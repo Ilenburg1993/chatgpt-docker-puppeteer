@@ -55,7 +55,8 @@ ChatGPT
    - Fonte: `https://developers.openai.com/apps-sdk/guides/security-privacy`
 
 5. `Set up Cloudflare Tunnel`
-   - A pagina OpenAI de conexao cita Cloudflare Tunnel para expor um MCP local durante desenvolvimento.
+   - A pagina OpenAI de conexao cita Cloudflare Tunnel para expor um MCP local durante
+     desenvolvimento.
    - Cloudflare publica hostname HTTPS para service HTTP local por `cloudflared`.
    - Quick Tunnels geram `trycloudflare.com`, sao temporarios e nao suportam SSE.
    - Fonte: `https://developers.cloudflare.com/tunnel/setup/`
@@ -153,8 +154,8 @@ Cole no ChatGPT a URL publica temporaria com o path MCP:
 https://<aleatorio>.trycloudflare.com/mcp
 ```
 
-Nao teremos dominio fixo por ora. Isso e intencional: cada sessao gera uma URL nova e o conector no ChatGPT deve ser
-atualizado/recriado com essa URL.
+Nao teremos dominio fixo por ora. Isso e intencional: cada sessao gera uma URL nova e o conector no
+ChatGPT deve ser atualizado/recriado com essa URL.
 
 ### 5.2 Cloudflare Quick Tunnel
 
@@ -176,12 +177,13 @@ npm run copilot:mcp:cloudflare:status
 npm run copilot:mcp:cloudflare:smoke
 ```
 
-Cloudflare documenta Quick Tunnels como teste/desenvolvimento, com URL temporaria, limite de concorrencia e sem suporte a
-SSE. Esses limites sao aceitos neste projeto por enquanto.
+Cloudflare documenta Quick Tunnels como teste/desenvolvimento, com URL temporaria, limite de
+concorrencia e sem suporte a SSE. Esses limites sao aceitos neste projeto por enquanto.
 
 ### 5.3 Cloudflare Tunnel publicado futuro opcional
 
-Nao usaremos dominio fixo por ora. Esta subfase fica apenas como referencia futura se a natureza do projeto mudar.
+Nao usaremos dominio fixo por ora. Esta subfase fica apenas como referencia futura se a natureza do
+projeto mudar.
 
 Para uma URL estavel futura:
 
@@ -216,8 +218,8 @@ Retorna:
 4. Autenticacao `none-dev`.
 5. Arquivo de estado local.
 
-Se o PID do `cloudflared` salvo no estado ja tiver encerrado, `status` retorna `ok=false`; a URL antiga deve ser tratada
-como expirada.
+Se o PID do `cloudflared` salvo no estado ja tiver encerrado, `status` retorna `ok=false`; a URL
+antiga deve ser tratada como expirada.
 
 Smoke:
 
@@ -230,6 +232,32 @@ Valida:
 1. `GET https://<aleatorio>.trycloudflare.com/health`.
 2. `POST https://<aleatorio>.trycloudflare.com/mcp` com `tools/list`.
 3. Quantidade de tools retornadas.
+4. Paridade exata entre `tools/list` remoto e `getCanonicalMcpTools()`.
+5. Presenca das tools criticas de leitura, validacao, runtime, smoke e indice.
+
+Se `toolsMatchLocalRegistry=false`, a URL nao deve ser usada como conector operacional. O caso mais
+comum durante desenvolvimento e simples: o `cloudflared` continua vivo, mas o origin local
+`127.0.0.1:3333` ainda esta rodando uma versao antiga do MCP. Nesse caso:
+
+1. Reinicie somente o origin MCP em `3333`.
+2. Mantenha o processo `cloudflared` vivo quando possivel, para preservar a mesma URL temporaria.
+3. Rode `npm run copilot:mcp:smoke:local` contra `http://127.0.0.1:3333/mcp`.
+4. Rode `npm run copilot:mcp:cloudflare:smoke`.
+5. Use a URL no ChatGPT somente quando `toolsMatchLocalRegistry=true`, `criticalToolsPresent=true`,
+   `missingLocalTools=[]` e `unexpectedRemoteTools=[]`.
+
+Estado validado em 2026-05-22 apos a rodada de paridade IO/indice:
+
+```text
+URL publica: https://hull-grove-hence-departmental.trycloudflare.com/mcp
+Origin: http://127.0.0.1:3333/mcp
+Tools remotas: 43
+Tools esperadas: 43
+toolsMatchLocalRegistry: true
+criticalToolsPresent: true
+missingLocalTools: []
+unexpectedRemoteTools: []
+```
 
 ### 5.5 Instalacao do cloudflared
 
@@ -239,11 +267,12 @@ Instalador desta rodada:
 npm run copilot:mcp:cloudflare:install
 ```
 
-Ele baixa o `.deb` oficial correspondente a arquitetura Debian e usa `dpkg -i` com `sudo -n` quando necessario.
-O rebuild do Dev Container tambem instala a versao pinada definida em `.devcontainer/Dockerfile`.
+Ele baixa o `.deb` oficial correspondente a arquitetura Debian e usa `dpkg -i` com `sudo -n` quando
+necessario. O rebuild do Dev Container tambem instala a versao pinada definida em
+`.devcontainer/Dockerfile`.
 
-O wrapper usa `http2` como transporte Cloudflare por default porque a saida UDP/QUIC pode falhar em Dev Containers.
-Para testar outro protocolo oficial:
+O wrapper usa `http2` como transporte Cloudflare por default porque a saida UDP/QUIC pode falhar em
+Dev Containers. Para testar outro protocolo oficial:
 
 ```bash
 COPILOT_MCP_CLOUDFLARE_PROTOCOL=auto npm run copilot:mcp:cloudflare:quick
@@ -331,8 +360,8 @@ export CONTROL_PLANE_API_KEY="sk-..."
 
 tunnel-client init \
   --profile repo-devcontainer-http \
-  --tunnel-id tunnel_<preencher> \
-  --mcp-server-url http://127.0.0.1:3333/mcp
+  --tunnel-id tunnel_ \
+  http://127.0.0.1:3333/mcp < preencher > --mcp-server-url
 
 tunnel-client doctor --profile repo-devcontainer-http --explain
 tunnel-client run --profile repo-devcontainer-http
@@ -352,8 +381,8 @@ export CONTROL_PLANE_API_KEY="sk-..."
 tunnel-client init \
   --sample sample_mcp_stdio_local \
   --profile repo-devcontainer-stdio \
-  --tunnel-id tunnel_<preencher> \
-  --mcp-command "node src/copilot/mcp/index.js --transport stdio"
+  --tunnel-id tunnel_ \
+  "node src/copilot/mcp/index.js --transport stdio" < preencher > --mcp-command
 
 tunnel-client doctor --profile repo-devcontainer-stdio --explain
 tunnel-client run --profile repo-devcontainer-stdio
@@ -396,23 +425,28 @@ http://localhost:3333/mcp
 http://127.0.0.1:3333/mcp
 ```
 
-Essas URLs só funcionam localmente. ChatGPT precisa de HTTPS alcançável por ele, por exemplo Cloudflare Quick Tunnel
-temporario ou endpoint OpenAI do Secure MCP Tunnel.
+Essas URLs só funcionam localmente. ChatGPT precisa de HTTPS alcançável por ele, por exemplo
+Cloudflare Quick Tunnel temporario ou endpoint OpenAI do Secure MCP Tunnel.
 
 ### Autenticação
 
 Para Cloudflare Tunnel:
 
 1. O MCP server atual nao implementa OAuth proprio.
-2. Se o formulario oferecer modo sem autenticacao em developer mode, use-o apenas no ambiente controlado.
-3. Se voce selecionar OAuth, a URL `/mcp` precisa ter fluxo OAuth compativel; Cloudflare Tunnel simples nao o fornece.
-4. Uma pagina de login interativa Cloudflare Access diante de `/mcp` pode bloquear o backend do ChatGPT.
-5. O perfil JSON usa `authMode=none-dev` por default e aceita override `COPILOT_MCP_CHATGPT_AUTH_MODE`.
+2. Se o formulario oferecer modo sem autenticacao em developer mode, use-o apenas no ambiente
+   controlado.
+3. Se voce selecionar OAuth, a URL `/mcp` precisa ter fluxo OAuth compativel; Cloudflare Tunnel
+   simples nao o fornece.
+4. Uma pagina de login interativa Cloudflare Access diante de `/mcp` pode bloquear o backend do
+   ChatGPT.
+5. O perfil JSON usa `authMode=none-dev` por default e aceita override
+   `COPILOT_MCP_CHATGPT_AUTH_MODE`.
 
 Para Secure MCP Tunnel:
 
 1. Use a opcao compativel com o tunnel configurado.
-2. Para uso persistente fora do ambiente controlado, prefira OAuth 2.1 ou autenticacao compativel com a infraestrutura.
+2. Para uso persistente fora do ambiente controlado, prefira OAuth 2.1 ou autenticacao compativel
+   com a infraestrutura.
 
 ### Confirmação de risco
 
@@ -420,8 +454,8 @@ Marque a confirmação apenas depois de:
 
 1. `tools/list` local funcionar.
 2. `repo_status` local funcionar.
-3. `npm run copilot:mcp:cloudflare:smoke` passar para Cloudflare temporario ou `tunnel-client doctor` passar para Secure
-   MCP Tunnel.
+3. `npm run copilot:mcp:cloudflare:smoke` passar para Cloudflare temporario ou
+   `tunnel-client doctor` passar para Secure MCP Tunnel.
 4. Você entender que as tools podem operar o repo real.
 
 ---
@@ -572,7 +606,8 @@ Uso recomendado:
 7. Usar `confirmOverwrite=true` somente quando `repo_move_file` receber `overwrite=true`.
 8. Usar `repo_remove_file` somente com `confirm=true`.
 
-As tools de escrita gravam eventos de auditoria em JSONL, mas não persistem o conteúdo editado dentro do log de auditoria.
+As tools de escrita gravam eventos de auditoria em JSONL, mas não persistem o conteúdo editado
+dentro do log de auditoria.
 
 ---
 
@@ -749,26 +784,31 @@ Essas falhas ja apareciam antes da Faixa I e nao pertencem aos arquivos novos de
 
 1. `npm run typecheck:strict:src.copilot` passou.
 2. `npm run lint:copilot` passou.
-3. `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache` passou.
-4. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 6 arquivos, 20 testes.
-5. `npm run test:copilot:unit` ainda falha nas mesmas 6 areas preexistentes fora do MCP; nesta rodada foram 3019
-   testes totais e 3013 passaram.
+3. `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache`
+   passou.
+4. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 6
+   arquivos, 20 testes.
+5. `npm run test:copilot:unit` ainda falha nas mesmas 6 areas preexistentes fora do MCP; nesta
+   rodada foram 3019 testes totais e 3013 passaram.
 
 ### Validacao adicional apos Cloudflare Tunnel
 
 1. `cloudflared` foi instalado no ambiente atual e reportou `2026.5.0`.
-2. `npm run copilot:mcp:cloudflare:doctor` passou com origin local vivo e URL publica HTTPS normalizada.
+2. `npm run copilot:mcp:cloudflare:doctor` passou com origin local vivo e URL publica HTTPS
+   normalizada.
 3. `npm run copilot:mcp:cloudflare:run` sem token falhou de modo explicito e sem imprimir segredo.
-4. Quick Tunnel em `auto` tentou QUIC e falhou neste Dev Container; o wrapper passou a usar `http2` por default.
+4. Quick Tunnel em `auto` tentou QUIC e falhou neste Dev Container; o wrapper passou a usar `http2`
+   por default.
 5. Quick Tunnel em HTTP/2 passou para:
    - `GET /health` remoto com HTTP 200;
    - `POST /mcp` remoto com `tools/list`;
    - contagem remota de 26 tools.
-6. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com 10 arquivos e 34
-   testes.
+6. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com 10
+   arquivos e 34 testes.
 7. `npm run typecheck:strict:src.copilot` passou.
 8. `npm run lint:copilot` passou.
-9. `npm run test:copilot:unit` repetiu as 6 falhas preexistentes fora do MCP: 3033 testes totais, 3027 passaram.
+9. `npm run test:copilot:unit` repetiu as 6 falhas preexistentes fora do MCP: 3033 testes totais,
+   3027 passaram.
 
 ### Validacao adicional apos promocao do dominio temporario
 
@@ -776,7 +816,8 @@ Essas falhas ja apareciam antes da Faixa I e nao pertencem aos arquivos novos de
 2. O CLI captura a URL `trycloudflare.com` automaticamente.
 3. O arquivo runtime `src/copilot/.ai/cloudflare/quick-tunnel.json` guarda a URL da sessao.
 4. `npm run copilot:mcp:cloudflare:status` mostra os dados da caixa do ChatGPT.
-5. `npm run copilot:mcp:cloudflare:smoke` valida `GET /health` e `POST /mcp tools/list` na URL temporaria.
+5. `npm run copilot:mcp:cloudflare:smoke` valida `GET /health` e `POST /mcp tools/list` na URL
+   temporaria.
 6. Smoke real desta rodada:
    - URL capturada: `https://sen-recall-handbook-tim.trycloudflare.com/mcp`;
    - `status` retornou `authentication=none-dev`;
@@ -785,10 +826,10 @@ Essas falhas ja apareciam antes da Faixa I e nao pertencem aos arquivos novos de
 7. Validacao focada apos a mudanca:
    - `npm run typecheck:strict:src.copilot` passou;
    - `npm run lint:copilot` passou;
-   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com 10 arquivos e 36
-     testes.
-8. `npm run test:copilot:unit` executou 3035 testes, 3029 passaram e as 6 falhas preexistentes fora do MCP/Cloudflare
-   permaneceram nas suites de contratos/config.
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com
+     10 arquivos e 36 testes.
+8. `npm run test:copilot:unit` executou 3035 testes, 3029 passaram e as 6 falhas preexistentes fora
+   do MCP/Cloudflare permaneceram nas suites de contratos/config.
 
 ### Validacao adicional apos primeiro uso real no ChatGPT
 
@@ -801,16 +842,17 @@ Feedback aplicado:
 5. `mcp_capabilities_summary` resume a superfície por categoria.
 6. `mcp_tunnel_status` expõe estado, idade, URL e recovery do Quick Tunnel temporário.
 7. `mcp_runtime_health` inclui o resumo de tunnel.
-8. Os smoke prompts do `chatgpt_connector_profile` foram ampliados para cobrir IO, busca, validação, jobs, métricas e
-   túnel.
+8. Os smoke prompts do `chatgpt_connector_profile` foram ampliados para cobrir IO, busca, validação,
+   jobs, métricas e túnel.
 
 Validação focada:
 
 1. `npm run typecheck:strict:src.copilot` passou.
 2. `npm run lint:copilot` passou.
-3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com 10 arquivos e 39 testes.
-4. `npm run test:copilot:unit` executou 3038 testes, 3032 passaram e as 6 falhas preexistentes fora do MCP
-   permaneceram nas suites de contratos/config.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com 10
+   arquivos e 39 testes.
+4. `npm run test:copilot:unit` executou 3038 testes, 3032 passaram e as 6 falhas preexistentes fora
+   do MCP permaneceram nas suites de contratos/config.
 5. Smoke HTTP local passou para as novas surfaces:
    - `repo_tree path=""`;
    - `repo_root_tree`;
