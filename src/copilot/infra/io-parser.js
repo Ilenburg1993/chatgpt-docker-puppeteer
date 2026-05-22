@@ -129,6 +129,7 @@ const _workerInFlight = new Map();
 
 let _workerPoolInitialized = false;
 let _workerPoolDisabledByError = false;
+let _workerPoolShuttingDown = false;
 
 function ensureInvalidationHook() {
     if (_parserInvalidationUnregister) return;
@@ -305,6 +306,7 @@ function createWorkerSlot(index) {
     });
 
     worker.on('error', () => {
+        if (_workerPoolShuttingDown) return;
         _parserRuntimeStats.workerFailures += 1;
         if (slot.currentTaskId !== null) {
             const inFlight = _workerInFlight.get(slot.currentTaskId);
@@ -319,6 +321,7 @@ function createWorkerSlot(index) {
 
     worker.on('exit', (code) => {
         if (code === 0) return;
+        if (_workerPoolShuttingDown) return;
         _parserRuntimeStats.workerFailures += 1;
         if (slot.currentTaskId !== null) {
             const inFlight = _workerInFlight.get(slot.currentTaskId);
@@ -409,6 +412,7 @@ async function parseSymbolsInWorker(payload) {
 }
 
 async function teardownWorkerPoolForTest() {
+    _workerPoolShuttingDown = true;
     while (_workerQueue.length > 0) {
         const queued = _workerQueue.shift();
         queued?.reject(new Error('parser worker pool reset'));
@@ -424,6 +428,7 @@ async function teardownWorkerPoolForTest() {
     _workerPool.length = 0;
     _workerPoolInitialized = false;
     _workerPoolDisabledByError = false;
+    _workerPoolShuttingDown = false;
     _workerRequestSeq = 0;
 }
 
@@ -780,6 +785,7 @@ export async function parseFileForContext(filePath, content) {
  *     workerRequestTimeoutMs: number;
  *     workerPoolInitialized: boolean;
  *     workerPoolDisabledByError: boolean;
+ *     workerPoolShuttingDown: boolean;
  *     budgetExceeded: number;
  *     skippedByLineGuard: number;
  *     lastParseDurationMs: number;
@@ -800,6 +806,7 @@ export function getParserCacheStats() {
         workerRequestTimeoutMs: PARSER_WORKER_REQUEST_TIMEOUT_MS,
         workerPoolInitialized: _workerPoolInitialized,
         workerPoolDisabledByError: _workerPoolDisabledByError,
+        workerPoolShuttingDown: _workerPoolShuttingDown,
         budgetExceeded: _parserRuntimeStats.budgetExceeded,
         skippedByLineGuard: _parserRuntimeStats.skippedByLineGuard,
         lastParseDurationMs: _parserRuntimeStats.lastParseDurationMs,

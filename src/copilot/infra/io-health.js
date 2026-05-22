@@ -158,6 +158,7 @@ export function readIoRuntimeHealthSnapshot() {
             workerRequestTimeoutMs: 0,
             workerPoolInitialized: false,
             workerPoolDisabledByError: false,
+            workerPoolShuttingDown: false,
             budgetExceeded: 0,
             skippedByLineGuard: 0,
             lastParseDurationMs: 0,
