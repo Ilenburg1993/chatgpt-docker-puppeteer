@@ -315,3 +315,28 @@ Quarta fatia concluida:
 - Evidencia live no-PR: `artifacts/terminal-live/2026-05-22T00-52-07-706Z/summary.md` (PASS; criterios
   `sdk-session-command-catalog-visible`, `sdk-session-events-cockpit-visible` e
   `sdk-session-waits-cockpit-visible` verdes).
+
+Quinta fatia concluida - Faixa F:
+
+- Investigacao SDK local 0.3.0 confirmou que `SessionFsConfig` e `createSessionFsHandler` existem, mas
+  `session.updateMetadata` continua ausente. A correcao, portanto, nao tenta escrever metadata no SDK; ela persiste
+  metadata local redigida no estado do agent.
+- `src/copilot/sdk/session/session-fs.js` agora expoe `describeConfiguredSessionFs()` e
+  `readConfiguredSessionFsState()`, reaproveitando a configuracao canonica de boot e retornando paths seguros
+  (`workspace:<relativo>` ou `external:<basename>`) com estado `exists/missing/unknown`.
+- `src/copilot/agent/session/initializers/initializer.js` persiste `sdkSessionLocalMetadata` por `sessionId`, contendo
+  modelo, reasoning, provider redigido e boundary/decisao de boot. O mapa e limitado para evitar crescimento indefinido.
+- `src/copilot/presentation/runtime/sdk-session.js` enriquece o inventario de sessoes com `sessionFs` e metadata local,
+  sem depender de API SDK inexistente e enriquecendo com I/O apenas a janela solicitada pelo terminal.
+- `/session sdk` agora mostra Session FS, metadata local provider/modelo/boundary, filtros `cwd`, `gitRoot`, `repo`/
+  `repository`, `branch`, e paginacao `offset=<n>`/`limit` numerico.
+- A exclusao continua protegendo a sessao SDK viva; os novos metadados sao somente diagnosticos/operacionais e nao
+  reabrem caminho paralelo de delete ou resume.
+- Testes focados: `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/sdk/test_sdk_session_fs.spec.js
+  tests/unit/copilot/terminal/test_commands_session.spec.js`.
+- Validadores executados nesta fatia: `npm run typecheck:strict:src.copilot` PASS; `npm run lint:copilot` PASS;
+  testes focados PASS.
+- `npm run test:copilot` completo foi executado e falhou em achados globais ja fora da Faixa F imediata. Uma violacao
+  introduzida durante a fatia (`presentation/runtime/sdk-session.js` importando `#copilot/sdk/session`) foi corrigida,
+  movendo o acesso a SessionFs para a facade do agent. O rerun focado de soberania deixou apenas o achado preexistente
+  de `hooks/session-hooks.js`.

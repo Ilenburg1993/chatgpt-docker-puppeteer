@@ -323,8 +323,10 @@ export {
     buildConfiguredClientSessionFsConfig,
     createLocalSessionFsProvider,
     createWorkspaceSessionFsHandler,
+    describeConfiguredSessionFs,
     getConfiguredSessionFsHandler,
     getConfiguredSessionIdleTimeoutSeconds,
+    readConfiguredSessionFsState,
 } from './session/session-fs.js';
 
 // ─── Faixa 7: RPC Core Subsystems (rev.4) ────────────────────────────────────

@@ -10,8 +10,10 @@ import {
     buildConfiguredClientSessionFsConfig,
     createLocalSessionFsProvider,
     createWorkspaceSessionFsHandler,
+    describeConfiguredSessionFs,
     getConfiguredSessionFsHandler,
     getConfiguredSessionIdleTimeoutSeconds,
+    readConfiguredSessionFsState,
 } from '../../../../src/copilot/sdk/session/session-fs.js';
 import { setSdkMetricEmitter } from '../../../../src/copilot/sdk/telemetry/operation-metrics.js';
 
@@ -199,6 +201,30 @@ describe('sdk/session-fs', () => {
         });
         expect(getConfiguredSessionIdleTimeoutSeconds()).toBe(900);
         expect(typeof getConfiguredSessionFsHandler()).toBe('function');
+    });
+
+    it('describeConfiguredSessionFs e readConfiguredSessionFsState expõem paths seguros e estado por sessão', async () => {
+        const storageRootDir = await createTempDir();
+        process.env.COPILOT_SDK_SESSION_FS_ENABLED = 'true';
+        process.env.COPILOT_SDK_SESSION_FS_ROOT = storageRootDir;
+
+        const descriptor = describeConfiguredSessionFs('sess-A');
+        expect(descriptor.enabled).toBe(true);
+        expect(descriptor.storageRoot.display).toBe(`external:${storageRootDir.split('/').pop()}`);
+        expect(descriptor.storageRoot.withinWorkspace).toBe(false);
+        expect(descriptor.session?.key).toBe('sess-A');
+        expect(descriptor.session?.display).toBe('external:sess-A');
+
+        const stateBefore = await readConfiguredSessionFsState('sess-A');
+        expect(stateBefore.storageRoot.exists).toBe(true);
+        expect(stateBefore.session?.exists).toBe(false);
+
+        const handler = createWorkspaceSessionFsHandler({ storageRootDir });
+        const provider = handler(/** @type {any} */ ({ sessionId: 'sess-A' }));
+        await provider.writeFile('state.txt', 'ok');
+
+        const stateAfter = await readConfiguredSessionFsState('sess-A');
+        expect(stateAfter.session?.exists).toBe(true);
     });
 
     it('não expõe config quando SessionFs está desabilitado', () => {

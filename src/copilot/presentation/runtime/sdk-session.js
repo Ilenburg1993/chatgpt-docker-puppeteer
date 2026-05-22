@@ -20,6 +20,7 @@
 import {
     deleteAgentSdkPlan as deleteAgentSdkPlanOnAgent,
     persistAgentRuntimeStatePartial,
+    readAgentConfiguredSessionFsState,
     readAgentSdkPlan as readAgentSdkPlanFromAgent,
     readAgentSdkSessionMode,
     readAgentRuntimePersistedStateAsync,
@@ -84,6 +85,42 @@ export function resolveAgentSdkActiveSessionEntry(runtimeId, sessionId) {
         createdAt: Date.now(),
         messagesCount: 0,
     };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, Record<string, unknown>>}
+ */
+function readSdkSessionLocalMetadataMap(value) {
+    if (!value || typeof value !== 'object') return {};
+    /** @type {Record<string, Record<string, unknown>>} */
+    const out = {};
+    for (const [sessionId, metadata] of Object.entries(/** @type {Record<string, unknown>} */ (value))) {
+        if (typeof sessionId !== 'string' || !metadata || typeof metadata !== 'object') continue;
+        out[sessionId] = { .../** @type {Record<string, unknown>} */ (metadata) };
+    }
+    return out;
+}
+
+/**
+ * @param {Record<string, unknown> | null} state
+ * @param {string | null} currentSessionId
+ * @param {Record<string, unknown> | null} persistedByokBinding
+ * @param {Record<string, unknown> | null} lastBootDecision
+ * @returns {Record<string, Record<string, unknown>>}
+ */
+function buildRuntimeSdkSessionLocalMetadata(state, currentSessionId, persistedByokBinding, lastBootDecision) {
+    const map = readSdkSessionLocalMetadataMap(state ? Reflect.get(state, 'sdkSessionLocalMetadata') : null);
+    if (currentSessionId && !map[currentSessionId]) {
+        map[currentSessionId] = {
+            sessionId: currentSessionId,
+            updatedAt: Date.now(),
+            ...(typeof state?.['model'] === 'string' ? { model: state['model'] } : {}),
+            ...(persistedByokBinding ? { provider: { kind: 'byok', ...persistedByokBinding } } : {}),
+            ...(lastBootDecision ? { boundary: { ...lastBootDecision } } : {}),
+        };
+    }
+    return map;
 }
 
 /**
@@ -252,16 +289,21 @@ export async function setAgentSdkSessionMode(mode, runtimeId) {
  *
  * @param {string | null | undefined} [runtimeId]
  * @param {import('#copilot/sdk/types').SessionListFilter} [filter]
+ * @param {{ enrichOffset?: number; enrichLimit?: number }} [options]
  * @returns {Promise<{
  *     currentSessionId: string | null;
  *     lastSessionId: string | null;
  *     foregroundSessionId: string | null;
  *     persistedByokBinding: Record<string, unknown> | null;
  *     lastBootDecision: Record<string, unknown> | null;
- *     sessions: import('#copilot/sdk/types').SessionMetadata[];
+ *     sessionFs: Awaited<ReturnType<typeof readAgentConfiguredSessionFsState>>;
+ *     sessions: Array<import('#copilot/sdk/types').SessionMetadata & {
+ *         localMetadata?: Record<string, unknown> | null;
+ *         sessionFs?: Awaited<ReturnType<typeof readAgentConfiguredSessionFsState>>;
+ *     }>;
  * }>}
  */
-export async function listAgentSdkSessionInventory(runtimeId, filter) {
+export async function listAgentSdkSessionInventory(runtimeId, filter, options = {}) {
     const agent = getAgentSdkSessionTarget(runtimeId);
     const snap = readAgentStatusSnapshot(agent);
     const [lastSessionId, foregroundSessionId, sessions, state] = await Promise.all([
@@ -278,13 +320,45 @@ export async function listAgentSdkSessionInventory(runtimeId, filter) {
         state?.sdkSessionBootDecision && typeof state.sdkSessionBootDecision === 'object'
             ? /** @type {Record<string, unknown>} */ (state.sdkSessionBootDecision)
             : null;
+    const currentSessionId = typeof snap['sessionId'] === 'string' ? snap['sessionId'] : null;
+    const localMetadata = buildRuntimeSdkSessionLocalMetadata(
+        state && typeof state === 'object' ? /** @type {Record<string, unknown>} */ (state) : null,
+        currentSessionId,
+        persistedByokBinding,
+        lastBootDecision,
+    );
+    const sessionFs = await readAgentConfiguredSessionFsState(currentSessionId);
+    const enrichOffset =
+        typeof options.enrichOffset === 'number' && Number.isFinite(options.enrichOffset)
+            ? Math.max(0, Math.trunc(options.enrichOffset))
+            : 0;
+    const enrichLimit =
+        typeof options.enrichLimit === 'number' && Number.isFinite(options.enrichLimit)
+            ? Math.max(1, Math.min(100, Math.trunc(options.enrichLimit)))
+            : 25;
+    const enrichedSessions = await Promise.all(
+        sessions.map(async (session, index) => {
+            const base = {
+                ...session,
+                localMetadata: localMetadata[session.sessionId] ?? null,
+            };
+            if (session.sessionId !== currentSessionId && (index < enrichOffset || index >= enrichOffset + enrichLimit)) {
+                return base;
+            }
+            return {
+                ...base,
+                sessionFs: await readAgentConfiguredSessionFsState(session.sessionId),
+            };
+        }),
+    );
     return {
-        currentSessionId: typeof snap['sessionId'] === 'string' ? snap['sessionId'] : null,
+        currentSessionId,
         lastSessionId: typeof lastSessionId === 'string' ? lastSessionId : null,
         foregroundSessionId: typeof foregroundSessionId === 'string' ? foregroundSessionId : null,
         persistedByokBinding,
         lastBootDecision,
-        sessions,
+        sessionFs,
+        sessions: enrichedSessions,
     };
 }
 

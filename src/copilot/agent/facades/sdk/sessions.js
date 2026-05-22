@@ -12,6 +12,7 @@ import {
     createSession,
     deleteSession,
     getConfiguredSessionFsHandler,
+    readConfiguredSessionFsState,
     listSessions,
     resumeOrCreate,
 } from '#copilot/sdk/session';
@@ -88,6 +89,14 @@ export async function createAgentSdkSessionByClient(client, options) {
  */
 export function getAgentConfiguredSessionFsHandler() {
     return getConfiguredSessionFsHandler();
+}
+
+/**
+ * @param {string | null | undefined} [sessionId]
+ * @returns {ReturnType<typeof readConfiguredSessionFsState>}
+ */
+export function readAgentConfiguredSessionFsState(sessionId) {
+    return readConfiguredSessionFsState(sessionId);
 }
 
 /**

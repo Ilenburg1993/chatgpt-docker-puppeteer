@@ -721,6 +721,63 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).not.toContain('delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta');
     });
 
+    it('cmdSessionSdk pagina, filtra e mostra metadata local/session fs segura', async () => {
+        listTerminalSdkSessionInventory.mockResolvedValueOnce({
+            currentSessionId: 'sdk-current',
+            lastSessionId: 'sdk-last',
+            foregroundSessionId: null,
+            sessionFs: {
+                enabled: true,
+                sessionStatePath: '.copilot/session-state',
+                storageRoot: { display: 'workspace:.copilot/sdk-session-fs', exists: true },
+                session: { display: 'workspace:.copilot/sdk-session-fs/sdk-current', exists: true },
+            },
+            sessions: [
+                {
+                    sessionId: 'sdk-first',
+                    startTime: new Date('2026-05-21T00:00:00.000Z'),
+                    modifiedTime: new Date('2026-05-21T00:01:00.000Z'),
+                    summary: 'primeira',
+                    isRemote: false,
+                },
+                {
+                    sessionId: 'sdk-current',
+                    startTime: new Date('2026-05-21T00:02:00.000Z'),
+                    modifiedTime: new Date('2026-05-21T00:03:00.000Z'),
+                    summary: 'atual',
+                    isRemote: false,
+                    localMetadata: {
+                        model: 'kilo-auto/free',
+                        provider: { kind: 'byok', model: 'kilo-auto/free' },
+                        boundary: { reason: 'provider-boundary: binding BYOK model mudou' },
+                    },
+                    sessionFs: {
+                        enabled: true,
+                        sessionStatePath: '.copilot/session-state',
+                        storageRoot: { display: 'workspace:.copilot/sdk-session-fs', exists: true },
+                        session: { display: 'workspace:.copilot/sdk-session-fs/sdk-current', exists: true },
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+        await cmdSessionSdk({ println: ctx.println }, '1 offset=1 branch=main repo=owner/repo');
+        expect(listTerminalSdkSessionInventory).toHaveBeenCalledWith(null, {
+            branch: 'main',
+            repository: 'owner/repo',
+        }, {
+            enrichLimit: 1,
+            enrichOffset: 1,
+        });
+        expect(ctx.output()).toContain('filtro=branch=main');
+        expect(ctx.output()).toContain('offset=1');
+        expect(ctx.output()).toContain('session fs:');
+        expect(ctx.output()).toContain('workspace:.copilot/sdk-session-fs');
+        expect(ctx.output()).toContain('metadata local: model=kilo-auto/free');
+        expect(ctx.output()).toContain('boundary=provider-boundary');
+        expect(ctx.output()).not.toContain('sdk-first');
+    });
+
     it('cmdSessionSdk agenda uma sessão nova para o próximo boot', async () => {
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, 'next new');

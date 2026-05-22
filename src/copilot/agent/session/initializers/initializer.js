@@ -401,6 +401,67 @@ function buildSdkSessionBootDecision(requestedMode, resumeCandidateSessionId, re
 }
 
 /**
+ * @param {unknown} value
+ * @returns {Record<string, Record<string, unknown>>}
+ */
+function readSdkSessionLocalMetadataMap(value) {
+    if (!value || typeof value !== 'object') return {};
+    /** @type {Record<string, Record<string, unknown>>} */
+    const out = {};
+    for (const [sessionId, metadata] of Object.entries(/** @type {Record<string, unknown>} */ (value))) {
+        if (!/^[a-zA-Z0-9_-]{8,128}$/u.test(sessionId)) continue;
+        if (!metadata || typeof metadata !== 'object') continue;
+        out[sessionId] = { .../** @type {Record<string, unknown>} */ (metadata) };
+    }
+    return out;
+}
+
+/**
+ * @param {import('../../lifecycle/state/index.js').AliveAgentState | null} state
+ * @param {string} sessionId
+ * @param {{
+ *     model: string;
+ *     reasoningEffort: 'low' | 'medium' | 'high' | 'xhigh' | undefined;
+ *     byokSessionBinding: ByokSessionBinding | null;
+ *     bootDecision: ReturnType<typeof buildSdkSessionBootDecision>;
+ * }} input
+ * @returns {Record<string, Record<string, unknown>>}
+ */
+function buildSdkSessionLocalMetadataMap(state, sessionId, input) {
+    const map = readSdkSessionLocalMetadataMap(state ? Reflect.get(state, 'sdkSessionLocalMetadata') : null);
+    map[sessionId] = {
+        sessionId,
+        updatedAt: Date.now(),
+        model: input.model,
+        reasoningEffort: input.reasoningEffort ?? null,
+        provider: input.byokSessionBinding
+            ? {
+                  kind: 'byok',
+                  profile: input.byokSessionBinding.profile,
+                  preset: input.byokSessionBinding.preset,
+                  providerType: input.byokSessionBinding.providerType,
+                  model: input.byokSessionBinding.model,
+              }
+            : {
+                  kind: 'github-copilot',
+                  model: input.model,
+              },
+        boundary: {
+            outcome: input.bootDecision.outcome,
+            requestedMode: input.bootDecision.requestedMode,
+            reason: input.bootDecision.reason,
+            resumeCandidateSessionId: input.bootDecision.resumeCandidateSessionId,
+            decidedAt: input.bootDecision.decidedAt,
+        },
+    };
+    return Object.fromEntries(
+        Object.entries(map)
+            .sort(([, a], [, b]) => Number(b['updatedAt'] ?? 0) - Number(a['updatedAt'] ?? 0))
+            .slice(0, 50),
+    );
+}
+
+/**
  * Inicializa ou retoma uma sessão Copilot SDK de forma persistente.
  *
  * Fluxo:
@@ -580,6 +641,7 @@ export async function initOrResumeSession(client, sessionOptions) {
         sdkSessionBootReason,
         result,
     );
+    const byokSessionBinding = buildByokSessionBinding(byok, model);
     if (byok.enabled && byok.provider) {
         Reflect.set(result.session, '__copilotByokEnabled', true);
         Reflect.set(result.session, '__copilotByokProvider', byok.provider);
@@ -619,6 +681,12 @@ export async function initOrResumeSession(client, sessionOptions) {
         byok.enabled && byok.supportsReasoning === false
             ? undefined
             : (result.reasoningEffort ?? sdkReasoningEffort ?? persistedReasoningEffort);
+    const sdkSessionLocalMetadata = buildSdkSessionLocalMetadataMap(state, result.session.sessionId, {
+        model: effectiveModel,
+        reasoningEffort: effectiveReasoningEffort,
+        byokSessionBinding,
+        bootDecision: sdkSessionBootDecision,
+    });
 
     // SYNC-SM-01 (fix): usar writeStateAsync nas chamadas dentro de funções async para não bloquear o event loop
     if (result.isResumed) {
@@ -629,8 +697,9 @@ export async function initOrResumeSession(client, sessionOptions) {
                 model: effectiveModel,
                 systemPromptBinding: buildSystemPromptBindingSnapshot(systemPromptStatus, result.session.sessionId),
                 reasoningEffort: effectiveReasoningEffort,
-                byokSessionBinding: buildByokSessionBinding(byok, model),
+                byokSessionBinding,
                 sdkSessionBootDecision,
+                sdkSessionLocalMetadata,
                 dialogPaused: false,
                 pendingTurnMessage: null,
                 pendingTurnTs: null,
@@ -654,8 +723,9 @@ export async function initOrResumeSession(client, sessionOptions) {
                 model: effectiveModel,
                 systemPromptBinding: buildSystemPromptBindingSnapshot(systemPromptStatus, result.session.sessionId),
                 reasoningEffort: effectiveReasoningEffort,
-                byokSessionBinding: buildByokSessionBinding(byok, model),
+                byokSessionBinding,
                 sdkSessionBootDecision,
+                sdkSessionLocalMetadata,
                 pendingQuestion: null,
                 pendingQuestionMeta: null,
                 nextSdkSessionBoot: null,
