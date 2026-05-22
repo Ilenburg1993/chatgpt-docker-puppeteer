@@ -269,7 +269,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         const prompt = buildUserPrompt();
 
         expect(prompt).toContain('[ASK]');
-        expect(prompt).toContain('[MM]');
+        expect(prompt).toContain('[MODEL?]');
         expect(prompt).toContain('[Q:3]');
         expect(prompt).not.toContain('[ASK:QUESTION]');
         expect(prompt).not.toContain('[MODEL-CHECK:gpt-5.4→claude-haiku-4.5]');
@@ -321,7 +321,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
             const plain = stripAnsiEscapes(prompt);
 
             expect(plain).toContain('[ASK]');
-            expect(plain).toContain('[MM]');
+            expect(plain).toContain('[MODEL?]');
             expect(plain).not.toContain('[MODEL-CHECK:gpt-5.4→claude-haiku-4.5]');
             expect(plain.length).toBeLessThanOrEqual(34);
         } finally {

@@ -9,7 +9,16 @@ const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv
         discoverConfiguredByokModelsFromEnv: vi.fn(),
         flushByokProviderHealth: vi.fn(() => Promise.resolve()),
         listByokProviderModelHealth: vi.fn(() => []),
-        listTerminalSdkSessionInventory: vi.fn(),
+        listTerminalSdkSessionInventory: vi.fn(() =>
+            Promise.resolve({
+                currentSessionId: null,
+                lastSessionId: null,
+                foregroundSessionId: null,
+                persistedByokBinding: null,
+                lastBootDecision: null,
+                sessions: [],
+            }),
+        ),
         loadDotenv: vi.fn(),
         probeTerminalConfiguredByokAgent: vi.fn(),
         probeTerminalConfiguredByokChat: vi.fn(),
@@ -200,9 +209,48 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('BYOK status');
         expect(ctx.output()).toContain('.env.local');
         expect(ctx.output()).toContain('bearer=');
+        expect(ctx.output()).toContain('prepared:');
+        expect(ctx.output()).toContain('live binding:');
         expect(ctx.output()).toContain('/session sdk next new');
         expect(ctx.output()).toContain('/restart reinicia só o dialog loop');
         expect(ctx.output()).not.toContain('secret');
+    });
+
+    it('distingue seleção BYOK preparada do provider vivo que ainda precisa de novo boot', async () => {
+        mockProjection({
+            summary: {
+                enabled: true,
+                ready: true,
+                profile: 'ollama-cloud',
+                preset: 'ollama-cloud',
+                providerType: 'openai',
+                baseUrl: 'https://ollama.com/v1',
+                model: 'qwen3-coder-next',
+            },
+        });
+        listTerminalSdkSessionInventory.mockResolvedValueOnce({
+            currentSessionId: 'sdk-kilo-live',
+            lastSessionId: 'sdk-kilo-live',
+            foregroundSessionId: 'sdk-kilo-live',
+            persistedByokBinding: {
+                enabled: true,
+                profile: 'kilo',
+                preset: 'kilo-code',
+                providerType: 'openai',
+                baseUrl: 'https://api.kilo.ai/api/gateway',
+                model: 'kilo-auto/free',
+            },
+            lastBootDecision: null,
+            sessions: [],
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'status');
+
+        expect(ctx.output()).toContain('BYOK profile=ollama-cloud');
+        expect(ctx.output()).toContain('BYOK profile=kilo');
+        expect(ctx.output()).toContain('cruzam provider/perfil');
+        expect(ctx.output()).toContain('/session sdk next new');
     });
 
     it('torna acionável o health falho da seleção BYOK ativa sem trocar modelo silenciosamente', async () => {

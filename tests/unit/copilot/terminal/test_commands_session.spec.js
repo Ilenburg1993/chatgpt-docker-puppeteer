@@ -757,6 +757,8 @@ describe('commands/session — async commands', () => {
         await cmdSessionSdk({ println: ctx.println }, '');
         expect(ctx.output()).toContain('provider bound');
         expect(ctx.output()).toContain('BYOK profile=groq-free');
+        expect(ctx.output()).toContain('BYOK prepared');
+        expect(ctx.output()).toContain('BYOK boundary');
         expect(ctx.output()).toContain('último boot');
         expect(ctx.output()).toContain('provider-boundary');
     });

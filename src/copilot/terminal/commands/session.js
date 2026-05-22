@@ -28,6 +28,7 @@ import {
     readTerminalStatusProjection,
     readTerminalTimelineProjection,
     readTerminalSdkSessionBootSelection,
+    readTerminalByokProjection,
     saveTerminalSnapshotProjection,
     scheduleTerminalSdkSessionBootSelection,
 } from '../frontend/index.js';
@@ -37,6 +38,10 @@ import {
     tryAnswerTerminalPendingQuestionInput,
 } from '../state/repl-runtime/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
+import {
+    classifyTerminalByokSdkBinding,
+    renderTerminalSdkProviderBinding,
+} from '../byok/session-binding.js';
 
 const DISABLED_BYOK_SUMMARY = Object.freeze({
     enabled: false,
@@ -854,20 +859,6 @@ function resolveSdkSessionResumeTarget(target, inventory) {
 }
 
 /**
- * @param {Record<string, unknown> | null | undefined} binding
- * @returns {string}
- */
-function renderSdkSessionProviderBinding(binding) {
-    if (!binding || binding['enabled'] !== true) return 'SDK Copilot';
-    const profile = typeof binding['profile'] === 'string' && binding['profile'] ? binding['profile'] : '-';
-    const preset = typeof binding['preset'] === 'string' && binding['preset'] ? binding['preset'] : '-';
-    const providerType =
-        typeof binding['providerType'] === 'string' && binding['providerType'] ? binding['providerType'] : '-';
-    const model = typeof binding['model'] === 'string' && binding['model'] ? binding['model'] : '-';
-    return `BYOK profile=${profile} · preset=${preset} · provider=${providerType} · model=${model}`;
-}
-
-/**
  * @param {Record<string, unknown> | null | undefined} decision
  * @returns {string | null}
  */
@@ -1031,7 +1022,17 @@ export async function cmdSessionSdk({ println }, arg = '') {
     println(`    last SDK:       \x1b[33m${inventory.lastSessionId ?? '-'}\x1b[0m`);
     println(`    foreground SDK: \x1b[33m${inventory.foregroundSessionId ?? '-'}\x1b[0m`);
     println(`    próximo boot:   \x1b[33m${nextLabel}\x1b[0m`);
-    println(`    provider bound: \x1b[33m${renderSdkSessionProviderBinding(inventory.persistedByokBinding)}\x1b[0m`);
+    const byokBinding = classifyTerminalByokSdkBinding(
+        readTerminalByokProjection().summary,
+        inventory.persistedByokBinding,
+        inventory.currentSessionId,
+    );
+    println(`    provider bound: \x1b[33m${renderTerminalSdkProviderBinding(inventory.persistedByokBinding)}\x1b[0m`);
+    println(`    BYOK prepared:  \x1b[33m${byokBinding.preparedLabel}\x1b[0m`);
+    println(`    BYOK boundary:  \x1b[90m${byokBinding.headline}\x1b[0m`);
+    if (byokBinding.action) {
+        println(`      \x1b[90m${byokBinding.action}\x1b[0m`);
+    }
     const bootDecision = renderSdkSessionBootDecision(inventory.lastBootDecision);
     if (bootDecision) {
         println(`    último boot:    \x1b[90m${bootDecision}\x1b[0m`);

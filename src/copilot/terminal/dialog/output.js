@@ -400,10 +400,10 @@ export function buildUserPrompt() {
             terminalThemeText(
                 'warn',
                 compactDetail
-                    ? '[MM]'
+                    ? '[MODEL?]'
                     : `[MODEL-CHECK:${modelProjection.configuredModel}→${modelProjection.observedModel}]`,
             ),
-            terminalThemeText('warn', '[MM]'),
+            terminalThemeText('warn', '[MODEL?]'),
         );
     }
     const prompt = `${terminalThemeText('success', 'você')}${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}${tags.join('')}${terminalThemeText('muted', '›')} `;

@@ -32,6 +32,10 @@ import {
     readByokProviderHealthState,
     readByokProviderModelHealth,
 } from '../state/byok-provider-health.js';
+import {
+    classifyTerminalByokSdkBinding,
+    isSameTerminalByokProviderBoundary,
+} from '../byok/session-binding.js';
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
 const DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT = 8;
@@ -106,29 +110,6 @@ function printByokSdkSessionBoundaryHint(println, options = {}) {
 }
 
 /**
- * @param {unknown} value
- * @returns {string | null}
- */
-function readByokBindingText(value) {
-    return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-/**
- * @param {ReturnType<typeof readTerminalByokProjection>['summary']} summary
- * @param {Record<string, unknown> | null | undefined} binding
- * @returns {boolean}
- */
-function isSameLiveByokProviderBoundary(summary, binding) {
-    if (!summary.enabled || !summary.ready || !binding || binding['enabled'] !== true) return false;
-    return (
-        readByokBindingText(binding['profile']) === summary.profile &&
-        readByokBindingText(binding['preset']) === summary.preset &&
-        readByokBindingText(binding['providerType']) === summary.providerType &&
-        readByokBindingText(binding['baseUrl']) === summary.baseUrl
-    );
-}
-
-/**
  * Troca modelo no runtime vivo apenas quando o handle SDK atual já nasceu com o mesmo provider BYOK.
  *
  * @param {ReturnType<typeof readTerminalByokProjection>['summary']} summary
@@ -149,7 +130,7 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
         );
         return;
     }
-    if (!inventory.currentSessionId || !isSameLiveByokProviderBoundary(summary, inventory.persistedByokBinding)) {
+    if (!inventory.currentSessionId || !isSameTerminalByokProviderBoundary(summary, inventory.persistedByokBinding)) {
         println(
             '  \x1b[33mSessão viva não está bound ao mesmo provider BYOK; modelo preparado para o próximo boot, sem setModel cruzando provider.\x1b[0m',
         );
@@ -1111,9 +1092,9 @@ function renderProfileAuth(profile) {
 /**
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
  * @param {(text: string) => void} println
- * @returns {void}
+ * @returns {Promise<void>}
  */
-function renderStatus(projection, println) {
+async function renderStatus(projection, println) {
     const { summary } = projection;
     println('\n  \x1b[36mBYOK status\x1b[0m');
     println(`    enabled:       ${yesNo(summary.enabled)}`);
@@ -1155,6 +1136,24 @@ function renderStatus(projection, println) {
         println(`    cost:          \x1b[33m${costTag.replace(/^ · /u, '')}\x1b[0m`);
     }
     println(`    modelList:     ${summary.modelList.count} modelo(s)`);
+    try {
+        const inventory = await listTerminalSdkSessionInventory();
+        const binding = classifyTerminalByokSdkBinding(
+            summary,
+            inventory.persistedByokBinding,
+            inventory.currentSessionId,
+        );
+        println(`    prepared:      \x1b[33m${binding.preparedLabel}\x1b[0m`);
+        println(
+            `    live binding:  \x1b[33m${inventory.currentSessionId ?? '(sem sessão viva)'}\x1b[0m \x1b[90m· ${binding.liveLabel}\x1b[0m`,
+        );
+        const color = binding.state === 'next-boot-required' || binding.state === 'selection-incomplete' ? '\x1b[33m' : '\x1b[90m';
+        println(`    boundary:      ${color}${binding.headline}\x1b[0m`);
+        if (binding.action) println(`      \x1b[90m${binding.action}\x1b[0m`);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        println(`    live binding:  \x1b[33mindisponível\x1b[0m \x1b[90m(${message})\x1b[0m`);
+    }
     for (const warning of summary.warnings) {
         println(`  \x1b[33m  aviso: ${warning}\x1b[0m`);
     }
@@ -1658,7 +1657,7 @@ export async function cmdByok({ println }, arg) {
             return;
         }
         println('  \x1b[32m.env.local recarregado no processo atual. Segredos não foram exibidos.\x1b[0m');
-        renderStatus(readTerminalByokProjection(), println);
+        await renderStatus(readTerminalByokProjection(), println);
         return;
     }
 
@@ -1844,7 +1843,7 @@ export async function cmdByok({ println }, arg) {
         process.env['COPILOT_BYOK_ENABLED'] = 'true';
         clearRuntimeSelectors();
         process.env['COPILOT_BYOK_PROFILE'] = target;
-        renderStatus(readTerminalByokProjection(), println);
+        await renderStatus(readTerminalByokProjection(), println);
         return;
     }
 
@@ -1858,7 +1857,7 @@ export async function cmdByok({ println }, arg) {
         process.env['COPILOT_BYOK_ENABLED'] = 'true';
         clearRuntimeSelectors(['COPILOT_BYOK_PROFILE']);
         process.env['COPILOT_BYOK_MODEL'] = model;
-        renderStatus(readTerminalByokProjection(), println);
+        await renderStatus(readTerminalByokProjection(), println);
         await tryApplyLiveByokModelSwitch(previousSummary, model, println);
         return;
     }
@@ -1874,9 +1873,9 @@ export async function cmdByok({ println }, arg) {
         process.env['COPILOT_BYOK_PROVIDER_PRESET'] = preset;
         if (model) process.env['COPILOT_BYOK_MODEL'] = model;
         if (baseUrl) process.env['COPILOT_BYOK_BASE_URL'] = baseUrl;
-        renderStatus(readTerminalByokProjection(), println);
+        await renderStatus(readTerminalByokProjection(), println);
         return;
     }
 
-    renderStatus(projection, println);
+    await renderStatus(projection, println);
 }

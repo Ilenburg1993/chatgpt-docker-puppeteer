@@ -1523,6 +1523,15 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
             detail: 'operator can distinguish SDK session cockpit from dialog loop, hub resume and snapshots',
         },
         {
+            id: 'byok-real-binding-cockpit',
+            pass:
+                /\bprepared:\s+BYOK/u.test(plain) &&
+                /\blive binding:\s+/u.test(plain) &&
+                /\bBYOK prepared:\s+/u.test(plain) &&
+                /\bBYOK boundary:\s+/u.test(plain),
+            detail: 'BYOK and SDK session cockpits separated prepared selection from live provider binding',
+        },
+        {
             id: 'byok-real-probe-session-cleanup',
             pass:
                 sessionProbeResidueCounts.length >= 2 &&

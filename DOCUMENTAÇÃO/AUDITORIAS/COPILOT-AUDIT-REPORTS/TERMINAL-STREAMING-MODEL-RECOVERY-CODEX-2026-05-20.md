@@ -1,6 +1,6 @@
 # Terminal LLM-B: streaming, modelo, sessão e recuperação
 
-Data: 2026-05-20  
+Data: 2026-05-20
 Escopo: `src/copilot`, com foco em `src/copilot/terminal` e integrações diretas com runtime, SDK, SSE, ferramentas, `ask_user`, elicitation, transcript e observabilidade.
 
 Este documento substitui a versão incremental anterior por uma trilha mais sóbria: o objetivo é registrar o estado real, separar achados validados de hipóteses externas, definir a situação ideal e manter um roadmap executável por faixas, fases e subfases.
@@ -67,35 +67,35 @@ Contrato canônico decidido nesta revisão:
 
 O arquivo `src/copilot/terminal/runtime-root.js` executava `ctx.wireRuntime()` sem `await` em `runTerminalRuntimeConfigPhase()`. Se a fiação do runtime for assíncrona, fases seguintes podem iniciar antes do runtime estar pronto.
 
-Status: corrigido nesta revisão.  
+Status: corrigido nesta revisão.
 Impacto: reduz corrida entre boot, listeners, SSE, terminal prompt e estado SDK.
 
 ### A2. Reflection loop tolerava mal falhas síncronas
 
 `boot-reflection-loop.js` capturava apenas rejeição assíncrona de `sendTurnFn(...).catch(...)`. Falhas síncronas em `readTerminalRuntimeStateFn()` ou `sendTurnFn()` podiam escapar do timer periódico.
 
-Status: corrigido nesta revisão.  
+Status: corrigido nesta revisão.
 Impacto: evita quebra silenciosa ou ruído de unhandled exception em Node 24+.
 
 ### A3. SIGHUP precisava de política explícita
 
 `boot-listeners.js` registrava handler de `SIGHUP` sem explicitar que o sinal tem semântica operacional confiável no POSIX, mas não no Windows.
 
-Status: corrigido nesta revisão com helper `shouldRegisterTerminalSighupHandler()`.  
+Status: corrigido nesta revisão com helper `shouldRegisterTerminalSighupHandler()`.
 Impacto: boot menos ambíguo, mais portável e testável.
 
 ### A4. `session.usage` era apresentado com ambiguidade
 
 A UX usa mensagens como "uso do turno contabilizado" e "custo", mas operadores tendem a ler isso como "Premium Request consumida". Isso é conceitualmente perigoso.
 
-Status: parcialmente tratado antes; wording principal corrigido nesta revisão.  
+Status: parcialmente tratado antes; wording principal corrigido nesta revisão.
 Regra canônica: o terminal só pode afirmar PR consumida quando houver métrica/fonte que confirme PR. Caso contrário, deve dizer "uso SDK/tokens/custo reportado".
 
 ### A5. Modelo configurado, modelo efetivo e modelo cobrado ainda precisam de linha única
 
 O terminal pode mostrar `auto`, preferência local, modelo efetivo observado e override manual. Quando o SDK roteia para outro modelo, a UX precisa explicar sem parecer bug.
 
-Status: parcialmente tratado.  
+Status: parcialmente tratado.
 Falta: contrato único de exibição e persistência: `configuredModel`, `preferredModel`, `effectiveModel`, `billingModel`, `routingReason`.
 
 ### A6. Deltas parciais precisam de teste live canônico mais forte
@@ -115,7 +115,7 @@ Status: parcialmente implementado com `/events --raw`; falta cenário live mais 
 
 O SDK 0.3.0 expõe eventos de tool mais ricos que a UX deve traduzir de modo canônico. A mensagem "tool unknown" continua sendo sintoma de normalização incompleta.
 
-Status: parcialmente corrigido nesta revisão: nomes genéricos do SDK agora cedem a fallback/payload real na camada canônica de apresentação.  
+Status: parcialmente corrigido nesta revisão: nomes genéricos do SDK agora cedem a fallback/payload real na camada canônica de apresentação.
 Critério: toda tool deve ter `name`, `phase`, `callId`, `source`, `startedAt`, `finishedAt`, duração, status, I/O associado e erro normalizado quando houver.
 
 ### A8. `ask_user`, user prompt e elicitation precisam de suíte ponta a ponta
@@ -136,7 +136,7 @@ Status: parcialmente implementado; falta teste live canônico e arquivo de evid�
 
 O auto-brief inicial pode dizer que tools estão indisponíveis antes de o registry terminar de subir. Isso é tecnicamente explicável, mas confunde o operador.
 
-Status: aberto.  
+Status: aberto.
 Critério: boot deve separar `boot:partial`, `ready:canonical`, `degraded:real`, e nunca apresentar estado transitório como diagnóstico final.
 
 ### A10. Documento anterior era útil, mas acumulativo demais
@@ -1436,6 +1436,35 @@ Validacao:
 
 Status: implementado nesta revisao.
 
+### A63. Cockpit BYOK ainda deixava o operador inferir seleção preparada versus provider bound vivo
+
+Situacao atual observada:
+
+- A fronteira de `A53` já era correta na arquitetura: seletor BYOK/configuração preparam provider/modelo, e o initializer único decide o binding da sessão SDK no boot.
+- O live multi-provider mostrou a lacuna de UX restante: depois de `/byok use ollama-cloud`, `/byok status` descrevia a nova seleção, enquanto o prompt e `/session sdk` ainda refletiam corretamente a sessão Kilo viva. O operador precisava juntar essas pistas dispersas para saber o que estava bound agora.
+- O prompt compacto ainda reduzia mismatch de modelo a `[MM]`, abreviação curta demais para ser uma advertência operacional clara.
+
+Situacao ideal:
+
+- Deve haver uma classificação única entre “seleção preparada” e “binding da sessão SDK viva”, usada pelos cockpits de BYOK e sessão sem narrativas paralelas.
+- Troca de provider/perfil deve aparecer como fronteira de próximo boot; modelo divergente no mesmo provider pode continuar apontando o caminho vivo de `setModel`.
+- Tags compactas do prompt podem ser curtas, mas não crípticas quando indicam discrepância de modelo.
+
+Correcao desta revisao:
+
+- `terminal/byok/session-binding.js` passou a centralizar rótulo da seleção preparada, rótulo do provider bound e classificação `aligned`, `live-model-drift`, `selection-incomplete` ou `next-boot-required`.
+- `/byok status` agora mostra lado a lado `prepared`, `live binding` e `boundary`, com a ação de novo boot apenas quando o provider/perfil realmente cruzam a fronteira.
+- `/session sdk` ganhou `BYOK prepared` e `BYOK boundary` no mesmo cockpit que já exibia `provider bound`, tornando a separação visível a partir da fonte viva de sessão.
+- O prompt compacto trocou `[MM]` por `[MODEL?]`; o bloco detalhado continua mostrando `[MODEL-CHECK:configurado→observado]`.
+- O runner BYOK real passou a cobrar `byok-real-binding-cockpit`, exigindo que ambos os cockpits mostrem seleção preparada e binding vivo.
+
+Validacao:
+
+- O live canônico BYOK Kilo em `artifacts/terminal-live/2026-05-21T23-55-18-824Z/summary.md` permaneceu `PASS` com deltas, tools, `ask_user`, resposta humana, pós-ask, usage sem Premium Request, SSE/export e zero erros rastreados.
+- O live real sem turno explícito Kilo/Ollama Cloud em `artifacts/terminal-live/2026-05-21T23-56-50-439Z/summary.md` permaneceu `PASS`: `/session sdk` mostrou Kilo vivo alinhado; `/byok use ollama-cloud` mostrou `prepared=ollama-cloud`, `live binding=kilo` e a fronteira de novo boot sem abrir turno de operador.
+
+Status: implementado e validado nesta revisão para cockpit e prompt. A próxima etapa de sessão pode avaliar se o advisory de pré-boot deve virar gate opcional sem quebrar o auto-resume padrão.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -1536,6 +1565,7 @@ Fase B1.5. Cockpit de sessão SDK
 - B1.5.3 Agendar seleção one-shot do próximo boot (`auto`, `new`, `resume <id>`) e consumi-la no initializer único. Status: feito nesta revisão.
 - B1.5.4 Criar pré-sessão opcional no boot com orientação para retomar default, abrir nova ou escolher ID SDK sem quebrar o default "continuar anterior". Status: advisory de boot feito; gate interativo antes do attach ainda em avaliação.
 - B1.5.5 Definir política segura para `deleteSession`/`disconnect` no terminal, distinguindo sessão viva e dados persistidos. Status: feito para `deleteSession`; `disconnect` documentado como cleanup/owner de runtime, não troca live de sessão.
+- B1.5.6 Mostrar no mesmo cockpit a seleção BYOK preparada e o provider binding vivo, separando troca de provider no próximo boot de troca de modelo no mesmo provider. Status: feito em `/byok status` e `/session sdk`.
 
 Fase B2. Modelo
 
@@ -1870,6 +1900,7 @@ Fase J6. Testes
 - J6.51 Detectar drift entre modelo BYOK configurado e catálogo remoto autoritativo, sem auto-troca opaca do seletor. Status: implementado em discovery/cockpit com unit tests; o live Chutes `artifacts/terminal-live/byok-chutes-canonical-2026-05-21/summary.md` é a evidência bloqueada que motivou o repair.
 - J6.52 Classificar falhas externas BYOK de forma unica em probe, turno e `session.error`, com leitura acionavel para `402`/credito sem duplicar erro generico. Status: implementado e reconfirmado no live Chutes `artifacts/terminal-live/byok-chutes-provider-credits-classified-2026-05-21/summary.md`.
 - J6.53 Separar no live runner ausencia real de streaming de modelo que alcanca `ask_user` apos deltas publicos sem emitir a serie `DELTA-CANONICAL-1..8`. Status: implementado nesta revisao com blocker `assistant-delta-protocol-missed`; live Kilo completo seguinte permaneceu PASS em `artifacts/terminal-live/byok-kilo-delta-protocol-blocker-2026-05-21/summary.md` quando o assistente emitiu a serie inteira.
+- J6.54 Expor seleção BYOK preparada e provider binding vivo pela mesma classificação canônica nos cockpits `/byok status` e `/session sdk`, removendo tag compacta críptica de mismatch. Status: PASS em unit tests e lives `artifacts/terminal-live/2026-05-21T23-55-18-824Z/summary.md` + `artifacts/terminal-live/2026-05-22T00-17-30-603Z/summary.md`; o runner BYOK real agora exige `byok-real-binding-cockpit`.
 
 Fase J7. Providers amplos
 
