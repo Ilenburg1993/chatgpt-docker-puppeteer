@@ -19,7 +19,7 @@ O resultado esperado é:
 ChatGPT
   -> Connector Apps & Connectors
   -> HTTPS /mcp
-  -> Cloudflare Tunnel publicado, Secure MCP Tunnel ou tunnel HTTPS equivalente
+  -> Cloudflare Quick Tunnel temporario, Secure MCP Tunnel ou tunnel HTTPS equivalente
   -> MCP local no Dev Container
   -> src/copilot/mcp
   -> repo real
@@ -131,12 +131,12 @@ Use `stdio` para VS Code, MCP Inspector local por comando, ou Secure MCP Tunnel 
 
 ### 5.1 Escolha canônica deste workspace
 
-Para a caixa do ChatGPT mostrada na captura, o caminho operacional desta rodada é:
+Para a caixa do ChatGPT mostrada na captura, o caminho operacional atual e temporario:
 
 ```text
 ChatGPT
-  -> https://<hostname-cloudflare>/mcp
-  -> Cloudflare Tunnel
+  -> https://<aleatorio>.trycloudflare.com/mcp
+  -> Cloudflare Quick Tunnel
   -> http://127.0.0.1:3333/mcp
   -> src/copilot/mcp
 ```
@@ -147,15 +147,18 @@ Configure a rota Cloudflare para o origin raiz:
 http://127.0.0.1:3333
 ```
 
-Cole no ChatGPT a URL pública com o path MCP:
+Cole no ChatGPT a URL publica temporaria com o path MCP:
 
 ```text
-https://<hostname-cloudflare>/mcp
+https://<aleatorio>.trycloudflare.com/mcp
 ```
+
+Nao teremos dominio fixo por ora. Isso e intencional: cada sessao gera uma URL nova e o conector no ChatGPT deve ser
+atualizado/recriado com essa URL.
 
 ### 5.2 Cloudflare Quick Tunnel
 
-Quick Tunnel e um smoke sem conta Cloudflare:
+Quick Tunnel e o modo principal sem conta Cloudflare e sem dominio fixo:
 
 ```bash
 npm run copilot:mcp:http
@@ -163,13 +166,24 @@ npm run copilot:mcp:cloudflare:doctor
 npm run copilot:mcp:cloudflare:quick
 ```
 
-O terminal do `cloudflared` imprime uma URL HTTPS aleatoria `trycloudflare.com`; acrescente `/mcp` para o conector.
-Cloudflare o documenta como teste/desenvolvimento, com URL temporaria e sem suporte a SSE. Use hostname publicado para
-uma conexao cadastrada de modo repetivel.
+O wrapper captura a URL HTTPS aleatoria `trycloudflare.com`, acrescenta `/mcp`, grava
+`src/copilot/.ai/cloudflare/quick-tunnel.json` e imprime o endpoint para uso no ChatGPT.
 
-### 5.3 Cloudflare Tunnel publicado
+Em outro terminal:
 
-Para a URL estavel:
+```bash
+npm run copilot:mcp:cloudflare:status
+npm run copilot:mcp:cloudflare:smoke
+```
+
+Cloudflare documenta Quick Tunnels como teste/desenvolvimento, com URL temporaria, limite de concorrencia e sem suporte a
+SSE. Esses limites sao aceitos neste projeto por enquanto.
+
+### 5.3 Cloudflare Tunnel publicado futuro opcional
+
+Nao usaremos dominio fixo por ora. Esta subfase fica apenas como referencia futura se a natureza do projeto mudar.
+
+Para uma URL estavel futura:
 
 1. Crie no painel Cloudflare um tunnel remoto.
 2. Adicione uma rota de published application.
@@ -186,7 +200,38 @@ npm run copilot:mcp:cloudflare:doctor
 npm run copilot:mcp:cloudflare:run
 ```
 
-### 5.4 Instalacao do cloudflared
+### 5.4 Status e smoke da sessao temporaria
+
+Status:
+
+```bash
+npm run copilot:mcp:cloudflare:status
+```
+
+Retorna:
+
+1. Nome.
+2. Descricao.
+3. URL MCP temporaria para a caixa do ChatGPT.
+4. Autenticacao `none-dev`.
+5. Arquivo de estado local.
+
+Se o PID do `cloudflared` salvo no estado ja tiver encerrado, `status` retorna `ok=false`; a URL antiga deve ser tratada
+como expirada.
+
+Smoke:
+
+```bash
+npm run copilot:mcp:cloudflare:smoke
+```
+
+Valida:
+
+1. `GET https://<aleatorio>.trycloudflare.com/health`.
+2. `POST https://<aleatorio>.trycloudflare.com/mcp` com `tools/list`.
+3. Quantidade de tools retornadas.
+
+### 5.5 Instalacao do cloudflared
 
 Instalador desta rodada:
 
@@ -205,11 +250,11 @@ COPILOT_MCP_CLOUDFLARE_PROTOCOL=auto npm run copilot:mcp:cloudflare:quick
 COPILOT_MCP_CLOUDFLARE_PROTOCOL=quic npm run copilot:mcp:cloudflare:run
 ```
 
-### 5.5 Secure MCP Tunnel alternativo
+### 5.6 Secure MCP Tunnel alternativo
 
 Secure MCP Tunnel continua documentado quando a preferencia for o `tunnel-client` da OpenAI.
 
-### 5.6 Pre-requisitos Secure MCP Tunnel
+### 5.7 Pre-requisitos Secure MCP Tunnel
 
 Antes de conectar o ChatGPT:
 
@@ -341,7 +386,7 @@ Conecta o ChatGPT ao repositório aberto no VS Code Dev Container. Permite ler a
 ### URL do servidor MCP
 
 ```text
-https://<hostname-cloudflare-ou-endpoint-do-tunel>/mcp
+https://<aleatorio>.trycloudflare.com/mcp
 ```
 
 Nunca use no formulário:
@@ -351,8 +396,8 @@ http://localhost:3333/mcp
 http://127.0.0.1:3333/mcp
 ```
 
-Essas URLs só funcionam localmente. ChatGPT precisa de HTTPS alcançável por ele, por exemplo Cloudflare Tunnel
-publicado, ou endpoint OpenAI do Secure MCP Tunnel.
+Essas URLs só funcionam localmente. ChatGPT precisa de HTTPS alcançável por ele, por exemplo Cloudflare Quick Tunnel
+temporario ou endpoint OpenAI do Secure MCP Tunnel.
 
 ### Autenticação
 
@@ -375,7 +420,8 @@ Marque a confirmação apenas depois de:
 
 1. `tools/list` local funcionar.
 2. `repo_status` local funcionar.
-3. `npm run copilot:mcp:cloudflare:doctor` passar para Cloudflare ou `tunnel-client doctor` passar para Secure MCP Tunnel.
+3. `npm run copilot:mcp:cloudflare:smoke` passar para Cloudflare temporario ou `tunnel-client doctor` passar para Secure
+   MCP Tunnel.
 4. Você entender que as tools podem operar o repo real.
 
 ---
@@ -589,8 +635,8 @@ Verifique:
 2. `GET /health` responde.
 3. `GET /chatgpt-connector.json` responde.
 4. `tools/list` inclui `chatgpt_connector_profile`.
-5. Cloudflare Tunnel publicado ou Secure MCP Tunnel configurado.
-6. ChatGPT recebe `https://<hostname-ou-endpoint>/mcp`.
+5. Cloudflare Quick Tunnel temporario ou Secure MCP Tunnel configurado.
+6. ChatGPT recebe `https://<aleatorio>.trycloudflare.com/mcp`.
 7. ChatGPT lista tools.
 8. ChatGPT chama `repo_status`.
 9. ChatGPT chama `repo_tree`.
@@ -686,3 +732,23 @@ Essas falhas ja apareciam antes da Faixa I e nao pertencem aos arquivos novos de
 7. `npm run typecheck:strict:src.copilot` passou.
 8. `npm run lint:copilot` passou.
 9. `npm run test:copilot:unit` repetiu as 6 falhas preexistentes fora do MCP: 3033 testes totais, 3027 passaram.
+
+### Validacao adicional apos promocao do dominio temporario
+
+1. O modo operacional principal passou a ser Quick Tunnel temporario.
+2. O CLI captura a URL `trycloudflare.com` automaticamente.
+3. O arquivo runtime `src/copilot/.ai/cloudflare/quick-tunnel.json` guarda a URL da sessao.
+4. `npm run copilot:mcp:cloudflare:status` mostra os dados da caixa do ChatGPT.
+5. `npm run copilot:mcp:cloudflare:smoke` valida `GET /health` e `POST /mcp tools/list` na URL temporaria.
+6. Smoke real desta rodada:
+   - URL capturada: `https://sen-recall-handbook-tim.trycloudflare.com/mcp`;
+   - `status` retornou `authentication=none-dev`;
+   - `smoke` retornou `ok=true`;
+   - `toolsList.tools=26`.
+7. Validacao focada apos a mudanca:
+   - `npm run typecheck:strict:src.copilot` passou;
+   - `npm run lint:copilot` passou;
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com 10 arquivos e 36
+     testes.
+8. `npm run test:copilot:unit` executou 3035 testes, 3029 passaram e as 6 falhas preexistentes fora do MCP/Cloudflare
+   permaneceram nas suites de contratos/config.

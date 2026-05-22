@@ -40,20 +40,23 @@ Perfil do formulario ChatGPT:
 http://127.0.0.1:3333/chatgpt-connector.json
 ```
 
-Exposicao HTTPS operacional via Cloudflare Tunnel:
+Exposicao HTTPS operacional via Cloudflare Quick Tunnel temporario:
 
 ```bash
 npm run copilot:mcp:cloudflare:doctor
-export CLOUDFLARE_TUNNEL_TOKEN="<token-do-tunnel>"
-export COPILOT_MCP_CLOUDFLARE_PUBLIC_URL="https://<hostname-cloudflare>/mcp"
-npm run copilot:mcp:cloudflare:run
-```
-
-Quick smoke temporario:
-
-```bash
 npm run copilot:mcp:cloudflare:quick
 ```
+
+Em outro terminal:
+
+```bash
+npm run copilot:mcp:cloudflare:status
+npm run copilot:mcp:cloudflare:smoke
+```
+
+O modo atual nao usa dominio fixo. Cada sessao cria uma URL `trycloudflare.com` nova, registrada em
+`src/copilot/.ai/cloudflare/quick-tunnel.json`.
+Quando o processo do tunnel encerra, `status` marca a sessao como `ok=false` para evitar reutilizar URL expirada.
 
 Stdio local:
 
@@ -73,7 +76,7 @@ Campos recomendados:
 
 1. Nome: `Repo DevContainer MCP`
 2. Descricao: conector para o repo aberto no Dev Container, com leitura, Git, diagnosticos e operacoes controladas.
-3. URL: `https://<hostname-cloudflare-ou-endpoint-do-tunel>/mcp`
+3. URL: a URL temporaria exibida por `npm run copilot:mcp:cloudflare:status`, sempre terminada em `/mcp`
 4. Autenticacao: conforme tunnel/OAuth disponivel.
 
 Nunca usar `localhost`, `127.0.0.1` ou URL HTTP no formulario do ChatGPT. O ChatGPT precisa de endpoint HTTPS publico

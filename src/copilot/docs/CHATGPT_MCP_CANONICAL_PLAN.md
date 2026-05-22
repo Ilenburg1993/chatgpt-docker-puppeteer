@@ -67,8 +67,9 @@
 15. Secure MCP Tunnel permite manter o servidor privado, usando saida HTTPS outbound para OpenAI.
 16. A pagina OpenAI de criacao do conector menciona Cloudflare Tunnel como opcao para expor o MCP local em
     desenvolvimento.
-17. Cloudflare Tunnel publicado mapeia hostname publico para service HTTP local sem abrir listener publico no container.
-18. Quick Tunnel Cloudflare e apenas smoke temporario: URL aleatoria e sem suporte a SSE segundo a documentacao oficial.
+17. Cloudflare Quick Tunnel gera URL aleatoria `trycloudflare.com`, sem exigir dominio fixo.
+18. Quick Tunnel Cloudflare e temporario, sem suporte a SSE e com limite de desenvolvimento segundo a documentacao oficial.
+19. Essa natureza temporaria e agora uma decisao arquitetural do projeto; hostname fixo fica somente como futuro opcional.
 
 ---
 
@@ -427,13 +428,13 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 
 ### Faixa I — Tunnel e ChatGPT
 
-**Status:** reaberta para consolidar Cloudflare Tunnel como exposicao HTTPS operacional; Secure MCP Tunnel permanece
-alternativa.
+**Status:** reaberta para consolidar Cloudflare Quick Tunnel temporario como exposicao HTTPS operacional; Secure MCP Tunnel
+permanece alternativa.
 
 #### Fase I.1 — Exposicao HTTPS
 
-1. Documentar Cloudflare Tunnel publicado para `http://127.0.0.1:3333`.
-2. Adicionar quick tunnel para smoke temporario.
+1. Documentar Cloudflare Quick Tunnel temporario para `http://127.0.0.1:3333`.
+2. Tratar dominio temporario `trycloudflare.com` como modo principal.
 3. Instalar `cloudflared` no ambiente atual.
 4. Incluir instalacao reproduzivel no package e Dev Container.
 5. Manter Secure MCP Tunnel como alternativa.
@@ -687,6 +688,33 @@ preencher o formulario do ChatGPT. O runbook detalha essa operacao.
     - `npm run lint:copilot` passou;
     - `npm run test:copilot:unit` executou 3033 testes, 3027 passaram e as 6 falhas externas/preexistentes de
       config/contratos voltaram a aparecer.
+
+### 2026-05-22 — Faixa I Cloudflare temporario como arquitetura principal
+
+1. Decisao atual: nao usar dominio fixo.
+2. Motivo: a natureza do projeto privilegia sessoes efemeras e reconfiguraveis, sem dependencia de hostname proprio.
+3. `npm run copilot:mcp:cloudflare:quick` agora captura automaticamente a URL `trycloudflare.com`.
+4. Criado arquivo runtime local:
+   - `src/copilot/.ai/cloudflare/quick-tunnel.json`
+5. `.gitignore` ignora o estado runtime Cloudflare, preservando apenas `.gitkeep`.
+6. Scripts adicionados:
+   - `copilot:mcp:cloudflare:status`;
+   - `copilot:mcp:cloudflare:smoke`.
+7. `status` mostra exatamente os dados da caixa ChatGPT:
+   - nome;
+   - descricao;
+   - URL temporaria terminada em `/mcp`;
+   - autenticacao `none-dev`.
+8. `smoke` usa a URL temporaria da sessao para validar:
+   - `GET /health`;
+   - `POST /mcp` com `tools/list`.
+9. Tunnel publicado com hostname estavel permanece somente como futuro opcional.
+10. Smoke real do modo temporario passou com URL `trycloudflare.com`, health remoto e 26 tools em `tools/list`.
+11. Validacao apos a mudanca:
+    - typecheck strict passou;
+    - lint passou;
+    - testes MCP focados passaram com 10 arquivos e 36 testes;
+    - unit completo executou 3035 testes, 3029 passaram e as 6 falhas preexistentes fora do MCP/Cloudflare permaneceram.
 
 ### Proximo item cronologico apos Faixa I
 

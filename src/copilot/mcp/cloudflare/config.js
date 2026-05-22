@@ -8,6 +8,8 @@
 import { normalizeMcpUrl, validatePublicConnectorUrl } from '../connection/profile.js';
 
 export const DEFAULT_CLOUDFLARE_ORIGIN_URL = 'http://127.0.0.1:3333';
+export const DEFAULT_QUICK_TUNNEL_STATE_FILE = 'src/copilot/.ai/cloudflare/quick-tunnel.json';
+export const TRYCLOUDFLARE_URL_PATTERN = /https:\/\/[a-z0-9][a-z0-9-]*\.trycloudflare\.com\b/i;
 
 /**
  * @typedef {object} CloudflareTunnelConfig
@@ -17,6 +19,7 @@ export const DEFAULT_CLOUDFLARE_ORIGIN_URL = 'http://127.0.0.1:3333';
  * @property {string | undefined} publicMcpUrl
  * @property {boolean} hasTunnelToken
  * @property {'auto' | 'http2' | 'quic'} transportProtocol
+ * @property {string} stateFile
  */
 
 /**
@@ -35,6 +38,7 @@ export function readCloudflareTunnelConfig(env = process.env) {
         transportProtocol: normalizeTransportProtocol(
             env['COPILOT_MCP_CLOUDFLARE_PROTOCOL'] ?? env['TUNNEL_TRANSPORT_PROTOCOL'],
         ),
+        stateFile: normalizeStateFile(env['COPILOT_MCP_CLOUDFLARE_STATE_FILE']),
     };
 }
 
@@ -49,6 +53,17 @@ export function normalizeTransportProtocol(value) {
     const protocol = String(value ?? 'http2').trim().toLowerCase();
     if (protocol === 'auto' || protocol === 'http2' || protocol === 'quic') return protocol;
     throw new Error('Cloudflare tunnel protocol must be auto, http2, or quic.');
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {string}
+ */
+export function normalizeStateFile(value) {
+    const stateFile = String(value ?? DEFAULT_QUICK_TUNNEL_STATE_FILE).trim();
+    if (!stateFile) return DEFAULT_QUICK_TUNNEL_STATE_FILE;
+    if (stateFile.includes('\0')) throw new Error('Cloudflare state file path must not contain null bytes.');
+    return stateFile;
 }
 
 /**
@@ -90,4 +105,25 @@ export function buildManagedTunnelArgs(token) {
 export function validateConfiguredPublicUrl(config) {
     if (!config.publicMcpUrl) return undefined;
     return validatePublicConnectorUrl(config.publicMcpUrl);
+}
+
+/**
+ * @param {string} text
+ * @returns {string | undefined}
+ */
+export function extractTryCloudflareUrl(text) {
+    const match = String(text).match(TRYCLOUDFLARE_URL_PATTERN);
+    return match?.[0]?.replace(/\/+$/, '');
+}
+
+/**
+ * @param {string} publicBaseUrl
+ * @returns {string}
+ */
+export function buildTemporaryConnectorUrl(publicBaseUrl) {
+    const base = String(publicBaseUrl || '').trim().replace(/\/+$/, '');
+    if (!base.endsWith('.trycloudflare.com') && !base.includes('.trycloudflare.com/')) {
+        throw new Error('Temporary Cloudflare connector URL must use a trycloudflare.com hostname.');
+    }
+    return normalizeMcpUrl(base);
 }

@@ -7,9 +7,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import {
+    buildTemporaryConnectorUrl,
+    extractTryCloudflareUrl,
     buildManagedTunnelArgs,
     buildQuickTunnelArgs,
     normalizeOriginUrl,
+    normalizeStateFile,
     normalizeTransportProtocol,
     readCloudflareTunnelConfig,
     validateConfiguredPublicUrl,
@@ -48,6 +51,23 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
         });
         assert.equal(config.publicMcpUrl, 'https://repo-mcp.example.com/mcp');
         assert.deepEqual(validateConfiguredPublicUrl(config), { ok: true });
+    });
+
+    it('extracts and normalizes temporary trycloudflare connector URLs', () => {
+        const text =
+            'Your quick Tunnel has been created! Visit it at https://alpha-beta-gamma.trycloudflare.com';
+        assert.equal(extractTryCloudflareUrl(text), 'https://alpha-beta-gamma.trycloudflare.com');
+        assert.equal(
+            buildTemporaryConnectorUrl('https://alpha-beta-gamma.trycloudflare.com'),
+            'https://alpha-beta-gamma.trycloudflare.com/mcp',
+        );
+        assert.throws(() => buildTemporaryConnectorUrl('https://example.com'), /trycloudflare\.com/);
+    });
+
+    it('keeps the temporary tunnel state path configurable', () => {
+        assert.equal(normalizeStateFile(undefined), 'src/copilot/.ai/cloudflare/quick-tunnel.json');
+        assert.equal(normalizeStateFile('tmp/state.json'), 'tmp/state.json');
+        assert.throws(() => normalizeStateFile('bad\0path'), /null bytes/);
     });
 
     it('accepts official Cloudflare transport protocol overrides', () => {

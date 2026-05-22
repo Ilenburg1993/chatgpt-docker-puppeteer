@@ -321,6 +321,8 @@
     "copilot:mcp:cloudflare:doctor": "node src/copilot/mcp/cloudflare/cli.js doctor",
     "copilot:mcp:cloudflare:install": "bash src/copilot/mcp/cloudflare/install-cloudflared.sh",
     "copilot:mcp:cloudflare:quick": "node src/copilot/mcp/cloudflare/cli.js quick",
+    "copilot:mcp:cloudflare:smoke": "node src/copilot/mcp/cloudflare/cli.js smoke",
+    "copilot:mcp:cloudflare:status": "node src/copilot/mcp/cloudflare/cli.js status",
     "copilot:mcp:cloudflare:run": "node src/copilot/mcp/cloudflare/cli.js run",
     "copilot:mcp:http": "node src/copilot/mcp/index.js --transport http",
     "copilot:mcp:stdio": "node src/copilot/mcp/index.js --transport stdio",

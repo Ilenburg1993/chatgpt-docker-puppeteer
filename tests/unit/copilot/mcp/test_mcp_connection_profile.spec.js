@@ -49,6 +49,8 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.equal(runbook.originUrl, 'http://127.0.0.1:3333');
         assert.equal(runbook.chatgptUrl, 'https://repo-mcp.example.com/mcp');
         assert.ok(runbook.quickTunnelCommands.includes('npm run copilot:mcp:cloudflare:quick'));
+        assert.ok(runbook.quickTunnelCommands.includes('npm run copilot:mcp:cloudflare:smoke'));
+        assert.ok(runbook.notes.some((note) => note.includes('trycloudflare.com')));
         assert.ok(runbook.notes.some((note) => note.includes('origin HTTP raiz')));
     });
 });
