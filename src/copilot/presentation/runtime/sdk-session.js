@@ -288,7 +288,7 @@ export async function setAgentSdkSessionMode(mode, runtimeId) {
  * Lê o cockpit mínimo de sessões SDK do runtime alvo.
  *
  * @param {string | null | undefined} [runtimeId]
- * @param {import('#copilot/sdk/types').SessionListFilter} [filter]
+ * @param {import('../contracts/index.js').RuntimeSessionListFilter} [filter]
  * @param {{ enrichOffset?: number; enrichLimit?: number }} [options]
  * @returns {Promise<{
  *     currentSessionId: string | null;
@@ -297,7 +297,7 @@ export async function setAgentSdkSessionMode(mode, runtimeId) {
  *     persistedByokBinding: Record<string, unknown> | null;
  *     lastBootDecision: Record<string, unknown> | null;
  *     sessionFs: Awaited<ReturnType<typeof readAgentConfiguredSessionFsState>>;
- *     sessions: Array<import('#copilot/sdk/types').SessionMetadata & {
+ *     sessions: Array<import('../contracts/index.js').RuntimeSessionMetadata & {
  *         localMetadata?: Record<string, unknown> | null;
  *         sessionFs?: Awaited<ReturnType<typeof readAgentConfiguredSessionFsState>>;
  *     }>;

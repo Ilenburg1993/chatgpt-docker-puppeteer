@@ -27,8 +27,7 @@ import {
     withEphemeralSession,
 } from '#copilot/sdk/session';
 import { createTool } from '#copilot/sdk/tools';
-import { evaluateTerminalByokProbeBudget } from '../../byok/admission.js';
-import { classifyTerminalByokProviderFailure } from '../../byok/provider-failure.js';
+import { classifyTerminalByokProviderFailure, evaluateTerminalByokProbeBudget } from '../../byok/index.js';
 import {
     compactAgentSdkSession,
     confirmAgentSdkSessionUi,
@@ -746,7 +745,7 @@ export async function getTerminalSdkUsageMetrics(runtimeId) {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @param {import('#copilot/sdk/types').SessionListFilter} [filter]
+ * @param {import('../../../presentation/contracts/index.js').RuntimeSessionListFilter} [filter]
  * @param {{ enrichOffset?: number; enrichLimit?: number }} [options]
  * @returns {ReturnType<typeof listAgentSdkSessionInventory>}
  */

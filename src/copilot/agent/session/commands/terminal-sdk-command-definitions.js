@@ -11,57 +11,13 @@
  * @module copilot/agent/session/commands/terminal-sdk-command-definitions
  */
 
+import { listTerminalSdkCommandSpecs } from '#copilot/config';
 import { EMITTER_SDK_COMMAND_EXECUTED } from '#copilot/events';
 
 /**
  * @typedef {import('#copilot/sdk/types').CommandContext} CommandContext
  * @typedef {import('#copilot/sdk/types').CommandDefinition} CommandDefinition
  */
-
-const TERMINAL_SDK_COMMAND_SPECS = Object.freeze([
-    {
-        name: 'terminal_status',
-        description: 'Mostra um snapshot operacional do terminal LLM-B.',
-        localCommand: '/status',
-        safe: true,
-    },
-    {
-        name: 'terminal_health',
-        description: 'Executa diagnostico de saude do runtime, IO, SDK e lifecycle.',
-        localCommand: '/health',
-        safe: true,
-    },
-    {
-        name: 'terminal_session',
-        description: 'Mostra o cockpit da sessao SDK viva, sessao preparada e boundary BYOK.',
-        localCommand: '/session sdk',
-        safe: true,
-    },
-    {
-        name: 'terminal_session_events',
-        description: 'Resume lifecycle e comandos SDK a partir do archive SSE canonico.',
-        localCommand: '/session sdk events',
-        safe: true,
-    },
-    {
-        name: 'terminal_session_waits',
-        description: 'Resume ask_user, elicitation e permission a partir do archive SSE canonico.',
-        localCommand: '/session sdk waits',
-        safe: true,
-    },
-    {
-        name: 'terminal_byok',
-        description: 'Mostra status BYOK, provider preparado, binding vivo e health resumido.',
-        localCommand: '/byok status',
-        safe: true,
-    },
-    {
-        name: 'terminal_events',
-        description: 'Mostra o archive recente de eventos canonicos do terminal.',
-        localCommand: '/events',
-        safe: true,
-    },
-]);
 
 /**
  * @param {unknown} value
@@ -117,16 +73,9 @@ export function buildTerminalSdkCommandDefinitions(host) {
     if (!host || typeof host.emit !== 'function') {
         return [];
     }
-    return TERMINAL_SDK_COMMAND_SPECS.map((spec) => ({
+    return listTerminalSdkCommandSpecs().map((spec) => ({
         name: spec.name,
         description: spec.description,
         handler: createTerminalSdkCommandHandler(host, spec),
     }));
-}
-
-/**
- * @returns {{ name: string; description: string; localCommand: string; safe: boolean }[]}
- */
-export function listTerminalSdkCommandSpecs() {
-    return TERMINAL_SDK_COMMAND_SPECS.map((spec) => ({ ...spec }));
 }

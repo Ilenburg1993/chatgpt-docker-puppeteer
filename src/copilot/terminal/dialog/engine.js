@@ -51,13 +51,13 @@ import {
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
-import { recordByokProviderModelCallFailure } from '../state/byok-provider-health.js';
 import {
     TERMINAL_BYOK_ADMISSION_MODE_ENV,
+    classifyTerminalByokProviderFailure,
     evaluateTerminalByokTurnBudget,
     readTerminalByokAdmissionMode,
-} from '../byok/admission.js';
-import { classifyTerminalByokProviderFailure } from '../byok/provider-failure.js';
+} from '../byok/index.js';
+import { recordByokProviderModelCallFailure } from '../state/index.js';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,

@@ -978,6 +978,43 @@ validacao no ChatGPT.
 8. `tools/call repo_status` passou em `main`.
 9. `GET /health` confirmou metricas apos tool calls.
 
+### 2026-05-22 — Correcao profunda pos-primeiro uso ChatGPT
+
+1. Relatorio externo do ChatGPT confirmou uso real do MCP com sucesso:
+   - descoberta de tools;
+   - navegacao por arvore;
+   - busca textual;
+   - leitura de arquivos;
+   - `project_doctor`;
+   - validator assincrono;
+   - `job_get_output`;
+   - metricas de runtime.
+2. Bugs/gaps tratados antes de retomar novas faixas:
+   - `repo_tree` ja aceitava `path=""`;
+   - `repo_search_text` ja possuia `contextLines` e cursor;
+   - `repo_read_file` ja retornava hashes;
+   - `mcp_tunnel_status` e `mcp_runtime_health` ja expunham estado do tunnel;
+   - a rodada atual fechou as 6 falhas persistentes do unit amplo fora do MCP/Cloudflare.
+3. Correcoes arquiteturais aplicadas:
+   - politica de recuperacao de `model_call` saiu do deep import `agent/ports` e passou a viver em `sdk/errors.js`;
+   - `hooks/session-hooks.js` deixou de importar `agent`;
+   - especificacoes puras dos comandos SDK do terminal foram movidas para `config/terminal-sdk-command-specs.js`;
+   - `terminal/commands/session.js` deixou de importar `#copilot/agent/session`;
+   - imports internos cross-folder de `terminal/byok` e `terminal/state/byok-provider-health` passaram por barrels;
+   - contratos de borda em `presentation/contracts` substituem JSDoc direto para `#copilot/sdk/types` em terminal/presentation.
+4. Correcoes BYOK aplicadas:
+   - `resolveProfileEnv` agora preserva overrides explicitos de env sobre o perfil BYOK selecionado;
+   - catalogo explicito (`COPILOT_BYOK_MODELS`, JSON ou endpoint) nao e mascarado por catalogo herdado do perfil ativo;
+   - teste do `/byok` passou a mockar o barrel efetivo `terminal/state/index.js`.
+5. Validadores canonicos executados apos a correcao:
+   - `npm run typecheck:strict:src.copilot` passou;
+   - `npm run lint:copilot` passou;
+   - `npm run test:copilot:unit` passou com 3038 testes, 3038 aprovados, 1008 suites aprovadas e zero warnings/errors.
+6. Proxima frente cronologica:
+   - continuar upgrades MCP/Cloudflare a partir de uma base verde;
+   - priorizar resiliencia de Quick Tunnel temporario, diagnostico de sessao e paridade de tools de leitura/scan com a LLM-B;
+   - manter LLM-B independente do MCP server, usando integracoes opcionais e contratos de IO compartilhados.
+
 ---
 
 ## 9. Criterios de pronto por faixa

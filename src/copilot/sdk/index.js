@@ -147,6 +147,8 @@ export {
 export {
     classifySdkError,
     classifySdkRateLimitScope,
+    decideModelCallAutoFallback,
+    decideModelCallErrorHandling,
     getSdkErrorFingerprint,
     getSdkRecoveryPolicy,
     isSdkQuotaOrRateLimitError,

@@ -73,7 +73,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     setTerminalModelProjection,
 }));
 
-vi.mock('../../../../src/copilot/terminal/state/byok-provider-health.js', () => ({
+vi.mock('../../../../src/copilot/terminal/state/index.js', () => ({
     clearByokProviderModelHealth,
     flushByokProviderHealth,
     listByokProviderModelHealth,

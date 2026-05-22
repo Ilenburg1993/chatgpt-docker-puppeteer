@@ -61,8 +61,8 @@ import {
 import {
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
-} from '../state/byok-provider-health.js';
-import { classifyTerminalByokProviderFailure } from '../byok/provider-failure.js';
+} from '../state/index.js';
+import { classifyTerminalByokProviderFailure } from '../byok/index.js';
 import { renderTerminalIntent } from './intent-renderer.js';
 import { compactTerminalToolText } from './tool-activity-presenter.js';
 import {

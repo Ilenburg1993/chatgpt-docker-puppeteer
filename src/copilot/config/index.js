@@ -96,6 +96,7 @@ export {
     loadOperationalProfile,
     resolveOperationalAgentSelection,
 } from './operational-profiles.js';
+export { listTerminalSdkCommandSpecs } from './terminal-sdk-command-specs.js';
 
 export {
     TOOL_ALIASES,

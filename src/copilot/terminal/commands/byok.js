@@ -31,11 +31,11 @@ import {
     recordByokProviderModelCallSuccess,
     readByokProviderHealthState,
     readByokProviderModelHealth,
-} from '../state/byok-provider-health.js';
+} from '../state/index.js';
 import {
     classifyTerminalByokSdkBinding,
     isSameTerminalByokProviderBoundary,
-} from '../byok/session-binding.js';
+} from '../byok/index.js';
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
 const DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT = 8;
@@ -153,7 +153,7 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @returns {{
  *   freeTier?: boolean | null;
  *   pricing?: { prompt?: number | null; completion?: number | null; request?: number | null };
@@ -174,7 +174,7 @@ function getByokModelMetadata(model) {
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @returns {boolean}
  */
 function supportsByokReasoning(model) {
@@ -291,7 +291,7 @@ function readByokProfileCostHint(profileName) {
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @returns {{ kind: 'free' | 'profile-free' | 'metered' | 'unknown'; label: string }}
  */
 function classifyByokModelCost(model) {
@@ -346,7 +346,7 @@ function readCurrentByokRequestBudget() {
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @returns {number}
  */
 function scoreByokModel(model) {
@@ -365,8 +365,8 @@ function scoreByokModel(model) {
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo[]} models
- * @returns {import('#copilot/sdk/types').ModelInfo[]}
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo[]} models
+ * @returns {import('../../presentation/contracts/index.js').RuntimeModelInfo[]}
  */
 function rankByokModels(models) {
     return models
@@ -376,7 +376,7 @@ function rankByokModels(models) {
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @param {ReturnType<typeof estimateCurrentByokRequestBudget>} [runtimeBudget]
  * @returns {{ level: 'ok' | 'caution' | 'blocked'; label: string }}
  */
@@ -479,7 +479,7 @@ function parseRecommendArgs(rest) {
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @param {ReturnType<typeof parseRecommendArgs>} filters
  * @param {ReturnType<typeof estimateCurrentByokRequestBudget>} [runtimeBudget]
  * @returns {boolean}
@@ -536,7 +536,7 @@ function withoutSafeFilter(filters) {
 
 /**
  * @param {(text: string) => void} println
- * @param {import('#copilot/sdk/types').ModelInfo[]} candidateModels
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo[]} candidateModels
  * @param {ReturnType<typeof parseRecommendArgs>} filters
  * @param {ReturnType<typeof estimateCurrentByokRequestBudget>} runtimeBudget
  * @returns {void}
@@ -559,7 +559,7 @@ function renderEmptyByokFilterDiagnostics(println, candidateModels, filters, run
 
 /**
  * @param {(text: string) => void} println
- * @param {import('#copilot/sdk/types').ModelInfo[]} budgetSafeModels
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo[]} budgetSafeModels
  * @returns {void}
  */
 function renderSafeRecommendationEvidenceDiagnostics(println, budgetSafeModels) {
@@ -580,9 +580,9 @@ function renderSafeRecommendationEvidenceDiagnostics(println, budgetSafeModels) 
  *
  * @param {(text: string) => void} println
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
- * @param {import('#copilot/sdk/types').ModelInfo[]} modelList
- * @param {import('#copilot/sdk/types').ModelInfo[]} eligibleModels
- * @param {import('#copilot/sdk/types').ModelInfo[]} shortlistedModels
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo[]} modelList
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo[]} eligibleModels
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo[]} shortlistedModels
  * @param {ReturnType<typeof parseRecommendArgs>} filters
  * @param {ReturnType<typeof estimateCurrentByokRequestBudget>} runtimeBudget
  * @returns {void}
@@ -601,7 +601,7 @@ function renderByokShortlistProfileCoverage(
     if (profiles.length === 0) return;
     println('  \x1b[90mCobertura por perfil antes das probes:\x1b[0m');
     for (const profile of profiles.slice(0, 12)) {
-        /** @param {import('#copilot/sdk/types').ModelInfo} model */
+        /** @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model */
         const fromProfile = (model) => getByokModelMetadata(model)?.profile === profile.name;
         const catalogCount = modelList.filter(fromProfile).length;
         const eligibleCount = eligibleModels.filter(fromProfile).length;
@@ -637,7 +637,7 @@ function renderByokShortlistProfileCoverage(
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @returns {string}
  */
 function renderByokVariantLabel(model) {
@@ -649,8 +649,8 @@ function renderByokVariantLabel(model) {
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo[]} models
- * @returns {{ model: import('#copilot/sdk/types').ModelInfo; variants: string[] }[]}
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo[]} models
+ * @returns {{ model: import('../../presentation/contracts/index.js').RuntimeModelInfo; variants: string[] }[]}
  */
 function groupByokModelVariants(models) {
     const groups = new Map();
@@ -731,7 +731,7 @@ function renderByokChatHealthEvidence(context) {
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @returns {ReturnType<typeof readByokProviderModelHealth>}
  */
 function readHealthForByokModel(model) {
@@ -752,7 +752,7 @@ function readHealthForByokModel(model) {
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @returns {boolean}
  */
 function isByokModelKnownFailed(model) {
@@ -764,7 +764,7 @@ function isByokModelKnownFailed(model) {
  * "safe" em recomendacao nao pode significar apenas "nao falhou ainda". O terminal opera como agente: para uma
  * selecao promovida ao operador, precisamos de evidencia positiva de tools + `ask_user` na sonda descartavel.
  *
- * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @returns {boolean}
  */
 function isByokModelAgentProbeVerified(model) {
@@ -823,14 +823,14 @@ function renderByokAgentProbeHealthTag(health) {
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @param {{ profileName?: string | null; preset?: string | null; providerType?: string | null }} source
- * @returns {import('#copilot/sdk/types').ModelInfo}
+ * @returns {import('../../presentation/contracts/index.js').RuntimeModelInfo}
  */
 function withByokCatalogSource(model, source) {
     const meta = getByokModelMetadata(model) ?? {};
     const profileCostHint = readByokProfileCostHint(source.profileName);
-    return /** @type {import('#copilot/sdk/types').ModelInfo} */ ({
+    return /** @type {import('../../presentation/contracts/index.js').RuntimeModelInfo} */ ({
         ...model,
         byok: {
             ...meta,
@@ -864,7 +864,7 @@ function selectProfilesForDiscovery(projection, filters) {
 /**
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
  * @param {ReturnType<typeof parseRecommendArgs>} filters
- * @returns {Promise<{ models: import('#copilot/sdk/types').ModelInfo[]; sourceLabel: string; endpoint: string | null; errors: string[]; warnings: string[]; profileCount: number }>}
+ * @returns {Promise<{ models: import('../../presentation/contracts/index.js').RuntimeModelInfo[]; sourceLabel: string; endpoint: string | null; errors: string[]; warnings: string[]; profileCount: number }>}
  */
 async function discoverByokCatalogForCommand(projection, filters) {
     if (!filters.allProviders) {
@@ -970,7 +970,7 @@ function renderByokCatalogWarnings(println, warnings) {
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @returns {string}
  */
 function renderModelTags(model) {
@@ -1005,7 +1005,7 @@ function renderModelTags(model) {
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @returns {string}
  */
 function renderByokRecommendationActionHint(model) {
@@ -1025,7 +1025,7 @@ function renderByokRecommendationActionHint(model) {
  * essa diferença em ação explícita sem trocar o provider/modelo silenciosamente.
  *
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
- * @returns {import('#copilot/sdk/types').ModelInfo[]}
+ * @returns {import('../../presentation/contracts/index.js').RuntimeModelInfo[]}
  */
 function listActiveByokHealthAlternatives(projection) {
     const { summary } = projection;
@@ -1379,7 +1379,7 @@ function hasExplicitByokProbeLimit(rest) {
 }
 
 /**
- * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @param {number | undefined} timeoutMs
  * @returns {ReturnType<typeof buildByokProbeSelection>}
  */

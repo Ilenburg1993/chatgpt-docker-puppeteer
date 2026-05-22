@@ -814,9 +814,42 @@ function resolveProfileEnv(env) {
             };
         }
         const profileEnv = applyProfileToEnv(profile, env);
-        const modelOverride = optionalString(env['COPILOT_BYOK_MODEL']);
-        if (modelOverride) {
-            profileEnv['COPILOT_BYOK_MODEL'] = modelOverride;
+        const explicitOverrideKeys = [
+            'COPILOT_BYOK_PROVIDER_PRESET',
+            'COPILOT_BYOK_PROVIDER_TYPE',
+            'COPILOT_BYOK_BASE_URL',
+            'COPILOT_BYOK_WIRE_API',
+            'COPILOT_BYOK_AZURE_API_VERSION',
+            'COPILOT_BYOK_HEADERS_JSON',
+            'COPILOT_BYOK_MODEL',
+            'COPILOT_BYOK_MODELS',
+            'COPILOT_BYOK_MODELS_JSON',
+            'COPILOT_BYOK_MODELS_ENDPOINT',
+            'COPILOT_BYOK_MODEL_DISCOVERY_ENABLED',
+            'COPILOT_BYOK_MODEL_DISCOVERY_TIMEOUT_MS',
+            'COPILOT_BYOK_MODEL_DISCOVERY_TTL_MS',
+            'COPILOT_BYOK_CONTEXT_WINDOW_TOKENS',
+            'COPILOT_BYOK_MAX_REQUEST_TOKENS',
+            'COPILOT_BYOK_TOKENS_PER_MINUTE',
+            'COPILOT_BYOK_REQUESTS_PER_MINUTE',
+            'COPILOT_BYOK_DAILY_REQUESTS',
+            'COPILOT_BYOK_SUPPORTS_REASONING',
+            'COPILOT_BYOK_SUPPORTS_VISION',
+            'COPILOT_BYOK_API_KEY',
+            'COPILOT_BYOK_BEARER_TOKEN',
+        ];
+        for (const key of explicitOverrideKeys) {
+            if (optionalString(env[key])) profileEnv[key] = env[key];
+        }
+        const explicitCatalogKeys = [
+            'COPILOT_BYOK_MODELS',
+            'COPILOT_BYOK_MODELS_JSON',
+            'COPILOT_BYOK_MODELS_ENDPOINT',
+        ];
+        if (explicitCatalogKeys.some((key) => optionalString(env[key]))) {
+            for (const key of explicitCatalogKeys) {
+                if (!optionalString(env[key])) delete profileEnv[key];
+            }
         }
         return { env: profileEnv, profile: profileName, profileError: null };
     } catch (error) {

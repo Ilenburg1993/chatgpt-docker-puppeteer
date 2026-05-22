@@ -5,8 +5,5 @@
  * @module copilot/agent/session/commands
  */
 
-export {
-    buildTerminalSdkCommandDefinitions,
-    listTerminalSdkCommandSpecs,
-} from './terminal-sdk-command-definitions.js';
-
+export { listTerminalSdkCommandSpecs } from '#copilot/config';
+export { buildTerminalSdkCommandDefinitions } from './terminal-sdk-command-definitions.js';

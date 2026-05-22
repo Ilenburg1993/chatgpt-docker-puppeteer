@@ -9,9 +9,8 @@
  * @see EventBus
  */
 
-import { COPILOT_OPERATIONAL_PROFILE, getEffectiveSdkAgentSelection } from '#copilot/config';
+import { COPILOT_OPERATIONAL_PROFILE, getEffectiveSdkAgentSelection, listTerminalSdkCommandSpecs } from '#copilot/config';
 import { toError } from '#copilot/core';
-import { listTerminalSdkCommandSpecs } from '#copilot/agent/session';
 import {
     clearPendingTerminalQuestionShadow,
     clearTerminalHistory,
@@ -42,7 +41,7 @@ import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from '
 import {
     classifyTerminalByokSdkBinding,
     renderTerminalSdkProviderBinding,
-} from '../byok/session-binding.js';
+} from '../byok/index.js';
 import { readTerminalSseEventArchiveTail } from '../state/index.js';
 
 const DISABLED_BYOK_SUMMARY = Object.freeze({
@@ -820,7 +819,7 @@ const SDK_SESSION_PROBE_SUMMARY_RE =
     /\bBYOK_(?:AGENT_)?PROBE\b|\bterminal_byok_probe_marker\b|\bBYOK_AGENT_PROBE_ASK\b/iu;
 
 /**
- * @param {import('#copilot/sdk/types').SessionMetadata} entry
+ * @param {import('../../presentation/contracts/index.js').RuntimeSessionMetadata} entry
  * @returns {boolean}
  */
 function isTerminalProbeSdkSession(entry) {
@@ -835,7 +834,7 @@ function isTerminalProbeSdkSession(entry) {
  *     currentSessionId: string | null;
  *     lastSessionId: string | null;
  *     foregroundSessionId: string | null;
- *     sessions: import('#copilot/sdk/types').SessionMetadata[];
+ *     sessions: import('../../presentation/contracts/index.js').RuntimeSessionMetadata[];
  * }} inventory
  * @returns {{ sessionId: string; source: string } | null}
  */
@@ -899,13 +898,13 @@ function renderSdkSessionSummaryPreview(summary) {
  * @param {string} action
  * @param {string} rawAction
  * @param {string[]} rest
- * @returns {{ limit: number; offset: number; filter: import('#copilot/sdk/types').SessionListFilter | undefined; filterLabel: string }}
+ * @returns {{ limit: number; offset: number; filter: import('../../presentation/contracts/index.js').RuntimeSessionListFilter | undefined; filterLabel: string }}
  */
 function parseSdkSessionInventoryArgs(action, rawAction, rest) {
     const tokens = action === 'status' || action === 'list' || action === 'ls' ? rest : [rawAction, ...rest];
     let limit = 12;
     let offset = 0;
-    /** @type {import('#copilot/sdk/types').SessionListFilter} */
+    /** @type {import('../../presentation/contracts/index.js').RuntimeSessionListFilter} */
     const filter = {};
     for (const token of tokens) {
         if (/^\d+$/u.test(token)) {

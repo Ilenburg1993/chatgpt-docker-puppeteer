@@ -627,9 +627,16 @@ Validadores:
 1. Testes MCP focados passaram com 10 arquivos e 34 testes.
 2. Typecheck strict do `src/copilot` passou.
 3. Lint do `src/copilot` passou.
-4. Suite unit ampla do `src/copilot` voltou a apresentar as 6 falhas preexistentes fora do modulo MCP, com 3033 testes
-   totais e 3027 aprovados.
+4. Suite unit ampla do `src/copilot` voltou a apresentar 6 falhas preexistentes fora do modulo MCP/Cloudflare; elas
+   foram posteriormente corrigidas na rodada pos-primeiro uso ChatGPT.
 5. Apos promover dominio temporario como padrao, testes MCP focados passaram com 10 arquivos e 36 testes.
 6. `npm run typecheck:strict:src.copilot` e `npm run lint:copilot` passaram apos a mudanca de dominio temporario.
-7. `npm run test:copilot:unit` executou 3035 testes, 3029 passaram e as 6 falhas preexistentes fora do MCP/Cloudflare
-   permaneceram.
+7. Na rodada de correcao profunda seguinte, os tres validadores canonicos passaram:
+   - `npm run typecheck:strict:src.copilot`;
+   - `npm run lint:copilot`;
+   - `npm run test:copilot:unit` com 3038/3038 testes e 1008/1008 suites.
+8. A estrategia de dominio permanece temporaria por decisao arquitetural:
+   - usar `*.trycloudflare.com`;
+   - registrar a URL ativa em `src/copilot/.ai/cloudflare/quick-tunnel.json`;
+   - expor recuperacao por `copilot:mcp:cloudflare:status`, `doctor` e `smoke`;
+   - nao introduzir dependencia de dominio fixo ate nova decisao explicita.

@@ -193,7 +193,10 @@ Estado conhecido neste release:
 1. Typecheck strict passa.
 2. Lint completo passa.
 3. Testes MCP focados passam.
-4. Suite unit completa ainda possui 6 falhas preexistentes fora do MCP.
+4. Suite unit completa passa apos a rodada de correcao pos-primeiro uso ChatGPT:
+   - 3038 testes aprovados;
+   - 1008 suites aprovadas;
+   - zero warnings/errors no runner compacto.
 
 ## 8. Observabilidade
 
@@ -308,3 +311,18 @@ Executado em 2026-05-22:
 
 Observacao para chamadas HTTP manuais: enviar header `Accept: application/json, text/event-stream`, pois o transporte
 Streamable HTTP do MCP exige aceitar JSON e SSE.
+
+## 12. Correcao Pos-Primeiro Uso ChatGPT
+
+Executado em 2026-05-22 apos o primeiro uso real do conector no ChatGPT:
+
+1. Corrigido acoplamento de `hooks/` para `agent/` movendo a politica compartilhada de erro para `sdk/errors.js`.
+2. Corrigido acoplamento de `terminal/commands/session.js` para `#copilot/agent/session` movendo specs puras para
+   `config/terminal-sdk-command-specs.js`.
+3. Corrigida governanca de barrels internos do terminal para `byok/` e `state/`.
+4. Corrigidos contratos de borda JSDoc para usar `presentation/contracts` em vez de tipos internos do SDK.
+5. Corrigido merge BYOK para preservar variaveis explicitas contra perfil ativo herdado.
+6. Validacao final:
+   - `npm run typecheck:strict:src.copilot` passou;
+   - `npm run lint:copilot` passou;
+   - `npm run test:copilot:unit` passou com 3038/3038.

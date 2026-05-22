@@ -108,10 +108,72 @@
  *
  * @typedef {{
  *     id: string;
+ *     name?: string;
+ *     displayName?: string;
+ *     vendor?: string;
+ *     family?: string;
  *     capabilities?: {
  *         supports?: { reasoningEffort?: boolean; vision?: boolean };
+ *         limits?: {
+ *             max_prompt_tokens?: number;
+ *             max_context_window_tokens?: number;
+ *             [key: string]: unknown;
+ *         };
+ *     };
+ *     byok?: {
+ *         freeTier?: boolean | null;
+ *         pricing?: { prompt?: number | null; completion?: number | null; request?: number | null };
+ *         rateLimits?: {
+ *             maxRequestTokens?: number | null;
+ *             tokensPerMinute?: number | null;
+ *             requestsPerMinute?: number | null;
+ *             dailyRequests?: number | null;
+ *         };
+ *         provider?: string | null;
+ *         profile?: string | null;
+ *         source?: string;
+ *         profileFreeTier?: boolean | null;
+ *         profileCostSource?: string | null;
+ *         profileCostDetail?: string | null;
+ *         inputModalities?: string[];
+ *         outputModalities?: string[];
+ *         supportsReasoning?: boolean;
+ *         [key: string]: unknown;
  *     };
  * }} RuntimeModelInfo
+ *
+ * @typedef {{
+ *     sessionId: string;
+ *     summary?: string | null;
+ *     startTime?: Date | number | string | null;
+ *     modifiedTime?: Date | number | string | null;
+ *     createdAt?: Date | number | string | null;
+ *     updatedAt?: Date | number | string | null;
+ *     lastActivityAt?: Date | number | string | null;
+ *     model?: string | null;
+ *     cwd?: string;
+ *     gitRoot?: string;
+ *     repository?: string;
+ *     branch?: string;
+ *     isRemote?: boolean;
+ *     mode?: RuntimeSdkMode | string;
+ *     localMetadata?: Record<string, unknown> | null;
+ *     sessionFs?: unknown;
+ *     context?: unknown;
+ *     [key: string]: unknown;
+ * }} RuntimeSessionMetadata
+ *
+ * @typedef {{
+ *     sessionId?: string;
+ *     cwd?: string;
+ *     gitRoot?: string;
+ *     repository?: string;
+ *     branch?: string;
+ *     limit?: number;
+ *     offset?: number;
+ *     includeDeleted?: boolean;
+ *     [key: string]: unknown;
+ * }} RuntimeSessionListFilter
  *
  *
  * @typedef {'ready' | 'reply' | 'stopped' | 'question'} RuntimePendingQuestionKind
