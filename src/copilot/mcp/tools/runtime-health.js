@@ -6,6 +6,8 @@
  */
 
 import { readOnlyAnnotations } from '../control-plane/annotations.js';
+import { readCloudflareTunnelConfig } from '../cloudflare/config.js';
+import { readQuickTunnelState, summarizeQuickTunnelState } from '../cloudflare/state.js';
 import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
 import { getMcpWorkspaceRoot } from '../control-plane/paths.js';
 import { okResult } from '../control-plane/result.js';
@@ -21,11 +23,14 @@ export const mcpRuntimeHealthTool = {
     annotations: readOnlyAnnotations(),
     handler: async () => {
         const metrics = readMcpMetricsSnapshot();
+        const tunnelConfig = readCloudflareTunnelConfig();
+        const tunnelState = await readQuickTunnelState(tunnelConfig.stateFile);
         return okResult({
             success: true,
             ok: true,
             workspaceRoot: getMcpWorkspaceRoot(),
             metrics,
+            tunnel: summarizeQuickTunnelState(tunnelState),
         });
     },
 };

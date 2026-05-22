@@ -55,6 +55,7 @@ Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
 
 - `repo_status`
 - `repo_tree`
+- `repo_root_tree`
 - `repo_read_file`
 - `repo_search_text`
 - `git_status`
@@ -78,6 +79,9 @@ Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
 - `repo_apply_patch`
 - `repo_move_file`
 - `repo_remove_file`
+- `mcp_capabilities_summary`
+- `mcp_tunnel_status`
+- `mcp_runtime_health`
 
 Validator job tools accept optional `timeoutMs` between 1000 and 3600000. Job records include the command, args, timeout,
 exit code, signal and `timedOut` flag.
@@ -103,6 +107,15 @@ do not expose live session objects.
 As ferramentas usam a política de path existente e permanecem sob a raiz do workspace. As tools de escrita controlada
 retornam diff unificado, suportam `dryRun` quando aplicável e gravam metadados de auditoria MCP sem persistir o texto
 editado no log. Operações destrutivas exigem confirmação explícita nos argumentos.
+
+As tools MCP de leitura espelham o plano de IO usado pelas tools locais da LLM-B:
+
+- `repo_tree` aceita `path=""` como default `src/copilot`; use `path="."` ou `repo_root_tree` para a raiz real.
+- `repo_search_text` aceita `contextLines` de 0 a 10 e `cursor` retornado por `nextCursor`.
+- `repo_read_file` retorna `sha256` e `returnedSha256` para permitir read -> apply/write com `expectedHash`.
+
+A LLM-B continua independente do MCP server. Ela pode consumir MCP por opt-in, mas o chat local nao passa a depender do
+servidor MCP para boot ou uso normal.
 
 ## Perfil do conector ChatGPT
 

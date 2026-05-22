@@ -716,6 +716,41 @@ preencher o formulario do ChatGPT. O runbook detalha essa operacao.
     - testes MCP focados passaram com 10 arquivos e 36 testes;
     - unit completo executou 3035 testes, 3029 passaram e as 6 falhas preexistentes fora do MCP/Cloudflare permaneceram.
 
+### 2026-05-22 — Correcoes e upgrades MCP/IO apos primeiro uso real
+
+Relatorio externo do ChatGPT confirmou:
+
+1. Conexao inicial e descoberta de tools funcionaram.
+2. Fluxo principal validado:
+   - `repo_status`;
+   - `repo_tree`;
+   - `repo_search_text`;
+   - `repo_read_file`;
+   - `project_doctor`;
+   - `run_copilot_validator`;
+   - `job_get_output`;
+   - `mcp_runtime_health`.
+3. Jobs assincronos + output + metricas funcionaram bem.
+4. Leitura de arquivo grande funcionou com conteudo e metadados.
+5. A queda final de rede foi explicada pelo encerramento deliberado do servidor/tunnel.
+
+Correcoes e upgrades aplicados:
+
+1. `repo_tree path=""` normaliza para o default `src/copilot`.
+2. `repo_root_tree` expoe a raiz real do workspace.
+3. `repo_search_text` aceita `contextLines` e `cursor`, espelhando `search_in_files`.
+4. `repo_read_file` expoe `sha256` e `returnedSha256`, espelhando o IO local de leitura.
+5. `mcp_tunnel_status` expoe estado/recovery de Quick Tunnel temporario.
+6. `mcp_runtime_health` passa a incluir tunnel summary.
+7. `mcp_capabilities_summary` resume categorias de tools para humanos e LLMs.
+8. LLM-B permanece independente: MCP e consumidor local seguem opt-in.
+9. Validacao focada passou:
+   - typecheck strict;
+   - lint;
+   - testes MCP com 10 arquivos e 39 testes.
+10. Unit completo executou 3038 testes, 3032 passaram e as 6 falhas preexistentes fora do MCP permaneceram.
+11. Smoke HTTP local confirmou as novas surfaces e `tools/list` passou a expor 29 tools.
+
 ### Proximo item cronologico apos Faixa I
 
 Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, path policy e auditoria.

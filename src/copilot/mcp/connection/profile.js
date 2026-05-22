@@ -66,9 +66,14 @@ export function buildChatGptConnectorProfile(options = {}) {
         ],
         smokePrompts: [
             'Use o conector Repo DevContainer MCP e chame repo_status.',
+            'Chame mcp_capabilities_summary e resuma as categorias de tools.',
             'Liste a árvore de src/copilot/mcp com repo_tree.',
-            'Leia src/copilot/mcp/README.md com repo_read_file.',
-            'Mostre git_status.',
+            'Liste a raiz real do workspace com repo_root_tree maxEntries=80.',
+            'Busque registerCanonicalMcpTools em src/copilot/mcp com repo_search_text contextLines=2.',
+            'Leia src/copilot/mcp/registry.js linhas 1 a 120 com repo_read_file e informe o sha256.',
+            'Chame project_doctor.',
+            'Inicie run_copilot_validator validator=typecheck e depois leia o output com job_get_output.',
+            'Chame mcp_runtime_health e mcp_tunnel_status.',
         ],
         requiredLocalChecks: [
             `MCP local responde em ${normalizeMcpUrl(localMcpUrl)}.`,

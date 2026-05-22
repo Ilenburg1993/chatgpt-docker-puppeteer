@@ -10,8 +10,10 @@ import { appendMcpAuditEvent } from './control-plane/audit.js';
 import { connectionTools } from './tools/connection.js';
 import { copilotSessionTools } from './tools/copilot-session.js';
 import { jobTools } from './tools/jobs.js';
+import { metaTools } from './tools/meta.js';
 import { recordMcpToolMetric } from './control-plane/metrics.js';
 import { mcpRuntimeHealthTool } from './tools/runtime-health.js';
+import { mcpTunnelStatusTool } from './tools/tunnel-status.js';
 import { projectDoctorTool } from './tools/project-doctor.js';
 import { repoReadTools } from './tools/repo-read.js';
 import { repoWriteTools } from './tools/repo-write.js';
@@ -38,6 +40,8 @@ export function getCanonicalMcpTools() {
         ...connectionTools,
         ...repoWriteTools,
         ...copilotSessionTools,
+        ...metaTools,
+        mcpTunnelStatusTool,
         mcpRuntimeHealthTool,
     ];
 }

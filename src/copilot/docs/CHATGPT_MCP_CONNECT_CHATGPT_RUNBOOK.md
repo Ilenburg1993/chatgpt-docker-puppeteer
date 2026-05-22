@@ -471,6 +471,18 @@ Esperado:
 1. Tool `repo_tree` chamada.
 2. Retorno com arquivos do módulo MCP.
 
+### Prompt 3.1 — Root Tree
+
+```text
+Liste a raiz real do workspace com repo_root_tree, maxEntries 80.
+```
+
+Esperado:
+
+1. Tool `repo_root_tree` chamada.
+2. Retorno com path `"."`.
+3. A raiz real do repo aparece sem enviar `path=""`.
+
 ### Prompt 4 — Read file
 
 ```text
@@ -481,6 +493,19 @@ Esperado:
 
 1. Tool `repo_read_file` chamada.
 2. Conteúdo do README retornado.
+3. `sha256` retornado para uso posterior em writes com `expectedHash`.
+
+### Prompt 4.1 — Search com contexto
+
+```text
+Busque registerCanonicalMcpTools em src/copilot/mcp com repo_search_text, contextLines 2.
+```
+
+Esperado:
+
+1. Tool `repo_search_text` chamada.
+2. Matches retornados com 2 linhas de contexto.
+3. Se `nextCursor` vier preenchido, repita a mesma tool com `cursor`.
 
 ### Prompt 5 — Git
 
@@ -492,6 +517,18 @@ Esperado:
 
 1. Tool `git_status` chamada.
 2. Retorno equivalente a `git status --short --branch`.
+
+### Prompt 6 — Capacidades e túnel
+
+```text
+Chame mcp_capabilities_summary, mcp_tunnel_status e mcp_runtime_health.
+```
+
+Esperado:
+
+1. Resumo categorizado das tools.
+2. Estado do Quick Tunnel temporário quando houver sessão ativa.
+3. Métricas internas do MCP.
 
 ---
 
@@ -752,3 +789,33 @@ Essas falhas ja apareciam antes da Faixa I e nao pertencem aos arquivos novos de
      testes.
 8. `npm run test:copilot:unit` executou 3035 testes, 3029 passaram e as 6 falhas preexistentes fora do MCP/Cloudflare
    permaneceram nas suites de contratos/config.
+
+### Validacao adicional apos primeiro uso real no ChatGPT
+
+Feedback aplicado:
+
+1. `repo_tree path=""` agora usa o default `src/copilot` em vez de falhar.
+2. `repo_root_tree` lista explicitamente a raiz real do workspace.
+3. `repo_search_text` agora aceita `contextLines` e `cursor`.
+4. `repo_read_file` agora retorna `sha256` e `returnedSha256`.
+5. `mcp_capabilities_summary` resume a superfície por categoria.
+6. `mcp_tunnel_status` expõe estado, idade, URL e recovery do Quick Tunnel temporário.
+7. `mcp_runtime_health` inclui o resumo de tunnel.
+8. Os smoke prompts do `chatgpt_connector_profile` foram ampliados para cobrir IO, busca, validação, jobs, métricas e
+   túnel.
+
+Validação focada:
+
+1. `npm run typecheck:strict:src.copilot` passou.
+2. `npm run lint:copilot` passou.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com 10 arquivos e 39 testes.
+4. `npm run test:copilot:unit` executou 3038 testes, 3032 passaram e as 6 falhas preexistentes fora do MCP
+   permaneceram nas suites de contratos/config.
+5. Smoke HTTP local passou para as novas surfaces:
+   - `repo_tree path=""`;
+   - `repo_root_tree`;
+   - `repo_read_file` com `sha256`;
+   - `repo_search_text contextLines=2`;
+   - `mcp_capabilities_summary`;
+   - `mcp_tunnel_status`;
+   - `tools/list` com 29 tools.

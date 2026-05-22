@@ -89,10 +89,12 @@ Depois de conectar no ChatGPT:
 1. Liste as tools disponiveis.
 2. Chame `repo_status`.
 3. Chame `repo_tree` em `src/copilot`.
-4. Chame `repo_read_file` em `src/copilot/mcp/README.md`.
-5. Chame `git_status`.
-6. Chame `mcp_runtime_health`.
-7. Faca um `repo_apply_patch` com `dryRun=true` antes de qualquer escrita real.
+4. Chame `repo_root_tree` com `maxEntries=80`.
+5. Chame `repo_search_text` com `contextLines=2`.
+6. Chame `repo_read_file` em `src/copilot/mcp/README.md` e observe `sha256`.
+7. Chame `git_status`.
+8. Chame `mcp_capabilities_summary`, `mcp_tunnel_status` e `mcp_runtime_health`.
+9. Faca um `repo_apply_patch` com `dryRun=true` antes de qualquer escrita real.
 
 ## 5. Superficie De Tools
 
@@ -100,13 +102,14 @@ Leitura e Git:
 
 1. `repo_status`
 2. `repo_tree`
-3. `repo_read_file`
-4. `repo_search_text`
-5. `git_status`
-6. `git_diff`
-7. `git_log`
-8. `git_branch_info`
-9. `project_doctor`
+3. `repo_root_tree`
+4. `repo_read_file`
+5. `repo_search_text`
+6. `git_status`
+7. `git_diff`
+8. `git_log`
+9. `git_branch_info`
+10. `project_doctor`
 
 Conexao ChatGPT:
 
@@ -139,6 +142,8 @@ LLM-B/Copilot SDK:
 Runtime MCP:
 
 1. `mcp_runtime_health`
+2. `mcp_tunnel_status`
+3. `mcp_capabilities_summary`
 
 ## 6. Guardrails
 

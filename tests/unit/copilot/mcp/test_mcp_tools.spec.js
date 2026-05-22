@@ -40,8 +40,49 @@ describe('copilot MCP tools', () => {
         const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
         assert.equal(structured['success'], true);
         assert.equal(structured['path'], 'src/copilot/mcp/README.md');
+        assert.equal(typeof structured['sha256'], 'string');
+        assert.equal(typeof structured['returnedSha256'], 'string');
         assert.ok(Array.isArray(result.content));
         assert.ok(String(result.content[0]?.text ?? '').includes('Copilot MCP Server'));
+    });
+
+    it('repo_tree accepts empty path and repo_root_tree exposes workspace root', async () => {
+        const treeTool = findTool('repo_tree');
+        const tree = await treeTool.handler({ path: '', maxEntries: 5 });
+        assert.equal(tree.isError, undefined);
+        assert.equal(tree.structuredContent?.['path'], 'src/copilot');
+
+        const rootTool = findTool('repo_root_tree');
+        const root = await rootTool.handler({ maxEntries: 20 });
+        assert.equal(root.isError, undefined);
+        assert.equal(root.structuredContent?.['path'], '.');
+        const entries = /** @type {unknown[]} */ (root.structuredContent?.['entries']);
+        assert.ok(entries.length > 0);
+    });
+
+    it('repo_search_text accepts context lines and cursor metadata', async () => {
+        const tool = findTool('repo_search_text');
+        const result = await tool.handler({
+            pattern: 'Copilot MCP Server',
+            path: 'src/copilot/mcp',
+            contextLines: 2,
+            maxResults: 5,
+        });
+        assert.equal(result.isError, undefined);
+        const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
+        assert.equal(structured['contextLines'], 2);
+        assert.equal(structured['cursor'], null);
+        assert.ok('nextCursor' in structured);
+    });
+
+    it('mcp_capabilities_summary groups the tool surface', async () => {
+        const tool = findTool('mcp_capabilities_summary');
+        const result = await tool.handler({});
+        assert.equal(result.isError, undefined);
+        const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
+        assert.ok(Array.isArray(structured['read']));
+        assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_root_tree'));
+        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tunnel_status'));
     });
 
     it('project_doctor returns canonical validators', async () => {
@@ -56,4 +97,3 @@ describe('copilot MCP tools', () => {
         assert.equal(validators['unit'], 'npm run test:copilot:unit');
     });
 });
-

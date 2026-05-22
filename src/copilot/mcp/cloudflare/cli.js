@@ -6,7 +6,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import {
@@ -17,6 +17,7 @@ import {
     readCloudflareTunnelConfig,
     validateConfiguredPublicUrl,
 } from './config.js';
+import { isProcessAlive, isQuickTunnelState, readQuickTunnelState } from './state.js';
 
 const command = process.argv[2] ?? 'doctor';
 
@@ -260,48 +261,6 @@ async function writeQuickTunnelState(config, publicBaseUrl, pid) {
  * @param {string} stateFile
  * @returns {Promise<unknown | undefined>}
  */
-async function readQuickTunnelState(stateFile) {
-    try {
-        return JSON.parse(await readFile(stateFile, 'utf8'));
-    } catch (error) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return undefined;
-        return { error: error instanceof Error ? error.message : String(error) };
-    }
-}
-
-/**
- * @param {unknown} pid
- * @returns {boolean}
- */
-function isProcessAlive(pid) {
-    if (!Number.isInteger(pid) || Number(pid) <= 0) return false;
-    try {
-        process.kill(Number(pid), 0);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-/**
- * @param {unknown} value
- * @returns {value is { pid?: unknown; connectorUrl: string; chatgpt: { name: string; description: string; authentication: string } }}
- */
-function isQuickTunnelState(value) {
-    if (!value || typeof value !== 'object') return false;
-    if (!('connectorUrl' in value) || typeof value.connectorUrl !== 'string') return false;
-    if (!('chatgpt' in value) || !value.chatgpt || typeof value.chatgpt !== 'object') return false;
-    const chatgpt = value.chatgpt;
-    return (
-        'name' in chatgpt &&
-        typeof chatgpt.name === 'string' &&
-        'description' in chatgpt &&
-        typeof chatgpt.description === 'string' &&
-        'authentication' in chatgpt &&
-        typeof chatgpt.authentication === 'string'
-    );
-}
-
 /**
  * @param {unknown} body
  * @returns {number}
