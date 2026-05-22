@@ -355,7 +355,7 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 
 ### Faixa F — Project Control Plane
 
-**Status:** pendente.
+**Status:** em execucao; F.1 e auditoria persistente inicial concluidas.
 
 #### Fase F.1 — `.ai` operacional sob escopo do projeto
 
@@ -578,6 +578,23 @@ Observacao: durante a sincronizacao inicial foi solicitado nao validar antes. A 
 ### Proximo item cronologico
 
 Faixa F, Fase F.1: Project Control Plane operacional, memoria `.ai`, auditoria MCP persistente e modelo inicial de jobs.
+
+### 2026-05-22 — Faixa F parcial
+
+1. Criado `src/copilot/.ai/context-pack.md`.
+2. Criadas pastas `src/copilot/.ai/audit/` e `src/copilot/.ai/jobs/` com `.gitkeep`.
+3. `.gitignore` atualizado para ignorar audit/job runtime data mantendo contratos.
+4. `appendMcpAuditEvent()` criado em `src/copilot/mcp/control-plane/audit.js`.
+5. Registry MCP passou a registrar `tool_call_started`, `tool_call_completed` e `tool_call_failed`.
+6. Audit file default: `src/copilot/.ai/audit/mcp-tool-calls.jsonl`.
+7. Override operacional: `COPILOT_MCP_AUDIT_FILE`.
+8. Kill switch operacional: `COPILOT_MCP_AUDIT_DISABLED=true`.
+9. Teste unitario de persistencia audit adicionado.
+10. Validacao focada: typecheck strict, lint MCP e testes MCP passaram.
+
+### Proximo item cronologico apos Faixa F parcial
+
+Faixa F, Fase F.3: modelo inicial de jobs (`spawn_job`, `get_job_output`, `cancel_job`) ainda pendente.
 
 ---
 

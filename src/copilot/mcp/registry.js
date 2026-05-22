@@ -6,6 +6,7 @@
  */
 
 import { gitReadTools } from './tools/git-read.js';
+import { appendMcpAuditEvent } from './control-plane/audit.js';
 import { projectDoctorTool } from './tools/project-doctor.js';
 import { repoReadTools } from './tools/repo-read.js';
 
@@ -41,9 +42,33 @@ export function registerCanonicalMcpTools(server) {
                 inputSchema: tool.inputSchema,
                 annotations: tool.annotations,
             },
-            tool.handler,
+            async (args) => {
+                const startedAt = Date.now();
+                await appendMcpAuditEvent({
+                    event: 'tool_call_started',
+                    tool: tool.name,
+                    readOnly: tool.annotations.readOnlyHint === true,
+                });
+                try {
+                    const result = await tool.handler(args);
+                    await appendMcpAuditEvent({
+                        event: 'tool_call_completed',
+                        tool: tool.name,
+                        durationMs: Date.now() - startedAt,
+                        isError: result.isError === true,
+                    });
+                    return result;
+                } catch (error) {
+                    await appendMcpAuditEvent({
+                        event: 'tool_call_failed',
+                        tool: tool.name,
+                        durationMs: Date.now() - startedAt,
+                        error: error instanceof Error ? error.message : String(error),
+                    });
+                    throw error;
+                }
+            },
         );
     }
     return tools;
 }
-

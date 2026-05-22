@@ -130,6 +130,12 @@ crash_reports/
 .github/hooks/state/.mismatch_track.json
 .github/hooks/state/sdk-always-alive.json
 
+# Copilot MCP operational memory: keep contracts, ignore runtime audit/job data.
+src/copilot/.ai/audit/*
+!src/copilot/.ai/audit/.gitkeep
+src/copilot/.ai/jobs/*
+!src/copilot/.ai/jobs/.gitkeep
+
 
 # =============================================================================
 # Stray file-descriptor redirect artifacts
