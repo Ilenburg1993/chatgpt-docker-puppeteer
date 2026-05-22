@@ -7,6 +7,7 @@
  */
 
 export { performBootWiring } from './boot/boot-wiring.js';
+export { buildTerminalSdkCommandDefinitions, listTerminalSdkCommandSpecs } from './commands/index.js';
 export { SessionMessagesCache, syncSdkHistory } from './history/history-sync.js';
 export {
     buildHookSystemContext,

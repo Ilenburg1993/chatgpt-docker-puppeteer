@@ -51,6 +51,7 @@ import {
     getAgentSdkToolsConfig,
     readAgentSdkModelRegistryEntry,
 } from '../../facades/index.js';
+import { buildTerminalSdkCommandDefinitions } from '../../session/commands/index.js';
 
 /**
  * Contrato mínimo do `AgentContext` exigido pelo setup de sessão.
@@ -359,6 +360,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
         .enableConfigDiscovery(bootConfig.sessionDefaults.enableConfigDiscovery)
         .includeSubAgentStreamingEvents(bootConfig.sessionDefaults.includeSubAgentStreamingEvents)
         .onPermissionRequest(getPermissionHandler(ctx))
+        .commands(buildTerminalSdkCommandDefinitions(host))
         .tools(tools)
         .excludedTools(excludedTools);
 

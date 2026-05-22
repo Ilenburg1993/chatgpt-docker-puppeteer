@@ -20,6 +20,8 @@ import {
     EMITTER_ERROR,
     EMITTER_LLM_USAGE,
     EMITTER_QUESTION_PENDING,
+    EMITTER_SDK_COMMAND_EXECUTED,
+    EMITTER_SDK_LIFECYCLE,
     EMITTER_SESSION_COMPACTION_COMPLETE,
     EMITTER_SESSION_COMPACTION_START,
     EMITTER_SESSION_ERROR,
@@ -151,6 +153,17 @@ const RECOVERABLE_MODEL_CALL_OPERATOR_DETAIL =
 const RECOVERABLE_BYOK_MODEL_CALL_OPERATOR_DETAIL =
     'erro de provider BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque provider/modelo via /byok use ou /byok model; sem Premium Request';
 
+/** @type {Readonly<Record<string, string>>} */
+const SDK_LIFECYCLE_LABELS = Object.freeze({
+    'session.created': 'Sessão SDK criada',
+    'session.deleted': 'Sessão SDK removida',
+    'session.updated': 'Sessão SDK atualizada',
+    'session.foreground': 'Sessão SDK em foreground',
+    'session.background': 'Sessão SDK em background',
+});
+
+const SDK_LIFECYCLE_VISIBLE_TYPES = new Set(['session.created', 'session.deleted', 'session.foreground', 'session.background']);
+
 /**
  * @param {Record<string, unknown>} evt
  * @returns {boolean}
@@ -189,6 +202,67 @@ function sanitizeOperationalErrorMessage(value) {
         .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{12,}/giu, 'Bearer [redacted]')
         .replace(/\b(sk|gsk|hf|csk|nvapi|cpk|cfat|AIza)[A-Za-z0-9._~+/=-]{8,}/gu, '[redacted]')
         .replace(/((?:api[_-]?key|authorization|token|secret)\s*[:=]\s*["']?)[^"',\s;]{8,}/giu, '$1[redacted]');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function normalizeSdkLifecycleString(value) {
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+/**
+ * @param {Record<string, unknown>} metadata
+ * @returns {Record<string, unknown>}
+ */
+function sanitizeSdkLifecycleMetadata(metadata) {
+    const out = /** @type {Record<string, unknown>} */ ({});
+    for (const [key, value] of Object.entries(metadata)) {
+        if (/token|secret|authorization|api[_-]?key/i.test(key)) {
+            out[key] = '[redacted]';
+            continue;
+        }
+        if (typeof value === 'string') {
+            out[key] = sanitizeOperationalErrorMessage(value);
+            continue;
+        }
+        if (value === null || ['number', 'boolean'].includes(typeof value)) {
+            out[key] = value;
+        }
+    }
+    return out;
+}
+
+/**
+ * @param {Record<string, unknown>} evt
+ * @returns {{ type: string; sessionId: string | null; metadata: Record<string, unknown>; label: string; visible: boolean; detail: string }}
+ */
+function normalizeSdkLifecycleEvent(evt) {
+    const type = normalizeSdkLifecycleString(evt?.['type']) ?? 'session.unknown';
+    const sessionId = normalizeSdkLifecycleString(evt?.['sessionId']);
+    const rawMetadata = evt?.['metadata'] && typeof evt['metadata'] === 'object' ? /** @type {Record<string, unknown>} */ (evt['metadata']) : {};
+    const metadata = sanitizeSdkLifecycleMetadata(rawMetadata);
+    const label = SDK_LIFECYCLE_LABELS[type] ?? 'Lifecycle SDK';
+    const summary = normalizeSdkLifecycleString(metadata['summary']);
+    const modifiedTime = normalizeSdkLifecycleString(metadata['modifiedTime']);
+    const startTime = normalizeSdkLifecycleString(metadata['startTime']);
+    const detail = [
+        sessionId ? `id=${sessionId}` : 'id=n/d',
+        summary ? `summary=${summary}` : null,
+        modifiedTime ? `modified=${modifiedTime}` : null,
+        startTime && !modifiedTime ? `start=${startTime}` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+    return {
+        type,
+        sessionId,
+        metadata,
+        label,
+        visible: SDK_LIFECYCLE_VISIBLE_TYPES.has(type),
+        detail,
+    };
 }
 
 /**
@@ -883,6 +957,75 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         broadcastSse(EMITTER_DIALOG_BOOT_RECOVERY, withAgentSseEnvelope(evt, 'agent/dialog.boot_recovery'));
     };
 
+    const onSdkLifecycle = (/** @type {Record<string, unknown>} */ evt) => {
+        const normalized = normalizeSdkLifecycleEvent(evt);
+        recordTerminalActivity('system', normalized.label, {
+            detail: normalized.detail,
+            source: 'sdk.lifecycle',
+            recordHistory: normalized.visible,
+            updateCurrent: normalized.visible,
+        });
+        if (normalized.visible && getShowSessionActivity() && !isTerminalRenderLocked()) {
+            println(
+                `  ${terminalThemeBadge('info', 'SESSION')} ${terminalThemeText('muted', `${normalized.label}: ${normalized.detail}`)}`,
+            );
+        }
+        broadcastSse(
+            EMITTER_SDK_LIFECYCLE,
+            withAgentSseEnvelope(
+                {
+                    type: normalized.type,
+                    sessionId: normalized.sessionId,
+                    metadata: normalized.metadata,
+                    visible: normalized.visible,
+                    label: normalized.label,
+                    detail: normalized.detail,
+                },
+                'agent/sdk.lifecycle',
+            ),
+        );
+    };
+
+    const onSdkCommandExecuted = (/** @type {Record<string, unknown>} */ evt) => {
+        const commandName = typeof evt?.['commandName'] === 'string' ? evt['commandName'] : 'unknown';
+        const localCommand = typeof evt?.['localCommand'] === 'string' ? evt['localCommand'] : null;
+        const sessionId = typeof evt?.['sessionId'] === 'string' ? evt['sessionId'] : null;
+        const args = Array.isArray(evt?.['args']) ? evt['args'].map((item) => String(item)).filter(Boolean) : [];
+        const detail = [
+            commandName,
+            localCommand ? `local=${localCommand}` : null,
+            args.length > 0 ? `args=${args.join(' ')}` : null,
+            sessionId ? `session=${sessionId}` : null,
+        ]
+            .filter(Boolean)
+            .join(' · ');
+        recordTerminalActivity('system', 'Comando SDK executado', {
+            detail,
+            source: 'sdk.command',
+            recordHistory: true,
+            updateCurrent: false,
+        });
+        if (getShowSessionActivity() && !isTerminalRenderLocked()) {
+            println(
+                `  ${terminalThemeBadge('info', 'COMMAND')} ${terminalThemeText('muted', `SDK command: ${detail}`)}`,
+            );
+        }
+        broadcastSse(
+            EMITTER_SDK_COMMAND_EXECUTED,
+            withAgentSseEnvelope(
+                {
+                    commandName,
+                    localCommand,
+                    sessionId,
+                    args,
+                    safe: evt?.['safe'] === true,
+                    description: typeof evt?.['description'] === 'string' ? evt['description'] : null,
+                },
+                'agent/sdk.command',
+            ),
+        );
+    };
+
     agent.on(EMITTER_QUESTION_PENDING, onQuestion);
     agent.on(EMITTER_ERROR, onAgentError);
     agent.on(EMITTER_STOPPED, onStopped);
@@ -905,6 +1048,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     agent.on(AGENT_PR_CONSUMED_EVENT, onPrConsumed);
     agent.on(AGENT_PR_FALLBACK_MODEL_EVENT, onPrFallbackModel);
     agent.on(EMITTER_DIALOG_BOOT_RECOVERY, onDialogBootRecovery);
+    agent.on(EMITTER_SDK_LIFECYCLE, onSdkLifecycle);
+    agent.on(EMITTER_SDK_COMMAND_EXECUTED, onSdkCommandExecuted);
 
     const runtimeState = readTerminalRuntimeState();
     if (runtimeState.pendingQuestion && runtimeState.pendingQuestionKind !== 'ready') {
@@ -939,5 +1084,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         agent.off(AGENT_PR_CONSUMED_EVENT, onPrConsumed);
         agent.off(AGENT_PR_FALLBACK_MODEL_EVENT, onPrFallbackModel);
         agent.off(EMITTER_DIALOG_BOOT_RECOVERY, onDialogBootRecovery);
+        agent.off(EMITTER_SDK_LIFECYCLE, onSdkLifecycle);
+        agent.off(EMITTER_SDK_COMMAND_EXECUTED, onSdkCommandExecuted);
     };
 }

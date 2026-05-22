@@ -124,6 +124,181 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(typeof mod.setupTerminalAgentRuntimeEventListeners).toBe('function');
     });
 
+    it('materializa lifecycle SDK em activity e SSE sem imprimir quando atividade de sessao esta oculta', async () => {
+        getShowSessionActivity.mockReturnValue(false);
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent) });
+        listeners.get('sdk.lifecycle')?.[0]?.({
+            type: 'session.foreground',
+            sessionId: 'sdk-session-1',
+            metadata: {
+                summary: 'Sessao viva',
+                authorization: 'Bearer very-secret-token-value',
+                modifiedTime: '2026-05-22T00:00:00.000Z',
+            },
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Sessão SDK em foreground',
+            expect.objectContaining({
+                detail: expect.stringContaining('id=sdk-session-1'),
+                source: 'sdk.lifecycle',
+                recordHistory: true,
+                updateCurrent: true,
+            }),
+        );
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Sessão SDK em foreground'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'sdk.lifecycle',
+            expect.objectContaining({
+                type: 'session.foreground',
+                sessionId: 'sdk-session-1',
+                visible: true,
+                label: 'Sessão SDK em foreground',
+                metadata: expect.objectContaining({
+                    summary: 'Sessao viva',
+                    authorization: '[redacted]',
+                }),
+                source: 'agent/sdk.lifecycle',
+            }),
+        );
+    });
+
+    it('imprime lifecycle SDK visivel quando atividade de sessao esta habilitada', async () => {
+        getShowSessionActivity.mockReturnValue(true);
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent) });
+        listeners.get('sdk.lifecycle')?.[0]?.({
+            type: 'session.created',
+            sessionId: 'sdk-created-1',
+            metadata: { startTime: '2026-05-22T00:00:00.000Z' },
+        });
+
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Sessão SDK criada: id=sdk-created-1'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'sdk.lifecycle',
+            expect.objectContaining({
+                type: 'session.created',
+                sessionId: 'sdk-created-1',
+                visible: true,
+            }),
+        );
+    });
+
+    it('mantem session.updated como lifecycle discreto para nao poluir streaming', async () => {
+        getShowSessionActivity.mockReturnValue(true);
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent) });
+        listeners.get('sdk.lifecycle')?.[0]?.({
+            type: 'session.updated',
+            sessionId: 'sdk-updated-1',
+            metadata: { modifiedTime: '2026-05-22T00:00:00.000Z' },
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Sessão SDK atualizada',
+            expect.objectContaining({
+                recordHistory: false,
+                updateCurrent: false,
+            }),
+        );
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Sessão SDK atualizada'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'sdk.lifecycle',
+            expect.objectContaining({
+                type: 'session.updated',
+                sessionId: 'sdk-updated-1',
+                visible: false,
+            }),
+        );
+    });
+
+    it('materializa comandos SDK executados como evento de comando sem duplicar resposta da LLM', async () => {
+        getShowSessionActivity.mockReturnValue(true);
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent) });
+        listeners.get('sdk.command.executed')?.[0]?.({
+            commandName: 'terminal_session',
+            localCommand: '/session sdk',
+            sessionId: 'sdk-session-1',
+            args: ['recent'],
+            safe: true,
+            description: 'Mostra sessao',
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Comando SDK executado',
+            expect.objectContaining({
+                detail: expect.stringContaining('terminal_session'),
+                source: 'sdk.command',
+                recordHistory: true,
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('SDK command: terminal_session'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'sdk.command.executed',
+            expect.objectContaining({
+                commandName: 'terminal_session',
+                localCommand: '/session sdk',
+                sessionId: 'sdk-session-1',
+                args: ['recent'],
+                safe: true,
+                source: 'agent/sdk.command',
+            }),
+        );
+    });
+
     it('apresenta tools de arquivo com alvo e operação durante streaming', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');

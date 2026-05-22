@@ -215,6 +215,8 @@ export const AGENT_SHELL_DETACHED_COMPLETED = 'agent:shell:detached_completed';
 /** @readonly */
 export const AGENT_SDK_LIFECYCLE = 'agent:sdk:lifecycle';
 /** @readonly */
+export const AGENT_SDK_COMMAND_EXECUTED = 'agent:sdk:command_executed';
+/** @readonly */
 export const AGENT_MCP_RECONNECTED = 'agent:mcp:reconnected';
 /** @readonly */
 export const AGENT_QUOTA_WARNING = 'agent:quota:warning';
@@ -341,6 +343,7 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'subagent.failed',
     // ── agent lifecycle (F55) ─────────────────────────────────────────────
     'sdk.lifecycle',
+    'sdk.command.executed',
     'session.cleanup',
     'session.keepalive',
     'session.idle',

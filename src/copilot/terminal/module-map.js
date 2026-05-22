@@ -229,7 +229,7 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         kind: 'file',
         role: 'event-adapter',
         tier: 'secondary',
-        risk: 'watch',
+        risk: 'hotspot',
         public: false,
         summary: 'Matriz contratual dos eventos do agent, fontes públicas canônicas, passthrough residual e ignorados.',
     },

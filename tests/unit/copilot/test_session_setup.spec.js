@@ -188,6 +188,48 @@ describe('session-setup (F63)', () => {
             expect(options.injectHookContext).toBe(true);
             expect(typeof options.onPermissionRequest).toBe('function');
             expect(typeof options.onUserInputRequest).toBe('function');
+            expect(Array.isArray(options.commands)).toBe(true);
+            expect(options.commands).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        name: 'terminal_status',
+                        description: expect.any(String),
+                        handler: expect.any(Function),
+                    }),
+                    expect.objectContaining({
+                        name: 'terminal_session',
+                        description: expect.any(String),
+                        handler: expect.any(Function),
+                    }),
+                ]),
+            );
+        });
+
+        it('registra comandos SDK operacionais que emitem evento canonico sem reimplementar o REPL', () => {
+            const tools = /** @type {any} */ (['t1']);
+            const busHooks = /** @type {any} */ ({ mock: true });
+            const options = buildSessionOptions(ctx, host, { tools, busHooks });
+            const commands = /** @type {{ name: string; handler: Function }[]} */ (options.commands);
+            const terminalSession = commands.find((command) => command.name === 'terminal_session');
+
+            terminalSession?.handler({
+                sessionId: 'sdk-session-1',
+                commandName: 'terminal_session',
+                command: 'terminal_session recent',
+                args: ['recent'],
+            });
+
+            expect(host.emit).toHaveBeenCalledWith(
+                'sdk.command.executed',
+                expect.objectContaining({
+                    commandName: 'terminal_session',
+                    command: 'terminal_session recent',
+                    sessionId: 'sdk-session-1',
+                    args: ['recent'],
+                    localCommand: '/session sdk',
+                    safe: true,
+                }),
+            );
         });
 
         it('oculta built-ins legadas de FS na superfície de sessão quando as file-tools canônicas existem', () => {

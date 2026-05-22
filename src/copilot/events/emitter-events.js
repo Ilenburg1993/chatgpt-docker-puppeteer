@@ -128,6 +128,7 @@ export const EMITTER_STEERING_SENT = 'steering.sent';
 
 // ── SDK/Boot ─────────────────────────────────────────────────
 export const EMITTER_SDK_LIFECYCLE = 'sdk.lifecycle';
+export const EMITTER_SDK_COMMAND_EXECUTED = 'sdk.command.executed';
 export const EMITTER_AGENT_METRICS = 'agent.metrics';
 export const EMITTER_MCP_RECONNECTED = 'mcp.reconnected';
 export const EMITTER_QUOTA_WARNING = 'quota.warning';

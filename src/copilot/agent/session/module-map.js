@@ -7,7 +7,7 @@
  */
 
 /**
- * @typedef {'entrypoint' | 'boot' | 'initializer' | 'lifecycle' | 'wiring' | 'history' | 'context' | 'state'} SessionModuleRole
+ * @typedef {'entrypoint' | 'boot' | 'commands' | 'initializer' | 'lifecycle' | 'wiring' | 'history' | 'context' | 'state'} SessionModuleRole
  *
  *
  * @typedef {'primary' | 'secondary' | 'internal'} SessionModuleTier
@@ -51,6 +51,20 @@ export const SESSION_MODULE_LAYOUT = Object.freeze([
         tier: 'secondary',
         public: false,
         summary: 'Barrel puro do contexto de hooks.',
+    },
+    {
+        path: 'commands/index.js',
+        role: 'commands',
+        tier: 'secondary',
+        public: false,
+        summary: 'Barrel puro dos comandos SDK expostos pela sessao.',
+    },
+    {
+        path: 'commands/terminal-sdk-command-definitions.js',
+        role: 'commands',
+        tier: 'secondary',
+        public: false,
+        summary: 'Ponte inicial entre comandos operacionais do terminal e CommandDefinition[] do SDK.',
     },
     {
         path: 'history/index.js',

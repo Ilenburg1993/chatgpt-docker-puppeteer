@@ -1,0 +1,286 @@
+# Terminal Copilot - Guia Canonico de Sessao, Comandos SDK e BYOK
+
+Data: 2026-05-22
+Autor: Codex
+Escopo primario: `src/copilot`
+Fonte anterior consolidada: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/TERMINAL-STREAMING-MODEL-RECOVERY-CODEX-2026-05-20.md`
+
+## 1. Proposito
+
+Este documento substitui o roadmap operacional disperso por um guia mais sobrio para a proxima fase do terminal LLM-B. O foco e manter um fluxo unico, observavel e auditavel para:
+
+- sessoes SDK;
+- sessoes do conversation hub;
+- dialog loop e ask_user;
+- comandos locais e comandos SDK;
+- lifecycle events do SDK;
+- `SessionUiApi`, elicitation e user input;
+- BYOK universal e selecao inteligente de modelos;
+- streaming, tools, deltas e materializacao no terminal.
+
+O terminal nao deve mascarar falhas arquiteturais. A UX e parte do backend operacional: se ela duplica, omite ou rotula mal um evento, o operador fica cego e a arquitetura fica menos verificavel.
+
+## 2. Contratos lidos no SDK local 0.3.0
+
+Auditoria local feita contra:
+
+- `node_modules/@github/copilot-sdk/dist/types.d.ts`
+- `node_modules/@github/copilot-sdk/dist/session.d.ts`
+
+Contratos confirmados:
+
+- `CommandContext`: `{ sessionId, command, commandName, args }`
+- `CommandHandler`: `(context: CommandContext) => Promise<void> | void`
+- `CommandDefinition`: `{ name, description?, handler }`
+- `SessionUiApi`: `elicitation`, `confirm`, `select`, `input`
+- `UserInputRequest`: `question`, `choices?`, `allowFreeform?`
+- `UserInputResponse`: `answer`, `wasFreeform`
+- `UserInputHandler`
+- `ElicitationSchemaField`, `ElicitationSchema`, `ElicitationFieldValue`, `ElicitationResult`, `ElicitationParams`, `ElicitationContext`, `ElicitationHandler`
+- `SessionConfig` e `ResumeSessionConfig`: aceitam `commands`, `onUserInputRequest`, `onElicitationRequest`, `provider`, `model`, `reasoningEffort`, `modelCapabilities`, `streaming`, `includeSubAgentStreamingEvents`, `createSessionFsHandler`, `enableConfigDiscovery`, tools, hooks e outros campos de sessao.
+- `SessionEventType`, `SessionEventPayload`, `TypedSessionEventHandler`, `SessionEventHandler`
+- `ConnectionState`
+- `SessionContext`, `SessionFsConfig`, `SessionListFilter`, `SessionMetadata`
+- `SessionLifecycleEventType`, `SessionLifecycleEvent`, `SessionLifecycleHandler`, `TypedSessionLifecycleHandler`
+- `ForegroundSessionInfo`
+- `CopilotSession`: `send`, `sendAndWait`, `on`, `registerCommands`, `registerTools`, `registerElicitationHandler`, `registerUserInputHandler`, `registerPermissionHandler`, `getMessages`, `disconnect`, `abort`, `setModel`, `log`, `[Symbol.asyncDispose]`.
+
+Contrato negativo tambem confirmado no pacote local:
+
+- `session.keepAlive` e `session.updateMetadata` nao aparecem como APIs publicas no SDK local instalado. Devem continuar fora do roadmap de implementacao direta ate existirem no pacote real.
+
+## 3. Situacao atual consolidada
+
+### 3.1 O que ja esta solido
+
+- Streaming assistant/tool/user input ja passa por trilhas normalizadas antes de chegar ao terminal.
+- `broadcastSse()` e o ponto unico mais importante de fanout publico para terminal/SSE/JSONL.
+- Deltas finais duplicados e algumas duplicacoes de ask_user foram reduzidas em rodadas anteriores.
+- `usage` foi reclassificado: uso de LLM nao e automaticamente Premium Request; BYOK nunca deve ser narrado como Premium Request.
+- BYOK ja possui perfis, catalogo, health, shortlist, recommend, admissao de modelo, safe default, testes reais no runner e cockpit de binding.
+- `/session sdk` ja informa provider vivo, BYOK preparado e boundary de sessao.
+- `/byok status`, `/byok use`, `/byok model`, `/byok recommend`, `/byok health` ja formam a base do cockpit do operador.
+
+### 3.2 O que ainda esta ambiguo
+
+- Comandos locais do terminal e `CommandDefinition` do SDK ainda nao nascem de uma fonte canonica unica.
+- O SDK lifecycle ja e observado no boot do agent, mas o terminal ainda nao materializa esse canal com a mesma riqueza de tools, usage e question.
+- `SessionUiApi` existe em comandos diagnosticos, mas ainda nao virou uma trilha canonicamente integrada de UX, teste e historico.
+- `Elicitation` ainda precisa de teste live e trilha de materializacao comparavel a ask_user.
+- A diferenca entre session SDK, hub session, dialog loop, turn e runtime ainda aparece dispersa na UX.
+- A gestao de sessao pelo operador ainda e mais diagnostica do que operacional: faltam cockpit de nova sessao, trocar sessao, retomar sessao especifica, encerrar/desconectar e pre-sessao assistida.
+- O catalogo BYOK ainda precisa calibrar tokens/limites por provider/modelo e expor filtros de gratuidade/capacidade de forma mais direta.
+
+## 4. Arquitetura canonica TO-BE
+
+### 4.1 Identidades
+
+- SDK session: unidade real do SDK; contem modelo/provider, handlers, tools, commands e historico do SDK.
+- Hub session: unidade local persistida para conversa, auditoria e retomada.
+- Dialog loop: protocolo ask_user/READY que mantem uma conversa operacional dentro da sessao.
+- Turn: uma interacao materializavel, com deltas, tools, usage, arquivos, perguntas, resultado e possivel erro.
+- Runtime: processo local que orquestra boot, agent, terminal, HTTP, SSE, JSONL e estado.
+- Provider binding: provider/modelo efetivamente ligados a sessao viva.
+- BYOK prepared selection: provider/modelo escolhido pelo operador para proxima sessao ou tentativa de binding.
+
+### 4.2 Regra de fanout
+
+Todos os eventos publicos devem convergir para um envelope canonico antes de serem renderizados, exportados ou transmitidos:
+
+1. SDK/local runtime event
+2. Normalizacao e correlacao de turno/sessao
+3. Materializacao em estado terminal
+4. `broadcastSse()`
+5. Render terminal, SSE, JSONL, export e diagnosticos
+
+Nao deve haver emissores paralelos que renderizem a mesma mensagem final ou o mesmo delta final independentemente.
+
+### 4.3 Comandos
+
+Fonte ideal:
+
+- Um catalogo canonico de comandos com metadados (`name`, aliases, categoria, descricao, permissao, escopo, handler local, elegibilidade SDK).
+- O REPL local e os `CommandDefinition[]` do SDK derivam desse catalogo.
+- O `handler` SDK nao deve reimplementar logica. Ele deve chamar o mesmo nucleo do comando local ou emitir uma solicitacao rastreavel para o runtime.
+
+### 4.4 Sessao e lifecycle
+
+Eventos SDK de lifecycle devem ser visiveis como eventos de primeira classe:
+
+- `session.created`
+- `session.deleted`
+- `session.updated`
+- `session.foreground`
+- `session.background`
+
+O operador deve conseguir ver a sessao viva, sessoes resumiveis, provider/modelo de cada uma, status de binding, origem do boot, erros e eventos recentes.
+
+### 4.5 UI SDK, ask_user e elicitation
+
+- `ask_user` e `onUserInputRequest` continuam sendo o caminho canonico do dialog loop.
+- `SessionUiApi.input/select/confirm` deve aparecer como canal explicito de UI SDK, nao confundido com ask_user do dialog loop.
+- Elicitation deve materializar schema, campos, resposta, cancelamento/decline e origem em um envelope canonico.
+- Testes live devem cobrir delta parcial, delta final, tool, ask_user, resposta do operador, elicitation e pos-ask_user.
+
+### 4.6 BYOK
+
+- Um unico arquivo local seguro de perfis BYOK deve concentrar configuracao do operador.
+- O terminal deve carregar perfis, catalogos, health e limites automaticamente.
+- Operador deve conseguir listar providers, filtrar modelos por gratuidade/capacidade/risco, testar modelo em live fake, selecionar, trocar provider/modelo e voltar ao SDK sem corromper sessao.
+- A troca de provider/modelo deve distinguir claramente:
+  - selecao preparada;
+  - binding vivo;
+  - necessidade de nova sessao;
+  - incompatibilidade com sessao atual.
+
+## 5. Achados atuais
+
+### BUG-SDK-LIFE-001 - Lifecycle SDK pouco visivel no terminal
+
+`boot-wiring.js` observa lifecycle do `CopilotClient` e emite `sdk.lifecycle`, mas `terminal/events/agent-runtime-events.js` nao trata esse canal. Resultado: eventos importantes de criacao, delecao, foreground/background e update podem existir no runtime, mas nao entram na UX viva, SSE terminal e timeline do operador com semantica propria.
+
+### GAP-CMD-001 - Comandos locais e SDK commands ainda sao duas arquiteturas
+
+`SessionConfigBuilder.commands()` existe e os tipos SDK estao importados, mas os comandos do REPL vivem em roteadores locais sem uma fonte de metadados unica. Isso impede `/help` dinamico, `CommandDefinition[]` completo e telemetria uniforme.
+
+### GAP-UI-001 - SessionUiApi existe, mas ainda e diagnostico
+
+`SessionUiApi` aparece em comandos `/sdk`, mas a experiencia ainda nao e tratada como workflow de operador com timeline, artefatos e testes live completos.
+
+### GAP-ELICIT-001 - Elicitation ainda nao tem circuito completo comparavel a ask_user
+
+Schemas, respostas, cancelamentos e declinios precisam virar eventos materializados, testaveis e exportaveis.
+
+### GAP-SESS-001 - Gestao de sessao ainda nao tem cockpit operacional completo
+
+Faltam comandos e UX para escolher entre retomar anterior, criar nova, trocar sessao, desconectar, deletar, listar por filtros e entender riscos de provider/modelo por sessao.
+
+### GAP-BYOK-001 - Catalogo ainda precisa de limites/capacidades melhores
+
+O operador ja consegue selecionar e testar providers, mas precisa de filtros mais ricos: free/paid, contexto, vision, tools, JSON, reasoning, limites free, saude local e compatibilidade com fluxo terminal.
+
+## 6. Roadmap
+
+### Faixa A - Fechar BYOK como cockpit operacional
+
+- A1. Persistir evidencia do ultimo live fake e live real por provider/modelo.
+- A2. Calibrar estimativa de tokens por provider/modelo.
+- A3. Expandir `/byok models` com filtros `free`, `vision`, `tools`, `reasoning`, `json`, `healthy`, `terminal-safe`.
+- A4. Fazer `/byok recommend all-providers safe` considerar health por alias de provider/modelo.
+- A5. Separar claramente modelo recomendado, modelo preparado e modelo vivo.
+- A6. Adicionar resumo de limites conhecidos por provider/modelo quando disponivel.
+- A7. Incluir Gemini 403 e NVIDIA ask_user como casos de diagnostico provider-specific.
+- A8. Planejar Ollama local, LiteLLM e vLLM como providers locais.
+
+### Faixa B - Sessao SDK e cockpit de operador
+
+- B1. Materializar `sdk.lifecycle` no terminal com SSE, activity e JSONL.
+- B2. Criar `/session events [n]` ou integrar lifecycle recente ao `/session sdk`.
+- B3. Distinguir no prompt: SDK session, hub session, dialog loop, provider binding e prepared BYOK.
+- B4. Implementar cockpit de nova sessao: criar nova, retomar anterior, selecionar antiga, deletar, desconectar.
+- B5. Avaliar pre-sessao assistida no boot sem quebrar retomada padrao.
+- B6. Expor `SessionListFilter` nos comandos de lista.
+- B7. Expor `SessionMetadata` com provider/modelo/boundary quando possivel.
+- B8. Garantir que troca de provider/modelo nao contamine sessao antiga sem aviso.
+
+### Faixa C - Comandos SDK canonicos
+
+- C1. Inventariar todos os comandos locais e classificar elegibilidade SDK.
+- C2. Criar catalogo canonico de comandos.
+- C3. Fazer `/help`, `/menu` e telemetria lerem o catalogo.
+- C4. Gerar `CommandDefinition[]` a partir do catalogo.
+- C5. Registrar os comandos elegiveis no `SessionConfigBuilder.commands()`.
+- C6. Criar handlers SDK que chamem o mesmo nucleo local ou emitam evento canonico de comando.
+- C7. Testar `CommandContext` com `sessionId`, `command`, `commandName`, `args`.
+- C8. Evitar comandos destrutivos via SDK sem confirmacao.
+
+### Faixa D - User input, ask_user, SessionUiApi e elicitation
+
+- D1. Documentar diferenca entre ask_user do dialog loop e `SessionUiApi`.
+- D2. Criar trilha canonica para `SessionUiApi.input/select/confirm`.
+- D3. Materializar `ElicitationContext` e `ElicitationResult`.
+- D4. Renderizar schemas com campos, required, enum, oneOf e defaults.
+- D5. Persistir resposta/cancelamento/decline.
+- D6. Criar testes live para ask_user + elicitation no mesmo turno.
+- D7. Garantir ausencia de duplicacao entre pergunta pendente, mensagem final e delta final.
+
+### Faixa E - Streaming, tools e materializacao
+
+- E1. Manter `broadcastSse()` como fanout publico unico.
+- E2. Auditar todos os renderizadores diretos que podem duplicar delta final.
+- E3. Criar contrato de "assistant wrote" com delta parcial, delta final e message final.
+- E4. Melhorar tool identity para external completions/progress.
+- E5. Expandir JSONL canonico com turn/session/provider/command correlation.
+- E6. Adicionar fake SDK end-to-end deterministico.
+
+### Faixa F - Session FS, metadata e persistencia
+
+- F1. Auditar `SessionFsConfig` e `createSessionFsHandler`.
+- F2. Expor path/estado de sessao de forma segura.
+- F3. Enriquecer metadata local com provider/modelo/boundary sem depender de API inexistente.
+- F4. Paginar e filtrar sessoes antigas.
+- F5. Validar delecao/desconexao sem perda acidental.
+
+### Faixa G - Testes live e fake
+
+- G1. Runner live padrao deve cobrir: delta parcial, delta final, tool, ask_user, resposta, usage, session cockpit e provider cockpit.
+- G2. Runner BYOK deve cobrir pelo menos dois providers reais e troca de modelo dentro de provider.
+- G3. Live fake deve testar chat sem contaminar a sessao canonica do operador.
+- G4. Fake SDK deve reproduzir `SessionEventType`, lifecycle, commands, user input e elicitation.
+- G5. Artefatos devem apontar claramente falha raiz, nao apenas "timeout".
+
+### Faixa H - Documentacao operacional
+
+- H1. Atualizar README do `src/copilot` com os conceitos de sessao.
+- H2. Criar guia do operador para BYOK.
+- H3. Criar guia do operador para sessoes.
+- H4. Criar matriz de recursos SDK local: suportado, ausente, implementado, planejado.
+- H5. Remover promessas de APIs nao existentes no pacote local.
+
+## 7. Primeira fatia de implementacao
+
+Prioridade imediata:
+
+1. Tratar `sdk.lifecycle` no terminal como evento de primeira classe. **Concluido em 2026-05-22.**
+2. Registrar lifecycle em activity/SSE sem poluir a resposta do assistente. **Concluido em 2026-05-22.**
+3. Atualizar testes de `agent-runtime-events`. **Concluido em 2026-05-22.**
+4. Atualizar este documento com a fatia concluida.
+5. Em seguida, iniciar catalogo canonico de comandos SDK/local.
+
+Implementacao inicial concluida:
+
+- `src/copilot/terminal/events/agent-runtime-events.js` agora escuta `EMITTER_SDK_LIFECYCLE`.
+- Eventos `session.created`, `session.deleted`, `session.foreground` e `session.background` entram em activity/SSE como eventos visiveis, respeitando o toggle de atividade de sessao.
+- `session.updated` continua materializado, mas discreto, para nao poluir streaming e blocos de resposta.
+- Metadados sensiveis de lifecycle sao redigidos antes de fanout.
+- Teste focado: `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
+
+Segunda fatia concluida:
+
+- `src/copilot/agent/session/commands/terminal-sdk-command-definitions.js` registra uma safelist inicial de
+  `CommandDefinition[]`: `terminal_status`, `terminal_health`, `terminal_session`, `terminal_byok` e
+  `terminal_events`.
+- `buildSessionOptions()` injeta esses comandos no `SessionConfigBuilder.commands()`.
+- Os handlers SDK nao duplicam o REPL: emitem `sdk.command.executed` com `CommandContext` normalizado.
+- `src/copilot/terminal/events/agent-runtime-events.js` materializa `sdk.command.executed` em activity/SSE e respeita o
+  toggle de atividade de sessao.
+- `agent/session/module-map.js`, `agent/session/README.md` e `agent/session/commands/index.js` agora declaram o papel
+  `commands` sem bypass cross-folder.
+- `events/event-adapter-events.js` foi reclassificado como hotspot no module-map do terminal, alinhando governanca com
+  tamanho real do arquivo.
+- Teste focado: `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/test_session_setup.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
+
+Proximo passo da Faixa C:
+
+- Extrair um catalogo comum de metadados de comando para deixar `/help`, `/menu`, `CMD_ROUTES` e `CommandDefinition[]`
+  derivados da mesma fonte.
+
+Evidencia live apos as duas primeiras fatias:
+
+- Runner: `artifacts/terminal-live/2026-05-22T00-36-22-750Z/summary.md`.
+- Status: PASS.
+- BYOK: `kilo-code` / `kilo-auto/free`.
+- Validou deltas parciais, bloco final, `report_intent`, `read_file_content`, `ask_user` real, resposta `SIM`,
+  mensagem pos-ask, usage sem Premium Request, `/tools diag`, `/events`, `/errors`, `/health`, export Markdown e
+  ausencia de duplicacao obvia.
+- O archive SSE mostrou `sdk.lifecycle` como evento publico materializado, com `session.updated` discreto.

@@ -11,7 +11,7 @@ arquivos são primários, quais são steps de boot, e quais são suporte secund�
 1. Comece por `index.js` para a superfície pública.
 2. Use `module-map.js` para o inventário executável de papéis, tiers e arquivos.
 3. Leia primeiro os módulos `primary`: `initializers/initializer.js` e `boot/boot-wiring.js`.
-4. Depois desça por papel: `boot`, `lifecycle`, `wiring`, `history`, `context` e `state`.
+4. Depois desça por papel: `boot`, `commands`, `lifecycle`, `wiring`, `history`, `context` e `state`.
 5. Trate `snapshot-store.js` e os substeps de boot como detalhes internos, mesmo quando usados por
    módulos públicos do subsistema.
 
@@ -22,6 +22,7 @@ arquivos são primários, quais são steps de boot, e quais são suporte secund�
 | `entrypoint`  | `index.js`, `module-map.js`                                                                                                           |
 | `initializer` | `initializers/initializer.js`                                                                                                         |
 | `boot`        | `boot/boot-wiring.js`, `boot/boot-steps.js`, `boot/boot-session-prep.js`, `boot/boot-dialog-recovery.js`, `boot/boot-runtime-bind.js` |
+| `commands`    | `commands/index.js`, `commands/terminal-sdk-command-definitions.js`                                                                    |
 | `lifecycle`   | `lifecycle/keepalive.js`, `lifecycle/cleanup.js`, `lifecycle/rotation.js`                                                             |
 | `wiring`      | `wiring/event-wirer.js`                                                                                                               |
 | `history`     | `history/history-sync.js`                                                                                                             |
@@ -39,6 +40,7 @@ agent/session/
   index.js
   module-map.js
   boot/
+  commands/
   context/
   history/
   initializers/
