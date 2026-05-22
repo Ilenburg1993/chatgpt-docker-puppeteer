@@ -28,6 +28,9 @@ npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.j
 - `git_log`
 - `git_branch_info`
 - `project_doctor`
+- `run_copilot_validator`
+- `job_get_output`
+- `job_cancel`
 
 ## Validacao conhecida
 
@@ -38,6 +41,15 @@ npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.j
 
 ## Proximo passo
 
-Continuar a Faixa F: melhorar auditoria persistente, criar modelo de jobs e preparar futuras tools de execucao
-controlada.
+Continuar para Faixa G: escrita controlada, começando por `repo_apply_patch`, mantendo diff, path policy e auditoria.
 
+## Jobs MCP
+
+`run_copilot_validator` executa apenas validadores allowlistados:
+
+- `typecheck`
+- `lint`
+- `unit-mcp`
+- `unit-copilot`
+
+Os logs de job ficam em `src/copilot/.ai/jobs/*.log` e sao ignorados pelo Git.

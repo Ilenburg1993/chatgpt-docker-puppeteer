@@ -18,19 +18,22 @@ describe('copilot MCP registry', () => {
             'git_diff',
             'git_log',
             'git_status',
+            'job_cancel',
+            'job_get_output',
             'project_doctor',
             'repo_read_file',
             'repo_search_text',
             'repo_status',
             'repo_tree',
+            'run_copilot_validator',
         ]);
     });
 
-    it('uses required read-only annotations on every initial tool', () => {
+    it('uses explicit annotations on every initial tool', () => {
         const tools = getCanonicalMcpTools();
 
         for (const tool of tools) {
-            assert.equal(tool.annotations.readOnlyHint, true, tool.name);
+            assert.equal(typeof tool.annotations.readOnlyHint, 'boolean', tool.name);
             assert.equal(tool.annotations.openWorldHint, false, tool.name);
             assert.equal(tool.annotations.destructiveHint, false, tool.name);
         }
@@ -42,4 +45,3 @@ describe('copilot MCP registry', () => {
         assert.equal(new Set(names).size, names.length);
     });
 });
-

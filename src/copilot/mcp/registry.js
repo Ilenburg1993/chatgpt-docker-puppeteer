@@ -7,6 +7,7 @@
 
 import { gitReadTools } from './tools/git-read.js';
 import { appendMcpAuditEvent } from './control-plane/audit.js';
+import { jobTools } from './tools/jobs.js';
 import { projectDoctorTool } from './tools/project-doctor.js';
 import { repoReadTools } from './tools/repo-read.js';
 
@@ -24,7 +25,7 @@ import { repoReadTools } from './tools/repo-read.js';
  * @returns {McpToolDefinition[]}
  */
 export function getCanonicalMcpTools() {
-    return [...repoReadTools, ...gitReadTools, projectDoctorTool];
+    return [...repoReadTools, ...gitReadTools, projectDoctorTool, ...jobTools];
 }
 
 /**

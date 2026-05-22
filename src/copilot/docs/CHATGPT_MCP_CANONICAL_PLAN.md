@@ -592,9 +592,26 @@ Faixa F, Fase F.1: Project Control Plane operacional, memoria `.ai`, auditoria M
 9. Teste unitario de persistencia audit adicionado.
 10. Validacao focada: typecheck strict, lint MCP e testes MCP passaram.
 
-### Proximo item cronologico apos Faixa F parcial
+### 2026-05-22 — Faixa F jobs inicial
 
-Faixa F, Fase F.3: modelo inicial de jobs (`spawn_job`, `get_job_output`, `cancel_job`) ainda pendente.
+1. Criado `src/copilot/mcp/control-plane/jobs.js`.
+2. Criadas tools:
+   - `run_copilot_validator`
+   - `job_get_output`
+   - `job_cancel`
+3. Execucao propositalmente allowlistada, sem `run_admin_command`.
+4. Validadores suportados:
+   - `typecheck`
+   - `lint`
+   - `unit-mcp`
+   - `unit-copilot`
+5. Logs de jobs ficam em `src/copilot/.ai/jobs/*.log`, ignorados pelo Git.
+6. Smoke HTTP confirmou que as tools de jobs aparecem em `tools/list`.
+7. Validacao focada: typecheck strict, lint MCP e testes MCP passaram.
+
+### Proximo item cronologico apos Faixa F jobs inicial
+
+Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, path policy e auditoria.
 
 ---
 

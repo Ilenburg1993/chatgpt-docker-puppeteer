@@ -43,4 +43,6 @@ Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
 - `git_log`
 - `git_branch_info`
 - `project_doctor`
-
+- `run_copilot_validator`
+- `job_get_output`
+- `job_cancel`
