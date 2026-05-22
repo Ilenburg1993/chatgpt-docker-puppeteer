@@ -21,7 +21,17 @@ export const metaTools = [
         handler: async () =>
             okResult({
                 success: true,
-                read: ['repo_status', 'repo_tree', 'repo_root_tree', 'repo_read_file', 'repo_search_text'],
+                read: [
+                    'repo_status',
+                    'repo_tree',
+                    'repo_root_tree',
+                    'repo_read_file',
+                    'repo_read_file_chunks',
+                    'repo_diff_files',
+                    'repo_search_text',
+                    'repo_symbol_search',
+                    'repo_file_outline',
+                ],
                 write: ['repo_write_file', 'repo_create_file', 'repo_apply_patch', 'repo_move_file', 'repo_remove_file'],
                 git: ['git_status', 'git_diff', 'git_log', 'git_branch_info'],
                 validation: [
@@ -43,7 +53,9 @@ export const metaTools = [
                 copilotSdk: ['copilot_sessions_list', 'copilot_session_get'],
                 ioGuidance: [
                     'Use repo_read_file.sha256 as expectedHash for safe write/patch calls.',
+                    'Use repo_read_file_chunks for large files instead of requesting entire content.',
                     'Use repo_search_text.contextLines for investigation and cursor/nextCursor for pagination.',
+                    'Use repo_symbol_search and repo_file_outline before edits that need code navigation.',
                     'Use repo_root_tree or repo_tree path="." for the real workspace root.',
                     'LLM-B can consume MCP optionally, but does not depend on this MCP server.',
                 ],

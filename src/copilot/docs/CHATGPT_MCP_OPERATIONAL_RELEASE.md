@@ -92,9 +92,11 @@ Depois de conectar no ChatGPT:
 4. Chame `repo_root_tree` com `maxEntries=80`.
 5. Chame `repo_search_text` com `contextLines=2`.
 6. Chame `repo_read_file` em `src/copilot/mcp/README.md` e observe `sha256`.
-7. Chame `git_status`.
-8. Chame `mcp_capabilities_summary`, `mcp_tunnel_status` e `mcp_runtime_health`.
-9. Faca um `repo_apply_patch` com `dryRun=true` antes de qualquer escrita real.
+7. Chame `repo_read_file_chunks` em um arquivo maior.
+8. Chame `repo_symbol_search` e `repo_file_outline` antes de qualquer alteracao de codigo.
+9. Chame `git_status`.
+10. Chame `mcp_capabilities_summary`, `mcp_tunnel_status` e `mcp_runtime_health`.
+11. Faca um `repo_apply_patch` com `dryRun=true` antes de qualquer escrita real.
 
 ## 5. Superficie De Tools
 
@@ -104,12 +106,16 @@ Leitura e Git:
 2. `repo_tree`
 3. `repo_root_tree`
 4. `repo_read_file`
-5. `repo_search_text`
-6. `git_status`
-7. `git_diff`
-8. `git_log`
-9. `git_branch_info`
-10. `project_doctor`
+5. `repo_read_file_chunks`
+6. `repo_diff_files`
+7. `repo_search_text`
+8. `repo_symbol_search`
+9. `repo_file_outline`
+10. `git_status`
+11. `git_diff`
+12. `git_log`
+13. `git_branch_info`
+14. `project_doctor`
 
 Conexao ChatGPT:
 
@@ -326,3 +332,29 @@ Executado em 2026-05-22 apos o primeiro uso real do conector no ChatGPT:
    - `npm run typecheck:strict:src.copilot` passou;
    - `npm run lint:copilot` passou;
    - `npm run test:copilot:unit` passou com 3038/3038.
+
+## 13. Upgrade De Paridade IO
+
+Executado em 2026-05-22 para aproximar o MCP das tools locais de leitura/scan da LLM-B sem criar dependencia inversa:
+
+1. `repo_read_file_chunks`:
+   - leitura UTF-8 paginada por linhas;
+   - `chunkLines`, `startLine`, `endLine`, `cursor`, `nextCursor`;
+   - adequado para arquivos grandes.
+2. `repo_diff_files`:
+   - diff unificado entre dois arquivos do workspace;
+   - usa o motor canonico de IO/diff.
+3. `repo_symbol_search`:
+   - busca funcoes, classes, exports, variaveis e tipos;
+   - espelha a intencao de `workspace_symbol_search`.
+4. `repo_file_outline`:
+   - retorna symbols/imports/exports/outline;
+   - espelha a intencao de `workspace_parse_file`.
+5. `mcp_capabilities_summary` e smoke prompts do perfil ChatGPT foram atualizados.
+6. `tools/list` local passa a conter 32 tools.
+7. Validacao executada:
+   - MCP unit focado passou com 42 testes;
+   - typecheck strict passou;
+   - lint passou;
+   - unit completo passou com 3041/3041;
+   - smoke HTTP local passou para `/health`, `tools/list`, `repo_symbol_search` e `repo_read_file_chunks`.

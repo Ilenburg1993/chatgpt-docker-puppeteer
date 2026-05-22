@@ -1015,6 +1015,33 @@ validacao no ChatGPT.
    - priorizar resiliencia de Quick Tunnel temporario, diagnostico de sessao e paridade de tools de leitura/scan com a LLM-B;
    - manter LLM-B independente do MCP server, usando integracoes opcionais e contratos de IO compartilhados.
 
+### 2026-05-22 — Upgrade de paridade IO MCP
+
+1. O MCP passou a expor mais primitivas de leitura/scan alinhadas com `src/copilot/tools` e `#copilot/infra`:
+   - `repo_read_file_chunks`;
+   - `repo_diff_files`;
+   - `repo_symbol_search`;
+   - `repo_file_outline`.
+2. As novas tools nao chamam tools da LLM-B nem inicializam sessao SDK:
+   - reaproveitam diretamente a infraestrutura canonica de IO;
+   - preservam independencia da LLM-B em relacao ao MCP;
+   - mantem outputs estruturados e read-only annotations.
+3. `mcp_capabilities_summary` e `chatgpt_connector_profile` foram atualizados para orientar o ChatGPT:
+   - chunked reads para arquivos grandes;
+   - busca simbolica antes de alteracoes;
+   - outline/parser antes de edicoes com impacto.
+4. `tools/list` agora expoe 32 tools canonicas.
+5. Validacao focada executada:
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com 10 suites e 42 testes;
+   - `npm run typecheck:strict:src.copilot` passou;
+   - `npm run lint:copilot` passou.
+6. Validacao ampla e smoke HTTP local:
+   - `npm run test:copilot:unit` passou com 3041 testes, 3041 aprovados, 1008 suites e zero warnings/errors;
+   - `GET /health` local passou;
+   - `POST /mcp tools/list` local confirmou a presenca das novas tools;
+   - `tools/call repo_symbol_search` passou para `repoReadTools`;
+   - `tools/call repo_read_file_chunks` passou para `src/copilot/mcp/tools/repo-read.js`.
+
 ---
 
 ## 9. Criterios de pronto por faixa

@@ -5,7 +5,8 @@
  * @module copilot/mcp/tools/repo-read
  */
 
-import { readText, scanDirectory, searchText } from '#copilot/infra/public/io';
+import { parseFileForContext } from '#copilot/infra';
+import { diffText, readText, readTextChunks, scanDirectory, searchText, searchWorkspaceSymbols } from '#copilot/infra/public/io';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { z } from 'zod';
 import { readOnlyAnnotations } from '../control-plane/annotations.js';
@@ -141,6 +142,99 @@ export const repoReadTools = [
         },
     },
     {
+        name: 'repo_read_file_chunks',
+        title: 'Read repository file chunks',
+        description:
+            'Read a UTF-8 file in line chunks for large-file navigation. Returns chunk metadata and nextCursor.',
+        inputSchema: {
+            path: z.string().min(1).describe('Workspace-relative file path.'),
+            startLine: z.number().int().min(1).optional().describe('Optional 1-based first line.'),
+            endLine: z.number().int().min(1).optional().describe('Optional 1-based last line.'),
+            chunkLines: z.number().int().min(1).max(1000).optional().describe('Lines per chunk. Default: 200.'),
+            cursor: z.string().optional().describe('Next-line cursor returned by a previous call.'),
+            highWaterMark: z
+                .number()
+                .int()
+                .min(1024)
+                .max(16 * 1024 * 1024)
+                .optional()
+                .describe('Optional stream highWaterMark in bytes.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ path, startLine, endLine, chunkLines, cursor, highWaterMark }) => {
+            const resolved = await resolveReadPath(path);
+            if (!resolved.ok) return errorResult(resolved.reason);
+            const parsedCursorLine = cursor !== undefined ? Number.parseInt(cursor, 10) : null;
+            if (parsedCursorLine !== null && (!Number.isFinite(parsedCursorLine) || parsedCursorLine < 1)) {
+                return errorResult('cursor must be a positive line number string.');
+            }
+            const effectiveStartLine = parsedCursorLine ?? startLine ?? 1;
+            if (endLine !== undefined && endLine < effectiveStartLine) {
+                return errorResult('endLine must be greater than or equal to the effective start line.');
+            }
+            const snapshot = await readTextChunks(resolved.resolved, {
+                startLine: effectiveStartLine,
+                ...(endLine !== undefined ? { endLine } : {}),
+                chunkLines: chunkLines ?? 200,
+                ...(highWaterMark !== undefined ? { highWaterMark } : {}),
+            });
+            const lastChunk = snapshot.chunks[snapshot.chunks.length - 1];
+            const lastReturnedLine = lastChunk?.endLine ?? effectiveStartLine - 1;
+            const nextCursor =
+                snapshot.totalLinesKnown && lastReturnedLine < snapshot.totalLines ? String(lastReturnedLine + 1) : null;
+            const text = snapshot.chunks.map((chunk) => chunk.content).join('\n');
+            return okResult(
+                {
+                    success: true,
+                    path: resolved.relative,
+                    chunks: snapshot.chunks,
+                    chunkCount: snapshot.chunks.length,
+                    chunkLines: chunkLines ?? 200,
+                    startLine: effectiveStartLine,
+                    endLine: endLine ?? null,
+                    totalLines: snapshot.totalLines,
+                    totalLinesKnown: snapshot.totalLinesKnown,
+                    bytes: snapshot.bytesRead,
+                    sizeBytes: snapshot.sizeBytes,
+                    nextCursor,
+                    cursor: cursor ?? null,
+                    engine: snapshot.io.engine,
+                },
+                text,
+            );
+        },
+    },
+    {
+        name: 'repo_diff_files',
+        title: 'Diff repository files',
+        description: 'Return a unified diff between two workspace files using the canonical IO diff engine.',
+        inputSchema: {
+            pathA: z.string().min(1).describe('Workspace-relative baseline file path.'),
+            pathB: z.string().min(1).describe('Workspace-relative comparison file path.'),
+            contextLines: z.number().int().min(0).max(20).optional().describe('Diff context lines. Default: 3.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ pathA, pathB, contextLines }) => {
+            const resolvedA = await resolveReadPath(pathA);
+            if (!resolvedA.ok) return errorResult(`pathA: ${resolvedA.reason}`);
+            const resolvedB = await resolveReadPath(pathB);
+            if (!resolvedB.ok) return errorResult(`pathB: ${resolvedB.reason}`);
+            const diff = await diffText(resolvedA.resolved, resolvedB.resolved, { contextLines: contextLines ?? 3 });
+            return okResult(
+                {
+                    success: true,
+                    pathA: resolvedA.relative,
+                    pathB: resolvedB.relative,
+                    identical: diff.identical,
+                    diff: diff.diff,
+                    engine: diff.io.engine,
+                    contextLines: contextLines ?? 3,
+                },
+                diff.diff,
+            );
+        },
+    },
+    {
         name: 'repo_search_text',
         title: 'Search repository text',
         description: 'Search text or regex inside the workspace and return matching lines.',
@@ -195,6 +289,88 @@ export const repoReadTools = [
                 engine: result.engine,
             };
             return okResult(structured, result.output);
+        },
+    },
+    {
+        name: 'repo_symbol_search',
+        title: 'Search repository symbols',
+        description:
+            'Search functions, classes, exports, variables and types in the workspace using the canonical IO symbol search.',
+        inputSchema: {
+            name: z.string().min(1).describe('Symbol name, prefix or substring to search.'),
+            kind: z
+                .enum(['function', 'class', 'variable', 'export', 'type', 'all'])
+                .optional()
+                .describe('Symbol kind. Default: all.'),
+            path: z.string().optional().describe('Workspace-relative search root. Default: src/copilot.'),
+            includePattern: z.string().optional().describe('Optional include glob, for example *.js.'),
+            caseSensitive: z.boolean().optional().describe('Case-sensitive search. Default: false.'),
+            exactMatch: z.boolean().optional().describe('Require exact symbol name. Default: false.'),
+            maxResults: z.number().int().min(1).max(500).optional().describe('Maximum matches returned.'),
+            cursor: z.string().optional().describe('Cursor returned by a previous repo_symbol_search call.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ name, kind, path, includePattern, caseSensitive, exactMatch, maxResults, cursor }) => {
+            const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH));
+            if (!resolved.ok) return errorResult(resolved.reason);
+            const result = await searchWorkspaceSymbols(resolved.resolved, {
+                symbolName: name,
+                kind: kind ?? 'all',
+                includePattern,
+                caseSensitive: caseSensitive === true,
+                exactMatch: exactMatch === true,
+                maxResults,
+                cursor,
+            });
+            return okResult(
+                {
+                    success: true,
+                    path: resolved.relative,
+                    symbol: name,
+                    kind: kind ?? 'all',
+                    output: result.output,
+                    matchCount: result.matchCount,
+                    totalMatches: result.totalMatches ?? result.matchCount,
+                    truncated: Boolean(result.truncated),
+                    nextCursor: result.nextCursor ?? null,
+                    cursorOffset: result.cursorOffset ?? 0,
+                    engine: result.engine,
+                },
+                result.output,
+            );
+        },
+    },
+    {
+        name: 'repo_file_outline',
+        title: 'Repository file outline',
+        description:
+            'Parse a workspace file and return symbols, imports, exports, outline and optional top comments for navigation.',
+        inputSchema: {
+            path: z.string().min(1).describe('Workspace-relative file path.'),
+            includeImports: z.boolean().optional().describe('Include imports. Default: true.'),
+            includeExports: z.boolean().optional().describe('Include exports. Default: true.'),
+            includeOutline: z.boolean().optional().describe('Include textual outline. Default: true.'),
+            includeTopComments: z.boolean().optional().describe('Include top comments. Default: false.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ path, includeImports, includeExports, includeOutline, includeTopComments }) => {
+            const resolved = await resolveReadPath(path);
+            if (!resolved.ok) return errorResult(resolved.reason);
+            const snapshot = await readText(resolved.resolved);
+            const parsed = await parseFileForContext(resolved.resolved, snapshot.content);
+            const structured = {
+                success: true,
+                path: resolved.relative,
+                sha256: snapshot.contentHash,
+                symbols: parsed.symbols.symbols,
+                parseError: parsed.symbols.parseError ?? null,
+                ...(includeImports !== false ? { imports: parsed.symbols.imports } : {}),
+                ...(includeExports !== false ? { exports: parsed.symbols.exports } : {}),
+                ...(includeOutline !== false ? { outline: parsed.outline } : {}),
+                ...(includeTopComments === true ? { topComments: parsed.topComments } : {}),
+            };
+            const text = Array.isArray(structured.outline) ? structured.outline.join('\n') : '';
+            return okResult(structured, text);
         },
     },
 ];

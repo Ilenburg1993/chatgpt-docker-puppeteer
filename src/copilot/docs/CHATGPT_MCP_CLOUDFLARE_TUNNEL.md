@@ -640,3 +640,5 @@ Validadores:
    - registrar a URL ativa em `src/copilot/.ai/cloudflare/quick-tunnel.json`;
    - expor recuperacao por `copilot:mcp:cloudflare:status`, `doctor` e `smoke`;
    - nao introduzir dependencia de dominio fixo ate nova decisao explicita.
+9. Apos o upgrade de paridade IO, `tools/list` local passa a expor 32 tools; o proximo smoke remoto deve confirmar esse
+   numero no endpoint temporario ativo.

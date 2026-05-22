@@ -57,7 +57,11 @@ Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
 - `repo_tree`
 - `repo_root_tree`
 - `repo_read_file`
+- `repo_read_file_chunks`
+- `repo_diff_files`
 - `repo_search_text`
+- `repo_symbol_search`
+- `repo_file_outline`
 - `git_status`
 - `git_diff`
 - `git_log`
@@ -113,6 +117,10 @@ As tools MCP de leitura espelham o plano de IO usado pelas tools locais da LLM-B
 - `repo_tree` aceita `path=""` como default `src/copilot`; use `path="."` ou `repo_root_tree` para a raiz real.
 - `repo_search_text` aceita `contextLines` de 0 a 10 e `cursor` retornado por `nextCursor`.
 - `repo_read_file` retorna `sha256` e `returnedSha256` para permitir read -> apply/write com `expectedHash`.
+- `repo_read_file_chunks` pagina arquivos grandes por linhas e retorna `nextCursor`.
+- `repo_diff_files` usa o diff canonico de IO para comparar dois arquivos do workspace.
+- `repo_symbol_search` espelha `workspace_symbol_search` para navegacao por declaracoes.
+- `repo_file_outline` espelha `workspace_parse_file` para symbols/imports/exports/outline sem expor runtime da LLM-B.
 
 A LLM-B continua independente do MCP server. Ela pode consumir MCP por opt-in, mas o chat local nao passa a depender do
 servidor MCP para boot ou uso normal.
