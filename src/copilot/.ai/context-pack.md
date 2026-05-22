@@ -60,8 +60,7 @@ npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.j
 
 ## Proximo passo
 
-Faixa K.1/K.2 foi preparada. Continuar para K.3: documentacao de release operacional, checklist de seguranca,
-troubleshooting e comandos.
+Faixa K foi preparada. Continuar para Faixa L/M: smoke HTTP completo e validacao externa quando houver endpoint HTTPS real.
 
 ## Jobs MCP
 
@@ -103,6 +102,14 @@ Essas tools consultam o registry ativo sem criar, retomar ou acionar sessoes LLM
 - `GET /health` retorna metricas em memoria.
 - `mcp_runtime_health` retorna workspace root, uptime e metricas por tool.
 - `repo_remove_file` nao retorna snapshot base64 do conteudo removido.
+
+## Release operacional
+
+Documento:
+
+```text
+src/copilot/docs/CHATGPT_MCP_OPERATIONAL_RELEASE.md
+```
 
 Os logs de job ficam em `src/copilot/.ai/jobs/*.log` e sao ignorados pelo Git.
 

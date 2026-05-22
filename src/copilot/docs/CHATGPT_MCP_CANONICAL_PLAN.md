@@ -483,10 +483,10 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 
 #### Fase K.3 — Documentacao final
 
-1. Atualizar README do modulo.
-2. Atualizar este plano.
-3. Registrar comandos de operacao.
-4. Registrar troubleshooting.
+1. Atualizar README do modulo — concluido.
+2. Atualizar este plano — concluido.
+3. Registrar comandos de operacao — concluido em `CHATGPT_MCP_OPERATIONAL_RELEASE.md`.
+4. Registrar troubleshooting — concluido em `CHATGPT_MCP_OPERATIONAL_RELEASE.md`.
 
 ---
 
@@ -832,6 +832,26 @@ de escrita/execucao.
 ### Proximo item cronologico apos K.1/K.2
 
 Faixa K.3: finalizar documentacao de release operacional, incluindo checklist de seguranca, troubleshooting e comandos.
+
+### 2026-05-22 — Faixa K.3 documentacao de release
+
+1. Criado `src/copilot/docs/CHATGPT_MCP_OPERATIONAL_RELEASE.md`.
+2. O documento cobre:
+   - escopo;
+   - entrypoints;
+   - campos do conector ChatGPT;
+   - smoke tests;
+   - superficie de tools;
+   - guardrails;
+   - validadores canonicos;
+   - observabilidade;
+   - troubleshooting;
+   - release gate.
+
+### Proximo item cronologico apos Faixa K
+
+Faixa L/M: usar o proprio MCP para execucoes finais de release, smoke HTTP completo e, quando houver endpoint HTTPS real,
+validacao no ChatGPT.
 
 ---
 
