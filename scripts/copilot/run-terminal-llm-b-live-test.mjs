@@ -92,7 +92,17 @@ function buildScenarioPrompt() {
 }
 
 function buildNoPrProbeCommands() {
-    return ['/usage now', '/activity 20', '/metrics', '/events 20', '/events 20 --raw', '/errors 10', '/quit'];
+    return [
+        '/usage now',
+        '/activity 20',
+        '/session sdk events 20',
+        '/session sdk waits 20',
+        '/metrics',
+        '/events 20',
+        '/events 20 --raw',
+        '/errors 10',
+        '/quit',
+    ];
 }
 
 function buildByokProbeCommands({ fixtureBaseUrl = 'http://127.0.0.1:11434/v1' } = {}) {
@@ -306,7 +316,16 @@ function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, 
 }
 
 function buildByokRealNoPrDiagnosticCommands() {
-    return ['/usage now', '/activity 20', '/metrics', '/events 60', '/events 100 --raw', '/errors 10'];
+    return [
+        '/usage now',
+        '/activity 20',
+        '/session sdk events 40',
+        '/session sdk waits 40',
+        '/metrics',
+        '/events 60',
+        '/events 100 --raw',
+        '/errors 10',
+    ];
 }
 
 function startByokFixtureProviderServer() {
@@ -1289,6 +1308,16 @@ function evaluateNoPrOutput(plain, sseSummary) {
             id: 'activity-visible',
             pass: /Atividade Atual da LLM-B/.test(plain) && /Streaming público/.test(plain),
             detail: '/activity rendered activity and streaming diagnostics sections',
+        },
+        {
+            id: 'sdk-session-events-cockpit-visible',
+            pass: /Eventos SDK da sessão/.test(plain) && /fonte=archive SSE canônico/.test(plain),
+            detail: '/session sdk events rendered lifecycle/command diagnostics from the canonical archive',
+        },
+        {
+            id: 'sdk-session-waits-cockpit-visible',
+            pass: /Waits SDK da sessão/.test(plain) && /ask_user=\d+/.test(plain) && /elicitation=\d+/.test(plain),
+            detail: '/session sdk waits rendered ask_user/elicitation/permission diagnostics from the canonical archive',
         },
         {
             id: 'metrics-visible',

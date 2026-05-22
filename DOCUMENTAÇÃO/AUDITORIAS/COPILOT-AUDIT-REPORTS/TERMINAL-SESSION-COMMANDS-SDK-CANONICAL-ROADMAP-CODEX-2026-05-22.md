@@ -294,7 +294,11 @@ Terceira fatia concluida:
 - `/session sdk waits [n]` agrega `user_input.*`, `elicitation.*` e `permission.*` publicados no mesmo fanout canonico,
   criando uma visao operacional unica para ask_user, SessionUiApi/elicitation e permissoes.
 - `/help` passou a expor a lente nova junto do cockpit de sessao.
+- O runner live `scripts/copilot/run-terminal-llm-b-live-test.mjs --no-pr` agora executa e valida
+  `/session sdk events` e `/session sdk waits`, para que a regressao seja visivel sem abrir turno LLM explicito.
 - Teste focado: `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/terminal/test_commands_session.spec.js`.
+- Evidencia live no-PR: `artifacts/terminal-live/2026-05-22T00-49-31-572Z/summary.md` (PASS, BYOK kilo-code,
+  zero turno explicito, criterios `sdk-session-events-cockpit-visible` e `sdk-session-waits-cockpit-visible` verdes).
 
 Proximo passo da Faixa B/C:
 
