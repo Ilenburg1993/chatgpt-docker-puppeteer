@@ -8,6 +8,7 @@
 import { gitReadTools } from './tools/git-read.js';
 import { appendMcpAuditEvent } from './control-plane/audit.js';
 import { connectionTools } from './tools/connection.js';
+import { copilotSessionTools } from './tools/copilot-session.js';
 import { jobTools } from './tools/jobs.js';
 import { projectDoctorTool } from './tools/project-doctor.js';
 import { repoReadTools } from './tools/repo-read.js';
@@ -27,7 +28,15 @@ import { repoWriteTools } from './tools/repo-write.js';
  * @returns {McpToolDefinition[]}
  */
 export function getCanonicalMcpTools() {
-    return [...repoReadTools, ...gitReadTools, projectDoctorTool, ...jobTools, ...connectionTools, ...repoWriteTools];
+    return [
+        ...repoReadTools,
+        ...gitReadTools,
+        projectDoctorTool,
+        ...jobTools,
+        ...connectionTools,
+        ...repoWriteTools,
+        ...copilotSessionTools,
+    ];
 }
 
 /**

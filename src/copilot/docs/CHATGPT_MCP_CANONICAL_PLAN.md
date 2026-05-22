@@ -447,7 +447,7 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 
 ### Faixa J — Integracao Copilot SDK 0.3.0
 
-**Status:** J.1 concluida; J.2 pendente.
+**Status:** J concluida no lado MCP/local.
 
 #### Fase J.1 — Consumidor local
 
@@ -457,9 +457,9 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 
 #### Fase J.2 — Delegacao
 
-1. Expor tools MCP futuras para criar ou acionar sessao Copilot.
-2. Nao fazer o boot da LLM-B depender dessas tools.
-3. Registrar eventos no hub/observability quando aplicavel.
+1. Expor tools MCP futuras para criar ou acionar sessao Copilot — concluido como leitura/delegacao segura de estado.
+2. Nao fazer o boot da LLM-B depender dessas tools — concluido.
+3. Registrar eventos no hub/observability quando aplicavel — coberto pelo audit wrapper MCP; hub profundo fica para K/L.
 
 ### Faixa K — Hardening e release operacional
 
@@ -778,6 +778,34 @@ Faixa J: integracao opcional do LLM-B/Copilot SDK com o MCP local sem criar depe
 ### Proximo item cronologico apos Faixa J.1
 
 Faixa J.2: expor uma delegacao MCP segura para consultar estado de sessoes Copilot/LLM-B sem obrigar boot da LLM-B.
+
+### 2026-05-22 — Faixa J.2 leitura segura de sessoes Copilot
+
+1. Criado `src/copilot/mcp/tools/copilot-session.js`.
+2. Tools registradas:
+   - `copilot_sessions_list`
+   - `copilot_session_get`
+3. As tools leem `defaultSdkSessionRegistry` via facades publicas de `#copilot/sdk/session`.
+4. As tools nao:
+   - criam sessao;
+   - retomam sessao;
+   - disparam turno LLM-B;
+   - expoem objeto vivo `session`.
+5. Retorno publico contem apenas:
+   - `sessionId`
+   - `model`
+   - `createdAt`
+   - `messagesCount`
+6. Validacao executada:
+   - `npm run typecheck:strict:src.copilot` passou.
+   - `npm run lint:copilot` passou.
+   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache` passou.
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 8 arquivos, 27 testes.
+
+### Proximo item cronologico apos Faixa J
+
+Faixa K: hardening e release operacional, com revisao de seguranca das tool descriptions, outputs, prompts e superficie
+de escrita/execucao.
 
 ---
 

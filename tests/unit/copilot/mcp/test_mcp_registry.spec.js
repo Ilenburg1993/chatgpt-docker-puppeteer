@@ -16,6 +16,8 @@ describe('copilot MCP registry', () => {
         assert.deepEqual(names, [
             'chatgpt_connector_profile',
             'chatgpt_connector_url_check',
+            'copilot_session_get',
+            'copilot_sessions_list',
             'git_branch_info',
             'git_diff',
             'git_log',

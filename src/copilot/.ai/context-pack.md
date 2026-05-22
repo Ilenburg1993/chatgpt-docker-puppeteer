@@ -55,11 +55,11 @@ npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.j
 - Faixa H.1 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 6 arquivos e 21 testes.
 - Faixa H.2 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 6 arquivos e 22 testes.
 - Faixa J.1 MCP: typecheck strict passou, lint completo passou, lint MCP/config passou, testes MCP focados passaram com 7 arquivos e 24 testes.
+- Faixa J.2 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 8 arquivos e 27 testes.
 
 ## Proximo passo
 
-Faixa J.1 foi preparada. Continuar para J.2: delegacao MCP segura para consultar estado de sessoes Copilot/LLM-B sem
-obrigar boot da LLM-B.
+Faixa J foi preparada no lado MCP/local. Continuar para Faixa K: hardening e release operacional.
 
 ## Jobs MCP
 
@@ -88,6 +88,13 @@ COPILOT_MCP_SERVERS=copilot-local npm run terminal:llm-b
 ```
 
 Sem essa env, LLM-B continua independente do MCP server.
+
+Tools de leitura segura de sessoes:
+
+- `copilot_sessions_list`
+- `copilot_session_get`
+
+Essas tools consultam o registry ativo sem criar, retomar ou acionar sessoes LLM-B.
 
 Os logs de job ficam em `src/copilot/.ai/jobs/*.log` e sao ignorados pelo Git.
 

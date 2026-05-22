@@ -52,6 +52,8 @@ Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
 - `job_cancel`
 - `chatgpt_connector_profile`
 - `chatgpt_connector_url_check`
+- `copilot_sessions_list`
+- `copilot_session_get`
 - `repo_write_file`
 - `repo_create_file`
 - `repo_apply_patch`
@@ -76,6 +78,8 @@ node src/copilot/mcp/index.js --transport stdio
 ```
 
 By default `COPILOT_MCP_SERVERS` remains empty, so LLM-B boots normally when the MCP server is offline.
+The MCP server can also inspect active SDK sessions through read-only metadata tools; these tools do not start LLM-B and
+do not expose live session objects.
 
 As ferramentas usam a política de path existente e permanecem sob a raiz do workspace. As tools de escrita controlada
 retornam diff unificado, suportam `dryRun` quando aplicável e gravam metadados de auditoria MCP sem persistir o texto
