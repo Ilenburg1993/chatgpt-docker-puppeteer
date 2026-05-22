@@ -258,3 +258,29 @@ Antes de considerar este release operacional:
 8. ChatGPT recebeu endpoint HTTPS real.
 9. Smoke tests read-only passaram no ChatGPT.
 10. Primeira escrita real foi precedida por `dryRun=true`.
+
+## 11. Smoke Local Executado
+
+Executado em 2026-05-22:
+
+1. `npm run copilot:mcp:http` subiu em `http://127.0.0.1:3333/mcp`.
+2. `GET /health` respondeu:
+   - `ok=true`;
+   - `name=copilot-mcp`;
+   - `mcpPath=/mcp`.
+3. `GET /chatgpt-connector.json?publicMcpUrl=https://example.openai-tunnel.test` respondeu:
+   - `name=Repo DevContainer MCP`;
+   - `connectorUrl=https://example.openai-tunnel.test/mcp`;
+   - `authMode=secure-mcp-tunnel`.
+4. `tools/list` respondeu com 26 tools.
+5. `tools/list` incluiu:
+   - `repo_status`;
+   - `repo_apply_patch`;
+   - `mcp_runtime_health`;
+   - `copilot_sessions_list`.
+6. `tools/call mcp_runtime_health` respondeu `success=true`.
+7. `tools/call repo_status` respondeu `success=true` e `branch=main`.
+8. `GET /health` apos chamadas reportou metricas com chamadas registradas.
+
+Observacao para chamadas HTTP manuais: enviar header `Accept: application/json, text/event-stream`, pois o transporte
+Streamable HTTP do MCP exige aceitar JSON e SSE.

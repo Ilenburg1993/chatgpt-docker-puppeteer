@@ -102,6 +102,7 @@ Essas tools consultam o registry ativo sem criar, retomar ou acionar sessoes LLM
 - `GET /health` retorna metricas em memoria.
 - `mcp_runtime_health` retorna workspace root, uptime e metricas por tool.
 - `repo_remove_file` nao retorna snapshot base64 do conteudo removido.
+- Smoke HTTP local de release passou com 26 tools em `tools/list`, `mcp_runtime_health`, `repo_status` e metricas em `/health`.
 
 ## Release operacional
 

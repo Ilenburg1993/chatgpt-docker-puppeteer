@@ -853,6 +853,22 @@ Faixa K.3: finalizar documentacao de release operacional, incluindo checklist de
 Faixa L/M: usar o proprio MCP para execucoes finais de release, smoke HTTP completo e, quando houver endpoint HTTPS real,
 validacao no ChatGPT.
 
+### 2026-05-22 — Smoke HTTP local de release
+
+1. `npm run copilot:mcp:http` subiu em `http://127.0.0.1:3333/mcp`.
+2. `GET /health` passou.
+3. `GET /chatgpt-connector.json?publicMcpUrl=https://example.openai-tunnel.test` passou.
+4. `tools/list` passou com header `Accept: application/json, text/event-stream`.
+5. `tools/list` retornou 26 tools.
+6. Confirmadas tools:
+   - `repo_status`
+   - `repo_apply_patch`
+   - `mcp_runtime_health`
+   - `copilot_sessions_list`
+7. `tools/call mcp_runtime_health` passou.
+8. `tools/call repo_status` passou em `main`.
+9. `GET /health` confirmou metricas apos tool calls.
+
 ---
 
 ## 9. Criterios de pronto por faixa
