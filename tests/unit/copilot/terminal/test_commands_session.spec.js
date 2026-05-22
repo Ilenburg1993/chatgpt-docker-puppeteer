@@ -932,6 +932,16 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('Este comando não cria eventos');
     });
 
+    it('cmdSessionSdk commands lista CommandDefinition[] expostos ao SDK', async () => {
+        const ctx = mockCtx();
+        await cmdSessionSdk({ println: ctx.println }, 'commands');
+        expect(ctx.output()).toContain('Comandos SDK expostos ao Copilot');
+        expect(ctx.output()).toContain('terminal_status');
+        expect(ctx.output()).toContain('/status');
+        expect(ctx.output()).toContain('terminal_session_waits');
+        expect(ctx.output()).toContain('sdk.command.executed');
+    });
+
     it('cmdSessionSdkWaits agrega ask_user, elicitation e permission pelo archive SSE canônico', async () => {
         const emptyProjection = (/** @type {string} */ event) => ({
             entries: [],

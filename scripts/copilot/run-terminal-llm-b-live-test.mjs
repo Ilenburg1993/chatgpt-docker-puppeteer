@@ -95,6 +95,7 @@ function buildNoPrProbeCommands() {
     return [
         '/usage now',
         '/activity 20',
+        '/session sdk commands',
         '/session sdk events 20',
         '/session sdk waits 20',
         '/metrics',
@@ -319,6 +320,7 @@ function buildByokRealNoPrDiagnosticCommands() {
     return [
         '/usage now',
         '/activity 20',
+        '/session sdk commands',
         '/session sdk events 40',
         '/session sdk waits 40',
         '/metrics',
@@ -1308,6 +1310,11 @@ function evaluateNoPrOutput(plain, sseSummary) {
             id: 'activity-visible',
             pass: /Atividade Atual da LLM-B/.test(plain) && /Streaming público/.test(plain),
             detail: '/activity rendered activity and streaming diagnostics sections',
+        },
+        {
+            id: 'sdk-session-command-catalog-visible',
+            pass: /Comandos SDK expostos ao Copilot/.test(plain) && /terminal_status/.test(plain),
+            detail: '/session sdk commands rendered the CommandDefinition catalog exposed to the SDK',
         },
         {
             id: 'sdk-session-events-cockpit-visible',

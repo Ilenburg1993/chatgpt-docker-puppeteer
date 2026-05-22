@@ -44,6 +44,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/abort\x1b[0m                               — aborta apenas o turno SDK ativo
   \x1b[33m/mailbox [status|consume|clear]\x1b[0m      — inspeciona/consome/limpa a fila mailbox zero-PR
   \x1b[33m/session [sdk [n]]\x1b[0m                   — cockpit da sessão SDK persistente; snapshots ficam em save/list/restore
+  \x1b[33m/session sdk commands\x1b[0m                — comandos CommandDefinition[] registrados no SDK
   \x1b[33m/session sdk events [n]\x1b[0m              — lifecycle/commands SDK resumidos a partir do archive SSE canônico
   \x1b[33m/session sdk waits [n]\x1b[0m               — ask_user/elicitation/permission publicados pelo fanout canônico
   \x1b[33m/session sdk next <new|resume <id|#n|current|last|foreground>|auto>\x1b[0m — agenda seleção de sessão SDK para o próximo boot

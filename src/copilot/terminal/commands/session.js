@@ -11,6 +11,7 @@
 
 import { COPILOT_OPERATIONAL_PROFILE, getEffectiveSdkAgentSelection } from '#copilot/config';
 import { toError } from '#copilot/core';
+import { listTerminalSdkCommandSpecs } from '#copilot/agent/session';
 import {
     clearPendingTerminalQuestionShadow,
     clearTerminalHistory,
@@ -1131,6 +1132,25 @@ async function cmdSessionSdkWaits({ println }, tokens) {
 }
 
 /**
+ * Lista os CommandDefinition[] locais registrados no SDK.
+ *
+ * @param {SessionContext} ctx
+ * @returns {void}
+ */
+function cmdSessionSdkCommands({ println }) {
+    const specs = listTerminalSdkCommandSpecs();
+    println('\n  \x1b[36mComandos SDK expostos ao Copilot\x1b[0m');
+    println(
+        `  \x1b[90mfonte=agent/session/commands · total=${specs.length} · modo=safelist observável; execução local continua no REPL\x1b[0m`,
+    );
+    for (const spec of specs) {
+        println(`    \x1b[33m${spec.name}\x1b[0m → \x1b[90m${spec.localCommand}${spec.safe ? ' · safe' : ''}\x1b[0m`);
+        println(`      \x1b[90m${spec.description}\x1b[0m`);
+    }
+    println('  \x1b[90mQuando o SDK chama um desses comandos, o terminal publica sdk.command.executed no fanout canônico.\x1b[0m\n');
+}
+
+/**
  * Cockpit de sessão SDK persistente. Diferencia sessão SDK, dialog loop, hub e snapshots locais sem trocar a sessão viva
  * por um caminho paralelo.
  *
@@ -1142,12 +1162,16 @@ export async function cmdSessionSdk({ println }, arg = '') {
     const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
     const [rawAction = 'status', ...rest] = cleanArg.trim().split(/\s+/u).filter(Boolean);
     const action = rawAction.toLowerCase();
-    if (action === 'events' || action === 'eventos' || action === 'lifecycle' || action === 'commands') {
+    if (action === 'events' || action === 'eventos' || action === 'lifecycle' || action === 'command-events') {
         await cmdSessionSdkEvents({ println }, [rawAction, ...rest]);
         return;
     }
     if (action === 'waits' || action === 'wait' || action === 'ui' || action === 'interactions') {
         await cmdSessionSdkWaits({ println }, [rawAction, ...rest]);
+        return;
+    }
+    if (action === 'commands' || action === 'command' || action === 'catalog' || action === 'catalogo') {
+        cmdSessionSdkCommands({ println });
         return;
     }
     if (action === 'next') {

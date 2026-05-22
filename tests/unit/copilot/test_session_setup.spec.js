@@ -201,6 +201,11 @@ describe('session-setup (F63)', () => {
                         description: expect.any(String),
                         handler: expect.any(Function),
                     }),
+                    expect.objectContaining({
+                        name: 'terminal_session_waits',
+                        description: expect.any(String),
+                        handler: expect.any(Function),
+                    }),
                 ]),
             );
         });

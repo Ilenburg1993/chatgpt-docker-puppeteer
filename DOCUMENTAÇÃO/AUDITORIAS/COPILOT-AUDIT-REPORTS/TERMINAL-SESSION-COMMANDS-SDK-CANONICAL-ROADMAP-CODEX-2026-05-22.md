@@ -304,3 +304,14 @@ Proximo passo da Faixa B/C:
 
 - Usar a mesma lente de eventos para conectar `SessionUiApi`/elicitation e comandos SDK no cockpit, distinguindo
   claramente "arquivo bruto completo" de "visao operacional agregada".
+
+Quarta fatia concluida:
+
+- `CommandDefinition[]` ganhou os comandos seguros `terminal_session_events` e `terminal_session_waits`.
+- `/session sdk commands` lista a safelist registrada no SDK, com comando local correspondente e explicacao de que a
+  execucao observavel publica `sdk.command.executed` em vez de criar um REPL paralelo.
+- O runner live no-PR passou a executar `/session sdk commands` e validar o criterio
+  `sdk-session-command-catalog-visible`.
+- Evidencia live no-PR: `artifacts/terminal-live/2026-05-22T00-52-07-706Z/summary.md` (PASS; criterios
+  `sdk-session-command-catalog-visible`, `sdk-session-events-cockpit-visible` e
+  `sdk-session-waits-cockpit-visible` verdes).

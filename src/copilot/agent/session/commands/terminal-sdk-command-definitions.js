@@ -38,6 +38,18 @@ const TERMINAL_SDK_COMMAND_SPECS = Object.freeze([
         safe: true,
     },
     {
+        name: 'terminal_session_events',
+        description: 'Resume lifecycle e comandos SDK a partir do archive SSE canonico.',
+        localCommand: '/session sdk events',
+        safe: true,
+    },
+    {
+        name: 'terminal_session_waits',
+        description: 'Resume ask_user, elicitation e permission a partir do archive SSE canonico.',
+        localCommand: '/session sdk waits',
+        safe: true,
+    },
+    {
         name: 'terminal_byok',
         description: 'Mostra status BYOK, provider preparado, binding vivo e health resumido.',
         localCommand: '/byok status',
@@ -118,4 +130,3 @@ export function buildTerminalSdkCommandDefinitions(host) {
 export function listTerminalSdkCommandSpecs() {
     return TERMINAL_SDK_COMMAND_SPECS.map((spec) => ({ ...spec }));
 }
-
