@@ -944,6 +944,65 @@ function summarizeSdkSessionArchiveEntry(entry) {
     };
 }
 
+const SDK_SESSION_WAIT_ARCHIVE_EVENTS = Object.freeze([
+    'user_input.requested',
+    'user_input.completed',
+    'elicitation.pending',
+    'elicitation.completed',
+    'permission.requested',
+    'permission.completed',
+    'permission.mode_changed',
+]);
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @param {string[]} keys
+ * @returns {unknown}
+ */
+function readPayloadValue(payload, keys) {
+    for (const key of keys) {
+        if (payload[key] !== undefined) return payload[key];
+    }
+    return undefined;
+}
+
+/**
+ * @param {import('../state/sse-event-archive.js').TerminalSseEventArchiveEntry} entry
+ * @returns {{ key: string; line: string }}
+ */
+function summarizeSdkWaitArchiveEntry(entry) {
+    const payload = entry.payload && typeof entry.payload === 'object' ? entry.payload : {};
+    const record = /** @type {Record<string, unknown>} */ (payload);
+    const requestId = readPayloadString(record, ['requestId', 'id', 'pendingRequestId']);
+    const sessionId = readPayloadString(record, ['sessionId', 'sdkSessionId']);
+    const type =
+        readPayloadString(record, ['permissionType', 'mode', 'action', 'kind', 'type']) ??
+        (entry.event.includes('.') ? entry.event.split('.').at(-1) ?? entry.event : entry.event);
+    const message = readPayloadString(record, ['question', 'message']);
+    const answer = readPayloadString(record, ['answer', 'result']);
+    const source = compactSdkSessionEventValue(entry.eventSource ?? entry.source ?? '-', 48);
+    const choices = readPayloadValue(record, ['choices']);
+    const choiceCount = Array.isArray(choices) ? choices.length : null;
+    const content = readPayloadValue(record, ['content']);
+    const contentKeys =
+        content && typeof content === 'object'
+            ? Object.keys(/** @type {Record<string, unknown>} */ (content)).slice(0, 4).join(',')
+            : '';
+    const detailParts = [
+        `tipo=${compactSdkSessionEventValue(type, 42)}`,
+        requestId ? `req=${compactSdkSessionEventValue(requestId, 54)}` : null,
+        sessionId ? `sessão=${compactSdkSessionEventValue(sessionId, 42)}` : null,
+        choiceCount != null ? `opções=${choiceCount}` : null,
+        message ? `msg=${compactSdkSessionEventValue(message, 70)}` : null,
+        answer ? `resp=${compactSdkSessionEventValue(answer, 52)}` : null,
+        contentKeys ? `content=${compactSdkSessionEventValue(contentKeys, 40)}` : null,
+    ].filter(Boolean);
+    return {
+        key: [entry.event, type, requestId ?? '', sessionId ?? '', message ?? '', answer ?? '', source].join('\u001f'),
+        line: `#${entry.eventId ?? '-'} ${entry.event} · ${source} · ${detailParts.join(' · ')}`,
+    };
+}
+
 /**
  * @param {string[]} tokens
  * @returns {number}
@@ -1015,6 +1074,63 @@ async function cmdSessionSdkEvents({ println }, tokens) {
 }
 
 /**
+ * Exibe waits/interações SDK publicados no fanout único: ask_user, elicitation e permission.
+ *
+ * @param {SessionContext} ctx
+ * @param {string[]} tokens
+ * @returns {Promise<void>}
+ */
+async function cmdSessionSdkWaits({ println }, tokens) {
+    const limit = parseSdkSessionEventsLimit(tokens);
+    const projections = await Promise.all(
+        SDK_SESSION_WAIT_ARCHIVE_EVENTS.map((event) => readTerminalSseEventArchiveTail({ event, limit })),
+    );
+    const merged = projections
+        .flatMap((projection) => projection.entries)
+        .sort((a, b) => {
+            const ts = Number(a.timestamp ?? 0) - Number(b.timestamp ?? 0);
+            return ts || Number(a.eventId ?? 0) - Number(b.eventId ?? 0);
+        })
+        .slice(-limit);
+    const state = projections.find((projection) => projection.state.path)?.state ?? projections[0]?.state;
+    const counts = new Map(SDK_SESSION_WAIT_ARCHIVE_EVENTS.map((event) => [event, 0]));
+    for (const entry of merged) counts.set(entry.event, (counts.get(entry.event) ?? 0) + 1);
+    println('\n  \x1b[36mWaits SDK da sessão\x1b[0m');
+    println(
+        `  \x1b[90mfonte=archive SSE canônico · arquivo=${state?.path ?? '(sem arquivo)'} · janela=${limit} · ask_user=${(counts.get('user_input.requested') ?? 0) + (counts.get('user_input.completed') ?? 0)} · elicitation=${(counts.get('elicitation.pending') ?? 0) + (counts.get('elicitation.completed') ?? 0)} · permission=${(counts.get('permission.requested') ?? 0) + (counts.get('permission.completed') ?? 0) + (counts.get('permission.mode_changed') ?? 0)}\x1b[0m`,
+    );
+    const error = projections.find((projection) => projection.state.error)?.state.error;
+    if (error) println(`  \x1b[31merro=${error}\x1b[0m`);
+    if (merged.length === 0) {
+        println('  \x1b[33mNenhum wait SDK arquivado ainda.\x1b[0m');
+        println('  \x1b[90mUse /sdk waits para pendências vivas e /events event=user_input.requested 20 para bruto.\x1b[0m\n');
+        return;
+    }
+    /** @type {{ key: string; line: string; firstTimestamp: number; count: number }[]} */
+    const collapsed = [];
+    for (const entry of merged) {
+        const summary = summarizeSdkWaitArchiveEntry(entry);
+        const last = collapsed[collapsed.length - 1];
+        if (last && last.key === summary.key) {
+            last.count += 1;
+            continue;
+        }
+        collapsed.push({
+            key: summary.key,
+            line: summary.line,
+            firstTimestamp: Number(entry.timestamp ?? 0),
+            count: 1,
+        });
+    }
+    for (const entry of collapsed) {
+        const time = entry.firstTimestamp ? new Date(entry.firstTimestamp).toLocaleTimeString('pt-BR') : '--:--:--';
+        const repeats = entry.count > 1 ? ` \x1b[90m×${entry.count}\x1b[0m` : '';
+        println(`    \x1b[90m${time}\x1b[0m  \x1b[33m${entry.line}\x1b[0m${repeats}`);
+    }
+    println('  \x1b[90mask_user, elicitation e permission continuam com comandos próprios; esta é só a trilha agregada.\x1b[0m\n');
+}
+
+/**
  * Cockpit de sessão SDK persistente. Diferencia sessão SDK, dialog loop, hub e snapshots locais sem trocar a sessão viva
  * por um caminho paralelo.
  *
@@ -1028,6 +1144,10 @@ export async function cmdSessionSdk({ println }, arg = '') {
     const action = rawAction.toLowerCase();
     if (action === 'events' || action === 'eventos' || action === 'lifecycle' || action === 'commands') {
         await cmdSessionSdkEvents({ println }, [rawAction, ...rest]);
+        return;
+    }
+    if (action === 'waits' || action === 'wait' || action === 'ui' || action === 'interactions') {
+        await cmdSessionSdkWaits({ println }, [rawAction, ...rest]);
         return;
     }
     if (action === 'next') {

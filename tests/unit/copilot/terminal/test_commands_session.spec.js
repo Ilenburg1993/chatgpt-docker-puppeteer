@@ -932,6 +932,129 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('Este comando não cria eventos');
     });
 
+    it('cmdSessionSdkWaits agrega ask_user, elicitation e permission pelo archive SSE canônico', async () => {
+        const emptyProjection = (/** @type {string} */ event) => ({
+            entries: [],
+            state: {
+                enabled: true,
+                path: '/tmp/terminal-sse-events.jsonl',
+                error: null,
+                events: 40,
+                bytes: 2048,
+                queueDepth: 0,
+                flushScheduled: false,
+                flushInFlight: false,
+                failedEvents: 0,
+                droppedEvents: 0,
+                lastEventId: 40,
+            },
+            filters: {
+                limit: 6,
+                event,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+        });
+        readTerminalSseEventArchiveTail
+            .mockResolvedValueOnce({
+                ...emptyProjection('user_input.requested'),
+                entries: [
+                    {
+                        schemaVersion: 1,
+                        ts: '2026-05-22T00:00:00.000Z',
+                        timestamp: Date.parse('2026-05-22T00:00:00.000Z'),
+                        event: 'user_input.requested',
+                        eventId: 20,
+                        source: 'sdk/user_input.requested',
+                        eventSource: 'sdk/user_input.requested',
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: {
+                            requestId: 'ask-1',
+                            question: 'Continuar?',
+                            choices: ['SIM', 'NAO'],
+                        },
+                    },
+                ],
+            })
+            .mockResolvedValueOnce({
+                ...emptyProjection('user_input.completed'),
+                entries: [
+                    {
+                        schemaVersion: 1,
+                        ts: '2026-05-22T00:00:01.000Z',
+                        timestamp: Date.parse('2026-05-22T00:00:01.000Z'),
+                        event: 'user_input.completed',
+                        eventId: 21,
+                        source: 'sdk/user_input.completed',
+                        eventSource: 'sdk/user_input.completed',
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { requestId: 'ask-1', answer: 'SIM' },
+                    },
+                ],
+            })
+            .mockResolvedValueOnce({
+                ...emptyProjection('elicitation.pending'),
+                entries: [
+                    {
+                        schemaVersion: 1,
+                        ts: '2026-05-22T00:00:02.000Z',
+                        timestamp: Date.parse('2026-05-22T00:00:02.000Z'),
+                        event: 'elicitation.pending',
+                        eventId: 22,
+                        source: 'sdk/elicitation.pending',
+                        eventSource: 'sdk/elicitation.pending',
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { id: 'el-1', mode: 'form', message: 'Escolha ambiente' },
+                    },
+                ],
+            })
+            .mockResolvedValueOnce(emptyProjection('elicitation.completed'))
+            .mockResolvedValueOnce({
+                ...emptyProjection('permission.requested'),
+                entries: [
+                    {
+                        schemaVersion: 1,
+                        ts: '2026-05-22T00:00:03.000Z',
+                        timestamp: Date.parse('2026-05-22T00:00:03.000Z'),
+                        event: 'permission.requested',
+                        eventId: 23,
+                        source: 'sdk/permission.requested',
+                        eventSource: 'sdk/permission.requested',
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { requestId: 'perm-1', permissionType: 'fs.write' },
+                    },
+                ],
+            })
+            .mockResolvedValueOnce(emptyProjection('permission.completed'))
+            .mockResolvedValueOnce(emptyProjection('permission.mode_changed'));
+
+        const ctx = mockCtx();
+        await cmdSessionSdk({ println: ctx.println }, 'waits 6');
+
+        expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'user_input.requested', limit: 6 });
+        expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'elicitation.pending', limit: 6 });
+        expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'permission.requested', limit: 6 });
+        expect(ctx.output()).toContain('Waits SDK da sessão');
+        expect(ctx.output()).toContain('ask_user=2');
+        expect(ctx.output()).toContain('elicitation=1');
+        expect(ctx.output()).toContain('permission=1');
+        expect(ctx.output()).toContain('Continuar?');
+        expect(ctx.output()).toContain('Escolha ambiente');
+        expect(ctx.output()).toContain('fs.write');
+    });
+
     it('cmdSessionSave salva e imprime path', async () => {
         const ctx = mockCtx();
         await cmdSessionSave({ println: ctx.println }, 'test-reason');

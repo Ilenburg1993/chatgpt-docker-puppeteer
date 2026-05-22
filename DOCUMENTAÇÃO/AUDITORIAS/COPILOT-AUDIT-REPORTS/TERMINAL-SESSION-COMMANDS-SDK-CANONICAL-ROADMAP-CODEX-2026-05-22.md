@@ -291,6 +291,8 @@ Terceira fatia concluida:
   canonico, sem criar novo emissor.
 - Eventos repetidos consecutivos, como rajadas de `session.updated`, sao colapsados na lente de operador, mas continuam
   integrais no JSONL bruto para auditoria.
+- `/session sdk waits [n]` agrega `user_input.*`, `elicitation.*` e `permission.*` publicados no mesmo fanout canonico,
+  criando uma visao operacional unica para ask_user, SessionUiApi/elicitation e permissoes.
 - `/help` passou a expor a lente nova junto do cockpit de sessao.
 - Teste focado: `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/terminal/test_commands_session.spec.js`.
 
