@@ -50,7 +50,7 @@ export {
 
 // ─── Categorias de tools ──────────────────────────────────────────────────────
 export { codeTools } from './code/index.js';
-export { fileReadTools, fileTools, fileWriteTools } from './file/index.js';
+export { fileReadTools, fileTools, fileWriteTools, validatePath, WORKSPACE_ROOT } from './file/index.js';
 export { gitTools } from './git/index.js';
 export {
     cancelAllUserInputRequests,
