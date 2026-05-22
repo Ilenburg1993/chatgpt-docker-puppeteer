@@ -38,10 +38,12 @@ npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.j
 - Lint completo de `src/copilot` e `tests/unit/copilot`: passou.
 - Testes MCP focados: passaram.
 - Suite unit completa possui falhas preexistentes fora do modulo MCP, registradas no plano canonico.
+- Faixa I repo-side: typecheck strict passou, lint completo passou, testes MCP focados passaram, smoke HTTP passou.
 
 ## Proximo passo
 
-Continuar para Faixa G: escrita controlada, começando por `repo_apply_patch`, mantendo diff, path policy e auditoria.
+Faixa I repo-side foi preparada. Continuar para Faixa G: escrita controlada, começando por `repo_apply_patch`,
+mantendo diff, path policy e auditoria.
 
 ## Jobs MCP
 
@@ -53,3 +55,22 @@ Continuar para Faixa G: escrita controlada, começando por `repo_apply_patch`, m
 - `unit-copilot`
 
 Os logs de job ficam em `src/copilot/.ai/jobs/*.log` e sao ignorados pelo Git.
+
+## ChatGPT connector
+
+Documento operacional:
+
+```text
+src/copilot/docs/CHATGPT_MCP_CONNECT_CHATGPT_RUNBOOK.md
+```
+
+Endpoint auxiliar local:
+
+```text
+GET http://127.0.0.1:3333/chatgpt-connector.json
+```
+
+Tools auxiliares:
+
+- `chatgpt_connector_profile`
+- `chatgpt_connector_url_check`

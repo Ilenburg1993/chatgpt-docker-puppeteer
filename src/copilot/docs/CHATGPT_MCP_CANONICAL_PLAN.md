@@ -420,7 +420,7 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 
 ### Faixa I — Tunnel e ChatGPT
 
-**Status:** pendente.
+**Status:** concluida no lado repo/local; pendente apenas o preenchimento humano do endpoint real no ChatGPT.
 
 #### Fase I.1 — Secure MCP Tunnel
 
@@ -610,6 +610,39 @@ Faixa F, Fase F.1: Project Control Plane operacional, memoria `.ai`, auditoria M
 7. Validacao focada: typecheck strict, lint MCP e testes MCP passaram.
 
 ### Proximo item cronologico apos Faixa F jobs inicial
+
+Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, path policy e auditoria.
+
+### 2026-05-22 — Faixa I repo-side
+
+1. Criado `src/copilot/docs/CHATGPT_MCP_CONNECT_CHATGPT_RUNBOOK.md`.
+2. Criado `src/copilot/mcp/connection/profile.js`.
+3. Criadas tools:
+   - `chatgpt_connector_profile`
+   - `chatgpt_connector_url_check`
+4. Criado endpoint HTTP auxiliar:
+   - `GET /chatgpt-connector.json`
+5. Perfil canonico do formulario ChatGPT:
+   - Nome: `Repo DevContainer MCP`
+   - URL: `https://<endpoint-do-tunel>/mcp`
+   - Auth: `secure-mcp-tunnel` ou OAuth conforme configuracao real.
+6. Runbook cobre Secure MCP Tunnel em modo HTTP e stdio.
+7. Runbook cobre smoke tests no ChatGPT: `repo_status`, `repo_tree`, `repo_read_file`, `git_status`.
+8. Validacao local deve confirmar `/health`, `/chatgpt-connector.json`, `tools/list` e chamadas read-only.
+9. Validacao executada:
+   - `npm run typecheck:strict:src.copilot` passou.
+   - `npm run lint:copilot` passou.
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 5 arquivos, 13 testes.
+   - Smoke HTTP passou para `/health`, `/chatgpt-connector.json`, `tools/list` e `chatgpt_connector_url_check`.
+   - `npm run test:copilot:unit` ainda falha em 6 testes preexistentes fora do modulo MCP/ChatGPT connection.
+
+### Observacao de prontidao Faixa I
+
+O repo agora fornece tudo que pode ser preparado localmente. A unica parte que nao pode ser materializada sem credenciais e
+sem acao no browser e criar o `tunnel_id`, rodar `tunnel-client` com runtime API key real, copiar o endpoint HTTPS gerado e
+preencher o formulario do ChatGPT. O runbook detalha essa operacao.
+
+### Proximo item cronologico apos Faixa I
 
 Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, path policy e auditoria.
 

@@ -46,3 +46,16 @@ Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
 - `run_copilot_validator`
 - `job_get_output`
 - `job_cancel`
+- `chatgpt_connector_profile`
+- `chatgpt_connector_url_check`
+
+## Perfil do conector ChatGPT
+
+Com o servidor HTTP local em execução:
+
+```bash
+curl http://127.0.0.1:3333/chatgpt-connector.json
+```
+
+O endpoint retorna nome, descrição, URL pública esperada, checklist de túnel e prompts de smoke test para preencher o
+formulário em ChatGPT > Settings > Connectors > Create.
