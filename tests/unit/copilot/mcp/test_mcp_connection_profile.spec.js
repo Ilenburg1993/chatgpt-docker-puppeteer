@@ -30,8 +30,11 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.equal(profile.name, 'Repo DevContainer MCP');
         assert.equal(profile.connectorUrl, 'https://example.com/tunnel/mcp');
         assert.equal(profile.authMode, 'none-dev');
+        assert.equal(profile.chatgptFormFields.mcpServerUrl, 'https://example.com/tunnel/mcp');
+        assert.match(profile.chatgptFormFields.authentication, /Sem autenticacao/);
         assert.ok(profile.description.includes('Dev Container'));
         assert.ok(profile.smokePrompts.some((prompt) => prompt.includes('repo_status')));
+        assert.ok(profile.smokePrompts.some((prompt) => prompt.includes('lastSmokeOk')));
     });
 
     it('builds secure tunnel commands for HTTP and stdio profiles', () => {
@@ -51,6 +54,7 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.ok(runbook.quickTunnelCommands.includes('npm run copilot:mcp:cloudflare:quick'));
         assert.ok(runbook.quickTunnelCommands.includes('npm run copilot:mcp:cloudflare:smoke'));
         assert.ok(runbook.notes.some((note) => note.includes('trycloudflare.com')));
+        assert.ok(runbook.notes.some((note) => note.includes('lastSmokeOk')));
         assert.ok(runbook.notes.some((note) => note.includes('origin HTTP raiz')));
     });
 });

@@ -31,6 +31,7 @@ export const CHATGPT_CONNECTOR_DESCRIPTION =
  * @property {ChatGptAuthMode} authMode
  * @property {string} localMcpUrl
  * @property {string} tunnelId
+ * @property {{ name: string; description: string; mcpServerUrl: string; authentication: string }} chatgptFormFields
  * @property {string[]} chatgptFormSteps
  * @property {string[]} smokePrompts
  * @property {string[]} requiredLocalChecks
@@ -48,25 +49,40 @@ export function buildChatGptConnectorProfile(options = {}) {
         options.authMode ??
         /** @type {ChatGptAuthMode} */ (process.env['COPILOT_MCP_CHATGPT_AUTH_MODE'] ?? 'none-dev');
     const tunnelId = options.tunnelId ?? process.env['OPENAI_MCP_TUNNEL_ID'] ?? 'tunnel_<preencher>';
+    const connectorUrl = normalizeMcpUrl(publicMcpUrl);
+    const localUrl = normalizeMcpUrl(localMcpUrl);
+    const authentication =
+        authMode === 'none-dev'
+            ? 'Sem autenticacao, apenas desenvolvimento controlado'
+            : authMode === 'oauth'
+              ? 'OAuth'
+              : 'Secure MCP Tunnel';
     return {
         name: CHATGPT_CONNECTOR_NAME,
         description: CHATGPT_CONNECTOR_DESCRIPTION,
-        connectorUrl: normalizeMcpUrl(publicMcpUrl),
+        connectorUrl,
         authMode,
-        localMcpUrl: normalizeMcpUrl(localMcpUrl),
+        localMcpUrl: localUrl,
         tunnelId,
+        chatgptFormFields: {
+            name: CHATGPT_CONNECTOR_NAME,
+            description: CHATGPT_CONNECTOR_DESCRIPTION,
+            mcpServerUrl: connectorUrl,
+            authentication,
+        },
         chatgptFormSteps: [
             'Abrir ChatGPT > Settings > Apps & Connectors > Advanced settings e habilitar developer mode.',
             'Abrir Settings > Connectors > Create.',
             `Nome: ${CHATGPT_CONNECTOR_NAME}`,
             `Descrição: ${CHATGPT_CONNECTOR_DESCRIPTION}`,
-            `URL do servidor MCP: ${normalizeMcpUrl(publicMcpUrl)}`,
-            'Escolher autenticação compatível com o túnel ou OAuth configurado.',
+            `URL do servidor MCP: ${connectorUrl}`,
+            `Autenticação: ${authentication}.`,
             'Criar o conector e confirmar que a lista de tools aparece.',
         ],
         smokePrompts: [
             'Use o conector Repo DevContainer MCP e chame repo_status.',
             'Chame mcp_capabilities_summary e resuma as categorias de tools.',
+            'Chame mcp_tunnel_status e confirme recommendedAction, lastSmokeOk e lastSmokeAgeMinutes.',
             'Liste a árvore de src/copilot/mcp com repo_tree.',
             'Liste a raiz real do workspace com repo_root_tree maxEntries=80.',
             'Busque registerCanonicalMcpTools em src/copilot/mcp com repo_search_text contextLines=2.',
@@ -158,6 +174,7 @@ export function buildCloudflareTunnelRunbook(options = {}) {
             'npm run copilot:mcp:cloudflare:quick',
             'npm run copilot:mcp:cloudflare:status',
             'npm run copilot:mcp:cloudflare:smoke',
+            'npm run copilot:mcp:cloudflare:status',
         ],
         managedTunnelCommands: [
             'npm run copilot:mcp:http',
@@ -169,6 +186,7 @@ export function buildCloudflareTunnelRunbook(options = {}) {
         notes: [
             'O modo principal deste projeto usa domínio temporário trycloudflare.com; a URL muda a cada sessão.',
             'O conector recebe a URL pública terminada em /mcp, capturada pelo arquivo de estado local.',
+            'Depois do smoke, status.summary.lastSmokeOk deve ser true antes de colar ou reutilizar a URL.',
             'A rota Cloudflare sempre aponta para o origin HTTP raiz; nunca configure o origin como /mcp.',
             'Hostname publicado fica documentado como futuro opcional, não como requisito atual.',
             'Não proteja /mcp com login interativo que o backend do ChatGPT não consiga atravessar.',

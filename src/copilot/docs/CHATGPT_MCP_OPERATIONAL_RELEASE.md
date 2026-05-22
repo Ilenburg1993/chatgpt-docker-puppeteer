@@ -81,6 +81,9 @@ Campos recomendados:
 3. URL: a URL temporaria exibida por `npm run copilot:mcp:cloudflare:status`, sempre terminada em `/mcp`
 4. Autenticacao: conforme tunnel/OAuth disponivel.
 
+O endpoint local `/chatgpt-connector.json` e a tool `chatgpt_connector_profile` retornam `chatgptFormFields` com esses
+campos ja normalizados para a caixa do ChatGPT.
+
 Nunca usar `localhost`, `127.0.0.1` ou URL HTTP no formulario do ChatGPT. O ChatGPT precisa de endpoint HTTPS publico
 por Cloudflare Tunnel ou mediado pelo Secure MCP Tunnel.
 

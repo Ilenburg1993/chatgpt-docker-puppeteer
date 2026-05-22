@@ -895,6 +895,21 @@ Efeito operacional:
 2. Humanos conseguem distinguir "tunnel vivo mas nao testado recentemente" de "tunnel testado e pronto".
 3. Falhas de smoke ficam registradas no estado para recovery imediato.
 
+### 2026-05-22 — Perfil ChatGPT alinhado ao Quick Tunnel temporario
+
+1. `buildChatGptConnectorProfile` passou a retornar `chatgptFormFields`.
+2. Os campos normalizados incluem:
+   - nome;
+   - descricao;
+   - URL `/mcp`;
+   - autenticacao recomendada para o modo atual.
+3. Smoke prompts passaram a pedir `mcp_tunnel_status` com verificacao de:
+   - `recommendedAction`;
+   - `lastSmokeOk`;
+   - `lastSmokeAgeMinutes`.
+4. O runbook Cloudflare passou a orientar `status -> smoke -> status`.
+5. O endpoint `/chatgpt-connector.json` herda o perfil atualizado.
+
 ### Proximo item cronologico apos Faixa I
 
 Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, path policy e auditoria.
