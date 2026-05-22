@@ -54,11 +54,12 @@ npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.j
 - Suite unit completa apos G.1: 3019 testes totais, 3013 passaram, 6 falhas preexistentes fora do MCP permanecem.
 - Faixa H.1 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 6 arquivos e 21 testes.
 - Faixa H.2 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 6 arquivos e 22 testes.
+- Faixa J.1 MCP: typecheck strict passou, lint completo passou, lint MCP/config passou, testes MCP focados passaram com 7 arquivos e 24 testes.
 
 ## Proximo passo
 
-Faixa H foi preparada no lado MCP. Continuar para Faixa J: integracao opcional do LLM-B/Copilot SDK com o MCP local sem
-dependencia obrigatoria.
+Faixa J.1 foi preparada. Continuar para J.2: delegacao MCP segura para consultar estado de sessoes Copilot/LLM-B sem
+obrigar boot da LLM-B.
 
 ## Jobs MCP
 
@@ -77,6 +78,16 @@ Aliases canonicos:
 - `run_project_doctor`
 
 Jobs aceitam `timeoutMs` por chamada. O job record retorna `command`, `args`, `timeoutMs`, `signal` e `timedOut`.
+
+## LLM-B opt-in MCP
+
+`copilot-local` esta registrado em `buildMcpConfig` como servidor stdio opcional:
+
+```bash
+COPILOT_MCP_SERVERS=copilot-local npm run terminal:llm-b
+```
+
+Sem essa env, LLM-B continua independente do MCP server.
 
 Os logs de job ficam em `src/copilot/.ai/jobs/*.log` e sao ignorados pelo Git.
 

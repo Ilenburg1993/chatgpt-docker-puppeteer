@@ -49,6 +49,22 @@ const GITHUB_TOKEN = envValues.GITHUB_TOKEN ?? '';
  */
 export const MCP_SERVERS = {
     /**
+     * Servidor MCP local deste repo — expõe o workspace para sessões Copilot/LLM-B quando explicitamente habilitado.
+     *
+     * Habilite com:
+     *
+     * COPILOT_MCP_SERVERS=copilot-local
+     *
+     * O default permanece desligado para que o chat LLM-B não dependa do MCP server.
+     */
+    'copilot-local': {
+        type: 'stdio',
+        command: 'node',
+        args: ['src/copilot/mcp/index.js', '--transport', 'stdio'],
+        timeout: MCP_STDIO_TIMEOUT_MS,
+    },
+
+    /**
      * Servidor GitHub MCP — acesso a issues, PRs, commits, arquivos. Requer GITHUB_TOKEN no ambiente.
      */
     github: {

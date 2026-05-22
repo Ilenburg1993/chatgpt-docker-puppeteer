@@ -61,6 +61,22 @@ Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
 Validator job tools accept optional `timeoutMs` between 1000 and 3600000. Job records include the command, args, timeout,
 exit code, signal and `timedOut` flag.
 
+## Copilot SDK / LLM-B
+
+The LLM-B chat can opt into this MCP server without depending on it:
+
+```bash
+COPILOT_MCP_SERVERS=copilot-local npm run terminal:llm-b
+```
+
+The `copilot-local` server is registered as a stdio MCP config that launches:
+
+```bash
+node src/copilot/mcp/index.js --transport stdio
+```
+
+By default `COPILOT_MCP_SERVERS` remains empty, so LLM-B boots normally when the MCP server is offline.
+
 As ferramentas usam a política de path existente e permanecem sob a raiz do workspace. As tools de escrita controlada
 retornam diff unificado, suportam `dryRun` quando aplicável e gravam metadados de auditoria MCP sem persistir o texto
 editado no log. Operações destrutivas exigem confirmação explícita nos argumentos.

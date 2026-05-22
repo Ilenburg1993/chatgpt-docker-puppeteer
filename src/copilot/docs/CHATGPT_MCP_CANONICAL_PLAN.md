@@ -447,13 +447,13 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 
 ### Faixa J — Integracao Copilot SDK 0.3.0
 
-**Status:** pendente.
+**Status:** J.1 concluida; J.2 pendente.
 
 #### Fase J.1 — Consumidor local
 
-1. Decidir se LLM-B consome o MCP server via bridge existente.
-2. Atualizar `mcp-tool-bridge` apenas se necessario.
-3. Manter fallback quando MCP offline.
+1. Decidir se LLM-B consome o MCP server via bridge existente — concluido: consumo via MCP server config opt-in.
+2. Atualizar `mcp-tool-bridge` apenas se necessario — concluido: sem alteracao obrigatoria na bridge legada.
+3. Manter fallback quando MCP offline — concluido: default `COPILOT_MCP_SERVERS` segue vazio.
 
 #### Fase J.2 — Delegacao
 
@@ -755,6 +755,29 @@ Concluir H.2 adicionando timeout explicito por chamada de job e metadados de com
 
 Retomar Faixa I somente no ambiente externo quando houver endpoint HTTPS real do Secure MCP Tunnel; no repo, seguir para
 Faixa J: integracao opcional do LLM-B/Copilot SDK com o MCP local sem criar dependencia obrigatoria.
+
+### 2026-05-22 — Faixa J.1 MCP local opcional para LLM-B
+
+1. `src/copilot/config/mcp-servers.js` registra `copilot-local`.
+2. `copilot-local` e um servidor MCP stdio:
+   - command: `node`
+   - args: `src/copilot/mcp/index.js --transport stdio`
+3. Ativacao:
+   - `COPILOT_MCP_SERVERS=copilot-local npm run terminal:llm-b`
+4. Fallback:
+   - default continua desligado;
+   - LLM-B nao depende do MCP server;
+   - MCP offline nao impede boot quando env nao habilita `copilot-local`.
+5. `mcp-tool-bridge` legado nao foi alterado nesta fase, pois o SDK ja aceita `mcpServers` em `SessionConfig`.
+6. Validacao executada:
+   - `npm run typecheck:strict:src.copilot` passou.
+   - `npm run lint:copilot` passou.
+   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp src/copilot/config/mcp-servers.js tests/unit/copilot/mcp --no-cache` passou.
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 7 arquivos, 24 testes.
+
+### Proximo item cronologico apos Faixa J.1
+
+Faixa J.2: expor uma delegacao MCP segura para consultar estado de sessoes Copilot/LLM-B sem obrigar boot da LLM-B.
 
 ---
 
