@@ -30,6 +30,20 @@ export async function resolveReadPath(filePath) {
 }
 
 /**
+ * @param {string} filePath
+ * @returns {Promise<{ ok: true; resolved: string; relative: string } | { ok: false; reason: string }>}
+ */
+export async function resolveWritePath(filePath) {
+    const result = await validatePath(filePath, { mode: 'write' });
+    if (!result.ok) return { ok: false, reason: result.reason ?? 'Path denied.' };
+    return {
+        ok: true,
+        resolved: result.resolved,
+        relative: toWorkspaceRelativePath(result.resolved),
+    };
+}
+
+/**
  * @param {string} absolutePath
  * @returns {string}
  */

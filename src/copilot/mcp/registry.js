@@ -11,6 +11,7 @@ import { connectionTools } from './tools/connection.js';
 import { jobTools } from './tools/jobs.js';
 import { projectDoctorTool } from './tools/project-doctor.js';
 import { repoReadTools } from './tools/repo-read.js';
+import { repoWriteTools } from './tools/repo-write.js';
 
 /**
  * @typedef {object} McpToolDefinition
@@ -26,7 +27,7 @@ import { repoReadTools } from './tools/repo-read.js';
  * @returns {McpToolDefinition[]}
  */
 export function getCanonicalMcpTools() {
-    return [...repoReadTools, ...gitReadTools, projectDoctorTool, ...jobTools, ...connectionTools];
+    return [...repoReadTools, ...gitReadTools, projectDoctorTool, ...jobTools, ...connectionTools, ...repoWriteTools];
 }
 
 /**

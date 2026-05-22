@@ -23,10 +23,15 @@ describe('copilot MCP registry', () => {
             'job_cancel',
             'job_get_output',
             'project_doctor',
+            'repo_apply_patch',
+            'repo_create_file',
+            'repo_move_file',
             'repo_read_file',
+            'repo_remove_file',
             'repo_search_text',
             'repo_status',
             'repo_tree',
+            'repo_write_file',
             'run_copilot_validator',
         ]);
     });
@@ -37,8 +42,9 @@ describe('copilot MCP registry', () => {
         for (const tool of tools) {
             assert.equal(typeof tool.annotations.readOnlyHint, 'boolean', tool.name);
             assert.equal(tool.annotations.openWorldHint, false, tool.name);
-            assert.equal(tool.annotations.destructiveHint, false, tool.name);
+            assert.equal(typeof tool.annotations.destructiveHint, 'boolean', tool.name);
         }
+        assert.equal(tools.find((tool) => tool.name === 'repo_remove_file')?.annotations.destructiveHint, true);
     });
 
     it('does not expose duplicate tool names', () => {

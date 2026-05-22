@@ -31,6 +31,13 @@ npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.j
 - `run_copilot_validator`
 - `job_get_output`
 - `job_cancel`
+- `chatgpt_connector_profile`
+- `chatgpt_connector_url_check`
+- `repo_write_file`
+- `repo_create_file`
+- `repo_apply_patch`
+- `repo_move_file`
+- `repo_remove_file`
 
 ## Validacao conhecida
 
@@ -39,11 +46,13 @@ npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.j
 - Testes MCP focados: passaram.
 - Suite unit completa possui falhas preexistentes fora do modulo MCP, registradas no plano canonico.
 - Faixa I repo-side: typecheck strict passou, lint completo passou, testes MCP focados passaram, smoke HTTP passou.
+- Faixa G.1 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 6 arquivos e 20 testes.
+- Suite unit completa apos G.1: 3019 testes totais, 3013 passaram, 6 falhas preexistentes fora do MCP permanecem.
 
 ## Proximo passo
 
-Faixa I repo-side foi preparada. Continuar para Faixa G: escrita controlada, começando por `repo_apply_patch`,
-mantendo diff, path policy e auditoria.
+Faixa G.1 foi preparada. Continuar para Faixa H: aliases/tools canonicas para validadores (`run_typecheck_copilot`,
+`run_lint_copilot`, `run_unit_copilot`, `run_project_doctor`) sobre o mecanismo de jobs MCP.
 
 ## Jobs MCP
 
@@ -74,3 +83,22 @@ Tools auxiliares:
 
 - `chatgpt_connector_profile`
 - `chatgpt_connector_url_check`
+
+## Escrita MCP
+
+Tools controladas:
+
+- `repo_write_file`
+- `repo_create_file`
+- `repo_apply_patch`
+- `repo_move_file`
+- `repo_remove_file`
+
+Guardrails:
+
+- path policy do workspace em toda operacao;
+- `dryRun` nas operacoes mutaveis principais;
+- diff preview em write/create/patch;
+- `confirm=true` para remocao;
+- `confirmOverwrite=true` para move com overwrite;
+- auditoria MCP sem gravar conteudo editado.

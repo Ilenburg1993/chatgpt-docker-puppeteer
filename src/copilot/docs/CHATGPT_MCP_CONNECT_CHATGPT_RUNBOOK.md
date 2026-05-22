@@ -357,6 +357,29 @@ Controle total não significa comando shell irrestrito no primeiro contato. Sign
 6. Reversibilidade por Git.
 7. Escalada explícita para ações destrutivas.
 
+### Escrita controlada disponível no repo
+
+Após a implementação da Faixa G.1, o ChatGPT deve enxergar também:
+
+1. `repo_write_file`
+2. `repo_create_file`
+3. `repo_apply_patch`
+4. `repo_move_file`
+5. `repo_remove_file`
+
+Uso recomendado:
+
+1. Ler antes com `repo_read_file`.
+2. Preferir `repo_apply_patch` para mudanças cirúrgicas.
+3. Usar `dryRun=true` quando quiser revisar diff antes de aplicar.
+4. Usar `expectedHash` em `repo_write_file` ou `repo_apply_patch` quando houver risco de corrida.
+5. Usar `repo_create_file` para arquivos novos, pois ele falha se o destino já existir.
+6. Usar `repo_move_file` sem overwrite por padrão.
+7. Usar `confirmOverwrite=true` somente quando `repo_move_file` receber `overwrite=true`.
+8. Usar `repo_remove_file` somente com `confirm=true`.
+
+As tools de escrita gravam eventos de auditoria em JSONL, mas não persistem o conteúdo editado dentro do log de auditoria.
+
 ---
 
 ## 12. Auditoria
@@ -437,11 +460,15 @@ Verifique:
 3. `git_status` retorna o branch esperado.
 4. `repo_tree` em `src/copilot` mostra os arquivos reais.
 
-### Escrita ainda não está liberada
+### Escrita não aparece no ChatGPT
 
-Isso é intencional até Faixa G.
+Verifique:
 
-Faixa I deve provar conexão, leitura, Git e jobs. A escrita controlada vem depois, com diff e auditoria própria.
+1. Servidor local está no commit que contém Faixa G.1.
+2. `tools/list` local inclui `repo_apply_patch`.
+3. O túnel foi reiniciado depois da atualização do servidor MCP.
+4. O conector no ChatGPT foi recriado ou recarregado.
+5. A chamada `chatgpt_connector_profile` retorna o perfil esperado.
 
 ---
 
@@ -523,3 +550,12 @@ Falhas observadas:
 4. Violacoes de terminal barrel governance preexistentes em comandos/dialog/events BYOK.
 
 Essas falhas ja apareciam antes da Faixa I e nao pertencem aos arquivos novos de conexao ChatGPT.
+
+### Validacao adicional apos Faixa G.1
+
+1. `npm run typecheck:strict:src.copilot` passou.
+2. `npm run lint:copilot` passou.
+3. `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache` passou.
+4. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 6 arquivos, 20 testes.
+5. `npm run test:copilot:unit` ainda falha nas mesmas 6 areas preexistentes fora do MCP; nesta rodada foram 3019
+   testes totais e 3013 passaram.

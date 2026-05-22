@@ -382,23 +382,23 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 
 ### Faixa G — Escrita controlada
 
-**Status:** pendente.
+**Status:** G.1 concluida; G.2 guardrails iniciais concluidos no MCP.
 
 #### Fase G.1 — Tools de escrita
 
-1. `repo_apply_patch`
-2. `repo_write_file`
-3. `repo_create_file`
-4. `repo_move_file`
-5. `repo_remove_file`
+1. `repo_apply_patch` — concluida.
+2. `repo_write_file` — concluida.
+3. `repo_create_file` — concluida.
+4. `repo_move_file` — concluida.
+5. `repo_remove_file` — concluida.
 
 #### Fase G.2 — Guardrails de escrita
 
-1. Path sempre dentro do workspace.
-2. Diff antes/depois.
-3. Audit log obrigatorio.
-4. Grants para operacoes destrutivas.
-5. Reversibilidade por Git quando aplicavel.
+1. Path sempre dentro do workspace — concluido via `resolveReadPath`/`resolveWritePath`.
+2. Diff antes/depois — concluido para `repo_apply_patch`, `repo_write_file` e `repo_create_file`; move/remove retornam metadados antes/depois.
+3. Audit log obrigatorio — concluido via wrapper MCP e eventos especificos por tool de escrita.
+4. Grants para operacoes destrutivas — concluido inicialmente por `destructiveHint` e `confirm`/`confirmOverwrite`.
+5. Reversibilidade por Git quando aplicavel — concluido inicialmente por hashes, snapshots de remocao e diff previews.
 
 ### Faixa H — Execucao controlada
 
@@ -645,6 +645,67 @@ preencher o formulario do ChatGPT. O runbook detalha essa operacao.
 ### Proximo item cronologico apos Faixa I
 
 Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, path policy e auditoria.
+
+### 2026-05-22 — Faixa G.1 escrita controlada MCP
+
+1. Criado `src/copilot/mcp/tools/repo-write.js`.
+2. Criado helper `resolveWritePath` em `src/copilot/mcp/control-plane/paths.js`.
+3. Tools registradas:
+   - `repo_write_file`
+   - `repo_create_file`
+   - `repo_apply_patch`
+   - `repo_move_file`
+   - `repo_remove_file`
+4. `repo_apply_patch` usa `patchTextLocked`, com:
+   - substituicao exata;
+   - `dryRun`;
+   - `expectedHash`;
+   - `replace_all`;
+   - `occurrence_index`;
+   - diff preview;
+   - hashes antes/depois;
+   - metadados IO.
+5. `repo_write_file` substitui arquivo existente, com:
+   - `expectedHash`;
+   - `dryRun`;
+   - diff preview;
+   - escrita atomica via `writeFileAtomic`.
+6. `repo_create_file` cria arquivo novo, com:
+   - falha se destino existe;
+   - `dryRun`;
+   - criacao opcional de diretorios pais;
+   - escrita atomica via `createOrReplaceFileAtomic`.
+7. `repo_move_file` move/renomeia arquivo, com:
+   - overwrite desligado por padrao;
+   - `confirmOverwrite` obrigatorio quando `overwrite=true`;
+   - `dryRun`;
+   - locks canonicos via `moveFileLocked`.
+8. `repo_remove_file` remove somente arquivos regulares, com:
+   - `destructiveHint=true`;
+   - `confirm=true` obrigatorio;
+   - `dryRun`;
+   - snapshot de rollback quando disponivel via `deleteFileLocked`.
+9. Auditoria:
+   - wrapper MCP registra inicio/conclusao/falha de toda tool;
+   - cada escrita registra evento especifico sem persistir conteudo editado.
+10. Validacao executada:
+    - `npm run typecheck:strict:src.copilot` passou.
+    - `npm run lint:copilot` passou.
+    - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache` passou.
+    - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 6 arquivos, 20 testes.
+    - `npm run test:copilot:unit` ainda falha em 6 testes preexistentes fora do modulo MCP; nesta rodada foram 3019 testes totais, 3013 passaram.
+11. Falhas unit completas ainda externas ao MCP:
+    - `tests/unit/copilot/config/test_faixa_c_session_config_builder.spec.js`: expectativa BYOK com 2 entradas recebeu 3.
+    - `tests/unit/copilot/contracts/test_arch_contracts.spec.js`: import externo para `#copilot/agent/session`.
+    - `tests/unit/copilot/contracts/test_global_architecture_strict.spec.js`: violacao em `hooks/session-hooks.js`.
+    - `tests/unit/copilot/contracts/test_owner_sovereignty_block_a.spec.js`: `hooks/session-hooks.js` importa runtime/agent.
+    - `tests/unit/copilot/contracts/test_terminal_barrel_governance.spec.js`: imports cross-folder do terminal sem barrels.
+
+### Proximo item cronologico apos Faixa G.1
+
+Faixa H ja possui a base inicial de jobs allowlistados. A proxima consolidacao cronologica e alinhar os nomes canonicos
+`run_typecheck_copilot`, `run_lint_copilot`, `run_unit_copilot` e `run_project_doctor` como aliases/tools explicitas sobre
+o mecanismo de jobs ja existente.
 
 ---
 

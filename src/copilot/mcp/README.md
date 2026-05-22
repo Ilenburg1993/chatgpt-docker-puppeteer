@@ -48,6 +48,15 @@ Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
 - `job_cancel`
 - `chatgpt_connector_profile`
 - `chatgpt_connector_url_check`
+- `repo_write_file`
+- `repo_create_file`
+- `repo_apply_patch`
+- `repo_move_file`
+- `repo_remove_file`
+
+As ferramentas usam a política de path existente e permanecem sob a raiz do workspace. As tools de escrita controlada
+retornam diff unificado, suportam `dryRun` quando aplicável e gravam metadados de auditoria MCP sem persistir o texto
+editado no log. Operações destrutivas exigem confirmação explícita nos argumentos.
 
 ## Perfil do conector ChatGPT
 
