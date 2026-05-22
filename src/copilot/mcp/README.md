@@ -58,6 +58,9 @@ Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
 - `repo_move_file`
 - `repo_remove_file`
 
+Validator job tools accept optional `timeoutMs` between 1000 and 3600000. Job records include the command, args, timeout,
+exit code, signal and `timedOut` flag.
+
 As ferramentas usam a política de path existente e permanecem sob a raiz do workspace. As tools de escrita controlada
 retornam diff unificado, suportam `dryRun` quando aplicável e gravam metadados de auditoria MCP sem persistir o texto
 editado no log. Operações destrutivas exigem confirmação explícita nos argumentos.

@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { resolveValidatorCommand } from '../../../../src/copilot/mcp/control-plane/jobs.js';
+import { resolveJobTimeoutMs, resolveValidatorCommand } from '../../../../src/copilot/mcp/control-plane/jobs.js';
 import { jobTools } from '../../../../src/copilot/mcp/tools/jobs.js';
 
 describe('copilot MCP jobs', () => {
@@ -28,6 +28,13 @@ describe('copilot MCP jobs', () => {
 
     it('rejects unsupported validators', () => {
         assert.throws(() => resolveValidatorCommand(/** @type {any} */ ('admin-command')), /Unsupported validator/);
+    });
+
+    it('normalizes job timeouts inside supported bounds', () => {
+        assert.equal(resolveJobTimeoutMs(undefined), 1_200_000);
+        assert.equal(resolveJobTimeoutMs(10), 1_000);
+        assert.equal(resolveJobTimeoutMs(2_500), 2_500);
+        assert.equal(resolveJobTimeoutMs(9_999_999), 3_600_000);
     });
 
     it('exposes canonical validator alias tools', () => {

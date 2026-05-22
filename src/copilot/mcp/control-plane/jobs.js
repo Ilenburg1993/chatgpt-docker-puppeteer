@@ -13,6 +13,9 @@ import { fileURLToPath } from 'node:url';
 import { getMcpWorkspaceRoot } from './paths.js';
 
 const MCP_JOBS_DIR = fileURLToPath(new URL('../../.ai/jobs/', import.meta.url));
+const DEFAULT_JOB_TIMEOUT_MS = 20 * 60 * 1000;
+const MIN_JOB_TIMEOUT_MS = 1_000;
+const MAX_JOB_TIMEOUT_MS = 60 * 60 * 1000;
 
 /**
  * @typedef {'typecheck' | 'lint' | 'unit-mcp' | 'unit-copilot'} CopilotValidatorName
@@ -24,6 +27,11 @@ const MCP_JOBS_DIR = fileURLToPath(new URL('../../.ai/jobs/', import.meta.url));
  * @property {number} startedAt
  * @property {number | null} endedAt
  * @property {number | null} exitCode
+ * @property {string | null} signal
+ * @property {string} command
+ * @property {string[]} args
+ * @property {number} timeoutMs
+ * @property {boolean} timedOut
  * @property {string} logFile
  * @property {import('node:child_process').ChildProcess | null} process
  */
@@ -54,15 +62,28 @@ export function resolveValidatorCommand(validator) {
 }
 
 /**
+ * @param {unknown} timeoutMs
+ * @returns {number}
+ */
+export function resolveJobTimeoutMs(timeoutMs) {
+    if (timeoutMs === undefined || timeoutMs === null) return DEFAULT_JOB_TIMEOUT_MS;
+    const parsed = Number(timeoutMs);
+    if (!Number.isFinite(parsed)) return DEFAULT_JOB_TIMEOUT_MS;
+    return Math.min(MAX_JOB_TIMEOUT_MS, Math.max(MIN_JOB_TIMEOUT_MS, Math.trunc(parsed)));
+}
+
+/**
  * @param {CopilotValidatorName} validator
+ * @param {{ timeoutMs?: number }} [options]
  * @returns {Promise<Omit<JobRecord, 'process'>>}
  */
-export async function spawnValidatorJob(validator) {
+export async function spawnValidatorJob(validator, options = {}) {
     const id = randomUUID();
     const command = resolveValidatorCommand(validator);
+    const timeoutMs = resolveJobTimeoutMs(options.timeoutMs);
     const logFile = path.join(MCP_JOBS_DIR, `${id}.log`);
     await mkdir(MCP_JOBS_DIR, { recursive: true });
-    await writeFile(logFile, `$ ${command.command} ${command.args.join(' ')}\n\n`, 'utf8');
+    await writeFile(logFile, `$ ${command.command} ${command.args.join(' ')}\n[job:timeoutMs] ${timeoutMs}\n\n`, 'utf8');
 
     const child = spawn(command.command, command.args, {
         cwd: getMcpWorkspaceRoot(),
@@ -78,10 +99,25 @@ export async function spawnValidatorJob(validator) {
         startedAt: Date.now(),
         endedAt: null,
         exitCode: null,
+        signal: null,
+        command: command.command,
+        args: command.args,
+        timeoutMs,
+        timedOut: false,
         logFile,
         process: child,
     };
     JOBS.set(id, record);
+
+    const timeout = setTimeout(() => {
+        if (record.status !== 'running' || !record.process) return;
+        record.status = 'failed';
+        record.timedOut = true;
+        record.endedAt = Date.now();
+        void appendJobLog(record.logFile, `\n[job:timeout] timeoutMs=${timeoutMs}\n`);
+        record.process.kill('SIGTERM');
+    }, timeoutMs);
+    timeout.unref();
 
     child.stdout.on('data', (chunk) => {
         void appendJobLog(logFile, chunk);
@@ -90,10 +126,13 @@ export async function spawnValidatorJob(validator) {
         void appendJobLog(logFile, chunk);
     });
     child.on('exit', (code, signal) => {
+        clearTimeout(timeout);
         record.endedAt = Date.now();
         record.exitCode = code;
+        record.signal = signal;
         record.process = null;
         if (record.status === 'cancelled') return;
+        if (record.timedOut) return;
         record.status = code === 0 ? 'completed' : 'failed';
         void appendJobLog(logFile, `\n[job:${record.status}] exitCode=${String(code)} signal=${String(signal)}\n`);
     });

@@ -25,10 +25,12 @@ function buildValidatorAliasTool(validator, name, title, description) {
         name,
         title,
         description,
-        inputSchema: {},
+        inputSchema: {
+            timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Optional job timeout in ms.'),
+        },
         annotations: boundedWriteAnnotations(),
-        handler: async () => {
-            const job = await spawnValidatorJob(validator);
+        handler: async ({ timeoutMs }) => {
+            const job = await spawnValidatorJob(validator, timeoutMs === undefined ? {} : { timeoutMs });
             return okResult({ success: true, job }, `Started job ${job.id} (${validator}).`);
         },
     };
@@ -73,10 +75,11 @@ export const jobTools = [
             'Start an allowlisted Copilot validator job. This can run typecheck, lint, focused MCP tests, or the full unit suite.',
         inputSchema: {
             validator: validatorSchema.describe('Validator to run: typecheck, lint, unit-mcp, or unit-copilot.'),
+            timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Optional job timeout in ms.'),
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ validator }) => {
-            const job = await spawnValidatorJob(validator);
+        handler: async ({ validator, timeoutMs }) => {
+            const job = await spawnValidatorJob(validator, timeoutMs === undefined ? {} : { timeoutMs });
             return okResult({ success: true, job }, `Started job ${job.id} (${validator}).`);
         },
     },

@@ -402,7 +402,7 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 
 ### Faixa H — Execucao controlada
 
-**Status:** H.1 concluida; H.2 ja possui base inicial concluida com jobs assincronos allowlistados.
+**Status:** H concluida no lado MCP.
 
 #### Fase H.1 — Scripts canonicos
 
@@ -416,7 +416,7 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 1. Comandos longos nao bloqueiam tool call indefinidamente — concluido via `spawnValidatorJob`.
 2. Saida paginada — concluido via `job_get_output` com `tailBytes`.
 3. Cancelamento — concluido via `job_cancel`.
-4. Timeout configuravel — pendente como configuracao explicita por chamada; atualmente comandos rodam ate concluir/cancelar.
+4. Timeout configuravel — concluido via `timeoutMs` por chamada.
 
 ### Faixa I — Tunnel e ChatGPT
 
@@ -727,6 +727,34 @@ o mecanismo de jobs ja existente.
 ### Proximo item cronologico apos Faixa H.1
 
 Concluir H.2 adicionando timeout explicito por chamada de job e metadados de comando no retorno do job.
+
+### 2026-05-22 — Faixa H.2 jobs assincronos completos
+
+1. `spawnValidatorJob` agora aceita `timeoutMs` por chamada.
+2. `resolveJobTimeoutMs` normaliza timeout entre 1000 e 3600000 ms.
+3. Job record publico agora inclui:
+   - `command`
+   - `args`
+   - `timeoutMs`
+   - `signal`
+   - `timedOut`
+4. Logs de job registram o timeout efetivo.
+5. Jobs que excedem timeout recebem SIGTERM e ficam com `timedOut=true`.
+6. Tools que aceitam `timeoutMs`:
+   - `run_copilot_validator`
+   - `run_typecheck_copilot`
+   - `run_lint_copilot`
+   - `run_unit_copilot`
+7. Validacao executada:
+   - `npm run typecheck:strict:src.copilot` passou.
+   - `npm run lint:copilot` passou.
+   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache` passou.
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 6 arquivos, 22 testes.
+
+### Proximo item cronologico apos Faixa H
+
+Retomar Faixa I somente no ambiente externo quando houver endpoint HTTPS real do Secure MCP Tunnel; no repo, seguir para
+Faixa J: integracao opcional do LLM-B/Copilot SDK com o MCP local sem criar dependencia obrigatoria.
 
 ---
 
