@@ -13,6 +13,7 @@ import {
     getIoIndex,
     getIoIndexStats,
     searchIoIndex,
+    shutdownParserWorkerPool,
 } from '../src/copilot/infra/index.js';
 
 /**
@@ -217,7 +218,11 @@ async function main() {
     );
 }
 
-main().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-});
+main()
+    .catch((error) => {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exitCode = 1;
+    })
+    .finally(async () => {
+        await shutdownParserWorkerPool();
+    });

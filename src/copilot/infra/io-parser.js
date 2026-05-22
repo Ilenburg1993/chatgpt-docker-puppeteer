@@ -427,6 +427,18 @@ async function teardownWorkerPoolForTest() {
     _workerRequestSeq = 0;
 }
 
+/**
+ * Encerra o pool de workers do parser quando um processo de CLI/one-shot termina seu trabalho.
+ *
+ * Servidores long-lived deixam o pool vivo para amortizar custo de parse. CLIs como `copilot:index build`, por outro
+ * lado, precisam liberar os workers explicitamente para que o processo Node encerre apos o resumo operacional.
+ *
+ * @returns {Promise<void>}
+ */
+export async function shutdownParserWorkerPool() {
+    await teardownWorkerPoolForTest();
+}
+
 // ---------------------------------------------------------------------------
 // JS/TS parsing via @babel/parser
 // ---------------------------------------------------------------------------

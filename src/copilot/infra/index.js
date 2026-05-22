@@ -63,6 +63,7 @@ export {
     parseAndCacheSymbols,
     parseFileForContext,
     parseFileSymbols,
+    shutdownParserWorkerPool,
 } from './io-parser.js';
 export {
     endSessionScope,
