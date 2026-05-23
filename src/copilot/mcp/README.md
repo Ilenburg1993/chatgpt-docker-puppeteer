@@ -28,7 +28,7 @@ O ChatGPT deve receber uma URL HTTPS que aponte para `/mcp`. O modo principal de
 Cloudflare Tunnel permanente no dominio `aurelin.org`:
 
 ```text
-https://workspace-mcp-dev.aurelin.org/mcp
+https://mcp.aurelin.org/mcp
 ```
 
 Cloudflare Tunnel permanente:
@@ -37,7 +37,7 @@ Cloudflare Tunnel permanente:
 npm run copilot:mcp:http
 npm run copilot:mcp:smoke:local
 npm run copilot:mcp:cloudflare:doctor
-CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token npm run copilot:mcp:cloudflare:run
+CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token npm run copilot:mcp:cloudflare:up
 ```
 
 Em outro terminal:
@@ -47,7 +47,7 @@ npm run copilot:mcp:cloudflare:status
 npm run copilot:mcp:cloudflare:smoke
 ```
 
-`status` mostra a URL permanente `https://workspace-mcp-dev.aurelin.org/mcp` para colar no ChatGPT.
+`status` mostra a URL permanente `https://mcp.aurelin.org/mcp` para colar no ChatGPT.
 Quick Tunnel continua disponivel como fallback explicito:
 
 ```bash

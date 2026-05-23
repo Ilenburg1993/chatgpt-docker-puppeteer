@@ -92,7 +92,7 @@ export function normalizeMcpAuthEnforcement(value, mode) {
  * @returns {string}
  */
 function normalizeResourceUrl(value) {
-    const raw = String(value ?? 'https://workspace-mcp-dev.aurelin.org')
+    const raw = String(value ?? 'https://mcp.aurelin.org')
         .trim()
         .replace(/\/+$/, '');
     return raw.endsWith('/mcp') ? raw.slice(0, -'/mcp'.length) : raw;

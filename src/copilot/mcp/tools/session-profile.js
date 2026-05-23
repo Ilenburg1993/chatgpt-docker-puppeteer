@@ -132,9 +132,9 @@ export const mcpSessionProfileTool = {
             },
             tunnelGuidance: {
                 mode: 'Cloudflare named permanent tunnel',
-                expectedUrlShape: 'https://workspace-mcp-dev.aurelin.org/mcp',
+                expectedUrlShape: 'https://mcp.aurelin.org/mcp',
                 reconnectRule:
-                    'Keep npm run copilot:mcp:http and npm run copilot:mcp:cloudflare:run alive; use COPILOT_MCP_CLOUDFLARE_MODE=temporary-quick only as fallback.',
+                    'Keep npm run copilot:mcp:cloudflare:up healthy; use COPILOT_MCP_CLOUDFLARE_MODE=temporary-quick only as fallback.',
             },
             smokePrompts: connector.smokePrompts,
             capabilities,

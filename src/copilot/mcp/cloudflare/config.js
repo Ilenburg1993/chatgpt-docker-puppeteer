@@ -10,7 +10,8 @@ import { normalizeMcpUrl, validatePublicConnectorUrl } from '../connection/profi
 export const DEFAULT_CLOUDFLARE_ORIGIN_URL = 'http://127.0.0.1:3333';
 export const DEFAULT_CLOUDFLARE_TUNNEL_NAME = 'workspace-mcp-dev';
 export const DEFAULT_CLOUDFLARE_ZONE = 'aurelin.org';
-export const DEFAULT_CLOUDFLARE_PUBLIC_HOSTNAME = `${DEFAULT_CLOUDFLARE_TUNNEL_NAME}.${DEFAULT_CLOUDFLARE_ZONE}`;
+export const DEFAULT_CLOUDFLARE_PUBLIC_LABEL = 'mcp';
+export const DEFAULT_CLOUDFLARE_PUBLIC_HOSTNAME = `${DEFAULT_CLOUDFLARE_PUBLIC_LABEL}.${DEFAULT_CLOUDFLARE_ZONE}`;
 export const DEFAULT_CLOUDFLARE_PUBLIC_URL = `https://${DEFAULT_CLOUDFLARE_PUBLIC_HOSTNAME}/mcp`;
 export const DEFAULT_QUICK_TUNNEL_STATE_FILE = 'src/copilot/.ai/cloudflare/quick-tunnel.json';
 export const DEFAULT_MANAGED_TUNNEL_PID_FILE = 'src/copilot/.ai/cloudflare/cloudflared.pid';
@@ -120,7 +121,8 @@ export function normalizeZone(value) {
  * @returns {string}
  */
 export function normalizePublicHostname(value, tunnelName, zone) {
-    const hostname = String(value ?? `${tunnelName}.${zone}`)
+    void tunnelName;
+    const hostname = String(value ?? `${DEFAULT_CLOUDFLARE_PUBLIC_LABEL}.${zone}`)
         .trim()
         .toLowerCase()
         .replace(/^https?:\/\//u, '')

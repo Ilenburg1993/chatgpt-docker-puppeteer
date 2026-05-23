@@ -1337,7 +1337,7 @@ Decisao atual:
 2. O dominio permanente e `aurelin.org`.
 3. O tunnel remoto Cloudflare se chama `workspace-mcp-dev`.
 4. A URL canonica para o ChatGPT passa a ser:
-   - `https://workspace-mcp-dev.aurelin.org/mcp`
+   - `https://mcp.aurelin.org/mcp`
 5. O origin local permanece:
    - `http://127.0.0.1:3333`
 6. O serviço publicado no Cloudflare deve apontar para o origin raiz, nao para `/mcp`.
@@ -1380,8 +1380,8 @@ Mudancas estruturais aplicadas:
    - `COPILOT_MCP_CLOUDFLARE_MODE=named-permanent`;
    - `COPILOT_MCP_CLOUDFLARE_TUNNEL_NAME=workspace-mcp-dev`;
    - `COPILOT_MCP_CLOUDFLARE_ZONE=aurelin.org`;
-   - `COPILOT_MCP_CLOUDFLARE_PUBLIC_HOSTNAME=workspace-mcp-dev.aurelin.org`;
-   - `COPILOT_MCP_CLOUDFLARE_PUBLIC_URL=https://workspace-mcp-dev.aurelin.org/mcp`;
+   - `COPILOT_MCP_CLOUDFLARE_PUBLIC_HOSTNAME=mcp.aurelin.org`;
+   - `COPILOT_MCP_CLOUDFLARE_PUBLIC_URL=https://mcp.aurelin.org/mcp`;
    - `COPILOT_MCP_CLOUDFLARE_ORIGIN_URL=http://127.0.0.1:3333`.
 2. O CLI `npm run copilot:mcp:cloudflare:run` agora aceita:
    - `CLOUDFLARE_TUNNEL_TOKEN`;
@@ -1391,7 +1391,12 @@ Mudancas estruturais aplicadas:
 4. `mcp_tunnel_status`, `mcp_runtime_health`, `mcp_smoke_workspace`, `mcp_session_profile`,
    `chatgpt_connector_profile` e `chatgpt_connector_current_url_status` passam a tratar o
    tunnel permanente como fonte primaria.
-5. Quick Tunnel continua disponivel como fallback:
+5. `npm run copilot:mcp:cloudflare:up` inicia MCP HTTP e `cloudflared` em background,
+   escrevendo PID/log/metadados em `src/copilot/.ai/cloudflare/`.
+6. `npm run copilot:mcp:cloudflare:down` encerra os processos controlados por PID local.
+7. O supervisor do `up` compara assinatura de comando/env e reinicia processos quando ha drift
+   de URL publica, modo, token-file ou argumentos de execucao.
+8. Quick Tunnel continua disponivel como fallback:
    - `COPILOT_MCP_CLOUDFLARE_MODE=temporary-quick npm run copilot:mcp:cloudflare:quick`.
 
 Runbook permanente atual:
@@ -1400,32 +1405,42 @@ Runbook permanente atual:
    - `src/copilot/.ai/cloudflare/workspace-mcp-dev.token`
 2. O conteudo do arquivo deve ser somente o token gerado pela tela Cloudflare.
 3. Nunca versionar esse arquivo.
-4. Rodar MCP HTTP:
-   - `npm run copilot:mcp:http`
-5. Em outro processo, rodar o tunnel:
-   - `CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token npm run copilot:mcp:cloudflare:run`
+4. Subir MCP HTTP e tunnel permanente:
+   - `CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token npm run copilot:mcp:cloudflare:up`
+5. Alternativa foreground para diagnostico fino:
+   - `npm run copilot:mcp:http`;
+   - `CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token npm run copilot:mcp:cloudflare:run`.
 6. No Cloudflare, confirmar que o tunnel `workspace-mcp-dev` detecta conexao ativa.
 7. Publicar hostname:
-   - hostname: `workspace-mcp-dev.aurelin.org`;
+   - hostname: `mcp.aurelin.org`;
    - service/origin: `http://127.0.0.1:3333`.
 8. Rodar smoke:
    - `npm run copilot:mcp:cloudflare:smoke`
 9. No ChatGPT, usar:
    - nome: `Repo DevContainer MCP`;
-   - URL: `https://workspace-mcp-dev.aurelin.org/mcp`;
+   - URL: `https://mcp.aurelin.org/mcp`;
    - autenticacao atual: sem autenticacao / desenvolvimento controlado.
 
-Pendencias externas:
+Estado externo apos criacao da rota `mcp.aurelin.org`:
 
 1. Confirmar no dashboard Cloudflare que a conexao do tunnel foi detectada.
    - Estado local: conexao registrada pelo `cloudflared` com quatro conexoes `http2`.
-2. Confirmar rota/public hostname em `workspace-mcp-dev.aurelin.org`.
-   - Estado local em 2026-05-23: `curl https://workspace-mcp-dev.aurelin.org/health`
-     ainda falha com DNS `Could not resolve host`, logo falta publicar/propagar o hostname.
-3. Rodar smoke externo contra `/health` e `/mcp` depois que DNS resolver.
-4. Atualizar o conector no ChatGPT para a URL permanente.
-5. Rodar teste real no ChatGPT com `mcp_tunnel_status`, `repo_status`, `mcp_autonomy_power_score`
+2. Rota/public hostname criado em `mcp.aurelin.org`.
+3. DNS Cloudflare criou CNAME de `mcp.aurelin.org` para o tunnel remoto.
+4. Smoke HTTP externo em 2026-05-23:
+   - `curl https://mcp.aurelin.org/health`: HTTP 200;
+   - corpo: `ok=true`, `name=copilot-mcp`, `mcpPath=/mcp`.
+5. O supervisor local foi reexecutado com `cloudflare:up` depois da canonicalizacao.
+6. O MCP HTTP foi reiniciado por drift de configuracao e passou a anunciar
+   `https://mcp.aurelin.org/mcp`.
+7. `cloudflared` permaneceu vivo e associado ao tunnel `workspace-mcp-dev`.
+
+Pendencias externas:
+
+1. Atualizar ou recriar o conector no ChatGPT para a URL permanente.
+2. Rodar teste real no ChatGPT com `mcp_tunnel_status`, `repo_status`, `mcp_autonomy_power_score`
    e `mcp_run_safe_validation_suite`.
+3. Quando OAuth real for escolhido, repetir smoke com auth `OAuth`.
 
 Validacao local desta virada:
 
@@ -1441,6 +1456,32 @@ Validacao local desta virada:
 7. `npm run test:copilot:unit`: passou com 3082 testes.
 8. `npm run copilot:mcp:cloudflare:status`: passou com `named-permanent`, MCP HTTP vivo e
    `cloudflared` vivo.
+9. `npm run copilot:mcp:cloudflare:up`: reiniciou MCP HTTP quando detectou drift de assinatura e
+   manteve `cloudflared` idempotente quando a assinatura ja estava coerente.
+10. `npm run copilot:mcp:cloudflare:smoke`: passou contra `https://mcp.aurelin.org/mcp`, com 67
+    tools remotas, 67 tools locais esperadas, nenhum missing e nenhum unexpected.
+11. `curl https://mcp.aurelin.org/health`: passou com HTTP 200.
+
+Roadmap atualizado para o dominio permanente:
+
+1. Faixa CF-P1 - Canonicalizacao do hostname.
+   - Trocar todos os defaults de `workspace-mcp-dev.aurelin.org` para `mcp.aurelin.org`.
+   - Manter `workspace-mcp-dev` apenas como nome do tunnel remoto.
+   - Atualizar `.env.example`, `.env.schema.json`, profile, auth resource e docs.
+   - Atualizar testes que verificam URL canonica.
+2. Faixa CF-P2 - Supervisao resiliente.
+   - Garantir `cloudflare:up` idempotente.
+   - Reiniciar processos quando a assinatura operacional mudar.
+   - Persistir metadados locais sem segredos.
+   - Manter `cloudflare:down` limpando PID e metadados.
+3. Faixa CF-P3 - Validacao externa.
+   - Rodar `cloudflare:status` contra a config atual.
+   - Rodar `cloudflare:smoke` contra `https://mcp.aurelin.org/mcp`.
+   - Confirmar `tools/list` remoto igual ao registry local.
+4. Faixa CF-P4 - Uso no ChatGPT.
+   - Preencher URL `https://mcp.aurelin.org/mcp`.
+   - Autenticacao atual: sem autenticacao, dev controlado.
+   - Confirmar chamadas reais `repo_status`, `mcp_tunnel_status`, `mcp_session_profile`.
 
 ## 13. Estado feito vs faltante apos a nova auditoria
 

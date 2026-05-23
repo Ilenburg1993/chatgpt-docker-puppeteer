@@ -8,7 +8,7 @@
 import { readMcpAuthConfig } from '../control-plane/auth.js';
 
 const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:3333/mcp';
-const DEFAULT_PUBLIC_MCP_URL = 'https://workspace-mcp-dev.aurelin.org/mcp';
+const DEFAULT_PUBLIC_MCP_URL = 'https://mcp.aurelin.org/mcp';
 const DEFAULT_CLOUDFLARE_ORIGIN_URL = 'http://127.0.0.1:3333';
 
 export const CHATGPT_CONNECTOR_NAME = 'Repo DevContainer MCP';
@@ -131,7 +131,7 @@ export function buildChatGptConnectorProfile(options = {}) {
             'O tunnel ativo alcança o origin local e preserva o path público /mcp.',
         ],
         remoteExposureOptions: [
-            'Cloudflare Tunnel permanente: modo operacional principal, com hostname workspace-mcp-dev.aurelin.org.',
+            'Cloudflare Tunnel permanente: modo operacional principal, com hostname mcp.aurelin.org.',
             'Cloudflare Quick Tunnel temporário: fallback explícito via COPILOT_MCP_CLOUDFLARE_MODE=temporary-quick.',
             'OpenAI Secure MCP Tunnel: alternativa privada baseada em tunnel-client.',
         ],
@@ -201,7 +201,7 @@ export function buildCloudflareTunnelRunbook(options = {}) {
             'cloudflared instalado no mesmo ambiente que alcança o MCP HTTP local.',
             `MCP HTTP saudável no origin ${originUrl}.`,
             'Tunnel remoto Cloudflare criado como workspace-mcp-dev.',
-            'Hostname público permanente configurado como workspace-mcp-dev.aurelin.org.',
+            'Hostname público permanente configurado como mcp.aurelin.org.',
             'Rota pública publicada para o origin local sem /mcp no serviço de origem.',
             'ChatGPT developer mode habilitado para criar conector customizado.',
         ],
@@ -215,10 +215,11 @@ export function buildCloudflareTunnelRunbook(options = {}) {
             'npm run copilot:mcp:cloudflare:status',
         ],
         managedTunnelCommands: [
-            'npm run copilot:mcp:http',
             'npm run copilot:mcp:cloudflare:doctor',
             'export CLOUDFLARE_TUNNEL_TOKEN_FILE="src/copilot/.ai/cloudflare/workspace-mcp-dev.token"',
-            'npm run copilot:mcp:cloudflare:run',
+            'npm run copilot:mcp:cloudflare:up',
+            'npm run copilot:mcp:cloudflare:status',
+            'npm run copilot:mcp:cloudflare:smoke',
         ],
         chatgptUrl: profile.connectorUrl,
         notes: [

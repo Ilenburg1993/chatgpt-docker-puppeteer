@@ -6,7 +6,8 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { closeSync, openSync } from 'node:fs';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { getCanonicalMcpTools } from '../registry.js';
@@ -37,6 +38,10 @@ try {
         await runStatus();
     } else if (command === 'smoke') {
         await runSmoke();
+    } else if (command === 'up') {
+        await runUp();
+    } else if (command === 'down') {
+        await runDown();
     } else if (command === 'run') {
         const config = readCloudflareTunnelConfig();
         runCloudflared(
@@ -44,7 +49,7 @@ try {
             config.transportProtocol,
         );
     } else {
-        fail(`Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, or run.`);
+        fail(`Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, up, down, or run.`);
     }
 } catch (error) {
     fail(error instanceof Error ? error.message : String(error));
@@ -285,6 +290,208 @@ async function runSmoke() {
     };
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runUp() {
+    const config = readCloudflareTunnelConfig();
+    const mcpHttp = await ensureDetachedProcess({
+        name: 'mcp-http',
+        command: process.execPath,
+        args: ['src/copilot/mcp/index.js', '--transport', 'http'],
+        pidFile: config.mcpHttpPidFile,
+        logFile: 'src/copilot/.ai/cloudflare/mcp-http.log',
+        env: {
+            COPILOT_MCP_PUBLIC_URL: config.publicMcpUrl ?? '',
+            COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: config.publicMcpUrl ?? '',
+            COPILOT_MCP_CLOUDFLARE_MODE: config.mode,
+        },
+    });
+    const cloudflared = await ensureDetachedProcess({
+        name: 'cloudflared',
+        command: 'cloudflared',
+        args: buildManagedTunnelArgs(process.env['CLOUDFLARE_TUNNEL_TOKEN'], config.tunnelTokenFile),
+        pidFile: config.managedTunnelPidFile,
+        logFile: 'src/copilot/.ai/cloudflare/cloudflared.log',
+        env: {
+            CLOUDFLARE_TUNNEL_TOKEN_FILE: config.tunnelTokenFile ?? '',
+            TUNNEL_TRANSPORT_PROTOCOL: config.transportProtocol,
+        },
+    });
+    process.stdout.write(
+        `${JSON.stringify(
+            {
+                ok: true,
+                mode: config.mode,
+                publicMcpUrl: config.publicMcpUrl,
+                mcpHttp,
+                cloudflared,
+                next: ['npm run copilot:mcp:cloudflare:status', 'npm run copilot:mcp:cloudflare:smoke'],
+            },
+            null,
+            2,
+        )}\n`,
+    );
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runDown() {
+    const config = readCloudflareTunnelConfig();
+    const cloudflared = await stopPidFileProcess(config.managedTunnelPidFile);
+    const mcpHttp = await stopPidFileProcess(config.mcpHttpPidFile);
+    process.stdout.write(`${JSON.stringify({ ok: true, cloudflared, mcpHttp }, null, 2)}\n`);
+}
+
+/**
+ * @param {{
+ *   name: string;
+ *   command: string;
+ *   args: string[];
+ *   pidFile: string;
+ *   logFile: string;
+ *   env?: Record<string, string>;
+ * }} options
+ * @returns {Promise<{ name: string; pidFile: string; logFile: string; metadataFile: string; pid: number | null; alreadyRunning: boolean; restarted: boolean; restartReason: string | null }>}
+ */
+async function ensureDetachedProcess(options) {
+    const metadataFile = `${options.pidFile}.json`;
+    const signature = buildProcessSignature(options);
+    const existing = await readPidFileStatus(options.pidFile);
+    if (existing.alive) {
+        const metadata = await readProcessMetadata(metadataFile);
+        if (metadata?.signature && JSON.stringify(metadata.signature) === JSON.stringify(signature)) {
+            return {
+                name: options.name,
+                pidFile: options.pidFile,
+                logFile: options.logFile,
+                metadataFile,
+                pid: existing.pid,
+                alreadyRunning: true,
+                restarted: false,
+                restartReason: null,
+            };
+        }
+        const stopped = await stopPidFileProcess(options.pidFile);
+        if (stopped.wasAlive && !stopped.stopped) {
+            throw new Error(`Could not restart ${options.name}: ${stopped.error ?? 'process did not stop'}`);
+        }
+    }
+    await mkdir(path.dirname(options.pidFile), { recursive: true });
+    await mkdir(path.dirname(options.logFile), { recursive: true });
+    const out = openSync(options.logFile, 'a');
+    const child = spawn(options.command, options.args, {
+        detached: true,
+        stdio: ['ignore', out, out],
+        env: { ...process.env, ...(options.env ?? {}) },
+    });
+    child.unref();
+    closeSync(out);
+    await writeFile(options.pidFile, `${child.pid ?? 0}\n`, 'utf8');
+    await writeFile(
+        metadataFile,
+        `${JSON.stringify(
+            {
+                schemaVersion: 1,
+                name: options.name,
+                pid: child.pid ?? null,
+                startedAt: new Date().toISOString(),
+                signature,
+            },
+            null,
+            2,
+        )}\n`,
+        'utf8',
+    );
+    return {
+        name: options.name,
+        pidFile: options.pidFile,
+        logFile: options.logFile,
+        metadataFile,
+        pid: child.pid ?? null,
+        alreadyRunning: false,
+        restarted: existing.alive,
+        restartReason: existing.alive ? 'configuration-changed-or-metadata-missing' : null,
+    };
+}
+
+/**
+ * @param {string} metadataFile
+ * @returns {Promise<{ signature?: unknown } | null>}
+ */
+async function readProcessMetadata(metadataFile) {
+    try {
+        const parsed = JSON.parse(await readFile(metadataFile, 'utf8'));
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * @param {{
+ *   name: string;
+ *   command: string;
+ *   args: string[];
+ *   env?: Record<string, string>;
+ * }} options
+ * @returns {{ name: string; command: string; args: string[]; env: Record<string, string> }}
+ */
+function buildProcessSignature(options) {
+    return {
+        name: options.name,
+        command: options.command,
+        args: redactCommandArgs(options.args),
+        env: Object.fromEntries(Object.entries(options.env ?? {}).sort(([left], [right]) => left.localeCompare(right))),
+    };
+}
+
+/**
+ * @param {string[]} args
+ * @returns {string[]}
+ */
+function redactCommandArgs(args) {
+    return args.map((arg, index) => {
+        const previous = args[index - 1];
+        if (previous === '--token') return '<redacted>';
+        if (arg.startsWith('--token=')) return '--token=<redacted>';
+        return arg;
+    });
+}
+
+/**
+ * @param {string} pidFile
+ * @returns {Promise<{ pidFile: string; pid: number | null; stopped: boolean; wasAlive: boolean; error: string | null }>}
+ */
+async function stopPidFileProcess(pidFile) {
+    const status = await readPidFileStatus(pidFile);
+    const metadataFile = `${pidFile}.json`;
+    if (!status.pid) {
+        await rm(metadataFile, { force: true });
+        return { pidFile, pid: null, stopped: false, wasAlive: false, error: status.error };
+    }
+    if (!status.alive) {
+        await rm(pidFile, { force: true });
+        await rm(metadataFile, { force: true });
+        return { pidFile, pid: status.pid, stopped: false, wasAlive: false, error: status.error };
+    }
+    try {
+        process.kill(status.pid, 'SIGTERM');
+        await rm(pidFile, { force: true });
+        await rm(metadataFile, { force: true });
+        return { pidFile, pid: status.pid, stopped: true, wasAlive: true, error: null };
+    } catch (error) {
+        return {
+            pidFile,
+            pid: status.pid,
+            stopped: false,
+            wasAlive: true,
+            error: error instanceof Error ? error.message : String(error),
+        };
+    }
 }
 
 /**

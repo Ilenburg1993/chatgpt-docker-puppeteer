@@ -356,7 +356,7 @@ describe('copilot MCP tools', () => {
         );
         const tunnelGuidance = /** @type {Record<string, unknown>} */ (structured['tunnelGuidance']);
         assert.equal(tunnelGuidance['mode'], 'Cloudflare named permanent tunnel');
-        assert.equal(tunnelGuidance['expectedUrlShape'], 'https://workspace-mcp-dev.aurelin.org/mcp');
+        assert.equal(tunnelGuidance['expectedUrlShape'], 'https://mcp.aurelin.org/mcp');
     });
 
     it('mcp maintenance tools plan and dry-run fixed safe batches', async () => {

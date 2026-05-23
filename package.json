@@ -324,6 +324,8 @@
     "copilot:mcp:cloudflare:run": "node src/copilot/mcp/cloudflare/cli.js run",
     "copilot:mcp:cloudflare:smoke": "node src/copilot/mcp/cloudflare/cli.js smoke",
     "copilot:mcp:cloudflare:status": "node src/copilot/mcp/cloudflare/cli.js status",
+    "copilot:mcp:cloudflare:up": "node src/copilot/mcp/cloudflare/cli.js up",
+    "copilot:mcp:cloudflare:down": "node src/copilot/mcp/cloudflare/cli.js down",
     "copilot:mcp:http": "node src/copilot/mcp/index.js --transport http",
     "copilot:mcp:safe-suite": "node src/copilot/mcp/scripts/run-safe-validation-suite.js",
     "copilot:mcp:smoke:local": "node src/copilot/mcp/scripts/smoke-http.js",

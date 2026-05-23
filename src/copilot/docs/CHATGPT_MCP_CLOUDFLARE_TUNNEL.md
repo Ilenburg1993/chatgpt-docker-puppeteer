@@ -6,7 +6,7 @@
 **Endpoint MCP local:** `http://127.0.0.1:3333/mcp`  
 **Tunnel Cloudflare padrao:** `workspace-mcp-dev`  
 **Dominio Cloudflare:** `aurelin.org`  
-**Endpoint MCP publico esperado:** `https://workspace-mcp-dev.aurelin.org/mcp`
+**Endpoint MCP publico esperado:** `https://mcp.aurelin.org/mcp`
 
 ---
 
@@ -88,10 +88,10 @@ smoke.
 
 1. Tunnel permanente e o caminho principal deste projeto a partir de 2026-05-23.
 2. O tunnel remoto se chama `workspace-mcp-dev`.
-3. O hostname publico canonico e `workspace-mcp-dev.aurelin.org`.
+3. O hostname publico canonico e `mcp.aurelin.org`.
 3. A rota Cloudflare deve mapear o origin raiz `http://127.0.0.1:3333`.
 4. O campo ChatGPT deve receber o endpoint publico permanente
-   `https://workspace-mcp-dev.aurelin.org/mcp`.
+   `https://mcp.aurelin.org/mcp`.
 5. Cloudflare Tunnel sozinho nao adiciona OAuth ao MCP.
 6. Quick Tunnel `trycloudflare.com` permanece como fallback operacional explicito, nao como padrao.
 
@@ -151,6 +151,10 @@ copilot:mcp:cloudflare:install
 copilot:mcp:cloudflare:doctor
 copilot:mcp:cloudflare:quick
 copilot:mcp:cloudflare:run
+copilot:mcp:cloudflare:up
+copilot:mcp:cloudflare:down
+copilot:mcp:cloudflare:status
+copilot:mcp:cloudflare:smoke
 ```
 
 ### 3.5 CLI local
@@ -471,10 +475,10 @@ npm run copilot:mcp:http
 Terminal B:
 
 ```bash
-export CLOUDFLARE_TUNNEL_TOKEN="<token-do-tunnel>"
-export COPILOT_MCP_CLOUDFLARE_PUBLIC_URL="https://repo-mcp.seudominio.example/mcp"
+export CLOUDFLARE_TUNNEL_TOKEN_FILE="src/copilot/.ai/cloudflare/workspace-mcp-dev.token"
+export COPILOT_MCP_CLOUDFLARE_PUBLIC_URL="https://mcp.aurelin.org/mcp"
 npm run copilot:mcp:cloudflare:doctor
-npm run copilot:mcp:cloudflare:run
+npm run copilot:mcp:cloudflare:up
 ```
 
 Teste:

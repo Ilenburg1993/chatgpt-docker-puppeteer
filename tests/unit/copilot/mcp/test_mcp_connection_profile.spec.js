@@ -54,7 +54,7 @@ describe('copilot MCP ChatGPT connection profile', () => {
         const runbook = buildSecureTunnelRunbook({ tunnelId: 'tunnel_test', localMcpUrl: 'http://127.0.0.1:3333' });
         assert.ok(runbook.httpTunnelCommands.join('\n').includes('--mcp-server-url http://127.0.0.1:3333/mcp'));
         assert.ok(runbook.stdioTunnelCommands.join('\n').includes('--mcp-command'));
-        assert.equal(runbook.chatgptUrl, 'https://workspace-mcp-dev.aurelin.org/mcp');
+        assert.equal(runbook.chatgptUrl, 'https://mcp.aurelin.org/mcp');
     });
 
     it('builds Cloudflare tunnel commands around the MCP origin root', () => {
