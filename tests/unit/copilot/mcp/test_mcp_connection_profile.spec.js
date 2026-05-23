@@ -14,9 +14,12 @@ import {
     validatePublicConnectorUrl,
 } from '../../../../src/copilot/mcp/connection/profile.js';
 import {
+    authorizeMcpToolCall,
     buildProtectedResourceMetadata,
     buildWwwAuthenticateChallenge,
+    normalizeMcpAuthEnforcement,
     normalizeMcpAuthMode,
+    parseBearerToken,
     readMcpAuthConfig,
     scopesForMcpTool,
     securitySchemesForMcpTool,
@@ -101,5 +104,43 @@ describe('copilot MCP ChatGPT connection profile', () => {
         });
         assert.ok(schemes.some((scheme) => scheme.type === 'noauth'));
         assert.ok(schemes.some((scheme) => scheme.type === 'oauth2'));
+    });
+
+    it('keeps temporary tunnel auth enforcement off by default outside oauth mode', async () => {
+        const tools = getCanonicalMcpTools();
+        const writeTool = tools.find((tool) => tool.name === 'repo_apply_patch');
+        assert.ok(writeTool);
+        assert.equal(normalizeMcpAuthEnforcement(undefined, 'mixed-auth'), 'off');
+        assert.equal(parseBearerToken('Bearer abc.def'), 'abc.def');
+        const decision = await authorizeMcpToolCall(
+            writeTool,
+            { bearerToken: undefined },
+            readMcpAuthConfig({
+                COPILOT_MCP_AUTH_MODE: 'mixed-auth',
+                COPILOT_MCP_PUBLIC_URL: 'https://example.com/mcp',
+            }),
+        );
+        assert.equal(decision.allowed, true);
+        assert.equal(decision.required, false);
+    });
+
+    it('requires scoped auth when enforcement is enabled and accepts configured static bearer token', async () => {
+        const tools = getCanonicalMcpTools();
+        const writeTool = tools.find((tool) => tool.name === 'repo_apply_patch');
+        assert.ok(writeTool);
+        const env = {
+            COPILOT_MCP_AUTH_MODE: 'mixed-auth',
+            COPILOT_MCP_AUTH_ENFORCEMENT: 'write',
+            COPILOT_MCP_PUBLIC_URL: 'https://example.com/mcp',
+            COPILOT_MCP_STATIC_BEARER_TOKEN: 'dev-token',
+        };
+        const config = readMcpAuthConfig(env);
+        const missing = await authorizeMcpToolCall(writeTool, { bearerToken: undefined }, config, env);
+        assert.equal(missing.allowed, false);
+        assert.equal(missing.code, 'MCP_AUTH_REQUIRED');
+        assert.match(String(missing.challenge ?? ''), /repo:write/);
+        const accepted = await authorizeMcpToolCall(writeTool, { bearerToken: 'dev-token' }, config, env);
+        assert.equal(accepted.allowed, true);
+        assert.equal(accepted.method, 'static-bearer');
     });
 });

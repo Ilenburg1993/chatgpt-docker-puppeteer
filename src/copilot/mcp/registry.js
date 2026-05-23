@@ -6,7 +6,9 @@
  */
 
 import { appendMcpAuditEvent } from './control-plane/audit.js';
+import { authorizeMcpToolCall } from './control-plane/auth.js';
 import { recordMcpToolMetric } from './control-plane/metrics.js';
+import { errorResult } from './control-plane/result.js';
 import { normalizeMcpToolDefinitions } from './control-plane/tool-metadata.js';
 import { connectionTools } from './tools/connection.js';
 import { copilotSessionTools } from './tools/copilot-session.js';
@@ -43,6 +45,9 @@ import { mcpTunnelStatusTool } from './tools/tunnel-status.js';
  * ) =>
  *     | Promise<import('@modelcontextprotocol/sdk/types.js').CallToolResult>
  *     | import('@modelcontextprotocol/sdk/types.js').CallToolResult} handler
+ *
+ * @typedef {object} RegisterCanonicalMcpToolsOptions
+ * @property {import('./control-plane/auth.js').McpAuthContext} [authContext]
  */
 
 /**
@@ -76,9 +81,10 @@ export function getCanonicalMcpTools() {
 
 /**
  * @param {import('@modelcontextprotocol/sdk/server/mcp.js').McpServer} server
+ * @param {RegisterCanonicalMcpToolsOptions} [options]
  * @returns {McpToolDefinition[]}
  */
-export function registerCanonicalMcpTools(server) {
+export function registerCanonicalMcpTools(server, options = {}) {
     const tools = getCanonicalMcpTools();
     for (const tool of tools) {
         server.registerTool(
@@ -99,6 +105,34 @@ export function registerCanonicalMcpTools(server) {
                     readOnly: tool.annotations.readOnlyHint === true,
                 });
                 try {
+                    const authorization = await authorizeMcpToolCall(tool, options.authContext);
+                    if (!authorization.allowed) {
+                        await appendMcpAuditEvent({
+                            event: 'tool_call_auth_denied',
+                            tool: tool.name,
+                            durationMs: Date.now() - startedAt,
+                            code: authorization.code,
+                            requiredScopes: authorization.requiredScopes,
+                        });
+                        recordMcpToolMetric(tool.name, {
+                            durationMs: Date.now() - startedAt,
+                            isError: true,
+                        });
+                        return errorResult(
+                            authorization.message ?? 'MCP authorization failed.',
+                            {
+                                code: authorization.code ?? 'MCP_AUTH_DENIED',
+                                hint: authorization.hint,
+                                requiredScopes: authorization.requiredScopes,
+                                enforcement: authorization.enforcement,
+                            },
+                            authorization.challenge
+                                ? {
+                                      'mcp/www_authenticate': authorization.challenge,
+                                  }
+                                : undefined,
+                        );
+                    }
                     const result = await tool.handler(args);
                     await appendMcpAuditEvent({
                         event: 'tool_call_completed',

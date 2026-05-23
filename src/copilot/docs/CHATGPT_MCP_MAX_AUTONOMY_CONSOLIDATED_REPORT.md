@@ -1214,7 +1214,7 @@ Resultado implementado:
 
 ### Faixa I — Mixed Authentication
 
-Status: readiness parcial implementada e validada em teste focado nesta rodada.
+Status: readiness implementada; enforcement gradual em implementacao nesta rodada.
 
 Objetivo:
 
@@ -1229,8 +1229,8 @@ Subfases:
 1. Mapear scopes por tool: implementado.
 2. Implementar protected resource metadata: implementado no HTTP adapter.
 3. Implementar authorization server metadata: pendente; depende de issuer real externo.
-4. Implementar runtime challenge `_meta["mcp/www_authenticate"]`: helper/challenge preview
-   implementado; enforcement real pendente.
+4. Implementar runtime challenge `_meta["mcp/www_authenticate"]`: implementado no wrapper
+   do registry quando enforcement exige token e o bearer esta ausente/invalido.
 5. Validar com MCP Inspector e ChatGPT: pendente em modo OAuth real.
 
 Pronto quando:
@@ -1274,21 +1274,32 @@ Resultado implementado:
    - `mcp_auth_profile`.
 6. `chatgpt_connector_profile` agora inclui `authReadiness`.
 7. CORS do HTTP adapter passa a aceitar header `Authorization` para a fase OAuth futura.
-8. Validacao focada:
+8. O HTTP adapter propaga bearer token para o registry sem acoplar LLM-B ao MCP.
+9. `COPILOT_MCP_AUTH_ENFORCEMENT` permite enforcement gradual:
+   - default em `none-dev`, `mixed-auth` e `secure-mcp-tunnel`: `off`;
+   - default em `oauth`: `all`;
+   - modos explicitos: `off`, `read`, `write`, `validate`, `admin`, `all`.
+10. Validador de bearer token suporta:
+   - token estatico local via `COPILOT_MCP_STATIC_BEARER_TOKEN`, util para testes controlados;
+   - OAuth/JWT por JWKS via `COPILOT_MCP_OAUTH_JWKS_URI`;
+   - issuer via `COPILOT_MCP_OAUTH_EXPECTED_ISSUER`;
+   - audience/resource via `COPILOT_MCP_OAUTH_AUDIENCE`;
+   - checagem de scopes `scope` ou `scp`.
+11. `mcp_auth_profile` reporta enforcement, issuer, audience, JWKS e static bearer sem revelar segredo.
+12. Validacao focada:
    - `npm run typecheck:strict:src.copilot`: passou;
    - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_connection_profile.spec.js tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
-     passou com 39 testes.
+     passou com 41 testes.
+   - `npm run lint:copilot`: passou.
+   - `npm run copilot:mcp:safe-suite -- mcp-full`: passou com typecheck, lint e 80 testes MCP.
+   - `npm run test:copilot:unit`: passou com 3079 testes.
 
 Pendencias da Faixa I:
 
 1. Escolher/fornecer issuer OAuth real para `COPILOT_MCP_OAUTH_ISSUER`.
 2. Publicar metadata do authorization server fora deste MCP ou integrar com provedor existente.
-3. Implementar validacao real de bearer token:
-   - issuer;
-   - audience/resource;
-   - exp;
-   - scopes.
-4. Ativar enforcement gradual por tool sem quebrar `none-dev`.
+3. Validar OAuth real com issuer/JWKS externo usado pelo ChatGPT.
+4. Publicar exemplos finais do `.env` para modo OAuth quando houver issuer real.
 5. Rodar teste real no ChatGPT com auth `OAuth`.
 
 ---
@@ -1322,6 +1333,8 @@ Feito:
 23. `mcp_auth_profile`.
 24. OAuth protected resource metadata endpoint.
 25. Scope/security-scheme readiness por tool.
+26. Enforcement gradual por tool, desligado por padrao no tunel temporario.
+27. Validador bearer token por static token local ou OAuth/JWKS.
 
 Faltante P0:
 
@@ -1334,7 +1347,7 @@ Faltante P1:
 Faltante P2:
 
 1. OAuth authorization server metadata real.
-2. Token/scopes validation.
-3. Enforcement gradual por tool.
+2. Teste OAuth/JWKS real com ChatGPT.
+3. Exemplos finais de configuracao OAuth para issuer escolhido.
 4. Teste ChatGPT OAuth real.
 5. Dashboard/power score.

@@ -124,21 +124,22 @@ export const connectionTools = [
                 protectedResourceMetadata: buildProtectedResourceMetadata(config),
                 protectedResourceMetadataUrl: config.protectedResourceMetadataUrl,
                 authorizationServersConfigured: config.authorizationServers.length > 0,
+                enforcement: config.enforcement,
+                expectedIssuerConfigured: Boolean(config.expectedIssuer),
+                expectedAudience: config.expectedAudience,
+                jwksUriConfigured: Boolean(config.jwksUri),
+                staticBearerConfigured: config.staticBearerConfigured,
                 challengePreview: buildWwwAuthenticateChallenge(challengeScopes, config),
-                enforcement:
-                    config.mode === 'none-dev' || config.mode === 'secure-mcp-tunnel'
-                        ? 'metadata-only-no-token-enforcement'
-                        : 'oauth-metadata-ready-token-enforcement-pending',
                 nextSteps:
-                    config.mode === 'none-dev'
+                    config.enforcement === 'off'
                         ? [
                               'Keep ChatGPT connector authentication as No authentication for controlled temporary-tunnel development.',
-                              'Set COPILOT_MCP_AUTH_MODE=mixed-auth and COPILOT_MCP_OAUTH_ISSUER when testing OAuth discovery.',
+                              'Set COPILOT_MCP_AUTH_MODE=mixed-auth and COPILOT_MCP_AUTH_ENFORCEMENT=write when testing scoped write auth.',
                           ]
                         : [
                               'Confirm the authorization server publishes OAuth metadata.',
-                              'Confirm ChatGPT receives the protected resource metadata URL.',
-                              'Implement token issuer/audience/scope validation before requiring OAuth for writes.',
+                              'Set COPILOT_MCP_OAUTH_EXPECTED_ISSUER, COPILOT_MCP_OAUTH_AUDIENCE and COPILOT_MCP_OAUTH_JWKS_URI.',
+                              'Confirm ChatGPT receives the protected resource metadata URL and returns scoped bearer tokens.',
                           ],
             });
         },

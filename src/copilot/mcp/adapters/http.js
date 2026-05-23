@@ -9,7 +9,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createServer } from 'node:http';
 import { buildChatGptConnectorProfile } from '../connection/profile.js';
 import { logMcp } from '../control-plane/audit.js';
-import { buildProtectedResourceMetadata } from '../control-plane/auth.js';
+import { buildProtectedResourceMetadata, parseBearerToken } from '../control-plane/auth.js';
 import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
 import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
 import { createCopilotMcpServer } from '../server.js';
@@ -80,7 +80,15 @@ export async function startHttpMcpServer(opts = {}) {
         const mcpMethods = new Set(['POST', 'GET', 'DELETE']);
         if (url.pathname === MCP_PATH && req.method && mcpMethods.has(req.method)) {
             setCorsHeaders(res);
-            const server = createCopilotMcpServer();
+            const authorizationHeader = Array.isArray(req.headers.authorization)
+                ? req.headers.authorization[0]
+                : req.headers.authorization;
+            const server = createCopilotMcpServer({
+                authContext: {
+                    bearerToken: parseBearerToken(authorizationHeader),
+                    headers: req.headers,
+                },
+            });
             const transport = new StreamableHTTPServerTransport(
                 /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransportOptions} */ (
                     /** @type {unknown} */ ({

@@ -14,11 +14,11 @@ export const COPILOT_MCP_SERVER_INFO = Object.freeze({
 });
 
 /**
+ * @param {import('./registry.js').RegisterCanonicalMcpToolsOptions} [options]
  * @returns {McpServer}
  */
-export function createCopilotMcpServer() {
+export function createCopilotMcpServer(options = {}) {
     const server = new McpServer(COPILOT_MCP_SERVER_INFO);
-    registerCanonicalMcpTools(server);
+    registerCanonicalMcpTools(server, options);
     return server;
 }
-

@@ -36,9 +36,10 @@ export function okResult(structuredContent, text, meta) {
 /**
  * @param {string} message
  * @param {Record<string, unknown>} [details]
+ * @param {Record<string, unknown>} [meta]
  * @returns {CallToolResult}
  */
-export function errorResult(message, details) {
+export function errorResult(message, details, meta) {
     const code =
         details && typeof details['code'] === 'string' && details['code'].trim() ? details['code'].trim() : undefined;
     const hint =
@@ -53,6 +54,7 @@ export function errorResult(message, details) {
             ...(hint ? { hint } : {}),
             ...(details ? { details } : {}),
         },
+        ...(meta ? { _meta: meta } : {}),
     };
 }
 

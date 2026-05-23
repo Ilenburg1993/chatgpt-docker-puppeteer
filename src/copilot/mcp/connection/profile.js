@@ -36,6 +36,9 @@ export const CHATGPT_CONNECTOR_DESCRIPTION =
  *     protectedResourceMetadataUrl: string;
  *     authorizationServersConfigured: boolean;
  *     scopesSupported: string[];
+ *     enforcement: string;
+ *     expectedIssuerConfigured: boolean;
+ *     jwksUriConfigured: boolean;
  * }} authReadiness
  * @property {string} localMcpUrl
  * @property {string} tunnelId
@@ -75,6 +78,9 @@ export function buildChatGptConnectorProfile(options = {}) {
             protectedResourceMetadataUrl: authConfig.protectedResourceMetadataUrl,
             authorizationServersConfigured: authConfig.authorizationServers.length > 0,
             scopesSupported: authConfig.scopesSupported,
+            enforcement: authConfig.enforcement,
+            expectedIssuerConfigured: Boolean(authConfig.expectedIssuer),
+            jwksUriConfigured: Boolean(authConfig.jwksUri),
         },
         localMcpUrl: localUrl,
         tunnelId,
