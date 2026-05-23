@@ -1067,7 +1067,7 @@ Resultado implementado:
 
 ### Faixa E — Runtime health agregado
 
-Status: pendente.
+Status: implementada e validada em teste focado nesta rodada.
 
 Objetivo:
 
@@ -1091,6 +1091,23 @@ Subfases:
 Pronto quando:
 
 1. `mcp_runtime_health` nao fica `ok` se smoke/index indicam degradacao operacional.
+
+Resultado implementado:
+
+1. `mcp_smoke_workspace` registra um resumo in-process do ultimo smoke local.
+2. `mcp_runtime_health` agora agrega:
+   - dirty workspace;
+   - disponibilidade/vazio do indice IO;
+   - estado do Cloudflare Quick Tunnel;
+   - ultimo smoke Cloudflare;
+   - ultimo `mcp_smoke_workspace`;
+   - error rates por tool.
+3. O campo `status` passa a refletir `ok`, `degraded` ou `failed`, preservando `success/ok` como
+   sucesso da chamada MCP.
+4. Validacao focada:
+   - `npm run typecheck:strict:src.copilot`: passou;
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_runtime_metrics.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
+     passou com 27 testes.
 
 ### Faixa F — Index resiliente fora do host
 
@@ -1196,6 +1213,7 @@ Feito:
 16. Plan-only read-only tools para patch/create/quarantine/move/index/validation.
 17. `chatgpt_connector_current_url_status`.
 18. `repo_root_redaction_status`.
+19. Runtime health agregado com dirty workspace, index, tunnel e ultimo smoke local.
 
 Faltante P0:
 
@@ -1203,10 +1221,9 @@ Faltante P0:
 
 Faltante P1:
 
-1. Runtime health agregado.
-2. Auto index refresh.
-3. `mcp_last_validation_summary`.
-4. Host block diagnostics.
+1. Auto index refresh.
+2. `mcp_last_validation_summary`.
+3. Host block diagnostics.
 
 Faltante P2:
 

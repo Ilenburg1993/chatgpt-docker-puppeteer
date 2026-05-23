@@ -5,12 +5,73 @@
  * @module copilot/mcp/tools/runtime-health
  */
 
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
+import { getIoIndexStats } from '#copilot/infra/public/indexing';
 import { readCloudflareTunnelConfig } from '../cloudflare/config.js';
 import { readQuickTunnelState, summarizeQuickTunnelState } from '../cloudflare/state.js';
+import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
 import { getMcpWorkspaceRoot } from '../control-plane/paths.js';
 import { okResult } from '../control-plane/result.js';
+import { readMcpWorkspaceSmokeSummary } from '../control-plane/smoke-state.js';
+import { repoStatusHandler } from './repo-status.js';
+
+/**
+ * @param {unknown} stats
+ * @returns {{
+ *     available: boolean;
+ *     enabled: boolean;
+ *     files: number | null;
+ *     empty: boolean;
+ *     degraded: boolean;
+ *     reason: string | null;
+ * }}
+ */
+function summarizeIndexHealth(stats) {
+    const record = /** @type {Record<string, unknown>} */ (stats && typeof stats === 'object' ? stats : {});
+    const available = record['available'] === true;
+    const enabled = record['enabled'] !== false;
+    const files = typeof record['files'] === 'number' ? record['files'] : null;
+    const empty = available && files === 0;
+    return {
+        available,
+        enabled,
+        files,
+        empty,
+        degraded: !available || empty,
+        reason: !available ? 'index-unavailable' : empty ? 'index-empty' : null,
+    };
+}
+
+/**
+ * @returns {Promise<{ dirty: boolean | null; branch: string | null; head: string | null; error: string | null }>}
+ */
+async function summarizeWorkspaceStatus() {
+    try {
+        const result = await repoStatusHandler();
+        if (result.isError === true) {
+            return {
+                dirty: null,
+                branch: null,
+                head: null,
+                error: String(result.structuredContent?.['error'] ?? 'repo_status failed'),
+            };
+        }
+        return {
+            dirty: result.structuredContent?.['dirty'] === true,
+            branch:
+                typeof result.structuredContent?.['branch'] === 'string' ? result.structuredContent['branch'] : null,
+            head: typeof result.structuredContent?.['head'] === 'string' ? result.structuredContent['head'] : null,
+            error: null,
+        };
+    } catch (error) {
+        return {
+            dirty: null,
+            branch: null,
+            head: null,
+            error: error instanceof Error ? error.message : String(error),
+        };
+    }
+}
 
 /**
  * @type {import('../registry.js').McpToolDefinition}
@@ -26,10 +87,28 @@ export const mcpRuntimeHealthTool = {
         const tunnelConfig = readCloudflareTunnelConfig();
         const tunnelState = await readQuickTunnelState(tunnelConfig.stateFile);
         const tunnel = summarizeQuickTunnelState(tunnelState, Date.now(), tunnelConfig.staleAfterMs);
+        const workspace = await summarizeWorkspaceStatus();
+        const indexStats = getIoIndexStats();
+        const index = summarizeIndexHealth(indexStats);
+        const lastWorkspaceSmoke = readMcpWorkspaceSmokeSummary();
         const warnings = [];
         const critical = [];
+        if (workspace.error) warnings.push(`Unable to read repository status: ${workspace.error}`);
+        if (workspace.dirty === true) warnings.push('Workspace has uncommitted or untracked changes.');
+        if (!index.available) warnings.push('Shared IO index is unavailable; run or auto-run repo_index_build.');
+        else if (index.empty)
+            warnings.push('Shared IO index is available but empty; refresh it before indexed search.');
+        if (!tunnel.configured)
+            warnings.push('No saved Cloudflare quick tunnel state; start a temporary tunnel for ChatGPT.');
+        if (tunnel.configured && !tunnel.processAlive) {
+            warnings.push('Saved Cloudflare quick tunnel process is not alive; start a fresh temporary tunnel.');
+        }
         if (tunnel.stale) warnings.push('Temporary Cloudflare tunnel is stale; run cloudflare smoke before reuse.');
+        if (tunnel.lastSmokeOk === null)
+            warnings.push('No Cloudflare smoke result is recorded for the current tunnel.');
         if (tunnel.lastSmokeOk === false) critical.push('Last Cloudflare smoke failed.');
+        if (!lastWorkspaceSmoke) warnings.push('No in-process mcp_smoke_workspace result has been recorded.');
+        if (lastWorkspaceSmoke?.success === false) critical.push('Last mcp_smoke_workspace failed.');
         for (const [toolName, metric] of Object.entries(metrics.tools)) {
             const calls = Number(metric.calls ?? 0);
             const errors = Number(metric.errors ?? 0);
@@ -45,6 +124,20 @@ export const mcpRuntimeHealthTool = {
             warnings,
             critical,
             workspaceRoot: getMcpWorkspaceRoot(),
+            operationalSignals: {
+                workspace,
+                index,
+                lastWorkspaceSmoke,
+                tunnel: {
+                    configured: tunnel.configured,
+                    processAlive: tunnel.processAlive,
+                    stale: tunnel.stale,
+                    recommendedAction: tunnel.recommendedAction,
+                    lastSmokeOk: tunnel.lastSmokeOk,
+                    lastSmokeAgeMinutes: tunnel.lastSmokeAgeMinutes,
+                },
+            },
+            indexStats,
             metrics,
             tunnel,
         });

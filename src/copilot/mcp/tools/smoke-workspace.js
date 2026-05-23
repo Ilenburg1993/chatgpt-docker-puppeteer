@@ -15,6 +15,7 @@ import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
 import { resolveReadPath } from '../control-plane/paths.js';
 import { okResult } from '../control-plane/result.js';
+import { recordMcpWorkspaceSmokeSummary } from '../control-plane/smoke-state.js';
 import { projectDoctorTool } from './project-doctor.js';
 import { repoStatusHandler } from './repo-status.js';
 
@@ -136,16 +137,28 @@ export const mcpSmokeWorkspaceTool = {
             return { metricsCalls: metrics.totals.calls, tunnelAction: tunnel.recommendedAction };
         });
 
+        const durationMs = Date.now() - startedAt;
         const failed = checks.filter((check) => !check.ok);
         const status = failed.length > 0 ? 'failed' : warnings.length > 0 ? 'degraded' : 'ok';
-        return okResult({
+        const structured = {
             success: failed.length === 0,
             status,
-            durationMs: Date.now() - startedAt,
+            durationMs,
             checks,
             warnings,
             critical: failed.map((check) => check.name),
+        };
+        recordMcpWorkspaceSmokeSummary({
+            checkedAt: new Date().toISOString(),
+            success: structured.success,
+            status,
+            durationMs,
+            checkCount: checks.length,
+            failedChecks: failed.map((check) => check.name),
+            warningCount: warnings.length,
+            criticalCount: failed.length,
         });
+        return okResult(structured);
     },
 };
 

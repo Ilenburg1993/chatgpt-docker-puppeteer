@@ -11,11 +11,13 @@ import {
     recordMcpToolMetric,
     resetMcpMetricsForTests,
 } from '../../../../src/copilot/mcp/control-plane/metrics.js';
+import { resetMcpWorkspaceSmokeSummaryForTests } from '../../../../src/copilot/mcp/control-plane/smoke-state.js';
 import { mcpRuntimeHealthTool } from '../../../../src/copilot/mcp/tools/runtime-health.js';
 
 describe('copilot MCP runtime metrics', () => {
     beforeEach(() => {
         resetMcpMetricsForTests();
+        resetMcpWorkspaceSmokeSummaryForTests();
     });
 
     it('records per-tool call counts, errors and average duration', () => {
@@ -40,9 +42,8 @@ describe('copilot MCP runtime metrics', () => {
         assert.equal(result.structuredContent.success, true);
         assert.equal(result.structuredContent.ok, true);
         assert.equal(typeof result.structuredContent.workspaceRoot, 'string');
-        assert.equal(
-            /** @type {{ totals: { calls: number } }} */ (result.structuredContent.metrics).totals.calls,
-            1,
-        );
+        assert.ok(result.structuredContent.operationalSignals);
+        assert.ok(result.structuredContent.indexStats);
+        assert.equal(/** @type {{ totals: { calls: number } }} */ (result.structuredContent.metrics).totals.calls, 1);
     });
 });
