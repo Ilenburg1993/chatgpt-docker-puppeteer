@@ -161,6 +161,8 @@ async function runSmoke() {
         'repo_file_outline',
         'repo_index_status',
         'project_doctor',
+        'mcp_maintenance_plan',
+        'mcp_maintenance_apply_safe_fixes',
         'mcp_run_safe_validation_suite',
         'run_copilot_validator',
         'job_list',

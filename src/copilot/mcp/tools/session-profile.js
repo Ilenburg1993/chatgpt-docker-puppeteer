@@ -38,6 +38,7 @@ export const mcpSessionProfileTool = {
                 'repo_status',
                 'mcp_tools_status',
                 'mcp_capabilities_summary',
+                'mcp_maintenance_plan',
                 'mcp_tunnel_status',
                 'project_doctor',
             ],
@@ -71,6 +72,11 @@ export const mcpSessionProfileTool = {
                     flow: ['mcp_run_safe_validation_suite suite=mcp-full', 'job_get_output'],
                     reason: 'One allowlisted job reduces repeated validator calls.',
                 },
+                {
+                    task: 'routine-maintenance',
+                    flow: ['mcp_maintenance_plan', 'mcp_maintenance_apply_safe_fixes dryRun=true'],
+                    reason: 'Batched maintenance reduces separate planning/status/smoke calls.',
+                },
             ],
             approvalGuidance: {
                 askUserToRememberWhenAvailable: [
@@ -81,6 +87,7 @@ export const mcpSessionProfileTool = {
                     'repo_quarantine_file',
                     'repo_restore_quarantined_file',
                     'mcp_run_safe_validation_suite',
+                    'mcp_maintenance_apply_safe_fixes',
                 ],
                 avoidUnlessExplicitlyNeeded: ['repo_remove_file', 'job_cancel'],
                 cannotDisableHostPrompts:

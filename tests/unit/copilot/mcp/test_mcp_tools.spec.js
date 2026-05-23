@@ -280,6 +280,7 @@ describe('copilot MCP tools', () => {
         assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_find_symbol_usages'));
         assert.ok(Array.isArray(structured['index']));
         assert.ok(/** @type {string[]} */ (structured['index']).includes('repo_index_status'));
+        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_maintenance_plan'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_session_profile'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tools_status'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tunnel_status'));
@@ -318,6 +319,29 @@ describe('copilot MCP tools', () => {
         );
         const tunnelGuidance = /** @type {Record<string, unknown>} */ (structured['tunnelGuidance']);
         assert.equal(tunnelGuidance['mode'], 'Cloudflare Quick Tunnel temporary URL');
+    });
+
+    it('mcp maintenance tools plan and dry-run fixed safe batches', async () => {
+        const planTool = findTool('mcp_maintenance_plan');
+        const plan = await planTool.handler({});
+        assert.equal(plan.isError, undefined);
+        assert.equal(plan.structuredContent?.['success'], true);
+        assert.equal(plan.structuredContent?.['defaultDryRun'], true);
+        assert.ok(Array.isArray(plan.structuredContent?.['items']));
+
+        const applyTool = findTool('mcp_maintenance_apply_safe_fixes');
+        const dryRun = await applyTool.handler({
+            fixes: ['workspace-status', 'summarize-tools', 'run-mcp-smoke', 'refresh-index'],
+            dryRun: true,
+        });
+        assert.equal(dryRun.isError, undefined);
+        assert.equal(dryRun.structuredContent?.['success'], true);
+        assert.equal(dryRun.structuredContent?.['dryRun'], true);
+        const results = /** @type {{ fix?: string; dryRun?: boolean; plannedPath?: string }[]} */ (
+            dryRun.structuredContent?.['results']
+        );
+        assert.ok(results.some((result) => result.fix === 'refresh-index' && result.plannedPath === 'src/copilot'));
+        assert.ok(results.every((result) => result.dryRun === true));
     });
 
     it('project_doctor returns canonical validators', async () => {

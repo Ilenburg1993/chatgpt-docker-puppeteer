@@ -11,6 +11,7 @@ import { connectionTools } from './tools/connection.js';
 import { copilotSessionTools } from './tools/copilot-session.js';
 import { gitReadTools } from './tools/git-read.js';
 import { jobTools } from './tools/jobs.js';
+import { maintenanceTools } from './tools/maintenance.js';
 import { metaTools } from './tools/meta.js';
 import { projectDoctorTool } from './tools/project-doctor.js';
 import { repoIndexTools } from './tools/repo-index.js';
@@ -46,6 +47,7 @@ export function getCanonicalMcpTools() {
         ...gitReadTools,
         projectDoctorTool,
         ...jobTools,
+        ...maintenanceTools,
         ...connectionTools,
         ...repoWriteTools,
         ...copilotSessionTools,

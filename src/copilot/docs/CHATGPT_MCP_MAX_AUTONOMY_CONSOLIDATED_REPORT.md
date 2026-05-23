@@ -696,6 +696,14 @@ Executados e aprovados:
 8. `npm run test:copilot:unit`
    - rerun final apos `mcp_session_profile`, listagem/inspecao de quarentena e docs passou;
    - 3064/3064 testes passaram.
+9. `npm run copilot:mcp:safe-suite -- mcp-full`
+   - rerun apos maintenance batch passou;
+   - typecheck strict passou;
+   - lint Copilot passou;
+   - 66 testes MCP passaram.
+10. `npm run test:copilot:unit`
+    - rerun final apos maintenance batch passou;
+    - 3065/3065 testes passaram.
 
 ### 9.7. Faixa 6 inicial concluida — `mcp_session_profile`
 
@@ -726,19 +734,43 @@ Efeito esperado no ChatGPT:
 
 ### 9.8. Proxima sequencia cronologica
 
-1. Finalizar Faixa 4:
-   - adicionar listagem/inspecao de itens em quarentena se o uso no ChatGPT indicar necessidade;
-   - atualizar runbook operacional com smoke de quarentena;
-   - medir prompts reais no ChatGPT.
-2. Faixa 5:
-   - criar `mcp_maintenance_plan`;
-   - criar `mcp_maintenance_apply_safe_fixes`;
-   - manter `dryRun=true` por padrao;
-   - sem path arbitrario.
-3. Faixa 6:
-   - criar `mcp_session_profile`;
-   - consolidar approval recommendations e prompt inicial ideal.
-4. Faixa 7:
+### 9.8. Faixa 5 inicial concluida — maintenance batch
+
+Mudancas implementadas:
+
+1. Criada tool:
+   - `mcp_maintenance_plan`.
+2. Criada tool:
+   - `mcp_maintenance_apply_safe_fixes`.
+3. Fixes allowlisted:
+   - `workspace-status`;
+   - `summarize-tools`;
+   - `run-mcp-smoke`;
+   - `refresh-index`.
+4. `dryRun=true` e o default.
+5. Nao ha shell arbitrario.
+6. Nao ha path arbitrario.
+7. `refresh-index` sempre mira `src/copilot`, usando IO index compartilhado.
+8. `run-mcp-smoke` em `dryRun=true` apenas planeja; em `dryRun=false`, chama a smoke suite
+   read-only.
+9. `mcp_session_profile` passou a recomendar o fluxo:
+   - `mcp_maintenance_plan`;
+   - `mcp_maintenance_apply_safe_fixes dryRun=true`.
+10. `mcp_capabilities_summary` passou a anunciar as tools de maintenance.
+11. Smoke remoto Cloudflare passou a exigir as duas tools como critical.
+
+Efeito esperado no ChatGPT:
+
+1. Manutencoes comuns podem virar uma chamada planejada/batch em vez de varias chamadas soltas.
+2. A chamada real continua estreita e allowlisted.
+3. O ChatGPT consegue operar com menor quantidade de pedidos de confirmacao quando o usuario aceitar
+   a tool batch.
+
+### 9.9. Proxima sequencia cronologica
+
+1. Atualizar runbook operacional com smoke de quarentena e maintenance.
+2. Medir prompts reais no ChatGPT.
+3. Faixa 7:
    - desenhar runner local de delegacao allowlisted.
-5. Faixa 8:
+4. Faixa 8:
    - golden prompts e medicao real de prompts/bloqueios no ChatGPT.
