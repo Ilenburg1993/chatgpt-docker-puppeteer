@@ -16,16 +16,62 @@ import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
 import { createCopilotMcpServer } from '../server.js';
 
 const MCP_PATH = '/mcp';
+const DEFAULT_ALLOWED_ORIGINS = [
+    'https://chatgpt.com',
+    'https://chat.openai.com',
+    'https://platform.openai.com',
+    'http://localhost',
+    'http://127.0.0.1',
+];
 
 /**
  * @param {import('node:http').ServerResponse} res
+ * @param {string | undefined} origin
  * @returns {void}
  */
-function setCorsHeaders(res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+function setCorsHeaders(res, origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin && isAllowedOrigin(origin) ? origin : '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type, mcp-session-id');
-    res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
+    res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type, mcp-session-id, mcp-protocol-version');
+    res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id, MCP-Protocol-Version');
+    res.setHeader('Vary', 'Origin');
+}
+
+/**
+ * @param {string | undefined} origin
+ * @returns {boolean}
+ */
+function isAllowedOrigin(origin) {
+    if (!origin) return true;
+    const configured = String(process.env['COPILOT_MCP_ALLOWED_ORIGINS'] ?? '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    const allowed = configured.length > 0 ? configured : DEFAULT_ALLOWED_ORIGINS;
+    try {
+        const parsed = new URL(origin);
+        if ((parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') && /^https?:$/u.test(parsed.protocol)) {
+            return allowed.some((candidate) => origin.startsWith(candidate));
+        }
+        return allowed.includes(origin);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * @param {import('node:http').IncomingMessage} req
+ * @param {import('node:http').ServerResponse} res
+ * @returns {boolean}
+ */
+function rejectInvalidOrigin(req, res) {
+    const originHeader = Array.isArray(req.headers.origin) ? req.headers.origin[0] : req.headers.origin;
+    if (originHeader && !isAllowedOrigin(originHeader)) {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message: 'Origin is not allowed.' } }));
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -40,7 +86,7 @@ export async function startHttpMcpServer(opts = {}) {
         const url = new URL(req.url ?? '/', `http://${req.headers.host ?? `${host}:${port}`}`);
 
         if (req.method === 'OPTIONS' && url.pathname === MCP_PATH) {
-            setCorsHeaders(res);
+            setCorsHeaders(res, Array.isArray(req.headers.origin) ? req.headers.origin[0] : req.headers.origin);
             res.writeHead(204).end();
             return;
         }
@@ -84,7 +130,8 @@ export async function startHttpMcpServer(opts = {}) {
 
         const mcpMethods = new Set(['POST', 'GET', 'DELETE']);
         if (url.pathname === MCP_PATH && req.method && mcpMethods.has(req.method)) {
-            setCorsHeaders(res);
+            setCorsHeaders(res, Array.isArray(req.headers.origin) ? req.headers.origin[0] : req.headers.origin);
+            if (rejectInvalidOrigin(req, res)) return;
             const authorizationHeader = Array.isArray(req.headers.authorization)
                 ? req.headers.authorization[0]
                 : req.headers.authorization;

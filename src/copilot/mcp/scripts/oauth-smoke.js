@@ -205,9 +205,12 @@ function summarizeMetadataProbe(probe) {
         authorizationEndpointConfigured: typeof body?.['authorization_endpoint'] === 'string',
         tokenEndpointConfigured: typeof body?.['token_endpoint'] === 'string',
         registrationEndpointConfigured: typeof body?.['registration_endpoint'] === 'string',
+        clientIdMetadataDocumentSupported: body?.['client_id_metadata_document_supported'] === true,
+        userinfoEndpointConfigured: typeof body?.['userinfo_endpoint'] === 'string',
         jwksUriConfigured: typeof body?.['jwks_uri'] === 'string',
         codeChallengeMethodsSupported: body?.['code_challenge_methods_supported'] ?? [],
         tokenEndpointAuthMethodsSupported: body?.['token_endpoint_auth_methods_supported'] ?? [],
+        scopesSupported: body?.['scopes_supported'] ?? [],
     };
 }
 

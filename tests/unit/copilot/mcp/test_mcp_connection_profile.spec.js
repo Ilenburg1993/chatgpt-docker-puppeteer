@@ -86,6 +86,8 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.equal(metadata.resource, 'https://example.com');
         assert.deepEqual(metadata.authorization_servers, ['https://auth.example.com']);
         assert.ok(/** @type {string[]} */ (metadata.scopes_supported).includes('repo:read'));
+        assert.ok(/** @type {string[]} */ (metadata.scopes_supported).includes('repo:validate'));
+        assert.equal(/** @type {string[]} */ (metadata.scopes_supported).includes('repo:admin'), false);
         assert.match(buildWwwAuthenticateChallenge(['repo:read'], config), /resource_metadata="https:\/\/example\.com/);
     });
 
@@ -105,6 +107,11 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.equal(metadata.authorization_endpoint, 'https://mcp.aurelin.org/oauth/authorize');
         assert.equal(metadata.token_endpoint, 'https://mcp.aurelin.org/oauth/token');
         assert.equal(metadata.jwks_uri, 'https://mcp.aurelin.org/oauth/jwks.json');
+        assert.equal(metadata.userinfo_endpoint, 'https://mcp.aurelin.org/oauth/userinfo');
+        assert.equal(metadata.client_id_metadata_document_supported, true);
+        assert.ok(/** @type {string[]} */ (metadata.scopes_supported).includes('openid'));
+        assert.ok(/** @type {string[]} */ (metadata.claims_supported).includes('email'));
+        assert.deepEqual(buildProtectedResourceMetadata(config).scopes_supported, ['repo:read', 'repo:validate']);
     });
 
     it('maps tool annotations to planned OAuth scopes and mixed security schemes', () => {

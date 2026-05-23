@@ -340,3 +340,23 @@ Quinta fatia concluida - Faixa F:
   introduzida durante a fatia (`presentation/runtime/sdk-session.js` importando `#copilot/sdk/session`) foi corrigida,
   movendo o acesso a SessionFs para a facade do agent. O rerun focado de soberania deixou apenas o achado preexistente
   de `hooks/session-hooks.js`.
+
+Sexta fatia correlata - MCP/OAuth/Cloudflare:
+
+- A analise das telas reais do ChatGPT mostrou que o conector publico `https://mcp.aurelin.org/mcp` ja era descoberto,
+  mas o issuer dev nao anunciava CIMD, o OIDC nao tinha `userinfo_endpoint` real e os escopos iniciais ficavam amplos
+  demais.
+- `src/copilot/mcp/control-plane/dev-oauth.js` passou a publicar `client_id_metadata_document_supported: true`,
+  aceitar Client ID Metadata Documents HTTPS com validacao de metadata/redirect, expor `/oauth/userinfo` e emitir
+  `id_token` quando `openid` for concedido.
+- `src/copilot/mcp/control-plane/auth.js` passou a separar escopos suportados de escopos iniciais do protected resource
+  metadata, defaultando o primeiro linking para `repo:read` e `repo:validate`.
+- `src/copilot/mcp/adapters/http.js` passou a expor `MCP-Protocol-Version` em CORS e validar `Origin` quando presente,
+  alinhando o transporte HTTP com a leitura MCP 2025-11-25 sem quebrar o modo stateless atual.
+- `mcp_oauth_issuer_diagnostics` e o smoke OAuth agora reportam CIMD, userinfo/OIDC e escopos anunciados.
+- Validadores focados desta fatia: `npm run typecheck:strict:src.copilot`, `npm run lint:copilot` e
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`.
+- O `npm run test:copilot:unit` amplo foi reexecutado apos a estabilizacao da fatia e passou com 3084/3084.
+- Publicacao operacional: `make copilot-mcp-restart`, `make copilot-mcp-status`, `make copilot-mcp-smoke` e
+  `make copilot-mcp-oauth-smoke` passaram. A metadata publica em `https://mcp.aurelin.org` agora confirma CIMD,
+  `userinfo_endpoint` e `scopes_supported` inicial reduzido para `repo:read`/`repo:validate`.

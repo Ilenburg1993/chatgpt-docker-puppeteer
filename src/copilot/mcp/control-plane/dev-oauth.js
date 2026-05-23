@@ -9,7 +9,16 @@
  * @module copilot/mcp/control-plane/dev-oauth
  */
 
-import { calculateJwkThumbprint, exportJWK, exportPKCS8, generateKeyPair, importPKCS8, SignJWT } from 'jose';
+import {
+    calculateJwkThumbprint,
+    createLocalJWKSet,
+    exportJWK,
+    exportPKCS8,
+    generateKeyPair,
+    importPKCS8,
+    jwtVerify,
+    SignJWT,
+} from 'jose';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -17,6 +26,19 @@ import path from 'node:path';
 const AUTH_CODE_TTL_MS = 5 * 60 * 1000;
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 const DEFAULT_KEY_FILE = 'src/copilot/.ai/mcp/oauth-dev-private-key.pem';
+const CLIENT_METADATA_TIMEOUT_MS = 5000;
+const OIDC_SCOPES = /** @type {const} */ (['openid', 'profile', 'email']);
+const OIDC_CLAIMS = /** @type {const} */ ([
+    'sub',
+    'iss',
+    'aud',
+    'exp',
+    'iat',
+    'email',
+    'email_verified',
+    'name',
+    'preferred_username',
+]);
 
 /** @type {Promise<{ privateKey: CryptoKey | import('node:crypto').KeyObject; publicJwk: Record<string, unknown>; kid: string }> | null} */
 let keyMaterialPromise = null;
@@ -24,8 +46,13 @@ let keyMaterialPromise = null;
 /** @type {Map<string, { clientId: string; redirectUri: string; scope: string; resource: string; codeChallenge: string; codeChallengeMethod: string; createdAt: number }>} */
 const authorizationCodes = new Map();
 
-/** @type {Map<string, { clientId: string; clientName: string; redirectUris: string[]; createdAt: number }>} */
+/** @typedef {{ clientId: string; clientName: string; redirectUris: string[]; createdAt: number; source: 'dcr' | 'cimd' }} DevOAuthClient */
+
+/** @type {Map<string, DevOAuthClient>} */
 const registeredClients = new Map();
+
+/** @type {Map<string, DevOAuthClient>} */
+const clientMetadataDocumentCache = new Map();
 
 /**
  * @param {import('./auth.js').McpAuthConfig} config
@@ -45,18 +72,24 @@ export function isBuiltInDevOAuthEnabled(config, env = process.env) {
  * @returns {Record<string, unknown>}
  */
 export function buildBuiltInDevOAuthMetadata(config) {
+    const scopesSupported = [...new Set([...config.scopesSupported, ...OIDC_SCOPES])];
     return {
         issuer: config.resource,
         authorization_endpoint: `${config.resource}/oauth/authorize`,
         token_endpoint: `${config.resource}/oauth/token`,
+        userinfo_endpoint: `${config.resource}/oauth/userinfo`,
         jwks_uri: `${config.resource}/oauth/jwks.json`,
         registration_endpoint: `${config.resource}/oauth/register`,
+        client_id_metadata_document_supported: true,
         response_types_supported: ['code'],
         grant_types_supported: ['authorization_code'],
         token_endpoint_auth_methods_supported: ['none'],
         code_challenge_methods_supported: ['S256'],
-        scopes_supported: [...config.scopesSupported],
+        scopes_supported: scopesSupported,
         resource_parameter_supported: true,
+        subject_types_supported: ['public'],
+        id_token_signing_alg_values_supported: ['RS256'],
+        claims_supported: [...OIDC_CLAIMS],
     };
 }
 
@@ -84,7 +117,7 @@ export async function handleBuiltInDevOAuthRequest(req, res, url, config) {
     if (req.method === 'POST' && url.pathname === '/oauth/register') {
         const body = await readRequestBody(req);
         const redirectUris = normalizeStringArray(body['redirect_uris']);
-        if (redirectUris.length === 0) {
+        if (redirectUris.length === 0 || redirectUris.some((redirectUri) => !isAllowedRedirectUri(redirectUri))) {
             writeJson(res, 400, { error: 'invalid_client_metadata', error_description: 'redirect_uris is required.' });
             return true;
         }
@@ -94,6 +127,7 @@ export async function handleBuiltInDevOAuthRequest(req, res, url, config) {
             clientName: typeof body['client_name'] === 'string' ? body['client_name'] : 'ChatGPT MCP Connector',
             redirectUris,
             createdAt: Date.now(),
+            source: /** @type {const} */ ('dcr'),
         };
         registeredClients.set(clientId, client);
         writeJson(res, 201, {
@@ -109,12 +143,17 @@ export async function handleBuiltInDevOAuthRequest(req, res, url, config) {
     }
 
     if (req.method === 'GET' && url.pathname === '/oauth/authorize') {
-        handleAuthorize(res, url, config);
+        await handleAuthorize(res, url, config);
         return true;
     }
 
     if (req.method === 'POST' && url.pathname === '/oauth/token') {
         await handleToken(req, res, config);
+        return true;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/oauth/userinfo') {
+        await handleUserInfo(req, res, config);
         return true;
     }
 
@@ -209,9 +248,9 @@ function isDevOAuthKeyRotationRequested() {
  * @param {import('node:http').ServerResponse} res
  * @param {URL} url
  * @param {import('./auth.js').McpAuthConfig} config
- * @returns {void}
+ * @returns {Promise<void>}
  */
-function handleAuthorize(res, url, config) {
+async function handleAuthorize(res, url, config) {
     const responseType = url.searchParams.get('response_type') ?? '';
     const clientId = url.searchParams.get('client_id') ?? '';
     const redirectUri = url.searchParams.get('redirect_uri') ?? '';
@@ -220,7 +259,7 @@ function handleAuthorize(res, url, config) {
     const resource = url.searchParams.get('resource') ?? config.resource;
     const scope = normalizeScope(url.searchParams.get('scope') ?? config.scopesSupported.join(' '), config);
     const state = url.searchParams.get('state') ?? '';
-    const client = registeredClients.get(clientId);
+    const client = registeredClients.get(clientId) ?? (await resolveClientMetadataDocument(clientId));
 
     if (
         responseType !== 'code' ||
@@ -296,12 +335,61 @@ async function handleToken(req, res, config) {
         .setJti(randomUUID())
         .sign(privateKey);
 
+    const idToken = saved.scope.split(/\s+/u).includes('openid')
+        ? await new SignJWT({
+              email: 'chatgpt-dev-connector@mcp.aurelin.org',
+              email_verified: true,
+              name: 'ChatGPT Dev Connector',
+              preferred_username: 'chatgpt-dev-connector',
+          })
+              .setProtectedHeader({ alg: 'RS256', kid })
+              .setIssuer(config.resource)
+              .setSubject('chatgpt-dev-connector')
+              .setAudience(clientId)
+              .setIssuedAt(nowSeconds)
+              .setExpirationTime(nowSeconds + ACCESS_TOKEN_TTL_SECONDS)
+              .setJti(randomUUID())
+              .sign(privateKey)
+        : undefined;
+
     writeJson(res, 200, {
         access_token: accessToken,
         token_type: 'Bearer',
         expires_in: ACCESS_TOKEN_TTL_SECONDS,
         scope: saved.scope,
+        ...(idToken ? { id_token: idToken } : {}),
     });
+}
+
+/**
+ * @param {import('node:http').IncomingMessage} req
+ * @param {import('node:http').ServerResponse} res
+ * @param {import('./auth.js').McpAuthConfig} config
+ * @returns {Promise<void>}
+ */
+async function handleUserInfo(req, res, config) {
+    const token = parseBearerToken(req.headers['authorization']);
+    if (!token) {
+        writeJson(res, 401, { error: 'invalid_token', error_description: 'Bearer token is required.' });
+        return;
+    }
+    try {
+        const { publicJwk } = await getKeyMaterial();
+        const jwks = createLocalJWKSet({ keys: [publicJwk] });
+        const verified = await jwtVerify(token, jwks, {
+            issuer: config.resource,
+            audience: config.resource,
+        });
+        writeJson(res, 200, {
+            sub: verified.payload.sub ?? 'chatgpt-dev-connector',
+            email: 'chatgpt-dev-connector@mcp.aurelin.org',
+            email_verified: true,
+            name: 'ChatGPT Dev Connector',
+            preferred_username: 'chatgpt-dev-connector',
+        });
+    } catch {
+        writeJson(res, 401, { error: 'invalid_token', error_description: 'Bearer token could not be verified.' });
+    }
 }
 
 /**
@@ -341,16 +429,64 @@ function normalizeStringArray(value) {
 }
 
 /**
+ * @param {string} clientId
+ * @returns {Promise<DevOAuthClient | undefined>}
+ */
+async function resolveClientMetadataDocument(clientId) {
+    const cached = clientMetadataDocumentCache.get(clientId);
+    if (cached) return cached;
+    if (!isAllowedClientMetadataUrl(clientId)) return undefined;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CLIENT_METADATA_TIMEOUT_MS);
+    try {
+        const response = await fetch(clientId, {
+            headers: { accept: 'application/json' },
+            signal: controller.signal,
+        });
+        if (!response.ok) return undefined;
+        const metadata = parseClientMetadata(await response.json(), clientId);
+        if (!metadata) return undefined;
+        clientMetadataDocumentCache.set(clientId, metadata);
+        return metadata;
+    } catch {
+        return undefined;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} clientId
+ * @returns {DevOAuthClient | undefined}
+ */
+function parseClientMetadata(value, clientId) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    const metadata = /** @type {Record<string, unknown>} */ (value);
+    if (metadata['client_id'] !== clientId) return undefined;
+    const redirectUris = normalizeStringArray(metadata['redirect_uris']).filter(isAllowedRedirectUri);
+    if (redirectUris.length === 0) return undefined;
+    return {
+        clientId,
+        clientName: typeof metadata['client_name'] === 'string' ? metadata['client_name'] : 'MCP Client Metadata Document',
+        redirectUris,
+        createdAt: Date.now(),
+        source: 'cimd',
+    };
+}
+
+/**
  * @param {string} scope
  * @param {import('./auth.js').McpAuthConfig} config
  * @returns {string}
  */
 function normalizeScope(scope, config) {
-    const allowed = new Set(config.scopesSupported);
+    const allowed = new Set([...config.scopesSupported, ...OIDC_SCOPES].map(String));
     const requested = scope
         .split(/\s+/u)
         .map((item) => item.trim())
-        .filter((item) => allowed.has(/** @type {import('./auth.js').McpAuthScope} */ (item)));
+        .filter((item) => allowed.has(item));
     return (requested.length > 0 ? requested : config.scopesSupported).join(' ');
 }
 
@@ -381,6 +517,60 @@ function safeEqual(left, right) {
     const leftBuffer = Buffer.from(left);
     const rightBuffer = Buffer.from(right);
     return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+/**
+ * @param {string | string[] | undefined} header
+ * @returns {string | undefined}
+ */
+function parseBearerToken(header) {
+    const raw = Array.isArray(header) ? header[0] : header;
+    const match = /^Bearer\s+(.+)$/iu.exec(String(raw ?? '').trim());
+    return match?.[1]?.trim() || undefined;
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isAllowedClientMetadataUrl(value) {
+    try {
+        const url = new URL(value);
+        if (url.protocol !== 'https:' || url.username || url.password || url.pathname === '/' || url.hash) return false;
+        return !isLocalOrPrivateHostname(url.hostname);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isAllowedRedirectUri(value) {
+    try {
+        const url = new URL(value);
+        return url.protocol === 'https:' || url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * @param {string} hostname
+ * @returns {boolean}
+ */
+function isLocalOrPrivateHostname(hostname) {
+    const normalized = hostname.toLowerCase();
+    return (
+        normalized === 'localhost' ||
+        normalized === '127.0.0.1' ||
+        normalized === '[::1]' ||
+        normalized.startsWith('10.') ||
+        normalized.startsWith('192.168.') ||
+        /^172\.(1[6-9]|2\d|3[0-1])\./u.test(normalized) ||
+        normalized.startsWith('169.254.')
+    );
 }
 
 /**

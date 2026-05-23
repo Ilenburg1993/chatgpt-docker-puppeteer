@@ -1850,3 +1850,116 @@ Validacao executada apos essa continuidade:
 11. `npm run copilot:mcp:cloudflare:smoke`: passou com 67/67 tools.
 12. Chave persistida criada localmente com permissao `0600`:
     - `src/copilot/.ai/mcp/oauth-dev-private-key.pem`.
+
+### 14.8. Auditoria OAuth/MCP 2025-11-25 a partir das telas do ChatGPT
+
+Data: 2026-05-23.
+
+Fontes oficiais relidas nesta fatia:
+
+1. MCP 2025-11-25 base protocol:
+   - `https://modelcontextprotocol.io/specification/2025-11-25/basic`.
+2. Lifecycle:
+   - `https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle`.
+3. Streamable HTTP:
+   - `https://modelcontextprotocol.io/specification/2025-11-25/basic/transports`.
+4. Authorization:
+   - `https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization`.
+5. Utilities:
+   - cancellation, ping, progress e tasks em `basic/utilities/*`.
+6. OpenAI Apps SDK:
+   - `https://developers.openai.com/apps-sdk/build/mcp-server`;
+   - `https://developers.openai.com/apps-sdk/build/auth`.
+
+Diagnostico das telas anexadas:
+
+1. O ChatGPT descobriu corretamente:
+   - MCP URL: `https://mcp.aurelin.org/mcp`;
+   - authorization endpoint: `https://mcp.aurelin.org/oauth/authorize`;
+   - token endpoint: `https://mcp.aurelin.org/oauth/token`;
+   - DCR endpoint: `https://mcp.aurelin.org/oauth/register`;
+   - resource/issuer base: `https://mcp.aurelin.org`.
+2. A tela mostrou o aviso "CIMD indisponivel" porque o issuer dev nao anunciava
+   `client_id_metadata_document_supported: true` no authorization server metadata.
+3. OIDC estava marcado como habilitado, mas a tela exibia `https://example.com` como userinfo placeholder,
+   indicando ausencia pratica de `userinfo_endpoint` no metadata.
+4. Os escopos padrao apareciam como `repo:read`, `repo:write`, `repo:validate` e `repo:admin`.
+   Isso e excessivo para o primeiro linking: a especificacao MCP orienta que `scopes_supported` no protected
+   resource metadata seja o conjunto minimo para funcionalidade basica, deixando escalada por tool/step-up.
+5. As telas confirmaram que o caminho Cloudflare permanente esta correto; o problema estava no contrato OAuth/OIDC
+   e nos sinais de transporte, nao no hostname.
+
+Mudancas estruturais aplicadas nesta fatia:
+
+1. `src/copilot/mcp/control-plane/dev-oauth.js` agora publica metadata OAuth/OIDC mais completo:
+   - `client_id_metadata_document_supported: true`;
+   - `userinfo_endpoint`;
+   - `subject_types_supported`;
+   - `id_token_signing_alg_values_supported`;
+   - `claims_supported`;
+   - escopos OIDC `openid`, `profile`, `email` junto dos escopos repo.
+2. O issuer dev agora aceita Client ID Metadata Documents:
+   - `client_id` HTTPS com path pode ser usado como identificador;
+   - o servidor busca o documento, exige `client_id` exatamente igual a URL e valida `redirect_uris`;
+   - hosts locais/privados sao bloqueados para reduzir risco SSRF mesmo em dev.
+3. O endpoint `GET /oauth/userinfo` foi implementado com verificacao RS256/JWKS local do access token.
+4. O token endpoint passa a emitir `id_token` quando o escopo `openid` e concedido.
+5. `buildProtectedResourceMetadata()` passou a anunciar `scopes_supported` inicial minimo:
+   - default: `repo:read`, `repo:validate`;
+   - override operacional: `COPILOT_MCP_OAUTH_INITIAL_SCOPES`.
+6. `WWW-Authenticate` agora inclui `error` e `error_description`, alem de `resource_metadata` e `scope`,
+   alinhando o gatilho de UI OAuth do ChatGPT com a documentacao do Apps SDK.
+7. O adapter HTTP passou a:
+   - aceitar/expor `MCP-Protocol-Version` nos headers CORS;
+   - validar `Origin` quando presente;
+   - manter compatibilidade stateless atual do `StreamableHTTPServerTransport`.
+8. `mcp_oauth_issuer_diagnostics` e `oauth-smoke` agora reportam explicitamente:
+   - suporte CIMD;
+   - userinfo endpoint;
+   - escopos OIDC;
+   - escopos suportados pelo metadata.
+
+Notas de conformidade MCP 2025-11-25:
+
+1. Lifecycle:
+   - o SDK MCP continua responsavel por `initialize`/`initialized` e negociacao de capabilities.
+2. Transport:
+   - seguimos em Streamable HTTP no endpoint unico `/mcp`;
+   - o modo continua stateless para preservar compatibilidade dos smokes e do ChatGPT atual;
+   - sessao stateful com `MCP-Session-Id` fica como faixa propria porque exige armazenar transports por sessao.
+3. Authorization:
+   - resource indicator ja e exigido no authorize/token;
+   - token audience/issuer ja e validado no resource server;
+   - CIMD agora e anunciado e funcional;
+   - DCR continua disponivel como fallback.
+4. Utilities:
+   - ping/cancellation/progress ficam majoritariamente sob o SDK;
+   - tasks existem no SDK 1.29 como experimental e devem virar faixa propria antes de migrar jobs longos.
+
+Roadmap OAuth/MCP restante:
+
+1. Testar no ChatGPT a criacao do app com metodo CIMD, confirmando que o aviso desaparece.
+2. Conferir se a tela de OIDC deixa de mostrar userinfo placeholder apos refresh do metadata.
+3. Medir se o primeiro linking passa a sugerir apenas `repo:read`/`repo:validate`.
+4. Evoluir jobs longos (`run_*`, safe suite) para task-augmented requests do SDK quando a API experimental estabilizar.
+5. Avaliar sessao stateful HTTP com cache de transports por `MCP-Session-Id`, sem quebrar smokes diretos.
+6. Decidir se o issuer dev continua aceitavel para uso interno ou se a proxima faixa deve trocar para IdP externo.
+
+Validacao executada nesta fatia:
+
+1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
+2. `npm run lint:copilot -- --quiet`: passou.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 85/85.
+4. `npm run test:copilot:unit`: passou com 3084/3084.
+5. `make copilot-mcp-restart`: passou e reiniciou:
+   - `mcp-http` PID `91552`;
+   - `cloudflared` PID `91553`.
+6. `make copilot-mcp-status`: passou com `ready=true`.
+7. `curl https://mcp.aurelin.org/.well-known/oauth-authorization-server`: confirmou:
+   - `client_id_metadata_document_supported=true`;
+   - `userinfo_endpoint=https://mcp.aurelin.org/oauth/userinfo`;
+   - escopos OIDC anunciados.
+8. `curl https://mcp.aurelin.org/.well-known/oauth-protected-resource`: confirmou `scopes_supported` inicial
+   reduzido para `repo:read` e `repo:validate`.
+9. `make copilot-mcp-smoke`: passou com 67/67 tools remotas.
+10. `make copilot-mcp-oauth-smoke`: passou com DCR, JWKS, token e chamada autenticada `mcp_runtime_health`.

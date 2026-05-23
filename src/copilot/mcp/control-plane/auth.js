@@ -22,6 +22,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
  * @property {string} protectedResourceMetadataUrl
  * @property {string[]} authorizationServers
  * @property {McpAuthScope[]} scopesSupported
+ * @property {McpAuthScope[]} initialScopes
  * @property {string} resourceDocumentation
  * @property {McpAuthEnforcementMode} enforcement
  * @property {string} expectedIssuer
@@ -54,6 +55,17 @@ export const MCP_AUTH_SCOPES = /** @type {const} */ ({
 
 /** @type {Map<string, ReturnType<typeof createRemoteJWKSet>>} */
 const REMOTE_JWKS_CACHE = new Map();
+
+/**
+ * @param {string | undefined} value
+ * @param {McpAuthScope[]} fallback
+ * @returns {McpAuthScope[]}
+ */
+function normalizeConfiguredScopes(value, fallback) {
+    const allowed = new Set(Object.values(MCP_AUTH_SCOPES));
+    const scopes = splitCsv(value).filter((scope) => allowed.has(/** @type {McpAuthScope} */ (scope)));
+    return scopes.length > 0 ? /** @type {McpAuthScope[]} */ (scopes) : fallback;
+}
 
 /**
  * @param {string | undefined} value
@@ -141,6 +153,10 @@ export function readMcpAuthConfig(env = process.env) {
         protectedResourceMetadataUrl: `${resource}/.well-known/oauth-protected-resource`,
         authorizationServers,
         scopesSupported: [MCP_AUTH_SCOPES.read, MCP_AUTH_SCOPES.write, MCP_AUTH_SCOPES.validate, MCP_AUTH_SCOPES.admin],
+        initialScopes: normalizeConfiguredScopes(env['COPILOT_MCP_OAUTH_INITIAL_SCOPES'], [
+            MCP_AUTH_SCOPES.read,
+            MCP_AUTH_SCOPES.validate,
+        ]),
         resourceDocumentation:
             env['COPILOT_MCP_RESOURCE_DOCUMENTATION'] ?? 'https://developers.openai.com/apps-sdk/build/auth',
         enforcement: normalizeMcpAuthEnforcement(env['COPILOT_MCP_AUTH_ENFORCEMENT'], mode),
@@ -211,7 +227,7 @@ export function buildProtectedResourceMetadata(config = readMcpAuthConfig()) {
     return {
         resource: config.resource,
         authorization_servers: [...config.authorizationServers],
-        scopes_supported: [...config.scopesSupported],
+        scopes_supported: [...config.initialScopes],
         resource_documentation: config.resourceDocumentation,
         token_endpoint_auth_methods_supported: ['none', 'private_key_jwt', 'client_secret_post', 'client_secret_basic'],
     };
@@ -220,11 +236,26 @@ export function buildProtectedResourceMetadata(config = readMcpAuthConfig()) {
 /**
  * @param {string[]} scopes
  * @param {McpAuthConfig} [config]
+ * @param {{ error?: string; errorDescription?: string }} [options]
  * @returns {string}
  */
-export function buildWwwAuthenticateChallenge(scopes, config = readMcpAuthConfig()) {
+export function buildWwwAuthenticateChallenge(scopes, config = readMcpAuthConfig(), options = {}) {
     const scopeValue = scopes.filter(Boolean).join(' ');
-    return `Bearer resource_metadata="${config.protectedResourceMetadataUrl}", scope="${scopeValue}"`;
+    const params = [
+        ['resource_metadata', config.protectedResourceMetadataUrl],
+        ...(options.error ? [['error', options.error]] : []),
+        ...(options.errorDescription ? [['error_description', options.errorDescription]] : []),
+        ...(scopeValue ? [['scope', scopeValue]] : []),
+    ];
+    return `Bearer ${params.map(([key, value]) => `${key}="${escapeChallengeValue(String(value ?? ''))}"`).join(', ')}`;
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function escapeChallengeValue(value) {
+    return value.replace(/\\/gu, '\\\\').replace(/"/gu, '\\"');
 }
 
 /**
@@ -263,7 +294,10 @@ async function verifyBearerToken(token, requiredScopes, config, env) {
             code: 'MCP_AUTH_VALIDATOR_NOT_CONFIGURED',
             message: 'OAuth bearer validation is enabled, but issuer, audience or JWKS URI is not configured.',
             hint: 'Set COPILOT_MCP_OAUTH_EXPECTED_ISSUER, COPILOT_MCP_OAUTH_AUDIENCE and COPILOT_MCP_OAUTH_JWKS_URI, or use none-dev for temporary tunnel testing.',
-            challenge: buildWwwAuthenticateChallenge(requiredScopes, config),
+            challenge: buildWwwAuthenticateChallenge(requiredScopes, config, {
+                error: 'invalid_token',
+                errorDescription: 'OAuth bearer validation is not fully configured.',
+            }),
         };
     }
     try {
@@ -290,7 +324,10 @@ async function verifyBearerToken(token, requiredScopes, config, env) {
                 code: 'MCP_AUTH_SCOPE_MISSING',
                 message: `Bearer token is missing required scope(s): ${missingScopes.join(', ')}.`,
                 hint: 'Request the connector OAuth flow with the scopes reported by mcp_auth_profile.',
-                challenge: buildWwwAuthenticateChallenge(requiredScopes, config),
+                challenge: buildWwwAuthenticateChallenge(requiredScopes, config, {
+                    error: 'insufficient_scope',
+                    errorDescription: `Missing required scope(s): ${missingScopes.join(', ')}.`,
+                }),
             };
         }
         return {
@@ -309,7 +346,10 @@ async function verifyBearerToken(token, requiredScopes, config, env) {
             code: 'MCP_AUTH_TOKEN_INVALID',
             message: 'Bearer token could not be verified.',
             hint: error instanceof Error ? error.message : String(error),
-            challenge: buildWwwAuthenticateChallenge(requiredScopes, config),
+            challenge: buildWwwAuthenticateChallenge(requiredScopes, config, {
+                error: 'invalid_token',
+                errorDescription: 'Bearer token could not be verified.',
+            }),
         };
     }
 }
@@ -342,7 +382,10 @@ export async function authorizeMcpToolCall(tool, context = { bearerToken: undefi
             code: 'MCP_AUTH_REQUIRED',
             message: 'MCP OAuth bearer token is required for this tool.',
             hint: 'Use mcp_auth_profile to inspect the current auth mode and required scopes.',
-            challenge: buildWwwAuthenticateChallenge(requiredScopes, config),
+            challenge: buildWwwAuthenticateChallenge(requiredScopes, config, {
+                error: 'invalid_token',
+                errorDescription: 'Bearer token is required for this tool.',
+            }),
         };
     }
     return verifyBearerToken(context.bearerToken, requiredScopes, config, env);

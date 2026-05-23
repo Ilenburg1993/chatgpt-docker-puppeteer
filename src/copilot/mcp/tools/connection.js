@@ -104,6 +104,9 @@ function summarizeOAuthMetadata(metadata, requiredScopes) {
         : [];
     if (tokenMethods.length === 0) warnings.push('token_endpoint_auth_methods_supported is not advertised.');
     if (!codeChallengeMethods.includes('S256')) warnings.push('code_challenge_methods_supported does not advertise S256.');
+    if (metadata['client_id_metadata_document_supported'] !== true) {
+        warnings.push('client_id_metadata_document_supported is not true; ChatGPT will fall back to DCR.');
+    }
     const missingScopes = requiredScopes.filter((scope) => !scopesSupported.includes(scope));
     if (missingScopes.length > 0) warnings.push(`scopes_supported is missing: ${missingScopes.join(', ')}.`);
     return {
@@ -114,10 +117,12 @@ function summarizeOAuthMetadata(metadata, requiredScopes) {
             issuer: metadata['issuer'] ?? null,
             authorizationEndpointConfigured: typeof metadata['authorization_endpoint'] === 'string',
             tokenEndpointConfigured: typeof metadata['token_endpoint'] === 'string',
+            userinfoEndpointConfigured: typeof metadata['userinfo_endpoint'] === 'string',
             registrationEndpointConfigured: typeof metadata['registration_endpoint'] === 'string',
             clientIdMetadataDocumentSupported: metadata['client_id_metadata_document_supported'] === true,
             tokenEndpointAuthMethodsSupported: tokenMethods,
             codeChallengeMethodsSupported: codeChallengeMethods,
+            oidcScopesSupported: ['openid', 'profile', 'email'].filter((scope) => scopesSupported.includes(scope)),
             scopesSupported,
             missingRequiredScopes: missingScopes,
         },
