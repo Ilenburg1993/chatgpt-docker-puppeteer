@@ -123,6 +123,37 @@ describe('copilot MCP Cloudflare quick tunnel state', () => {
         assert.equal(summary.lastSmokeConnectorUrl, baseState.connectorUrl);
     });
 
+    it('ignores last smoke metadata from a different connector URL', () => {
+        const summary = summarizeQuickTunnelState(
+            {
+                ...baseState,
+                lastSmoke: {
+                    checkedAt: '2026-05-22T12:02:00.000Z',
+                    ok: true,
+                    connectorUrl: 'https://mcp.aurelin.org/mcp',
+                    health: { ok: true, status: 200 },
+                    toolsList: {
+                        ok: true,
+                        status: 200,
+                        tools: 67,
+                        expectedLocalTools: 67,
+                        toolsMatchLocalRegistry: true,
+                        criticalToolsPresent: true,
+                        missingCriticalTools: [],
+                        missingLocalTools: [],
+                        unexpectedRemoteTools: [],
+                    },
+                },
+            },
+            Date.parse('2026-05-22T12:05:00.000Z'),
+            10 * 60 * 1000,
+        );
+
+        assert.equal(summary.lastSmokeOk, null);
+        assert.equal(summary.lastSmokeAt, null);
+        assert.equal(summary.lastSmokeConnectorUrl, null);
+    });
+
     it('recommends restart when the recorded process is gone', () => {
         const summary = summarizeQuickTunnelState(
             { ...baseState, pid: 9_999_999 },

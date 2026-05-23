@@ -197,7 +197,8 @@ export function summarizeQuickTunnelState(state, nowMs = Date.now(), staleAfterM
     const ageMs = Number.isFinite(createdAtMs) ? Math.max(0, nowMs - createdAtMs) : null;
     const stale = ageMs !== null && ageMs > staleAfterMs;
     const recommendedAction = !processAlive ? 'restart' : stale ? 'smoke' : 'use';
-    const lastSmoke = normalizeLastSmoke(state.lastSmoke);
+    const rawLastSmoke = normalizeLastSmoke(state.lastSmoke);
+    const lastSmoke = rawLastSmoke?.connectorUrl === state.connectorUrl ? rawLastSmoke : undefined;
     const lastSmokeAtMs = lastSmoke ? Date.parse(lastSmoke.checkedAt) : NaN;
     const lastSmokeAgeMs = Number.isFinite(lastSmokeAtMs) ? Math.max(0, nowMs - lastSmokeAtMs) : null;
     return {

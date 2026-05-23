@@ -89,7 +89,7 @@ async function runDoctor() {
             mcpHttpProcess,
         },
         temporaryTunnel,
-        temporaryTunnelState: temporaryState ?? 'not-created',
+        temporaryTunnelState: buildQuickTunnelStateReport(temporaryState),
         stalePolicy: {
             staleAfterMs: config.staleAfterMs,
             staleAfterMinutes: Math.round(config.staleAfterMs / 60000),
@@ -145,7 +145,7 @@ async function runStatus() {
             staleAfterMinutes: Math.round(config.staleAfterMs / 60000),
         },
         summary,
-        state: state ?? 'not-created',
+        state: buildQuickTunnelStateReport(state),
         chatgpt: isQuickTunnelState(state)
             ? {
                   name: state.chatgpt.name,
@@ -274,10 +274,13 @@ async function runSmoke() {
         health: healthSummary,
         toolsList: toolsListSummary,
     };
-    const stateUpdated = await updateQuickTunnelLastSmoke(config.stateFile, state, {
-        ...lastSmoke,
-        toolsList: persistedToolsListSummary,
-    });
+    const stateUpdated =
+        isQuickTunnelState(state) && connectorUrl === state.connectorUrl
+            ? await updateQuickTunnelLastSmoke(config.stateFile, state, {
+                  ...lastSmoke,
+                  toolsList: persistedToolsListSummary,
+              })
+            : false;
     const report = {
         ok,
         connectorUrl,
@@ -460,6 +463,25 @@ function redactCommandArgs(args) {
         if (arg.startsWith('--token=')) return '--token=<redacted>';
         return arg;
     });
+}
+
+/**
+ * @param {import('./state.js').QuickTunnelState | { error: string } | undefined} state
+ * @returns {unknown}
+ */
+function buildQuickTunnelStateReport(state) {
+    if (!state) return 'not-created';
+    if (!isQuickTunnelState(state)) return state;
+    if (!state.lastSmoke || state.lastSmoke.connectorUrl === state.connectorUrl) return state;
+    return {
+        ...state,
+        lastSmoke: {
+            ignored: true,
+            reason: 'connector-url-mismatch',
+            connectorUrl: state.lastSmoke.connectorUrl,
+            expectedConnectorUrl: state.connectorUrl,
+        },
+    };
 }
 
 /**

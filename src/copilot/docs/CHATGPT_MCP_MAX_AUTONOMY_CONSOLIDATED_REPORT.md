@@ -1453,7 +1453,7 @@ Validacao local desta virada:
 4. `npm run typecheck:strict:src.copilot`: passou.
 5. `npm run lint:copilot`: passou.
 6. `npm run copilot:mcp:safe-suite -- mcp-full`: passou com 83 testes MCP.
-7. `npm run test:copilot:unit`: passou com 3082 testes.
+7. `npm run test:copilot:unit`: passou com 3083 testes.
 8. `npm run copilot:mcp:cloudflare:status`: passou com `named-permanent`, MCP HTTP vivo e
    `cloudflared` vivo.
 9. `npm run copilot:mcp:cloudflare:up`: reiniciou MCP HTTP quando detectou drift de assinatura e
@@ -1461,6 +1461,12 @@ Validacao local desta virada:
 10. `npm run copilot:mcp:cloudflare:smoke`: passou contra `https://mcp.aurelin.org/mcp`, com 67
     tools remotas, 67 tools locais esperadas, nenhum missing e nenhum unexpected.
 11. `curl https://mcp.aurelin.org/health`: passou com HTTP 200.
+12. Correcao pos-push de observabilidade:
+    - smoke permanente nao atualiza mais `lastSmoke` do Quick Tunnel antigo;
+    - `summarizeQuickTunnelState` ignora `lastSmoke` cujo `connectorUrl` nao corresponda ao
+      connector temporario salvo;
+    - `cloudflare:status` marca esse caso como `connector-url-mismatch`, em vez de misturar
+      telemetria permanente com fallback temporario.
 
 Roadmap atualizado para o dominio permanente:
 
@@ -1499,7 +1505,7 @@ Feito:
 10. `mcp_run_safe_validation_suite`.
 11. Quarantine/restore/list/inspect.
 12. Cloudflare permanent tunnel workflow como padrao; Quick Tunnel como fallback.
-13. Testes MCP e unitarios passando no ultimo ciclo: 83 MCP e 3082 unitarios.
+13. Testes MCP e unitarios passando no ultimo ciclo: 83 MCP e 3083 unitarios.
 14. `outputSchema` registry-wide.
 15. `_meta.securitySchemes` registry-wide para perfil dev `noauth`.
 16. Plan-only read-only tools para patch/create/quarantine/move/index/validation.
