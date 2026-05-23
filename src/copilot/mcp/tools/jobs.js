@@ -60,6 +60,44 @@ function latestJobsByValidator(jobs) {
     return latest;
 }
 
+/** @type {Record<string, string[]>} */
+const EFFECTIVE_CHECKS_BY_VALIDATOR = {
+    typecheck: ['typecheck'],
+    lint: ['lint'],
+    'unit-mcp': ['unit-mcp'],
+    'unit-copilot': ['unit-copilot'],
+    'suite-mcp-fast': ['typecheck', 'unit-mcp'],
+    'suite-mcp-full': ['typecheck', 'lint', 'unit-mcp'],
+    'suite-copilot-fast': ['typecheck', 'lint', 'unit-copilot'],
+};
+
+/**
+ * @param {Omit<import('../control-plane/jobs.js').JobRecord, 'process'>[]} jobs
+ * @returns {Record<string, Record<string, unknown>>}
+ */
+function buildEffectiveValidationChecks(jobs) {
+    /** @type {Record<string, Record<string, unknown>>} */
+    const effective = {};
+    const sorted = [...jobs].sort((left, right) => left.startedAt - right.startedAt);
+    for (const job of sorted) {
+        const checks = EFFECTIVE_CHECKS_BY_VALIDATOR[job.validator] ?? [job.validator];
+        for (const check of checks) {
+            effective[check] = {
+                check,
+                effectiveStatus: job.status === 'completed' && job.exitCode === 0 ? 'passed' : job.status,
+                passed: job.status === 'completed' && job.exitCode === 0,
+                sourceValidator: job.validator,
+                sourceJobId: job.id,
+                startedAt: new Date(job.startedAt).toISOString(),
+                endedAt: job.endedAt === null ? null : new Date(job.endedAt).toISOString(),
+                exitCode: job.exitCode,
+                timedOut: job.timedOut,
+            };
+        }
+    }
+    return effective;
+}
+
 /** @type {Record<string, import('../control-plane/jobs.js').CopilotValidatorName>} */
 const SAFE_VALIDATION_SUITE_TO_VALIDATOR = {
     'mcp-fast': 'suite-mcp-fast',
@@ -225,6 +263,7 @@ export const jobTools = [
                 count: summaries.length,
                 validatorsCovered: summaries.map((summary) => summary['validator']),
                 summaries,
+                effectiveChecks: buildEffectiveValidationChecks(jobs),
                 hint:
                     summaries.length === 0
                         ? 'No persisted validator jobs found. Run mcp_run_safe_validation_suite or run_copilot_validator when allowed.'

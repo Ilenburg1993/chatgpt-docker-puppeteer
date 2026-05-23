@@ -7,7 +7,12 @@
 
 import { getIoIndexStats } from '#copilot/infra/public/indexing';
 import { readCloudflareTunnelConfig } from '../cloudflare/config.js';
-import { readQuickTunnelState, summarizeQuickTunnelState } from '../cloudflare/state.js';
+import {
+    readConnectorSmokeState,
+    readQuickTunnelState,
+    summarizeConnectorSmokeState,
+    summarizeQuickTunnelState,
+} from '../cloudflare/state.js';
 import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { readMcpIndexAutoBuildState } from '../control-plane/index-auto-build.js';
 import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
@@ -88,6 +93,11 @@ export const mcpRuntimeHealthTool = {
         const tunnelConfig = readCloudflareTunnelConfig();
         const tunnelState = await readQuickTunnelState(tunnelConfig.stateFile);
         const tunnel = summarizeQuickTunnelState(tunnelState, Date.now(), tunnelConfig.staleAfterMs);
+        const connectorSmoke = summarizeConnectorSmokeState(
+            await readConnectorSmokeState(tunnelConfig.smokeStateFile),
+            tunnelConfig.publicMcpUrl ?? tunnel.connectorUrl,
+        );
+        const permanentMode = tunnelConfig.mode === 'named-permanent';
         const workspace = await summarizeWorkspaceStatus();
         const indexStats = getIoIndexStats();
         const index = summarizeIndexHealth(indexStats);
@@ -111,9 +121,9 @@ export const mcpRuntimeHealthTool = {
         if (tunnelConfig.mode === 'temporary-quick' && tunnel.stale) {
             warnings.push('Temporary Cloudflare tunnel is stale; run cloudflare smoke before reuse.');
         }
-        if (tunnel.lastSmokeOk === null)
-            warnings.push('No Cloudflare smoke result is recorded for the current tunnel.');
-        if (tunnel.lastSmokeOk === false) critical.push('Last Cloudflare smoke failed.');
+        if (connectorSmoke.ok === null)
+            warnings.push('No Cloudflare smoke result is recorded for the current connector URL.');
+        if (connectorSmoke.ok === false) critical.push('Last Cloudflare smoke failed.');
         if (!lastWorkspaceSmoke) warnings.push('No in-process mcp_smoke_workspace result has been recorded.');
         if (lastWorkspaceSmoke?.success === false) critical.push('Last mcp_smoke_workspace failed.');
         for (const [toolName, metric] of Object.entries(metrics.tools)) {
@@ -140,18 +150,34 @@ export const mcpRuntimeHealthTool = {
                     mode: tunnelConfig.mode,
                     publicMcpUrl: tunnelConfig.publicMcpUrl ?? tunnel.connectorUrl ?? null,
                     tunnelName: tunnelConfig.tunnelName,
-                    configured: tunnel.configured,
-                    processAlive: tunnel.processAlive,
-                    stale: tunnel.stale,
+                    configured: permanentMode ? Boolean(tunnelConfig.publicMcpUrl) : tunnel.configured,
+                    processAlive: permanentMode ? null : tunnel.processAlive,
+                    stale: permanentMode ? false : tunnel.stale,
                     recommendedAction:
                         tunnelConfig.mode === 'named-permanent' ? 'use-permanent-hostname' : tunnel.recommendedAction,
-                    lastSmokeOk: tunnel.lastSmokeOk,
-                    lastSmokeAgeMinutes: tunnel.lastSmokeAgeMinutes,
+                    lastSmokeOk: connectorSmoke.ok,
+                    lastSmokeAgeMinutes: connectorSmoke.ageMinutes,
+                    lastSmokeCheckedAt: connectorSmoke.checkedAt,
+                    smokeStateFile: tunnelConfig.smokeStateFile,
+                },
+                temporaryFallbackTunnel: {
+                    ...tunnel,
+                    ignoredForOperationalReadiness: permanentMode,
                 },
             },
             indexStats,
             metrics,
-            tunnel,
+            tunnel: permanentMode
+                ? {
+                      mode: 'named-permanent',
+                      publicMcpUrl: tunnelConfig.publicMcpUrl ?? null,
+                      lastSmoke: connectorSmoke,
+                      temporaryFallback: {
+                          ...tunnel,
+                          ignoredForOperationalReadiness: true,
+                      },
+                  }
+                : tunnel,
         });
     },
 };

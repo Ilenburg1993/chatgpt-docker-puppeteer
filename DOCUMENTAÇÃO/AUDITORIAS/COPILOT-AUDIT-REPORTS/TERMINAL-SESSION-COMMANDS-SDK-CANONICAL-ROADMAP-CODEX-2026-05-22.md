@@ -407,3 +407,27 @@ Decima fatia correlata - introspeccao max-power:
   descricao antiga de dev/noauth deixou de ser o sinal canonico.
 - Validacao: typecheck strict Copilot, lint Copilot, teste focado `test_mcp_tools` 30/30, testes MCP 85/85,
   testes Copilot unit 3084/3084, restart/status/smoke Cloudflare e smoke OAuth max-power.
+
+Decima primeira fatia correlata - auditoria WORKSPACE pos-transformacoes:
+
+- A auditoria `src/copilot/docs/Auditoria profunda — WORKSPACE MCP após.md` foi lida integralmente e usada como guia
+  da nova fatia.
+- Corrigido `mcp_tunnel_status.chatgpt.authentication`, que ainda retornava `none-dev`; agora o display de auth vem da
+  mesma leitura efetiva usada pelo perfil do conector.
+- O quick tunnel temporario stale deixa de ser sinal principal quando o tunnel permanente `mcp.aurelin.org` esta
+  configurado; aparece como fallback e pode ser ignorado para readiness operacional.
+- `copilot:mcp:cloudflare:smoke` passa a persistir o smoke do connector permanente em
+  `src/copilot/.ai/cloudflare/connector-smoke.json`, e `mcp_runtime_health` passa a ler esse estado.
+- Auto-build de index passa a ser default no boot HTTP (`COPILOT_MCP_INDEX_AUTO_BUILD=true`, path `src/copilot`,
+  `maxFiles=5000`), preservando override para desligar.
+- `mcp_smoke_workspace` agora emite warning proprio `INDEX_UNAVAILABLE` quando o indice IO esta habilitado, mas vazio
+  ou indisponivel.
+- `mcp_last_validation_summary` agora retorna `effectiveChecks`, permitindo que suites recentes passem a representar
+  efetivamente `typecheck`, `lint`, `unit-mcp` e `unit-copilot`.
+- `.gitignore` cobre `src/copilot/.ai/quarantine/*` para evitar dirty workspace por metadados de quarantine.
+- O tema das janelas do ChatGPT foi classificado corretamente: OAuth max-power concede escopos, mas confirmacao de
+  write action e controle do host. A mitigacao legitima e reduzir chamadas mutantes separadas com plan-only, suites,
+  runners fixos e remember approval quando a UI oferecer.
+- Validacao: typecheck strict Copilot, lint Copilot, testes MCP 86/86, testes Copilot unit 3085/3085,
+  env audit/validate/check, restart/status/smoke Cloudflare, smoke OAuth max-power e `/health` confirmando
+  `indexAutoBuild.status=completed` com 999 arquivos indexados.

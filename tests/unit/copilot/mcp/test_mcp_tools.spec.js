@@ -343,6 +343,8 @@ describe('copilot MCP tools', () => {
                 .find((candidate) => candidate.name === 'repo_status')
                 ?.securitySchemes?.some((scheme) => scheme.type === 'oauth2'),
         );
+        const hostApprovalProfile = /** @type {Record<string, unknown>} */ (structured['hostApprovalProfile']);
+        assert.equal(hostApprovalProfile['oauthGrantsAllRepoScopesByDefault'], true);
     });
 
     it('mcp_session_profile returns the recommended ChatGPT autonomy profile', async () => {
@@ -491,6 +493,16 @@ describe('copilot MCP tools', () => {
         assert.equal(result.structuredContent?.['success'], true);
         assert.equal(typeof result.structuredContent?.['count'], 'number');
         assert.ok(Array.isArray(result.structuredContent?.['summaries']));
+        assert.equal(typeof result.structuredContent?.['effectiveChecks'], 'object');
+    });
+
+    it('mcp_tunnel_status reports effective OAuth auth instead of stale quick tunnel auth', async () => {
+        const tool = findTool('mcp_tunnel_status');
+        const result = await tool.handler({});
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(result.structuredContent?.['chatgpt']?.['authentication'], 'OAuth');
+        assert.ok('temporaryFallback' in (result.structuredContent ?? {}));
     });
 
     it('project_doctor returns canonical validators', async () => {

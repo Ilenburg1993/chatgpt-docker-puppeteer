@@ -51,6 +51,17 @@ export const CHATGPT_CONNECTOR_DESCRIPTION =
  */
 
 /**
+ * @param {{ mode: string }} [authConfig]
+ * @returns {string}
+ */
+export function formatChatGptConnectorAuthentication(authConfig = readMcpAuthConfig()) {
+    if (authConfig.mode === 'oauth') return 'OAuth';
+    if (authConfig.mode === 'mixed-auth') return 'Mixed Authentication';
+    if (authConfig.mode === 'secure-mcp-tunnel') return 'Secure MCP Tunnel';
+    return 'No authentication';
+}
+
+/**
  * @param {ConnectorProfileOptions} [options]
  * @returns {ConnectorProfile}
  */
@@ -62,13 +73,8 @@ export function buildChatGptConnectorProfile(options = {}) {
     const tunnelId = options.tunnelId ?? process.env['OPENAI_MCP_TUNNEL_ID'] ?? 'tunnel_<preencher>';
     const connectorUrl = normalizeMcpUrl(publicMcpUrl);
     const localUrl = normalizeMcpUrl(localMcpUrl);
-    const authentication =
-        authMode === 'none-dev'
-            ? 'Sem autenticacao, apenas desenvolvimento controlado'
-            : authMode === 'oauth' || authMode === 'mixed-auth'
-              ? 'OAuth'
-              : 'Secure MCP Tunnel';
     const authConfig = { ...readMcpAuthConfig(), mode: authMode };
+    const authentication = formatChatGptConnectorAuthentication(authConfig);
     return {
         name: CHATGPT_CONNECTOR_NAME,
         description: CHATGPT_CONNECTOR_DESCRIPTION,

@@ -8,7 +8,7 @@
 import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { okResult } from '../control-plane/result.js';
 
-const GOLDEN_PROMPTS_VERSION = 2;
+const GOLDEN_PROMPTS_VERSION = 3;
 
 const GOLDEN_PROMPTS = [
     {
@@ -47,6 +47,12 @@ const GOLDEN_PROMPTS = [
         prompt: 'Chame delegate_to_repo_autonomy_runner mission=diagnose-mcp dryRun=true. Se o plano for seguro, execute com dryRun=false e resuma.',
         expectedTools: ['delegate_to_repo_autonomy_runner'],
     },
+    {
+        id: 'oauth-max-power-write-confirmation',
+        goal: 'Measure whether OAuth max-power removes auth linking prompts and identify remaining host write confirmations.',
+        prompt: 'Chame mcp_auth_profile, depois repo_create_file_plan para um arquivo temporario seguro em src/copilot/.ai/tmp. Se o ChatGPT pedir confirmacao para a acao de escrita real, registre approvalPromptsShown e rememberApprovalOffered antes de prosseguir.',
+        expectedTools: ['mcp_auth_profile', 'repo_create_file_plan', 'repo_create_file'],
+    },
 ];
 
 /**
@@ -71,6 +77,8 @@ export const mcpGoldenPromptsTool = {
                 'toolCalls',
                 'approvalPromptsShown',
                 'rememberApprovalOffered',
+                'oauthLinkingPromptShown',
+                'writeConfirmationPromptShown',
                 'blockedByHost',
                 'hostBlockCode',
                 'blockedToolName',
@@ -94,6 +102,8 @@ export const mcpGoldenPromptsTool = {
                 validation: 'One approval path for mcp_run_safe_validation_suite plus job_get_output reads.',
                 cleanup: 'Quarantine path is preferred over repo_remove_file.',
                 delegation: 'Dry-run plan is visible before real fixed-mission execution.',
+                oauthMaxPower:
+                    'No OAuth re-linking after account connection; any remaining prompt is classified as ChatGPT host write confirmation, not missing MCP authorization.',
             },
         }),
 };

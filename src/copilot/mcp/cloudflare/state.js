@@ -5,7 +5,8 @@
  * @module copilot/mcp/cloudflare/state
  */
 
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
 /**
  * @typedef {object} QuickTunnelSmokeState
@@ -44,6 +45,10 @@ import { readFile, writeFile } from 'node:fs/promises';
  */
 
 /**
+ * @typedef {QuickTunnelSmokeState & { oauth?: Record<string, unknown> }} ConnectorSmokeState
+ */
+
+/**
  * @param {string} stateFile
  * @returns {Promise<QuickTunnelState | { error: string } | undefined>}
  */
@@ -76,6 +81,81 @@ export async function updateQuickTunnelLastSmoke(stateFile, state, lastSmoke) {
     if (!isQuickTunnelState(state)) return false;
     await saveQuickTunnelState(stateFile, { ...state, lastSmoke });
     return true;
+}
+
+/**
+ * @param {string} smokeFile
+ * @returns {Promise<ConnectorSmokeState | { error: string } | undefined>}
+ */
+export async function readConnectorSmokeState(smokeFile) {
+    try {
+        const parsed = JSON.parse(await readFile(smokeFile, 'utf8'));
+        return normalizeLastSmoke(parsed) ? /** @type {ConnectorSmokeState} */ (parsed) : { error: 'Invalid connector smoke state file.' };
+    } catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return undefined;
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * @param {string} smokeFile
+ * @param {ConnectorSmokeState} lastSmoke
+ * @returns {Promise<void>}
+ */
+export async function writeConnectorSmokeState(smokeFile, lastSmoke) {
+    await mkdir(path.dirname(smokeFile), { recursive: true });
+    await writeFile(smokeFile, `${JSON.stringify(lastSmoke, null, 2)}\n`, 'utf8');
+}
+
+/**
+ * @param {ConnectorSmokeState | { error: string } | undefined} smoke
+ * @param {string | null | undefined} connectorUrl
+ * @param {number} [nowMs]
+ * @returns {{
+ *   configured: boolean;
+ *   ok: boolean | null;
+ *   checkedAt: string | null;
+ *   ageSeconds: number | null;
+ *   ageMinutes: number | null;
+ *   connectorUrl: string | null;
+ *   stateError: string | null;
+ * }}
+ */
+export function summarizeConnectorSmokeState(smoke, connectorUrl, nowMs = Date.now()) {
+    if (!smoke) {
+        return {
+            configured: false,
+            ok: null,
+            checkedAt: null,
+            ageSeconds: null,
+            ageMinutes: null,
+            connectorUrl: null,
+            stateError: null,
+        };
+    }
+    if ('error' in smoke) {
+        return {
+            configured: true,
+            ok: null,
+            checkedAt: null,
+            ageSeconds: null,
+            ageMinutes: null,
+            connectorUrl: null,
+            stateError: smoke.error,
+        };
+    }
+    const smokeAtMs = Date.parse(smoke.checkedAt);
+    const ageMs = Number.isFinite(smokeAtMs) ? Math.max(0, nowMs - smokeAtMs) : null;
+    const matchesCurrentConnector = !connectorUrl || smoke.connectorUrl === connectorUrl;
+    return {
+        configured: matchesCurrentConnector,
+        ok: matchesCurrentConnector ? smoke.ok : null,
+        checkedAt: matchesCurrentConnector ? smoke.checkedAt : null,
+        ageSeconds: ageMs === null || !matchesCurrentConnector ? null : Math.round(ageMs / 1000),
+        ageMinutes: ageMs === null || !matchesCurrentConnector ? null : Math.round(ageMs / 60000),
+        connectorUrl: smoke.connectorUrl,
+        stateError: matchesCurrentConnector ? null : 'connector-url-mismatch',
+    };
 }
 
 /**

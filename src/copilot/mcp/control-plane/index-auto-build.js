@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Optional MCP HTTP boot-time IO index auto-build.
+ * MCP HTTP boot-time IO index auto-build.
  *
  * @module copilot/mcp/control-plane/index-auto-build
  */
@@ -54,6 +54,20 @@ function envBool(value) {
 
 /**
  * @param {unknown} value
+ * @param {boolean} fallback
+ * @returns {boolean}
+ */
+function envBoolWithDefault(value, fallback) {
+    const normalized = String(value ?? '')
+        .trim()
+        .toLowerCase();
+    if (!normalized) return fallback;
+    if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') return false;
+    return envBool(normalized);
+}
+
+/**
+ * @param {unknown} value
  * @param {number} fallback
  * @param {{ min: number; max: number }} range
  * @returns {number}
@@ -72,7 +86,7 @@ function envInt(value, fallback, range) {
  */
 export function readMcpIndexAutoBuildConfig(env = process.env) {
     return {
-        enabled: envBool(env['COPILOT_MCP_INDEX_AUTO_BUILD']),
+        enabled: envBoolWithDefault(env['COPILOT_MCP_INDEX_AUTO_BUILD'], true),
         path:
             String(env['COPILOT_MCP_INDEX_AUTO_BUILD_PATH'] ?? DEFAULT_AUTO_BUILD_PATH).trim() ||
             DEFAULT_AUTO_BUILD_PATH,

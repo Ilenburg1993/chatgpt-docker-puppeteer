@@ -117,6 +117,9 @@ export const mcpSmokeWorkspaceTool = {
         });
         await runCheck(checks, 'repo_index_status', async () => {
             const stats = getIoIndexStats();
+            if (stats.enabled !== false && stats.available !== true) {
+                warnings.push('INDEX_UNAVAILABLE: shared IO index is enabled but not available.');
+            }
             return {
                 enabled: stats.enabled,
                 available: stats.available,

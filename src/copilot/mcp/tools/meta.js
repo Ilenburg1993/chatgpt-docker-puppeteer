@@ -137,7 +137,7 @@ const IO_GUIDANCE = [
     'Use repo_search_text.contextLines for investigation and cursor/nextCursor for pagination.',
     'Use repo_find_symbol_usages for impact analysis before refactors.',
     'Use repo_index_build then repo_index_search/repo_index_find_symbol/repo_find_imports for indexed navigation.',
-    'Set COPILOT_MCP_INDEX_AUTO_BUILD=true before npm run copilot:mcp:http to refresh the index outside ChatGPT host calls.',
+    'COPILOT_MCP_INDEX_AUTO_BUILD defaults to true so indexed navigation is warmed outside ChatGPT host calls.',
     'Use repo_symbol_search and repo_file_outline before edits that need code navigation.',
     'Use mcp_run_safe_validation_suite suite="mcp-full" before separate validator calls when ChatGPT needs one canonical verification step.',
     'Use mcp_last_validation_summary when ChatGPT host blocks starting a new validation job.',

@@ -14,6 +14,7 @@ export const DEFAULT_CLOUDFLARE_PUBLIC_LABEL = 'mcp';
 export const DEFAULT_CLOUDFLARE_PUBLIC_HOSTNAME = `${DEFAULT_CLOUDFLARE_PUBLIC_LABEL}.${DEFAULT_CLOUDFLARE_ZONE}`;
 export const DEFAULT_CLOUDFLARE_PUBLIC_URL = `https://${DEFAULT_CLOUDFLARE_PUBLIC_HOSTNAME}/mcp`;
 export const DEFAULT_QUICK_TUNNEL_STATE_FILE = 'src/copilot/.ai/cloudflare/quick-tunnel.json';
+export const DEFAULT_CONNECTOR_SMOKE_STATE_FILE = 'src/copilot/.ai/cloudflare/connector-smoke.json';
 export const DEFAULT_MANAGED_TUNNEL_PID_FILE = 'src/copilot/.ai/cloudflare/cloudflared.pid';
 export const DEFAULT_MCP_HTTP_PID_FILE = 'src/copilot/.ai/cloudflare/mcp-http.pid';
 export const DEFAULT_QUICK_TUNNEL_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
@@ -34,6 +35,7 @@ export const TRYCLOUDFLARE_URL_PATTERN = /https:\/\/[a-z0-9][a-z0-9-]*\.trycloud
  * @property {string | undefined} tunnelTokenFile
  * @property {'auto' | 'http2' | 'quic'} transportProtocol
  * @property {string} stateFile
+ * @property {string} smokeStateFile
  * @property {string} managedTunnelPidFile
  * @property {string} mcpHttpPidFile
  * @property {number} staleAfterMs
@@ -68,6 +70,7 @@ export function readCloudflareTunnelConfig(env = process.env) {
             env['COPILOT_MCP_CLOUDFLARE_PROTOCOL'] ?? env['TUNNEL_TRANSPORT_PROTOCOL'],
         ),
         stateFile: normalizeStateFile(env['COPILOT_MCP_CLOUDFLARE_STATE_FILE']),
+        smokeStateFile: normalizeStateFile(env['COPILOT_MCP_CLOUDFLARE_SMOKE_STATE_FILE'] ?? DEFAULT_CONNECTOR_SMOKE_STATE_FILE),
         managedTunnelPidFile: normalizeStateFile(env['COPILOT_MCP_CLOUDFLARE_PID_FILE'] ?? DEFAULT_MANAGED_TUNNEL_PID_FILE),
         mcpHttpPidFile: normalizeStateFile(env['COPILOT_MCP_HTTP_PID_FILE'] ?? DEFAULT_MCP_HTTP_PID_FILE),
         staleAfterMs: normalizeStaleAfterMs(env['COPILOT_MCP_CLOUDFLARE_STALE_AFTER_MS']),

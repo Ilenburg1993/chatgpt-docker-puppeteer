@@ -78,6 +78,8 @@ export const mcpToolsStatusTool = {
         const boundedWrite = summaries.filter((tool) => tool.riskClass === 'bounded-write');
         const destructive = summaries.filter((tool) => tool.riskClass === 'destructive');
         const openWorld = summaries.filter((tool) => tool.riskClass === 'open-world');
+        const auth = readMcpAuthConfig();
+        const maxPowerRepoScopesByDefault = MAX_POWER_REPO_SCOPES.every((scope) => auth.initialScopes.includes(scope));
         return okResult({
             success: true,
             totalTools: summaries.length,
@@ -91,6 +93,17 @@ export const mcpToolsStatusTool = {
                 .map((tool) => tool.name),
             destructiveTools: destructive.map((tool) => tool.name),
             openWorldTools: openWorld.map((tool) => tool.name),
+            hostApprovalProfile: {
+                oauthGrantsAllRepoScopesByDefault: maxPowerRepoScopesByDefault,
+                writeActionsMayStillPrompt:
+                    'ChatGPT host confirmation is separate from OAuth consent. Developer Mode requires confirmation for write actions by default; this MCP cannot disable that UI from the server side.',
+                approvalMinimizers: [
+                    'Use read-only *_plan tools before write tools.',
+                    'Use mcp_run_safe_validation_suite instead of separate validator jobs.',
+                    'Use delegate_to_repo_autonomy_runner for fixed multi-step missions.',
+                    'When ChatGPT offers it, remember approval for trusted bounded-write tools in the current conversation.',
+                ],
+            },
             tools: summaries,
         });
     },

@@ -5,8 +5,15 @@
  * @module copilot/mcp/tools/tunnel-status
  */
 
+import { formatChatGptConnectorAuthentication } from '../connection/profile.js';
 import { readCloudflareTunnelConfig, validateConfiguredPublicUrl } from '../cloudflare/config.js';
-import { readQuickTunnelState, summarizeQuickTunnelState } from '../cloudflare/state.js';
+import {
+    readConnectorSmokeState,
+    readQuickTunnelState,
+    summarizeConnectorSmokeState,
+    summarizeQuickTunnelState,
+} from '../cloudflare/state.js';
+import { readMcpAuthConfig } from '../control-plane/auth.js';
 import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { okResult } from '../control-plane/result.js';
 
@@ -23,7 +30,14 @@ export const mcpTunnelStatusTool = {
     handler: async () => {
         const config = readCloudflareTunnelConfig();
         const state = await readQuickTunnelState(config.stateFile);
+        const auth = readMcpAuthConfig();
         const quickTunnel = summarizeQuickTunnelState(state, Date.now(), config.staleAfterMs);
+        const publicUrlValidation = validateConfiguredPublicUrl(config) ?? null;
+        const permanentReady = config.mode === 'named-permanent' && publicUrlValidation?.ok === true && Boolean(config.publicMcpUrl);
+        const connectorSmoke = summarizeConnectorSmokeState(
+            await readConnectorSmokeState(config.smokeStateFile),
+            config.publicMcpUrl ?? null,
+        );
         return okResult({
             success: true,
             mode: config.mode,
@@ -32,17 +46,26 @@ export const mcpTunnelStatusTool = {
             publicHostname: config.publicHostname,
             permanentTunnel: {
                 publicMcpUrl: config.publicMcpUrl ?? null,
-                validation: validateConfiguredPublicUrl(config) ?? null,
+                validation: publicUrlValidation,
                 tokenPresent: config.hasTunnelToken,
                 tokenFilePresent: config.hasTunnelTokenFile,
                 transportProtocol: config.transportProtocol,
+                lastSmoke: connectorSmoke,
             },
-            temporaryTunnel: quickTunnel,
+            temporaryFallback: {
+                ...quickTunnel,
+                ignoredForOperationalReadiness: permanentReady,
+            },
+            temporaryTunnel: {
+                ...quickTunnel,
+                ignoredForOperationalReadiness: permanentReady,
+            },
             configuredPublicUrl: config.publicMcpUrl ?? null,
-            configuredPublicUrlValidation: validateConfiguredPublicUrl(config) ?? null,
+            configuredPublicUrlValidation: publicUrlValidation,
             originUrl: config.originUrl,
             localMcpUrl: config.localMcpUrl,
             stateFile: config.stateFile,
+            smokeStateFile: config.smokeStateFile,
             transportProtocol: config.transportProtocol,
             stalePolicy: {
                 staleAfterMs: config.staleAfterMs,
@@ -51,7 +74,7 @@ export const mcpTunnelStatusTool = {
             chatgpt: {
                 mcpServerUrl: config.publicMcpUrl ?? quickTunnel.connectorUrl ?? null,
                 preferredMcpServerUrl: config.publicMcpUrl ?? quickTunnel.connectorUrl ?? null,
-                authentication: 'none-dev',
+                authentication: formatChatGptConnectorAuthentication(auth),
             },
         });
     },

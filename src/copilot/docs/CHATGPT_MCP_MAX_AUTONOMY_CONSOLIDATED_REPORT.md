@@ -2150,3 +2150,75 @@ Validacao executada nesta continuidade:
 7. `make copilot-mcp-status`: passou com `ready=true`.
 8. `make copilot-mcp-smoke`: passou com OAuth readiness max-power e 67/67 tools remotas.
 9. `make copilot-mcp-oauth-smoke`: passou com DCR/CIMD max-power, `id_token` e `/oauth/userinfo`.
+
+### 14.13. Continuidade — auditoria WORKSPACE pos-transformacoes
+
+Data: 2026-05-23.
+
+Entrada lida integralmente:
+
+1. `src/copilot/docs/Auditoria profunda — WORKSPACE MCP após.md`.
+2. A auditoria confirmou 67 tools, OAuth max-power, outputSchema/securitySchemes em 100% das tools, index funcional apos
+   build manual, writes/quarantine/delete reais funcionando e validation suite MCP passando.
+3. A auditoria tambem apontou problemas operacionais: auth inconsistente em `mcp_tunnel_status`, ruido de quick tunnel
+   antigo, auto-build de index desabilitado, smoke sem warning proprio para index indisponivel, summary de validacao sem
+   agregacao efetiva por suite e quarantine sujando o workspace.
+
+Correcoes aplicadas:
+
+1. `formatChatGptConnectorAuthentication()` virou helper unico para display de auth do conector:
+   - `OAuth`;
+   - `Mixed Authentication`;
+   - `Secure MCP Tunnel`;
+   - `No authentication`.
+2. `mcp_tunnel_status` deixou de reportar `none-dev` hardcoded e agora usa a auth efetiva. O quick tunnel antigo fica
+   marcado como `temporaryFallback` e `ignoredForOperationalReadiness` quando o modo permanente e valido.
+3. `copilot:mcp:cloudflare:smoke` agora persiste tambem o smoke do connector URL permanente em
+   `src/copilot/.ai/cloudflare/connector-smoke.json`.
+4. `mcp_runtime_health` usa esse smoke do connector URL atual, em vez de tratar o quick tunnel temporario stale como
+   sinal operacional principal quando `named-permanent` esta ativo.
+5. `mcp_smoke_workspace` passa a emitir `INDEX_UNAVAILABLE` quando o indice IO esta habilitado, mas indisponivel.
+6. `COPILOT_MCP_INDEX_AUTO_BUILD` passou a defaultar para `true`, com path `src/copilot` e limite 5000 arquivos; os
+   templates/schema de ambiente foram atualizados.
+7. `mcp_last_validation_summary` ganhou `effectiveChecks`, agregando suites como fonte efetiva de `typecheck`,
+   `lint`, `unit-mcp` e `unit-copilot`.
+8. `.gitignore` passou a ignorar `src/copilot/.ai/quarantine/*`, preservando `.gitkeep` se existir.
+9. `mcp_tools_status` e `mcp_golden_prompts` passaram a separar explicitamente:
+   - OAuth max-power/escopos concedidos;
+   - confirmacoes de write action controladas pelo host ChatGPT.
+
+Nota sobre janelas de confirmacao do ChatGPT:
+
+1. OAuth max-power remove falta de escopo/autorizacao MCP, mas nao controla a UI de confirmacao de acoes de escrita do
+   ChatGPT.
+2. A documentacao oficial de Developer Mode declara que write actions exigem confirmacao por default e que tools sem
+   `readOnlyHint` sao tratadas como write actions.
+3. A documentacao de annotations declara que `readOnlyHint=true` deve ser usado apenas para tools que nao criam,
+   atualizam, deletam ou enviam dados. Portanto, marcar `repo_create_file`, `repo_move_file` ou `repo_remove_file`
+   como read-only para esconder janelas seria metadata falsa e deixaria o host menos correto.
+4. A estrategia legitima implementada e reduzir janelas por batch/workflows confiaveis, plan-only tools, suites
+   agregadas e "remember approval" quando o proprio ChatGPT oferecer essa opcao na conversa.
+
+Validacao executada nesta continuidade:
+
+1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
+2. `npm run lint:copilot -- --quiet`: passou.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 86/86.
+4. `npm run test:copilot:unit`: passou com 3085/3085.
+5. `node scripts/env/audit-env-surface.mjs`: passou.
+6. `node scripts/env/validate-env.js`: passou.
+7. `node scripts/env/check-env-local.mjs`: passou.
+8. `make copilot-mcp-restart`: passou e reiniciou:
+   - `mcp-http` PID `16717`;
+   - `cloudflared` PID `16723`.
+9. `make copilot-mcp-status`: passou com `ready=true`, `authentication="OAuth"` e `permanentTunnel.lastSmoke`
+   inicialmente vazio antes do smoke.
+10. `make copilot-mcp-smoke`: passou com:
+    - `permanentSmokeUpdated=true`;
+    - smoke persistido em `src/copilot/.ai/cloudflare/connector-smoke.json`;
+    - OAuth readiness max-power;
+    - 67/67 tools remotas.
+11. `make copilot-mcp-status` apos o smoke: passou com `permanentTunnel.lastSmoke.ok=true`.
+12. `make copilot-mcp-oauth-smoke`: passou com DCR/CIMD max-power, `id_token` e `/oauth/userinfo`.
+13. `curl https://mcp.aurelin.org/health`: confirmou `indexAutoBuild.status="completed"`, `indexed=999`,
+    `symbols=5776` e `imports=2394`.

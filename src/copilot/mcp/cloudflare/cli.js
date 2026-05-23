@@ -10,6 +10,7 @@ import { closeSync, openSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { formatChatGptConnectorAuthentication } from '../connection/profile.js';
 import { getCanonicalMcpTools } from '../registry.js';
 import { readMcpAuthConfig } from '../control-plane/auth.js';
 import {
@@ -22,9 +23,12 @@ import {
 } from './config.js';
 import {
     isQuickTunnelState,
+    readConnectorSmokeState,
     readQuickTunnelState,
+    summarizeConnectorSmokeState,
     summarizeQuickTunnelState,
     updateQuickTunnelLastSmoke,
+    writeConnectorSmokeState,
 } from './state.js';
 
 const REQUIRED_MAX_POWER_REPO_SCOPES = ['repo:read', 'repo:write', 'repo:validate', 'repo:admin'];
@@ -130,7 +134,11 @@ async function runStatus() {
     const mcpHttpProcess = await readPidFileStatus(config.mcpHttpPidFile);
     const managedReady = permanentOk && managedProcess.alive === true && mcpHttpProcess.alive === true;
     const fallbackReady = quickTunnelSummary.stateValid && quickTunnelSummary.processAlive;
-    const authentication = authConfig.mode === 'oauth' || authConfig.mode === 'mixed-auth' ? 'OAuth' : 'none-dev';
+    const authentication = formatChatGptConnectorAuthentication(authConfig);
+    const connectorSmoke = summarizeConnectorSmokeState(
+        await readConnectorSmokeState(config.smokeStateFile),
+        config.publicMcpUrl ?? null,
+    );
     const summary =
         config.mode === 'named-permanent'
             ? {
@@ -165,7 +173,9 @@ async function runStatus() {
         permanentTunnel: {
             process: managedProcess,
             mcpHttpProcess,
+            lastSmoke: connectorSmoke,
         },
+        smokeStateFile: config.smokeStateFile,
         stateFile: config.stateFile,
         originUrl: config.originUrl,
         localMcpUrl: config.localMcpUrl,
@@ -328,10 +338,19 @@ async function runSmoke() {
                   toolsList: persistedToolsListSummary,
               })
             : false;
+    const permanentSmokeUpdated = connectorUrl === config.publicMcpUrl;
+    if (permanentSmokeUpdated) {
+        await writeConnectorSmokeState(config.smokeStateFile, {
+            ...lastSmoke,
+            toolsList: persistedToolsListSummary,
+        });
+    }
     const report = {
         ok,
         connectorUrl,
         stateUpdated,
+        permanentSmokeUpdated,
+        smokeStateFile: permanentSmokeUpdated ? config.smokeStateFile : null,
         health: healthSummary,
         oauth: oauthSummary,
         toolsList: toolsListSummary,
