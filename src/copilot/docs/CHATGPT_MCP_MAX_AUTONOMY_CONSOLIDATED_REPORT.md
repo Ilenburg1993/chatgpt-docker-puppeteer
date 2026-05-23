@@ -851,3 +851,352 @@ Efeito esperado no ChatGPT:
 2. Registrar autorizacoes/bloqueios.
 3. Refinar descriptions e workflows com base em dados reais.
 4. Evoluir `delegate_to_repo_autonomy_runner` para missoes adicionais, mantendo allowlist.
+
+---
+
+## 10. Incorporacao da auditoria live ampliada de 2026-05-23
+
+Fonte local incorporada:
+
+1. `src/copilot/docs/NEW_AUDIT_AUTONOMIA_GPT.md`
+
+Contexto observado pela auditoria:
+
+1. Endpoint testado:
+   - `/WORKSPACE/link_6a11939cefd08191906489d7b45c6a3d`.
+2. HEAD observado:
+   - `044b2060`.
+3. Tunnel:
+   - online;
+   - temporary Cloudflare;
+   - auth `none-dev`.
+4. Superficie MCP:
+   - 54 tools;
+   - 37 read-only idempotentes;
+   - 16 bounded-write;
+   - 1 destrutiva;
+   - 0 open-world.
+5. O ChatGPT confirmou que as tools novas existem e funcionam em discovery/profile.
+
+### 10.1. Conclusoes validadas
+
+1. `No Authentication` e compativel com dev mode.
+2. A ausencia de OAuth nao explica sozinha os bloqueios.
+3. OAuth/Mixed Auth melhora governanca, escopos e confianca, mas nao elimina confirmacoes de write
+   actions.
+4. `outputSchema` e lacuna real: a UI exibiu recomendacao de esquema de saida.
+5. `securitySchemes` por tool e importante para evolucao de auth.
+6. O host bloqueou chamadas antes de chegarem ao MCP.
+7. Bloqueios ocorreram tambem em chamadas read-only.
+8. `dryRun` dentro de bounded-write nao basta para o host; plan-only read-only precisa ser separado.
+9. `mcp_runtime_health` estava mais verde que `mcp_smoke_workspace`.
+10. Index estava vazio/indisponivel durante o teste live.
+
+### 10.2. Confirmacao oficial rechecada
+
+Documentacao oficial consultada nesta atualizacao:
+
+1. Apps SDK Reference:
+   - `https://developers.openai.com/apps-sdk/reference`
+   - Confirma `outputSchema`, `securitySchemes` e annotations.
+   - Confirma que annotations influenciam como ChatGPT enquadra a chamada, mas o servidor ainda deve
+     aplicar auth.
+2. Apps SDK Authentication:
+   - `https://developers.openai.com/apps-sdk/build/auth`
+   - Confirma que ChatGPT so mostra OAuth quando o servidor sinaliza metadata e runtime challenge.
+   - Recomenda `securitySchemes` por tool.
+3. Apps SDK Define tools:
+   - `https://developers.openai.com/apps-sdk/plan/tools`
+   - Recomenda uma tarefa por tool, inputs explicitos, outputs previsiveis e separar read/write para
+     confirmation flows.
+4. Apps SDK Build MCP server:
+   - `https://developers.openai.com/apps-sdk/build/mcp-server`
+   - Reforca o papel do MCP server como contrato de tools, auth e structured content.
+
+### 10.3. Investigacao local adicional
+
+O SDK instalado `@modelcontextprotocol/sdk` suporta:
+
+1. `outputSchema` diretamente no `server.registerTool(...)`.
+2. `_meta` diretamente no `server.registerTool(...)`.
+
+O tipo local do metodo `registerTool` nao expoe `securitySchemes` top-level no config object atual,
+embora a documentacao Apps SDK mostre esse campo em exemplos. Portanto a sequencia tecnica segura e:
+
+1. Fase imediata:
+   - adicionar `outputSchema`;
+   - adicionar `_meta["securitySchemes"]`.
+2. Fase posterior:
+   - avaliar wrapper Apps SDK ou compat shim para `securitySchemes` top-level sem quebrar typecheck;
+   - evoluir para Mixed Auth.
+
+---
+
+## 11. Roadmap canonico atualizado apos a nova auditoria
+
+### Faixa A — Documentacao e baseline
+
+Status: concluida nesta rodada de planejamento.
+
+Objetivo:
+
+1. Incorporar a auditoria live ampliada.
+2. Registrar estado feito/faltante.
+3. Ordenar P0/P1/P2 por dependencia real.
+
+Pronto quando:
+
+1. Este documento conter a nova matriz.
+2. O roadmap distinguir plano, metadata, schemas, auth, runtime health e index.
+
+### Faixa B — Metadata registry-wide minima
+
+Status: implementada e validada em teste focado nesta rodada.
+
+Objetivo:
+
+1. Adicionar `outputSchema` basico a todas as tools.
+2. Adicionar `_meta["securitySchemes"]` explicito a todas as tools.
+3. Testar que toda tool registrada tem:
+   - annotations;
+   - outputSchema;
+   - `_meta.securitySchemes`.
+
+Subfases:
+
+1. Criar helpers em `src/copilot/mcp/control-plane/tool-metadata.js`.
+2. Criar schema base `success/error passthrough`.
+3. Adaptar typedef `McpToolDefinition`.
+4. Adaptar `registerCanonicalMcpTools`.
+5. Aplicar schema base em todas as tools.
+6. Aplicar schemes por risco:
+   - read-only: `noauth`;
+   - bounded-write: `noauth` em dev, com scope planejado;
+   - destructive: `noauth` em dev, com scope planejado.
+7. Adicionar testes.
+
+Pronto quando:
+
+1. ChatGPT nao deve mais apontar ausencia ampla de output schema.
+2. Tests de registry impedem regressao.
+
+Resultado implementado:
+
+1. `src/copilot/mcp/control-plane/tool-metadata.js` normaliza todas as tools canonicas.
+2. Toda tool recebe `outputSchema` base estruturado.
+3. Toda tool recebe `_meta.securitySchemes` com `noauth` no perfil dev atual.
+4. `registerCanonicalMcpTools` propaga `outputSchema` e `_meta` para o SDK MCP.
+5. `mcp_tools_status` passa a expor `hasOutputSchema` e `securitySchemes`.
+6. `mcp_capabilities_summary` documenta o perfil de metadata.
+7. Validacao focada:
+   - `npm run typecheck:strict:src.copilot`: passou;
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
+     passou com 27 testes.
+
+### Faixa C — Plan-only read-only tools
+
+Status: implementada e validada em teste focado nesta rodada.
+
+Objetivo:
+
+1. Separar planejamento read-only de aplicacao write.
+2. Reduzir bloqueios do host em dry-run.
+
+Tools novas:
+
+1. `repo_patch_plan`
+2. `repo_create_file_plan`
+3. `repo_quarantine_file_plan`
+4. `repo_move_file_plan`
+5. `repo_index_refresh_plan`
+6. `mcp_validation_plan`
+
+Pronto quando:
+
+1. Golden prompts usam plan tools antes de apply.
+2. Plan tools sao read-only/idempotentes.
+
+Resultado implementado:
+
+1. `repo_patch_plan` cria plano read-only com diff preview, contagem de ocorrencias e `sha256` para
+   `expectedHash`.
+2. `repo_create_file_plan` cria plano read-only com diff preview e deteccao de destino existente.
+3. `repo_quarantine_file_plan` cria plano read-only para remocao reversivel por quarantine.
+4. `repo_move_file_plan` cria plano read-only para rename/move com deteccao de overwrite.
+5. `repo_index_refresh_plan` cria plano read-only para refresh do indice.
+6. `mcp_validation_plan` cria plano read-only para suites seguras de validacao.
+7. `mcp_session_profile`, `mcp_capabilities_summary`, `mcp_tools_status`, Cloudflare CLI e connector
+   profile foram atualizados para favorecer plan-before-apply.
+8. Validacao focada:
+   - `npm run typecheck:strict:src.copilot`: passou;
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
+     passou com 27 testes.
+
+### Faixa D — URL/redaction status sem inputs sensiveis
+
+Status: pendente.
+
+Objetivo:
+
+1. Contornar bloqueios com URL publica passada como argumento.
+2. Contornar bloqueio de `showHidden=true`.
+
+Tools novas:
+
+1. `chatgpt_connector_current_url_status`
+2. `repo_root_redaction_status`
+
+Pronto quando:
+
+1. ChatGPT consegue auditar tunnel atual sem passar URL.
+2. ChatGPT consegue auditar redaction sem listar hidden names.
+
+### Faixa E — Runtime health agregado
+
+Status: pendente.
+
+Objetivo:
+
+1. Fazer `mcp_runtime_health` refletir:
+   - ultimo smoke;
+   - dirty workspace;
+   - index empty/unavailable;
+   - tunnel stale/fail;
+   - error rates.
+
+Subfases:
+
+1. Persistir ou calcular ultimo smoke summary.
+2. Incluir index status.
+3. Incluir dirty workspace warning.
+4. Ajustar status:
+   - `ok`;
+   - `degraded`;
+   - `failed`.
+
+Pronto quando:
+
+1. `mcp_runtime_health` nao fica `ok` se smoke/index indicam degradacao operacional.
+
+### Faixa F — Index resiliente fora do host
+
+Status: pendente.
+
+Objetivo:
+
+1. Evitar dependencia de `repo_index_build` quando o host bloqueia.
+
+Subfases:
+
+1. Criar variaveis:
+   - `COPILOT_MCP_INDEX_AUTO_BUILD`;
+   - `COPILOT_MCP_INDEX_AUTO_BUILD_PATH`;
+   - `COPILOT_MCP_INDEX_AUTO_BUILD_MAX_FILES`.
+2. Implementar auto-build opcional no boot HTTP.
+3. Implementar status claro quando index vazio.
+4. Integrar maintenance plan.
+
+Pronto quando:
+
+1. `repo_index_status` nao permanece vazio por falta de chamada do ChatGPT.
+
+### Faixa G — Last validation summary
+
+Status: pendente.
+
+Objetivo:
+
+1. Usar jobs existentes quando iniciar validação for bloqueado.
+
+Tool nova:
+
+1. `mcp_last_validation_summary`
+
+Pronto quando:
+
+1. ChatGPT consegue saber ultimo typecheck/lint/unit sem iniciar novo job.
+
+### Faixa H — Host block diagnostics
+
+Status: pendente.
+
+Objetivo:
+
+1. Estruturar registro manual de bloqueios externos, pois eles nao chegam ao MCP.
+
+Tools/docs:
+
+1. `mcp_host_block_diagnostics`
+2. golden prompt result template JSON/MD
+
+Pronto quando:
+
+1. Cada bloqueio tem tool, args class, mensagem, contexto e timestamp.
+
+### Faixa I — Mixed Authentication
+
+Status: design, sem implementacao imediata nesta rodada.
+
+Objetivo:
+
+1. Evoluir de `none-dev` para perfis:
+   - `dev-noauth`;
+   - `dev-mixed-auth`;
+   - `team-oauth`;
+   - `prod-readonly`.
+
+Subfases:
+
+1. Mapear scopes por tool.
+2. Implementar protected resource metadata.
+3. Implementar authorization server metadata.
+4. Implementar runtime challenge `_meta["mcp/www_authenticate"]`.
+5. Validar com MCP Inspector e ChatGPT.
+
+Pronto quando:
+
+1. ChatGPT mostra OAuth/linking quando apropriado.
+2. Server valida token/scope/audience em write/validate/destructive.
+
+---
+
+## 12. Estado feito vs faltante apos a nova auditoria
+
+Feito:
+
+1. 54 tools expostas.
+2. Annotations completas.
+3. `idempotentHint` para read-only.
+4. `mcp_tools_status`.
+5. `mcp_session_profile`.
+6. `mcp_golden_prompts`.
+7. `mcp_maintenance_plan`.
+8. `mcp_maintenance_apply_safe_fixes`.
+9. `delegate_to_repo_autonomy_runner`.
+10. `mcp_run_safe_validation_suite`.
+11. Quarantine/restore/list/inspect.
+12. Temporary Cloudflare tunnel workflow.
+13. Testes MCP e unitarios passando no ultimo ciclo.
+14. `outputSchema` registry-wide.
+15. `_meta.securitySchemes` registry-wide para perfil dev `noauth`.
+16. Plan-only read-only tools para patch/create/quarantine/move/index/validation.
+
+Faltante P0:
+
+1. `chatgpt_connector_current_url_status`.
+2. `repo_root_redaction_status`.
+
+Faltante P1:
+
+1. Runtime health agregado.
+2. Auto index refresh.
+3. `mcp_last_validation_summary`.
+4. Host block diagnostics.
+
+Faltante P2:
+
+1. Mixed Auth completo.
+2. OAuth resource metadata.
+3. OAuth authorization server metadata.
+4. Token/scopes validation.
+5. Dashboard/power score.

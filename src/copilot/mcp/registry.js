@@ -7,6 +7,7 @@
 
 import { appendMcpAuditEvent } from './control-plane/audit.js';
 import { recordMcpToolMetric } from './control-plane/metrics.js';
+import { normalizeMcpToolDefinitions } from './control-plane/tool-metadata.js';
 import { connectionTools } from './tools/connection.js';
 import { copilotSessionTools } from './tools/copilot-session.js';
 import { delegateToRepoAutonomyRunnerTool } from './tools/delegation-runner.js';
@@ -17,6 +18,7 @@ import { maintenanceTools } from './tools/maintenance.js';
 import { metaTools } from './tools/meta.js';
 import { projectDoctorTool } from './tools/project-doctor.js';
 import { repoIndexTools } from './tools/repo-index.js';
+import { repoPlanTools } from './tools/repo-plan.js';
 import { repoReadTools } from './tools/repo-read.js';
 import { repoWriteTools } from './tools/repo-write.js';
 import { mcpRuntimeHealthTool } from './tools/runtime-health.js';
@@ -31,6 +33,9 @@ import { mcpTunnelStatusTool } from './tools/tunnel-status.js';
  * @property {string} title
  * @property {string} description
  * @property {Record<string, import('zod').ZodTypeAny>} inputSchema
+ * @property {import('zod').ZodTypeAny | Record<string, import('zod').ZodTypeAny>} [outputSchema]
+ * @property {Record<string, unknown>[]} [securitySchemes]
+ * @property {Record<string, unknown>} [_meta]
  * @property {import('@modelcontextprotocol/sdk/types.js').ToolAnnotations} annotations
  * @property {(
  *     args: any,
@@ -43,8 +48,9 @@ import { mcpTunnelStatusTool } from './tools/tunnel-status.js';
  * @returns {McpToolDefinition[]}
  */
 export function getCanonicalMcpTools() {
-    const tools = [
+    const tools = normalizeMcpToolDefinitions([
         ...repoReadTools,
+        ...repoPlanTools,
         ...repoIndexTools,
         ...gitReadTools,
         projectDoctorTool,
@@ -61,7 +67,7 @@ export function getCanonicalMcpTools() {
         mcpSmokeWorkspaceTool,
         mcpTunnelStatusTool,
         mcpRuntimeHealthTool,
-    ];
+    ]);
     bindMcpToolsStatusProvider(() => tools);
     return tools;
 }
@@ -80,6 +86,8 @@ export function registerCanonicalMcpTools(server) {
                 description: tool.description,
                 inputSchema: tool.inputSchema,
                 annotations: tool.annotations,
+                ...(tool.outputSchema !== undefined ? { outputSchema: tool.outputSchema } : {}),
+                ...(tool._meta !== undefined ? { _meta: tool._meta } : {}),
             },
             async (args) => {
                 const startedAt = Date.now();

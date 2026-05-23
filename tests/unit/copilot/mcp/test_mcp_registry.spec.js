@@ -36,9 +36,11 @@ describe('copilot MCP registry', () => {
             'mcp_smoke_workspace',
             'mcp_tools_status',
             'mcp_tunnel_status',
+            'mcp_validation_plan',
             'project_doctor',
             'repo_apply_patch',
             'repo_create_file',
+            'repo_create_file_plan',
             'repo_diff_files',
             'repo_file_outline',
             'repo_file_stats',
@@ -47,12 +49,16 @@ describe('copilot MCP registry', () => {
             'repo_index_build',
             'repo_index_find_symbol',
             'repo_index_invalidate',
+            'repo_index_refresh_plan',
             'repo_index_search',
             'repo_index_status',
             'repo_inspect_quarantined_file',
             'repo_list_quarantine',
             'repo_move_file',
+            'repo_move_file_plan',
+            'repo_patch_plan',
             'repo_quarantine_file',
+            'repo_quarantine_file_plan',
             'repo_read_file',
             'repo_read_file_chunks',
             'repo_remove_file',
@@ -82,6 +88,22 @@ describe('copilot MCP registry', () => {
             assert.equal(tool.annotations.idempotentHint, tool.annotations.readOnlyHint === true, tool.name);
         }
         assert.equal(tools.find((tool) => tool.name === 'repo_remove_file')?.annotations.destructiveHint, true);
+    });
+
+    it('adds registry-wide output schema and security metadata to every tool', () => {
+        const tools = getCanonicalMcpTools();
+
+        for (const tool of tools) {
+            assert.ok(tool.outputSchema, `missing outputSchema: ${tool.name}`);
+            assert.ok(tool._meta, `missing _meta: ${tool.name}`);
+            assert.ok(Array.isArray(tool._meta?.['securitySchemes']), `missing securitySchemes: ${tool.name}`);
+            const schemes = /** @type {{ type?: string }[]} */ (tool._meta?.['securitySchemes']);
+            assert.ok(schemes.length > 0, `empty securitySchemes: ${tool.name}`);
+            assert.ok(
+                schemes.some((scheme) => scheme.type === 'noauth'),
+                `missing noauth scheme: ${tool.name}`,
+            );
+        }
     });
 
     it('does not expose duplicate tool names', () => {

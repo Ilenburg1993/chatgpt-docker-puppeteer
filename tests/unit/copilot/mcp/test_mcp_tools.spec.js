@@ -301,10 +301,21 @@ describe('copilot MCP tools', () => {
         assert.ok(Number(structured['destructiveCount'] ?? 0) > 0);
         assert.ok(/** @type {string[]} */ (structured['rememberApprovalCandidates']).includes('repo_apply_patch'));
         assert.ok(/** @type {string[]} */ (structured['destructiveTools']).includes('repo_remove_file'));
-        const tools = /** @type {{ name?: string; annotations?: { idempotentHint?: boolean } }[]} */ (
-            structured['tools']
-        );
+        const tools = /**
+         * @type {{
+         *     name?: string;
+         *     annotations?: { idempotentHint?: boolean };
+         *     hasOutputSchema?: boolean;
+         *     securitySchemes?: { type?: string }[];
+         * }[]}
+         */ (structured['tools']);
         assert.equal(tools.find((candidate) => candidate.name === 'repo_status')?.annotations?.idempotentHint, true);
+        assert.equal(tools.find((candidate) => candidate.name === 'repo_status')?.hasOutputSchema, true);
+        assert.ok(
+            tools
+                .find((candidate) => candidate.name === 'repo_status')
+                ?.securitySchemes?.some((scheme) => scheme.type === 'noauth'),
+        );
     });
 
     it('mcp_session_profile returns the recommended ChatGPT autonomy profile', async () => {
@@ -367,6 +378,32 @@ describe('copilot MCP tools', () => {
         assert.ok(Array.isArray(structured['prompts']));
         assert.ok(/** @type {unknown[]} */ (structured['prompts']).length >= 6);
         assert.ok(/** @type {string[]} */ (structured['measurementFields']).includes('approvalPromptsShown'));
+    });
+
+    it('plan-only tools return read-only next-call previews for sensitive operations', async () => {
+        const patchPlanTool = findTool('repo_patch_plan');
+        const patchPlan = await patchPlanTool.handler({
+            path: 'src/copilot/mcp/registry.js',
+            old_string: 'getCanonicalMcpTools',
+            new_string: 'getCanonicalMcpTools',
+        });
+        assert.equal(patchPlan.isError, undefined);
+        assert.equal(patchPlan.structuredContent?.['success'], true);
+        assert.equal(patchPlan.structuredContent?.['plannedTool'], 'repo_apply_patch');
+        assert.equal(typeof patchPlan.structuredContent?.['sha256'], 'string');
+
+        const createPlanTool = findTool('repo_create_file_plan');
+        const createPlan = await createPlanTool.handler({
+            path: 'src/copilot/.ai/jobs/plan-only-created.txt',
+            content: 'planned\n',
+        });
+        assert.equal(createPlan.isError, undefined);
+        assert.equal(createPlan.structuredContent?.['plannedTool'], 'repo_create_file');
+
+        const validationPlanTool = findTool('mcp_validation_plan');
+        const validationPlan = await validationPlanTool.handler({ suite: 'mcp-fast' });
+        assert.equal(validationPlan.isError, undefined);
+        assert.equal(validationPlan.structuredContent?.['validator'], 'suite-mcp-fast');
     });
 
     it('project_doctor returns canonical validators', async () => {

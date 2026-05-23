@@ -47,6 +47,8 @@ function summarizeTool(tool) {
             openWorldHint: openWorld,
             idempotentHint: idempotent,
         },
+        hasOutputSchema: Boolean(tool.outputSchema),
+        securitySchemes: tool.securitySchemes ?? tool._meta?.['securitySchemes'] ?? [],
         rememberApprovalCandidate: !readOnly && !destructive && !openWorld,
     };
 }

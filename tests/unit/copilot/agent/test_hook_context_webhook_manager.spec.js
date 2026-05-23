@@ -50,6 +50,8 @@ vi.mock('#copilot/core', async (importOriginal) => {
             })),
         },
         logSwallowed: mocks.logSwallowed,
+        validateWebhookUrl: mocks.validateWebhookUrl,
+        checkResolvedIp: mocks.checkResolvedIp,
         toError: (/** @type {unknown} */ v) => (v instanceof Error ? v : new Error(String(v))),
     };
 });

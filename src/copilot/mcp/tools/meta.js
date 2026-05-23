@@ -9,7 +9,7 @@ import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { okResult } from '../control-plane/result.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 6;
+const CAPABILITIES_VERSION = 7;
 
 const READ_TOOLS = [
     'repo_status',
@@ -21,6 +21,12 @@ const READ_TOOLS = [
     'repo_diff_files',
     'repo_list_quarantine',
     'repo_inspect_quarantined_file',
+    'repo_patch_plan',
+    'repo_create_file_plan',
+    'repo_quarantine_file_plan',
+    'repo_move_file_plan',
+    'repo_index_refresh_plan',
+    'mcp_validation_plan',
     'repo_search_text',
     'repo_find_symbol_usages',
     'repo_symbol_search',
@@ -94,12 +100,18 @@ const ANNOTATION_PROFILE = {
         'ChatGPT host authorization prompts are controlled by chatgpt.com; this MCP can reduce friction with precise annotations and narrow tools, but cannot disable host safety UI.',
 };
 
+const METADATA_PROFILE = {
+    outputSchema: 'registry-wide minimal passthrough schema; tool-specific schemas are the next hardening band',
+    securitySchemes: 'registry-wide explicit noauth metadata for dev; Mixed Auth/OAuth scopes remain a future band',
+};
+
 const IO_GUIDANCE = [
     'Use mcp_tools_status before planning broad work to inspect read-only, bounded-write, destructive and approval-friendly tools.',
     'Use mcp_session_profile at the start of a new ChatGPT conversation to load the recommended autonomy profile.',
     'Use mcp_maintenance_plan then mcp_maintenance_apply_safe_fixes dryRun=true for batched low-risk maintenance.',
     'Use delegate_to_repo_autonomy_runner dryRun=true for fixed longer workflows before requesting real execution.',
     'Use mcp_golden_prompts when measuring real ChatGPT approval prompts and host blocks.',
+    'Use plan-only tools such as repo_patch_plan and repo_quarantine_file_plan before bounded-write apply tools.',
     'Use repo_read_file.sha256 as expectedHash for safe write/patch calls.',
     'Use repo_quarantine_file before repo_remove_file when reversible cleanup is acceptable.',
     'Use repo_read_file_chunks for large files instead of requesting entire content.',
@@ -161,6 +173,7 @@ export function buildMcpCapabilitiesSummary() {
         experimental: [...EXPERIMENTAL_TOOLS],
         securityPolicy: { ...SECURITY_POLICY },
         annotationProfile: { ...ANNOTATION_PROFILE },
+        metadataProfile: { ...METADATA_PROFILE },
         ioGuidance: [...IO_GUIDANCE],
     };
 }

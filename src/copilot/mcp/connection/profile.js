@@ -86,6 +86,7 @@ export function buildChatGptConnectorProfile(options = {}) {
             'Chame mcp_maintenance_plan e depois mcp_maintenance_apply_safe_fixes dryRun=true.',
             'Chame delegate_to_repo_autonomy_runner mission=diagnose-mcp dryRun=true.',
             'Chame mcp_tools_status e identifique tools read-only, bounded-write e destructive.',
+            'Antes de qualquer escrita, chame repo_patch_plan, repo_create_file_plan, repo_quarantine_file_plan ou repo_move_file_plan.',
             'Chame mcp_tunnel_status e confirme recommendedAction, lastSmokeOk e lastSmokeAgeMinutes.',
             'Liste a árvore de src/copilot/mcp com repo_tree.',
             'Liste a raiz real do workspace com repo_root_tree maxEntries=80.',

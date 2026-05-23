@@ -14,9 +14,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks (hoisted) ────────────────────────────────────────────────────────
 
-const { mockLog, mockLogSwallowed } = vi.hoisted(() => ({
+const {
+    mockLog,
+    mockLogSwallowed,
+    mockBuildStructuredRequest,
+    mockParseStructuredResponse,
+    mockSerializeStructuredMessage,
+} = vi.hoisted(() => ({
     mockLog: vi.fn(),
     mockLogSwallowed: vi.fn(),
+    mockBuildStructuredRequest: vi.fn((input) => ({ ...input, _type: 'structured' })),
+    mockParseStructuredResponse: vi.fn((raw) => {
+        try {
+            const parsed = JSON.parse(raw);
+            if (parsed.responseType) return parsed;
+        } catch {
+            /* não é JSON */
+        }
+        return null;
+    }),
+    mockSerializeStructuredMessage: vi.fn((msg) => JSON.stringify(msg)),
 }));
 
 vi.mock('#copilot/observability/logger', () => ({
@@ -25,6 +42,15 @@ vi.mock('#copilot/observability/logger', () => ({
     getRecentLogs: vi.fn(() => []),
 }));
 vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mockLogSwallowed }));
+vi.mock('#copilot/core', async (importOriginal) => {
+    const actual = /** @type {any} */ (await importOriginal());
+    return {
+        ...actual,
+        buildStructuredRequest: mockBuildStructuredRequest,
+        parseStructuredResponse: mockParseStructuredResponse,
+        serializeStructuredMessage: mockSerializeStructuredMessage,
+    };
+});
 
 // ─── Imports ─────────────────────────────────────────────────────────────────
 
@@ -267,20 +293,6 @@ describe('F40 — getLastNPairs', () => {
 // client-structured.js
 // ═══════════════════════════════════════════════════════════════════════════════
 
-vi.mock('#copilot/core/structured-message', () => ({
-    buildStructuredRequest: vi.fn((input) => ({ ...input, _type: 'structured' })),
-    parseStructuredResponse: vi.fn((raw) => {
-        try {
-            const parsed = JSON.parse(raw);
-            if (parsed.responseType) return parsed;
-        } catch {
-            /* não é JSON */
-        }
-        return null;
-    }),
-    serializeStructuredMessage: vi.fn((msg) => JSON.stringify(msg)),
-}));
-
 const { chatStructured } = await import('#copilot/channel/client-structured');
 
 describe('F40 — chatStructured', () => {
@@ -378,7 +390,7 @@ describe('F40 — chatStructured', () => {
         );
 
         // buildStructuredRequest should have received custom-sess
-        const { buildStructuredRequest } = await import('#copilot/core/structured-message');
+        const { buildStructuredRequest } = await import('#copilot/core');
         expect(buildStructuredRequest).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'custom-sess' }));
     });
 });

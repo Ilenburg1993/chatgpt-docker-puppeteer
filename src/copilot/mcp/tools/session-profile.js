@@ -55,23 +55,37 @@ export const mcpSessionProfileTool = {
                 'repo_index_search',
                 'repo_list_quarantine',
                 'repo_inspect_quarantined_file',
+                'repo_patch_plan',
+                'repo_create_file_plan',
+                'repo_quarantine_file_plan',
+                'repo_move_file_plan',
+                'repo_index_refresh_plan',
+                'mcp_validation_plan',
                 'git_status',
                 'git_diff',
             ],
             preferredWriteWorkflows: [
                 {
                     task: 'patch-existing-file',
-                    flow: ['repo_read_file', 'repo_apply_patch dryRun=true', 'repo_apply_patch expectedHash=<sha256>'],
-                    reason: 'Exact-string patch is narrower than full-file replacement.',
+                    flow: ['repo_patch_plan', 'repo_apply_patch expectedHash=<sha256 from plan>'],
+                    reason: 'Plan-only read is lower friction than dryRun inside the write tool.',
                 },
                 {
                     task: 'remove-file-safely',
-                    flow: ['repo_quarantine_file', 'repo_restore_quarantined_file if rollback is needed'],
+                    flow: [
+                        'repo_quarantine_file_plan',
+                        'repo_quarantine_file',
+                        'repo_restore_quarantined_file if rollback is needed',
+                    ],
                     reason: 'Quarantine is reversible and should be preferred over repo_remove_file.',
                 },
                 {
                     task: 'validate-work',
-                    flow: ['mcp_run_safe_validation_suite suite=mcp-full', 'job_get_output'],
+                    flow: [
+                        'mcp_validation_plan suite=mcp-full',
+                        'mcp_run_safe_validation_suite suite=mcp-full',
+                        'job_get_output',
+                    ],
                     reason: 'One allowlisted job reduces repeated validator calls.',
                 },
                 {
