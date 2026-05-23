@@ -11,6 +11,7 @@ import { connectionTools } from './tools/connection.js';
 import { copilotSessionTools } from './tools/copilot-session.js';
 import { delegateToRepoAutonomyRunnerTool } from './tools/delegation-runner.js';
 import { gitReadTools } from './tools/git-read.js';
+import { mcpGoldenPromptsTool } from './tools/golden-prompts.js';
 import { jobTools } from './tools/jobs.js';
 import { maintenanceTools } from './tools/maintenance.js';
 import { metaTools } from './tools/meta.js';
@@ -50,6 +51,7 @@ export function getCanonicalMcpTools() {
         ...jobTools,
         ...maintenanceTools,
         delegateToRepoAutonomyRunnerTool,
+        mcpGoldenPromptsTool,
         ...connectionTools,
         ...repoWriteTools,
         ...copilotSessionTools,

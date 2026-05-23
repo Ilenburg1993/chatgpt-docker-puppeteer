@@ -81,6 +81,7 @@ export function buildChatGptConnectorProfile(options = {}) {
         smokePrompts: [
             'Use o conector Repo DevContainer MCP e chame repo_status.',
             'Chame mcp_session_profile e siga a ordem recommendedFirstCalls.',
+            'Chame mcp_golden_prompts antes de medir prompts de autorizacao no ChatGPT.',
             'Chame mcp_capabilities_summary e resuma as categorias de tools.',
             'Chame mcp_maintenance_plan e depois mcp_maintenance_apply_safe_fixes dryRun=true.',
             'Chame delegate_to_repo_autonomy_runner mission=diagnose-mcp dryRun=true.',

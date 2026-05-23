@@ -281,6 +281,7 @@ describe('copilot MCP tools', () => {
         assert.ok(Array.isArray(structured['index']));
         assert.ok(/** @type {string[]} */ (structured['index']).includes('repo_index_status'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('delegate_to_repo_autonomy_runner'));
+        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_golden_prompts'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_maintenance_plan'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_session_profile'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tools_status'));
@@ -355,6 +356,17 @@ describe('copilot MCP tools', () => {
         assert.equal(result.structuredContent?.['constraints']?.['arbitraryShell'], false);
         const plan = /** @type {{ step?: string }[]} */ (result.structuredContent?.['plan']);
         assert.ok(plan.some((step) => step.step === 'mcp_smoke_workspace'));
+    });
+
+    it('mcp_golden_prompts returns real-ChatGPT measurement prompts', async () => {
+        const tool = findTool('mcp_golden_prompts');
+        const result = await tool.handler({});
+        assert.equal(result.isError, undefined);
+        const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
+        assert.equal(structured['success'], true);
+        assert.ok(Array.isArray(structured['prompts']));
+        assert.ok(/** @type {unknown[]} */ (structured['prompts']).length >= 6);
+        assert.ok(/** @type {string[]} */ (structured['measurementFields']).includes('approvalPromptsShown'));
     });
 
     it('project_doctor returns canonical validators', async () => {

@@ -162,6 +162,7 @@ async function runSmoke() {
         'repo_index_status',
         'project_doctor',
         'delegate_to_repo_autonomy_runner',
+        'mcp_golden_prompts',
         'mcp_maintenance_plan',
         'mcp_maintenance_apply_safe_fixes',
         'mcp_run_safe_validation_suite',

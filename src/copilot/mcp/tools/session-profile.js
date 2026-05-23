@@ -38,6 +38,7 @@ export const mcpSessionProfileTool = {
                 'repo_status',
                 'mcp_tools_status',
                 'mcp_capabilities_summary',
+                'mcp_golden_prompts',
                 'mcp_maintenance_plan',
                 'delegate_to_repo_autonomy_runner',
                 'mcp_tunnel_status',

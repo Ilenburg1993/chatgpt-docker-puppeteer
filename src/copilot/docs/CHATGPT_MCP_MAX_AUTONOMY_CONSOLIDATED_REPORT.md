@@ -712,6 +712,14 @@ Executados e aprovados:
 12. `npm run test:copilot:unit`
     - rerun final apos delegation runner passou;
     - 3066/3066 testes passaram.
+13. `npm run copilot:mcp:safe-suite -- mcp-full`
+    - rerun apos golden prompts passou;
+    - typecheck strict passou;
+    - lint Copilot passou;
+    - 68 testes MCP passaram.
+14. `npm run test:copilot:unit`
+    - rerun final apos golden prompts passou;
+    - 3067/3067 testes passaram.
 
 ### 9.7. Faixa 6 inicial concluida — `mcp_session_profile`
 
@@ -814,5 +822,32 @@ Efeito esperado no ChatGPT:
 
 ### 9.11. Proxima sequencia cronologica
 
-1. Faixa 8:
-   - golden prompts e medicao real de prompts/bloqueios no ChatGPT.
+### 9.11. Faixa 8 inicial concluida — golden prompts e medicao
+
+Mudancas implementadas:
+
+1. Criado documento:
+   - `src/copilot/docs/CHATGPT_MCP_GOLDEN_PROMPTS_AND_MEASUREMENT.md`.
+2. Criada tool:
+   - `mcp_golden_prompts`.
+3. A tool retorna:
+   - prompt set canonico;
+   - expected tools por prompt;
+   - measurement fields;
+   - success criteria.
+4. `mcp_session_profile` passou a recomendar `mcp_golden_prompts`.
+5. `mcp_capabilities_summary` passou a anunciar `mcp_golden_prompts`.
+6. Smoke remoto Cloudflare passou a exigir `mcp_golden_prompts` como critical.
+
+Efeito esperado no ChatGPT:
+
+1. A medicao de prompts de autorizacao deixa de ser anedotica.
+2. O ChatGPT consegue consultar o protocolo de teste sem depender do documento MD.
+3. Fica mais facil comparar iteracoes de tool descriptions, annotations e workflows.
+
+### 9.12. Proxima sequencia cronologica
+
+1. Rodar golden prompts no ChatGPT real.
+2. Registrar autorizacoes/bloqueios.
+3. Refinar descriptions e workflows com base em dados reais.
+4. Evoluir `delegate_to_repo_autonomy_runner` para missoes adicionais, mantendo allowlist.
