@@ -129,7 +129,7 @@ describe('copilot MCP tools', () => {
         assert.equal(result.isError, undefined);
         assert.ok('currentUrl' in (result.structuredContent ?? {}));
         assert.ok('validation' in (result.structuredContent ?? {}));
-        assert.equal(result.structuredContent?.['chatgptForm']?.['authentication'], 'No authentication');
+        assert.equal(result.structuredContent?.['chatgptForm']?.['authentication'], 'OAuth');
         assert.ok(Array.isArray(result.structuredContent?.['recovery']));
     });
 
@@ -236,7 +236,7 @@ describe('copilot MCP tools', () => {
 
     it('mcp_smoke_workspace runs read-only end-to-end checks', async () => {
         const tool = findTool('mcp_smoke_workspace');
-        const result = await tool.handler({});
+        const result = await tool.handler({ issuer: 'http://not-https.example.com' });
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);
         assert.ok(Array.isArray(result.structuredContent?.['checks']));
@@ -338,7 +338,7 @@ describe('copilot MCP tools', () => {
         assert.ok(
             tools
                 .find((candidate) => candidate.name === 'repo_status')
-                ?.securitySchemes?.some((scheme) => scheme.type === 'noauth'),
+                ?.securitySchemes?.some((scheme) => scheme.type === 'oauth2'),
         );
     });
 
@@ -434,7 +434,7 @@ describe('copilot MCP tools', () => {
 
     it('mcp_oauth_issuer_diagnostics reports missing issuer without network calls', async () => {
         const tool = findTool('mcp_oauth_issuer_diagnostics');
-        const result = await tool.handler({});
+        const result = await tool.handler({ issuer: 'http://not-https.example.com' });
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);
         assert.equal(result.structuredContent?.['ready'], false);

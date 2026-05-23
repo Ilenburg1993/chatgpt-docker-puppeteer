@@ -58,7 +58,7 @@ export function buildChatGptConnectorProfile(options = {}) {
     const publicMcpUrl = options.publicMcpUrl ?? process.env['COPILOT_MCP_PUBLIC_URL'] ?? DEFAULT_PUBLIC_MCP_URL;
     const localMcpUrl = options.localMcpUrl ?? process.env['COPILOT_MCP_LOCAL_URL'] ?? DEFAULT_LOCAL_MCP_URL;
     const authMode =
-        options.authMode ?? /** @type {ChatGptAuthMode} */ (process.env['COPILOT_MCP_CHATGPT_AUTH_MODE'] ?? 'none-dev');
+        options.authMode ?? /** @type {ChatGptAuthMode} */ (process.env['COPILOT_MCP_CHATGPT_AUTH_MODE'] ?? 'oauth');
     const tunnelId = options.tunnelId ?? process.env['OPENAI_MCP_TUNNEL_ID'] ?? 'tunnel_<preencher>';
     const connectorUrl = normalizeMcpUrl(publicMcpUrl);
     const localUrl = normalizeMcpUrl(localMcpUrl);
@@ -229,7 +229,7 @@ export function buildCloudflareTunnelRunbook(options = {}) {
             'Depois do smoke, o endpoint permanente deve responder /health e /mcp tools/list.',
             'Quick Tunnel continua disponível como fallback, mas não é mais o caminho padrão.',
             'Não proteja /mcp com login interativo que o backend do ChatGPT não consiga atravessar.',
-            'Sem OAuth no MCP, escolha no ChatGPT o modo sem autenticação somente em desenvolvimento controlado.',
+            'OAuth e o modo padrão do MCP permanente. Use No authentication apenas com COPILOT_MCP_AUTH_MODE=none-dev em desenvolvimento controlado.',
         ],
     };
 }

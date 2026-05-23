@@ -42,6 +42,19 @@ let _modelsCache = null;
 let _inflightRequest = null;
 
 /**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {boolean}
+ */
+export function isPersistentModelCacheEnabled(env = process.env) {
+    const raw = String(env['COPILOT_MODEL_PERSISTENT_CACHE_ENABLED'] ?? '')
+        .trim()
+        .toLowerCase();
+    if (raw === 'true' || raw === '1' || raw === 'yes') return true;
+    if (raw === 'false' || raw === '0' || raw === 'no') return false;
+    return env['NODE_ENV'] !== 'test';
+}
+
+/**
  * Invalida o cache de modelos (útil em testes ou após mudança de conta).
  *
  * @returns {void}
@@ -78,13 +91,14 @@ export async function clearModelsCacheAsync() {
  */
 export async function listModels(clientOverrides = {}, forceRefresh = false) {
     const now = Date.now();
+    const persistentCacheEnabled = isPersistentModelCacheEnabled();
     // L1: Check memória (5min TTL)
     if (!forceRefresh && _modelsCache && _modelsCache.expiresAt > now) {
         return _modelsCache.models;
     }
 
     // L2: Check disk persistent cache se L1 miss (24h TTL)
-    if (!forceRefresh && !_modelsCache) {
+    if (persistentCacheEnabled && !forceRefresh && !_modelsCache) {
         const persistedCache = await readPersistentModelCache();
         if (persistedCache) {
             const fallbackResult = evaluatePersistentCache(persistedCache);
@@ -112,11 +126,12 @@ export async function listModels(clientOverrides = {}, forceRefresh = false) {
             const models = await client.listModels();
             _modelsCache = { models, expiresAt: now + MODELS_CACHE_TTL_MS };
             // Fase 3.3 Optimization #2: Salvar L2 persistente async (fire-and-forget)
-            writePersistentModelCacheAsync(models);
+            if (persistentCacheEnabled) writePersistentModelCacheAsync(models);
             return models;
         } catch (e) {
             // Network falhou: try fallback L2 (mesmo que stale)
             _modelsCache = null;
+            if (!persistentCacheEnabled) throw e;
             const persistedCache = await readPersistentModelCache();
             if (persistedCache) {
                 log('WARN', `[models] Network falhou, usando cache stale do disk`);

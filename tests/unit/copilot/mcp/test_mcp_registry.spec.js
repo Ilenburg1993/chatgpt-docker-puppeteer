@@ -107,8 +107,8 @@ describe('copilot MCP registry', () => {
             const schemes = /** @type {{ type?: string }[]} */ (tool._meta?.['securitySchemes']);
             assert.ok(schemes.length > 0, `empty securitySchemes: ${tool.name}`);
             assert.ok(
-                schemes.some((scheme) => scheme.type === 'noauth'),
-                `missing noauth scheme: ${tool.name}`,
+                schemes.some((scheme) => scheme.type === 'oauth2'),
+                `missing oauth2 scheme: ${tool.name}`,
             );
         }
     });

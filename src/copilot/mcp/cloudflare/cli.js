@@ -11,6 +11,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { getCanonicalMcpTools } from '../registry.js';
+import { readMcpAuthConfig } from '../control-plane/auth.js';
 import {
     buildManagedTunnelArgs,
     buildQuickTunnelArgs,
@@ -42,6 +43,8 @@ try {
         await runUp();
     } else if (command === 'down') {
         await runDown();
+    } else if (command === 'restart') {
+        await runRestart();
     } else if (command === 'run') {
         const config = readCloudflareTunnelConfig();
         runCloudflared(
@@ -49,7 +52,7 @@ try {
             config.transportProtocol,
         );
     } else {
-        fail(`Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, up, down, or run.`);
+        fail(`Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, up, down, restart, or run.`);
     }
 } catch (error) {
     fail(error instanceof Error ? error.message : String(error));
@@ -116,16 +119,41 @@ async function runDoctor() {
  */
 async function runStatus() {
     const config = readCloudflareTunnelConfig();
+    const authConfig = readMcpAuthConfig();
     const state = await readQuickTunnelState(config.stateFile);
-    const summary = summarizeQuickTunnelState(state, Date.now(), config.staleAfterMs);
+    const quickTunnelSummary = summarizeQuickTunnelState(state, Date.now(), config.staleAfterMs);
     const configuredPublicUrlValidation = validateConfiguredPublicUrl(config);
     const permanentOk = config.mode === 'named-permanent' && configuredPublicUrlValidation?.ok === true;
     const managedProcess = await readPidFileStatus(config.managedTunnelPidFile);
     const mcpHttpProcess = await readPidFileStatus(config.mcpHttpPidFile);
+    const managedReady = permanentOk && managedProcess.alive === true && mcpHttpProcess.alive === true;
+    const fallbackReady = quickTunnelSummary.stateValid && quickTunnelSummary.processAlive;
+    const authentication = authConfig.mode === 'oauth' || authConfig.mode === 'mixed-auth' ? 'OAuth' : 'none-dev';
+    const summary =
+        config.mode === 'named-permanent'
+            ? {
+                  mode: 'named-permanent',
+                  configured: Boolean(config.publicMcpUrl),
+                  connectorUrl: config.publicMcpUrl ?? null,
+                  publicHostname: config.publicHostname,
+                  originUrl: config.originUrl,
+                  localMcpUrl: config.localMcpUrl,
+                  authentication,
+                  publicUrlValidation: configuredPublicUrlValidation ?? null,
+                  tunnelProcessAlive: managedProcess.alive,
+                  mcpHttpProcessAlive: mcpHttpProcess.alive,
+                  ready: managedReady,
+                  recommendedAction: managedReady ? 'use' : 'restart',
+                  recovery: managedReady
+                      ? []
+                      : [
+                            'Restart the permanent MCP tunnel with npm run copilot:mcp:cloudflare:restart.',
+                            'Then run npm run copilot:mcp:cloudflare:status and npm run copilot:mcp:oauth:smoke.',
+                        ],
+              }
+            : quickTunnelSummary;
     const report = {
-        ok:
-            (permanentOk && managedProcess.alive === true && mcpHttpProcess.alive === true) ||
-            (summary.stateValid && summary.processAlive),
+        ok: managedReady || fallbackReady,
         mode: config.mode,
         tunnelName: config.tunnelName,
         zone: config.zone,
@@ -139,26 +167,30 @@ async function runStatus() {
         stateFile: config.stateFile,
         originUrl: config.originUrl,
         localMcpUrl: config.localMcpUrl,
-        processAlive: summary.processAlive,
+        processAlive: config.mode === 'named-permanent' ? managedReady : quickTunnelSummary.processAlive,
         stalePolicy: {
             staleAfterMs: config.staleAfterMs,
             staleAfterMinutes: Math.round(config.staleAfterMs / 60000),
         },
         summary,
-        state: buildQuickTunnelStateReport(state),
+        temporaryFallback: {
+            stateFile: config.stateFile,
+            summary: quickTunnelSummary,
+            state: buildQuickTunnelStateReport(state),
+        },
         chatgpt: isQuickTunnelState(state)
             ? {
                   name: state.chatgpt.name,
                   description: state.chatgpt.description,
                   mcpServerUrl: config.publicMcpUrl ?? state.connectorUrl,
-                  authentication: state.chatgpt.authentication,
+                  authentication,
               }
             : {
                   name: 'Repo DevContainer MCP',
                   description:
                       'Conecta o ChatGPT ao repositório aberto no VS Code Dev Container por túnel Cloudflare permanente.',
                   mcpServerUrl: config.publicMcpUrl ?? null,
-                  authentication: 'none-dev',
+                  authentication,
               },
     };
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
@@ -310,6 +342,8 @@ async function runUp() {
             COPILOT_MCP_PUBLIC_URL: config.publicMcpUrl ?? '',
             COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: config.publicMcpUrl ?? '',
             COPILOT_MCP_CLOUDFLARE_MODE: config.mode,
+            COPILOT_MCP_AUTH_MODE: process.env['COPILOT_MCP_AUTH_MODE'] ?? 'oauth',
+            COPILOT_MCP_AUTH_ENFORCEMENT: process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] ?? 'all',
         },
     });
     const cloudflared = await ensureDetachedProcess({
@@ -347,6 +381,57 @@ async function runDown() {
     const cloudflared = await stopPidFileProcess(config.managedTunnelPidFile);
     const mcpHttp = await stopPidFileProcess(config.mcpHttpPidFile);
     process.stdout.write(`${JSON.stringify({ ok: true, cloudflared, mcpHttp }, null, 2)}\n`);
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runRestart() {
+    const config = readCloudflareTunnelConfig();
+    const stopped = {
+        cloudflared: await stopPidFileProcess(config.managedTunnelPidFile),
+        mcpHttp: await stopPidFileProcess(config.mcpHttpPidFile),
+    };
+    const mcpHttp = await ensureDetachedProcess({
+        name: 'mcp-http',
+        command: process.execPath,
+        args: ['src/copilot/mcp/index.js', '--transport', 'http'],
+        pidFile: config.mcpHttpPidFile,
+        logFile: 'src/copilot/.ai/cloudflare/mcp-http.log',
+        env: {
+            COPILOT_MCP_PUBLIC_URL: config.publicMcpUrl ?? '',
+            COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: config.publicMcpUrl ?? '',
+            COPILOT_MCP_CLOUDFLARE_MODE: config.mode,
+            COPILOT_MCP_AUTH_MODE: process.env['COPILOT_MCP_AUTH_MODE'] ?? 'oauth',
+            COPILOT_MCP_AUTH_ENFORCEMENT: process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] ?? 'all',
+        },
+    });
+    const cloudflared = await ensureDetachedProcess({
+        name: 'cloudflared',
+        command: 'cloudflared',
+        args: buildManagedTunnelArgs(process.env['CLOUDFLARE_TUNNEL_TOKEN'], config.tunnelTokenFile),
+        pidFile: config.managedTunnelPidFile,
+        logFile: 'src/copilot/.ai/cloudflare/cloudflared.log',
+        env: {
+            CLOUDFLARE_TUNNEL_TOKEN_FILE: config.tunnelTokenFile ?? '',
+            TUNNEL_TRANSPORT_PROTOCOL: config.transportProtocol,
+        },
+    });
+    process.stdout.write(
+        `${JSON.stringify(
+            {
+                ok: true,
+                mode: config.mode,
+                publicMcpUrl: config.publicMcpUrl,
+                stopped,
+                mcpHttp,
+                cloudflared,
+                next: ['npm run copilot:mcp:cloudflare:status', 'npm run copilot:mcp:cloudflare:smoke'],
+            },
+            null,
+            2,
+        )}\n`,
+    );
 }
 
 /**

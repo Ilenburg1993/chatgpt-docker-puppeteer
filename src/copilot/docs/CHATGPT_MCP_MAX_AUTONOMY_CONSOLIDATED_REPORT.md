@@ -1523,6 +1523,9 @@ Feito:
 28. `mcp_oauth_issuer_diagnostics` para checar metadata OAuth/OIDC do issuer real.
 29. Templates de env sem segredo dentro de `mcp_auth_profile`.
 30. `mcp_autonomy_power_score`.
+31. OAuth-first como postura canonica do endpoint permanente.
+32. Authorization server dev embutido no MCP permanente.
+33. Smoke OAuth automatizado com DCR, PKCE, token e tool call bearer.
 
 Faltante P0:
 
@@ -1534,8 +1537,271 @@ Faltante P1:
 
 Faltante P2:
 
-1. OAuth authorization server metadata real.
-2. Teste OAuth/JWKS real com ChatGPT.
-3. Teste real dos templates de env OAuth contra issuer escolhido apos diagnostico.
-4. Teste ChatGPT OAuth real.
-5. Dashboard visual externo, se ainda for util apos o power score read-only.
+1. Teste OAuth real com ChatGPT usando o issuer dev embutido em `https://mcp.aurelin.org`.
+2. Troca futura do issuer dev por IdP externo, se o projeto passar de dev controlado para time/prod.
+3. Teste real dos templates de env OAuth com ChatGPT.
+4. Dashboard visual externo, se ainda for util apos o power score read-only.
+
+---
+
+## 14. Virada OAuth-first — issuer dev embutido no MCP permanente
+
+Data: 2026-05-23.
+
+### 14.1. Nova decisao canonica
+
+O conector permanente deixa de ter `No authentication` como postura padrao. A nova postura
+canonica e:
+
+1. endpoint MCP:
+   - `https://mcp.aurelin.org/mcp`;
+2. autenticacao no ChatGPT:
+   - `OAuth`;
+3. resource server:
+   - `https://mcp.aurelin.org`;
+4. authorization server dev:
+   - `https://mcp.aurelin.org`;
+5. tunnel Cloudflare:
+   - `workspace-mcp-dev`;
+6. fallback:
+   - `COPILOT_MCP_AUTH_MODE=none-dev`;
+   - `COPILOT_MCP_AUTH_ENFORCEMENT=off`;
+   - usar apenas em desenvolvimento controlado.
+
+Essa decisao aumenta autonomia pratica porque o ChatGPT passa a ter um fluxo de linking OAuth
+formal, security schemes por tool, scopes claros e tokens bearer em vez de operar uma superficie
+write-heavy anonima.
+
+### 14.2. Fontes oficiais rechecadas para OAuth-first
+
+1. Apps SDK Authentication:
+   - `https://developers.openai.com/apps-sdk/build/auth`;
+   - confirma OAuth 2.1 para MCP autenticado;
+   - confirma protected resource metadata em
+     `/.well-known/oauth-protected-resource`;
+   - confirma OAuth metadata no authorization server;
+   - confirma `resource` parameter e audience do token;
+   - confirma authorization-code flow com PKCE `S256`;
+   - confirma que a UI de linking OAuth do ChatGPT depende de `securitySchemes`,
+     resource metadata e `_meta["mcp/www_authenticate"]`.
+2. Apps SDK Reference:
+   - `https://developers.openai.com/apps-sdk/reference`;
+   - confirma `outputSchema`, `structuredContent`, `securitySchemes`,
+     annotations e `_meta["mcp/www_authenticate"]`.
+3. Apps SDK Define tools:
+   - `https://developers.openai.com/apps-sdk/plan/tools`;
+   - reforca separacao read/write, hints read-only/destructive/open-world e
+     auth coerente por tool.
+4. Apps SDK Build MCP server:
+   - `https://developers.openai.com/apps-sdk/build/mcp-server`;
+   - reforca que o MCP server define tools, aplica auth e retorna structured data.
+5. Apps SDK Test your integration:
+   - `https://developers.openai.com/apps-sdk/deploy/testing`;
+   - recomenda unit tests para handlers/auth flows e MCP Inspector para depuracao.
+
+### 14.3. Auditoria local antes da implementacao OAuth-first
+
+Estado encontrado:
+
+1. `mcp_auth_profile` ja existia e reportava protected resource metadata.
+2. `authorizeMcpToolCall` ja validava bearer estatico e JWT via JWKS.
+3. `securitySchemesForMcpTool` ja mapeava:
+   - read-only -> `repo:read`;
+   - writes -> `repo:write`;
+   - validators -> `repo:validate`;
+   - destructive/admin -> `repo:admin`.
+4. O HTTP adapter ja expunha:
+   - `GET /.well-known/oauth-protected-resource`.
+5. O registry ja emitia `_meta["mcp/www_authenticate"]` quando enforcement bloqueava tool calls.
+6. Gaps reais:
+   - default ainda era `none-dev`;
+   - faltava authorization server funcional;
+   - faltavam endpoints OAuth metadata, DCR, authorize, token e JWKS;
+   - package/Makefile nao tinham fluxo OAuth canonico;
+   - `cloudflare:up` nao tinha restart explicito para deploy de mudanca de codigo;
+   - docs ainda tratavam OAuth como P2 externo, nao como default.
+
+### 14.4. Implementacao planejada
+
+Faixa OAUTH-P1 - Defaults e contrato:
+
+1. `COPILOT_MCP_AUTH_MODE=oauth` como default.
+2. `COPILOT_MCP_AUTH_ENFORCEMENT=all` como default em OAuth.
+3. `COPILOT_MCP_PUBLIC_URL=https://mcp.aurelin.org/mcp`.
+4. issuer/audience/JWKS defaults:
+   - issuer: `https://mcp.aurelin.org`;
+   - audience: `https://mcp.aurelin.org`;
+   - JWKS: `https://mcp.aurelin.org/oauth/jwks.json`.
+
+Faixa OAUTH-P2 - Authorization server dev embutido:
+
+1. `GET /.well-known/oauth-authorization-server`.
+2. `GET /.well-known/openid-configuration`.
+3. `POST /oauth/register` para DCR dev.
+4. `GET /oauth/authorize` com authorization-code + PKCE `S256`.
+5. `POST /oauth/token`.
+6. `GET /oauth/jwks.json`.
+7. Tokens RS256 de curta duracao com:
+   - `iss=https://mcp.aurelin.org`;
+   - `aud=https://mcp.aurelin.org`;
+   - `scope=repo:*` conforme request.
+
+Faixa OAUTH-P3 - Tool metadata e enforcement:
+
+1. `securitySchemes` top-level e `_meta.securitySchemes`.
+2. `oauth2` como scheme padrao no modo OAuth.
+3. `mcp/www_authenticate` em error result quando falta bearer/scope.
+4. `mcp_auth_profile` deve orientar OAuth como padrao e noauth como fallback.
+
+Faixa OAUTH-P4 - Operacao:
+
+1. `npm run copilot:mcp:oauth:smoke`.
+2. `npm run copilot:mcp:cloudflare:restart`.
+3. `make copilot-mcp-up`.
+4. `make copilot-mcp-restart`.
+5. `make copilot-mcp-oauth-smoke`.
+
+Faixa OAUTH-P5 - Validacao:
+
+1. typecheck strict `src/copilot`;
+2. lint `src/copilot`;
+3. testes unitarios MCP;
+4. unitarios completos Copilot;
+5. smoke Cloudflare;
+6. smoke OAuth;
+7. teste real no ChatGPT com Authentication=`OAuth`.
+
+### 14.5. Situacao ideal apos OAuth-first
+
+1. O usuario cria/atualiza o conector do ChatGPT com:
+   - Nome: `Repo DevContainer MCP`;
+   - URL: `https://mcp.aurelin.org/mcp`;
+   - Autenticacao: `OAuth`.
+2. O ChatGPT descobre:
+   - protected resource metadata;
+   - authorization server metadata;
+   - DCR;
+   - PKCE S256;
+   - scopes `repo:read`, `repo:write`, `repo:validate`, `repo:admin`.
+3. O MCP valida tokens antes de tool calls.
+4. O ChatGPT continua podendo pedir confirmacao para writes, mas a superficie deixa de ser anonima
+   e passa a ser governada por scopes.
+5. O fallback `none-dev` permanece possivel, mas deixa de ser recomendado.
+
+### 14.6. Resultado implementado nesta faixa
+
+Mudancas aplicadas:
+
+1. `normalizeMcpAuthMode()` passa a defaultar para `oauth`.
+2. `readMcpAuthConfig()` passa a defaultar authorization server, issuer, audience e JWKS para o
+   proprio resource `https://mcp.aurelin.org`.
+3. Criado authorization server dev embutido:
+   - `src/copilot/mcp/control-plane/dev-oauth.js`.
+4. Endpoints publicados pelo HTTP adapter:
+   - `GET /.well-known/oauth-authorization-server`;
+   - `GET /.well-known/openid-configuration`;
+   - `GET /oauth/jwks.json`;
+   - `POST /oauth/register`;
+   - `GET /oauth/authorize`;
+   - `POST /oauth/token`.
+5. O authorization server dev suporta:
+   - DCR simples;
+   - authorization-code flow;
+   - PKCE `S256`;
+   - `resource` parameter;
+   - tokens RS256 de curta duracao;
+   - JWKS publico em `/oauth/jwks.json`.
+6. O registry passa a enviar `securitySchemes` top-level e `_meta.securitySchemes`.
+7. `chatgpt_connector_profile`, `chatgpt_connector_current_url_status` e `cloudflare:status`
+   passam a refletir `OAuth` como autenticacao canonica.
+8. Criado script:
+   - `src/copilot/mcp/scripts/oauth-smoke.js`.
+9. Criado npm script:
+   - `npm run copilot:mcp:oauth:smoke`.
+10. Criado npm script:
+    - `npm run copilot:mcp:cloudflare:restart`.
+11. Criados targets Make:
+    - `make copilot-mcp-up`;
+    - `make copilot-mcp-down`;
+    - `make copilot-mcp-restart`;
+    - `make copilot-mcp-status`;
+    - `make copilot-mcp-smoke`;
+    - `make copilot-mcp-oauth-smoke`.
+12. `.env.example`, `.env.local.example`, `.env.expert.example` e `.env.schema.json` agora
+    documentam/cobrem o fluxo OAuth-first.
+13. O smoke HTTP local ficou OAuth-aware:
+    - `tools/list` e `/health` continuam obrigatorios;
+    - chamada de tool protegida e pulada quando `COPILOT_MCP_AUTH_ENFORCEMENT=all` e nao ha bearer
+      de smoke;
+    - `npm run copilot:mcp:oauth:smoke` e o verificador canonico do fluxo autenticado.
+14. `cloudflare:status` agora separa claramente:
+    - `summary.mode=named-permanent`;
+    - `summary.authentication=OAuth`;
+    - `summary.recommendedAction=use` quando `cloudflared` e `mcp-http` estao vivos;
+    - `temporaryFallback` apenas como estado legado/fallback do quick tunnel.
+15. Corrigida governanca de env:
+    - auditor de env ignora Markdown para evitar falso positivo de exemplo textual `process.env.*`;
+    - templates cobrem os knobs reais de teste/cache/terminal;
+    - schema cobre `COPILOT_SDK_ENABLED`, `COPILOT_TERMINAL_ENABLED`, `COPILOT_MODEL`,
+      `COPILOT_MODEL_PERSISTENT_CACHE_ENABLED`, `LLM_B_TERMINAL_PORT` e knobs de teste/cache.
+16. Corrigido bug de hermeticidade dos unitarios Copilot:
+    - o cache persistente de catalogo de modelos continua ativo por default em runtime normal;
+    - em `NODE_ENV=test`, o default interno desabilita L2 persistente para impedir interferencia entre
+      arquivos de teste paralelos;
+    - o knob `COPILOT_MODEL_PERSISTENT_CACHE_ENABLED=true|false` permite override explicito.
+
+Validacao live ja executada e consolidada:
+
+1. MCP/Cloudflare reiniciado com:
+   - `COPILOT_MCP_AUTH_MODE=oauth`;
+   - `COPILOT_MCP_AUTH_ENFORCEMENT=all`.
+2. `npm run copilot:mcp:oauth:smoke`: passou.
+3. O smoke OAuth confirmou:
+   - protected resource metadata HTTP 200;
+   - authorization server metadata HTTP 200;
+   - JWKS com 1 chave;
+   - DCR com `client_id`;
+   - token endpoint com bearer;
+   - chamada MCP `mcp_runtime_health` autenticada, sem JSON-RPC error.
+4. `curl https://mcp.aurelin.org/.well-known/oauth-protected-resource`: passou.
+5. `curl https://mcp.aurelin.org/.well-known/oauth-authorization-server`: passou.
+6. `npm run copilot:mcp:cloudflare:status`: passou e agora reporta:
+   - `mode=named-permanent`;
+   - `connectorUrl=https://mcp.aurelin.org/mcp`;
+   - `authentication=OAuth`;
+   - `recommendedAction=use`;
+   - `ready=true`.
+7. `npm run copilot:mcp:cloudflare:smoke`: passou com 67 tools remotas e 67 tools locais.
+8. `npm run copilot:mcp:smoke:local`: passou em modo OAuth, com runtime tool call marcada como
+   `skipped=auth-required`.
+9. `make copilot-mcp-oauth-smoke`: passou.
+10. `node scripts/env/audit-env-surface.mjs`: passou sem env descoberta fora de template.
+11. `node scripts/env/validate-env.js`: passou sem avisos de extras.
+12. `node scripts/env/check-env-local.mjs`: passou.
+13. `npm run typecheck:strict:src.copilot`: passou.
+14. `npm run lint:copilot`: passou.
+15. `npm run copilot:mcp:safe-suite -- mcp-full`: passou:
+    - typecheck;
+    - lint;
+    - 85 testes MCP.
+16. `npm run test:copilot:unit`: passou:
+    - 3084 testes;
+    - 1012 suites;
+    - 0 falhas;
+    - 0 warnings/errors unicos.
+17. Testes focados do cache/modelos SDK passaram:
+    - `test_sdk_models.spec.js`;
+    - `test_sdk_client.spec.js`;
+    - `test_persistent_model_cache.spec.js`.
+
+Roadmap restante da faixa OAuth:
+
+1. Testar no ChatGPT criando/atualizando o app com:
+   - URL: `https://mcp.aurelin.org/mcp`;
+   - Authentication: `OAuth`.
+2. Registrar comportamento real de linking, scopes e prompts no golden log.
+3. Decidir se o issuer dev embutido continua suficiente ou se a proxima faixa deve integrar IdP
+   externo.
+4. Persistir/rotacionar chaves OAuth dev se o relinking apos restart passar a ser inconveniente.
+5. Evoluir `cloudflare:smoke` para tambem executar uma tool autenticada quando houver bearer/fluxo OAuth
+   disponivel, mantendo `oauth:smoke` como verificador autoritativo.

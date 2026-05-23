@@ -9,7 +9,8 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createServer } from 'node:http';
 import { buildChatGptConnectorProfile } from '../connection/profile.js';
 import { logMcp } from '../control-plane/audit.js';
-import { buildProtectedResourceMetadata, parseBearerToken } from '../control-plane/auth.js';
+import { buildProtectedResourceMetadata, parseBearerToken, readMcpAuthConfig } from '../control-plane/auth.js';
+import { handleBuiltInDevOAuthRequest } from '../control-plane/dev-oauth.js';
 import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
 import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
 import { createCopilotMcpServer } from '../server.js';
@@ -74,6 +75,10 @@ export async function startHttpMcpServer(opts = {}) {
         if (req.method === 'GET' && url.pathname === '/.well-known/oauth-protected-resource') {
             res.writeHead(200, { 'content-type': 'application/json' });
             res.end(JSON.stringify(buildProtectedResourceMetadata(), null, 2));
+            return;
+        }
+
+        if (await handleBuiltInDevOAuthRequest(req, res, url, readMcpAuthConfig())) {
             return;
         }
 

@@ -96,6 +96,7 @@ export function registerCanonicalMcpTools(server, options = {}) {
                 inputSchema: tool.inputSchema,
                 annotations: tool.annotations,
                 ...(tool.outputSchema !== undefined ? { outputSchema: tool.outputSchema } : {}),
+                ...(tool.securitySchemes !== undefined ? { securitySchemes: tool.securitySchemes } : {}),
                 ...(tool._meta !== undefined ? { _meta: tool._meta } : {}),
             },
             async (args) => {

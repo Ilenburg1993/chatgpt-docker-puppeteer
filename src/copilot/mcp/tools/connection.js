@@ -131,7 +131,19 @@ function summarizeOAuthMetadata(metadata, requiredScopes) {
 function buildAuthEnvironmentTemplates(config) {
     const permanentMcpUrl = `${config.resource}/mcp`;
     return {
-        permanentTunnelNoAuth: {
+        permanentTunnelOAuth: {
+            COPILOT_MCP_AUTH_MODE: 'oauth',
+            COPILOT_MCP_AUTH_ENFORCEMENT: 'all',
+            COPILOT_MCP_PUBLIC_URL: permanentMcpUrl,
+            COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: permanentMcpUrl,
+            COPILOT_MCP_CLOUDFLARE_MODE: 'named-permanent',
+            COPILOT_MCP_OAUTH_ISSUER: config.resource,
+            COPILOT_MCP_OAUTH_EXPECTED_ISSUER: config.resource,
+            COPILOT_MCP_OAUTH_AUDIENCE: config.resource,
+            COPILOT_MCP_OAUTH_JWKS_URI: `${config.resource}/oauth/jwks.json`,
+            COPILOT_MCP_DEV_OAUTH_ENABLED: 'true',
+        },
+        permanentTunnelNoAuthFallback: {
             COPILOT_MCP_AUTH_MODE: 'none-dev',
             COPILOT_MCP_AUTH_ENFORCEMENT: 'off',
             COPILOT_MCP_PUBLIC_URL: permanentMcpUrl,
@@ -211,6 +223,7 @@ export const connectionTools = [
         annotations: readOnlyAnnotations(),
         handler: async () => {
             const config = readCloudflareTunnelConfig();
+            const authConfig = readMcpAuthConfig();
             const state = await readQuickTunnelState(config.stateFile);
             const temporaryTunnel = summarizeQuickTunnelState(state, Date.now(), config.staleAfterMs);
             const currentUrl = config.publicMcpUrl ?? temporaryTunnel.connectorUrl ?? null;
@@ -232,7 +245,13 @@ export const connectionTools = [
                     name: 'LLM-B Workspace MCP',
                     description: 'Repo-scoped MCP connector for src/copilot development in this workspace.',
                     mcpServerUrl: currentUrl,
-                    authentication: 'No authentication',
+                    authentication: authConfig.mode === 'oauth' || authConfig.mode === 'mixed-auth' ? 'OAuth' : 'No authentication',
+                },
+                auth: {
+                    mode: authConfig.mode,
+                    enforcement: authConfig.enforcement,
+                    protectedResourceMetadataUrl: authConfig.protectedResourceMetadataUrl,
+                    authorizationServersConfigured: authConfig.authorizationServers.length > 0,
                 },
                 temporaryTunnel,
                 permanentTunnel: {
@@ -282,8 +301,8 @@ export const connectionTools = [
                 nextSteps:
                     config.enforcement === 'off'
                         ? [
-                              'Keep ChatGPT connector authentication as No authentication for controlled temporary-tunnel development.',
-                              'Set COPILOT_MCP_AUTH_MODE=mixed-auth and COPILOT_MCP_AUTH_ENFORCEMENT=write when testing scoped write auth.',
+                              'Use OAuth as the default for the permanent Cloudflare endpoint.',
+                              'Use No authentication only with COPILOT_MCP_AUTH_MODE=none-dev for controlled fallback testing.',
                           ]
                         : [
                               'Confirm the authorization server publishes OAuth metadata.',

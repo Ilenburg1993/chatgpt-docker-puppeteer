@@ -24,6 +24,10 @@ import {
     scopesForMcpTool,
     securitySchemesForMcpTool,
 } from '../../../../src/copilot/mcp/control-plane/auth.js';
+import {
+    buildBuiltInDevOAuthMetadata as buildDevOAuthServerMetadata,
+    isBuiltInDevOAuthEnabled as isDevOAuthServerEnabled,
+} from '../../../../src/copilot/mcp/control-plane/dev-oauth.js';
 import { getCanonicalMcpTools } from '../../../../src/copilot/mcp/registry.js';
 
 describe('copilot MCP ChatGPT connection profile', () => {
@@ -41,10 +45,10 @@ describe('copilot MCP ChatGPT connection profile', () => {
         const profile = buildChatGptConnectorProfile({ publicMcpUrl: 'https://example.com/tunnel' });
         assert.equal(profile.name, 'Repo DevContainer MCP');
         assert.equal(profile.connectorUrl, 'https://example.com/tunnel/mcp');
-        assert.equal(profile.authMode, 'none-dev');
-        assert.equal(profile.authReadiness.mode, 'none-dev');
+        assert.equal(profile.authMode, 'oauth');
+        assert.equal(profile.authReadiness.mode, 'oauth');
         assert.equal(profile.chatgptFormFields.mcpServerUrl, 'https://example.com/tunnel/mcp');
-        assert.match(profile.chatgptFormFields.authentication, /Sem autenticacao/);
+        assert.equal(profile.chatgptFormFields.authentication, 'OAuth');
         assert.ok(profile.description.includes('Dev Container'));
         assert.ok(profile.smokePrompts.some((prompt) => prompt.includes('repo_status')));
         assert.ok(profile.smokePrompts.some((prompt) => prompt.includes('lastSmokeOk')));
@@ -83,6 +87,24 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.deepEqual(metadata.authorization_servers, ['https://auth.example.com']);
         assert.ok(/** @type {string[]} */ (metadata.scopes_supported).includes('repo:read'));
         assert.match(buildWwwAuthenticateChallenge(['repo:read'], config), /resource_metadata="https:\/\/example\.com/);
+    });
+
+    it('defaults OAuth to the built-in development issuer on the MCP resource', () => {
+        const config = readMcpAuthConfig({
+            COPILOT_MCP_PUBLIC_URL: 'https://mcp.aurelin.org/mcp',
+        });
+        assert.equal(config.mode, 'oauth');
+        assert.equal(config.enforcement, 'all');
+        assert.deepEqual(config.authorizationServers, ['https://mcp.aurelin.org']);
+        assert.equal(config.expectedIssuer, 'https://mcp.aurelin.org');
+        assert.equal(config.expectedAudience, 'https://mcp.aurelin.org');
+        assert.equal(config.jwksUri, 'https://mcp.aurelin.org/oauth/jwks.json');
+        assert.equal(isDevOAuthServerEnabled(config), true);
+        const metadata = buildDevOAuthServerMetadata(config);
+        assert.equal(metadata.issuer, 'https://mcp.aurelin.org');
+        assert.equal(metadata.authorization_endpoint, 'https://mcp.aurelin.org/oauth/authorize');
+        assert.equal(metadata.token_endpoint, 'https://mcp.aurelin.org/oauth/token');
+        assert.equal(metadata.jwks_uri, 'https://mcp.aurelin.org/oauth/jwks.json');
     });
 
     it('maps tool annotations to planned OAuth scopes and mixed security schemes', () => {

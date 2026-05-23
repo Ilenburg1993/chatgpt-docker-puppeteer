@@ -34,10 +34,10 @@ https://mcp.aurelin.org/mcp
 Cloudflare Tunnel permanente:
 
 ```bash
-npm run copilot:mcp:http
-npm run copilot:mcp:smoke:local
 npm run copilot:mcp:cloudflare:doctor
-CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token npm run copilot:mcp:cloudflare:up
+COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all \
+  CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token \
+  npm run copilot:mcp:cloudflare:up
 ```
 
 Em outro terminal:
@@ -45,9 +45,11 @@ Em outro terminal:
 ```bash
 npm run copilot:mcp:cloudflare:status
 npm run copilot:mcp:cloudflare:smoke
+npm run copilot:mcp:oauth:smoke
 ```
 
 `status` mostra a URL permanente `https://mcp.aurelin.org/mcp` para colar no ChatGPT.
+O modo canônico de autenticação é `OAuth`; `none-dev` fica apenas como fallback controlado.
 Quick Tunnel continua disponivel como fallback explicito:
 
 ```bash

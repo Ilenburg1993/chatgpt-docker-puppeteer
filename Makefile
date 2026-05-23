@@ -200,6 +200,9 @@ help:
 	@echo "  $(CYAN)make validate-platform$(NC)     Validação consolidada de plataforma/CI"
 	@echo "  $(CYAN)make validate-git$(NC)      Validar configurações Git"
 	@echo "  $(CYAN)make mcp-diagnose$(NC)      Diagnóstico MCP (RAG/LSP/Ollama)"
+	@echo "  $(CYAN)make copilot-mcp-up$(NC)    Sobe MCP OAuth + Cloudflare permanente"
+	@echo "  $(CYAN)make copilot-mcp-restart$(NC) Reinicia MCP OAuth + Cloudflare"
+	@echo "  $(CYAN)make copilot-mcp-oauth-smoke$(NC) Smoke OAuth canônico do MCP público"
 	@echo "  $(CYAN)make lsp-health$(NC)        Diagnóstico funcional LSP via MCP"
 	@echo "  $(CYAN)make semantic-preflight$(NC) Preflight PM2+MCP+RAG+LSP"
 	@echo ""
@@ -1177,7 +1180,7 @@ test-all: test test-unit test-integration test-e2e
 # 9️⃣.1 RAG & MCP
 # =============================================================================
 
-.PHONY: mcp-diagnose lsp-health semantic-preflight rag-help audit-help rag-preflight rag-health rag-index rag-index-code-config rag-index-docs rag-ask rag-hybrid rag-expand rag-reset rag-watch rag-full-rebuild rag-rebuild-zero rag-rebuild-code-config rag-rebuild-code-config-strict
+.PHONY: mcp-diagnose copilot-mcp-up copilot-mcp-down copilot-mcp-restart copilot-mcp-status copilot-mcp-smoke copilot-mcp-oauth-smoke lsp-health semantic-preflight rag-help audit-help rag-preflight rag-health rag-index rag-index-code-config rag-index-docs rag-ask rag-hybrid rag-expand rag-reset rag-watch rag-full-rebuild rag-rebuild-zero rag-rebuild-code-config rag-rebuild-code-config-strict
 
 rag-help:
 	@echo ""
@@ -1219,6 +1222,30 @@ rag-preflight:
 mcp-diagnose:
 	@echo "$(CYAN)🔍 Diagnóstico MCP$(NC)"
 	@$(NPM) run mcp:diagnose
+
+copilot-mcp-up:
+	@echo "$(CYAN)🔐 Subindo MCP OAuth + Cloudflare permanente$(NC)"
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:up
+
+copilot-mcp-down:
+	@echo "$(CYAN)🛑 Encerrando MCP + Cloudflare permanente$(NC)"
+	@$(NPM) run copilot:mcp:cloudflare:down
+
+copilot-mcp-restart:
+	@echo "$(CYAN)🔁 Reiniciando MCP OAuth + Cloudflare permanente$(NC)"
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:restart
+
+copilot-mcp-status:
+	@echo "$(CYAN)📡 Status MCP + Cloudflare permanente$(NC)"
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:status
+
+copilot-mcp-smoke:
+	@echo "$(CYAN)🧪 Smoke MCP tools/list público$(NC)"
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:smoke
+
+copilot-mcp-oauth-smoke:
+	@echo "$(CYAN)🔐 Smoke OAuth MCP público$(NC)"
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all $(NPM) run copilot:mcp:oauth:smoke
 
 lsp-health:
 	@echo "$(CYAN)🔍 Diagnóstico funcional LSP$(NC)"

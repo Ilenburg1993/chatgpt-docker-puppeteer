@@ -10,6 +10,7 @@ if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const SCAN_ROOTS = ['src', 'scripts', '.devcontainer'];
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.git']);
+const SKIP_EXTENSIONS = new Set(['.md', '.mdx']);
 const TEMPLATE_FILES = ['.env.example', '.env.local.example', '.env.expert.example'];
 const RUNTIME_ONLY = new Set([
     'FORCE_COLOR',
@@ -55,6 +56,9 @@ function walk(/** @type {string} */ dirPath, /** @type {string[]} */ files = [])
             continue;
         }
         if (entry.isFile()) {
+            if (SKIP_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
+                continue;
+            }
             files.push(abs);
         }
     }

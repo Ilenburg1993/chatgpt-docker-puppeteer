@@ -7,6 +7,7 @@
 
 import { pathToFileURL } from 'node:url';
 import { normalizeMcpUrl } from '../connection/profile.js';
+import { readMcpAuthConfig } from '../control-plane/auth.js';
 import { getCanonicalMcpTools } from '../registry.js';
 
 const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:3333/mcp';
@@ -17,6 +18,8 @@ const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:3333/mcp';
  * @property {number} [status]
  * @property {unknown} [body]
  * @property {string} [error]
+ * @property {boolean} [skipped]
+ * @property {string} [reason]
  */
 
 /**
@@ -26,12 +29,27 @@ const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:3333/mcp';
 export async function runMcpHttpSmoke(options = {}) {
     const mcpUrl = normalizeMcpUrl(options.mcpUrl ?? process.env['COPILOT_MCP_SMOKE_URL'] ?? DEFAULT_LOCAL_MCP_URL);
     const originUrl = mcpUrl.replace(/\/mcp$/, '');
+    const authConfig = readMcpAuthConfig();
+    const bearerToken = readSmokeBearerToken();
     const health = await probeJson(`${originUrl}/health`, { method: 'GET' });
     const toolsList = await callJsonRpc(mcpUrl, 1, 'tools/list', {});
-    const runtimeHealth = await callJsonRpc(mcpUrl, 2, 'tools/call', {
-        name: 'mcp_runtime_health',
-        arguments: {},
-    });
+    const runtimeHealth =
+        authConfig.enforcement !== 'off' && !bearerToken
+            ? {
+                  ok: true,
+                  skipped: true,
+                  reason: 'auth-required',
+              }
+            : await callJsonRpc(
+                  mcpUrl,
+                  2,
+                  'tools/call',
+                  {
+                      name: 'mcp_runtime_health',
+                      arguments: {},
+                  },
+                  bearerToken,
+              );
     const remoteToolNames = extractMcpToolNames(toolsList.body);
     const expectedToolNames = getCanonicalMcpTools()
         .map((tool) => tool.name)
@@ -54,6 +72,8 @@ export async function runMcpHttpSmoke(options = {}) {
             ok: runtimeToolOk,
             status: runtimeHealth.status ?? null,
             hasJsonRpcError: hasJsonRpcError(runtimeHealth.body),
+            skipped: 'skipped' in runtimeHealth ? runtimeHealth.skipped : false,
+            reason: 'reason' in runtimeHealth ? runtimeHealth.reason : null,
         },
     };
     return report;
@@ -119,17 +139,28 @@ async function probeJson(url, init) {
  * @param {number} id
  * @param {string} method
  * @param {Record<string, unknown>} params
+ * @param {string | undefined} [bearerToken]
  * @returns {Promise<ProbeResult>}
  */
-async function callJsonRpc(mcpUrl, id, method, params) {
+async function callJsonRpc(mcpUrl, id, method, params, bearerToken) {
     return probeJson(mcpUrl, {
         method: 'POST',
         headers: {
+            ...(bearerToken ? { authorization: `Bearer ${bearerToken}` } : {}),
             'content-type': 'application/json',
             accept: 'application/json, text/event-stream',
         },
         body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
     });
+}
+
+/**
+ * @returns {string | undefined}
+ */
+function readSmokeBearerToken() {
+    const raw = process.env['COPILOT_MCP_SMOKE_BEARER_TOKEN'] ?? process.env['COPILOT_MCP_STATIC_BEARER_TOKEN'];
+    const token = String(raw ?? '').trim();
+    return token || undefined;
 }
 
 /**

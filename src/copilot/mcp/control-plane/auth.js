@@ -4,7 +4,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 /**
  * MCP auth metadata and scope planning.
  *
- * This module prepares Apps SDK/OAuth metadata without forcing auth in the current temporary-tunnel development mode.
+ * This module prepares Apps SDK/OAuth metadata for the canonical ChatGPT MCP connector.
  *
  * @module copilot/mcp/control-plane/auth
  */
@@ -60,13 +60,16 @@ const REMOTE_JWKS_CACHE = new Map();
  * @returns {McpAuthMode}
  */
 export function normalizeMcpAuthMode(value) {
-    const normalized = String(value ?? 'none-dev')
+    const normalized = String(value ?? 'oauth')
         .trim()
         .toLowerCase();
     if (normalized === 'oauth' || normalized === 'team-oauth') return 'oauth';
     if (normalized === 'mixed' || normalized === 'mixed-auth' || normalized === 'dev-mixed-auth') return 'mixed-auth';
     if (normalized === 'secure-mcp-tunnel') return 'secure-mcp-tunnel';
-    return 'none-dev';
+    if (normalized === 'none' || normalized === 'noauth' || normalized === 'none-dev' || normalized === 'dev-noauth') {
+        return 'none-dev';
+    }
+    return 'oauth';
 }
 
 /**
@@ -116,11 +119,22 @@ function splitCsv(value) {
 export function readMcpAuthConfig(env = process.env) {
     const mode = normalizeMcpAuthMode(env['COPILOT_MCP_AUTH_MODE'] ?? env['COPILOT_MCP_CHATGPT_AUTH_MODE']);
     const resource = normalizeResourceUrl(env['COPILOT_MCP_PUBLIC_URL'] ?? env['COPILOT_MCP_CLOUDFLARE_PUBLIC_URL']);
-    const authorizationServers = splitCsv(
+    const configuredAuthorizationServers = splitCsv(
         env['COPILOT_MCP_OAUTH_AUTHORIZATION_SERVERS'] ?? env['COPILOT_MCP_OAUTH_ISSUER'],
     );
+    const authorizationServers =
+        configuredAuthorizationServers.length > 0
+            ? configuredAuthorizationServers
+            : mode === 'oauth' || mode === 'mixed-auth'
+              ? [resource]
+              : [];
     const expectedIssuer = env['COPILOT_MCP_OAUTH_EXPECTED_ISSUER'] ?? authorizationServers[0] ?? '';
     const expectedAudience = env['COPILOT_MCP_OAUTH_AUDIENCE'] ?? resource;
+    const defaultJwksUri = expectedIssuer
+        ? expectedIssuer === resource
+            ? `${resource}/oauth/jwks.json`
+            : `${expectedIssuer}/.well-known/jwks.json`
+        : '';
     return {
         mode,
         resource,
@@ -132,7 +146,7 @@ export function readMcpAuthConfig(env = process.env) {
         enforcement: normalizeMcpAuthEnforcement(env['COPILOT_MCP_AUTH_ENFORCEMENT'], mode),
         expectedIssuer,
         expectedAudience,
-        jwksUri: env['COPILOT_MCP_OAUTH_JWKS_URI'] ?? (expectedIssuer ? `${expectedIssuer}/.well-known/jwks.json` : ''),
+        jwksUri: env['COPILOT_MCP_OAUTH_JWKS_URI'] ?? defaultJwksUri,
         staticBearerConfigured: typeof env['COPILOT_MCP_STATIC_BEARER_TOKEN'] === 'string' && env['COPILOT_MCP_STATIC_BEARER_TOKEN'].length > 0,
     };
 }
