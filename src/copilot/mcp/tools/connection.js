@@ -129,25 +129,34 @@ function summarizeOAuthMetadata(metadata, requiredScopes) {
  * @returns {Record<string, Record<string, string>>}
  */
 function buildAuthEnvironmentTemplates(config) {
+    const permanentMcpUrl = `${config.resource}/mcp`;
     return {
+        permanentTunnelNoAuth: {
+            COPILOT_MCP_AUTH_MODE: 'none-dev',
+            COPILOT_MCP_AUTH_ENFORCEMENT: 'off',
+            COPILOT_MCP_PUBLIC_URL: permanentMcpUrl,
+            COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: permanentMcpUrl,
+            COPILOT_MCP_CLOUDFLARE_MODE: 'named-permanent',
+        },
         temporaryTunnelNoAuth: {
             COPILOT_MCP_AUTH_MODE: 'none-dev',
             COPILOT_MCP_AUTH_ENFORCEMENT: 'off',
-            COPILOT_MCP_PUBLIC_URL: config.resource === 'https://<endpoint-do-tunel>' ? 'https://<trycloudflare-host>/mcp' : `${config.resource}/mcp`,
+            COPILOT_MCP_PUBLIC_URL: 'https://<trycloudflare-host>/mcp',
+            COPILOT_MCP_CLOUDFLARE_MODE: 'temporary-quick',
         },
         mixedAuthWriteTest: {
             COPILOT_MCP_AUTH_MODE: 'mixed-auth',
             COPILOT_MCP_AUTH_ENFORCEMENT: 'write',
-            COPILOT_MCP_PUBLIC_URL: config.resource === 'https://<endpoint-do-tunel>' ? 'https://<trycloudflare-host>/mcp' : `${config.resource}/mcp`,
+            COPILOT_MCP_PUBLIC_URL: permanentMcpUrl,
             COPILOT_MCP_STATIC_BEARER_TOKEN: '<local-dev-token-not-committed>',
         },
         oauthJwks: {
             COPILOT_MCP_AUTH_MODE: 'oauth',
             COPILOT_MCP_AUTH_ENFORCEMENT: 'all',
-            COPILOT_MCP_PUBLIC_URL: config.resource === 'https://<endpoint-do-tunel>' ? 'https://<trycloudflare-host>/mcp' : `${config.resource}/mcp`,
+            COPILOT_MCP_PUBLIC_URL: permanentMcpUrl,
             COPILOT_MCP_OAUTH_ISSUER: 'https://<issuer>',
             COPILOT_MCP_OAUTH_EXPECTED_ISSUER: 'https://<issuer>',
-            COPILOT_MCP_OAUTH_AUDIENCE: config.resource === 'https://<endpoint-do-tunel>' ? 'https://<trycloudflare-host>' : config.resource,
+            COPILOT_MCP_OAUTH_AUDIENCE: config.resource,
             COPILOT_MCP_OAUTH_JWKS_URI: 'https://<issuer>/.well-known/jwks.json',
         },
     };
@@ -204,14 +213,14 @@ export const connectionTools = [
             const config = readCloudflareTunnelConfig();
             const state = await readQuickTunnelState(config.stateFile);
             const temporaryTunnel = summarizeQuickTunnelState(state, Date.now(), config.staleAfterMs);
-            const currentUrl = temporaryTunnel.connectorUrl ?? config.publicMcpUrl ?? null;
+            const currentUrl = config.publicMcpUrl ?? temporaryTunnel.connectorUrl ?? null;
             const validation = currentUrl
                 ? validatePublicConnectorUrl(currentUrl)
                 : (validateConfiguredPublicUrl(config) ?? { ok: false, reason: 'No public MCP URL is configured.' });
-            const source = temporaryTunnel.connectorUrl
-                ? 'quick-tunnel-state'
-                : config.publicMcpUrl
-                  ? 'environment'
+            const source = config.publicMcpUrl
+                ? 'permanent-config'
+                : temporaryTunnel.connectorUrl
+                  ? 'quick-tunnel-state'
                   : 'missing';
 
             return okResult({
@@ -226,6 +235,14 @@ export const connectionTools = [
                     authentication: 'No authentication',
                 },
                 temporaryTunnel,
+                permanentTunnel: {
+                    mode: config.mode,
+                    tunnelName: config.tunnelName,
+                    zone: config.zone,
+                    publicHostname: config.publicHostname,
+                    tokenPresent: config.hasTunnelToken,
+                    tokenFilePresent: config.hasTunnelTokenFile,
+                },
                 originUrl: config.originUrl,
                 localMcpUrl: config.localMcpUrl,
                 stateFile: config.stateFile,

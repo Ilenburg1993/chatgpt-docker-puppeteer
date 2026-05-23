@@ -1327,7 +1327,122 @@ Pendencias da Faixa I:
 
 ---
 
-## 12. Estado feito vs faltante apos a nova auditoria
+## 12. Virada para Cloudflare Tunnel permanente — aurelin.org
+
+Data: 2026-05-23.
+
+Decisao atual:
+
+1. O modo padrao deixa de ser `trycloudflare.com` temporario.
+2. O dominio permanente e `aurelin.org`.
+3. O tunnel remoto Cloudflare se chama `workspace-mcp-dev`.
+4. A URL canonica para o ChatGPT passa a ser:
+   - `https://workspace-mcp-dev.aurelin.org/mcp`
+5. O origin local permanece:
+   - `http://127.0.0.1:3333`
+6. O serviço publicado no Cloudflare deve apontar para o origin raiz, nao para `/mcp`.
+7. O path `/mcp` continua sendo responsabilidade do ChatGPT e do MCP HTTP adapter.
+
+Fontes oficiais Cloudflare rechecadas:
+
+1. `https://developers.cloudflare.com/tunnel/setup/`
+   - Confirma que tunnels remotos podem rodar por token e que Quick Tunnels sao apenas para
+     desenvolvimento/testes.
+2. `https://developers.cloudflare.com/tunnel/advanced/tunnel-tokens/`
+   - Confirma que qualquer pessoa com o tunnel token pode rodar o tunnel; portanto o token nao
+     deve ser versionado nem impresso.
+3. `https://developers.cloudflare.com/tunnel/advanced/run-parameters/`
+   - Confirma `cloudflared tunnel run --token <TOKEN>` e `--token-file <PATH>` para
+     tunnels remotamente gerenciados.
+4. `https://developers.cloudflare.com/tunnel/routing/`
+   - Confirma o modelo public hostname -> local service.
+5. `https://developers.cloudflare.com/tunnel/`
+   - Confirma que `cloudflared` cria conexao outbound, sem portas inbound no Dev Container.
+
+Estado local investigado:
+
+1. `cloudflared` ja esta instalado no Dev Container.
+2. Versao observada:
+   - `cloudflared version 2026.5.0`.
+3. Usuario atual:
+   - `node`.
+4. Ambiente:
+   - WSL2/devcontainer Linux.
+5. Como `systemd`/servico pode nao ser confiavel dentro do Dev Container, o caminho operacional
+   preferido no workspace e:
+   - MCP HTTP em um processo;
+   - `cloudflared tunnel run` em outro processo;
+   - token armazenado em arquivo local ignorado pelo Git.
+
+Mudancas estruturais aplicadas:
+
+1. Defaults de Cloudflare passam a ser:
+   - `COPILOT_MCP_CLOUDFLARE_MODE=named-permanent`;
+   - `COPILOT_MCP_CLOUDFLARE_TUNNEL_NAME=workspace-mcp-dev`;
+   - `COPILOT_MCP_CLOUDFLARE_ZONE=aurelin.org`;
+   - `COPILOT_MCP_CLOUDFLARE_PUBLIC_HOSTNAME=workspace-mcp-dev.aurelin.org`;
+   - `COPILOT_MCP_CLOUDFLARE_PUBLIC_URL=https://workspace-mcp-dev.aurelin.org/mcp`;
+   - `COPILOT_MCP_CLOUDFLARE_ORIGIN_URL=http://127.0.0.1:3333`.
+2. O CLI `npm run copilot:mcp:cloudflare:run` agora aceita:
+   - `CLOUDFLARE_TUNNEL_TOKEN`;
+   - `CLOUDFLARE_TUNNEL_TOKEN_FILE`.
+3. O caminho preferido e `CLOUDFLARE_TUNNEL_TOKEN_FILE`, para reduzir risco de vazamento em
+   historico de shell.
+4. `mcp_tunnel_status`, `mcp_runtime_health`, `mcp_smoke_workspace`, `mcp_session_profile`,
+   `chatgpt_connector_profile` e `chatgpt_connector_current_url_status` passam a tratar o
+   tunnel permanente como fonte primaria.
+5. Quick Tunnel continua disponivel como fallback:
+   - `COPILOT_MCP_CLOUDFLARE_MODE=temporary-quick npm run copilot:mcp:cloudflare:quick`.
+
+Runbook permanente atual:
+
+1. Criar arquivo local de token:
+   - `src/copilot/.ai/cloudflare/workspace-mcp-dev.token`
+2. O conteudo do arquivo deve ser somente o token gerado pela tela Cloudflare.
+3. Nunca versionar esse arquivo.
+4. Rodar MCP HTTP:
+   - `npm run copilot:mcp:http`
+5. Em outro processo, rodar o tunnel:
+   - `CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token npm run copilot:mcp:cloudflare:run`
+6. No Cloudflare, confirmar que o tunnel `workspace-mcp-dev` detecta conexao ativa.
+7. Publicar hostname:
+   - hostname: `workspace-mcp-dev.aurelin.org`;
+   - service/origin: `http://127.0.0.1:3333`.
+8. Rodar smoke:
+   - `npm run copilot:mcp:cloudflare:smoke`
+9. No ChatGPT, usar:
+   - nome: `Repo DevContainer MCP`;
+   - URL: `https://workspace-mcp-dev.aurelin.org/mcp`;
+   - autenticacao atual: sem autenticacao / desenvolvimento controlado.
+
+Pendencias externas:
+
+1. Confirmar no dashboard Cloudflare que a conexao do tunnel foi detectada.
+   - Estado local: conexao registrada pelo `cloudflared` com quatro conexoes `http2`.
+2. Confirmar rota/public hostname em `workspace-mcp-dev.aurelin.org`.
+   - Estado local em 2026-05-23: `curl https://workspace-mcp-dev.aurelin.org/health`
+     ainda falha com DNS `Could not resolve host`, logo falta publicar/propagar o hostname.
+3. Rodar smoke externo contra `/health` e `/mcp` depois que DNS resolver.
+4. Atualizar o conector no ChatGPT para a URL permanente.
+5. Rodar teste real no ChatGPT com `mcp_tunnel_status`, `repo_status`, `mcp_autonomy_power_score`
+   e `mcp_run_safe_validation_suite`.
+
+Validacao local desta virada:
+
+1. `node scripts/env/validate-env.js`: passou.
+2. `node scripts/env/check-env-local.mjs`: passou.
+3. `node scripts/env/audit-env-surface.mjs`: falhou por lacunas preexistentes fora desta frente
+   (`COPILOT_SDK_ENABLED`, `COPILOT_TEST_*`, `ENABLE_AUDIT_AGENT_PM2_PROCESSES`,
+   `LLM_B_TERMINAL_PORT`, `LSP_`, `NODE_COMPILE_CACHE`, `XDG_CACHE_HOME`); as novas variaveis
+   Cloudflare ficaram cobertas por templates/schema.
+4. `npm run typecheck:strict:src.copilot`: passou.
+5. `npm run lint:copilot`: passou.
+6. `npm run copilot:mcp:safe-suite -- mcp-full`: passou com 83 testes MCP.
+7. `npm run test:copilot:unit`: passou com 3082 testes.
+8. `npm run copilot:mcp:cloudflare:status`: passou com `named-permanent`, MCP HTTP vivo e
+   `cloudflared` vivo.
+
+## 13. Estado feito vs faltante apos a nova auditoria
 
 Feito:
 
@@ -1342,8 +1457,8 @@ Feito:
 9. `delegate_to_repo_autonomy_runner`.
 10. `mcp_run_safe_validation_suite`.
 11. Quarantine/restore/list/inspect.
-12. Temporary Cloudflare tunnel workflow.
-13. Testes MCP e unitarios passando no ultimo ciclo.
+12. Cloudflare permanent tunnel workflow como padrao; Quick Tunnel como fallback.
+13. Testes MCP e unitarios passando no ultimo ciclo: 83 MCP e 3082 unitarios.
 14. `outputSchema` registry-wide.
 15. `_meta.securitySchemes` registry-wide para perfil dev `noauth`.
 16. Plan-only read-only tools para patch/create/quarantine/move/index/validation.

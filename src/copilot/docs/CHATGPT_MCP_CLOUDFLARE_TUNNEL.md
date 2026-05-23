@@ -4,7 +4,9 @@
 **Escopo:** `src/copilot/`  
 **Origin local:** `http://127.0.0.1:3333`  
 **Endpoint MCP local:** `http://127.0.0.1:3333/mcp`  
-**Endpoint MCP publico esperado:** `https://<aleatorio>.trycloudflare.com/mcp`
+**Tunnel Cloudflare padrao:** `workspace-mcp-dev`  
+**Dominio Cloudflare:** `aurelin.org`  
+**Endpoint MCP publico esperado:** `https://workspace-mcp-dev.aurelin.org/mcp`
 
 ---
 
@@ -84,14 +86,14 @@ https://developers.cloudflare.com/tunnel/downloads/
 O servidor MCP atual usa Streamable HTTP e o adapter local responde JSON para chamadas usuais de
 smoke.
 
-1. Quick Tunnel e o caminho principal deste projeto por enquanto.
-2. Cada sessao gera uma URL nova `trycloudflare.com`, que deve ser colada novamente no ChatGPT.
+1. Tunnel permanente e o caminho principal deste projeto a partir de 2026-05-23.
+2. O tunnel remoto se chama `workspace-mcp-dev`.
+3. O hostname publico canonico e `workspace-mcp-dev.aurelin.org`.
 3. A rota Cloudflare deve mapear o origin raiz `http://127.0.0.1:3333`.
-4. O campo ChatGPT deve receber o endpoint publico temporario
-   `https://<aleatorio>.trycloudflare.com/mcp`.
+4. O campo ChatGPT deve receber o endpoint publico permanente
+   `https://workspace-mcp-dev.aurelin.org/mcp`.
 5. Cloudflare Tunnel sozinho nao adiciona OAuth ao MCP.
-6. Tunnel publicado com hostname estavel fica documentado como caminho futuro opcional, nao como
-   requisito atual.
+6. Quick Tunnel `trycloudflare.com` permanece como fallback operacional explicito, nao como padrao.
 
 ---
 

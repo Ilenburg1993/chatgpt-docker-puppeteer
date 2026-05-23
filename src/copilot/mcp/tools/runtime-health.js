@@ -102,12 +102,15 @@ export const mcpRuntimeHealthTool = {
             warnings.push('Shared IO index is available but empty; refresh it before indexed search.');
         if (indexAutoBuild.status === 'failed') critical.push('MCP index auto-build failed.');
         if (indexAutoBuild.status === 'running') warnings.push('MCP index auto-build is currently running.');
-        if (!tunnel.configured)
+        if (tunnelConfig.mode === 'temporary-quick' && !tunnel.configured) {
             warnings.push('No saved Cloudflare quick tunnel state; start a temporary tunnel for ChatGPT.');
-        if (tunnel.configured && !tunnel.processAlive) {
+        }
+        if (tunnelConfig.mode === 'temporary-quick' && tunnel.configured && !tunnel.processAlive) {
             warnings.push('Saved Cloudflare quick tunnel process is not alive; start a fresh temporary tunnel.');
         }
-        if (tunnel.stale) warnings.push('Temporary Cloudflare tunnel is stale; run cloudflare smoke before reuse.');
+        if (tunnelConfig.mode === 'temporary-quick' && tunnel.stale) {
+            warnings.push('Temporary Cloudflare tunnel is stale; run cloudflare smoke before reuse.');
+        }
         if (tunnel.lastSmokeOk === null)
             warnings.push('No Cloudflare smoke result is recorded for the current tunnel.');
         if (tunnel.lastSmokeOk === false) critical.push('Last Cloudflare smoke failed.');
@@ -134,10 +137,14 @@ export const mcpRuntimeHealthTool = {
                 indexAutoBuild,
                 lastWorkspaceSmoke,
                 tunnel: {
+                    mode: tunnelConfig.mode,
+                    publicMcpUrl: tunnelConfig.publicMcpUrl ?? tunnel.connectorUrl ?? null,
+                    tunnelName: tunnelConfig.tunnelName,
                     configured: tunnel.configured,
                     processAlive: tunnel.processAlive,
                     stale: tunnel.stale,
-                    recommendedAction: tunnel.recommendedAction,
+                    recommendedAction:
+                        tunnelConfig.mode === 'named-permanent' ? 'use-permanent-hostname' : tunnel.recommendedAction,
                     lastSmokeOk: tunnel.lastSmokeOk,
                     lastSmokeAgeMinutes: tunnel.lastSmokeAgeMinutes,
                 },

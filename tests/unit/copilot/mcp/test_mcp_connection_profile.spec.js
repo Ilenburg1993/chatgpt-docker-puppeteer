@@ -54,7 +54,7 @@ describe('copilot MCP ChatGPT connection profile', () => {
         const runbook = buildSecureTunnelRunbook({ tunnelId: 'tunnel_test', localMcpUrl: 'http://127.0.0.1:3333' });
         assert.ok(runbook.httpTunnelCommands.join('\n').includes('--mcp-server-url http://127.0.0.1:3333/mcp'));
         assert.ok(runbook.stdioTunnelCommands.join('\n').includes('--mcp-command'));
-        assert.equal(runbook.chatgptUrl, 'https://<endpoint-do-tunel>/mcp');
+        assert.equal(runbook.chatgptUrl, 'https://workspace-mcp-dev.aurelin.org/mcp');
     });
 
     it('builds Cloudflare tunnel commands around the MCP origin root', () => {
@@ -66,8 +66,8 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.equal(runbook.chatgptUrl, 'https://repo-mcp.example.com/mcp');
         assert.ok(runbook.quickTunnelCommands.includes('npm run copilot:mcp:cloudflare:quick'));
         assert.ok(runbook.quickTunnelCommands.includes('npm run copilot:mcp:cloudflare:smoke'));
-        assert.ok(runbook.notes.some((note) => note.includes('trycloudflare.com')));
-        assert.ok(runbook.notes.some((note) => note.includes('lastSmokeOk')));
+        assert.ok(runbook.notes.some((note) => note.includes('domínio permanente')));
+        assert.ok(runbook.notes.some((note) => note.includes('Quick Tunnel')));
         assert.ok(runbook.notes.some((note) => note.includes('origin HTTP raiz')));
     });
 

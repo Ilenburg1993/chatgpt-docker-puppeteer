@@ -8,7 +8,8 @@
 import { readMcpAuthConfig } from '../control-plane/auth.js';
 
 const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:3333/mcp';
-const DEFAULT_PUBLIC_MCP_URL = 'https://<endpoint-do-tunel>/mcp';
+const DEFAULT_PUBLIC_MCP_URL = 'https://workspace-mcp-dev.aurelin.org/mcp';
+const DEFAULT_CLOUDFLARE_ORIGIN_URL = 'http://127.0.0.1:3333';
 
 export const CHATGPT_CONNECTOR_NAME = 'Repo DevContainer MCP';
 
@@ -108,7 +109,7 @@ export function buildChatGptConnectorProfile(options = {}) {
             'Chame delegate_to_repo_autonomy_runner mission=diagnose-mcp dryRun=true.',
             'Chame mcp_tools_status e identifique tools read-only, bounded-write e destructive.',
             'Antes de qualquer escrita, chame repo_patch_plan, repo_create_file_plan, repo_quarantine_file_plan ou repo_move_file_plan.',
-            'Chame chatgpt_connector_current_url_status para recuperar a URL temporária atual sem passar URL como argumento.',
+            'Chame chatgpt_connector_current_url_status para recuperar a URL pública atual sem passar URL como argumento.',
             'Chame mcp_tunnel_status e confirme recommendedAction, lastSmokeOk e lastSmokeAgeMinutes.',
             'Liste a árvore de src/copilot/mcp com repo_tree.',
             'Liste a raiz real do workspace com repo_root_tree maxEntries=80.',
@@ -130,8 +131,8 @@ export function buildChatGptConnectorProfile(options = {}) {
             'O tunnel ativo alcança o origin local e preserva o path público /mcp.',
         ],
         remoteExposureOptions: [
-            'Cloudflare Quick Tunnel temporário: modo operacional principal, com URL trycloudflare.com por sessão.',
-            'Cloudflare Tunnel publicado: modo futuro opcional se algum dia houver hostname estável.',
+            'Cloudflare Tunnel permanente: modo operacional principal, com hostname workspace-mcp-dev.aurelin.org.',
+            'Cloudflare Quick Tunnel temporário: fallback explícito via COPILOT_MCP_CLOUDFLARE_MODE=temporary-quick.',
             'OpenAI Secure MCP Tunnel: alternativa privada baseada em tunnel-client.',
         ],
     };
@@ -194,14 +195,14 @@ export function buildCloudflareTunnelRunbook(options = {}) {
     const profile = buildChatGptConnectorProfile(options);
     const originUrl =
         options.originUrl ??
-        process.env['COPILOT_MCP_CLOUDFLARE_ORIGIN_URL'] ??
-        profile.localMcpUrl.replace(/\/mcp$/, '');
+        process.env['COPILOT_MCP_CLOUDFLARE_ORIGIN_URL'] ?? profile.localMcpUrl.replace(/\/mcp$/, '');
     return {
         prerequisites: [
             'cloudflared instalado no mesmo ambiente que alcança o MCP HTTP local.',
             `MCP HTTP saudável no origin ${originUrl}.`,
-            'Para o modo atual: Quick Tunnel temporário gerado por sessão, sem domínio fixo.',
-            'Para modo futuro com hostname estável: tunnel remoto Cloudflare criado e rota publicada para o origin local.',
+            'Tunnel remoto Cloudflare criado como workspace-mcp-dev.',
+            'Hostname público permanente configurado como workspace-mcp-dev.aurelin.org.',
+            'Rota pública publicada para o origin local sem /mcp no serviço de origem.',
             'ChatGPT developer mode habilitado para criar conector customizado.',
         ],
         originUrl,
@@ -216,16 +217,16 @@ export function buildCloudflareTunnelRunbook(options = {}) {
         managedTunnelCommands: [
             'npm run copilot:mcp:http',
             'npm run copilot:mcp:cloudflare:doctor',
-            'export CLOUDFLARE_TUNNEL_TOKEN="<token-do-tunnel>"',
+            'export CLOUDFLARE_TUNNEL_TOKEN_FILE="src/copilot/.ai/cloudflare/workspace-mcp-dev.token"',
             'npm run copilot:mcp:cloudflare:run',
         ],
         chatgptUrl: profile.connectorUrl,
         notes: [
-            'O modo principal deste projeto usa domínio temporário trycloudflare.com; a URL muda a cada sessão.',
-            'O conector recebe a URL pública terminada em /mcp, capturada pelo arquivo de estado local.',
-            'Depois do smoke, status.summary.lastSmokeOk deve ser true antes de colar ou reutilizar a URL.',
-            'A rota Cloudflare sempre aponta para o origin HTTP raiz; nunca configure o origin como /mcp.',
-            'Hostname publicado fica documentado como futuro opcional, não como requisito atual.',
+            'O modo principal deste projeto usa domínio permanente Cloudflare.',
+            `URL do conector no ChatGPT: ${DEFAULT_PUBLIC_MCP_URL}.`,
+            `A rota Cloudflare aponta para o origin HTTP raiz ${DEFAULT_CLOUDFLARE_ORIGIN_URL}; nunca configure o serviço de origem como /mcp.`,
+            'Depois do smoke, o endpoint permanente deve responder /health e /mcp tools/list.',
+            'Quick Tunnel continua disponível como fallback, mas não é mais o caminho padrão.',
             'Não proteja /mcp com login interativo que o backend do ChatGPT não consiga atravessar.',
             'Sem OAuth no MCP, escolha no ChatGPT o modo sem autenticação somente em desenvolvimento controlado.',
         ],

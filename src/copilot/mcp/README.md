@@ -24,20 +24,20 @@ node src/copilot/mcp/index.js --transport stdio
 
 ## ChatGPT
 
-O ChatGPT deve receber uma URL HTTPS que aponte para `/mcp`. O modo principal deste projeto e
-Cloudflare Quick Tunnel temporario, com dominio `trycloudflare.com` novo a cada sessao:
+O ChatGPT deve receber uma URL HTTPS que aponte para `/mcp`. O modo principal deste projeto agora e
+Cloudflare Tunnel permanente no dominio `aurelin.org`:
 
 ```text
-https://<endpoint>/mcp
+https://workspace-mcp-dev.aurelin.org/mcp
 ```
 
-Cloudflare Quick Tunnel:
+Cloudflare Tunnel permanente:
 
 ```bash
 npm run copilot:mcp:http
 npm run copilot:mcp:smoke:local
 npm run copilot:mcp:cloudflare:doctor
-npm run copilot:mcp:cloudflare:quick
+CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token npm run copilot:mcp:cloudflare:run
 ```
 
 Em outro terminal:
@@ -47,8 +47,12 @@ npm run copilot:mcp:cloudflare:status
 npm run copilot:mcp:cloudflare:smoke
 ```
 
-`status` mostra exatamente a URL temporaria `https://<random>.trycloudflare.com/mcp` para colar no
-ChatGPT. O modo com hostname fixo fica apenas como caminho futuro opcional.
+`status` mostra a URL permanente `https://workspace-mcp-dev.aurelin.org/mcp` para colar no ChatGPT.
+Quick Tunnel continua disponivel como fallback explicito:
+
+```bash
+COPILOT_MCP_CLOUDFLARE_MODE=temporary-quick npm run copilot:mcp:cloudflare:quick
+```
 
 ## Primeira superfície
 

@@ -8,7 +8,13 @@
 import { normalizeMcpUrl, validatePublicConnectorUrl } from '../connection/profile.js';
 
 export const DEFAULT_CLOUDFLARE_ORIGIN_URL = 'http://127.0.0.1:3333';
+export const DEFAULT_CLOUDFLARE_TUNNEL_NAME = 'workspace-mcp-dev';
+export const DEFAULT_CLOUDFLARE_ZONE = 'aurelin.org';
+export const DEFAULT_CLOUDFLARE_PUBLIC_HOSTNAME = `${DEFAULT_CLOUDFLARE_TUNNEL_NAME}.${DEFAULT_CLOUDFLARE_ZONE}`;
+export const DEFAULT_CLOUDFLARE_PUBLIC_URL = `https://${DEFAULT_CLOUDFLARE_PUBLIC_HOSTNAME}/mcp`;
 export const DEFAULT_QUICK_TUNNEL_STATE_FILE = 'src/copilot/.ai/cloudflare/quick-tunnel.json';
+export const DEFAULT_MANAGED_TUNNEL_PID_FILE = 'src/copilot/.ai/cloudflare/cloudflared.pid';
+export const DEFAULT_MCP_HTTP_PID_FILE = 'src/copilot/.ai/cloudflare/mcp-http.pid';
 export const DEFAULT_QUICK_TUNNEL_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
 export const TRYCLOUDFLARE_URL_PATTERN = /https:\/\/[a-z0-9][a-z0-9-]*\.trycloudflare\.com\b/i;
 
@@ -18,9 +24,17 @@ export const TRYCLOUDFLARE_URL_PATTERN = /https:\/\/[a-z0-9][a-z0-9-]*\.trycloud
  * @property {string} healthUrl
  * @property {string} localMcpUrl
  * @property {string | undefined} publicMcpUrl
+ * @property {'named-permanent' | 'temporary-quick'} mode
+ * @property {string} tunnelName
+ * @property {string} zone
+ * @property {string} publicHostname
  * @property {boolean} hasTunnelToken
+ * @property {boolean} hasTunnelTokenFile
+ * @property {string | undefined} tunnelTokenFile
  * @property {'auto' | 'http2' | 'quic'} transportProtocol
  * @property {string} stateFile
+ * @property {string} managedTunnelPidFile
+ * @property {string} mcpHttpPidFile
  * @property {number} staleAfterMs
  */
 
@@ -29,20 +43,102 @@ export const TRYCLOUDFLARE_URL_PATTERN = /https:\/\/[a-z0-9][a-z0-9-]*\.trycloud
  * @returns {CloudflareTunnelConfig}
  */
 export function readCloudflareTunnelConfig(env = process.env) {
+    const mode = normalizeTunnelMode(env['COPILOT_MCP_CLOUDFLARE_MODE']);
     const originUrl = normalizeOriginUrl(env['COPILOT_MCP_CLOUDFLARE_ORIGIN_URL']);
-    const publicInput = env['COPILOT_MCP_CLOUDFLARE_PUBLIC_URL'] ?? env['COPILOT_MCP_PUBLIC_URL'];
+    const tunnelName = normalizeTunnelName(env['COPILOT_MCP_CLOUDFLARE_TUNNEL_NAME']);
+    const zone = normalizeZone(env['COPILOT_MCP_CLOUDFLARE_ZONE']);
+    const publicHostname = normalizePublicHostname(env['COPILOT_MCP_CLOUDFLARE_PUBLIC_HOSTNAME'], tunnelName, zone);
+    const defaultPublicUrl = mode === 'named-permanent' ? `https://${publicHostname}/mcp` : undefined;
+    const publicInput = env['COPILOT_MCP_CLOUDFLARE_PUBLIC_URL'] ?? env['COPILOT_MCP_PUBLIC_URL'] ?? defaultPublicUrl;
+    const tunnelTokenFile = normalizeOptionalPath(env['CLOUDFLARE_TUNNEL_TOKEN_FILE']);
     return {
         originUrl,
         healthUrl: `${originUrl}/health`,
         localMcpUrl: `${originUrl}/mcp`,
         publicMcpUrl: publicInput ? normalizeMcpUrl(publicInput) : undefined,
+        mode,
+        tunnelName,
+        zone,
+        publicHostname,
         hasTunnelToken: Boolean(env['CLOUDFLARE_TUNNEL_TOKEN']?.trim()),
+        hasTunnelTokenFile: Boolean(tunnelTokenFile),
+        tunnelTokenFile,
         transportProtocol: normalizeTransportProtocol(
             env['COPILOT_MCP_CLOUDFLARE_PROTOCOL'] ?? env['TUNNEL_TRANSPORT_PROTOCOL'],
         ),
         stateFile: normalizeStateFile(env['COPILOT_MCP_CLOUDFLARE_STATE_FILE']),
+        managedTunnelPidFile: normalizeStateFile(env['COPILOT_MCP_CLOUDFLARE_PID_FILE'] ?? DEFAULT_MANAGED_TUNNEL_PID_FILE),
+        mcpHttpPidFile: normalizeStateFile(env['COPILOT_MCP_HTTP_PID_FILE'] ?? DEFAULT_MCP_HTTP_PID_FILE),
         staleAfterMs: normalizeStaleAfterMs(env['COPILOT_MCP_CLOUDFLARE_STALE_AFTER_MS']),
     };
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {'named-permanent' | 'temporary-quick'}
+ */
+export function normalizeTunnelMode(value) {
+    const mode = String(value ?? 'named-permanent')
+        .trim()
+        .toLowerCase();
+    if (mode === 'quick' || mode === 'temporary' || mode === 'temporary-quick') return 'temporary-quick';
+    if (mode === 'named' || mode === 'permanent' || mode === 'named-permanent') return 'named-permanent';
+    throw new Error('Cloudflare MCP tunnel mode must be named-permanent or temporary-quick.');
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {string}
+ */
+export function normalizeTunnelName(value) {
+    const name = String(value ?? DEFAULT_CLOUDFLARE_TUNNEL_NAME).trim();
+    if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/u.test(name)) {
+        throw new Error('Cloudflare tunnel name must be a DNS-friendly label.');
+    }
+    return name;
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {string}
+ */
+export function normalizeZone(value) {
+    const zone = String(value ?? DEFAULT_CLOUDFLARE_ZONE)
+        .trim()
+        .toLowerCase()
+        .replace(/\.+$/u, '');
+    if (!/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/u.test(zone)) {
+        throw new Error('Cloudflare zone must be a valid domain such as aurelin.org.');
+    }
+    return zone;
+}
+
+/**
+ * @param {string | undefined} value
+ * @param {string} tunnelName
+ * @param {string} zone
+ * @returns {string}
+ */
+export function normalizePublicHostname(value, tunnelName, zone) {
+    const hostname = String(value ?? `${tunnelName}.${zone}`)
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//u, '')
+        .replace(/\/.*$/u, '')
+        .replace(/\.+$/u, '');
+    if (!hostname.endsWith(zone)) throw new Error('Cloudflare public hostname must live under the configured zone.');
+    return hostname;
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {string | undefined}
+ */
+function normalizeOptionalPath(value) {
+    const path = String(value ?? '').trim();
+    if (!path) return undefined;
+    if (path.includes('\0')) throw new Error('Cloudflare token file path must not contain null bytes.');
+    return path;
 }
 
 /**
@@ -105,12 +201,17 @@ export function buildQuickTunnelArgs(config) {
 
 /**
  * @param {string | undefined} token
+ * @param {string | undefined} [tokenFile]
  * @returns {string[]}
  */
-export function buildManagedTunnelArgs(token) {
+export function buildManagedTunnelArgs(token, tokenFile) {
     const trimmed = String(token ?? '').trim();
+    const normalizedTokenFile = normalizeOptionalPath(tokenFile);
+    if (normalizedTokenFile) {
+        return ['tunnel', '--no-autoupdate', 'run', '--token-file', normalizedTokenFile];
+    }
     if (!trimmed) {
-        throw new Error('CLOUDFLARE_TUNNEL_TOKEN is required to run a remotely-managed Cloudflare Tunnel.');
+        throw new Error('CLOUDFLARE_TUNNEL_TOKEN or CLOUDFLARE_TUNNEL_TOKEN_FILE is required to run a remotely-managed Cloudflare Tunnel.');
     }
     return ['tunnel', '--no-autoupdate', 'run', '--token', trimmed];
 }

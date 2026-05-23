@@ -132,9 +132,16 @@ export const mcpSmokeWorkspaceTool = {
             const tunnelConfig = readCloudflareTunnelConfig();
             const tunnelState = await readQuickTunnelState(tunnelConfig.stateFile);
             const tunnel = summarizeQuickTunnelState(tunnelState, Date.now(), tunnelConfig.staleAfterMs);
-            if (tunnel.stale) warnings.push('Temporary Cloudflare tunnel is stale.');
+            if (tunnelConfig.mode === 'temporary-quick' && tunnel.stale) {
+                warnings.push('Temporary Cloudflare tunnel is stale.');
+            }
             if (tunnel.lastSmokeOk === false) warnings.push('Last Cloudflare smoke failed.');
-            return { metricsCalls: metrics.totals.calls, tunnelAction: tunnel.recommendedAction };
+            return {
+                metricsCalls: metrics.totals.calls,
+                tunnelMode: tunnelConfig.mode,
+                publicMcpUrl: tunnelConfig.publicMcpUrl ?? tunnel.connectorUrl ?? null,
+                tunnelAction: tunnelConfig.mode === 'named-permanent' ? 'use-permanent-hostname' : tunnel.recommendedAction,
+            };
         });
 
         const durationMs = Date.now() - startedAt;

@@ -6,7 +6,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { getCanonicalMcpTools } from '../registry.js';
@@ -39,7 +39,10 @@ try {
         await runSmoke();
     } else if (command === 'run') {
         const config = readCloudflareTunnelConfig();
-        runCloudflared(buildManagedTunnelArgs(process.env['CLOUDFLARE_TUNNEL_TOKEN']), config.transportProtocol);
+        runCloudflared(
+            buildManagedTunnelArgs(process.env['CLOUDFLARE_TUNNEL_TOKEN'], config.tunnelTokenFile),
+            config.transportProtocol,
+        );
     } else {
         fail(`Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, or run.`);
     }
@@ -55,6 +58,8 @@ async function runDoctor() {
     const cloudflared = readCloudflaredVersion();
     const health = await probeHealth(config.healthUrl);
     const publicUrlValidation = validateConfiguredPublicUrl(config);
+    const managedProcess = await readPidFileStatus(config.managedTunnelPidFile);
+    const mcpHttpProcess = await readPidFileStatus(config.mcpHttpPidFile);
     const temporaryState = await readQuickTunnelState(config.stateFile);
     const temporaryTunnel = summarizeQuickTunnelState(temporaryState, Date.now(), config.staleAfterMs);
     const report = {
@@ -67,9 +72,16 @@ async function runDoctor() {
             health,
         },
         managedTunnel: {
+            mode: config.mode,
+            tunnelName: config.tunnelName,
+            zone: config.zone,
+            publicHostname: config.publicHostname,
             tokenPresent: config.hasTunnelToken,
+            tokenFilePresent: config.hasTunnelTokenFile,
             transportProtocol: config.transportProtocol,
-            fixedDomainMode: false,
+            fixedDomainMode: config.mode === 'named-permanent',
+            process: managedProcess,
+            mcpHttpProcess,
         },
         temporaryTunnel,
         temporaryTunnelState: temporaryState ?? 'not-created',
@@ -86,6 +98,8 @@ async function runDoctor() {
             status: 'npm run copilot:mcp:cloudflare:status',
             smoke: 'npm run copilot:mcp:cloudflare:smoke',
             managed: `TUNNEL_TRANSPORT_PROTOCOL=${config.transportProtocol} cloudflared tunnel --no-autoupdate run --token <redacted>`,
+            managedTokenFile:
+                'CLOUDFLARE_TUNNEL_TOKEN_FILE=/run/secrets/cloudflared-token npm run copilot:mcp:cloudflare:run',
         },
     };
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
@@ -99,8 +113,24 @@ async function runStatus() {
     const config = readCloudflareTunnelConfig();
     const state = await readQuickTunnelState(config.stateFile);
     const summary = summarizeQuickTunnelState(state, Date.now(), config.staleAfterMs);
+    const configuredPublicUrlValidation = validateConfiguredPublicUrl(config);
+    const permanentOk = config.mode === 'named-permanent' && configuredPublicUrlValidation?.ok === true;
+    const managedProcess = await readPidFileStatus(config.managedTunnelPidFile);
+    const mcpHttpProcess = await readPidFileStatus(config.mcpHttpPidFile);
     const report = {
-        ok: summary.stateValid && summary.processAlive,
+        ok:
+            (permanentOk && managedProcess.alive === true && mcpHttpProcess.alive === true) ||
+            (summary.stateValid && summary.processAlive),
+        mode: config.mode,
+        tunnelName: config.tunnelName,
+        zone: config.zone,
+        publicHostname: config.publicHostname,
+        configuredPublicUrl: config.publicMcpUrl ?? null,
+        configuredPublicUrlValidation: configuredPublicUrlValidation ?? null,
+        permanentTunnel: {
+            process: managedProcess,
+            mcpHttpProcess,
+        },
         stateFile: config.stateFile,
         originUrl: config.originUrl,
         localMcpUrl: config.localMcpUrl,
@@ -115,10 +145,16 @@ async function runStatus() {
             ? {
                   name: state.chatgpt.name,
                   description: state.chatgpt.description,
-                  mcpServerUrl: state.connectorUrl,
+                  mcpServerUrl: config.publicMcpUrl ?? state.connectorUrl,
                   authentication: state.chatgpt.authentication,
               }
-            : 'not-created',
+            : {
+                  name: 'Repo DevContainer MCP',
+                  description:
+                      'Conecta o ChatGPT ao repositório aberto no VS Code Dev Container por túnel Cloudflare permanente.',
+                  mcpServerUrl: config.publicMcpUrl ?? null,
+                  authentication: 'none-dev',
+              },
     };
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     if (!report.ok) process.exitCode = 1;
@@ -132,7 +168,7 @@ async function runSmoke() {
     const state = await readQuickTunnelState(config.stateFile);
     const connectorUrl = config.publicMcpUrl ?? (isQuickTunnelState(state) ? state.connectorUrl : undefined);
     if (!connectorUrl) {
-        throw new Error('No temporary Cloudflare connector URL found. Run npm run copilot:mcp:cloudflare:quick first.');
+        throw new Error('No Cloudflare connector URL found. Configure COPILOT_MCP_CLOUDFLARE_PUBLIC_URL or run the quick fallback.');
     }
     const baseUrl = connectorUrl.replace(/\/mcp$/, '');
     const health = await probeJson(`${baseUrl}/health`, { method: 'GET' });
@@ -261,6 +297,28 @@ function readCloudflaredVersion() {
         return { ok: false, error: result.stderr.trim() || `cloudflared exited with status ${result.status}` };
     }
     return { ok: true, version: result.stdout.trim() };
+}
+
+/**
+ * @param {string} pidFile
+ * @returns {Promise<{ pidFile: string; pid: number | null; alive: boolean; error: string | null }>}
+ */
+async function readPidFileStatus(pidFile) {
+    try {
+        const raw = (await readFile(pidFile, 'utf8')).trim();
+        const pid = Number(raw);
+        if (!Number.isInteger(pid) || pid <= 0) {
+            return { pidFile, pid: null, alive: false, error: 'PID file does not contain a positive integer.' };
+        }
+        try {
+            process.kill(pid, 0);
+            return { pidFile, pid, alive: true, error: null };
+        } catch (error) {
+            return { pidFile, pid, alive: false, error: error instanceof Error ? error.message : String(error) };
+        }
+    } catch (error) {
+        return { pidFile, pid: null, alive: false, error: error instanceof Error ? error.message : String(error) };
+    }
 }
 
 /**

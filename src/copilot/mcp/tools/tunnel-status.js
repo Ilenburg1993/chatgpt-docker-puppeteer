@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Tunnel status MCP tool for temporary Cloudflare sessions.
+ * Tunnel status MCP tool for Cloudflare sessions.
  *
  * @module copilot/mcp/tools/tunnel-status
  */
@@ -17,7 +17,7 @@ export const mcpTunnelStatusTool = {
     name: 'mcp_tunnel_status',
     title: 'MCP tunnel status',
     description:
-        'Return the current temporary Cloudflare tunnel state, ChatGPT connector URL, age and recovery guidance.',
+        'Return the current Cloudflare tunnel mode, permanent connector URL, temporary fallback state and recovery guidance.',
     inputSchema: {},
     annotations: readOnlyAnnotations(),
     handler: async () => {
@@ -26,7 +26,17 @@ export const mcpTunnelStatusTool = {
         const quickTunnel = summarizeQuickTunnelState(state, Date.now(), config.staleAfterMs);
         return okResult({
             success: true,
-            mode: quickTunnel.mode,
+            mode: config.mode,
+            tunnelName: config.tunnelName,
+            zone: config.zone,
+            publicHostname: config.publicHostname,
+            permanentTunnel: {
+                publicMcpUrl: config.publicMcpUrl ?? null,
+                validation: validateConfiguredPublicUrl(config) ?? null,
+                tokenPresent: config.hasTunnelToken,
+                tokenFilePresent: config.hasTunnelTokenFile,
+                transportProtocol: config.transportProtocol,
+            },
             temporaryTunnel: quickTunnel,
             configuredPublicUrl: config.publicMcpUrl ?? null,
             configuredPublicUrlValidation: validateConfiguredPublicUrl(config) ?? null,
@@ -39,7 +49,8 @@ export const mcpTunnelStatusTool = {
                 staleAfterMinutes: Math.round(config.staleAfterMs / 60000),
             },
             chatgpt: {
-                mcpServerUrl: quickTunnel.connectorUrl ?? config.publicMcpUrl ?? null,
+                mcpServerUrl: config.publicMcpUrl ?? quickTunnel.connectorUrl ?? null,
+                preferredMcpServerUrl: config.publicMcpUrl ?? quickTunnel.connectorUrl ?? null,
                 authentication: 'none-dev',
             },
         });

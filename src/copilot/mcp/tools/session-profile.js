@@ -131,10 +131,10 @@ export const mcpSessionProfileTool = {
                     'ChatGPT controls connector confirmation UI. This MCP reduces friction with precise annotations, narrow tools and reversible workflows; it cannot bypass host safety prompts.',
             },
             tunnelGuidance: {
-                mode: 'Cloudflare Quick Tunnel temporary URL',
-                expectedUrlShape: 'https://<random>.trycloudflare.com/mcp',
+                mode: 'Cloudflare named permanent tunnel',
+                expectedUrlShape: 'https://workspace-mcp-dev.aurelin.org/mcp',
                 reconnectRule:
-                    'When the quick tunnel process exits, create a fresh URL and update or recreate the ChatGPT connector.',
+                    'Keep npm run copilot:mcp:http and npm run copilot:mcp:cloudflare:run alive; use COPILOT_MCP_CLOUDFLARE_MODE=temporary-quick only as fallback.',
             },
             smokePrompts: connector.smokePrompts,
             capabilities,

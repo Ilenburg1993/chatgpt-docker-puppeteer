@@ -12,9 +12,11 @@ import {
     extractTryCloudflareUrl,
     buildManagedTunnelArgs,
     buildQuickTunnelArgs,
+    DEFAULT_CLOUDFLARE_PUBLIC_URL,
     normalizeOriginUrl,
     normalizeStateFile,
     normalizeStaleAfterMs,
+    normalizeTunnelMode,
     normalizeTransportProtocol,
     readCloudflareTunnelConfig,
     validateConfiguredPublicUrl,
@@ -30,6 +32,12 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
             COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: 'http://127.0.0.1:3333',
             CLOUDFLARE_TUNNEL_TOKEN: 'secret-token',
         });
+        assert.equal(config.mode, 'named-permanent');
+        assert.equal(config.tunnelName, 'workspace-mcp-dev');
+        assert.equal(config.zone, 'aurelin.org');
+        assert.equal(config.publicMcpUrl, DEFAULT_CLOUDFLARE_PUBLIC_URL);
+        assert.equal(config.managedTunnelPidFile, 'src/copilot/.ai/cloudflare/cloudflared.pid');
+        assert.equal(config.mcpHttpPidFile, 'src/copilot/.ai/cloudflare/mcp-http.pid');
         assert.deepEqual(buildQuickTunnelArgs(config), [
             'tunnel',
             '--url',
@@ -44,7 +52,23 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
             '--token',
             'secret-token',
         ]);
+        assert.deepEqual(buildManagedTunnelArgs(undefined, 'src/copilot/.ai/cloudflare/workspace-mcp-dev.token'), [
+            'tunnel',
+            '--no-autoupdate',
+            'run',
+            '--token-file',
+            'src/copilot/.ai/cloudflare/workspace-mcp-dev.token',
+        ]);
         assert.throws(() => buildManagedTunnelArgs(undefined), /CLOUDFLARE_TUNNEL_TOKEN/);
+    });
+
+    it('keeps temporary quick tunnel as an explicit fallback mode', () => {
+        assert.equal(normalizeTunnelMode('temporary-quick'), 'temporary-quick');
+        const config = readCloudflareTunnelConfig({
+            COPILOT_MCP_CLOUDFLARE_MODE: 'temporary-quick',
+        });
+        assert.equal(config.mode, 'temporary-quick');
+        assert.equal(config.publicMcpUrl, undefined);
     });
 
     it('validates configured ChatGPT public URLs', () => {
