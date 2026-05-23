@@ -9,11 +9,14 @@
  * @module copilot/mcp/control-plane/dev-oauth
  */
 
-import { calculateJwkThumbprint, exportJWK, generateKeyPair, SignJWT } from 'jose';
+import { calculateJwkThumbprint, exportJWK, exportPKCS8, generateKeyPair, importPKCS8, SignJWT } from 'jose';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
 const AUTH_CODE_TTL_MS = 5 * 60 * 1000;
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
+const DEFAULT_KEY_FILE = 'src/copilot/.ai/mcp/oauth-dev-private-key.pem';
 
 /** @type {Promise<{ privateKey: CryptoKey | import('node:crypto').KeyObject; publicJwk: Record<string, unknown>; kid: string }> | null} */
 let keyMaterialPromise = null;
@@ -123,8 +126,8 @@ export async function handleBuiltInDevOAuthRequest(req, res, url, config) {
  */
 async function getKeyMaterial() {
     keyMaterialPromise ??= (async () => {
-        const { privateKey, publicKey } = await generateKeyPair('RS256', { extractable: true });
-        const publicJwk = await exportJWK(publicKey);
+        const privateKey = await readOrCreatePrivateKey();
+        const publicJwk = await exportPublicJwk(privateKey);
         const kid = await calculateJwkThumbprint(publicJwk);
         return {
             privateKey,
@@ -138,6 +141,68 @@ async function getKeyMaterial() {
         };
     })();
     return keyMaterialPromise;
+}
+
+/**
+ * @returns {Promise<CryptoKey | import('node:crypto').KeyObject>}
+ */
+async function readOrCreatePrivateKey() {
+    const keyFile = readDevOAuthKeyFile();
+    if (!isDevOAuthKeyRotationRequested()) {
+        try {
+            const pem = await readFile(keyFile, 'utf8');
+            if (pem.trim()) return importPKCS8(pem, 'RS256', { extractable: true });
+        } catch {
+            // Missing or unreadable key files are repaired by generating a new dev key.
+        }
+    }
+    const { privateKey } = await generateKeyPair('RS256', { extractable: true });
+    await persistPrivateKey(keyFile, privateKey);
+    return privateKey;
+}
+
+/**
+ * @param {CryptoKey | import('node:crypto').KeyObject} privateKey
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function exportPublicJwk(privateKey) {
+    const publicJwk = /** @type {Record<string, unknown>} */ (await exportJWK(privateKey));
+    for (const privateField of ['d', 'p', 'q', 'dp', 'dq', 'qi', 'oth']) {
+        delete publicJwk[privateField];
+    }
+    return publicJwk;
+}
+
+/**
+ * @param {string} keyFile
+ * @param {CryptoKey | import('node:crypto').KeyObject} privateKey
+ * @returns {Promise<void>}
+ */
+async function persistPrivateKey(keyFile, privateKey) {
+    try {
+        await mkdir(path.dirname(keyFile), { recursive: true });
+        const pem = await exportPKCS8(privateKey);
+        await writeFile(keyFile, pem, { encoding: 'utf8', mode: 0o600 });
+    } catch {
+        // The dev issuer can still operate with an in-memory key; persistence is a stability upgrade, not a hard dependency.
+    }
+}
+
+/**
+ * @returns {string}
+ */
+function readDevOAuthKeyFile() {
+    return String(process.env['COPILOT_MCP_DEV_OAUTH_KEY_FILE'] ?? DEFAULT_KEY_FILE).trim() || DEFAULT_KEY_FILE;
+}
+
+/**
+ * @returns {boolean}
+ */
+function isDevOAuthKeyRotationRequested() {
+    const raw = String(process.env['COPILOT_MCP_DEV_OAUTH_ROTATE_KEY'] ?? '')
+        .trim()
+        .toLowerCase();
+    return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
 }
 
 /**

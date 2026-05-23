@@ -1802,6 +1802,51 @@ Roadmap restante da faixa OAuth:
 2. Registrar comportamento real de linking, scopes e prompts no golden log.
 3. Decidir se o issuer dev embutido continua suficiente ou se a proxima faixa deve integrar IdP
    externo.
-4. Persistir/rotacionar chaves OAuth dev se o relinking apos restart passar a ser inconveniente.
-5. Evoluir `cloudflare:smoke` para tambem executar uma tool autenticada quando houver bearer/fluxo OAuth
+4. Evoluir `cloudflare:smoke` para tambem executar uma tool autenticada quando houver bearer/fluxo OAuth
    disponivel, mantendo `oauth:smoke` como verificador autoritativo.
+
+### 14.7. Continuidade pos-commit — persistencia da chave OAuth dev
+
+Data: 2026-05-23.
+
+Motivo:
+
+1. O issuer dev embutido gerava uma chave RS256 em memoria.
+2. Isso era correto para um primeiro smoke, mas fazia tokens anteriores perderem validade apos restart.
+3. Para o uso diario do ChatGPT em `https://mcp.aurelin.org/mcp`, a postura mais profissional e manter
+   a chave dev estavel no workspace local, sem comita-la.
+
+Mudanca aplicada:
+
+1. `src/copilot/mcp/control-plane/dev-oauth.js` agora tenta ler a chave privada de:
+   - `COPILOT_MCP_DEV_OAUTH_KEY_FILE`;
+   - default: `src/copilot/.ai/mcp/oauth-dev-private-key.pem`.
+2. Se o arquivo nao existir ou estiver ilegivel, o issuer gera uma nova chave RS256 e tenta persisti-la
+   com permissao `0600`.
+3. Se a persistencia falhar, o issuer continua operando com chave em memoria.
+4. Rotacao explicita:
+   - `COPILOT_MCP_DEV_OAUTH_ROTATE_KEY=true`.
+5. Templates/schema atualizados:
+   - `.env.example`;
+   - `.env.local.example`;
+   - `.env.schema.json`.
+6. README MCP atualizado para documentar o comportamento.
+
+Validacao executada apos essa continuidade:
+
+1. `npm run typecheck:strict:src.copilot`: passou.
+2. `npm run lint:copilot`: passou.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`:
+   passou com 85 testes MCP.
+4. `npm run copilot:mcp:safe-suite -- mcp-full`: passou.
+5. `npm run test:copilot:unit`: passou com 3084/3084 testes.
+6. `node scripts/env/audit-env-surface.mjs`: passou.
+7. `node scripts/env/validate-env.js`: passou.
+8. MCP/Cloudflare reiniciado:
+   - `mcp-http` PID `79170`;
+   - `cloudflared` PID `79171`.
+9. `make copilot-mcp-oauth-smoke`: passou.
+10. `npm run copilot:mcp:cloudflare:status`: passou com `ready=true`.
+11. `npm run copilot:mcp:cloudflare:smoke`: passou com 67/67 tools.
+12. Chave persistida criada localmente com permissao `0600`:
+    - `src/copilot/.ai/mcp/oauth-dev-private-key.pem`.
