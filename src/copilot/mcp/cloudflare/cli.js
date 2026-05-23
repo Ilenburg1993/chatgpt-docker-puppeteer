@@ -27,6 +27,8 @@ import {
     updateQuickTunnelLastSmoke,
 } from './state.js';
 
+const REQUIRED_MAX_POWER_REPO_SCOPES = ['repo:read', 'repo:write', 'repo:validate', 'repo:admin'];
+
 const command = process.argv[2] ?? 'doctor';
 
 try {
@@ -385,8 +387,9 @@ function summarizeOAuthReadiness(protectedResourceBody, oauthMetadataBody, authM
     const missingProtectedFields = [];
     if (typeof protectedResource?.['resource'] !== 'string') missingProtectedFields.push('resource');
     if (!Array.isArray(protectedResource?.['authorization_servers'])) missingProtectedFields.push('authorization_servers');
-    if (!protectedScopes.includes('repo:read')) missingProtectedFields.push('scopes_supported:repo:read');
-    if (!protectedScopes.includes('repo:validate')) missingProtectedFields.push('scopes_supported:repo:validate');
+    for (const scope of REQUIRED_MAX_POWER_REPO_SCOPES) {
+        if (!protectedScopes.includes(scope)) missingProtectedFields.push(`scopes_supported:${scope}`);
+    }
     const missingMetadataFields = [];
     if (typeof metadata?.['issuer'] !== 'string') missingMetadataFields.push('issuer');
     if (typeof metadata?.['authorization_endpoint'] !== 'string') missingMetadataFields.push('authorization_endpoint');

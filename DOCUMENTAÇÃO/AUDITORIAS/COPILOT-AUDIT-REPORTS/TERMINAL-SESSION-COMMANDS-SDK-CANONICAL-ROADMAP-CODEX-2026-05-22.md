@@ -350,7 +350,8 @@ Sexta fatia correlata - MCP/OAuth/Cloudflare:
   aceitar Client ID Metadata Documents HTTPS com validacao de metadata/redirect, expor `/oauth/userinfo` e emitir
   `id_token` quando `openid` for concedido.
 - `src/copilot/mcp/control-plane/auth.js` passou a separar escopos suportados de escopos iniciais do protected resource
-  metadata, defaultando o primeiro linking para `repo:read` e `repo:validate`.
+  metadata. A reducao temporaria do primeiro linking para `repo:read` e `repo:validate` foi revogada na nona fatia:
+  o default canonico voltou a ser max-power.
 - `src/copilot/mcp/adapters/http.js` passou a expor `MCP-Protocol-Version` em CORS e validar `Origin` quando presente,
   alinhando o transporte HTTP com a leitura MCP 2025-11-25 sem quebrar o modo stateless atual.
 - `mcp_oauth_issuer_diagnostics` e o smoke OAuth agora reportam CIMD, userinfo/OIDC e escopos anunciados.
@@ -358,8 +359,8 @@ Sexta fatia correlata - MCP/OAuth/Cloudflare:
   `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`.
 - O `npm run test:copilot:unit` amplo foi reexecutado apos a estabilizacao da fatia e passou com 3084/3084.
 - Publicacao operacional: `make copilot-mcp-restart`, `make copilot-mcp-status`, `make copilot-mcp-smoke` e
-  `make copilot-mcp-oauth-smoke` passaram. A metadata publica em `https://mcp.aurelin.org` agora confirma CIMD,
-  `userinfo_endpoint` e `scopes_supported` inicial reduzido para `repo:read`/`repo:validate`.
+  `make copilot-mcp-oauth-smoke` passaram. A metadata publica em `https://mcp.aurelin.org` confirmou CIMD,
+  `userinfo_endpoint` e, naquela fatia, escopos iniciais reduzidos; essa decisao foi substituida pela nona fatia.
 
 Setima fatia correlata - prova operacional CIMD:
 
@@ -378,3 +379,20 @@ Oitava fatia correlata - diagnostico MCP CIMD:
 - `mcp_oauth_issuer_diagnostics` passou a validar tambem o documento CIMD quando o issuer e o proprio resource MCP.
 - A readiness do diagnostico agora inclui falhas no client metadata document quando ele deveria existir.
 - Validacao: typecheck strict Copilot, lint Copilot e 85 testes MCP.
+
+Nona fatia correlata - correcao max-power ChatGPT:
+
+- A direcao de reduzir `scopes_supported` inicial para `repo:read`/`repo:validate` foi reclassificada como desalinhada
+  do objetivo canonico deste repo. Para o conector ChatGPT, o default deve maximizar liberdade e autonomia sobre o
+  workspace/repo.
+- `COPILOT_MCP_OAUTH_INITIAL_SCOPES`, o protected resource metadata, o smoke OAuth, o smoke Cloudflare e o preview de
+  `WWW-Authenticate` agora usam por default `repo:read`, `repo:write`, `repo:validate` e `repo:admin`.
+- DCR e CIMD devem provar tokens max-power; CIMD continua somando `openid profile email` para OIDC.
+- Os exemplos e o schema de ambiente documentam max-power como default, preservando override explicito apenas para
+  operacao excepcional.
+- Validacao desta correcao: typecheck strict Copilot, lint Copilot, 85 testes MCP, 3084 testes Copilot unit,
+  env audit/validate/check, `make copilot-mcp-restart`, `make copilot-mcp-status`, `make copilot-mcp-smoke` e
+  `make copilot-mcp-oauth-smoke`.
+- Evidencia publica apos restart: protected resource metadata anuncia os quatro escopos repo; DCR emitiu
+  `repo:read repo:write repo:validate repo:admin`; CIMD emitiu
+  `repo:read repo:write repo:validate repo:admin openid profile email`, com `id_token` e `/oauth/userinfo` verdes.

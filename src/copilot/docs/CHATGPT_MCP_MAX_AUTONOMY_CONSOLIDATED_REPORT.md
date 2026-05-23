@@ -1884,8 +1884,9 @@ Diagnostico das telas anexadas:
 3. OIDC estava marcado como habilitado, mas a tela exibia `https://example.com` como userinfo placeholder,
    indicando ausencia pratica de `userinfo_endpoint` no metadata.
 4. Os escopos padrao apareciam como `repo:read`, `repo:write`, `repo:validate` e `repo:admin`.
-   Isso e excessivo para o primeiro linking: a especificacao MCP orienta que `scopes_supported` no protected
-   resource metadata seja o conjunto minimo para funcionalidade basica, deixando escalada por tool/step-up.
+   A interpretacao temporaria de reduzir o primeiro linking foi revogada em 14.11: para este repo, o contrato
+   canonico e dar ao ChatGPT o pacote repo max-power por default, usando `COPILOT_MCP_OAUTH_INITIAL_SCOPES` apenas
+   como escape hatch operacional.
 5. As telas confirmaram que o caminho Cloudflare permanente esta correto; o problema estava no contrato OAuth/OIDC
    e nos sinais de transporte, nao no hostname.
 
@@ -1904,8 +1905,8 @@ Mudancas estruturais aplicadas nesta fatia:
    - hosts locais/privados sao bloqueados para reduzir risco SSRF mesmo em dev.
 3. O endpoint `GET /oauth/userinfo` foi implementado com verificacao RS256/JWKS local do access token.
 4. O token endpoint passa a emitir `id_token` quando o escopo `openid` e concedido.
-5. `buildProtectedResourceMetadata()` passou a anunciar `scopes_supported` inicial minimo:
-   - default: `repo:read`, `repo:validate`;
+5. `buildProtectedResourceMetadata()` passou a separar escopos suportados de escopos iniciais:
+   - default canonico apos 14.11: `repo:read`, `repo:write`, `repo:validate`, `repo:admin`;
    - override operacional: `COPILOT_MCP_OAUTH_INITIAL_SCOPES`.
 6. `WWW-Authenticate` agora inclui `error` e `error_description`, alem de `resource_metadata` e `scope`,
    alinhando o gatilho de UI OAuth do ChatGPT com a documentacao do Apps SDK.
@@ -1940,7 +1941,8 @@ Roadmap OAuth/MCP restante:
 
 1. Testar no ChatGPT a criacao do app com metodo CIMD, confirmando que o aviso desaparece.
 2. Conferir se a tela de OIDC deixa de mostrar userinfo placeholder apos refresh do metadata.
-3. Medir se o primeiro linking passa a sugerir apenas `repo:read`/`repo:validate`.
+3. Medir se o primeiro linking sugere o pacote max-power completo `repo:read`/`repo:write`/`repo:validate`/
+   `repo:admin`.
 4. Evoluir jobs longos (`run_*`, safe suite) para task-augmented requests do SDK quando a API experimental estabilizar.
 5. Avaliar sessao stateful HTTP com cache de transports por `MCP-Session-Id`, sem quebrar smokes diretos.
 6. Decidir se o issuer dev continua aceitavel para uso interno ou se a proxima faixa deve trocar para IdP externo.
@@ -1959,8 +1961,8 @@ Validacao executada nesta fatia:
    - `client_id_metadata_document_supported=true`;
    - `userinfo_endpoint=https://mcp.aurelin.org/oauth/userinfo`;
    - escopos OIDC anunciados.
-8. `curl https://mcp.aurelin.org/.well-known/oauth-protected-resource`: confirmou `scopes_supported` inicial
-   reduzido para `repo:read` e `repo:validate`.
+8. `curl https://mcp.aurelin.org/.well-known/oauth-protected-resource`: confirmou, naquela fatia, a reducao para
+   `repo:read` e `repo:validate`; essa direcao foi substituida pela correcao max-power de 14.11.
 9. `make copilot-mcp-smoke`: passou com 67/67 tools remotas.
 10. `make copilot-mcp-oauth-smoke`: passou com DCR, JWKS, token e chamada autenticada `mcp_runtime_health`.
 
@@ -1981,9 +1983,10 @@ Mudancas aplicadas:
    - `GET /.well-known/oauth-client/codex-smoke.json`;
    - `client_id` exatamente igual a URL publica HTTPS;
    - `redirect_uris=["https://chatgpt.com/connector/oauth/codex-smoke"]`.
-2. `npm run copilot:mcp:oauth:smoke` passou a exercitar dois fluxos:
-   - DCR com `repo:read repo:validate`;
-   - CIMD com `repo:read repo:validate openid profile email`.
+2. `npm run copilot:mcp:oauth:smoke` passou a exercitar dois fluxos; em 14.11 esses fluxos foram elevados para o
+   pacote max-power:
+   - DCR com `repo:read repo:write repo:validate repo:admin`;
+   - CIMD com `repo:read repo:write repo:validate repo:admin openid profile email`.
 3. O fluxo CIMD do smoke confirma:
    - fetch HTTPS do client metadata;
    - authorization-code + PKCE;
@@ -1992,7 +1995,7 @@ Mudancas aplicadas:
    - `/oauth/userinfo`.
 4. `npm run copilot:mcp:cloudflare:smoke` agora tambem valida OAuth quando `COPILOT_MCP_AUTH_MODE=oauth|mixed-auth`:
    - protected resource metadata;
-   - `repo:read` e `repo:validate` como escopos iniciais;
+   - `repo:read`, `repo:write`, `repo:validate` e `repo:admin` como escopos iniciais canonicos;
    - authorization server metadata;
    - `client_id_metadata_document_supported=true`;
    - `userinfo_endpoint`;
@@ -2013,8 +2016,8 @@ Validacao executada nesta continuidade:
    - `cloudflared` PID `94763`.
 6. `curl https://mcp.aurelin.org/.well-known/oauth-client/codex-smoke.json`: passou.
 7. `make copilot-mcp-oauth-smoke`: passou e confirmou:
-   - `dcrFlow.token.scope="repo:read repo:validate"`;
-   - `cimdFlow.token.scope="repo:read repo:validate openid profile email"`;
+   - antes de 14.11: `dcrFlow.token.scope="repo:read repo:validate"`;
+   - antes de 14.11: `cimdFlow.token.scope="repo:read repo:validate openid profile email"`;
    - `cimdFlow.token.idTokenIssued=true`;
    - `cimdFlow.userinfo.ok=true`.
 8. `make copilot-mcp-status`: passou com `ready=true`.
@@ -2026,8 +2029,7 @@ Validacao executada nesta continuidade:
 Roadmap restante atualizado:
 
 1. Testar novamente na UI do ChatGPT e registrar se a opcao CIMD deixa de aparecer indisponivel.
-2. Fazer o ChatGPT executar uma tool que exija step-up (`repo:write` ou `repo:admin`) e medir se o host pede apenas o
-   escopo novo.
+2. Fazer o ChatGPT executar tools de escrita/admin e confirmar que o token inicial max-power ja cobre essas chamadas.
 3. Evoluir `mcp_oauth_issuer_diagnostics` para testar tambem o documento CIMD quando o issuer for o proprio resource.
 4. Projetar faixa separada para tasks MCP experimentais em jobs longos.
 
@@ -2055,3 +2057,54 @@ Validacao executada nesta microfatia:
 1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
 2. `npm run lint:copilot -- --quiet`: passou.
 3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 85/85.
+
+### 14.11. Correcao de direcao — OAuth max-power por default
+
+Data: 2026-05-23.
+
+Motivo da correcao:
+
+1. A reducao de escopos iniciais para `repo:read`/`repo:validate` seguia uma leitura defensiva de primeiro linking,
+   mas conflita com o objetivo canonico deste repo: dar ao ChatGPT liberdade maxima sobre o workspace/repo.
+2. Para este conector, `repo:write` e `repo:admin` nao sao excecoes futuras; fazem parte do contrato operacional
+   esperado. O host pode ainda mostrar consentimento OAuth, mas a metadata publica deve anunciar o pacote completo.
+3. `COPILOT_MCP_OAUTH_INITIAL_SCOPES` permanece como knob de emergencia, nao como politica padrao.
+
+Mudancas aplicadas nesta correcao:
+
+1. `readMcpAuthConfig()` defaulta `initialScopes` para:
+   - `repo:read`;
+   - `repo:write`;
+   - `repo:validate`;
+   - `repo:admin`.
+2. `mcp_auth_profile` passa a montar o challenge preview com os quatro escopos repo quando o operador nao informa
+   uma lista customizada.
+3. `copilot:mcp:oauth:smoke` passa a provar:
+   - DCR com `repo:read repo:write repo:validate repo:admin`;
+   - CIMD com `repo:read repo:write repo:validate repo:admin openid profile email`.
+4. `copilot:mcp:cloudflare:smoke` passa a falhar se qualquer escopo repo max-power desaparecer do protected resource
+   metadata.
+5. `.env.example`, `.env.local.example` e `.env.schema.json` passam a documentar max-power como default.
+6. Os testes MCP passam a tratar `repo:admin` no protected resource metadata como esperado, nao regressao.
+
+Validacao executada nesta correcao:
+
+1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
+2. `npm run lint:copilot -- --quiet`: passou.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 85/85.
+4. `npm run test:copilot:unit`: passou com 3084/3084.
+5. `node scripts/env/audit-env-surface.mjs`: passou.
+6. `node scripts/env/validate-env.js`: passou.
+7. `node scripts/env/check-env-local.mjs`: passou.
+8. `make copilot-mcp-restart`: passou e reiniciou:
+   - `mcp-http` PID `4314`;
+   - `cloudflared` PID `4320`.
+9. `make copilot-mcp-status`: passou com `ready=true`.
+10. `curl https://mcp.aurelin.org/.well-known/oauth-protected-resource`: confirmou `scopes_supported` com
+    `repo:read`, `repo:write`, `repo:validate` e `repo:admin`.
+11. `make copilot-mcp-smoke`: passou com OAuth readiness max-power e 67/67 tools remotas.
+12. `make copilot-mcp-oauth-smoke`: passou e confirmou:
+    - `dcrFlow.token.scope="repo:read repo:write repo:validate repo:admin"`;
+    - `cimdFlow.token.scope="repo:read repo:write repo:validate repo:admin openid profile email"`;
+    - `cimdFlow.token.idTokenIssued=true`;
+    - `cimdFlow.userinfo.ok=true`.

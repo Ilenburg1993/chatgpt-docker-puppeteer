@@ -9,6 +9,9 @@ import { createHash, randomBytes } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { readMcpAuthConfig } from '../control-plane/auth.js';
 
+const FULL_REPO_SCOPE = 'repo:read repo:write repo:validate repo:admin';
+const FULL_REPO_OIDC_SCOPE = `${FULL_REPO_SCOPE} openid profile email`;
+
 /**
  * @typedef {{ ok: boolean; status?: number; body?: unknown; error?: string; headers?: Record<string, string> }} ProbeResult
  */
@@ -30,7 +33,7 @@ export async function runMcpOAuthSmoke(options = {}) {
     const jwks = await probeJson(jwksUri, { method: 'GET' });
     const registration = await registerClient(metadata, authorizationServer);
     const dcrToken = registration.ok
-        ? await authorizeAndExchangeRegisteredClient(metadata, registration, resource, 'repo:read repo:validate')
+        ? await authorizeAndExchangeRegisteredClient(metadata, registration, resource, FULL_REPO_SCOPE)
         : failure('registration failed');
     const dcrTokenBody = asRecord(dcrToken.body);
     const runtimeHealth =
@@ -47,7 +50,7 @@ export async function runMcpOAuthSmoke(options = {}) {
                   clientId: cimdClientMetadataUrl,
                   redirectUri: cimdRedirectUri,
                   resource,
-                  scope: 'repo:read repo:validate openid profile email',
+                  scope: FULL_REPO_OIDC_SCOPE,
               })
             : failure('client_id_metadata_document_supported missing');
     const cimdTokenBody = asRecord(cimdToken.body);

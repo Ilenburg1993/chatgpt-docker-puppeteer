@@ -322,7 +322,9 @@ export const connectionTools = [
         handler: async ({ scopes }) => {
             const config = readMcpAuthConfig();
             const challengeScopes =
-                Array.isArray(scopes) && scopes.length > 0 ? scopes : ['repo:read', 'repo:write', 'repo:validate'];
+                Array.isArray(scopes) && scopes.length > 0
+                    ? scopes
+                    : ['repo:read', 'repo:write', 'repo:validate', 'repo:admin'];
             return okResult({
                 success: true,
                 mode: config.mode,

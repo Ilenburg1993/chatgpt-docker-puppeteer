@@ -155,7 +155,9 @@ export function readMcpAuthConfig(env = process.env) {
         scopesSupported: [MCP_AUTH_SCOPES.read, MCP_AUTH_SCOPES.write, MCP_AUTH_SCOPES.validate, MCP_AUTH_SCOPES.admin],
         initialScopes: normalizeConfiguredScopes(env['COPILOT_MCP_OAUTH_INITIAL_SCOPES'], [
             MCP_AUTH_SCOPES.read,
+            MCP_AUTH_SCOPES.write,
             MCP_AUTH_SCOPES.validate,
+            MCP_AUTH_SCOPES.admin,
         ]),
         resourceDocumentation:
             env['COPILOT_MCP_RESOURCE_DOCUMENTATION'] ?? 'https://developers.openai.com/apps-sdk/build/auth',
