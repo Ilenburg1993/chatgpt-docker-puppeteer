@@ -2030,3 +2030,28 @@ Roadmap restante atualizado:
    escopo novo.
 3. Evoluir `mcp_oauth_issuer_diagnostics` para testar tambem o documento CIMD quando o issuer for o proprio resource.
 4. Projetar faixa separada para tasks MCP experimentais em jobs longos.
+
+### 14.10. Continuidade — diagnostico MCP tambem cobre CIMD
+
+Data: 2026-05-23.
+
+Mudanca aplicada:
+
+1. `mcp_oauth_issuer_diagnostics` agora tenta validar tambem o documento CIMD quando:
+   - o metadata do authorization server anuncia `client_id_metadata_document_supported=true`;
+   - o issuer normalizado e igual ao resource MCP configurado.
+2. O diagnostico retorna `clientMetadata` com:
+   - URL checada;
+   - status/erro HTTP;
+   - `client_id`;
+   - `client_name`;
+   - `redirect_uris`;
+   - `token_endpoint_auth_method`;
+   - campos faltantes e warnings.
+3. A readiness geral do diagnostico passa a considerar a metadata OAuth e, quando aplicavel, a metadata CIMD.
+
+Validacao executada nesta microfatia:
+
+1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
+2. `npm run lint:copilot -- --quiet`: passou.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 85/85.

@@ -130,6 +130,39 @@ function summarizeOAuthMetadata(metadata, requiredScopes) {
 }
 
 /**
+ * @param {Record<string, unknown> | undefined} metadata
+ * @param {string} expectedClientId
+ * @returns {{ ready: boolean; missingFields: string[]; warnings: string[]; summary: Record<string, unknown> }}
+ */
+function summarizeClientMetadataDocument(metadata, expectedClientId) {
+    /** @type {string[]} */
+    const missingFields = [];
+    /** @type {string[]} */
+    const warnings = [];
+    if (!metadata) return { ready: false, missingFields: ['metadata'], warnings, summary: {} };
+    if (metadata['client_id'] !== expectedClientId) missingFields.push('client_id');
+    if (typeof metadata['client_name'] !== 'string' || !metadata['client_name']) missingFields.push('client_name');
+    const redirectUris = Array.isArray(metadata['redirect_uris'])
+        ? /** @type {unknown[]} */ (metadata['redirect_uris']).filter((item) => typeof item === 'string')
+        : [];
+    if (redirectUris.length === 0) missingFields.push('redirect_uris');
+    if (redirectUris.some((redirectUri) => !String(redirectUri).startsWith('https://'))) {
+        warnings.push('redirect_uris contains a non-HTTPS redirect URI.');
+    }
+    return {
+        ready: missingFields.length === 0,
+        missingFields,
+        warnings,
+        summary: {
+            clientId: metadata['client_id'] ?? null,
+            clientName: metadata['client_name'] ?? null,
+            redirectUris,
+            tokenEndpointAuthMethod: metadata['token_endpoint_auth_method'] ?? null,
+        },
+    };
+}
+
+/**
  * @param {ReturnType<typeof readMcpAuthConfig>} config
  * @returns {Record<string, Record<string, string>>}
  */
@@ -355,18 +388,47 @@ export const connectionTools = [
             }
             const firstOk = checked.find((candidate) => candidate.ok);
             const summary = summarizeOAuthMetadata(firstOk?.metadata, config.scopesSupported);
+            const clientMetadataUrl =
+                firstOk && firstOk.metadata?.['client_id_metadata_document_supported'] === true && normalizedIssuer === config.resource
+                    ? `${normalizedIssuer}/.well-known/oauth-client/codex-smoke.json`
+                    : null;
+            const clientMetadataProbe = clientMetadataUrl
+                ? await fetchOAuthMetadata(clientMetadataUrl, effectiveTimeoutMs)
+                : null;
+            const clientMetadataSummary = clientMetadataProbe
+                ? summarizeClientMetadataDocument(clientMetadataProbe.metadata, clientMetadataUrl ?? '')
+                : null;
             return okResult({
                 success: true,
-                ready: Boolean(firstOk && summary.ready),
+                ready: Boolean(firstOk && summary.ready && (clientMetadataSummary?.ready ?? true)),
                 issuer: normalizedIssuer,
                 requiredForCurrentMode: config.enforcement !== 'off',
                 checkedUrls: checked.map(({ url, ok, status, error }) => ({ url, ok, status: status ?? null, error: error ?? null })),
                 selectedMetadataUrl: firstOk?.url ?? null,
                 metadataSummary: summary.summary,
+                clientMetadata:
+                    clientMetadataProbe && clientMetadataSummary
+                        ? {
+                              checkedUrl: clientMetadataProbe.url,
+                              ok: clientMetadataProbe.ok,
+                              status: clientMetadataProbe.status ?? null,
+                              error: clientMetadataProbe.error ?? null,
+                              summary: clientMetadataSummary.summary,
+                              missingFields: clientMetadataSummary.missingFields,
+                              warnings: clientMetadataSummary.warnings,
+                          }
+                        : {
+                              checkedUrl: clientMetadataUrl,
+                              ok: clientMetadataUrl === null ? null : false,
+                              reason:
+                                  clientMetadataUrl === null
+                                      ? 'Skipped because CIMD is not advertised or issuer differs from the MCP resource.'
+                                      : 'Client metadata probe did not run.',
+                          },
                 missingFields: summary.missingFields,
-                warnings: summary.warnings,
+                warnings: [...summary.warnings, ...(clientMetadataSummary?.warnings ?? [])],
                 nextSteps:
-                    firstOk && summary.ready
+                    firstOk && summary.ready && (clientMetadataSummary?.ready ?? true)
                         ? [
                               'Set COPILOT_MCP_OAUTH_JWKS_URI if it differs from the issuer default JWKS URL.',
                               'Run mcp_auth_profile and then test ChatGPT connector with Authentication=OAuth.',

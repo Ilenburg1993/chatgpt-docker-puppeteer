@@ -372,3 +372,9 @@ Setima fatia correlata - prova operacional CIMD:
 - Validacao desta continuidade: typecheck strict Copilot, lint Copilot, 85 testes MCP, 3084 testes Copilot,
   env audit/validate/check, `make copilot-mcp-restart`, `make copilot-mcp-status`, `make copilot-mcp-smoke` e
   `make copilot-mcp-oauth-smoke`.
+
+Oitava fatia correlata - diagnostico MCP CIMD:
+
+- `mcp_oauth_issuer_diagnostics` passou a validar tambem o documento CIMD quando o issuer e o proprio resource MCP.
+- A readiness do diagnostico agora inclui falhas no client metadata document quando ele deveria existir.
+- Validacao: typecheck strict Copilot, lint Copilot e 85 testes MCP.
