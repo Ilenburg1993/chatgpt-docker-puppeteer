@@ -280,7 +280,44 @@ describe('copilot MCP tools', () => {
         assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_find_symbol_usages'));
         assert.ok(Array.isArray(structured['index']));
         assert.ok(/** @type {string[]} */ (structured['index']).includes('repo_index_status'));
+        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_session_profile'));
+        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tools_status'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tunnel_status'));
+        assert.equal(typeof structured['annotationProfile'], 'object');
+    });
+
+    it('mcp_tools_status exposes annotation and approval planning metadata', async () => {
+        const tool = findTool('mcp_tools_status');
+        const result = await tool.handler({});
+        assert.equal(result.isError, undefined);
+        const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
+        assert.equal(structured['success'], true);
+        assert.equal(structured['totalTools'], getCanonicalMcpTools().length);
+        assert.ok(Number(structured['readOnlyCount'] ?? 0) > 0);
+        assert.ok(Number(structured['boundedWriteCount'] ?? 0) > 0);
+        assert.ok(Number(structured['destructiveCount'] ?? 0) > 0);
+        assert.ok(/** @type {string[]} */ (structured['rememberApprovalCandidates']).includes('repo_apply_patch'));
+        assert.ok(/** @type {string[]} */ (structured['destructiveTools']).includes('repo_remove_file'));
+        const tools = /** @type {{ name?: string; annotations?: { idempotentHint?: boolean } }[]} */ (
+            structured['tools']
+        );
+        assert.equal(tools.find((candidate) => candidate.name === 'repo_status')?.annotations?.idempotentHint, true);
+    });
+
+    it('mcp_session_profile returns the recommended ChatGPT autonomy profile', async () => {
+        const tool = findTool('mcp_session_profile');
+        const result = await tool.handler({});
+        assert.equal(result.isError, undefined);
+        const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
+        assert.equal(structured['success'], true);
+        assert.equal(structured['profile'], 'chatgpt-max-autonomy-temporary-tunnel');
+        assert.ok(/** @type {string[]} */ (structured['recommendedFirstCalls']).includes('mcp_tools_status'));
+        const approvalGuidance = /** @type {Record<string, unknown>} */ (structured['approvalGuidance']);
+        assert.ok(
+            /** @type {string[]} */ (approvalGuidance['avoidUnlessExplicitlyNeeded']).includes('repo_remove_file'),
+        );
+        const tunnelGuidance = /** @type {Record<string, unknown>} */ (structured['tunnelGuidance']);
+        assert.equal(tunnelGuidance['mode'], 'Cloudflare Quick Tunnel temporary URL');
     });
 
     it('project_doctor returns canonical validators', async () => {
@@ -294,5 +331,6 @@ describe('copilot MCP tools', () => {
         assert.equal(validators['lint'], 'npm run lint:copilot');
         assert.equal(validators['unitMcp'], 'npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp');
         assert.equal(validators['unit'], 'npm run test:copilot:unit');
+        assert.equal(validators['mcpFullSuite'], 'npm run copilot:mcp:safe-suite -- mcp-full');
     });
 });

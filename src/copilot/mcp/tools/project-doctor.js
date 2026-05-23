@@ -5,8 +5,8 @@
  * @module copilot/mcp/tools/project-doctor
  */
 
-import { z } from 'zod';
 import { readFile } from 'node:fs/promises';
+import { z } from 'zod';
 import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { getMcpWorkspaceRoot } from '../control-plane/paths.js';
 import { okResult } from '../control-plane/result.js';
@@ -35,6 +35,7 @@ export const projectDoctorTool = {
                     name === 'typecheck:strict:src.copilot' ||
                     name === 'lint:copilot' ||
                     name === 'test:copilot:unit' ||
+                    name === 'copilot:mcp:safe-suite' ||
                     name.startsWith('terminal:llm-b')
                 );
             }),
@@ -52,6 +53,9 @@ export const projectDoctorTool = {
                 lint: 'npm run lint:copilot',
                 unitMcp: 'npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp',
                 unit: 'npm run test:copilot:unit',
+                mcpFastSuite: 'npm run copilot:mcp:safe-suite -- mcp-fast',
+                mcpFullSuite: 'npm run copilot:mcp:safe-suite -- mcp-full',
+                copilotFastSuite: 'npm run copilot:mcp:safe-suite -- copilot-fast',
             },
             scripts: includeScripts === false ? undefined : relevantScripts,
         };

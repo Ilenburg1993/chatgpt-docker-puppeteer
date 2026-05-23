@@ -6,9 +6,9 @@
  */
 
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { getMcpWorkspaceRoot } from './paths.js';
 
@@ -18,7 +18,14 @@ const MIN_JOB_TIMEOUT_MS = 1_000;
 const MAX_JOB_TIMEOUT_MS = 60 * 60 * 1000;
 
 /**
- * @typedef {'typecheck' | 'lint' | 'unit-mcp' | 'unit-copilot'} CopilotValidatorName
+ * @typedef {'typecheck'
+ *     | 'lint'
+ *     | 'unit-mcp'
+ *     | 'unit-copilot'
+ *     | 'suite-mcp-fast'
+ *     | 'suite-mcp-full'
+ *     | 'suite-copilot-fast'} CopilotValidatorName
+ *
  *
  * @typedef {object} JobRecord
  * @property {string} id
@@ -57,6 +64,21 @@ export function resolveValidatorCommand(validator) {
             };
         case 'unit-copilot':
             return { command: 'npm', args: ['run', 'test:copilot:unit'] };
+        case 'suite-mcp-fast':
+            return {
+                command: 'node',
+                args: ['src/copilot/mcp/scripts/run-safe-validation-suite.js', 'mcp-fast'],
+            };
+        case 'suite-mcp-full':
+            return {
+                command: 'node',
+                args: ['src/copilot/mcp/scripts/run-safe-validation-suite.js', 'mcp-full'],
+            };
+        case 'suite-copilot-fast':
+            return {
+                command: 'node',
+                args: ['src/copilot/mcp/scripts/run-safe-validation-suite.js', 'copilot-fast'],
+            };
         default:
             throw new Error(`Unsupported validator: ${String(validator)}`);
     }
@@ -85,7 +107,11 @@ export async function spawnValidatorJob(validator, options = {}) {
     const logFile = path.join(MCP_JOBS_DIR, `${id}.log`);
     const manifestFile = path.join(MCP_JOBS_DIR, `${id}.json`);
     await mkdir(MCP_JOBS_DIR, { recursive: true });
-    await writeFile(logFile, `$ ${command.command} ${command.args.join(' ')}\n[job:timeoutMs] ${timeoutMs}\n\n`, 'utf8');
+    await writeFile(
+        logFile,
+        `$ ${command.command} ${command.args.join(' ')}\n[job:timeoutMs] ${timeoutMs}\n\n`,
+        'utf8',
+    );
 
     const child = spawn(command.command, command.args, {
         cwd: getMcpWorkspaceRoot(),
@@ -185,10 +211,10 @@ export function cancelJob(id) {
 
 /**
  * @param {{
- *   status?: JobRecord['status'];
- *   validator?: CopilotValidatorName;
- *   limit?: number;
- *   includeCompleted?: boolean;
+ *     status?: JobRecord['status'];
+ *     validator?: CopilotValidatorName;
+ *     limit?: number;
+ *     includeCompleted?: boolean;
  * }} [options]
  * @returns {Promise<Omit<JobRecord, 'process'>[]>}
  */

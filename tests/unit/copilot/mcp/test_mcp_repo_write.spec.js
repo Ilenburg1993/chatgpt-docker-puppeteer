@@ -15,6 +15,10 @@ const applyPatchTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_p
 const writeFileTool = repoWriteTools.find((tool) => tool.name === 'repo_write_file');
 const createFileTool = repoWriteTools.find((tool) => tool.name === 'repo_create_file');
 const moveFileTool = repoWriteTools.find((tool) => tool.name === 'repo_move_file');
+const listQuarantineTool = repoWriteTools.find((tool) => tool.name === 'repo_list_quarantine');
+const inspectQuarantinedFileTool = repoWriteTools.find((tool) => tool.name === 'repo_inspect_quarantined_file');
+const quarantineFileTool = repoWriteTools.find((tool) => tool.name === 'repo_quarantine_file');
+const restoreQuarantinedFileTool = repoWriteTools.find((tool) => tool.name === 'repo_restore_quarantined_file');
 const removeFileTool = repoWriteTools.find((tool) => tool.name === 'repo_remove_file');
 
 describe('copilot MCP repo write tools', () => {
@@ -115,6 +119,79 @@ describe('copilot MCP repo write tools', () => {
         await assert.rejects(() => fs.access(filePath));
     });
 
+    it('quarantines and restores files through a reversible workspace flow', async () => {
+        assert.ok(listQuarantineTool);
+        assert.ok(inspectQuarantinedFileTool);
+        assert.ok(quarantineFileTool);
+        assert.ok(restoreQuarantinedFileTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const filePath = path.join(dir, 'quarantine.txt');
+        await fs.writeFile(filePath, 'recover me\n', 'utf8');
+
+        const quarantined = await quarantineFileTool.handler({ path: filePath });
+        assert.equal(quarantined.isError, undefined);
+        assert.equal(quarantined.structuredContent.success, true);
+        assert.equal(quarantined.structuredContent.status, 'quarantined');
+        assert.equal(await pathExists(filePath), false);
+
+        const quarantineId = String(quarantined.structuredContent.quarantineId);
+        const listed = await listQuarantineTool.handler({ status: 'quarantined', limit: 20 });
+        assert.equal(listed.isError, undefined);
+        const listedItems = /** @type {{ quarantineId?: string }[]} */ (listed.structuredContent.items);
+        assert.ok(listedItems.some((item) => item.quarantineId === quarantineId));
+
+        const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
+        assert.equal(inspected.isError, undefined);
+        assert.equal(inspected.structuredContent.restorable, true);
+        assert.equal(typeof inspected.structuredContent.dataSha256, 'string');
+
+        const restored = await restoreQuarantinedFileTool.handler({ quarantineId });
+        assert.equal(restored.isError, undefined);
+        assert.equal(restored.structuredContent.success, true);
+        assert.equal(restored.structuredContent.destination.endsWith('quarantine.txt'), true);
+        assert.equal(await fs.readFile(filePath, 'utf8'), 'recover me\n');
+
+        const secondRestore = await restoreQuarantinedFileTool.handler({ quarantineId });
+        assert.equal(secondRestore.isError, true);
+        assert.equal(secondRestore.structuredContent.code, 'ERR_QUARANTINE_NOT_RESTORABLE');
+    });
+
+    it('requires explicit overwrite confirmation when restoring quarantine over an existing file', async () => {
+        assert.ok(quarantineFileTool);
+        assert.ok(restoreQuarantinedFileTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const source = path.join(dir, 'source.txt');
+        const destination = path.join(dir, 'destination.txt');
+        await fs.writeFile(source, 'from quarantine\n', 'utf8');
+        await fs.writeFile(destination, 'existing\n', 'utf8');
+
+        const quarantined = await quarantineFileTool.handler({ path: source });
+        assert.equal(quarantined.isError, undefined);
+        const quarantineId = String(quarantined.structuredContent.quarantineId);
+
+        const blocked = await restoreQuarantinedFileTool.handler({ quarantineId, destinationPath: destination });
+        assert.equal(blocked.isError, true);
+        assert.equal(blocked.structuredContent.code, 'EEXIST');
+        assert.equal(await fs.readFile(destination, 'utf8'), 'existing\n');
+
+        const missingConfirm = await restoreQuarantinedFileTool.handler({
+            quarantineId,
+            destinationPath: destination,
+            overwrite: true,
+        });
+        assert.equal(missingConfirm.isError, true);
+        assert.equal(missingConfirm.structuredContent.code, 'ERR_RESTORE_CONFIRM_OVERWRITE_REQUIRED');
+
+        const restored = await restoreQuarantinedFileTool.handler({
+            quarantineId,
+            destinationPath: destination,
+            overwrite: true,
+            confirmOverwrite: true,
+        });
+        assert.equal(restored.isError, undefined);
+        assert.equal(await fs.readFile(destination, 'utf8'), 'from quarantine\n');
+    });
+
     it('supports dry-run patches without mutating the file', async () => {
         assert.ok(applyPatchTool);
         const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
@@ -151,3 +228,16 @@ describe('copilot MCP repo write tools', () => {
         assert.match(String(result.structuredContent.error), /Acesso negado|outside/i);
     });
 });
+
+/**
+ * @param {string} filePath
+ * @returns {Promise<boolean>}
+ */
+async function pathExists(filePath) {
+    try {
+        await fs.access(filePath);
+        return true;
+    } catch {
+        return false;
+    }
+}

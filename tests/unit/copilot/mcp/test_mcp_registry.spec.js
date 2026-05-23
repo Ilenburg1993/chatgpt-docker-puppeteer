@@ -26,8 +26,11 @@ describe('copilot MCP registry', () => {
             'job_get_output',
             'job_list',
             'mcp_capabilities_summary',
+            'mcp_run_safe_validation_suite',
             'mcp_runtime_health',
+            'mcp_session_profile',
             'mcp_smoke_workspace',
+            'mcp_tools_status',
             'mcp_tunnel_status',
             'project_doctor',
             'repo_apply_patch',
@@ -42,10 +45,14 @@ describe('copilot MCP registry', () => {
             'repo_index_invalidate',
             'repo_index_search',
             'repo_index_status',
+            'repo_inspect_quarantined_file',
+            'repo_list_quarantine',
             'repo_move_file',
+            'repo_quarantine_file',
             'repo_read_file',
             'repo_read_file_chunks',
             'repo_remove_file',
+            'repo_restore_quarantined_file',
             'repo_root_tree',
             'repo_search_text',
             'repo_status',
@@ -67,6 +74,8 @@ describe('copilot MCP registry', () => {
             assert.equal(typeof tool.annotations.readOnlyHint, 'boolean', tool.name);
             assert.equal(tool.annotations.openWorldHint, false, tool.name);
             assert.equal(typeof tool.annotations.destructiveHint, 'boolean', tool.name);
+            assert.equal(typeof tool.annotations.idempotentHint, 'boolean', tool.name);
+            assert.equal(tool.annotations.idempotentHint, tool.annotations.readOnlyHint === true, tool.name);
         }
         assert.equal(tools.find((tool) => tool.name === 'repo_remove_file')?.annotations.destructiveHint, true);
     });

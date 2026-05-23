@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import { resolveJobTimeoutMs, resolveValidatorCommand } from '../../../../src/copilot/mcp/control-plane/jobs.js';
+import { resolveSafeValidationSuite } from '../../../../src/copilot/mcp/scripts/run-safe-validation-suite.js';
 import { jobTools } from '../../../../src/copilot/mcp/tools/jobs.js';
 
 describe('copilot MCP jobs', () => {
@@ -27,10 +28,41 @@ describe('copilot MCP jobs', () => {
             command: 'npx',
             args: ['vitest', '--config', 'vitest.copilot.config.js', 'run', 'tests/unit/copilot/mcp'],
         });
+        assert.deepEqual(resolveValidatorCommand('suite-mcp-fast'), {
+            command: 'node',
+            args: ['src/copilot/mcp/scripts/run-safe-validation-suite.js', 'mcp-fast'],
+        });
+        assert.deepEqual(resolveValidatorCommand('suite-mcp-full'), {
+            command: 'node',
+            args: ['src/copilot/mcp/scripts/run-safe-validation-suite.js', 'mcp-full'],
+        });
+        assert.deepEqual(resolveValidatorCommand('suite-copilot-fast'), {
+            command: 'node',
+            args: ['src/copilot/mcp/scripts/run-safe-validation-suite.js', 'copilot-fast'],
+        });
     });
 
     it('rejects unsupported validators', () => {
         assert.throws(() => resolveValidatorCommand(/** @type {any} */ ('admin-command')), /Unsupported validator/);
+    });
+
+    it('resolves fixed safe validation suite steps', () => {
+        assert.deepEqual(
+            resolveSafeValidationSuite('mcp-fast').map((step) => step.name),
+            ['typecheck', 'unit-mcp'],
+        );
+        assert.deepEqual(
+            resolveSafeValidationSuite('mcp-full').map((step) => step.name),
+            ['typecheck', 'lint', 'unit-mcp'],
+        );
+        assert.deepEqual(
+            resolveSafeValidationSuite('copilot-fast').map((step) => step.name),
+            ['typecheck', 'lint', 'unit-copilot'],
+        );
+        assert.throws(
+            () => resolveSafeValidationSuite(/** @type {any} */ ('admin-command')),
+            /Unsupported validation suite/,
+        );
     });
 
     it('normalizes job timeouts inside supported bounds', () => {
@@ -46,6 +78,7 @@ describe('copilot MCP jobs', () => {
         assert.ok(names.includes('run_lint_copilot'));
         assert.ok(names.includes('run_unit_copilot'));
         assert.ok(names.includes('run_project_doctor'));
+        assert.ok(names.includes('mcp_run_safe_validation_suite'));
         assert.ok(names.includes('job_list'));
     });
 

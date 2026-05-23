@@ -161,11 +161,14 @@ async function runSmoke() {
         'repo_file_outline',
         'repo_index_status',
         'project_doctor',
+        'mcp_run_safe_validation_suite',
         'run_copilot_validator',
         'job_list',
         'job_get_output',
         'mcp_runtime_health',
+        'mcp_session_profile',
         'mcp_smoke_workspace',
+        'mcp_tools_status',
         'mcp_tunnel_status',
     ];
     const missingCriticalTools = criticalToolNames.filter((toolName) => !remoteToolNames.includes(toolName));

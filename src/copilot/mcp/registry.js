@@ -17,7 +17,9 @@ import { repoIndexTools } from './tools/repo-index.js';
 import { repoReadTools } from './tools/repo-read.js';
 import { repoWriteTools } from './tools/repo-write.js';
 import { mcpRuntimeHealthTool } from './tools/runtime-health.js';
+import { mcpSessionProfileTool } from './tools/session-profile.js';
 import { mcpSmokeWorkspaceTool } from './tools/smoke-workspace.js';
+import { bindMcpToolsStatusProvider, mcpToolsStatusTool } from './tools/tools-status.js';
 import { mcpTunnelStatusTool } from './tools/tunnel-status.js';
 
 /**
@@ -38,7 +40,7 @@ import { mcpTunnelStatusTool } from './tools/tunnel-status.js';
  * @returns {McpToolDefinition[]}
  */
 export function getCanonicalMcpTools() {
-    return [
+    const tools = [
         ...repoReadTools,
         ...repoIndexTools,
         ...gitReadTools,
@@ -48,10 +50,14 @@ export function getCanonicalMcpTools() {
         ...repoWriteTools,
         ...copilotSessionTools,
         ...metaTools,
+        mcpSessionProfileTool,
+        mcpToolsStatusTool,
         mcpSmokeWorkspaceTool,
         mcpTunnelStatusTool,
         mcpRuntimeHealthTool,
     ];
+    bindMcpToolsStatusProvider(() => tools);
+    return tools;
 }
 
 /**

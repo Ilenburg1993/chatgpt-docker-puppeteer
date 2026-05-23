@@ -36,7 +36,9 @@ export const mcpSmokeWorkspaceTool = {
 
         await runCheck(checks, 'repo_status', async () => {
             const result = await repoStatusHandler();
-            return { dirty: result.structuredContent?.['dirty'] === true };
+            const dirty = result.structuredContent?.['dirty'] === true;
+            if (dirty) warnings.push('WORKSPACE_DIRTY: repository has uncommitted or untracked changes.');
+            return { dirty };
         });
         await runCheck(checks, 'repo_tree_default', async () => {
             const resolved = await resolveReadPath('src/copilot');

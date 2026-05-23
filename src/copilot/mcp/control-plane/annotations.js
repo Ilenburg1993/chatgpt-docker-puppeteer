@@ -17,6 +17,7 @@ export function readOnlyAnnotations() {
         readOnlyHint: true,
         openWorldHint: false,
         destructiveHint: false,
+        idempotentHint: true,
     };
 }
 
@@ -28,6 +29,7 @@ export function boundedWriteAnnotations() {
         readOnlyHint: false,
         openWorldHint: false,
         destructiveHint: false,
+        idempotentHint: false,
     };
 }
 
@@ -39,6 +41,6 @@ export function destructiveAnnotations() {
         readOnlyHint: false,
         openWorldHint: false,
         destructiveHint: true,
+        idempotentHint: false,
     };
 }
-

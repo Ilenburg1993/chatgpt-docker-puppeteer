@@ -11,8 +11,24 @@ import { cancelJob, listJobs, readJobOutput, spawnValidatorJob } from '../contro
 import { errorResult, okResult } from '../control-plane/result.js';
 import { projectDoctorTool } from './project-doctor.js';
 
-const validatorSchema = z.enum(['typecheck', 'lint', 'unit-mcp', 'unit-copilot']);
+const validatorSchema = z.enum([
+    'typecheck',
+    'lint',
+    'unit-mcp',
+    'unit-copilot',
+    'suite-mcp-fast',
+    'suite-mcp-full',
+    'suite-copilot-fast',
+]);
+const safeValidationSuiteSchema = z.enum(['mcp-fast', 'mcp-full', 'copilot-fast']);
 const jobStatusSchema = z.enum(['running', 'completed', 'failed', 'cancelled']);
+
+/** @type {Record<string, import('../control-plane/jobs.js').CopilotValidatorName>} */
+const SAFE_VALIDATION_SUITE_TO_VALIDATOR = {
+    'mcp-fast': 'suite-mcp-fast',
+    'mcp-full': 'suite-mcp-full',
+    'copilot-fast': 'suite-copilot-fast',
+};
 
 /**
  * @param {import('../control-plane/jobs.js').CopilotValidatorName} validator
@@ -60,6 +76,31 @@ export const jobTools = [
         'Start the canonical full unit test job for src/copilot.',
     ),
     {
+        name: 'mcp_run_safe_validation_suite',
+        title: 'Run safe MCP validation suite',
+        description:
+            'Start a fixed allowlisted validation suite as one job, reducing repeated ChatGPT approval prompts for common verification workflows.',
+        inputSchema: {
+            suite: safeValidationSuiteSchema.describe(
+                'Suite to run: mcp-fast (typecheck + MCP tests), mcp-full (typecheck + lint + MCP tests), or copilot-fast (typecheck + lint + unit-copilot).',
+            ),
+            timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Optional job timeout in ms.'),
+        },
+        annotations: boundedWriteAnnotations(),
+        handler: async ({ suite, timeoutMs }) => {
+            const validator = SAFE_VALIDATION_SUITE_TO_VALIDATOR[String(suite)];
+            if (!validator) {
+                return errorResult('Unsupported validation suite.', {
+                    code: 'ERR_UNSUPPORTED_VALIDATION_SUITE',
+                    hint: 'Use mcp-fast, mcp-full, or copilot-fast.',
+                    suite,
+                });
+            }
+            const job = await spawnValidatorJob(validator, timeoutMs === undefined ? {} : { timeoutMs });
+            return okResult({ success: true, suite, job }, `Started job ${job.id} (${suite}).`);
+        },
+    },
+    {
         name: 'run_project_doctor',
         title: 'Run project doctor',
         description: 'Return the canonical Copilot MCP project doctor report.',
@@ -92,7 +133,10 @@ export const jobTools = [
             status: jobStatusSchema.optional().describe('Optional job status filter.'),
             validator: validatorSchema.optional().describe('Optional validator filter.'),
             limit: z.number().int().min(1).max(200).optional().describe('Maximum jobs returned. Default: 50.'),
-            includeCompleted: z.boolean().optional().describe('Include completed/failed/cancelled jobs. Default: true.'),
+            includeCompleted: z
+                .boolean()
+                .optional()
+                .describe('Include completed/failed/cancelled jobs. Default: true.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ status, validator, limit, includeCompleted }) => {

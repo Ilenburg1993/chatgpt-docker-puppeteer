@@ -1,0 +1,99 @@
+// @ts-check
+/**
+ * MCP session profile for low-friction ChatGPT connector usage.
+ *
+ * @module copilot/mcp/tools/session-profile
+ */
+
+import { buildChatGptConnectorProfile } from '../connection/profile.js';
+import { readOnlyAnnotations } from '../control-plane/annotations.js';
+import { okResult } from '../control-plane/result.js';
+import { buildMcpCapabilitiesSummary } from './meta.js';
+
+/**
+ * @type {import('../registry.js').McpToolDefinition}
+ */
+export const mcpSessionProfileTool = {
+    name: 'mcp_session_profile',
+    title: 'MCP session profile',
+    description:
+        'Return the recommended ChatGPT operating profile for this repo MCP session, including approval-minimizing workflows.',
+    inputSchema: {},
+    annotations: readOnlyAnnotations(),
+    handler: async () => {
+        const connector = buildChatGptConnectorProfile();
+        const capabilities = buildMcpCapabilitiesSummary();
+        return okResult({
+            success: true,
+            profile: 'chatgpt-max-autonomy-temporary-tunnel',
+            connector: {
+                name: connector.name,
+                description: connector.description,
+                mcpServerUrl: connector.chatgptFormFields.mcpServerUrl,
+                authentication: connector.chatgptFormFields.authentication,
+                authMode: connector.authMode,
+                localMcpUrl: connector.localMcpUrl,
+            },
+            recommendedFirstCalls: [
+                'repo_status',
+                'mcp_tools_status',
+                'mcp_capabilities_summary',
+                'mcp_tunnel_status',
+                'project_doctor',
+            ],
+            lowFrictionReadCalls: [
+                'repo_tree',
+                'repo_root_tree',
+                'repo_search_text',
+                'repo_read_file',
+                'repo_read_file_chunks',
+                'repo_file_outline',
+                'repo_symbol_search',
+                'repo_index_search',
+                'repo_list_quarantine',
+                'repo_inspect_quarantined_file',
+                'git_status',
+                'git_diff',
+            ],
+            preferredWriteWorkflows: [
+                {
+                    task: 'patch-existing-file',
+                    flow: ['repo_read_file', 'repo_apply_patch dryRun=true', 'repo_apply_patch expectedHash=<sha256>'],
+                    reason: 'Exact-string patch is narrower than full-file replacement.',
+                },
+                {
+                    task: 'remove-file-safely',
+                    flow: ['repo_quarantine_file', 'repo_restore_quarantined_file if rollback is needed'],
+                    reason: 'Quarantine is reversible and should be preferred over repo_remove_file.',
+                },
+                {
+                    task: 'validate-work',
+                    flow: ['mcp_run_safe_validation_suite suite=mcp-full', 'job_get_output'],
+                    reason: 'One allowlisted job reduces repeated validator calls.',
+                },
+            ],
+            approvalGuidance: {
+                askUserToRememberWhenAvailable: [
+                    'repo_apply_patch',
+                    'repo_write_file',
+                    'repo_create_file',
+                    'repo_move_file',
+                    'repo_quarantine_file',
+                    'repo_restore_quarantined_file',
+                    'mcp_run_safe_validation_suite',
+                ],
+                avoidUnlessExplicitlyNeeded: ['repo_remove_file', 'job_cancel'],
+                cannotDisableHostPrompts:
+                    'ChatGPT controls connector confirmation UI. This MCP reduces friction with precise annotations, narrow tools and reversible workflows; it cannot bypass host safety prompts.',
+            },
+            tunnelGuidance: {
+                mode: 'Cloudflare Quick Tunnel temporary URL',
+                expectedUrlShape: 'https://<random>.trycloudflare.com/mcp',
+                reconnectRule:
+                    'When the quick tunnel process exits, create a fresh URL and update or recreate the ChatGPT connector.',
+            },
+            smokePrompts: connector.smokePrompts,
+            capabilities,
+        });
+    },
+};

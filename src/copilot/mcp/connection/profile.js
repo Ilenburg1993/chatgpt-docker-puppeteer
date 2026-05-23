@@ -46,8 +46,7 @@ export function buildChatGptConnectorProfile(options = {}) {
     const publicMcpUrl = options.publicMcpUrl ?? process.env['COPILOT_MCP_PUBLIC_URL'] ?? DEFAULT_PUBLIC_MCP_URL;
     const localMcpUrl = options.localMcpUrl ?? process.env['COPILOT_MCP_LOCAL_URL'] ?? DEFAULT_LOCAL_MCP_URL;
     const authMode =
-        options.authMode ??
-        /** @type {ChatGptAuthMode} */ (process.env['COPILOT_MCP_CHATGPT_AUTH_MODE'] ?? 'none-dev');
+        options.authMode ?? /** @type {ChatGptAuthMode} */ (process.env['COPILOT_MCP_CHATGPT_AUTH_MODE'] ?? 'none-dev');
     const tunnelId = options.tunnelId ?? process.env['OPENAI_MCP_TUNNEL_ID'] ?? 'tunnel_<preencher>';
     const connectorUrl = normalizeMcpUrl(publicMcpUrl);
     const localUrl = normalizeMcpUrl(localMcpUrl);
@@ -81,7 +80,9 @@ export function buildChatGptConnectorProfile(options = {}) {
         ],
         smokePrompts: [
             'Use o conector Repo DevContainer MCP e chame repo_status.',
+            'Chame mcp_session_profile e siga a ordem recommendedFirstCalls.',
             'Chame mcp_capabilities_summary e resuma as categorias de tools.',
+            'Chame mcp_tools_status e identifique tools read-only, bounded-write e destructive.',
             'Chame mcp_tunnel_status e confirme recommendedAction, lastSmokeOk e lastSmokeAgeMinutes.',
             'Liste a árvore de src/copilot/mcp com repo_tree.',
             'Liste a raiz real do workspace com repo_root_tree maxEntries=80.',
@@ -91,6 +92,7 @@ export function buildChatGptConnectorProfile(options = {}) {
             'Faça repo_symbol_search name=registerCanonicalMcpTools path=src/copilot/mcp.',
             'Faça repo_file_outline path=src/copilot/mcp/tools/repo-read.js includeTopComments=true.',
             'Chame project_doctor.',
+            'Inicie mcp_run_safe_validation_suite suite=mcp-full e depois leia o output com job_get_output.',
             'Inicie run_copilot_validator validator=typecheck e depois leia o output com job_get_output.',
             'Chame mcp_runtime_health e mcp_tunnel_status.',
         ],
@@ -110,7 +112,13 @@ export function buildChatGptConnectorProfile(options = {}) {
 
 /**
  * @param {ConnectorProfileOptions} [options]
- * @returns {{ prerequisites: string[]; httpTunnelCommands: string[]; stdioTunnelCommands: string[]; chatgptUrl: string; notes: string[] }}
+ * @returns {{
+ *     prerequisites: string[];
+ *     httpTunnelCommands: string[];
+ *     stdioTunnelCommands: string[];
+ *     chatgptUrl: string;
+ *     notes: string[];
+ * }}
  */
 export function buildSecureTunnelRunbook(options = {}) {
     const profile = buildChatGptConnectorProfile(options);
@@ -147,18 +155,20 @@ export function buildSecureTunnelRunbook(options = {}) {
 /**
  * @param {ConnectorProfileOptions & { originUrl?: string }} [options]
  * @returns {{
- *   prerequisites: string[];
- *   originUrl: string;
- *   quickTunnelCommands: string[];
- *   managedTunnelCommands: string[];
- *   chatgptUrl: string;
- *   notes: string[];
+ *     prerequisites: string[];
+ *     originUrl: string;
+ *     quickTunnelCommands: string[];
+ *     managedTunnelCommands: string[];
+ *     chatgptUrl: string;
+ *     notes: string[];
  * }}
  */
 export function buildCloudflareTunnelRunbook(options = {}) {
     const profile = buildChatGptConnectorProfile(options);
     const originUrl =
-        options.originUrl ?? process.env['COPILOT_MCP_CLOUDFLARE_ORIGIN_URL'] ?? profile.localMcpUrl.replace(/\/mcp$/, '');
+        options.originUrl ??
+        process.env['COPILOT_MCP_CLOUDFLARE_ORIGIN_URL'] ??
+        profile.localMcpUrl.replace(/\/mcp$/, '');
     return {
         prerequisites: [
             'cloudflared instalado no mesmo ambiente que alcança o MCP HTTP local.',
