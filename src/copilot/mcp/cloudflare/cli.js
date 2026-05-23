@@ -209,6 +209,13 @@ async function runSmoke() {
     }
     const baseUrl = connectorUrl.replace(/\/mcp$/, '');
     const health = await probeJson(`${baseUrl}/health`, { method: 'GET' });
+    const authConfig = readMcpAuthConfig();
+    const protectedResource = await probeJson(`${baseUrl}/.well-known/oauth-protected-resource`, { method: 'GET' });
+    const authorizationServer = extractAuthorizationServer(protectedResource.body) ?? baseUrl;
+    const oauthMetadata = await probeJson(`${authorizationServer}/.well-known/oauth-authorization-server`, {
+        method: 'GET',
+    });
+    const oauthSummary = summarizeOAuthReadiness(protectedResource.body, oauthMetadata.body, authConfig.mode);
     const toolsList = await probeJson(connectorUrl, {
         method: 'POST',
         headers: {
@@ -267,7 +274,12 @@ async function runSmoke() {
     const toolsMatchLocalRegistry = missingLocalTools.length === 0 && unexpectedRemoteTools.length === 0;
     const criticalToolsPresent = missingCriticalTools.length === 0;
     const ok =
-        health.ok && toolsList.ok && remoteToolNames.length > 0 && toolsMatchLocalRegistry && criticalToolsPresent;
+        health.ok &&
+        toolsList.ok &&
+        remoteToolNames.length > 0 &&
+        toolsMatchLocalRegistry &&
+        criticalToolsPresent &&
+        oauthSummary.ok;
     const healthSummary = {
         ok: health.ok,
         ...(health.status !== undefined ? { status: health.status } : {}),
@@ -304,6 +316,7 @@ async function runSmoke() {
         ok,
         connectorUrl,
         health: healthSummary,
+        oauth: oauthSummary,
         toolsList: toolsListSummary,
     };
     const stateUpdated =
@@ -318,6 +331,7 @@ async function runSmoke() {
         connectorUrl,
         stateUpdated,
         health: healthSummary,
+        oauth: oauthSummary,
         toolsList: toolsListSummary,
         chatgpt: {
             mcpServerUrl: connectorUrl,
@@ -325,6 +339,79 @@ async function runSmoke() {
     };
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
+function asRecord(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function normalizeStringArray(value) {
+    return Array.isArray(value) ? value.filter((item) => typeof item === 'string' && item.trim()) : [];
+}
+
+/**
+ * @param {unknown} body
+ * @returns {string | null}
+ */
+function extractAuthorizationServer(body) {
+    const metadata = asRecord(body);
+    const servers = Array.isArray(metadata?.['authorization_servers']) ? metadata['authorization_servers'] : [];
+    const first = servers.find((item) => typeof item === 'string' && item.startsWith('https://'));
+    return typeof first === 'string' ? first.replace(/\/+$/u, '') : null;
+}
+
+/**
+ * @param {unknown} protectedResourceBody
+ * @param {unknown} oauthMetadataBody
+ * @param {string} authMode
+ * @returns {Record<string, unknown> & { ok: boolean }}
+ */
+function summarizeOAuthReadiness(protectedResourceBody, oauthMetadataBody, authMode) {
+    if (authMode !== 'oauth' && authMode !== 'mixed-auth') {
+        return { ok: true, required: false, mode: authMode };
+    }
+    const protectedResource = asRecord(protectedResourceBody);
+    const metadata = asRecord(oauthMetadataBody);
+    const protectedScopes = normalizeStringArray(protectedResource?.['scopes_supported']);
+    const oauthScopes = normalizeStringArray(metadata?.['scopes_supported']);
+    const missingProtectedFields = [];
+    if (typeof protectedResource?.['resource'] !== 'string') missingProtectedFields.push('resource');
+    if (!Array.isArray(protectedResource?.['authorization_servers'])) missingProtectedFields.push('authorization_servers');
+    if (!protectedScopes.includes('repo:read')) missingProtectedFields.push('scopes_supported:repo:read');
+    if (!protectedScopes.includes('repo:validate')) missingProtectedFields.push('scopes_supported:repo:validate');
+    const missingMetadataFields = [];
+    if (typeof metadata?.['issuer'] !== 'string') missingMetadataFields.push('issuer');
+    if (typeof metadata?.['authorization_endpoint'] !== 'string') missingMetadataFields.push('authorization_endpoint');
+    if (typeof metadata?.['token_endpoint'] !== 'string') missingMetadataFields.push('token_endpoint');
+    if (metadata?.['client_id_metadata_document_supported'] !== true) missingMetadataFields.push('client_id_metadata_document_supported');
+    if (typeof metadata?.['userinfo_endpoint'] !== 'string') missingMetadataFields.push('userinfo_endpoint');
+    if (!oauthScopes.includes('openid')) missingMetadataFields.push('scopes_supported:openid');
+    return {
+        ok: missingProtectedFields.length === 0 && missingMetadataFields.length === 0,
+        required: true,
+        mode: authMode,
+        protectedResource: {
+            resource: protectedResource?.['resource'] ?? null,
+            authorizationServers: protectedResource?.['authorization_servers'] ?? [],
+            scopesSupported: protectedScopes,
+            missingFields: missingProtectedFields,
+        },
+        authorizationServerMetadata: {
+            issuer: metadata?.['issuer'] ?? null,
+            clientIdMetadataDocumentSupported: metadata?.['client_id_metadata_document_supported'] === true,
+            userinfoEndpointConfigured: typeof metadata?.['userinfo_endpoint'] === 'string',
+            scopesSupported: oauthScopes,
+            missingFields: missingMetadataFields,
+        },
+    };
 }
 
 /**

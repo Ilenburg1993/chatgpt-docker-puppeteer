@@ -1963,3 +1963,70 @@ Validacao executada nesta fatia:
    reduzido para `repo:read` e `repo:validate`.
 9. `make copilot-mcp-smoke`: passou com 67/67 tools remotas.
 10. `make copilot-mcp-oauth-smoke`: passou com DCR, JWKS, token e chamada autenticada `mcp_runtime_health`.
+
+### 14.9. Continuidade — smoke CIMD e Cloudflare OAuth guardrail
+
+Data: 2026-05-23.
+
+Problema restante apos 14.8:
+
+1. O servidor anunciava CIMD, mas o smoke publico ainda provava principalmente DCR.
+2. `cloudflare:smoke` validava `/health` e `tools/list`, mas nao falhava se a metadata OAuth/OIDC regredisse.
+3. Os novos knobs `COPILOT_MCP_OAUTH_INITIAL_SCOPES` e `COPILOT_MCP_ALLOWED_ORIGINS` ainda precisavam entrar na
+   governanca de ambiente.
+
+Mudancas aplicadas:
+
+1. O issuer dev agora serve um documento de client metadata para smoke:
+   - `GET /.well-known/oauth-client/codex-smoke.json`;
+   - `client_id` exatamente igual a URL publica HTTPS;
+   - `redirect_uris=["https://chatgpt.com/connector/oauth/codex-smoke"]`.
+2. `npm run copilot:mcp:oauth:smoke` passou a exercitar dois fluxos:
+   - DCR com `repo:read repo:validate`;
+   - CIMD com `repo:read repo:validate openid profile email`.
+3. O fluxo CIMD do smoke confirma:
+   - fetch HTTPS do client metadata;
+   - authorization-code + PKCE;
+   - token endpoint;
+   - `id_token`;
+   - `/oauth/userinfo`.
+4. `npm run copilot:mcp:cloudflare:smoke` agora tambem valida OAuth quando `COPILOT_MCP_AUTH_MODE=oauth|mixed-auth`:
+   - protected resource metadata;
+   - `repo:read` e `repo:validate` como escopos iniciais;
+   - authorization server metadata;
+   - `client_id_metadata_document_supported=true`;
+   - `userinfo_endpoint`;
+   - escopo OIDC `openid`.
+5. Governanca de ambiente atualizada:
+   - `.env.example`;
+   - `.env.local.example`;
+   - `.env.schema.json`.
+
+Validacao executada nesta continuidade:
+
+1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
+2. `npm run lint:copilot -- --quiet`: passou.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 85/85.
+4. `npm run test:copilot:unit`: passou com 3084/3084.
+5. `make copilot-mcp-restart`: passou e reiniciou:
+   - `mcp-http` PID `94757`;
+   - `cloudflared` PID `94763`.
+6. `curl https://mcp.aurelin.org/.well-known/oauth-client/codex-smoke.json`: passou.
+7. `make copilot-mcp-oauth-smoke`: passou e confirmou:
+   - `dcrFlow.token.scope="repo:read repo:validate"`;
+   - `cimdFlow.token.scope="repo:read repo:validate openid profile email"`;
+   - `cimdFlow.token.idTokenIssued=true`;
+   - `cimdFlow.userinfo.ok=true`.
+8. `make copilot-mcp-status`: passou com `ready=true`.
+9. `make copilot-mcp-smoke`: passou e agora inclui `oauth.ok=true`.
+10. `node scripts/env/audit-env-surface.mjs`: passou.
+11. `node scripts/env/validate-env.js`: passou.
+12. `node scripts/env/check-env-local.mjs`: passou.
+
+Roadmap restante atualizado:
+
+1. Testar novamente na UI do ChatGPT e registrar se a opcao CIMD deixa de aparecer indisponivel.
+2. Fazer o ChatGPT executar uma tool que exija step-up (`repo:write` ou `repo:admin`) e medir se o host pede apenas o
+   escopo novo.
+3. Evoluir `mcp_oauth_issuer_diagnostics` para testar tambem o documento CIMD quando o issuer for o proprio resource.
+4. Projetar faixa separada para tasks MCP experimentais em jobs longos.

@@ -25,6 +25,7 @@ import {
     securitySchemesForMcpTool,
 } from '../../../../src/copilot/mcp/control-plane/auth.js';
 import {
+    buildBuiltInDevOAuthClientMetadata,
     buildBuiltInDevOAuthMetadata as buildDevOAuthServerMetadata,
     isBuiltInDevOAuthEnabled as isDevOAuthServerEnabled,
 } from '../../../../src/copilot/mcp/control-plane/dev-oauth.js';
@@ -112,6 +113,9 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.ok(/** @type {string[]} */ (metadata.scopes_supported).includes('openid'));
         assert.ok(/** @type {string[]} */ (metadata.claims_supported).includes('email'));
         assert.deepEqual(buildProtectedResourceMetadata(config).scopes_supported, ['repo:read', 'repo:validate']);
+        const clientMetadata = buildBuiltInDevOAuthClientMetadata(config);
+        assert.equal(clientMetadata.client_id, 'https://mcp.aurelin.org/.well-known/oauth-client/codex-smoke.json');
+        assert.deepEqual(clientMetadata.redirect_uris, ['https://chatgpt.com/connector/oauth/codex-smoke']);
     });
 
     it('maps tool annotations to planned OAuth scopes and mixed security schemes', () => {

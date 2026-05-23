@@ -360,3 +360,15 @@ Sexta fatia correlata - MCP/OAuth/Cloudflare:
 - Publicacao operacional: `make copilot-mcp-restart`, `make copilot-mcp-status`, `make copilot-mcp-smoke` e
   `make copilot-mcp-oauth-smoke` passaram. A metadata publica em `https://mcp.aurelin.org` agora confirma CIMD,
   `userinfo_endpoint` e `scopes_supported` inicial reduzido para `repo:read`/`repo:validate`.
+
+Setima fatia correlata - prova operacional CIMD:
+
+- O issuer dev passou a servir `/.well-known/oauth-client/codex-smoke.json` para smoke CIMD com `client_id` HTTPS
+  autoconsistente.
+- `copilot:mcp:oauth:smoke` agora valida DCR e CIMD. O fluxo CIMD confirma `id_token` e `/oauth/userinfo`.
+- `copilot:mcp:cloudflare:smoke` agora falha se OAuth metadata, CIMD, userinfo ou escopos iniciais regredirem.
+- `.env.example`, `.env.local.example` e `.env.schema.json` cobrem `COPILOT_MCP_OAUTH_INITIAL_SCOPES` e
+  `COPILOT_MCP_ALLOWED_ORIGINS`.
+- Validacao desta continuidade: typecheck strict Copilot, lint Copilot, 85 testes MCP, 3084 testes Copilot,
+  env audit/validate/check, `make copilot-mcp-restart`, `make copilot-mcp-status`, `make copilot-mcp-smoke` e
+  `make copilot-mcp-oauth-smoke`.

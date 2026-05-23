@@ -27,6 +27,8 @@ const AUTH_CODE_TTL_MS = 5 * 60 * 1000;
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 const DEFAULT_KEY_FILE = 'src/copilot/.ai/mcp/oauth-dev-private-key.pem';
 const CLIENT_METADATA_TIMEOUT_MS = 5000;
+const DEV_CLIENT_METADATA_PATH = '/.well-known/oauth-client/codex-smoke.json';
+const DEV_CLIENT_REDIRECT_URI = 'https://chatgpt.com/connector/oauth/codex-smoke';
 const OIDC_SCOPES = /** @type {const} */ (['openid', 'profile', 'email']);
 const OIDC_CLAIMS = /** @type {const} */ ([
     'sub',
@@ -94,6 +96,23 @@ export function buildBuiltInDevOAuthMetadata(config) {
 }
 
 /**
+ * @param {import('./auth.js').McpAuthConfig} config
+ * @returns {Record<string, unknown>}
+ */
+export function buildBuiltInDevOAuthClientMetadata(config) {
+    const clientId = `${config.resource}${DEV_CLIENT_METADATA_PATH}`;
+    return {
+        client_id: clientId,
+        client_name: 'Copilot MCP CIMD smoke client',
+        client_uri: config.resource,
+        redirect_uris: [DEV_CLIENT_REDIRECT_URI],
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+    };
+}
+
+/**
  * @param {import('node:http').IncomingMessage} req
  * @param {import('node:http').ServerResponse} res
  * @param {URL} url
@@ -105,6 +124,11 @@ export async function handleBuiltInDevOAuthRequest(req, res, url, config) {
 
     if (req.method === 'GET' && (url.pathname === '/.well-known/oauth-authorization-server' || url.pathname === '/.well-known/openid-configuration')) {
         writeJson(res, 200, buildBuiltInDevOAuthMetadata(config));
+        return true;
+    }
+
+    if (req.method === 'GET' && url.pathname === DEV_CLIENT_METADATA_PATH) {
+        writeJson(res, 200, buildBuiltInDevOAuthClientMetadata(config));
         return true;
     }
 

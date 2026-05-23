@@ -29,33 +29,65 @@ export async function runMcpOAuthSmoke(options = {}) {
     const jwksUri = typeof metadata?.['jwks_uri'] === 'string' ? metadata['jwks_uri'] : `${authorizationServer}/oauth/jwks.json`;
     const jwks = await probeJson(jwksUri, { method: 'GET' });
     const registration = await registerClient(metadata, authorizationServer);
-    const token = registration.ok ? await authorizeAndExchangeToken(metadata, registration, resource) : failure('registration failed');
-    const tokenBody = asRecord(token.body);
+    const dcrToken = registration.ok
+        ? await authorizeAndExchangeRegisteredClient(metadata, registration, resource, 'repo:read repo:validate')
+        : failure('registration failed');
+    const dcrTokenBody = asRecord(dcrToken.body);
     const runtimeHealth =
-        typeof tokenBody?.['access_token'] === 'string'
-            ? await callMcpTool(`${resource}/mcp`, tokenBody['access_token'], 'mcp_runtime_health')
+        typeof dcrTokenBody?.['access_token'] === 'string'
+            ? await callMcpTool(`${resource}/mcp`, dcrTokenBody['access_token'], 'mcp_runtime_health')
             : failure('token missing');
+    const cimdClientMetadataUrl = `${authorizationServer}/.well-known/oauth-client/codex-smoke.json`;
+    const cimdClientMetadata = await probeJson(cimdClientMetadataUrl, { method: 'GET' });
+    const cimdBody = asRecord(cimdClientMetadata.body);
+    const cimdRedirectUri = normalizeStringArray(cimdBody?.['redirect_uris'])[0] ?? 'https://chatgpt.com/connector/oauth/codex-smoke';
+    const cimdToken =
+        metadata?.['client_id_metadata_document_supported'] === true
+            ? await authorizeAndExchangeClient(metadata, {
+                  clientId: cimdClientMetadataUrl,
+                  redirectUri: cimdRedirectUri,
+                  resource,
+                  scope: 'repo:read repo:validate openid profile email',
+              })
+            : failure('client_id_metadata_document_supported missing');
+    const cimdTokenBody = asRecord(cimdToken.body);
+    const userinfo =
+        typeof cimdTokenBody?.['access_token'] === 'string' && typeof metadata?.['userinfo_endpoint'] === 'string'
+            ? await probeJson(metadata['userinfo_endpoint'], {
+                  method: 'GET',
+                  headers: { authorization: `Bearer ${cimdTokenBody['access_token']}`, accept: 'application/json' },
+              })
+            : failure('userinfo unavailable');
     return {
-        ok: protectedResource.ok && oauthMetadata.ok && jwks.ok && registration.ok && token.ok && runtimeHealth.ok,
+        ok:
+            protectedResource.ok &&
+            oauthMetadata.ok &&
+            jwks.ok &&
+            registration.ok &&
+            dcrToken.ok &&
+            runtimeHealth.ok &&
+            cimdClientMetadata.ok &&
+            cimdToken.ok &&
+            userinfo.ok,
         resource,
         protectedResource,
         authorizationServer,
         oauthMetadata: summarizeMetadataProbe(oauthMetadata),
         jwks: summarizeJwks(jwks),
         registration: summarizeRegistration(registration),
-        token: {
-            ok: token.ok,
-            status: token.status ?? null,
-            tokenType: tokenBody?.['token_type'] ?? null,
-            expiresIn: tokenBody?.['expires_in'] ?? null,
-            scope: tokenBody?.['scope'] ?? null,
-            error: token.error ?? null,
+        dcrFlow: {
+            token: summarizeToken(dcrToken),
+            runtimeHealth: {
+                ok: runtimeHealth.ok,
+                status: runtimeHealth.status ?? null,
+                hasJsonRpcError: hasJsonRpcError(runtimeHealth.body),
+                error: runtimeHealth.error ?? null,
+            },
         },
-        runtimeHealth: {
-            ok: runtimeHealth.ok,
-            status: runtimeHealth.status ?? null,
-            hasJsonRpcError: hasJsonRpcError(runtimeHealth.body),
-            error: runtimeHealth.error ?? null,
+        cimdFlow: {
+            clientMetadata: summarizeClientMetadata(cimdClientMetadata),
+            token: summarizeToken(cimdToken),
+            userinfo: summarizeUserinfo(userinfo),
         },
     };
 }
@@ -87,23 +119,33 @@ async function registerClient(metadata, authorizationServer) {
  * @param {Record<string, unknown> | null} metadata
  * @param {ProbeResult} registration
  * @param {string} resource
+ * @param {string} scope
  * @returns {Promise<ProbeResult>}
  */
-async function authorizeAndExchangeToken(metadata, registration, resource) {
+async function authorizeAndExchangeRegisteredClient(metadata, registration, resource, scope) {
     const registrationBody = asRecord(registration.body);
     const clientId = String(registrationBody?.['client_id'] ?? '');
     const redirectUri =
         normalizeStringArray(registrationBody?.['redirect_uris'])[0] ?? 'https://chatgpt.com/connector/oauth/codex-smoke';
+    return authorizeAndExchangeClient(metadata, { clientId, redirectUri, resource, scope });
+}
+
+/**
+ * @param {Record<string, unknown> | null} metadata
+ * @param {{ clientId: string; redirectUri: string; resource: string; scope: string }} client
+ * @returns {Promise<ProbeResult>}
+ */
+async function authorizeAndExchangeClient(metadata, client) {
     const verifier = base64Url(randomBytes(32));
     const challenge = base64Url(createHash('sha256').update(verifier).digest());
-    const authorizationEndpoint = String(metadata?.['authorization_endpoint'] ?? `${resource}/oauth/authorize`);
-    const tokenEndpoint = String(metadata?.['token_endpoint'] ?? `${resource}/oauth/token`);
+    const authorizationEndpoint = String(metadata?.['authorization_endpoint'] ?? `${client.resource}/oauth/authorize`);
+    const tokenEndpoint = String(metadata?.['token_endpoint'] ?? `${client.resource}/oauth/token`);
     const authorizeUrl = new URL(authorizationEndpoint);
     authorizeUrl.searchParams.set('response_type', 'code');
-    authorizeUrl.searchParams.set('client_id', clientId);
-    authorizeUrl.searchParams.set('redirect_uri', redirectUri);
-    authorizeUrl.searchParams.set('scope', 'repo:read repo:write repo:validate repo:admin');
-    authorizeUrl.searchParams.set('resource', resource);
+    authorizeUrl.searchParams.set('client_id', client.clientId);
+    authorizeUrl.searchParams.set('redirect_uri', client.redirectUri);
+    authorizeUrl.searchParams.set('scope', client.scope);
+    authorizeUrl.searchParams.set('resource', client.resource);
     authorizeUrl.searchParams.set('code_challenge', challenge);
     authorizeUrl.searchParams.set('code_challenge_method', 'S256');
     authorizeUrl.searchParams.set('state', 'codex-smoke');
@@ -117,10 +159,10 @@ async function authorizeAndExchangeToken(metadata, registration, resource) {
         body: new URLSearchParams({
             grant_type: 'authorization_code',
             code,
-            client_id: clientId,
-            redirect_uri: redirectUri,
+            client_id: client.clientId,
+            redirect_uri: client.redirectUri,
             code_verifier: verifier,
-            resource,
+            resource: client.resource,
         }).toString(),
     });
 }
@@ -238,6 +280,52 @@ function summarizeRegistration(registration) {
         status: registration.status ?? null,
         clientIdIssued: typeof body?.['client_id'] === 'string',
         redirectUris: body?.['redirect_uris'] ?? [],
+    };
+}
+
+/**
+ * @param {ProbeResult} token
+ * @returns {Record<string, unknown>}
+ */
+function summarizeToken(token) {
+    const body = asRecord(token.body);
+    return {
+        ok: token.ok,
+        status: token.status ?? null,
+        tokenType: body?.['token_type'] ?? null,
+        expiresIn: body?.['expires_in'] ?? null,
+        scope: body?.['scope'] ?? null,
+        idTokenIssued: typeof body?.['id_token'] === 'string',
+        error: token.error ?? null,
+    };
+}
+
+/**
+ * @param {ProbeResult} probe
+ * @returns {Record<string, unknown>}
+ */
+function summarizeClientMetadata(probe) {
+    const body = asRecord(probe.body);
+    return {
+        ok: probe.ok,
+        status: probe.status ?? null,
+        clientId: body?.['client_id'] ?? null,
+        redirectUris: body?.['redirect_uris'] ?? [],
+    };
+}
+
+/**
+ * @param {ProbeResult} probe
+ * @returns {Record<string, unknown>}
+ */
+function summarizeUserinfo(probe) {
+    const body = asRecord(probe.body);
+    return {
+        ok: probe.ok,
+        status: probe.status ?? null,
+        subject: body?.['sub'] ?? null,
+        emailVerified: body?.['email_verified'] ?? null,
+        error: probe.error ?? null,
     };
 }
 
