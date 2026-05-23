@@ -14,6 +14,7 @@ describe('copilot MCP registry', () => {
         const names = tools.map((tool) => tool.name).sort();
 
         assert.deepEqual(names, [
+            'chatgpt_connector_current_url_status',
             'chatgpt_connector_profile',
             'chatgpt_connector_url_check',
             'copilot_session_get',
@@ -63,6 +64,7 @@ describe('copilot MCP registry', () => {
             'repo_read_file_chunks',
             'repo_remove_file',
             'repo_restore_quarantined_file',
+            'repo_root_redaction_status',
             'repo_root_tree',
             'repo_search_text',
             'repo_status',

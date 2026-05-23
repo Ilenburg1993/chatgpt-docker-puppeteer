@@ -47,6 +47,7 @@ export const mcpSessionProfileTool = {
             lowFrictionReadCalls: [
                 'repo_tree',
                 'repo_root_tree',
+                'repo_root_redaction_status',
                 'repo_search_text',
                 'repo_read_file',
                 'repo_read_file_chunks',
@@ -61,6 +62,7 @@ export const mcpSessionProfileTool = {
                 'repo_move_file_plan',
                 'repo_index_refresh_plan',
                 'mcp_validation_plan',
+                'chatgpt_connector_current_url_status',
                 'git_status',
                 'git_diff',
             ],

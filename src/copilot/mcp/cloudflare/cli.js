@@ -152,6 +152,7 @@ async function runSmoke() {
         'repo_status',
         'repo_tree',
         'repo_root_tree',
+        'repo_root_redaction_status',
         'repo_read_file',
         'repo_read_file_chunks',
         'repo_file_stats',
@@ -180,6 +181,7 @@ async function runSmoke() {
         'mcp_smoke_workspace',
         'mcp_tools_status',
         'mcp_tunnel_status',
+        'chatgpt_connector_current_url_status',
     ];
     const missingCriticalTools = criticalToolNames.filter((toolName) => !remoteToolNames.includes(toolName));
     const missingLocalTools = localToolNames.filter((toolName) => !remoteToolNames.includes(toolName));

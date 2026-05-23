@@ -110,6 +110,29 @@ describe('copilot MCP tools', () => {
         );
     });
 
+    it('repo_root_redaction_status audits root redaction without returning hidden names', async () => {
+        const tool = findTool('repo_root_redaction_status');
+        const result = await tool.handler({});
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(result.structuredContent?.['path'], '.');
+        assert.equal(result.structuredContent?.['policy']?.['hiddenNamesReturned'], false);
+        assert.equal(result.structuredContent?.['policy']?.['protectedNamesReturned'], false);
+        assert.equal(typeof result.structuredContent?.['hiddenInspectableTopLevelCount'], 'number');
+        assert.equal(typeof result.structuredContent?.['protectedOrRedactedTopLevelCount'], 'number');
+        assert.equal('entries' in (result.structuredContent ?? {}), false);
+    });
+
+    it('chatgpt_connector_current_url_status returns saved URL status without client URL input', async () => {
+        const tool = findTool('chatgpt_connector_current_url_status');
+        const result = await tool.handler({});
+        assert.equal(result.isError, undefined);
+        assert.ok('currentUrl' in (result.structuredContent ?? {}));
+        assert.ok('validation' in (result.structuredContent ?? {}));
+        assert.equal(result.structuredContent?.['chatgptForm']?.['authentication'], 'No authentication');
+        assert.ok(Array.isArray(result.structuredContent?.['recovery']));
+    });
+
     it('repo_search_text accepts context lines and cursor metadata', async () => {
         const tool = findTool('repo_search_text');
         const result = await tool.handler({

@@ -6,14 +6,16 @@
  */
 
 import { z } from 'zod';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { okResult } from '../control-plane/result.js';
+import { readCloudflareTunnelConfig, validateConfiguredPublicUrl } from '../cloudflare/config.js';
+import { readQuickTunnelState, summarizeQuickTunnelState } from '../cloudflare/state.js';
 import {
     buildChatGptConnectorProfile,
     buildCloudflareTunnelRunbook,
     buildSecureTunnelRunbook,
     validatePublicConnectorUrl,
 } from '../connection/profile.js';
+import { readOnlyAnnotations } from '../control-plane/annotations.js';
+import { okResult } from '../control-plane/result.js';
 
 /**
  * @type {import('../registry.js').McpToolDefinition[]}
@@ -52,6 +54,46 @@ export const connectionTools = [
                 success: validation.ok,
                 url: publicMcpUrl,
                 validation,
+            });
+        },
+    },
+    {
+        name: 'chatgpt_connector_current_url_status',
+        title: 'Current ChatGPT connector URL status',
+        description:
+            'Return the currently saved ChatGPT connector URL, validation, tunnel age and recovery guidance without requiring the client to pass a public URL.',
+        inputSchema: {},
+        annotations: readOnlyAnnotations(),
+        handler: async () => {
+            const config = readCloudflareTunnelConfig();
+            const state = await readQuickTunnelState(config.stateFile);
+            const temporaryTunnel = summarizeQuickTunnelState(state, Date.now(), config.staleAfterMs);
+            const currentUrl = temporaryTunnel.connectorUrl ?? config.publicMcpUrl ?? null;
+            const validation = currentUrl
+                ? validatePublicConnectorUrl(currentUrl)
+                : (validateConfiguredPublicUrl(config) ?? { ok: false, reason: 'No public MCP URL is configured.' });
+            const source = temporaryTunnel.connectorUrl
+                ? 'quick-tunnel-state'
+                : config.publicMcpUrl
+                  ? 'environment'
+                  : 'missing';
+
+            return okResult({
+                success: validation.ok === true,
+                currentUrl,
+                source,
+                validation,
+                chatgptForm: {
+                    name: 'LLM-B Workspace MCP',
+                    description: 'Repo-scoped MCP connector for src/copilot development in this workspace.',
+                    mcpServerUrl: currentUrl,
+                    authentication: 'No authentication',
+                },
+                temporaryTunnel,
+                originUrl: config.originUrl,
+                localMcpUrl: config.localMcpUrl,
+                stateFile: config.stateFile,
+                recovery: temporaryTunnel.recovery,
             });
         },
     },

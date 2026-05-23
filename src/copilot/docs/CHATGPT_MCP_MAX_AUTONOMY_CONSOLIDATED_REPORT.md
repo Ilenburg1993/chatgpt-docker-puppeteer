@@ -1034,7 +1034,7 @@ Resultado implementado:
 
 ### Faixa D — URL/redaction status sem inputs sensiveis
 
-Status: pendente.
+Status: implementada e validada em teste focado nesta rodada.
 
 Objetivo:
 
@@ -1050,6 +1050,20 @@ Pronto quando:
 
 1. ChatGPT consegue auditar tunnel atual sem passar URL.
 2. ChatGPT consegue auditar redaction sem listar hidden names.
+
+Resultado implementado:
+
+1. `chatgpt_connector_current_url_status` le o estado salvo do Cloudflare Quick Tunnel e/ou env
+   atual, valida a URL `/mcp`, devolve campos prontos para a caixa do ChatGPT e orienta recovery sem
+   exigir URL publica como argumento.
+2. `repo_root_redaction_status` usa a engine de scan/IO para calcular contagens agregadas da raiz,
+   inclusive hidden/protected, sem retornar arrays de entradas nem nomes hidden/protected.
+3. `mcp_capabilities_summary`, `mcp_session_profile`, Cloudflare smoke critical list e smoke prompts
+   foram atualizados para favorecer essas tools.
+4. Validacao focada:
+   - `npm run typecheck:strict:src.copilot`: passou;
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
+     passou com 29 testes.
 
 ### Faixa E — Runtime health agregado
 
@@ -1180,11 +1194,12 @@ Feito:
 14. `outputSchema` registry-wide.
 15. `_meta.securitySchemes` registry-wide para perfil dev `noauth`.
 16. Plan-only read-only tools para patch/create/quarantine/move/index/validation.
+17. `chatgpt_connector_current_url_status`.
+18. `repo_root_redaction_status`.
 
 Faltante P0:
 
-1. `chatgpt_connector_current_url_status`.
-2. `repo_root_redaction_status`.
+1. Nenhum item P0 da nova auditoria permanece aberto apos a Faixa D; os proximos itens sao P1/P2.
 
 Faltante P1:
 

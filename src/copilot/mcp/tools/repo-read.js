@@ -5,6 +5,7 @@
  * @module copilot/mcp/tools/repo-read
  */
 
+import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '#copilot/core';
 import { parseFileForContext } from '#copilot/infra';
 import {
     diffText,
@@ -76,6 +77,21 @@ function parseUsageOutput(output, defaultFile) {
  */
 function formatUsageMatches(matches) {
     return matches.map((match) => `${match.file}:${match.line}: ${match.text}`.trimEnd()).join('\n');
+}
+
+/**
+ * @param {{ type: string }[]} entries
+ * @returns {{ files: number; directories: number; symlinks: number; other: number }}
+ */
+function countEntryTypes(entries) {
+    const counts = { files: 0, directories: 0, symlinks: 0, other: 0 };
+    for (const entry of entries) {
+        if (entry.type === 'file') counts.files += 1;
+        else if (entry.type === 'directory') counts.directories += 1;
+        else if (entry.type === 'symlink') counts.symlinks += 1;
+        else counts.other += 1;
+    }
+    return counts;
 }
 
 /**
@@ -170,6 +186,57 @@ export const repoReadTools = [
                     writeProtectedPaths: 'blocked',
                 },
                 entries,
+            });
+        },
+    },
+    {
+        name: 'repo_root_redaction_status',
+        title: 'Repository root redaction status',
+        description:
+            'Return root listing redaction and hidden/protected-path aggregate counts without exposing hidden or protected entry names.',
+        inputSchema: {},
+        annotations: readOnlyAnnotations(),
+        handler: async () => {
+            const resolved = await resolveReadPath('.');
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
+            const visibleScan = await scanDirectory(resolved.resolved, {
+                workspaceRoot: WORKSPACE_ROOT,
+                recursive: false,
+                depth: 1,
+                showHidden: false,
+            });
+            const aggregateScan = await scanDirectory(resolved.resolved, {
+                workspaceRoot: WORKSPACE_ROOT,
+                recursive: false,
+                depth: 1,
+                showHidden: true,
+                respectDenylist: false,
+                redactProtectedPaths: true,
+                fingerprint: false,
+            });
+            const hiddenInspectableCount = aggregateScan.entries.filter((entry) => entry.name.startsWith('.')).length;
+            return okResult({
+                success: true,
+                workspaceRoot: getMcpWorkspaceRoot(),
+                path: resolved.relative,
+                policy: {
+                    hiddenNamesReturned: false,
+                    protectedNamesReturned: false,
+                    rootTreeDefaultShowHidden: false,
+                    listProtectedPaths: 'redacted',
+                    readProtectedPaths: 'blocked',
+                    writeProtectedPaths: 'blocked',
+                    protectedSegmentCount: DEFAULT_BLOCKED_PATH_SEGMENTS.length,
+                },
+                visibleTopLevelCount: visibleScan.entries.length,
+                visibleTypeCounts: countEntryTypes(visibleScan.entries),
+                hiddenInspectableTopLevelCount: hiddenInspectableCount,
+                protectedOrRedactedTopLevelCount: aggregateScan.blockedEntries,
+                aggregateInspectableTopLevelCount: aggregateScan.entries.length,
+                aggregateTypeCounts: countEntryTypes(aggregateScan.entries),
+                totalScannedVisible: visibleScan.scannedEntries,
+                totalScannedAggregate: aggregateScan.scannedEntries,
+                hint: 'Use repo_root_tree without showHidden for names. Use this status tool for hidden/protected aggregate auditing.',
             });
         },
     },

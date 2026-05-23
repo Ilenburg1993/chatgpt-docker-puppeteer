@@ -9,12 +9,13 @@ import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { okResult } from '../control-plane/result.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 7;
+const CAPABILITIES_VERSION = 8;
 
 const READ_TOOLS = [
     'repo_status',
     'repo_tree',
     'repo_root_tree',
+    'repo_root_redaction_status',
     'repo_read_file',
     'repo_read_file_chunks',
     'repo_file_stats',
@@ -80,7 +81,11 @@ const RUNTIME_TOOLS = [
     'mcp_capabilities_summary',
 ];
 
-const CONNECTION_TOOLS = ['chatgpt_connector_profile', 'chatgpt_connector_url_check'];
+const CONNECTION_TOOLS = [
+    'chatgpt_connector_profile',
+    'chatgpt_connector_url_check',
+    'chatgpt_connector_current_url_status',
+];
 const COPILOT_SDK_TOOLS = ['copilot_sessions_list', 'copilot_session_get'];
 /** @type {string[]} */
 const DEPRECATED_TOOLS = [];
@@ -121,6 +126,8 @@ const IO_GUIDANCE = [
     'Use repo_symbol_search and repo_file_outline before edits that need code navigation.',
     'Use mcp_run_safe_validation_suite suite="mcp-full" before separate validator calls when ChatGPT needs one canonical verification step.',
     'Use repo_root_tree or repo_tree path="." for the real workspace root.',
+    'Use repo_root_redaction_status to audit hidden/protected root redaction without returning hidden names.',
+    'Use chatgpt_connector_current_url_status to recover the saved temporary tunnel URL without passing it as input.',
     'LLM-B can consume MCP optionally, but does not depend on this MCP server.',
 ];
 
