@@ -9,6 +9,7 @@ import { getIoIndexStats } from '#copilot/infra/public/indexing';
 import { readCloudflareTunnelConfig } from '../cloudflare/config.js';
 import { readQuickTunnelState, summarizeQuickTunnelState } from '../cloudflare/state.js';
 import { readOnlyAnnotations } from '../control-plane/annotations.js';
+import { readMcpIndexAutoBuildState } from '../control-plane/index-auto-build.js';
 import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
 import { getMcpWorkspaceRoot } from '../control-plane/paths.js';
 import { okResult } from '../control-plane/result.js';
@@ -90,6 +91,7 @@ export const mcpRuntimeHealthTool = {
         const workspace = await summarizeWorkspaceStatus();
         const indexStats = getIoIndexStats();
         const index = summarizeIndexHealth(indexStats);
+        const indexAutoBuild = readMcpIndexAutoBuildState();
         const lastWorkspaceSmoke = readMcpWorkspaceSmokeSummary();
         const warnings = [];
         const critical = [];
@@ -98,6 +100,8 @@ export const mcpRuntimeHealthTool = {
         if (!index.available) warnings.push('Shared IO index is unavailable; run or auto-run repo_index_build.');
         else if (index.empty)
             warnings.push('Shared IO index is available but empty; refresh it before indexed search.');
+        if (indexAutoBuild.status === 'failed') critical.push('MCP index auto-build failed.');
+        if (indexAutoBuild.status === 'running') warnings.push('MCP index auto-build is currently running.');
         if (!tunnel.configured)
             warnings.push('No saved Cloudflare quick tunnel state; start a temporary tunnel for ChatGPT.');
         if (tunnel.configured && !tunnel.processAlive) {
@@ -127,6 +131,7 @@ export const mcpRuntimeHealthTool = {
             operationalSignals: {
                 workspace,
                 index,
+                indexAutoBuild,
                 lastWorkspaceSmoke,
                 tunnel: {
                     configured: tunnel.configured,

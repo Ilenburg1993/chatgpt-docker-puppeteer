@@ -258,6 +258,7 @@ describe('copilot MCP tools', () => {
         assert.equal(status.isError, undefined);
         assert.equal(status.structuredContent?.['success'], true);
         assert.equal(typeof status.structuredContent?.['stats'], 'object');
+        assert.equal(typeof status.structuredContent?.['autoBuild'], 'object');
 
         const searchTool = findTool('repo_index_search');
         const search = await searchTool.handler({ query: 'repoIndexTools', maxResults: 5 });

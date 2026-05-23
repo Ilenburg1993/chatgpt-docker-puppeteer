@@ -25,6 +25,7 @@ import {
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { z } from 'zod';
 import { boundedWriteAnnotations, readOnlyAnnotations } from '../control-plane/annotations.js';
+import { readMcpIndexAutoBuildState } from '../control-plane/index-auto-build.js';
 import { getMcpWorkspaceRoot, resolveReadPath } from '../control-plane/paths.js';
 import { errorResult, okResult } from '../control-plane/result.js';
 
@@ -57,6 +58,7 @@ export const repoIndexTools = [
                 workspaceRoot: getMcpWorkspaceRoot(),
                 defaultPath: DEFAULT_INDEX_PATH,
                 stats: getIoIndexStats(),
+                autoBuild: readMcpIndexAutoBuildState(),
             }),
     },
     {

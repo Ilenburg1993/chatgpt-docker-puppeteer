@@ -9,6 +9,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createServer } from 'node:http';
 import { buildChatGptConnectorProfile } from '../connection/profile.js';
 import { logMcp } from '../control-plane/audit.js';
+import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
 import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
 import { createCopilotMcpServer } from '../server.js';
 
@@ -44,7 +45,15 @@ export async function startHttpMcpServer(opts = {}) {
 
         if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/health')) {
             res.writeHead(200, { 'content-type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, name: 'copilot-mcp', mcpPath: MCP_PATH, metrics: readMcpMetricsSnapshot() }));
+            res.end(
+                JSON.stringify({
+                    ok: true,
+                    name: 'copilot-mcp',
+                    mcpPath: MCP_PATH,
+                    metrics: readMcpMetricsSnapshot(),
+                    indexAutoBuild: readMcpIndexAutoBuildState(),
+                }),
+            );
             return;
         }
 
@@ -78,7 +87,9 @@ export async function startHttpMcpServer(opts = {}) {
                 void server.close();
             });
             try {
-                await server.connect(/** @type {import('@modelcontextprotocol/sdk/shared/transport.js').Transport} */ (transport));
+                await server.connect(
+                    /** @type {import('@modelcontextprotocol/sdk/shared/transport.js').Transport} */ (transport),
+                );
                 await transport.handleRequest(req, res);
             } catch (error) {
                 logMcp('ERROR', 'Error handling MCP HTTP request.', {
@@ -98,5 +109,6 @@ export async function startHttpMcpServer(opts = {}) {
         httpServer.listen(port, host, () => resolve(undefined));
     });
     logMcp('INFO', 'MCP HTTP server listening.', { url: `http://${host}:${port}${MCP_PATH}` });
+    startMcpIndexAutoBuildInBackground({ reason: 'mcp-http-start' });
     return httpServer;
 }

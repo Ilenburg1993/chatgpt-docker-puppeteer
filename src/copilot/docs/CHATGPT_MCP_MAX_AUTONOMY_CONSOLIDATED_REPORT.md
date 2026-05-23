@@ -1111,7 +1111,7 @@ Resultado implementado:
 
 ### Faixa F — Index resiliente fora do host
 
-Status: pendente.
+Status: implementada e validada em teste focado nesta rodada.
 
 Objetivo:
 
@@ -1130,6 +1130,25 @@ Subfases:
 Pronto quando:
 
 1. `repo_index_status` nao permanece vazio por falta de chamada do ChatGPT.
+
+Resultado implementado:
+
+1. `COPILOT_MCP_INDEX_AUTO_BUILD=true` ativa auto-build opcional no boot HTTP do MCP.
+2. Variaveis suportadas:
+   - `COPILOT_MCP_INDEX_AUTO_BUILD_PATH`;
+   - `COPILOT_MCP_INDEX_AUTO_BUILD_MAX_FILES`;
+   - `COPILOT_MCP_INDEX_AUTO_BUILD_DEPTH`;
+   - `COPILOT_MCP_INDEX_AUTO_BUILD_CONCURRENCY`;
+   - `COPILOT_MCP_INDEX_AUTO_BUILD_IGNORE_GITIGNORE`.
+3. O build roda em background apos o servidor HTTP ficar ouvindo, evitando bloquear startup/tunnel.
+4. `repo_index_status`, `/health` e `mcp_runtime_health` passam a expor `indexAutoBuild`.
+5. O objetivo operacional e permitir que o operador inicie:
+   - `COPILOT_MCP_INDEX_AUTO_BUILD=true npm run copilot:mcp:http` antes de conectar pelo ChatGPT,
+     evitando depender de `repo_index_build` dentro do host.
+6. Validacao focada:
+   - `npm run typecheck:strict:src.copilot`: passou;
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_runtime_metrics.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
+     passou com 28 testes.
 
 ### Faixa G — Last validation summary
 
@@ -1214,6 +1233,7 @@ Feito:
 17. `chatgpt_connector_current_url_status`.
 18. `repo_root_redaction_status`.
 19. Runtime health agregado com dirty workspace, index, tunnel e ultimo smoke local.
+20. Auto index refresh opt-in no boot HTTP do MCP.
 
 Faltante P0:
 
@@ -1221,9 +1241,8 @@ Faltante P0:
 
 Faltante P1:
 
-1. Auto index refresh.
-2. `mcp_last_validation_summary`.
-3. Host block diagnostics.
+1. `mcp_last_validation_summary`.
+2. Host block diagnostics.
 
 Faltante P2:
 
