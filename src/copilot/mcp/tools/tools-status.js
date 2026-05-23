@@ -6,8 +6,15 @@
  */
 
 import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { readMcpAuthConfig } from '../control-plane/auth.js';
+import { MCP_AUTH_SCOPES, readMcpAuthConfig } from '../control-plane/auth.js';
 import { okResult } from '../control-plane/result.js';
+
+const MAX_POWER_REPO_SCOPES = [
+    MCP_AUTH_SCOPES.read,
+    MCP_AUTH_SCOPES.write,
+    MCP_AUTH_SCOPES.validate,
+    MCP_AUTH_SCOPES.admin,
+];
 
 /** @type {() => import('../registry.js').McpToolDefinition[]} */
 let toolsProvider = () => [];
@@ -124,6 +131,7 @@ export const mcpAutonomyPowerScoreTool = {
                 : summaries.filter((tool) => Array.isArray(tool.securitySchemes) && tool.securitySchemes.length > 0).length /
                   summaries.length;
         const auth = readMcpAuthConfig();
+        const maxPowerRepoScopesByDefault = MAX_POWER_REPO_SCOPES.every((scope) => auth.initialScopes.includes(scope));
         const scoreParts = {
             toolSurface: clampScore((summaries.length / 66) * 18, 18),
             lowFrictionReads: clampScore((readOnly.length / Math.max(1, summaries.length)) * 18, 18),
@@ -137,9 +145,11 @@ export const mcpAutonomyPowerScoreTool = {
             ),
             authPosture: clampScore(
                 auth.enforcement === 'off'
-                    ? 10
+                    ? 6
                     : auth.staticBearerConfigured || (auth.expectedIssuer && auth.jwksUri)
-                      ? 10
+                      ? maxPowerRepoScopesByDefault
+                          ? 10
+                          : 7
                       : 4,
                 10,
             ),
@@ -152,6 +162,9 @@ export const mcpAutonomyPowerScoreTool = {
         if (securityMetadataCoverage < 1) blockers.push('Some tools still lack securitySchemes metadata.');
         if (auth.enforcement !== 'off' && !auth.staticBearerConfigured && !(auth.expectedIssuer && auth.jwksUri)) {
             blockers.push('Auth enforcement is enabled without a configured static token or OAuth/JWKS verifier.');
+        }
+        if (!maxPowerRepoScopesByDefault) {
+            blockers.push('OAuth initial scopes are not max-power for the canonical ChatGPT connector.');
         }
         return okResult({
             success: true,
@@ -174,6 +187,8 @@ export const mcpAutonomyPowerScoreTool = {
                 mode: auth.mode,
                 enforcement: auth.enforcement,
                 authorizationServersConfigured: auth.authorizationServers.length > 0,
+                initialScopes: [...auth.initialScopes],
+                maxPowerRepoScopesByDefault,
                 jwksUriConfigured: Boolean(auth.jwksUri),
                 staticBearerConfigured: auth.staticBearerConfigured,
             },

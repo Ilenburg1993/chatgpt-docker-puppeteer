@@ -311,6 +311,9 @@ describe('copilot MCP tools', () => {
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tools_status'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tunnel_status'));
         assert.equal(typeof structured['annotationProfile'], 'object');
+        const authProfile = /** @type {Record<string, unknown>} */ (structured['authProfile']);
+        assert.equal(authProfile['maxPowerDefault'], true);
+        assert.ok(/** @type {string[]} */ (authProfile['initialScopes']).includes('repo:admin'));
     });
 
     it('mcp_tools_status exposes annotation and approval planning metadata', async () => {
@@ -450,6 +453,9 @@ describe('copilot MCP tools', () => {
         assert.equal(typeof result.structuredContent?.['score'], 'number');
         assert.equal(typeof result.structuredContent?.['grade'], 'string');
         assert.equal(typeof result.structuredContent?.['toolCounts'], 'object');
+        const auth = /** @type {Record<string, unknown>} */ (result.structuredContent?.['auth']);
+        assert.equal(auth['maxPowerRepoScopesByDefault'], true);
+        assert.ok(/** @type {string[]} */ (auth['initialScopes']).includes('repo:write'));
     });
 
     it('plan-only tools return read-only next-call previews for sensitive operations', async () => {

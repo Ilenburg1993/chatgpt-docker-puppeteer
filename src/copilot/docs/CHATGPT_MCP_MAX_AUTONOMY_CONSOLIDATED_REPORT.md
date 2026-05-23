@@ -2108,3 +2108,45 @@ Validacao executada nesta correcao:
     - `cimdFlow.token.scope="repo:read repo:write repo:validate repo:admin openid profile email"`;
     - `cimdFlow.token.idTokenIssued=true`;
     - `cimdFlow.userinfo.ok=true`.
+
+### 14.12. Continuidade — introspeccao MCP tambem reporta max-power
+
+Data: 2026-05-23.
+
+Problema restante apos 14.11:
+
+1. O runtime publico ja anunciava os quatro escopos, mas algumas tools de introspeccao ainda descreviam a metadata como
+   heranca dev/noauth ou nao mostravam explicitamente se o default max-power estava ativo.
+2. Isso criava risco de o proprio ChatGPT receber sinais conflitantes ao chamar `mcp_capabilities_summary` ou
+   `mcp_autonomy_power_score`.
+
+Mudancas aplicadas:
+
+1. `mcp_capabilities_summary` passou a expor `authProfile` com:
+   - `mode`;
+   - `enforcement`;
+   - `authorizationServersConfigured`;
+   - `initialScopes`;
+   - `maxPowerDefault`.
+2. `mcp_autonomy_power_score` passou a incluir:
+   - `auth.initialScopes`;
+   - `auth.maxPowerRepoScopesByDefault`;
+   - blocker explicito se o default deixar de conter `repo:read`, `repo:write`, `repo:validate` e `repo:admin`.
+3. O texto de `metadataProfile.securitySchemes` foi atualizado para OAuth registry-wide com escopos repo max-power
+   por default, removendo a mensagem antiga de dev/noauth.
+4. `CAPABILITIES_VERSION` subiu para `13`, marcando a mudanca de contrato de introspeccao.
+
+Validacao executada nesta continuidade:
+
+1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
+2. `npm run lint:copilot -- --quiet`: passou.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
+   passou com 30/30.
+4. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 85/85.
+5. `npm run test:copilot:unit`: passou com 3084/3084.
+6. `make copilot-mcp-restart`: passou e reiniciou:
+   - `mcp-http` PID `8031`;
+   - `cloudflared` PID `8032`.
+7. `make copilot-mcp-status`: passou com `ready=true`.
+8. `make copilot-mcp-smoke`: passou com OAuth readiness max-power e 67/67 tools remotas.
+9. `make copilot-mcp-oauth-smoke`: passou com DCR/CIMD max-power, `id_token` e `/oauth/userinfo`.

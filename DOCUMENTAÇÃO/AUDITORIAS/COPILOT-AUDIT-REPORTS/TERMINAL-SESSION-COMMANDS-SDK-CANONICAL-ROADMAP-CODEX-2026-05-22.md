@@ -396,3 +396,14 @@ Nona fatia correlata - correcao max-power ChatGPT:
 - Evidencia publica apos restart: protected resource metadata anuncia os quatro escopos repo; DCR emitiu
   `repo:read repo:write repo:validate repo:admin`; CIMD emitiu
   `repo:read repo:write repo:validate repo:admin openid profile email`, com `id_token` e `/oauth/userinfo` verdes.
+
+Decima fatia correlata - introspeccao max-power:
+
+- `mcp_capabilities_summary` agora retorna `authProfile.initialScopes` e `authProfile.maxPowerDefault`, evitando que o
+  proprio ChatGPT receba uma leitura ambigua do contrato OAuth vigente.
+- `mcp_autonomy_power_score` agora inclui `auth.initialScopes`, `auth.maxPowerRepoScopesByDefault` e blocker dedicado
+  se o pacote `repo:read`/`repo:write`/`repo:validate`/`repo:admin` deixar de ser default.
+- `metadataProfile.securitySchemes` foi atualizado para descrever OAuth registry-wide com max-power por default; a
+  descricao antiga de dev/noauth deixou de ser o sinal canonico.
+- Validacao: typecheck strict Copilot, lint Copilot, teste focado `test_mcp_tools` 30/30, testes MCP 85/85,
+  testes Copilot unit 3084/3084, restart/status/smoke Cloudflare e smoke OAuth max-power.

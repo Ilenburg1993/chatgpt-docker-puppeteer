@@ -6,10 +6,17 @@
  */
 
 import { readOnlyAnnotations } from '../control-plane/annotations.js';
+import { MCP_AUTH_SCOPES, readMcpAuthConfig } from '../control-plane/auth.js';
 import { okResult } from '../control-plane/result.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 12;
+const CAPABILITIES_VERSION = 13;
+const MAX_POWER_REPO_SCOPES = [
+    MCP_AUTH_SCOPES.read,
+    MCP_AUTH_SCOPES.write,
+    MCP_AUTH_SCOPES.validate,
+    MCP_AUTH_SCOPES.admin,
+];
 
 const READ_TOOLS = [
     'repo_status',
@@ -112,7 +119,7 @@ const ANNOTATION_PROFILE = {
 
 const METADATA_PROFILE = {
     outputSchema: 'registry-wide minimal passthrough schema; tool-specific schemas are the next hardening band',
-    securitySchemes: 'registry-wide explicit noauth metadata for dev; Mixed Auth/OAuth scopes are available for staged enforcement',
+    securitySchemes: 'registry-wide OAuth securitySchemes with repo max-power scopes advertised by default for ChatGPT',
 };
 
 const IO_GUIDANCE = [
@@ -137,8 +144,8 @@ const IO_GUIDANCE = [
     'Use repo_root_tree or repo_tree path="." for the real workspace root.',
     'Use repo_root_redaction_status to audit hidden/protected root redaction without returning hidden names.',
     'Use chatgpt_connector_current_url_status to recover the saved temporary tunnel URL without passing it as input.',
-    'Use mcp_auth_profile before switching from none-dev to mixed-auth or OAuth.',
-    'Use mcp_oauth_issuer_diagnostics before enabling OAuth enforcement with a real issuer.',
+    'Use mcp_auth_profile to confirm OAuth max-power scopes and WWW-Authenticate challenge metadata.',
+    'Use mcp_oauth_issuer_diagnostics before changing issuer, CIMD, OIDC or Cloudflare OAuth settings.',
     'LLM-B can consume MCP optionally, but does not depend on this MCP server.',
 ];
 
@@ -180,6 +187,8 @@ export function getAdvertisedMcpToolNames() {
  */
 export function buildMcpCapabilitiesSummary() {
     const groups = getMcpCapabilityGroups();
+    const auth = readMcpAuthConfig();
+    const maxPowerDefault = MAX_POWER_REPO_SCOPES.every((scope) => auth.initialScopes.includes(scope));
     return {
         success: true,
         ...groups,
@@ -192,6 +201,13 @@ export function buildMcpCapabilitiesSummary() {
         securityPolicy: { ...SECURITY_POLICY },
         annotationProfile: { ...ANNOTATION_PROFILE },
         metadataProfile: { ...METADATA_PROFILE },
+        authProfile: {
+            mode: auth.mode,
+            enforcement: auth.enforcement,
+            authorizationServersConfigured: auth.authorizationServers.length > 0,
+            initialScopes: [...auth.initialScopes],
+            maxPowerDefault,
+        },
         ioGuidance: [...IO_GUIDANCE],
     };
 }
