@@ -8,7 +8,7 @@
 import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { okResult } from '../control-plane/result.js';
 
-const GOLDEN_PROMPTS_VERSION = 1;
+const GOLDEN_PROMPTS_VERSION = 2;
 
 const GOLDEN_PROMPTS = [
     {
@@ -72,10 +72,23 @@ export const mcpGoldenPromptsTool = {
                 'approvalPromptsShown',
                 'rememberApprovalOffered',
                 'blockedByHost',
+                'hostBlockCode',
+                'blockedToolName',
+                'replacementToolTried',
                 'mcpNetworkError',
                 'completed',
                 'notes',
             ],
+            hostBlockTemplate: {
+                timestamp: '<ISO timestamp>',
+                blockedToolName: '<tool name>',
+                blockedToolArgsClass:
+                    '<read | plan-read | bounded-write | destructive | validation | url-input | unknown>',
+                hostMessage: '<message shown by chatgpt.com>',
+                mcpReachedServer: false,
+                replacementToolTried: '<optional lower-friction tool>',
+                completedAfterReplacement: '<true | false | unknown>',
+            },
             successCriteria: {
                 readInvestigation: 'No write approval prompts for read-only flows.',
                 validation: 'One approval path for mcp_run_safe_validation_suite plus job_get_output reads.',

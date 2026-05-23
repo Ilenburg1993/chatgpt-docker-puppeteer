@@ -1180,7 +1180,7 @@ Resultado implementado:
 
 ### Faixa H — Host block diagnostics
 
-Status: pendente.
+Status: implementada e validada em teste focado nesta rodada.
 
 Objetivo:
 
@@ -1194,6 +1194,23 @@ Tools/docs:
 Pronto quando:
 
 1. Cada bloqueio tem tool, args class, mensagem, contexto e timestamp.
+
+Resultado implementado:
+
+1. `mcp_host_block_diagnostics` classifica bloqueios host-side que nao chegaram ao MCP.
+2. A tool e read-only/idempotente, nao persiste dados e aceita apenas descricoes nao sensiveis.
+3. A resposta inclui:
+   - codigo estavel de classificacao;
+   - severidade;
+   - alternativas de menor atrito;
+   - template de auditoria manual.
+4. `mcp_golden_prompts` foi atualizado com campos e template de host block.
+5. `mcp_session_profile`, `mcp_capabilities_summary` e Cloudflare smoke critical list anunciam a
+   tool.
+6. Validacao focada:
+   - `npm run typecheck:strict:src.copilot`: passou;
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
+     passou com 31 testes.
 
 ### Faixa I — Mixed Authentication
 
@@ -1247,6 +1264,7 @@ Feito:
 19. Runtime health agregado com dirty workspace, index, tunnel e ultimo smoke local.
 20. Auto index refresh opt-in no boot HTTP do MCP.
 21. `mcp_last_validation_summary`.
+22. `mcp_host_block_diagnostics`.
 
 Faltante P0:
 
@@ -1254,7 +1272,7 @@ Faltante P0:
 
 Faltante P1:
 
-1. Host block diagnostics.
+1. Nenhum item P1 da nova auditoria permanece aberto apos a Faixa H.
 
 Faltante P2:
 

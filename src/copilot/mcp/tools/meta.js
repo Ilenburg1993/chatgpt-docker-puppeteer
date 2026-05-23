@@ -9,7 +9,7 @@ import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { okResult } from '../control-plane/result.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 8;
+const CAPABILITIES_VERSION = 9;
 
 const READ_TOOLS = [
     'repo_status',
@@ -71,6 +71,7 @@ const VALIDATION_TOOLS = [
 const RUNTIME_TOOLS = [
     'delegate_to_repo_autonomy_runner',
     'mcp_golden_prompts',
+    'mcp_host_block_diagnostics',
     'mcp_maintenance_plan',
     'mcp_maintenance_apply_safe_fixes',
     'project_doctor',
@@ -117,6 +118,7 @@ const IO_GUIDANCE = [
     'Use mcp_maintenance_plan then mcp_maintenance_apply_safe_fixes dryRun=true for batched low-risk maintenance.',
     'Use delegate_to_repo_autonomy_runner dryRun=true for fixed longer workflows before requesting real execution.',
     'Use mcp_golden_prompts when measuring real ChatGPT approval prompts and host blocks.',
+    'Use mcp_host_block_diagnostics after any ChatGPT host-side block to classify it and select a lower-friction replacement.',
     'Use plan-only tools such as repo_patch_plan and repo_quarantine_file_plan before bounded-write apply tools.',
     'Use repo_read_file.sha256 as expectedHash for safe write/patch calls.',
     'Use repo_quarantine_file before repo_remove_file when reversible cleanup is acceptable.',

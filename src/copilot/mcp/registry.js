@@ -13,6 +13,7 @@ import { copilotSessionTools } from './tools/copilot-session.js';
 import { delegateToRepoAutonomyRunnerTool } from './tools/delegation-runner.js';
 import { gitReadTools } from './tools/git-read.js';
 import { mcpGoldenPromptsTool } from './tools/golden-prompts.js';
+import { mcpHostBlockDiagnosticsTool } from './tools/host-blocks.js';
 import { jobTools } from './tools/jobs.js';
 import { maintenanceTools } from './tools/maintenance.js';
 import { metaTools } from './tools/meta.js';
@@ -58,6 +59,7 @@ export function getCanonicalMcpTools() {
         ...maintenanceTools,
         delegateToRepoAutonomyRunnerTool,
         mcpGoldenPromptsTool,
+        mcpHostBlockDiagnosticsTool,
         ...connectionTools,
         ...repoWriteTools,
         ...copilotSessionTools,

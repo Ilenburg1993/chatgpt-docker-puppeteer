@@ -402,6 +402,22 @@ describe('copilot MCP tools', () => {
         assert.ok(Array.isArray(structured['prompts']));
         assert.ok(/** @type {unknown[]} */ (structured['prompts']).length >= 6);
         assert.ok(/** @type {string[]} */ (structured['measurementFields']).includes('approvalPromptsShown'));
+        assert.ok(/** @type {string[]} */ (structured['measurementFields']).includes('hostBlockCode'));
+        assert.equal(typeof structured['hostBlockTemplate'], 'object');
+    });
+
+    it('mcp_host_block_diagnostics classifies host-side blocks and suggests lower-friction tools', async () => {
+        const tool = findTool('mcp_host_block_diagnostics');
+        const result = await tool.handler({
+            toolName: 'repo_root_tree',
+            argsShape: 'showHidden=true',
+            hostMessage: 'Blocked by host before MCP call',
+        });
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(result.structuredContent?.['classification']?.['code'], 'HOST_HIDDEN_LISTING_BLOCK');
+        assert.equal(result.structuredContent?.['observed']?.['mcpReachedServer'], false);
+        assert.equal(typeof result.structuredContent?.['auditTemplate'], 'object');
     });
 
     it('plan-only tools return read-only next-call previews for sensitive operations', async () => {
