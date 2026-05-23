@@ -5,6 +5,8 @@
  * @module copilot/mcp/connection/profile
  */
 
+import { readMcpAuthConfig } from '../control-plane/auth.js';
+
 const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:3333/mcp';
 const DEFAULT_PUBLIC_MCP_URL = 'https://<endpoint-do-tunel>/mcp';
 
@@ -16,7 +18,7 @@ export const CHATGPT_CONNECTOR_DESCRIPTION =
     'e operar o workspace por tools MCP auditáveis.';
 
 /**
- * @typedef {'none-dev' | 'oauth' | 'secure-mcp-tunnel'} ChatGptAuthMode
+ * @typedef {'none-dev' | 'mixed-auth' | 'oauth' | 'secure-mcp-tunnel'} ChatGptAuthMode
  *
  * @typedef {object} ConnectorProfileOptions
  * @property {string} [publicMcpUrl]
@@ -29,6 +31,12 @@ export const CHATGPT_CONNECTOR_DESCRIPTION =
  * @property {string} description
  * @property {string} connectorUrl
  * @property {ChatGptAuthMode} authMode
+ * @property {{
+ *     mode: string;
+ *     protectedResourceMetadataUrl: string;
+ *     authorizationServersConfigured: boolean;
+ *     scopesSupported: string[];
+ * }} authReadiness
  * @property {string} localMcpUrl
  * @property {string} tunnelId
  * @property {{ name: string; description: string; mcpServerUrl: string; authentication: string }} chatgptFormFields
@@ -53,14 +61,21 @@ export function buildChatGptConnectorProfile(options = {}) {
     const authentication =
         authMode === 'none-dev'
             ? 'Sem autenticacao, apenas desenvolvimento controlado'
-            : authMode === 'oauth'
+            : authMode === 'oauth' || authMode === 'mixed-auth'
               ? 'OAuth'
               : 'Secure MCP Tunnel';
+    const authConfig = { ...readMcpAuthConfig(), mode: authMode };
     return {
         name: CHATGPT_CONNECTOR_NAME,
         description: CHATGPT_CONNECTOR_DESCRIPTION,
         connectorUrl,
         authMode,
+        authReadiness: {
+            mode: authConfig.mode,
+            protectedResourceMetadataUrl: authConfig.protectedResourceMetadataUrl,
+            authorizationServersConfigured: authConfig.authorizationServers.length > 0,
+            scopesSupported: authConfig.scopesSupported,
+        },
         localMcpUrl: localUrl,
         tunnelId,
         chatgptFormFields: {

@@ -180,6 +180,7 @@ async function runSmoke() {
         'job_get_output',
         'mcp_runtime_health',
         'mcp_session_profile',
+        'mcp_auth_profile',
         'mcp_smoke_workspace',
         'mcp_tools_status',
         'mcp_tunnel_status',

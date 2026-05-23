@@ -13,6 +13,15 @@ import {
     normalizeMcpUrl,
     validatePublicConnectorUrl,
 } from '../../../../src/copilot/mcp/connection/profile.js';
+import {
+    buildProtectedResourceMetadata,
+    buildWwwAuthenticateChallenge,
+    normalizeMcpAuthMode,
+    readMcpAuthConfig,
+    scopesForMcpTool,
+    securitySchemesForMcpTool,
+} from '../../../../src/copilot/mcp/control-plane/auth.js';
+import { getCanonicalMcpTools } from '../../../../src/copilot/mcp/registry.js';
 
 describe('copilot MCP ChatGPT connection profile', () => {
     it('normalizes connector URLs to /mcp', () => {
@@ -30,6 +39,7 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.equal(profile.name, 'Repo DevContainer MCP');
         assert.equal(profile.connectorUrl, 'https://example.com/tunnel/mcp');
         assert.equal(profile.authMode, 'none-dev');
+        assert.equal(profile.authReadiness.mode, 'none-dev');
         assert.equal(profile.chatgptFormFields.mcpServerUrl, 'https://example.com/tunnel/mcp');
         assert.match(profile.chatgptFormFields.authentication, /Sem autenticacao/);
         assert.ok(profile.description.includes('Dev Container'));
@@ -56,5 +66,40 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.ok(runbook.notes.some((note) => note.includes('trycloudflare.com')));
         assert.ok(runbook.notes.some((note) => note.includes('lastSmokeOk')));
         assert.ok(runbook.notes.some((note) => note.includes('origin HTTP raiz')));
+    });
+
+    it('builds OAuth protected resource metadata and challenge previews', () => {
+        const config = readMcpAuthConfig({
+            COPILOT_MCP_AUTH_MODE: 'mixed-auth',
+            COPILOT_MCP_PUBLIC_URL: 'https://example.com/mcp',
+            COPILOT_MCP_OAUTH_ISSUER: 'https://auth.example.com',
+        });
+        const metadata = buildProtectedResourceMetadata(config);
+        assert.equal(config.mode, 'mixed-auth');
+        assert.equal(metadata.resource, 'https://example.com');
+        assert.deepEqual(metadata.authorization_servers, ['https://auth.example.com']);
+        assert.ok(/** @type {string[]} */ (metadata.scopes_supported).includes('repo:read'));
+        assert.match(buildWwwAuthenticateChallenge(['repo:read'], config), /resource_metadata="https:\/\/example\.com/);
+    });
+
+    it('maps tool annotations to planned OAuth scopes and mixed security schemes', () => {
+        assert.equal(normalizeMcpAuthMode('dev-mixed-auth'), 'mixed-auth');
+        const tools = getCanonicalMcpTools();
+        const readTool = tools.find((tool) => tool.name === 'repo_status');
+        const writeTool = tools.find((tool) => tool.name === 'repo_apply_patch');
+        assert.ok(readTool);
+        assert.ok(writeTool);
+        assert.deepEqual(scopesForMcpTool(readTool), ['repo:read']);
+        assert.deepEqual(scopesForMcpTool(writeTool), ['repo:write']);
+        const schemes = securitySchemesForMcpTool(writeTool, {
+            mode: 'mixed-auth',
+            resource: 'https://example.com',
+            protectedResourceMetadataUrl: 'https://example.com/.well-known/oauth-protected-resource',
+            authorizationServers: ['https://auth.example.com'],
+            scopesSupported: ['repo:read', 'repo:write', 'repo:validate', 'repo:admin'],
+            resourceDocumentation: 'https://example.com/docs',
+        });
+        assert.ok(schemes.some((scheme) => scheme.type === 'noauth'));
+        assert.ok(schemes.some((scheme) => scheme.type === 'oauth2'));
     });
 });

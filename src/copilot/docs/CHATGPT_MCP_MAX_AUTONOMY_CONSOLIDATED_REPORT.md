@@ -1214,7 +1214,7 @@ Resultado implementado:
 
 ### Faixa I — Mixed Authentication
 
-Status: design, sem implementacao imediata nesta rodada.
+Status: readiness parcial implementada e validada em teste focado nesta rodada.
 
 Objetivo:
 
@@ -1226,16 +1226,70 @@ Objetivo:
 
 Subfases:
 
-1. Mapear scopes por tool.
-2. Implementar protected resource metadata.
-3. Implementar authorization server metadata.
-4. Implementar runtime challenge `_meta["mcp/www_authenticate"]`.
-5. Validar com MCP Inspector e ChatGPT.
+1. Mapear scopes por tool: implementado.
+2. Implementar protected resource metadata: implementado no HTTP adapter.
+3. Implementar authorization server metadata: pendente; depende de issuer real externo.
+4. Implementar runtime challenge `_meta["mcp/www_authenticate"]`: helper/challenge preview
+   implementado; enforcement real pendente.
+5. Validar com MCP Inspector e ChatGPT: pendente em modo OAuth real.
 
 Pronto quando:
 
 1. ChatGPT mostra OAuth/linking quando apropriado.
 2. Server valida token/scope/audience em write/validate/destructive.
+
+Fontes oficiais rechecadas nesta fase:
+
+1. Apps SDK Authentication:
+   - `https://developers.openai.com/apps-sdk/build/auth`
+   - Confirma protected resource metadata, authorization server metadata, `resource` parameter, PKCE
+     e verificacao de token pelo resource server.
+2. Apps SDK Reference:
+   - `https://developers.openai.com/apps-sdk/reference`
+   - Confirma `_meta["mcp/www_authenticate"]` em error tool result para disparar OAuth.
+3. Apps SDK Define tools:
+   - `https://developers.openai.com/apps-sdk/plan/tools`
+   - Reforca hints de read-only/destructive/open-world e separacao de tools por tarefa.
+
+Resultado implementado:
+
+1. `src/copilot/mcp/control-plane/auth.js` define:
+   - `none-dev`;
+   - `mixed-auth`;
+   - `oauth`;
+   - `secure-mcp-tunnel`;
+   - scopes `repo:read`, `repo:write`, `repo:validate`, `repo:admin`.
+2. Scopes sao derivados das annotations e nomes das tools:
+   - read-only -> `repo:read`;
+   - bounded write -> `repo:write`;
+   - validators/jobs -> `repo:validate`;
+   - destructive/admin -> `repo:admin`.
+3. `securitySchemes` agora acompanha o modo:
+   - `none-dev`: `noauth`;
+   - `mixed-auth`: `noauth` + `oauth2`;
+   - `oauth`: `oauth2`.
+4. O HTTP adapter expoe:
+   - `GET /.well-known/oauth-protected-resource`.
+5. Nova tool read-only:
+   - `mcp_auth_profile`.
+6. `chatgpt_connector_profile` agora inclui `authReadiness`.
+7. CORS do HTTP adapter passa a aceitar header `Authorization` para a fase OAuth futura.
+8. Validacao focada:
+   - `npm run typecheck:strict:src.copilot`: passou;
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_connection_profile.spec.js tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
+     passou com 39 testes.
+
+Pendencias da Faixa I:
+
+1. Escolher/fornecer issuer OAuth real para `COPILOT_MCP_OAUTH_ISSUER`.
+2. Publicar metadata do authorization server fora deste MCP ou integrar com provedor existente.
+3. Implementar validacao real de bearer token:
+   - issuer;
+   - audience/resource;
+   - exp;
+   - scopes.
+4. Ativar enforcement gradual por tool sem quebrar `none-dev`.
+5. Rodar teste real no ChatGPT com auth `OAuth`.
 
 ---
 
@@ -1243,7 +1297,7 @@ Pronto quando:
 
 Feito:
 
-1. 54 tools expostas.
+1. 65 tools expostas.
 2. Annotations completas.
 3. `idempotentHint` para read-only.
 4. `mcp_tools_status`.
@@ -1265,6 +1319,9 @@ Feito:
 20. Auto index refresh opt-in no boot HTTP do MCP.
 21. `mcp_last_validation_summary`.
 22. `mcp_host_block_diagnostics`.
+23. `mcp_auth_profile`.
+24. OAuth protected resource metadata endpoint.
+25. Scope/security-scheme readiness por tool.
 
 Faltante P0:
 
@@ -1276,8 +1333,8 @@ Faltante P1:
 
 Faltante P2:
 
-1. Mixed Auth completo.
-2. OAuth resource metadata.
-3. OAuth authorization server metadata.
-4. Token/scopes validation.
+1. OAuth authorization server metadata real.
+2. Token/scopes validation.
+3. Enforcement gradual por tool.
+4. Teste ChatGPT OAuth real.
 5. Dashboard/power score.

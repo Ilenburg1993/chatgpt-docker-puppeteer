@@ -420,6 +420,16 @@ describe('copilot MCP tools', () => {
         assert.equal(typeof result.structuredContent?.['auditTemplate'], 'object');
     });
 
+    it('mcp_auth_profile exposes OAuth readiness metadata without requiring enforcement', async () => {
+        const tool = findTool('mcp_auth_profile');
+        const result = await tool.handler({ scopes: ['repo:read'] });
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(typeof result.structuredContent?.['protectedResourceMetadataUrl'], 'string');
+        assert.match(String(result.structuredContent?.['challengePreview'] ?? ''), /Bearer/);
+        assert.equal(typeof result.structuredContent?.['protectedResourceMetadata'], 'object');
+    });
+
     it('plan-only tools return read-only next-call previews for sensitive operations', async () => {
         const patchPlanTool = findTool('repo_patch_plan');
         const patchPlan = await patchPlanTool.handler({

@@ -9,6 +9,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createServer } from 'node:http';
 import { buildChatGptConnectorProfile } from '../connection/profile.js';
 import { logMcp } from '../control-plane/audit.js';
+import { buildProtectedResourceMetadata } from '../control-plane/auth.js';
 import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
 import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
 import { createCopilotMcpServer } from '../server.js';
@@ -22,7 +23,7 @@ const MCP_PATH = '/mcp';
 function setCorsHeaders(res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'content-type, mcp-session-id');
+    res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type, mcp-session-id');
     res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
 }
 
@@ -67,6 +68,12 @@ export async function startHttpMcpServer(opts = {}) {
                     2,
                 ),
             );
+            return;
+        }
+
+        if (req.method === 'GET' && url.pathname === '/.well-known/oauth-protected-resource') {
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(JSON.stringify(buildProtectedResourceMetadata(), null, 2));
             return;
         }
 

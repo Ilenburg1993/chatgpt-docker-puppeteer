@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { securitySchemesForMcpTool } from './auth.js';
 
 /**
  * @typedef {{ type: 'noauth' } | { type: 'oauth2'; scopes: string[] }} McpSecurityScheme
@@ -31,10 +32,13 @@ export function baseMcpOutputSchema() {
 }
 
 /**
+ * @param {import('../registry.js').McpToolDefinition} tool
  * @returns {McpSecurityScheme[]}
  */
-export function defaultSecuritySchemesForTool() {
-    return [{ ...NOAUTH }];
+export function defaultSecuritySchemesForTool(tool) {
+    return securitySchemesForMcpTool(tool).map((scheme) =>
+        scheme.type === 'noauth' ? { ...NOAUTH } : { type: 'oauth2', scopes: [...scheme.scopes] },
+    );
 }
 
 /**
@@ -44,7 +48,7 @@ export function defaultSecuritySchemesForTool() {
 export function buildToolMeta(tool) {
     return {
         ...(tool._meta ?? {}),
-        securitySchemes: tool.securitySchemes ?? defaultSecuritySchemesForTool(),
+        securitySchemes: tool.securitySchemes ?? defaultSecuritySchemesForTool(tool),
         'openai/toolInvocation/invoking': tool._meta?.['openai/toolInvocation/invoking'] ?? `Running ${tool.name}`,
         'openai/toolInvocation/invoked': tool._meta?.['openai/toolInvocation/invoked'] ?? `Finished ${tool.name}`,
     };
@@ -55,7 +59,7 @@ export function buildToolMeta(tool) {
  * @returns {import('../registry.js').McpToolDefinition}
  */
 export function normalizeMcpToolDefinition(tool) {
-    const securitySchemes = tool.securitySchemes ?? defaultSecuritySchemesForTool();
+    const securitySchemes = tool.securitySchemes ?? defaultSecuritySchemesForTool(tool);
     return {
         ...tool,
         outputSchema: tool.outputSchema ?? baseMcpOutputSchema(),

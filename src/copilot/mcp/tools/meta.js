@@ -9,7 +9,7 @@ import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { okResult } from '../control-plane/result.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 9;
+const CAPABILITIES_VERSION = 10;
 
 const READ_TOOLS = [
     'repo_status',
@@ -87,6 +87,7 @@ const CONNECTION_TOOLS = [
     'chatgpt_connector_profile',
     'chatgpt_connector_url_check',
     'chatgpt_connector_current_url_status',
+    'mcp_auth_profile',
 ];
 const COPILOT_SDK_TOOLS = ['copilot_sessions_list', 'copilot_session_get'];
 /** @type {string[]} */
@@ -133,6 +134,7 @@ const IO_GUIDANCE = [
     'Use repo_root_tree or repo_tree path="." for the real workspace root.',
     'Use repo_root_redaction_status to audit hidden/protected root redaction without returning hidden names.',
     'Use chatgpt_connector_current_url_status to recover the saved temporary tunnel URL without passing it as input.',
+    'Use mcp_auth_profile before switching from none-dev to mixed-auth or OAuth.',
     'LLM-B can consume MCP optionally, but does not depend on this MCP server.',
 ];
 

@@ -15,6 +15,11 @@ import {
     validatePublicConnectorUrl,
 } from '../connection/profile.js';
 import { readOnlyAnnotations } from '../control-plane/annotations.js';
+import {
+    buildProtectedResourceMetadata,
+    buildWwwAuthenticateChallenge,
+    readMcpAuthConfig,
+} from '../control-plane/auth.js';
 import { okResult } from '../control-plane/result.js';
 
 /**
@@ -94,6 +99,47 @@ export const connectionTools = [
                 localMcpUrl: config.localMcpUrl,
                 stateFile: config.stateFile,
                 recovery: temporaryTunnel.recovery,
+            });
+        },
+    },
+    {
+        name: 'mcp_auth_profile',
+        title: 'MCP auth profile',
+        description:
+            'Return the current MCP auth mode, OAuth protected resource metadata, supported scopes and WWW-Authenticate challenge preview.',
+        inputSchema: {
+            scopes: z
+                .array(z.string().min(1))
+                .optional()
+                .describe('Optional scopes to include in the challenge preview.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ scopes }) => {
+            const config = readMcpAuthConfig();
+            const challengeScopes =
+                Array.isArray(scopes) && scopes.length > 0 ? scopes : ['repo:read', 'repo:write', 'repo:validate'];
+            return okResult({
+                success: true,
+                mode: config.mode,
+                protectedResourceMetadata: buildProtectedResourceMetadata(config),
+                protectedResourceMetadataUrl: config.protectedResourceMetadataUrl,
+                authorizationServersConfigured: config.authorizationServers.length > 0,
+                challengePreview: buildWwwAuthenticateChallenge(challengeScopes, config),
+                enforcement:
+                    config.mode === 'none-dev' || config.mode === 'secure-mcp-tunnel'
+                        ? 'metadata-only-no-token-enforcement'
+                        : 'oauth-metadata-ready-token-enforcement-pending',
+                nextSteps:
+                    config.mode === 'none-dev'
+                        ? [
+                              'Keep ChatGPT connector authentication as No authentication for controlled temporary-tunnel development.',
+                              'Set COPILOT_MCP_AUTH_MODE=mixed-auth and COPILOT_MCP_OAUTH_ISSUER when testing OAuth discovery.',
+                          ]
+                        : [
+                              'Confirm the authorization server publishes OAuth metadata.',
+                              'Confirm ChatGPT receives the protected resource metadata URL.',
+                              'Implement token issuer/audience/scope validation before requiring OAuth for writes.',
+                          ],
             });
         },
     },
