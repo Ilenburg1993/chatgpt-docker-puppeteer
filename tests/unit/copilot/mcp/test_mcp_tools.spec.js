@@ -428,6 +428,7 @@ describe('copilot MCP tools', () => {
         assert.equal(typeof result.structuredContent?.['protectedResourceMetadataUrl'], 'string');
         assert.match(String(result.structuredContent?.['challengePreview'] ?? ''), /Bearer/);
         assert.equal(typeof result.structuredContent?.['protectedResourceMetadata'], 'object');
+        assert.equal(typeof result.structuredContent?.['environmentTemplates'], 'object');
     });
 
     it('mcp_oauth_issuer_diagnostics reports missing issuer without network calls', async () => {

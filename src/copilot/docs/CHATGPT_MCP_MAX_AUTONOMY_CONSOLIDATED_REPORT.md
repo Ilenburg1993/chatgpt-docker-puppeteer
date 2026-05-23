@@ -1286,6 +1286,10 @@ Resultado implementado:
    - audience/resource via `COPILOT_MCP_OAUTH_AUDIENCE`;
    - checagem de scopes `scope` ou `scp`.
 11. `mcp_auth_profile` reporta enforcement, issuer, audience, JWKS e static bearer sem revelar segredo.
+    Tambem retorna templates redigidos de ambiente para:
+   - tunnel temporario sem auth;
+   - teste local `mixed-auth` com bearer estatico nao commitado;
+   - OAuth/JWKS com issuer real.
 12. `mcp_oauth_issuer_diagnostics` valida, quando houver issuer real, os documentos:
    - `/.well-known/oauth-authorization-server`;
    - `/.well-known/openid-configuration`.
@@ -1347,6 +1351,7 @@ Feito:
 26. Enforcement gradual por tool, desligado por padrao no tunel temporario.
 27. Validador bearer token por static token local ou OAuth/JWKS.
 28. `mcp_oauth_issuer_diagnostics` para checar metadata OAuth/OIDC do issuer real.
+29. Templates de env sem segredo dentro de `mcp_auth_profile`.
 
 Faltante P0:
 
@@ -1360,6 +1365,6 @@ Faltante P2:
 
 1. OAuth authorization server metadata real.
 2. Teste OAuth/JWKS real com ChatGPT.
-3. Exemplos finais de configuracao OAuth para issuer escolhido apos diagnostico.
+3. Teste real dos templates de env OAuth contra issuer escolhido apos diagnostico.
 4. Teste ChatGPT OAuth real.
 5. Dashboard/power score.

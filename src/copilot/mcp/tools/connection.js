@@ -125,6 +125,35 @@ function summarizeOAuthMetadata(metadata, requiredScopes) {
 }
 
 /**
+ * @param {ReturnType<typeof readMcpAuthConfig>} config
+ * @returns {Record<string, Record<string, string>>}
+ */
+function buildAuthEnvironmentTemplates(config) {
+    return {
+        temporaryTunnelNoAuth: {
+            COPILOT_MCP_AUTH_MODE: 'none-dev',
+            COPILOT_MCP_AUTH_ENFORCEMENT: 'off',
+            COPILOT_MCP_PUBLIC_URL: config.resource === 'https://<endpoint-do-tunel>' ? 'https://<trycloudflare-host>/mcp' : `${config.resource}/mcp`,
+        },
+        mixedAuthWriteTest: {
+            COPILOT_MCP_AUTH_MODE: 'mixed-auth',
+            COPILOT_MCP_AUTH_ENFORCEMENT: 'write',
+            COPILOT_MCP_PUBLIC_URL: config.resource === 'https://<endpoint-do-tunel>' ? 'https://<trycloudflare-host>/mcp' : `${config.resource}/mcp`,
+            COPILOT_MCP_STATIC_BEARER_TOKEN: '<local-dev-token-not-committed>',
+        },
+        oauthJwks: {
+            COPILOT_MCP_AUTH_MODE: 'oauth',
+            COPILOT_MCP_AUTH_ENFORCEMENT: 'all',
+            COPILOT_MCP_PUBLIC_URL: config.resource === 'https://<endpoint-do-tunel>' ? 'https://<trycloudflare-host>/mcp' : `${config.resource}/mcp`,
+            COPILOT_MCP_OAUTH_ISSUER: 'https://<issuer>',
+            COPILOT_MCP_OAUTH_EXPECTED_ISSUER: 'https://<issuer>',
+            COPILOT_MCP_OAUTH_AUDIENCE: config.resource === 'https://<endpoint-do-tunel>' ? 'https://<trycloudflare-host>' : config.resource,
+            COPILOT_MCP_OAUTH_JWKS_URI: 'https://<issuer>/.well-known/jwks.json',
+        },
+    };
+}
+
+/**
  * @type {import('../registry.js').McpToolDefinition[]}
  */
 export const connectionTools = [
@@ -232,6 +261,7 @@ export const connectionTools = [
                 jwksUriConfigured: Boolean(config.jwksUri),
                 staticBearerConfigured: config.staticBearerConfigured,
                 challengePreview: buildWwwAuthenticateChallenge(challengeScopes, config),
+                environmentTemplates: buildAuthEnvironmentTemplates(config),
                 nextSteps:
                     config.enforcement === 'off'
                         ? [
