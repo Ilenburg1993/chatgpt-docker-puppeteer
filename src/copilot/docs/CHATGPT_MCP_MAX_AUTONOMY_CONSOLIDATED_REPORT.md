@@ -1303,10 +1303,18 @@ Resultado implementado:
 14. Validacao focada:
    - `npm run typecheck:strict:src.copilot`: passou;
    - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
-     passou com 33 testes.
+     passou com 34 testes.
    - `npm run lint:copilot`: passou.
-   - `npm run copilot:mcp:safe-suite -- mcp-full`: passou com typecheck, lint e 81 testes MCP.
-   - `npm run test:copilot:unit`: passou com 3080 testes.
+   - `npm run copilot:mcp:safe-suite -- mcp-full`: passou com typecheck, lint e 82 testes MCP.
+   - `npm run test:copilot:unit`: passou com 3081 testes.
+15. `mcp_autonomy_power_score` mede postura de autonomia do conector por:
+   - cobertura de tools;
+   - proporcao read-only/low-friction;
+   - seguranca de escrita e plan-only;
+   - cobertura de outputSchema/security metadata;
+   - prontidao de validadores;
+   - postura auth/tunnel;
+   - ausencia de open-world tools.
 
 Pendencias da Faixa I:
 
@@ -1323,7 +1331,7 @@ Pendencias da Faixa I:
 
 Feito:
 
-1. 66 tools expostas.
+1. 67 tools expostas.
 2. Annotations completas.
 3. `idempotentHint` para read-only.
 4. `mcp_tools_status`.
@@ -1352,6 +1360,7 @@ Feito:
 27. Validador bearer token por static token local ou OAuth/JWKS.
 28. `mcp_oauth_issuer_diagnostics` para checar metadata OAuth/OIDC do issuer real.
 29. Templates de env sem segredo dentro de `mcp_auth_profile`.
+30. `mcp_autonomy_power_score`.
 
 Faltante P0:
 
@@ -1367,4 +1376,4 @@ Faltante P2:
 2. Teste OAuth/JWKS real com ChatGPT.
 3. Teste real dos templates de env OAuth contra issuer escolhido apos diagnostico.
 4. Teste ChatGPT OAuth real.
-5. Dashboard/power score.
+5. Dashboard visual externo, se ainda for util apos o power score read-only.

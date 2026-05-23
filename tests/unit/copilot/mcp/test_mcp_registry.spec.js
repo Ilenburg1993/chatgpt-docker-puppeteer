@@ -28,6 +28,7 @@ describe('copilot MCP registry', () => {
             'job_get_output',
             'job_list',
             'mcp_auth_profile',
+            'mcp_autonomy_power_score',
             'mcp_capabilities_summary',
             'mcp_golden_prompts',
             'mcp_host_block_diagnostics',

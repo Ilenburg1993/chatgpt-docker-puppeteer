@@ -9,7 +9,7 @@ import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { okResult } from '../control-plane/result.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 11;
+const CAPABILITIES_VERSION = 12;
 
 const READ_TOOLS = [
     'repo_status',
@@ -78,6 +78,7 @@ const RUNTIME_TOOLS = [
     'mcp_runtime_health',
     'mcp_session_profile',
     'mcp_smoke_workspace',
+    'mcp_autonomy_power_score',
     'mcp_tools_status',
     'mcp_tunnel_status',
     'mcp_capabilities_summary',
@@ -116,6 +117,7 @@ const METADATA_PROFILE = {
 
 const IO_GUIDANCE = [
     'Use mcp_tools_status before planning broad work to inspect read-only, bounded-write, destructive and approval-friendly tools.',
+    'Use mcp_autonomy_power_score after broad changes to measure connector autonomy posture.',
     'Use mcp_session_profile at the start of a new ChatGPT conversation to load the recommended autonomy profile.',
     'Use mcp_maintenance_plan then mcp_maintenance_apply_safe_fixes dryRun=true for batched low-risk maintenance.',
     'Use delegate_to_repo_autonomy_runner dryRun=true for fixed longer workflows before requesting real execution.',

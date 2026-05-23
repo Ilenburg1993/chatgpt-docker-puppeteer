@@ -441,6 +441,16 @@ describe('copilot MCP tools', () => {
         assert.ok(Array.isArray(result.structuredContent?.['checkedUrls']));
     });
 
+    it('mcp_autonomy_power_score returns a deterministic connector posture score', async () => {
+        const tool = findTool('mcp_autonomy_power_score');
+        const result = await tool.handler({});
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(typeof result.structuredContent?.['score'], 'number');
+        assert.equal(typeof result.structuredContent?.['grade'], 'string');
+        assert.equal(typeof result.structuredContent?.['toolCounts'], 'object');
+    });
+
     it('plan-only tools return read-only next-call previews for sensitive operations', async () => {
         const patchPlanTool = findTool('repo_patch_plan');
         const patchPlan = await patchPlanTool.handler({

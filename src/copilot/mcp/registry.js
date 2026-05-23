@@ -27,7 +27,7 @@ import { repoWriteTools } from './tools/repo-write.js';
 import { mcpRuntimeHealthTool } from './tools/runtime-health.js';
 import { mcpSessionProfileTool } from './tools/session-profile.js';
 import { mcpSmokeWorkspaceTool } from './tools/smoke-workspace.js';
-import { bindMcpToolsStatusProvider, mcpToolsStatusTool } from './tools/tools-status.js';
+import { bindMcpToolsStatusProvider, mcpAutonomyPowerScoreTool, mcpToolsStatusTool } from './tools/tools-status.js';
 import { mcpTunnelStatusTool } from './tools/tunnel-status.js';
 
 /**
@@ -70,6 +70,7 @@ export function getCanonicalMcpTools() {
         ...copilotSessionTools,
         ...metaTools,
         mcpSessionProfileTool,
+        mcpAutonomyPowerScoreTool,
         mcpToolsStatusTool,
         mcpSmokeWorkspaceTool,
         mcpTunnelStatusTool,
