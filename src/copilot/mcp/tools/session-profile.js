@@ -42,6 +42,7 @@ export const mcpSessionProfileTool = {
                 'mcp_maintenance_plan',
                 'delegate_to_repo_autonomy_runner',
                 'mcp_tunnel_status',
+                'mcp_last_validation_summary',
                 'project_doctor',
             ],
             lowFrictionReadCalls: [
@@ -62,6 +63,7 @@ export const mcpSessionProfileTool = {
                 'repo_move_file_plan',
                 'repo_index_refresh_plan',
                 'mcp_validation_plan',
+                'mcp_last_validation_summary',
                 'chatgpt_connector_current_url_status',
                 'git_status',
                 'git_diff',

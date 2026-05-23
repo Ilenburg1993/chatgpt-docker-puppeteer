@@ -23,6 +23,43 @@ const validatorSchema = z.enum([
 const safeValidationSuiteSchema = z.enum(['mcp-fast', 'mcp-full', 'copilot-fast']);
 const jobStatusSchema = z.enum(['running', 'completed', 'failed', 'cancelled']);
 
+/**
+ * @param {Omit<import('../control-plane/jobs.js').JobRecord, 'process'>} job
+ * @returns {Record<string, unknown>}
+ */
+function summarizeJob(job) {
+    const durationMs = job.endedAt === null ? Date.now() - job.startedAt : job.endedAt - job.startedAt;
+    return {
+        id: job.id,
+        validator: job.validator,
+        status: job.status,
+        passed: job.status === 'completed' && job.exitCode === 0,
+        running: job.status === 'running',
+        startedAt: new Date(job.startedAt).toISOString(),
+        endedAt: job.endedAt === null ? null : new Date(job.endedAt).toISOString(),
+        durationMs: Math.max(0, durationMs),
+        exitCode: job.exitCode,
+        signal: job.signal,
+        timedOut: job.timedOut,
+        commandLine: [job.command, ...job.args].join(' '),
+        logFile: job.logFile,
+    };
+}
+
+/**
+ * @param {Omit<import('../control-plane/jobs.js').JobRecord, 'process'>[]} jobs
+ * @returns {Record<string, Omit<import('../control-plane/jobs.js').JobRecord, 'process'>>}
+ */
+function latestJobsByValidator(jobs) {
+    /** @type {Record<string, Omit<import('../control-plane/jobs.js').JobRecord, 'process'>>} */
+    const latest = {};
+    for (const job of jobs) {
+        const current = latest[job.validator];
+        if (!current || job.startedAt > current.startedAt) latest[job.validator] = job;
+    }
+    return latest;
+}
+
 /** @type {Record<string, import('../control-plane/jobs.js').CopilotValidatorName>} */
 const SAFE_VALIDATION_SUITE_TO_VALIDATOR = {
     'mcp-fast': 'suite-mcp-fast',
@@ -145,6 +182,53 @@ export const jobTools = [
                 success: true,
                 count: jobs.length,
                 jobs,
+            });
+        },
+    },
+    {
+        name: 'mcp_last_validation_summary',
+        title: 'Last MCP validation summary',
+        description:
+            'Return the latest persisted validation job per validator without starting a new validator. Use when ChatGPT host blocks new validation jobs.',
+        inputSchema: {
+            validator: validatorSchema.optional().describe('Optional validator filter.'),
+            includeOutputTail: z
+                .boolean()
+                .optional()
+                .describe('Include a short log tail for each returned job. Default: false.'),
+            tailBytes: z
+                .number()
+                .int()
+                .min(1000)
+                .max(20000)
+                .optional()
+                .describe('Output tail bytes when includeOutputTail=true.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ validator, includeOutputTail, tailBytes }) => {
+            const jobs = await listJobs({ validator, includeCompleted: true, limit: 200 });
+            const latestByValidator = latestJobsByValidator(jobs);
+            const selected = validator
+                ? Object.values(latestByValidator).filter((job) => job.validator === validator)
+                : Object.values(latestByValidator).sort((left, right) => left.validator.localeCompare(right.validator));
+            const summaries = [];
+            for (const job of selected) {
+                const summary = summarizeJob(job);
+                if (includeOutputTail === true) {
+                    const output = await readJobOutput(job.id, tailBytes ?? 8000);
+                    summary['outputTail'] = output.output;
+                }
+                summaries.push(summary);
+            }
+            return okResult({
+                success: true,
+                count: summaries.length,
+                validatorsCovered: summaries.map((summary) => summary['validator']),
+                summaries,
+                hint:
+                    summaries.length === 0
+                        ? 'No persisted validator jobs found. Run mcp_run_safe_validation_suite or run_copilot_validator when allowed.'
+                        : 'Use job_get_output with a specific job id for a longer log tail.',
             });
         },
     },

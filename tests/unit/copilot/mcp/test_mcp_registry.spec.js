@@ -29,6 +29,7 @@ describe('copilot MCP registry', () => {
             'job_list',
             'mcp_capabilities_summary',
             'mcp_golden_prompts',
+            'mcp_last_validation_summary',
             'mcp_maintenance_apply_safe_fixes',
             'mcp_maintenance_plan',
             'mcp_run_safe_validation_suite',

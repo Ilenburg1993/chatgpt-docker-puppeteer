@@ -1152,7 +1152,7 @@ Resultado implementado:
 
 ### Faixa G — Last validation summary
 
-Status: pendente.
+Status: implementada e validada em teste focado nesta rodada.
 
 Objetivo:
 
@@ -1165,6 +1165,18 @@ Tool nova:
 Pronto quando:
 
 1. ChatGPT consegue saber ultimo typecheck/lint/unit sem iniciar novo job.
+
+Resultado implementado:
+
+1. `mcp_last_validation_summary` le manifests persistidos dos validator jobs em `.ai/jobs`.
+2. A tool retorna o job mais recente por validator, com status, exit code, duracao, command line e
+   id.
+3. Opcionalmente inclui `outputTail` curto quando `includeOutputTail=true`.
+4. A tool e read-only/idempotente e foi adicionada ao capabilities/session profile/Cloudflare smoke.
+5. Validacao focada:
+   - `npm run typecheck:strict:src.copilot`: passou;
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
+     passou com 30 testes.
 
 ### Faixa H — Host block diagnostics
 
@@ -1234,6 +1246,7 @@ Feito:
 18. `repo_root_redaction_status`.
 19. Runtime health agregado com dirty workspace, index, tunnel e ultimo smoke local.
 20. Auto index refresh opt-in no boot HTTP do MCP.
+21. `mcp_last_validation_summary`.
 
 Faltante P0:
 
@@ -1241,8 +1254,7 @@ Faltante P0:
 
 Faltante P1:
 
-1. `mcp_last_validation_summary`.
-2. Host block diagnostics.
+1. Host block diagnostics.
 
 Faltante P2:
 

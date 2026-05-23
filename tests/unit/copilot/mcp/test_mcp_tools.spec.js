@@ -430,6 +430,15 @@ describe('copilot MCP tools', () => {
         assert.equal(validationPlan.structuredContent?.['validator'], 'suite-mcp-fast');
     });
 
+    it('mcp_last_validation_summary reads persisted validator history without starting jobs', async () => {
+        const tool = findTool('mcp_last_validation_summary');
+        const result = await tool.handler({});
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(typeof result.structuredContent?.['count'], 'number');
+        assert.ok(Array.isArray(result.structuredContent?.['summaries']));
+    });
+
     it('project_doctor returns canonical validators', async () => {
         const tool = findTool('project_doctor');
         const result = await tool.handler({ includeScripts: false });
