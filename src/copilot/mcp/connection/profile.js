@@ -83,6 +83,7 @@ export function buildChatGptConnectorProfile(options = {}) {
             'Chame mcp_session_profile e siga a ordem recommendedFirstCalls.',
             'Chame mcp_capabilities_summary e resuma as categorias de tools.',
             'Chame mcp_maintenance_plan e depois mcp_maintenance_apply_safe_fixes dryRun=true.',
+            'Chame delegate_to_repo_autonomy_runner mission=diagnose-mcp dryRun=true.',
             'Chame mcp_tools_status e identifique tools read-only, bounded-write e destructive.',
             'Chame mcp_tunnel_status e confirme recommendedAction, lastSmokeOk e lastSmokeAgeMinutes.',
             'Liste a árvore de src/copilot/mcp com repo_tree.',

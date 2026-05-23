@@ -9,6 +9,7 @@ import { appendMcpAuditEvent } from './control-plane/audit.js';
 import { recordMcpToolMetric } from './control-plane/metrics.js';
 import { connectionTools } from './tools/connection.js';
 import { copilotSessionTools } from './tools/copilot-session.js';
+import { delegateToRepoAutonomyRunnerTool } from './tools/delegation-runner.js';
 import { gitReadTools } from './tools/git-read.js';
 import { jobTools } from './tools/jobs.js';
 import { maintenanceTools } from './tools/maintenance.js';
@@ -48,6 +49,7 @@ export function getCanonicalMcpTools() {
         projectDoctorTool,
         ...jobTools,
         ...maintenanceTools,
+        delegateToRepoAutonomyRunnerTool,
         ...connectionTools,
         ...repoWriteTools,
         ...copilotSessionTools,

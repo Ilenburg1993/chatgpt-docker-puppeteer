@@ -704,6 +704,14 @@ Executados e aprovados:
 10. `npm run test:copilot:unit`
     - rerun final apos maintenance batch passou;
     - 3065/3065 testes passaram.
+11. `npm run copilot:mcp:safe-suite -- mcp-full`
+    - rerun apos delegation runner passou;
+    - typecheck strict passou;
+    - lint Copilot passou;
+    - 67 testes MCP passaram.
+12. `npm run test:copilot:unit`
+    - rerun final apos delegation runner passou;
+    - 3066/3066 testes passaram.
 
 ### 9.7. Faixa 6 inicial concluida — `mcp_session_profile`
 
@@ -770,7 +778,41 @@ Efeito esperado no ChatGPT:
 
 1. Atualizar runbook operacional com smoke de quarentena e maintenance.
 2. Medir prompts reais no ChatGPT.
-3. Faixa 7:
-   - desenhar runner local de delegacao allowlisted.
-4. Faixa 8:
+
+### 9.10. Faixa 7 inicial concluida — delegation runner allowlisted
+
+Mudancas implementadas:
+
+1. Criada tool:
+   - `delegate_to_repo_autonomy_runner`.
+2. Missions allowlisted:
+   - `diagnose-mcp`;
+   - `validate-mcp-full`;
+   - `maintenance-safe-dry-run`.
+3. `dryRun=true` e o default.
+4. Constraints explicitas:
+   - sem shell arbitrario;
+   - sem paths arbitrarios;
+   - sem acoes destrutivas diretas.
+5. `diagnose-mcp` em execucao real chama apenas:
+   - `repo_status`;
+   - `mcp_capabilities_summary`;
+   - `mcp_smoke_workspace`;
+   - `mcp_runtime_health`.
+6. `validate-mcp-full` em execucao real inicia job `suite-mcp-full`, exigindo leitura posterior via
+   `job_get_output`.
+7. `maintenance-safe-dry-run` permanece sem mutacao mesmo com `dryRun=false`.
+8. `mcp_session_profile` passou a recomendar o fluxo de delegacao.
+9. `mcp_capabilities_summary` passou a anunciar o runner.
+10. Smoke remoto Cloudflare passou a exigir o runner como critical.
+
+Efeito esperado no ChatGPT:
+
+1. Workflows maiores podem ser compactados em uma tool, reduzindo sequencias de autorizacao.
+2. A primeira chamada pode ser dry-run, dando ao usuario uma visao objetiva do que sera executado.
+3. A execucao real continua presa a missoes fixas, sem abrir shell generico.
+
+### 9.11. Proxima sequencia cronologica
+
+1. Faixa 8:
    - golden prompts e medicao real de prompts/bloqueios no ChatGPT.

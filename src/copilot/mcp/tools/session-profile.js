@@ -39,6 +39,7 @@ export const mcpSessionProfileTool = {
                 'mcp_tools_status',
                 'mcp_capabilities_summary',
                 'mcp_maintenance_plan',
+                'delegate_to_repo_autonomy_runner',
                 'mcp_tunnel_status',
                 'project_doctor',
             ],
@@ -77,6 +78,14 @@ export const mcpSessionProfileTool = {
                     flow: ['mcp_maintenance_plan', 'mcp_maintenance_apply_safe_fixes dryRun=true'],
                     reason: 'Batched maintenance reduces separate planning/status/smoke calls.',
                 },
+                {
+                    task: 'delegated-longer-work',
+                    flow: [
+                        'delegate_to_repo_autonomy_runner dryRun=true',
+                        'delegate_to_repo_autonomy_runner dryRun=false',
+                    ],
+                    reason: 'The local runner executes only fixed missions and avoids arbitrary shell or destructive actions.',
+                },
             ],
             approvalGuidance: {
                 askUserToRememberWhenAvailable: [
@@ -88,6 +97,7 @@ export const mcpSessionProfileTool = {
                     'repo_restore_quarantined_file',
                     'mcp_run_safe_validation_suite',
                     'mcp_maintenance_apply_safe_fixes',
+                    'delegate_to_repo_autonomy_runner',
                 ],
                 avoidUnlessExplicitlyNeeded: ['repo_remove_file', 'job_cancel'],
                 cannotDisableHostPrompts:

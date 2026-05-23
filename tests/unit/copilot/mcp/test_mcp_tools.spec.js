@@ -280,6 +280,7 @@ describe('copilot MCP tools', () => {
         assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_find_symbol_usages'));
         assert.ok(Array.isArray(structured['index']));
         assert.ok(/** @type {string[]} */ (structured['index']).includes('repo_index_status'));
+        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('delegate_to_repo_autonomy_runner'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_maintenance_plan'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_session_profile'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tools_status'));
@@ -342,6 +343,18 @@ describe('copilot MCP tools', () => {
         );
         assert.ok(results.some((result) => result.fix === 'refresh-index' && result.plannedPath === 'src/copilot'));
         assert.ok(results.every((result) => result.dryRun === true));
+    });
+
+    it('delegate_to_repo_autonomy_runner dry-runs fixed autonomy missions', async () => {
+        const tool = findTool('delegate_to_repo_autonomy_runner');
+        const result = await tool.handler({ mission: 'diagnose-mcp', dryRun: true });
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(result.structuredContent?.['dryRun'], true);
+        assert.equal(result.structuredContent?.['executed'], false);
+        assert.equal(result.structuredContent?.['constraints']?.['arbitraryShell'], false);
+        const plan = /** @type {{ step?: string }[]} */ (result.structuredContent?.['plan']);
+        assert.ok(plan.some((step) => step.step === 'mcp_smoke_workspace'));
     });
 
     it('project_doctor returns canonical validators', async () => {

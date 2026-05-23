@@ -61,6 +61,7 @@ const VALIDATION_TOOLS = [
 ];
 
 const RUNTIME_TOOLS = [
+    'delegate_to_repo_autonomy_runner',
     'mcp_maintenance_plan',
     'mcp_maintenance_apply_safe_fixes',
     'project_doctor',
@@ -96,6 +97,7 @@ const IO_GUIDANCE = [
     'Use mcp_tools_status before planning broad work to inspect read-only, bounded-write, destructive and approval-friendly tools.',
     'Use mcp_session_profile at the start of a new ChatGPT conversation to load the recommended autonomy profile.',
     'Use mcp_maintenance_plan then mcp_maintenance_apply_safe_fixes dryRun=true for batched low-risk maintenance.',
+    'Use delegate_to_repo_autonomy_runner dryRun=true for fixed longer workflows before requesting real execution.',
     'Use repo_read_file.sha256 as expectedHash for safe write/patch calls.',
     'Use repo_quarantine_file before repo_remove_file when reversible cleanup is acceptable.',
     'Use repo_read_file_chunks for large files instead of requesting entire content.',

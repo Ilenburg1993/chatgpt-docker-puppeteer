@@ -18,6 +18,7 @@ describe('copilot MCP registry', () => {
             'chatgpt_connector_url_check',
             'copilot_session_get',
             'copilot_sessions_list',
+            'delegate_to_repo_autonomy_runner',
             'git_branch_info',
             'git_diff',
             'git_log',
