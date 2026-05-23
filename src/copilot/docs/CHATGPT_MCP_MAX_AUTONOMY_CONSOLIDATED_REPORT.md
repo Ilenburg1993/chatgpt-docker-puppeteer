@@ -1286,21 +1286,32 @@ Resultado implementado:
    - audience/resource via `COPILOT_MCP_OAUTH_AUDIENCE`;
    - checagem de scopes `scope` ou `scp`.
 11. `mcp_auth_profile` reporta enforcement, issuer, audience, JWKS e static bearer sem revelar segredo.
-12. Validacao focada:
+12. `mcp_oauth_issuer_diagnostics` valida, quando houver issuer real, os documentos:
+   - `/.well-known/oauth-authorization-server`;
+   - `/.well-known/openid-configuration`.
+13. O diagnostico de issuer verifica:
+   - `issuer`;
+   - `authorization_endpoint`;
+   - `token_endpoint`;
+   - `token_endpoint_auth_methods_supported`;
+   - `code_challenge_methods_supported` com `S256`;
+   - scopes de repo.
+14. Validacao focada:
    - `npm run typecheck:strict:src.copilot`: passou;
-   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_connection_profile.spec.js tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
-     passou com 41 testes.
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
+     passou com 33 testes.
    - `npm run lint:copilot`: passou.
-   - `npm run copilot:mcp:safe-suite -- mcp-full`: passou com typecheck, lint e 80 testes MCP.
-   - `npm run test:copilot:unit`: passou com 3079 testes.
+   - `npm run copilot:mcp:safe-suite -- mcp-full`: passou com typecheck, lint e 81 testes MCP.
+   - `npm run test:copilot:unit`: passou com 3080 testes.
 
 Pendencias da Faixa I:
 
 1. Escolher/fornecer issuer OAuth real para `COPILOT_MCP_OAUTH_ISSUER`.
 2. Publicar metadata do authorization server fora deste MCP ou integrar com provedor existente.
-3. Validar OAuth real com issuer/JWKS externo usado pelo ChatGPT.
-4. Publicar exemplos finais do `.env` para modo OAuth quando houver issuer real.
-5. Rodar teste real no ChatGPT com auth `OAuth`.
+3. Rodar `mcp_oauth_issuer_diagnostics` contra o issuer real.
+4. Validar OAuth real com issuer/JWKS externo usado pelo ChatGPT.
+5. Publicar exemplos finais do `.env` para modo OAuth quando houver issuer real.
+6. Rodar teste real no ChatGPT com auth `OAuth`.
 
 ---
 
@@ -1308,7 +1319,7 @@ Pendencias da Faixa I:
 
 Feito:
 
-1. 65 tools expostas.
+1. 66 tools expostas.
 2. Annotations completas.
 3. `idempotentHint` para read-only.
 4. `mcp_tools_status`.
@@ -1335,6 +1346,7 @@ Feito:
 25. Scope/security-scheme readiness por tool.
 26. Enforcement gradual por tool, desligado por padrao no tunel temporario.
 27. Validador bearer token por static token local ou OAuth/JWKS.
+28. `mcp_oauth_issuer_diagnostics` para checar metadata OAuth/OIDC do issuer real.
 
 Faltante P0:
 
@@ -1348,6 +1360,6 @@ Faltante P2:
 
 1. OAuth authorization server metadata real.
 2. Teste OAuth/JWKS real com ChatGPT.
-3. Exemplos finais de configuracao OAuth para issuer escolhido.
+3. Exemplos finais de configuracao OAuth para issuer escolhido apos diagnostico.
 4. Teste ChatGPT OAuth real.
 5. Dashboard/power score.

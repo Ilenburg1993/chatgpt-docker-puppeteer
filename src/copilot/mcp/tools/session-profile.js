@@ -45,6 +45,7 @@ export const mcpSessionProfileTool = {
                 'mcp_tunnel_status',
                 'mcp_last_validation_summary',
                 'mcp_auth_profile',
+                'mcp_oauth_issuer_diagnostics',
                 'project_doctor',
             ],
             lowFrictionReadCalls: [
@@ -69,6 +70,7 @@ export const mcpSessionProfileTool = {
                 'mcp_host_block_diagnostics',
                 'chatgpt_connector_current_url_status',
                 'mcp_auth_profile',
+                'mcp_oauth_issuer_diagnostics',
                 'git_status',
                 'git_diff',
             ],

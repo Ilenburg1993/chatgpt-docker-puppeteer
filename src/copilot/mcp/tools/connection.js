@@ -22,6 +22,108 @@ import {
 } from '../control-plane/auth.js';
 import { okResult } from '../control-plane/result.js';
 
+const OAUTH_METADATA_PATHS = ['/.well-known/oauth-authorization-server', '/.well-known/openid-configuration'];
+
+/**
+ * @param {string | undefined} value
+ * @returns {string | null}
+ */
+function normalizeIssuerUrl(value) {
+    const trimmed = String(value ?? '')
+        .trim()
+        .replace(/\/+$/u, '');
+    if (!trimmed || trimmed.includes('<') || trimmed.includes('>')) return null;
+    if (!/^https:\/\//u.test(trimmed)) return null;
+    return trimmed;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
+function asObject(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+}
+
+/**
+ * @param {string} url
+ * @param {number} timeoutMs
+ * @returns {Promise<{ ok: boolean; url: string; status?: number; metadata?: Record<string, unknown>; error?: string }>}
+ */
+async function fetchOAuthMetadata(url, timeoutMs) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(url, {
+            headers: { accept: 'application/json' },
+            signal: controller.signal,
+        });
+        const contentType = response.headers.get('content-type') ?? '';
+        const body = contentType.includes('application/json') ? asObject(await response.json()) : null;
+        return {
+            ok: response.ok && body !== null,
+            url,
+            status: response.status,
+            ...(body ? { metadata: body } : {}),
+            ...(!response.ok ? { error: `HTTP ${response.status}` } : {}),
+            ...(response.ok && body === null ? { error: 'Response is not a JSON object.' } : {}),
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            url,
+            error: error instanceof Error ? error.message : String(error),
+        };
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+/**
+ * @param {Record<string, unknown> | undefined} metadata
+ * @param {string[]} requiredScopes
+ * @returns {{ ready: boolean; missingFields: string[]; warnings: string[]; summary: Record<string, unknown> }}
+ */
+function summarizeOAuthMetadata(metadata, requiredScopes) {
+    const missingFields = [];
+    const warnings = [];
+    if (!metadata) {
+        return { ready: false, missingFields: ['metadata'], warnings: [], summary: {} };
+    }
+    for (const field of ['issuer', 'authorization_endpoint', 'token_endpoint']) {
+        if (typeof metadata[field] !== 'string' || !String(metadata[field]).trim()) missingFields.push(field);
+    }
+    const tokenMethods = Array.isArray(metadata['token_endpoint_auth_methods_supported'])
+        ? /** @type {unknown[]} */ (metadata['token_endpoint_auth_methods_supported']).filter((item) => typeof item === 'string')
+        : [];
+    const codeChallengeMethods = Array.isArray(metadata['code_challenge_methods_supported'])
+        ? /** @type {unknown[]} */ (metadata['code_challenge_methods_supported']).filter((item) => typeof item === 'string')
+        : [];
+    const scopesSupported = Array.isArray(metadata['scopes_supported'])
+        ? /** @type {unknown[]} */ (metadata['scopes_supported']).filter((item) => typeof item === 'string')
+        : [];
+    if (tokenMethods.length === 0) warnings.push('token_endpoint_auth_methods_supported is not advertised.');
+    if (!codeChallengeMethods.includes('S256')) warnings.push('code_challenge_methods_supported does not advertise S256.');
+    const missingScopes = requiredScopes.filter((scope) => !scopesSupported.includes(scope));
+    if (missingScopes.length > 0) warnings.push(`scopes_supported is missing: ${missingScopes.join(', ')}.`);
+    return {
+        ready: missingFields.length === 0,
+        missingFields,
+        warnings,
+        summary: {
+            issuer: metadata['issuer'] ?? null,
+            authorizationEndpointConfigured: typeof metadata['authorization_endpoint'] === 'string',
+            tokenEndpointConfigured: typeof metadata['token_endpoint'] === 'string',
+            registrationEndpointConfigured: typeof metadata['registration_endpoint'] === 'string',
+            clientIdMetadataDocumentSupported: metadata['client_id_metadata_document_supported'] === true,
+            tokenEndpointAuthMethodsSupported: tokenMethods,
+            codeChallengeMethodsSupported: codeChallengeMethods,
+            scopesSupported,
+            missingRequiredScopes: missingScopes,
+        },
+    };
+}
+
 /**
  * @type {import('../registry.js').McpToolDefinition[]}
  */
@@ -140,6 +242,67 @@ export const connectionTools = [
                               'Confirm the authorization server publishes OAuth metadata.',
                               'Set COPILOT_MCP_OAUTH_EXPECTED_ISSUER, COPILOT_MCP_OAUTH_AUDIENCE and COPILOT_MCP_OAUTH_JWKS_URI.',
                               'Confirm ChatGPT receives the protected resource metadata URL and returns scoped bearer tokens.',
+                          ],
+            });
+        },
+    },
+    {
+        name: 'mcp_oauth_issuer_diagnostics',
+        title: 'MCP OAuth issuer diagnostics',
+        description:
+            'Check OAuth authorization server well-known metadata readiness for ChatGPT without requiring a fixed domain or exposing secrets.',
+        inputSchema: {
+            issuer: z
+                .string()
+                .optional()
+                .describe('Optional HTTPS OAuth issuer base URL. Defaults to COPILOT_MCP_OAUTH_EXPECTED_ISSUER or COPILOT_MCP_OAUTH_ISSUER.'),
+            timeoutMs: z.number().int().min(500).max(10000).optional().describe('Per-request timeout in milliseconds.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ issuer, timeoutMs }) => {
+            const config = readMcpAuthConfig();
+            const normalizedIssuer = normalizeIssuerUrl(issuer ?? config.expectedIssuer);
+            const effectiveTimeoutMs = typeof timeoutMs === 'number' ? timeoutMs : 3000;
+            if (!normalizedIssuer) {
+                return okResult({
+                    success: true,
+                    ready: false,
+                    issuer: null,
+                    reason: 'No HTTPS OAuth issuer is configured.',
+                    requiredForCurrentMode: config.enforcement !== 'off',
+                    checkedUrls: [],
+                    nextSteps: [
+                        'Keep Authentication as No authentication while using temporary Cloudflare tunnel with COPILOT_MCP_AUTH_ENFORCEMENT=off.',
+                        'When testing OAuth, set COPILOT_MCP_OAUTH_ISSUER to an HTTPS issuer that publishes OAuth or OIDC metadata.',
+                    ],
+                });
+            }
+            const checked = [];
+            for (const path of OAUTH_METADATA_PATHS) {
+                checked.push(await fetchOAuthMetadata(`${normalizedIssuer}${path}`, effectiveTimeoutMs));
+                if (checked[checked.length - 1]?.ok === true) break;
+            }
+            const firstOk = checked.find((candidate) => candidate.ok);
+            const summary = summarizeOAuthMetadata(firstOk?.metadata, config.scopesSupported);
+            return okResult({
+                success: true,
+                ready: Boolean(firstOk && summary.ready),
+                issuer: normalizedIssuer,
+                requiredForCurrentMode: config.enforcement !== 'off',
+                checkedUrls: checked.map(({ url, ok, status, error }) => ({ url, ok, status: status ?? null, error: error ?? null })),
+                selectedMetadataUrl: firstOk?.url ?? null,
+                metadataSummary: summary.summary,
+                missingFields: summary.missingFields,
+                warnings: summary.warnings,
+                nextSteps:
+                    firstOk && summary.ready
+                        ? [
+                              'Set COPILOT_MCP_OAUTH_JWKS_URI if it differs from the issuer default JWKS URL.',
+                              'Run mcp_auth_profile and then test ChatGPT connector with Authentication=OAuth.',
+                          ]
+                        : [
+                              'Publish .well-known/oauth-authorization-server or .well-known/openid-configuration on the issuer.',
+                              'Ensure authorization_endpoint, token_endpoint, PKCE S256 and repo scopes are advertised.',
                           ],
             });
         },

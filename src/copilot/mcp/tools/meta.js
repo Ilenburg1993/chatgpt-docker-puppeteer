@@ -9,7 +9,7 @@ import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { okResult } from '../control-plane/result.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 10;
+const CAPABILITIES_VERSION = 11;
 
 const READ_TOOLS = [
     'repo_status',
@@ -88,6 +88,7 @@ const CONNECTION_TOOLS = [
     'chatgpt_connector_url_check',
     'chatgpt_connector_current_url_status',
     'mcp_auth_profile',
+    'mcp_oauth_issuer_diagnostics',
 ];
 const COPILOT_SDK_TOOLS = ['copilot_sessions_list', 'copilot_session_get'];
 /** @type {string[]} */
@@ -110,7 +111,7 @@ const ANNOTATION_PROFILE = {
 
 const METADATA_PROFILE = {
     outputSchema: 'registry-wide minimal passthrough schema; tool-specific schemas are the next hardening band',
-    securitySchemes: 'registry-wide explicit noauth metadata for dev; Mixed Auth/OAuth scopes remain a future band',
+    securitySchemes: 'registry-wide explicit noauth metadata for dev; Mixed Auth/OAuth scopes are available for staged enforcement',
 };
 
 const IO_GUIDANCE = [
@@ -135,6 +136,7 @@ const IO_GUIDANCE = [
     'Use repo_root_redaction_status to audit hidden/protected root redaction without returning hidden names.',
     'Use chatgpt_connector_current_url_status to recover the saved temporary tunnel URL without passing it as input.',
     'Use mcp_auth_profile before switching from none-dev to mixed-auth or OAuth.',
+    'Use mcp_oauth_issuer_diagnostics before enabling OAuth enforcement with a real issuer.',
     'LLM-B can consume MCP optionally, but does not depend on this MCP server.',
 ];
 
