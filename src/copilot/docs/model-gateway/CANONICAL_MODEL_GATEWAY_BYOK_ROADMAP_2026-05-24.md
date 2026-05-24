@@ -190,6 +190,7 @@ src/copilot/model-gateway/
 - [x] Adicionar probe JSON.
 - [x] Expor `/byok probe streaming` e `/byok probe json` sem degradar health de chat/agente.
 - [x] Criar evento e métricas canônicas para conclusão de probes.
+- [x] Emitir `model_gateway:probe:completed` pelo `/byok probe` via EventBus.
 - [ ] Adicionar probe de vision quando houver fixtures seguras.
 - [ ] Registrar cada probe em health e observability.
 - [ ] Diferenciar `catalog says` de `runtime proved`.

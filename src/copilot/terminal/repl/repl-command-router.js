@@ -12,9 +12,10 @@
 
 import { readCopilotBootConfig } from '#copilot/boot';
 import { getTerminalInterventionPolicy, LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
-import { runShutdown, toError } from '#copilot/core';
+import { EVENT_BUS, runShutdown, toError } from '#copilot/core';
 import { EMITTER_DIALOG_READY } from '#copilot/events';
 import { logSwallowed } from '../../core/error-handlers.js';
+import { container } from '../../core/di-container.js';
 import {
     clearRuntimeInterventionMailbox,
     consumeRuntimeInterventionMailbox,
@@ -114,7 +115,7 @@ const RESTART_WAIT_TIMEOUT_MS = resolveBoundedTimeoutMs(LLM_B_BOOT_TIMEOUT_MS, 6
 let _terminalInterventionQueue = Promise.resolve();
 
 /**
- * @typedef {{ hubSessionId: string | null; injectPort: number }} CmdCtx
+ * @typedef {{ hubSessionId: string | null; injectPort: number; eventBus: import('../../core/event-bus.js').EventBus | null }} CmdCtx
  */
 
 /**
@@ -560,7 +561,7 @@ export const CMD_ROUTES = [
     [['restart'], () => _cmdRestart()],
     [['emergency-reset', 'ereset'], () => _cmdEmergencyReset()],
     [['model'], (_, arg) => _cmdModel({ println }, arg)],
-    [['byok'], (_, arg) => _cmdByok({ println }, arg)],
+    [['byok'], (ctx, arg) => _cmdByok({ println, eventBus: ctx.eventBus }, arg)],
     [['reasoning'], (_, arg) => _cmdReasoning({ println }, arg)],
     [['attach'], (_, arg) => _cmdAttach({ println }, arg)],
     [['context'], (_, arg) => _cmdContext({ println }, arg)],
@@ -655,7 +656,12 @@ export function setTerminalCommandRouterInjectPort(port) {
  * @returns {Promise<void>}
  */
 export async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
-    const ctx = { println, hubSessionId: getHubSessionId(), injectPort: activeInjectPort };
+    const ctx = {
+        println,
+        hubSessionId: getHubSessionId(),
+        injectPort: activeInjectPort,
+        eventBus: container.has(EVENT_BUS) ? container.resolve(EVENT_BUS) : null,
+    };
     const handler = _cmdRouteMap.get(cmd?.toLowerCase() ?? '');
     if (handler) {
         await handler(ctx, arg, rest, rl, injectServer, cleanup);

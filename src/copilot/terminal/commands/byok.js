@@ -12,6 +12,7 @@ import fs from 'node:fs/promises';
 
 import { config as loadDotenv } from 'dotenv';
 import {
+    buildProbeCompletedEvent,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
     runConfiguredByokJsonProbe,
@@ -74,6 +75,7 @@ const BYOK_RUNTIME_SELECTOR_ENV_KEYS = Object.freeze([
 /**
  * @typedef {object} ByokCommandContext
  * @property {(text: string) => void} println
+ * @property {{ emit?: (event: { type: string; [key: string]: unknown }) => unknown } | null} [eventBus]
  */
 
 /**
@@ -1397,9 +1399,10 @@ function renderByokProbeResult(println, mode, probe, options = {}) {
 /**
  * @param {ByokProbeMode} mode
  * @param {ReturnType<typeof buildByokProbeSelection>} selection
+ * @param {ByokCommandContext['eventBus']} [eventBus]
  * @returns {Promise<{ probe: ByokProbeResult; providerAttempted: boolean }>}
  */
-async function runByokProbe(mode, selection) {
+async function runByokProbe(mode, selection, eventBus = null) {
     const probeRunner =
         mode === 'agent'
             ? runConfiguredByokAgentProbe
@@ -1417,9 +1420,17 @@ async function runByokProbe(mode, selection) {
             classifyProviderFailure: classifyTerminalByokProviderFailure,
         },
     });
+    const providerAttempted = await recordByokProbeHealth(mode, probe);
+    if (eventBus?.emit) {
+        try {
+            eventBus.emit(buildProbeCompletedEvent({ probeKind: mode, result: probe, providerAttempted }));
+        } catch {
+            // Observability is diagnostic and must not break the operator command path.
+        }
+    }
     return {
         probe,
-        providerAttempted: await recordByokProbeHealth(mode, probe),
+        providerAttempted,
     };
 }
 
@@ -1588,7 +1599,7 @@ async function persistByokSelection(rest, projection) {
  * @param {string | undefined} arg
  * @returns {Promise<void>}
  */
-export async function cmdByok({ println }, arg) {
+export async function cmdByok({ println, eventBus = null }, arg) {
     const raw = (arg ?? '').trim();
     const [rawSub = 'status', ...rest] = raw.split(/\s+/u);
     const sub = rawSub.toLowerCase();
@@ -1673,7 +1684,7 @@ export async function cmdByok({ println }, arg) {
             let attempted = 0;
             for (const [index, model] of candidates.entries()) {
                 println(`    ${index + 1}. \x1b[33m${model.id}\x1b[0m  \x1b[90m${renderModelTags(model)}\x1b[0m`);
-                const result = await runByokProbe('agent', buildByokModelProbeSelection(model, timeoutMs));
+                const result = await runByokProbe('agent', buildByokModelProbeSelection(model, timeoutMs), eventBus);
                 renderByokProbeResult(println, 'agent', result.probe, {
                     indent: '       ',
                     providerAttempted: result.providerAttempted,
@@ -1704,7 +1715,7 @@ export async function cmdByok({ println }, arg) {
         println(
             `  \x1b[90mEscopo: sessão SDK descartável; não troca o dialog loop nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : mode === 'agent' ? ' Agent exige tools representativas do terminal + ask_user com resposta sintética.' : mode === 'streaming' ? ' Streaming exige assistant.message_delta real; não degrada health de chat.' : ' JSON exige payload parseável; não degrada health de chat.'}${selection.profile ? ` profile=${selection.profile}` : ''}${selection.model ? ` model=${selection.model}` : ''}\x1b[0m`,
         );
-        const { probe, providerAttempted } = await runByokProbe(mode, selection);
+        const { probe, providerAttempted } = await runByokProbe(mode, selection, eventBus);
         renderByokProbeResult(println, mode, probe, { providerAttempted });
         println(
             mode === 'agent'

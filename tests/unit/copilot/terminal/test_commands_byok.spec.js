@@ -2,8 +2,15 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, rename, setTerminalModelProjection, writeFile } =
+const { buildProbeCompletedEvent, chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, rename, setTerminalModelProjection, writeFile } =
     vi.hoisted(() => ({
+        buildProbeCompletedEvent: vi.fn((input) => ({
+            type: 'model_gateway:probe:completed',
+            probeKind: input.probeKind,
+            ok: input.result?.ok === true,
+            status: input.result?.status ?? 'unknown',
+            providerAttempted: input.providerAttempted !== false,
+        })),
         chmod: vi.fn(),
         clearByokProviderModelHealth: vi.fn(),
         discoverConfiguredByokModelsFromEnv: vi.fn(),
@@ -80,6 +87,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
 }));
 
 vi.mock('#copilot/model-gateway', () => ({
+    buildProbeCompletedEvent: buildProbeCompletedEvent,
     runConfiguredByokChatProbe: runConfiguredByokChatProbe,
     runConfiguredByokAgentProbe: runConfiguredByokAgentProbe,
     runConfiguredByokJsonProbe: runConfiguredByokJsonProbe,
@@ -177,6 +185,7 @@ describe('terminal /byok command', () => {
             sessions: [],
         });
         loadDotenv.mockReset();
+        buildProbeCompletedEvent.mockClear();
         runConfiguredByokChatProbe.mockReset();
         runConfiguredByokAgentProbe.mockReset();
         runConfiguredByokJsonProbe.mockReset();
@@ -436,8 +445,9 @@ describe('terminal /byok command', () => {
             warnings: ['catalogo remoto'],
         });
         const ctx = mockCtx();
+        const eventBus = { emit: vi.fn() };
 
-        await cmdByok({ println: ctx.println }, 'probe profile:groq-free model:probe-model timeout:9000');
+        await cmdByok({ println: ctx.println, eventBus }, 'probe profile:groq-free model:probe-model timeout:9000');
 
         expect(runConfiguredByokChatProbe).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -452,6 +462,16 @@ describe('terminal /byok command', () => {
             model: 'probe-model',
             successContext: 'byok_probe',
         });
+        expect(buildProbeCompletedEvent).toHaveBeenCalledWith(
+            expect.objectContaining({
+                probeKind: 'chat',
+                providerAttempted: true,
+                result: expect.objectContaining({ status: 'ok', model: 'probe-model' }),
+            }),
+        );
+        expect(eventBus.emit).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'model_gateway:probe:completed', probeKind: 'chat' }),
+        );
         expect(flushByokProviderHealth).toHaveBeenCalled();
         expect(ctx.output()).toContain('sessão SDK descartável');
         expect(ctx.output()).toContain('deltas=2/13 chars');
