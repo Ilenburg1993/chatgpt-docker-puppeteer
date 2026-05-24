@@ -9,6 +9,7 @@ import {
     readConfiguredByokProfileSummaries,
     readConfiguredByokSummary,
 } from '#copilot/config';
+import { buildEnvByokModelGatewaySnapshot } from '#copilot/model-gateway';
 import {
     listRuntimeAvailableModelsProjection,
     observeRuntimeModelChangeProjection,
@@ -65,6 +66,7 @@ function resolveSdkSessionModeProjection(storedMode, binding) {
  *     usedDefaultRuntimeFallback: boolean;
  *     runtimeFallbackWarning: string | null;
  *     byok: ReturnType<typeof readConfiguredByokSummary>;
+ *     modelGateway: ReturnType<typeof buildEnvByokModelGatewaySnapshot>;
  *     agentRuntimes: import('./shared.js').TerminalRuntimeBase['agentRuntimes'];
  *     runtimeSessionId: string | null;
  * }}
@@ -92,6 +94,7 @@ export function readTerminalConfigProjection(runtimeId) {
         usedDefaultRuntimeFallback: base.usedDefaultRuntimeFallback,
         runtimeFallbackWarning: base.runtimeFallbackWarning,
         byok: readConfiguredByokSummary(),
+        modelGateway: buildEnvByokModelGatewaySnapshot(),
         agentRuntimes: base.agentRuntimes,
         runtimeSessionId: base.runtimeSessionId,
     };
@@ -121,6 +124,7 @@ export function readTerminalModelStatsProjection(runtimeId) {
  *     models: ReturnType<typeof readConfiguredByokModelsFromEnv>;
  *     profiles: ReturnType<typeof readConfiguredByokProfileSummaries>;
  *     envKeys: readonly string[];
+ *     modelGateway: ReturnType<typeof buildEnvByokModelGatewaySnapshot>;
  * }}
  */
 export function readTerminalByokProjection() {
@@ -135,6 +139,7 @@ export function readTerminalByokProjection() {
         }),
         profiles: readConfiguredByokProfileSummaries(),
         envKeys: BYOK_ENV_KEYS,
+        modelGateway: buildEnvByokModelGatewaySnapshot(),
     };
 }
 

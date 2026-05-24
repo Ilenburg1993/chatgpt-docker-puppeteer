@@ -87,6 +87,22 @@ export function createMetricsCollector({ bus, metrics }) {
     on('agent:session:usage', () => {
         metrics.recordCounter('session.usage_report', 1);
     });
+    on('model_gateway:registry:snapshot', (evt) => {
+        metrics.recordCounter('model_gateway.registry.snapshot', 1);
+        metrics.recordGauge('model_gateway.providers', evt.providerCount ?? 0);
+        metrics.recordGauge('model_gateway.models', evt.modelCount ?? 0);
+        metrics.recordGauge('model_gateway.models.enabled', evt.enabledModelCount ?? 0);
+    });
+    on('model_gateway:route:decision', () => {
+        metrics.recordCounter('model_gateway.route.decision', 1);
+    });
+    on('model_gateway:probe:completed', (evt) => {
+        metrics.recordCounter(evt.ok === false ? 'model_gateway.probe.failed' : 'model_gateway.probe.ok', 1);
+    });
+    on('model_gateway:provider:failure', (evt) => {
+        const kind = typeof evt.kind === 'string' && evt.kind ? evt.kind : 'unknown';
+        metrics.recordCounter(`model_gateway.provider_failure.${kind}`, 1);
+    });
 
     log('INFO', `[metrics-collector] ${unsubs.length} subscribers registrados`);
 

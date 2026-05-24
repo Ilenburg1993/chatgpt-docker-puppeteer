@@ -13,6 +13,7 @@ import * as agentEvents from '../events/agent-events.js';
 import * as emitterEvents from '../events/emitter-events.js';
 import * as hookEvents from '../events/hook-events.js';
 import * as hubEvents from '../events/hub-events.js';
+import * as modelGatewayEvents from '../events/model-gateway-events.js';
 import * as nervEvents from '../events/nerv-events.js';
 import * as serviceEvents from '../events/service-events.js';
 import * as systemEvents from '../events/system-events.js';
@@ -104,6 +105,7 @@ export function getCatalog() {
         ...extractEntries(terminalEvents, 'terminal-events'),
         ...extractEntries(systemEvents, 'system-events'),
         ...extractEntries(serviceEvents, 'service-events'),
+        ...extractEntries(modelGatewayEvents, 'model-gateway-events'),
         ...extractEntries(nervEvents, 'nerv-events'),
         ...extractEntries(emitterEvents, 'emitter-events'),
     ];

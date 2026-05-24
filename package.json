@@ -125,6 +125,8 @@
     "#copilot/observability/metrics": "./src/copilot/observability/metrics.js",
     "#copilot/observability/otel": "./src/copilot/observability/otel.js",
     "#copilot/observability/*": "./src/copilot/observability/*.js",
+    "#copilot/model-gateway": "./src/copilot/model-gateway/index.js",
+    "#copilot/model-gateway/*": "./src/copilot/model-gateway/*.js",
     "#copilot/plugins": "./src/copilot/plugins/index.js",
     "#copilot/plugins/*": "./src/copilot/plugins/*.js",
     "#copilot/*": "./src/copilot/*.js",

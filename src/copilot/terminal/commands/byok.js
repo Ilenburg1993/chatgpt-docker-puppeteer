@@ -1136,6 +1136,23 @@ async function renderStatus(projection, println) {
         println(`    cost:          \x1b[33m${costTag.replace(/^ · /u, '')}\x1b[0m`);
     }
     println(`    modelList:     ${summary.modelList.count} modelo(s)`);
+    const gateway =
+        projection.modelGateway ?? {
+            source: 'unavailable',
+            active: { modelId: null },
+            diagnostics: {
+                providerCount: 0,
+                modelCount: projection.models.length,
+                enabledModelCount: projection.models.length,
+            },
+        };
+    println(
+        `    gateway:       \x1b[33mproviders=${gateway.diagnostics.providerCount} · models=${gateway.diagnostics.modelCount} · enabled=${gateway.diagnostics.enabledModelCount} · source=${gateway.source}\x1b[0m`,
+    );
+    const gatewayActive = /** @type {{ modelId?: string | null }} */ (gateway.active);
+    if (gatewayActive.modelId) {
+        println(`    gatewayModel:  \x1b[33m${gatewayActive.modelId}\x1b[0m`);
+    }
     try {
         const inventory = await listTerminalSdkSessionInventory();
         const binding = classifyTerminalByokSdkBinding(
