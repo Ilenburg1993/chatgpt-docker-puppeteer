@@ -431,3 +431,40 @@ Decima primeira fatia correlata - auditoria WORKSPACE pos-transformacoes:
 - Validacao: typecheck strict Copilot, lint Copilot, testes MCP 86/86, testes Copilot unit 3085/3085,
   env audit/validate/check, restart/status/smoke Cloudflare, smoke OAuth max-power e `/health` confirmando
   `indexAutoBuild.status=completed` com 999 arquivos indexados.
+
+Decima segunda fatia correlata - lote de file ops para reduzir janelas:
+
+- Criada `repo_apply_file_batch` para agrupar `create_file`, `move_file`, `quarantine_file` e `remove_file` explicito em
+  uma unica tool call auditavel.
+- A tool usa `dryRun=true` por default; aplicacao real exige `dryRun=false` e `confirmBatch=true`; delete dentro do lote
+  tambem exige `confirm=true` por operacao.
+- Esta fatia nao falsifica `readOnlyHint`: a documentacao oficial do Apps SDK reserva esse hint para tools sem efeitos
+  de criacao/alteracao/delete. Como o lote pode deletar, ele permanece com `destructiveHint=true`.
+- Objetivo pratico: reduzir multiplas confirmacoes potenciais em chatgpt.com para uma unica chamada confiavel, sem
+  prometer controle sobre a UI host-side.
+- Validacao: typecheck strict Copilot, lint Copilot, testes focados repo-write/registry/tools 45/45, testes MCP 87/87,
+  testes Copilot unit 3086/3086, restart/status/smoke Cloudflare com 68/68 tools e smoke OAuth max-power.
+
+Decima terceira fatia correlata - OAuth refresh-token e auditoria de friccao:
+
+- `src/copilot/docs/# Plano completo de patches OAuth.md` foi lido integralmente e usado como guia da nova revisao.
+- A implementacao anterior de `mcp_oauth_friction_audit` foi reclassificada como quebrada: o arquivo havia sido gravado
+  como uma unica linha com `\n` literais e nao seguia o contrato real do registry MCP.
+- `src/copilot/mcp/control-plane/dev-oauth.js` agora usa nomes canônicos para refresh token, anuncia
+  `refresh_token` em issuer metadata, DCR e CIMD, emite access tokens de 24h e refresh tokens rotativos de 30 dias.
+- O token endpoint foi endurecido para invalidar refresh token somente apos validar client/resource/expiracao, evitando
+  invalidacao por tentativa incorreta de outro cliente.
+- `readDevOAuthTokenLifetimePolicy()` centraliza a leitura de
+  `COPILOT_MCP_DEV_OAUTH_ACCESS_TOKEN_TTL_SECONDS` e
+  `COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_TTL_SECONDS`.
+- `mcp_oauth_friction_audit` foi refeito como tool read-only real com `okResult()`, annotations canonicas, leitura da
+  metadata protegida, leitura da metadata do issuer dev, checagem de CIMD, PKCE S256, `authorization_code`,
+  `refresh_token`, escopos max-power e fronteira OAuth versus aprovacao host-side.
+- `copilot:mcp:oauth:smoke` agora valida refresh-token em DCR e CIMD e usa token renovado para chamar
+  `mcp_runtime_health`.
+- `.env.example`, `.env.local.example` e `.env.schema.json` cobrem os TTLs do OAuth dev e
+  `COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS`.
+- Validacao: typecheck strict Copilot, lint Copilot, testes MCP 91/91, testes Copilot unit 3090/3090 no rerun limpo,
+  env audit/validate/check, `git diff --check`, restart/status/smoke Cloudflare com 71/71 tools, smoke OAuth com
+  DCR/CIMD max-power + `refresh_token`, `id_token` e `/oauth/userinfo`, e `/health` com index auto-build completo
+  (`indexed=1002`, `symbols=5815`, `imports=2405`).

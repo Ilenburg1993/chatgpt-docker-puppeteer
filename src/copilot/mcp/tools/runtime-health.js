@@ -21,6 +21,8 @@ import { okResult } from '../control-plane/result.js';
 import { readMcpWorkspaceSmokeSummary } from '../control-plane/smoke-state.js';
 import { repoStatusHandler } from './repo-status.js';
 
+const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
+
 /**
  * @param {unknown} stats
  * @returns {{
@@ -105,8 +107,9 @@ export const mcpRuntimeHealthTool = {
         const lastWorkspaceSmoke = readMcpWorkspaceSmokeSummary();
         const warnings = [];
         const critical = [];
+        const informational = [];
         if (workspace.error) warnings.push(`Unable to read repository status: ${workspace.error}`);
-        if (workspace.dirty === true) warnings.push('Workspace has uncommitted or untracked changes.');
+        if (workspace.dirty === true) informational.push('Workspace has uncommitted or untracked changes.');
         if (!index.available) warnings.push('Shared IO index is unavailable; run or auto-run repo_index_build.');
         else if (index.empty)
             warnings.push('Shared IO index is available but empty; refresh it before indexed search.');
@@ -124,6 +127,15 @@ export const mcpRuntimeHealthTool = {
         if (connectorSmoke.ok === null)
             warnings.push('No Cloudflare smoke result is recorded for the current connector URL.');
         if (connectorSmoke.ok === false) critical.push('Last Cloudflare smoke failed.');
+        if (
+            connectorSmoke.ok === true &&
+            typeof connectorSmoke.ageMinutes === 'number' &&
+            connectorSmoke.ageMinutes > CONNECTOR_SMOKE_STALE_AFTER_MINUTES
+        ) {
+            warnings.push(
+                `Cloudflare connector smoke is ${connectorSmoke.ageMinutes} minutes old; refresh smoke after tunnel, auth or DNS changes.`,
+            );
+        }
         if (!lastWorkspaceSmoke) warnings.push('No in-process mcp_smoke_workspace result has been recorded.');
         if (lastWorkspaceSmoke?.success === false) critical.push('Last mcp_smoke_workspace failed.');
         for (const [toolName, metric] of Object.entries(metrics.tools)) {
@@ -140,6 +152,7 @@ export const mcpRuntimeHealthTool = {
             status,
             warnings,
             critical,
+            informational,
             workspaceRoot: getMcpWorkspaceRoot(),
             operationalSignals: {
                 workspace,

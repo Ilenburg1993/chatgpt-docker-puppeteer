@@ -10,6 +10,7 @@ import { authorizeMcpToolCall } from './control-plane/auth.js';
 import { recordMcpToolMetric } from './control-plane/metrics.js';
 import { errorResult } from './control-plane/result.js';
 import { normalizeMcpToolDefinitions } from './control-plane/tool-metadata.js';
+import { mcpAppsSdkReadinessTool } from './tools/apps-sdk-readiness.js';
 import { connectionTools } from './tools/connection.js';
 import { copilotSessionTools } from './tools/copilot-session.js';
 import { delegateToRepoAutonomyRunnerTool } from './tools/delegation-runner.js';
@@ -19,6 +20,7 @@ import { mcpHostBlockDiagnosticsTool } from './tools/host-blocks.js';
 import { jobTools } from './tools/jobs.js';
 import { maintenanceTools } from './tools/maintenance.js';
 import { metaTools } from './tools/meta.js';
+import { bindMcpOAuthFrictionAuditProvider, mcpOAuthFrictionAuditTool } from './tools/oauth-friction-audit.js';
 import { projectDoctorTool } from './tools/project-doctor.js';
 import { repoIndexTools } from './tools/repo-index.js';
 import { repoPlanTools } from './tools/repo-plan.js';
@@ -46,6 +48,7 @@ import { mcpTunnelStatusTool } from './tools/tunnel-status.js';
  *     | Promise<import('@modelcontextprotocol/sdk/types.js').CallToolResult>
  *     | import('@modelcontextprotocol/sdk/types.js').CallToolResult} handler
  *
+ *
  * @typedef {object} RegisterCanonicalMcpToolsOptions
  * @property {import('./control-plane/auth.js').McpAuthContext} [authContext]
  */
@@ -64,11 +67,13 @@ export function getCanonicalMcpTools() {
         ...maintenanceTools,
         delegateToRepoAutonomyRunnerTool,
         mcpGoldenPromptsTool,
+        mcpAppsSdkReadinessTool,
         mcpHostBlockDiagnosticsTool,
         ...connectionTools,
         ...repoWriteTools,
         ...copilotSessionTools,
         ...metaTools,
+        mcpOAuthFrictionAuditTool,
         mcpSessionProfileTool,
         mcpAutonomyPowerScoreTool,
         mcpToolsStatusTool,
@@ -77,6 +82,7 @@ export function getCanonicalMcpTools() {
         mcpRuntimeHealthTool,
     ]);
     bindMcpToolsStatusProvider(() => tools);
+    bindMcpOAuthFrictionAuditProvider(() => tools);
     return tools;
 }
 

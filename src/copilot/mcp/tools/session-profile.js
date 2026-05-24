@@ -25,7 +25,7 @@ export const mcpSessionProfileTool = {
         const capabilities = buildMcpCapabilitiesSummary();
         return okResult({
             success: true,
-            profile: 'chatgpt-max-autonomy-temporary-tunnel',
+            profile: 'chatgpt-max-autonomy-permanent-cloudflare-oauth',
             connector: {
                 name: connector.name,
                 description: connector.description,
@@ -81,6 +81,12 @@ export const mcpSessionProfileTool = {
                     task: 'patch-existing-file',
                     flow: ['repo_patch_plan', 'repo_apply_patch expectedHash=<sha256 from plan>'],
                     reason: 'Plan-only read is lower friction than dryRun inside the write tool.',
+                },
+                {
+                    task: 'apply-multiple-file-ops',
+                    flow: ['repo_apply_file_batch_plan', 'repo_apply_file_batch dryRun=false confirmBatch=true'],
+                    reason:
+                        'Plan the batch with a read-only tool first, then apply all trusted create/move/quarantine operations in one ChatGPT write confirmation.',
                 },
                 {
                     task: 'remove-file-safely',

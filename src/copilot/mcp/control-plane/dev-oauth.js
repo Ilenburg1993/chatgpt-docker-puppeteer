@@ -2,9 +2,8 @@
 /**
  * Built-in development OAuth 2.1 authorization server for the ChatGPT MCP connector.
  *
- * This is intentionally scoped to local/dev MCP usage. It gives ChatGPT a real OAuth
- * flow for the permanent Cloudflare endpoint without introducing an external IdP
- * dependency before the project chooses a production issuer.
+ * This is intentionally scoped to local/dev MCP usage. It gives ChatGPT a real OAuth flow for the permanent Cloudflare
+ * endpoint without introducing an external IdP dependency before the project chooses a production issuer.
  *
  * @module copilot/mcp/control-plane/dev-oauth
  */
@@ -24,12 +23,15 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const AUTH_CODE_TTL_MS = 5 * 60 * 1000;
-const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
+const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 24 * 60 * 60;
+const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
 const DEFAULT_KEY_FILE = 'src/copilot/.ai/mcp/oauth-dev-private-key.pem';
 const CLIENT_METADATA_TIMEOUT_MS = 5000;
 const DEV_CLIENT_METADATA_PATH = '/.well-known/oauth-client/codex-smoke.json';
 const DEV_CLIENT_REDIRECT_URI = 'https://chatgpt.com/connector/oauth/codex-smoke';
 const OIDC_SCOPES = /** @type {const} */ (['openid', 'profile', 'email']);
+const REFRESH_TOKEN_GRANT = 'refresh_token';
+const REFRESH_TOKEN_PREFIX = 'rt_';
 const OIDC_CLAIMS = /** @type {const} */ ([
     'sub',
     'iss',
@@ -42,19 +44,43 @@ const OIDC_CLAIMS = /** @type {const} */ ([
     'preferred_username',
 ]);
 
-/** @type {Promise<{ privateKey: CryptoKey | import('node:crypto').KeyObject; publicJwk: Record<string, unknown>; kid: string }> | null} */
+/** @type {Promise<{
+    privateKey: CryptoKey | import('node:crypto').KeyObject;
+    publicJwk: Record<string, unknown>;
+    kid: string;
+}> | null} */
 let keyMaterialPromise = null;
 
-/** @type {Map<string, { clientId: string; redirectUri: string; scope: string; resource: string; codeChallenge: string; codeChallengeMethod: string; createdAt: number }>} */
+/** @type {Map<
+    string,
+    {
+        clientId: string;
+        redirectUri: string;
+        scope: string;
+        resource: string;
+        codeChallenge: string;
+        codeChallengeMethod: string;
+        createdAt: number;
+    }
+>} */
 const authorizationCodes = new Map();
 
-/** @typedef {{ clientId: string; clientName: string; redirectUris: string[]; createdAt: number; source: 'dcr' | 'cimd' }} DevOAuthClient */
+/** @typedef {{
+    clientId: string;
+    clientName: string;
+    redirectUris: string[];
+    createdAt: number;
+    source: 'dcr' | 'cimd';
+}} DevOAuthClient */
 
 /** @type {Map<string, DevOAuthClient>} */
 const registeredClients = new Map();
 
 /** @type {Map<string, DevOAuthClient>} */
 const clientMetadataDocumentCache = new Map();
+
+/** @type {Map<string, { clientId: string; scope: string; resource: string; expiresAt: number }>} */
+const renewCredentials = new Map();
 
 /**
  * @param {import('./auth.js').McpAuthConfig} config
@@ -84,7 +110,7 @@ export function buildBuiltInDevOAuthMetadata(config) {
         registration_endpoint: `${config.resource}/oauth/register`,
         client_id_metadata_document_supported: true,
         response_types_supported: ['code'],
-        grant_types_supported: ['authorization_code'],
+        grant_types_supported: ['authorization_code', REFRESH_TOKEN_GRANT],
         token_endpoint_auth_methods_supported: ['none'],
         code_challenge_methods_supported: ['S256'],
         scopes_supported: scopesSupported,
@@ -106,7 +132,7 @@ export function buildBuiltInDevOAuthClientMetadata(config) {
         client_name: 'Copilot MCP CIMD smoke client',
         client_uri: config.resource,
         redirect_uris: [DEV_CLIENT_REDIRECT_URI],
-        grant_types: ['authorization_code'],
+        grant_types: ['authorization_code', REFRESH_TOKEN_GRANT],
         response_types: ['code'],
         token_endpoint_auth_method: 'none',
     };
@@ -122,7 +148,11 @@ export function buildBuiltInDevOAuthClientMetadata(config) {
 export async function handleBuiltInDevOAuthRequest(req, res, url, config) {
     if (!isBuiltInDevOAuthEnabled(config)) return false;
 
-    if (req.method === 'GET' && (url.pathname === '/.well-known/oauth-authorization-server' || url.pathname === '/.well-known/openid-configuration')) {
+    if (
+        req.method === 'GET' &&
+        (url.pathname === '/.well-known/oauth-authorization-server' ||
+            url.pathname === '/.well-known/openid-configuration')
+    ) {
         writeJson(res, 200, buildBuiltInDevOAuthMetadata(config));
         return true;
     }
@@ -160,7 +190,7 @@ export async function handleBuiltInDevOAuthRequest(req, res, url, config) {
             client_name: client.clientName,
             redirect_uris: client.redirectUris,
             token_endpoint_auth_method: 'none',
-            grant_types: ['authorization_code'],
+            grant_types: ['authorization_code', REFRESH_TOKEN_GRANT],
             response_types: ['code'],
         });
         return true;
@@ -185,7 +215,11 @@ export async function handleBuiltInDevOAuthRequest(req, res, url, config) {
 }
 
 /**
- * @returns {Promise<{ privateKey: CryptoKey | import('node:crypto').KeyObject; publicJwk: Record<string, unknown>; kid: string }>}
+ * @returns {Promise<{
+ *     privateKey: CryptoKey | import('node:crypto').KeyObject;
+ *     publicJwk: Record<string, unknown>;
+ *     kid: string;
+ * }>}
  */
 async function getKeyMaterial() {
     keyMaterialPromise ??= (async () => {
@@ -322,6 +356,24 @@ async function handleAuthorize(res, url, config) {
 async function handleToken(req, res, config) {
     const body = await readRequestBody(req);
     const grantType = String(body['grant_type'] ?? '');
+    if (grantType === 'authorization_code') {
+        await handleAuthorizationCodeToken(body, res, config);
+        return;
+    }
+    if (grantType === REFRESH_TOKEN_GRANT) {
+        await handleRefreshToken(body, res, config);
+        return;
+    }
+    writeJson(res, 400, { error: 'unsupported_grant_type' });
+}
+
+/**
+ * @param {Record<string, unknown>} body
+ * @param {import('node:http').ServerResponse} res
+ * @param {import('./auth.js').McpAuthConfig} config
+ * @returns {Promise<void>}
+ */
+async function handleAuthorizationCodeToken(body, res, config) {
     const code = String(body['code'] ?? '');
     const clientId = String(body['client_id'] ?? '');
     const redirectUri = String(body['redirect_uri'] ?? '');
@@ -331,7 +383,6 @@ async function handleToken(req, res, config) {
     authorizationCodes.delete(code);
 
     if (
-        grantType !== 'authorization_code' ||
         !saved ||
         saved.clientId !== clientId ||
         saved.redirectUri !== redirectUri ||
@@ -343,23 +394,78 @@ async function handleToken(req, res, config) {
         return;
     }
 
+    writeJson(
+        res,
+        200,
+        await issueTokenSet(
+            {
+                clientId,
+                scope: saved.scope,
+                resource,
+                includeIdToken: saved.scope.split(/\s+/u).includes('openid'),
+            },
+            config,
+        ),
+    );
+}
+
+/**
+ * @param {Record<string, unknown>} body
+ * @param {import('node:http').ServerResponse} res
+ * @param {import('./auth.js').McpAuthConfig} config
+ * @returns {Promise<void>}
+ */
+async function handleRefreshToken(body, res, config) {
+    const clientId = String(body['client_id'] ?? '');
+    const credential = String(body[REFRESH_TOKEN_GRANT] ?? '');
+    const saved = renewCredentials.get(credential);
+
+    if (!saved || saved.clientId !== clientId || saved.resource !== config.resource || Date.now() > saved.expiresAt) {
+        if (saved && Date.now() > saved.expiresAt) renewCredentials.delete(credential);
+        writeJson(res, 400, { error: 'invalid_grant' });
+        return;
+    }
+
+    renewCredentials.delete(credential);
+    writeJson(
+        res,
+        200,
+        await issueTokenSet(
+            {
+                clientId,
+                scope: saved.scope,
+                resource: saved.resource,
+                includeIdToken: saved.scope.split(/\s+/u).includes('openid'),
+            },
+            config,
+        ),
+    );
+}
+
+/**
+ * @param {{ clientId: string; scope: string; resource: string; includeIdToken: boolean }} options
+ * @param {import('./auth.js').McpAuthConfig} config
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function issueTokenSet(options, config) {
     const { privateKey, kid } = await getKeyMaterial();
     const nowSeconds = Math.floor(Date.now() / 1000);
+    const { accessTokenTtlSeconds, refreshTokenTtlSeconds } = readDevOAuthTokenLifetimePolicy();
     const accessToken = await new SignJWT({
-        scope: saved.scope,
-        client_id: clientId,
-        resource,
+        scope: options.scope,
+        client_id: options.clientId,
+        resource: options.resource,
     })
         .setProtectedHeader({ alg: 'RS256', kid })
         .setIssuer(config.resource)
         .setSubject('chatgpt-dev-connector')
         .setAudience(config.resource)
         .setIssuedAt(nowSeconds)
-        .setExpirationTime(nowSeconds + ACCESS_TOKEN_TTL_SECONDS)
+        .setExpirationTime(nowSeconds + accessTokenTtlSeconds)
         .setJti(randomUUID())
         .sign(privateKey);
 
-    const idToken = saved.scope.split(/\s+/u).includes('openid')
+    const idToken = options.includeIdToken
         ? await new SignJWT({
               email: 'chatgpt-dev-connector@mcp.aurelin.org',
               email_verified: true,
@@ -369,20 +475,97 @@ async function handleToken(req, res, config) {
               .setProtectedHeader({ alg: 'RS256', kid })
               .setIssuer(config.resource)
               .setSubject('chatgpt-dev-connector')
-              .setAudience(clientId)
+              .setAudience(options.clientId)
               .setIssuedAt(nowSeconds)
-              .setExpirationTime(nowSeconds + ACCESS_TOKEN_TTL_SECONDS)
+              .setExpirationTime(nowSeconds + accessTokenTtlSeconds)
               .setJti(randomUUID())
               .sign(privateKey)
         : undefined;
 
-    writeJson(res, 200, {
+    return {
         access_token: accessToken,
         token_type: 'Bearer',
-        expires_in: ACCESS_TOKEN_TTL_SECONDS,
-        scope: saved.scope,
+        expires_in: accessTokenTtlSeconds,
+        scope: options.scope,
+        [REFRESH_TOKEN_GRANT]: issueRefreshToken(
+            options.clientId,
+            options.scope,
+            options.resource,
+            refreshTokenTtlSeconds,
+        ),
+        refresh_token_expires_in: refreshTokenTtlSeconds,
         ...(idToken ? { id_token: idToken } : {}),
+    };
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {{
+ *     accessTokenTtlSeconds: number;
+ *     refreshTokenTtlSeconds: number;
+ *     defaults: { accessTokenTtlSeconds: number; refreshTokenTtlSeconds: number };
+ * }}
+ */
+export function readDevOAuthTokenLifetimePolicy(env = process.env) {
+    return {
+        accessTokenTtlSeconds: readPositiveIntegerEnv(
+            'COPILOT_MCP_DEV_OAUTH_ACCESS_TOKEN_TTL_SECONDS',
+            DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
+            60 * 60,
+            env,
+        ),
+        refreshTokenTtlSeconds: readPositiveIntegerEnv(
+            'COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_TTL_SECONDS',
+            DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
+            24 * 60 * 60,
+            env,
+        ),
+        defaults: {
+            accessTokenTtlSeconds: DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
+            refreshTokenTtlSeconds: DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
+        },
+    };
+}
+
+/**
+ * @param {string} name
+ * @param {number} fallback
+ * @param {number} minimum
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {number}
+ */
+function readPositiveIntegerEnv(name, fallback, minimum, env = process.env) {
+    const parsed = Number(env[name] ?? fallback);
+    return Number.isFinite(parsed) && parsed >= minimum ? Math.floor(parsed) : fallback;
+}
+
+/**
+ * @param {string} clientId
+ * @param {string} scope
+ * @param {string} resource
+ * @param {number} ttlSeconds
+ * @returns {string}
+ */
+function issueRefreshToken(clientId, scope, resource, ttlSeconds) {
+    pruneExpiredRenewCredentials();
+    const credential = `${REFRESH_TOKEN_PREFIX}${randomUUID()}`;
+    renewCredentials.set(credential, {
+        clientId,
+        scope,
+        resource,
+        expiresAt: Date.now() + ttlSeconds * 1000,
     });
+    return credential;
+}
+
+/**
+ * @param {number} [nowMs]
+ * @returns {void}
+ */
+function pruneExpiredRenewCredentials(nowMs = Date.now()) {
+    for (const [credential, metadata] of renewCredentials) {
+        if (metadata.expiresAt <= nowMs) renewCredentials.delete(credential);
+    }
 }
 
 /**
@@ -493,7 +676,8 @@ function parseClientMetadata(value, clientId) {
     if (redirectUris.length === 0) return undefined;
     return {
         clientId,
-        clientName: typeof metadata['client_name'] === 'string' ? metadata['client_name'] : 'MCP Client Metadata Document',
+        clientName:
+            typeof metadata['client_name'] === 'string' ? metadata['client_name'] : 'MCP Client Metadata Document',
         redirectUris,
         createdAt: Date.now(),
         source: 'cimd',

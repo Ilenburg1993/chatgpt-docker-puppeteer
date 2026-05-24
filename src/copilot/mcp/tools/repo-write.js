@@ -30,6 +30,32 @@ import { errorResult, okResult } from '../control-plane/result.js';
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
 const DEFAULT_MAX_DIFF_LINES = 2000;
 const QUARANTINE_DIR = path.join(getMcpWorkspaceRoot(), 'src/copilot/.ai/quarantine');
+const MAX_BATCH_FILE_OPERATIONS = 10;
+
+const batchOperationSchema = z.discriminatedUnion('type', [
+    z.object({
+        type: z.literal('create_file'),
+        path: z.string().min(1).describe('Workspace-relative file path to create.'),
+        content: z.string().optional().describe('Initial UTF-8 content. Default: empty string.'),
+        createParentDirs: z.boolean().optional().describe('Create parent directories. Default: true.'),
+    }),
+    z.object({
+        type: z.literal('move_file'),
+        source: z.string().min(1).describe('Workspace-relative existing source file.'),
+        destination: z.string().min(1).describe('Workspace-relative destination path.'),
+        overwrite: z.boolean().optional().describe('Overwrite destination if it exists. Default: false.'),
+        confirmOverwrite: z.boolean().optional().describe('Must be true when overwrite=true.'),
+    }),
+    z.object({
+        type: z.literal('quarantine_file'),
+        path: z.string().min(1).describe('Workspace-relative file path to move into reversible quarantine.'),
+    }),
+    z.object({
+        type: z.literal('remove_file'),
+        path: z.string().min(1).describe('Workspace-relative file path to delete. Prefer quarantine_file when possible.'),
+        confirm: z.boolean().optional().describe('Must be true for remove_file when dryRun=false.'),
+    }),
+]);
 
 /**
  * @typedef {object} QuarantineMetadata
@@ -198,9 +224,284 @@ async function sha256File(filePath) {
 }
 
 /**
+ * @param {unknown} operation
+ * @param {number} index
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function previewBatchFileOperation(operation, index) {
+    const item = /** @type {Record<string, unknown>} */ (operation);
+    const type = String(item['type'] ?? '');
+    if (type === 'create_file') {
+        const resolved = await resolveWritePath(String(item['path'] ?? ''));
+        if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
+        const exists = await pathExists(resolved.resolved);
+        return {
+            index,
+            type,
+            path: resolved.relative,
+            wouldCreate: !exists,
+            destinationExists: exists,
+            bytes: Buffer.byteLength(String(item['content'] ?? ''), 'utf8'),
+        };
+    }
+    if (type === 'move_file') {
+        const source = await resolveReadPath(String(item['source'] ?? ''));
+        if (!source.ok) throw new Error(`operation ${index}: ${source.reason}`);
+        const destination = await resolveWritePath(String(item['destination'] ?? ''));
+        if (!destination.ok) throw new Error(`operation ${index}: ${destination.reason}`);
+        const stats = await fs.stat(source.resolved);
+        const destinationExists = await pathExists(destination.resolved);
+        if (destinationExists && item['overwrite'] !== true) {
+            throw new Error(`operation ${index}: destination already exists: ${destination.relative}`);
+        }
+        if (item['overwrite'] === true && item['confirmOverwrite'] !== true) {
+            throw new Error(`operation ${index}: confirmOverwrite must be true when overwrite=true`);
+        }
+        return {
+            index,
+            type,
+            source: source.relative,
+            destination: destination.relative,
+            sourceBytes: stats.size,
+            destinationExists,
+            overwrite: item['overwrite'] === true,
+        };
+    }
+    if (type === 'quarantine_file' || type === 'remove_file') {
+        const resolved = await resolveWritePath(String(item['path'] ?? ''));
+        if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
+        const stats = await fs.stat(resolved.resolved);
+        if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
+        return {
+            index,
+            type,
+            path: resolved.relative,
+            bytes: stats.size,
+            destructive: type === 'remove_file',
+            reversible: type === 'quarantine_file',
+        };
+    }
+    throw new Error(`operation ${index}: unsupported batch operation type`);
+}
+
+/**
+ * @param {unknown} operation
+ * @param {number} index
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function applyBatchFileOperation(operation, index) {
+    const item = /** @type {Record<string, unknown>} */ (operation);
+    const type = String(item['type'] ?? '');
+    if (type === 'create_file') {
+        const resolved = await resolveWritePath(String(item['path'] ?? ''));
+        if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
+        const content = String(item['content'] ?? '');
+        const write = await createOrReplaceFileAtomic(resolved.resolved, content, {
+            encoding: 'utf8',
+            createParentDirs: item['createParentDirs'] !== false,
+            failIfExists: true,
+            riskClass: 'medium',
+            advisoryLimits: { tool: 'repo_apply_file_batch', operation: type, contentChars: content.length },
+        });
+        return {
+            index,
+            type,
+            path: resolved.relative,
+            bytesWritten: write.bytesWritten,
+            contentHash: write.contentHash,
+            traceId: write.io.traceId ?? null,
+        };
+    }
+    if (type === 'move_file') {
+        const source = await resolveReadPath(String(item['source'] ?? ''));
+        if (!source.ok) throw new Error(`operation ${index}: ${source.reason}`);
+        const destination = await resolveWritePath(String(item['destination'] ?? ''));
+        if (!destination.ok) throw new Error(`operation ${index}: ${destination.reason}`);
+        if (item['overwrite'] === true && item['confirmOverwrite'] !== true) {
+            throw new Error(`operation ${index}: confirmOverwrite must be true when overwrite=true`);
+        }
+        const moved = await moveFileLocked(source.resolved, destination.resolved, {
+            overwrite: item['overwrite'] === true,
+        });
+        return {
+            index,
+            type,
+            source: source.relative,
+            destination: destination.relative,
+            sourceBytes: moved.sourceBytes,
+            sourceHash: moved.sourceHash,
+            destinationPreviousHash: moved.destinationPreviousHash,
+            traceId: moved.io.traceId ?? null,
+        };
+    }
+    if (type === 'quarantine_file') {
+        const resolved = await resolveWritePath(String(item['path'] ?? ''));
+        if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
+        const stats = await fs.stat(resolved.resolved);
+        if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
+        const quarantineId = buildQuarantineId(resolved.relative);
+        const quarantinePaths = resolveQuarantinePaths(quarantineId);
+        await fs.mkdir(QUARANTINE_DIR, { recursive: true });
+        const moved = await moveFileLocked(resolved.resolved, quarantinePaths.dataPath, { overwrite: false });
+        /** @type {QuarantineMetadata} */
+        const metadata = {
+            quarantineId,
+            originalPath: resolved.relative,
+            quarantinePath: toWorkspaceRelativePath(quarantinePaths.dataPath),
+            metadataPath: toWorkspaceRelativePath(quarantinePaths.metadataPath),
+            createdAt: new Date().toISOString(),
+            status: 'quarantined',
+            restoredAt: null,
+            restoredPath: null,
+            sourceBytes: moved.sourceBytes,
+            sourceHash: moved.sourceHash,
+        };
+        await writeQuarantineMetadata(metadata, quarantinePaths.metadataPath);
+        return { index, type, path: resolved.relative, ...metadata, traceId: moved.io.traceId ?? null };
+    }
+    if (type === 'remove_file') {
+        if (item['confirm'] !== true) throw new Error(`operation ${index}: confirm must be true for remove_file`);
+        const resolved = await resolveWritePath(String(item['path'] ?? ''));
+        if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
+        const stats = await fs.stat(resolved.resolved);
+        if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
+        const removed = await deleteFileLocked(resolved.resolved);
+        return {
+            index,
+            type,
+            path: resolved.relative,
+            deleted: removed.deleted,
+            previousHash: removed.previousHash,
+            previousBytes: removed.previousBytes,
+            rollbackSnapshotAvailable: typeof removed.previousSnapshotBase64 === 'string',
+            previousSnapshotTruncated: removed.previousSnapshotTruncated,
+            traceId: removed.io.traceId ?? null,
+        };
+    }
+    throw new Error(`operation ${index}: unsupported batch operation type`);
+}
+
+/**
  * @type {import('../registry.js').McpToolDefinition[]}
  */
 export const repoWriteTools = [
+    {
+        name: 'repo_apply_file_batch_plan',
+        title: 'Plan repository file batch',
+        description: 'Read-only plan for a bounded batch of workspace file operations. Does not modify files; use before repo_apply_file_batch to reduce high-risk prompts.',
+        inputSchema: {
+            operations: z
+                .array(batchOperationSchema)
+                .min(1)
+                .max(MAX_BATCH_FILE_OPERATIONS)
+                .describe('Ordered file operations to validate and preview.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ operations }) => {
+            try {
+                const previews = [];
+                for (const [index, operation] of operations.entries()) {
+                    previews.push(await previewBatchFileOperation(operation, index));
+                }
+                await appendMcpAuditEvent({
+                    event: 'repo_apply_file_batch_plan',
+                    tool: 'repo_apply_file_batch_plan',
+                    operations: previews.map((preview) => preview['type']),
+                    operationCount: previews.length,
+                });
+                return okResult({
+                    success: true,
+                    plannedTool: 'repo_apply_file_batch',
+                    dryRun: true,
+                    operationCount: previews.length,
+                    operations: previews,
+                    applied: [],
+                    nextCall: {
+                        tool: 'repo_apply_file_batch',
+                        args: {
+                            operations,
+                            dryRun: false,
+                            confirmBatch: true,
+                        },
+                    },
+                });
+            } catch (error) {
+                return errorResult(error instanceof Error ? error.message : String(error), {
+                    code: 'ERR_BATCH_FILE_PLAN_FAILED',
+                });
+            }
+        },
+    },
+    {
+        name: 'repo_apply_file_batch',
+        title: 'Apply repository file batch',
+        description:
+            'Apply a bounded batch of workspace file operations in one tool call to reduce repeated ChatGPT write confirmations. Supports create_file, move_file, quarantine_file and explicit remove_file.',
+        inputSchema: {
+            operations: z
+                .array(batchOperationSchema)
+                .min(1)
+                .max(MAX_BATCH_FILE_OPERATIONS)
+                .describe('Ordered file operations. Later operations can depend on earlier ones.'),
+            dryRun: z.boolean().optional().describe('Validate and preview all operations without writing. Default: true.'),
+            confirmBatch: z
+                .boolean()
+                .optional()
+                .describe('Must be true when dryRun=false because this applies multiple file operations.'),
+        },
+        annotations: destructiveAnnotations(),
+        handler: async ({ operations, dryRun, confirmBatch }) => {
+            const isDryRun = dryRun !== false;
+            if (!isDryRun && confirmBatch !== true) {
+                return errorResult('confirmBatch deve ser true quando dryRun=false.', {
+                    code: 'ERR_BATCH_CONFIRM_REQUIRED',
+                });
+            }
+            try {
+                const previews = [];
+                for (const [index, operation] of operations.entries()) {
+                    previews.push(await previewBatchFileOperation(operation, index));
+                }
+                if (isDryRun) {
+                    await appendMcpAuditEvent({
+                        event: 'repo_apply_file_batch_dry_run',
+                        tool: 'repo_apply_file_batch',
+                        operations: previews.map((preview) => preview['type']),
+                        operationCount: previews.length,
+                    });
+                    return okResult({
+                        success: true,
+                        dryRun: true,
+                        operationCount: previews.length,
+                        operations: previews,
+                        applied: [],
+                    });
+                }
+
+                const applied = [];
+                for (const [index, operation] of operations.entries()) {
+                    applied.push(await applyBatchFileOperation(operation, index));
+                }
+                await appendMcpAuditEvent({
+                    event: 'repo_apply_file_batch_applied',
+                    tool: 'repo_apply_file_batch',
+                    operations: applied.map((operation) => operation['type']),
+                    operationCount: applied.length,
+                });
+                return okResult({
+                    success: true,
+                    dryRun: false,
+                    operationCount: applied.length,
+                    planned: previews,
+                    applied,
+                });
+            } catch (error) {
+                return errorResult(error instanceof Error ? error.message : String(error), {
+                    code: 'ERR_BATCH_FILE_OPERATION_FAILED',
+                });
+            }
+        },
+    },
     {
         name: 'repo_write_file',
         title: 'Write repository file',

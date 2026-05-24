@@ -253,6 +253,7 @@ async function runSmoke() {
         'repo_symbol_search',
         'repo_file_outline',
         'repo_patch_plan',
+        'repo_apply_file_batch',
         'repo_create_file_plan',
         'repo_quarantine_file_plan',
         'repo_move_file_plan',

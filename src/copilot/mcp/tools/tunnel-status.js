@@ -17,6 +17,8 @@ import { readMcpAuthConfig } from '../control-plane/auth.js';
 import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { okResult } from '../control-plane/result.js';
 
+const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
+
 /**
  * @type {import('../registry.js').McpToolDefinition}
  */
@@ -38,6 +40,17 @@ export const mcpTunnelStatusTool = {
             await readConnectorSmokeState(config.smokeStateFile),
             config.publicMcpUrl ?? null,
         );
+        const connectorSmokeFresh =
+            connectorSmoke.ok === true &&
+            typeof connectorSmoke.ageMinutes === 'number' &&
+            connectorSmoke.ageMinutes <= CONNECTOR_SMOKE_STALE_AFTER_MINUTES;
+        const permanentRecommendedAction = !permanentReady
+            ? 'fix-permanent-url'
+            : connectorSmoke.ok !== true
+              ? 'run-connector-smoke'
+              : connectorSmokeFresh
+                ? 'use-permanent-hostname'
+                : 'refresh-connector-smoke';
         return okResult({
             success: true,
             mode: config.mode,
@@ -51,6 +64,9 @@ export const mcpTunnelStatusTool = {
                 tokenFilePresent: config.hasTunnelTokenFile,
                 transportProtocol: config.transportProtocol,
                 lastSmoke: connectorSmoke,
+                lastSmokeFresh: connectorSmokeFresh,
+                lastSmokeStaleAfterMinutes: CONNECTOR_SMOKE_STALE_AFTER_MINUTES,
+                recommendedAction: permanentRecommendedAction,
             },
             temporaryFallback: {
                 ...quickTunnel,

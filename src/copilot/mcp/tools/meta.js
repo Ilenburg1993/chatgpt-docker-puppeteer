@@ -10,7 +10,7 @@ import { MCP_AUTH_SCOPES, readMcpAuthConfig } from '../control-plane/auth.js';
 import { okResult } from '../control-plane/result.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 13;
+const CAPABILITIES_VERSION = 16;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -33,6 +33,7 @@ const READ_TOOLS = [
     'repo_create_file_plan',
     'repo_quarantine_file_plan',
     'repo_move_file_plan',
+    'repo_apply_file_batch_plan',
     'repo_index_refresh_plan',
     'mcp_validation_plan',
     'repo_search_text',
@@ -51,6 +52,7 @@ const INDEX_TOOLS = [
 ];
 
 const WRITE_TOOLS = [
+    'repo_apply_file_batch',
     'repo_write_file',
     'repo_create_file',
     'repo_apply_patch',
@@ -78,6 +80,7 @@ const VALIDATION_TOOLS = [
 const RUNTIME_TOOLS = [
     'delegate_to_repo_autonomy_runner',
     'mcp_golden_prompts',
+    'mcp_apps_sdk_readiness',
     'mcp_host_block_diagnostics',
     'mcp_maintenance_plan',
     'mcp_maintenance_apply_safe_fixes',
@@ -97,6 +100,7 @@ const CONNECTION_TOOLS = [
     'chatgpt_connector_current_url_status',
     'mcp_auth_profile',
     'mcp_oauth_issuer_diagnostics',
+    'mcp_oauth_friction_audit',
 ];
 const COPILOT_SDK_TOOLS = ['copilot_sessions_list', 'copilot_session_get'];
 /** @type {string[]} */
@@ -130,7 +134,8 @@ const IO_GUIDANCE = [
     'Use delegate_to_repo_autonomy_runner dryRun=true for fixed longer workflows before requesting real execution.',
     'Use mcp_golden_prompts when measuring real ChatGPT approval prompts and host blocks.',
     'Use mcp_host_block_diagnostics after any ChatGPT host-side block to classify it and select a lower-friction replacement.',
-    'Use plan-only tools such as repo_patch_plan and repo_quarantine_file_plan before bounded-write apply tools.',
+    'Use plan-only tools such as repo_patch_plan, repo_quarantine_file_plan and repo_apply_file_batch_plan before write or destructive apply tools.',
+    'Use repo_apply_file_batch_plan first, then repo_apply_file_batch when several trusted file operations should be applied in one ChatGPT write confirmation.',
     'Use repo_read_file.sha256 as expectedHash for safe write/patch calls.',
     'Use repo_quarantine_file before repo_remove_file when reversible cleanup is acceptable.',
     'Use repo_read_file_chunks for large files instead of requesting entire content.',
@@ -146,6 +151,7 @@ const IO_GUIDANCE = [
     'Use chatgpt_connector_current_url_status to recover the saved temporary tunnel URL without passing it as input.',
     'Use mcp_auth_profile to confirm OAuth max-power scopes and WWW-Authenticate challenge metadata.',
     'Use mcp_oauth_issuer_diagnostics before changing issuer, CIMD, OIDC or Cloudflare OAuth settings.',
+    'Use mcp_oauth_friction_audit after OAuth or connector changes to detect reauth risk and metadata drift.',
     'LLM-B can consume MCP optionally, but does not depend on this MCP server.',
 ];
 

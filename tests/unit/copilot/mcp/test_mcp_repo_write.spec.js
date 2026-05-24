@@ -12,6 +12,8 @@ import { describe, it } from 'vitest';
 import { repoWriteTools } from '../../../../src/copilot/mcp/tools/repo-write.js';
 
 const applyPatchTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_patch');
+const applyFileBatchPlanTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_file_batch_plan');
+const applyFileBatchTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_file_batch');
 const writeFileTool = repoWriteTools.find((tool) => tool.name === 'repo_write_file');
 const createFileTool = repoWriteTools.find((tool) => tool.name === 'repo_create_file');
 const moveFileTool = repoWriteTools.find((tool) => tool.name === 'repo_move_file');
@@ -117,6 +119,65 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(removed.structuredContent.success, true);
         assert.equal(removed.structuredContent.deleted, true);
         await assert.rejects(() => fs.access(filePath));
+    });
+
+    it('plans bounded file batches without mutating files', async () => {
+        assert.ok(applyFileBatchPlanTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const created = path.join(dir, 'batch-plan-created.txt');
+
+        const plan = await applyFileBatchPlanTool.handler({
+            operations: [{ type: 'create_file', path: created, content: 'planned batch\\n' }],
+        });
+
+        assert.equal(plan.isError, undefined);
+        assert.equal(plan.structuredContent.success, true);
+        assert.equal(plan.structuredContent.plannedTool, 'repo_apply_file_batch');
+        assert.equal(plan.structuredContent.dryRun, true);
+        assert.equal(plan.structuredContent.operationCount, 1);
+        assert.equal(plan.structuredContent.nextCall.tool, 'repo_apply_file_batch');
+        await assert.rejects(() => fs.access(created));
+    });
+
+    it('applies bounded file batches after a dry-run preview and confirmation', async () => {
+        assert.ok(applyFileBatchTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const created = path.join(dir, 'batch-created.txt');
+        const source = path.join(dir, 'batch-source.txt');
+        const moved = path.join(dir, 'batch-moved.txt');
+        await fs.writeFile(source, 'move in batch\n', 'utf8');
+
+        const dryRun = await applyFileBatchTool.handler({
+            operations: [
+                { type: 'create_file', path: created, content: 'batched\n' },
+                { type: 'move_file', source, destination: moved },
+            ],
+        });
+        assert.equal(dryRun.isError, undefined);
+        assert.equal(dryRun.structuredContent.success, true);
+        assert.equal(dryRun.structuredContent.dryRun, true);
+        await assert.rejects(() => fs.access(created));
+
+        const missingConfirm = await applyFileBatchTool.handler({
+            operations: [{ type: 'create_file', path: created, content: 'batched\n' }],
+            dryRun: false,
+        });
+        assert.equal(missingConfirm.isError, true);
+        assert.equal(missingConfirm.structuredContent.code, 'ERR_BATCH_CONFIRM_REQUIRED');
+
+        const applied = await applyFileBatchTool.handler({
+            operations: [
+                { type: 'create_file', path: created, content: 'batched\n' },
+                { type: 'move_file', source, destination: moved },
+            ],
+            dryRun: false,
+            confirmBatch: true,
+        });
+        assert.equal(applied.isError, undefined);
+        assert.equal(applied.structuredContent.success, true);
+        assert.equal(applied.structuredContent.operationCount, 2);
+        assert.equal(await fs.readFile(created, 'utf8'), 'batched\n');
+        assert.equal(await fs.readFile(moved, 'utf8'), 'move in batch\n');
     });
 
     it('quarantines and restores files through a reversible workspace flow', async () => {

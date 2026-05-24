@@ -2222,3 +2222,120 @@ Validacao executada nesta continuidade:
 12. `make copilot-mcp-oauth-smoke`: passou com DCR/CIMD max-power, `id_token` e `/oauth/userinfo`.
 13. `curl https://mcp.aurelin.org/health`: confirmou `indexAutoBuild.status="completed"`, `indexed=999`,
     `symbols=5776` e `imports=2394`.
+
+### 14.14. Continuidade — lote de operacoes de arquivo para reduzir confirmacoes
+
+Data: 2026-05-23.
+
+Problema tratado:
+
+1. O ChatGPT ainda pode exibir janela de confirmacao para create/move/delete, mesmo quando OAuth ja concedeu todos os
+   escopos repo.
+2. Essa janela e host-side para write action; o servidor MCP nao possui API documentada para desativa-la.
+3. Reclassificar create/move/delete como `readOnlyHint=true` seria falso, porque a referencia do Apps SDK define
+   `readOnlyHint` apenas para tools que nao criam, atualizam, deletam ou enviam dados.
+
+Upgrade aplicado:
+
+1. Criada `repo_apply_file_batch`, uma tool de lote para aplicar varias operacoes de arquivo em uma chamada:
+   - `create_file`;
+   - `move_file`;
+   - `quarantine_file`;
+   - `remove_file` explicito.
+2. A tool usa `dryRun=true` por default.
+3. Para aplicar, exige `dryRun=false` e `confirmBatch=true`.
+4. `remove_file` dentro do lote tambem exige `confirm=true` na operacao individual.
+5. O lote e limitado a 10 operacoes, usa paths workspace-relative validados, reaproveita locks/atomicidade da camada IO
+   e grava audit events.
+6. `mcp_capabilities_summary`, `mcp_session_profile`, `mcp_golden_prompts`, smoke Cloudflare e testes de registry foram
+   atualizados para conhecer a nova tool.
+
+Efeito esperado:
+
+1. Nao promete remover toda janela do chatgpt.com, porque isso e controle do host.
+2. Reduz a quantidade de janelas potenciais ao permitir que ChatGPT aplique varias mudancas confiaveis em uma unica
+   chamada.
+3. Mantem metadata honesta: por suportar remocao, a tool e `destructiveHint=true`; para fluxos menos sensiveis, a
+   orientacao continua preferir `quarantine_file` a delete real.
+
+Validacao executada nesta continuidade:
+
+1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
+2. `npm run lint:copilot -- --quiet`: passou.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_repo_write.spec.js tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`: passou com 45/45.
+4. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 87/87.
+5. `npm run test:copilot:unit`: passou com 3086/3086.
+6. `make copilot-mcp-restart`: passou e reiniciou `mcp-http` PID `21276` e `cloudflared` PID `21277`.
+7. `make copilot-mcp-status`: passou com `ready=true` e `authentication="OAuth"`.
+8. `make copilot-mcp-smoke`: passou com `permanentSmokeUpdated=true` e 68/68 tools remotas.
+9. `make copilot-mcp-oauth-smoke`: passou com DCR/CIMD max-power, `id_token` e `/oauth/userinfo`.
+
+### 14.15. Continuidade — OAuth refresh-token real e auditoria de friccao revisada
+
+Data: 2026-05-23/2026-05-24.
+
+Entrada lida integralmente:
+
+1. `src/copilot/docs/# Plano completo de patches OAuth.md`.
+2. O plano consolidava patches para reduzir reauth OAuth, publicar metadata sem ambiguidade e diagnosticar friccao de
+   conector.
+3. A revisao confirmou que a implementacao anterior estava incompleta: `mcp_oauth_friction_audit` havia sido criado
+   como arquivo de uma linha com `\n` literais, fora do padrao real do registry; os TTLs novos nao estavam totalmente
+   cobertos pela governanca de ambiente; e o smoke OAuth nao provava renovacao via `refresh_token`.
+
+Correcoes aplicadas:
+
+1. `dev-oauth.js` passou a usar nomes canônicos `REFRESH_TOKEN_GRANT`/`REFRESH_TOKEN_PREFIX`, mantendo o wire protocol
+   padrao `grant_type=refresh_token` e parametro `refresh_token`.
+2. O issuer dev embutido anuncia `refresh_token` em:
+   - `grant_types_supported`;
+   - metadata DCR;
+   - Client ID Metadata Document.
+3. O token endpoint emite access token de 24h por default e refresh token rotativo de 30 dias por default:
+   - `expires_in=86400`;
+   - `refresh_token`;
+   - `refresh_token_expires_in=2592000`.
+4. A rotacao invalida o refresh token somente apos validar client/resource/expiracao, evitando invalidacao por tentativa
+   incorreta de outro cliente.
+5. `readDevOAuthTokenLifetimePolicy()` virou helper exportado para que diagnosticos e emissor compartilhem a mesma
+   leitura de TTL.
+6. `mcp_oauth_friction_audit` foi refeito como tool MCP real:
+   - `// @ts-check`;
+   - `readOnlyAnnotations()`;
+   - `okResult()`;
+   - checagem de resource/audience/issuer, authorization servers, CIMD, PKCE S256, `authorization_code`,
+     `refresh_token`, escopos max-power e profile de tool scopes;
+   - mensagem explicita sobre o limite OAuth versus aprovacoes host-side.
+7. `copilot:mcp:oauth:smoke` agora testa refresh-token em DCR e CIMD e usa token renovado para chamar
+   `mcp_runtime_health`.
+8. `.env.example`, `.env.local.example` e `.env.schema.json` passaram a cobrir:
+   - `COPILOT_MCP_DEV_OAUTH_ACCESS_TOKEN_TTL_SECONDS`;
+   - `COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_TTL_SECONDS`;
+   - `COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS`.
+9. Os testes de conexao confirmam `refresh_token` e `token_endpoint_auth_methods_supported=["none"]`.
+
+Validacao executada nesta continuidade:
+
+1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
+2. `npm run lint:copilot -- --quiet`: passou.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 91/91.
+4. `npm run test:copilot:unit`: passou no rerun limpo com 3090/3090. A primeira execucao completa teve um flake de
+   timeout em `ConversationHub`; o teste focado passou 9/9 e o rerun completo passou.
+5. `node scripts/env/audit-env-surface.mjs`: passou com 276 envs referenciadas e 417 cobertas.
+6. `node scripts/env/validate-env.js`: passou.
+7. `node scripts/env/check-env-local.mjs`: passou.
+8. `git diff --check`: passou.
+9. `make copilot-mcp-restart`: passou e reiniciou `mcp-http` PID `71023` e `cloudflared` PID `71029`.
+10. `make copilot-mcp-status`: passou com `ready=true` e `authentication="OAuth"`.
+11. `make copilot-mcp-smoke`: passou com 71/71 tools remotas e `permanentSmokeUpdated=true`.
+12. `make copilot-mcp-oauth-smoke`: passou com DCR/CIMD max-power, `refresh_token`, `id_token` e `/oauth/userinfo`.
+13. `curl https://mcp.aurelin.org/health`: confirmou `indexAutoBuild.status="completed"`, `indexed=1002`,
+    `symbols=5815` e `imports=2405`.
+
+Estado resultante:
+
+1. O ChatGPT recebe OAuth max-power por default, com tokens de 24h e refresh tokens de 30 dias no issuer dev embutido.
+2. O diagnostico publico `mcp_oauth_friction_audit` consegue explicar friccao de OAuth mesmo quando o conector perdeu
+   contexto de bearer token.
+3. A fronteira permanece honesta: OAuth reduz reauth/linking/401, mas nao promete desligar confirmacoes host-side de
+   escrita/destruicao.

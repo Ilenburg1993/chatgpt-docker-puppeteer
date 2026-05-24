@@ -53,6 +53,12 @@ const GOLDEN_PROMPTS = [
         prompt: 'Chame mcp_auth_profile, depois repo_create_file_plan para um arquivo temporario seguro em src/copilot/.ai/tmp. Se o ChatGPT pedir confirmacao para a acao de escrita real, registre approvalPromptsShown e rememberApprovalOffered antes de prosseguir.',
         expectedTools: ['mcp_auth_profile', 'repo_create_file_plan', 'repo_create_file'],
     },
+    {
+        id: 'single-confirmation-file-batch',
+        goal: 'Apply multiple trusted file operations through one bounded batch call instead of separate create/move/quarantine calls.',
+        prompt: 'Use repo_apply_file_batch dryRun=true para criar e mover um arquivo temporario seguro em src/copilot/.ai/tmp. Se o plano estiver correto, execute uma unica chamada repo_apply_file_batch dryRun=false confirmBatch=true.',
+        expectedTools: ['repo_apply_file_batch'],
+    },
 ];
 
 /**

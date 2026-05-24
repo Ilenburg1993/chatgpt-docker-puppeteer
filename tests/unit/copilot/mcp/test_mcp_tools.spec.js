@@ -131,6 +131,14 @@ describe('copilot MCP tools', () => {
         assert.ok('validation' in (result.structuredContent ?? {}));
         assert.equal(result.structuredContent?.['chatgptForm']?.['authentication'], 'OAuth');
         assert.ok(Array.isArray(result.structuredContent?.['recovery']));
+        if (
+            result.structuredContent?.['source'] === 'permanent-config' &&
+            result.structuredContent?.['validation']?.['ok'] === true
+        ) {
+            assert.deepEqual(result.structuredContent?.['recovery'], []);
+            assert.equal(result.structuredContent?.['permanentTunnel']?.['ready'], true);
+            assert.equal(result.structuredContent?.['temporaryTunnel']?.['ignoredForOperationalReadiness'], true);
+        }
     });
 
     it('repo_search_text accepts context lines and cursor metadata', async () => {
@@ -353,7 +361,7 @@ describe('copilot MCP tools', () => {
         assert.equal(result.isError, undefined);
         const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
         assert.equal(structured['success'], true);
-        assert.equal(structured['profile'], 'chatgpt-max-autonomy-temporary-tunnel');
+        assert.equal(structured['profile'], 'chatgpt-max-autonomy-permanent-cloudflare-oauth');
         assert.ok(/** @type {string[]} */ (structured['recommendedFirstCalls']).includes('mcp_tools_status'));
         const approvalGuidance = /** @type {Record<string, unknown>} */ (structured['approvalGuidance']);
         assert.ok(
@@ -412,18 +420,49 @@ describe('copilot MCP tools', () => {
         assert.equal(typeof structured['hostBlockTemplate'], 'object');
     });
 
-    it('mcp_host_block_diagnostics classifies host-side blocks and suggests lower-friction tools', async () => {
+    it('mcp_apps_sdk_readiness reports that CSP is widget-only for this repo MCP', async () => {
+        const tool = findTool('mcp_apps_sdk_readiness');
+        const result = await tool.handler({});
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        const appsSdk = /** @type {Record<string, unknown>} */ (result.structuredContent?.['appsSdk']);
+        assert.equal(appsSdk['cspApplicable'], false);
+        assert.equal(appsSdk['hasWidgetResource'], false);
+        assert.equal(typeof result.structuredContent?.['promptFrictionImpact'], 'string');
+    });
+
+    it('mcp_host_block_diagnostics uses hard evidence before heuristic host-block labels', async () => {
         const tool = findTool('mcp_host_block_diagnostics');
         const result = await tool.handler({
             toolName: 'repo_root_tree',
             argsShape: 'showHidden=true',
             hostMessage: 'Blocked by host before MCP call',
+            mcpReachedServer: false,
         });
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);
-        assert.equal(result.structuredContent?.['classification']?.['code'], 'HOST_HIDDEN_LISTING_BLOCK');
+        assert.equal(result.structuredContent?.['classification']?.['code'], 'CHATGPT_HOST_PRECALL_BLOCK');
+        assert.equal(result.structuredContent?.['classification']?.['layer'], 'chatgpt-host');
+        assert.equal(result.structuredContent?.['classification']?.['confidence'], 'high');
         assert.equal(result.structuredContent?.['observed']?.['mcpReachedServer'], false);
         assert.equal(typeof result.structuredContent?.['auditTemplate'], 'object');
+    });
+
+    it('mcp_host_block_diagnostics separates OAuth reauth from host precall blocks', async () => {
+        const tool = findTool('mcp_host_block_diagnostics');
+        const result = await tool.handler({
+            toolName: 'repo_status',
+            mcpReachedServer: true,
+            httpStatus: 401,
+            wwwAuthenticatePresent: true,
+            hostMessage: 'Server returned 401: Reauthentication required',
+        });
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['classification']?.['code'], 'MCP_AUTH_CHALLENGE_OR_REAUTH');
+        assert.equal(result.structuredContent?.['classification']?.['layer'], 'mcp-oauth-auth');
+        assert.equal(result.structuredContent?.['classification']?.['confidence'], 'high');
+        assert.equal(result.structuredContent?.['observed']?.['mcpReachedServer'], true);
+        assert.equal(result.structuredContent?.['observed']?.['httpStatus'], 401);
     });
 
     it('mcp_auth_profile exposes OAuth readiness metadata without requiring enforcement', async () => {
@@ -435,6 +474,22 @@ describe('copilot MCP tools', () => {
         assert.match(String(result.structuredContent?.['challengePreview'] ?? ''), /Bearer/);
         assert.equal(typeof result.structuredContent?.['protectedResourceMetadata'], 'object');
         assert.equal(typeof result.structuredContent?.['environmentTemplates'], 'object');
+    });
+
+    it('mcp_oauth_friction_audit reports metadata alignment and approval boundaries', async () => {
+        const tool = findTool('mcp_oauth_friction_audit');
+        const result = await tool.handler({});
+        assert.equal(result.isError, undefined);
+        // The tool returns an okResult wrapper with structuredContent-like fields in this test harness
+        // Support both shapes for compatibility.
+        const structured = result.structuredContent ?? result;
+        assert.equal(structured['success'], true);
+        assert.equal(typeof structured['reauthRisk'], 'string');
+        assert.equal(typeof structured['approvalImpact'], 'string');
+        const metadataAlignment = /** @type {Record<string, unknown>} */ (structured['metadataAlignment']);
+        assert.equal(typeof metadataAlignment['resourceMatchesAudience'], 'boolean');
+        const toolScopes = /** @type {Record<string, unknown>} */ (structured['toolScopes']);
+        assert.ok(Array.isArray(toolScopes['publicDiagnosticTools']));
     });
 
     it('mcp_oauth_issuer_diagnostics reports missing issuer without network calls', async () => {
@@ -496,13 +551,21 @@ describe('copilot MCP tools', () => {
         assert.equal(typeof result.structuredContent?.['effectiveChecks'], 'object');
     });
 
-    it('mcp_tunnel_status reports effective OAuth auth instead of stale quick tunnel auth', async () => {
+    it('mcp_tunnel_status reports effective OAuth auth and connector smoke freshness', async () => {
         const tool = findTool('mcp_tunnel_status');
         const result = await tool.handler({});
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);
         assert.equal(result.structuredContent?.['chatgpt']?.['authentication'], 'OAuth');
         assert.ok('temporaryFallback' in (result.structuredContent ?? {}));
+        const permanentTunnel = /** @type {Record<string, unknown>} */ (result.structuredContent?.['permanentTunnel']);
+        assert.equal(typeof permanentTunnel['lastSmokeFresh'], 'boolean');
+        assert.equal(permanentTunnel['lastSmokeStaleAfterMinutes'], 60);
+        assert.ok(
+            ['fix-permanent-url', 'run-connector-smoke', 'refresh-connector-smoke', 'use-permanent-hostname'].includes(
+                String(permanentTunnel['recommendedAction']),
+            ),
+        );
     });
 
     it('project_doctor returns canonical validators', async () => {

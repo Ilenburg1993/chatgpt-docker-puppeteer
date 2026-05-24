@@ -108,6 +108,8 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.equal(metadata.jwks_uri, 'https://mcp.aurelin.org/oauth/jwks.json');
         assert.equal(metadata.userinfo_endpoint, 'https://mcp.aurelin.org/oauth/userinfo');
         assert.equal(metadata.client_id_metadata_document_supported, true);
+        assert.ok(/** @type {string[]} */ (metadata.grant_types_supported).includes('refresh_token'));
+        assert.deepEqual(metadata.token_endpoint_auth_methods_supported, ['none']);
         assert.ok(/** @type {string[]} */ (metadata.scopes_supported).includes('openid'));
         assert.ok(/** @type {string[]} */ (metadata.claims_supported).includes('email'));
         assert.deepEqual(buildProtectedResourceMetadata(config).scopes_supported, [
@@ -119,6 +121,7 @@ describe('copilot MCP ChatGPT connection profile', () => {
         const clientMetadata = buildBuiltInDevOAuthClientMetadata(config);
         assert.equal(clientMetadata.client_id, 'https://mcp.aurelin.org/.well-known/oauth-client/codex-smoke.json');
         assert.deepEqual(clientMetadata.redirect_uris, ['https://chatgpt.com/connector/oauth/codex-smoke']);
+        assert.ok(/** @type {string[]} */ (clientMetadata.grant_types).includes('refresh_token'));
     });
 
     it('maps tool annotations to planned OAuth scopes and mixed security schemes', () => {

@@ -28,9 +28,42 @@ export function bindMcpToolsStatusProvider(provider) {
 }
 
 /**
- * @param {import('../registry.js').McpToolDefinition} tool
+ * @param {{ name: string; riskClass: string; rememberApprovalCandidate: boolean }[]} summaries
  */
-function summarizeTool(tool) {
+function buildApprovalFrictionProfile(summaries) {
+    const remember = summaries.filter((tool) => tool.rememberApprovalCandidate).map((tool) => tool.name).sort();
+    const manual = summaries
+        .filter((tool) => tool.riskClass === 'destructive' || tool.name === 'job_cancel')
+        .map((tool) => tool.name)
+        .sort();
+    return {
+        hostPolicy: 'write actions may require ChatGPT confirmation; readOnlyHint and conversation-level remembered approvals reduce friction but do not disable host safety UI',
+        firstCalls: ['mcp_session_profile', 'mcp_tools_status', 'mcp_capabilities_summary'],
+        firstRememberApprovalWave: remember.filter((name) =>
+            [
+                'repo_apply_patch',
+                'repo_write_file',
+                'repo_create_file',
+                'repo_move_file',
+                'repo_quarantine_file',
+                'repo_restore_quarantined_file',
+                'mcp_run_safe_validation_suite',
+            ].includes(name),
+        ),
+        rememberApprovalCandidates: remember,
+        neverRememberApproval: manual,
+        planFirstWorkflows: [
+            ['repo_patch_plan', 'repo_apply_patch'],
+            ['repo_create_file_plan', 'repo_create_file'],
+            ['repo_move_file_plan', 'repo_move_file'],
+            ['repo_quarantine_file_plan', 'repo_quarantine_file'],
+            ['repo_apply_file_batch_plan', 'repo_apply_file_batch'],
+            ['mcp_validation_plan', 'mcp_run_safe_validation_suite'],
+        ],
+    };
+}
+
+function summarizeTool(tool = /** @type {any} */ ({})) {
     const annotations = tool.annotations;
     const readOnly = annotations.readOnlyHint === true;
     const destructive = annotations.destructiveHint === true;
@@ -104,6 +137,7 @@ export const mcpToolsStatusTool = {
                     'When ChatGPT offers it, remember approval for trusted bounded-write tools in the current conversation.',
                 ],
             },
+            approvalFrictionProfile: buildApprovalFrictionProfile(summaries),
             tools: summaries,
         });
     },

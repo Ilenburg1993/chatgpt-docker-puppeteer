@@ -35,10 +35,16 @@ export async function runMcpOAuthSmoke(options = {}) {
     const dcrToken = registration.ok
         ? await authorizeAndExchangeRegisteredClient(metadata, registration, resource, FULL_REPO_SCOPE)
         : failure('registration failed');
+    const registrationBody = asRecord(registration.body);
     const dcrTokenBody = asRecord(dcrToken.body);
+    const dcrRefreshToken =
+        typeof dcrTokenBody?.['refresh_token'] === 'string'
+            ? await refreshToken(metadata, resource, String(registrationBody?.['client_id'] ?? ''), dcrTokenBody['refresh_token'])
+            : failure('refresh_token missing');
+    const dcrRefreshTokenBody = asRecord(dcrRefreshToken.body);
     const runtimeHealth =
-        typeof dcrTokenBody?.['access_token'] === 'string'
-            ? await callMcpTool(`${resource}/mcp`, dcrTokenBody['access_token'], 'mcp_runtime_health')
+        typeof dcrRefreshTokenBody?.['access_token'] === 'string'
+            ? await callMcpTool(`${resource}/mcp`, dcrRefreshTokenBody['access_token'], 'mcp_runtime_health')
             : failure('token missing');
     const cimdClientMetadataUrl = `${authorizationServer}/.well-known/oauth-client/codex-smoke.json`;
     const cimdClientMetadata = await probeJson(cimdClientMetadataUrl, { method: 'GET' });
@@ -54,6 +60,10 @@ export async function runMcpOAuthSmoke(options = {}) {
               })
             : failure('client_id_metadata_document_supported missing');
     const cimdTokenBody = asRecord(cimdToken.body);
+    const cimdRefreshToken =
+        typeof cimdTokenBody?.['refresh_token'] === 'string'
+            ? await refreshToken(metadata, resource, cimdClientMetadataUrl, cimdTokenBody['refresh_token'])
+            : failure('refresh_token missing');
     const userinfo =
         typeof cimdTokenBody?.['access_token'] === 'string' && typeof metadata?.['userinfo_endpoint'] === 'string'
             ? await probeJson(metadata['userinfo_endpoint'], {
@@ -68,9 +78,11 @@ export async function runMcpOAuthSmoke(options = {}) {
             jwks.ok &&
             registration.ok &&
             dcrToken.ok &&
+            dcrRefreshToken.ok &&
             runtimeHealth.ok &&
             cimdClientMetadata.ok &&
             cimdToken.ok &&
+            cimdRefreshToken.ok &&
             userinfo.ok,
         resource,
         protectedResource,
@@ -80,6 +92,7 @@ export async function runMcpOAuthSmoke(options = {}) {
         registration: summarizeRegistration(registration),
         dcrFlow: {
             token: summarizeToken(dcrToken),
+            refreshToken: summarizeToken(dcrRefreshToken),
             runtimeHealth: {
                 ok: runtimeHealth.ok,
                 status: runtimeHealth.status ?? null,
@@ -90,6 +103,7 @@ export async function runMcpOAuthSmoke(options = {}) {
         cimdFlow: {
             clientMetadata: summarizeClientMetadata(cimdClientMetadata),
             token: summarizeToken(cimdToken),
+            refreshToken: summarizeToken(cimdRefreshToken),
             userinfo: summarizeUserinfo(userinfo),
         },
     };
@@ -131,6 +145,26 @@ async function authorizeAndExchangeRegisteredClient(metadata, registration, reso
     const redirectUri =
         normalizeStringArray(registrationBody?.['redirect_uris'])[0] ?? 'https://chatgpt.com/connector/oauth/codex-smoke';
     return authorizeAndExchangeClient(metadata, { clientId, redirectUri, resource, scope });
+}
+
+/**
+ * @param {Record<string, unknown> | null} metadata
+ * @param {string} resource
+ * @param {string} clientId
+ * @param {string} token
+ * @returns {Promise<ProbeResult>}
+ */
+async function refreshToken(metadata, resource, clientId, token) {
+    const tokenEndpoint = String(metadata?.['token_endpoint'] ?? `${resource}/oauth/token`);
+    return probeJson(tokenEndpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
+        body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: token,
+            client_id: clientId,
+        }).toString(),
+    });
 }
 
 /**
@@ -298,6 +332,8 @@ function summarizeToken(token) {
         tokenType: body?.['token_type'] ?? null,
         expiresIn: body?.['expires_in'] ?? null,
         scope: body?.['scope'] ?? null,
+        refreshTokenIssued: typeof body?.['refresh_token'] === 'string',
+        refreshTokenExpiresIn: body?.['refresh_token_expires_in'] ?? null,
         idTokenIssued: typeof body?.['id_token'] === 'string',
         error: token.error ?? null,
     };

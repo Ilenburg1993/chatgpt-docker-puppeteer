@@ -56,6 +56,28 @@ export const MCP_AUTH_SCOPES = /** @type {const} */ ({
 /** @type {Map<string, ReturnType<typeof createRemoteJWKSet>>} */
 const REMOTE_JWKS_CACHE = new Map();
 
+const PUBLIC_OAUTH_DIAGNOSTIC_TOOLS = new Set(['mcp_oauth_friction_audit']);
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {boolean}
+ */
+function publicOauthDiagnosticsEnabled(env = process.env) {
+    const raw = String(env['COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS'] ?? 'true')
+        .trim()
+        .toLowerCase();
+    return raw !== '0' && raw !== 'false' && raw !== 'no' && raw !== 'off';
+}
+
+/**
+ * @param {import('../registry.js').McpToolDefinition} tool
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {boolean}
+ */
+export function isPublicOauthDiagnosticTool(tool, env = process.env) {
+    return publicOauthDiagnosticsEnabled(env) && PUBLIC_OAUTH_DIAGNOSTIC_TOOLS.has(tool.name);
+}
+
 /**
  * @param {string | undefined} value
  * @param {McpAuthScope[]} fallback
@@ -165,7 +187,9 @@ export function readMcpAuthConfig(env = process.env) {
         expectedIssuer,
         expectedAudience,
         jwksUri: env['COPILOT_MCP_OAUTH_JWKS_URI'] ?? defaultJwksUri,
-        staticBearerConfigured: typeof env['COPILOT_MCP_STATIC_BEARER_TOKEN'] === 'string' && env['COPILOT_MCP_STATIC_BEARER_TOKEN'].length > 0,
+        staticBearerConfigured:
+            typeof env['COPILOT_MCP_STATIC_BEARER_TOKEN'] === 'string' &&
+            env['COPILOT_MCP_STATIC_BEARER_TOKEN'].length > 0,
     };
 }
 
@@ -216,6 +240,7 @@ export function parseBearerToken(header) {
  */
 export function securitySchemesForMcpTool(tool, config = readMcpAuthConfig()) {
     const oauth = { type: /** @type {const} */ ('oauth2'), scopes: scopesForMcpTool(tool) };
+    if (config.mode === 'oauth' && isPublicOauthDiagnosticTool(tool)) return [{ type: 'noauth' }, oauth];
     if (config.mode === 'oauth') return [oauth];
     if (config.mode === 'mixed-auth') return [{ type: 'noauth' }, oauth];
     return [{ type: 'noauth' }];
@@ -231,7 +256,7 @@ export function buildProtectedResourceMetadata(config = readMcpAuthConfig()) {
         authorization_servers: [...config.authorizationServers],
         scopes_supported: [...config.initialScopes],
         resource_documentation: config.resourceDocumentation,
-        token_endpoint_auth_methods_supported: ['none', 'private_key_jwt', 'client_secret_post', 'client_secret_basic'],
+        token_endpoint_auth_methods_supported: ['none'],
     };
 }
 
@@ -265,9 +290,68 @@ function escapeChallengeValue(value) {
  * @returns {string[]}
  */
 function normalizeScopeClaim(value) {
-    if (typeof value === 'string') return value.split(/\s+/u).map((item) => item.trim()).filter(Boolean);
+    if (typeof value === 'string')
+        return value
+            .split(/\s+/u)
+            .map((item) => item.trim())
+            .filter(Boolean);
     if (Array.isArray(value)) return value.filter((item) => typeof item === 'string' && item.trim()).map(String);
     return [];
+}
+
+/**
+ * @param {unknown} error
+ * @returns {{ code: string; message: string; hint: string; wwwAuthenticateError: string; errorDescription: string }}
+ */
+function classifyBearerVerificationError(error) {
+    const metadata = error && typeof error === 'object' ? /** @type {Record<string, unknown>} */ (error) : {};
+    const joseCode = typeof metadata['code'] === 'string' ? metadata['code'] : '';
+    const name = error instanceof Error ? error.name : '';
+    const message = error instanceof Error ? error.message : String(error);
+    const normalized = `${joseCode} ${name} ${message}`.toLowerCase();
+    if (normalized.includes('expired')) {
+        return {
+            code: 'MCP_AUTH_TOKEN_EXPIRED',
+            message: 'Bearer token has expired.',
+            hint: message,
+            wwwAuthenticateError: 'invalid_token',
+            errorDescription: 'Bearer token has expired; reauthorize or use a renewed token.',
+        };
+    }
+    if (normalized.includes('aud') || normalized.includes('audience')) {
+        return {
+            code: 'MCP_AUTH_AUDIENCE_INVALID',
+            message: 'Bearer token audience does not match this MCP resource.',
+            hint: message,
+            wwwAuthenticateError: 'invalid_token',
+            errorDescription: 'Bearer token audience does not match this MCP resource.',
+        };
+    }
+    if (normalized.includes('issuer') || normalized.includes('iss')) {
+        return {
+            code: 'MCP_AUTH_ISSUER_INVALID',
+            message: 'Bearer token issuer does not match the configured OAuth issuer.',
+            hint: message,
+            wwwAuthenticateError: 'invalid_token',
+            errorDescription: 'Bearer token issuer does not match the configured OAuth issuer.',
+        };
+    }
+    if (normalized.includes('jwks') || normalized.includes('jwk') || normalized.includes('key')) {
+        return {
+            code: 'MCP_AUTH_JWKS_ERROR',
+            message: 'Bearer token could not be verified with the configured JWKS.',
+            hint: message,
+            wwwAuthenticateError: 'invalid_token',
+            errorDescription: 'Bearer token could not be verified with the configured JWKS.',
+        };
+    }
+    return {
+        code: 'MCP_AUTH_TOKEN_INVALID',
+        message: 'Bearer token could not be verified.',
+        hint: message,
+        wwwAuthenticateError: 'invalid_token',
+        errorDescription: 'Bearer token could not be verified.',
+    };
 }
 
 /**
@@ -340,17 +424,18 @@ async function verifyBearerToken(token, requiredScopes, config, env) {
             method: 'oauth-jwks',
         };
     } catch (error) {
+        const classification = classifyBearerVerificationError(error);
         return {
             allowed: false,
             required: true,
             enforcement: config.enforcement,
             requiredScopes,
-            code: 'MCP_AUTH_TOKEN_INVALID',
-            message: 'Bearer token could not be verified.',
-            hint: error instanceof Error ? error.message : String(error),
+            code: classification.code,
+            message: classification.message,
+            hint: classification.hint,
             challenge: buildWwwAuthenticateChallenge(requiredScopes, config, {
-                error: 'invalid_token',
-                errorDescription: 'Bearer token could not be verified.',
+                error: classification.wwwAuthenticateError,
+                errorDescription: classification.errorDescription,
             }),
         };
     }
@@ -363,7 +448,12 @@ async function verifyBearerToken(token, requiredScopes, config, env) {
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {Promise<McpAuthorizationDecision>}
  */
-export async function authorizeMcpToolCall(tool, context = { bearerToken: undefined }, config = readMcpAuthConfig(), env = process.env) {
+export async function authorizeMcpToolCall(
+    tool,
+    context = { bearerToken: undefined },
+    config = readMcpAuthConfig(),
+    env = process.env,
+) {
     const requiredScopes = scopesForMcpTool(tool);
     const required = scopesRequireAuth(requiredScopes, config.enforcement);
     if (!required) {
@@ -373,6 +463,15 @@ export async function authorizeMcpToolCall(tool, context = { bearerToken: undefi
             enforcement: config.enforcement,
             requiredScopes,
             method: 'not-required',
+        };
+    }
+    if (isPublicOauthDiagnosticTool(tool, env)) {
+        return {
+            allowed: true,
+            required: false,
+            enforcement: config.enforcement,
+            requiredScopes,
+            method: 'public-diagnostic',
         };
     }
     if (!context.bearerToken) {

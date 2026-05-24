@@ -42,13 +42,21 @@ function normalizeIssuerUrl(value) {
  * @returns {Record<string, unknown> | null}
  */
 function asObject(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
 /**
  * @param {string} url
  * @param {number} timeoutMs
- * @returns {Promise<{ ok: boolean; url: string; status?: number; metadata?: Record<string, unknown>; error?: string }>}
+ * @returns {Promise<{
+ *     ok: boolean;
+ *     url: string;
+ *     status?: number;
+ *     metadata?: Record<string, unknown>;
+ *     error?: string;
+ * }>}
  */
 async function fetchOAuthMetadata(url, timeoutMs) {
     const controller = new AbortController();
@@ -94,16 +102,21 @@ function summarizeOAuthMetadata(metadata, requiredScopes) {
         if (typeof metadata[field] !== 'string' || !String(metadata[field]).trim()) missingFields.push(field);
     }
     const tokenMethods = Array.isArray(metadata['token_endpoint_auth_methods_supported'])
-        ? /** @type {unknown[]} */ (metadata['token_endpoint_auth_methods_supported']).filter((item) => typeof item === 'string')
+        ? /** @type {unknown[]} */ (metadata['token_endpoint_auth_methods_supported']).filter(
+              (item) => typeof item === 'string',
+          )
         : [];
     const codeChallengeMethods = Array.isArray(metadata['code_challenge_methods_supported'])
-        ? /** @type {unknown[]} */ (metadata['code_challenge_methods_supported']).filter((item) => typeof item === 'string')
+        ? /** @type {unknown[]} */ (metadata['code_challenge_methods_supported']).filter(
+              (item) => typeof item === 'string',
+          )
         : [];
     const scopesSupported = Array.isArray(metadata['scopes_supported'])
         ? /** @type {unknown[]} */ (metadata['scopes_supported']).filter((item) => typeof item === 'string')
         : [];
     if (tokenMethods.length === 0) warnings.push('token_endpoint_auth_methods_supported is not advertised.');
-    if (!codeChallengeMethods.includes('S256')) warnings.push('code_challenge_methods_supported does not advertise S256.');
+    if (!codeChallengeMethods.includes('S256'))
+        warnings.push('code_challenge_methods_supported does not advertise S256.');
     if (metadata['client_id_metadata_document_supported'] !== true) {
         warnings.push('client_id_metadata_document_supported is not true; ChatGPT will fall back to DCR.');
     }
@@ -180,6 +193,9 @@ function buildAuthEnvironmentTemplates(config) {
             COPILOT_MCP_OAUTH_AUDIENCE: config.resource,
             COPILOT_MCP_OAUTH_JWKS_URI: `${config.resource}/oauth/jwks.json`,
             COPILOT_MCP_DEV_OAUTH_ENABLED: 'true',
+            COPILOT_MCP_DEV_OAUTH_ACCESS_TOKEN_TTL_SECONDS: '86400',
+            COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_TTL_SECONDS: '2592000',
+            COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS: 'true',
         },
         permanentTunnelNoAuthFallback: {
             COPILOT_MCP_AUTH_MODE: 'none-dev',
@@ -273,6 +289,7 @@ export const connectionTools = [
                 : temporaryTunnel.connectorUrl
                   ? 'quick-tunnel-state'
                   : 'missing';
+            const permanentReady = source === 'permanent-config' && validation.ok === true;
 
             return okResult({
                 success: validation.ok === true,
@@ -283,7 +300,8 @@ export const connectionTools = [
                     name: 'LLM-B Workspace MCP',
                     description: 'Repo-scoped MCP connector for src/copilot development in this workspace.',
                     mcpServerUrl: currentUrl,
-                    authentication: authConfig.mode === 'oauth' || authConfig.mode === 'mixed-auth' ? 'OAuth' : 'No authentication',
+                    authentication:
+                        authConfig.mode === 'oauth' || authConfig.mode === 'mixed-auth' ? 'OAuth' : 'No authentication',
                 },
                 auth: {
                     mode: authConfig.mode,
@@ -291,7 +309,10 @@ export const connectionTools = [
                     protectedResourceMetadataUrl: authConfig.protectedResourceMetadataUrl,
                     authorizationServersConfigured: authConfig.authorizationServers.length > 0,
                 },
-                temporaryTunnel,
+                temporaryTunnel: {
+                    ...temporaryTunnel,
+                    ignoredForOperationalReadiness: permanentReady,
+                },
                 permanentTunnel: {
                     mode: config.mode,
                     tunnelName: config.tunnelName,
@@ -299,11 +320,12 @@ export const connectionTools = [
                     publicHostname: config.publicHostname,
                     tokenPresent: config.hasTunnelToken,
                     tokenFilePresent: config.hasTunnelTokenFile,
+                    ready: permanentReady,
                 },
                 originUrl: config.originUrl,
                 localMcpUrl: config.localMcpUrl,
                 stateFile: config.stateFile,
-                recovery: temporaryTunnel.recovery,
+                recovery: permanentReady ? [] : temporaryTunnel.recovery,
             });
         },
     },
@@ -361,7 +383,9 @@ export const connectionTools = [
             issuer: z
                 .string()
                 .optional()
-                .describe('Optional HTTPS OAuth issuer base URL. Defaults to COPILOT_MCP_OAUTH_EXPECTED_ISSUER or COPILOT_MCP_OAUTH_ISSUER.'),
+                .describe(
+                    'Optional HTTPS OAuth issuer base URL. Defaults to COPILOT_MCP_OAUTH_EXPECTED_ISSUER or COPILOT_MCP_OAUTH_ISSUER.',
+                ),
             timeoutMs: z.number().int().min(500).max(10000).optional().describe('Per-request timeout in milliseconds.'),
         },
         annotations: readOnlyAnnotations(),
@@ -391,7 +415,9 @@ export const connectionTools = [
             const firstOk = checked.find((candidate) => candidate.ok);
             const summary = summarizeOAuthMetadata(firstOk?.metadata, config.scopesSupported);
             const clientMetadataUrl =
-                firstOk && firstOk.metadata?.['client_id_metadata_document_supported'] === true && normalizedIssuer === config.resource
+                firstOk &&
+                firstOk.metadata?.['client_id_metadata_document_supported'] === true &&
+                normalizedIssuer === config.resource
                     ? `${normalizedIssuer}/.well-known/oauth-client/codex-smoke.json`
                     : null;
             const clientMetadataProbe = clientMetadataUrl
@@ -405,7 +431,12 @@ export const connectionTools = [
                 ready: Boolean(firstOk && summary.ready && (clientMetadataSummary?.ready ?? true)),
                 issuer: normalizedIssuer,
                 requiredForCurrentMode: config.enforcement !== 'off',
-                checkedUrls: checked.map(({ url, ok, status, error }) => ({ url, ok, status: status ?? null, error: error ?? null })),
+                checkedUrls: checked.map(({ url, ok, status, error }) => ({
+                    url,
+                    ok,
+                    status: status ?? null,
+                    error: error ?? null,
+                })),
                 selectedMetadataUrl: firstOk?.url ?? null,
                 metadataSummary: summary.summary,
                 clientMetadata:
