@@ -19,8 +19,6 @@ import {
     normalizeUserInputCompletedEvent,
     normalizeUserInputRequestedEvent,
 } from '#copilot/sdk/session';
-import { runConfiguredByokAgentProbe, runConfiguredByokChatProbe } from '#copilot/model-gateway';
-import { classifyTerminalByokProviderFailure, evaluateTerminalByokProbeBudget } from '../../byok/index.js';
 import {
     compactAgentSdkSession,
     confirmAgentSdkSessionUi,
@@ -146,82 +144,6 @@ export function normalizeTerminalUserInputCompletedEvent(evt) {
  */
 export function classifyTerminalUserInputQuestionKind(question) {
     return classifyUserInputQuestionKind(question);
-}
-
-/**
- * Executa um chat canário em uma sessão SDK descartável com o provider/modelo BYOK resolvido.
- *
- * Esta sonda usa o mesmo `ProviderConfig` e o mesmo client SDK do runtime, mas não entra no dialog loop, não registra
- * transcript do operador e nega permissões. Serve para separar "modelo aparece no catálogo" de "chat real responde".
- *
- * @param {{ env?: Record<string, string | undefined>; model?: string | null; timeoutMs?: number; prompt?: string }} [options]
- * @returns {Promise<{
- *     ok: boolean;
- *     status: 'ok' | 'unavailable' | 'admission-blocked' | 'empty' | 'failed';
- *     elapsedMs: number;
- *     model: string | null;
- *     profile: string | null;
- *     preset: string | null;
- *     providerType: string | null;
- *     deltaCount: number;
- *     deltaChars: number;
- *     finalChars: number;
- *     observedFinalEvent: boolean;
- *     sessionId: string | null;
- *     errors: string[];
- *     warnings: string[];
- *     providerFailure?: import('../../byok/provider-failure.js').TerminalByokProviderFailure | null;
- * }>}
- */
-export async function probeTerminalConfiguredByokChat(options = {}) {
-    return runConfiguredByokChatProbe({
-        ...options,
-        deps: {
-            evaluateAdmission: evaluateTerminalByokProbeBudget,
-            classifyProviderFailure: classifyTerminalByokProviderFailure,
-        },
-    });
-}
-
-/**
- * Executa uma sonda agente descartável para BYOK.
- *
- * Diferente do chat canário, esta sonda exige duas capacidades operacionais do runtime Copilot: tools com identidade
- * terminal representativa e `ask_user`. Ela não toca no dialog loop live; a resposta humana é sintética e confinada à
- * sessão temporária.
- *
- * @param {{ env?: Record<string, string | undefined>; model?: string | null; timeoutMs?: number; prompt?: string }} [options]
- * @returns {Promise<{
- *     ok: boolean;
- *     status: 'ok' | 'unavailable' | 'admission-blocked' | 'tool-missing' | 'ask-missing' | 'empty' | 'failed';
- *     elapsedMs: number;
- *     model: string | null;
- *     profile: string | null;
- *     preset: string | null;
- *     providerType: string | null;
- *     deltaCount: number;
- *     deltaChars: number;
- *     finalChars: number;
- *     observedFinalEvent: boolean;
- *     toolCallCount: number;
- *     markerToolCallCount: number;
- *     readToolCallCount: number;
- *     userInputRequestCount: number;
- *     userInputAnswerCount: number;
- *     sessionId: string | null;
- *     errors: string[];
- *     warnings: string[];
- *     providerFailure?: import('../../byok/provider-failure.js').TerminalByokProviderFailure | null;
- * }>}
- */
-export async function probeTerminalConfiguredByokAgent(options = {}) {
-    return runConfiguredByokAgentProbe({
-        ...options,
-        deps: {
-            evaluateAdmission: evaluateTerminalByokProbeBudget,
-            classifyProviderFailure: classifyTerminalByokProviderFailure,
-        },
-    });
 }
 
 // ---------------------------------------------------------------------------

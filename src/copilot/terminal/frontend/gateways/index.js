@@ -92,8 +92,6 @@ export {
     normalizeTerminalPermissionRequestedEvent,
     normalizeTerminalUserInputCompletedEvent,
     normalizeTerminalUserInputRequestedEvent,
-    probeTerminalConfiguredByokAgent,
-    probeTerminalConfiguredByokChat,
     readTerminalSdkPlan,
     readTerminalSdkSessionBootSelection,
     readTerminalSdkSkillsGovernance,

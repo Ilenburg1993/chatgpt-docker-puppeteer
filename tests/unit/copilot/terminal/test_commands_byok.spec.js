@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, probeTerminalConfiguredByokAgent, probeTerminalConfiguredByokChat, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, rename, setTerminalModelProjection, writeFile } =
+const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, rename, setTerminalModelProjection, writeFile } =
     vi.hoisted(() => ({
         chmod: vi.fn(),
         clearByokProviderModelHealth: vi.fn(),
@@ -20,8 +20,10 @@ const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv
             }),
         ),
         loadDotenv: vi.fn(),
-        probeTerminalConfiguredByokAgent: vi.fn(),
-        probeTerminalConfiguredByokChat: vi.fn(),
+        runConfiguredByokAgentProbe: vi.fn(),
+        runConfiguredByokChatProbe: vi.fn(),
+        runConfiguredByokJsonProbe: vi.fn(),
+        runConfiguredByokStreamingProbe: vi.fn(),
         readByokProviderHealthState: vi.fn(() => ({
             enabled: false,
             path: null,
@@ -70,13 +72,18 @@ vi.mock('#copilot/config', () => ({
 }));
 
 vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
-    probeTerminalConfiguredByokChat,
-    probeTerminalConfiguredByokAgent,
     listTerminalSdkSessionInventory,
     readTerminalByokGatewayProjectionFromEnv,
     readTerminalByokProjection,
     readTerminalRuntimeState,
     setTerminalModelProjection,
+}));
+
+vi.mock('#copilot/model-gateway', () => ({
+    runConfiguredByokChatProbe: runConfiguredByokChatProbe,
+    runConfiguredByokAgentProbe: runConfiguredByokAgentProbe,
+    runConfiguredByokJsonProbe: runConfiguredByokJsonProbe,
+    runConfiguredByokStreamingProbe: runConfiguredByokStreamingProbe,
 }));
 
 vi.mock('../../../../src/copilot/terminal/state/index.js', () => ({
@@ -170,8 +177,10 @@ describe('terminal /byok command', () => {
             sessions: [],
         });
         loadDotenv.mockReset();
-        probeTerminalConfiguredByokChat.mockReset();
-        probeTerminalConfiguredByokAgent.mockReset();
+        runConfiguredByokChatProbe.mockReset();
+        runConfiguredByokAgentProbe.mockReset();
+        runConfiguredByokJsonProbe.mockReset();
+        runConfiguredByokStreamingProbe.mockReset();
         readByokProviderHealthState.mockReset();
         readByokProviderHealthState.mockReturnValue({
             enabled: false,
@@ -410,7 +419,7 @@ describe('terminal /byok command', () => {
 
     it('roda probe descartável e registra chat health sem expor segredo', async () => {
         mockProjection();
-        probeTerminalConfiguredByokChat.mockResolvedValue({
+        runConfiguredByokChatProbe.mockResolvedValue({
             ok: true,
             status: 'ok',
             elapsedMs: 123,
@@ -430,7 +439,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'probe profile:groq-free model:probe-model timeout:9000');
 
-        expect(probeTerminalConfiguredByokChat).toHaveBeenCalledWith(
+        expect(runConfiguredByokChatProbe).toHaveBeenCalledWith(
             expect.objectContaining({
                 env: expect.objectContaining({ COPILOT_BYOK_PROFILE: 'groq-free' }),
                 model: 'probe-model',
@@ -451,7 +460,7 @@ describe('terminal /byok command', () => {
 
     it('roda agent probe descartável e separa compatibilidade agente do chat canário', async () => {
         mockProjection();
-        probeTerminalConfiguredByokAgent.mockResolvedValue({
+        runConfiguredByokAgentProbe.mockResolvedValue({
             ok: false,
             status: 'tool-missing',
             elapsedMs: 456,
@@ -474,7 +483,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'probe agent profile:kilo model:chat-only-model timeout:12000');
 
-        expect(probeTerminalConfiguredByokAgent).toHaveBeenCalledWith(
+        expect(runConfiguredByokAgentProbe).toHaveBeenCalledWith(
             expect.objectContaining({
                 env: expect.objectContaining({ COPILOT_BYOK_PROFILE: 'kilo' }),
                 model: 'chat-only-model',
@@ -499,7 +508,7 @@ describe('terminal /byok command', () => {
 
     it('explica bloqueio externo de credito/cota em probe BYOK sem degradar o diagnostico em erro cru', async () => {
         mockProjection();
-        probeTerminalConfiguredByokAgent.mockResolvedValue({
+        runConfiguredByokAgentProbe.mockResolvedValue({
             ok: false,
             status: 'failed',
             elapsedMs: 456,
@@ -575,7 +584,7 @@ describe('terminal /byok command', () => {
             fromCache: false,
             error: null,
         });
-        probeTerminalConfiguredByokAgent
+        runConfiguredByokAgentProbe
             .mockResolvedValueOnce({
                 ok: true,
                 status: 'ok',
@@ -623,7 +632,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'probe shortlist free reasoning safe 2 timeout:15000');
 
-        expect(probeTerminalConfiguredByokAgent).toHaveBeenNthCalledWith(
+        expect(runConfiguredByokAgentProbe).toHaveBeenNthCalledWith(
             1,
             expect.objectContaining({
                 env: expect.objectContaining({ COPILOT_BYOK_PROFILE: 'kilo' }),
@@ -631,7 +640,7 @@ describe('terminal /byok command', () => {
                 timeoutMs: 15000,
             }),
         );
-        expect(probeTerminalConfiguredByokAgent).toHaveBeenNthCalledWith(
+        expect(runConfiguredByokAgentProbe).toHaveBeenNthCalledWith(
             2,
             expect.objectContaining({
                 env: expect.objectContaining({ COPILOT_BYOK_PROFILE: 'openrouter-free' }),
@@ -682,7 +691,7 @@ describe('terminal /byok command', () => {
                 fromCache: false,
                 error: null,
             });
-        probeTerminalConfiguredByokAgent.mockResolvedValue({
+        runConfiguredByokAgentProbe.mockResolvedValue({
             ok: true,
             status: 'ok',
             elapsedMs: 111,
@@ -729,7 +738,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'probe shortlist all-providers free reasoning safe 1');
 
-        expect(probeTerminalConfiguredByokAgent).toHaveBeenCalledTimes(1);
+        expect(runConfiguredByokAgentProbe).toHaveBeenCalledTimes(1);
         expect(ctx.output()).toContain('Cobertura por perfil antes das probes');
         expect(ctx.output()).toContain('kilo: catalogo=1 · elegiveis=1 · shortlist=1');
         expect(ctx.output()).toContain('groq-free: catalogo=1 · safe removeu=1');
@@ -738,7 +747,7 @@ describe('terminal /byok command', () => {
 
     it('não degrada health real quando admission bloqueia a probe antes do provider', async () => {
         mockProjection();
-        probeTerminalConfiguredByokChat.mockResolvedValue({
+        runConfiguredByokChatProbe.mockResolvedValue({
             ok: false,
             status: 'admission-blocked',
             elapsedMs: 1,
@@ -761,6 +770,87 @@ describe('terminal /byok command', () => {
         expect(recordByokProviderModelCallFailure).not.toHaveBeenCalled();
         expect(ctx.output()).toContain('admission-blocked');
         expect(ctx.output()).toContain('health real do modelo não foi degradado');
+    });
+
+    it('roda probe streaming sem passar pelo wrapper terminal legado nem degradar chat health', async () => {
+        mockProjection();
+        runConfiguredByokStreamingProbe.mockResolvedValue({
+            ok: false,
+            status: 'no-delta',
+            elapsedMs: 42,
+            model: 'stream-model',
+            profile: 'openrouter-free',
+            preset: 'openrouter',
+            providerType: 'openai',
+            deltaCount: 0,
+            deltaChars: 0,
+            finalChars: 24,
+            observedFinalEvent: true,
+            sessionId: 'tmp-stream',
+            errors: ['Probe respondeu, mas não emitiu assistant.message_delta.'],
+            warnings: [],
+            streamingProved: false,
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'probe streaming profile:openrouter-free model:stream-model');
+
+        expect(runConfiguredByokStreamingProbe).toHaveBeenCalledWith(
+            expect.objectContaining({
+                env: expect.objectContaining({ COPILOT_BYOK_PROFILE: 'openrouter-free' }),
+                model: 'stream-model',
+                deps: expect.objectContaining({
+                    evaluateAdmission: expect.any(Function),
+                    classifyProviderFailure: expect.any(Function),
+                }),
+            }),
+        );
+        expect(recordByokProviderModelCallFailure).not.toHaveBeenCalled();
+        expect(recordByokProviderModelAgentProbeFailure).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('BYOK streaming probe');
+        expect(ctx.output()).toContain('UX live ficaria cega');
+    });
+
+    it('roda probe JSON como capacidade estruturada sem degradar chat health', async () => {
+        mockProjection();
+        runConfiguredByokJsonProbe.mockResolvedValue({
+            ok: true,
+            status: 'ok',
+            elapsedMs: 55,
+            model: 'json-model',
+            profile: 'mistral-free',
+            preset: 'mistral',
+            providerType: 'openai',
+            deltaCount: 1,
+            deltaChars: 12,
+            finalChars: 33,
+            finalContent: '{"byok_probe":"ok","mode":"json"}',
+            observedFinalEvent: true,
+            sessionId: 'tmp-json',
+            errors: [],
+            warnings: [],
+            jsonProved: true,
+            parsedJson: { byok_probe: 'ok', mode: 'json' },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'probe json profile:mistral-free model:json-model timeout:7000');
+
+        expect(runConfiguredByokJsonProbe).toHaveBeenCalledWith(
+            expect.objectContaining({
+                env: expect.objectContaining({ COPILOT_BYOK_PROFILE: 'mistral-free' }),
+                model: 'json-model',
+                timeoutMs: 7000,
+                deps: expect.objectContaining({
+                    evaluateAdmission: expect.any(Function),
+                    classifyProviderFailure: expect.any(Function),
+                }),
+            }),
+        );
+        expect(recordByokProviderModelCallSuccess).not.toHaveBeenCalled();
+        expect(recordByokProviderModelAgentProbeSuccess).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('BYOK json probe');
+        expect(ctx.output()).toContain('JSON probe confirma saída estruturada');
     });
 
     it('lista providers disponíveis com comandos operacionais redigidos', async () => {

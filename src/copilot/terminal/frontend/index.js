@@ -62,8 +62,6 @@ export {
     resolveTerminalSdkPendingElicitation,
     resumeTerminalDialogLoop,
     runTerminalDialogTurn,
-    probeTerminalConfiguredByokAgent,
-    probeTerminalConfiguredByokChat,
     saveTerminalSnapshot,
     scheduleTerminalSdkSessionBootSelection,
     searchTerminalHubTurns,

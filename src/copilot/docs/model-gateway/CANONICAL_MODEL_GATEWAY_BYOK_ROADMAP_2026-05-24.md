@@ -185,8 +185,10 @@ src/copilot/model-gateway/
 
 - [x] Promover probe chat descartável para `model-gateway/probes`.
 - [x] Promover probe agente descartável com tools + `ask_user`.
+- [x] Remover wrappers legados `probeTerminalConfiguredByok*` do frontend terminal.
 - [x] Adicionar probe streaming/delta.
 - [x] Adicionar probe JSON.
+- [x] Expor `/byok probe streaming` e `/byok probe json` sem degradar health de chat/agente.
 - [x] Criar evento e métricas canônicas para conclusão de probes.
 - [ ] Adicionar probe de vision quando houver fixtures seguras.
 - [ ] Registrar cada probe em health e observability.

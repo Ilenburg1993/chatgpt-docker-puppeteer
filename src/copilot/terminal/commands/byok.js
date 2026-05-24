@@ -11,11 +11,15 @@
 import fs from 'node:fs/promises';
 
 import { config as loadDotenv } from 'dotenv';
+import {
+    runConfiguredByokAgentProbe,
+    runConfiguredByokChatProbe,
+    runConfiguredByokJsonProbe,
+    runConfiguredByokStreamingProbe,
+} from '#copilot/model-gateway';
 
 import { discoverConfiguredByokModelsFromEnv, readConfiguredByokProfilesFromEnv } from '#copilot/config';
 import {
-    probeTerminalConfiguredByokAgent,
-    probeTerminalConfiguredByokChat,
     listTerminalSdkSessionInventory,
     readTerminalByokGatewayProjectionFromEnv,
     readTerminalByokProjection,
@@ -34,7 +38,9 @@ import {
     readByokProviderModelHealth,
 } from '../state/index.js';
 import {
+    classifyTerminalByokProviderFailure,
     classifyTerminalByokSdkBinding,
+    evaluateTerminalByokProbeBudget,
     isSameTerminalByokProviderBoundary,
 } from '../byok/index.js';
 
@@ -71,7 +77,8 @@ const BYOK_RUNTIME_SELECTOR_ENV_KEYS = Object.freeze([
  */
 
 /**
- * @typedef {Awaited<ReturnType<typeof probeTerminalConfiguredByokChat>> | Awaited<ReturnType<typeof probeTerminalConfiguredByokAgent>>} ByokProbeResult
+ * @typedef {Awaited<ReturnType<typeof runConfiguredByokChatProbe>> | Awaited<ReturnType<typeof runConfiguredByokAgentProbe>> | Awaited<ReturnType<typeof runConfiguredByokStreamingProbe>> | Awaited<ReturnType<typeof runConfiguredByokJsonProbe>>} ByokProbeResult
+ * @typedef {'chat' | 'agent' | 'streaming' | 'json'} ByokProbeMode
  */
 
 /**
@@ -1199,7 +1206,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok health [clear] | /byok probe [chat|agent] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok health [clear] | /byok probe [chat|agent|streaming|json] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1308,7 +1315,7 @@ function buildByokProbeSelection(rest) {
 }
 
 /**
- * @param {'chat' | 'agent'} mode
+ * @param {ByokProbeMode} mode
  * @param {ByokProbeResult} probe
  * @returns {Promise<boolean>}
  */
@@ -1319,6 +1326,7 @@ async function recordByokProbeHealth(mode, probe) {
         model: probe.model,
     };
     const providerAttempted = probe.status !== 'admission-blocked';
+    if (mode !== 'chat' && mode !== 'agent') return providerAttempted;
     if (mode === 'agent' && probe.ok) {
         recordByokProviderModelAgentProbeSuccess(healthIdentity);
     } else if (mode === 'agent' && providerAttempted) {
@@ -1345,7 +1353,7 @@ async function recordByokProbeHealth(mode, probe) {
 
 /**
  * @param {(text: string) => void} println
- * @param {'chat' | 'agent'} mode
+ * @param {ByokProbeMode} mode
  * @param {ByokProbeResult} probe
  * @param {{ indent?: string; providerAttempted?: boolean; showSession?: boolean; showWarnings?: boolean }} [options]
  * @returns {void}
@@ -1387,15 +1395,27 @@ function renderByokProbeResult(println, mode, probe, options = {}) {
 }
 
 /**
- * @param {'chat' | 'agent'} mode
+ * @param {ByokProbeMode} mode
  * @param {ReturnType<typeof buildByokProbeSelection>} selection
  * @returns {Promise<{ probe: ByokProbeResult; providerAttempted: boolean }>}
  */
 async function runByokProbe(mode, selection) {
-    const probe = await (mode === 'agent' ? probeTerminalConfiguredByokAgent : probeTerminalConfiguredByokChat)({
+    const probeRunner =
+        mode === 'agent'
+            ? runConfiguredByokAgentProbe
+            : mode === 'streaming'
+              ? runConfiguredByokStreamingProbe
+              : mode === 'json'
+                ? runConfiguredByokJsonProbe
+                : runConfiguredByokChatProbe;
+    const probe = await probeRunner({
         env: selection.env,
         ...(selection.model ? { model: selection.model } : {}),
         ...(selection.timeoutMs ? { timeoutMs: selection.timeoutMs } : {}),
+        deps: {
+            evaluateAdmission: evaluateTerminalByokProbeBudget,
+            classifyProviderFailure: classifyTerminalByokProviderFailure,
+        },
     });
     return {
         probe,
@@ -1668,19 +1688,32 @@ export async function cmdByok({ println }, arg) {
             );
             return;
         }
-        const mode = /^(agent|runtime|full)$/iu.test(rest[0] ?? '') ? 'agent' : 'chat';
-        const explicitChatMode = /^(chat|canary)$/iu.test(rest[0] ?? '');
-        const selection = buildByokProbeSelection(mode === 'agent' || explicitChatMode ? rest.slice(1) : rest);
+        /** @type {ByokProbeMode} */
+        const mode = /^(agent|runtime|full)$/iu.test(rest[0] ?? '')
+            ? 'agent'
+            : /^(streaming|stream|delta|deltas)$/iu.test(rest[0] ?? '')
+              ? 'streaming'
+              : /^(json|structured)$/iu.test(rest[0] ?? '')
+                ? 'json'
+                : 'chat';
+        const explicitMode = /^(chat|canary|agent|runtime|full|streaming|stream|delta|deltas|json|structured)$/iu.test(
+            rest[0] ?? '',
+        );
+        const selection = buildByokProbeSelection(explicitMode ? rest.slice(1) : rest);
         println(`\n  \x1b[36mBYOK ${mode} probe\x1b[0m`);
         println(
-            `  \x1b[90mEscopo: sessão SDK descartável; não troca o dialog loop nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : ' Agent exige tools representativas do terminal + ask_user com resposta sintética.'}${selection.profile ? ` profile=${selection.profile}` : ''}${selection.model ? ` model=${selection.model}` : ''}\x1b[0m`,
+            `  \x1b[90mEscopo: sessão SDK descartável; não troca o dialog loop nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : mode === 'agent' ? ' Agent exige tools representativas do terminal + ask_user com resposta sintética.' : mode === 'streaming' ? ' Streaming exige assistant.message_delta real; não degrada health de chat.' : ' JSON exige payload parseável; não degrada health de chat.'}${selection.profile ? ` profile=${selection.profile}` : ''}${selection.model ? ` model=${selection.model}` : ''}\x1b[0m`,
         );
         const { probe, providerAttempted } = await runByokProbe(mode, selection);
         renderByokProbeResult(println, mode, probe, { providerAttempted });
         println(
             mode === 'agent'
                 ? '  \x1b[90mAgent probe confirma a fronteira exigida pelo terminal: streaming + tools representativas + ask_user. Chat probe isolado continua disponível com /byok probe chat.\x1b[0m\n'
-                : '  \x1b[90mCatálogo mostra oferta; chat probe confirma conversa canária. Para validar runtime agente, rode /byok probe agent antes do live.\x1b[0m\n',
+                : mode === 'streaming'
+                  ? '  \x1b[90mStreaming probe separa resposta final de delta incremental. Falha no delta não implica que o chat seja inutilizável, mas a UX live ficaria cega.\x1b[0m\n'
+                  : mode === 'json'
+                    ? '  \x1b[90mJSON probe confirma saída estruturada parseável. Use junto com agent probe antes de promover modelo para fluxos automatizados.\x1b[0m\n'
+                    : '  \x1b[90mCatálogo mostra oferta; chat probe confirma conversa canária. Para validar runtime agente, rode /byok probe agent antes do live.\x1b[0m\n',
         );
         return;
     }
