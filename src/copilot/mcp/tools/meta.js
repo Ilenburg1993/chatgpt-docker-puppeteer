@@ -10,7 +10,7 @@ import { MCP_AUTH_SCOPES, readMcpAuthConfig } from '../control-plane/auth.js';
 import { okResult } from '../control-plane/result.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 19;
+const CAPABILITIES_VERSION = 20;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -83,6 +83,7 @@ const RUNTIME_TOOLS = [
     'delegate_to_repo_autonomy_runner',
     'mcp_golden_prompts',
     'mcp_apps_sdk_readiness',
+    'mcp_cloudflare_metrics_snapshot',
     'mcp_host_block_diagnostics',
     'mcp_maintenance_plan',
     'mcp_maintenance_apply_safe_fixes',
@@ -161,6 +162,7 @@ const IO_GUIDANCE = [
     'Use mcp_oauth_friction_audit after OAuth or connector changes to detect reauth risk and metadata drift.',
     'Use mcp_connector_smoke_refresh after MCP/Cloudflare restarts to refresh the permanent connector smoke cache.',
     'Use mcp_cloudflare_remote_audit to compare the Cloudflare-hosted tunnel config, DNS CNAME and expected local origin without exposing API tokens.',
+    'Use mcp_cloudflare_metrics_snapshot to inspect local cloudflared version, orchestration config version and registration counters.',
     'Use mcp_post_restart_readiness after any restart before starting heavy ChatGPT work.',
     'Use claude_connector_profile when adding the same remote MCP server to claude.ai custom connectors.',
     'LLM-B can consume MCP optionally, but does not depend on this MCP server.',

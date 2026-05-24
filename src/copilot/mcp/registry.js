@@ -11,6 +11,7 @@ import { recordMcpToolMetric } from './control-plane/metrics.js';
 import { errorResult } from './control-plane/result.js';
 import { normalizeMcpToolDefinitions } from './control-plane/tool-metadata.js';
 import { mcpAppsSdkReadinessTool } from './tools/apps-sdk-readiness.js';
+import { mcpCloudflareMetricsSnapshotTool } from './tools/cloudflare-metrics.js';
 import { connectionTools } from './tools/connection.js';
 import { mcpCloudflareRemoteAuditTool } from './tools/cloudflare-remote.js';
 import { copilotSessionTools } from './tools/copilot-session.js';
@@ -73,6 +74,7 @@ export function getCanonicalMcpTools() {
         delegateToRepoAutonomyRunnerTool,
         mcpGoldenPromptsTool,
         mcpAppsSdkReadinessTool,
+        mcpCloudflareMetricsSnapshotTool,
         mcpHostBlockDiagnosticsTool,
         ...connectionTools,
         mcpCloudflareRemoteAuditTool,

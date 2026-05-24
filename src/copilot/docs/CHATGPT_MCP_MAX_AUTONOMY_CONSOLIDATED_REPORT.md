@@ -3042,7 +3042,7 @@ Subfaixa 17-B — hardening do processo `cloudflared`:
 4. [x] Adicionar `COPILOT_MCP_CLOUDFLARE_LOGLEVEL`.
 5. [x] Default: `info`.
 6. [x] Passar `--metrics` e `--loglevel` para tunnel permanente e fallback temporario.
-7. [ ] Criar leitura/parsing de metricas Prometheus como tool propria, se a necessidade aparecer apos uso real.
+7. [x] Criar leitura/parsing de metricas Prometheus como tool propria.
 
 Subfaixa 17-C — Claude custom connector:
 
@@ -3151,8 +3151,40 @@ Campos recomendados agora:
    - erro observado: `403 Authentication error` ao chamar DNS/Zone API.
    - impacto: a auditoria ainda valida tunnel/config/ingress/conexoes; apenas DNS CNAME fica como warning.
    - upgrade: fornecer `CLOUDFLARE_ZONE_ID` e token com permissoes Zone Read + DNS Read para fechar o ciclo DNS.
-2. A tool de parsing de metricas Prometheus ainda nao foi criada.
-   - metricas ja estao expostas localmente;
-   - upgrade natural: `mcp_cloudflare_metrics_snapshot`.
-3. Teste real no Claude ainda precisa ser executado na UI.
+2. Teste real no Claude ainda precisa ser executado na UI.
    - os dados da caixa ja estao no runbook e na tool `claude_connector_profile`.
+
+### 17.9. Continuidade pos-push — metricas Cloudflare como tool MCP
+
+Apos o commit `2a55b004`, a continuidade imediata fechou o gap de observabilidade local do `cloudflared`.
+
+Mudancas:
+
+1. `src/copilot/mcp/cloudflare/metrics.js` parseia o endpoint Prometheus local.
+2. `mcp_cloudflare_metrics_snapshot` expoe snapshot read-only com:
+   - versao `cloudflared`;
+   - revision/go version;
+   - `cloudflared_orchestration_config_version`;
+   - contadores de config push;
+   - contador de registro de conexoes.
+3. `mcp_capabilities_summary`, `mcp_session_profile` e o smoke Cloudflare passam a anunciar a tool.
+4. Teste unitario `test_cloudflare_metrics.spec.js` cobre parsing/sumario.
+
+Validacao desta continuidade:
+
+1. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_cloudflare_metrics.spec.js tests/unit/copilot/mcp/test_mcp_registry.spec.js --reporter=dot`
+   - passou com 6/6.
+2. `npm run typecheck:strict:src.copilot -- --pretty false`
+   - passou.
+3. `npm run lint:copilot -- --quiet`
+   - passou.
+4. `npm run test:copilot:unit`
+   - passou com 3098/3098, sem warnings/errors.
+5. `make copilot-mcp-restart`
+   - passou, reiniciando `mcp-http` e `cloudflared`.
+6. `curl http://127.0.0.1:60123/metrics`
+   - passou e confirmou presenca de `cloudflared_orchestration_config_version`.
+7. `make copilot-mcp-smoke-refresh`
+   - passou com 78/78 tools remotas e `toolsMatchLocalRegistry=true`.
+   - `mcp_cloudflare_metrics_snapshot` apareceu no registry remoto.
+8. Proximo passo: commit/push da continuidade de metricas.
