@@ -20,6 +20,7 @@ import {
     buildProviderModelId,
     buildProbeCompletedEvent,
     buildRegistrySnapshotEvent,
+    createModelRecord,
     createEnvSecretRegistry,
     buildModelGatewayOnListModelsHandler,
     evaluateGatewayModelHealthRoute,
@@ -39,15 +40,20 @@ import {
     resolveModelGatewayProviderAdapter,
     resolveModelGatewayTaskProfile,
     resetByokProviderHealthForTests,
+    routeGatewayModels,
     BYOK_AGENT_PROBE_ANSWER,
     BYOK_AGENT_PROBE_QUESTION,
     BYOK_AGENT_PROBE_READ_PATH,
     BYOK_AGENT_PROBE_READ_TOOL,
     BYOK_AGENT_PROBE_TOOL,
+    BYOK_VISION_PROBE_DISPLAY_NAME,
+    BYOK_VISION_PROBE_MIME_TYPE,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
     runConfiguredByokJsonProbe,
     runConfiguredByokStreamingProbe,
+    runConfiguredByokVisionProbe,
+    scoreGatewayModelCandidate,
     toCopilotModelInfoList,
 } from '../../../../src/copilot/model-gateway/index.js';
 
@@ -214,6 +220,59 @@ describe('model-gateway foundation', () => {
         assert.equal(resolveModelGatewayTaskProfile('repo-agent')?.requireAgentProbeOk, true);
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.requires, ['text', 'streaming', 'vision']);
         assert.equal(resolveModelGatewayTaskProfile('missing'), null);
+    });
+
+    it('scores and explains gateway route decisions before runtime probes', () => {
+        const weak = createModelRecord({
+            providerId: 'openrouter',
+            providerModel: 'weak-chat',
+            capabilities: { tools: false, streaming: true },
+            limits: { contextWindowTokens: 32_000 },
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+            routing: { tier: 'free' },
+        });
+        const strong = createModelRecord({
+            providerId: 'kilo',
+            providerModel: 'anthropic/claude-sonnet-4.5',
+            capabilities: { tools: true, streaming: true, reasoningEffort: true },
+            limits: { contextWindowTokens: 200_000 },
+            pricing: { inputUsdPerMillion: 3, outputUsdPerMillion: 15 },
+            verification: { confidence: 'probe_verified', sources: ['probe'] },
+        });
+
+        recordByokProviderModelAgentProbeSuccess({
+            routeProfile: 'repo_agent',
+            providerId: 'kilo',
+            providerModel: 'anthropic/claude-sonnet-4.5',
+            timestamp: 50,
+        });
+
+        const decision = routeGatewayModels([weak, strong], 'repo_agent', { routeProfile: 'repo_agent' });
+
+        assert.equal(decision.selected?.model['id'], 'kilo:anthropic/claude-sonnet-4.5');
+        assert.deepEqual(decision.fallbackChain, ['kilo:anthropic/claude-sonnet-4.5']);
+        assert.ok(decision.selected?.reasons.includes('agent_probe_verified'));
+        assert.ok(decision.selected?.reasons.includes('preferred:large_context'));
+        assert.ok(decision.rejected.some((candidate) => candidate.rejectedReasons.includes('missing_capability:tools')));
+    });
+
+    it('applies provider allow/block policy to scored candidates with audit reasons', () => {
+        const model = createModelRecord({
+            providerId: 'groq',
+            providerModel: 'qwen/qwen3-32b',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+        });
+        const blocked = scoreGatewayModelCandidate(model, MODEL_GATEWAY_TASK_PROFILES.tool_agent, {
+            routeProfile: 'tool_agent',
+            blockProviders: ['groq'],
+            requireAgentProbeOk: false,
+        });
+
+        assert.equal(blocked.include, false);
+        assert.ok(blocked.rejectedReasons.includes('provider_blocked'));
+        assert.ok(blocked.score > 0);
     });
 
     it('imports current env BYOK without serializing secrets', () => {
@@ -945,5 +1004,82 @@ describe('model-gateway foundation', () => {
         assert.equal(invalid.status, 'json-invalid');
         assert.equal(invalid.jsonProved, false);
         assert.match(invalid.errors.at(-1) ?? '', /JSON invalido/);
+    });
+
+    it('validates configured BYOK vision probe with a hermetic image attachment', async () => {
+        /** @type {any} */
+        let capturedPayload = null;
+        const baseDeps = {
+            // @ts-expect-error test double keeps only the fields consumed by the probe.
+            readConfiguredByokState: () => ({
+                enabled: true,
+                ready: true,
+                provider: { type: 'openai', apiKey: 'secret' },
+                model: 'model-vision',
+                errors: [],
+                warnings: [],
+                summary: { model: 'model-vision', profile: 'dev', preset: 'openrouter', providerType: 'openai' },
+            }),
+            // @ts-expect-error test double keeps only the fields consumed by the probe.
+            resolveConfiguredByokSessionOverrides: () => ({
+                provider: { type: 'openai', apiKey: 'secret' },
+                model: 'model-vision',
+                modelCapabilities: { supports: { vision: true } },
+                summary: {
+                    model: 'model-vision',
+                    profile: 'dev',
+                    preset: 'openrouter',
+                    providerType: 'openai',
+                    warnings: [],
+                },
+            }),
+            // @ts-expect-error test double calls the callback synchronously with a fake SDK session.
+            withEphemeralSession: async (_config, callback) => {
+                await callback({ session: { id: 'vision-session-object' }, sessionId: 'tmp-vision-probe' });
+            },
+            // @ts-expect-error test double records no actual permission behavior.
+            createPermissionHandler: () => ({}),
+        };
+
+        const valid = await runConfiguredByokVisionProbe({
+            deps: {
+                ...baseDeps,
+                // @ts-expect-error test double emits final content after image interpretation.
+                onSessionEvents: (_session, handlers) => {
+                    handlers['assistant.message']?.({ data: { content: 'VISION_PROBE_OK:red' } });
+                    return () => {};
+                },
+                // @ts-expect-error test double records the payload with attachment.
+                sendSessionAndWait: async (_session, payload) => {
+                    capturedPayload = payload;
+                    return { data: { content: 'VISION_PROBE_OK:red' } };
+                },
+            },
+        });
+        const invalid = await runConfiguredByokVisionProbe({
+            deps: {
+                ...baseDeps,
+                // @ts-expect-error test double emits the wrong color.
+                onSessionEvents: (_session, handlers) => {
+                    handlers['assistant.message']?.({ data: { content: 'VISION_PROBE_OK:blue' } });
+                    return () => {};
+                },
+                // @ts-expect-error test double returns the wrong color.
+                sendSessionAndWait: async () => ({ data: { content: 'VISION_PROBE_OK:blue' } }),
+            },
+        });
+
+        assert.equal(valid.ok, true);
+        assert.equal(valid.status, 'ok');
+        assert.equal(valid.visionProved, true);
+        assert.equal(valid.dominantColor, 'red');
+        assert.equal(valid.attachmentMimeType, BYOK_VISION_PROBE_MIME_TYPE);
+        assert.equal(capturedPayload.attachments[0].type, 'blob');
+        assert.equal(capturedPayload.attachments[0].mimeType, BYOK_VISION_PROBE_MIME_TYPE);
+        assert.equal(capturedPayload.attachments[0].displayName, BYOK_VISION_PROBE_DISPLAY_NAME);
+        assert.equal(invalid.ok, false);
+        assert.equal(invalid.status, 'vision-mismatch');
+        assert.equal(invalid.visionProved, false);
+        assert.match(invalid.errors.at(-1) ?? '', /cor dominante inesperada|não identificou/);
     });
 });

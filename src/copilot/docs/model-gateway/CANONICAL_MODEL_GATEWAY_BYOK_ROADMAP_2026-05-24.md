@@ -14,7 +14,8 @@ Hoje há quatro focos diferentes:
 - `sdk/models/*`: possui registry/selector/stats por `modelId`, ainda sem identidade provider-model.
 - `terminal/byok/*`: classifica falhas e aplica admissão/orçamento terminal.
 - `model-gateway/health/*`: classifica falhas externas e persiste health operacional provider/model.
-- `model-gateway/probes/*`: roda probes descartáveis chat/agent/streaming/JSON, incluindo delta, tools e `ask_user`.
+- `model-gateway/probes/*`: roda probes descartáveis chat/agent/streaming/JSON/vision, incluindo delta, tools,
+  `ask_user` e attachment de imagem hermético.
 
 Isso funciona, mas cria uma ambiguidade arquitetural: terminal e SDK começam a possuir fatos de provider/model que deveriam
 pertencer a um domínio próprio.
@@ -418,7 +419,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Expor `/byok probe streaming` e `/byok probe json` sem degradar health de chat/agente.
 - [x] Criar evento e métricas canônicas para conclusão de probes.
 - [x] Emitir `model_gateway:probe:completed` pelo `/byok probe` via EventBus.
-- [ ] Adicionar probe de vision quando houver fixtures seguras.
+- [x] Adicionar probe de vision com fixture PNG inline segura e validação comportamental de cor.
 - [x] Registrar cada probe em health e observability.
 - [x] Diferenciar `catalog says` de `runtime proved`.
 
@@ -434,10 +435,10 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 
 - [x] Definir task profiles: `cheap_chat`, `code`, `repo_agent`, `tool_agent`, `json_extraction`, `vision`,
    `deep_reasoning`, `local_private`.
-- [ ] Criar scoring por capability obrigatória.
-- [ ] Incluir custo, latência, contexto, confidence, health, allow/block provider.
-- [ ] Criar fallback auditável.
-- [ ] Explicar decisão ao operador com candidatos recusados e razão.
+- [x] Criar scoring por capability obrigatória.
+- [x] Incluir custo, latência, contexto, confidence, health, allow/block provider.
+- [x] Criar fallback auditável.
+- [x] Explicar decisão ao operador com candidatos recusados e razão.
 
 ### Faixa H — Terminal UX
 
@@ -685,3 +686,34 @@ Próximo corte recomendado:
    (`KiloGatewayCatalogImporter`) e primeiro importer mínimo (`OpenAIModelsImporter`) para provar merge por campo.
 5. Criar projection canônica que enriquece `ModelRecord` atual sem quebrar `/byok models` nem `onListModels()`.
 6. Adicionar comando/serviço interno de refresh em dry-run, mostrando diff sem alterar seleção ativa.
+
+## 9. Continuidade 2026-05-24 — fechamento da camada E-G antes de K
+
+Pedido novo: antes de avançar para Faixa K e catálogo profundo, concluir a camada atual até J e deixar o caminho
+funcional para lives com `llm-b` usando probes.
+
+Implementado neste corte:
+
+- Faixa E concluída com `runConfiguredByokVisionProbe`.
+- O probe vision usa fixture PNG inline, hermética e redigível, enviada como `blobAttachment` pelo mesmo caminho
+  `sendSessionAndWait` usado pelo runtime.
+- `/byok probe vision` foi exposto no terminal, registra health genérico por `probeKind=vision` e emite
+  `model_gateway:probe:completed`.
+- Faixa G ganhou `scoreGatewayModelCandidate()` e `routeGatewayModels()`, com scoring determinístico por capabilities
+  obrigatórias, contexto, preço, confidence, health, allow/block provider, latência opcional, fallbackChain e razões de
+  rejeição.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+- PASS `npm run typecheck:strict:src.copilot`
+- PASS `npm run lint:copilot`
+- FAIL conhecido `npm run test:copilot`: 8 assertions fora deste corte em lifecycle/hooks/event adapters/mocks. Próxima
+  fatia deve estabilizar esses contratos globais antes de marcar J como completo ou iniciar lives `llm-b`.
+
+Próxima fatia antes de K:
+
+1. Corrigir os 8 bloqueios de `npm run test:copilot` e separar contratos realmente obsoletos de regressões de runtime.
+2. Conectar `routeGatewayModels()` a uma projection/UX inicial de `/models route <profile>` ou `/byok recommend`.
+3. Criar usage ledger mínimo da Faixa I para registrar decisão/routeProfile/fallback/failure sem tokens sensíveis.
+4. Completar Faixa H/J e só então rodar lives `terminal:llm-b:live-test` com probes.

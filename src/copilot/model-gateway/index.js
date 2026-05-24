@@ -73,7 +73,9 @@ export {
     listModelGatewayTaskProfiles,
     MODEL_GATEWAY_TASK_PROFILES,
     readGatewayModelHealth,
+    routeGatewayModels,
     resolveModelGatewayTaskProfile,
+    scoreGatewayModelCandidate,
 } from './routing/index.js';
 export { buildModelGatewayOnListModelsHandler } from './session/on-list-models.js';
 export { toCopilotModelInfo, toCopilotModelInfoList } from './session/copilot-model-projection.js';
@@ -97,10 +99,13 @@ export {
     BYOK_AGENT_PROBE_READ_PATH,
     BYOK_AGENT_PROBE_READ_TOOL,
     BYOK_AGENT_PROBE_TOOL,
+    BYOK_VISION_PROBE_DISPLAY_NAME,
+    BYOK_VISION_PROBE_MIME_TYPE,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
     runConfiguredByokJsonProbe,
     runConfiguredByokStreamingProbe,
+    runConfiguredByokVisionProbe,
 } from './probes/index.js';
 export {
     MODEL_GATEWAY_EVENTS,

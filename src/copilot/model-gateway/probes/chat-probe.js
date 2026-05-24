@@ -66,6 +66,7 @@ function defaultAdmission(summary, mode, prompt) {
  *     model?: string | null;
  *     timeoutMs?: number;
  *     prompt?: string;
+ *     attachments?: NonNullable<import('@github/copilot-sdk').MessageOptions['attachments']>;
  *     deps?: {
  *         readConfiguredByokState?: typeof readConfiguredByokState;
  *         resolveConfiguredByokSessionOverrides?: typeof resolveConfiguredByokSessionOverrides;
@@ -218,7 +219,11 @@ export async function runConfiguredByokChatProbe(options = {}) {
                     },
                 });
                 try {
-                    const reply = await sendAndWait(session, { prompt }, timeoutMs);
+                    const payload = {
+                        prompt,
+                        ...(options.attachments ? { attachments: options.attachments } : {}),
+                    };
+                    const reply = await sendAndWait(session, payload, timeoutMs);
                     const content = typeof reply?.data?.content === 'string' ? reply.data.content : '';
                     if (content) finalContent = content;
                 } finally {

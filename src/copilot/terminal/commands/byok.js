@@ -28,6 +28,7 @@ import {
     runConfiguredByokChatProbe,
     runConfiguredByokJsonProbe,
     runConfiguredByokStreamingProbe,
+    runConfiguredByokVisionProbe,
 } from '#copilot/model-gateway';
 
 import { discoverConfiguredByokModelsFromEnv, readConfiguredByokProfilesFromEnv } from '#copilot/config';
@@ -78,8 +79,8 @@ const BYOK_RUNTIME_SELECTOR_ENV_KEYS = Object.freeze([
  */
 
 /**
- * @typedef {Awaited<ReturnType<typeof runConfiguredByokChatProbe>> | Awaited<ReturnType<typeof runConfiguredByokAgentProbe>> | Awaited<ReturnType<typeof runConfiguredByokStreamingProbe>> | Awaited<ReturnType<typeof runConfiguredByokJsonProbe>>} ByokProbeResult
- * @typedef {'chat' | 'agent' | 'streaming' | 'json'} ByokProbeMode
+ * @typedef {Awaited<ReturnType<typeof runConfiguredByokChatProbe>> | Awaited<ReturnType<typeof runConfiguredByokAgentProbe>> | Awaited<ReturnType<typeof runConfiguredByokStreamingProbe>> | Awaited<ReturnType<typeof runConfiguredByokJsonProbe>> | Awaited<ReturnType<typeof runConfiguredByokVisionProbe>>} ByokProbeResult
+ * @typedef {'chat' | 'agent' | 'streaming' | 'json' | 'vision'} ByokProbeMode
  */
 
 /**
@@ -1221,7 +1222,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok health [clear] | /byok probe [chat|agent|streaming|json] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1397,6 +1398,14 @@ function renderByokProbeResult(println, mode, probe, options = {}) {
             `${indent}agente:    toolCalls=${Number(Reflect.get(probe, 'toolCallCount') ?? 0)} · marker=${Number(Reflect.get(probe, 'markerToolCallCount') ?? 0)} · read=${Number(Reflect.get(probe, 'readToolCallCount') ?? 0)} · ask=${Number(Reflect.get(probe, 'userInputRequestCount') ?? 0)} · answer=${Number(Reflect.get(probe, 'userInputAnswerCount') ?? 0)}`,
         );
     }
+    if (mode === 'vision') {
+        const dominantColor = Reflect.get(probe, 'dominantColor');
+        const attachmentMimeType = Reflect.get(probe, 'attachmentMimeType');
+        const attachmentBytes = Reflect.get(probe, 'attachmentBytes');
+        println(
+            `${indent}vision:    proved=${yesNo(Reflect.get(probe, 'visionProved') === true)} · color=${valueOrDash(typeof dominantColor === 'string' ? dominantColor : null)} · fixture=${valueOrDash(typeof attachmentMimeType === 'string' ? attachmentMimeType : null)}${typeof attachmentBytes === 'number' ? `/${attachmentBytes} bytes` : ''}`,
+        );
+    }
     if (options.showSession !== false && probe.sessionId) {
         println(`${indent}\x1b[90msessão temporária=${probe.sessionId}\x1b[0m`);
     }
@@ -1433,6 +1442,8 @@ async function runByokProbe(mode, selection, eventBus = null) {
               ? runConfiguredByokStreamingProbe
               : mode === 'json'
                 ? runConfiguredByokJsonProbe
+                : mode === 'vision'
+                  ? runConfiguredByokVisionProbe
                 : runConfiguredByokChatProbe;
     const probe = await probeRunner({
         env: selection.env,
@@ -1729,14 +1740,16 @@ export async function cmdByok({ println, eventBus = null }, arg) {
               ? 'streaming'
               : /^(json|structured)$/iu.test(rest[0] ?? '')
                 ? 'json'
+                : /^(vision|image|imagem|vlm)$/iu.test(rest[0] ?? '')
+                  ? 'vision'
                 : 'chat';
-        const explicitMode = /^(chat|canary|agent|runtime|full|streaming|stream|delta|deltas|json|structured)$/iu.test(
+        const explicitMode = /^(chat|canary|agent|runtime|full|streaming|stream|delta|deltas|json|structured|vision|image|imagem|vlm)$/iu.test(
             rest[0] ?? '',
         );
         const selection = buildByokProbeSelection(explicitMode ? rest.slice(1) : rest);
         println(`\n  \x1b[36mBYOK ${mode} probe\x1b[0m`);
         println(
-            `  \x1b[90mEscopo: sessão SDK descartável; não troca o dialog loop nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : mode === 'agent' ? ' Agent exige tools representativas do terminal + ask_user com resposta sintética.' : mode === 'streaming' ? ' Streaming exige assistant.message_delta real; não degrada health de chat.' : ' JSON exige payload parseável; não degrada health de chat.'}${selection.profile ? ` profile=${selection.profile}` : ''}${selection.model ? ` model=${selection.model}` : ''}\x1b[0m`,
+            `  \x1b[90mEscopo: sessão SDK descartável; não troca o dialog loop nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : mode === 'agent' ? ' Agent exige tools representativas do terminal + ask_user com resposta sintética.' : mode === 'streaming' ? ' Streaming exige assistant.message_delta real; não degrada health de chat.' : mode === 'json' ? ' JSON exige payload parseável; não degrada health de chat.' : ' Vision anexa fixture PNG hermética e exige identificação visual; não degrada health de chat.'}${selection.profile ? ` profile=${selection.profile}` : ''}${selection.model ? ` model=${selection.model}` : ''}\x1b[0m`,
         );
         const { probe, providerAttempted } = await runByokProbe(mode, selection, eventBus);
         renderByokProbeResult(println, mode, probe, { providerAttempted });
@@ -1747,6 +1760,8 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                   ? '  \x1b[90mStreaming probe separa resposta final de delta incremental. Falha no delta não implica que o chat seja inutilizável, mas a UX live ficaria cega.\x1b[0m\n'
                   : mode === 'json'
                     ? '  \x1b[90mJSON probe confirma saída estruturada parseável. Use junto com agent probe antes de promover modelo para fluxos automatizados.\x1b[0m\n'
+                    : mode === 'vision'
+                      ? '  \x1b[90mVision probe confirma que o provider aceitou attachment de imagem e interpretou a fixture. Use junto com agent/JSON quando o fluxo precisar automação multimodal.\x1b[0m\n'
                     : '  \x1b[90mCatálogo mostra oferta; chat probe confirma conversa canária. Para validar runtime agente, rode /byok probe agent antes do live.\x1b[0m\n',
         );
         return;

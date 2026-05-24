@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildProbeCompletedEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, rename, setTerminalModelProjection, writeFile } =
+const { buildProbeCompletedEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, rename, setTerminalModelProjection, writeFile } =
     vi.hoisted(() => ({
         buildProbeCompletedEvent: vi.fn((input) => ({
             type: 'model_gateway:probe:completed',
@@ -40,6 +40,7 @@ const { buildProbeCompletedEvent, chmod, classifyByokProviderFailure, clearByokP
         runConfiguredByokChatProbe: vi.fn(),
         runConfiguredByokJsonProbe: vi.fn(),
         runConfiguredByokStreamingProbe: vi.fn(),
+        runConfiguredByokVisionProbe: vi.fn(),
         readByokProviderHealthState: vi.fn(() => ({
             enabled: false,
             path: null,
@@ -113,6 +114,7 @@ vi.mock('#copilot/model-gateway', () => ({
     runConfiguredByokAgentProbe: runConfiguredByokAgentProbe,
     runConfiguredByokJsonProbe: runConfiguredByokJsonProbe,
     runConfiguredByokStreamingProbe: runConfiguredByokStreamingProbe,
+    runConfiguredByokVisionProbe: runConfiguredByokVisionProbe,
 }));
 
 const { cmdByok } = await import('../../../../src/copilot/terminal/commands/byok.js');
@@ -199,6 +201,7 @@ describe('terminal /byok command', () => {
         runConfiguredByokAgentProbe.mockReset();
         runConfiguredByokJsonProbe.mockReset();
         runConfiguredByokStreamingProbe.mockReset();
+        runConfiguredByokVisionProbe.mockReset();
         readByokProviderHealthState.mockReset();
         readByokProviderHealthState.mockReturnValue({
             enabled: false,
@@ -926,6 +929,61 @@ describe('terminal /byok command', () => {
         );
         expect(ctx.output()).toContain('BYOK json probe');
         expect(ctx.output()).toContain('JSON probe confirma saída estruturada');
+    });
+
+    it('roda probe vision com fixture de imagem sem degradar chat health', async () => {
+        mockProjection();
+        runConfiguredByokVisionProbe.mockResolvedValue({
+            ok: true,
+            status: 'ok',
+            elapsedMs: 66,
+            model: 'vision-model',
+            profile: 'kilo',
+            preset: 'kilo-code',
+            providerType: 'openai',
+            deltaCount: 1,
+            deltaChars: 18,
+            finalChars: 19,
+            finalContent: 'VISION_PROBE_OK:red',
+            observedFinalEvent: true,
+            sessionId: 'tmp-vision',
+            errors: [],
+            warnings: [],
+            visionProved: true,
+            dominantColor: 'red',
+            attachmentMimeType: 'image/png',
+            attachmentBytes: 68,
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'probe vision profile:kilo model:vision-model timeout:8000');
+
+        expect(runConfiguredByokVisionProbe).toHaveBeenCalledWith(
+            expect.objectContaining({
+                env: expect.objectContaining({ COPILOT_BYOK_PROFILE: 'kilo' }),
+                model: 'vision-model',
+                timeoutMs: 8000,
+                deps: expect.objectContaining({
+                    evaluateAdmission: expect.any(Function),
+                    classifyProviderFailure: expect.any(Function),
+                }),
+            }),
+        );
+        expect(recordByokProviderModelCallSuccess).not.toHaveBeenCalled();
+        expect(recordByokProviderModelAgentProbeSuccess).not.toHaveBeenCalled();
+        expect(recordByokProviderModelProbeResult).toHaveBeenCalledWith(
+            expect.objectContaining({
+                routeProfile: 'kilo',
+                providerId: 'kilo-code',
+                providerModel: 'vision-model',
+                probeKind: 'vision',
+                status: 'ok',
+                ok: true,
+            }),
+        );
+        expect(ctx.output()).toContain('BYOK vision probe');
+        expect(ctx.output()).toContain('fixture=image/png/68 bytes');
+        expect(ctx.output()).toContain('Vision probe confirma');
     });
 
     it('lista providers disponíveis com comandos operacionais redigidos', async () => {

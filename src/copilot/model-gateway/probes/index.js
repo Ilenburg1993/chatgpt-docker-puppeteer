@@ -19,3 +19,8 @@ export {
 } from './agent-probe.js';
 export { runConfiguredByokJsonProbe } from './json-probe.js';
 export { runConfiguredByokStreamingProbe } from './streaming-probe.js';
+export {
+    BYOK_VISION_PROBE_DISPLAY_NAME,
+    BYOK_VISION_PROBE_MIME_TYPE,
+    runConfiguredByokVisionProbe,
+} from './vision-probe.js';
