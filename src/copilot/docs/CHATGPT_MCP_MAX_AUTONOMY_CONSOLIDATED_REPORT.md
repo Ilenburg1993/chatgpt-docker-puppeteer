@@ -3389,3 +3389,83 @@ Proximo passo tecnico:
 
 1. Criar diff read-only entre actual edge audit e desired edge policy plan.
 2. Continuar evitando mutacao automatica ate existir backup/diff/rollback.
+
+### 18.2. Continuidade apos correcao do token Cloudflare
+
+Depois que o acesso do token foi corrigido, a auditoria remota deixou de ser parcial no plano DNS.
+
+Resultado observado:
+
+1. `make copilot-mcp-remote-audit`
+   - `ok=true`;
+   - tunnel `workspace-mcp-dev` healthy;
+   - 4 conexoes ativas;
+   - ingress canonico `mcp.aurelin.org -> http://127.0.0.1:3333`;
+   - DNS audit `checked=true`;
+   - CNAME `mcp.aurelin.org` aponta para `0e81ae66-b74d-44db-87ba-73102826ffdf.cfargotunnel.com`;
+   - `proxied=true`;
+   - nenhum warning.
+2. `make copilot-mcp-edge-audit`
+   - `edgeAuditable=true`;
+   - zona resolvida;
+   - `rulesets=[]`;
+   - nenhum critical;
+   - warnings por ausencia de regras explicitas de cache bypass e rate limiting.
+3. `make copilot-mcp-edge-policy-plan`
+   - continua `mode=plan-only`, `appliesChanges=false`.
+4. `make copilot-mcp-status`
+   - `ready=true`.
+
+Mudancas implementadas nesta continuidade:
+
+1. Novo modulo `src/copilot/mcp/cloudflare/edge-policy-diff.js`.
+2. Nova tool MCP `mcp_cloudflare_edge_policy_diff`.
+3. Novo script `npm run copilot:mcp:cloudflare:edge-policy-diff`.
+4. Novo target `make copilot-mcp-edge-policy-diff`.
+5. Registry/capabilities/smoke atualizados.
+6. README MCP atualizado.
+7. Teste unitario `test_cloudflare_edge_policy_diff.spec.js`.
+
+Contrato da nova tool:
+
+1. `mode="plan-only-diff"`.
+2. `appliesChanges=false`.
+3. Compara `actual` da edge audit com `desired` da edge policy plan.
+4. Classifica gaps:
+   - cache bypass ausente;
+   - rate limit de `/oauth/token` ausente;
+   - rate limit anonimo de `/mcp` ausente;
+   - WAF/challenge/block conflitante;
+   - transform de header sensivel conflitante;
+   - permission gaps.
+5. Retorna `mutationReady` apenas quando a edge e auditavel e nao existem conflitos criticos.
+
+Proximo passo tecnico:
+
+1. Preparar backup/export de rulesets antes de qualquer mutacao real.
+2. Manter qualquer aplicador futuro atras de backup/diff/rollback.
+
+Validacao final da continuidade:
+
+1. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_cloudflare_edge_policy_diff.spec.js tests/unit/copilot/mcp/test_cloudflare_edge_policy_plan.spec.js tests/unit/copilot/mcp/test_cloudflare_edge_audit.spec.js tests/unit/copilot/mcp/test_mcp_registry.spec.js --reporter=dot`
+   - passou com 11/11.
+2. `npm run typecheck:strict:src.copilot -- --pretty false`
+   - passou.
+3. `make copilot-mcp-edge-policy-diff`
+   - passou.
+   - `mutationReady=true`.
+   - 3 diffs nao criticos:
+     - cache bypass ausente;
+     - rate limit de `/oauth/token` ausente;
+     - rate limit anonimo de `/mcp` ausente.
+4. `npm run lint:copilot -- --quiet`
+   - passou.
+5. `npm run test:copilot:unit`
+   - passou com 3104/3104, sem warnings/errors.
+6. `make copilot-mcp-restart`
+   - passou.
+7. `make copilot-mcp-smoke-refresh`
+   - passou com 81/81 tools remotas e `toolsMatchLocalRegistry=true`.
+   - `mcp_cloudflare_edge_policy_diff` apareceu no endpoint publico.
+8. `make copilot-mcp-status`
+   - passou com `ready=true`, OAuth, tunnel e MCP HTTP vivos.

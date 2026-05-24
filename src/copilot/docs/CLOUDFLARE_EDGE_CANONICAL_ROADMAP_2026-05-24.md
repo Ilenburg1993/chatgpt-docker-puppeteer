@@ -386,7 +386,7 @@ Status: futuro.
 Subfases:
 
 1. [x] Criar export JSON de desired edge policy em modo plan-only.
-2. [ ] Criar diff entre desired e actual rulesets.
+2. [x] Criar diff entre desired e actual rulesets em modo plan-only.
 3. [ ] Criar plano de mudanca sem aplicar.
 4. [ ] Criar aplicador com backup previo.
 5. [ ] Criar rollback automatizado.
@@ -404,6 +404,18 @@ Continuidade pos-push:
 5. [x] Rodar validadores completos novamente.
 6. [x] Reiniciar/smoke remoto para publicar a nova tool.
 7. [x] Confirmar smoke remoto com 80/80 tools.
+
+Continuidade apos correcao de token:
+
+1. [x] Reexecutar auditoria remota com DNS Read ativo.
+2. [x] Confirmar CNAME `mcp.aurelin.org` proxied apontando para o tunnel esperado.
+3. [x] Confirmar `make copilot-mcp-remote-audit` sem warnings.
+4. [x] Criar `mcp_cloudflare_edge_policy_diff`.
+5. [x] Criar `npm run copilot:mcp:cloudflare:edge-policy-diff`.
+6. [x] Criar `make copilot-mcp-edge-policy-diff`.
+7. [x] Rodar validadores completos novamente.
+8. [x] Reiniciar/smoke remoto para publicar a nova tool.
+9. [x] Confirmar smoke remoto com 81/81 tools.
 
 ## 7. Criterios de pronto
 
@@ -424,6 +436,7 @@ Este turno Cloudflare sera considerado pronto quando:
 make copilot-mcp-status
 make copilot-mcp-remote-audit
 make copilot-mcp-edge-audit
+make copilot-mcp-edge-policy-diff
 make copilot-mcp-edge-policy-plan
 make copilot-mcp-smoke-refresh
 ```
