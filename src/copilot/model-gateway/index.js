@@ -70,7 +70,10 @@ export {
     isGatewayModelAgentProbeHealthFailed,
     isGatewayModelAgentProbeVerified,
     isGatewayModelChatHealthFailed,
+    listModelGatewayTaskProfiles,
+    MODEL_GATEWAY_TASK_PROFILES,
     readGatewayModelHealth,
+    resolveModelGatewayTaskProfile,
 } from './routing/index.js';
 export { buildModelGatewayOnListModelsHandler } from './session/on-list-models.js';
 export { toCopilotModelInfo, toCopilotModelInfoList } from './session/copilot-model-projection.js';

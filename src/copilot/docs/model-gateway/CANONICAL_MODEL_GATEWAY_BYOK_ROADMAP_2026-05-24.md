@@ -206,7 +206,7 @@ src/copilot/model-gateway/
 
 ### Faixa G — Policy engine
 
-- [ ] Definir task profiles: `cheap_chat`, `code`, `repo_agent`, `tool_agent`, `json_extraction`, `vision`,
+- [x] Definir task profiles: `cheap_chat`, `code`, `repo_agent`, `tool_agent`, `json_extraction`, `vision`,
    `deep_reasoning`, `local_private`.
 - [ ] Criar scoring por capability obrigatória.
 - [ ] Incluir custo, latência, contexto, confidence, health, allow/block provider.

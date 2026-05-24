@@ -12,4 +12,8 @@ export {
     isGatewayModelChatHealthFailed,
     readGatewayModelHealth,
 } from './health-routing.js';
-
+export {
+    MODEL_GATEWAY_TASK_PROFILES,
+    listModelGatewayTaskProfiles,
+    resolveModelGatewayTaskProfile,
+} from './task-profiles.js';

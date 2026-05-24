@@ -11,7 +11,9 @@ import { afterEach, describe, it } from 'vitest';
 
 import {
     JsonModelGatewayRegistryStore,
+    listModelGatewayTaskProfiles,
     ModelGatewayRegistry,
+    MODEL_GATEWAY_TASK_PROFILES,
     anthropicAdapter,
     buildEnvByokModelGatewaySnapshot,
     buildModelGatewayOperatorProjection,
@@ -35,6 +37,7 @@ import {
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
     resolveModelGatewayProviderAdapter,
+    resolveModelGatewayTaskProfile,
     resetByokProviderHealthForTests,
     BYOK_AGENT_PROBE_ANSWER,
     BYOK_AGENT_PROBE_QUESTION,
@@ -192,6 +195,25 @@ describe('model-gateway foundation', () => {
             }).reason,
             'chat_health_failed',
         );
+    });
+
+    it('defines canonical task profiles before provider-specific scoring', () => {
+        assert.deepEqual(
+            listModelGatewayTaskProfiles().map((profile) => profile.id),
+            [
+                'cheap_chat',
+                'code',
+                'repo_agent',
+                'tool_agent',
+                'json_extraction',
+                'vision',
+                'deep_reasoning',
+                'local_private',
+            ],
+        );
+        assert.equal(resolveModelGatewayTaskProfile('repo-agent')?.requireAgentProbeOk, true);
+        assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.requires, ['text', 'streaming', 'vision']);
+        assert.equal(resolveModelGatewayTaskProfile('missing'), null);
     });
 
     it('imports current env BYOK without serializing secrets', () => {
