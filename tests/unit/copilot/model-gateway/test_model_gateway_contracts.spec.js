@@ -12,12 +12,14 @@ import { describe, it } from 'vitest';
 import {
     JsonModelGatewayRegistryStore,
     ModelGatewayRegistry,
+    anthropicAdapter,
     buildEnvByokModelGatewaySnapshot,
     buildModelGatewayOperatorProjection,
     buildProviderModelId,
     buildRegistrySnapshotEvent,
     createEnvSecretRegistry,
     buildModelGatewayOnListModelsHandler,
+    geminiAdapter,
     ollamaAdapter,
     openAICompatibleAdapter,
     openRouterAdapter,
@@ -258,6 +260,66 @@ describe('model-gateway foundation', () => {
         assert.equal(overrides.gateway?.providerFamily, 'ollama');
         assert.equal(overrides.gateway?.runtimeKind, 'local');
         assert.equal(overrides.gateway?.localPrivate, true);
+    });
+
+    it('projects Gemini through its OpenAI-compatible endpoint while preserving provider family metadata', () => {
+        const secret = 'gemini-secret-that-must-not-leak';
+        const env = {
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_PRESET: 'gemini',
+            COPILOT_BYOK_MODEL: 'gemini-2.5-flash',
+            GEMINI_API_KEY: secret,
+        };
+        const snapshot = buildEnvByokModelGatewaySnapshot(env);
+        const provider = snapshot.providers.find((item) => item.id === 'gemini');
+        const model = snapshot.models.find((item) => item.providerModel === 'gemini-2.5-flash');
+        assert.ok(provider);
+        assert.ok(model);
+        assert.equal(geminiAdapter.canHandle(provider), true);
+
+        const overrides = geminiAdapter.toCopilotSessionOverrides({
+            provider,
+            model,
+            secrets: createEnvSecretRegistry({ env }),
+        });
+
+        assert.equal(overrides.model, 'gemini-2.5-flash');
+        assert.equal(overrides.provider.type, 'openai');
+        assert.equal(overrides.provider.baseUrl, 'https://generativelanguage.googleapis.com/v1beta/openai');
+        assert.equal(overrides.provider.apiKey, secret);
+        assert.equal(overrides.gateway?.providerFamily, 'gemini');
+        assert.equal(overrides.gateway?.openAiCompatibleEndpoint, true);
+    });
+
+    it('projects Anthropic as a native SDK provider type without wireApi', () => {
+        const secret = 'sk-ant-secret-that-must-not-leak';
+        const provider = {
+            id: 'anthropic',
+            providerType: 'anthropic',
+            baseUrl: 'https://api.anthropic.com',
+            auth: { apiKeyRefs: ['ANTHROPIC_API_KEY'] },
+        };
+        const model = {
+            providerId: 'anthropic',
+            providerModel: 'claude-sonnet-4.5',
+            capabilities: { reasoningEffort: true, vision: true },
+            limits: { contextWindowTokens: 200_000 },
+        };
+        assert.equal(anthropicAdapter.canHandle(provider), true);
+
+        const overrides = anthropicAdapter.toCopilotSessionOverrides({
+            provider,
+            model,
+            secrets: createEnvSecretRegistry({ env: { ANTHROPIC_API_KEY: secret } }),
+        });
+
+        assert.equal(overrides.model, 'claude-sonnet-4.5');
+        assert.equal(overrides.provider.type, 'anthropic');
+        assert.equal(overrides.provider.baseUrl, 'https://api.anthropic.com');
+        assert.equal(overrides.provider.apiKey, secret);
+        assert.equal(overrides.provider.wireApi, undefined);
+        assert.equal(overrides.gateway?.providerFamily, 'anthropic');
+        assert.equal(overrides.gateway?.openAiCompatibleEndpoint, false);
     });
 
     it('builds an SDK onListModels handler from gateway records without exposing secrets', async () => {

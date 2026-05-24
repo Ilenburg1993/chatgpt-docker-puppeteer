@@ -6,6 +6,8 @@
  */
 
 export { OpenAICompatibleAdapter, openAICompatibleAdapter } from './openai-compatible-adapter.js';
+export { ANTHROPIC_BASE_URL, ANTHROPIC_PROVIDER_ID, AnthropicAdapter, anthropicAdapter } from './anthropic-adapter.js';
+export { GEMINI_OPENAI_BASE_URL, GEMINI_PROVIDER_ID, GeminiAdapter, geminiAdapter } from './gemini-adapter.js';
 export {
     OLLAMA_CLOUD_BASE_URL,
     OLLAMA_LOCAL_BASE_URL,

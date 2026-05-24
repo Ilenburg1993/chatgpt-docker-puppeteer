@@ -37,6 +37,12 @@ export {
 } from './secrets/env-secret-registry.js';
 export { redactSecretRecord, redactSecretText } from './secrets/redaction.js';
 export {
+    ANTHROPIC_BASE_URL,
+    ANTHROPIC_PROVIDER_ID,
+    AnthropicAdapter,
+    GEMINI_OPENAI_BASE_URL,
+    GEMINI_PROVIDER_ID,
+    GeminiAdapter,
     OPENROUTER_BASE_URL,
     OPENROUTER_DEFAULT_HEADERS,
     OPENROUTER_PROVIDER_ID,
@@ -44,6 +50,8 @@ export {
     OLLAMA_LOCAL_BASE_URL,
     OLLAMA_PROVIDER_IDS,
     OllamaAdapter,
+    anthropicAdapter,
+    geminiAdapter,
     OpenAICompatibleAdapter,
     OpenRouterAdapter,
     ollamaAdapter,
