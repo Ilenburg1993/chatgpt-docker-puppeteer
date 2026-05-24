@@ -8,6 +8,7 @@
 import { MODEL_GATEWAY_SCHEMA_VERSION } from '../contracts/records.js';
 import { ModelGatewayRegistry } from './model-registry.js';
 import { importConfiguredByokFromEnv } from './env-byok-compat-importer.js';
+import { JsonModelGatewayRegistryStore } from './json-registry-store.js';
 
 /**
  * @param {Record<string, string | undefined>} [env]
@@ -44,3 +45,19 @@ export function buildEnvByokModelGatewaySnapshot(env = process.env) {
     };
 }
 
+/**
+ * Builds the current env compat snapshot and persists it into the JSON registry store.
+ *
+ * @param {Record<string, string | undefined>} [env]
+ * @param {{ filePath?: string }} [options]
+ * @returns {Promise<ReturnType<typeof buildEnvByokModelGatewaySnapshot> & { registryPath: string }>}
+ */
+export async function persistEnvByokModelGatewaySnapshot(env = process.env, options = {}) {
+    const snapshot = buildEnvByokModelGatewaySnapshot(env);
+    const store = new JsonModelGatewayRegistryStore(options);
+    await store.writeSnapshot(snapshot);
+    return {
+        ...snapshot,
+        registryPath: store.filePath,
+    };
+}

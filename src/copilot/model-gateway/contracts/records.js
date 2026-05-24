@@ -146,6 +146,7 @@ export function normalizeVerification(input = {}) {
  * @param {boolean} [input.configured]
  * @param {string[]} [input.secretRefs]
  * @param {Record<string, string>} [input.headers]
+ * @param {Record<string, unknown>} [input.auth]
  * @param {object} [input.provenance]
  * @returns {object}
  */
@@ -163,6 +164,7 @@ export function createProviderRecord(input) {
         enabled: input.enabled !== false,
         configured: input.configured === true,
         secretRefs: Array.isArray(input.secretRefs) ? [...new Set(input.secretRefs.map(optionalString).filter((item) => item !== null))] : [],
+        auth: isRecord(input.auth) ? { ...input.auth } : {},
         headers: isRecord(input.headers) ? Object.fromEntries(Object.keys(input.headers).map((key) => [key, '[redacted]'])) : {},
         createdAt: now,
         updatedAt: now,

@@ -10,6 +10,7 @@
 
 import { readConfiguredByokModelsFromEnv, readConfiguredByokState } from '#copilot/sdk/session';
 import { buildProviderModelId, createModelRecord, createProviderRecord, normalizeGatewayIdPart } from '../contracts/records.js';
+import { createEnvSecretRegistry } from '../secrets/env-secret-registry.js';
 
 /**
  * @param {ReturnType<typeof readConfiguredByokState>} state
@@ -17,6 +18,20 @@ import { buildProviderModelId, createModelRecord, createProviderRecord, normaliz
  */
 function resolveProviderId(state) {
     return normalizeGatewayIdPart(state.summary.preset ?? state.summary.providerType ?? 'byok-configured') || 'byok-configured';
+}
+
+/**
+ * @param {string[]} refs
+ * @returns {{ apiKeyRefs: string[]; bearerTokenRefs: string[]; headersConfigured: boolean }}
+ */
+function classifySecretRefs(refs) {
+    const bearerTokenRefs = refs.filter((ref) => /BEARER|KILO/u.test(ref));
+    const apiKeyRefs = refs.filter((ref) => !bearerTokenRefs.includes(ref));
+    return {
+        apiKeyRefs,
+        bearerTokenRefs,
+        headersConfigured: false,
+    };
 }
 
 /**
@@ -92,6 +107,9 @@ export function importConfiguredByokFromEnv(env = process.env) {
     }
 
     const providerId = resolveProviderId(state);
+    const configuredSecretRefs = createEnvSecretRegistry({ env })
+        .listConfigured()
+        .map((entry) => entry.ref);
     const provider = createProviderRecord({
         id: providerId,
         displayName: state.summary.preset ?? state.summary.providerType ?? providerId,
@@ -100,11 +118,8 @@ export function importConfiguredByokFromEnv(env = process.env) {
         wireApi: state.summary.wireApi ?? undefined,
         enabled: true,
         configured: state.ready,
-        secretRefs: [
-            ...(state.summary.auth.apiKeyConfigured ? ['apiKey'] : []),
-            ...(state.summary.auth.bearerTokenConfigured ? ['bearerToken'] : []),
-            ...(state.summary.auth.headersConfigured ? ['headers'] : []),
-        ],
+        secretRefs: configuredSecretRefs,
+        auth: classifySecretRefs(configuredSecretRefs),
         headers: state.provider?.headers ?? {},
         provenance: {
             source: 'env_compat',

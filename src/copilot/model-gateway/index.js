@@ -23,7 +23,20 @@ export {
 } from './contracts/records.js';
 export { ModelGatewayRegistry } from './registry/model-registry.js';
 export { importConfiguredByokFromEnv } from './registry/env-byok-compat-importer.js';
-export { buildEnvByokModelGatewaySnapshot } from './registry/snapshot.js';
+export {
+    DEFAULT_MODEL_GATEWAY_REGISTRY_PATH,
+    JsonModelGatewayRegistryStore,
+    normalizeStoredRegistrySnapshot,
+} from './registry/json-registry-store.js';
+export { buildModelGatewayOperatorProjection } from './registry/projection.js';
+export { buildEnvByokModelGatewaySnapshot, persistEnvByokModelGatewaySnapshot } from './registry/snapshot.js';
+export {
+    DEFAULT_MODEL_GATEWAY_SECRET_ENV_KEYS,
+    EnvSecretRegistry,
+    createEnvSecretRegistry,
+} from './secrets/env-secret-registry.js';
+export { redactSecretRecord, redactSecretText } from './secrets/redaction.js';
+export { OpenAICompatibleAdapter, openAICompatibleAdapter } from './providers/index.js';
 export { toCopilotModelInfo, toCopilotModelInfoList } from './session/copilot-model-projection.js';
 export {
     MODEL_GATEWAY_EVENTS,
@@ -36,4 +49,3 @@ export {
     buildRegistrySnapshotEvent,
     projectModelGatewayMetrics,
 } from './observability/events.js';
-

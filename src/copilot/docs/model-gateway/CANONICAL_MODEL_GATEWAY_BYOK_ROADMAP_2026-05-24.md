@@ -150,24 +150,28 @@ src/copilot/model-gateway/
 ### Faixa B — Registry e projections operacionais
 
 - [x] Expor snapshot do gateway no `/byok` sem trocar o fluxo legado de decisão.
-- [ ] Criar store JSON em `data/copilot/model-gateway/registry.json`.
-- [ ] Persistir records com `schemaVersion`.
-- [ ] Criar `RegistryProjection` para operador.
+- [x] Criar store JSON em `data/copilot/model-gateway/registry.json`.
+- [x] Persistir records com `schemaVersion`.
+- [x] Criar `RegistryProjection` para operador.
 - [ ] Trocar `/byok models` para ler projection do gateway, mantendo fallback legado.
 - [ ] Fazer `onListModels()` aceitar projection do gateway sem `sdk/session` importar gateway.
 - [ ] Adicionar snapshot de providers e models no `/health` e `/now`.
 
 ### Faixa C — Secrets e redaction
 
-- [ ] Criar `SecretRegistry`.
-- [ ] Criar `EnvSecretRegistry`.
+- [x] Criar `SecretRegistry`.
+- [x] Criar `EnvSecretRegistry`.
+- [x] Criar redaction canônica do gateway para textos e records aninhados.
+- [x] Fazer `EnvByokCompatImporter` publicar apenas refs configuradas, nunca valores.
+- [x] Classificar refs de autenticação em `apiKeyRefs` e `bearerTokenRefs` no record seguro de provider.
 - [ ] Centralizar redaction hoje duplicada entre `provider.js` e terminal health.
 - [x] Garantir que snapshots e events nunca carreguem `apiKey`, `bearerToken` ou headers sensíveis.
 - [x] Criar teste de regressão que falha se uma key aparece serializada.
 
 ### Faixa D — Provider adapters
 
-- [ ] Extrair `OpenAICompatibleAdapter`.
+- [x] Extrair `OpenAICompatibleAdapter`.
+- [x] Cobrir `OpenAICompatibleAdapter` com teste de bridge record seguro -> override SDK.
 - [ ] Extrair `OpenRouterAdapter`.
 - [ ] Extrair `OllamaAdapter`.
 - [ ] Extrair `GeminiAdapter`.
