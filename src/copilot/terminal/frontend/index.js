@@ -94,6 +94,7 @@ export {
     normalizeContextWindowProjection,
     normalizeTerminalModelBillingProjection,
     observeTerminalModelChangeProjection,
+    readTerminalByokGatewayProjectionFromEnv,
     readTerminalActivityProjection,
     readTerminalByokProjection,
     readTerminalConfigProjection,

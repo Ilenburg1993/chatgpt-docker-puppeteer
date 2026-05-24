@@ -17,6 +17,7 @@ import {
     probeTerminalConfiguredByokAgent,
     probeTerminalConfiguredByokChat,
     listTerminalSdkSessionInventory,
+    readTerminalByokGatewayProjectionFromEnv,
     readTerminalByokProjection,
     readTerminalRuntimeState,
     setTerminalModelProjection,
@@ -845,6 +846,15 @@ function withByokCatalogSource(model, source) {
 }
 
 /**
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo[]} primary
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo[]} fallback
+ * @returns {import('../../presentation/contracts/index.js').RuntimeModelInfo[]}
+ */
+function chooseByokCatalogModels(primary, fallback) {
+    return primary.length > 0 ? primary : fallback;
+}
+
+/**
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
  * @param {ReturnType<typeof parseRecommendArgs>} filters
  * @returns {Array<ReturnType<typeof readTerminalByokProjection>['profiles'][number]>}
@@ -869,16 +879,21 @@ function selectProfilesForDiscovery(projection, filters) {
 async function discoverByokCatalogForCommand(projection, filters) {
     if (!filters.allProviders) {
         const discovered = await discoverConfiguredByokModelsFromEnv(process.env, { forceRefresh: filters.forceRefresh });
+        const remoteAuthoritative = discovered.source === 'remote' || discovered.source === 'remote-cache';
+        const gatewayModels = chooseByokCatalogModels(projection.gatewayModels, projection.models);
+        const selectedModels = remoteAuthoritative
+            ? chooseByokCatalogModels(discovered.models, gatewayModels)
+            : chooseByokCatalogModels(gatewayModels, discovered.models);
         const sourceLabel =
             discovered.source === 'remote'
                 ? 'provider'
                 : discovered.source === 'remote-cache'
                   ? 'provider-cache'
                   : discovered.source === 'static-fallback'
-                    ? 'static-fallback'
-                    : 'static';
+                    ? 'model-gateway/static-fallback'
+                    : 'model-gateway/static';
         return {
-            models: (discovered.models.length > 0 ? discovered.models : projection.models).map((model) =>
+            models: selectedModels.map((model) =>
                 withByokCatalogSource(model, {
                     profileName: projection.summary.profile,
                     preset: projection.summary.preset,
@@ -910,11 +925,15 @@ async function discoverByokCatalogForCommand(projection, filters) {
             COPILOT_BYOK_PROFILE: profile.name,
         };
         const discovered = await discoverConfiguredByokModelsFromEnv(env, { forceRefresh: filters.forceRefresh });
+        const gateway = readTerminalByokGatewayProjectionFromEnv(env);
+        const remoteAuthoritative = discovered.source === 'remote' || discovered.source === 'remote-cache';
+        const profileModels = remoteAuthoritative
+            ? chooseByokCatalogModels(discovered.models, gateway.gatewayModels)
+            : chooseByokCatalogModels(gateway.gatewayModels, discovered.models);
         sourceCounts.set(discovered.source, (sourceCounts.get(discovered.source) ?? 0) + 1);
         if (!endpoint && discovered.endpoint) endpoint = discovered.endpoint;
         if (discovered.error) errors.push(`${profile.name}: ${discovered.error}`);
         warnings.push(...renderConfiguredByokCatalogWarnings(discovered, { profile: profile.name, provider: profile.preset ?? profile.providerType }));
-        const profileModels = discovered.models.length > 0 ? discovered.models : [];
         for (const model of profileModels) {
             models.push(
                 withByokCatalogSource(model, {

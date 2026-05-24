@@ -45,9 +45,22 @@ export function toCopilotModelInfo(model) {
             providerModel,
             source: model['provenance']?.source ?? model['verification']?.sources?.[0] ?? 'model-gateway',
             confidence: model['verification']?.confidence ?? 'unknown',
+            supportsReasoning: Boolean(capabilities.reasoningEffort),
+            inputModalities: Array.isArray(model['modalities']?.input) ? model['modalities'].input : ['text'],
+            outputModalities: Array.isArray(model['modalities']?.output) ? model['modalities'].output : ['text'],
             capabilities: model['capabilities'] ?? {},
-            limits: model['limits'] ?? {},
-            pricing: model['pricing'] ?? {},
+            limits,
+            rateLimits: {
+                maxRequestTokens: limits['maxRequestTokens'] ?? null,
+                tokensPerMinute: limits['tokensPerMinute'] ?? null,
+                requestsPerMinute: limits['requestsPerMinute'] ?? null,
+                dailyRequests: limits['dailyRequests'] ?? null,
+            },
+            pricing: {
+                prompt: model['pricing']?.inputUsdPerMillion ?? null,
+                completion: model['pricing']?.outputUsdPerMillion ?? null,
+                request: model['pricing']?.requestUsd ?? null,
+            },
         },
     });
 }

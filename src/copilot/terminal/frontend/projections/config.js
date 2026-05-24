@@ -9,7 +9,11 @@ import {
     readConfiguredByokProfileSummaries,
     readConfiguredByokSummary,
 } from '#copilot/config';
-import { buildEnvByokModelGatewaySnapshot } from '#copilot/model-gateway';
+import {
+    buildEnvByokModelGatewaySnapshot,
+    buildModelGatewayOperatorProjection,
+    toCopilotModelInfoList,
+} from '#copilot/model-gateway';
 import {
     listRuntimeAvailableModelsProjection,
     observeRuntimeModelChangeProjection,
@@ -122,13 +126,16 @@ export function readTerminalModelStatsProjection(runtimeId) {
  * @returns {{
  *     summary: ReturnType<typeof readConfiguredByokSummary>;
  *     models: ReturnType<typeof readConfiguredByokModelsFromEnv>;
+ *     gatewayModels: ReturnType<typeof toCopilotModelInfoList>;
  *     profiles: ReturnType<typeof readConfiguredByokProfileSummaries>;
  *     envKeys: readonly string[];
  *     modelGateway: ReturnType<typeof buildEnvByokModelGatewaySnapshot>;
+ *     modelGatewayProjection: ReturnType<typeof buildModelGatewayOperatorProjection>;
  * }}
  */
 export function readTerminalByokProjection() {
     const summary = readConfiguredByokSummary();
+    const modelGateway = buildEnvByokModelGatewaySnapshot();
     return {
         summary,
         models: readConfiguredByokModelsFromEnv(process.env, {
@@ -137,9 +144,28 @@ export function readTerminalByokProjection() {
             supportsReasoning: summary.capabilities.reasoningEffort,
             supportsVision: summary.capabilities.vision,
         }),
+        gatewayModels: toCopilotModelInfoList(modelGateway.models),
         profiles: readConfiguredByokProfileSummaries(),
         envKeys: BYOK_ENV_KEYS,
-        modelGateway: buildEnvByokModelGatewaySnapshot(),
+        modelGateway,
+        modelGatewayProjection: buildModelGatewayOperatorProjection(modelGateway),
+    };
+}
+
+/**
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {{
+ *     modelGateway: ReturnType<typeof buildEnvByokModelGatewaySnapshot>;
+ *     modelGatewayProjection: ReturnType<typeof buildModelGatewayOperatorProjection>;
+ *     gatewayModels: ReturnType<typeof toCopilotModelInfoList>;
+ * }}
+ */
+export function readTerminalByokGatewayProjectionFromEnv(env = process.env) {
+    const modelGateway = buildEnvByokModelGatewaySnapshot(env);
+    return {
+        modelGateway,
+        modelGatewayProjection: buildModelGatewayOperatorProjection(modelGateway),
+        gatewayModels: toCopilotModelInfoList(modelGateway.models),
     };
 }
 

@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, probeTerminalConfiguredByokAgent, probeTerminalConfiguredByokChat, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, rename, setTerminalModelProjection, writeFile } =
+const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, probeTerminalConfiguredByokAgent, probeTerminalConfiguredByokChat, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, rename, setTerminalModelProjection, writeFile } =
     vi.hoisted(() => ({
         chmod: vi.fn(),
         clearByokProviderModelHealth: vi.fn(),
@@ -36,6 +36,11 @@ const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv
         readByokProviderModelHealth: vi.fn(() => null),
         readConfiguredByokProfilesFromEnv: vi.fn(() => ({})),
         readFile: vi.fn(),
+        readTerminalByokGatewayProjectionFromEnv: vi.fn(() => ({
+            gatewayModels: [],
+            modelGateway: { providers: [], models: [] },
+            modelGatewayProjection: { providers: [], models: [] },
+        })),
         readTerminalByokProjection: vi.fn(),
         readTerminalRuntimeState: vi.fn(() => ({ contextWindow: null })),
         recordByokProviderModelCallFailure: vi.fn(),
@@ -68,6 +73,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     probeTerminalConfiguredByokChat,
     probeTerminalConfiguredByokAgent,
     listTerminalSdkSessionInventory,
+    readTerminalByokGatewayProjectionFromEnv,
     readTerminalByokProjection,
     readTerminalRuntimeState,
     setTerminalModelProjection,
@@ -89,8 +95,23 @@ const { cmdByok } = await import('../../../../src/copilot/terminal/commands/byok
 
 const BASE_PROJECTION = Object.freeze({
     envKeys: Object.freeze(['COPILOT_BYOK_ENABLED', 'COPILOT_BYOK_PROFILE', 'KILO_API_KEY']),
+    gatewayModels: Object.freeze([]),
     models: Object.freeze([]),
     profiles: Object.freeze([]),
+    modelGateway: Object.freeze({
+        source: 'test',
+        active: Object.freeze({ modelId: null }),
+        providers: Object.freeze([]),
+        models: Object.freeze([]),
+        diagnostics: Object.freeze({ providerCount: 0, modelCount: 0, enabledModelCount: 0 }),
+    }),
+    modelGatewayProjection: Object.freeze({
+        providerCount: 0,
+        modelCount: 0,
+        enabledModelCount: 0,
+        providers: Object.freeze([]),
+        models: Object.freeze([]),
+    }),
     summary: Object.freeze({
         enabled: false,
         ready: false,
@@ -168,6 +189,12 @@ describe('terminal /byok command', () => {
         readConfiguredByokProfilesFromEnv.mockReset();
         readConfiguredByokProfilesFromEnv.mockReturnValue({});
         readFile.mockReset();
+        readTerminalByokGatewayProjectionFromEnv.mockReset();
+        readTerminalByokGatewayProjectionFromEnv.mockReturnValue({
+            gatewayModels: [],
+            modelGateway: { providers: [], models: [] },
+            modelGatewayProjection: { providers: [], models: [] },
+        });
         readTerminalByokProjection.mockReset();
         readTerminalRuntimeState.mockReset();
         readTerminalRuntimeState.mockReturnValue({ contextWindow: null });
@@ -1017,6 +1044,47 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('ctx=200000');
         expect(ctx.output()).toContain('maxReq=6000');
         expect(ctx.output()).toContain('TPM=6000');
+    });
+
+    it('usa a projection do model gateway quando a descoberta remota cai para catálogo estático', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'legacy-static',
+                    capabilities: { supports: { reasoningEffort: false, vision: false }, limits: { max_context_window_tokens: 8000 } },
+                    byok: { provider: 'legacy' },
+                },
+            ],
+            source: 'static-fallback',
+            endpoint: 'https://provider.example/v1/models',
+            fromCache: false,
+            error: 'HTTP 401',
+        });
+        mockProjection({
+            gatewayModels: [
+                {
+                    id: 'gateway-model',
+                    capabilities: { supports: { reasoningEffort: true, vision: true }, limits: { max_context_window_tokens: 131072 } },
+                    byok: {
+                        gatewayId: 'openrouter:gateway-model',
+                        provider: 'openrouter',
+                        providerModel: 'gateway-model',
+                        source: 'env_compat',
+                        supportsReasoning: true,
+                        rateLimits: { maxRequestTokens: 64000 },
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models reasoning vision 5');
+
+        expect(ctx.output()).toContain('fonte=model-gateway/static-fallback');
+        expect(ctx.output()).toContain('gateway-model');
+        expect(ctx.output()).toContain('provider=openrouter');
+        expect(ctx.output()).toContain('maxReq=64000');
+        expect(ctx.output()).not.toContain('legacy-static');
     });
 
     it('ranqueia modelos BYOK free e capazes antes de modelos pagos ou desconhecidos', async () => {

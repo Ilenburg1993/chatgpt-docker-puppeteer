@@ -4,6 +4,7 @@ export {
     readTerminalByokProjection,
     listTerminalAvailableModelsProjection,
     observeTerminalModelChangeProjection,
+    readTerminalByokGatewayProjectionFromEnv,
     readTerminalConfigProjection,
     readTerminalModelStatsProjection,
     setTerminalModelProjection,

@@ -153,7 +153,7 @@ src/copilot/model-gateway/
 - [x] Criar store JSON em `data/copilot/model-gateway/registry.json`.
 - [x] Persistir records com `schemaVersion`.
 - [x] Criar `RegistryProjection` para operador.
-- [ ] Trocar `/byok models` para ler projection do gateway, mantendo fallback legado.
+- [x] Trocar `/byok models` para ler projection do gateway, mantendo fallback legado.
 - [ ] Fazer `onListModels()` aceitar projection do gateway sem `sdk/session` importar gateway.
 - [ ] Adicionar snapshot de providers e models no `/health` e `/now`.
 
