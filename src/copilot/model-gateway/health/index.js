@@ -20,3 +20,4 @@ export {
     recordByokProviderModelCallSuccess,
     resetByokProviderHealthForTests,
 } from './provider-health.js';
+export { classifyByokProviderFailure } from './provider-failure.js';

@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildProbeCompletedEvent, chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, rename, setTerminalModelProjection, writeFile } =
+const { buildProbeCompletedEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, rename, setTerminalModelProjection, writeFile } =
     vi.hoisted(() => ({
         buildProbeCompletedEvent: vi.fn((input) => ({
             type: 'model_gateway:probe:completed',
@@ -12,6 +12,15 @@ const { buildProbeCompletedEvent, chmod, clearByokProviderModelHealth, discoverC
             providerAttempted: input.providerAttempted !== false,
         })),
         chmod: vi.fn(),
+        classifyByokProviderFailure: vi.fn((error) => ({
+            kind: 'unknown',
+            message: error instanceof Error ? error.message : String(error),
+            statusCode: null,
+            errorContext: 'provider.unknown',
+            operatorLabel: 'falha BYOK ainda sem classe operacional',
+            operatorAction: 'inspecione /byok health',
+            external: true,
+        })),
         clearByokProviderModelHealth: vi.fn(),
         discoverConfiguredByokModelsFromEnv: vi.fn(),
         flushByokProviderHealth: vi.fn(() => Promise.resolve()),
@@ -88,6 +97,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
 
 vi.mock('#copilot/model-gateway', () => ({
     buildProbeCompletedEvent: buildProbeCompletedEvent,
+    classifyByokProviderFailure,
     clearByokProviderModelHealth,
     flushByokProviderHealth,
     listByokProviderModelHealth,

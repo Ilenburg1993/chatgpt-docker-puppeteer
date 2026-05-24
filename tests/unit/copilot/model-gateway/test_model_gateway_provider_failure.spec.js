@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyTerminalByokProviderFailure } from '../../../../src/copilot/terminal/byok/provider-failure.js';
+import { classifyByokProviderFailure } from '../../../../src/copilot/model-gateway/health/provider-failure.js';
 
-describe('terminal BYOK provider failure taxonomy', () => {
+describe('model-gateway BYOK provider failure taxonomy', () => {
     it('classifica 402 sem body como bloqueio externo de credito/cota', () => {
-        const failure = classifyTerminalByokProviderFailure(new Error('402 402 status code (no body)'));
+        const failure = classifyByokProviderFailure(new Error('402 402 status code (no body)'));
 
         expect(failure).toEqual(
             expect.objectContaining({
@@ -19,12 +19,12 @@ describe('terminal BYOK provider failure taxonomy', () => {
     });
 
     it('preserva classes diferentes para auth, modelo/rota e rede', () => {
-        expect(classifyTerminalByokProviderFailure(Object.assign(new Error('Forbidden'), { status: 403 })).kind).toBe(
+        expect(classifyByokProviderFailure(Object.assign(new Error('Forbidden'), { status: 403 })).kind).toBe(
             'auth',
         );
-        expect(classifyTerminalByokProviderFailure('HTTP status code 404').kind).toBe('model-or-route');
+        expect(classifyByokProviderFailure('HTTP status code 404').kind).toBe('model-or-route');
         expect(
-            classifyTerminalByokProviderFailure(Object.assign(new Error('fetch failed'), { code: 'ECONNRESET' })).kind,
+            classifyByokProviderFailure(Object.assign(new Error('fetch failed'), { code: 'ECONNRESET' })).kind,
         ).toBe('network');
     });
 });

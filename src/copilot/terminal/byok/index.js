@@ -9,7 +9,6 @@ export {
     evaluateTerminalByokTurnBudget,
     readTerminalByokAdmissionMode,
 } from './admission.js';
-export { classifyTerminalByokProviderFailure } from './provider-failure.js';
 export {
     classifyTerminalByokSdkBinding,
     isSameTerminalByokProviderBoundary,

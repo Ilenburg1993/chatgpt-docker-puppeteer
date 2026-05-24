@@ -68,6 +68,7 @@ export {
 export { buildModelGatewayOnListModelsHandler } from './session/on-list-models.js';
 export { toCopilotModelInfo, toCopilotModelInfoList } from './session/copilot-model-projection.js';
 export {
+    classifyByokProviderFailure,
     clearByokProviderModelHealth,
     flushByokProviderHealth,
     listByokProviderModelHealth,

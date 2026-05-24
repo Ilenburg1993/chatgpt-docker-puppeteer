@@ -1,24 +1,24 @@
 // @ts-check
 /**
- * Taxonomia terminal de falhas externas BYOK.
+ * Taxonomia operacional de falhas externas BYOK.
  *
  * O SDK pode entregar o mesmo bloqueio do provider por caminhos distintos: throw do `sendTurn`, `session.error` ou
- * resultado de uma probe descartavel. A UX nao deve fazer cada borda adivinhar sozinha se um `402`, `429`, credencial
- * ou modelo ausente e um problema local. Este modulo preserva a mensagem original para auditoria e fornece a leitura
- * operacional comum usada por probe, turno vivo e erro de sessao.
+ * resultado de uma probe descartavel. Cada borda consumidora deve receber a mesma leitura operacional para `402`,
+ * `429`, credencial invalida, modelo ausente, timeout e falhas de rede. Este modulo preserva a mensagem original para
+ * auditoria e fornece a taxonomia comum usada por probes, turnos vivos, erro de sessao e health.
  *
- * @module copilot/terminal/byok/provider-failure
+ * @module copilot/model-gateway/health/provider-failure
  */
 
 import { toError } from '#copilot/core';
 
 /**
- * @typedef {'credits' | 'rate-limit' | 'auth' | 'model-or-route' | 'timeout' | 'network' | 'upstream' | 'unknown'} TerminalByokProviderFailureKind
+ * @typedef {'credits' | 'rate-limit' | 'auth' | 'model-or-route' | 'timeout' | 'network' | 'upstream' | 'unknown'} ByokProviderFailureKind
  */
 
 /**
- * @typedef {object} TerminalByokProviderFailure
- * @property {TerminalByokProviderFailureKind} kind
+ * @typedef {object} ByokProviderFailure
+ * @property {ByokProviderFailureKind} kind
  * @property {string} message
  * @property {number | null} statusCode
  * @property {string} errorContext
@@ -115,10 +115,10 @@ function textLooksLikeNetworkFailure(message, code) {
 }
 
 /**
- * @param {TerminalByokProviderFailureKind} kind
+ * @param {ByokProviderFailureKind} kind
  * @param {number | null} statusCode
  * @param {string} message
- * @returns {TerminalByokProviderFailure}
+ * @returns {ByokProviderFailure}
  */
 function buildFailure(kind, statusCode, message) {
     const http = statusCode ? `HTTP ${statusCode}` : null;
@@ -219,9 +219,9 @@ function buildFailure(kind, statusCode, message) {
  * usa-la apenas dentro de fluxo BYOK ou combinar seu resultado com evidencias de runtime.
  *
  * @param {unknown} error
- * @returns {TerminalByokProviderFailure}
+ * @returns {ByokProviderFailure}
  */
-export function classifyTerminalByokProviderFailure(error) {
+export function classifyByokProviderFailure(error) {
     const err = toError(error);
     const message = err.message || 'erro BYOK sem mensagem';
     const statusCode = readStructuredStatusCode(error) ?? readMessageStatusCode(message);

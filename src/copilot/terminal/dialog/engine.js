@@ -53,11 +53,10 @@ import {
 } from '../state/events/index.js';
 import {
     TERMINAL_BYOK_ADMISSION_MODE_ENV,
-    classifyTerminalByokProviderFailure,
     evaluateTerminalByokTurnBudget,
     readTerminalByokAdmissionMode,
 } from '../byok/index.js';
-import { recordByokProviderModelCallFailure } from '#copilot/model-gateway';
+import { classifyByokProviderFailure, recordByokProviderModelCallFailure } from '#copilot/model-gateway';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,
@@ -248,13 +247,13 @@ function errorCodeOf(error) {
 /**
  * @param {unknown} error
  * @param {ReturnType<typeof readConfiguredByokSummary>} byok
- * @returns {{ message: string; errorContext: string; provider: string | null; profile: string | null; model: string | null; failure: import('../byok/provider-failure.js').TerminalByokProviderFailure } | null}
+ * @returns {{ message: string; errorContext: string; provider: string | null; profile: string | null; model: string | null; failure: import('../../model-gateway/health/provider-failure.js').ByokProviderFailure } | null}
  */
 function resolveByokTurnErrorDescriptor(error, byok) {
     if (byok.enabled !== true || byok.ready !== true) return null;
     const err = toError(error);
     const message = err.message || 'erro no turno BYOK';
-    const failure = classifyTerminalByokProviderFailure(error);
+    const failure = classifyByokProviderFailure(error);
     const code = errorCodeOf(error);
     const timeoutLike = code === 'DIALOG_TIMEOUT' || /sendTurn sem progresso|inactivity timeout|timeout/i.test(message);
     const providerLike =

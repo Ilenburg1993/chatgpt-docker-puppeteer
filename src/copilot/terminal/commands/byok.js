@@ -13,6 +13,7 @@ import fs from 'node:fs/promises';
 import { config as loadDotenv } from 'dotenv';
 import {
     buildProbeCompletedEvent,
+    classifyByokProviderFailure,
     clearByokProviderModelHealth,
     flushByokProviderHealth,
     listByokProviderModelHealth,
@@ -37,7 +38,6 @@ import {
     setTerminalModelProjection,
 } from '../frontend/index.js';
 import {
-    classifyTerminalByokProviderFailure,
     classifyTerminalByokSdkBinding,
     evaluateTerminalByokProbeBudget,
     isSameTerminalByokProviderBoundary,
@@ -1415,7 +1415,7 @@ async function runByokProbe(mode, selection, eventBus = null) {
         ...(selection.timeoutMs ? { timeoutMs: selection.timeoutMs } : {}),
         deps: {
             evaluateAdmission: evaluateTerminalByokProbeBudget,
-            classifyProviderFailure: classifyTerminalByokProviderFailure,
+            classifyProviderFailure: classifyByokProviderFailure,
         },
     });
     const providerAttempted = await recordByokProbeHealth(mode, probe);

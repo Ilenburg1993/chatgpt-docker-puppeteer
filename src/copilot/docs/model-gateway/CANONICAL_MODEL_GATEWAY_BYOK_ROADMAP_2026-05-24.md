@@ -13,7 +13,7 @@ Hoje há quatro focos diferentes:
 - `sdk/session/provider.js`: sabe resolver env, presets, `ProviderConfig`, discovery de modelos e `ModelInfo`.
 - `sdk/models/*`: possui registry/selector/stats por `modelId`, ainda sem identidade provider-model.
 - `terminal/byok/*`: classifica falhas e aplica admissão/orçamento terminal.
-- `model-gateway/health/*`: persiste health operacional provider/model.
+- `model-gateway/health/*`: classifica falhas externas e persiste health operacional provider/model.
 - `model-gateway/probes/*`: roda probes descartáveis chat/agent/streaming/JSON, incluindo delta, tools e `ask_user`.
 
 Isso funciona, mas cria uma ambiguidade arquitetural: terminal e SDK começam a possuir fatos de provider/model que deveriam
@@ -199,7 +199,7 @@ src/copilot/model-gateway/
 ### Faixa F — Health e failure taxonomy
 
 - [x] Migrar `terminal/state/byok-provider-health.js` para `model-gateway/health`.
-- [ ] Migrar `terminal/byok/provider-failure.js` para classifier compartilhado.
+- [x] Migrar `terminal/byok/provider-failure.js` para classifier compartilhado.
 - [ ] Separar falhas `auth`, `credits`, `rate-limit`, `model-or-route`, `timeout`, `network`, `upstream`, `unknown`.
 - [ ] Persistir health por `providerId|providerModel|routeProfile`.
 - [ ] Usar health no roteamento.

@@ -64,10 +64,10 @@ import {
     reviseRecentTerminalTurnTraceStatus,
 } from '../state/events/index.js';
 import {
+    classifyByokProviderFailure,
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
 } from '#copilot/model-gateway';
-import { classifyTerminalByokProviderFailure } from '../byok/index.js';
 import { renderTerminalIntent } from './intent-renderer.js';
 import { compactTerminalToolText } from './tool-activity-presenter.js';
 import {
@@ -266,7 +266,7 @@ function normalizeSdkLifecycleEvent(evt) {
 
 /**
  * @param {{ errorType: string; message: string }} input
- * @returns {{ enabled: boolean; profile: string | null; provider: string | null; model: string | null; operatorDetail: string | null; failure: import('../byok/provider-failure.js').TerminalByokProviderFailure | null }}
+ * @returns {{ enabled: boolean; profile: string | null; provider: string | null; model: string | null; operatorDetail: string | null; failure: import('../../model-gateway/health/provider-failure.js').ByokProviderFailure | null }}
  */
 function resolveByokSessionErrorDescriptor({ errorType, message }) {
     let byok;
@@ -279,7 +279,7 @@ function resolveByokSessionErrorDescriptor({ errorType, message }) {
         return { enabled: false, profile: null, provider: null, model: null, operatorDetail: null, failure: null };
     }
     const normalizedType = errorType.trim().toLowerCase();
-    const failure = classifyTerminalByokProviderFailure(message);
+    const failure = classifyByokProviderFailure(message);
     const providerLikeError =
         ['query', 'model_call', 'rate_limit', 'quota', 'provider', 'network', 'fetch'].includes(normalizedType) ||
         failure.kind !== 'unknown' ||
