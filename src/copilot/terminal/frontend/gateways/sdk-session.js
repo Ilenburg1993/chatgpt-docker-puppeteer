@@ -9,7 +9,6 @@
 import {
     classifyPermissionDecision,
     classifyUserInputQuestionKind,
-    createStaticInputHandler,
     getPendingStructuredUserInputCount,
     getPendingStructuredUserInputRequests,
     hasPendingStructuredUserInputRequests,
@@ -19,15 +18,8 @@ import {
     normalizePermissionRequestedEvent,
     normalizeUserInputCompletedEvent,
     normalizeUserInputRequestedEvent,
-    createPermissionHandler,
-    onSessionEvents,
-    readConfiguredByokState,
-    resolveConfiguredByokSessionOverrides,
-    sendSessionAndWait,
-    withEphemeralSession,
 } from '#copilot/sdk/session';
-import { runConfiguredByokChatProbe } from '#copilot/model-gateway';
-import { createTool } from '#copilot/sdk/tools';
+import { runConfiguredByokAgentProbe, runConfiguredByokChatProbe } from '#copilot/model-gateway';
 import { classifyTerminalByokProviderFailure, evaluateTerminalByokProbeBudget } from '../../byok/index.js';
 import {
     compactAgentSdkSession,
@@ -191,12 +183,6 @@ export async function probeTerminalConfiguredByokChat(options = {}) {
     });
 }
 
-const BYOK_AGENT_PROBE_TOOL = 'terminal_byok_probe_marker';
-const BYOK_AGENT_PROBE_READ_TOOL = 'read_file_content';
-const BYOK_AGENT_PROBE_READ_PATH = 'BYOK_AGENT_PROBE.md';
-const BYOK_AGENT_PROBE_QUESTION = 'BYOK_AGENT_PROBE_ASK: confirme com a resposta automatica do probe.';
-const BYOK_AGENT_PROBE_ANSWER = 'BYOK_AGENT_PROBE_USER_OK';
-
 /**
  * Executa uma sonda agente descartável para BYOK.
  *
@@ -229,257 +215,13 @@ const BYOK_AGENT_PROBE_ANSWER = 'BYOK_AGENT_PROBE_USER_OK';
  * }>}
  */
 export async function probeTerminalConfiguredByokAgent(options = {}) {
-    const env = options.env ?? process.env;
-    const startedAt = Date.now();
-    const byokState = readConfiguredByokState(env);
-    if (!byokState.enabled || !byokState.ready || !byokState.provider || !byokState.model) {
-        return {
-            ok: false,
-            status: 'unavailable',
-            elapsedMs: Date.now() - startedAt,
-            model: byokState.model ?? byokState.summary.model ?? null,
-            profile: byokState.summary.profile ?? null,
-            preset: byokState.summary.preset ?? null,
-            providerType: byokState.summary.providerType ?? null,
-            deltaCount: 0,
-            deltaChars: 0,
-            finalChars: 0,
-            observedFinalEvent: false,
-            toolCallCount: 0,
-            markerToolCallCount: 0,
-            readToolCallCount: 0,
-            userInputRequestCount: 0,
-            userInputAnswerCount: 0,
-            sessionId: null,
-            errors:
-                byokState.errors.length > 0
-                    ? [...byokState.errors]
-                    : ['BYOK não está ativo/pronto para probe agente.'],
-            warnings: [...byokState.warnings],
-            providerFailure: null,
-        };
-    }
-
-    const byok = resolveConfiguredByokSessionOverrides(env, options.model ?? undefined);
-    const provider = byok.provider ?? byokState.provider;
-    const model = byok.model ?? byokState.model;
-    if (!provider || !model) {
-        throw new Error('[terminal/byok-agent-probe] Provider/modelo BYOK desapareceram durante a resolução do probe.');
-    }
-
-    const baseResult = {
-        model: model ?? byok.summary.model ?? null,
-        profile: byok.summary.profile ?? null,
-        preset: byok.summary.preset ?? null,
-        providerType: byok.summary.providerType ?? null,
-        warnings: [...byok.summary.warnings],
-    };
-    const timeoutMs =
-        typeof options.timeoutMs === 'number' && Number.isFinite(options.timeoutMs)
-            ? Math.max(5_000, Math.min(120_000, Math.round(options.timeoutMs)))
-            : 60_000;
-    const prompt =
-        options.prompt ??
-        `Valide o runtime agente. Chame primeiro a tool ${BYOK_AGENT_PROBE_TOOL} com marker="BYOK_AGENT_PROBE_TOOL_OK". ` +
-            `Depois chame a tool ${BYOK_AGENT_PROBE_READ_TOOL} com path="${BYOK_AGENT_PROBE_READ_PATH}", startLine=1 e endLine=3. ` +
-            `Depois chame ask_user perguntando exatamente "${BYOK_AGENT_PROBE_QUESTION}". ` +
-            'Quando receber a resposta, responda somente com BYOK_AGENT_PROBE_DONE.';
-    const admission = evaluateTerminalByokProbeBudget(byok.summary, 'agent', prompt);
-    if (admission.shouldBlock) {
-        return {
-            ok: false,
-            status: 'admission-blocked',
-            elapsedMs: Date.now() - startedAt,
-            ...baseResult,
-            deltaCount: 0,
-            deltaChars: 0,
-            finalChars: 0,
-            observedFinalEvent: false,
-            toolCallCount: 0,
-            markerToolCallCount: 0,
-            readToolCallCount: 0,
-            userInputRequestCount: 0,
-            userInputAnswerCount: 0,
-            sessionId: null,
-            errors: [admission.label],
-            providerFailure: null,
-        };
-    }
-
-    let deltaCount = 0;
-    let deltaChars = 0;
-    let finalContent = '';
-    let observedFinalEvent = false;
-    let markerToolCallCount = 0;
-    let readToolCallCount = 0;
-    let userInputRequestCount = 0;
-    let userInputAnswerCount = 0;
-    let sessionId = null;
-    /** @type {string[]} */
-    const errors = [];
-    /** @type {import('../../byok/provider-failure.js').TerminalByokProviderFailure | null} */
-    let providerFailure = null;
-    const onUserInputRequest = createStaticInputHandler(
-        { [BYOK_AGENT_PROBE_QUESTION.toLowerCase()]: BYOK_AGENT_PROBE_ANSWER },
-        BYOK_AGENT_PROBE_ANSWER,
-    );
-    const markerTool = createTool({
-        name: BYOK_AGENT_PROBE_TOOL,
-        description: 'Sonda interna read-only para confirmar tool calling BYOK em sessão descartável.',
-        parameters: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-                marker: { type: 'string', description: 'Marcador BYOK_AGENT_PROBE_TOOL_OK do probe.' },
-            },
-            required: ['marker'],
-        },
-        skipPermission: true,
-        handler: async (/** @type {unknown} */ args) => {
-            markerToolCallCount += 1;
-            const marker =
-                args && typeof args === 'object' && typeof /** @type {{ marker?: unknown }} */ (args).marker === 'string'
-                    ? /** @type {{ marker: string }} */ (args).marker
-                    : '';
-            return marker.includes('BYOK_AGENT_PROBE_TOOL_OK')
-                ? 'BYOK_AGENT_PROBE_TOOL_OK'
-                : `BYOK_AGENT_PROBE_TOOL_MARKER=${marker || 'missing'}`;
+    return runConfiguredByokAgentProbe({
+        ...options,
+        deps: {
+            evaluateAdmission: evaluateTerminalByokProbeBudget,
+            classifyProviderFailure: classifyTerminalByokProviderFailure,
         },
     });
-    const readTool = createTool({
-        name: BYOK_AGENT_PROBE_READ_TOOL,
-        description:
-            'Sonda interna read-only com o nome canônico da leitura de arquivo usada pelo terminal. Retorna somente conteúdo sintético.',
-        parameters: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-                path: { type: 'string', description: `Use ${BYOK_AGENT_PROBE_READ_PATH} neste probe.` },
-                startLine: { type: 'number', description: 'Primeira linha sintética solicitada.' },
-                endLine: { type: 'number', description: 'Última linha sintética solicitada.' },
-            },
-            required: ['path'],
-        },
-        skipPermission: true,
-        handler: async (/** @type {unknown} */ args) => {
-            readToolCallCount += 1;
-            const path =
-                args && typeof args === 'object' && typeof /** @type {{ path?: unknown }} */ (args).path === 'string'
-                    ? /** @type {{ path: string }} */ (args).path
-                    : '';
-            return path === BYOK_AGENT_PROBE_READ_PATH
-                ? 'BYOK_AGENT_PROBE_READ_OK\nlinha 2\nlinha 3'
-                : `BYOK_AGENT_PROBE_READ_PATH=${path || 'missing'}`;
-        },
-    });
-
-    try {
-        await withEphemeralSession(
-            {
-                model,
-                provider,
-                ...(byok.modelCapabilities ? { modelCapabilities: byok.modelCapabilities } : {}),
-                streaming: true,
-                enableConfigDiscovery: false,
-                includeSubAgentStreamingEvents: false,
-                systemMessage: false,
-                tools: [markerTool, readTool],
-                availableTools: [BYOK_AGENT_PROBE_TOOL, BYOK_AGENT_PROBE_READ_TOOL, 'ask_user'],
-                onPermissionRequest: createPermissionHandler({ allowAll: true }),
-                onUserInputRequest: async (request, invocation) => {
-                    userInputRequestCount += 1;
-                    const response = await onUserInputRequest(request, invocation);
-                    userInputAnswerCount += 1;
-                    return response;
-                },
-            },
-            async ({ session, sessionId: temporarySessionId }) => {
-                sessionId = temporarySessionId;
-                const unsubscribe = onSessionEvents(session, {
-                    'assistant.message_delta': (event) => {
-                        const delta = typeof event?.data?.deltaContent === 'string' ? event.data.deltaContent : '';
-                        if (!delta) return;
-                        deltaCount += 1;
-                        deltaChars += delta.length;
-                    },
-                    'assistant.message': (event) => {
-                        const content = typeof event?.data?.content === 'string' ? event.data.content : '';
-                        if (!content) return;
-                        observedFinalEvent = true;
-                        finalContent = content;
-                    },
-                    'session.error': (event) => {
-                        const message =
-                            typeof event?.data?.message === 'string'
-                                ? event.data.message
-                                : typeof event?.data?.error === 'string'
-                                  ? event.data.error
-                                  : null;
-                        if (message) {
-                            errors.push(message);
-                            providerFailure ??= classifyTerminalByokProviderFailure(message);
-                        }
-                    },
-                });
-                try {
-                    const reply = await sendSessionAndWait(session, { prompt }, timeoutMs);
-                    const content = typeof reply?.data?.content === 'string' ? reply.data.content : '';
-                    if (content) finalContent = content;
-                } finally {
-                    unsubscribe();
-                }
-            },
-        );
-    } catch (error) {
-        errors.push(error instanceof Error ? error.message : String(error));
-        providerFailure ??= classifyTerminalByokProviderFailure(error);
-        return {
-            ok: false,
-            status: 'failed',
-            elapsedMs: Date.now() - startedAt,
-            ...baseResult,
-            deltaCount,
-            deltaChars,
-            finalChars: finalContent.length,
-            observedFinalEvent,
-            toolCallCount: markerToolCallCount + readToolCallCount,
-            markerToolCallCount,
-            readToolCallCount,
-            userInputRequestCount,
-            userInputAnswerCount,
-            sessionId,
-            errors,
-            providerFailure,
-        };
-    }
-
-    const finalChars = finalContent.length;
-    const status =
-        markerToolCallCount === 0 || readToolCallCount === 0
-            ? 'tool-missing'
-            : userInputRequestCount === 0 || userInputAnswerCount === 0
-              ? 'ask-missing'
-              : finalChars > 0 || deltaChars > 0
-                ? 'ok'
-                : 'empty';
-    return {
-        ok: status === 'ok',
-        status,
-        elapsedMs: Date.now() - startedAt,
-        ...baseResult,
-        deltaCount,
-        deltaChars,
-        finalChars,
-        observedFinalEvent,
-        toolCallCount: markerToolCallCount + readToolCallCount,
-        markerToolCallCount,
-        readToolCallCount,
-        userInputRequestCount,
-        userInputAnswerCount,
-        sessionId,
-        errors,
-        providerFailure,
-    };
 }
 
 // ---------------------------------------------------------------------------

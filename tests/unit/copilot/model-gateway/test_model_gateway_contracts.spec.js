@@ -29,6 +29,12 @@ import {
     redactSecretRecord,
     redactSecretText,
     resolveModelGatewayProviderAdapter,
+    BYOK_AGENT_PROBE_ANSWER,
+    BYOK_AGENT_PROBE_QUESTION,
+    BYOK_AGENT_PROBE_READ_PATH,
+    BYOK_AGENT_PROBE_READ_TOOL,
+    BYOK_AGENT_PROBE_TOOL,
+    runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
     toCopilotModelInfoList,
 } from '../../../../src/copilot/model-gateway/index.js';
@@ -572,5 +578,102 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(capturedConfig.availableTools, []);
         assert.deepEqual(capturedConfig.onPermissionRequest, { permission: 'deny' });
         assert.deepEqual(capturedPayload, { payload: { prompt: 'probe now' }, timeoutMs: 5000 });
+    });
+
+    it('runs configured BYOK agent probe through disposable tools, ask_user, deltas and final event', async () => {
+        let unsubscribed = false;
+        /** @type {any} */
+        let capturedConfig = null;
+        /** @type {any} */
+        let capturedPayload = null;
+        /** @type {unknown} */
+        let capturedAskAnswer = null;
+
+        const result = await runConfiguredByokAgentProbe({
+            prompt: 'agent probe now',
+            timeoutMs: 100,
+            deps: {
+                // @ts-expect-error test double keeps only the fields consumed by the probe.
+                readConfiguredByokState: () => ({
+                    enabled: true,
+                    ready: true,
+                    provider: { type: 'openai', apiKey: 'secret' },
+                    model: 'model-agent',
+                    errors: [],
+                    warnings: [],
+                    summary: { model: 'model-agent', profile: 'dev', preset: 'kilo-code', providerType: 'openai' },
+                }),
+                // @ts-expect-error test double keeps only the fields consumed by the probe.
+                resolveConfiguredByokSessionOverrides: () => ({
+                    provider: { type: 'openai', apiKey: 'secret' },
+                    model: 'model-agent',
+                    modelCapabilities: { tools: true },
+                    summary: {
+                        model: 'model-agent',
+                        profile: 'dev',
+                        preset: 'kilo-code',
+                        providerType: 'openai',
+                        warnings: ['agent tier'],
+                    },
+                }),
+                // @ts-expect-error test double uses the same shape consumed by the probe.
+                createTool: (definition) => definition,
+                // @ts-expect-error test double returns a deterministic ask_user handler.
+                createStaticInputHandler: (answers, fallback) => async (request) => {
+                    const question =
+                        request && typeof request === 'object' && typeof request.question === 'string'
+                            ? request.question.toLowerCase()
+                            : '';
+                    return answers[question] ?? fallback;
+                },
+                // @ts-expect-error test double calls the callback synchronously with a fake SDK session.
+                withEphemeralSession: async (config, callback) => {
+                    capturedConfig = config;
+                    await config.tools[0].handler({ marker: 'BYOK_AGENT_PROBE_TOOL_OK' });
+                    await config.tools[1].handler({ path: BYOK_AGENT_PROBE_READ_PATH, startLine: 1, endLine: 3 });
+                    capturedAskAnswer = await config.onUserInputRequest({ question: BYOK_AGENT_PROBE_QUESTION }, {});
+                    await callback({ session: { id: 'agent-session-object' }, sessionId: 'tmp-agent-probe' });
+                },
+                // @ts-expect-error test double emits the subset of SDK events used by the probe.
+                onSessionEvents: (_session, handlers) => {
+                    handlers['assistant.message_delta']?.({ data: { deltaContent: 'AGENT_' } });
+                    handlers['assistant.message']?.({ data: { content: 'BYOK_AGENT_PROBE_DONE' } });
+                    return () => {
+                        unsubscribed = true;
+                    };
+                },
+                // @ts-expect-error test double records the prompt payload.
+                sendSessionAndWait: async (_session, payload, timeoutMs) => {
+                    capturedPayload = { payload, timeoutMs };
+                    return { data: { content: 'BYOK_AGENT_PROBE_DONE' } };
+                },
+                // @ts-expect-error test double makes the permission handler identity observable.
+                createPermissionHandler: (options) => ({ permission: options.allowAll ? 'allow' : 'deny' }),
+            },
+        });
+
+        assert.equal(result.ok, true);
+        assert.equal(result.status, 'ok');
+        assert.equal(result.sessionId, 'tmp-agent-probe');
+        assert.equal(result.toolCallCount, 2);
+        assert.equal(result.markerToolCallCount, 1);
+        assert.equal(result.readToolCallCount, 1);
+        assert.equal(result.userInputRequestCount, 1);
+        assert.equal(result.userInputAnswerCount, 1);
+        assert.equal(result.deltaCount, 1);
+        assert.equal(result.deltaChars, 'AGENT_'.length);
+        assert.equal(result.finalChars, 'BYOK_AGENT_PROBE_DONE'.length);
+        assert.equal(result.observedFinalEvent, true);
+        assert.deepEqual(result.warnings, ['agent tier']);
+        assert.equal(capturedAskAnswer, BYOK_AGENT_PROBE_ANSWER);
+        assert.equal(unsubscribed, true);
+        assert.equal(capturedConfig.streaming, true);
+        assert.deepEqual(capturedConfig.availableTools, [
+            BYOK_AGENT_PROBE_TOOL,
+            BYOK_AGENT_PROBE_READ_TOOL,
+            'ask_user',
+        ]);
+        assert.deepEqual(capturedConfig.onPermissionRequest, { permission: 'allow' });
+        assert.deepEqual(capturedPayload, { payload: { prompt: 'agent probe now' }, timeoutMs: 5000 });
     });
 });

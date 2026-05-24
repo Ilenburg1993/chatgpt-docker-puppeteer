@@ -9,3 +9,11 @@
  */
 
 export { runConfiguredByokChatProbe } from './chat-probe.js';
+export {
+    BYOK_AGENT_PROBE_ANSWER,
+    BYOK_AGENT_PROBE_QUESTION,
+    BYOK_AGENT_PROBE_READ_PATH,
+    BYOK_AGENT_PROBE_READ_TOOL,
+    BYOK_AGENT_PROBE_TOOL,
+    runConfiguredByokAgentProbe,
+} from './agent-probe.js';

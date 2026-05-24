@@ -67,7 +67,15 @@ export {
 } from './providers/index.js';
 export { buildModelGatewayOnListModelsHandler } from './session/on-list-models.js';
 export { toCopilotModelInfo, toCopilotModelInfoList } from './session/copilot-model-projection.js';
-export { runConfiguredByokChatProbe } from './probes/index.js';
+export {
+    BYOK_AGENT_PROBE_ANSWER,
+    BYOK_AGENT_PROBE_QUESTION,
+    BYOK_AGENT_PROBE_READ_PATH,
+    BYOK_AGENT_PROBE_READ_TOOL,
+    BYOK_AGENT_PROBE_TOOL,
+    runConfiguredByokAgentProbe,
+    runConfiguredByokChatProbe,
+} from './probes/index.js';
 export {
     MODEL_GATEWAY_EVENTS,
     MODEL_GATEWAY_MODEL_IMPORTED,

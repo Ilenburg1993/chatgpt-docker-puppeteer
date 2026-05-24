@@ -184,7 +184,7 @@ src/copilot/model-gateway/
 ### Faixa E — Probes
 
 - [x] Promover probe chat descartável para `model-gateway/probes`.
-- [ ] Promover probe agente descartável com tools + `ask_user`.
+- [x] Promover probe agente descartável com tools + `ask_user`.
 - [ ] Adicionar probe streaming/delta.
 - [ ] Adicionar probe JSON.
 - [ ] Adicionar probe de vision quando houver fixtures seguras.
