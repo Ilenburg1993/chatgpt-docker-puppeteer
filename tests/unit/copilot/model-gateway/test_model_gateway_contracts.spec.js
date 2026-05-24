@@ -29,6 +29,7 @@ import {
     redactSecretRecord,
     redactSecretText,
     resolveModelGatewayProviderAdapter,
+    runConfiguredByokChatProbe,
     toCopilotModelInfoList,
 } from '../../../../src/copilot/model-gateway/index.js';
 
@@ -441,5 +442,135 @@ describe('model-gateway foundation', () => {
 
     it('does not install a gateway onListModels handler when BYOK is disabled', () => {
         assert.equal(buildModelGatewayOnListModelsHandler({ COPILOT_BYOK_ENABLED: 'false' }), undefined);
+    });
+
+    it('reports configured BYOK chat probe as unavailable before provider readiness', async () => {
+        const result = await runConfiguredByokChatProbe({
+            deps: {
+                // @ts-expect-error test double keeps only the fields consumed by the probe.
+                readConfiguredByokState: () => ({
+                    enabled: false,
+                    ready: false,
+                    provider: null,
+                    model: null,
+                    errors: [],
+                    warnings: ['missing provider'],
+                    summary: {
+                        model: null,
+                        profile: 'dev',
+                        preset: 'openrouter',
+                        providerType: 'openai',
+                    },
+                }),
+            },
+        });
+
+        assert.equal(result.ok, false);
+        assert.equal(result.status, 'unavailable');
+        assert.equal(result.profile, 'dev');
+        assert.equal(result.providerType, 'openai');
+        assert.deepEqual(result.warnings, ['missing provider']);
+        assert.match(result.errors[0], /BYOK/);
+    });
+
+    it('blocks configured BYOK chat probe through canonical admission policy', async () => {
+        const result = await runConfiguredByokChatProbe({
+            deps: {
+                // @ts-expect-error test double keeps only the fields consumed by the probe.
+                readConfiguredByokState: () => ({
+                    enabled: true,
+                    ready: true,
+                    provider: { type: 'openai', apiKey: 'secret' },
+                    model: 'model-a',
+                    errors: [],
+                    warnings: [],
+                    summary: { model: 'model-a', profile: 'dev', preset: 'groq', providerType: 'openai' },
+                }),
+                // @ts-expect-error test double keeps only the fields consumed by the probe.
+                resolveConfiguredByokSessionOverrides: () => ({
+                    provider: { type: 'openai', apiKey: 'secret' },
+                    model: 'model-a',
+                    summary: { model: 'model-a', profile: 'dev', preset: 'groq', providerType: 'openai', warnings: [] },
+                }),
+                evaluateAdmission: () => ({ shouldBlock: true, label: 'blocked by budget' }),
+            },
+        });
+
+        assert.equal(result.ok, false);
+        assert.equal(result.status, 'admission-blocked');
+        assert.deepEqual(result.errors, ['blocked by budget']);
+    });
+
+    it('runs configured BYOK chat probe through disposable session with deltas and final event', async () => {
+        let unsubscribed = false;
+        /** @type {any} */
+        let capturedConfig = null;
+        /** @type {any} */
+        let capturedPayload = null;
+
+        const result = await runConfiguredByokChatProbe({
+            prompt: 'probe now',
+            timeoutMs: 100,
+            deps: {
+                // @ts-expect-error test double keeps only the fields consumed by the probe.
+                readConfiguredByokState: () => ({
+                    enabled: true,
+                    ready: true,
+                    provider: { type: 'openai', apiKey: 'secret' },
+                    model: 'model-a',
+                    errors: [],
+                    warnings: [],
+                    summary: { model: 'model-a', profile: 'dev', preset: 'openrouter', providerType: 'openai' },
+                }),
+                // @ts-expect-error test double keeps only the fields consumed by the probe.
+                resolveConfiguredByokSessionOverrides: () => ({
+                    provider: { type: 'openai', apiKey: 'secret' },
+                    model: 'model-a',
+                    modelCapabilities: { tools: false },
+                    summary: {
+                        model: 'model-a',
+                        profile: 'dev',
+                        preset: 'openrouter',
+                        providerType: 'openai',
+                        warnings: ['free tier'],
+                    },
+                }),
+                // @ts-expect-error test double calls the callback synchronously with a fake SDK session.
+                withEphemeralSession: async (config, callback) => {
+                    capturedConfig = config;
+                    await callback({ session: { id: 'session-object' }, sessionId: 'tmp-chat-probe' });
+                },
+                // @ts-expect-error test double emits the subset of SDK events used by the probe.
+                onSessionEvents: (_session, handlers) => {
+                    handlers['assistant.message_delta']?.({ data: { deltaContent: 'BYOK_' } });
+                    handlers['assistant.message_delta']?.({ data: { deltaContent: 'PROBE_' } });
+                    handlers['assistant.message']?.({ data: { content: 'BYOK_PROBE_OK' } });
+                    return () => {
+                        unsubscribed = true;
+                    };
+                },
+                // @ts-expect-error test double records the prompt payload.
+                sendSessionAndWait: async (_session, payload, timeoutMs) => {
+                    capturedPayload = { payload, timeoutMs };
+                    return { data: { content: 'BYOK_PROBE_OK' } };
+                },
+                // @ts-expect-error test double makes the permission handler identity observable.
+                createPermissionHandler: (options) => ({ permission: options.defaultDecision }),
+            },
+        });
+
+        assert.equal(result.ok, true);
+        assert.equal(result.status, 'ok');
+        assert.equal(result.sessionId, 'tmp-chat-probe');
+        assert.equal(result.deltaCount, 2);
+        assert.equal(result.deltaChars, 'BYOK_PROBE_'.length);
+        assert.equal(result.finalChars, 'BYOK_PROBE_OK'.length);
+        assert.equal(result.observedFinalEvent, true);
+        assert.deepEqual(result.warnings, ['free tier']);
+        assert.equal(unsubscribed, true);
+        assert.equal(capturedConfig.streaming, true);
+        assert.deepEqual(capturedConfig.availableTools, []);
+        assert.deepEqual(capturedConfig.onPermissionRequest, { permission: 'deny' });
+        assert.deepEqual(capturedPayload, { payload: { prompt: 'probe now' }, timeoutMs: 5000 });
     });
 });

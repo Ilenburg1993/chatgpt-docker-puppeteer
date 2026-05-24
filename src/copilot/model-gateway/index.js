@@ -67,6 +67,7 @@ export {
 } from './providers/index.js';
 export { buildModelGatewayOnListModelsHandler } from './session/on-list-models.js';
 export { toCopilotModelInfo, toCopilotModelInfoList } from './session/copilot-model-projection.js';
+export { runConfiguredByokChatProbe } from './probes/index.js';
 export {
     MODEL_GATEWAY_EVENTS,
     MODEL_GATEWAY_MODEL_IMPORTED,
