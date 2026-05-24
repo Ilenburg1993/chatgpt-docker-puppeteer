@@ -144,6 +144,8 @@ export const mcpOAuthFrictionAuditTool = {
                           lastPersistedAt: persistence.lastPersistedAt,
                           lastPersistenceError: persistence.lastPersistenceError,
                           storesOnlyTokenHashes: persistence.storesOnlyTokenHashes,
+                          dynamicClientCount: persistence.dynamicClientCount,
+                          clientStore: persistence.clientStore,
                       }
                     : null,
                 note: 'Longer token lifetimes reduce OAuth reauthentication, but do not disable ChatGPT host tool-call approvals.',

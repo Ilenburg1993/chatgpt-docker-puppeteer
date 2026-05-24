@@ -198,6 +198,7 @@ describe('copilot MCP ChatGPT connection profile', () => {
             'COPILOT_MCP_PUBLIC_URL',
             'COPILOT_MCP_DEV_OAUTH_KEY_FILE',
             'COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE',
+            'COPILOT_MCP_DEV_OAUTH_CLIENT_FILE',
             'COPILOT_MCP_ALLOWED_ORIGINS',
         ]);
         const server = await startHttpMcpServer({ host: '127.0.0.1', port: 0 });
@@ -210,6 +211,7 @@ describe('copilot MCP ChatGPT connection profile', () => {
             process.env['COPILOT_MCP_PUBLIC_URL'] = `${resource}/mcp`;
             process.env['COPILOT_MCP_DEV_OAUTH_KEY_FILE'] = path.join(tempDir, 'oauth-key.pem');
             process.env['COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE'] = path.join(tempDir, 'refresh-tokens.json');
+            process.env['COPILOT_MCP_DEV_OAUTH_CLIENT_FILE'] = path.join(tempDir, 'oauth-clients.json');
             process.env['COPILOT_MCP_ALLOWED_ORIGINS'] = 'https://chatgpt.com,http://127.0.0.1';
             resetDevOAuthRuntimeForTests();
 
@@ -230,6 +232,9 @@ describe('copilot MCP ChatGPT connection profile', () => {
             });
             const clientId = String(registered['client_id']);
             assert.match(clientId, /^mcp_dev_/u);
+            const clientStoreText = await readFile(process.env['COPILOT_MCP_DEV_OAUTH_CLIENT_FILE'], 'utf8');
+            assert.ok(clientStoreText.includes(clientId));
+            resetDevOAuthRuntimeForTests();
 
             const codeVerifier = base64Url(randomBytes(32));
             const codeChallenge = base64Url(createHash('sha256').update(codeVerifier).digest());

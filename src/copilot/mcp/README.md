@@ -55,6 +55,8 @@ O issuer OAuth dev embutido persiste sua chave RS256 em
 Os refresh tokens rotativos tambem persistem, mas somente como hashes SHA-256, em
 `src/copilot/.ai/mcp/oauth-refresh-tokens.json`; isso preserva o linking do ChatGPT durante restarts
 sem gravar refresh token em claro.
+Clientes DCR publicos ficam em `src/copilot/.ai/mcp/oauth-clients.json`, tambem ignorado por git, para que
+um `client_id` emitido antes do restart continue valido quando o ChatGPT repetir o fluxo OAuth.
 Use `COPILOT_MCP_DEV_OAUTH_ROTATE_KEY=true` apenas quando quiser forçar rotação da chave.
 Quick Tunnel continua disponivel como fallback explicito:
 

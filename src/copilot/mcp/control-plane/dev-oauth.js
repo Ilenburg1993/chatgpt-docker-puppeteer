@@ -28,6 +28,8 @@ const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
 const DEFAULT_KEY_FILE = 'src/copilot/.ai/mcp/oauth-dev-private-key.pem';
 const DEFAULT_REFRESH_TOKEN_FILE = 'src/copilot/.ai/mcp/oauth-refresh-tokens.json';
 const REFRESH_TOKEN_STORE_SCHEMA_VERSION = 1;
+const DEFAULT_CLIENT_FILE = 'src/copilot/.ai/mcp/oauth-clients.json';
+const CLIENT_STORE_SCHEMA_VERSION = 1;
 const CLIENT_METADATA_TIMEOUT_MS = 5000;
 const DEV_CLIENT_METADATA_PATH = '/.well-known/oauth-client/codex-smoke.json';
 const DEV_CLIENT_REDIRECT_URI = 'https://chatgpt.com/connector/oauth/codex-smoke';
@@ -91,6 +93,14 @@ let renewCredentialsLoadedFromFile = false;
 let renewCredentialsLastLoadedAt = /** @type {string | null} */ (null);
 let renewCredentialsLastPersistedAt = /** @type {string | null} */ (null);
 let renewCredentialsLastPersistenceError = /** @type {string | null} */ (null);
+
+/** @type {Promise<void> | null} */
+let registeredClientsLoadPromise = null;
+let registeredClientsLoaded = false;
+let registeredClientsLoadedFromFile = false;
+let registeredClientsLastLoadedAt = /** @type {string | null} */ (null);
+let registeredClientsLastPersistedAt = /** @type {string | null} */ (null);
+let registeredClientsLastPersistenceError = /** @type {string | null} */ (null);
 
 /**
  * @param {import('./auth.js').McpAuthConfig} config
@@ -179,6 +189,7 @@ export async function handleBuiltInDevOAuthRequest(req, res, url, config) {
     }
 
     if (req.method === 'POST' && url.pathname === '/oauth/register') {
+        await ensureRegisteredClientsLoaded();
         const body = await readRequestBody(req);
         const redirectUris = normalizeStringArray(body['redirect_uris']);
         if (redirectUris.length === 0 || redirectUris.some((redirectUri) => !isAllowedRedirectUri(redirectUri))) {
@@ -194,6 +205,7 @@ export async function handleBuiltInDevOAuthRequest(req, res, url, config) {
             source: /** @type {const} */ ('dcr'),
         };
         registeredClients.set(clientId, client);
+        await persistRegisteredClients();
         writeJson(res, 201, {
             client_id: clientId,
             client_id_issued_at: Math.floor(client.createdAt / 1000),
@@ -327,6 +339,7 @@ async function handleAuthorize(res, url, config) {
     const resource = url.searchParams.get('resource') ?? config.resource;
     const scope = normalizeScope(url.searchParams.get('scope') ?? config.scopesSupported.join(' '), config);
     const state = url.searchParams.get('state') ?? '';
+    await ensureRegisteredClientsLoaded();
     const client = registeredClients.get(clientId) ?? (await resolveClientMetadataDocument(clientId));
 
     if (
@@ -545,14 +558,17 @@ export function readDevOAuthTokenLifetimePolicy(env = process.env) {
 
 /**
  * @param {NodeJS.ProcessEnv} [env]
- * @returns {{ refreshTokenFile: string; persistenceEnabled: true }}
+ * @returns {{ refreshTokenFile: string; clientFile: string; persistenceEnabled: true }}
  */
 export function readDevOAuthPersistenceConfig(env = process.env) {
     const refreshTokenFile =
         String(env['COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE'] ?? DEFAULT_REFRESH_TOKEN_FILE).trim() ||
         DEFAULT_REFRESH_TOKEN_FILE;
+    const clientFile =
+        String(env['COPILOT_MCP_DEV_OAUTH_CLIENT_FILE'] ?? DEFAULT_CLIENT_FILE).trim() || DEFAULT_CLIENT_FILE;
     return {
         refreshTokenFile,
+        clientFile,
         persistenceEnabled: true,
     };
 }
@@ -570,14 +586,25 @@ export function readDevOAuthPersistenceConfig(env = process.env) {
  *     lastPersistenceError: string | null;
  *     storesOnlyTokenHashes: true;
  *     rotation: 'one-time-rotating-persistent';
+ *     dynamicClientCount: number;
+ *     clientStore: {
+ *         clientFile: string;
+ *         loaded: boolean;
+ *         loadedFromFile: boolean;
+ *         lastLoadedAt: string | null;
+ *         lastPersistedAt: string | null;
+ *         lastPersistenceError: string | null;
+ *     };
  * }>}
  */
 export async function readDevOAuthPersistenceStatus(env = process.env) {
     await ensureRenewCredentialsLoaded(env);
+    await ensureRegisteredClientsLoaded(env);
     const pruned = pruneExpiredRenewCredentials();
     if (pruned) await persistRenewCredentials(env);
+    const persistenceConfig = readDevOAuthPersistenceConfig(env);
     return {
-        ...readDevOAuthPersistenceConfig(env),
+        ...persistenceConfig,
         loaded: renewCredentialsLoaded,
         loadedFromFile: renewCredentialsLoadedFromFile,
         tokenCount: renewCredentials.size,
@@ -586,6 +613,15 @@ export async function readDevOAuthPersistenceStatus(env = process.env) {
         lastPersistenceError: renewCredentialsLastPersistenceError,
         storesOnlyTokenHashes: true,
         rotation: 'one-time-rotating-persistent',
+        dynamicClientCount: registeredClients.size,
+        clientStore: {
+            clientFile: persistenceConfig.clientFile,
+            loaded: registeredClientsLoaded,
+            loadedFromFile: registeredClientsLoadedFromFile,
+            lastLoadedAt: registeredClientsLastLoadedAt,
+            lastPersistedAt: registeredClientsLastPersistedAt,
+            lastPersistenceError: registeredClientsLastPersistenceError,
+        },
     };
 }
 
@@ -605,6 +641,12 @@ export function resetDevOAuthRuntimeForTests() {
     renewCredentialsLastLoadedAt = null;
     renewCredentialsLastPersistedAt = null;
     renewCredentialsLastPersistenceError = null;
+    registeredClientsLoadPromise = null;
+    registeredClientsLoaded = false;
+    registeredClientsLoadedFromFile = false;
+    registeredClientsLastLoadedAt = null;
+    registeredClientsLastPersistedAt = null;
+    registeredClientsLastPersistenceError = null;
 }
 
 /**
@@ -760,6 +802,100 @@ async function persistRenewCredentials(env = process.env) {
  */
 function hashRefreshToken(credential) {
     return createHash('sha256').update(credential).digest('hex');
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {Promise<void>}
+ */
+async function ensureRegisteredClientsLoaded(env = process.env) {
+    if (registeredClientsLoaded) return;
+    registeredClientsLoadPromise ??= loadRegisteredClients(env);
+    await registeredClientsLoadPromise;
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {Promise<void>}
+ */
+async function loadRegisteredClients(env = process.env) {
+    const { clientFile } = readDevOAuthPersistenceConfig(env);
+    registeredClients.clear();
+    registeredClientsLoaded = false;
+    registeredClientsLoadedFromFile = false;
+    registeredClientsLastLoadedAt = new Date().toISOString();
+    registeredClientsLastPersistenceError = null;
+    try {
+        const text = await readFile(clientFile, 'utf8');
+        const parsed = JSON.parse(text);
+        for (const client of parseRegisteredClientRecords(parsed)) registeredClients.set(client.clientId, client);
+        registeredClientsLoadedFromFile = true;
+    } catch (error) {
+        const code = error && typeof error === 'object' ? /** @type {{ code?: unknown }} */ (error).code : undefined;
+        if (code !== 'ENOENT') registeredClientsLastPersistenceError = error instanceof Error ? error.message : String(error);
+    } finally {
+        registeredClientsLoaded = true;
+    }
+}
+
+/**
+ * @param {unknown} parsed
+ * @returns {DevOAuthClient[]}
+ */
+function parseRegisteredClientRecords(parsed) {
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return [];
+    const root = /** @type {Record<string, unknown>} */ (parsed);
+    const rawClients = Array.isArray(root['clients']) ? root['clients'] : [];
+    const clients = [];
+    for (const item of rawClients) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+        const record = /** @type {Record<string, unknown>} */ (item);
+        const clientId = String(record['clientId'] ?? '');
+        const clientName = String(record['clientName'] ?? '');
+        const redirectUris = normalizeStringArray(record['redirectUris']).filter(isAllowedRedirectUri);
+        const createdAt = Number(record['createdAt']);
+        if (!clientId.startsWith('mcp_dev_') || !clientName || redirectUris.length === 0 || !Number.isFinite(createdAt)) {
+            continue;
+        }
+        clients.push({
+            clientId,
+            clientName,
+            redirectUris,
+            createdAt,
+            source: /** @type {const} */ ('dcr'),
+        });
+    }
+    return clients;
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {Promise<void>}
+ */
+async function persistRegisteredClients(env = process.env) {
+    const { clientFile } = readDevOAuthPersistenceConfig(env);
+    const tempFile = `${clientFile}.${process.pid}.${Date.now()}.tmp`;
+    try {
+        await mkdir(path.dirname(clientFile), { recursive: true });
+        const body = {
+            schemaVersion: CLIENT_STORE_SCHEMA_VERSION,
+            updatedAt: new Date().toISOString(),
+            clients: [...registeredClients.values()]
+                .filter((client) => client.source === 'dcr')
+                .sort((left, right) => left.createdAt - right.createdAt || left.clientId.localeCompare(right.clientId)),
+        };
+        await writeFile(tempFile, `${JSON.stringify(body, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+        await rename(tempFile, clientFile);
+        registeredClientsLastPersistedAt = body.updatedAt;
+        registeredClientsLastPersistenceError = null;
+    } catch (error) {
+        registeredClientsLastPersistenceError = error instanceof Error ? error.message : String(error);
+        try {
+            await rm(tempFile, { force: true });
+        } catch {
+            // Best-effort temp cleanup only.
+        }
+    }
 }
 
 /**

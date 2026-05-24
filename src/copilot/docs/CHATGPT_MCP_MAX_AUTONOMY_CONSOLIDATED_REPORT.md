@@ -2880,3 +2880,68 @@ Subfases:
     - `storesOnlyTokenHashes=true`;
     - `plaintextRefreshTokenPresent=false`;
     - token count produzido pelo smoke: 2.
+
+### 16.7. Continuidade pos-push — clientes DCR persistentes
+
+Apos o commit `b4c9863e`, a proxima lacuna natural da mesma frente foi iniciada: clientes DCR tambem eram estado em
+memoria. Embora o ChatGPT possa usar CIMD, DCR persistente reduz risco de relinking quando o conector reutiliza um
+`client_id` emitido antes do restart.
+
+Mudancas em implementacao nesta continuidade:
+
+1. `dev-oauth.js` passa a persistir clientes DCR publicos em `src/copilot/.ai/mcp/oauth-clients.json`.
+2. O arquivo armazena apenas metadados publicos:
+   - `clientId`;
+   - `clientName`;
+   - `redirectUris`;
+   - `createdAt`;
+   - `source=dcr`.
+3. `handleAuthorize()` carrega o client store antes de validar `client_id`.
+4. `handle /oauth/register` persiste o cliente recem-emitido.
+5. `readDevOAuthPersistenceStatus()` agora informa:
+   - `dynamicClientCount`;
+   - `clientStore.clientFile`;
+   - `clientStore.loaded`;
+   - `clientStore.loadedFromFile`;
+   - `clientStore.lastLoadedAt`;
+   - `clientStore.lastPersistedAt`;
+   - `clientStore.lastPersistenceError`.
+6. `mcp_oauth_friction_audit` expõe tambem o status do client store.
+7. `.env.example`, `.env.local.example`, `.env.schema.json`, `package.json`, `Makefile` e `README.md` passam a declarar
+   `COPILOT_MCP_DEV_OAUTH_CLIENT_FILE`.
+8. O teste de persistencia OAuth agora registra um cliente DCR, reseta o runtime logico, e so entao executa
+   `authorize -> token -> refresh`, provando que o client store sobreviveu ao reset.
+
+Subfases adicionais:
+
+1. [x] Persistir DCR client store.
+2. [x] Carregar DCR clients antes de `/oauth/authorize`.
+3. [x] Expor client store em diagnostico OAuth.
+4. [x] Atualizar env/package/Makefile/docs.
+5. [x] Rodar validadores focados.
+6. [x] Reiniciar MCP/Cloudflare e repetir smoke OAuth.
+7. [ ] Commit/push da continuidade.
+
+Validacao da continuidade DCR:
+
+1. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_connection_profile.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`
+   - passou com 47/47.
+2. `npm run typecheck:strict:src.copilot -- --pretty false`
+   - passou apos ajustar JSDoc de `readDevOAuthPersistenceConfig()` e literal type `source=dcr`.
+3. `npm run lint:copilot -- --quiet`
+   - passou.
+4. `npm run test:copilot:unit`
+   - passou com 3094/3094, sem warnings/errors.
+5. `git diff --check`
+   - passou.
+6. `make copilot-mcp-restart`
+   - passou, ativando o client store persistente no endpoint permanente.
+7. `make copilot-mcp-oauth-smoke`
+   - passou com CORS preflight, DCR, CIMD, refresh-token, id-token, userinfo e chamada bearer.
+8. `make copilot-mcp-smoke-refresh`
+   - passou com 75/75 tools remotas.
+9. `make copilot-mcp-status`
+   - passou com `ready=true`.
+10. Stores locais verificados:
+    - `oauth-refresh-tokens.json`: permissao `0600`, 4 hashes, nenhum refresh token em claro;
+    - `oauth-clients.json`: permissao `0600`, 1 cliente DCR publico.
