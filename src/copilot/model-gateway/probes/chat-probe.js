@@ -88,6 +88,7 @@ function defaultAdmission(summary, mode, prompt) {
  *     deltaCount: number;
  *     deltaChars: number;
  *     finalChars: number;
+ *     finalContent: string;
  *     observedFinalEvent: boolean;
  *     sessionId: string | null;
  *     errors: string[];
@@ -120,6 +121,7 @@ export async function runConfiguredByokChatProbe(options = {}) {
             deltaCount: 0,
             deltaChars: 0,
             finalChars: 0,
+            finalContent: '',
             observedFinalEvent: false,
             sessionId: null,
             errors:
@@ -156,6 +158,7 @@ export async function runConfiguredByokChatProbe(options = {}) {
             deltaCount: 0,
             deltaChars: 0,
             finalChars: 0,
+            finalContent: '',
             observedFinalEvent: false,
             sessionId: null,
             errors: [admission.label],
@@ -234,6 +237,7 @@ export async function runConfiguredByokChatProbe(options = {}) {
             deltaCount,
             deltaChars,
             finalChars: finalContent.length,
+            finalContent,
             observedFinalEvent,
             sessionId,
             errors,
@@ -251,6 +255,7 @@ export async function runConfiguredByokChatProbe(options = {}) {
         deltaCount,
         deltaChars,
         finalChars,
+        finalContent,
         observedFinalEvent,
         sessionId,
         errors: ok ? errors : [...errors, 'Probe concluiu sem delta nem mensagem final.'],

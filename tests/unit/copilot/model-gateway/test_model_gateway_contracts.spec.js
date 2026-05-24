@@ -36,6 +36,7 @@ import {
     BYOK_AGENT_PROBE_TOOL,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
+    runConfiguredByokJsonProbe,
     runConfiguredByokStreamingProbe,
     toCopilotModelInfoList,
 } from '../../../../src/copilot/model-gateway/index.js';
@@ -572,6 +573,7 @@ describe('model-gateway foundation', () => {
         assert.equal(result.deltaCount, 2);
         assert.equal(result.deltaChars, 'BYOK_PROBE_'.length);
         assert.equal(result.finalChars, 'BYOK_PROBE_OK'.length);
+        assert.equal(result.finalContent, 'BYOK_PROBE_OK');
         assert.equal(result.observedFinalEvent, true);
         assert.deepEqual(result.warnings, ['free tier']);
         assert.equal(unsubscribed, true);
@@ -743,5 +745,72 @@ describe('model-gateway foundation', () => {
         assert.equal(withoutDelta.status, 'no-delta');
         assert.equal(withoutDelta.streamingProved, false);
         assert.match(withoutDelta.errors.at(-1) ?? '', /message_delta/);
+    });
+
+    it('validates configured BYOK JSON probe from final assistant content', async () => {
+        const baseDeps = {
+            // @ts-expect-error test double keeps only the fields consumed by the probe.
+            readConfiguredByokState: () => ({
+                enabled: true,
+                ready: true,
+                provider: { type: 'openai', apiKey: 'secret' },
+                model: 'model-json',
+                errors: [],
+                warnings: [],
+                summary: { model: 'model-json', profile: 'dev', preset: 'mistral', providerType: 'openai' },
+            }),
+            // @ts-expect-error test double keeps only the fields consumed by the probe.
+            resolveConfiguredByokSessionOverrides: () => ({
+                provider: { type: 'openai', apiKey: 'secret' },
+                model: 'model-json',
+                summary: {
+                    model: 'model-json',
+                    profile: 'dev',
+                    preset: 'mistral',
+                    providerType: 'openai',
+                    warnings: [],
+                },
+            }),
+            // @ts-expect-error test double calls the callback synchronously with a fake SDK session.
+            withEphemeralSession: async (_config, callback) => {
+                await callback({ session: { id: 'json-session-object' }, sessionId: 'tmp-json-probe' });
+            },
+            // @ts-expect-error test double records no actual permission behavior.
+            createPermissionHandler: () => ({}),
+        };
+
+        const valid = await runConfiguredByokJsonProbe({
+            deps: {
+                ...baseDeps,
+                // @ts-expect-error test double emits valid JSON final content.
+                onSessionEvents: (_session, handlers) => {
+                    handlers['assistant.message']?.({ data: { content: '{"byok_probe":"ok","mode":"json"}' } });
+                    return () => {};
+                },
+                // @ts-expect-error test double returns valid JSON final content.
+                sendSessionAndWait: async () => ({ data: { content: '{"byok_probe":"ok","mode":"json"}' } }),
+            },
+        });
+        const invalid = await runConfiguredByokJsonProbe({
+            deps: {
+                ...baseDeps,
+                // @ts-expect-error test double emits invalid JSON final content.
+                onSessionEvents: (_session, handlers) => {
+                    handlers['assistant.message']?.({ data: { content: 'not-json' } });
+                    return () => {};
+                },
+                // @ts-expect-error test double returns invalid JSON final content.
+                sendSessionAndWait: async () => ({ data: { content: 'not-json' } }),
+            },
+        });
+
+        assert.equal(valid.ok, true);
+        assert.equal(valid.status, 'ok');
+        assert.equal(valid.jsonProved, true);
+        assert.deepEqual(valid.parsedJson, { byok_probe: 'ok', mode: 'json' });
+        assert.equal(invalid.ok, false);
+        assert.equal(invalid.status, 'json-invalid');
+        assert.equal(invalid.jsonProved, false);
+        assert.match(invalid.errors.at(-1) ?? '', /JSON invalido/);
     });
 });

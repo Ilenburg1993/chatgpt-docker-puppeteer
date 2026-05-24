@@ -186,7 +186,7 @@ src/copilot/model-gateway/
 - [x] Promover probe chat descartável para `model-gateway/probes`.
 - [x] Promover probe agente descartável com tools + `ask_user`.
 - [x] Adicionar probe streaming/delta.
-- [ ] Adicionar probe JSON.
+- [x] Adicionar probe JSON.
 - [ ] Adicionar probe de vision quando houver fixtures seguras.
 - [ ] Registrar cada probe em health e observability.
 - [ ] Diferenciar `catalog says` de `runtime proved`.

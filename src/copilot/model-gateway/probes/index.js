@@ -17,4 +17,5 @@ export {
     BYOK_AGENT_PROBE_TOOL,
     runConfiguredByokAgentProbe,
 } from './agent-probe.js';
+export { runConfiguredByokJsonProbe } from './json-probe.js';
 export { runConfiguredByokStreamingProbe } from './streaming-probe.js';

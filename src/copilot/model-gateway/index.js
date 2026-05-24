@@ -75,6 +75,7 @@ export {
     BYOK_AGENT_PROBE_TOOL,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
+    runConfiguredByokJsonProbe,
     runConfiguredByokStreamingProbe,
 } from './probes/index.js';
 export {
