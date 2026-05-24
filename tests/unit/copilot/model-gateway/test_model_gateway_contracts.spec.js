@@ -16,6 +16,7 @@ import {
     buildEnvByokModelGatewaySnapshot,
     buildModelGatewayOperatorProjection,
     buildProviderModelId,
+    buildProbeCompletedEvent,
     buildRegistrySnapshotEvent,
     createEnvSecretRegistry,
     buildModelGatewayOnListModelsHandler,
@@ -25,6 +26,7 @@ import {
     OPENAI_PROVIDER_FAMILY_SPECS,
     openRouterAdapter,
     persistEnvByokModelGatewaySnapshot,
+    projectProbeCompletedMetrics,
     projectModelGatewayMetrics,
     redactSecretRecord,
     redactSecretText,
@@ -169,6 +171,44 @@ describe('model-gateway foundation', () => {
         assert.ok(event.modelCount >= 1);
         assert.equal(metrics.gauges['model_gateway.providers'], 1);
         assert.equal(JSON.stringify({ event, metrics }).includes('gsk-secret-value-that-must-not-leak'), false);
+    });
+
+    it('projects probe completion into stable observability event and metrics without prompt content', () => {
+        const event = buildProbeCompletedEvent({
+            probeKind: 'streaming',
+            providerAttempted: true,
+            result: {
+                ok: false,
+                status: 'no-delta',
+                elapsedMs: 1234,
+                model: 'free-model',
+                profile: 'openrouter-free',
+                preset: 'openrouter',
+                providerType: 'openai',
+                deltaCount: 0,
+                deltaChars: 0,
+                finalChars: 32,
+                observedFinalEvent: true,
+                sessionId: 'tmp-stream-probe',
+                errors: ['Probe respondeu, mas não emitiu assistant.message_delta.'],
+                warnings: ['free tier'],
+                // @ts-expect-error event builder intentionally ignores content-bearing probe fields.
+                finalContent: 'STREAM_A STREAM_B STREAM_C',
+            },
+        });
+        const metrics = projectProbeCompletedMetrics(event);
+
+        assert.equal(event.type, 'model_gateway:probe:completed');
+        assert.equal(event.probeKind, 'streaming');
+        assert.equal(event.ok, false);
+        assert.equal(event.status, 'no-delta');
+        assert.equal(event.errorCount, 1);
+        assert.equal(event.warningCount, 1);
+        assert.equal(JSON.stringify(event).includes('STREAM_A'), false);
+        assert.equal(metrics.counters['model_gateway.probe.failed'], 1);
+        assert.equal(metrics.counters['model_gateway.probe.kind.streaming'], 1);
+        assert.equal(metrics.counters['model_gateway.probe.status.no-delta'], 1);
+        assert.equal(metrics.gauges['model_gateway.probe.final_chars'], 32);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {

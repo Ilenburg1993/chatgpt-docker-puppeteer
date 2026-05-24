@@ -86,6 +86,8 @@ export {
     MODEL_GATEWAY_PROVIDER_IMPORTED,
     MODEL_GATEWAY_REGISTRY_SNAPSHOT,
     MODEL_GATEWAY_ROUTE_DECISION,
+    buildProbeCompletedEvent,
     buildRegistrySnapshotEvent,
+    projectProbeCompletedMetrics,
     projectModelGatewayMetrics,
 } from './observability/events.js';
