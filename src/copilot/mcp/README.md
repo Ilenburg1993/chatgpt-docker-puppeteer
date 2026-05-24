@@ -45,6 +45,7 @@ Em outro terminal:
 ```bash
 npm run copilot:mcp:cloudflare:status
 npm run copilot:mcp:cloudflare:remote-audit
+npm run copilot:mcp:cloudflare:edge-audit
 npm run copilot:mcp:cloudflare:smoke
 npm run copilot:mcp:oauth:smoke
 ```
@@ -61,6 +62,10 @@ um `client_id` emitido antes do restart continue valido quando o ChatGPT repetir
 Use `COPILOT_MCP_DEV_OAUTH_ROTATE_KEY=true` apenas quando quiser forçar rotação da chave.
 Use `npm run copilot:mcp:cloudflare:remote-audit` para comparar a config remota Cloudflare contra o estado
 canonico local sem imprimir tokens. O serviço de origem remoto deve permanecer `http://127.0.0.1:3333`.
+Use `npm run copilot:mcp:cloudflare:edge-audit` para auditar, quando o token permitir, rulesets da zona
+que possam interferir em MCP/OAuth: cache, WAF, rate limit e transform rules. Se o token atual ainda nao
+tiver `Zone:Read`/`Zone Rulesets:Read`, o comando retorna estado parcial com permissoes faltantes em vez de
+expor segredos.
 Quick Tunnel continua disponivel como fallback explicito:
 
 ```bash

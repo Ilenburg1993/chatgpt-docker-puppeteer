@@ -3188,3 +3188,151 @@ Validacao desta continuidade:
    - passou com 78/78 tools remotas e `toolsMatchLocalRegistry=true`.
    - `mcp_cloudflare_metrics_snapshot` apareceu no registry remoto.
 8. Proximo passo: commit/push da continuidade de metricas.
+
+## 18. Faixa Cloudflare Edge — cache, WAF, rate limit e transforms
+
+Data: 2026-05-24.
+
+Documento especifico criado:
+
+1. `src/copilot/docs/CLOUDFLARE_EDGE_CANONICAL_ROADMAP_2026-05-24.md`
+
+Motivo da faixa:
+
+1. O tunnel permanente ja esta saudavel.
+2. O endpoint publico canonico ja e `https://mcp.aurelin.org/mcp`.
+3. A proxima camada de risco nao e apenas conectividade do tunnel, mas interferencia da edge Cloudflare:
+   - cache indevido em `/mcp`, `/.well-known/*`, `/oauth/*` ou `/health`;
+   - WAF/challenge interativo em cliente MCP nao-browser;
+   - rate limit baixo para sessoes autenticadas longas;
+   - transform rule alterando headers de OAuth/CORS/streaming;
+   - dificuldade de diferenciar falha do origin, falha do tunnel e bloqueio de edge.
+
+Investigacao oficial usada nesta faixa:
+
+1. Cloudflare Codex + Cloudflare:
+   - `https://developers.cloudflare.com/agent-setup/codex/`
+   - conclusao: o MCP oficial da Cloudflare e complemento operacional util para administrar DNS/WAF/Rulesets/Tunnel, mas nao substitui nosso MCP local do repo.
+2. Cloudflare MCP servers:
+   - `https://developers.cloudflare.com/agents/model-context-protocol/mcp-servers-for-cloudflare/`
+   - conclusao: `https://mcp.cloudflare.com/mcp` expoe a API Cloudflare via Code Mode e pode ajudar em operacoes profundas quando conectado/autorizado.
+3. Cloudflare Tunnel configuration:
+   - `https://developers.cloudflare.com/tunnel/configuration/`
+   - conclusao: nosso uso de tunnel permanente com `cloudflared` outbound e metricas locais esta alinhado ao modelo oficial.
+4. Cloudflare Tunnel metrics:
+   - `https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/monitor-tunnels/metrics/`
+   - conclusao: `--metrics 127.0.0.1:60123` e o caminho correto para observabilidade local.
+5. Cloudflare Node SDK Rulesets:
+   - `https://developers.cloudflare.com/api/node/resources/rulesets/`
+   - conclusao: o pacote oficial `cloudflare` permite auditar rulesets da zona em modo read-only.
+
+Mudancas implementadas:
+
+1. Novo modulo `src/copilot/mcp/cloudflare/edge-audit.js`.
+   - le config Cloudflare sem imprimir tokens;
+   - resolve `zoneId` por env ou `zones.list`;
+   - lista rulesets de fases relevantes:
+     - `http_request_cache_settings`;
+     - `http_request_firewall_custom`;
+     - `http_ratelimit`;
+     - `http_request_transform`;
+     - `http_response_headers_transform`;
+     - `http_config_settings`;
+     - `http_request_origin`;
+   - normaliza rulesets/regras com IDs redigidos;
+   - detecta cache bypass ausente/presente;
+   - detecta WAF/block/challenge em `/mcp`;
+   - detecta rate limit em `/oauth/token`;
+   - detecta rate limit em `/mcp`;
+   - detecta transforms sobre headers sensiveis.
+2. Nova tool MCP `mcp_cloudflare_edge_audit`.
+3. Registry canonico atualizado.
+4. `mcp_capabilities_summary` atualizado para anunciar a auditoria de edge.
+5. Smoke Cloudflare atualizado para esperar a tool nova.
+6. Novo script `npm run copilot:mcp:cloudflare:edge-audit`.
+7. Novo target `make copilot-mcp-edge-audit`.
+8. README do MCP atualizado com o novo comando.
+9. Testes unitarios novos em `tests/unit/copilot/mcp/test_cloudflare_edge_audit.spec.js`.
+
+Resultado da primeira execucao real:
+
+1. `npm run copilot:mcp:cloudflare:edge-audit`
+   - `ok=true`;
+   - `edgeAuditable=true`;
+   - `zone` resolvida por `cloudflare:zones.list`;
+   - `zoneId` redigido;
+   - `rulesets=[]` no momento da auditoria;
+   - nenhum `critical`;
+   - warnings por ausencia de regras explicitas:
+     - cache bypass para rotas dinamicas;
+     - rate limit moderado de `/oauth/token`;
+     - rate limit/limite anti-abuse de `/mcp`.
+
+Interpretacao:
+
+1. O token atual conseguiu auditar a zona/rulesets nesta faixa, apesar do warning anterior de DNS API.
+2. A zona aparentemente ainda nao tem rulesets relevantes para o hostname MCP.
+3. Isso e bom para evitar interferencia acidental imediata.
+4. Tambem deixa oportunidade clara: criar regras explicitas e cuidadosamente testadas para cache bypass e anti-abuse.
+5. A proxima fase segura e manter auditoria read-only por alguns ciclos antes de aplicar rulesets automaticamente.
+
+Validacao focada ja executada:
+
+1. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_cloudflare_edge_audit.spec.js tests/unit/copilot/mcp/test_mcp_registry.spec.js --reporter=dot`
+   - passou com 8/8.
+
+Roadmap atualizado desta faixa:
+
+1. [x] Criar plano Cloudflare Edge especifico.
+2. [x] Criar auditoria read-only de edge/rulesets.
+3. [x] Expor auditoria como tool MCP.
+4. [x] Adicionar script/package e target Makefile.
+5. [x] Criar testes unitarios focados.
+6. [x] Rodar typecheck strict.
+7. [x] Rodar lint.
+8. [x] Rodar unit tests completos.
+9. [x] Rodar `make copilot-mcp-edge-audit`.
+10. [x] Rodar `make copilot-mcp-smoke-refresh` apos restart para confirmar a nova tool no endpoint publico.
+11. [ ] Commit/push da faixa Cloudflare Edge.
+
+Proximo passo tecnico:
+
+1. Commit/push da faixa Cloudflare Edge.
+2. Planejar faixa posterior de desired edge policy e diff seguro antes de qualquer mutacao de rulesets.
+
+Validacao final da faixa:
+
+1. `npm run typecheck:strict:src.copilot -- --pretty false`
+   - passou.
+2. `npm run lint:copilot -- --quiet`
+   - passou.
+3. `npm run test:copilot:unit`
+   - passou com 3101/3101, sem warnings/errors.
+4. `git diff --check`
+   - passou.
+5. `make copilot-mcp-restart`
+   - passou, reiniciando `mcp-http` e `cloudflared`.
+6. `make copilot-mcp-status`
+   - passou com `ready=true`, OAuth e last smoke recente.
+7. `make copilot-mcp-remote-audit`
+   - passou com tunnel healthy, 4 conexoes e ingress `mcp.aurelin.org -> http://127.0.0.1:3333`.
+   - DNS segue com warning `403 Authentication error`, sem critical.
+8. `make copilot-mcp-edge-audit`
+   - passou com `edgeAuditable=true`.
+   - zona `aurelin.org` resolvida via `zones.list`.
+   - `rulesets=[]`.
+   - nenhum critical.
+   - warnings por ausencia de regras explicitas de cache bypass e rate limiting.
+9. `make copilot-mcp-smoke-refresh`
+   - passou com 79/79 tools remotas.
+   - `mcp_cloudflare_edge_audit` presente no endpoint publico.
+
+Correcao adicional descoberta pelos validadores:
+
+1. A suite completa expôs flake de tempo em `tests/unit/copilot/conversation-hub/test_hub.spec.js`.
+2. Causa: teste de `ConversationHub` usava o `conversationStore` singleton real, competindo com outros testes paralelos.
+3. Correcao estrutural:
+   - `ConversationHub` agora aceita `ConversationStore` injetavel.
+   - o singleton de producao continua usando o store padrao.
+   - o teste passou a usar SQLite `:memory:` com migrations e store isolado.
+4. O teste isolado do hub passou em seguida, e a suite completa confirmou a estabilidade.

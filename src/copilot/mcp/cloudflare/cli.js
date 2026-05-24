@@ -13,6 +13,7 @@ import process from 'node:process';
 import { formatChatGptConnectorAuthentication } from '../connection/profile.js';
 import { readMcpAuthConfig } from '../control-plane/auth.js';
 import { getCanonicalMcpTools } from '../registry.js';
+import { auditCloudflareEdgeRulesets } from './edge-audit.js';
 import { auditCloudflareRemoteTunnel } from './remote-api.js';
 import {
     buildManagedTunnelArgs,
@@ -48,6 +49,8 @@ try {
         await runSmoke();
     } else if (command === 'remote-audit') {
         await runRemoteAudit();
+    } else if (command === 'edge-audit') {
+        await runEdgeAudit();
     } else if (command === 'up') {
         await runUp();
     } else if (command === 'down') {
@@ -62,7 +65,7 @@ try {
         );
     } else {
         fail(
-            `Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, remote-audit, up, down, restart, or run.`,
+            `Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, remote-audit, edge-audit, up, down, restart, or run.`,
         );
     }
 } catch (error) {
@@ -297,6 +300,7 @@ async function runSmoke() {
         'mcp_smoke_workspace',
         'mcp_tools_status',
         'mcp_tunnel_status',
+        'mcp_cloudflare_edge_audit',
         'mcp_cloudflare_remote_audit',
         'mcp_cloudflare_metrics_snapshot',
         'mcp_connector_smoke_refresh',
@@ -390,6 +394,15 @@ async function runSmoke() {
  */
 async function runRemoteAudit() {
     const report = await auditCloudflareRemoteTunnel();
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runEdgeAudit() {
+    const report = await auditCloudflareEdgeRulesets();
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     if (!report.ok) process.exitCode = 1;
 }

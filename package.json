@@ -320,6 +320,7 @@
     "copilot:index:status": "node scripts/copilot-io-index.mjs status",
     "copilot:mcp:cloudflare:doctor": "node src/copilot/mcp/cloudflare/cli.js doctor",
     "copilot:mcp:cloudflare:down": "node src/copilot/mcp/cloudflare/cli.js down",
+    "copilot:mcp:cloudflare:edge-audit": "node src/copilot/mcp/cloudflare/cli.js edge-audit",
     "copilot:mcp:cloudflare:install": "bash src/copilot/mcp/cloudflare/install-cloudflared.sh",
     "copilot:mcp:cloudflare:quick": "node src/copilot/mcp/cloudflare/cli.js quick",
     "copilot:mcp:cloudflare:remote-audit": "node src/copilot/mcp/cloudflare/cli.js remote-audit",

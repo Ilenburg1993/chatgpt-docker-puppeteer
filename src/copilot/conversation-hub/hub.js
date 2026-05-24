@@ -64,8 +64,18 @@ export class ConversationHub {
     /** @type {HubOrchestrator | null} */
     #orchestrator = null;
 
+    /** @type {import('./store.js').ConversationStore} */
+    #store;
+
     /** @type {boolean} */
     #initialized = false;
+
+    /**
+     * @param {import('./store.js').ConversationStore} [store]
+     */
+    constructor(store = conversationStore) {
+        this.#store = store;
+    }
 
     // ─── Inicialização ─────────────────────────────────────────────────────────
 
@@ -85,17 +95,17 @@ export class ConversationHub {
         }
 
         // 1. Inicializar store (DDL idempotente)
-        conversationStore.init();
+        this.#store.init();
 
         // 2. Criar orquestrador
-        this.#orchestrator = new HubOrchestrator(conversationStore);
+        this.#orchestrator = new HubOrchestrator(this.#store);
         this.#orchestrator.init();
 
         // 3. Montar namespace Socket.io /copilot (se io e mountFn fornecidos)
         // Faixa-3.1: mountFn é injetada pelo server layer — hub.js não importa de server/
         if (opts?.io) {
             if (opts.mountFn) {
-                opts.mountFn(opts.io, this.#orchestrator, conversationStore);
+                opts.mountFn(opts.io, this.#orchestrator, this.#store);
             } else {
                 log(
                     'DEBUG',
@@ -147,7 +157,7 @@ export class ConversationHub {
             );
         }
         if (mountFn) {
-            mountFn(io, this.#orchestrator, conversationStore);
+            mountFn(io, this.#orchestrator, this.#store);
             log('INFO', '[ConversationHub] Socket.IO conectado via attachSocketIO() com mountFn.');
         } else {
             log('INFO', '[ConversationHub] Socket.IO disponível — namespace já montado por createCopilotSocket().');
@@ -177,7 +187,7 @@ export class ConversationHub {
      * @returns {import('./store.js').ConversationStore}
      */
     get store() {
-        return conversationStore;
+        return this.#store;
     }
 
     /**
@@ -279,7 +289,7 @@ export class ConversationHub {
         // Fechar todas as sessões ativas no orchestrator
         if (this.#orchestrator) {
             try {
-                const activeSessions = conversationStore.listHubSessions({ status: 'active' });
+                const activeSessions = this.#store.listHubSessions({ status: 'active' });
                 for (const session of activeSessions) {
                     try {
                         this.#orchestrator.closeSession(session.id);

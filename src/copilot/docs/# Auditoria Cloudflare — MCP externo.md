@@ -1,4 +1,4 @@
-# Auditoria Cloudflare — MCP externo do ChatGPT.com vs runtime local `src/copilot`
+# Auditoria Cloudflare 1 — MCP externo do ChatGPT.com vs runtime local `src/copilot`
 
 Data: 2026-05-24
 Escopo deste turno: Cloudflare, Cloudflare Tunnel, SDK/API oficial Node/TypeScript, operação do hostname `mcp.aurelin.org`, e superfície MCP externa usada pelo ChatGPT.com.

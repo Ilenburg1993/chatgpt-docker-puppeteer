@@ -7,17 +7,61 @@
  */
 
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
 import { ConversationHub } from '../../../../src/copilot/conversation-hub/hub.js';
+import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
+import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
+
+const require = createRequire(import.meta.url);
+
+/** @param {import('better-sqlite3').Database} db */
+function applyCopilotMigrations(db) {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            applied_at_ms INTEGER NOT NULL
+        );
+    `);
+    for (const migration of COPILOT_MIGRATIONS) {
+        if (typeof migration.up === 'string') db.exec(migration.up);
+        else if (typeof migration.upFn === 'function') migration.upFn(db);
+        db.prepare('INSERT OR IGNORE INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)').run(
+            migration.version,
+            migration.name,
+            Date.now(),
+        );
+    }
+}
 
 // ─── Helper ──────────────────────────────────────────────────────────────
 
 /** Helper para criar instância não-singleton com init() standalone */
 async function createHub() {
-    const hub = new ConversationHub();
+    const Database = require('better-sqlite3');
+    const db = new Database(':memory:');
+    applyCopilotMigrations(db);
+    const store = new ConversationStore();
+    store.init(db);
+    const hub = new ConversationHub(store);
     await hub.init();
+    /** @type {ConversationHub & { __testDb?: import('better-sqlite3').Database }} */
+    const testHub = hub;
+    testHub.__testDb = db;
     return hub;
+}
+
+/**
+ * @param {ConversationHub} hub
+ */
+function cleanupHub(hub) {
+    hub.stop();
+    hub.store.close();
+    /** @type {ConversationHub & { __testDb?: import('better-sqlite3').Database }} */
+    const testHub = hub;
+    testHub.__testDb?.close();
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────
@@ -26,15 +70,14 @@ describe('ConversationHub lifecycle', () => {
     it('init() sem args marca isReady=true', async () => {
         const hub = await createHub();
         assert.strictEqual(hub.isReady, true);
-        hub.stop();
+        cleanupHub(hub);
     });
 
     it('init() é idempotente', async () => {
-        const hub = new ConversationHub();
+        const hub = await createHub();
         await hub.init();
-        await hub.init(); // should be no-op
         assert.strictEqual(hub.isReady, true);
-        hub.stop();
+        cleanupHub(hub);
     });
 
     it('orchestrator getter lança antes de init', () => {
@@ -45,7 +88,7 @@ describe('ConversationHub lifecycle', () => {
     it('stop reseta isReady para false', async () => {
         const hub = await createHub();
         assert.strictEqual(hub.isReady, true);
-        hub.stop();
+        cleanupHub(hub);
         assert.strictEqual(hub.isReady, false);
     });
 
@@ -63,6 +106,10 @@ describe('ConversationHub lifecycle', () => {
 
         await hub.close();
         assert.strictEqual(hub.isReady, false);
+        hub.store.close();
+        /** @type {ConversationHub & { __testDb?: import('better-sqlite3').Database }} */
+        const testHub = hub;
+        testHub.__testDb?.close();
     });
 });
 
@@ -75,7 +122,7 @@ describe('ConversationHub facade methods (standalone)', () => {
     });
 
     afterEach(() => {
-        hub.stop();
+        cleanupHub(hub);
     });
 
     it('createSession retorna hubSessionId', () => {
