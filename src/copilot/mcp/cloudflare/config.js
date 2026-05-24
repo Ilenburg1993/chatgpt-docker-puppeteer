@@ -17,6 +17,7 @@ export const DEFAULT_QUICK_TUNNEL_STATE_FILE = 'src/copilot/.ai/cloudflare/quick
 export const DEFAULT_CONNECTOR_SMOKE_STATE_FILE = 'src/copilot/.ai/cloudflare/connector-smoke.json';
 export const DEFAULT_MANAGED_TUNNEL_PID_FILE = 'src/copilot/.ai/cloudflare/cloudflared.pid';
 export const DEFAULT_MCP_HTTP_PID_FILE = 'src/copilot/.ai/cloudflare/mcp-http.pid';
+export const DEFAULT_CLOUDFLARE_EDGE_BACKUP_DIR = 'src/copilot/.ai/cloudflare/edge-snapshots';
 export const DEFAULT_QUICK_TUNNEL_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
 export const DEFAULT_CLOUDFLARE_METRICS_ADDR = '127.0.0.1:60123';
 export const DEFAULT_CLOUDFLARE_LOGLEVEL = 'info';

@@ -13,6 +13,7 @@ import process from 'node:process';
 import { formatChatGptConnectorAuthentication } from '../connection/profile.js';
 import { readMcpAuthConfig } from '../control-plane/auth.js';
 import { getCanonicalMcpTools } from '../registry.js';
+import { createCloudflareEdgeBackup, listCloudflareEdgeBackups } from './edge-backup.js';
 import { auditCloudflareEdgeRulesets } from './edge-audit.js';
 import { diffCloudflareEdgePolicy } from './edge-policy-diff.js';
 import { buildCloudflareEdgePolicyPlan } from './edge-policy-plan.js';
@@ -60,6 +61,10 @@ try {
         await runEdgePolicyPlan();
     } else if (command === 'edge-snapshot') {
         await runEdgeSnapshot();
+    } else if (command === 'edge-backup-create') {
+        await runEdgeBackupCreate();
+    } else if (command === 'edge-backup-list') {
+        await runEdgeBackupList();
     } else if (command === 'up') {
         await runUp();
     } else if (command === 'down') {
@@ -74,7 +79,7 @@ try {
         );
     } else {
         fail(
-            `Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, remote-audit, edge-audit, edge-policy-diff, edge-policy-plan, edge-snapshot, up, down, restart, or run.`,
+            `Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, remote-audit, edge-audit, edge-policy-diff, edge-policy-plan, edge-snapshot, edge-backup-create, edge-backup-list, up, down, restart, or run.`,
         );
     }
 } catch (error) {
@@ -248,15 +253,17 @@ async function runSmoke() {
         );
     }
     const baseUrl = connectorUrl.replace(/\/mcp$/, '');
-    const health = await probeJson(`${baseUrl}/health`, { method: 'GET' });
+    const health = await probeJsonWithRetry(`${baseUrl}/health`, { method: 'GET' });
     const authConfig = readMcpAuthConfig();
-    const protectedResource = await probeJson(`${baseUrl}/.well-known/oauth-protected-resource`, { method: 'GET' });
+    const protectedResource = await probeJsonWithRetry(`${baseUrl}/.well-known/oauth-protected-resource`, {
+        method: 'GET',
+    });
     const authorizationServer = extractAuthorizationServer(protectedResource.body) ?? baseUrl;
-    const oauthMetadata = await probeJson(`${authorizationServer}/.well-known/oauth-authorization-server`, {
+    const oauthMetadata = await probeJsonWithRetry(`${authorizationServer}/.well-known/oauth-authorization-server`, {
         method: 'GET',
     });
     const oauthSummary = summarizeOAuthReadiness(protectedResource.body, oauthMetadata.body, authConfig.mode);
-    const toolsList = await probeJson(connectorUrl, {
+    const toolsList = await probeJsonWithRetry(connectorUrl, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -309,6 +316,8 @@ async function runSmoke() {
         'mcp_smoke_workspace',
         'mcp_tools_status',
         'mcp_tunnel_status',
+        'mcp_cloudflare_edge_backup_create',
+        'mcp_cloudflare_edge_backups_list',
         'mcp_cloudflare_edge_audit',
         'mcp_cloudflare_edge_policy_diff',
         'mcp_cloudflare_edge_policy_plan',
@@ -335,12 +344,14 @@ async function runSmoke() {
         ok: health.ok,
         ...(health.status !== undefined ? { status: health.status } : {}),
         ...(health.error ? { error: health.error } : {}),
+        ...(health.attempts !== undefined ? { attempts: health.attempts } : {}),
         body: health.body,
     };
     const toolsListSummary = {
         ok: toolsList.ok,
         ...(toolsList.status !== undefined ? { status: toolsList.status } : {}),
         ...(toolsList.error ? { error: toolsList.error } : {}),
+        ...(toolsList.attempts !== undefined ? { attempts: toolsList.attempts } : {}),
         tools: remoteToolNames.length,
         expectedLocalTools: localToolNames.length,
         toolsMatchLocalRegistry,
@@ -354,6 +365,7 @@ async function runSmoke() {
         ok: toolsList.ok,
         ...(toolsList.status !== undefined ? { status: toolsList.status } : {}),
         ...(toolsList.error ? { error: toolsList.error } : {}),
+        ...(toolsList.attempts !== undefined ? { attempts: toolsList.attempts } : {}),
         tools: remoteToolNames.length,
         expectedLocalTools: localToolNames.length,
         toolsMatchLocalRegistry,
@@ -442,6 +454,27 @@ async function runEdgePolicyPlan() {
  */
 async function runEdgeSnapshot() {
     const report = await buildCloudflareEdgeSnapshot();
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runEdgeBackupCreate() {
+    const label = process.argv[3];
+    const report = await createCloudflareEdgeBackup({
+        ...(typeof label === 'string' && label.trim() ? { label } : {}),
+    });
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runEdgeBackupList() {
+    const report = await listCloudflareEdgeBackups();
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     if (!report.ok) process.exitCode = 1;
 }
@@ -917,6 +950,46 @@ async function probeJson(url, init) {
     } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
+}
+
+/**
+ * @param {string} url
+ * @param {RequestInit} init
+ * @param {{ attempts?: number; delayMs?: number }} [options]
+ * @returns {Promise<{ ok: boolean; status?: number; body?: unknown; error?: string; attempts: number }>}
+ */
+async function probeJsonWithRetry(url, init, options = {}) {
+    const attempts = options.attempts ?? 6;
+    const delayMs = options.delayMs ?? 1500;
+    /** @type {{ ok: boolean; status?: number; body?: unknown; error?: string; attempts: number } | null} */
+    let last = null;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        const result = await probeJson(url, init);
+        last = { ...result, attempts: attempt };
+        if (result.ok || !isTransientProbeFailure(result) || attempt === attempts) return last;
+        await sleep(delayMs * attempt);
+    }
+    return last ?? { ok: false, error: 'probe-not-run', attempts: 0 };
+}
+
+/**
+ * @param {{ ok: boolean; status?: number; error?: string }} result
+ * @returns {boolean}
+ */
+function isTransientProbeFailure(result) {
+    if (result.ok) return false;
+    if (result.error) return true;
+    return result.status === 502 || result.status === 503 || result.status === 504;
+}
+
+/**
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
+function sleep(ms) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
 }
 
 /**

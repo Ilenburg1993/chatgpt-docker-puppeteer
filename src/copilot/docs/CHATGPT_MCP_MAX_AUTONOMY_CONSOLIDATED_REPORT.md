@@ -3524,3 +3524,71 @@ Proximo passo tecnico:
 
 1. Criar uma camada de backup/restore ou instrucao operacional manual antes da primeira mutacao Cloudflare real.
 2. Depois disso, aplicar em ordem: cache bypass explicito, rate limit anonimo de `/mcp`, rate limit de `/oauth/token`.
+
+### 18.4. Continuidade — backup persistido antes de mutacao Cloudflare
+
+Apos publicar a snapshot read-only, a proxima camada transforma a recomendacao de backup em operacao canonica
+do proprio MCP/CLI. O objetivo e permitir que ChatGPT/Claude criem um ponto local de restauracao antes de qualquer
+mudanca de cache, WAF, transform ou rate-limit.
+
+Mudancas em andamento:
+
+1. Novo modulo `src/copilot/mcp/cloudflare/edge-backup.js`.
+2. Nova tool MCP `mcp_cloudflare_edge_backup_create`.
+3. Nova tool MCP `mcp_cloudflare_edge_backups_list`.
+4. Novo script `npm run copilot:mcp:cloudflare:edge-backup-create`.
+5. Novo script `npm run copilot:mcp:cloudflare:edge-backup-list`.
+6. Novo target `make copilot-mcp-edge-backup-create`.
+7. Novo target `make copilot-mcp-edge-backup-list`.
+8. Teste unitario `test_cloudflare_edge_backup.spec.js`.
+
+Contrato de backup:
+
+1. `mode="local-json-backup"`.
+2. `appliesChanges=false`.
+3. Persiste JSON em `src/copilot/.ai/cloudflare/edge-snapshots/`.
+4. O diretorio e ignorado pelo Git por estar sob `src/copilot/.ai/cloudflare/*`.
+5. O payload inclui:
+   - schema version;
+   - kind `cloudflare-edge-snapshot-backup`;
+   - timestamp;
+   - label normalizado opcional;
+   - SHA-256 do snapshot;
+   - snapshot completo.
+6. A resposta da tool retorna resumo, caminho local e hashes, mas nao precisa devolver o snapshot completo salvo,
+   salvo quando `includeSnapshot=true`.
+
+Racional:
+
+1. Antes de aplicar regras reais na Cloudflare, precisamos de um artefato local reproduzivel.
+2. O backup reduz risco de mudanca irreversivel feita por dashboard ou API.
+3. A lista de backups permite ao ChatGPT escolher o ultimo ponto conhecido antes de comparar diffs posteriores.
+4. Mutacao automatica segue bloqueada ate existir aplicador com diff, smoke e rollback documentado.
+
+Proxima validacao:
+
+1. Rodar teste focado de backup + registry.
+   - passou com 8/8.
+2. Rodar typecheck strict.
+   - passou apos ajuste de opcionais exatos em `edge-backup.js`.
+3. Rodar lint.
+   - passou.
+4. Criar um backup real contra `mcp.aurelin.org`.
+   - passou; artefato salvo em `src/copilot/.ai/cloudflare/edge-snapshots/`.
+5. Listar backups reais.
+   - passou; lista retornou 1 backup valido.
+6. Rodar unit tests completos.
+   - passou com 3107/3107, sem warnings/errors.
+7. Reiniciar/smoke remoto para publicar tools 83 e 84.
+   - primeiro smoke imediato pos-restart recebeu 502 transiente da Cloudflare durante warm-up.
+   - segundo smoke passou com 84/84 tools remotas e `toolsMatchLocalRegistry=true`.
+8. Corrigir a fragilidade operacional encontrada.
+   - `smoke` agora usa retry para falhas transientes 502/503/504 e erros de rede nos probes de health, metadata OAuth e `tools/list`.
+   - a resposta do smoke passa a expor `attempts` em health/toolsList para diagnostico.
+
+Status da faixa:
+
+1. Backup persistido esta operacional.
+2. O endpoint publico esta pronto com 84/84 tools.
+3. A criacao automatica de regras Cloudflare reais ainda nao foi liberada; a proxima faixa deve criar aplicador com
+   guardrails, diff pos-mutacao e rollback documentado.

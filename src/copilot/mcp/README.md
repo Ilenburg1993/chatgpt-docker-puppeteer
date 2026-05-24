@@ -46,6 +46,8 @@ Em outro terminal:
 npm run copilot:mcp:cloudflare:status
 npm run copilot:mcp:cloudflare:remote-audit
 npm run copilot:mcp:cloudflare:edge-audit
+npm run copilot:mcp:cloudflare:edge-backup-create
+npm run copilot:mcp:cloudflare:edge-backup-list
 npm run copilot:mcp:cloudflare:edge-policy-diff
 npm run copilot:mcp:cloudflare:edge-policy-plan
 npm run copilot:mcp:cloudflare:edge-snapshot
@@ -75,6 +77,10 @@ Use `npm run copilot:mcp:cloudflare:edge-policy-diff` para comparar o estado rea
 canonico sem aplicar nenhuma alteracao.
 Use `npm run copilot:mcp:cloudflare:edge-snapshot` para capturar tunnel, DNS, rulesets e diff em um unico JSON
 antes de qualquer mudanca Cloudflare.
+Use `npm run copilot:mcp:cloudflare:edge-backup-create` para persistir esse snapshot em
+`src/copilot/.ai/cloudflare/edge-snapshots/`, ignorado pelo Git, antes de mudar cache, WAF ou rate limits.
+Use `npm run copilot:mcp:cloudflare:edge-backup-list` para localizar o backup mais recente antes/depois de
+uma alteracao operacional.
 Quick Tunnel continua disponivel como fallback explicito:
 
 ```bash

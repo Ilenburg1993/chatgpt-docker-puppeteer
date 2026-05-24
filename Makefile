@@ -203,6 +203,8 @@ help:
 	@echo "  $(CYAN)make copilot-mcp-up$(NC)    Sobe MCP OAuth + Cloudflare permanente"
 	@echo "  $(CYAN)make copilot-mcp-restart$(NC) Reinicia MCP OAuth + Cloudflare"
 	@echo "  $(CYAN)make copilot-mcp-edge-audit$(NC) Audita Cloudflare cache/WAF/rate-limit/transforms"
+	@echo "  $(CYAN)make copilot-mcp-edge-backup-create$(NC) Persiste backup local Cloudflare antes de mutar"
+	@echo "  $(CYAN)make copilot-mcp-edge-backup-list$(NC) Lista backups locais Cloudflare"
 	@echo "  $(CYAN)make copilot-mcp-edge-policy-diff$(NC) Compara edge actual vs desired sem aplicar"
 	@echo "  $(CYAN)make copilot-mcp-edge-policy-plan$(NC) Planeja edge policy Cloudflare sem aplicar"
 	@echo "  $(CYAN)make copilot-mcp-edge-snapshot$(NC) Snapshot Cloudflare tunnel/DNS/rulesets/diff"
@@ -1251,6 +1253,14 @@ copilot-mcp-remote-audit:
 copilot-mcp-edge-audit:
 	@echo "$(CYAN)🛡️  Auditoria Cloudflare Edge/Rulesets MCP$(NC)"
 	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:edge-audit
+
+copilot-mcp-edge-backup-create:
+	@echo "$(CYAN)💾 Backup local Cloudflare Edge MCP$(NC)"
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:edge-backup-create
+
+copilot-mcp-edge-backup-list:
+	@echo "$(CYAN)📚 Backups locais Cloudflare Edge MCP$(NC)"
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:edge-backup-list
 
 copilot-mcp-edge-policy-diff:
 	@echo "$(CYAN)🧮 Diff Cloudflare Edge actual vs desired MCP$(NC)"

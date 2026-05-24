@@ -10,7 +10,7 @@ import { MCP_AUTH_SCOPES, readMcpAuthConfig } from '../control-plane/auth.js';
 import { okResult } from '../control-plane/result.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 24;
+const CAPABILITIES_VERSION = 25;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -83,6 +83,8 @@ const RUNTIME_TOOLS = [
     'delegate_to_repo_autonomy_runner',
     'mcp_golden_prompts',
     'mcp_apps_sdk_readiness',
+    'mcp_cloudflare_edge_backup_create',
+    'mcp_cloudflare_edge_backups_list',
     'mcp_cloudflare_edge_audit',
     'mcp_cloudflare_edge_policy_diff',
     'mcp_cloudflare_edge_policy_plan',
@@ -170,6 +172,8 @@ const IO_GUIDANCE = [
     'Use mcp_cloudflare_edge_policy_plan before proposing Cloudflare edge changes; it is plan-only and does not mutate rulesets.',
     'Use mcp_cloudflare_edge_policy_diff to compare actual Cloudflare rulesets with the desired MCP edge policy before any dashboard/API change.',
     'Use mcp_cloudflare_edge_snapshot to capture tunnel, DNS, edge rulesets and desired-policy diff before any Cloudflare mutation.',
+    'Use mcp_cloudflare_edge_backup_create to persist that snapshot locally before changing Cloudflare cache, WAF or rate-limit policy.',
+    'Use mcp_cloudflare_edge_backups_list to find the latest rollback reference before and after Cloudflare policy changes.',
     'Use mcp_cloudflare_metrics_snapshot to inspect local cloudflared version, orchestration config version and registration counters.',
     'Use mcp_post_restart_readiness after any restart before starting heavy ChatGPT work.',
     'Use claude_connector_profile when adding the same remote MCP server to claude.ai custom connectors.',

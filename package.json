@@ -321,6 +321,8 @@
     "copilot:mcp:cloudflare:doctor": "node src/copilot/mcp/cloudflare/cli.js doctor",
     "copilot:mcp:cloudflare:down": "node src/copilot/mcp/cloudflare/cli.js down",
     "copilot:mcp:cloudflare:edge-audit": "node src/copilot/mcp/cloudflare/cli.js edge-audit",
+    "copilot:mcp:cloudflare:edge-backup-create": "node src/copilot/mcp/cloudflare/cli.js edge-backup-create",
+    "copilot:mcp:cloudflare:edge-backup-list": "node src/copilot/mcp/cloudflare/cli.js edge-backup-list",
     "copilot:mcp:cloudflare:edge-policy-diff": "node src/copilot/mcp/cloudflare/cli.js edge-policy-diff",
     "copilot:mcp:cloudflare:edge-policy-plan": "node src/copilot/mcp/cloudflare/cli.js edge-policy-plan",
     "copilot:mcp:cloudflare:edge-snapshot": "node src/copilot/mcp/cloudflare/cli.js edge-snapshot",

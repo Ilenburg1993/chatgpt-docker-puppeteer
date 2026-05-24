@@ -387,7 +387,7 @@ Subfases:
 
 1. [x] Criar export JSON de desired edge policy em modo plan-only.
 2. [x] Criar diff entre desired e actual rulesets em modo plan-only.
-3. [ ] Criar plano de mudanca sem aplicar.
+3. [x] Criar plano de mudanca sem aplicar.
 4. [ ] Criar aplicador com backup previo.
 5. [ ] Criar rollback automatizado.
 6. [ ] Integrar Security Events/Ray ID.
@@ -427,6 +427,20 @@ Continuidade de snapshot/backup:
 6. [x] Reiniciar/smoke remoto para publicar a nova tool.
 7. [x] Confirmar smoke remoto com 82/82 tools.
 
+Continuidade de backup persistido:
+
+1. [x] Criar `mcp_cloudflare_edge_backup_create`.
+2. [x] Criar `mcp_cloudflare_edge_backups_list`.
+3. [x] Criar `npm run copilot:mcp:cloudflare:edge-backup-create`.
+4. [x] Criar `npm run copilot:mcp:cloudflare:edge-backup-list`.
+5. [x] Criar `make copilot-mcp-edge-backup-create`.
+6. [x] Criar `make copilot-mcp-edge-backup-list`.
+7. [x] Persistir backups em `src/copilot/.ai/cloudflare/edge-snapshots/`, fora do Git.
+8. [x] Rodar validadores completos novamente.
+9. [x] Reiniciar/smoke remoto para publicar as novas tools.
+10. [x] Confirmar smoke remoto com 84/84 tools.
+11. [x] Adicionar retry transiente ao smoke para absorver 502/503/504 durante warm-up pos-restart.
+
 ## 7. Criterios de pronto
 
 Este turno Cloudflare sera considerado pronto quando:
@@ -446,6 +460,8 @@ Este turno Cloudflare sera considerado pronto quando:
 make copilot-mcp-status
 make copilot-mcp-remote-audit
 make copilot-mcp-edge-audit
+make copilot-mcp-edge-backup-create
+make copilot-mcp-edge-backup-list
 make copilot-mcp-edge-policy-diff
 make copilot-mcp-edge-policy-plan
 make copilot-mcp-edge-snapshot
