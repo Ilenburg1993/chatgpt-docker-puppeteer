@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildProbeCompletedEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, rename, setTerminalModelProjection, writeFile } =
+const { buildProbeCompletedEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, rename, setTerminalModelProjection, writeFile } =
     vi.hoisted(() => ({
         buildProbeCompletedEvent: vi.fn((input) => ({
             type: 'model_gateway:probe:completed',
@@ -63,6 +63,7 @@ const { buildProbeCompletedEvent, chmod, classifyByokProviderFailure, clearByokP
         readTerminalRuntimeState: vi.fn(() => ({ contextWindow: null })),
         recordByokProviderModelCallFailure: vi.fn(),
         recordByokProviderModelCallSuccess: vi.fn(),
+        recordByokProviderModelProbeResult: vi.fn(),
         recordByokProviderModelAgentProbeFailure: vi.fn(),
         recordByokProviderModelAgentProbeSuccess: vi.fn(),
         rename: vi.fn(),
@@ -107,6 +108,7 @@ vi.mock('#copilot/model-gateway', () => ({
     recordByokProviderModelAgentProbeSuccess,
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
+    recordByokProviderModelProbeResult,
     runConfiguredByokChatProbe: runConfiguredByokChatProbe,
     runConfiguredByokAgentProbe: runConfiguredByokAgentProbe,
     runConfiguredByokJsonProbe: runConfiguredByokJsonProbe,
@@ -225,6 +227,7 @@ describe('terminal /byok command', () => {
         readTerminalRuntimeState.mockReturnValue({ contextWindow: null });
         recordByokProviderModelCallFailure.mockReset();
         recordByokProviderModelCallSuccess.mockReset();
+        recordByokProviderModelProbeResult.mockReset();
         recordByokProviderModelAgentProbeFailure.mockReset();
         recordByokProviderModelAgentProbeSuccess.mockReset();
         rename.mockReset();
@@ -476,6 +479,17 @@ describe('terminal /byok command', () => {
             providerModel: 'probe-model',
             successContext: 'byok_probe',
         });
+        expect(recordByokProviderModelProbeResult).toHaveBeenCalledWith(
+            expect.objectContaining({
+                routeProfile: 'groq-free',
+                providerId: 'groq',
+                providerModel: 'probe-model',
+                probeKind: 'chat',
+                status: 'ok',
+                ok: true,
+                providerAttempted: true,
+            }),
+        );
         expect(buildProbeCompletedEvent).toHaveBeenCalledWith(
             expect.objectContaining({
                 probeKind: 'chat',
@@ -802,6 +816,14 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'probe chat profile:groq-free model:tiny-limit-model');
 
         expect(recordByokProviderModelCallFailure).not.toHaveBeenCalled();
+        expect(recordByokProviderModelProbeResult).toHaveBeenCalledWith(
+            expect.objectContaining({
+                probeKind: 'chat',
+                status: 'admission-blocked',
+                ok: false,
+                providerAttempted: false,
+            }),
+        );
         expect(ctx.output()).toContain('admission-blocked');
         expect(ctx.output()).toContain('health real do modelo não foi degradado');
     });
@@ -841,6 +863,15 @@ describe('terminal /byok command', () => {
         );
         expect(recordByokProviderModelCallFailure).not.toHaveBeenCalled();
         expect(recordByokProviderModelAgentProbeFailure).not.toHaveBeenCalled();
+        expect(recordByokProviderModelProbeResult).toHaveBeenCalledWith(
+            expect.objectContaining({
+                routeProfile: 'openrouter-free',
+                providerId: 'openrouter',
+                providerModel: 'stream-model',
+                probeKind: 'streaming',
+                status: 'no-delta',
+            }),
+        );
         expect(ctx.output()).toContain('BYOK streaming probe');
         expect(ctx.output()).toContain('UX live ficaria cega');
     });
@@ -883,6 +914,16 @@ describe('terminal /byok command', () => {
         );
         expect(recordByokProviderModelCallSuccess).not.toHaveBeenCalled();
         expect(recordByokProviderModelAgentProbeSuccess).not.toHaveBeenCalled();
+        expect(recordByokProviderModelProbeResult).toHaveBeenCalledWith(
+            expect.objectContaining({
+                routeProfile: 'mistral-free',
+                providerId: 'mistral',
+                providerModel: 'json-model',
+                probeKind: 'json',
+                status: 'ok',
+                ok: true,
+            }),
+        );
         expect(ctx.output()).toContain('BYOK json probe');
         expect(ctx.output()).toContain('JSON probe confirma saída estruturada');
     });

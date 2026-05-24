@@ -44,6 +44,21 @@ const DEFAULT_BYOK_PROVIDER_HEALTH_PATH = join(process.cwd(), 'data', 'copilot-t
  * @property {number | null} lastAgentProbeSuccessAt
  * @property {string | null} lastAgentProbeMessage
  * @property {string | null} lastAgentProbeErrorContext
+ * @property {Record<string, ByokProviderProbeHealthRecord>} probes
+ */
+
+/**
+ * @typedef {object} ByokProviderProbeHealthRecord
+ * @property {string} kind
+ * @property {string} status
+ * @property {boolean} ok
+ * @property {boolean} providerAttempted
+ * @property {number} count
+ * @property {number} successCount
+ * @property {number} failureCount
+ * @property {number | null} lastAt
+ * @property {string | null} lastMessage
+ * @property {string | null} lastErrorContext
  */
 
 /** @type {Map<string, ByokProviderHealthRecord>} */
@@ -167,6 +182,42 @@ function normalizeCount(value) {
 }
 
 /**
+ * @param {string} kind
+ * @param {unknown} value
+ * @returns {ByokProviderProbeHealthRecord | null}
+ */
+function normalizeProbeRecord(kind, value) {
+    if (!isRecord(value)) return null;
+    const status = normalizePart(/** @type {string | null | undefined} */ (value['status']));
+    if (!status) return null;
+    return {
+        kind,
+        status,
+        ok: value['ok'] === true,
+        providerAttempted: value['providerAttempted'] !== false,
+        count: normalizeCount(value['count']),
+        successCount: normalizeCount(value['successCount']),
+        failureCount: normalizeCount(value['failureCount']),
+        lastAt: normalizeTimestamp(value['lastAt']),
+        lastMessage: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastMessage'])),
+        lastErrorContext: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastErrorContext'])),
+    };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, ByokProviderProbeHealthRecord>}
+ */
+function normalizeProbeRecords(value) {
+    if (!isRecord(value)) return {};
+    return Object.fromEntries(
+        Object.entries(value)
+            .map(([kind, probe]) => [kind, normalizeProbeRecord(kind, probe)])
+            .filter((entry) => entry[1] !== null),
+    );
+}
+
+/**
  * @param {unknown} value
  * @returns {ByokProviderHealthRecord | null}
  */
@@ -182,8 +233,9 @@ function normalizeRecord(value) {
     });
     const lastStatus = normalizeStatus(value['lastStatus']);
     const agentProbeStatus = normalizeStatus(value['agentProbeStatus']);
+    const probes = normalizeProbeRecords(value['probes']);
     if (
-        (!lastStatus && !agentProbeStatus) ||
+        (!lastStatus && !agentProbeStatus && Object.keys(probes).length === 0) ||
         (!identity.routeProfile && !identity.providerId && !identity.providerModel)
     ) {
         return null;
@@ -217,6 +269,7 @@ function normalizeRecord(value) {
         lastAgentProbeErrorContext: sanitizeHealthText(
             /** @type {string | null | undefined} */ (value['lastAgentProbeErrorContext']),
         ),
+        probes,
     };
     if (record.failureCount === 0 && record.lastFailureAt) record.failureCount = 1;
     if (record.successCount === 0 && record.lastSuccessAt) record.successCount = 1;
@@ -352,6 +405,7 @@ export function recordByokProviderModelCallFailure(input) {
         lastAgentProbeSuccessAt: previous?.lastAgentProbeSuccessAt ?? null,
         lastAgentProbeMessage: previous?.lastAgentProbeMessage ?? null,
         lastAgentProbeErrorContext: previous?.lastAgentProbeErrorContext ?? null,
+        probes: previous?.probes ?? {},
     });
     pruneByokProviderHealth();
     scheduleByokProviderHealthFlush();
@@ -386,6 +440,7 @@ export function recordByokProviderModelCallSuccess(input) {
         lastAgentProbeSuccessAt: previous?.lastAgentProbeSuccessAt ?? null,
         lastAgentProbeMessage: previous?.lastAgentProbeMessage ?? null,
         lastAgentProbeErrorContext: previous?.lastAgentProbeErrorContext ?? null,
+        probes: previous?.probes ?? {},
     });
     pruneByokProviderHealth();
     scheduleByokProviderHealthFlush();
@@ -421,6 +476,7 @@ export function recordByokProviderModelAgentProbeFailure(input) {
         lastAgentProbeMessage: sanitizeHealthText(input.message) ?? previous?.lastAgentProbeMessage ?? null,
         lastAgentProbeErrorContext:
             sanitizeHealthText(input.errorContext) ?? previous?.lastAgentProbeErrorContext ?? null,
+        probes: previous?.probes ?? {},
     });
     pruneByokProviderHealth();
     scheduleByokProviderHealthFlush();
@@ -455,6 +511,61 @@ export function recordByokProviderModelAgentProbeSuccess(input) {
         lastAgentProbeSuccessAt: now,
         lastAgentProbeMessage: null,
         lastAgentProbeErrorContext: null,
+        probes: previous?.probes ?? {},
+    });
+    pruneByokProviderHealth();
+    scheduleByokProviderHealthFlush();
+}
+
+/**
+ * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; probeKind: string; status: string; ok?: boolean; providerAttempted?: boolean; message?: string | null; errorContext?: string | null; timestamp?: number }} input
+ * @returns {void}
+ */
+export function recordByokProviderModelProbeResult(input) {
+    hydrateByokProviderHealthFromDisk();
+    const identity = normalizeHealthIdentity(input);
+    const probeKind = normalizePart(input.probeKind);
+    const status = normalizePart(input.status);
+    if ((!identity.routeProfile && !identity.providerId && !identity.providerModel) || !probeKind || !status) return;
+    const key = healthKey(identity);
+    const now = typeof input.timestamp === 'number' && Number.isFinite(input.timestamp) ? input.timestamp : Date.now();
+    const previous = _byokProviderHealthByKey.get(key);
+    const previousProbe = previous?.probes?.[probeKind] ?? null;
+    const ok = input.ok === true;
+    const probe = {
+        kind: probeKind,
+        status,
+        ok,
+        providerAttempted: input.providerAttempted !== false,
+        count: (previousProbe?.count ?? 0) + 1,
+        successCount: (previousProbe?.successCount ?? 0) + (ok ? 1 : 0),
+        failureCount: (previousProbe?.failureCount ?? 0) + (ok ? 0 : 1),
+        lastAt: now,
+        lastMessage: sanitizeHealthText(input.message) ?? previousProbe?.lastMessage ?? null,
+        lastErrorContext: sanitizeHealthText(input.errorContext) ?? previousProbe?.lastErrorContext ?? null,
+    };
+    _byokProviderHealthByKey.set(key, {
+        key,
+        ...identity,
+        lastStatus: previous?.lastStatus ?? null,
+        failureCount: previous?.failureCount ?? 0,
+        successCount: previous?.successCount ?? 0,
+        lastFailureAt: previous?.lastFailureAt ?? null,
+        lastSuccessAt: previous?.lastSuccessAt ?? null,
+        lastMessage: previous?.lastMessage ?? null,
+        lastErrorContext: previous?.lastErrorContext ?? null,
+        lastSuccessContext: previous?.lastSuccessContext ?? null,
+        agentProbeStatus: previous?.agentProbeStatus ?? null,
+        agentProbeFailureCount: previous?.agentProbeFailureCount ?? 0,
+        agentProbeSuccessCount: previous?.agentProbeSuccessCount ?? 0,
+        lastAgentProbeFailureAt: previous?.lastAgentProbeFailureAt ?? null,
+        lastAgentProbeSuccessAt: previous?.lastAgentProbeSuccessAt ?? null,
+        lastAgentProbeMessage: previous?.lastAgentProbeMessage ?? null,
+        lastAgentProbeErrorContext: previous?.lastAgentProbeErrorContext ?? null,
+        probes: {
+            ...(previous?.probes ?? {}),
+            [probeKind]: probe,
+        },
     });
     pruneByokProviderHealth();
     scheduleByokProviderHealthFlush();

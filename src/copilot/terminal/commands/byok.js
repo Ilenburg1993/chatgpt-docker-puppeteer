@@ -23,6 +23,7 @@ import {
     recordByokProviderModelAgentProbeSuccess,
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
+    recordByokProviderModelProbeResult,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
     runConfiguredByokJsonProbe,
@@ -832,6 +833,19 @@ function renderByokAgentProbeHealthTag(health) {
 }
 
 /**
+ * @param {ReturnType<typeof readByokProviderModelHealth>} health
+ * @returns {string}
+ */
+function renderByokProbeHealthSummary(health) {
+    const probes = health?.probes && typeof health.probes === 'object' ? Object.values(health.probes) : [];
+    if (probes.length === 0) return 'probes=?';
+    return probes
+        .sort((a, b) => String(a.kind).localeCompare(String(b.kind)))
+        .map((probe) => `${probe.kind}=${probe.status}${probe.providerAttempted ? '' : ':local'}${probe.count > 1 ? `x${probe.count}` : ''}`)
+        .join(' ');
+}
+
+/**
  * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @param {{ profileName?: string | null; preset?: string | null; providerType?: string | null }} source
  * @returns {import('../../presentation/contracts/index.js').RuntimeModelInfo}
@@ -1234,6 +1248,7 @@ function renderByokHealth(println) {
             record.providerModel ? `providerModel=${record.providerModel}` : null,
             label,
             renderByokAgentProbeHealthTag(record),
+            renderByokProbeHealthSummary(record),
         ].filter(Boolean);
         println(`    \x1b[33m${record.key}\x1b[0m`);
         println(`      \x1b[90m${parts.join(' · ')}\x1b[0m`);
@@ -1327,6 +1342,15 @@ async function recordByokProbeHealth(mode, probe) {
         providerModel: probe.model,
     };
     const providerAttempted = probe.status !== 'admission-blocked';
+    recordByokProviderModelProbeResult({
+        ...healthIdentity,
+        probeKind: mode,
+        status: probe.status,
+        ok: probe.ok,
+        providerAttempted,
+        message: probe.errors[0] ?? null,
+        errorContext: probe.providerFailure?.errorContext ?? `byok_${mode}_probe`,
+    });
     if (mode !== 'chat' && mode !== 'agent') return providerAttempted;
     if (mode === 'agent' && probe.ok) {
         recordByokProviderModelAgentProbeSuccess(healthIdentity);

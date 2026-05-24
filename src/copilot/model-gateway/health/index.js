@@ -18,6 +18,7 @@ export {
     recordByokProviderModelAgentProbeSuccess,
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
+    recordByokProviderModelProbeResult,
     resetByokProviderHealthForTests,
 } from './provider-health.js';
 export { classifyByokProviderFailure } from './provider-failure.js';

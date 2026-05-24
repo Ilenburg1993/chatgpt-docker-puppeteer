@@ -14,6 +14,7 @@ import {
     recordByokProviderModelAgentProbeSuccess,
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
+    recordByokProviderModelProbeResult,
     resetByokProviderHealthForTests,
 } from '../../../../src/copilot/model-gateway/health/provider-health.js';
 
@@ -179,6 +180,58 @@ describe('BYOK provider chat health state', () => {
                 providerId: 'groq',
                 providerModel: 'llama',
                 lastStatus: 'ok',
+            }),
+        );
+    });
+
+    it('registra probes descartáveis por tipo sem transformar streaming/json em saúde de chat', async () => {
+        await useTempHealthPath();
+
+        recordByokProviderModelProbeResult({
+            routeProfile: 'openrouter-free',
+            providerId: 'openrouter',
+            providerModel: 'stream-model',
+            probeKind: 'streaming',
+            status: 'no-delta',
+            ok: false,
+            providerAttempted: true,
+            message: 'sem delta',
+            errorContext: 'byok_streaming_probe',
+            timestamp: 1_700_000_040_000,
+        });
+        recordByokProviderModelProbeResult({
+            routeProfile: 'openrouter-free',
+            providerId: 'openrouter',
+            providerModel: 'stream-model',
+            probeKind: 'json',
+            status: 'ok',
+            ok: true,
+            providerAttempted: true,
+            timestamp: 1_700_000_050_000,
+        });
+        await flushByokProviderHealth();
+        resetByokProviderHealthForTests();
+
+        const health = readByokProviderModelHealth({
+            routeProfile: 'openrouter-free',
+            providerId: 'openrouter',
+            providerModel: 'stream-model',
+        });
+
+        expect(health?.lastStatus).toBeNull();
+        expect(health?.probes?.['streaming']).toEqual(
+            expect.objectContaining({
+                status: 'no-delta',
+                ok: false,
+                failureCount: 1,
+                lastMessage: 'sem delta',
+            }),
+        );
+        expect(health?.probes?.['json']).toEqual(
+            expect.objectContaining({
+                status: 'ok',
+                ok: true,
+                successCount: 1,
             }),
         );
     });

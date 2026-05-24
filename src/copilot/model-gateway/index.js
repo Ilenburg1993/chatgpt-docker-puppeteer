@@ -85,6 +85,7 @@ export {
     recordByokProviderModelAgentProbeSuccess,
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
+    recordByokProviderModelProbeResult,
     resetByokProviderHealthForTests,
 } from './health/index.js';
 export {
