@@ -260,29 +260,53 @@ function mockCtx() {
 
 describe('commands/diagnose', () => {
     it('inclui health, issues e status transversais do agente', async () => {
+        const previousEnv = {
+            COPILOT_BYOK_ENABLED: process.env.COPILOT_BYOK_ENABLED,
+            COPILOT_BYOK_PROVIDER_PRESET: process.env.COPILOT_BYOK_PROVIDER_PRESET,
+            COPILOT_BYOK_MODEL: process.env.COPILOT_BYOK_MODEL,
+            COPILOT_BYOK_API_KEY: process.env.COPILOT_BYOK_API_KEY,
+        };
+        process.env.COPILOT_BYOK_ENABLED = 'true';
+        process.env.COPILOT_BYOK_PROVIDER_PRESET = 'openrouter';
+        process.env.COPILOT_BYOK_MODEL = 'deepseek/deepseek-v4-flash:free';
+        process.env.COPILOT_BYOK_API_KEY = 'test-diagnose-byok-key-that-must-not-render';
         const ctx = mockCtx();
 
-        await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println });
+        try {
+            await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println });
 
-        expect(ctx.output()).toContain('Diagnóstico do Terminal LLM-B');
-        expect(ctx.output()).toContain('degraded');
-        expect(ctx.output()).toContain('bg tasks');
-        expect(ctx.output()).toContain('keepalive');
-        expect(ctx.output()).toContain('quota monitor');
-        expect(ctx.output()).toContain('background.backlog_high');
-        expect(ctx.output()).toContain('Executando tool');
-        expect(ctx.output()).toContain('inspect_boot_report');
-        expect(ctx.output()).toContain('streaming=');
-        expect(ctx.output()).toContain('ask_user');
-        expect(ctx.output()).toContain('shadow expirando');
-        expect(ctx.output()).toContain('runtime id');
-        expect(ctx.output()).toContain('*default:gpt-5/processing');
-        expect(ctx.output()).toContain('Boot report');
-        expect(ctx.output()).toContain('Shutdown');
-        expect(ctx.output()).toContain('Timers');
-        expect(ctx.output()).toContain('Lifecycle mx');
-        expect(ctx.output()).toContain('sdk↔fs route');
-        expect(ctx.output()).toContain('degraded');
+            expect(ctx.output()).toContain('Diagnóstico do Terminal LLM-B');
+            expect(ctx.output()).toContain('degraded');
+            expect(ctx.output()).toContain('bg tasks');
+            expect(ctx.output()).toContain('keepalive');
+            expect(ctx.output()).toContain('quota monitor');
+            expect(ctx.output()).toContain('background.backlog_high');
+            expect(ctx.output()).toContain('Executando tool');
+            expect(ctx.output()).toContain('inspect_boot_report');
+            expect(ctx.output()).toContain('streaming=');
+            expect(ctx.output()).toContain('ask_user');
+            expect(ctx.output()).toContain('shadow expirando');
+            expect(ctx.output()).toContain('runtime id');
+            expect(ctx.output()).toContain('*default:gpt-5/processing');
+            expect(ctx.output()).toContain('gateway');
+            expect(ctx.output()).toContain('providers=1 · models=3 · enabled=3');
+            expect(ctx.output()).toContain('active=openrouter:deepseek/deepseek-v4-flash:free@openrouter');
+            expect(ctx.output()).not.toContain('test-diagnose-byok-key-that-must-not-render');
+            expect(ctx.output()).toContain('Boot report');
+            expect(ctx.output()).toContain('Shutdown');
+            expect(ctx.output()).toContain('Timers');
+            expect(ctx.output()).toContain('Lifecycle mx');
+            expect(ctx.output()).toContain('sdk↔fs route');
+            expect(ctx.output()).toContain('degraded');
+        } finally {
+            for (const [key, value] of Object.entries(previousEnv)) {
+                if (value === undefined) {
+                    delete process.env[key];
+                } else {
+                    process.env[key] = value;
+                }
+            }
+        }
     });
 
     it('aceita runtimeId explícito no comando', async () => {

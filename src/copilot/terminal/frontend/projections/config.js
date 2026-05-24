@@ -71,6 +71,7 @@ function resolveSdkSessionModeProjection(storedMode, binding) {
  *     runtimeFallbackWarning: string | null;
  *     byok: ReturnType<typeof readConfiguredByokSummary>;
  *     modelGateway: ReturnType<typeof buildEnvByokModelGatewaySnapshot>;
+ *     modelGatewayProjection: ReturnType<typeof buildModelGatewayOperatorProjection>;
  *     agentRuntimes: import('./shared.js').TerminalRuntimeBase['agentRuntimes'];
  *     runtimeSessionId: string | null;
  * }}
@@ -80,6 +81,7 @@ export function readTerminalConfigProjection(runtimeId) {
     const currentModel = String(base.model ?? base.snap['model'] ?? 'unknown');
     const currentReasoningEffort = String(base.reasoningEffort ?? base.snap['reasoningEffort'] ?? 'off');
     const autoModelPolicy = readRuntimeAutoModelPolicyProjection(base.runtimeId);
+    const modelGateway = buildEnvByokModelGatewaySnapshot();
     return {
         currentModel,
         currentReasoningEffort,
@@ -98,7 +100,8 @@ export function readTerminalConfigProjection(runtimeId) {
         usedDefaultRuntimeFallback: base.usedDefaultRuntimeFallback,
         runtimeFallbackWarning: base.runtimeFallbackWarning,
         byok: readConfiguredByokSummary(),
-        modelGateway: buildEnvByokModelGatewaySnapshot(),
+        modelGateway,
+        modelGatewayProjection: buildModelGatewayOperatorProjection(modelGateway),
         agentRuntimes: base.agentRuntimes,
         runtimeSessionId: base.runtimeSessionId,
     };

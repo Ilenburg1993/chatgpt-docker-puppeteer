@@ -139,6 +139,18 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     const byokLine = byok.enabled
         ? `${byok.ready ? `${C.green}ready${C.reset}` : `${C.red}incompleto${C.reset}`} ${C.grey}preset=${byok.preset ?? '-'} · provider=${byok.providerType ?? '-'} · model=${byok.model ?? '-'} · auth=${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'none'}${C.reset}`
         : `${C.grey}off${C.reset}`;
+    const gatewayProjection = configProjection.modelGatewayProjection ?? {
+        providerCount: 0,
+        modelCount: 0,
+        enabledModelCount: 0,
+        active: null,
+    };
+    const gatewayActive =
+        gatewayProjection.active && typeof gatewayProjection.active === 'object' ? gatewayProjection.active : null;
+    const gatewayLine =
+        gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0
+            ? `${C.grey}providers=${gatewayProjection.providerCount} · models=${gatewayProjection.modelCount} · enabled=${gatewayProjection.enabledModelCount} · active=${gatewayActive?.['modelId'] ?? '-'}${gatewayActive?.['providerId'] ? `@${gatewayActive['providerId']}` : ''}${C.reset}`
+            : `${C.grey}off${C.reset}`;
     const planOpLine = configProjection.sdkPlanOperation
         ? `${C.yellow}${configProjection.sdkPlanOperation}${C.reset}${configProjection.sdkPlanChangedAt ? ` ${C.grey}@ ${new Date(configProjection.sdkPlanChangedAt).toLocaleTimeString('pt-BR')}${C.reset}` : ''}`
         : `${C.grey}(sem alteração)${C.reset}`;
@@ -198,6 +210,7 @@ ${C.cyan}  AGENTE${C.reset}
     dialog loop   ${dialogLoopActive ? `${C.green}● ativo${C.reset}` : `${C.red}○ inativo${C.reset}`}
     modelo        ${C.magenta}${snap['model']}${C.reset}
     byok          ${byokLine}
+    gateway       ${gatewayLine}
     reasoning     ${C.magenta}${configProjection.currentReasoningEffort}${C.reset}
     modo sdk      ${sdkModeLine}
     plan arquivo  ${planOpLine}

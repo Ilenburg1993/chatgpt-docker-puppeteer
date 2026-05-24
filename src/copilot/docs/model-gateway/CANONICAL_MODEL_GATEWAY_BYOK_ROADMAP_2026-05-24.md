@@ -155,7 +155,7 @@ src/copilot/model-gateway/
 - [x] Criar `RegistryProjection` para operador.
 - [x] Trocar `/byok models` para ler projection do gateway, mantendo fallback legado.
 - [x] Fazer `onListModels()` aceitar projection do gateway sem `sdk/session` importar gateway.
-- [ ] Adicionar snapshot de providers e models no `/health` e `/now`.
+- [x] Adicionar snapshot de providers e models no `/health` e `/now`.
 
 ### Faixa C — Secrets e redaction
 

@@ -478,14 +478,37 @@ describe('commands/session — sync commands', () => {
     });
 
     it('cmdNow imprime snapshot operacional compacto', () => {
+        const previousEnv = {
+            COPILOT_BYOK_ENABLED: process.env.COPILOT_BYOK_ENABLED,
+            COPILOT_BYOK_PROVIDER_PRESET: process.env.COPILOT_BYOK_PROVIDER_PRESET,
+            COPILOT_BYOK_MODEL: process.env.COPILOT_BYOK_MODEL,
+            COPILOT_BYOK_API_KEY: process.env.COPILOT_BYOK_API_KEY,
+        };
+        process.env.COPILOT_BYOK_ENABLED = 'true';
+        process.env.COPILOT_BYOK_PROVIDER_PRESET = 'openrouter';
+        process.env.COPILOT_BYOK_MODEL = 'deepseek/deepseek-v4-flash:free';
+        process.env.COPILOT_BYOK_API_KEY = 'test-byok-key-that-must-not-render';
         const ctx = mockCtx();
-        cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
-        expect(ctx.output()).toContain('[now]');
-        expect(ctx.output()).toContain('runtime=default');
-        expect(ctx.output()).toContain('live=');
-        expect(ctx.output()).toContain('sse=');
-        expect(ctx.output()).toContain('loop=off');
-        expect(ctx.output()).toContain('PM:approve_all');
+        try {
+            cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
+            expect(ctx.output()).toContain('[now]');
+            expect(ctx.output()).toContain('runtime=default');
+            expect(ctx.output()).toContain('live=');
+            expect(ctx.output()).toContain('sse=');
+            expect(ctx.output()).toContain('loop=off');
+            expect(ctx.output()).toContain('PM:approve_all');
+            expect(ctx.output()).toContain('gateway=providers:1 models:3 enabled:3');
+            expect(ctx.output()).toContain('active=openrouter:deepseek/deepseek-v4-flash:free@openrouter');
+            expect(ctx.output()).not.toContain('test-byok-key-that-must-not-render');
+        } finally {
+            for (const [key, value] of Object.entries(previousEnv)) {
+                if (value === undefined) {
+                    delete process.env[key];
+                } else {
+                    process.env[key] = value;
+                }
+            }
+        }
     });
 
     it('cmdLive imprime fluxo operacional live consolidado', () => {

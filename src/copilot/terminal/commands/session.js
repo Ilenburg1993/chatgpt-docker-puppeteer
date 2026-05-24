@@ -438,6 +438,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
             runtimeId,
         ),
     );
+    const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, projection.runtimeId);
     const mode = projection.sdkSessionMode ?? 'interactive';
     const state = String(projection.snap['status'] ?? 'unknown');
     const ask = projection.pendingQuestion
@@ -469,10 +470,23 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
     const mismatchLabel = modelBilling.mismatch
         ? `mismatch(cfg=${modelBilling.configuredModel ?? '-'}|bill=${modelBilling.billedModel ?? '-'})`
         : `model=${modelBilling.displayModel}`;
+    const gatewayProjection = configProjection.modelGatewayProjection ?? {
+        providerCount: 0,
+        modelCount: 0,
+        enabledModelCount: 0,
+        active: null,
+    };
+    const gatewayActive =
+        gatewayProjection.active && typeof gatewayProjection.active === 'object' ? gatewayProjection.active : null;
 
     println(
         `\x1b[36m[now]\x1b[0m runtime=${projection.runtimeId} live=${live.state} status=${state} loop=${projection.dialogLoopActive ? 'on' : 'off'} channel=${channel.state} mode=${mode} queue=${queue} ${ask}${sdkWait ? ` ${sdkWait}` : ''} timeline=${projection.timelineSource}:${projection.timelineReconciliationStatus}:sync=${projection.timelineSyncStatus} sse=${live.sse.clients}/${live.sse.criticalClients} ${mismatchLabel}`,
     );
+    if (gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0) {
+        println(
+            `\x1b[90m[now]\x1b[0m gateway=providers:${gatewayProjection.providerCount} models:${gatewayProjection.modelCount} enabled:${gatewayProjection.enabledModelCount} active=${gatewayActive?.['modelId'] ?? '-'}${gatewayActive?.['providerId'] ? `@${gatewayActive['providerId']}` : ''}`,
+        );
+    }
     if (projection.activity?.label) {
         const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';
         println(`\x1b[90m[now]\x1b[0m atividade=${projection.activity.phase}:${projection.activity.label}${detail}`);
