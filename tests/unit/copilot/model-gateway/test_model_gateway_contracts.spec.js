@@ -307,6 +307,12 @@ describe('model-gateway foundation', () => {
             COPILOT_BYOK_MODEL: 'gemini-2.5-flash',
             GEMINI_API_KEY: 'gemini_secret_value_that_must_not_leak',
         });
+        recordByokProviderModelCallSuccess({
+            providerId: 'gemini',
+            providerModel: 'gemini-2.5-flash',
+            successContext: 'projection-test',
+            timestamp: 1_700_000_000_000,
+        });
 
         const projection = buildModelGatewayOperatorProjection(snapshot);
         assert.equal(projection.providerCount, 1);
@@ -314,6 +320,10 @@ describe('model-gateway foundation', () => {
         assert.equal(projection.providers[0].id, 'gemini');
         assert.ok(projection.models.some((model) => model.providerModel === 'gemini-2.5-flash'));
         assert.ok(projection.models.some((model) => model.tags.includes('vision')));
+        const model = projection.models.find((item) => item.providerModel === 'gemini-2.5-flash');
+        assert.equal(model?.runtime.chat, 'ok');
+        assert.ok(model?.tags.includes('runtime=proved'));
+        assert.ok(model?.tags.includes('runtime.chat=ok'));
     });
 
     it('resolves env secrets by reference without exposing values in descriptions', () => {

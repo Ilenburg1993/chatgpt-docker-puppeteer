@@ -194,7 +194,7 @@ src/copilot/model-gateway/
 - [x] Emitir `model_gateway:probe:completed` pelo `/byok probe` via EventBus.
 - [ ] Adicionar probe de vision quando houver fixtures seguras.
 - [ ] Registrar cada probe em health e observability.
-- [ ] Diferenciar `catalog says` de `runtime proved`.
+- [x] Diferenciar `catalog says` de `runtime proved`.
 
 ### Faixa F — Health e failure taxonomy
 
