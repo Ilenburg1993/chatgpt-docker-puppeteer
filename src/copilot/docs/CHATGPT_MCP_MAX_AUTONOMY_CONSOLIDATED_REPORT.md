@@ -3469,3 +3469,58 @@ Validacao final da continuidade:
    - `mcp_cloudflare_edge_policy_diff` apareceu no endpoint publico.
 8. `make copilot-mcp-status`
    - passou com `ready=true`, OAuth, tunnel e MCP HTTP vivos.
+
+### 18.3. Continuidade — snapshot read-only para backup operacional
+
+Apos publicar `mcp_cloudflare_edge_policy_diff`, a proxima camada adicionada foi snapshot consolidado, ainda sem
+mutacao.
+
+Mudancas:
+
+1. Novo modulo `src/copilot/mcp/cloudflare/edge-snapshot.js`.
+2. Nova tool MCP `mcp_cloudflare_edge_snapshot`.
+3. Novo script `npm run copilot:mcp:cloudflare:edge-snapshot`.
+4. Novo target `make copilot-mcp-edge-snapshot`.
+5. README MCP atualizado.
+6. Teste unitario `test_cloudflare_edge_snapshot.spec.js`.
+
+Contrato da snapshot:
+
+1. `mode="read-only-snapshot"`.
+2. `appliesChanges=false`.
+3. Consolida:
+   - tunnel remoto;
+   - DNS/CNAME;
+   - rulesets da edge;
+   - findings;
+   - diff desired vs actual;
+   - guidance de backup.
+4. Sugere um `suggestedFileName` para persistencia externa do JSON antes de qualquer mudanca Cloudflare.
+
+Validacao final da continuidade:
+
+1. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_cloudflare_edge_snapshot.spec.js tests/unit/copilot/mcp/test_mcp_registry.spec.js --reporter=dot`
+   - passou com 6/6.
+2. `npm run typecheck:strict:src.copilot -- --pretty false`
+   - passou.
+3. `npm run lint:copilot -- --quiet`
+   - passou.
+4. `make copilot-mcp-edge-snapshot`
+   - passou.
+   - `readiness.mutationReady=true`.
+   - `criticalCount=0`.
+   - snapshot consolidou tunnel remoto, DNS validado, rulesets vazios, diff e sequencia recomendada.
+5. `npm run test:copilot:unit`
+   - passou com 3105/3105, sem warnings/errors.
+6. `make copilot-mcp-restart`
+   - passou.
+7. `make copilot-mcp-smoke-refresh`
+   - passou com 82/82 tools remotas e `toolsMatchLocalRegistry=true`.
+   - `mcp_cloudflare_edge_snapshot` apareceu no endpoint publico.
+8. `make copilot-mcp-status`
+   - passou com `ready=true`, OAuth, tunnel e MCP HTTP vivos.
+
+Proximo passo tecnico:
+
+1. Criar uma camada de backup/restore ou instrucao operacional manual antes da primeira mutacao Cloudflare real.
+2. Depois disso, aplicar em ordem: cache bypass explicito, rate limit anonimo de `/mcp`, rate limit de `/oauth/token`.

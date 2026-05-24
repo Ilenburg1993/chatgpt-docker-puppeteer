@@ -417,6 +417,16 @@ Continuidade apos correcao de token:
 8. [x] Reiniciar/smoke remoto para publicar a nova tool.
 9. [x] Confirmar smoke remoto com 81/81 tools.
 
+Continuidade de snapshot/backup:
+
+1. [x] Criar `mcp_cloudflare_edge_snapshot`.
+2. [x] Criar `npm run copilot:mcp:cloudflare:edge-snapshot`.
+3. [x] Criar `make copilot-mcp-edge-snapshot`.
+4. [x] Consolidar tunnel, DNS, edge rulesets e policy diff em JSON unico.
+5. [x] Rodar validadores completos novamente.
+6. [x] Reiniciar/smoke remoto para publicar a nova tool.
+7. [x] Confirmar smoke remoto com 82/82 tools.
+
 ## 7. Criterios de pronto
 
 Este turno Cloudflare sera considerado pronto quando:
@@ -438,6 +448,7 @@ make copilot-mcp-remote-audit
 make copilot-mcp-edge-audit
 make copilot-mcp-edge-policy-diff
 make copilot-mcp-edge-policy-plan
+make copilot-mcp-edge-snapshot
 make copilot-mcp-smoke-refresh
 ```
 

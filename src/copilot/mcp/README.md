@@ -48,6 +48,7 @@ npm run copilot:mcp:cloudflare:remote-audit
 npm run copilot:mcp:cloudflare:edge-audit
 npm run copilot:mcp:cloudflare:edge-policy-diff
 npm run copilot:mcp:cloudflare:edge-policy-plan
+npm run copilot:mcp:cloudflare:edge-snapshot
 npm run copilot:mcp:cloudflare:smoke
 npm run copilot:mcp:oauth:smoke
 ```
@@ -72,6 +73,8 @@ Use `npm run copilot:mcp:cloudflare:edge-policy-plan` para gerar a proposta cano
 Cloudflare antes de qualquer alteracao manual ou futura automacao de mutacao.
 Use `npm run copilot:mcp:cloudflare:edge-policy-diff` para comparar o estado real da edge com essa proposta
 canonico sem aplicar nenhuma alteracao.
+Use `npm run copilot:mcp:cloudflare:edge-snapshot` para capturar tunnel, DNS, rulesets e diff em um unico JSON
+antes de qualquer mudanca Cloudflare.
 Quick Tunnel continua disponivel como fallback explicito:
 
 ```bash

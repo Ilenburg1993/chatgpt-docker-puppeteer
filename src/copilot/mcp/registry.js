@@ -14,6 +14,7 @@ import { mcpAppsSdkReadinessTool } from './tools/apps-sdk-readiness.js';
 import { mcpCloudflareEdgeAuditTool } from './tools/cloudflare-edge.js';
 import { mcpCloudflareEdgePolicyDiffTool } from './tools/cloudflare-edge-diff.js';
 import { mcpCloudflareEdgePolicyPlanTool } from './tools/cloudflare-edge-policy.js';
+import { mcpCloudflareEdgeSnapshotTool } from './tools/cloudflare-edge-snapshot.js';
 import { mcpCloudflareMetricsSnapshotTool } from './tools/cloudflare-metrics.js';
 import { connectionTools } from './tools/connection.js';
 import { mcpCloudflareRemoteAuditTool } from './tools/cloudflare-remote.js';
@@ -80,6 +81,7 @@ export function getCanonicalMcpTools() {
         mcpCloudflareEdgeAuditTool,
         mcpCloudflareEdgePolicyDiffTool,
         mcpCloudflareEdgePolicyPlanTool,
+        mcpCloudflareEdgeSnapshotTool,
         mcpCloudflareMetricsSnapshotTool,
         mcpHostBlockDiagnosticsTool,
         ...connectionTools,

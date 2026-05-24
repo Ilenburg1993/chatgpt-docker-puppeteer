@@ -205,6 +205,7 @@ help:
 	@echo "  $(CYAN)make copilot-mcp-edge-audit$(NC) Audita Cloudflare cache/WAF/rate-limit/transforms"
 	@echo "  $(CYAN)make copilot-mcp-edge-policy-diff$(NC) Compara edge actual vs desired sem aplicar"
 	@echo "  $(CYAN)make copilot-mcp-edge-policy-plan$(NC) Planeja edge policy Cloudflare sem aplicar"
+	@echo "  $(CYAN)make copilot-mcp-edge-snapshot$(NC) Snapshot Cloudflare tunnel/DNS/rulesets/diff"
 	@echo "  $(CYAN)make copilot-mcp-smoke-refresh$(NC) Atualiza smoke persistido do MCP público"
 	@echo "  $(CYAN)make copilot-mcp-oauth-smoke$(NC) Smoke OAuth canônico do MCP público"
 	@echo "  $(CYAN)make lsp-health$(NC)        Diagnóstico funcional LSP via MCP"
@@ -1258,6 +1259,10 @@ copilot-mcp-edge-policy-diff:
 copilot-mcp-edge-policy-plan:
 	@echo "$(CYAN)🧭 Plano Cloudflare Edge policy MCP$(NC)"
 	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:edge-policy-plan
+
+copilot-mcp-edge-snapshot:
+	@echo "$(CYAN)📦 Snapshot Cloudflare Edge MCP$(NC)"
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:edge-snapshot
 
 copilot-mcp-smoke:
 	@echo "$(CYAN)🧪 Smoke MCP tools/list público$(NC)"

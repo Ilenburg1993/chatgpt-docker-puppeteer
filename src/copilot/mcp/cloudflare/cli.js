@@ -16,6 +16,7 @@ import { getCanonicalMcpTools } from '../registry.js';
 import { auditCloudflareEdgeRulesets } from './edge-audit.js';
 import { diffCloudflareEdgePolicy } from './edge-policy-diff.js';
 import { buildCloudflareEdgePolicyPlan } from './edge-policy-plan.js';
+import { buildCloudflareEdgeSnapshot } from './edge-snapshot.js';
 import { auditCloudflareRemoteTunnel } from './remote-api.js';
 import {
     buildManagedTunnelArgs,
@@ -57,6 +58,8 @@ try {
         await runEdgePolicyDiff();
     } else if (command === 'edge-policy-plan') {
         await runEdgePolicyPlan();
+    } else if (command === 'edge-snapshot') {
+        await runEdgeSnapshot();
     } else if (command === 'up') {
         await runUp();
     } else if (command === 'down') {
@@ -71,7 +74,7 @@ try {
         );
     } else {
         fail(
-            `Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, remote-audit, edge-audit, edge-policy-diff, edge-policy-plan, up, down, restart, or run.`,
+            `Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, remote-audit, edge-audit, edge-policy-diff, edge-policy-plan, edge-snapshot, up, down, restart, or run.`,
         );
     }
 } catch (error) {
@@ -309,6 +312,7 @@ async function runSmoke() {
         'mcp_cloudflare_edge_audit',
         'mcp_cloudflare_edge_policy_diff',
         'mcp_cloudflare_edge_policy_plan',
+        'mcp_cloudflare_edge_snapshot',
         'mcp_cloudflare_remote_audit',
         'mcp_cloudflare_metrics_snapshot',
         'mcp_connector_smoke_refresh',
@@ -429,6 +433,15 @@ async function runEdgePolicyDiff() {
  */
 async function runEdgePolicyPlan() {
     const report = await buildCloudflareEdgePolicyPlan();
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runEdgeSnapshot() {
+    const report = await buildCloudflareEdgeSnapshot();
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     if (!report.ok) process.exitCode = 1;
 }

@@ -323,6 +323,7 @@
     "copilot:mcp:cloudflare:edge-audit": "node src/copilot/mcp/cloudflare/cli.js edge-audit",
     "copilot:mcp:cloudflare:edge-policy-diff": "node src/copilot/mcp/cloudflare/cli.js edge-policy-diff",
     "copilot:mcp:cloudflare:edge-policy-plan": "node src/copilot/mcp/cloudflare/cli.js edge-policy-plan",
+    "copilot:mcp:cloudflare:edge-snapshot": "node src/copilot/mcp/cloudflare/cli.js edge-snapshot",
     "copilot:mcp:cloudflare:install": "bash src/copilot/mcp/cloudflare/install-cloudflared.sh",
     "copilot:mcp:cloudflare:quick": "node src/copilot/mcp/cloudflare/cli.js quick",
     "copilot:mcp:cloudflare:remote-audit": "node src/copilot/mcp/cloudflare/cli.js remote-audit",
