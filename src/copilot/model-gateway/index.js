@@ -36,7 +36,20 @@ export {
     createEnvSecretRegistry,
 } from './secrets/env-secret-registry.js';
 export { redactSecretRecord, redactSecretText } from './secrets/redaction.js';
-export { OpenAICompatibleAdapter, openAICompatibleAdapter } from './providers/index.js';
+export {
+    OPENROUTER_BASE_URL,
+    OPENROUTER_DEFAULT_HEADERS,
+    OPENROUTER_PROVIDER_ID,
+    OLLAMA_CLOUD_BASE_URL,
+    OLLAMA_LOCAL_BASE_URL,
+    OLLAMA_PROVIDER_IDS,
+    OllamaAdapter,
+    OpenAICompatibleAdapter,
+    OpenRouterAdapter,
+    ollamaAdapter,
+    openAICompatibleAdapter,
+    openRouterAdapter,
+} from './providers/index.js';
 export { buildModelGatewayOnListModelsHandler } from './session/on-list-models.js';
 export { toCopilotModelInfo, toCopilotModelInfoList } from './session/copilot-model-projection.js';
 export {

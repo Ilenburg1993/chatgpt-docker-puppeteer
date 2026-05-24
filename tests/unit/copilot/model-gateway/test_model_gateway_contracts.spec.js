@@ -18,7 +18,9 @@ import {
     buildRegistrySnapshotEvent,
     createEnvSecretRegistry,
     buildModelGatewayOnListModelsHandler,
+    ollamaAdapter,
     openAICompatibleAdapter,
+    openRouterAdapter,
     persistEnvByokModelGatewaySnapshot,
     projectModelGatewayMetrics,
     redactSecretRecord,
@@ -193,6 +195,69 @@ describe('model-gateway foundation', () => {
         assert.equal(overrides.provider.apiKey, secret);
         assert.equal(overrides.modelCapabilities?.supports.vision, true);
         assert.equal(JSON.stringify({ provider, model }).includes(secret), false);
+    });
+
+    it('projects OpenRouter through a provider-specific adapter with public attribution headers', () => {
+        const secret = 'sk-or-v1-openrouter-secret-that-must-not-leak';
+        const env = {
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_PRESET: 'openrouter',
+            COPILOT_BYOK_MODEL: 'deepseek/deepseek-v4-flash:free',
+            OPEN_ROUTER_KEY: secret,
+        };
+        const snapshot = buildEnvByokModelGatewaySnapshot(env);
+        const provider = snapshot.providers.find((item) => item.id === 'openrouter');
+        const model = snapshot.models.find((item) => item.providerModel === 'deepseek/deepseek-v4-flash:free');
+        assert.ok(provider);
+        assert.ok(model);
+        assert.equal(openRouterAdapter.canHandle(provider), true);
+
+        const overrides = openRouterAdapter.toCopilotSessionOverrides({
+            provider,
+            model,
+            secrets: createEnvSecretRegistry({ env }),
+        });
+
+        assert.equal(overrides.model, 'deepseek/deepseek-v4-flash:free');
+        assert.equal(overrides.provider.baseUrl, 'https://openrouter.ai/api/v1');
+        assert.equal(overrides.provider.apiKey, secret);
+        assert.equal(overrides.provider.headers['X-Title'], 'Terminal LLM-B');
+        assert.equal(
+            JSON.stringify({
+                provider,
+                model,
+                overrides: { ...overrides, provider: { ...overrides.provider, apiKey: undefined } },
+            }).includes(secret),
+            false,
+        );
+    });
+
+    it('projects Ollama local as a private local route without requiring auth', () => {
+        const env = {
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_PRESET: 'ollama-local',
+            COPILOT_BYOK_MODEL: 'qwen3-coder-next',
+            OLLAMA_LOCAL_BASE_URL: 'http://localhost:11434/v1',
+        };
+        const snapshot = buildEnvByokModelGatewaySnapshot(env);
+        const provider = snapshot.providers.find((item) => item.id === 'ollama-local');
+        const model = snapshot.models.find((item) => item.providerModel === 'qwen3-coder-next');
+        assert.ok(provider);
+        assert.ok(model);
+        assert.equal(ollamaAdapter.canHandle(provider), true);
+
+        const overrides = ollamaAdapter.toCopilotSessionOverrides({
+            provider,
+            model,
+            secrets: createEnvSecretRegistry({ env }),
+        });
+
+        assert.equal(overrides.model, 'qwen3-coder-next');
+        assert.equal(overrides.provider.baseUrl, 'http://localhost:11434/v1');
+        assert.equal(overrides.provider.apiKey, undefined);
+        assert.equal(overrides.gateway?.providerFamily, 'ollama');
+        assert.equal(overrides.gateway?.runtimeKind, 'local');
+        assert.equal(overrides.gateway?.localPrivate, true);
     });
 
     it('builds an SDK onListModels handler from gateway records without exposing secrets', async () => {

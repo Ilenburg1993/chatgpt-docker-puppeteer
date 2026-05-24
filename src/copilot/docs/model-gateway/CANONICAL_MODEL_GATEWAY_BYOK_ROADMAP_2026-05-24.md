@@ -172,8 +172,8 @@ src/copilot/model-gateway/
 
 - [x] Extrair `OpenAICompatibleAdapter`.
 - [x] Cobrir `OpenAICompatibleAdapter` com teste de bridge record seguro -> override SDK.
-- [ ] Extrair `OpenRouterAdapter`.
-- [ ] Extrair `OllamaAdapter`.
+- [x] Extrair `OpenRouterAdapter`.
+- [x] Extrair `OllamaAdapter`.
 - [ ] Extrair `GeminiAdapter`.
 - [ ] Extrair `AnthropicAdapter`.
 - [ ] Fazer novo provider ser adicionável sem editar `sdk/session/provider.js`.
