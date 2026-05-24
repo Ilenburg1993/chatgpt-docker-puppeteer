@@ -6,6 +6,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { readCloudflareTunnelConfig, validateConfiguredPublicUrl } from '../cloudflare/config.js';
 import {
@@ -22,6 +23,41 @@ import { errorResult, okResult } from '../control-plane/result.js';
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
 const CONNECTOR_SMOKE_TIMEOUT_MS = 45_000;
 const CONNECTOR_SMOKE_OUTPUT_LIMIT = 256_000;
+
+/**
+ * @param {string} pidFile
+ * @returns {Promise<{ pidFile: string; pid: number | null; alive: boolean; error: string | null }>}
+ */
+async function readPidFileStatus(pidFile) {
+    try {
+        const raw = (await readFile(pidFile, 'utf8')).trim();
+        const pid = Number(raw);
+        if (!Number.isInteger(pid) || pid <= 0) {
+            return { pidFile, pid: null, alive: false, error: 'PID file does not contain a positive integer.' };
+        }
+        try {
+            process.kill(pid, 0);
+            return { pidFile, pid, alive: true, error: null };
+        } catch (error) {
+            return { pidFile, pid, alive: false, error: error instanceof Error ? error.message : String(error) };
+        }
+    } catch (error) {
+        return { pidFile, pid: null, alive: false, error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * @param {string} url
+ * @returns {Promise<{ ok: boolean; status?: number; error?: string }>}
+ */
+async function probeHealth(url) {
+    try {
+        const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+        return { ok: response.ok, status: response.status };
+    } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+}
 
 /**
  * @param {unknown} value
@@ -237,4 +273,76 @@ export const mcpConnectorSmokeRefreshTool = {
     },
     annotations: boundedWriteAnnotations(),
     handler: runConnectorSmokeRefresh,
+};
+
+/**
+ * @type {import('../registry.js').McpToolDefinition}
+ */
+export const mcpPostRestartReadinessTool = {
+    name: 'mcp_post_restart_readiness',
+    title: 'MCP post-restart readiness',
+    description:
+        'Return a compact post-restart readiness snapshot for the permanent Cloudflare MCP connector before ChatGPT starts heavier work.',
+    inputSchema: {},
+    annotations: readOnlyAnnotations(),
+    handler: async () => {
+        const config = readCloudflareTunnelConfig();
+        const publicUrlValidation = validateConfiguredPublicUrl(config) ?? null;
+        const connectorSmoke = summarizeConnectorSmokeState(
+            await readConnectorSmokeState(config.smokeStateFile),
+            config.publicMcpUrl ?? null,
+        );
+        const connectorSmokeFresh =
+            connectorSmoke.ok === true &&
+            typeof connectorSmoke.ageMinutes === 'number' &&
+            connectorSmoke.ageMinutes <= CONNECTOR_SMOKE_STALE_AFTER_MINUTES;
+        const [mcpHttpProcess, cloudflaredProcess, localHealth] = await Promise.all([
+            readPidFileStatus(config.mcpHttpPidFile),
+            readPidFileStatus(config.managedTunnelPidFile),
+            probeHealth(config.healthUrl),
+        ]);
+        const permanentUrlReady =
+            config.mode === 'named-permanent' && Boolean(config.publicMcpUrl) && publicUrlValidation?.ok === true;
+        const ready =
+            permanentUrlReady &&
+            mcpHttpProcess.alive &&
+            cloudflaredProcess.alive &&
+            localHealth.ok &&
+            connectorSmokeFresh;
+        const nextActions = [];
+        if (!permanentUrlReady)
+            nextActions.push('Fix COPILOT_MCP_CLOUDFLARE_PUBLIC_URL or public hostname configuration.');
+        if (!mcpHttpProcess.alive || !cloudflaredProcess.alive || !localHealth.ok) {
+            nextActions.push('Run make copilot-mcp-restart.');
+        }
+        if (!connectorSmokeFresh)
+            nextActions.push('Run mcp_connector_smoke_refresh or make copilot-mcp-smoke-refresh.');
+        if (ready) {
+            nextActions.push('Start with mcp_session_profile, mcp_validation_dashboard and repo_status.');
+        }
+        return okResult({
+            success: true,
+            ready,
+            mode: config.mode,
+            connectorUrl: config.publicMcpUrl ?? null,
+            publicUrlValidation,
+            processes: {
+                mcpHttp: mcpHttpProcess,
+                cloudflared: cloudflaredProcess,
+            },
+            localHealth,
+            connectorSmoke: {
+                ...connectorSmoke,
+                fresh: connectorSmokeFresh,
+                staleAfterMinutes: CONNECTOR_SMOKE_STALE_AFTER_MINUTES,
+            },
+            chatgpt: {
+                authentication: formatChatGptConnectorAuthentication(readMcpAuthConfig()),
+                recommendedFirstCalls: ready
+                    ? ['mcp_session_profile', 'mcp_validation_dashboard', 'repo_status']
+                    : ['mcp_tunnel_status', 'mcp_connector_smoke_refresh'],
+            },
+            nextActions,
+        });
+    },
 };

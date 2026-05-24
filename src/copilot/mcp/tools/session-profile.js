@@ -43,6 +43,7 @@ export const mcpSessionProfileTool = {
                 'mcp_maintenance_plan',
                 'delegate_to_repo_autonomy_runner',
                 'mcp_tunnel_status',
+                'mcp_post_restart_readiness',
                 'mcp_last_validation_summary',
                 'mcp_auth_profile',
                 'mcp_autonomy_power_score',
@@ -70,6 +71,7 @@ export const mcpSessionProfileTool = {
                 'mcp_last_validation_summary',
                 'mcp_host_block_diagnostics',
                 'chatgpt_connector_current_url_status',
+                'mcp_post_restart_readiness',
                 'mcp_auth_profile',
                 'mcp_autonomy_power_score',
                 'mcp_oauth_issuer_diagnostics',
@@ -79,14 +81,16 @@ export const mcpSessionProfileTool = {
             preferredWriteWorkflows: [
                 {
                     task: 'patch-existing-file',
-                    flow: ['repo_patch_plan includeDiffPreview=false', 'repo_apply_patch expectedHash=<sha256 from plan> includeDiffPreview=false'],
+                    flow: [
+                        'repo_patch_plan includeDiffPreview=false',
+                        'repo_apply_patch expectedHash=<sha256 from plan> includeDiffPreview=false',
+                    ],
                     reason: 'Plan-only read is lower friction than dryRun inside the write tool; textual diffs are suppressed by default to avoid ChatGPT web stream interruptions.',
                 },
                 {
                     task: 'apply-multiple-file-ops',
                     flow: ['repo_apply_file_batch_plan', 'repo_apply_file_batch dryRun=false confirmBatch=true'],
-                    reason:
-                        'Plan the batch with a read-only tool first, then apply all trusted create/move/quarantine operations in one ChatGPT write confirmation.',
+                    reason: 'Plan the batch with a read-only tool first, then apply all trusted create/move/quarantine operations in one ChatGPT write confirmation.',
                 },
                 {
                     task: 'remove-file-safely',

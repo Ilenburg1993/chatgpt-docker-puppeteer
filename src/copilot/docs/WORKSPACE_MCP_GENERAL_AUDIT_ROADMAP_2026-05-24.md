@@ -961,7 +961,7 @@ issuerGrantTypes inclui refresh_token
 ### P1
 
 - [x] Criar `mcp_connector_smoke_refresh`.
-- [ ] Criar `mcp_post_restart_readiness`.
+- [x] Criar `mcp_post_restart_readiness`.
 - [x] Remover `job_cancel` de `rememberApprovalCandidates`.
 - [ ] Separar batch seguro/destrutivo.
 
@@ -971,6 +971,7 @@ Atualizacao 2026-05-24:
 - [x] `make copilot-mcp-status` confirmou `ready=true` no tunnel permanente.
 - [x] `make copilot-mcp-oauth-smoke` confirmou OAuth, DCR, CIMD, refresh token, id token e `/oauth/userinfo`.
 - [x] Restart MCP/Cloudflare corrigido para aguardar liberacao real da porta `127.0.0.1:3333`.
+- [x] `mcp_post_restart_readiness` criado como gate read-only compacto pos-restart.
 
 ### P2
 

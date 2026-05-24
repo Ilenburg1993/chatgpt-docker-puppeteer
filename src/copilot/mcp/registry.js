@@ -30,7 +30,11 @@ import { mcpRuntimeHealthTool } from './tools/runtime-health.js';
 import { mcpSessionProfileTool } from './tools/session-profile.js';
 import { mcpSmokeWorkspaceTool } from './tools/smoke-workspace.js';
 import { bindMcpToolsStatusProvider, mcpAutonomyPowerScoreTool, mcpToolsStatusTool } from './tools/tools-status.js';
-import { mcpConnectorSmokeRefreshTool, mcpTunnelStatusTool } from './tools/tunnel-status.js';
+import {
+    mcpConnectorSmokeRefreshTool,
+    mcpPostRestartReadinessTool,
+    mcpTunnelStatusTool,
+} from './tools/tunnel-status.js';
 
 /**
  * @typedef {object} McpToolDefinition
@@ -80,6 +84,7 @@ export function getCanonicalMcpTools() {
         mcpSmokeWorkspaceTool,
         mcpTunnelStatusTool,
         mcpConnectorSmokeRefreshTool,
+        mcpPostRestartReadinessTool,
         mcpRuntimeHealthTool,
     ]);
     bindMcpToolsStatusProvider(() => tools);

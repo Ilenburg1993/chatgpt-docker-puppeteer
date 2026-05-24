@@ -41,6 +41,7 @@ describe('copilot MCP registry', () => {
             'mcp_maintenance_plan',
             'mcp_oauth_friction_audit',
             'mcp_oauth_issuer_diagnostics',
+            'mcp_post_restart_readiness',
             'mcp_run_safe_validation_suite',
             'mcp_runtime_health',
             'mcp_session_profile',

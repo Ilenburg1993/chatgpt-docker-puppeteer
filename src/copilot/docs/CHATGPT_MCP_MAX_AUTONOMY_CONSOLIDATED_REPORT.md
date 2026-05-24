@@ -2458,6 +2458,10 @@ Isso reduz payload, reduz tempo de stream e reduz chance de o host web perder a 
       `127.0.0.1:3333`, causando `EADDRINUSE`, origin morto e 502 no Cloudflare.
     - Agora `stopPidFileProcess()` aguarda a saida apos `SIGTERM` e so entao remove pid/metadata e inicia o novo
       processo.
+14. Iniciada a proxima subfase com `mcp_post_restart_readiness`.
+    - A tool retorna um snapshot compacto pos-restart antes de o ChatGPT iniciar trabalho pesado.
+    - Ela combina URL publica, pids de `mcp-http`/`cloudflared`, health local, smoke persistido e proximas acoes.
+    - Ela e read-only e complementa `mcp_connector_smoke_refresh`, que continua sendo o refresh persistente do smoke.
 
 ### 15.5. Roadmap atualizado
 
@@ -2482,9 +2486,10 @@ Subfases:
 1. [x] Criar `mcp_connector_smoke_refresh`.
 2. [x] Adicionar comandos package/Makefile para refresh canonico de smoke.
 3. [x] Manter `trycloudflare` como fallback separado e nao como readiness padrao.
-4. [x] Rodar `make copilot-mcp-smoke-refresh` com tunnel vivo.
-5. [x] Rodar `make copilot-mcp-status` e confirmar `lastSmokeFresh=true`.
-6. [x] Rodar `make copilot-mcp-oauth-smoke`.
+4. [x] Criar `mcp_post_restart_readiness`.
+5. [x] Rodar `make copilot-mcp-smoke-refresh` com tunnel vivo.
+6. [x] Rodar `make copilot-mcp-status` e confirmar `lastSmokeFresh=true`.
+7. [x] Rodar `make copilot-mcp-oauth-smoke`.
 
 #### Faixa C — Ergonomia de leitura e busca
 
@@ -2566,10 +2571,37 @@ Estado operacional final desta rodada:
 
 ```text
 Public MCP URL: https://mcp.aurelin.org/mcp
-Registry remoto: 74 tools
-Registry local:  74 tools
+Registry remoto: 75 tools
+Registry local:  75 tools
 OAuth:           ok
 Cloudflare:      ready=true
 Smoke:           fresh
 Fallback:        trycloudflare mantido apenas como contingencia
+```
+
+### 15.8. Continuidade pos-push — readiness gate
+
+Apos o commit `671cf024`, a sessao prosseguiu para a subfase seguinte:
+
+1. `mcp_post_restart_readiness` foi implementado como tool read-only.
+2. `mcp_capabilities_summary` subiu para `CAPABILITIES_VERSION=18`.
+3. `mcp_session_profile` passou a sugerir `mcp_post_restart_readiness` entre chamadas iniciais e leituras de baixa
+   friccao.
+4. O smoke Cloudflare passou a considerar `mcp_post_restart_readiness` como critical tool.
+5. Validacao executada:
+   - `npm run typecheck:strict:src.copilot -- --pretty false`: passou;
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`: passou com 41/41;
+   - `npm run lint:copilot -- --quiet`: passou;
+   - `npm run test:copilot:unit`: passou com 3093/3093;
+   - `git diff --check`: passou;
+   - `make copilot-mcp-restart`: passou;
+   - `make copilot-mcp-smoke-refresh`: passou com 75/75 tools remotas;
+   - `make copilot-mcp-status`: passou com `ready=true`.
+
+Novo gate recomendado para o ChatGPT ao iniciar uma sessao depois de restart:
+
+```text
+mcp_post_restart_readiness
+se ready=true: mcp_session_profile -> repo_status -> mcp_validation_dashboard
+se ready=false: mcp_tunnel_status -> mcp_connector_smoke_refresh -> mcp_post_restart_readiness
 ```

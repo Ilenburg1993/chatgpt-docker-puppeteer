@@ -334,6 +334,7 @@ describe('copilot MCP tools', () => {
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tools_status'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tunnel_status'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_connector_smoke_refresh'));
+        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_post_restart_readiness'));
         assert.ok(/** @type {string[]} */ (structured['validation']).includes('mcp_validation_dashboard'));
         assert.ok(/** @type {string[]} */ (structured['validation']).includes('job_get_summary'));
         assert.equal(typeof structured['annotationProfile'], 'object');
@@ -395,6 +396,16 @@ describe('copilot MCP tools', () => {
         const tunnelGuidance = /** @type {Record<string, unknown>} */ (structured['tunnelGuidance']);
         assert.equal(tunnelGuidance['mode'], 'Cloudflare named permanent tunnel');
         assert.equal(tunnelGuidance['expectedUrlShape'], 'https://mcp.aurelin.org/mcp');
+    });
+
+    it('mcp_post_restart_readiness reports compact permanent tunnel readiness', async () => {
+        const tool = findTool('mcp_post_restart_readiness');
+        const result = await tool.handler({});
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.ok('ready' in (result.structuredContent ?? {}));
+        assert.equal(result.structuredContent?.['connectorUrl'], 'https://mcp.aurelin.org/mcp');
+        assert.ok(Array.isArray(result.structuredContent?.['nextActions']));
     });
 
     it('mcp maintenance tools plan and dry-run fixed safe batches', async () => {

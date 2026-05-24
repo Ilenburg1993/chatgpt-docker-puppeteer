@@ -286,6 +286,7 @@ async function runSmoke() {
         'mcp_tools_status',
         'mcp_tunnel_status',
         'mcp_connector_smoke_refresh',
+        'mcp_post_restart_readiness',
         'chatgpt_connector_current_url_status',
     ];
     const missingCriticalTools = criticalToolNames.filter((toolName) => !remoteToolNames.includes(toolName));
