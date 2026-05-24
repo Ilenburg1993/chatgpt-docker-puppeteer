@@ -12,6 +12,7 @@ import { errorResult } from './control-plane/result.js';
 import { normalizeMcpToolDefinitions } from './control-plane/tool-metadata.js';
 import { mcpAppsSdkReadinessTool } from './tools/apps-sdk-readiness.js';
 import { connectionTools } from './tools/connection.js';
+import { mcpCloudflareRemoteAuditTool } from './tools/cloudflare-remote.js';
 import { copilotSessionTools } from './tools/copilot-session.js';
 import { delegateToRepoAutonomyRunnerTool } from './tools/delegation-runner.js';
 import { gitReadTools } from './tools/git-read.js';
@@ -74,6 +75,7 @@ export function getCanonicalMcpTools() {
         mcpAppsSdkReadinessTool,
         mcpHostBlockDiagnosticsTool,
         ...connectionTools,
+        mcpCloudflareRemoteAuditTool,
         ...repoWriteTools,
         ...copilotSessionTools,
         ...metaTools,

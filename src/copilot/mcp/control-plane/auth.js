@@ -27,6 +27,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
  * @property {McpAuthEnforcementMode} enforcement
  * @property {string} expectedIssuer
  * @property {string} expectedAudience
+ * @property {string[]} acceptedAudiences
  * @property {string} jwksUri
  * @property {boolean} staticBearerConfigured
  *
@@ -186,11 +187,21 @@ export function readMcpAuthConfig(env = process.env) {
         enforcement: normalizeMcpAuthEnforcement(env['COPILOT_MCP_AUTH_ENFORCEMENT'], mode),
         expectedIssuer,
         expectedAudience,
+        acceptedAudiences: buildAcceptedAudiences(expectedAudience, resource),
         jwksUri: env['COPILOT_MCP_OAUTH_JWKS_URI'] ?? defaultJwksUri,
         staticBearerConfigured:
             typeof env['COPILOT_MCP_STATIC_BEARER_TOKEN'] === 'string' &&
             env['COPILOT_MCP_STATIC_BEARER_TOKEN'].length > 0,
     };
+}
+
+/**
+ * @param {string} expectedAudience
+ * @param {string} resource
+ * @returns {string[]}
+ */
+function buildAcceptedAudiences(expectedAudience, resource) {
+    return [...new Set([expectedAudience, resource, `${resource}/mcp`].filter(Boolean))];
 }
 
 /**
@@ -248,11 +259,13 @@ export function securitySchemesForMcpTool(tool, config = readMcpAuthConfig()) {
 
 /**
  * @param {McpAuthConfig} [config]
+ * @param {{ resource?: string }} [options]
  * @returns {Record<string, unknown>}
  */
-export function buildProtectedResourceMetadata(config = readMcpAuthConfig()) {
+export function buildProtectedResourceMetadata(config = readMcpAuthConfig(), options = {}) {
+    const resource = typeof options.resource === 'string' ? options.resource.replace(/\/+$/u, '') : config.resource;
     return {
-        resource: config.resource,
+        resource,
         authorization_servers: [...config.authorizationServers],
         scopes_supported: [...config.initialScopes],
         resource_documentation: config.resourceDocumentation,
@@ -394,7 +407,7 @@ async function verifyBearerToken(token, requiredScopes, config, env) {
         }
         const verified = await jwtVerify(token, jwks, {
             issuer: config.expectedIssuer,
-            audience: config.expectedAudience,
+            audience: config.acceptedAudiences,
         });
         const tokenScopes = new Set([
             ...normalizeScopeClaim(verified.payload['scope']),

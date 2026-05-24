@@ -1181,7 +1181,7 @@ test-all: test test-unit test-integration test-e2e
 # 9️⃣.1 RAG & MCP
 # =============================================================================
 
-.PHONY: mcp-diagnose copilot-mcp-up copilot-mcp-down copilot-mcp-restart copilot-mcp-status copilot-mcp-smoke copilot-mcp-smoke-refresh copilot-mcp-oauth-smoke lsp-health semantic-preflight rag-help audit-help rag-preflight rag-health rag-index rag-index-code-config rag-index-docs rag-ask rag-hybrid rag-expand rag-reset rag-watch rag-full-rebuild rag-rebuild-zero rag-rebuild-code-config rag-rebuild-code-config-strict
+.PHONY: mcp-diagnose copilot-mcp-up copilot-mcp-down copilot-mcp-restart copilot-mcp-status copilot-mcp-remote-audit copilot-mcp-smoke copilot-mcp-smoke-refresh copilot-mcp-oauth-smoke lsp-health semantic-preflight rag-help audit-help rag-preflight rag-health rag-index rag-index-code-config rag-index-docs rag-ask rag-hybrid rag-expand rag-reset rag-watch rag-full-rebuild rag-rebuild-zero rag-rebuild-code-config rag-rebuild-code-config-strict
 
 rag-help:
 	@echo ""
@@ -1239,6 +1239,10 @@ copilot-mcp-restart:
 copilot-mcp-status:
 	@echo "$(CYAN)📡 Status MCP + Cloudflare permanente$(NC)"
 	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:status
+
+copilot-mcp-remote-audit:
+	@echo "$(CYAN)☁️  Auditoria remota Cloudflare MCP$(NC)"
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:remote-audit
 
 copilot-mcp-smoke:
 	@echo "$(CYAN)🧪 Smoke MCP tools/list público$(NC)"

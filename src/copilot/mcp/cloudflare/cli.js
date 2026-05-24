@@ -13,6 +13,7 @@ import process from 'node:process';
 import { formatChatGptConnectorAuthentication } from '../connection/profile.js';
 import { readMcpAuthConfig } from '../control-plane/auth.js';
 import { getCanonicalMcpTools } from '../registry.js';
+import { auditCloudflareRemoteTunnel } from './remote-api.js';
 import {
     buildManagedTunnelArgs,
     buildQuickTunnelArgs,
@@ -45,6 +46,8 @@ try {
         await runStatus();
     } else if (command === 'smoke') {
         await runSmoke();
+    } else if (command === 'remote-audit') {
+        await runRemoteAudit();
     } else if (command === 'up') {
         await runUp();
     } else if (command === 'down') {
@@ -54,12 +57,12 @@ try {
     } else if (command === 'run') {
         const config = readCloudflareTunnelConfig();
         runCloudflared(
-            buildManagedTunnelArgs(process.env['CLOUDFLARE_TUNNEL_TOKEN'], config.tunnelTokenFile),
+            buildManagedTunnelArgs(process.env['CLOUDFLARE_TUNNEL_TOKEN'], config.tunnelTokenFile, config),
             config.transportProtocol,
         );
     } else {
         fail(
-            `Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, up, down, restart, or run.`,
+            `Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, remote-audit, up, down, restart, or run.`,
         );
     }
 } catch (error) {
@@ -95,6 +98,8 @@ async function runDoctor() {
             tokenPresent: config.hasTunnelToken,
             tokenFilePresent: config.hasTunnelTokenFile,
             transportProtocol: config.transportProtocol,
+            metricsAddr: config.metricsAddr ?? null,
+            loglevel: config.loglevel,
             fixedDomainMode: config.mode === 'named-permanent',
             process: managedProcess,
             mcpHttpProcess,
@@ -113,7 +118,12 @@ async function runDoctor() {
             quick: `TUNNEL_TRANSPORT_PROTOCOL=${config.transportProtocol} cloudflared ${buildQuickTunnelArgs(config).join(' ')}`,
             status: 'npm run copilot:mcp:cloudflare:status',
             smoke: 'npm run copilot:mcp:cloudflare:smoke',
-            managed: `TUNNEL_TRANSPORT_PROTOCOL=${config.transportProtocol} cloudflared tunnel --no-autoupdate run --token <redacted>`,
+            remoteAudit: 'npm run copilot:mcp:cloudflare:remote-audit',
+            managed: `TUNNEL_TRANSPORT_PROTOCOL=${config.transportProtocol} cloudflared ${buildManagedTunnelArgs(
+                '<redacted>',
+                undefined,
+                config,
+            ).join(' ')}`,
             managedTokenFile:
                 'CLOUDFLARE_TUNNEL_TOKEN_FILE=/run/secrets/cloudflared-token npm run copilot:mcp:cloudflare:run',
         },
@@ -151,6 +161,8 @@ async function runStatus() {
                   originUrl: config.originUrl,
                   localMcpUrl: config.localMcpUrl,
                   authentication,
+                  metricsAddr: config.metricsAddr ?? null,
+                  loglevel: config.loglevel,
                   publicUrlValidation: configuredPublicUrlValidation ?? null,
                   tunnelProcessAlive: managedProcess.alive,
                   mcpHttpProcessAlive: mcpHttpProcess.alive,
@@ -285,6 +297,7 @@ async function runSmoke() {
         'mcp_smoke_workspace',
         'mcp_tools_status',
         'mcp_tunnel_status',
+        'mcp_cloudflare_remote_audit',
         'mcp_connector_smoke_refresh',
         'mcp_post_restart_readiness',
         'chatgpt_connector_current_url_status',
@@ -367,6 +380,15 @@ async function runSmoke() {
             mcpServerUrl: connectorUrl,
         },
     };
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runRemoteAudit() {
+    const report = await auditCloudflareRemoteTunnel();
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     if (!report.ok) process.exitCode = 1;
 }
@@ -471,12 +493,14 @@ async function runUp() {
     const cloudflared = await ensureDetachedProcess({
         name: 'cloudflared',
         command: 'cloudflared',
-        args: buildManagedTunnelArgs(process.env['CLOUDFLARE_TUNNEL_TOKEN'], config.tunnelTokenFile),
+        args: buildManagedTunnelArgs(process.env['CLOUDFLARE_TUNNEL_TOKEN'], config.tunnelTokenFile, config),
         pidFile: config.managedTunnelPidFile,
         logFile: 'src/copilot/.ai/cloudflare/cloudflared.log',
         env: {
             CLOUDFLARE_TUNNEL_TOKEN_FILE: config.tunnelTokenFile ?? '',
             TUNNEL_TRANSPORT_PROTOCOL: config.transportProtocol,
+            COPILOT_MCP_CLOUDFLARE_METRICS_ADDR: config.metricsAddr ?? '',
+            COPILOT_MCP_CLOUDFLARE_LOGLEVEL: config.loglevel,
         },
     });
     process.stdout.write(
@@ -531,12 +555,14 @@ async function runRestart() {
     const cloudflared = await ensureDetachedProcess({
         name: 'cloudflared',
         command: 'cloudflared',
-        args: buildManagedTunnelArgs(process.env['CLOUDFLARE_TUNNEL_TOKEN'], config.tunnelTokenFile),
+        args: buildManagedTunnelArgs(process.env['CLOUDFLARE_TUNNEL_TOKEN'], config.tunnelTokenFile, config),
         pidFile: config.managedTunnelPidFile,
         logFile: 'src/copilot/.ai/cloudflare/cloudflared.log',
         env: {
             CLOUDFLARE_TUNNEL_TOKEN_FILE: config.tunnelTokenFile ?? '',
             TUNNEL_TRANSPORT_PROTOCOL: config.transportProtocol,
+            COPILOT_MCP_CLOUDFLARE_METRICS_ADDR: config.metricsAddr ?? '',
+            COPILOT_MCP_CLOUDFLARE_LOGLEVEL: config.loglevel,
         },
     });
     process.stdout.write(

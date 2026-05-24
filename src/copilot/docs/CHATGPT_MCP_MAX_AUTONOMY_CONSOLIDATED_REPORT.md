@@ -2920,7 +2920,7 @@ Subfases adicionais:
 4. [x] Atualizar env/package/Makefile/docs.
 5. [x] Rodar validadores focados.
 6. [x] Reiniciar MCP/Cloudflare e repetir smoke OAuth.
-7. [ ] Commit/push da continuidade.
+7. [x] Commit/push da continuidade.
 
 Validacao da continuidade DCR:
 
@@ -2945,3 +2945,214 @@ Validacao da continuidade DCR:
 10. Stores locais verificados:
     - `oauth-refresh-tokens.json`: permissao `0600`, 4 hashes, nenhum refresh token em claro;
     - `oauth-clients.json`: permissao `0600`, 1 cliente DCR publico.
+
+## 17. Faixa Cloudflare/Claude — auditoria remota, drift zero e multi-cliente MCP
+
+### 17.1. Situacao lida na auditoria externa
+
+O arquivo `src/copilot/docs/# Auditoria Cloudflare — MCP externo.md` foi lido integralmente. O ponto central
+validado localmente foi que a arquitetura local ja estava correta, mas a fonte remota de verdade do Cloudflare
+precisava virar objeto auditavel pelo proprio repo.
+
+Achados confirmados:
+
+1. O MCP local deve escutar em `http://127.0.0.1:3333`.
+2. A URL publica canonica permanece `https://mcp.aurelin.org/mcp`.
+3. O tunnel remoto chama `workspace-mcp-dev`.
+4. O servico de origem remoto do Cloudflare nao deve apontar para `/mcp`.
+5. O servico de origem remoto nao deve ser `http://localhost:3333`, porque `localhost` pode resolver para IPv6
+   `::1` em alguns contextos e gerar `connection refused`.
+6. O servico de origem remoto correto e `http://127.0.0.1:3333`.
+7. A auditoria anterior recomendou uma tool ou comando de auditoria remota via API oficial Cloudflare.
+8. Tambem recomendou metricas locais do `cloudflared` e `loglevel` explicito.
+
+### 17.2. Pesquisa oficial consolidada
+
+Fontes oficiais usadas nesta faixa:
+
+1. Cloudflare Tunnel — setup e operacao de tunnels.
+   - `https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/`
+   - Conclusao operacional: `cloudflared` cria conexoes outbound para a edge Cloudflare; nao precisamos abrir porta
+     inbound no Dev Container.
+2. Cloudflare Tunnel — tokens e run parameters.
+   - `https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/tunnel-run-parameters/`
+   - Conclusao operacional: tunnel remoto pode rodar por `--token` ou `--token-file`; o token deve ficar fora do git.
+3. Cloudflare Tunnel — metricas.
+   - `https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/monitor-tunnels/metrics/`
+   - Conclusao operacional: `cloudflared` pode expor endpoint local de metricas via `--metrics`.
+4. Cloudflare API / Node SDK.
+   - `https://developers.cloudflare.com/api/node/`
+   - Conclusao operacional: o pacote oficial `cloudflare` permite listar tunnel, buscar configuracao remota e auditar
+     DNS sem shelling para `curl`.
+5. Claude custom connectors / remote MCP.
+   - `https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp`
+   - `https://support.claude.com/en/articles/11176164-use-connectors-to-extend-claude-s-capabilities`
+   - Conclusao operacional: Claude custom connectors aceitam um servidor MCP remoto e campos opcionais de OAuth
+     client id/client secret; nosso caminho preferencial e deixar esses campos vazios e usar DCR/CIMD publico.
+6. MCP Authorization.
+   - `https://modelcontextprotocol.io/specification/draft/basic/authorization`
+   - Conclusao operacional: clientes MCP remotos podem preferir metadata de protected resource mais especifica por
+     caminho. Por isso o servidor deve publicar tanto o well-known raiz quanto `/.well-known/oauth-protected-resource/mcp`.
+
+### 17.3. Estado real verificado antes dos patches
+
+1. `.env.local` contem `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`.
+2. A key funciona para a API de Zero Trust Tunnel:
+   - o tunnel `workspace-mcp-dev` foi encontrado;
+   - status remoto: `healthy`;
+   - conexoes remotas: 4.
+3. `client.user.tokens.verify()` retornou `401` na checagem generica, mas a mesma credencial leu tunnel e config.
+   - Interpretacao: o verify generico nao foi tratado como autoridade final para este token escopado.
+   - A autoridade pratica e a capacidade de ler o recurso-alvo Zero Trust Tunnel.
+4. A config remota estava em drift:
+   - antes: `mcp.aurelin.org -> http://localhost:3333`;
+   - depois da correcao via API: `mcp.aurelin.org -> http://127.0.0.1:3333`.
+5. O dashboard Cloudflare atualizou a config para version `2`.
+6. O `cloudflared` logou a troca da config remota e passou a receber `127.0.0.1`.
+7. Depois de restart e warm-up:
+   - `make copilot-mcp-oauth-smoke` passou;
+   - `make copilot-mcp-smoke-refresh` passou;
+   - `/health` remoto em `https://mcp.aurelin.org/health` respondeu 200.
+
+### 17.4. Transformacoes planejadas nesta faixa
+
+Subfaixa 17-A — auditoria remota Cloudflare:
+
+1. [x] Instalar SDK oficial `cloudflare`.
+2. [x] Ler `.env.local` de forma local e sanitizada para auditoria remota.
+3. [x] Criar `src/copilot/mcp/cloudflare/remote-api.js`.
+4. [x] Comparar desired local contra actual remoto:
+   - tunnel name;
+   - hostname;
+   - origin service;
+   - catch-all 404;
+   - source/version;
+   - conexoes.
+5. [x] Auditar DNS CNAME quando `CLOUDFLARE_ZONE_ID` estiver presente ou resolvivel pela API.
+6. [x] Nunca retornar tokens, API keys ou IDs completos.
+7. [x] Criar tool `mcp_cloudflare_remote_audit`.
+8. [x] Criar script `copilot:mcp:cloudflare:remote-audit`.
+9. [x] Criar target `make copilot-mcp-remote-audit`.
+
+Subfaixa 17-B — hardening do processo `cloudflared`:
+
+1. [x] Adicionar `COPILOT_MCP_CLOUDFLARE_METRICS_ADDR`.
+2. [x] Default: `127.0.0.1:60123`.
+3. [x] Permitir `off` para desabilitar metricas.
+4. [x] Adicionar `COPILOT_MCP_CLOUDFLARE_LOGLEVEL`.
+5. [x] Default: `info`.
+6. [x] Passar `--metrics` e `--loglevel` para tunnel permanente e fallback temporario.
+7. [ ] Criar leitura/parsing de metricas Prometheus como tool propria, se a necessidade aparecer apos uso real.
+
+Subfaixa 17-C — Claude custom connector:
+
+1. [x] Adicionar CORS default para `https://claude.ai` e `https://www.claude.ai`.
+2. [x] Publicar `/.well-known/oauth-protected-resource/mcp`.
+3. [x] Aceitar resource OAuth tanto como `https://mcp.aurelin.org` quanto como `https://mcp.aurelin.org/mcp`.
+4. [x] Emitir access token com audience igual ao resource solicitado no authorize/token flow.
+5. [x] Validar bearer com audiences aceitas base e `/mcp`.
+6. [x] Criar `claude_connector_profile`.
+7. [x] Incluir Claude nos capabilities/roadmap.
+8. [ ] Teste real no claude.ai.
+
+Subfaixa 17-D — documentacao e governanca:
+
+1. [x] Atualizar `.env.example`.
+2. [x] Atualizar `.env.schema.json`.
+3. [x] Atualizar `package.json` e `Makefile`.
+4. [x] Atualizar este plano canonico.
+5. [ ] Criar runbook dedicado Claude se o teste real mostrar passos especificos da UI.
+6. [ ] Incorporar o relatorio externo `# Auditoria Cloudflare — MCP externo.md` ao commit se o usuario quiser que ele vire artefato versionado.
+
+### 17.5. Dados para a caixa da Claude
+
+Campos recomendados agora:
+
+1. Nome:
+   - `Repo DevContainer MCP`
+2. URL do servidor MCP remoto:
+   - `https://mcp.aurelin.org/mcp`
+3. Configuracoes avancadas:
+   - OAuth Client ID: deixar vazio.
+   - OAuth Client Secret: deixar vazio.
+4. Fluxo esperado:
+   - Claude descobre metadata OAuth;
+   - usa DCR ou metadata publica de client quando aplicavel;
+   - pede autorizacao OAuth;
+   - recebe token com audience compativel com `https://mcp.aurelin.org` ou `https://mcp.aurelin.org/mcp`;
+   - chama tools MCP normalmente.
+
+### 17.6. Roadmap imediato pos-patch
+
+1. Rodar typecheck strict de `src/copilot`.
+2. Rodar lint de `src/copilot`.
+3. Rodar unit tests de `src/copilot`.
+4. Rodar `git diff --check`.
+5. Reiniciar MCP/Cloudflare para aplicar:
+   - nova registry;
+   - nova rota protected-resource `/mcp`;
+   - novas flags `cloudflared --metrics/--loglevel`.
+6. Rodar `make copilot-mcp-remote-audit`.
+7. Rodar `make copilot-mcp-oauth-smoke`.
+8. Rodar `make copilot-mcp-smoke-refresh`.
+9. Rodar `make copilot-mcp-status`.
+10. Testar no ChatGPT:
+    - `mcp_cloudflare_remote_audit`;
+    - `claude_connector_profile`;
+    - `mcp_oauth_friction_audit`;
+    - `repo_status`.
+11. Testar no Claude:
+    - adicionar conector com os campos acima;
+    - chamar `repo_status`;
+    - chamar `mcp_session_profile`;
+    - chamar `mcp_cloudflare_remote_audit`.
+
+### 17.7. Validacao executada nesta faixa
+
+1. `npm run typecheck:strict:src.copilot -- --pretty false`
+   - passou apos ajustes de narrowing/JSDoc na auditoria Cloudflare.
+2. `npm run lint:copilot -- --quiet`
+   - passou.
+3. `npm run test:copilot:unit`
+   - passou com 3097/3097, sem warnings/errors.
+4. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_cloudflare_config.spec.js tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_cloudflare_remote_api.spec.js --reporter=dot`
+   - passou com 16/16.
+5. `git diff --check`
+   - passou.
+6. `make copilot-mcp-restart`
+   - passou, reiniciando MCP HTTP e `cloudflared`.
+   - novo `cloudflared` expôs metricas em `127.0.0.1:60123`.
+7. `curl http://127.0.0.1:60123/metrics`
+   - passou e mostrou `cloudflared_orchestration_config_version 2`.
+8. `make copilot-mcp-remote-audit`
+   - passou com `ok=true`.
+   - tunnel remoto `workspace-mcp-dev` em estado `healthy`.
+   - 4 conexoes ativas.
+   - ingress remoto correto: `mcp.aurelin.org -> http://127.0.0.1:3333`.
+   - catch-all `http_status:404` presente.
+   - DNS audit retornou warning por falta de permissao DNS/Zone no token atual, sem critical.
+9. `make copilot-mcp-oauth-smoke`
+   - passou no resource raiz `https://mcp.aurelin.org`.
+10. `COPILOT_MCP_OAUTH_SMOKE_RESOURCE=https://mcp.aurelin.org/mcp make copilot-mcp-oauth-smoke`
+    - passou no resource path-specific usado para compatibilidade Claude.
+    - protected resource metadata URL testada:
+      `https://mcp.aurelin.org/.well-known/oauth-protected-resource/mcp`.
+11. `make copilot-mcp-smoke-refresh`
+    - passou com 77/77 tools remotas e `toolsMatchLocalRegistry=true`.
+12. `make copilot-mcp-status`
+    - passou com `ready=true`, `recommendedAction=use`, OAuth e metricas/loglevel no resumo.
+13. CORS Claude:
+    - `OPTIONS https://mcp.aurelin.org/.well-known/oauth-protected-resource/mcp` com
+      `Origin: https://claude.ai` retornou 204 e `Access-Control-Allow-Origin: https://claude.ai`.
+
+### 17.8. Gaps residuais conhecidos
+
+1. O token Cloudflare atual le Zero Trust Tunnel, mas nao conseguiu auditar DNS record:
+   - erro observado: `403 Authentication error` ao chamar DNS/Zone API.
+   - impacto: a auditoria ainda valida tunnel/config/ingress/conexoes; apenas DNS CNAME fica como warning.
+   - upgrade: fornecer `CLOUDFLARE_ZONE_ID` e token com permissoes Zone Read + DNS Read para fechar o ciclo DNS.
+2. A tool de parsing de metricas Prometheus ainda nao foi criada.
+   - metricas ja estao expostas localmente;
+   - upgrade natural: `mcp_cloudflare_metrics_snapshot`.
+3. Teste real no Claude ainda precisa ser executado na UI.
+   - os dados da caixa ja estao no runbook e na tool `claude_connector_profile`.

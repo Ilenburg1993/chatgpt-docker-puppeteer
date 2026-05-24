@@ -57,12 +57,12 @@ export const mcpOAuthFrictionAuditTool = {
         const warnings = [];
         const critical = [];
 
-        const resourceMatchesAudience = config.resource === config.expectedAudience;
+        const resourceMatchesAudience = config.acceptedAudiences.includes(config.resource);
         const issuerMatchesResource = config.expectedIssuer === config.resource;
         if (config.mode === 'oauth' && config.enforcement === 'off') {
             warnings.push('OAuth mode is configured but enforcement is off; this is only appropriate for fallback testing.');
         }
-        if (!resourceMatchesAudience) critical.push('Configured OAuth audience differs from protected resource.');
+        if (!resourceMatchesAudience) critical.push('Configured OAuth accepted audiences do not include protected resource.');
         if (config.mode === 'oauth' && !config.jwksUri) critical.push('OAuth mode is enabled but JWKS URI is missing.');
         if (config.mode === 'oauth' && config.authorizationServers.length === 0) {
             critical.push('Protected resource metadata has no authorization server.');
@@ -105,6 +105,7 @@ export const mcpOAuthFrictionAuditTool = {
                 enforcement: config.enforcement,
                 resource: config.resource,
                 expectedAudience: config.expectedAudience,
+                acceptedAudiences: config.acceptedAudiences,
                 expectedIssuer: config.expectedIssuer,
                 protectedResourceMetadataUrl: config.protectedResourceMetadataUrl,
                 authorizationServers: [...config.authorizationServers],

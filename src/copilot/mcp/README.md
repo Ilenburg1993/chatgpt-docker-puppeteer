@@ -44,6 +44,7 @@ Em outro terminal:
 
 ```bash
 npm run copilot:mcp:cloudflare:status
+npm run copilot:mcp:cloudflare:remote-audit
 npm run copilot:mcp:cloudflare:smoke
 npm run copilot:mcp:oauth:smoke
 ```
@@ -58,11 +59,27 @@ sem gravar refresh token em claro.
 Clientes DCR publicos ficam em `src/copilot/.ai/mcp/oauth-clients.json`, tambem ignorado por git, para que
 um `client_id` emitido antes do restart continue valido quando o ChatGPT repetir o fluxo OAuth.
 Use `COPILOT_MCP_DEV_OAUTH_ROTATE_KEY=true` apenas quando quiser forçar rotação da chave.
+Use `npm run copilot:mcp:cloudflare:remote-audit` para comparar a config remota Cloudflare contra o estado
+canonico local sem imprimir tokens. O serviço de origem remoto deve permanecer `http://127.0.0.1:3333`.
 Quick Tunnel continua disponivel como fallback explicito:
 
 ```bash
 COPILOT_MCP_CLOUDFLARE_MODE=temporary-quick npm run copilot:mcp:cloudflare:quick
 ```
+
+## Claude
+
+O mesmo endpoint remoto tambem pode ser usado em Claude custom connectors:
+
+```text
+Name: Repo DevContainer MCP
+Remote MCP server URL: https://mcp.aurelin.org/mcp
+OAuth Client ID: deixar vazio
+OAuth Client Secret: deixar vazio
+```
+
+O servidor publica metadata OAuth raiz e path-specific em `/.well-known/oauth-protected-resource/mcp`.
+Veja `src/copilot/docs/CLAUDE_MCP_CONNECTOR_RUNBOOK.md`.
 
 ## Primeira superfície
 

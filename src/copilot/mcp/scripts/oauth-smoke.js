@@ -23,8 +23,9 @@ const FULL_REPO_OIDC_SCOPE = `${FULL_REPO_SCOPE} openid profile email`;
 export async function runMcpOAuthSmoke(options = {}) {
     const config = readMcpAuthConfig();
     const resource = String(options.resource ?? process.env['COPILOT_MCP_OAUTH_SMOKE_RESOURCE'] ?? config.resource).replace(/\/+$/u, '');
-    const protectedResource = await probeJson(`${resource}/.well-known/oauth-protected-resource`, { method: 'GET' });
-    const protectedResourceCors = await probeCorsPreflight(`${resource}/.well-known/oauth-protected-resource`, 'GET');
+    const protectedResourceUrl = buildProtectedResourceMetadataUrl(resource);
+    const protectedResource = await probeJson(protectedResourceUrl, { method: 'GET' });
+    const protectedResourceCors = await probeCorsPreflight(protectedResourceUrl, 'GET');
     const authorizationServer = extractAuthorizationServer(protectedResource.body) ?? resource;
     const oauthMetadata = await probeJson(`${authorizationServer}/.well-known/oauth-authorization-server`, {
         method: 'GET',
@@ -46,7 +47,7 @@ export async function runMcpOAuthSmoke(options = {}) {
     const dcrRefreshTokenBody = asRecord(dcrRefreshToken.body);
     const runtimeHealth =
         typeof dcrRefreshTokenBody?.['access_token'] === 'string'
-            ? await callMcpTool(`${resource}/mcp`, dcrRefreshTokenBody['access_token'], 'mcp_runtime_health')
+            ? await callMcpTool(buildMcpUrlFromResource(resource), dcrRefreshTokenBody['access_token'], 'mcp_runtime_health')
             : failure('token missing');
     const cimdClientMetadataUrl = `${authorizationServer}/.well-known/oauth-client/codex-smoke.json`;
     const cimdClientMetadata = await probeJson(cimdClientMetadataUrl, { method: 'GET' });
@@ -89,6 +90,7 @@ export async function runMcpOAuthSmoke(options = {}) {
             cimdRefreshToken.ok &&
             userinfo.ok,
         resource,
+        protectedResourceUrl,
         protectedResource,
         cors: {
             protectedResource: protectedResourceCors,
@@ -115,6 +117,28 @@ export async function runMcpOAuthSmoke(options = {}) {
             userinfo: summarizeUserinfo(userinfo),
         },
     };
+}
+
+/**
+ * @param {string} resource
+ * @returns {string}
+ */
+function buildProtectedResourceMetadataUrl(resource) {
+    const normalized = resource.replace(/\/+$/u, '');
+    if (normalized.endsWith('/mcp')) {
+        const base = normalized.slice(0, -'/mcp'.length);
+        return `${base}/.well-known/oauth-protected-resource/mcp`;
+    }
+    return `${normalized}/.well-known/oauth-protected-resource`;
+}
+
+/**
+ * @param {string} resource
+ * @returns {string}
+ */
+function buildMcpUrlFromResource(resource) {
+    const normalized = resource.replace(/\/+$/u, '');
+    return normalized.endsWith('/mcp') ? normalized : `${normalized}/mcp`;
 }
 
 /**

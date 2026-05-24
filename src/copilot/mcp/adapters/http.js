@@ -20,6 +20,8 @@ const DEFAULT_ALLOWED_ORIGINS = [
     'https://chatgpt.com',
     'https://chat.openai.com',
     'https://platform.openai.com',
+    'https://claude.ai',
+    'https://www.claude.ai',
     'http://localhost',
     'http://127.0.0.1',
 ];
@@ -96,6 +98,7 @@ function isCorsManagedRoute(pathname) {
         pathname === MCP_PATH ||
         pathname === '/chatgpt-connector.json' ||
         pathname === '/.well-known/oauth-protected-resource' ||
+        pathname === '/.well-known/oauth-protected-resource/mcp' ||
         pathname === '/.well-known/oauth-authorization-server' ||
         pathname === '/.well-known/openid-configuration' ||
         pathname === '/.well-known/oauth-client/codex-smoke.json' ||
@@ -152,9 +155,15 @@ export async function startHttpMcpServer(opts = {}) {
             return;
         }
 
-        if (req.method === 'GET' && url.pathname === '/.well-known/oauth-protected-resource') {
+        if (
+            req.method === 'GET' &&
+            (url.pathname === '/.well-known/oauth-protected-resource' ||
+                url.pathname === '/.well-known/oauth-protected-resource/mcp')
+        ) {
+            const config = readMcpAuthConfig();
+            const resource = url.pathname.endsWith('/mcp') ? `${config.resource}/mcp` : config.resource;
             res.writeHead(200, { 'content-type': 'application/json' });
-            res.end(JSON.stringify(buildProtectedResourceMetadata(), null, 2));
+            res.end(JSON.stringify(buildProtectedResourceMetadata(config, { resource }), null, 2));
             return;
         }
 

@@ -18,6 +18,11 @@ export const CHATGPT_CONNECTOR_DESCRIPTION =
     'Permite ler arquivos, buscar no código, inspecionar Git, executar validadores controlados ' +
     'e operar o workspace por tools MCP auditáveis.';
 
+export const CLAUDE_CONNECTOR_NAME = 'Repo DevContainer MCP';
+
+export const CLAUDE_CONNECTOR_DESCRIPTION =
+    'Conecta Claude ao MCP remoto deste workspace via Cloudflare, com OAuth, leitura, busca, Git, validadores e escrita controlada.';
+
 /**
  * @typedef {'none-dev' | 'mixed-auth' | 'oauth' | 'secure-mcp-tunnel'} ChatGptAuthMode
  *
@@ -59,6 +64,79 @@ export function formatChatGptConnectorAuthentication(authConfig = readMcpAuthCon
     if (authConfig.mode === 'mixed-auth') return 'Mixed Authentication';
     if (authConfig.mode === 'secure-mcp-tunnel') return 'Secure MCP Tunnel';
     return 'No authentication';
+}
+
+/**
+ * @param {ConnectorProfileOptions} [options]
+ * @returns {{
+ *     name: string;
+ *     description: string;
+ *     connectorUrl: string;
+ *     claudeFormFields: {
+ *         name: string;
+ *         remoteMcpServerUrl: string;
+ *         oauthClientId: string;
+ *         oauthClientSecret: string;
+ *     };
+ *     oauth: {
+ *         mode: string;
+ *         protectedResourceMetadataUrls: string[];
+ *         authorizationServer: string;
+ *         advancedClientFields: string;
+ *     };
+ *     setupSteps: string[];
+ *     smokePrompts: string[];
+ *     notes: string[];
+ * }}
+ */
+export function buildClaudeConnectorProfile(options = {}) {
+    const publicMcpUrl = options.publicMcpUrl ?? process.env['COPILOT_MCP_PUBLIC_URL'] ?? DEFAULT_PUBLIC_MCP_URL;
+    const connectorUrl = normalizeMcpUrl(publicMcpUrl);
+    const authConfig = readMcpAuthConfig();
+    return {
+        name: CLAUDE_CONNECTOR_NAME,
+        description: CLAUDE_CONNECTOR_DESCRIPTION,
+        connectorUrl,
+        claudeFormFields: {
+            name: CLAUDE_CONNECTOR_NAME,
+            remoteMcpServerUrl: connectorUrl,
+            oauthClientId: '',
+            oauthClientSecret: '',
+        },
+        oauth: {
+            mode: authConfig.mode,
+            protectedResourceMetadataUrls: [
+                `${authConfig.resource}/.well-known/oauth-protected-resource/mcp`,
+                authConfig.protectedResourceMetadataUrl,
+            ],
+            authorizationServer: authConfig.resource,
+            advancedClientFields:
+                'Leave OAuth Client ID and OAuth Client Secret blank. The built-in dev issuer supports public Dynamic Client Registration and Client ID Metadata Documents.',
+        },
+        setupSteps: [
+            'Abrir Claude > Customize > Connectors.',
+            'Clicar em + e escolher Add custom connector.',
+            `Nome: ${CLAUDE_CONNECTOR_NAME}`,
+            `Remote MCP server URL: ${connectorUrl}`,
+            'Configurações avançadas: deixar OAuth Client ID e OAuth Client Secret em branco.',
+            'Adicionar, conectar e concluir o fluxo OAuth quando Claude solicitar.',
+            'Habilitar o conector na conversa pelo menu + > Connectors.',
+        ],
+        smokePrompts: [
+            'Use o conector Repo DevContainer MCP e chame repo_status.',
+            'Chame mcp_session_profile e resuma recommendedFirstCalls.',
+            'Chame mcp_cloudflare_remote_audit e confirme que o origin remoto é http://127.0.0.1:3333.',
+            'Chame mcp_oauth_friction_audit e confirme refresh token persistence.',
+            'Chame repo_tree path="src/copilot/mcp" maxDepth=2.',
+            'Chame mcp_run_safe_validation_suite suite="mcp-full" e acompanhe mcp_validation_dashboard.',
+        ],
+        notes: [
+            'Claude custom connectors conectam a partir da infraestrutura Anthropic, então o endpoint precisa continuar público em https://mcp.aurelin.org/mcp.',
+            'O servidor publica metadata OAuth tanto no well-known raiz quanto no well-known path-specific /mcp para compatibilidade com clientes MCP que preferem a URI mais específica.',
+            'Permissões e prompts adicionais do host Claude são controlados pela própria Claude; este MCP reduz atrito com annotations, OAuth persistente e tools granulares.',
+            'A LLM-B local continua independente do MCP; ambas as superfícies devem compartilhar a engine de IO e navegação, não dependência runtime.',
+        ],
+    };
 }
 
 /**
@@ -117,6 +195,8 @@ export function buildChatGptConnectorProfile(options = {}) {
             'Antes de qualquer escrita, chame repo_patch_plan, repo_create_file_plan, repo_quarantine_file_plan ou repo_move_file_plan.',
             'Chame chatgpt_connector_current_url_status para recuperar a URL pública atual sem passar URL como argumento.',
             'Chame mcp_tunnel_status e confirme recommendedAction, lastSmokeOk e lastSmokeAgeMinutes.',
+            'Chame mcp_cloudflare_remote_audit e confirme que o Cloudflare remoto aponta mcp.aurelin.org para http://127.0.0.1:3333.',
+            'Chame claude_connector_profile se também for conectar em claude.ai.',
             'Liste a árvore de src/copilot/mcp com repo_tree.',
             'Liste a raiz real do workspace com repo_root_tree maxEntries=80.',
             'Audite redaction da raiz com repo_root_redaction_status sem expor nomes hidden/protected.',
@@ -219,6 +299,7 @@ export function buildCloudflareTunnelRunbook(options = {}) {
             'npm run copilot:mcp:cloudflare:doctor',
             'npm run copilot:mcp:cloudflare:quick',
             'npm run copilot:mcp:cloudflare:status',
+            'npm run copilot:mcp:cloudflare:remote-audit',
             'npm run copilot:mcp:cloudflare:smoke',
             'npm run copilot:mcp:cloudflare:status',
         ],
@@ -227,6 +308,7 @@ export function buildCloudflareTunnelRunbook(options = {}) {
             'export CLOUDFLARE_TUNNEL_TOKEN_FILE="src/copilot/.ai/cloudflare/workspace-mcp-dev.token"',
             'npm run copilot:mcp:cloudflare:up',
             'npm run copilot:mcp:cloudflare:status',
+            'npm run copilot:mcp:cloudflare:remote-audit',
             'npm run copilot:mcp:cloudflare:smoke',
         ],
         chatgptUrl: profile.connectorUrl,
@@ -234,6 +316,7 @@ export function buildCloudflareTunnelRunbook(options = {}) {
             'O modo principal deste projeto usa domínio permanente Cloudflare.',
             `URL do conector no ChatGPT: ${DEFAULT_PUBLIC_MCP_URL}.`,
             `A rota Cloudflare aponta para o origin HTTP raiz ${DEFAULT_CLOUDFLARE_ORIGIN_URL}; nunca configure o serviço de origem como /mcp.`,
+            'Audite drift remoto com npm run copilot:mcp:cloudflare:remote-audit depois de qualquer alteração no dashboard.',
             'Depois do smoke, o endpoint permanente deve responder /health e /mcp tools/list.',
             'Quick Tunnel continua disponível como fallback, mas não é mais o caminho padrão.',
             'Não proteja /mcp com login interativo que o backend do ChatGPT não consiga atravessar.',

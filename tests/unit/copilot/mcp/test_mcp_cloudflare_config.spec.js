@@ -38,27 +38,44 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
         assert.equal(config.publicMcpUrl, DEFAULT_CLOUDFLARE_PUBLIC_URL);
         assert.equal(config.managedTunnelPidFile, 'src/copilot/.ai/cloudflare/cloudflared.pid');
         assert.equal(config.mcpHttpPidFile, 'src/copilot/.ai/cloudflare/mcp-http.pid');
+        assert.equal(config.metricsAddr, '127.0.0.1:60123');
+        assert.equal(config.loglevel, 'info');
         assert.deepEqual(buildQuickTunnelArgs(config), [
             'tunnel',
+            '--no-autoupdate',
+            '--loglevel',
+            'info',
+            '--metrics',
+            '127.0.0.1:60123',
             '--url',
             'http://127.0.0.1:3333',
-            '--no-autoupdate',
         ]);
         assert.equal(config.transportProtocol, 'http2');
-        assert.deepEqual(buildManagedTunnelArgs('secret-token'), [
+        assert.deepEqual(buildManagedTunnelArgs('secret-token', undefined, config), [
             'tunnel',
             '--no-autoupdate',
+            '--loglevel',
+            'info',
+            '--metrics',
+            '127.0.0.1:60123',
             'run',
             '--token',
             'secret-token',
         ]);
-        assert.deepEqual(buildManagedTunnelArgs(undefined, 'src/copilot/.ai/cloudflare/workspace-mcp-dev.token'), [
-            'tunnel',
-            '--no-autoupdate',
-            'run',
-            '--token-file',
-            'src/copilot/.ai/cloudflare/workspace-mcp-dev.token',
-        ]);
+        assert.deepEqual(
+            buildManagedTunnelArgs(undefined, 'src/copilot/.ai/cloudflare/workspace-mcp-dev.token', config),
+            [
+                'tunnel',
+                '--no-autoupdate',
+                '--loglevel',
+                'info',
+                '--metrics',
+                '127.0.0.1:60123',
+                'run',
+                '--token-file',
+                'src/copilot/.ai/cloudflare/workspace-mcp-dev.token',
+            ],
+        );
         assert.throws(() => buildManagedTunnelArgs(undefined), /CLOUDFLARE_TUNNEL_TOKEN/);
     });
 

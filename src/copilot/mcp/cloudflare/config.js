@@ -18,6 +18,8 @@ export const DEFAULT_CONNECTOR_SMOKE_STATE_FILE = 'src/copilot/.ai/cloudflare/co
 export const DEFAULT_MANAGED_TUNNEL_PID_FILE = 'src/copilot/.ai/cloudflare/cloudflared.pid';
 export const DEFAULT_MCP_HTTP_PID_FILE = 'src/copilot/.ai/cloudflare/mcp-http.pid';
 export const DEFAULT_QUICK_TUNNEL_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
+export const DEFAULT_CLOUDFLARE_METRICS_ADDR = '127.0.0.1:60123';
+export const DEFAULT_CLOUDFLARE_LOGLEVEL = 'info';
 export const TRYCLOUDFLARE_URL_PATTERN = /https:\/\/[a-z0-9][a-z0-9-]*\.trycloudflare\.com\b/i;
 
 /**
@@ -34,6 +36,8 @@ export const TRYCLOUDFLARE_URL_PATTERN = /https:\/\/[a-z0-9][a-z0-9-]*\.trycloud
  * @property {boolean} hasTunnelTokenFile
  * @property {string | undefined} tunnelTokenFile
  * @property {'auto' | 'http2' | 'quic'} transportProtocol
+ * @property {string | undefined} metricsAddr
+ * @property {'debug' | 'info' | 'warn' | 'error' | 'fatal'} loglevel
  * @property {string} stateFile
  * @property {string} smokeStateFile
  * @property {string} managedTunnelPidFile
@@ -69,6 +73,8 @@ export function readCloudflareTunnelConfig(env = process.env) {
         transportProtocol: normalizeTransportProtocol(
             env['COPILOT_MCP_CLOUDFLARE_PROTOCOL'] ?? env['TUNNEL_TRANSPORT_PROTOCOL'],
         ),
+        metricsAddr: normalizeMetricsAddr(env['COPILOT_MCP_CLOUDFLARE_METRICS_ADDR']),
+        loglevel: normalizeLogLevel(env['COPILOT_MCP_CLOUDFLARE_LOGLEVEL']),
         stateFile: normalizeStateFile(env['COPILOT_MCP_CLOUDFLARE_STATE_FILE']),
         smokeStateFile: normalizeStateFile(env['COPILOT_MCP_CLOUDFLARE_SMOKE_STATE_FILE'] ?? DEFAULT_CONNECTOR_SMOKE_STATE_FILE),
         managedTunnelPidFile: normalizeStateFile(env['COPILOT_MCP_CLOUDFLARE_PID_FILE'] ?? DEFAULT_MANAGED_TUNNEL_PID_FILE),
@@ -161,6 +167,35 @@ export function normalizeTransportProtocol(value) {
 
 /**
  * @param {string | undefined} value
+ * @returns {string | undefined}
+ */
+export function normalizeMetricsAddr(value) {
+    const raw = String(value ?? DEFAULT_CLOUDFLARE_METRICS_ADDR).trim();
+    if (!raw || raw === 'off' || raw === 'false' || raw === '0') return undefined;
+    if (!/^(127\.0\.0\.1|localhost|\[::1\]|0\.0\.0\.0):\d{2,5}$/u.test(raw)) {
+        throw new Error('Cloudflare metrics address must be localhost-style host:port, for example 127.0.0.1:60123.');
+    }
+    const port = Number(raw.slice(raw.lastIndexOf(':') + 1));
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error('Cloudflare metrics port must be between 1 and 65535.');
+    }
+    return raw;
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {'debug' | 'info' | 'warn' | 'error' | 'fatal'}
+ */
+export function normalizeLogLevel(value) {
+    const raw = String(value ?? DEFAULT_CLOUDFLARE_LOGLEVEL)
+        .trim()
+        .toLowerCase();
+    if (raw === 'debug' || raw === 'info' || raw === 'warn' || raw === 'error' || raw === 'fatal') return raw;
+    throw new Error('Cloudflare loglevel must be debug, info, warn, error, or fatal.');
+}
+
+/**
+ * @param {string | undefined} value
  * @returns {string}
  */
 export function normalizeStateFile(value) {
@@ -201,24 +236,36 @@ export function normalizeOriginUrl(value) {
  * @returns {string[]}
  */
 export function buildQuickTunnelArgs(config) {
-    return ['tunnel', '--url', config.originUrl, '--no-autoupdate'];
+    return ['tunnel', ...buildCloudflaredRunFlags(config), '--url', config.originUrl];
 }
 
 /**
  * @param {string | undefined} token
  * @param {string | undefined} [tokenFile]
+ * @param {CloudflareTunnelConfig} [config]
  * @returns {string[]}
  */
-export function buildManagedTunnelArgs(token, tokenFile) {
+export function buildManagedTunnelArgs(token, tokenFile, config) {
     const trimmed = String(token ?? '').trim();
     const normalizedTokenFile = normalizeOptionalPath(tokenFile);
+    const flags = config ? buildCloudflaredRunFlags(config) : ['--no-autoupdate'];
     if (normalizedTokenFile) {
-        return ['tunnel', '--no-autoupdate', 'run', '--token-file', normalizedTokenFile];
+        return ['tunnel', ...flags, 'run', '--token-file', normalizedTokenFile];
     }
     if (!trimmed) {
         throw new Error('CLOUDFLARE_TUNNEL_TOKEN or CLOUDFLARE_TUNNEL_TOKEN_FILE is required to run a remotely-managed Cloudflare Tunnel.');
     }
-    return ['tunnel', '--no-autoupdate', 'run', '--token', trimmed];
+    return ['tunnel', ...flags, 'run', '--token', trimmed];
+}
+
+/**
+ * @param {CloudflareTunnelConfig} config
+ * @returns {string[]}
+ */
+function buildCloudflaredRunFlags(config) {
+    const flags = ['--no-autoupdate', '--loglevel', config.loglevel];
+    if (config.metricsAddr) flags.push('--metrics', config.metricsAddr);
+    return flags;
 }
 
 /**

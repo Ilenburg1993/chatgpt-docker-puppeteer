@@ -10,7 +10,7 @@ import { MCP_AUTH_SCOPES, readMcpAuthConfig } from '../control-plane/auth.js';
 import { okResult } from '../control-plane/result.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 18;
+const CAPABILITIES_VERSION = 19;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -93,6 +93,7 @@ const RUNTIME_TOOLS = [
     'mcp_autonomy_power_score',
     'mcp_tools_status',
     'mcp_tunnel_status',
+    'mcp_cloudflare_remote_audit',
     'mcp_connector_smoke_refresh',
     'mcp_post_restart_readiness',
     'mcp_capabilities_summary',
@@ -105,6 +106,7 @@ const CONNECTION_TOOLS = [
     'mcp_auth_profile',
     'mcp_oauth_issuer_diagnostics',
     'mcp_oauth_friction_audit',
+    'claude_connector_profile',
 ];
 const COPILOT_SDK_TOOLS = ['copilot_sessions_list', 'copilot_session_get'];
 /** @type {string[]} */
@@ -158,7 +160,9 @@ const IO_GUIDANCE = [
     'Use mcp_oauth_issuer_diagnostics before changing issuer, CIMD, OIDC or Cloudflare OAuth settings.',
     'Use mcp_oauth_friction_audit after OAuth or connector changes to detect reauth risk and metadata drift.',
     'Use mcp_connector_smoke_refresh after MCP/Cloudflare restarts to refresh the permanent connector smoke cache.',
+    'Use mcp_cloudflare_remote_audit to compare the Cloudflare-hosted tunnel config, DNS CNAME and expected local origin without exposing API tokens.',
     'Use mcp_post_restart_readiness after any restart before starting heavy ChatGPT work.',
+    'Use claude_connector_profile when adding the same remote MCP server to claude.ai custom connectors.',
     'LLM-B can consume MCP optionally, but does not depend on this MCP server.',
 ];
 

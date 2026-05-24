@@ -10,6 +10,7 @@ import { readCloudflareTunnelConfig, validateConfiguredPublicUrl } from '../clou
 import { readQuickTunnelState, summarizeQuickTunnelState } from '../cloudflare/state.js';
 import {
     buildChatGptConnectorProfile,
+    buildClaudeConnectorProfile,
     buildCloudflareTunnelRunbook,
     buildSecureTunnelRunbook,
     validatePublicConnectorUrl,
@@ -252,6 +253,31 @@ export const connectionTools = [
         },
     },
     {
+        name: 'claude_connector_profile',
+        title: 'Claude connector profile',
+        description:
+            'Return the canonical Claude custom connector form values, OAuth notes, Cloudflare checks and smoke prompts for this repo MCP server.',
+        inputSchema: {
+            publicMcpUrl: z
+                .string()
+                .optional()
+                .describe('Optional public HTTPS /mcp URL. Defaults to the permanent Cloudflare hostname.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ publicMcpUrl }) => {
+            const profile = buildClaudeConnectorProfile({ publicMcpUrl });
+            return okResult({
+                success: true,
+                profile,
+                cloudflareChecklist: [
+                    'Run npm run copilot:mcp:cloudflare:remote-audit and require ok=true.',
+                    'Run make copilot-mcp-smoke and make copilot-mcp-oauth-smoke before adding or reconnecting in Claude.',
+                    'Keep the Cloudflare route service as http://127.0.0.1:3333, not localhost and not /mcp.',
+                ],
+            });
+        },
+    },
+    {
         name: 'chatgpt_connector_url_check',
         title: 'Check ChatGPT connector URL',
         description: 'Validate that a candidate ChatGPT connector URL is HTTPS and ends with /mcp.',
@@ -356,6 +382,7 @@ export const connectionTools = [
                 enforcement: config.enforcement,
                 expectedIssuerConfigured: Boolean(config.expectedIssuer),
                 expectedAudience: config.expectedAudience,
+                acceptedAudiences: config.acceptedAudiences,
                 jwksUriConfigured: Boolean(config.jwksUri),
                 staticBearerConfigured: config.staticBearerConfigured,
                 challengePreview: buildWwwAuthenticateChallenge(challengeScopes, config),

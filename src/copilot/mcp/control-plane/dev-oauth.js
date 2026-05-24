@@ -135,6 +135,7 @@ export function buildBuiltInDevOAuthMetadata(config) {
         code_challenge_methods_supported: ['S256'],
         scopes_supported: scopesSupported,
         resource_parameter_supported: true,
+        resource_indicators_supported: [config.resource, `${config.resource}/mcp`],
         subject_types_supported: ['public'],
         id_token_signing_alg_values_supported: ['RS256'],
         claims_supported: [...OIDC_CLAIMS],
@@ -346,7 +347,7 @@ async function handleAuthorize(res, url, config) {
         responseType !== 'code' ||
         !client ||
         !client.redirectUris.includes(redirectUri) ||
-        resource !== config.resource ||
+        !isAllowedOAuthResource(resource, config) ||
         codeChallengeMethod !== 'S256' ||
         !codeChallenge
     ) {
@@ -445,7 +446,7 @@ async function handleRefreshToken(body, res, config) {
     const credentialHash = hashRefreshToken(credential);
     const saved = renewCredentials.get(credentialHash);
 
-    if (!saved || saved.clientId !== clientId || saved.resource !== config.resource || Date.now() > saved.expiresAt) {
+    if (!saved || saved.clientId !== clientId || !isAllowedOAuthResource(saved.resource, config) || Date.now() > saved.expiresAt) {
         if (saved && Date.now() > saved.expiresAt) {
             renewCredentials.delete(credentialHash);
             await persistRenewCredentials();
@@ -488,7 +489,7 @@ async function issueTokenSet(options, config) {
         .setProtectedHeader({ alg: 'RS256', kid })
         .setIssuer(config.resource)
         .setSubject('chatgpt-dev-connector')
-        .setAudience(config.resource)
+        .setAudience(options.resource)
         .setIssuedAt(nowSeconds)
         .setExpirationTime(nowSeconds + accessTokenTtlSeconds)
         .setJti(randomUUID())
@@ -915,7 +916,7 @@ async function handleUserInfo(req, res, config) {
         const jwks = createLocalJWKSet({ keys: [publicJwk] });
         const verified = await jwtVerify(token, jwks, {
             issuer: config.resource,
-            audience: config.resource,
+            audience: [config.resource, `${config.resource}/mcp`],
         });
         writeJson(res, 200, {
             sub: verified.payload.sub ?? 'chatgpt-dev-connector',
@@ -1026,6 +1027,15 @@ function normalizeScope(scope, config) {
         .map((item) => item.trim())
         .filter((item) => allowed.has(item));
     return (requested.length > 0 ? requested : config.scopesSupported).join(' ');
+}
+
+/**
+ * @param {string} resource
+ * @param {import('./auth.js').McpAuthConfig} config
+ * @returns {boolean}
+ */
+function isAllowedOAuthResource(resource, config) {
+    return resource === config.resource || resource === `${config.resource}/mcp`;
 }
 
 /**
