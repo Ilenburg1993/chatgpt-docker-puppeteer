@@ -80,7 +80,7 @@ describe('terminal/event-adapter-events.js — contrato', () => {
         );
         expect(new Set(sourcePolicies.map((policy) => policy.id)).size).toBe(sourcePolicies.length);
         for (const policy of sourcePolicies) {
-            expect(policy.class).toMatch(/^(content|interaction|tool|state|telemetry|diagnostic|lifecycle)$/u);
+            expect(policy.class).toMatch(/^(content|interaction|tool|state|telemetry|diagnostic|lifecycle|provider)$/u);
             expect(policy.canonicalEmitter).toBeTruthy();
             expect(policy.owner).toBeTruthy();
             expect(policy.publicEvents.length).toBeGreaterThan(0);

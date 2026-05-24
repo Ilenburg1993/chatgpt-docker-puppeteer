@@ -708,12 +708,11 @@ Validação deste corte:
 - PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
 - PASS `npm run typecheck:strict:src.copilot`
 - PASS `npm run lint:copilot`
-- FAIL conhecido `npm run test:copilot`: 8 assertions fora deste corte em lifecycle/hooks/event adapters/mocks. Próxima
-  fatia deve estabilizar esses contratos globais antes de marcar J como completo ou iniciar lives `llm-b`.
+- PASS `npm run test:copilot` após estabilizar contratos globais de lifecycle/hooks/event adapters/mocks
+  (`5596` testes, `0` falhas; warning remanescente: `[erro] sdk stream failed` registrado pelo runner compacto).
 
 Próxima fatia antes de K:
 
-1. Corrigir os 8 bloqueios de `npm run test:copilot` e separar contratos realmente obsoletos de regressões de runtime.
-2. Conectar `routeGatewayModels()` a uma projection/UX inicial de `/models route <profile>` ou `/byok recommend`.
-3. Criar usage ledger mínimo da Faixa I para registrar decisão/routeProfile/fallback/failure sem tokens sensíveis.
-4. Completar Faixa H/J e só então rodar lives `terminal:llm-b:live-test` com probes.
+1. Conectar `routeGatewayModels()` a uma projection/UX inicial de `/models route <profile>` ou `/byok recommend`.
+2. Criar usage ledger mínimo da Faixa I para registrar decisão/routeProfile/fallback/failure sem tokens sensíveis.
+3. Completar Faixa H/J e só então rodar lives `terminal:llm-b:live-test` com probes.

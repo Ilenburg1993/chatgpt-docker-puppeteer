@@ -770,6 +770,7 @@ describe('hooks/session-lifecycle › createSessionHooks', () => {
 
     it('onErrorOccurred: agenda fallback auto mesmo quando env legado configura modelo concreto', () => {
         process.env['COPILOT_FALLBACK_MODEL'] = 'gpt-3.5-turbo';
+        process.env['COPILOT_BYOK_ENABLED'] = 'false';
         let scheduled = null;
         const ctx = makeCtx({
             scheduleFallback: (/** @type {string} */ m) => {
@@ -780,6 +781,7 @@ describe('hooks/session-lifecycle › createSessionHooks', () => {
         onErrorOccurred(errorInput({ error: 'Too many requests', errorContext: 'rate_limit' }), { sessionId: 'sess' });
         assert.strictEqual(scheduled, 'auto');
         delete process.env['COPILOT_FALLBACK_MODEL'];
+        delete process.env['COPILOT_BYOK_ENABLED'];
     });
 
     it('onErrorOccurred: não agenda fallback quando o SDK indica limite de sessão', () => {

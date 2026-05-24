@@ -143,7 +143,7 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
     describe('BUG-06: reasoningEffort validado', () => {
         it('valor válido não emite WARN de reasoningEffort', async () => {
             const client = fakeClient();
-            await createSession(client, { reasoningEffort: 'high', onPermissionRequest: mockApproveAll });
+            await createSession(client, { model: 'gpt-5-mini', reasoningEffort: 'high', onPermissionRequest: mockApproveAll });
 
             const warnCalls = mockLog.mock.calls.filter(
                 ([level, msg]) => level === 'WARN' && String(msg).includes('reasoningEffort'),
@@ -156,7 +156,7 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
 
         it('xhigh (válido no SDK) não emite WARN de reasoningEffort', async () => {
             const client = fakeClient();
-            await createSession(client, { reasoningEffort: 'xhigh', onPermissionRequest: mockApproveAll });
+            await createSession(client, { model: 'gpt-5-mini', reasoningEffort: 'xhigh', onPermissionRequest: mockApproveAll });
 
             const warnCalls = mockLog.mock.calls.filter(
                 ([level, msg]) => level === 'WARN' && String(msg).includes('reasoningEffort'),
@@ -167,6 +167,7 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
         it('valor inválido emite WARN mas ainda passa ao SDK', async () => {
             const client = fakeClient();
             await createSession(client, {
+                model: 'gpt-5-mini',
                 reasoningEffort: /** @type {any} */ ('maximum'),
                 onPermissionRequest: mockApproveAll,
             });

@@ -215,8 +215,11 @@ export const TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES = Object.freeze([
         id: 'byok.provider.config',
         class: 'provider',
         canonicalEmitter: 'sdk/session/provider.readConfiguredByokState + terminal/frontend/projections/config',
-        publicEvents: ['terminal.started', 'llm.usage', 'session.usage'],
+        publicEvents: ['byok.provider.config'],
         accepts: [
+            'terminal.started',
+            'llm.usage',
+            'session.usage',
             'COPILOT_BYOK_* resolved into SDK provider',
             '/byok status/profiles/models/use/model/provider/reload commands',
             'provider model catalog discovery',

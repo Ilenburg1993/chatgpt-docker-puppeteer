@@ -30,7 +30,7 @@ describe('terminal/repl dialog bootstrap', () => {
         const source = await readFile(new URL('../../../src/copilot/terminal/repl/repl.js', import.meta.url), 'utf8');
         const startReplBody = source.slice(source.indexOf('export async function startRepl'));
 
-        expect(startReplBody).toContain('void launchTerminalDialogLoopBootstrap();');
+        expect(startReplBody).toContain('void launchTerminalDialogLoopBootstrap({ injectPort });');
         expect(startReplBody).not.toContain('await ensureDialogLoop();');
     });
 });

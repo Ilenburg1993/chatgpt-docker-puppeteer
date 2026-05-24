@@ -14,6 +14,10 @@ const mocks = vi.hoisted(() => ({
     /** @type {import('vitest').Mock<(...args: any[]) => () => void>} */
     setupTerminalSdkSessionEventListeners: vi.fn(() => vi.fn()),
     buildUserPrompt: vi.fn(() => 'prompt> '),
+    scheduleTerminalPromptRedraw: vi.fn((rl, prompt) => {
+        rl.setPrompt(prompt);
+        rl.prompt();
+    }),
     readTerminalAgentRuntimeEventHost: vi.fn(() => ({ on: vi.fn(), off: vi.fn() })),
 }));
 
@@ -31,6 +35,7 @@ vi.mock('../../../src/copilot/terminal/events/sdk-session-events.js', () => ({
 
 vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     buildUserPrompt: mocks.buildUserPrompt,
+    scheduleTerminalPromptRedraw: mocks.scheduleTerminalPromptRedraw,
 }));
 
 vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({

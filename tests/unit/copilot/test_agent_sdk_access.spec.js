@@ -165,6 +165,11 @@ vi.mock('#copilot/sdk', () => ({
 
 vi.mock('#copilot/sdk/constants', () => ({
     DEFAULT_MODEL: 'auto',
+    PROVIDER_TYPES: {
+        OPENAI: 'openai',
+        AZURE: 'azure',
+        ANTHROPIC: 'anthropic',
+    },
     SESSION_LIFECYCLE_EVENTS: {
         CREATED: 'session.created',
         UPDATED: 'session.updated',
