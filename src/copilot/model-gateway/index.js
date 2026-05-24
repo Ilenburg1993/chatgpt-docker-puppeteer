@@ -65,6 +65,13 @@ export {
     openRouterAdapter,
     resolveModelGatewayProviderAdapter,
 } from './providers/index.js';
+export {
+    evaluateGatewayModelHealthRoute,
+    isGatewayModelAgentProbeHealthFailed,
+    isGatewayModelAgentProbeVerified,
+    isGatewayModelChatHealthFailed,
+    readGatewayModelHealth,
+} from './routing/index.js';
 export { buildModelGatewayOnListModelsHandler } from './session/on-list-models.js';
 export { toCopilotModelInfo, toCopilotModelInfoList } from './session/copilot-model-projection.js';
 export {

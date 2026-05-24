@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, it } from 'vitest';
+import { afterEach, describe, it } from 'vitest';
 
 import {
     JsonModelGatewayRegistryStore,
@@ -20,6 +20,7 @@ import {
     buildRegistrySnapshotEvent,
     createEnvSecretRegistry,
     buildModelGatewayOnListModelsHandler,
+    evaluateGatewayModelHealthRoute,
     geminiAdapter,
     ollamaAdapter,
     openAICompatibleAdapter,
@@ -30,7 +31,11 @@ import {
     projectModelGatewayMetrics,
     redactSecretRecord,
     redactSecretText,
+    recordByokProviderModelAgentProbeSuccess,
+    recordByokProviderModelCallFailure,
+    recordByokProviderModelCallSuccess,
     resolveModelGatewayProviderAdapter,
+    resetByokProviderHealthForTests,
     BYOK_AGENT_PROBE_ANSWER,
     BYOK_AGENT_PROBE_QUESTION,
     BYOK_AGENT_PROBE_READ_PATH,
@@ -111,6 +116,10 @@ const PROVIDER_FAMILY_ENV_FIXTURES = Object.freeze([
 ]);
 
 describe('model-gateway foundation', () => {
+    afterEach(() => {
+        resetByokProviderHealthForTests();
+    });
+
     it('keeps provider/model identity distinct from provider-local SDK ids', () => {
         const registry = new ModelGatewayRegistry();
         registry.upsertProvider({ id: 'openrouter', providerType: 'openai', baseUrl: 'https://openrouter.ai/api/v1' });
@@ -130,6 +139,58 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(
             sdkModels.map((model) => model.byok?.gatewayId).sort(),
             ['groq:openai/gpt-oss-120b', 'openrouter:openai/gpt-oss-120b'],
+        );
+    });
+
+    it('uses runtime health when routing gateway model candidates', () => {
+        const registry = new ModelGatewayRegistry();
+        registry.upsertProvider({ id: 'openrouter', providerType: 'openai' });
+        registry.upsertProvider({ id: 'groq', providerType: 'openai' });
+        registry.upsertModel({ providerId: 'openrouter', providerModel: 'model-a', capabilities: { tools: true } });
+        registry.upsertModel({ providerId: 'groq', providerModel: 'model-b', capabilities: { tools: true } });
+
+        recordByokProviderModelCallFailure({
+            routeProfile: 'agent',
+            providerId: 'openrouter',
+            providerModel: 'model-a',
+            message: 'rate limit',
+            errorContext: 'provider.rate_limit',
+            timestamp: 10,
+        });
+        recordByokProviderModelCallSuccess({
+            routeProfile: 'agent',
+            providerId: 'groq',
+            providerModel: 'model-b',
+            timestamp: 20,
+        });
+        recordByokProviderModelAgentProbeSuccess({
+            routeProfile: 'agent',
+            providerId: 'groq',
+            providerModel: 'model-b',
+            timestamp: 30,
+        });
+
+        assert.deepEqual(
+            registry
+                .findCandidates({ requires: ['tools'], health: { routeProfile: 'agent', excludeFailed: true } })
+                .map((model) => model['id']),
+            ['groq:model-b'],
+        );
+        assert.deepEqual(
+            registry
+                .findCandidates({
+                    requires: ['tools'],
+                    health: { routeProfile: 'agent', excludeFailed: true, requireAgentProbeOk: true },
+                })
+                .map((model) => model['id']),
+            ['groq:model-b'],
+        );
+        assert.equal(
+            evaluateGatewayModelHealthRoute(registry.getModel('openrouter:model-a') ?? {}, {
+                routeProfile: 'agent',
+                excludeFailed: true,
+            }).reason,
+            'chat_health_failed',
         );
     });
 

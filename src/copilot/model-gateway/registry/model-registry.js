@@ -9,6 +9,7 @@
  */
 
 import { createModelRecord, createProviderRecord } from '../contracts/records.js';
+import { evaluateGatewayModelHealthRoute } from '../routing/index.js';
 
 export class ModelGatewayRegistry {
     /** @type {Map<string, Record<string, any>>} */
@@ -68,7 +69,7 @@ export class ModelGatewayRegistry {
     }
 
     /**
-     * @param {{ providerId?: string; requires?: string[]; minContextWindowTokens?: number }} [requirements]
+     * @param {{ providerId?: string; requires?: string[]; minContextWindowTokens?: number; health?: { routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean } }} [requirements]
      * @returns {Record<string, any>[]}
      */
     findCandidates(requirements = {}) {
@@ -78,6 +79,10 @@ export class ModelGatewayRegistry {
             if (typeof requirements.minContextWindowTokens === 'number') {
                 const context = typeof model['limits']?.contextWindowTokens === 'number' ? model['limits'].contextWindowTokens : 0;
                 if (context < requirements.minContextWindowTokens) return false;
+            }
+            if (requirements.health) {
+                const healthRoute = evaluateGatewayModelHealthRoute(model, requirements.health);
+                if (!healthRoute.include) return false;
             }
             return requiredCapabilities.every((name) => model['capabilities']?.[name] === true);
         });
