@@ -66,7 +66,7 @@ import {
 import {
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
-} from '../state/index.js';
+} from '#copilot/model-gateway';
 import { classifyTerminalByokProviderFailure } from '../byok/index.js';
 import { renderTerminalIntent } from './intent-renderer.js';
 import { compactTerminalToolText } from './tool-activity-presenter.js';

@@ -68,6 +68,18 @@ export {
 export { buildModelGatewayOnListModelsHandler } from './session/on-list-models.js';
 export { toCopilotModelInfo, toCopilotModelInfoList } from './session/copilot-model-projection.js';
 export {
+    clearByokProviderModelHealth,
+    flushByokProviderHealth,
+    listByokProviderModelHealth,
+    readByokProviderHealthState,
+    readByokProviderModelHealth,
+    recordByokProviderModelAgentProbeFailure,
+    recordByokProviderModelAgentProbeSuccess,
+    recordByokProviderModelCallFailure,
+    recordByokProviderModelCallSuccess,
+    resetByokProviderHealthForTests,
+} from './health/index.js';
+export {
     BYOK_AGENT_PROBE_ANSWER,
     BYOK_AGENT_PROBE_QUESTION,
     BYOK_AGENT_PROBE_READ_PATH,

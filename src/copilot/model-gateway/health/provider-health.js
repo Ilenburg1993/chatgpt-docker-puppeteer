@@ -7,7 +7,7 @@
  * `ask_user` independently from plain chat. It is intentionally fed by runtime events/probes, not by another discovery
  * path.
  *
- * @module copilot/terminal/state/byok-provider-health
+ * @module copilot/model-gateway/health/provider-health
  */
 
 import { existsSync, readFileSync } from 'node:fs';

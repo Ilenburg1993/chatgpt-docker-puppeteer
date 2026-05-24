@@ -15,7 +15,7 @@ import {
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
     resetByokProviderHealthForTests,
-} from '../../../../src/copilot/terminal/state/byok-provider-health.js';
+} from '../../../../src/copilot/model-gateway/health/provider-health.js';
 
 /** @type {string[]} */
 const cleanupDirs = [];

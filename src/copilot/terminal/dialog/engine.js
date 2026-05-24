@@ -57,7 +57,7 @@ import {
     evaluateTerminalByokTurnBudget,
     readTerminalByokAdmissionMode,
 } from '../byok/index.js';
-import { recordByokProviderModelCallFailure } from '../state/index.js';
+import { recordByokProviderModelCallFailure } from '#copilot/model-gateway';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,

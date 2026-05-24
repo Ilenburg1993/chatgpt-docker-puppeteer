@@ -88,22 +88,19 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
 
 vi.mock('#copilot/model-gateway', () => ({
     buildProbeCompletedEvent: buildProbeCompletedEvent,
-    runConfiguredByokChatProbe: runConfiguredByokChatProbe,
-    runConfiguredByokAgentProbe: runConfiguredByokAgentProbe,
-    runConfiguredByokJsonProbe: runConfiguredByokJsonProbe,
-    runConfiguredByokStreamingProbe: runConfiguredByokStreamingProbe,
-}));
-
-vi.mock('../../../../src/copilot/terminal/state/index.js', () => ({
     clearByokProviderModelHealth,
     flushByokProviderHealth,
     listByokProviderModelHealth,
     readByokProviderHealthState,
     readByokProviderModelHealth,
-    recordByokProviderModelCallFailure,
-    recordByokProviderModelCallSuccess,
     recordByokProviderModelAgentProbeFailure,
     recordByokProviderModelAgentProbeSuccess,
+    recordByokProviderModelCallFailure,
+    recordByokProviderModelCallSuccess,
+    runConfiguredByokChatProbe: runConfiguredByokChatProbe,
+    runConfiguredByokAgentProbe: runConfiguredByokAgentProbe,
+    runConfiguredByokJsonProbe: runConfiguredByokJsonProbe,
+    runConfiguredByokStreamingProbe: runConfiguredByokStreamingProbe,
 }));
 
 const { cmdByok } = await import('../../../../src/copilot/terminal/commands/byok.js');

@@ -135,7 +135,7 @@ vi.mock('../../../src/copilot/terminal/dialog/engine-persistence.js', () => ({
     persistTurnToHub: vi.fn(async () => undefined),
 }));
 vi.mock('../../../src/copilot/terminal/dialog/sse.js', () => ({ broadcastSse: vi.fn() }));
-vi.mock('../../../src/copilot/terminal/state/byok-provider-health.js', () => ({
+vi.mock('../../../src/copilot/model-gateway/health/provider-health.js', () => ({
     recordByokProviderModelCallFailure: vi.fn(),
 }));
 vi.mock('../../../src/copilot/terminal/dialog/turn-display.js', () => ({
@@ -429,7 +429,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
 
     it('classifica timeout de inatividade BYOK como falha operacional do provider/modelo', async () => {
         const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
-        const health = await import('../../../src/copilot/terminal/state/byok-provider-health.js');
+        const health = await import('../../../src/copilot/model-gateway/health/provider-health.js');
 
         configMocks.readConfiguredByokSummary.mockReturnValue({
             enabled: true,
@@ -471,7 +471,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
 
     it('classifica 402 BYOK como bloqueio de credito no turno vivo sem duplicar erro generico no terminal', async () => {
         const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
-        const health = await import('../../../src/copilot/terminal/state/byok-provider-health.js');
+        const health = await import('../../../src/copilot/model-gateway/health/provider-health.js');
         const activity = await import('../../../src/copilot/terminal/state/activity-state.js');
 
         vi.mocked(activity.recordTerminalActivity).mockClear();
@@ -522,7 +522,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
 
     it('expõe turno BYOK vazio como falha operacional quando não há input humano pendente', async () => {
         const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
-        const health = await import('../../../src/copilot/terminal/state/byok-provider-health.js');
+        const health = await import('../../../src/copilot/model-gateway/health/provider-health.js');
         const sse = await import('../../../src/copilot/terminal/dialog/sse.js');
 
         vi.mocked(health.recordByokProviderModelCallFailure).mockClear();
@@ -576,7 +576,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
     it('aceita reply vazio quando ask_user deixou input humano pendente', async () => {
         const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
         const runtime = await import('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js');
-        const health = await import('../../../src/copilot/terminal/state/byok-provider-health.js');
+        const health = await import('../../../src/copilot/model-gateway/health/provider-health.js');
         const sse = await import('../../../src/copilot/terminal/dialog/sse.js');
 
         vi.mocked(health.recordByokProviderModelCallFailure).mockClear();

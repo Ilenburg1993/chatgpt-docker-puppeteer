@@ -13,18 +13,6 @@ export {
     terminalActivityEmitter,
 } from './activity-state.js';
 export {
-    clearByokProviderModelHealth,
-    flushByokProviderHealth,
-    listByokProviderModelHealth,
-    readByokProviderHealthState,
-    readByokProviderModelHealth,
-    recordByokProviderModelAgentProbeFailure,
-    recordByokProviderModelAgentProbeSuccess,
-    recordByokProviderModelCallFailure,
-    recordByokProviderModelCallSuccess,
-    resetByokProviderHealthForTests,
-} from './byok-provider-health.js';
-export {
     TERMINAL_DISPLAY_PRESETS,
     TERMINAL_DISPLAY_TOGGLE_KEYS,
     applyTerminalBootDisplayPreset,

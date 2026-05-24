@@ -1278,7 +1278,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             '../../../src/copilot/terminal/state/turn-materialization-state.js'
         );
         const { clearByokProviderModelHealth, readByokProviderModelHealth } = await import(
-            '../../../src/copilot/terminal/state/byok-provider-health.js'
+            '../../../src/copilot/model-gateway/health/provider-health.js'
         );
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
