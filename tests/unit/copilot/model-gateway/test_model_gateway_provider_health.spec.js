@@ -1,6 +1,6 @@
 // @ts-check
 
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -41,9 +41,9 @@ describe('BYOK provider chat health state', () => {
         await useTempHealthPath();
 
         recordByokProviderModelCallFailure({
-            profile: 'cerebras-free',
-            provider: 'cerebras',
-            model: 'gpt-oss-120b',
+            routeProfile: 'cerebras-free',
+            providerId: 'cerebras',
+            providerModel: 'gpt-oss-120b',
             message: 'Provider rejected request with Bearer abcdefghijklmnopqrstuvwxyz012345',
             errorContext: 'model_call',
             timestamp: 1_700_000_000_000,
@@ -52,11 +52,14 @@ describe('BYOK provider chat health state', () => {
         resetByokProviderHealthForTests();
 
         const health = readByokProviderModelHealth({
-            profile: 'cerebras-free',
-            provider: 'cerebras',
-            model: 'gpt-oss-120b',
+            routeProfile: 'cerebras-free',
+            providerId: 'cerebras',
+            providerModel: 'gpt-oss-120b',
         });
 
+        expect(health?.routeProfile).toBe('cerebras-free');
+        expect(health?.providerId).toBe('cerebras');
+        expect(health?.providerModel).toBe('gpt-oss-120b');
         expect(health?.lastStatus).toBe('failed');
         expect(health?.failureCount).toBe(1);
         expect(health?.lastMessage).toContain('[redacted]');
@@ -68,17 +71,17 @@ describe('BYOK provider chat health state', () => {
         await useTempHealthPath();
 
         recordByokProviderModelCallFailure({
-            profile: 'kilo',
-            provider: 'kilo-code',
-            model: 'kilo-auto/free',
+            routeProfile: 'kilo',
+            providerId: 'kilo-code',
+            providerModel: 'kilo-auto/free',
             message: 'timeout',
             errorContext: 'model_call',
             timestamp: 1_700_000_000_000,
         });
         recordByokProviderModelCallSuccess({
-            profile: 'kilo',
-            provider: 'kilo-code',
-            model: 'kilo-auto/free',
+            routeProfile: 'kilo',
+            providerId: 'kilo-code',
+            providerModel: 'kilo-auto/free',
             successContext: 'llm.usage',
             timestamp: 1_700_000_010_000,
         });
@@ -86,9 +89,9 @@ describe('BYOK provider chat health state', () => {
         resetByokProviderHealthForTests();
 
         const health = readByokProviderModelHealth({
-            profile: 'kilo',
-            provider: 'kilo-code',
-            model: 'kilo-auto/free',
+            routeProfile: 'kilo',
+            providerId: 'kilo-code',
+            providerModel: 'kilo-auto/free',
         });
 
         expect(health?.lastStatus).toBe('ok');
@@ -103,32 +106,32 @@ describe('BYOK provider chat health state', () => {
         await useTempHealthPath();
 
         recordByokProviderModelCallSuccess({
-            profile: 'kilo',
-            provider: 'kilo-code',
-            model: 'kilo-auto/free',
+            routeProfile: 'kilo',
+            providerId: 'kilo-code',
+            providerModel: 'kilo-auto/free',
             timestamp: 1_700_000_000_000,
         });
         recordByokProviderModelAgentProbeFailure({
-            profile: 'kilo',
-            provider: 'kilo-code',
-            model: 'kilo-auto/free',
+            routeProfile: 'kilo',
+            providerId: 'kilo-code',
+            providerModel: 'kilo-auto/free',
             message: 'tool was not invoked',
             errorContext: 'byok_agent_probe',
             timestamp: 1_700_000_010_000,
         });
         recordByokProviderModelAgentProbeSuccess({
-            profile: 'kilo',
-            provider: 'kilo-code',
-            model: 'kilo-auto/free',
+            routeProfile: 'kilo',
+            providerId: 'kilo-code',
+            providerModel: 'kilo-auto/free',
             timestamp: 1_700_000_020_000,
         });
         await flushByokProviderHealth();
         resetByokProviderHealthForTests();
 
         const health = readByokProviderModelHealth({
-            profile: 'kilo',
-            provider: 'kilo-code',
-            model: 'kilo-auto/free',
+            routeProfile: 'kilo',
+            providerId: 'kilo-code',
+            providerModel: 'kilo-auto/free',
         });
 
         expect(health?.lastStatus).toBe('ok');
@@ -137,5 +140,46 @@ describe('BYOK provider chat health state', () => {
         expect(health?.agentProbeSuccessCount).toBe(1);
         expect(health?.lastAgentProbeFailureAt).toBe(1_700_000_010_000);
         expect(health?.lastAgentProbeSuccessAt).toBe(1_700_000_020_000);
+    });
+
+    it('migra registros schema v1 profile/provider/model para identidade gateway canônica', async () => {
+        await useTempHealthPath();
+        const filePath = process.env['TERMINAL_BYOK_PROVIDER_HEALTH_PATH'];
+        expect(filePath).toBeTruthy();
+        await writeFile(
+            /** @type {string} */ (filePath),
+            `${JSON.stringify({
+                schemaVersion: 1,
+                updatedAt: '2026-05-24T00:00:00.000Z',
+                records: [
+                    {
+                        key: 'legacy|groq|llama',
+                        profile: 'legacy',
+                        provider: 'groq',
+                        model: 'llama',
+                        lastStatus: 'ok',
+                        successCount: 1,
+                        lastSuccessAt: 1_700_000_030_000,
+                    },
+                ],
+            })}\n`,
+            'utf8',
+        );
+
+        const health = readByokProviderModelHealth({
+            routeProfile: 'legacy',
+            providerId: 'groq',
+            providerModel: 'llama',
+        });
+
+        expect(health).toEqual(
+            expect.objectContaining({
+                key: 'legacy|groq|llama',
+                routeProfile: 'legacy',
+                providerId: 'groq',
+                providerModel: 'llama',
+                lastStatus: 'ok',
+            }),
+        );
     });
 });

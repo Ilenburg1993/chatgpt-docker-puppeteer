@@ -451,9 +451,9 @@ describe('terminal/dialog/engine.js — contrato', () => {
 
         expect(vi.mocked(health.recordByokProviderModelCallFailure)).toHaveBeenCalledWith(
             expect.objectContaining({
-                profile: 'mistral-free',
-                provider: 'mistral',
-                model: 'codestral-latest',
+                routeProfile: 'mistral-free',
+                providerId: 'mistral',
+                providerModel: 'codestral-latest',
                 errorContext: 'dialog.byok_inactivity_timeout',
             }),
         );
@@ -493,8 +493,8 @@ describe('terminal/dialog/engine.js — contrato', () => {
 
         expect(vi.mocked(health.recordByokProviderModelCallFailure)).toHaveBeenCalledWith(
             expect.objectContaining({
-                profile: 'chutes-ai',
-                provider: 'chutes',
+                routeProfile: 'chutes-ai',
+                providerId: 'chutes',
                 errorContext: 'dialog.byok_provider_credits',
             }),
         );
@@ -547,9 +547,9 @@ describe('terminal/dialog/engine.js — contrato', () => {
 
         expect(vi.mocked(health.recordByokProviderModelCallFailure)).toHaveBeenCalledWith(
             expect.objectContaining({
-                profile: 'kilo',
-                provider: 'kilo-code',
-                model: 'kilo-auto/free',
+                routeProfile: 'kilo',
+                providerId: 'kilo-code',
+                providerModel: 'kilo-auto/free',
                 errorContext: 'dialog.byok_empty_output',
             }),
         );

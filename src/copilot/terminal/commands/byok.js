@@ -745,16 +745,17 @@ function renderByokChatHealthEvidence(context) {
 function readHealthForByokModel(model) {
     const meta = getByokModelMetadata(model);
     const exact = readByokProviderModelHealth({
-        profile: meta?.profile ?? null,
-        provider: meta?.provider ?? null,
-        model: model.id,
+        routeProfile: meta?.profile ?? null,
+        providerId: meta?.provider ?? null,
+        providerModel: model.id,
     });
     if (exact) return exact;
     return (
         listByokProviderModelHealth().find(
             (health) =>
-                health.model === model.id &&
-                ((meta?.profile && health.profile === meta.profile) || (meta?.provider && health.provider === meta.provider)),
+                health.providerModel === model.id &&
+                ((meta?.profile && health.routeProfile === meta.profile) ||
+                    (meta?.provider && health.providerId === meta.provider)),
         ) ?? null
     );
 }
@@ -788,9 +789,9 @@ function isByokModelAgentProbeVerified(model) {
 function readHealthForByokProfile(profile) {
     const providerCandidates = [profile.preset, profile.providerType].filter(Boolean);
     const exact = readByokProviderModelHealth({
-        profile: profile.name,
-        provider: profile.preset ?? profile.providerType,
-        model: profile.model,
+        routeProfile: profile.name,
+        providerId: profile.preset ?? profile.providerType,
+        providerModel: profile.model,
     });
     if (exact) return exact;
     return (
@@ -798,8 +799,8 @@ function readHealthForByokProfile(profile) {
             (health) =>
                 Boolean(
                     profile.model &&
-                        health.model === profile.model &&
-                        (health.profile === profile.name || providerCandidates.includes(health.provider)),
+                        health.providerModel === profile.model &&
+                        (health.routeProfile === profile.name || providerCandidates.includes(health.providerId)),
                 ),
         ) ?? null
     );
@@ -1228,9 +1229,9 @@ function renderByokHealth(println) {
     for (const record of records.slice(0, 30)) {
         const label = renderByokHealthTag(record);
         const parts = [
-            record.profile ? `profile=${record.profile}` : null,
-            record.provider ? `provider=${record.provider}` : null,
-            record.model ? `model=${record.model}` : null,
+            record.routeProfile ? `routeProfile=${record.routeProfile}` : null,
+            record.providerId ? `providerId=${record.providerId}` : null,
+            record.providerModel ? `providerModel=${record.providerModel}` : null,
             label,
             renderByokAgentProbeHealthTag(record),
         ].filter(Boolean);
@@ -1321,9 +1322,9 @@ function buildByokProbeSelection(rest) {
  */
 async function recordByokProbeHealth(mode, probe) {
     const healthIdentity = {
-        profile: probe.profile,
-        provider: probe.preset ?? probe.providerType,
-        model: probe.model,
+        routeProfile: probe.profile,
+        providerId: probe.preset ?? probe.providerType,
+        providerModel: probe.model,
     };
     const providerAttempted = probe.status !== 'admission-blocked';
     if (mode !== 'chat' && mode !== 'agent') return providerAttempted;

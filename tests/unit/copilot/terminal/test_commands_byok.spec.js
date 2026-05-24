@@ -307,10 +307,14 @@ describe('terminal /byok command', () => {
 
     it('torna acionável o health falho da seleção BYOK ativa sem trocar modelo silenciosamente', async () => {
         const now = Date.now();
-        readByokProviderModelHealth.mockImplementation(({ model }) =>
-            model === 'deepseek/deepseek-v4-flash:free'
+        readByokProviderModelHealth.mockImplementation((input) => {
+            const model = input.providerModel ?? input.model;
+            return model === 'deepseek/deepseek-v4-flash:free'
                 ? {
                       key: 'openrouter-free|openrouter|deepseek/deepseek-v4-flash:free',
+                      routeProfile: 'openrouter-free',
+                      providerId: 'openrouter',
+                      providerModel: model,
                       profile: 'openrouter-free',
                       provider: 'openrouter',
                       model,
@@ -329,8 +333,8 @@ describe('terminal /byok command', () => {
                       lastAgentProbeMessage: 'timeout',
                       lastAgentProbeErrorContext: 'byok_agent_probe',
                   }
-                : null,
-        );
+                : null;
+        });
         mockProjection({
             models: [
                 {
@@ -369,6 +373,9 @@ describe('terminal /byok command', () => {
         listByokProviderModelHealth.mockReturnValue([
             {
                 key: 'openrouter-free|openrouter|openrouter/free',
+                routeProfile: 'openrouter-free',
+                providerId: 'openrouter',
+                providerModel: 'openrouter/free',
                 profile: 'openrouter-free',
                 provider: 'openrouter',
                 model: 'openrouter/free',
@@ -464,9 +471,9 @@ describe('terminal /byok command', () => {
             }),
         );
         expect(recordByokProviderModelCallSuccess).toHaveBeenCalledWith({
-            profile: 'groq-free',
-            provider: 'groq',
-            model: 'probe-model',
+            routeProfile: 'groq-free',
+            providerId: 'groq',
+            providerModel: 'probe-model',
             successContext: 'byok_probe',
         });
         expect(buildProbeCompletedEvent).toHaveBeenCalledWith(
@@ -519,9 +526,9 @@ describe('terminal /byok command', () => {
         );
         expect(recordByokProviderModelAgentProbeFailure).toHaveBeenCalledWith(
             expect.objectContaining({
-                profile: 'kilo',
-                provider: 'kilo-code',
-                model: 'chat-only-model',
+                routeProfile: 'kilo',
+                providerId: 'kilo-code',
+                providerModel: 'chat-only-model',
                 message: 'agent probe tool-missing',
             }),
         );
@@ -571,9 +578,9 @@ describe('terminal /byok command', () => {
 
         expect(recordByokProviderModelAgentProbeFailure).toHaveBeenCalledWith(
             expect.objectContaining({
-                profile: 'chutes-ai',
-                provider: 'chutes',
-                model: 'metered-model',
+                routeProfile: 'chutes-ai',
+                providerId: 'chutes',
+                providerModel: 'metered-model',
                 errorContext: 'provider.credits',
             }),
         );
@@ -890,6 +897,9 @@ describe('terminal /byok command', () => {
         listByokProviderModelHealth.mockReturnValue([
             {
                 key: 'groq-free|groq|openai/gpt-oss-120b',
+                routeProfile: 'groq-free',
+                providerId: 'groq',
+                providerModel: 'openai/gpt-oss-120b',
                 profile: 'groq-free',
                 provider: 'groq',
                 model: 'openai/gpt-oss-120b',
@@ -963,6 +973,9 @@ describe('terminal /byok command', () => {
         listByokProviderModelHealth.mockReturnValue([
             {
                 key: 'kilo|kilo-code|kilo-auto/free',
+                routeProfile: 'kilo',
+                providerId: 'kilo-code',
+                providerModel: 'kilo-auto/free',
                 profile: 'kilo',
                 provider: 'kilo-code',
                 model: 'kilo-auto/free',
@@ -982,6 +995,7 @@ describe('terminal /byok command', () => {
 
         expect(ctx.output()).toContain('BYOK operational health');
         expect(ctx.output()).toContain('byok-provider-health.json');
+        expect(ctx.output()).toContain('providerId=kilo-code');
         expect(ctx.output()).toContain('chat=ok');
     });
 
@@ -1634,10 +1648,14 @@ describe('terminal /byok command', () => {
 
     it('recomenda modelos BYOK com filtros e alerta limites baixos', async () => {
         const now = Date.now();
-        readByokProviderModelHealth.mockImplementation(({ model }) =>
-            model === 'free-comfortable'
+        readByokProviderModelHealth.mockImplementation((input) => {
+            const model = input.providerModel ?? input.model;
+            return model === 'free-comfortable'
                 ? {
                       key: 'openrouter|openrouter|free-comfortable',
+                      routeProfile: null,
+                      providerId: 'openrouter',
+                      providerModel: model,
                       profile: null,
                       provider: 'openrouter',
                       model,
@@ -1654,8 +1672,8 @@ describe('terminal /byok command', () => {
                       lastAgentProbeFailureAt: null,
                       lastAgentProbeSuccessAt: now,
                   }
-                : null,
-        );
+                : null;
+        });
         discoverConfiguredByokModelsFromEnv.mockResolvedValue({
             models: [
                 {
@@ -1730,10 +1748,14 @@ describe('terminal /byok command', () => {
     });
 
     it('distingue health de chat vindo de probe e de turno vivo no ranking BYOK', async () => {
-        readByokProviderModelHealth.mockImplementation(({ model }) =>
-            model === 'probe-ok'
+        readByokProviderModelHealth.mockImplementation((input) => {
+            const model = input.providerModel ?? input.model;
+            return model === 'probe-ok'
                 ? {
                       key: 'kilo|kilo-code|probe-ok',
+                      routeProfile: 'kilo',
+                      providerId: 'kilo-code',
+                      providerModel: model,
                       profile: 'kilo',
                       provider: 'kilo-code',
                       model,
@@ -1754,10 +1776,13 @@ describe('terminal /byok command', () => {
                       lastAgentProbeErrorContext: null,
                   }
                 : model === 'turn-ok'
-                  ? {
-                        key: 'kilo|kilo-code|turn-ok',
-                        profile: 'kilo',
-                        provider: 'kilo-code',
+	                  ? {
+	                        key: 'kilo|kilo-code|turn-ok',
+                            routeProfile: 'kilo',
+                            providerId: 'kilo-code',
+                            providerModel: model,
+	                        profile: 'kilo',
+	                        provider: 'kilo-code',
                         model,
                         lastStatus: 'ok',
                         failureCount: 0,
@@ -1775,8 +1800,8 @@ describe('terminal /byok command', () => {
                         lastAgentProbeMessage: null,
                         lastAgentProbeErrorContext: null,
                     }
-                  : null,
-        );
+	                  : null;
+        });
         discoverConfiguredByokModelsFromEnv.mockResolvedValue({
             models: [
                 {
@@ -1815,6 +1840,9 @@ describe('terminal /byok command', () => {
         listByokProviderModelHealth.mockReturnValue([
             {
                 key: 'cerebras-free|cerebras|gpt-oss-120b',
+                routeProfile: 'cerebras-free',
+                providerId: 'cerebras',
+                providerModel: 'gpt-oss-120b',
                 profile: 'cerebras-free',
                 provider: 'cerebras',
                 model: 'gpt-oss-120b',
@@ -1828,6 +1856,9 @@ describe('terminal /byok command', () => {
             },
             {
                 key: 'kilo|kilo-code|kilo/healthy',
+                routeProfile: 'kilo',
+                providerId: 'kilo-code',
+                providerModel: 'kilo/healthy',
                 profile: 'kilo',
                 provider: 'kilo-code',
                 model: 'kilo/healthy',
@@ -1887,6 +1918,9 @@ describe('terminal /byok command', () => {
         listByokProviderModelHealth.mockReturnValue([
             {
                 key: 'cerebras-free|cerebras|gpt-oss-120b',
+                routeProfile: 'cerebras-free',
+                providerId: 'cerebras',
+                providerModel: 'gpt-oss-120b',
                 profile: 'cerebras-free',
                 provider: 'cerebras',
                 model: 'gpt-oss-120b',
@@ -1991,10 +2025,14 @@ describe('terminal /byok command', () => {
 
     it('recomenda modelos BYOK considerando o orçamento vivo da sessão atual', async () => {
         const now = Date.now();
-        readByokProviderModelHealth.mockImplementation(({ model }) =>
-            model === 'openrouter-roomy'
+        readByokProviderModelHealth.mockImplementation((input) => {
+            const model = input.providerModel ?? input.model;
+            return model === 'openrouter-roomy'
                 ? {
                       key: 'openrouter|openrouter|openrouter-roomy',
+                      routeProfile: null,
+                      providerId: 'openrouter',
+                      providerModel: model,
                       profile: null,
                       provider: 'openrouter',
                       model,
@@ -2011,8 +2049,8 @@ describe('terminal /byok command', () => {
                       lastAgentProbeFailureAt: null,
                       lastAgentProbeSuccessAt: now,
                   }
-                : null,
-        );
+                : null;
+        });
         readTerminalRuntimeState.mockReturnValue({
             contextWindow: { tokens: 63000, tokenLimit: 200000, utilization: 0.315 },
         });

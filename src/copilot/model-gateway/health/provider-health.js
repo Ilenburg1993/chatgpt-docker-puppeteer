@@ -16,12 +16,16 @@ import { dirname, join } from 'node:path';
 import { redactSecretText } from '#copilot/core';
 
 const MAX_BYOK_PROVIDER_HEALTH_RECORDS = 200;
-const BYOK_PROVIDER_HEALTH_SCHEMA_VERSION = 1;
+const BYOK_PROVIDER_HEALTH_SCHEMA_VERSION = 2;
+const LEGACY_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION = 1;
 const DEFAULT_BYOK_PROVIDER_HEALTH_PATH = join(process.cwd(), 'data', 'copilot-terminal', 'byok-provider-health.json');
 
 /**
  * @typedef {object} ByokProviderHealthRecord
  * @property {string} key
+ * @property {string | null} routeProfile
+ * @property {string | null} providerId
+ * @property {string | null} providerModel
  * @property {string | null} profile
  * @property {string | null} provider
  * @property {string | null} model
@@ -90,11 +94,40 @@ function normalizePart(value) {
 }
 
 /**
- * @param {{ profile?: string | null; provider?: string | null; model?: string | null }} input
+ * @typedef {object} ByokProviderHealthIdentity
+ * @property {string | null} routeProfile
+ * @property {string | null} providerId
+ * @property {string | null} providerModel
+ * @property {string | null} profile
+ * @property {string | null} provider
+ * @property {string | null} model
+ */
+
+/**
+ * @param {{ routeProfile?: string | null | undefined; providerId?: string | null | undefined; providerModel?: string | null | undefined; profile?: string | null | undefined; provider?: string | null | undefined; model?: string | null | undefined }} input
+ * @returns {ByokProviderHealthIdentity}
+ */
+function normalizeHealthIdentity(input) {
+    const routeProfile = normalizePart(input.routeProfile) ?? normalizePart(input.profile);
+    const providerId = normalizePart(input.providerId) ?? normalizePart(input.provider);
+    const providerModel = normalizePart(input.providerModel) ?? normalizePart(input.model);
+    return {
+        routeProfile,
+        providerId,
+        providerModel,
+        profile: routeProfile,
+        provider: providerId,
+        model: providerModel,
+    };
+}
+
+/**
+ * @param {{ routeProfile?: string | null | undefined; providerId?: string | null | undefined; providerModel?: string | null | undefined; profile?: string | null | undefined; provider?: string | null | undefined; model?: string | null | undefined }} input
  * @returns {string}
  */
 function healthKey(input) {
-    return [normalizePart(input.profile) ?? '-', normalizePart(input.provider) ?? '-', normalizePart(input.model) ?? '-']
+    const identity = normalizeHealthIdentity(input);
+    return [identity.routeProfile ?? '-', identity.providerId ?? '-', identity.providerModel ?? '-']
         .join('|')
         .toLowerCase();
 }
@@ -139,17 +172,30 @@ function normalizeCount(value) {
  */
 function normalizeRecord(value) {
     if (!isRecord(value)) return null;
-    const profile = normalizePart(/** @type {string | null | undefined} */ (value['profile']));
-    const provider = normalizePart(/** @type {string | null | undefined} */ (value['provider']));
-    const model = normalizePart(/** @type {string | null | undefined} */ (value['model']));
+    const identity = normalizeHealthIdentity({
+        routeProfile: /** @type {string | null | undefined} */ (value['routeProfile']),
+        providerId: /** @type {string | null | undefined} */ (value['providerId']),
+        providerModel: /** @type {string | null | undefined} */ (value['providerModel']),
+        profile: /** @type {string | null | undefined} */ (value['profile']),
+        provider: /** @type {string | null | undefined} */ (value['provider']),
+        model: /** @type {string | null | undefined} */ (value['model']),
+    });
     const lastStatus = normalizeStatus(value['lastStatus']);
     const agentProbeStatus = normalizeStatus(value['agentProbeStatus']);
-    if ((!lastStatus && !agentProbeStatus) || (!profile && !provider && !model)) return null;
+    if (
+        (!lastStatus && !agentProbeStatus) ||
+        (!identity.routeProfile && !identity.providerId && !identity.providerModel)
+    ) {
+        return null;
+    }
     const record = {
-        key: healthKey({ profile, provider, model }),
-        profile,
-        provider,
-        model,
+        key: healthKey(identity),
+        routeProfile: identity.routeProfile,
+        providerId: identity.providerId,
+        providerModel: identity.providerModel,
+        profile: identity.profile,
+        provider: identity.provider,
+        model: identity.model,
         lastStatus,
         failureCount: normalizeCount(value['failureCount']),
         successCount: normalizeCount(value['successCount']),
@@ -201,7 +247,14 @@ function hydrateByokProviderHealthFromDisk() {
     try {
         const raw = readFileSync(filePath, 'utf8');
         const parsed = JSON.parse(raw);
-        if (!isRecord(parsed) || parsed['schemaVersion'] !== BYOK_PROVIDER_HEALTH_SCHEMA_VERSION) return;
+        if (
+            !isRecord(parsed) ||
+            ![BYOK_PROVIDER_HEALTH_SCHEMA_VERSION, LEGACY_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION].includes(
+                /** @type {number} */ (parsed['schemaVersion']),
+            )
+        ) {
+            return;
+        }
         const records = Array.isArray(parsed['records']) ? parsed['records'] : [];
         for (const item of records) {
             const record = normalizeRecord(item);
@@ -271,23 +324,19 @@ export async function flushByokProviderHealth() {
 }
 
 /**
- * @param {{ profile?: string | null; provider?: string | null; model?: string | null; message?: string | null; errorContext?: string | null; timestamp?: number }} input
+ * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; message?: string | null; errorContext?: string | null; timestamp?: number }} input
  * @returns {void}
  */
 export function recordByokProviderModelCallFailure(input) {
     hydrateByokProviderHealthFromDisk();
-    const profile = normalizePart(input.profile);
-    const provider = normalizePart(input.provider);
-    const model = normalizePart(input.model);
-    if (!profile && !provider && !model) return;
-    const key = healthKey({ profile, provider, model });
+    const identity = normalizeHealthIdentity(input);
+    if (!identity.routeProfile && !identity.providerId && !identity.providerModel) return;
+    const key = healthKey(identity);
     const now = typeof input.timestamp === 'number' && Number.isFinite(input.timestamp) ? input.timestamp : Date.now();
     const previous = _byokProviderHealthByKey.get(key);
     _byokProviderHealthByKey.set(key, {
         key,
-        profile,
-        provider,
-        model,
+        ...identity,
         lastStatus: 'failed',
         failureCount: (previous?.failureCount ?? 0) + 1,
         successCount: previous?.successCount ?? 0,
@@ -309,23 +358,19 @@ export function recordByokProviderModelCallFailure(input) {
 }
 
 /**
- * @param {{ profile?: string | null; provider?: string | null; model?: string | null; successContext?: string | null; timestamp?: number }} input
+ * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; successContext?: string | null; timestamp?: number }} input
  * @returns {void}
  */
 export function recordByokProviderModelCallSuccess(input) {
     hydrateByokProviderHealthFromDisk();
-    const profile = normalizePart(input.profile);
-    const provider = normalizePart(input.provider);
-    const model = normalizePart(input.model);
-    if (!profile && !provider && !model) return;
-    const key = healthKey({ profile, provider, model });
+    const identity = normalizeHealthIdentity(input);
+    if (!identity.routeProfile && !identity.providerId && !identity.providerModel) return;
+    const key = healthKey(identity);
     const now = typeof input.timestamp === 'number' && Number.isFinite(input.timestamp) ? input.timestamp : Date.now();
     const previous = _byokProviderHealthByKey.get(key);
     _byokProviderHealthByKey.set(key, {
         key,
-        profile,
-        provider,
-        model,
+        ...identity,
         lastStatus: 'ok',
         failureCount: previous?.failureCount ?? 0,
         successCount: (previous?.successCount ?? 0) + 1,
@@ -347,23 +392,19 @@ export function recordByokProviderModelCallSuccess(input) {
 }
 
 /**
- * @param {{ profile?: string | null; provider?: string | null; model?: string | null; message?: string | null; errorContext?: string | null; timestamp?: number }} input
+ * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; message?: string | null; errorContext?: string | null; timestamp?: number }} input
  * @returns {void}
  */
 export function recordByokProviderModelAgentProbeFailure(input) {
     hydrateByokProviderHealthFromDisk();
-    const profile = normalizePart(input.profile);
-    const provider = normalizePart(input.provider);
-    const model = normalizePart(input.model);
-    if (!profile && !provider && !model) return;
-    const key = healthKey({ profile, provider, model });
+    const identity = normalizeHealthIdentity(input);
+    if (!identity.routeProfile && !identity.providerId && !identity.providerModel) return;
+    const key = healthKey(identity);
     const now = typeof input.timestamp === 'number' && Number.isFinite(input.timestamp) ? input.timestamp : Date.now();
     const previous = _byokProviderHealthByKey.get(key);
     _byokProviderHealthByKey.set(key, {
         key,
-        profile,
-        provider,
-        model,
+        ...identity,
         lastStatus: previous?.lastStatus ?? null,
         failureCount: previous?.failureCount ?? 0,
         successCount: previous?.successCount ?? 0,
@@ -386,23 +427,19 @@ export function recordByokProviderModelAgentProbeFailure(input) {
 }
 
 /**
- * @param {{ profile?: string | null; provider?: string | null; model?: string | null; timestamp?: number }} input
+ * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; timestamp?: number }} input
  * @returns {void}
  */
 export function recordByokProviderModelAgentProbeSuccess(input) {
     hydrateByokProviderHealthFromDisk();
-    const profile = normalizePart(input.profile);
-    const provider = normalizePart(input.provider);
-    const model = normalizePart(input.model);
-    if (!profile && !provider && !model) return;
-    const key = healthKey({ profile, provider, model });
+    const identity = normalizeHealthIdentity(input);
+    if (!identity.routeProfile && !identity.providerId && !identity.providerModel) return;
+    const key = healthKey(identity);
     const now = typeof input.timestamp === 'number' && Number.isFinite(input.timestamp) ? input.timestamp : Date.now();
     const previous = _byokProviderHealthByKey.get(key);
     _byokProviderHealthByKey.set(key, {
         key,
-        profile,
-        provider,
-        model,
+        ...identity,
         lastStatus: previous?.lastStatus ?? null,
         failureCount: previous?.failureCount ?? 0,
         successCount: previous?.successCount ?? 0,
@@ -424,7 +461,7 @@ export function recordByokProviderModelAgentProbeSuccess(input) {
 }
 
 /**
- * @param {{ profile?: string | null; provider?: string | null; model?: string | null }} input
+ * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null }} input
  * @returns {ByokProviderHealthRecord | null}
  */
 export function readByokProviderModelHealth(input) {

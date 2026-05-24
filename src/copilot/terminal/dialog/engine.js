@@ -351,12 +351,12 @@ function recordTerminalExplicitEmptyOutput(input) {
 
     if (input.byok.enabled === true && input.byok.ready === true) {
         recordByokProviderModelCallFailure({
-            profile: input.byok.profile ?? null,
-            provider:
+            routeProfile: input.byok.profile ?? null,
+            providerId:
                 input.byok.preset ??
                 input.byok.providerType ??
                 (typeof Reflect.get(input.byok, 'provider') === 'string' ? Reflect.get(input.byok, 'provider') : null),
-            model: input.byok.model ?? null,
+            providerModel: input.byok.model ?? null,
             message: 'turno explícito encerrou sem saída pública materializada',
             errorContext: 'dialog.byok_empty_output',
             timestamp,
@@ -1130,9 +1130,9 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         if (byokFailure) {
             const now = Date.now();
             recordByokProviderModelCallFailure({
-                profile: byokFailure.profile,
-                provider: byokFailure.provider,
-                model: byokFailure.model,
+                routeProfile: byokFailure.profile,
+                providerId: byokFailure.provider,
+                providerModel: byokFailure.model,
                 message: byokFailure.message,
                 errorContext: byokFailure.errorContext,
                 timestamp: now,

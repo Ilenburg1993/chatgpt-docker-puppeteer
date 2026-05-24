@@ -1326,7 +1326,13 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             }),
         );
         expect(completeTerminalTurnTrace).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
-        expect(readByokProviderModelHealth({ profile: 'mistral-free', provider: 'mistral', model: 'codestral-latest' })).toEqual(
+        expect(
+            readByokProviderModelHealth({
+                routeProfile: 'mistral-free',
+                providerId: 'mistral',
+                providerModel: 'codestral-latest',
+            }),
+        ).toEqual(
             expect.objectContaining({
                 lastStatus: 'failed',
                 lastErrorContext: 'session.query',

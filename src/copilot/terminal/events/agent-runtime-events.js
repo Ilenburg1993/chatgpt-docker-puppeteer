@@ -545,9 +545,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         if (byokError.enabled) {
             const now = Date.now();
             recordByokProviderModelCallFailure({
-                profile: byokError.profile,
-                provider: byokError.provider,
-                model: byokError.model,
+                routeProfile: byokError.profile,
+                providerId: byokError.provider,
+                providerModel: byokError.model,
                 message: msg,
                 errorContext:
                     byokError.failure && byokError.failure.kind !== 'unknown'
@@ -623,14 +623,14 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
 
         if (isByokModelCall) {
             recordByokProviderModelCallFailure({
-                profile: typeof evt?.['byokProfile'] === 'string' ? evt['byokProfile'] : null,
-                provider:
+                routeProfile: typeof evt?.['byokProfile'] === 'string' ? evt['byokProfile'] : null,
+                providerId:
                     typeof evt?.['byokProviderType'] === 'string'
                         ? evt['byokProviderType']
                         : typeof evt?.['byokPreset'] === 'string'
                           ? evt['byokPreset']
                           : null,
-                model: typeof evt?.['byokModel'] === 'string' ? evt['byokModel'] : null,
+                providerModel: typeof evt?.['byokModel'] === 'string' ? evt['byokModel'] : null,
                 message: msg,
                 errorContext,
                 timestamp: now,
@@ -878,14 +878,14 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
 
         if (evt?.['byokProvider'] === true) {
             recordByokProviderModelCallSuccess({
-                profile: typeof evt?.['byokProfile'] === 'string' ? evt['byokProfile'] : null,
-                provider:
+                routeProfile: typeof evt?.['byokProfile'] === 'string' ? evt['byokProfile'] : null,
+                providerId:
                     typeof evt?.['byokPreset'] === 'string'
                         ? evt['byokPreset']
                         : typeof evt?.['byokProviderType'] === 'string'
                           ? evt['byokProviderType']
                           : null,
-                model:
+                providerModel:
                     typeof evt?.['effectiveModel'] === 'string'
                         ? evt['effectiveModel']
                         : typeof evt?.['model'] === 'string'
