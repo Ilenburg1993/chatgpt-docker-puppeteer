@@ -154,6 +154,9 @@ Exemplos confirmados em documentação oficial:
 - Ollama local usa `/api/tags` para modelos instalados e `/api/show` deve enriquecer detalhes de template/parameters.
 - Hugging Face Inference Providers e Cloudflare Workers AI expõem catálogos públicos ricos em tabelas/docs, incluindo
   provider real, preço, contexto, latency/throughput, tools/structured outputs e task type.
+- Kilo AI Gateway expõe um gateway OpenAI-compatible em `https://api.kilo.ai/api/gateway`, lista pública de modelos em
+  `/models`, metadata de preço/contexto/features, BYOK interno por provider, headers próprios de organização/tarefa/modo
+  e rotas `provider/model` parecidas com agregadores.
 - Cerebras tem `/v1/models` mínimo e catálogo/documentação pública mais rica para parâmetros/speed/depreciação.
 
 Conclusão: o banco canônico não deve armazenar apenas `ModelRecord` achatado. Ele precisa de duas camadas:
@@ -178,7 +181,7 @@ Campos novos planejados, além de `ProviderRecord`/`ModelRecord` atuais:
 ProviderCatalogSource
   id
   providerId
-  kind: api | docs_markdown | html_table | static_seed | local_daemon | aggregator | manual | probe
+  kind: api | docs_markdown | html_table | static_seed | local_daemon | aggregator | gateway | manual | probe
   url | command | envRequirements
   authMode: none | api_key | bearer | account_scoped | local
   refreshPolicy: on_boot | scheduled | manual | cache_only
@@ -206,10 +209,27 @@ ModelRouteOption
   providerId
   providerModel
   routeProfile
-  selectorKind: exact_model | provider_auto | aggregator_auto | cheapest | fastest | preferred_provider | fallback_chain
+  selectorKind: exact_model | provider_auto | aggregator_auto | gateway_auto | cheapest | fastest | preferred_provider |
+    fallback_chain
   selectorSyntax
   providerSpecific
   normalizedPolicy
+
+ProviderAccountOverlay
+  providerId
+  accountScope
+  secretRef
+  organizationIdRef
+  enabledModels
+  blockedModels
+  byokProviderKeys
+  quota
+  rateLimits
+  spendingLimits
+  policyHeaders
+  observedAt
+  expiresAt
+  redactionStatus
 
 CanonicalModelProjection
   providerId
@@ -231,6 +251,7 @@ CanonicalModelProjection
   provenanceByField
   confidenceByField
   routingHints
+  accountOverlayRefs
 ```
 
 Para listas imensas de providers, a projection deve ir para SQLite em vez de depender apenas de JSON:
@@ -249,6 +270,7 @@ data/copilot/model-gateway/catalog.sqlite
   model_limit_facts
   model_price_facts
   model_lifecycle_facts
+  provider_account_overlays
   model_probe_results
   canonical_model_projection
 ```
@@ -278,6 +300,8 @@ Regras importantes:
   `tool_agent` se `requireAgentProbeOk=true`.
 - Falha de probe não apaga o fato de catálogo; ela cria evidência concorrente com maior precedência operacional.
 - Dados caros/instáveis como preço e depreciação precisam de `expiresAt` curto.
+- Account/organization overlays, como allow lists, BYOK interno e spending limits de Kilo ou Cloudflare AI Gateway, têm
+  precedência operacional sobre catálogo público, mas nunca viram capability global do modelo.
 - Nomes como `:free`, `vision`, `instruct`, `coder`, `thinking`, `reasoning`, `latest` podem gerar heurísticas, mas
   sempre com confidence baixa.
 
@@ -288,13 +312,16 @@ O gateway deve combinar importers especializados:
 1. **API importers autenticados**: OpenAI, Anthropic, Gemini, Mistral, Groq, Cerebras, Ollama local/cloud, etc.
 2. **Rich aggregator importers**: OpenRouter, Hugging Face Inference Providers, Cloudflare unified catalog. Eles ajudam
    a preencher preço/contexto/capabilities, mas a provenance deve deixar claro que são agregadores.
-3. **Docs/Markdown table importers**: para páginas oficiais que expõem capabilities melhor que API, como Cloudflare
+3. **Gateway importers**: Kilo AI Gateway, Cloudflare AI Gateway e LiteLLM/Kilo-like gateways. Eles expõem modelos e
+   políticas de rota próprias; o import precisa preservar `gatewayId`, provider upstream, headers aceitos, políticas de
+   organização e o fato de que BYOK pode ocorrer dentro do gateway.
+4. **Docs/Markdown table importers**: para páginas oficiais que expõem capabilities melhor que API, como Cloudflare
    Workers AI e páginas de overview de provider.
-4. **Local daemon importers**: Ollama `/api/tags` + `/api/show`, vLLM/LiteLLM/OpenAI-compatible `/v1/models`,
+5. **Local daemon importers**: Ollama `/api/tags` + `/api/show`, vLLM/LiteLLM/OpenAI-compatible `/v1/models`,
    containers NIM self-hosted.
-5. **Probe importers**: probes de chat, streaming, tools, JSON schema, vision, context-window, parameter fuzzing e
+6. **Probe importers**: probes de chat, streaming, tools, JSON schema, vision, context-window, parameter fuzzing e
    error taxonomy.
-6. **Heuristic enrichers**: parser de nomes e famílias para inferir versão, tamanho, quantização, free tier, preview,
+7. **Heuristic enrichers**: parser de nomes e famílias para inferir versão, tamanho, quantização, free tier, preview,
    deprecation provável e especialização (`coder`, `rerank`, `embed`, `image`, `tts`, `asr`).
 
 O pipeline recomendado:
@@ -314,6 +341,9 @@ capacidade explicitamente:
 - **Aggregator auto**: OpenRouter pode escolher upstream/provider para um mesmo model id; Hugging Face permite sufixos
   de provider e rotas como `:fastest`, `:cheapest` ou provider preferido; Cloudflare AI Gateway pode aplicar caching,
   retries e fallback em uma camada acima do provider.
+- **Gateway auto**: Kilo Gateway pode rotear `provider/model`, aplicar BYOK interno, políticas de organização, limites de
+  gasto e hints como `x-kilocode-mode`; isso precisa ser representado como rota de gateway, não como provider direto
+  puro.
 - **Local auto**: Ollama/vLLM/LiteLLM podem ter tags locais que apontam para pesos diferentes ao longo do tempo.
 - **Fallback chain nosso**: sequência auditável escolhida pelo `PolicyEngine`.
 
@@ -321,6 +351,7 @@ Cada opção precisa virar `ModelRouteOption`, com `selectorKind`, `selectorSynt
 roteador consegue decidir se usa:
 
 - `openrouter:model` com roteamento automático;
+- `kilo:provider/model` com gateway BYOK ou conta Kilo;
 - `huggingface:model:provider`;
 - provider local privado;
 - fallback próprio multi-provider;
@@ -481,9 +512,16 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] Implementar `OllamaCatalogImporter` para `/api/tags` + `/api/show`.
 - [ ] Implementar `HuggingFaceInferenceProvidersImporter` para catálogo de providers/modelos/rotas.
 - [ ] Implementar `CloudflareWorkersAiCatalogImporter` para unified catalog/Workers AI docs.
+- [ ] Implementar `KiloGatewayCatalogImporter` para `https://api.kilo.ai/api/gateway/models`, capturando ids
+  `provider/model`, provider upstream, pricing, context window, features, rotas gratuitas e endpoints auxiliares.
+- [ ] Implementar `KiloGatewayProvidersImporter` para `/providers` quando disponível, preservando provider upstream e
+  diferença entre Kilo Gateway, Kilo Code e providers BYOK internos.
 - [ ] Implementar `CerebrasModelsImporter` para `/v1/models` + catálogo público.
 - [ ] Implementar `NvidiaNimCatalogImporter` para docs/API catalog quando disponível.
-- [ ] Permitir importers `OpenAICompatibleGenericImporter` para vLLM, LiteLLM, Chutes, Z.AI, Kilo e endpoints locais.
+- [ ] Permitir importers `OpenAICompatibleGenericImporter` para vLLM, LiteLLM, Chutes, Z.AI e endpoints locais sem
+  importer especializado.
+- [ ] Criar modo `accountScoped` para importers autenticados que retornam modelos habilitados por plano, organização,
+  quota ou BYOK interno, sem serializar segredo.
 
 ### Faixa M — Normalização, enriquecimento e heurísticas controladas
 
@@ -494,6 +532,10 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] Criar normalizador de pricing: input/output/cache/read/write/request/image/audio, moeda e unidade.
 - [ ] Criar normalizador de lifecycle: active, preview, beta, deprecated, retired, replacement, expiresAt.
 - [ ] Criar parser de aliases/versionamento (`latest`, datas `YYYY-MM`, famílias, tamanho, quantização).
+- [ ] Criar normalizador de providers/gateways que separe `direct_provider`, `aggregator`, `gateway`,
+  `openai_compatible_proxy`, `local_daemon` e `sdk_native`.
+- [ ] Criar normalizador de overlays de conta: allow/block lists, organization headers, spending limits, quotas, free
+  tiers e BYOK interno por provider.
 - [ ] Criar heuristics engine com confidence baixa e sempre sobrescrevível por catálogo/probe/manual.
 - [ ] Criar detector de conflitos por campo e comando de operador para listar conflitos de metadata.
 
@@ -502,6 +544,9 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] Criar `ModelRouteOption` para modelar rotas exatas, aliases, provider-auto, aggregator-auto, cheapest, fastest,
   preferred-provider e fallback-chain.
 - [ ] Representar seleção automática de OpenRouter como rota própria, sem apagar provider upstream quando conhecido.
+- [ ] Representar Kilo Gateway como rota própria `gateway_auto`/`exact_model`, incluindo `provider/model`,
+  `x-kilocode-mode`, `X-KiloCode-OrganizationId`, `X-KiloCode-TaskId`, BYOK interno e falha sem fallback quando a key
+  BYOK interna falhar.
 - [ ] Representar sufixos/seletores de Hugging Face Inference Providers, incluindo provider explícito e políticas de
   `fastest`/`cheapest` quando publicadas.
 - [ ] Representar Cloudflare AI Gateway/Workers AI como camada de rota com cache, retry, rate-limit e fallback quando
@@ -514,6 +559,8 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 
 - [ ] Criar `model-gateway catalog refresh` programático e comando terminal correspondente.
 - [ ] Criar refresh incremental por provider, com cache TTL por fonte.
+- [ ] Criar refresh por overlay de conta/organização quando houver secretRef configurado, mantendo snapshot público e
+  snapshot account-scoped separados.
 - [ ] Criar diff entre snapshots: modelos novos, removidos, deprecados, preço alterado, limits alterados, capabilities
   alteradas.
 - [ ] Emitir eventos:
@@ -534,6 +581,8 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] `/models explain <provider:model>`.
 - [ ] `/models conflicts`.
 - [ ] `/models route <profile> --show-rejected`.
+- [ ] `/models gateways` com Kilo, OpenRouter, Cloudflare AI Gateway, LiteLLM e outros gateways/proxies configurados.
+- [ ] `/models account-overlays` para mostrar modelos habilitados/bloqueados por conta ou organização sem expor secrets.
 - [ ] Filtros por preço, contexto, tools, JSON schema, vision, local/private, free tier, provider, confidence,
   probe status e lifecycle.
 - [ ] Mostrar `catalog says`, `probe proved`, `manual override` e `health says` lado a lado.
@@ -551,6 +600,9 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - O banco completo de catálogo preserva fatos por campo com provenance/confidence, não apenas records achatados.
 - Catálogos remotos, docs, agregadores, heurísticas e probes podem coexistir sem sobrescrever evidência mais forte.
 - Rotas automáticas de provider/agregador são modeladas explicitamente e nunca confundidas com modelo exato.
+- Gateways como Kilo/OpenRouter/Cloudflare podem ser escolhidos como rota própria sem apagar o provider upstream nem as
+  políticas de conta/organização.
+- Overlays autenticados de conta/plano/BYOK interno afetam elegibilidade operacional sem contaminar o catálogo público.
 - O roteador usa a projection canônica como primeiro filtro antes de probes/runtime, mas probes podem rebaixar ou
   promover capabilities com rastreabilidade.
 
@@ -588,6 +640,8 @@ Fontes oficiais consultadas nesta continuidade:
 - Hugging Face Inference Providers — catálogo com provider real, preço, contexto, latency, throughput, tools e
   structured outputs.
 - Cloudflare Workers AI — catálogo/unified catalog com task types, capabilities e modelos hosted/partner.
+- Kilo AI Gateway — gateway OpenAI-compatible, `/models`, `/providers`, BYOK interno, headers de organização/tarefa/modo
+  e rotas `provider/model`.
 - Cerebras Inference — `/v1/models` e catálogo público.
 - NVIDIA NIM docs — APIs OpenAI-compatible e catálogo/docs de modelos.
 
@@ -603,6 +657,10 @@ Reflexão consolidada:
    arquitetura frágil.
 5. O primeiro filtro de seleção deve usar a projection canônica de metadata, mas perfis agentic continuam exigindo prova
    runtime para capabilities críticas.
+6. Gateways como Kilo não são apenas "mais um preset": eles combinam catálogo público, roteamento `provider/model`,
+   BYOK interno, limites de organização, modos operacionais e erro/fallback próprios.
+7. A auditoria completa reforça que `sdk/session/provider.js` deve perder responsabilidade progressivamente, mas sem
+   inversão de dependência: `onListModels()` recebe projection segura, e adapters/importers vivem no gateway.
 
 Decisão incorporada ao roadmap:
 
@@ -615,12 +673,15 @@ Decisão incorporada ao roadmap:
   - N: modelagem de auto-seleção e rotas;
   - O: refresh/diffs/governança;
   - P: UX de exploração do catálogo.
+- Refinadas as Faixas K-P para incluir Kilo/Kilo Gateway como gateway de primeira classe, overlays account-scoped,
+  importers próprios, headers/políticas operacionais e rotas `gateway_auto`.
 
 Próximo corte recomendado:
 
 1. Criar contratos `CatalogSource`, `ModelMetadataEvidence`, `ModelRouteOption` e `CanonicalModelProjection`.
-2. Criar store SQLite `catalog.sqlite` com migrations e testes de redaction.
-3. Implementar primeiro importer rico (`OpenRouterModelsImporter`) e primeiro importer mínimo (`OpenAIModelsImporter`)
-   para provar merge por campo.
-4. Criar projection canônica que enriquece `ModelRecord` atual sem quebrar `/byok models` nem `onListModels()`.
-5. Adicionar comando/serviço interno de refresh em dry-run, mostrando diff sem alterar seleção ativa.
+2. Criar `ProviderAccountOverlay` para separar catálogo público de plano/organização/BYOK interno.
+3. Criar store SQLite `catalog.sqlite` com migrations e testes de redaction.
+4. Implementar primeiro importer rico (`OpenRouterModelsImporter`), primeiro gateway importer
+   (`KiloGatewayCatalogImporter`) e primeiro importer mínimo (`OpenAIModelsImporter`) para provar merge por campo.
+5. Criar projection canônica que enriquece `ModelRecord` atual sem quebrar `/byok models` nem `onListModels()`.
+6. Adicionar comando/serviço interno de refresh em dry-run, mostrando diff sem alterar seleção ativa.
