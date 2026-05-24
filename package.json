@@ -330,6 +330,7 @@
     "copilot:mcp:cloudflare:up": "node src/copilot/mcp/cloudflare/cli.js up",
     "copilot:mcp:http": "node src/copilot/mcp/index.js --transport http",
     "copilot:mcp:oauth:smoke": "node src/copilot/mcp/scripts/oauth-smoke.js",
+    "copilot:mcp:oauth:smoke:persistent": "COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE=src/copilot/.ai/mcp/oauth-refresh-tokens.json node src/copilot/mcp/scripts/oauth-smoke.js",
     "copilot:mcp:safe-suite": "node src/copilot/mcp/scripts/run-safe-validation-suite.js",
     "copilot:mcp:smoke:local": "node src/copilot/mcp/scripts/smoke-http.js",
     "copilot:mcp:stdio": "node src/copilot/mcp/index.js --transport stdio",

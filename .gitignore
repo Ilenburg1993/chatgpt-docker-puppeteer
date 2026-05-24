@@ -139,6 +139,8 @@ src/copilot/.ai/quarantine/*
 !src/copilot/.ai/quarantine/.gitkeep
 src/copilot/.ai/cloudflare/*
 !src/copilot/.ai/cloudflare/.gitkeep
+src/copilot/.ai/mcp/*
+!src/copilot/.ai/mcp/.gitkeep
 
 
 # =============================================================================

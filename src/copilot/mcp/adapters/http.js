@@ -30,10 +30,21 @@ const DEFAULT_ALLOWED_ORIGINS = [
  * @returns {void}
  */
 function setCorsHeaders(res, origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin && isAllowedOrigin(origin) ? origin : '*');
+    const allowedOrigin = origin ? (isAllowedOrigin(origin) ? origin : undefined) : '*';
+    if (allowedOrigin) res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type, mcp-session-id, mcp-protocol-version');
-    res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id, MCP-Protocol-Version');
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        [
+            'accept',
+            'authorization',
+            'content-type',
+            'mcp-session-id',
+            'mcp-protocol-version',
+            'x-requested-with',
+        ].join(', '),
+    );
+    res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id, MCP-Protocol-Version, WWW-Authenticate');
     res.setHeader('Vary', 'Origin');
 }
 
@@ -75,6 +86,24 @@ function rejectInvalidOrigin(req, res) {
 }
 
 /**
+ * @param {string} pathname
+ * @returns {boolean}
+ */
+function isCorsManagedRoute(pathname) {
+    return (
+        pathname === '/' ||
+        pathname === '/health' ||
+        pathname === MCP_PATH ||
+        pathname === '/chatgpt-connector.json' ||
+        pathname === '/.well-known/oauth-protected-resource' ||
+        pathname === '/.well-known/oauth-authorization-server' ||
+        pathname === '/.well-known/openid-configuration' ||
+        pathname === '/.well-known/oauth-client/codex-smoke.json' ||
+        pathname.startsWith('/oauth/')
+    );
+}
+
+/**
  * @param {{ host?: string; port?: number }} [opts]
  * @returns {Promise<import('node:http').Server>}
  */
@@ -84,9 +113,14 @@ export async function startHttpMcpServer(opts = {}) {
 
     const httpServer = createServer(async (req, res) => {
         const url = new URL(req.url ?? '/', `http://${req.headers.host ?? `${host}:${port}`}`);
+        const requestOrigin = Array.isArray(req.headers.origin) ? req.headers.origin[0] : req.headers.origin;
 
-        if (req.method === 'OPTIONS' && url.pathname === MCP_PATH) {
-            setCorsHeaders(res, Array.isArray(req.headers.origin) ? req.headers.origin[0] : req.headers.origin);
+        if (isCorsManagedRoute(url.pathname)) {
+            setCorsHeaders(res, requestOrigin);
+            if (rejectInvalidOrigin(req, res)) return;
+        }
+
+        if (req.method === 'OPTIONS' && isCorsManagedRoute(url.pathname)) {
             res.writeHead(204).end();
             return;
         }
@@ -130,8 +164,6 @@ export async function startHttpMcpServer(opts = {}) {
 
         const mcpMethods = new Set(['POST', 'GET', 'DELETE']);
         if (url.pathname === MCP_PATH && req.method && mcpMethods.has(req.method)) {
-            setCorsHeaders(res, Array.isArray(req.headers.origin) ? req.headers.origin[0] : req.headers.origin);
-            if (rejectInvalidOrigin(req, res)) return;
             const authorizationHeader = Array.isArray(req.headers.authorization)
                 ? req.headers.authorization[0]
                 : req.headers.authorization;

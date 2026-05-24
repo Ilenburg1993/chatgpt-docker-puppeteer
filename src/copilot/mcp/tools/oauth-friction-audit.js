@@ -15,6 +15,7 @@ import {
 import {
     buildBuiltInDevOAuthMetadata,
     isBuiltInDevOAuthEnabled,
+    readDevOAuthPersistenceStatus,
     readDevOAuthTokenLifetimePolicy,
 } from '../control-plane/dev-oauth.js';
 import { okResult } from '../control-plane/result.js';
@@ -50,6 +51,7 @@ export const mcpOAuthFrictionAuditTool = {
         const issuerGrants = asSortedStringArray(issuerMetadata?.['grant_types_supported']);
         const issuerScopes = asSortedStringArray(issuerMetadata?.['scopes_supported']);
         const lifetime = readDevOAuthTokenLifetimePolicy();
+        const persistence = builtInIssuerEnabled ? await readDevOAuthPersistenceStatus() : null;
         const tools = toolsProvider();
         const toolScopes = summarizeToolScopes(tools);
         const warnings = [];
@@ -91,6 +93,9 @@ export const mcpOAuthFrictionAuditTool = {
         if (lifetime.refreshTokenTtlSeconds < lifetime.defaults.refreshTokenTtlSeconds) {
             warnings.push('Refresh-token TTL is below the max-autonomy default of 30 days.');
         }
+        if (persistence?.lastPersistenceError) {
+            warnings.push(`Refresh-token persistence has a recent error: ${persistence.lastPersistenceError}`);
+        }
 
         return okResult({
             success: true,
@@ -127,7 +132,20 @@ export const mcpOAuthFrictionAuditTool = {
                 accessTokenTtlSeconds: lifetime.accessTokenTtlSeconds,
                 refreshTokenTtlSeconds: lifetime.refreshTokenTtlSeconds,
                 defaults: lifetime.defaults,
-                refreshTokenRotation: 'in-memory one-time rotation for the built-in development issuer',
+                refreshTokenRotation: persistence?.rotation ?? 'external-issuer-or-disabled',
+                refreshTokenPersistence: persistence
+                    ? {
+                          enabled: persistence.persistenceEnabled,
+                          refreshTokenFile: persistence.refreshTokenFile,
+                          loaded: persistence.loaded,
+                          loadedFromFile: persistence.loadedFromFile,
+                          tokenCount: persistence.tokenCount,
+                          lastLoadedAt: persistence.lastLoadedAt,
+                          lastPersistedAt: persistence.lastPersistedAt,
+                          lastPersistenceError: persistence.lastPersistenceError,
+                          storesOnlyTokenHashes: persistence.storesOnlyTokenHashes,
+                      }
+                    : null,
                 note: 'Longer token lifetimes reduce OAuth reauthentication, but do not disable ChatGPT host tool-call approvals.',
             },
             toolScopes,

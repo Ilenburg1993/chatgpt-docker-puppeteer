@@ -1226,7 +1226,7 @@ mcp-diagnose:
 
 copilot-mcp-up:
 	@echo "$(CYAN)🔐 Subindo MCP OAuth + Cloudflare permanente$(NC)"
-	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:up
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE=src/copilot/.ai/mcp/oauth-refresh-tokens.json CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:up
 
 copilot-mcp-down:
 	@echo "$(CYAN)🛑 Encerrando MCP + Cloudflare permanente$(NC)"
@@ -1234,7 +1234,7 @@ copilot-mcp-down:
 
 copilot-mcp-restart:
 	@echo "$(CYAN)🔁 Reiniciando MCP OAuth + Cloudflare permanente$(NC)"
-	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:restart
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE=src/copilot/.ai/mcp/oauth-refresh-tokens.json CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:restart
 
 copilot-mcp-status:
 	@echo "$(CYAN)📡 Status MCP + Cloudflare permanente$(NC)"
@@ -1250,7 +1250,7 @@ copilot-mcp-smoke-refresh:
 
 copilot-mcp-oauth-smoke:
 	@echo "$(CYAN)🔐 Smoke OAuth MCP público$(NC)"
-	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all $(NPM) run copilot:mcp:oauth:smoke
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE=src/copilot/.ai/mcp/oauth-refresh-tokens.json $(NPM) run copilot:mcp:oauth:smoke:persistent
 
 lsp-health:
 	@echo "$(CYAN)🔍 Diagnóstico funcional LSP$(NC)"

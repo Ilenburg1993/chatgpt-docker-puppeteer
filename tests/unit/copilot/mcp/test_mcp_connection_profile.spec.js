@@ -4,8 +4,13 @@
  */
 
 import assert from 'node:assert/strict';
+import { createHash, randomBytes } from 'node:crypto';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, it } from 'vitest';
 
+import { startHttpMcpServer } from '../../../../src/copilot/mcp/adapters/http.js';
 import {
     buildChatGptConnectorProfile,
     buildCloudflareTunnelRunbook,
@@ -28,6 +33,8 @@ import {
     buildBuiltInDevOAuthClientMetadata,
     buildBuiltInDevOAuthMetadata as buildDevOAuthServerMetadata,
     isBuiltInDevOAuthEnabled as isDevOAuthServerEnabled,
+    readDevOAuthPersistenceStatus,
+    resetDevOAuthRuntimeForTests,
 } from '../../../../src/copilot/mcp/control-plane/dev-oauth.js';
 import { getCanonicalMcpTools } from '../../../../src/copilot/mcp/registry.js';
 
@@ -182,4 +189,165 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.equal(accepted.allowed, true);
         assert.equal(accepted.method, 'static-bearer');
     });
+
+    it('persists OAuth refresh-token rotation by hash across a logical restart', async () => {
+        const tempDir = await mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-oauth-'));
+        const oldEnv = snapshotEnv([
+            'COPILOT_MCP_AUTH_MODE',
+            'COPILOT_MCP_AUTH_ENFORCEMENT',
+            'COPILOT_MCP_PUBLIC_URL',
+            'COPILOT_MCP_DEV_OAUTH_KEY_FILE',
+            'COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE',
+            'COPILOT_MCP_ALLOWED_ORIGINS',
+        ]);
+        const server = await startHttpMcpServer({ host: '127.0.0.1', port: 0 });
+        try {
+            const address = server.address();
+            assert.ok(address && typeof address === 'object');
+            const resource = `http://127.0.0.1:${address.port}`;
+            process.env['COPILOT_MCP_AUTH_MODE'] = 'oauth';
+            process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] = 'all';
+            process.env['COPILOT_MCP_PUBLIC_URL'] = `${resource}/mcp`;
+            process.env['COPILOT_MCP_DEV_OAUTH_KEY_FILE'] = path.join(tempDir, 'oauth-key.pem');
+            process.env['COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE'] = path.join(tempDir, 'refresh-tokens.json');
+            process.env['COPILOT_MCP_ALLOWED_ORIGINS'] = 'https://chatgpt.com,http://127.0.0.1';
+            resetDevOAuthRuntimeForTests();
+
+            const preflight = await fetch(`${resource}/.well-known/oauth-authorization-server`, {
+                method: 'OPTIONS',
+                headers: {
+                    origin: 'https://chatgpt.com',
+                    'access-control-request-method': 'GET',
+                },
+            });
+            assert.equal(preflight.status, 204);
+            assert.equal(preflight.headers.get('access-control-allow-origin'), 'https://chatgpt.com');
+            assert.match(String(preflight.headers.get('access-control-allow-headers') ?? ''), /authorization/u);
+
+            const registered = await postJson(`${resource}/oauth/register`, {
+                client_name: 'Unit Test Client',
+                redirect_uris: ['http://127.0.0.1/callback'],
+            });
+            const clientId = String(registered['client_id']);
+            assert.match(clientId, /^mcp_dev_/u);
+
+            const codeVerifier = base64Url(randomBytes(32));
+            const codeChallenge = base64Url(createHash('sha256').update(codeVerifier).digest());
+            const authorize = new URL(`${resource}/oauth/authorize`);
+            authorize.searchParams.set('response_type', 'code');
+            authorize.searchParams.set('client_id', clientId);
+            authorize.searchParams.set('redirect_uri', 'http://127.0.0.1/callback');
+            authorize.searchParams.set('scope', 'openid repo:read repo:write repo:validate repo:admin');
+            authorize.searchParams.set('resource', resource);
+            authorize.searchParams.set('code_challenge', codeChallenge);
+            authorize.searchParams.set('code_challenge_method', 'S256');
+            const authorizationResponse = await fetch(authorize, { redirect: 'manual' });
+            assert.equal(authorizationResponse.status, 302);
+            const location = authorizationResponse.headers.get('location');
+            assert.ok(location);
+            const code = new URL(location).searchParams.get('code');
+            assert.ok(code);
+
+            const tokenSet = await postForm(`${resource}/oauth/token`, {
+                grant_type: 'authorization_code',
+                client_id: clientId,
+                redirect_uri: 'http://127.0.0.1/callback',
+                code,
+                code_verifier: codeVerifier,
+                resource,
+            });
+            const refreshToken = String(tokenSet['refresh_token']);
+            assert.match(refreshToken, /^rt_/u);
+            const storeText = await readFile(process.env['COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE'], 'utf8');
+            assert.equal(storeText.includes(refreshToken), false);
+            assert.ok(storeText.includes(hashRefreshTokenForTest(refreshToken)));
+
+            resetDevOAuthRuntimeForTests();
+            const persistenceAfterReset = await readDevOAuthPersistenceStatus();
+            assert.equal(persistenceAfterReset.loadedFromFile, true);
+            assert.equal(persistenceAfterReset.tokenCount, 1);
+
+            const refreshed = await postForm(`${resource}/oauth/token`, {
+                grant_type: 'refresh_token',
+                client_id: clientId,
+                refresh_token: refreshToken,
+                resource,
+            });
+            assert.equal(typeof refreshed['access_token'], 'string');
+            assert.match(String(refreshed['refresh_token']), /^rt_/u);
+            assert.notEqual(refreshed['refresh_token'], refreshToken);
+        } finally {
+            server.close();
+            resetDevOAuthRuntimeForTests();
+            restoreEnv(oldEnv);
+            await rm(tempDir, { recursive: true, force: true });
+        }
+    });
 });
+
+/**
+ * @param {string[]} keys
+ * @returns {Record<string, string | undefined>}
+ */
+function snapshotEnv(keys) {
+    return Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+}
+
+/**
+ * @param {Record<string, string | undefined>} snapshot
+ * @returns {void}
+ */
+function restoreEnv(snapshot) {
+    for (const [key, value] of Object.entries(snapshot)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+    }
+}
+
+/**
+ * @param {Buffer} buffer
+ * @returns {string}
+ */
+function base64Url(buffer) {
+    return buffer.toString('base64').replace(/=/gu, '').replace(/\+/gu, '-').replace(/\//gu, '_');
+}
+
+/**
+ * @param {string} token
+ * @returns {string}
+ */
+function hashRefreshTokenForTest(token) {
+    return createHash('sha256').update(token).digest('hex');
+}
+
+/**
+ * @param {string} url
+ * @param {Record<string, unknown>} body
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function postJson(url, body) {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'https://chatgpt.com' },
+        body: JSON.stringify(body),
+    });
+    const text = await response.text();
+    assert.ok(response.ok, `${response.status} ${text}`);
+    return /** @type {Record<string, unknown>} */ (JSON.parse(text));
+}
+
+/**
+ * @param {string} url
+ * @param {Record<string, string>} body
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function postForm(url, body) {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'https://chatgpt.com' },
+        body: new URLSearchParams(body),
+    });
+    const text = await response.text();
+    assert.ok(response.ok, `${response.status} ${text}`);
+    return /** @type {Record<string, unknown>} */ (JSON.parse(text));
+}

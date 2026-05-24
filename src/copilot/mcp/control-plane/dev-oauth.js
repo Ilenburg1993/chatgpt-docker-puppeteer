@@ -19,13 +19,15 @@ import {
     SignJWT,
 } from 'jose';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const AUTH_CODE_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 24 * 60 * 60;
 const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
 const DEFAULT_KEY_FILE = 'src/copilot/.ai/mcp/oauth-dev-private-key.pem';
+const DEFAULT_REFRESH_TOKEN_FILE = 'src/copilot/.ai/mcp/oauth-refresh-tokens.json';
+const REFRESH_TOKEN_STORE_SCHEMA_VERSION = 1;
 const CLIENT_METADATA_TIMEOUT_MS = 5000;
 const DEV_CLIENT_METADATA_PATH = '/.well-known/oauth-client/codex-smoke.json';
 const DEV_CLIENT_REDIRECT_URI = 'https://chatgpt.com/connector/oauth/codex-smoke';
@@ -81,6 +83,14 @@ const clientMetadataDocumentCache = new Map();
 
 /** @type {Map<string, { clientId: string; scope: string; resource: string; expiresAt: number }>} */
 const renewCredentials = new Map();
+
+/** @type {Promise<void> | null} */
+let renewCredentialsLoadPromise = null;
+let renewCredentialsLoaded = false;
+let renewCredentialsLoadedFromFile = false;
+let renewCredentialsLastLoadedAt = /** @type {string | null} */ (null);
+let renewCredentialsLastPersistedAt = /** @type {string | null} */ (null);
+let renewCredentialsLastPersistenceError = /** @type {string | null} */ (null);
 
 /**
  * @param {import('./auth.js').McpAuthConfig} config
@@ -418,15 +428,21 @@ async function handleAuthorizationCodeToken(body, res, config) {
 async function handleRefreshToken(body, res, config) {
     const clientId = String(body['client_id'] ?? '');
     const credential = String(body[REFRESH_TOKEN_GRANT] ?? '');
-    const saved = renewCredentials.get(credential);
+    await ensureRenewCredentialsLoaded();
+    const credentialHash = hashRefreshToken(credential);
+    const saved = renewCredentials.get(credentialHash);
 
     if (!saved || saved.clientId !== clientId || saved.resource !== config.resource || Date.now() > saved.expiresAt) {
-        if (saved && Date.now() > saved.expiresAt) renewCredentials.delete(credential);
+        if (saved && Date.now() > saved.expiresAt) {
+            renewCredentials.delete(credentialHash);
+            await persistRenewCredentials();
+        }
         writeJson(res, 400, { error: 'invalid_grant' });
         return;
     }
 
-    renewCredentials.delete(credential);
+    renewCredentials.delete(credentialHash);
+    await persistRenewCredentials();
     writeJson(
         res,
         200,
@@ -487,7 +503,7 @@ async function issueTokenSet(options, config) {
         token_type: 'Bearer',
         expires_in: accessTokenTtlSeconds,
         scope: options.scope,
-        [REFRESH_TOKEN_GRANT]: issueRefreshToken(
+        [REFRESH_TOKEN_GRANT]: await issueRefreshToken(
             options.clientId,
             options.scope,
             options.resource,
@@ -528,6 +544,70 @@ export function readDevOAuthTokenLifetimePolicy(env = process.env) {
 }
 
 /**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {{ refreshTokenFile: string; persistenceEnabled: true }}
+ */
+export function readDevOAuthPersistenceConfig(env = process.env) {
+    const refreshTokenFile =
+        String(env['COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE'] ?? DEFAULT_REFRESH_TOKEN_FILE).trim() ||
+        DEFAULT_REFRESH_TOKEN_FILE;
+    return {
+        refreshTokenFile,
+        persistenceEnabled: true,
+    };
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {Promise<{
+ *     refreshTokenFile: string;
+ *     persistenceEnabled: true;
+ *     loaded: boolean;
+ *     loadedFromFile: boolean;
+ *     tokenCount: number;
+ *     lastLoadedAt: string | null;
+ *     lastPersistedAt: string | null;
+ *     lastPersistenceError: string | null;
+ *     storesOnlyTokenHashes: true;
+ *     rotation: 'one-time-rotating-persistent';
+ * }>}
+ */
+export async function readDevOAuthPersistenceStatus(env = process.env) {
+    await ensureRenewCredentialsLoaded(env);
+    const pruned = pruneExpiredRenewCredentials();
+    if (pruned) await persistRenewCredentials(env);
+    return {
+        ...readDevOAuthPersistenceConfig(env),
+        loaded: renewCredentialsLoaded,
+        loadedFromFile: renewCredentialsLoadedFromFile,
+        tokenCount: renewCredentials.size,
+        lastLoadedAt: renewCredentialsLastLoadedAt,
+        lastPersistedAt: renewCredentialsLastPersistedAt,
+        lastPersistenceError: renewCredentialsLastPersistenceError,
+        storesOnlyTokenHashes: true,
+        rotation: 'one-time-rotating-persistent',
+    };
+}
+
+/**
+ * Reset in-memory OAuth state for unit tests that need to simulate a process restart.
+ *
+ * @returns {void}
+ */
+export function resetDevOAuthRuntimeForTests() {
+    authorizationCodes.clear();
+    registeredClients.clear();
+    clientMetadataDocumentCache.clear();
+    renewCredentials.clear();
+    renewCredentialsLoadPromise = null;
+    renewCredentialsLoaded = false;
+    renewCredentialsLoadedFromFile = false;
+    renewCredentialsLastLoadedAt = null;
+    renewCredentialsLastPersistedAt = null;
+    renewCredentialsLastPersistenceError = null;
+}
+
+/**
  * @param {string} name
  * @param {number} fallback
  * @param {number} minimum
@@ -544,28 +624,142 @@ function readPositiveIntegerEnv(name, fallback, minimum, env = process.env) {
  * @param {string} scope
  * @param {string} resource
  * @param {number} ttlSeconds
- * @returns {string}
+ * @returns {Promise<string>}
  */
-function issueRefreshToken(clientId, scope, resource, ttlSeconds) {
+async function issueRefreshToken(clientId, scope, resource, ttlSeconds) {
+    await ensureRenewCredentialsLoaded();
     pruneExpiredRenewCredentials();
     const credential = `${REFRESH_TOKEN_PREFIX}${randomUUID()}`;
-    renewCredentials.set(credential, {
+    renewCredentials.set(hashRefreshToken(credential), {
         clientId,
         scope,
         resource,
         expiresAt: Date.now() + ttlSeconds * 1000,
     });
+    await persistRenewCredentials();
     return credential;
 }
 
 /**
  * @param {number} [nowMs]
- * @returns {void}
+ * @returns {boolean}
  */
 function pruneExpiredRenewCredentials(nowMs = Date.now()) {
+    let changed = false;
     for (const [credential, metadata] of renewCredentials) {
-        if (metadata.expiresAt <= nowMs) renewCredentials.delete(credential);
+        if (metadata.expiresAt <= nowMs) {
+            renewCredentials.delete(credential);
+            changed = true;
+        }
     }
+    return changed;
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {Promise<void>}
+ */
+async function ensureRenewCredentialsLoaded(env = process.env) {
+    if (renewCredentialsLoaded) return;
+    renewCredentialsLoadPromise ??= loadRenewCredentials(env);
+    await renewCredentialsLoadPromise;
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {Promise<void>}
+ */
+async function loadRenewCredentials(env = process.env) {
+    const { refreshTokenFile } = readDevOAuthPersistenceConfig(env);
+    renewCredentials.clear();
+    renewCredentialsLoaded = false;
+    renewCredentialsLoadedFromFile = false;
+    renewCredentialsLastLoadedAt = new Date().toISOString();
+    renewCredentialsLastPersistenceError = null;
+    try {
+        const text = await readFile(refreshTokenFile, 'utf8');
+        const parsed = JSON.parse(text);
+        const records = parseRefreshTokenRecords(parsed);
+        for (const record of records) {
+            renewCredentials.set(record.tokenHash, {
+                clientId: record.clientId,
+                scope: record.scope,
+                resource: record.resource,
+                expiresAt: record.expiresAt,
+            });
+        }
+        renewCredentialsLoadedFromFile = true;
+        const pruned = pruneExpiredRenewCredentials();
+        if (pruned) await persistRenewCredentials(env);
+    } catch (error) {
+        const code = error && typeof error === 'object' ? /** @type {{ code?: unknown }} */ (error).code : undefined;
+        if (code !== 'ENOENT') renewCredentialsLastPersistenceError = error instanceof Error ? error.message : String(error);
+    } finally {
+        renewCredentialsLoaded = true;
+    }
+}
+
+/**
+ * @param {unknown} parsed
+ * @returns {{ tokenHash: string; clientId: string; scope: string; resource: string; expiresAt: number }[]}
+ */
+function parseRefreshTokenRecords(parsed) {
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return [];
+    const root = /** @type {Record<string, unknown>} */ (parsed);
+    const rawTokens = Array.isArray(root['tokens']) ? root['tokens'] : [];
+    const records = [];
+    for (const item of rawTokens) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+        const record = /** @type {Record<string, unknown>} */ (item);
+        const tokenHash = String(record['tokenHash'] ?? '');
+        const clientId = String(record['clientId'] ?? '');
+        const scope = String(record['scope'] ?? '');
+        const resource = String(record['resource'] ?? '');
+        const expiresAt = Number(record['expiresAt']);
+        if (!/^[a-f0-9]{64}$/u.test(tokenHash)) continue;
+        if (!clientId || !scope || !resource || !Number.isFinite(expiresAt)) continue;
+        records.push({ tokenHash, clientId, scope, resource, expiresAt });
+    }
+    return records;
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {Promise<void>}
+ */
+async function persistRenewCredentials(env = process.env) {
+    const { refreshTokenFile } = readDevOAuthPersistenceConfig(env);
+    const tempFile = `${refreshTokenFile}.${process.pid}.${Date.now()}.tmp`;
+    try {
+        await mkdir(path.dirname(refreshTokenFile), { recursive: true });
+        const body = {
+            schemaVersion: REFRESH_TOKEN_STORE_SCHEMA_VERSION,
+            updatedAt: new Date().toISOString(),
+            storesOnlyTokenHashes: true,
+            tokens: [...renewCredentials.entries()]
+                .map(([tokenHash, metadata]) => ({ tokenHash, ...metadata }))
+                .sort((left, right) => left.expiresAt - right.expiresAt || left.tokenHash.localeCompare(right.tokenHash)),
+        };
+        await writeFile(tempFile, `${JSON.stringify(body, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+        await rename(tempFile, refreshTokenFile);
+        renewCredentialsLastPersistedAt = body.updatedAt;
+        renewCredentialsLastPersistenceError = null;
+    } catch (error) {
+        renewCredentialsLastPersistenceError = error instanceof Error ? error.message : String(error);
+        try {
+            await rm(tempFile, { force: true });
+        } catch {
+            // Best-effort temp cleanup only.
+        }
+    }
+}
+
+/**
+ * @param {string} credential
+ * @returns {string}
+ */
+function hashRefreshToken(credential) {
+    return createHash('sha256').update(credential).digest('hex');
 }
 
 /**

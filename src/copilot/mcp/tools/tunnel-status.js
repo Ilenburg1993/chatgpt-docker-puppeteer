@@ -23,6 +23,7 @@ import { errorResult, okResult } from '../control-plane/result.js';
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
 const CONNECTOR_SMOKE_TIMEOUT_MS = 45_000;
 const CONNECTOR_SMOKE_OUTPUT_LIMIT = 256_000;
+const CLOUDFLARED_LOG_FILE = 'src/copilot/.ai/cloudflare/cloudflared.log';
 
 /**
  * @param {string} pidFile
@@ -57,6 +58,45 @@ async function probeHealth(url) {
     } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
+}
+
+/**
+ * @returns {Promise<{
+ *     logFile: string;
+ *     originUsesLocalhost: boolean;
+ *     originUsesLoopbackIp: boolean;
+ *     recentOriginErrors: string[];
+ *     recommendation: string | null;
+ * }>}
+ */
+async function readCloudflaredOriginDiagnostics() {
+    let text;
+    try {
+        text = (await readFile(CLOUDFLARED_LOG_FILE, 'utf8')).slice(-64_000);
+    } catch {
+        return {
+            logFile: CLOUDFLARED_LOG_FILE,
+            originUsesLocalhost: false,
+            originUsesLoopbackIp: false,
+            recentOriginErrors: [],
+            recommendation: 'cloudflared log not found yet; run make copilot-mcp-restart and smoke after startup.',
+        };
+    }
+    const recentOriginErrors = text
+        .split(/\r?\n/u)
+        .filter((line) => /origin|localhost:3333|\[::1\]:3333|connection refused|502|1033/iu.test(line))
+        .slice(-8);
+    const originUsesLocalhost = /http:\/\/localhost:3333|\[::1\]:3333/iu.test(text);
+    const originUsesLoopbackIp = /http:\/\/127\.0\.0\.1:3333/iu.test(text);
+    return {
+        logFile: CLOUDFLARED_LOG_FILE,
+        originUsesLocalhost,
+        originUsesLoopbackIp,
+        recentOriginErrors,
+        recommendation: originUsesLocalhost
+            ? 'Prefer Cloudflare public hostname service http://127.0.0.1:3333 instead of http://localhost:3333 to avoid IPv6 ::1 origin misses.'
+            : null,
+    };
 }
 
 /**
@@ -199,6 +239,7 @@ export const mcpTunnelStatusTool = {
             await readConnectorSmokeState(config.smokeStateFile),
             config.publicMcpUrl ?? null,
         );
+        const originDiagnostics = await readCloudflaredOriginDiagnostics();
         const connectorSmokeFresh =
             connectorSmoke.ok === true &&
             typeof connectorSmoke.ageMinutes === 'number' &&
@@ -226,6 +267,7 @@ export const mcpTunnelStatusTool = {
                 lastSmokeFresh: connectorSmokeFresh,
                 lastSmokeStaleAfterMinutes: CONNECTOR_SMOKE_STALE_AFTER_MINUTES,
                 recommendedAction: permanentRecommendedAction,
+                originDiagnostics,
             },
             temporaryFallback: {
                 ...quickTunnel,
@@ -301,6 +343,7 @@ export const mcpPostRestartReadinessTool = {
             readPidFileStatus(config.managedTunnelPidFile),
             probeHealth(config.healthUrl),
         ]);
+        const originDiagnostics = await readCloudflaredOriginDiagnostics();
         const permanentUrlReady =
             config.mode === 'named-permanent' && Boolean(config.publicMcpUrl) && publicUrlValidation?.ok === true;
         const ready =
@@ -331,6 +374,7 @@ export const mcpPostRestartReadinessTool = {
                 cloudflared: cloudflaredProcess,
             },
             localHealth,
+            originDiagnostics,
             connectorSmoke: {
                 ...connectorSmoke,
                 fresh: connectorSmokeFresh,

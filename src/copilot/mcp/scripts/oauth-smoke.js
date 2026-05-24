@@ -24,10 +24,12 @@ export async function runMcpOAuthSmoke(options = {}) {
     const config = readMcpAuthConfig();
     const resource = String(options.resource ?? process.env['COPILOT_MCP_OAUTH_SMOKE_RESOURCE'] ?? config.resource).replace(/\/+$/u, '');
     const protectedResource = await probeJson(`${resource}/.well-known/oauth-protected-resource`, { method: 'GET' });
+    const protectedResourceCors = await probeCorsPreflight(`${resource}/.well-known/oauth-protected-resource`, 'GET');
     const authorizationServer = extractAuthorizationServer(protectedResource.body) ?? resource;
     const oauthMetadata = await probeJson(`${authorizationServer}/.well-known/oauth-authorization-server`, {
         method: 'GET',
     });
+    const oauthMetadataCors = await probeCorsPreflight(`${authorizationServer}/.well-known/oauth-authorization-server`, 'GET');
     const metadata = asRecord(oauthMetadata.body);
     const jwksUri = typeof metadata?.['jwks_uri'] === 'string' ? metadata['jwks_uri'] : `${authorizationServer}/oauth/jwks.json`;
     const jwks = await probeJson(jwksUri, { method: 'GET' });
@@ -74,7 +76,9 @@ export async function runMcpOAuthSmoke(options = {}) {
     return {
         ok:
             protectedResource.ok &&
+            protectedResourceCors.ok &&
             oauthMetadata.ok &&
+            oauthMetadataCors.ok &&
             jwks.ok &&
             registration.ok &&
             dcrToken.ok &&
@@ -86,6 +90,10 @@ export async function runMcpOAuthSmoke(options = {}) {
             userinfo.ok,
         resource,
         protectedResource,
+        cors: {
+            protectedResource: protectedResourceCors,
+            oauthMetadata: oauthMetadataCors,
+        },
         authorizationServer,
         oauthMetadata: summarizeMetadataProbe(oauthMetadata),
         jwks: summarizeJwks(jwks),
@@ -107,6 +115,39 @@ export async function runMcpOAuthSmoke(options = {}) {
             userinfo: summarizeUserinfo(userinfo),
         },
     };
+}
+
+/**
+ * @param {string} url
+ * @param {string} requestMethod
+ * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
+ */
+async function probeCorsPreflight(url, requestMethod) {
+    try {
+        const response = await fetch(url, {
+            method: 'OPTIONS',
+            headers: {
+                origin: 'https://chatgpt.com',
+                'access-control-request-method': requestMethod,
+                'access-control-request-headers': 'authorization, content-type',
+            },
+            signal: AbortSignal.timeout(10000),
+        });
+        const allowOrigin = response.headers.get('access-control-allow-origin');
+        const allowHeaders = response.headers.get('access-control-allow-headers') ?? '';
+        return {
+            ok:
+                response.status === 204 &&
+                allowOrigin === 'https://chatgpt.com' &&
+                /authorization/iu.test(allowHeaders) &&
+                /content-type/iu.test(allowHeaders),
+            status: response.status,
+            allowOrigin,
+            allowHeaders,
+        };
+    } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
 }
 
 /**

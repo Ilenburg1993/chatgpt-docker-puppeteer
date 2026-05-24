@@ -52,6 +52,9 @@ npm run copilot:mcp:oauth:smoke
 O modo canônico de autenticação é `OAuth`; `none-dev` fica apenas como fallback controlado.
 O issuer OAuth dev embutido persiste sua chave RS256 em
 `src/copilot/.ai/mcp/oauth-dev-private-key.pem` para evitar relinking desnecessário após restart.
+Os refresh tokens rotativos tambem persistem, mas somente como hashes SHA-256, em
+`src/copilot/.ai/mcp/oauth-refresh-tokens.json`; isso preserva o linking do ChatGPT durante restarts
+sem gravar refresh token em claro.
 Use `COPILOT_MCP_DEV_OAUTH_ROTATE_KEY=true` apenas quando quiser forçar rotação da chave.
 Quick Tunnel continua disponivel como fallback explicito:
 
