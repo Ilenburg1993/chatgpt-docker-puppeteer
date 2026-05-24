@@ -32,7 +32,11 @@ function buildMissionPlan(mission) {
     if (mission === 'validate-mcp-full') {
         return [
             { step: 'mcp_run_safe_validation_suite', effect: 'Start suite-mcp-full validator job.' },
-            { step: 'job_get_output', effect: 'Caller reads output after job starts.' },
+            {
+                step: 'mcp_validation_dashboard',
+                effect: 'Caller reads compact validation status after the suite starts.',
+            },
+            { step: 'job_get_summary', effect: 'Caller inspects compact job status before any log tail.' },
         ];
     }
     return [
@@ -118,7 +122,8 @@ export const delegateToRepoAutonomyRunnerTool = {
                 executed: true,
                 plan,
                 job,
-                nextStep: 'Use job_get_output with the returned job.id.',
+                nextStep:
+                    'Use mcp_validation_dashboard, then job_get_summary with the returned job.id; use job_get_output only for a small failure tail.',
             });
         }
 

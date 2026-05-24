@@ -416,9 +416,13 @@ export const repoReadTools = [
             pathA: z.string().min(1).describe('Workspace-relative baseline file path.'),
             pathB: z.string().min(1).describe('Workspace-relative comparison file path.'),
             contextLines: z.number().int().min(0).max(20).optional().describe('Diff context lines. Default: 3.'),
+            includeDiffPreview: z
+                .boolean()
+                .optional()
+                .describe('Include textual diff in the tool result. Default: false.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ pathA, pathB, contextLines }) => {
+        handler: async ({ pathA, pathB, contextLines, includeDiffPreview }) => {
             const resolvedA = await resolveReadPath(pathA);
             if (!resolvedA.ok) return errorResult(`pathA: ${resolvedA.reason}`, { ...resolvedA, field: 'pathA' });
             const resolvedB = await resolveReadPath(pathB);
@@ -430,11 +434,13 @@ export const repoReadTools = [
                     pathA: resolvedA.relative,
                     pathB: resolvedB.relative,
                     identical: diff.identical,
-                    diff: diff.diff,
+                    diffPreviewSuppressed: includeDiffPreview !== true,
+                    diffPreviewAvailable: !diff.identical,
+                    ...(includeDiffPreview === true ? { diff: diff.diff } : {}),
                     engine: diff.io.engine,
                     contextLines: contextLines ?? 3,
                 },
-                diff.diff,
+                includeDiffPreview === true ? diff.diff : 'Diff computed; textual diff suppressed.',
             );
         },
     },
@@ -443,7 +449,12 @@ export const repoReadTools = [
         title: 'Search repository text',
         description: 'Search text or regex inside the workspace and return matching lines.',
         inputSchema: {
-            pattern: z.string().min(1).describe('Text or regex pattern to search.'),
+            pattern: z.string().min(1).optional().describe('Text or regex pattern to search.'),
+            query: z
+                .string()
+                .min(1)
+                .optional()
+                .describe('Alias for pattern; useful for clients that call search inputs query.'),
             path: z.string().optional().describe('Workspace-relative search root. Default: src/copilot.'),
             isRegex: z.boolean().optional().describe('Treat pattern as regex. Default: false.'),
             caseSensitive: z.boolean().optional().describe('Case-sensitive search. Default: false.'),
@@ -470,12 +481,20 @@ export const repoReadTools = [
             contextLines,
             maxResults,
             cursor,
+            query,
         }) => {
+            const effectivePattern = pattern ?? query;
+            if (!effectivePattern) {
+                return errorResult('Search pattern is required.', {
+                    code: 'ERR_SEARCH_PATTERN_REQUIRED',
+                    hint: 'Provide pattern or query.',
+                });
+            }
             const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH));
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const result = await searchText(resolved.resolved, {
                 workspaceRoot: WORKSPACE_ROOT,
-                pattern,
+                pattern: effectivePattern,
                 isRegex: isRegex === true,
                 caseSensitive: caseSensitive === true,
                 includePattern,
@@ -487,7 +506,8 @@ export const repoReadTools = [
             const structured = {
                 success: true,
                 path: resolved.relative,
-                pattern,
+                pattern: effectivePattern,
+                query: query ?? null,
                 contextLines: contextLines ?? 0,
                 cursor: cursor ?? null,
                 output: result.output,

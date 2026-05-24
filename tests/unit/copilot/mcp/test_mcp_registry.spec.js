@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import { getCanonicalMcpTools } from '../../../../src/copilot/mcp/registry.js';
+import { getAdvertisedMcpToolNames } from '../../../../src/copilot/mcp/tools/meta.js';
 
 describe('copilot MCP registry', () => {
     it('exposes the initial read-only tool surface', () => {
@@ -26,11 +27,13 @@ describe('copilot MCP registry', () => {
             'git_status',
             'job_cancel',
             'job_get_output',
+            'job_get_summary',
             'job_list',
             'mcp_apps_sdk_readiness',
             'mcp_auth_profile',
             'mcp_autonomy_power_score',
             'mcp_capabilities_summary',
+            'mcp_connector_smoke_refresh',
             'mcp_golden_prompts',
             'mcp_host_block_diagnostics',
             'mcp_last_validation_summary',
@@ -44,6 +47,7 @@ describe('copilot MCP registry', () => {
             'mcp_smoke_workspace',
             'mcp_tools_status',
             'mcp_tunnel_status',
+            'mcp_validation_dashboard',
             'mcp_validation_plan',
             'project_doctor',
             'repo_apply_file_batch',
@@ -121,5 +125,13 @@ describe('copilot MCP registry', () => {
         const tools = getCanonicalMcpTools();
         const names = tools.map((tool) => tool.name);
         assert.equal(new Set(names).size, names.length);
+    });
+
+    it('keeps capability metadata in parity with the canonical registry', () => {
+        const registryNames = getCanonicalMcpTools()
+            .map((tool) => tool.name)
+            .sort((left, right) => left.localeCompare(right));
+
+        assert.deepEqual(getAdvertisedMcpToolNames(), registryNames);
     });
 });

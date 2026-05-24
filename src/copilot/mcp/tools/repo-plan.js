@@ -66,6 +66,27 @@ function buildPlanDiffPreview(contentA, contentB, options = {}) {
 }
 
 /**
+ * @param {boolean | undefined} include
+ * @param {{ diff: string; truncated: boolean; lines: number; contextLines: number }} diff
+ * @returns {Record<string, unknown>}
+ */
+function maybePlanDiffPreview(include, diff) {
+    return include === true
+        ? {
+              diffPreview: diff.diff,
+              diffPreviewTruncated: diff.truncated,
+              diffPreviewLines: diff.lines,
+              diffContextLines: diff.contextLines,
+          }
+        : {
+              diffPreviewSuppressed: true,
+              diffPreviewAvailable: diff.lines > 0,
+              diffPreviewLines: diff.lines,
+              diffContextLines: diff.contextLines,
+          };
+}
+
+/**
  * @param {string} haystack
  * @param {string} needle
  * @returns {number}
@@ -115,9 +136,10 @@ export const repoPlanTools = [
             path: z.string().min(1).describe('Workspace-relative file path to plan.'),
             content: z.string().optional().describe('Planned initial content. Default: empty string.'),
             maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
+            includeDiffPreview: z.boolean().optional().describe('Include textual diffPreview in the tool result. Default: false.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ path, content, maxDiffLines }) => {
+        handler: async ({ path, content, maxDiffLines, includeDiffPreview }) => {
             const resolved = await resolveWritePath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const initialContent = typeof content === 'string' ? content : '';
@@ -133,15 +155,13 @@ export const repoPlanTools = [
                     path: resolved.relative,
                     destinationExists,
                     contentChars: initialContent.length,
-                    diffPreview: diff.diff,
-                    diffPreviewTruncated: diff.truncated,
-                    diffPreviewLines: diff.lines,
+                    ...maybePlanDiffPreview(includeDiffPreview, diff),
                     nextCall: {
                         tool: 'repo_create_file',
                         args: { path: resolved.relative, content: initialContent },
                     },
                 },
-                diff.diff,
+                includeDiffPreview === true ? diff.diff : 'Create file plan ready; diff preview suppressed.',
             );
         },
     },
@@ -156,9 +176,10 @@ export const repoPlanTools = [
             replace_all: z.boolean().optional().describe('Plan replacing every occurrence. Default: false.'),
             diffContextLines: z.number().int().min(0).max(20).optional().describe('Context lines in diff preview.'),
             maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
+            includeDiffPreview: z.boolean().optional().describe('Include textual diffPreview in the tool result. Default: false.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ path, old_string, new_string, replace_all, diffContextLines, maxDiffLines }) => {
+        handler: async ({ path, old_string, new_string, replace_all, diffContextLines, maxDiffLines, includeDiffPreview }) => {
             const resolved = await resolveReadPath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const snapshot = await readText(resolved.resolved);
@@ -187,9 +208,7 @@ export const repoPlanTools = [
                     previousBytes: snapshot.bytesRead,
                     projectedBytes: Buffer.byteLength(plannedContent, 'utf8'),
                     sha256: snapshot.contentHash,
-                    diffPreview: diff.diff,
-                    diffPreviewTruncated: diff.truncated,
-                    diffPreviewLines: diff.lines,
+                    ...maybePlanDiffPreview(includeDiffPreview, diff),
                     nextCall: {
                         tool: 'repo_apply_patch',
                         args: {
@@ -201,7 +220,7 @@ export const repoPlanTools = [
                         },
                     },
                 },
-                diff.diff,
+                includeDiffPreview === true ? diff.diff : 'Patch plan ready; diff preview suppressed.',
             );
         },
     },

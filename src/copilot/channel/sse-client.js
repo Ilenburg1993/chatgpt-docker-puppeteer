@@ -38,6 +38,7 @@ export function subscribeSse(path, port, onEvent) {
     let destroyed = false;
     let reconnectMs = 1_000;
     const MAX_RECONNECT_MS = 30_000;
+    const REQUEST_TIMEOUT_MS = 15_000;
     /** @type {ReturnType<typeof setTimeout> | null} */
     let reconnectTimer = null;
     /** @type {ReturnType<typeof http.request> | null} */
@@ -61,6 +62,17 @@ export function subscribeSse(path, port, onEvent) {
                 headers,
             },
             (res) => {
+                const statusCode = res.statusCode ?? 0;
+                const contentType = String(res.headers['content-type'] ?? '').toLowerCase();
+                if (statusCode < 200 || statusCode >= 300 || !contentType.includes('text/event-stream')) {
+                    log(
+                        'WARN',
+                        `[inject] SSE resposta invalida (${path}) status=${statusCode} content-type=${contentType || 'n/a'}`,
+                    );
+                    res.resume();
+                    if (!destroyed) scheduleReconnect();
+                    return;
+                }
                 reconnectMs = 1_000;
                 let buf = '';
                 res.on('data', (/** @type {Buffer} */ chunk) => {
@@ -104,6 +116,9 @@ export function subscribeSse(path, port, onEvent) {
         );
         currentReq = req;
 
+        req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+            req.destroy(new Error(`SSE connect timeout after ${REQUEST_TIMEOUT_MS}ms`));
+        });
         req.on('error', () => {
             if (!destroyed) scheduleReconnect();
         });
@@ -117,6 +132,7 @@ export function subscribeSse(path, port, onEvent) {
             reconnectTimer = null;
             connect();
         }, reconnectMs);
+        reconnectTimer.unref?.();
         reconnectMs = Math.min(reconnectMs * 2, MAX_RECONNECT_MS);
     }
 

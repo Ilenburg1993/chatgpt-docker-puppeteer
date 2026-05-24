@@ -10,7 +10,7 @@ import { MCP_AUTH_SCOPES, readMcpAuthConfig } from '../control-plane/auth.js';
 import { okResult } from '../control-plane/result.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 16;
+const CAPABILITIES_VERSION = 17;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -71,8 +71,10 @@ const VALIDATION_TOOLS = [
     'run_lint_copilot',
     'run_unit_copilot',
     'run_project_doctor',
+    'mcp_validation_dashboard',
     'mcp_last_validation_summary',
     'job_list',
+    'job_get_summary',
     'job_get_output',
     'job_cancel',
 ];
@@ -91,6 +93,7 @@ const RUNTIME_TOOLS = [
     'mcp_autonomy_power_score',
     'mcp_tools_status',
     'mcp_tunnel_status',
+    'mcp_connector_smoke_refresh',
     'mcp_capabilities_summary',
 ];
 
@@ -134,7 +137,8 @@ const IO_GUIDANCE = [
     'Use delegate_to_repo_autonomy_runner dryRun=true for fixed longer workflows before requesting real execution.',
     'Use mcp_golden_prompts when measuring real ChatGPT approval prompts and host blocks.',
     'Use mcp_host_block_diagnostics after any ChatGPT host-side block to classify it and select a lower-friction replacement.',
-    'Use plan-only tools such as repo_patch_plan, repo_quarantine_file_plan and repo_apply_file_batch_plan before write or destructive apply tools.',
+    'Use plan-only tools such as repo_patch_plan includeDiffPreview=false, repo_quarantine_file_plan and repo_apply_file_batch_plan before write or destructive apply tools.',
+    'Keep includeDiffPreview=false by default for repo_patch_plan, repo_create_file_plan, repo_apply_patch, repo_write_file, repo_create_file and repo_diff_files; request textual diffs only when explicitly needed.',
     'Use repo_apply_file_batch_plan first, then repo_apply_file_batch when several trusted file operations should be applied in one ChatGPT write confirmation.',
     'Use repo_read_file.sha256 as expectedHash for safe write/patch calls.',
     'Use repo_quarantine_file before repo_remove_file when reversible cleanup is acceptable.',
@@ -145,13 +149,14 @@ const IO_GUIDANCE = [
     'COPILOT_MCP_INDEX_AUTO_BUILD defaults to true so indexed navigation is warmed outside ChatGPT host calls.',
     'Use repo_symbol_search and repo_file_outline before edits that need code navigation.',
     'Use mcp_run_safe_validation_suite suite="mcp-full" before separate validator calls when ChatGPT needs one canonical verification step.',
-    'Use mcp_last_validation_summary when ChatGPT host blocks starting a new validation job.',
+    'Use mcp_validation_dashboard, mcp_last_validation_summary and job_get_summary before job_get_output; read job logs only with small tailBytes and only when needed.',
     'Use repo_root_tree or repo_tree path="." for the real workspace root.',
     'Use repo_root_redaction_status to audit hidden/protected root redaction without returning hidden names.',
     'Use chatgpt_connector_current_url_status to recover the saved temporary tunnel URL without passing it as input.',
     'Use mcp_auth_profile to confirm OAuth max-power scopes and WWW-Authenticate challenge metadata.',
     'Use mcp_oauth_issuer_diagnostics before changing issuer, CIMD, OIDC or Cloudflare OAuth settings.',
     'Use mcp_oauth_friction_audit after OAuth or connector changes to detect reauth risk and metadata drift.',
+    'Use mcp_connector_smoke_refresh after MCP/Cloudflare restarts to refresh the permanent connector smoke cache.',
     'LLM-B can consume MCP optionally, but does not depend on this MCP server.',
 ];
 

@@ -5,7 +5,8 @@
  * @module copilot/mcp/tools/tunnel-status
  */
 
-import { formatChatGptConnectorAuthentication } from '../connection/profile.js';
+import { spawn } from 'node:child_process';
+import { z } from 'zod';
 import { readCloudflareTunnelConfig, validateConfiguredPublicUrl } from '../cloudflare/config.js';
 import {
     readConnectorSmokeState,
@@ -13,11 +14,132 @@ import {
     summarizeConnectorSmokeState,
     summarizeQuickTunnelState,
 } from '../cloudflare/state.js';
+import { formatChatGptConnectorAuthentication } from '../connection/profile.js';
+import { boundedWriteAnnotations, readOnlyAnnotations } from '../control-plane/annotations.js';
 import { readMcpAuthConfig } from '../control-plane/auth.js';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { okResult } from '../control-plane/result.js';
+import { errorResult, okResult } from '../control-plane/result.js';
 
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
+const CONNECTOR_SMOKE_TIMEOUT_MS = 45_000;
+const CONNECTOR_SMOKE_OUTPUT_LIMIT = 256_000;
+
+/**
+ * @param {unknown} value
+ * @param {boolean} includeRemoteToolNames
+ * @returns {unknown}
+ */
+function compactSmokeReport(value, includeRemoteToolNames) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+    const report = /** @type {Record<string, unknown>} */ (value);
+    const toolsList =
+        report['toolsList'] && typeof report['toolsList'] === 'object' && !Array.isArray(report['toolsList'])
+            ? { .../** @type {Record<string, unknown>} */ (report['toolsList']) }
+            : report['toolsList'];
+    if (toolsList && typeof toolsList === 'object' && !Array.isArray(toolsList) && !includeRemoteToolNames) {
+        const toolsListRecord = /** @type {Record<string, unknown>} */ (toolsList);
+        delete toolsListRecord['remoteToolNames'];
+        toolsListRecord['remoteToolNamesSuppressed'] = true;
+    }
+    return { ...report, toolsList };
+}
+
+/**
+ * @param {{ includeRemoteToolNames?: boolean }} input
+ * @returns {Promise<import('@modelcontextprotocol/sdk/types.js').CallToolResult>}
+ */
+async function runConnectorSmokeRefresh(input) {
+    const config = readCloudflareTunnelConfig();
+    if (!config.publicMcpUrl) {
+        return errorResult('Permanent MCP connector URL is not configured.', {
+            code: 'ERR_MCP_PUBLIC_URL_NOT_CONFIGURED',
+            hint: 'Configure COPILOT_MCP_CLOUDFLARE_PUBLIC_URL or COPILOT_MCP_PUBLIC_URL.',
+        });
+    }
+    const includeRemoteToolNames = input.includeRemoteToolNames === true;
+    const child = spawn(process.execPath, ['src/copilot/mcp/cloudflare/cli.js', 'smoke'], {
+        cwd: process.cwd(),
+        env: {
+            ...process.env,
+            COPILOT_MCP_AUTH_MODE: process.env['COPILOT_MCP_AUTH_MODE'] ?? 'oauth',
+            COPILOT_MCP_AUTH_ENFORCEMENT: process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] ?? 'all',
+            COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: config.publicMcpUrl,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    /**
+     * @param {string} current
+     * @param {Buffer | string} chunk
+     * @returns {string}
+     */
+    const appendBounded = (current, chunk) => `${current}${String(chunk)}`.slice(-CONNECTOR_SMOKE_OUTPUT_LIMIT);
+    const timeout = setTimeout(() => {
+        timedOut = true;
+        child.kill('SIGTERM');
+    }, CONNECTOR_SMOKE_TIMEOUT_MS);
+    timeout.unref?.();
+    child.stdout.on('data', (chunk) => {
+        stdout = appendBounded(stdout, chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+        stderr = appendBounded(stderr, chunk);
+    });
+    const exit = await new Promise((resolve) => {
+        child.on('error', (error) => resolve({ code: null, signal: null, error }));
+        child.on('close', (code, signal) => resolve({ code, signal, error: null }));
+    });
+    clearTimeout(timeout);
+    if (timedOut) {
+        return errorResult('Cloudflare connector smoke refresh timed out.', {
+            code: 'ERR_CONNECTOR_SMOKE_TIMEOUT',
+            timeoutMs: CONNECTOR_SMOKE_TIMEOUT_MS,
+            connectorUrl: config.publicMcpUrl,
+            stderrTail: stderr.slice(-8000),
+        });
+    }
+    if (exit.error instanceof Error) {
+        return errorResult('Cloudflare connector smoke refresh failed to start.', {
+            code: 'ERR_CONNECTOR_SMOKE_START_FAILED',
+            error: exit.error.message,
+        });
+    }
+    let parsed;
+    try {
+        parsed = JSON.parse(stdout);
+    } catch {
+        return errorResult('Cloudflare connector smoke refresh did not return JSON.', {
+            code: 'ERR_CONNECTOR_SMOKE_INVALID_JSON',
+            exitCode: exit.code,
+            connectorUrl: config.publicMcpUrl,
+            stdoutTail: stdout.slice(-8000),
+            stderrTail: stderr.slice(-8000),
+        });
+    }
+    const compact = compactSmokeReport(parsed, includeRemoteToolNames);
+    const ok = exit.code === 0 && Boolean(/** @type {Record<string, unknown>} */ (parsed)['ok']);
+    if (!ok) {
+        return errorResult('Cloudflare connector smoke refresh completed with failures.', {
+            code: 'ERR_CONNECTOR_SMOKE_FAILED',
+            exitCode: exit.code,
+            signal: exit.signal,
+            report: compact,
+            stderrTail: stderr.slice(-8000),
+        });
+    }
+    return okResult({
+        success: true,
+        connectorUrl: config.publicMcpUrl,
+        smokeStateFile: config.smokeStateFile,
+        refreshedAt: new Date().toISOString(),
+        report: compact,
+        next: [
+            'Call mcp_tunnel_status to confirm lastSmokeFresh=true.',
+            'Use the ChatGPT connector URL https://mcp.aurelin.org/mcp.',
+        ],
+    });
+}
 
 /**
  * @type {import('../registry.js').McpToolDefinition}
@@ -35,7 +157,8 @@ export const mcpTunnelStatusTool = {
         const auth = readMcpAuthConfig();
         const quickTunnel = summarizeQuickTunnelState(state, Date.now(), config.staleAfterMs);
         const publicUrlValidation = validateConfiguredPublicUrl(config) ?? null;
-        const permanentReady = config.mode === 'named-permanent' && publicUrlValidation?.ok === true && Boolean(config.publicMcpUrl);
+        const permanentReady =
+            config.mode === 'named-permanent' && publicUrlValidation?.ok === true && Boolean(config.publicMcpUrl);
         const connectorSmoke = summarizeConnectorSmokeState(
             await readConnectorSmokeState(config.smokeStateFile),
             config.publicMcpUrl ?? null,
@@ -94,4 +217,24 @@ export const mcpTunnelStatusTool = {
             },
         });
     },
+};
+
+/**
+ * @type {import('../registry.js').McpToolDefinition}
+ */
+export const mcpConnectorSmokeRefreshTool = {
+    name: 'mcp_connector_smoke_refresh',
+    title: 'Refresh MCP connector smoke',
+    description:
+        'Run the canonical Cloudflare/OAuth connector smoke for the permanent MCP URL and persist the compact readiness state.',
+    inputSchema: {
+        includeRemoteToolNames: z
+            .boolean()
+            .optional()
+            .describe(
+                'Include the full remote tool-name list in the response. Default: false to keep ChatGPT streams compact.',
+            ),
+    },
+    annotations: boundedWriteAnnotations(),
+    handler: runConnectorSmokeRefresh,
 };

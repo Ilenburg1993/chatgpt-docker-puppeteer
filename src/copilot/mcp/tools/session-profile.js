@@ -79,8 +79,8 @@ export const mcpSessionProfileTool = {
             preferredWriteWorkflows: [
                 {
                     task: 'patch-existing-file',
-                    flow: ['repo_patch_plan', 'repo_apply_patch expectedHash=<sha256 from plan>'],
-                    reason: 'Plan-only read is lower friction than dryRun inside the write tool.',
+                    flow: ['repo_patch_plan includeDiffPreview=false', 'repo_apply_patch expectedHash=<sha256 from plan> includeDiffPreview=false'],
+                    reason: 'Plan-only read is lower friction than dryRun inside the write tool; textual diffs are suppressed by default to avoid ChatGPT web stream interruptions.',
                 },
                 {
                     task: 'apply-multiple-file-ops',
@@ -102,9 +102,12 @@ export const mcpSessionProfileTool = {
                     flow: [
                         'mcp_validation_plan suite=mcp-full',
                         'mcp_run_safe_validation_suite suite=mcp-full',
-                        'job_get_output',
+                        'mcp_validation_dashboard',
+                        'mcp_last_validation_summary includeOutputTail=false',
+                        'job_get_summary <jobId> when inspecting one job',
+                        'job_get_output tailBytes<=8000 only if the summary reports failure',
                     ],
-                    reason: 'One allowlisted job reduces repeated validator calls.',
+                    reason: 'One allowlisted job reduces repeated validator calls; summary-first avoids ChatGPT web stream interruptions from long logs.',
                 },
                 {
                     task: 'routine-maintenance',

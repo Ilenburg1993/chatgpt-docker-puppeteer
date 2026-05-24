@@ -98,6 +98,18 @@ function buildEffectiveValidationChecks(jobs) {
     return effective;
 }
 
+/**
+ * @param {Record<string, Record<string, unknown>>} effectiveChecks
+ * @returns {string}
+ */
+function recommendValidationAction(effectiveChecks) {
+    const entries = Object.values(effectiveChecks);
+    if (entries.some((check) => check['effectiveStatus'] === 'running')) return 'wait-and-refresh-summary';
+    if (entries.some((check) => check['passed'] === false)) return 'read-small-tail-for-failing-job';
+    if (entries.length === 0) return 'run-validation-only-when-needed';
+    return 'none';
+}
+
 /** @type {Record<string, import('../control-plane/jobs.js').CopilotValidatorName>} */
 const SAFE_VALIDATION_SUITE_TO_VALIDATOR = {
     'mcp-fast': 'suite-mcp-fast',
@@ -258,12 +270,23 @@ export const jobTools = [
                 }
                 summaries.push(summary);
             }
+            const effectiveChecks = buildEffectiveValidationChecks(jobs);
             return okResult({
                 success: true,
                 count: summaries.length,
                 validatorsCovered: summaries.map((summary) => summary['validator']),
                 summaries,
-                effectiveChecks: buildEffectiveValidationChecks(jobs),
+                effectiveChecks,
+                recommendedNextAction: recommendValidationAction(effectiveChecks),
+                streamSafety: {
+                    preferredFlow: [
+                        'mcp_validation_dashboard',
+                        'mcp_last_validation_summary',
+                        'job_get_summary',
+                        'job_get_output tailBytes<=8000 only when needed',
+                    ],
+                    avoid: ['large job_get_output tails', 'multiple validators back-to-back in ChatGPT web'],
+                },
                 hint:
                     summaries.length === 0
                         ? 'No persisted validator jobs found. Run mcp_run_safe_validation_suite or run_copilot_validator when allowed.'
@@ -272,16 +295,89 @@ export const jobTools = [
         },
     },
     {
+        name: 'mcp_validation_dashboard',
+        title: 'MCP validation dashboard',
+        description:
+            'Return compact validation status without starting jobs or returning long logs. Use this to avoid ChatGPT stream interruptions.',
+        inputSchema: {
+            includeRunning: z.boolean().optional().describe('Include currently running jobs. Default: true.'),
+            includeLatest: z.boolean().optional().describe('Include latest compact job per validator. Default: true.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ includeRunning, includeLatest }) => {
+            const jobs = await listJobs({ includeCompleted: true, limit: 200 });
+            const running = jobs.filter((job) => job.status === 'running').map(summarizeJob);
+            const latest = Object.values(latestJobsByValidator(jobs)).sort((left, right) =>
+                left.validator.localeCompare(right.validator),
+            );
+            const effectiveChecks = buildEffectiveValidationChecks(jobs);
+            return okResult({
+                success: true,
+                runningJobs: includeRunning === false ? [] : running,
+                latestJobs: includeLatest === false ? [] : latest.map(summarizeJob),
+                effectiveChecks,
+                recommendedNextAction: recommendValidationAction(effectiveChecks),
+                streamSafety: {
+                    preferredFlow: [
+                        'start validation only when needed',
+                        'mcp_validation_dashboard',
+                        'job_get_summary',
+                        'job_get_output tailBytes<=8000 only on failure',
+                    ],
+                    avoid: ['large job_get_output tails', 'multiple validators back-to-back in ChatGPT web'],
+                },
+            });
+        },
+    },
+    {
+        name: 'job_get_summary',
+        title: 'Get job summary',
+        description:
+            'Return compact status for one validator job without returning log output. Prefer this before job_get_output in ChatGPT web.',
+        inputSchema: {
+            jobId: z.string().min(1).describe('Job id returned by a validator tool.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ jobId }) => {
+            const result = await readJobOutput(jobId, 1000);
+            if (!result.job) {
+                return errorResult('Job not found.', {
+                    code: 'ERR_JOB_NOT_FOUND',
+                    hint: 'Use a job id returned by a validator tool, or call mcp_last_validation_summary.',
+                    jobId,
+                });
+            }
+            return okResult({
+                success: true,
+                job: summarizeJob(result.job),
+                outputAvailable: Boolean(result.output),
+                outputSuppressed: true,
+                nextAction:
+                    result.job.status === 'failed'
+                        ? 'Use job_get_output with a small tailBytes value only if the compact summary is insufficient.'
+                        : 'No log read is needed unless debugging is required.',
+            });
+        },
+    },
+    {
         name: 'job_get_output',
         title: 'Get job output',
-        description: 'Read the tail output and status of a validator job started by run_copilot_validator.',
+        description:
+            'Read a bounded log tail and status of a validator job. Prefer job_get_summary first; default tail is intentionally small for ChatGPT web.',
         inputSchema: {
             jobId: z.string().min(1).describe('Job id returned by run_copilot_validator.'),
-            tailBytes: z.number().int().min(1000).max(200000).optional().describe('Maximum bytes from the log tail.'),
+            tailBytes: z
+                .number()
+                .int()
+                .min(1000)
+                .max(50000)
+                .optional()
+                .describe('Maximum bytes from the log tail. Default: 8000.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ jobId, tailBytes }) => {
-            const result = await readJobOutput(jobId, tailBytes);
+            const effectiveTailBytes = tailBytes ?? 8000;
+            const result = await readJobOutput(jobId, effectiveTailBytes);
             if (!result.job) {
                 return errorResult('Job not found.', {
                     code: 'ERR_JOB_NOT_FOUND',

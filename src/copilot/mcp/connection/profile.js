@@ -126,8 +126,9 @@ export function buildChatGptConnectorProfile(options = {}) {
             'Faça repo_symbol_search name=registerCanonicalMcpTools path=src/copilot/mcp.',
             'Faça repo_file_outline path=src/copilot/mcp/tools/repo-read.js includeTopComments=true.',
             'Chame project_doctor.',
-            'Inicie mcp_run_safe_validation_suite suite=mcp-full e depois leia o output com job_get_output.',
-            'Inicie run_copilot_validator validator=typecheck e depois leia o output com job_get_output.',
+            'Consulte mcp_validation_dashboard antes de iniciar novos validadores.',
+            'Inicie mcp_run_safe_validation_suite suite=mcp-full e depois consulte mcp_validation_dashboard e job_get_summary; use job_get_output tailBytes pequeno só se falhar.',
+            'Inicie run_copilot_validator validator=typecheck e depois consulte job_get_summary; use job_get_output tailBytes pequeno só se falhar.',
             'Chame mcp_runtime_health e mcp_tunnel_status.',
         ],
         requiredLocalChecks: [
@@ -201,7 +202,8 @@ export function buildCloudflareTunnelRunbook(options = {}) {
     const profile = buildChatGptConnectorProfile(options);
     const originUrl =
         options.originUrl ??
-        process.env['COPILOT_MCP_CLOUDFLARE_ORIGIN_URL'] ?? profile.localMcpUrl.replace(/\/mcp$/, '');
+        process.env['COPILOT_MCP_CLOUDFLARE_ORIGIN_URL'] ??
+        profile.localMcpUrl.replace(/\/mcp$/, '');
     return {
         prerequisites: [
             'cloudflared instalado no mesmo ambiente que alcança o MCP HTTP local.',

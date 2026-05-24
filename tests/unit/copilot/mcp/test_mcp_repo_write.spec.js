@@ -33,6 +33,7 @@ describe('copilot MCP repo write tools', () => {
         const result = await writeFileTool.handler({
             path: filePath,
             content: 'after\n',
+            includeDiffPreview: true,
         });
 
         assert.equal(result.isError, undefined);
@@ -51,6 +52,7 @@ describe('copilot MCP repo write tools', () => {
         const created = await createFileTool.handler({
             path: filePath,
             content: 'new file\n',
+            includeDiffPreview: true,
         });
         assert.equal(created.isError, undefined);
         assert.equal(created.structuredContent.success, true);
@@ -76,6 +78,7 @@ describe('copilot MCP repo write tools', () => {
             old_string: 'beta',
             new_string: 'BETA',
             dryRun: false,
+            includeDiffPreview: true,
         });
 
         assert.equal(result.isError, undefined);

@@ -113,15 +113,37 @@ export function createSseWriter(req, res, opts = {}) {
     }
     res.flushHeaders();
 
-    /** @type {{ write: (chunk: string) => boolean; writableEnded: boolean }} */
+    /** @type {{
+    write: (chunk: string) => boolean;
+    writableEnded: boolean;
+    once?: (event: string, listener: () => void) => unknown;
+}} */
     const out = gzStream
         ? {
               get writableEnded() {
                   return res.writableEnded;
               },
               write: (/** @type {string} */ chunk) => /** @type {boolean} */ (gzStream?.write(chunk, 'utf8') ?? false),
+              once: (event, listener) => gzStream?.once(event, listener),
           }
         : res;
+
+    let backpressureActive = false;
+
+    /**
+     * @param {string} frame
+     */
+    const writeFrame = (frame) => {
+        if (out.writableEnded) return;
+        const accepted = out.write(frame);
+        if (accepted || backpressureActive) return;
+        backpressureActive = true;
+        defaultMetrics.recordCounter('sse.writer.backpressure_total');
+        out.once?.('drain', () => {
+            backpressureActive = false;
+            defaultMetrics.recordCounter('sse.writer.backpressure_drained_total');
+        });
+    };
 
     /**
      * Envia um evento SSE formatado.
@@ -146,7 +168,7 @@ export function createSseWriter(req, res, opts = {}) {
             explicitEventId ??
             (replayBuffer && !sendOpts?.skipBuffer ? replayBuffer.push(safeEvent, payload) : undefined);
         const idLine = id != null ? `id: ${id}\n` : '';
-        out.write(`${idLine}event: ${safeEvent}\ndata: ${JSON.stringify(payload)}\n\n`);
+        writeFrame(`${idLine}event: ${safeEvent}\ndata: ${JSON.stringify(payload)}\n\n`);
     };
 
     // --- Replay de eventos perdidos via Last-Event-ID ---
@@ -156,7 +178,7 @@ export function createSseWriter(req, res, opts = {}) {
             const missed = replayBuffer.getAfter(lastEventId);
             for (const evt of missed) {
                 if (out.writableEnded) break;
-                out.write(
+                writeFrame(
                     `id: ${evt.id}\nevent: ${sanitizeSseEvent(evt.event)}\ndata: ${JSON.stringify(evt.data)}\n\n`,
                 );
             }

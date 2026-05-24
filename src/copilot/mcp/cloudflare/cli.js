@@ -11,8 +11,8 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { formatChatGptConnectorAuthentication } from '../connection/profile.js';
-import { getCanonicalMcpTools } from '../registry.js';
 import { readMcpAuthConfig } from '../control-plane/auth.js';
+import { getCanonicalMcpTools } from '../registry.js';
 import {
     buildManagedTunnelArgs,
     buildQuickTunnelArgs,
@@ -58,7 +58,9 @@ try {
             config.transportProtocol,
         );
     } else {
-        fail(`Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, up, down, restart, or run.`);
+        fail(
+            `Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, up, down, restart, or run.`,
+        );
     }
 } catch (error) {
     fail(error instanceof Error ? error.message : String(error));
@@ -217,7 +219,9 @@ async function runSmoke() {
     const state = await readQuickTunnelState(config.stateFile);
     const connectorUrl = config.publicMcpUrl ?? (isQuickTunnelState(state) ? state.connectorUrl : undefined);
     if (!connectorUrl) {
-        throw new Error('No Cloudflare connector URL found. Configure COPILOT_MCP_CLOUDFLARE_PUBLIC_URL or run the quick fallback.');
+        throw new Error(
+            'No Cloudflare connector URL found. Configure COPILOT_MCP_CLOUDFLARE_PUBLIC_URL or run the quick fallback.',
+        );
     }
     const baseUrl = connectorUrl.replace(/\/mcp$/, '');
     const health = await probeJson(`${baseUrl}/health`, { method: 'GET' });
@@ -267,9 +271,11 @@ async function runSmoke() {
         'mcp_maintenance_plan',
         'mcp_maintenance_apply_safe_fixes',
         'mcp_run_safe_validation_suite',
+        'mcp_validation_dashboard',
         'mcp_last_validation_summary',
         'run_copilot_validator',
         'job_list',
+        'job_get_summary',
         'job_get_output',
         'mcp_runtime_health',
         'mcp_session_profile',
@@ -279,6 +285,7 @@ async function runSmoke() {
         'mcp_smoke_workspace',
         'mcp_tools_status',
         'mcp_tunnel_status',
+        'mcp_connector_smoke_refresh',
         'chatgpt_connector_current_url_status',
     ];
     const missingCriticalTools = criticalToolNames.filter((toolName) => !remoteToolNames.includes(toolName));
@@ -368,7 +375,9 @@ async function runSmoke() {
  * @returns {Record<string, unknown> | null}
  */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
 /**
@@ -406,7 +415,8 @@ function summarizeOAuthReadiness(protectedResourceBody, oauthMetadataBody, authM
     const oauthScopes = normalizeStringArray(metadata?.['scopes_supported']);
     const missingProtectedFields = [];
     if (typeof protectedResource?.['resource'] !== 'string') missingProtectedFields.push('resource');
-    if (!Array.isArray(protectedResource?.['authorization_servers'])) missingProtectedFields.push('authorization_servers');
+    if (!Array.isArray(protectedResource?.['authorization_servers']))
+        missingProtectedFields.push('authorization_servers');
     for (const scope of REQUIRED_MAX_POWER_REPO_SCOPES) {
         if (!protectedScopes.includes(scope)) missingProtectedFields.push(`scopes_supported:${scope}`);
     }
@@ -414,7 +424,8 @@ function summarizeOAuthReadiness(protectedResourceBody, oauthMetadataBody, authM
     if (typeof metadata?.['issuer'] !== 'string') missingMetadataFields.push('issuer');
     if (typeof metadata?.['authorization_endpoint'] !== 'string') missingMetadataFields.push('authorization_endpoint');
     if (typeof metadata?.['token_endpoint'] !== 'string') missingMetadataFields.push('token_endpoint');
-    if (metadata?.['client_id_metadata_document_supported'] !== true) missingMetadataFields.push('client_id_metadata_document_supported');
+    if (metadata?.['client_id_metadata_document_supported'] !== true)
+        missingMetadataFields.push('client_id_metadata_document_supported');
     if (typeof metadata?.['userinfo_endpoint'] !== 'string') missingMetadataFields.push('userinfo_endpoint');
     if (!oauthScopes.includes('openid')) missingMetadataFields.push('scopes_supported:openid');
     return {
@@ -546,14 +557,23 @@ async function runRestart() {
 
 /**
  * @param {{
- *   name: string;
- *   command: string;
- *   args: string[];
- *   pidFile: string;
- *   logFile: string;
- *   env?: Record<string, string>;
+ *     name: string;
+ *     command: string;
+ *     args: string[];
+ *     pidFile: string;
+ *     logFile: string;
+ *     env?: Record<string, string>;
  * }} options
- * @returns {Promise<{ name: string; pidFile: string; logFile: string; metadataFile: string; pid: number | null; alreadyRunning: boolean; restarted: boolean; restartReason: string | null }>}
+ * @returns {Promise<{
+ *     name: string;
+ *     pidFile: string;
+ *     logFile: string;
+ *     metadataFile: string;
+ *     pid: number | null;
+ *     alreadyRunning: boolean;
+ *     restarted: boolean;
+ *     restartReason: string | null;
+ * }>}
  */
 async function ensureDetachedProcess(options) {
     const metadataFile = `${options.pidFile}.json`;
@@ -631,10 +651,10 @@ async function readProcessMetadata(metadataFile) {
 
 /**
  * @param {{
- *   name: string;
- *   command: string;
- *   args: string[];
- *   env?: Record<string, string>;
+ *     name: string;
+ *     command: string;
+ *     args: string[];
+ *     env?: Record<string, string>;
  * }} options
  * @returns {{ name: string; command: string; args: string[]; env: Record<string, string> }}
  */
@@ -681,7 +701,13 @@ function buildQuickTunnelStateReport(state) {
 
 /**
  * @param {string} pidFile
- * @returns {Promise<{ pidFile: string; pid: number | null; stopped: boolean; wasAlive: boolean; error: string | null }>}
+ * @returns {Promise<{
+ *     pidFile: string;
+ *     pid: number | null;
+ *     stopped: boolean;
+ *     wasAlive: boolean;
+ *     error: string | null;
+ * }>}
  */
 async function stopPidFileProcess(pidFile) {
     const status = await readPidFileStatus(pidFile);
@@ -697,9 +723,20 @@ async function stopPidFileProcess(pidFile) {
     }
     try {
         process.kill(status.pid, 'SIGTERM');
+        const exited = await waitForProcessExit(status.pid, 5000);
+        if (!exited) {
+            process.kill(status.pid, 'SIGKILL');
+            await waitForProcessExit(status.pid, 2000);
+        }
         await rm(pidFile, { force: true });
         await rm(metadataFile, { force: true });
-        return { pidFile, pid: status.pid, stopped: true, wasAlive: true, error: null };
+        return {
+            pidFile,
+            pid: status.pid,
+            stopped: true,
+            wasAlive: true,
+            error: exited ? null : 'SIGKILL after timeout',
+        };
     } catch (error) {
         return {
             pidFile,
@@ -708,6 +745,29 @@ async function stopPidFileProcess(pidFile) {
             wasAlive: true,
             error: error instanceof Error ? error.message : String(error),
         };
+    }
+}
+
+/**
+ * @param {number} pid
+ * @param {number} timeoutMs
+ * @returns {Promise<boolean>}
+ */
+async function waitForProcessExit(pid, timeoutMs) {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+        try {
+            process.kill(pid, 0);
+        } catch {
+            return true;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    try {
+        process.kill(pid, 0);
+        return false;
+    } catch {
+        return true;
     }
 }
 

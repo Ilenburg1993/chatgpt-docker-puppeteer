@@ -156,6 +156,20 @@ describe('copilot MCP tools', () => {
         assert.ok('nextCursor' in structured);
     });
 
+    it('repo_search_text accepts query as a client-friendly alias for pattern', async () => {
+        const tool = findTool('repo_search_text');
+        const result = await tool.handler({
+            query: 'Copilot MCP Server',
+            path: 'src/copilot/mcp',
+            maxResults: 5,
+        });
+        assert.equal(result.isError, undefined);
+        const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
+        assert.equal(structured['pattern'], 'Copilot MCP Server');
+        assert.equal(structured['query'], 'Copilot MCP Server');
+        assert.ok(Number(structured['returnedMatchCount'] ?? 0) > 0);
+    });
+
     it('repo_search_text returns match and line counts separately when context is included', async () => {
         const tool = findTool('repo_search_text');
         const result = await tool.handler({
@@ -294,6 +308,7 @@ describe('copilot MCP tools', () => {
             pathA: 'src/copilot/mcp/tools/repo-read.js',
             pathB: 'src/copilot/mcp/tools/meta.js',
             contextLines: 1,
+            includeDiffPreview: true,
         });
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);
@@ -318,6 +333,9 @@ describe('copilot MCP tools', () => {
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_session_profile'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tools_status'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tunnel_status'));
+        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_connector_smoke_refresh'));
+        assert.ok(/** @type {string[]} */ (structured['validation']).includes('mcp_validation_dashboard'));
+        assert.ok(/** @type {string[]} */ (structured['validation']).includes('job_get_summary'));
         assert.equal(typeof structured['annotationProfile'], 'object');
         const authProfile = /** @type {Record<string, unknown>} */ (structured['authProfile']);
         assert.equal(authProfile['maxPowerDefault'], true);
@@ -335,7 +353,14 @@ describe('copilot MCP tools', () => {
         assert.ok(Number(structured['boundedWriteCount'] ?? 0) > 0);
         assert.ok(Number(structured['destructiveCount'] ?? 0) > 0);
         assert.ok(/** @type {string[]} */ (structured['rememberApprovalCandidates']).includes('repo_apply_patch'));
+        assert.equal(/** @type {string[]} */ (structured['rememberApprovalCandidates']).includes('job_cancel'), false);
         assert.ok(/** @type {string[]} */ (structured['destructiveTools']).includes('repo_remove_file'));
+        const approvalFrictionProfile = /** @type {Record<string, unknown>} */ (structured['approvalFrictionProfile']);
+        assert.equal(
+            /** @type {string[]} */ (approvalFrictionProfile['rememberApprovalCandidates']).includes('job_cancel'),
+            false,
+        );
+        assert.ok(/** @type {string[]} */ (approvalFrictionProfile['neverRememberApproval']).includes('job_cancel'));
         const tools = /**
          * @type {{
          *     name?: string;

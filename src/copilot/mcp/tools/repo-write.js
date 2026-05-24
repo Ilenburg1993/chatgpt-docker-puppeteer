@@ -123,6 +123,29 @@ function buildInlineDiffPreview(contentA, contentB, options = {}) {
 }
 
 /**
+ * @param {boolean | undefined} include
+ * @param {{ diff: string; truncated: boolean; lines: number; contextLines: number; bytes?: number }} diff
+ * @returns {Record<string, unknown>}
+ */
+function maybeDiffPreview(include, diff) {
+    return include === true
+        ? {
+              diffPreview: diff.diff,
+              diffPreviewTruncated: diff.truncated,
+              diffPreviewLines: diff.lines,
+              ...(typeof diff.bytes === 'number' ? { diffPreviewBytes: diff.bytes } : {}),
+              diffContextLines: diff.contextLines,
+          }
+        : {
+              diffPreviewSuppressed: true,
+              diffPreviewAvailable: diff.lines > 0,
+              diffPreviewLines: diff.lines,
+              ...(typeof diff.bytes === 'number' ? { diffPreviewBytes: diff.bytes } : {}),
+              diffContextLines: diff.contextLines,
+          };
+}
+
+/**
  * @param {unknown} value
  * @returns {number | undefined}
  */
@@ -514,9 +537,10 @@ export const repoWriteTools = [
             dryRun: z.boolean().optional().describe('Return diff and hashes without writing. Default: false.'),
             diffContextLines: z.number().int().min(0).max(20).optional().describe('Context lines in diff preview.'),
             maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
+            includeDiffPreview: z.boolean().optional().describe('Include textual diffPreview in the tool result. Default: false.'),
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ path, content, expectedHash, dryRun, diffContextLines, maxDiffLines }) => {
+        handler: async ({ path, content, expectedHash, dryRun, diffContextLines, maxDiffLines, includeDiffPreview }) => {
             const resolved = await resolveWritePath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
 
@@ -540,12 +564,9 @@ export const repoWriteTools = [
                             dryRun: true,
                             bytesWritten: 0,
                             previousBytes: previous.bytesRead,
-                            diffPreview: diff.diff,
-                            diffPreviewTruncated: diff.truncated,
-                            diffPreviewLines: diff.lines,
-                            diffContextLines: diff.contextLines,
+                            ...maybeDiffPreview(includeDiffPreview, diff),
                         },
-                        diff.diff,
+                        includeDiffPreview === true ? diff.diff : 'Write dry run complete; diff preview suppressed.',
                     );
                 }
 
@@ -577,10 +598,7 @@ export const repoWriteTools = [
                         previousBytes: previous.bytesRead,
                         previousHash: write.previousHash,
                         contentHash: write.contentHash,
-                        diffPreview: diff.diff,
-                        diffPreviewTruncated: diff.truncated,
-                        diffPreviewLines: diff.lines,
-                        diffContextLines: diff.contextLines,
+                        ...maybeDiffPreview(includeDiffPreview, diff),
                         io: {
                             operation: write.io.operation,
                             targetKind: write.io.targetKind,
@@ -590,7 +608,7 @@ export const repoWriteTools = [
                             traceId: write.io.traceId ?? null,
                         },
                     },
-                    diff.diff,
+                    includeDiffPreview === true ? diff.diff : 'Write applied; diff preview suppressed.',
                 );
             } catch (error) {
                 return errorResult(error instanceof Error ? error.message : String(error), {
@@ -611,9 +629,10 @@ export const repoWriteTools = [
             createParentDirs: z.boolean().optional().describe('Create parent directories. Default: true.'),
             dryRun: z.boolean().optional().describe('Validate and return diff without writing. Default: false.'),
             maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
+            includeDiffPreview: z.boolean().optional().describe('Include textual diffPreview in the tool result. Default: false.'),
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ path, content, createParentDirs, dryRun, maxDiffLines }) => {
+        handler: async ({ path, content, createParentDirs, dryRun, maxDiffLines, includeDiffPreview }) => {
             const resolved = await resolveWritePath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const initialContent = typeof content === 'string' ? content : '';
@@ -635,12 +654,9 @@ export const repoWriteTools = [
                             path: resolved.relative,
                             dryRun: true,
                             bytesWritten: 0,
-                            diffPreview: diff.diff,
-                            diffPreviewTruncated: diff.truncated,
-                            diffPreviewLines: diff.lines,
-                            diffContextLines: diff.contextLines,
+                            ...maybeDiffPreview(includeDiffPreview, diff),
                         },
-                        diff.diff,
+                        includeDiffPreview === true ? diff.diff : 'Create file dry run complete; diff preview suppressed.',
                     );
                 }
 
@@ -670,10 +686,7 @@ export const repoWriteTools = [
                         bytesWritten: write.bytesWritten,
                         previousHash: write.previousHash,
                         contentHash: write.contentHash,
-                        diffPreview: diff.diff,
-                        diffPreviewTruncated: diff.truncated,
-                        diffPreviewLines: diff.lines,
-                        diffContextLines: diff.contextLines,
+                        ...maybeDiffPreview(includeDiffPreview, diff),
                         io: {
                             operation: write.io.operation,
                             targetKind: write.io.targetKind,
@@ -683,7 +696,7 @@ export const repoWriteTools = [
                             traceId: write.io.traceId ?? null,
                         },
                     },
-                    diff.diff,
+                    includeDiffPreview === true ? diff.diff : 'Create file applied; diff preview suppressed.',
                 );
             } catch (error) {
                 return errorResult(error instanceof Error ? error.message : String(error), {
@@ -723,6 +736,7 @@ export const repoWriteTools = [
                 .describe('Allow old_string and new_string to be identical. Default: false.'),
             diffContextLines: z.number().int().min(0).max(20).optional().describe('Context lines in diff preview.'),
             maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
+            includeDiffPreview: z.boolean().optional().describe('Include textual diffPreview in the tool result. Default: false.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({
@@ -737,6 +751,7 @@ export const repoWriteTools = [
             allowNoop,
             diffContextLines,
             maxDiffLines,
+            includeDiffPreview,
         }) => {
             const resolved = await resolveWritePath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
@@ -799,11 +814,13 @@ export const repoWriteTools = [
                     noop: patch.noop,
                     previousHash: patch.previousHash,
                     contentHash: patch.contentHash,
-                    diffPreview: patch.diffPreview,
-                    diffPreviewTruncated: patch.diffPreviewTruncated,
-                    diffPreviewLines: patch.diffPreviewLines,
-                    diffPreviewBytes: patch.diffPreviewBytes,
-                    diffContextLines: patch.diffContextLines,
+                    ...maybeDiffPreview(includeDiffPreview, {
+                        diff: patch.diffPreview,
+                        truncated: patch.diffPreviewTruncated,
+                        lines: patch.diffPreviewLines,
+                        bytes: patch.diffPreviewBytes,
+                        contextLines: patch.diffContextLines,
+                    }),
                     io: {
                         operation: patch.io.operation,
                         targetKind: patch.io.targetKind,
@@ -813,7 +830,12 @@ export const repoWriteTools = [
                         traceId: patch.io.traceId ?? null,
                     },
                 };
-                return okResult(structured, patch.diffPreview);
+                return okResult(
+                    structured,
+                    includeDiffPreview === true
+                        ? patch.diffPreview
+                        : `Patch ${patch.dryRun ? 'planned' : 'applied'}: ${patch.replacedOccurrences} replacement(s), diff preview suppressed.`,
+                );
             } catch (error) {
                 return errorResult(error instanceof Error ? error.message : String(error), {
                     path: resolved.relative,

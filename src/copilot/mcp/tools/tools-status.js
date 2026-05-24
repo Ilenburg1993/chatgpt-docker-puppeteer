@@ -27,17 +27,32 @@ export function bindMcpToolsStatusProvider(provider) {
     toolsProvider = provider;
 }
 
+const NEVER_REMEMBER_APPROVAL_TOOLS = new Set(['job_cancel']);
+
+/**
+ * @param {{ name: string; riskClass: string }} tool
+ * @returns {boolean}
+ */
+function requiresManualApproval(tool) {
+    return tool.riskClass === 'destructive' || NEVER_REMEMBER_APPROVAL_TOOLS.has(tool.name);
+}
+
 /**
  * @param {{ name: string; riskClass: string; rememberApprovalCandidate: boolean }[]} summaries
  */
 function buildApprovalFrictionProfile(summaries) {
-    const remember = summaries.filter((tool) => tool.rememberApprovalCandidate).map((tool) => tool.name).sort();
     const manual = summaries
-        .filter((tool) => tool.riskClass === 'destructive' || tool.name === 'job_cancel')
+        .filter(requiresManualApproval)
+        .map((tool) => tool.name)
+        .sort();
+    const manualSet = new Set(manual);
+    const remember = summaries
+        .filter((tool) => tool.rememberApprovalCandidate && !manualSet.has(tool.name))
         .map((tool) => tool.name)
         .sort();
     return {
-        hostPolicy: 'write actions may require ChatGPT confirmation; readOnlyHint and conversation-level remembered approvals reduce friction but do not disable host safety UI',
+        hostPolicy:
+            'write actions may require ChatGPT confirmation; readOnlyHint and conversation-level remembered approvals reduce friction but do not disable host safety UI',
         firstCalls: ['mcp_session_profile', 'mcp_tools_status', 'mcp_capabilities_summary'],
         firstRememberApprovalWave: remember.filter((name) =>
             [
@@ -122,7 +137,7 @@ export const mcpToolsStatusTool = {
             openWorldCount: openWorld.length,
             idempotentReadCount: readOnly.filter((tool) => tool.annotations.idempotentHint).length,
             rememberApprovalCandidates: boundedWrite
-                .filter((tool) => tool.rememberApprovalCandidate)
+                .filter((tool) => tool.rememberApprovalCandidate && !requiresManualApproval(tool))
                 .map((tool) => tool.name),
             destructiveTools: destructive.map((tool) => tool.name),
             openWorldTools: openWorld.map((tool) => tool.name),
@@ -175,19 +190,25 @@ export const mcpAutonomyPowerScoreTool = {
         const securityMetadataCoverage =
             summaries.length === 0
                 ? 0
-                : summaries.filter((tool) => Array.isArray(tool.securitySchemes) && tool.securitySchemes.length > 0).length /
-                  summaries.length;
+                : summaries.filter((tool) => Array.isArray(tool.securitySchemes) && tool.securitySchemes.length > 0)
+                      .length / summaries.length;
         const auth = readMcpAuthConfig();
         const maxPowerRepoScopesByDefault = MAX_POWER_REPO_SCOPES.every((scope) => auth.initialScopes.includes(scope));
         const scoreParts = {
             toolSurface: clampScore((summaries.length / 66) * 18, 18),
             lowFrictionReads: clampScore((readOnly.length / Math.max(1, summaries.length)) * 18, 18),
-            writeSafety: clampScore((boundedWrite.length > 0 ? 9 : 0) + (planOnly.length >= 5 ? 7 : planOnly.length), 16),
+            writeSafety: clampScore(
+                (boundedWrite.length > 0 ? 9 : 0) + (planOnly.length >= 5 ? 7 : planOnly.length),
+                16,
+            ),
             metadata: clampScore((outputSchemaCoverage + securityMetadataCoverage) * 10, 20),
             validation: clampScore(
-                ['mcp_run_safe_validation_suite', 'run_typecheck_copilot', 'run_lint_copilot', 'run_unit_copilot'].filter(
-                    (name) => summaries.some((tool) => tool.name === name),
-                ).length * 3,
+                [
+                    'mcp_run_safe_validation_suite',
+                    'run_typecheck_copilot',
+                    'run_lint_copilot',
+                    'run_unit_copilot',
+                ].filter((name) => summaries.some((tool) => tool.name === name)).length * 3,
                 12,
             ),
             authPosture: clampScore(

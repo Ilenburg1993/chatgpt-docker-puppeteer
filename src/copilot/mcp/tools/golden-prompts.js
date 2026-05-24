@@ -8,7 +8,7 @@
 import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { okResult } from '../control-plane/result.js';
 
-const GOLDEN_PROMPTS_VERSION = 3;
+const GOLDEN_PROMPTS_VERSION = 4;
 
 const GOLDEN_PROMPTS = [
     {
@@ -38,8 +38,8 @@ const GOLDEN_PROMPTS = [
     {
         id: 'validation-one-job',
         goal: 'Validate code through one allowlisted job instead of separate validator calls.',
-        prompt: 'Inicie mcp_run_safe_validation_suite suite=mcp-full e depois use job_get_output para acompanhar.',
-        expectedTools: ['mcp_run_safe_validation_suite', 'job_get_output'],
+        prompt: 'Inicie mcp_run_safe_validation_suite suite=mcp-full, depois use mcp_validation_dashboard e job_get_summary; leia job_get_output com tailBytes pequeno apenas se houver falha.',
+        expectedTools: ['mcp_run_safe_validation_suite', 'mcp_validation_dashboard', 'job_get_summary'],
     },
     {
         id: 'delegated-diagnostics',
@@ -105,7 +105,8 @@ export const mcpGoldenPromptsTool = {
             },
             successCriteria: {
                 readInvestigation: 'No write approval prompts for read-only flows.',
-                validation: 'One approval path for mcp_run_safe_validation_suite plus job_get_output reads.',
+                validation:
+                    'One approval path for mcp_run_safe_validation_suite plus compact dashboard/summary reads; job_get_output only as a bounded failure fallback.',
                 cleanup: 'Quarantine path is preferred over repo_remove_file.',
                 delegation: 'Dry-run plan is visible before real fixed-mission execution.',
                 oauthMaxPower:

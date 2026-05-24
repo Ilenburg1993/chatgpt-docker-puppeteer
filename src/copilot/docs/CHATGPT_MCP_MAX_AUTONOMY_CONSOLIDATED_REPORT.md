@@ -2339,3 +2339,237 @@ Estado resultante:
    contexto de bearer token.
 3. A fronteira permanece honesta: OAuth reduz reauth/linking/401, mas nao promete desligar confirmacoes host-side de
    escrita/destruicao.
+
+---
+
+## 15. Rodada 2026-05-24 — auditoria externa, parity de capabilities e estabilidade de stream
+
+### 15.1. Entrada analisada integralmente
+
+Documento lido integralmente nesta rodada:
+
+```text
+src/copilot/docs/AUDIT_EXT_24-05-2026.md
+```
+
+O relatorio externo confirma que houve grande progresso no MCP permanente em `https://mcp.aurelin.org/mcp`, mas aponta
+um conjunto coerente de gaps de segunda ordem:
+
+1. o estado runtime ainda podia aparecer `degraded` por smoke Cloudflare stale;
+2. as novas tools compactas de validacao existiam, mas nao estavam refletidas em todas as superficies meta;
+3. `mcp_tools_status` ainda anunciava `job_cancel` como candidato a aprovacao lembravel no campo top-level;
+4. prompts de smoke e golden prompts ainda empurravam o ChatGPT para `job_get_output` como caminho primario;
+5. `repo_search_text` ainda exigia `pattern`, embora clientes MCP frequentemente usem `query`;
+6. `mcp_validation_dashboard` era estrito demais para argumentos opcionais benignos;
+7. o cliente SSE local nao validava status/content-type antes de tratar resposta como stream;
+8. o writer SSE compartilhado nao registrava backpressure;
+9. o roadmap precisava distinguir melhor o fallback temporario de Cloudflare do caminho permanente padrao.
+
+### 15.2. Documentacao oficial reconsultada
+
+Fontes externas atuais reconsultadas nesta rodada:
+
+1. OpenAI Apps SDK Quickstart: `https://developers.openai.com/apps-sdk/quickstart`
+   - confirma que apps para ChatGPT conectam por MCP;
+   - confirma que o servidor deve expor um endpoint publico HTTPS com caminho `/mcp`;
+   - confirma que, no fluxo de desenvolvimento, o conector do ChatGPT recebe a URL publica completa, por exemplo
+     `https://<host>/mcp`.
+2. Cloudflare Tunnel Routing: `https://developers.cloudflare.com/tunnel/routing/`
+   - confirma que uma published application mapeia hostname publico para um servico local;
+   - o desenho atual `mcp.aurelin.org -> http://localhost:3333` esta alinhado com esse modelo.
+3. Cloudflare Tunnel Configuration: `https://developers.cloudflare.com/tunnel/configuration/`
+   - confirma o uso de `cloudflared tunnel run --token <TOKEN>` para tunnel remoto gerenciado;
+   - confirma parametros operacionais como protocolo, logfile e metricas.
+4. Cloudflare Tunnel Tokens: `https://developers.cloudflare.com/tunnel/advanced/tunnel-tokens/`
+   - confirma que tunnels remotamente gerenciados podem rodar apenas com token;
+   - reforca que o token e segredo operacional e nao deve ser documentado ou retornado por tools.
+
+### 15.3. Diagnostico consolidado desta rodada
+
+O caminho permanente esta correto:
+
+```text
+ChatGPT connector URL: https://mcp.aurelin.org/mcp
+Origin local:          http://127.0.0.1:3333
+Tunnel:                workspace-mcp-dev
+Default auth:          OAuth
+Auth enforcement:      all
+Fallback temporario:   trycloudflare apenas como contingencia explicita
+```
+
+A causa mais provavel das interrupcoes observadas no ChatGPT web segue sendo tamanho/duracao de chamadas e leitura de
+logs, nao falha primaria de OAuth. Por isso, a prioridade desta rodada e transformar a experiencia em:
+
+```text
+dashboard primeiro -> summary por job -> output pequeno apenas se falhar
+```
+
+Isso reduz payload, reduz tempo de stream e reduz chance de o host web perder a resposta enquanto o job local conclui.
+
+### 15.4. Correcoes aplicadas nesta rodada
+
+1. `mcp_capabilities_summary` foi atualizado para paridade com o registry:
+   - `CAPABILITIES_VERSION=17`;
+   - `mcp_validation_dashboard` em `validation`;
+   - `job_get_summary` em `validation`;
+   - `mcp_connector_smoke_refresh` em `runtime`;
+   - guidance explicito para refresh de smoke apos restart Cloudflare/MCP.
+2. `mcp_tools_status` agora remove `job_cancel` tambem do campo top-level `rememberApprovalCandidates`.
+   - `job_cancel` permanece em `neverRememberApproval`;
+   - destructive tools continuam fora da primeira onda de aprovacao lembravel.
+3. `chatgpt_connector_profile` passou a recomendar fluxo summary-first:
+   - `mcp_validation_dashboard`;
+   - `job_get_summary`;
+   - `job_get_output tailBytes` pequeno somente em falha ou debugging necessario.
+4. `mcp_golden_prompts` foi atualizado para versao 4.
+   - O prompt `validation-one-job` deixou de tratar `job_get_output` como ferramenta esperada primaria.
+5. `delegate_to_repo_autonomy_runner mission=validate-mcp-full` agora orienta o caller para dashboard e summary antes de
+   qualquer leitura de log.
+6. `repo_search_text` passou a aceitar `query` como alias de `pattern`.
+   - `pattern` continua suportado;
+   - ausencia de ambos retorna erro estruturado `ERR_SEARCH_PATTERN_REQUIRED`;
+   - a resposta normaliza `pattern` para o valor efetivo e preserva `query` quando usado.
+7. `mcp_validation_dashboard` passou a tolerar argumentos opcionais benignos:
+   - `includeRunning`;
+   - `includeLatest`.
+8. Foi criada a tool operacional `mcp_connector_smoke_refresh`.
+   - executa o smoke canonico Cloudflare/OAuth contra a URL permanente;
+   - persiste o estado compacto em `src/copilot/.ai/cloudflare/connector-smoke.json`;
+   - suprime a lista completa de tools por default para proteger o stream do ChatGPT;
+   - expande `remoteToolNames` apenas se `includeRemoteToolNames=true`.
+9. O smoke Cloudflare passou a tratar as novas tools compactas como criticas:
+   - `mcp_validation_dashboard`;
+   - `job_get_summary`;
+   - `mcp_connector_smoke_refresh`.
+10. O package e o Makefile ganharam fluxo canonico explicito:
+    - `npm run copilot:mcp:cloudflare:smoke:refresh`;
+    - `make copilot-mcp-smoke-refresh`.
+11. O cliente SSE local passou a validar:
+    - status HTTP 2xx;
+    - `Content-Type: text/event-stream`;
+    - timeout de conexao;
+    - backoff preservado para respostas invalidas.
+12. O writer SSE compartilhado passou a registrar backpressure:
+    - `sse.writer.backpressure_total`;
+    - `sse.writer.backpressure_drained_total`.
+13. O restart Cloudflare/MCP foi corrigido para aguardar a liberacao real do processo antigo antes de iniciar um novo
+    origin HTTP.
+    - Antes, `make copilot-mcp-restart` podia iniciar um novo `mcp-http` enquanto o processo antigo ainda segurava
+      `127.0.0.1:3333`, causando `EADDRINUSE`, origin morto e 502 no Cloudflare.
+    - Agora `stopPidFileProcess()` aguarda a saida apos `SIGTERM` e so entao remove pid/metadata e inicia o novo
+      processo.
+
+### 15.5. Roadmap atualizado
+
+#### Faixa A — Paridade meta e contrato de tool surface
+
+Estado: em execucao nesta rodada.
+
+Subfases:
+
+1. [x] Atualizar `mcp_capabilities_summary` para incluir todas as tools novas.
+2. [x] Adicionar teste de paridade entre registry canonico e capabilities anunciadas.
+3. [x] Corrigir `mcp_tools_status.rememberApprovalCandidates` para excluir `job_cancel`.
+4. [x] Atualizar golden prompts e connector profile para summary-first.
+5. [ ] Validar com `npm run test:copilot:unit`.
+
+#### Faixa B — Confiabilidade Cloudflare permanente
+
+Estado: em execucao nesta rodada.
+
+Subfases:
+
+1. [x] Criar `mcp_connector_smoke_refresh`.
+2. [x] Adicionar comandos package/Makefile para refresh canonico de smoke.
+3. [x] Manter `trycloudflare` como fallback separado e nao como readiness padrao.
+4. [x] Rodar `make copilot-mcp-smoke-refresh` com tunnel vivo.
+5. [x] Rodar `make copilot-mcp-status` e confirmar `lastSmokeFresh=true`.
+6. [x] Rodar `make copilot-mcp-oauth-smoke`.
+
+#### Faixa C — Ergonomia de leitura e busca
+
+Estado: em execucao nesta rodada.
+
+Subfases:
+
+1. [x] Aceitar `repo_search_text.query`.
+2. [x] Preservar `pattern` como contrato principal para retrocompatibilidade.
+3. [x] Adicionar teste unitario do alias.
+4. [ ] Avaliar uma futura tool `repo_search_text_continue` se a paginacao por cursor for usada em sessoes reais.
+
+#### Faixa D — Estabilidade de streams e payloads
+
+Estado: em execucao nesta rodada.
+
+Subfases:
+
+1. [x] Validar status/content-type no cliente SSE local.
+2. [x] Adicionar timeout de conexao SSE.
+3. [x] Registrar backpressure no writer SSE compartilhado.
+4. [ ] Considerar budget comum de resposta para tools MCP de alto payload.
+5. [ ] Medir em ChatGPT real se `mcp_validation_dashboard -> job_get_summary` elimina interrupcoes de validacao.
+
+#### Faixa E — Validacao e publicacao
+
+Estado: pendente nesta rodada.
+
+Subfases:
+
+1. [x] `npm run typecheck:strict:src.copilot -- --pretty false`.
+2. [x] `npm run lint:copilot -- --quiet`.
+3. [x] `npm run test:copilot:unit`.
+4. [x] `git diff --check`.
+5. [ ] Commit e push de todo o conjunto validado.
+
+### 15.6. Criterios de aceite atualizados
+
+Para esta rodada ser considerada concluida:
+
+1. `mcp_capabilities_summary.advertisedToolCount` deve ser igual ao total do registry.
+2. `mcp_tools_status.rememberApprovalCandidates` nao deve incluir `job_cancel`.
+3. `mcp_golden_prompts` deve recomendar summaries antes de log tails.
+4. `repo_search_text` deve funcionar com `pattern` e com `query`.
+5. `mcp_connector_smoke_refresh` deve aparecer no registry e no capabilities summary.
+6. `make copilot-mcp-smoke-refresh` deve conseguir atualizar o smoke permanente quando o tunnel estiver vivo.
+7. Os tres validadores do escopo `src/copilot` devem passar antes do commit:
+   - typecheck strict;
+   - lint;
+   - unit tests.
+
+### 15.7. Validacao executada nesta rodada
+
+1. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`
+   - passou com 40/40.
+2. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_repo_write.spec.js tests/unit/copilot/conversation-hub/test_hub.spec.js --reporter=dot`
+   - passou com 20/20 apos ajustar testes para `includeDiffPreview=true` no novo contrato de diffs suprimidos por
+     default.
+3. `npm run typecheck:strict:src.copilot -- --pretty false`
+   - passou.
+4. `npm run lint:copilot -- --quiet`
+   - passou.
+5. `npm run test:copilot:unit`
+   - passou com 3092/3092, sem warnings/errors.
+6. `git diff --check`
+   - passou.
+7. `make copilot-mcp-restart`
+   - passou e reiniciou `mcp-http` e `cloudflared`.
+8. `make copilot-mcp-smoke-refresh`
+   - passou com 74/74 tools remotas, `toolsMatchLocalRegistry=true`, `criticalToolsPresent=true`,
+     `permanentSmokeUpdated=true`.
+9. `make copilot-mcp-status`
+   - passou com `ready=true`, `recommendedAction=use`, `authentication=OAuth` e smoke fresco.
+10. `make copilot-mcp-oauth-smoke`
+    - passou com protected resource, OAuth metadata, JWKS, DCR, CIMD, refresh token, id token CIMD, `/oauth/userinfo` e
+      chamada autenticada `mcp_runtime_health`.
+
+Estado operacional final desta rodada:
+
+```text
+Public MCP URL: https://mcp.aurelin.org/mcp
+Registry remoto: 74 tools
+Registry local:  74 tools
+OAuth:           ok
+Cloudflare:      ready=true
+Smoke:           fresh
+Fallback:        trycloudflare mantido apenas como contingencia
+```
