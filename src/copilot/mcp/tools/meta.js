@@ -10,7 +10,7 @@ import { MCP_AUTH_SCOPES, readMcpAuthConfig } from '../control-plane/auth.js';
 import { okResult } from '../control-plane/result.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 21;
+const CAPABILITIES_VERSION = 22;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -84,6 +84,7 @@ const RUNTIME_TOOLS = [
     'mcp_golden_prompts',
     'mcp_apps_sdk_readiness',
     'mcp_cloudflare_edge_audit',
+    'mcp_cloudflare_edge_policy_plan',
     'mcp_cloudflare_metrics_snapshot',
     'mcp_host_block_diagnostics',
     'mcp_maintenance_plan',
@@ -164,6 +165,7 @@ const IO_GUIDANCE = [
     'Use mcp_connector_smoke_refresh after MCP/Cloudflare restarts to refresh the permanent connector smoke cache.',
     'Use mcp_cloudflare_remote_audit to compare the Cloudflare-hosted tunnel config, DNS CNAME and expected local origin without exposing API tokens.',
     'Use mcp_cloudflare_edge_audit to inspect Cloudflare zone rulesets for cache, WAF, rate-limit and transform interference with MCP/OAuth.',
+    'Use mcp_cloudflare_edge_policy_plan before proposing Cloudflare edge changes; it is plan-only and does not mutate rulesets.',
     'Use mcp_cloudflare_metrics_snapshot to inspect local cloudflared version, orchestration config version and registration counters.',
     'Use mcp_post_restart_readiness after any restart before starting heavy ChatGPT work.',
     'Use claude_connector_profile when adding the same remote MCP server to claude.ai custom connectors.',

@@ -35,6 +35,7 @@ describe('copilot MCP registry', () => {
             'mcp_autonomy_power_score',
             'mcp_capabilities_summary',
             'mcp_cloudflare_edge_audit',
+            'mcp_cloudflare_edge_policy_plan',
             'mcp_cloudflare_metrics_snapshot',
             'mcp_cloudflare_remote_audit',
             'mcp_connector_smoke_refresh',

@@ -385,7 +385,7 @@ Status: futuro.
 
 Subfases:
 
-1. [ ] Criar export JSON de desired edge policy.
+1. [x] Criar export JSON de desired edge policy em modo plan-only.
 2. [ ] Criar diff entre desired e actual rulesets.
 3. [ ] Criar plano de mudanca sem aplicar.
 4. [ ] Criar aplicador com backup previo.
@@ -394,6 +394,16 @@ Subfases:
 7. [ ] Integrar Audit Logs MCP/Cloudflare API quando a permissao existir.
 8. [ ] Avaliar replicas do tunnel.
 9. [ ] Avaliar Load Balancing apenas se houver mais de uma origem real.
+
+Continuidade pos-push:
+
+1. [x] Criar `mcp_cloudflare_edge_policy_plan`.
+2. [x] Criar `npm run copilot:mcp:cloudflare:edge-policy-plan`.
+3. [x] Criar `make copilot-mcp-edge-policy-plan`.
+4. [x] Documentar o comando no README MCP.
+5. [x] Rodar validadores completos novamente.
+6. [x] Reiniciar/smoke remoto para publicar a nova tool.
+7. [x] Confirmar smoke remoto com 80/80 tools.
 
 ## 7. Criterios de pronto
 
@@ -414,6 +424,7 @@ Este turno Cloudflare sera considerado pronto quando:
 make copilot-mcp-status
 make copilot-mcp-remote-audit
 make copilot-mcp-edge-audit
+make copilot-mcp-edge-policy-plan
 make copilot-mcp-smoke-refresh
 ```
 

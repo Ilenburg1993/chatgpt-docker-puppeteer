@@ -14,6 +14,7 @@ import { formatChatGptConnectorAuthentication } from '../connection/profile.js';
 import { readMcpAuthConfig } from '../control-plane/auth.js';
 import { getCanonicalMcpTools } from '../registry.js';
 import { auditCloudflareEdgeRulesets } from './edge-audit.js';
+import { buildCloudflareEdgePolicyPlan } from './edge-policy-plan.js';
 import { auditCloudflareRemoteTunnel } from './remote-api.js';
 import {
     buildManagedTunnelArgs,
@@ -51,6 +52,8 @@ try {
         await runRemoteAudit();
     } else if (command === 'edge-audit') {
         await runEdgeAudit();
+    } else if (command === 'edge-policy-plan') {
+        await runEdgePolicyPlan();
     } else if (command === 'up') {
         await runUp();
     } else if (command === 'down') {
@@ -65,7 +68,7 @@ try {
         );
     } else {
         fail(
-            `Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, remote-audit, edge-audit, up, down, restart, or run.`,
+            `Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, remote-audit, edge-audit, edge-policy-plan, up, down, restart, or run.`,
         );
     }
 } catch (error) {
@@ -301,6 +304,7 @@ async function runSmoke() {
         'mcp_tools_status',
         'mcp_tunnel_status',
         'mcp_cloudflare_edge_audit',
+        'mcp_cloudflare_edge_policy_plan',
         'mcp_cloudflare_remote_audit',
         'mcp_cloudflare_metrics_snapshot',
         'mcp_connector_smoke_refresh',
@@ -403,6 +407,15 @@ async function runRemoteAudit() {
  */
 async function runEdgeAudit() {
     const report = await auditCloudflareEdgeRulesets();
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runEdgePolicyPlan() {
+    const report = await buildCloudflareEdgePolicyPlan();
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     if (!report.ok) process.exitCode = 1;
 }

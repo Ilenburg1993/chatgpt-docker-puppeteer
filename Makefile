@@ -203,6 +203,7 @@ help:
 	@echo "  $(CYAN)make copilot-mcp-up$(NC)    Sobe MCP OAuth + Cloudflare permanente"
 	@echo "  $(CYAN)make copilot-mcp-restart$(NC) Reinicia MCP OAuth + Cloudflare"
 	@echo "  $(CYAN)make copilot-mcp-edge-audit$(NC) Audita Cloudflare cache/WAF/rate-limit/transforms"
+	@echo "  $(CYAN)make copilot-mcp-edge-policy-plan$(NC) Planeja edge policy Cloudflare sem aplicar"
 	@echo "  $(CYAN)make copilot-mcp-smoke-refresh$(NC) Atualiza smoke persistido do MCP público"
 	@echo "  $(CYAN)make copilot-mcp-oauth-smoke$(NC) Smoke OAuth canônico do MCP público"
 	@echo "  $(CYAN)make lsp-health$(NC)        Diagnóstico funcional LSP via MCP"
@@ -1248,6 +1249,10 @@ copilot-mcp-remote-audit:
 copilot-mcp-edge-audit:
 	@echo "$(CYAN)🛡️  Auditoria Cloudflare Edge/Rulesets MCP$(NC)"
 	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:edge-audit
+
+copilot-mcp-edge-policy-plan:
+	@echo "$(CYAN)🧭 Plano Cloudflare Edge policy MCP$(NC)"
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:edge-policy-plan
 
 copilot-mcp-smoke:
 	@echo "$(CYAN)🧪 Smoke MCP tools/list público$(NC)"

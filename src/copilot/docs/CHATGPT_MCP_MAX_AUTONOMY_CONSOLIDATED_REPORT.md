@@ -3336,3 +3336,56 @@ Correcao adicional descoberta pelos validadores:
    - o singleton de producao continua usando o store padrao.
    - o teste passou a usar SQLite `:memory:` com migrations e store isolado.
 4. O teste isolado do hub passou em seguida, e a suite completa confirmou a estabilidade.
+
+### 18.1. Continuidade pos-push — desired edge policy plan-only
+
+Apos o commit `c755986d`, a continuidade imediata adicionou uma segunda tool Cloudflare focada em planejamento seguro,
+sem aplicar nenhuma mudanca na conta.
+
+Mudancas:
+
+1. Novo modulo `src/copilot/mcp/cloudflare/edge-policy-plan.js`.
+2. Nova tool MCP `mcp_cloudflare_edge_policy_plan`.
+3. Novo script `npm run copilot:mcp:cloudflare:edge-policy-plan`.
+4. Novo target `make copilot-mcp-edge-policy-plan`.
+5. Registry/capabilities/smoke atualizados para 80 tools.
+6. README MCP atualizado com o comando plan-only.
+7. Teste unitario `test_cloudflare_edge_policy_plan.spec.js`.
+
+Contrato da nova tool:
+
+1. `mode="plan-only"`.
+2. `appliesChanges=false`.
+3. Gera proposta canonica para:
+   - cache bypass de `/mcp`, `/oauth/*`, `/.well-known/*` e `/health`;
+   - rate limit moderado de `/oauth/token`;
+   - protecao de trafego anonimo em `/mcp`;
+   - invariantes de nao interferencia para WAF, Access, transforms e streaming.
+4. A tool nao chama API de mutacao e nao cria rulesets.
+
+Validacao desta continuidade:
+
+1. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_cloudflare_edge_policy_plan.spec.js tests/unit/copilot/mcp/test_mcp_registry.spec.js --reporter=dot`
+   - passou com 6/6 apos ajustar uma assercao fragil de JSON escapado.
+2. `npm run typecheck:strict:src.copilot -- --pretty false`
+   - passou.
+3. `npm run lint:copilot -- --quiet`
+   - passou.
+4. `git diff --check`
+   - passou.
+5. `npm run test:copilot:unit`
+   - passou com 3102/3102, sem warnings/errors.
+6. `make copilot-mcp-restart`
+   - passou.
+7. `make copilot-mcp-edge-policy-plan`
+   - passou e retornou plano plan-only.
+8. `make copilot-mcp-smoke-refresh`
+   - passou com 80/80 tools remotas e `toolsMatchLocalRegistry=true`.
+   - `mcp_cloudflare_edge_policy_plan` apareceu no endpoint publico.
+9. `make copilot-mcp-status`
+   - passou com `ready=true`, OAuth, tunnel e MCP HTTP vivos, last smoke recente.
+
+Proximo passo tecnico:
+
+1. Criar diff read-only entre actual edge audit e desired edge policy plan.
+2. Continuar evitando mutacao automatica ate existir backup/diff/rollback.

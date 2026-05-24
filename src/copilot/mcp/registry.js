@@ -12,6 +12,7 @@ import { errorResult } from './control-plane/result.js';
 import { normalizeMcpToolDefinitions } from './control-plane/tool-metadata.js';
 import { mcpAppsSdkReadinessTool } from './tools/apps-sdk-readiness.js';
 import { mcpCloudflareEdgeAuditTool } from './tools/cloudflare-edge.js';
+import { mcpCloudflareEdgePolicyPlanTool } from './tools/cloudflare-edge-policy.js';
 import { mcpCloudflareMetricsSnapshotTool } from './tools/cloudflare-metrics.js';
 import { connectionTools } from './tools/connection.js';
 import { mcpCloudflareRemoteAuditTool } from './tools/cloudflare-remote.js';
@@ -76,6 +77,7 @@ export function getCanonicalMcpTools() {
         mcpGoldenPromptsTool,
         mcpAppsSdkReadinessTool,
         mcpCloudflareEdgeAuditTool,
+        mcpCloudflareEdgePolicyPlanTool,
         mcpCloudflareMetricsSnapshotTool,
         mcpHostBlockDiagnosticsTool,
         ...connectionTools,

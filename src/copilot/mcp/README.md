@@ -46,6 +46,7 @@ Em outro terminal:
 npm run copilot:mcp:cloudflare:status
 npm run copilot:mcp:cloudflare:remote-audit
 npm run copilot:mcp:cloudflare:edge-audit
+npm run copilot:mcp:cloudflare:edge-policy-plan
 npm run copilot:mcp:cloudflare:smoke
 npm run copilot:mcp:oauth:smoke
 ```
@@ -66,6 +67,8 @@ Use `npm run copilot:mcp:cloudflare:edge-audit` para auditar, quando o token per
 que possam interferir em MCP/OAuth: cache, WAF, rate limit e transform rules. Se o token atual ainda nao
 tiver `Zone:Read`/`Zone Rulesets:Read`, o comando retorna estado parcial com permissoes faltantes em vez de
 expor segredos.
+Use `npm run copilot:mcp:cloudflare:edge-policy-plan` para gerar a proposta canonica plan-only de rulesets
+Cloudflare antes de qualquer alteracao manual ou futura automacao de mutacao.
 Quick Tunnel continua disponivel como fallback explicito:
 
 ```bash
