@@ -27,4 +27,15 @@ describe('model-gateway BYOK provider failure taxonomy', () => {
             classifyByokProviderFailure(Object.assign(new Error('fetch failed'), { code: 'ECONNRESET' })).kind,
         ).toBe('network');
     });
+
+    it('classifica rate-limit, timeout, upstream e desconhecido sem colapsar em fallback unico', () => {
+        expect(classifyByokProviderFailure(Object.assign(new Error('too many requests'), { status: 429 })).kind).toBe(
+            'rate-limit',
+        );
+        expect(classifyByokProviderFailure(new Error('provider timed out without progress')).kind).toBe('timeout');
+        expect(classifyByokProviderFailure(Object.assign(new Error('bad gateway'), { statusCode: 502 })).kind).toBe(
+            'upstream',
+        );
+        expect(classifyByokProviderFailure(new Error('unexpected provider envelope')).kind).toBe('unknown');
+    });
 });

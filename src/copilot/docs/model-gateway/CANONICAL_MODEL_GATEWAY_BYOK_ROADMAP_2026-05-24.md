@@ -200,7 +200,7 @@ src/copilot/model-gateway/
 
 - [x] Migrar `terminal/state/byok-provider-health.js` para `model-gateway/health`.
 - [x] Migrar `terminal/byok/provider-failure.js` para classifier compartilhado.
-- [ ] Separar falhas `auth`, `credits`, `rate-limit`, `model-or-route`, `timeout`, `network`, `upstream`, `unknown`.
+- [x] Separar falhas `auth`, `credits`, `rate-limit`, `model-or-route`, `timeout`, `network`, `upstream`, `unknown`.
 - [ ] Persistir health por `providerId|providerModel|routeProfile`.
 - [ ] Usar health no roteamento.
 
