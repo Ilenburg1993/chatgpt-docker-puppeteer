@@ -16,6 +16,7 @@ import {
     runCopilotBootPlan,
 } from '#copilot/boot';
 import { EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
+import { buildModelGatewayOnListModelsHandler } from '#copilot/model-gateway';
 import { ERROR_TRACKER } from '#copilot/observability';
 import {
     HOOKS_LOGGER,
@@ -37,6 +38,14 @@ import { startCopilotServer } from '../server/index.js';
 
 /** @type {boolean} */
 let _booted = false;
+
+/**
+ * @returns {Partial<import('#copilot/sdk/types').CopilotClientOptions>}
+ */
+function buildModelGatewayClientOptions() {
+    const onListModels = buildModelGatewayOnListModelsHandler(process.env);
+    return onListModels ? { onListModels } : {};
+}
 
 /**
  * @typedef {{
@@ -164,7 +173,7 @@ export async function bootCopilot(options) {
             },
             'sdk-preflight': async () => {
                 bootState.bootPreflight = await runCopilotSdkBootPreflight({
-                    createClient: () => createCopilotClient(),
+                    createClient: () => createCopilotClient(buildModelGatewayClientOptions()),
                     checkAuthStatus,
                     configuredModel: COPILOT_MODEL,
                     pingTimeoutMs: PING_TIMEOUT_MS,

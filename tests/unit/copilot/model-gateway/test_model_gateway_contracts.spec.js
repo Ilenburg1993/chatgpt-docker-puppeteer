@@ -17,6 +17,7 @@ import {
     buildProviderModelId,
     buildRegistrySnapshotEvent,
     createEnvSecretRegistry,
+    buildModelGatewayOnListModelsHandler,
     openAICompatibleAdapter,
     persistEnvByokModelGatewaySnapshot,
     projectModelGatewayMetrics,
@@ -185,5 +186,25 @@ describe('model-gateway foundation', () => {
         assert.equal(overrides.provider.apiKey, secret);
         assert.equal(overrides.modelCapabilities?.supports.vision, true);
         assert.equal(JSON.stringify({ provider, model }).includes(secret), false);
+    });
+
+    it('builds an SDK onListModels handler from gateway records without exposing secrets', async () => {
+        const secret = 'sk-or-v1-list-models-secret-that-must-not-leak';
+        const handler = buildModelGatewayOnListModelsHandler({
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_PRESET: 'openrouter',
+            COPILOT_BYOK_MODEL: 'deepseek/deepseek-v4-flash:free',
+            OPEN_ROUTER_KEY: secret,
+        });
+        assert.equal(typeof handler, 'function');
+
+        const models = await handler?.();
+        assert.ok(models?.some((model) => model.id === 'deepseek/deepseek-v4-flash:free'));
+        assert.ok(models?.some((model) => model.byok?.gatewayId === 'openrouter:deepseek/deepseek-v4-flash:free'));
+        assert.equal(JSON.stringify(models).includes(secret), false);
+    });
+
+    it('does not install a gateway onListModels handler when BYOK is disabled', () => {
+        assert.equal(buildModelGatewayOnListModelsHandler({ COPILOT_BYOK_ENABLED: 'false' }), undefined);
     });
 });

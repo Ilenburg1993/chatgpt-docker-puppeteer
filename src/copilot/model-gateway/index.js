@@ -37,6 +37,7 @@ export {
 } from './secrets/env-secret-registry.js';
 export { redactSecretRecord, redactSecretText } from './secrets/redaction.js';
 export { OpenAICompatibleAdapter, openAICompatibleAdapter } from './providers/index.js';
+export { buildModelGatewayOnListModelsHandler } from './session/on-list-models.js';
 export { toCopilotModelInfo, toCopilotModelInfoList } from './session/copilot-model-projection.js';
 export {
     MODEL_GATEWAY_EVENTS,

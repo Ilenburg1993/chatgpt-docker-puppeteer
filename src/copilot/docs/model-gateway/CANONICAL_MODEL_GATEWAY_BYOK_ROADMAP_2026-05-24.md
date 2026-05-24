@@ -1,6 +1,6 @@
 # Canonical Model Gateway / BYOK Roadmap
 
-Data: 2026-05-24  
+Data: 2026-05-24
 Escopo: `src/copilot`, GitHub Copilot SDK 0.3.0, BYOK universal, seleção de modelos, probes, sessões e observability.
 
 ## 1. Diagnóstico
@@ -154,7 +154,7 @@ src/copilot/model-gateway/
 - [x] Persistir records com `schemaVersion`.
 - [x] Criar `RegistryProjection` para operador.
 - [x] Trocar `/byok models` para ler projection do gateway, mantendo fallback legado.
-- [ ] Fazer `onListModels()` aceitar projection do gateway sem `sdk/session` importar gateway.
+- [x] Fazer `onListModels()` aceitar projection do gateway sem `sdk/session` importar gateway.
 - [ ] Adicionar snapshot de providers e models no `/health` e `/now`.
 
 ### Faixa C — Secrets e redaction
