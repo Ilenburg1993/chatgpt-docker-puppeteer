@@ -11,6 +11,7 @@ import { recordMcpToolMetric } from './control-plane/metrics.js';
 import { errorResult } from './control-plane/result.js';
 import { normalizeMcpToolDefinitions } from './control-plane/tool-metadata.js';
 import { mcpAppsSdkReadinessTool } from './tools/apps-sdk-readiness.js';
+import { mcpCloudflareEdgePolicyApplyTool } from './tools/cloudflare-edge-apply.js';
 import {
     mcpCloudflareEdgeBackupCreateTool,
     mcpCloudflareEdgeBackupsListTool,
@@ -85,6 +86,7 @@ export function getCanonicalMcpTools() {
         mcpCloudflareEdgeBackupCreateTool,
         mcpCloudflareEdgeBackupsListTool,
         mcpCloudflareEdgeAuditTool,
+        mcpCloudflareEdgePolicyApplyTool,
         mcpCloudflareEdgePolicyDiffTool,
         mcpCloudflareEdgePolicyPlanTool,
         mcpCloudflareEdgeSnapshotTool,

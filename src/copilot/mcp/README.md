@@ -48,6 +48,7 @@ npm run copilot:mcp:cloudflare:remote-audit
 npm run copilot:mcp:cloudflare:edge-audit
 npm run copilot:mcp:cloudflare:edge-backup-create
 npm run copilot:mcp:cloudflare:edge-backup-list
+npm run copilot:mcp:cloudflare:edge-policy-apply
 npm run copilot:mcp:cloudflare:edge-policy-diff
 npm run copilot:mcp:cloudflare:edge-policy-plan
 npm run copilot:mcp:cloudflare:edge-snapshot
@@ -81,6 +82,9 @@ Use `npm run copilot:mcp:cloudflare:edge-backup-create` para persistir esse snap
 `src/copilot/.ai/cloudflare/edge-snapshots/`, ignorado pelo Git, antes de mudar cache, WAF ou rate limits.
 Use `npm run copilot:mcp:cloudflare:edge-backup-list` para localizar o backup mais recente antes/depois de
 uma alteracao operacional.
+Use `npm run copilot:mcp:cloudflare:edge-policy-apply` para dry-run do aplicador com backup obrigatorio.
+Aplicacao real exige chamar o CLI com `edge-policy-apply --apply --confirm-apply` ou a tool MCP com
+`dryRun=false` e `confirmApply=true`.
 Quick Tunnel continua disponivel como fallback explicito:
 
 ```bash

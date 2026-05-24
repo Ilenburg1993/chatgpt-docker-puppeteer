@@ -3592,3 +3592,71 @@ Status da faixa:
 2. O endpoint publico esta pronto com 84/84 tools.
 3. A criacao automatica de regras Cloudflare reais ainda nao foi liberada; a proxima faixa deve criar aplicador com
    guardrails, diff pos-mutacao e rollback documentado.
+
+### 18.5. Continuidade — aplicador Cloudflare com guardrails
+
+Apos a camada de backup persistido, foi iniciada a faixa de aplicador. A implementacao segue a documentacao oficial
+da Cloudflare Rulesets API: cache rules usam `http_request_cache_settings` com `set_cache_settings` e
+`action_parameters.cache=false`; rate limiting usa `http_ratelimit` com objeto `ratelimit`, e regras de rate limit
+devem ficar ao fim da lista de regras do ruleset.
+
+Fontes oficiais consultadas:
+
+1. Cloudflare Cache Rules API: `https://developers.cloudflare.com/cache/how-to/cache-rules/create-api/`
+2. Cloudflare Rulesets Node SDK: `https://developers.cloudflare.com/api/node/resources/rulesets/`
+3. Cloudflare Rate Limiting Rules API: `https://developers.cloudflare.com/waf/rate-limiting-rules/create-api/`
+
+Mudancas em andamento:
+
+1. Novo modulo `src/copilot/mcp/cloudflare/edge-policy-apply.js`.
+2. Nova tool MCP `mcp_cloudflare_edge_policy_apply`.
+3. Novo script `npm run copilot:mcp:cloudflare:edge-policy-apply`.
+4. Novo target `make copilot-mcp-edge-policy-apply`.
+5. Teste unitario `test_cloudflare_edge_policy_apply.spec.js`.
+
+Contrato do aplicador:
+
+1. `dryRun=true` por default.
+2. `appliesChanges=false` enquanto `dryRun=true` ou `confirmApply` nao for `true`.
+3. Mutacao real exige simultaneamente:
+   - preflight limpo;
+   - backup criado;
+   - `dryRun=false`;
+   - `confirmApply=true`.
+4. Regras usam `ref` estavel:
+   - `copilot-mcp-cache-bypass-v1`;
+   - `copilot-mcp-oauth-token-rate-limit-v1`;
+   - `copilot-mcp-anonymous-rate-limit-v1`.
+5. O plano preserva regras existentes do ruleset ao anexar/substituir apenas refs do MCP.
+6. O CLI real aceita `edge-policy-apply --apply --confirm-apply`; sem flags ele apenas planeja.
+
+Proxima validacao:
+
+1. Rodar teste focado de apply + registry.
+   - passou.
+2. Rodar typecheck strict.
+   - passou apos casts pontuais nas chamadas tipadas do SDK Cloudflare.
+3. Rodar lint.
+   - passou.
+4. Rodar `make copilot-mcp-edge-policy-apply` em dry-run contra Cloudflare real.
+   - passou.
+   - criou backup `preflight`.
+   - plano final:
+     - criar entrypoint `http_request_cache_settings`;
+     - criar entrypoint `http_ratelimit`;
+     - anexar segunda regra de rate-limit apos criacao do entrypoint.
+5. Rodar unit tests completos.
+   - passou com 3110/3110, sem warnings/errors.
+6. Reiniciar/smoke remoto para publicar a tool 85.
+   - primeiro smoke imediato pos-restart recebeu 530/1033 transiente da Cloudflare.
+   - smoke foi ajustado para tratar 530 como transiente junto com 502/503/504.
+   - smoke posterior passou com 85/85 tools remotas, OAuth ok e `toolsMatchLocalRegistry=true`.
+   - `make copilot-mcp-status` passou com `ready=true`.
+
+Observacao de qualidade:
+
+1. O primeiro dry-run expôs uma imprecisao no plano: duas regras na mesma fase ausente apareciam como duas criacoes
+   de entrypoint.
+2. O planejador foi corrigido para marcar a primeira regra da fase como `create-entrypoint-ruleset` e as demais como
+   `append-rule-after-entrypoint-create`.
+3. Esse ajuste evita confusao operacional antes de uma futura aplicacao real.

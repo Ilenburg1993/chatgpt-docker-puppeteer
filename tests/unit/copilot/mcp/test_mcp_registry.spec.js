@@ -37,6 +37,7 @@ describe('copilot MCP registry', () => {
             'mcp_cloudflare_edge_audit',
             'mcp_cloudflare_edge_backup_create',
             'mcp_cloudflare_edge_backups_list',
+            'mcp_cloudflare_edge_policy_apply',
             'mcp_cloudflare_edge_policy_diff',
             'mcp_cloudflare_edge_policy_plan',
             'mcp_cloudflare_edge_snapshot',

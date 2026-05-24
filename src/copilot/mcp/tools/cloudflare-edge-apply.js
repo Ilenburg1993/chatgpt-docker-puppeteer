@@ -1,0 +1,41 @@
+// @ts-check
+/**
+ * Cloudflare edge policy apply tools.
+ *
+ * @module copilot/mcp/tools/cloudflare-edge-apply
+ */
+
+import { z } from 'zod';
+import { applyCloudflareEdgePolicy } from '../cloudflare/edge-policy-apply.js';
+import { boundedWriteAnnotations } from '../control-plane/annotations.js';
+import { okResult } from '../control-plane/result.js';
+
+/**
+ * @type {import('../registry.js').McpToolDefinition}
+ */
+export const mcpCloudflareEdgePolicyApplyTool = {
+    name: 'mcp_cloudflare_edge_policy_apply',
+    title: 'Cloudflare edge policy apply',
+    description:
+        'Plan or apply the canonical Cloudflare edge policy with mandatory backup. Defaults to dryRun and requires confirmApply=true for real mutation.',
+    inputSchema: {
+        dryRun: z.boolean().optional().describe('Plan only. Default: true.'),
+        confirmApply: z
+            .boolean()
+            .optional()
+            .describe('Required together with dryRun=false to mutate Cloudflare rulesets. Default: false.'),
+        phases: z
+            .array(z.enum(['http_request_cache_settings', 'http_ratelimit']))
+            .optional()
+            .describe('Optional phases to include. Default: cache settings and rate limiting.'),
+    },
+    annotations: boundedWriteAnnotations(),
+    handler: async ({ dryRun, confirmApply, phases }) =>
+        okResult(
+            await applyCloudflareEdgePolicy({
+                ...(typeof dryRun === 'boolean' ? { dryRun } : {}),
+                ...(typeof confirmApply === 'boolean' ? { confirmApply } : {}),
+                ...(Array.isArray(phases) ? { phases } : {}),
+            }),
+        ),
+};
