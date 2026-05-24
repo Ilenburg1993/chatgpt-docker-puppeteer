@@ -164,7 +164,7 @@ src/copilot/model-gateway/
 - [x] Criar redaction canônica do gateway para textos e records aninhados.
 - [x] Fazer `EnvByokCompatImporter` publicar apenas refs configuradas, nunca valores.
 - [x] Classificar refs de autenticação em `apiKeyRefs` e `bearerTokenRefs` no record seguro de provider.
-- [ ] Centralizar redaction hoje duplicada entre `provider.js` e terminal health.
+- [x] Centralizar redaction hoje duplicada entre `provider.js` e terminal health.
 - [x] Garantir que snapshots e events nunca carreguem `apiKey`, `bearerToken` ou headers sensíveis.
 - [x] Criar teste de regressão que falha se uma key aparece serializada.
 

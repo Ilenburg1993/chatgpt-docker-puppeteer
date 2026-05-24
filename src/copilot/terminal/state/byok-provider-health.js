@@ -13,6 +13,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { redactSecretText } from '#copilot/core';
 
 const MAX_BYOK_PROVIDER_HEALTH_RECORDS = 200;
 const BYOK_PROVIDER_HEALTH_SCHEMA_VERSION = 1;
@@ -105,11 +106,7 @@ function healthKey(input) {
 function sanitizeHealthText(value) {
     const normalized = normalizePart(value);
     if (!normalized) return null;
-    const redacted = normalized
-        .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{12,}/giu, 'Bearer [redacted]')
-        .replace(/\b(sk|gsk|hf|csk|nvapi|cpk|cfat|AIza)[A-Za-z0-9._~+/=-]{8,}/gu, '[redacted]')
-        .replace(/((?:api[_-]?key|authorization|token|secret)\s*[:=]\s*["']?)[^"',\s;]{8,}/giu, '$1[redacted]');
-    return redacted.length > 500 ? `${redacted.slice(0, 497)}...` : redacted;
+    return redactSecretText(normalized, { maxLength: 500 });
 }
 
 /**

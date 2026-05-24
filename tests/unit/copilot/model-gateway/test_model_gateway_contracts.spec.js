@@ -150,6 +150,13 @@ describe('model-gateway foundation', () => {
     it('redacts secret-like text and nested records', () => {
         const secret = 'gsk_secret_value_that_must_not_leak';
         assert.equal(redactSecretText(`Authorization: Bearer ${secret}`).includes(secret), false);
+        assert.equal(redactSecretText('erro com token direto', { additionalSecrets: ['token direto'] }), 'erro com [redacted]');
+        assert.equal(
+            redactSecretText(
+                'jwt eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbnYiOiJwcm9kdWN0aW9uIiwia2lsb0lkIjoiabcifQ.F6DBD5my8raY_4eMPA5HjaVtUMFG4l3JUg8WQtD29_c',
+            ).includes('eyJhbGci'),
+            false,
+        );
 
         const redacted = redactSecretRecord({
             headers: { Authorization: `Bearer ${secret}` },

@@ -21,8 +21,15 @@ const recordTerminalActivity = vi.fn();
 const getShowToolActivity = vi.fn(() => true);
 const getShowUsage = vi.fn(() => true);
 const getShowStreaming = vi.fn(() => true);
+const getShowThinking = vi.fn(() => false);
 const getShowIntentActivity = vi.fn(() => true);
 const getShowSessionActivity = vi.fn(() => false);
+const setShowToolActivity = vi.fn();
+const setShowUsage = vi.fn();
+const setShowStreaming = vi.fn();
+const setShowThinking = vi.fn();
+const setShowIntentActivity = vi.fn();
+const setShowSessionActivity = vi.fn();
 const readTerminalRuntimeState = vi.fn(
     () =>
         /** @type {any} */ ({
@@ -58,8 +65,15 @@ vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
     getShowToolActivity,
     getShowUsage,
     getShowStreaming,
+    getShowThinking,
     getShowIntentActivity,
     getShowSessionActivity,
+    setShowToolActivity,
+    setShowUsage,
+    setShowStreaming,
+    setShowThinking,
+    setShowIntentActivity,
+    setShowSessionActivity,
 }));
 
 vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({

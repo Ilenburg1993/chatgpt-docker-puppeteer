@@ -13,6 +13,7 @@
 
 import { PROVIDER_TYPES } from '../constants.js';
 import { log } from '../logger.js';
+import { redactSecretRecord, redactSecretText } from '../../core/index.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1029,14 +1030,9 @@ function inferAuth(env, preset, providerType) {
  * @returns {string}
  */
 function toSafeMessage(message) {
-    let safe = message;
-    for (const key of BYOK_SECRET_ENV_KEYS) {
-        const value = process.env[key];
-        if (typeof value === 'string' && value.length > 0) {
-            safe = safe.split(value).join('[redacted]');
-        }
-    }
-    return safe;
+    return redactSecretText(message, {
+        additionalSecrets: BYOK_SECRET_ENV_KEYS.map((key) => process.env[key]),
+    });
 }
 
 /**
@@ -1391,12 +1387,7 @@ function summarizeConfiguredByokModelCatalog(model, models, authoritative) {
  */
 export function redactProviderConfig(provider) {
     if (!provider) return null;
-    return {
-        ...provider,
-        ...(provider.apiKey !== undefined ? { apiKey: '[redacted]' } : {}),
-        ...(provider.bearerToken !== undefined ? { bearerToken: '[redacted]' } : {}),
-        ...(provider.headers !== undefined ? { headers: Object.fromEntries(Object.keys(provider.headers).map((key) => [key, '[redacted]'])) } : {}),
-    };
+    return /** @type {ProviderConfig} */ (redactSecretRecord(/** @type {Record<string, unknown>} */ (provider)));
 }
 
 /**

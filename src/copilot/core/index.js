@@ -72,6 +72,10 @@ export { EventBus, bridgeEmitter, createEventBus } from './event-bus.js';
 
 // ─── Security ─────────────────────────────────────────────────────────────────
 export {
+    redactSecretRecord,
+    redactSecretText,
+} from './security/redaction.js';
+export {
     checkResolvedIp,
     isPrivateIp,
     validateUrl,

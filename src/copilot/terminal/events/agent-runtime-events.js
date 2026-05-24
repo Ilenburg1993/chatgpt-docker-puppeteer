@@ -10,7 +10,13 @@
  * @module copilot/terminal/agent-runtime-events
  */
 
-import { cancelTimer, registerInterval } from '#copilot/core';
+import {
+    cancelTimer,
+    redactSecretRecord,
+    redactSecretText,
+    registerInterval,
+    resolveModelSelectionMismatch,
+} from '#copilot/core';
 import { readConfiguredByokSummary } from '#copilot/config';
 import {
     EMITTER_AGENT_BACKGROUND_COMPLETED,
@@ -34,7 +40,6 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
-import { resolveModelSelectionMismatch } from '#copilot/core';
 import { getShowSessionActivity, getShowToolActivity, getShowUsage } from '../../presentation/state/index.js';
 import {
     broadcastSse,
@@ -198,10 +203,7 @@ function resolveRecoverableModelCallOperatorDetail(evt) {
  * @returns {string}
  */
 function sanitizeOperationalErrorMessage(value) {
-    return value
-        .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{12,}/giu, 'Bearer [redacted]')
-        .replace(/\b(sk|gsk|hf|csk|nvapi|cpk|cfat|AIza)[A-Za-z0-9._~+/=-]{8,}/gu, '[redacted]')
-        .replace(/((?:api[_-]?key|authorization|token|secret)\s*[:=]\s*["']?)[^"',\s;]{8,}/giu, '$1[redacted]');
+    return redactSecretText(value);
 }
 
 /**
@@ -217,14 +219,11 @@ function normalizeSdkLifecycleString(value) {
  * @returns {Record<string, unknown>}
  */
 function sanitizeSdkLifecycleMetadata(metadata) {
+    const redacted = redactSecretRecord(metadata);
     const out = /** @type {Record<string, unknown>} */ ({});
-    for (const [key, value] of Object.entries(metadata)) {
-        if (/token|secret|authorization|api[_-]?key/i.test(key)) {
-            out[key] = '[redacted]';
-            continue;
-        }
+    for (const [key, value] of Object.entries(redacted)) {
         if (typeof value === 'string') {
-            out[key] = sanitizeOperationalErrorMessage(value);
+            out[key] = value;
             continue;
         }
         if (value === null || ['number', 'boolean'].includes(typeof value)) {
