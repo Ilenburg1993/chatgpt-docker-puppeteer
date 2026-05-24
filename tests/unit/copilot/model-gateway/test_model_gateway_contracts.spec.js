@@ -22,13 +22,82 @@ import {
     geminiAdapter,
     ollamaAdapter,
     openAICompatibleAdapter,
+    OPENAI_PROVIDER_FAMILY_SPECS,
     openRouterAdapter,
     persistEnvByokModelGatewaySnapshot,
     projectModelGatewayMetrics,
     redactSecretRecord,
     redactSecretText,
+    resolveModelGatewayProviderAdapter,
     toCopilotModelInfoList,
 } from '../../../../src/copilot/model-gateway/index.js';
+
+const PROVIDER_FAMILY_ENV_FIXTURES = Object.freeze([
+    {
+        preset: 'kilo-code',
+        model: 'kilo-auto/free',
+        secretKey: 'KILO_API_KEY',
+        secretValue: 'kilo-secret-that-must-not-leak',
+        expectedAdapter: 'kilo',
+    },
+    {
+        preset: 'groq',
+        model: 'qwen/qwen3-32b',
+        secretKey: 'GROQ_KEY',
+        secretValue: 'gsk-secret-that-must-not-leak',
+        expectedAdapter: 'groq',
+    },
+    {
+        preset: 'mistral',
+        model: 'codestral-latest',
+        secretKey: 'MISTRAL_KEY',
+        secretValue: 'mistral-secret-that-must-not-leak',
+        expectedAdapter: 'mistral',
+    },
+    {
+        preset: 'huggingface',
+        model: 'openai/gpt-oss-120b:fastest',
+        secretKey: 'HUGGING_FACE_KEY',
+        secretValue: 'hf-secret-that-must-not-leak',
+        expectedAdapter: 'huggingface',
+    },
+    {
+        preset: 'cloudflare-workers-ai',
+        model: '@cf/meta/llama-3.1-8b-instruct',
+        secretKey: 'CLOUDFLARE_KEY',
+        secretValue: 'cfat-secret-that-must-not-leak',
+        extraEnv: { CLOUDFLARE_ACCOUNT_ID: 'account-for-test' },
+        expectedAdapter: 'cloudflare-workers-ai',
+    },
+    {
+        preset: 'nvidia-nim',
+        model: 'openai/gpt-oss-120b',
+        secretKey: 'NVIDIA_KEY',
+        secretValue: 'nvapi-secret-that-must-not-leak',
+        expectedAdapter: 'nvidia-nim',
+    },
+    {
+        preset: 'cerebras',
+        model: 'gpt-oss-120b',
+        secretKey: 'CEREBRAS_KEY',
+        secretValue: 'csk-secret-that-must-not-leak',
+        expectedAdapter: 'cerebras',
+    },
+    {
+        preset: 'chutes',
+        model: 'Qwen/Qwen3.5-397B-A17B-TEE',
+        secretKey: 'CHUTES_AI',
+        secretValue: 'cpk-secret-that-must-not-leak',
+        expectedAdapter: 'chutes',
+    },
+    {
+        preset: 'zai',
+        model: 'glm-4.6',
+        secretKey: 'Z_AI_KEY',
+        secretValue: 'zai-secret-that-must-not-leak',
+        expectedAdapter: 'zai',
+    },
+]);
 
 describe('model-gateway foundation', () => {
     it('keeps provider/model identity distinct from provider-local SDK ids', () => {
@@ -320,6 +389,38 @@ describe('model-gateway foundation', () => {
         assert.equal(overrides.provider.wireApi, undefined);
         assert.equal(overrides.gateway?.providerFamily, 'anthropic');
         assert.equal(overrides.gateway?.openAiCompatibleEndpoint, false);
+    });
+
+    it('resolves remaining BYOK provider families through gateway adapters instead of SDK preset logic', () => {
+        const registeredFamilies = new Set(OPENAI_PROVIDER_FAMILY_SPECS.map((spec) => spec.id));
+        for (const fixture of PROVIDER_FAMILY_ENV_FIXTURES) {
+            const env = {
+                COPILOT_BYOK_ENABLED: 'true',
+                COPILOT_BYOK_PROVIDER_PRESET: fixture.preset,
+                COPILOT_BYOK_MODEL: fixture.model,
+                [fixture.secretKey]: fixture.secretValue,
+                ...(fixture.extraEnv ?? {}),
+            };
+            const snapshot = buildEnvByokModelGatewaySnapshot(env);
+            const provider = snapshot.providers.find((item) => item.id === fixture.preset);
+            const model = snapshot.models.find((item) => item.providerModel === fixture.model);
+            assert.ok(provider, `provider missing for ${fixture.preset}`);
+            assert.ok(model, `model missing for ${fixture.preset}`);
+            assert.ok(registeredFamilies.has(fixture.expectedAdapter), `family spec missing for ${fixture.expectedAdapter}`);
+
+            const adapter = resolveModelGatewayProviderAdapter(provider);
+            const overrides = adapter.toCopilotSessionOverrides({
+                provider,
+                model,
+                secrets: createEnvSecretRegistry({ env }),
+            });
+
+            assert.equal(adapter.id, fixture.expectedAdapter);
+            assert.equal(overrides.model, fixture.model);
+            assert.equal(overrides.provider.apiKey ?? overrides.provider.bearerToken, fixture.secretValue);
+            assert.equal(overrides.gateway?.providerFamily, fixture.expectedAdapter);
+            assert.equal(JSON.stringify({ provider, model, gateway: overrides.gateway }).includes(fixture.secretValue), false);
+        }
     });
 
     it('builds an SDK onListModels handler from gateway records without exposing secrets', async () => {

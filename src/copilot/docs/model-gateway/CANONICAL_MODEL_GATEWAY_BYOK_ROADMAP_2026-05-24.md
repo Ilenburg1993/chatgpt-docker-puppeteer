@@ -176,8 +176,10 @@ src/copilot/model-gateway/
 - [x] Extrair `OllamaAdapter`.
 - [x] Extrair `GeminiAdapter`.
 - [x] Extrair `AnthropicAdapter`.
-- [ ] Fazer novo provider ser adicionável sem editar `sdk/session/provider.js`.
-- [ ] Manter presets antigos como compat layer durante transição.
+- [x] Criar registry de adapters do gateway.
+- [x] Cobrir adapters de Kilo, Groq, Mistral, Hugging Face, Cloudflare Workers AI, NVIDIA NIM, Cerebras, Chutes e Z.AI.
+- [x] Fazer novo provider ser adicionável sem editar `sdk/session/provider.js`.
+- [x] Manter presets antigos como compat layer durante transição.
 
 ### Faixa E — Probes
 
