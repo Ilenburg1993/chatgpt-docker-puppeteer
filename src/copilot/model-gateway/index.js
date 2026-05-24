@@ -75,6 +75,7 @@ export {
     BYOK_AGENT_PROBE_TOOL,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
+    runConfiguredByokStreamingProbe,
 } from './probes/index.js';
 export {
     MODEL_GATEWAY_EVENTS,

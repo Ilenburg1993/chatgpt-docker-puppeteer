@@ -36,6 +36,7 @@ import {
     BYOK_AGENT_PROBE_TOOL,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
+    runConfiguredByokStreamingProbe,
     toCopilotModelInfoList,
 } from '../../../../src/copilot/model-gateway/index.js';
 
@@ -675,5 +676,72 @@ describe('model-gateway foundation', () => {
         ]);
         assert.deepEqual(capturedConfig.onPermissionRequest, { permission: 'allow' });
         assert.deepEqual(capturedPayload, { payload: { prompt: 'agent probe now' }, timeoutMs: 5000 });
+    });
+
+    it('classifies configured BYOK streaming probe as ok only when message deltas are observed', async () => {
+        const baseDeps = {
+            // @ts-expect-error test double keeps only the fields consumed by the probe.
+            readConfiguredByokState: () => ({
+                enabled: true,
+                ready: true,
+                provider: { type: 'openai', apiKey: 'secret' },
+                model: 'model-stream',
+                errors: [],
+                warnings: [],
+                summary: { model: 'model-stream', profile: 'dev', preset: 'openrouter', providerType: 'openai' },
+            }),
+            // @ts-expect-error test double keeps only the fields consumed by the probe.
+            resolveConfiguredByokSessionOverrides: () => ({
+                provider: { type: 'openai', apiKey: 'secret' },
+                model: 'model-stream',
+                summary: {
+                    model: 'model-stream',
+                    profile: 'dev',
+                    preset: 'openrouter',
+                    providerType: 'openai',
+                    warnings: [],
+                },
+            }),
+            // @ts-expect-error test double calls the callback synchronously with a fake SDK session.
+            withEphemeralSession: async (_config, callback) => {
+                await callback({ session: { id: 'stream-session-object' }, sessionId: 'tmp-stream-probe' });
+            },
+            // @ts-expect-error test double records no actual permission behavior.
+            createPermissionHandler: () => ({}),
+        };
+        const withDelta = await runConfiguredByokStreamingProbe({
+            deps: {
+                ...baseDeps,
+                // @ts-expect-error test double emits the subset of SDK events used by the probe.
+                onSessionEvents: (_session, handlers) => {
+                    handlers['assistant.message_delta']?.({ data: { deltaContent: 'STREAM_A' } });
+                    handlers['assistant.message']?.({ data: { content: 'STREAM_A STREAM_B STREAM_C' } });
+                    return () => {};
+                },
+                // @ts-expect-error test double returns final content.
+                sendSessionAndWait: async () => ({ data: { content: 'STREAM_A STREAM_B STREAM_C' } }),
+            },
+        });
+        const withoutDelta = await runConfiguredByokStreamingProbe({
+            deps: {
+                ...baseDeps,
+                // @ts-expect-error test double emits only final content.
+                onSessionEvents: (_session, handlers) => {
+                    handlers['assistant.message']?.({ data: { content: 'STREAM_A STREAM_B STREAM_C' } });
+                    return () => {};
+                },
+                // @ts-expect-error test double returns final content.
+                sendSessionAndWait: async () => ({ data: { content: 'STREAM_A STREAM_B STREAM_C' } }),
+            },
+        });
+
+        assert.equal(withDelta.ok, true);
+        assert.equal(withDelta.status, 'ok');
+        assert.equal(withDelta.streamingProved, true);
+        assert.equal(withDelta.deltaCount, 1);
+        assert.equal(withoutDelta.ok, false);
+        assert.equal(withoutDelta.status, 'no-delta');
+        assert.equal(withoutDelta.streamingProved, false);
+        assert.match(withoutDelta.errors.at(-1) ?? '', /message_delta/);
     });
 });
