@@ -110,6 +110,7 @@ export {
     rankCatalogEvidenceConfidence,
     refreshModelGatewayCatalog,
     runCatalogImporters,
+    searchModelGatewayCatalogEntries,
     summarizeModelGatewayCatalogSnapshot,
     summarizeCanonicalModelProjectionDiff,
     toOpenAIModelCatalogEntry,

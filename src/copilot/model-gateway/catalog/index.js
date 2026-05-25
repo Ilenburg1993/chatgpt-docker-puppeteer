@@ -124,3 +124,4 @@ export {
     mirrorModelGatewayCatalogSnapshotToSqlite,
     summarizeModelGatewayCatalogSnapshot,
 } from './sqlite-migration.js';
+export { searchModelGatewayCatalogEntries } from './search.js';

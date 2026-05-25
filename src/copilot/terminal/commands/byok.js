@@ -49,6 +49,7 @@ import {
     runConfiguredByokJsonProbe,
     runConfiguredByokStreamingProbe,
     runConfiguredByokVisionProbe,
+    searchModelGatewayCatalogEntries,
     SqliteModelGatewayCatalogStore,
     summarizeCanonicalModelProjectionDiff,
     toOpenAIModelCatalogList,
@@ -1526,7 +1527,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>> | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>> | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1883,6 +1884,57 @@ async function renderByokGatewayCatalogExplain(println, selector) {
         );
     }
     println(`      \x1b[90mnext=${explanation.nextActions.slice(0, 6).join(',') || '-'}\x1b[0m\n`);
+}
+
+/**
+ * @param {string[]} rest
+ * @returns {{ query: string; providerId: string | undefined; onlyEligible: boolean; requireTools: boolean; requireStreaming: boolean; requireReasoning: boolean; limit: number }}
+ */
+function parseByokGatewayCatalogSearchArgs(rest) {
+    const numeric = rest.map((item) => Number(item)).find((value) => Number.isFinite(value) && value > 0);
+    const providerToken = rest.find((item) => /^(?:provider|providerId)[:=]/iu.test(item));
+    const providerId = providerToken ? providerToken.slice(providerToken.search(/[:=]/u) + 1).trim() || undefined : undefined;
+    const query = rest
+        .filter((item) => Number.isNaN(Number(item)))
+        .filter((item) => !/^(eligible|tools|streaming|reasoning|provider[:=]|providerId[:=])/iu.test(item))
+        .join(' ')
+        .trim();
+    return {
+        query,
+        providerId,
+        onlyEligible: rest.some((item) => /^(eligible|only-eligible)$/iu.test(item)),
+        requireTools: rest.some((item) => /^(tools|tool)$/iu.test(item)),
+        requireStreaming: rest.some((item) => /^(streaming|stream)$/iu.test(item)),
+        requireReasoning: rest.some((item) => /^(reasoning|raciocinio|raciocínio)$/iu.test(item)),
+        limit: Math.min(Math.floor(numeric ?? 20), 100),
+    };
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayCatalogSearch(println, rest) {
+    const args = parseByokGatewayCatalogSearchArgs(rest);
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const snapshot = await store.readSnapshot();
+    const results = searchModelGatewayCatalogEntries(snapshot, args);
+    println(`\n  \x1b[36mBYOK model-gateway catalog search\x1b[0m`);
+    println(
+        `  \x1b[90mstore=${store.filePath} · query=${args.query || '-'} · provider=${args.providerId ?? '-'} · eligible=${args.onlyEligible ? 'sim' : 'nao'} · tools=${args.requireTools ? 'sim' : 'nao'} · results=${results.length}\x1b[0m\n`,
+    );
+    if (results.length === 0) {
+        println('    \x1b[33mNenhum modelo encontrado para os filtros informados.\x1b[0m\n');
+        return;
+    }
+    for (const result of results) {
+        println(`    \x1b[33m${result.key}\x1b[0m  \x1b[90mscore=${result.score} · eligibility=${result.eligibilityStatus}\x1b[0m`);
+        println(
+            `      \x1b[90m${result.displayName} · routes=${result.routeOptionCount} · overlays=${result.accountOverlayCount} · matched=${result.matchedFields.slice(0, 4).join(',') || '-'}\x1b[0m`,
+        );
+    }
+    println('');
 }
 
 /**
@@ -2490,6 +2542,13 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             /^(explain|explicar|describe|show)$/iu.test(rest[1] ?? '')
         ) {
             await renderByokGatewayCatalogExplain(println, rest.slice(2).join(' ') || null);
+            return;
+        }
+        if (
+            /^(catalog|catalogo)$/iu.test(rest[0] ?? '') &&
+            /^(search|buscar|find|filter|filtrar)$/iu.test(rest[1] ?? '')
+        ) {
+            await renderByokGatewayCatalogSearch(println, rest.slice(2));
             return;
         }
         if (/^(eligibility|elegibilidade|eligible|exclusion|exclusao|exclusão)$/iu.test(rest[0] ?? '')) {

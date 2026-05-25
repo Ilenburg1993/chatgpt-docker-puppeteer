@@ -512,7 +512,7 @@ Se a tarefa não exige imagem, vision é no máximo bônus ou superfície a vali
 - [x] UX inicial de eligibility decisions via `/byok gateway eligibility`.
 - [x] UX de explicação por modelo juntando catálogo, overlay, eligibility e
   probes.
-- [ ] Busca rica por metadados.
+- [x] Busca rica por metadados via `/byok gateway catalog search`.
 - [x] Export OpenAI schema visível via `/byok gateway catalog openai`.
 
 ### 5.11 Observabilidade
@@ -1372,7 +1372,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Catalog diff.
 - [x] Catalog conflicts.
 - [x] Endpoint inventory.
-- [ ] `/byok gateway catalog search`.
+- [x] `/byok gateway catalog search`.
 - [x] `/byok gateway catalog explain <model>`.
 - [ ] `/byok gateway overlays`.
 - [x] `/byok gateway eligibility`.
@@ -1493,7 +1493,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 
 - [x] Refresh/diff/conflicts no terminal.
 - [x] Endpoint inventory.
-- [ ] Search/filter.
+- [x] Search/filter.
 - [x] Explain por modelo.
 - [ ] Explain por provider.
 - [ ] Mostrar route options.
@@ -1833,6 +1833,10 @@ Implementado neste corte:
   options, account overlays, eligibility e OpenAI projection sem runtime.
 - [x] Exposto `/byok gateway catalog explain <model>` como inspeção terminal
   sem rede.
+- [x] Criado `searchModelGatewayCatalogEntries()` para busca/ranking de
+  metadados antes do runtime.
+- [x] Exposto `/byok gateway catalog search <query> [provider:<id>] [eligible]
+  [tools] [streaming] [reasoning] [n]`.
 - [x] Adicionados testes de migrations gerais criando as tabelas do
   model-gateway.
 
@@ -1847,11 +1851,11 @@ Separação arquitetural reafirmada:
 Validação deste corte:
 
 - [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
-  com `83` testes.
+  com `84` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS `npm run lint:copilot`.
 - [x] PASS `git diff --check`.
-- [x] PASS `npm run test:copilot` com `5660` testes totais, `5627` passed,
+- [x] PASS `npm run test:copilot` com `5661` testes totais, `5628` passed,
   `33` pending, `0` failed e `0` warnings/errors.
 
 Próxima direção:
