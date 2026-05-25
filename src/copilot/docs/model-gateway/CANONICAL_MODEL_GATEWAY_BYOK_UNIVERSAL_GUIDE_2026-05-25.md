@@ -1535,7 +1535,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Manter export JSON para debug.
 - [x] Testar redaction.
 - [x] Testar idempotência.
-- [ ] Testar downgrade/unknown schema.
+- [x] Testar downgrade/unknown schema.
 - [x] Criar índices por provider/model/route/account.
 - [x] Criar views OpenAI schema.
 - [x] Preparar snapshot JSON com `modelEligibilityRuns` e
@@ -1962,6 +1962,37 @@ Validação parcial deste corte:
 
 - [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   com `89` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS `npm run lint:copilot`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 22. Continuidade 2026-05-25 — Guarda De Schema SQLite
+
+Implementado neste corte:
+
+- [x] `SqliteModelGatewayCatalogStore` lê `PRAGMA user_version` antes de aplicar
+  o schema.
+- [x] Banco novo ou antigo conhecido recebe `MODEL_GATEWAY_SQLITE_SCHEMA_VERSION`
+  após criação/atualização idempotente.
+- [x] Banco com `user_version` maior que o suportado é rejeitado com erro
+  acionável antes de qualquer escrita.
+- [x] Adicionado teste de store novo com `user_version=0`.
+- [x] Adicionado teste de schema futuro desconhecido para impedir downgrade
+  acidental.
+
+Separação preservada:
+
+- [x] A proteção fica no store SQLite, não no JSON store.
+- [x] A migração explícita JSON->SQLite continua intacta.
+- [x] O schema normalizado continua separado de runtime health/probes e route
+  decisions.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `90` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS `npm run lint:copilot`.
 - [x] PASS `git diff --check`.

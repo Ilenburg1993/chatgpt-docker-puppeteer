@@ -93,6 +93,7 @@ import {
     createModelEligibilityDecision,
     createModelEligibilityRun,
     MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
+    MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,
     MODEL_GATEWAY_SQLITE_TABLES,
     createModelMetadataEvidence,
     createModelRouteOption,
@@ -1339,6 +1340,26 @@ describe('model-gateway foundation', () => {
             assert.deepEqual(row, { include: 1, disposition: 'eligible' });
         } finally {
             db.close();
+        }
+    });
+
+    it('guards SQLite catalog stores against unknown future schema versions', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const fresh = new Database(':memory:');
+        const future = new Database(':memory:');
+        try {
+            assert.equal(fresh.pragma('user_version', { simple: true }), 0);
+            new SqliteModelGatewayCatalogStore({ db: fresh });
+            assert.equal(fresh.pragma('user_version', { simple: true }), MODEL_GATEWAY_SQLITE_SCHEMA_VERSION);
+
+            future.pragma(`user_version = ${MODEL_GATEWAY_SQLITE_SCHEMA_VERSION + 100}`);
+            assert.throws(
+                () => new SqliteModelGatewayCatalogStore({ db: future }),
+                /database schema version .* newer than supported version/u,
+            );
+        } finally {
+            fresh.close();
+            future.close();
         }
     });
 

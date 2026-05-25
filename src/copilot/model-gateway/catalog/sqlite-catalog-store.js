@@ -14,7 +14,7 @@ import { getCopilotDb } from '../../db/sqlite.js';
 import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { toOpenAIModelCatalogList } from './openai-schema.js';
-import { MODEL_GATEWAY_SQLITE_SCHEMA_SQL } from './sqlite-schema.js';
+import { MODEL_GATEWAY_SQLITE_SCHEMA_SQL, MODEL_GATEWAY_SQLITE_SCHEMA_VERSION } from './sqlite-schema.js';
 
 const ACTIVE_SNAPSHOT_ID = 'active';
 const DEFAULT_ROUTE_PROFILE = 'default';
@@ -61,6 +61,27 @@ function optionalString(value) {
 function optionalInteger(value) {
     const number = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
     return Number.isFinite(number) ? Math.floor(number) : null;
+}
+
+/**
+ * @param {import('better-sqlite3').Database} db
+ * @returns {number}
+ */
+function sqliteUserVersion(db) {
+    return optionalInteger(db.pragma('user_version', { simple: true })) ?? 0;
+}
+
+/**
+ * @param {import('better-sqlite3').Database} db
+ * @returns {void}
+ */
+function ensureCompatibleSqliteSchemaVersion(db) {
+    const userVersion = sqliteUserVersion(db);
+    if (userVersion > MODEL_GATEWAY_SQLITE_SCHEMA_VERSION) {
+        throw new Error(
+            `[model-gateway/sqlite] database schema version ${userVersion} is newer than supported version ${MODEL_GATEWAY_SQLITE_SCHEMA_VERSION}`,
+        );
+    }
 }
 
 /**
@@ -232,7 +253,9 @@ export class SqliteModelGatewayCatalogStore {
     constructor(options = {}) {
         this.#db = options.db ?? (options.dbPath ? new Database(options.dbPath) : getCopilotDb());
         this.#db.pragma('foreign_keys = ON');
+        ensureCompatibleSqliteSchemaVersion(this.#db);
         this.#db.exec(MODEL_GATEWAY_SQLITE_SCHEMA_SQL);
+        this.#db.pragma(`user_version = ${MODEL_GATEWAY_SQLITE_SCHEMA_VERSION}`);
     }
 
     /**
