@@ -65,6 +65,7 @@ import {
     createCerebrasPublicModelsImporter,
     createGeminiModelsImporter,
     createMistralModelsImporter,
+    createOllamaCatalogImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
@@ -1708,6 +1709,95 @@ describe('model-gateway foundation', () => {
         assert.equal(snapshot.routeOptions[0].normalizedPolicy.resourceName, 'models/gemini-2.5-flash');
     });
 
+    it('imports Ollama local tags and show metadata as private local catalog evidence', async () => {
+        /** @type {Array<{ url: string; body: unknown }>} */
+        const requests = [];
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (url, init) => {
+                requests.push({
+                    url: String(url),
+                    body: typeof init?.body === 'string' ? JSON.parse(init.body) : null,
+                });
+                if (String(url).endsWith('/api/tags')) {
+                    return /** @type {Response} */ ({
+                        ok: true,
+                        status: 200,
+                        json: async () => ({
+                            models: [
+                                {
+                                    name: 'gemma3:4b',
+                                    model: 'gemma3:4b',
+                                    modified_at: '2025-10-03T23:34:03.409490317-07:00',
+                                    size: 3338801804,
+                                    digest: 'sha256-local-digest',
+                                    details: {
+                                        format: 'gguf',
+                                        family: 'gemma',
+                                        families: ['gemma'],
+                                        parameter_size: '4.3B',
+                                        quantization_level: 'Q4_K_M',
+                                    },
+                                },
+                            ],
+                        }),
+                    });
+                }
+                if (String(url).endsWith('/api/show')) {
+                    return /** @type {Response} */ ({
+                        ok: true,
+                        status: 200,
+                        json: async () => ({
+                            parameters: 'temperature 0.7\nnum_ctx 8192',
+                            template: '{{ .Prompt }}',
+                            license: 'Local model license',
+                            capabilities: ['completion', 'vision'],
+                            modified_at: '2025-10-04T00:00:00.000Z',
+                            details: {
+                                parent_model: '',
+                                format: 'gguf',
+                                family: 'gemma3',
+                                families: ['gemma3'],
+                                parameter_size: '4.3B',
+                                quantization_level: 'Q4_K_M',
+                            },
+                            model_info: {
+                                'gemma3.context_length': 131072,
+                                'general.architecture': 'gemma3',
+                                'general.parameter_count': 4299915632,
+                            },
+                        }),
+                    });
+                }
+                return /** @type {Response} */ ({ ok: false, status: 404, json: async () => ({}) });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createOllamaCatalogImporter({ fetchImpl: fakeFetch, baseUrl: 'http://127.0.0.1:11434' })],
+            now: () => new Date('2026-05-25T13:35:00.000Z'),
+        });
+        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+
+        assert.equal(requests.length, 2);
+        assert.equal(requests[0].url, 'http://127.0.0.1:11434/api/tags');
+        assert.deepEqual(requests[1].body, { model: 'gemma3:4b', verbose: false });
+        assert.equal(snapshot.sources[0].providerId, 'ollama-local');
+        assert.equal(snapshot.sources[0].kind, 'local_daemon');
+        assert.equal(snapshot.evidences[0].confidence, 'catalog');
+        assert.equal(byPath.get('limits.contextWindowTokens'), 8192);
+        assert.equal(byPath.get('capabilities.chat'), true);
+        assert.equal(byPath.get('capabilities.vision'), true);
+        assert.deepEqual(byPath.get('modalities.input'), ['text', 'image']);
+        assert.equal(byPath.get('providerMetadata.ollama.digest'), 'sha256-local-digest');
+        assert.equal(byPath.get('providerMetadata.ollama.family'), 'gemma3');
+        assert.equal(byPath.get('providerMetadata.ollama.quantizationLevel'), 'Q4_K_M');
+        assert.deepEqual(byPath.get('providerMetadata.ollama.parameters'), { temperature: 0.7, num_ctx: 8192 });
+        assert.equal(snapshot.routeOptions[0].providerId, 'ollama-local');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.localPrivate, true);
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.openAICompatibleBaseUrl, 'http://127.0.0.1:11434/v1');
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['gemma3:4b']);
+        assert.equal(snapshot.accountOverlays[0].providerMetadata.semantics, 'locally_installed_models');
+    });
+
     it('extracts Cerebras public rich model metadata without proving runtime access', async () => {
         const fakeFetch = /** @type {typeof fetch} */ (
             async () =>
@@ -2078,6 +2168,10 @@ describe('model-gateway foundation', () => {
             env: { GOOGLE_API_KEY: 'gemini-secret-that-must-not-leak' },
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
+        const ollamaLocal = createDefaultModelGatewayCatalogImporters({
+            env: { OLLAMA_BASE_URL: 'http://127.0.0.1:11434' },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ models: [] }) })),
+        });
 
         assert.deepEqual(
             importers.map((importer) => importer.id),
@@ -2091,6 +2185,7 @@ describe('model-gateway foundation', () => {
         assert.equal(mistralAuthenticated.some((importer) => importer.id === 'mistral-models'), true);
         assert.equal(anthropicAuthenticated.some((importer) => importer.id === 'anthropic-models'), true);
         assert.equal(geminiAuthenticated.some((importer) => importer.id === 'gemini-models'), true);
+        assert.equal(ollamaLocal.some((importer) => importer.id === 'ollama-catalog'), true);
         assert.equal(JSON.stringify(importers).includes(secret), false);
         assert.equal(JSON.stringify(genericAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(mistralAuthenticated).includes('mistral-secret-that-must-not-leak'), false);

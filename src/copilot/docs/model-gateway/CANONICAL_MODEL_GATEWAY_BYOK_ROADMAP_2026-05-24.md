@@ -574,7 +574,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Implementar `MistralModelsImporter` para `/v1/models`, capturando capabilities, aliases,
   `max_context_length`, deprecation e replacement.
 - [ ] Implementar `GroqModelsImporter` para `/openai/v1/models` e docs de limites.
-- [ ] Implementar `OllamaCatalogImporter` para `/api/tags` + `/api/show`.
+- [x] Implementar `OllamaCatalogImporter` para `/api/tags` + `/api/show`.
 - [ ] Implementar `HuggingFaceInferenceProvidersImporter` para catálogo de providers/modelos/rotas.
 - [ ] Implementar `CloudflareWorkersAiCatalogImporter` para unified catalog/Workers AI docs.
 - [x] Implementar `KiloGatewayCatalogImporter` para `https://api.kilo.ai/api/gateway/models`, capturando ids
@@ -2493,3 +2493,64 @@ Próxima direção:
 
 - Depois da suíte completa e push, seguir para Groq especializado ou Ollama. Groq fecha o caminho account-scoped
   OpenAI-compatible com docs de limite; Ollama fecha o caminho local com `/api/tags` + `/api/show`.
+
+## 48. Continuidade 2026-05-25 — importer local Ollama tags/show
+
+Investigação oficial:
+
+- A documentação oficial do Ollama confirma `GET /api/tags` para listar modelos locais e seus detalhes.
+- A resposta de `/api/tags` inclui `name`, `model`, `modified_at`, `size`, `digest` e `details` com `format`, `family`,
+  `families`, `parameter_size` e `quantization_level`.
+- A documentação oficial também confirma `POST /api/show` com body `{ "model": "..." }` e opção `verbose`.
+- A resposta de `/api/show` inclui `parameters`, `license`, `capabilities`, `modified_at`, `details`, `template` e
+  `model_info`, incluindo chaves como `*.context_length`, arquitetura, quantização e tokenizer.
+
+Implementado neste corte:
+
+- Novo `OllamaCatalogImporter` para daemon local, com defaults:
+  - `OLLAMA_LOCAL_API_BASE_URL=http://localhost:11434/api`;
+  - `OLLAMA_LOCAL_TAGS_URL=http://localhost:11434/api/tags`;
+  - `OLLAMA_LOCAL_SHOW_URL=http://localhost:11434/api/show`;
+  - `OLLAMA_LOCAL_OPENAI_BASE_URL=http://localhost:11434/v1`.
+- O importer busca `/api/tags` e, para cada modelo local, chama `/api/show` com `verbose=false` por default.
+- `baseUrl` aceita `http://host:11434`, `.../api` ou `.../v1`; o importer normaliza para APIs nativa e OpenAI-compatible.
+- A composição padrão só inclui Ollama quando `OLLAMA_BASE_URL`, `OLLAMA_HOST` ou `COPILOT_OLLAMA_BASE_URL` estão
+  presentes, evitando tentativas implícitas contra localhost em refresh genérico.
+- O payload vira evidências para:
+  - `displayName`;
+  - aliases normalizados;
+  - `limits.contextWindowTokens` por `num_ctx` dos parâmetros ou `*.context_length` do `model_info`;
+  - capabilities declaradas por Ollama: `chat`, `vision`, `embeddings`, `tools` quando presentes;
+  - modalidades text/image quando `vision` aparece;
+  - `providerMetadata.ownedBy=local`;
+  - digest, size bytes, modifiedAt, formato, família, famílias, parâmetro, quantização, parent model;
+  - parâmetros parseados e texto bruto de parâmetros;
+  - template, licença e `model_info` completo;
+  - `openai.owned_by=local`.
+- O importer também emite:
+  - `ModelRouteOption` `exact_model`;
+  - política `routeLayer=openai_compatible`, `runtimeKind=local`, `localPrivate=true`;
+  - `nativeApiBaseUrl`, `openAICompatibleBaseUrl` e digest;
+  - `ProviderAccountOverlay` sem segredo, com semântica `locally_installed_models`.
+- Barrels de importers, catálogo e root exportam as constantes Ollama e `createOllamaCatalogImporter()`.
+
+Separação arquitetural reafirmada:
+
+- `/api/tags` + `/api/show` provam instalação local e metadata do daemon, não sucesso de chat/tools/vision em runtime.
+- Tags locais são aliases instáveis; digest/hash é preservado como metadado de identidade forte.
+- Ollama local entra como provider `ollama-local`, compatível com o adapter existente e marcado como rota privada/local.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`58` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5635` testes totais, `5602` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T19-34-39-605Z/summary.md`).
+
+Próxima direção:
+
+- Seguir para Groq especializado ou Hugging Face. Groq deve combinar `/openai/v1/models` account-scoped com docs de
+  limites; Hugging Face exige preservar estratégias de provider/rota do Inference Providers Router.

@@ -15,6 +15,7 @@ import {
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
     createMistralModelsImporter,
+    createOllamaCatalogImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
@@ -77,6 +78,10 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             createKiloGatewayProvidersImporter({ fetchImpl: options.fetchImpl }),
             createCerebrasPublicModelsImporter({ fetchImpl: options.fetchImpl }),
         );
+    }
+    const ollamaBaseUrl = readEnvSecret(env, ['OLLAMA_BASE_URL', 'OLLAMA_HOST', 'COPILOT_OLLAMA_BASE_URL']);
+    if (includePublic && ollamaBaseUrl) {
+        importers.push(createOllamaCatalogImporter({ fetchImpl: options.fetchImpl, baseUrl: ollamaBaseUrl.value }));
     }
     const openAiSecret = readEnvSecret(env, ['OPENAI_API_KEY', 'COPILOT_OPENAI_API_KEY']);
     if (includeAuthenticated && openAiSecret) {

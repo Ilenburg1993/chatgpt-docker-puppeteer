@@ -34,6 +34,13 @@ export {
     createMistralModelsImporter,
 } from './mistral-models-importer.js';
 export {
+    OLLAMA_LOCAL_API_BASE_URL,
+    OLLAMA_LOCAL_OPENAI_BASE_URL,
+    OLLAMA_LOCAL_SHOW_URL,
+    OLLAMA_LOCAL_TAGS_URL,
+    createOllamaCatalogImporter,
+} from './ollama-catalog-importer.js';
+export {
     OPENAI_MODELS_CATALOG_URL,
     createOpenAIModelsImporter,
 } from './openai-models-importer.js';
