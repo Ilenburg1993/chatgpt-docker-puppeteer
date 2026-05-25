@@ -84,6 +84,7 @@ import {
     createDefaultModelGatewayCatalogImporters,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
+    createModelEligibilityDecision,
     createModelMetadataEvidence,
     createModelRouteOption,
     createProviderAccountOverlay,
@@ -104,6 +105,7 @@ import {
     normalizeUsdPricing,
     rankCatalogEvidenceConfidence,
     recommendCatalogDiffProbes,
+    evaluateModelGatewayEligibility,
     refreshModelGatewayCatalog,
     runCatalogImporters,
     runConfiguredByokAgentProbe,
@@ -2966,6 +2968,163 @@ describe('model-gateway foundation', () => {
             plan: 'team',
             freeTier: false,
         });
+    });
+
+    it('creates sanitized pre-runtime eligibility decisions without mutating catalog facts', () => {
+        const decision = createModelEligibilityDecision({
+            providerId: 'openai',
+            providerModel: 'gpt-paid',
+            include: true,
+            hardExclusions: ['account_model_not_visible'],
+            softPenalties: ['price_unknown'],
+            policyInputs: {
+                authorization: 'Bearer secret-value-that-must-not-leak',
+                unknownAccessPolicy: 'block',
+            },
+        });
+
+        assert.equal(decision.include, false);
+        assert.equal(decision.disposition, 'excluded');
+        assert.deepEqual(decision.hardExclusions, ['account_model_not_visible']);
+        assert.deepEqual(decision.softPenalties, ['price_unknown']);
+        assert.equal(decision.redactionStatus, 'sanitized');
+        assert.equal(JSON.stringify(decision).includes('secret-value-that-must-not-leak'), false);
+    });
+
+    it('evaluates hard pre-runtime exclusions from secrets, account overlays and access visibility', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'openai',
+            providerModel: 'gpt-paid',
+            lifecycle: { status: 'active' },
+            pricing: { inputUsdPerMillion: 2, outputUsdPerMillion: 8 },
+            confidenceByField: { 'displayName': 'authenticated_catalog' },
+        });
+        const route = createModelRouteOption({
+            providerId: 'openai',
+            providerModel: 'gpt-paid',
+            selectorKind: 'exact_model',
+            normalizedPolicy: { routeLayer: 'direct_provider', wireApi: 'openai_responses' },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'openai',
+            accountScope: 'default',
+            secretRef: 'OPENAI_API_KEY',
+            enabledModels: ['gpt-other'],
+            sourceKind: 'authenticated_catalog',
+        });
+
+        const decision = evaluateModelGatewayEligibility({
+            projection,
+            routeOption: route,
+            accountOverlays: [overlay],
+            secretRegistry: { has: () => false },
+        });
+
+        assert.equal(decision.include, false);
+        assert.equal(decision.disposition, 'deferred_missing_secret');
+        assert.deepEqual(decision.hardExclusions.sort(), ['account_model_not_visible', 'secret_missing:OPENAI_API_KEY'].sort());
+        assert.deepEqual(decision.overlayRefs, [overlay.accountOverlayId]);
+        assert.equal(JSON.stringify(decision).includes('OPENAI_API_KEY'), true);
+    });
+
+    it('allows unknown account visibility only when policy permits a cheap runtime probe', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'openrouter',
+            providerModel: 'new/model',
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+        });
+        const decision = evaluateModelGatewayEligibility({
+            projection,
+            routeOption: createModelRouteOption({
+                providerId: 'openrouter',
+                providerModel: 'new/model',
+                selectorKind: 'gateway_auto',
+                selectorSyntax: 'openrouter:auto:new/model',
+                normalizedPolicy: { routeLayer: 'gateway', autoSelection: true },
+            }),
+            accountOverlays: [],
+            policy: { unknownAccessPolicy: 'allow_probe' },
+        });
+
+        assert.equal(decision.include, true);
+        assert.equal(decision.disposition, 'unknown_policy_allows_probe');
+        assert.equal(decision.softPenalties.includes('account_overlay_missing'), true);
+        assert.equal(decision.softPenalties.includes('account_visibility_unknown'), true);
+        assert.equal(decision.softPenalties.includes('route_auto_selects_upstream'), true);
+        assert.deepEqual(decision.requiredRuntimeProbes, ['chat']);
+
+        const blocked = evaluateModelGatewayEligibility({
+            projection,
+            accountOverlays: [],
+            policy: { unknownAccessPolicy: 'block' },
+        });
+        assert.equal(blocked.include, false);
+        assert.equal(blocked.disposition, 'unknown_policy_blocks_probe');
+        assert.equal(blocked.hardExclusions.includes('account_access_unknown'), true);
+    });
+
+    it('excludes Cloudflare gateway routes before runtime when account or gateway config is missing', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'cloudflare-workers-ai',
+            providerModel: '@cf/openai/gpt-oss-120b',
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+        });
+        const route = createModelRouteOption({
+            providerId: 'cloudflare-workers-ai',
+            providerModel: '@cf/openai/gpt-oss-120b',
+            selectorKind: 'gateway_fallback',
+            selectorSyntax: 'cloudflare-gateway:@cf/openai/gpt-oss-120b',
+            normalizedPolicy: {
+                routeLayer: 'gateway',
+                wireApi: 'cloudflare_ai_gateway_universal',
+                supportsFallback: true,
+            },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'cloudflare-workers-ai',
+            secretRef: 'CLOUDFLARE_API_TOKEN',
+            enabledModels: ['@cf/openai/gpt-oss-120b'],
+            providerMetadata: { accountIdConfigured: false, gatewayIdConfigured: false },
+        });
+
+        const decision = evaluateModelGatewayEligibility({
+            projection,
+            routeOption: route,
+            accountOverlays: [overlay],
+            secretRegistry: { has: () => true },
+        });
+
+        assert.equal(decision.include, false);
+        assert.equal(decision.hardExclusions.includes('cloudflare_account_id_missing'), true);
+        assert.equal(decision.hardExclusions.includes('cloudflare_gateway_id_missing'), true);
+    });
+
+    it('treats local Ollama installation metadata as eligibility input, not runtime proof', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'ollama-local',
+            providerModel: 'gemma3:4b',
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+        });
+        const route = createModelRouteOption({
+            providerId: 'ollama-local',
+            providerModel: 'gemma3:4b',
+            normalizedPolicy: { routeLayer: 'local_daemon', localPrivate: true },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'ollama-local',
+            enabledModels: ['llama3.2:3b'],
+            providerMetadata: { semantics: 'locally_installed_models' },
+        });
+
+        const decision = evaluateModelGatewayEligibility({
+            projection,
+            routeOption: route,
+            accountOverlays: [overlay],
+        });
+
+        assert.equal(decision.include, false);
+        assert.equal(decision.hardExclusions.includes('account_model_not_visible'), true);
+        assert.equal(decision.hardExclusions.includes('ollama_local_model_not_installed'), true);
     });
 
     it('refreshes catalog snapshots, replaces source evidence, diffs projections and emits OpenAI schema', async () => {

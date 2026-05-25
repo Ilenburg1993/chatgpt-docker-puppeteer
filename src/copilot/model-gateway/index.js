@@ -139,6 +139,14 @@ export {
     redactSecretText,
 } from './secrets/index.js';
 export {
+    MODEL_GATEWAY_ELIGIBILITY_DISPOSITION,
+    MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS,
+    MODEL_GATEWAY_ELIGIBILITY_SCHEMA_VERSION,
+    MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS,
+    createModelEligibilityDecision,
+    evaluateModelGatewayEligibility,
+} from './eligibility/index.js';
+export {
     MODEL_GATEWAY_PRE_K_STAGE,
     buildModelGatewayPreKCompatibilityReport,
 } from './migration/index.js';

@@ -1,0 +1,15 @@
+// @ts-check
+/**
+ * Pre-runtime eligibility layer.
+ *
+ * @module copilot/model-gateway/eligibility
+ */
+
+export {
+    MODEL_GATEWAY_ELIGIBILITY_DISPOSITION,
+    MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS,
+    MODEL_GATEWAY_ELIGIBILITY_SCHEMA_VERSION,
+    MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS,
+    createModelEligibilityDecision,
+} from './contracts.js';
+export { evaluateModelGatewayEligibility } from './evaluator.js';
