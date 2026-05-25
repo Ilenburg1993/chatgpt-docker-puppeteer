@@ -68,6 +68,7 @@ import {
     createHuggingFaceInferenceProvidersImporter,
     createMistralModelsImporter,
     createOllamaCatalogImporter,
+    createOpenCodeZenModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
@@ -1964,6 +1965,72 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(snapshot.accountOverlays[0].providerMetadata.routePolicySuffixes, ['fastest', 'cheapest', 'preferred']);
     });
 
+    it('imports OpenCode Zen models with family-specific endpoints and account overlay', async () => {
+        const secret = 'opencode-secret-that-must-not-leak';
+        /** @type {string | null} */
+        let authorizationHeader = null;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (_url, init) => {
+                authorizationHeader = /** @type {{ authorization?: string }} */ (init)?.headers?.authorization ?? null;
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        object: 'list',
+                        data: [
+                            { id: 'gpt-5.1-codex', object: 'model', created: 1779739295, owned_by: 'opencode' },
+                            { id: 'claude-sonnet-4-5', object: 'model', created: 1779739295, owned_by: 'opencode' },
+                            { id: 'gemini-3.5-flash', object: 'model', created: 1779739295, owned_by: 'opencode' },
+                            { id: 'glm-5.1', object: 'model', created: 1779739295, owned_by: 'opencode' },
+                            { id: 'deepseek-v4-flash-free', object: 'model', created: 1779739295, owned_by: 'opencode' },
+                        ],
+                    }),
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [
+                createOpenCodeZenModelsImporter({
+                    fetchImpl: fakeFetch,
+                    apiKey: secret,
+                    secretRef: 'OPENCODE_API_KEY',
+                    now: () => new Date('2026-05-25T14:20:00.000Z'),
+                }),
+            ],
+            now: () => new Date('2026-05-25T14:20:00.000Z'),
+        });
+        const byModel = new Map(
+            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+        );
+        const byRoute = new Map(snapshot.routeOptions.map((route) => [route.providerModel, route]));
+
+        assert.equal(authorizationHeader, `Bearer ${secret}`);
+        assert.equal(JSON.stringify(snapshot).includes(secret), false);
+        assert.equal(snapshot.sources[0].providerId, 'opencode');
+        assert.equal(byModel.get('opencode:gpt-5.1-codex:providerMetadata.opencode.wireApi'), 'openai_responses');
+        assert.equal(byModel.get('opencode:claude-sonnet-4-5:providerMetadata.opencode.wireApi'), 'anthropic_messages');
+        assert.equal(byModel.get('opencode:gemini-3.5-flash:providerMetadata.opencode.wireApi'), 'google_generative_model');
+        assert.equal(byModel.get('opencode:glm-5.1:providerMetadata.opencode.wireApi'), 'openai_chat_completions');
+        assert.equal(byModel.get('opencode:deepseek-v4-flash-free:providerMetadata.opencode.free'), true);
+        assert.equal(byModel.get('opencode:gpt-5.1-codex:lifecycle.status'), 'scheduled_retirement');
+        assert.equal(byModel.get('opencode:gpt-5.1-codex:pricing.inputUsdPerMillion'), 1.07);
+        assert.equal(byModel.get('opencode:glm-5.1:pricing.outputUsdPerMillion'), 4.4);
+        assert.equal(byRoute.get('gpt-5.1-codex')?.normalizedPolicy.endpoint, 'https://opencode.ai/zen/v1/responses');
+        assert.equal(byRoute.get('claude-sonnet-4-5')?.normalizedPolicy.endpoint, 'https://opencode.ai/zen/v1/messages');
+        assert.equal(
+            byRoute.get('gemini-3.5-flash')?.normalizedPolicy.endpoint,
+            'https://opencode.ai/zen/v1/models/gemini-3.5-flash',
+        );
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, [
+            'gpt-5.1-codex',
+            'claude-sonnet-4-5',
+            'gemini-3.5-flash',
+            'glm-5.1',
+            'deepseek-v4-flash-free',
+        ]);
+        assert.equal(snapshot.accountOverlays[0].secretRef, 'OPENCODE_API_KEY');
+    });
+
     it('extracts Cerebras public rich model metadata without proving runtime access', async () => {
         const fakeFetch = /** @type {typeof fetch} */ (
             async () =>
@@ -2346,6 +2413,10 @@ describe('model-gateway foundation', () => {
             env: { HF_TOKEN: 'hf-secret-that-must-not-leak' },
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
+        const openCodeAuthenticated = createDefaultModelGatewayCatalogImporters({
+            env: { OPENCODE_API_KEY: 'opencode-secret-that-must-not-leak' },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+        });
 
         assert.deepEqual(
             importers.map((importer) => importer.id),
@@ -2362,6 +2433,7 @@ describe('model-gateway foundation', () => {
         assert.equal(geminiAuthenticated.some((importer) => importer.id === 'gemini-models'), true);
         assert.equal(ollamaLocal.some((importer) => importer.id === 'ollama-catalog'), true);
         assert.equal(huggingFaceAuthenticated.some((importer) => importer.id === 'huggingface-inference-providers'), true);
+        assert.equal(openCodeAuthenticated.some((importer) => importer.id === 'opencode-zen-models'), true);
         assert.equal(JSON.stringify(importers).includes(secret), false);
         assert.equal(JSON.stringify(groqAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(genericAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
@@ -2370,6 +2442,7 @@ describe('model-gateway foundation', () => {
         assert.equal(JSON.stringify(anthropicAuthenticated).includes('anthropic-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(geminiAuthenticated).includes('gemini-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(huggingFaceAuthenticated).includes('hf-secret-that-must-not-leak'), false);
+        assert.equal(JSON.stringify(openCodeAuthenticated).includes('opencode-secret-that-must-not-leak'), false);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {
@@ -2658,6 +2731,7 @@ describe('model-gateway foundation', () => {
             'huggingface',
             'cloudflare-workers-ai',
             'nvidia-nim',
+            'opencode',
             'cerebras',
             'chutes',
             'zai',
@@ -2668,12 +2742,15 @@ describe('model-gateway foundation', () => {
         const kilo = resolveProviderEndpointInventory('kilo');
         const hf = resolveProviderEndpointInventory('huggingface');
         const cloudflare = resolveProviderEndpointInventory('cloudflare-workers-ai');
+        const openCode = resolveProviderEndpointInventory('opencode');
 
         assert.equal(kilo?.providerKind, 'gateway');
         assert.ok(kilo?.modelCatalogSources.some((source) => source.url.endsWith('/api/gateway/models')));
         assert.ok(hf?.routeSelectors.includes('fastest'));
         assert.ok(hf?.routeSelectors.includes('cheapest'));
         assert.ok(cloudflare?.routeSelectors.includes('gateway_fallback'));
+        assert.ok(openCode?.runtimeEndpoints.some((endpoint) => endpoint.kind === 'openai_responses'));
+        assert.ok(openCode?.runtimeEndpoints.some((endpoint) => endpoint.kind === 'anthropic_messages'));
     });
 
     it('builds an SDK onListModels handler from gateway records without exposing secrets', async () => {

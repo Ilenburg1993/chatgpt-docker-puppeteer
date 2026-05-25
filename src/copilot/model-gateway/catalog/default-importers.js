@@ -18,6 +18,7 @@ import {
     createKiloGatewayProvidersImporter,
     createMistralModelsImporter,
     createOllamaCatalogImporter,
+    createOpenCodeZenModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
@@ -137,6 +138,16 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                 fetchImpl: options.fetchImpl,
                 apiKey: huggingFaceSecret.value,
                 secretRef: huggingFaceSecret.key,
+            }),
+        );
+    }
+    const openCodeSecret = readEnvSecret(env, ['OPENCODE_API_KEY']);
+    if (includeAuthenticated && openCodeSecret) {
+        importers.push(
+            createOpenCodeZenModelsImporter({
+                fetchImpl: options.fetchImpl,
+                apiKey: openCodeSecret.value,
+                secretRef: openCodeSecret.key,
             }),
         );
     }

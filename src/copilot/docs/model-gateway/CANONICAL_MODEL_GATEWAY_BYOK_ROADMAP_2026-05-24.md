@@ -579,6 +579,8 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   rate por tier/modelo.
 - [x] Implementar `OllamaCatalogImporter` para `/api/tags` + `/api/show`.
 - [x] Implementar `HuggingFaceInferenceProvidersImporter` para catálogo de providers/modelos/rotas.
+- [x] Implementar `OpenCodeZenModelsImporter` para `https://opencode.ai/zen/v1/models`, preservando endpoints por
+  família, pricing/lifecycle de docs e overlay por `OPENCODE_API_KEY`.
 - [ ] Implementar `CloudflareWorkersAiCatalogImporter` para unified catalog/Workers AI docs.
 - [x] Implementar `KiloGatewayCatalogImporter` para `https://api.kilo.ai/api/gateway/models`, capturando ids
   `provider/model`, provider upstream, pricing, context window, features, rotas gratuitas e endpoints auxiliares.
@@ -2683,3 +2685,70 @@ Próxima direção:
 
 - Continuar para Cloudflare Workers AI/AI Gateway, separando catálogo público Workers AI, gateway universal e possíveis
   overlays de conta/gateway.
+
+## 51. Continuidade 2026-05-25 — importer OpenCode Zen e `OPENCODE_API_KEY`
+
+Investigação oficial:
+
+- A documentação oficial do OpenCode Zen descreve Zen como uma lista curada/testada de modelos fornecida pela equipe
+  OpenCode.
+- A documentação confirma que a lista completa de modelos e metadata pode ser obtida em
+  `https://opencode.ai/zen/v1/models`.
+- O endpoint real retorna schema OpenAI-like: `object=list` e `data[]` com `id`, `object`, `created` e `owned_by`.
+- A mesma página oficial documenta endpoints diferentes por família:
+  - OpenAI/GPT via `https://opencode.ai/zen/v1/responses`;
+  - Claude/Qwen via `https://opencode.ai/zen/v1/messages`;
+  - Gemini via `https://opencode.ai/zen/v1/models/{model}`;
+  - GLM/Kimi/MiniMax/Grok/DeepSeek/Nemotron/Big Pickle via `https://opencode.ai/zen/v1/chat/completions`.
+- A documentação também traz preço por 1M tokens, modelos gratuitos temporários, deprecações, privacidade e a regra de
+  uso em config OpenCode como `opencode/{model-id}`.
+- O novo segredo local relevante é `OPENCODE_API_KEY`.
+
+Implementado neste corte:
+
+- Novo `OpenCodeZenModelsImporter` para `https://opencode.ai/zen/v1/models`.
+- O importer funciona como catálogo público ou autenticado; quando `OPENCODE_API_KEY` existe, envia
+  `Authorization: Bearer <key>` e emite overlay account-scoped.
+- Foi criado provider próprio:
+  - `providers/specs/opencode.js`;
+  - `providers/endpoints/opencode.js`.
+- `OPENCODE_API_KEY` entrou no `EnvSecretRegistry`.
+- A composição padrão inclui `OpenCodeZenModelsImporter` quando `OPENCODE_API_KEY` está presente.
+- O payload + seed oficial de docs viram evidências para:
+  - `displayName`;
+  - aliases normalizados e `aliases.opencodeConfigModel=opencode/{model}`;
+  - lifecycle por `created` e depreciações conhecidas;
+  - capabilities conservadoras `chat`, `tools`, `reasoning` e `code` quando inferível por família/nome;
+  - pricing normalizado por milhão de tokens, incluindo modelos gratuitos;
+  - `providerMetadata.ownedBy=opencode`;
+  - `providerMetadata.opencode.endpoint`, `wireApi`, `aiSdkPackage`, `family`, `free` e `priceTierNote`;
+  - campos OpenAI-compatible `openai.created` e `openai.owned_by`.
+- O importer emite `ModelRouteOption` `exact_model` por modelo, com política que preserva:
+  - endpoint efetivo;
+  - `wireApi`;
+  - família;
+  - pacote AI SDK documentado;
+  - `routeLayer` `openai_compatible` apenas para `chat/completions`, e `direct_provider` para Responses/Messages/Google.
+- O overlay autenticado preserva modelos visíveis e `secretRef=OPENCODE_API_KEY`, sem serializar o token.
+- Barrels de importers, catálogo e root exportam as constantes OpenCode e `createOpenCodeZenModelsImporter()`.
+
+Separação arquitetural reafirmada:
+
+- `/zen/v1/models` prova catálogo/visibilidade do gateway, não sucesso runtime.
+- Endpoints por família são metadata de roteamento; adaptação fina para Responses, Messages e Google deve ocorrer no
+  runtime/adapter posterior.
+- Pricing/lifecycle vindo de docs oficiais é `catalog/static docs`, não medição de cobrança real da conta.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`61` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5638` testes totais, `5605` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T20-07-21-787Z/summary.md`).
+
+Próxima direção:
+
+- Continuar para Cloudflare Workers AI/AI Gateway.

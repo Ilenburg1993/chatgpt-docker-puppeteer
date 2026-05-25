@@ -43,6 +43,7 @@ export const DEFAULT_MODEL_GATEWAY_SECRET_ENV_KEYS = Object.freeze([
     'Z_AI_KEY',
     'OLLAMA_API_KEY',
     'OLLAMA_CLOUD_API_KEY',
+    'OPENCODE_API_KEY',
     'KILO_API_KEY',
     'KILO_CODE_API_KEY',
 ]);
@@ -118,4 +119,3 @@ export class EnvSecretRegistry {
 export function createEnvSecretRegistry(options = {}) {
     return new EnvSecretRegistry(options);
 }
-

@@ -52,6 +52,14 @@ export {
     createOllamaCatalogImporter,
 } from './ollama-catalog-importer.js';
 export {
+    OPENCODE_ZEN_BASE_URL,
+    OPENCODE_ZEN_CHAT_COMPLETIONS_URL,
+    OPENCODE_ZEN_MESSAGES_URL,
+    OPENCODE_ZEN_MODELS_URL,
+    OPENCODE_ZEN_RESPONSES_URL,
+    createOpenCodeZenModelsImporter,
+} from './opencode-zen-models-importer.js';
+export {
     OPENAI_MODELS_CATALOG_URL,
     createOpenAIModelsImporter,
 } from './openai-models-importer.js';
