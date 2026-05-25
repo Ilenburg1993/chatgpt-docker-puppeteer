@@ -24,6 +24,7 @@ export {
     mergeModelMetadataEvidence,
     normalizeStoredCatalogSnapshot,
     rankCatalogEvidenceConfidence,
+    runCatalogImporters,
 } from './catalog/index.js';
 export {
     MODEL_GATEWAY_SCHEMA_VERSION,

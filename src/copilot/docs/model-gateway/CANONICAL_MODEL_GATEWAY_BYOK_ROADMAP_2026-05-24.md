@@ -514,7 +514,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 
 ### Faixa L — Importers de catálogos oficiais e agregadores
 
-- [ ] Criar interface `CatalogImporter`:
+- [x] Criar interface `CatalogImporter`:
   - `id`;
   - `providerId`;
   - `sourceKind`;
@@ -522,6 +522,8 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   - `fetchRaw()`;
   - `parseRows()`;
   - `toEvidenceFacts()`.
+- [x] Criar runner storage-neutral de importers que monta `ProviderCatalogSource`, `rawPayloadRef`, evidências,
+  `CatalogImportRun` e snapshot JSON secret-safe antes dos importers específicos.
 - [ ] Implementar `OpenAIModelsImporter` para `/v1/models` + seeds oficiais complementares.
 - [ ] Implementar `OpenRouterModelsImporter` para `/api/v1/models`, preservando `supported_parameters`, pricing,
   context, top provider e per-request limits.
@@ -1094,3 +1096,40 @@ Decisão de roadmap:
   2. criar o store SQLite com a mesma semântica e migrar o teste secret-safe para DB.
 - `registry.json` continua snapshot operacional legado; o catálogo JSON/SQLite passa a ser a camada de fatos,
   evidências e runs. Nenhum importer deve escrever segredo bruto em projection, raw payload ou run.
+
+## 17. Continuidade 2026-05-25 — interface e runner de importers
+
+Implementado neste corte:
+
+- Criado `src/copilot/model-gateway/catalog/importer-runner.js`.
+- Exportado `runCatalogImporters()` pelo barrel de catálogo e pelo barrel raiz.
+- Formalizada a interface `CatalogImporter` em JSDoc com:
+  - `id`;
+  - `providerId`;
+  - `sourceKind`;
+  - `requiresAuth`;
+  - `fetchRaw()`;
+  - `parseRows()`;
+  - `toEvidenceFacts()`.
+- O runner executa importers sem assumir rede: cada provider específico continua livre para implementar fetch real,
+  fetch autenticado, parser HTML/docs, API pública, daemon local ou fixture dry-run.
+- Para cada importer, o runner cria `ProviderCatalogSource`, sanitiza raw payload em `rawPayloadRef`, converte rows em
+  evidências, registra `CatalogImportRun` concluído ou falho e pode persistir tudo no `JsonModelGatewayCatalogStore`.
+- Erros de import são capturados como import run falho e sanitizados pelo contrato de run; segredo em mensagem de erro
+  não vaza para snapshot.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`36` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5608` testes, `0` falhas, `warnings/errors unique=0 total=0`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T14-53-54-304Z/summary.md`).
+
+Decisão de roadmap:
+
+- Faixa L agora tem a espinha dorsal para importers reais. O próximo passo deve ser `OpenAIModelsImporter` ou
+  `OpenRouterModelsImporter`; OpenRouter tende a entregar mais metadados por payload e é bom para provar parsing rico,
+  enquanto OpenAI é o menor importer autenticado para provar `/v1/models`.

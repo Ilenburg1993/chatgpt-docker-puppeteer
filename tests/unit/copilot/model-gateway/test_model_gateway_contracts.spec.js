@@ -68,6 +68,7 @@ import {
     diffCanonicalModelProjections,
     mergeModelMetadataEvidence,
     rankCatalogEvidenceConfidence,
+    runCatalogImporters,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
     runConfiguredByokJsonProbe,
@@ -711,6 +712,77 @@ describe('model-gateway foundation', () => {
             assert.equal(loaded.projections[0].limits.contextWindowTokens, 131072);
             assert.equal(loaded.rawPayloadRefs.length, 1);
             assert.equal(loaded.importRuns.length, 1);
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('runs catalog importers into a secret-safe snapshot', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-model-importers-'));
+        try {
+            const filePath = join(dir, 'catalog.json');
+            const store = new JsonModelGatewayCatalogStore({ filePath });
+            const dates = [
+                new Date('2026-05-25T12:00:00.000Z'),
+                new Date('2026-05-25T12:00:01.000Z'),
+                new Date('2026-05-25T12:00:02.000Z'),
+                new Date('2026-05-25T12:00:03.000Z'),
+            ];
+            const snapshot = await runCatalogImporters({
+                store,
+                now: () => dates.shift() ?? new Date('2026-05-25T12:00:04.000Z'),
+                importers: [
+                    {
+                        id: 'openrouter-models',
+                        providerId: 'openrouter',
+                        sourceKind: 'public_api',
+                        requiresAuth: false,
+                        url: 'https://openrouter.ai/api/v1/models',
+                        fetchRaw: () => ({
+                            Authorization: 'Bearer sk-secret-that-must-not-leak',
+                            data: [{ id: 'm', contextWindowTokens: 131072 }],
+                        }),
+                        parseRows: (raw) => /** @type {{ data: unknown[] }} */ (raw).data,
+                        toEvidenceFacts: (rows, context) =>
+                            rows.map((row) =>
+                                createModelMetadataEvidence({
+                                    evidenceId: 'openrouter-m-context',
+                                    providerId: 'openrouter',
+                                    providerModel: /** @type {{ id: string }} */ (row).id,
+                                    fieldPath: 'limits.contextWindowTokens',
+                                    value: /** @type {{ contextWindowTokens: number }} */ (row).contextWindowTokens,
+                                    sourceId: /** @type {{ id: string }} */ (context.source).id,
+                                    rawPayloadRef: context.rawPayloadRef,
+                                }),
+                            ),
+                    },
+                    {
+                        id: 'broken-auth-catalog',
+                        providerId: 'groq',
+                        sourceKind: 'authenticated_api',
+                        requiresAuth: true,
+                        fetchRaw: () => {
+                            throw new Error('token gsk-secret-that-must-not-leak rejected');
+                        },
+                        parseRows: () => [],
+                        toEvidenceFacts: () => [],
+                    },
+                ],
+            });
+            const raw = await readFile(filePath, 'utf8');
+            const loaded = await store.readSnapshot();
+
+            assert.equal(raw.includes('sk-secret-that-must-not-leak'), false);
+            assert.equal(raw.includes('gsk-secret-that-must-not-leak'), false);
+            assert.equal(snapshot.evidences.length, 1);
+            assert.equal(snapshot.rawPayloadRefs.length, 1);
+            assert.deepEqual(
+                snapshot.importRuns.map((run) => run.status),
+                ['completed', 'failed'],
+            );
+            assert.equal(loaded.sources.length, 2);
+            assert.equal(loaded.evidences[0].value, 131072);
+            assert.equal(JSON.stringify(loaded.importRuns).includes('gsk-secret-that-must-not-leak'), false);
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
