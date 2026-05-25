@@ -52,8 +52,9 @@ export const MODEL_GATEWAY_TASK_PROFILES = Object.freeze({
     vision: Object.freeze({
         id: 'vision',
         displayName: 'Vision',
-        requires: Object.freeze(['text', 'streaming', 'vision']),
-        prefers: Object.freeze(['large_context', 'runtime_proved']),
+        requires: Object.freeze(['text', 'streaming']),
+        softRequires: Object.freeze(['vision']),
+        prefers: Object.freeze(['vision', 'large_context', 'runtime_proved']),
         minContextWindowTokens: 16_000,
         requireAgentProbeOk: false,
     }),
@@ -91,4 +92,3 @@ export function resolveModelGatewayTaskProfile(id) {
     const normalized = id.trim().toLowerCase().replace(/[-\s]+/gu, '_');
     return MODEL_GATEWAY_TASK_PROFILES[/** @type {keyof typeof MODEL_GATEWAY_TASK_PROFILES} */ (normalized)] ?? null;
 }
-

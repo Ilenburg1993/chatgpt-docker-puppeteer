@@ -113,6 +113,16 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         else score += 50;
     }
 
+    for (const capability of profile['softRequires'] ?? []) {
+        if (hasCapability(model, capability)) {
+            score += 25;
+            reasons.push(`soft_capability:${capability}`);
+        } else {
+            score -= 5;
+            reasons.push(`missing_soft_capability:${capability}`);
+        }
+    }
+
     const minContext = finiteNumber(profile['minContextWindowTokens']);
     const context = contextWindow(model);
     if (minContext !== null) {

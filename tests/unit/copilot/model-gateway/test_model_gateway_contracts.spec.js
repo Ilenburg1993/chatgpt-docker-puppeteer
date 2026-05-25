@@ -224,8 +224,37 @@ describe('model-gateway foundation', () => {
             ],
         );
         assert.equal(resolveModelGatewayTaskProfile('repo-agent')?.requireAgentProbeOk, true);
-        assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.requires, ['text', 'streaming', 'vision']);
+        assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.requires, ['text', 'streaming']);
+        assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.softRequires, ['vision']);
         assert.equal(resolveModelGatewayTaskProfile('missing'), null);
+    });
+
+    it('treats vision as a soft routing preference rather than a hard admission gate', () => {
+        const textOnly = createModelRecord({
+            providerId: 'basic',
+            providerModel: 'text-model',
+            capabilities: { streaming: true },
+            limits: { contextWindowTokens: 32_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        const multimodal = createModelRecord({
+            providerId: 'visionary',
+            providerModel: 'vision-model',
+            capabilities: { streaming: true, vision: true },
+            limits: { contextWindowTokens: 32_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+
+        const decision = routeGatewayModels([textOnly, multimodal], 'vision', { routeProfile: 'vision' });
+
+        assert.equal(decision.selected?.model['id'], 'visionary:vision-model');
+        assert.deepEqual(
+            decision.candidates.map((candidate) => candidate.model['id']),
+            ['visionary:vision-model', 'basic:text-model'],
+        );
+        assert.equal(decision.rejected.some((candidate) => candidate.rejectedReasons.includes('missing_capability:vision')), false);
+        assert.ok(decision.candidates[0].reasons.includes('soft_capability:vision'));
+        assert.ok(decision.candidates[1].reasons.includes('missing_soft_capability:vision'));
     });
 
     it('scores and explains gateway route decisions before runtime probes', () => {

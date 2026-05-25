@@ -9,6 +9,7 @@
  */
 
 import { OpenAICompatibleAdapter } from './openai-compatible-adapter.js';
+import { OPENAI_PROVIDER_FAMILY_SPECS } from './specs/index.js';
 
 /**
  * @typedef {object} OpenAIProviderFamilySpec
@@ -101,62 +102,7 @@ export class OpenAIProviderFamilyAdapter extends OpenAICompatibleAdapter {
     }
 }
 
-/** @type {readonly OpenAIProviderFamilySpec[]} */
-export const OPENAI_PROVIDER_FAMILY_SPECS = Object.freeze([
-    {
-        id: 'openai',
-        providerIds: Object.freeze(['openai', 'openai-compatible']),
-        defaultBaseUrl: 'https://api.openai.com/v1',
-    },
-    {
-        id: 'kilo',
-        providerIds: Object.freeze(['kilo', 'kilo-code', 'kilo-gateway']),
-        defaultBaseUrl: 'https://api.kilo.ai/api/gateway',
-    },
-    {
-        id: 'groq',
-        providerIds: Object.freeze(['groq']),
-        defaultBaseUrl: 'https://api.groq.com/openai/v1',
-    },
-    {
-        id: 'mistral',
-        providerIds: Object.freeze(['mistral']),
-        defaultBaseUrl: 'https://api.mistral.ai/v1',
-    },
-    {
-        id: 'huggingface',
-        providerIds: Object.freeze(['huggingface']),
-        defaultBaseUrl: 'https://router.huggingface.co/v1',
-        gateway: Object.freeze({ providerSelectionPolicySuffixes: Object.freeze([':fastest', ':cheapest', ':preferred']) }),
-    },
-    {
-        id: 'cloudflare-workers-ai',
-        providerIds: Object.freeze(['cloudflare-workers-ai']),
-        defaultBaseUrl: 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1',
-        gateway: Object.freeze({ requiresAccountId: true }),
-    },
-    {
-        id: 'nvidia-nim',
-        providerIds: Object.freeze(['nvidia-nim']),
-        defaultBaseUrl: 'https://integrate.api.nvidia.com/v1',
-    },
-    {
-        id: 'cerebras',
-        providerIds: Object.freeze(['cerebras']),
-        defaultBaseUrl: 'https://api.cerebras.ai/v1',
-    },
-    {
-        id: 'chutes',
-        providerIds: Object.freeze(['chutes']),
-        defaultBaseUrl: 'https://llm.chutes.ai/v1',
-    },
-    {
-        id: 'zai',
-        providerIds: Object.freeze(['zai']),
-        defaultBaseUrl: 'https://api.z.ai/api/paas/v4',
-        headers: Object.freeze({ 'Accept-Language': 'en-US,en' }),
-    },
-]);
+export { OPENAI_PROVIDER_FAMILY_SPECS } from './specs/index.js';
 
 export const openAIProviderFamilyAdapters = Object.freeze(
     OPENAI_PROVIDER_FAMILY_SPECS.map((spec) => new OpenAIProviderFamilyAdapter(spec)),

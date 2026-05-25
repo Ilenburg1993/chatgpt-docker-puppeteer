@@ -406,6 +406,8 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Extrair `AnthropicAdapter`.
 - [x] Criar registry de adapters do gateway.
 - [x] Cobrir adapters de Kilo, Groq, Mistral, Hugging Face, Cloudflare Workers AI, NVIDIA NIM, Cerebras, Chutes e Z.AI.
+- [x] Separar specs OpenAI-compatible em um arquivo por provider, para endpoint metadata/importers evoluírem por família
+  sem reencher o adapter de conhecimento específico.
 - [x] Fazer novo provider ser adicionável sem editar `sdk/session/provider.js`.
 - [x] Manter presets antigos como compat layer durante transição.
 
@@ -439,6 +441,9 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Incluir custo, latência, contexto, confidence, health, allow/block provider.
 - [x] Criar fallback auditável.
 - [x] Explicar decisão ao operador com candidatos recusados e razão.
+- [x] Tratar `vision` como requisito suave/preferência de rota, não como exclusão automática. Um modelo text-only que
+  responde, streama e tem contexto mínimo continua elegível para o perfil `vision`; modelos com vision comprovável sobem
+  no ranking e devem ser priorizados para probes multimodais.
 
 ### Faixa H — Terminal UX
 
@@ -753,6 +758,88 @@ Validação deste corte:
 
 Próxima fatia antes de K:
 
-1. Corrigir o gap do provider/modelo ativo em vision: escolher automaticamente candidato vision do catálogo para
-   `/byok probe vision` quando o modelo ativo não aceita attachment, em vez de exigir troca manual.
+1. Refinar `/byok probe vision` para sugerir ou tentar primeiro candidatos com evidence de vision, sem transformar
+   ausência de vision em recusa global antes de provas básicas de acesso/chat/streaming.
 2. Só depois avançar para K: banco universal, evidence ledger persistente e importers profundos.
+
+## 10. Continuidade 2026-05-25 — seleção por acesso básico antes de capability fina
+
+Pedido novo: continuar a camada atual sem tratar `vision` como característica automaticamente excludente, garantir um
+arquivo por provider e preparar a investigação de endpoints como primeira etapa do banco universal.
+
+Decisões consolidadas:
+
+1. A primeira barreira operacional não é “tem vision/tools/JSON perfeito”, mas sim:
+   - existe secret/conta/overlay que habilita o provider;
+   - o endpoint responde;
+   - o modelo aceita uma pergunta simples;
+   - streaming básico funciona quando o perfil exige streaming;
+   - há orçamento/context window razoável;
+   - falhas de auth, rota, quota ou modelo inexistente são classificadas com precisão.
+2. Capabilities finas (`vision`, `tools`, JSON schema, forced tool choice, parallel tool calls, reasoning budget) entram
+   como ranking, recomendação de probe e promoção progressiva de confiança. Elas só devem virar gate duro quando o
+   usuário ou o workflow explicitamente exige aquela capacidade para completar a tarefa.
+3. O perfil `vision` agora mantém `text` e `streaming` como requisitos duros e move `vision` para `softRequires` +
+   `prefers`. Assim, um modelo que ainda não tem metadata multimodal não desaparece do roteador; ele apenas perde pontos
+   e carrega razão auditável `missing_soft_capability:vision`.
+4. Todo provider OpenAI-compatible passa a ter spec próprio em `src/copilot/model-gateway/providers/specs/<provider>.js`.
+   Isso prepara importers por família, endpoints próprios, overlays de conta e quirks sem acoplar tudo ao adapter.
+5. A seleção final continuará em três camadas:
+   - metadata coletada/projetada;
+   - prova runtime básica;
+   - prova runtime específica do workflow.
+
+Fontes oficiais reconsultadas nesta continuidade:
+
+- OpenAI API Reference: `GET /v1/models` lista modelos disponíveis com metadados básicos de identidade/owner.
+- OpenRouter Models API: `/api/v1/models` expõe metadata rica, filtros por modalidade/parâmetros e campos como pricing,
+  architecture, supported parameters e expiração.
+- Anthropic Models API: `GET /v1/models` lista modelos disponíveis para a key, com paginação e identificação.
+- Gemini API: `models.list`/`models.get` retorna limits e métodos suportados, útil para acesso por conta/API version.
+- Mistral Models API: `GET /v1/models` traz `capabilities`, `max_context_length`, aliases e deprecation/replacement.
+- Groq API Reference: endpoint OpenAI-compatible em `https://api.groq.com/openai/v1`, incluindo `/models`.
+- Ollama API: `/api/tags` lista modelos locais com digest, formato, família, tamanho e quantização; `/api/show` deve
+  enriquecer detalhes por modelo.
+- Hugging Face Inference Providers: roteamento OpenAI-compatible em `https://router.huggingface.co/v1`, com seleção
+  `:fastest`, `:cheapest`, `:preferred` ou provider explícito.
+- Cloudflare Workers AI/AI Gateway: Workers AI tem catálogo público de modelos; AI Gateway tem endpoints por provider e
+  Universal Endpoint `https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}` com retry/fallback/headers.
+- Kilo AI Gateway: endpoint OpenAI-compatible `https://api.kilo.ai/api/gateway`, catálogo público
+  `/api/gateway/models`, providers, modelo `provider/model`, BYOK interno e controles de organização.
+- Cerebras Inference: `GET /v1/models` lista modelos disponíveis com identidade/owner.
+- NVIDIA NIM: catálogo NIM e endpoints OpenAI-compatible exigem importer híbrido docs/API porque a riqueza depende do
+  microserviço/modelo.
+- Chutes e Z.AI: tratados inicialmente como OpenAI-compatible/gateway specs próprios; precisam de investigação dedicada
+  de catálogo/endpoints antes de virarem importers especializados.
+
+Matriz de investigação por provider, antes da Faixa K:
+
+| Provider | Arquivo spec | Endpoint/catálogo primário | Próxima pergunta de importer |
+| --- | --- | --- | --- |
+| OpenAI | `providers/specs/openai.js` | `GET /v1/models` + docs/pricing | Como enriquecer capabilities/preço sem confiar só no endpoint mínimo? |
+| Kilo | `providers/specs/kilo.js` | `/api/gateway/models` e `/api/gateway/providers` | Como modelar BYOK interno, org allow lists, headers e `provider/model`? |
+| Groq | `providers/specs/groq.js` | `/openai/v1/models` + docs de modelos | Quais limites/capabilities precisam vir de docs/probe? |
+| Mistral | `providers/specs/mistral.js` | `/v1/models` | Como mapear `capabilities` para tools/vision/FIM/classification? |
+| Hugging Face | `providers/specs/huggingface.js` | `router.huggingface.co/v1` + catálogo Inference Providers | Como preservar `:fastest`, `:cheapest`, `:preferred` e provider explícito? |
+| Cloudflare | `providers/specs/cloudflare-workers-ai.js` | Workers AI catalog + AI Gateway universal/provider endpoints | Como separar Workers AI direto de AI Gateway com fallback/cache? |
+| NVIDIA NIM | `providers/specs/nvidia-nim.js` | `integrate.api.nvidia.com/v1` + NIM catalog | Como descobrir modelos habilitados por conta e por microserviço? |
+| Cerebras | `providers/specs/cerebras.js` | `/v1/models` + public model docs | Quais campos ricos só existem em docs públicas? |
+| Chutes | `providers/specs/chutes.js` | OpenAI-compatible atual + docs Chutes | Existe endpoint público de modelos estável ou a fonte inicial é docs/API auth? |
+| Z.AI | `providers/specs/zai.js` | OpenAI-compatible `api/paas/v4` + docs GLM | Quais endpoints separam chat, coding plan, vision e Anthropic-compatible? |
+
+Alterações implementadas neste corte:
+
+- `MODEL_GATEWAY_TASK_PROFILES.vision` passou a usar `softRequires: ['vision']`.
+- `scoreGatewayModelCandidate()` pontua `softRequires` com razão auditável sem rejeitar candidato.
+- Teste de contrato garante que modelo text-only continua candidato para perfil `vision`, enquanto multimodal ranqueia
+  acima.
+- Specs OpenAI-compatible foram extraídos para um arquivo por provider e reexportados pelo índice de specs.
+
+Validação parcial:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS `npm run typecheck:strict:src.copilot`
+- PASS `npm run lint:copilot`
+- PASS `npm run test:copilot`
+  (`5599` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T13-54-07-233Z/summary.md`).
