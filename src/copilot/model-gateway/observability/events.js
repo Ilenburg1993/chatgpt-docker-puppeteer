@@ -9,12 +9,20 @@
  */
 
 import {
+    MODEL_GATEWAY_CATALOG_IMPORT_COMPLETED,
     MODEL_GATEWAY_PROBE_COMPLETED,
     MODEL_GATEWAY_REGISTRY_SNAPSHOT,
     MODEL_GATEWAY_ROUTE_DECISION,
 } from '#copilot/events';
+import { summarizeCanonicalModelProjectionDiff } from '../catalog/import-runs.js';
 
 export {
+    MODEL_GATEWAY_CATALOG_CONFLICT_DETECTED,
+    MODEL_GATEWAY_CATALOG_IMPORT_COMPLETED,
+    MODEL_GATEWAY_CATALOG_IMPORT_STARTED,
+    MODEL_GATEWAY_CATALOG_MODEL_ADDED,
+    MODEL_GATEWAY_CATALOG_MODEL_CHANGED,
+    MODEL_GATEWAY_CATALOG_MODEL_REMOVED,
     MODEL_GATEWAY_EVENTS,
     MODEL_GATEWAY_MODEL_IMPORTED,
     MODEL_GATEWAY_PROBE_COMPLETED,
@@ -324,6 +332,90 @@ export function projectRouteDecisionMetrics(event) {
             'model_gateway.route.fallback': event.fallbackChain.length,
             'model_gateway.route.estimated_input_tokens': event.estimatedInputTokens ?? 0,
             'model_gateway.route.estimated_cost_usd': event.estimatedCostUsd ?? 0,
+        },
+    };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function uniqueStringList(value) {
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value.map(optionalString).filter((item) => item !== null))];
+}
+
+/**
+ * @param {{
+ *     source?: string;
+ *     storePath?: string | null;
+ *     importerIds?: string[];
+ *     snapshot: { projections?: unknown[]; providerProjections?: unknown[]; importRuns?: unknown[]; conflicts?: unknown[] };
+ *     diff: { added?: string[]; removed?: string[]; changed?: Array<{ changedKinds?: string[] }> };
+ *     openai?: { data?: unknown[] };
+ * }} input
+ * @returns {{
+ *     type: string;
+ *     timestamp: number;
+ *     source: string;
+ *     storePath: string | null;
+ *     importerIds: string[];
+ *     projectionCount: number;
+ *     providerProjectionCount: number;
+ *     openaiModelCount: number;
+ *     importRunCount: number;
+ *     conflictCount: number;
+ *     addedCount: number;
+ *     removedCount: number;
+ *     changedCount: number;
+ *     changedKinds: string[];
+ *     changedKindCounts: Record<string, number>;
+ * }}
+ */
+export function buildCatalogRefreshCompletedEvent(input) {
+    const diffSummary = summarizeCanonicalModelProjectionDiff(input.diff);
+    return {
+        type: MODEL_GATEWAY_CATALOG_IMPORT_COMPLETED,
+        timestamp: Date.now(),
+        source: optionalString(input.source) ?? 'catalog-refresh',
+        storePath: optionalString(input.storePath),
+        importerIds: uniqueStringList(input.importerIds),
+        projectionCount: Array.isArray(input.snapshot.projections) ? input.snapshot.projections.length : 0,
+        providerProjectionCount: Array.isArray(input.snapshot.providerProjections) ? input.snapshot.providerProjections.length : 0,
+        openaiModelCount: Array.isArray(input.openai?.data) ? input.openai.data.length : 0,
+        importRunCount: Array.isArray(input.snapshot.importRuns) ? input.snapshot.importRuns.length : 0,
+        conflictCount: Array.isArray(input.snapshot.conflicts) ? input.snapshot.conflicts.length : 0,
+        addedCount: diffSummary.addedCount,
+        removedCount: diffSummary.removedCount,
+        changedCount: diffSummary.changedCount,
+        changedKinds: diffSummary.changedKinds,
+        changedKindCounts: diffSummary.changedKindCounts,
+    };
+}
+
+/**
+ * @param {ReturnType<typeof buildCatalogRefreshCompletedEvent>} event
+ * @returns {{ counters: Record<string, number>; gauges: Record<string, number> }}
+ */
+export function projectCatalogRefreshCompletedMetrics(event) {
+    /** @type {Record<string, number>} */
+    const counters = {
+        'model_gateway.catalog.refresh.completed': 1,
+    };
+    for (const kind of event.changedKinds) {
+        counters[`model_gateway.catalog.diff.${kind}`] = event.changedKindCounts[kind] ?? 1;
+    }
+    return {
+        counters,
+        gauges: {
+            'model_gateway.catalog.projections': event.projectionCount,
+            'model_gateway.catalog.provider_projections': event.providerProjectionCount,
+            'model_gateway.catalog.openai_models': event.openaiModelCount,
+            'model_gateway.catalog.import_runs': event.importRunCount,
+            'model_gateway.catalog.conflicts': event.conflictCount,
+            'model_gateway.catalog.diff.added': event.addedCount,
+            'model_gateway.catalog.diff.removed': event.removedCount,
+            'model_gateway.catalog.diff.changed': event.changedCount,
         },
     };
 }

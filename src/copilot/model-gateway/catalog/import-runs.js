@@ -129,7 +129,7 @@ export function createCatalogImportRun(input) {
 /**
  * @param {Array<Record<string, any>>} previous
  * @param {Array<Record<string, any>>} next
- * @returns {{ added: string[]; removed: string[]; changed: Array<{ key: string; changedFields: string[] }> }}
+ * @returns {{ added: string[]; removed: string[]; changed: Array<{ key: string; changedFields: string[]; changedKinds: string[] }> }}
  */
 export function diffCanonicalModelProjections(previous, next) {
     const previousByKey = new Map(previous.map((item) => [projectionKey(item), item]));
@@ -144,9 +144,69 @@ export function diffCanonicalModelProjections(previous, next) {
             .filter((field) => !['provenanceByField', 'confidenceByField'].includes(field))
             .filter((field) => stableJson(previousItem[field]) !== stableJson(nextItem[field]))
             .sort();
-        if (changedFields.length > 0) changed.push({ key, changedFields });
+        if (changedFields.length > 0) changed.push({ key, changedFields, changedKinds: classifyChangedFields(changedFields) });
     }
     return { added, removed, changed: changed.sort((a, b) => a.key.localeCompare(b.key)) };
+}
+
+/**
+ * @param {{ added?: unknown[]; removed?: unknown[]; changed?: Array<{ changedKinds?: unknown[] }> }} diff
+ * @returns {{ addedCount: number; removedCount: number; changedCount: number; changedKinds: string[]; changedKindCounts: Record<string, number> }}
+ */
+export function summarizeCanonicalModelProjectionDiff(diff) {
+    /** @type {Record<string, number>} */
+    const changedKindCounts = {};
+    /** @type {string[]} */
+    const changedKinds = [];
+    const changed = Array.isArray(diff.changed) ? diff.changed : [];
+    for (const item of changed) {
+        /** @type {Set<string>} */
+        const itemKinds = new Set();
+        for (const rawKind of Array.isArray(item.changedKinds) ? item.changedKinds : []) {
+            const kind = optionalString(rawKind);
+            if (kind) itemKinds.add(kind);
+        }
+        for (const kind of itemKinds) {
+            changedKindCounts[kind] = (changedKindCounts[kind] ?? 0) + 1;
+            if (!changedKinds.includes(kind)) changedKinds.push(kind);
+        }
+    }
+    return {
+        addedCount: Array.isArray(diff.added) ? diff.added.length : 0,
+        removedCount: Array.isArray(diff.removed) ? diff.removed.length : 0,
+        changedCount: changed.length,
+        changedKinds,
+        changedKindCounts,
+    };
+}
+
+/**
+ * @param {string[]} changedFields
+ * @returns {string[]}
+ */
+function classifyChangedFields(changedFields) {
+    const kinds = new Set();
+    for (const field of changedFields) {
+        if (field === 'pricing') kinds.add('pricing_changed');
+        else if (field === 'limits' || field === 'rateLimits') kinds.add('limits_changed');
+        else if (field === 'capabilities' || field === 'supportedParameters' || field === 'unsupportedParameters') {
+            kinds.add('capabilities_changed');
+        } else if (field === 'lifecycle') {
+            kinds.add('lifecycle_changed');
+            kinds.add('deprecation_changed');
+        } else if (field === 'modalities') {
+            kinds.add('modalities_changed');
+        } else if (field === 'accountOverlayRefs') {
+            kinds.add('account_overlay_changed');
+        } else if (field === 'routingHints') {
+            kinds.add('routing_changed');
+        } else if (field === 'providerMetadata' || field === 'dataPolicy') {
+            kinds.add('provider_metadata_changed');
+        } else {
+            kinds.add('metadata_changed');
+        }
+    }
+    return [...kinds].sort();
 }
 
 /**

@@ -12,6 +12,7 @@ import fs from 'node:fs/promises';
 
 import { config as loadDotenv } from 'dotenv';
 import {
+    buildCatalogRefreshCompletedEvent,
     buildModelGatewayPreKCompatibilityReport,
     buildRouteDecisionEvent,
     buildProbeCompletedEvent,
@@ -1624,15 +1625,29 @@ async function renderByokGatewayCatalogRefresh(println) {
     }
     try {
         const result = await refreshModelGatewayCatalog({ store, importers });
+        const refreshEvent = buildCatalogRefreshCompletedEvent({
+            source: 'terminal-byok',
+            storePath: store.filePath,
+            importerIds: importers.map((importer) => importer.id),
+            snapshot: result.snapshot,
+            diff: result.diff,
+            openai: result.openai,
+        });
         println(
             `    \x1b[32mrefresh concluído\x1b[0m  \x1b[90mprojections=${result.snapshot.projections.length} · openai=${result.openai.data.length} · runs=${result.snapshot.importRuns.length}\x1b[0m`,
         );
         println(
             `    \x1b[90mdiff: added=${result.diff.added.length} · removed=${result.diff.removed.length} · changed=${result.diff.changed.length}\x1b[0m`,
         );
+        if (refreshEvent.changedKinds.length > 0) {
+            println(`    \x1b[90mdiff kinds: ${refreshEvent.changedKinds.join(',')}\x1b[0m`);
+        }
         for (const id of result.diff.added.slice(0, 5)) println(`      \x1b[32m+\x1b[0m ${id}`);
         for (const id of result.diff.removed.slice(0, 5)) println(`      \x1b[31m-\x1b[0m ${id}`);
-        for (const item of result.diff.changed.slice(0, 5)) println(`      \x1b[33m~\x1b[0m ${item.key} (${item.changedFields.join(',')})`);
+        for (const item of result.diff.changed.slice(0, 5)) {
+            const kinds = Array.isArray(item.changedKinds) && item.changedKinds.length > 0 ? ` · ${item.changedKinds.join(',')}` : '';
+            println(`      \x1b[33m~\x1b[0m ${item.key} (${item.changedFields.join(',')}${kinds})`);
+        }
         println('\n  \x1b[90mSaída interoperável disponível como OpenAI Models list em memória; snapshot interno ficou em data/copilot/model-gateway/catalog.json.\x1b[0m\n');
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

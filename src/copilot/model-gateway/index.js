@@ -52,6 +52,7 @@ export {
     rankCatalogEvidenceConfidence,
     refreshModelGatewayCatalog,
     runCatalogImporters,
+    summarizeCanonicalModelProjectionDiff,
     toOpenAIModelCatalogEntry,
     toOpenAIModelCatalogList,
 } from './catalog/index.js';
@@ -163,6 +164,12 @@ export {
     runConfiguredByokVisionProbe,
 } from './probes/index.js';
 export {
+    MODEL_GATEWAY_CATALOG_CONFLICT_DETECTED,
+    MODEL_GATEWAY_CATALOG_IMPORT_COMPLETED,
+    MODEL_GATEWAY_CATALOG_IMPORT_STARTED,
+    MODEL_GATEWAY_CATALOG_MODEL_ADDED,
+    MODEL_GATEWAY_CATALOG_MODEL_CHANGED,
+    MODEL_GATEWAY_CATALOG_MODEL_REMOVED,
     MODEL_GATEWAY_EVENTS,
     MODEL_GATEWAY_MODEL_IMPORTED,
     MODEL_GATEWAY_PROBE_COMPLETED,
@@ -170,10 +177,12 @@ export {
     MODEL_GATEWAY_PROVIDER_IMPORTED,
     MODEL_GATEWAY_REGISTRY_SNAPSHOT,
     MODEL_GATEWAY_ROUTE_DECISION,
+    buildCatalogRefreshCompletedEvent,
     buildProbeCompletedEvent,
     buildRegistrySnapshotEvent,
     buildRouteDecisionEvent,
     buildRouteDecisionTraceAttributes,
+    projectCatalogRefreshCompletedMetrics,
     projectProbeCompletedMetrics,
     projectRouteDecisionMetrics,
     projectModelGatewayMetrics,

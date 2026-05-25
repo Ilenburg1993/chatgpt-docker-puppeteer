@@ -2,8 +2,14 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildModelGatewayPreKCompatibilityReport, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listProviderEndpointInventory, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, resolveProviderEndpointInventory, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, writeFile } =
+const { buildCatalogRefreshCompletedEvent, buildModelGatewayPreKCompatibilityReport, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listProviderEndpointInventory, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, resolveProviderEndpointInventory, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, writeFile } =
     vi.hoisted(() => ({
+        buildCatalogRefreshCompletedEvent: vi.fn((input) => ({
+            type: 'model_gateway:catalog:import_completed',
+            changedKinds: [
+                ...new Set((input.diff?.changed ?? []).flatMap((item) => item.changedKinds ?? [])),
+            ],
+        })),
         buildModelGatewayPreKCompatibilityReport: vi.fn(() => ({
             stage: 'pre-k',
             ready: true,
@@ -190,6 +196,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
 }));
 
 vi.mock('#copilot/model-gateway', () => ({
+    buildCatalogRefreshCompletedEvent,
     buildModelGatewayPreKCompatibilityReport,
     buildProbeCompletedEvent: buildProbeCompletedEvent,
     buildRouteDecisionEvent,
@@ -323,7 +330,17 @@ describe('terminal /byok command', () => {
         refreshModelGatewayCatalog.mockReset();
         refreshModelGatewayCatalog.mockResolvedValue({
             snapshot: { projections: [{ providerModel: 'new-model' }], importRuns: [{ status: 'completed' }] },
-            diff: { added: ['openrouter:new-model:default'], removed: [], changed: [] },
+            diff: {
+                added: ['openrouter:new-model:default'],
+                removed: [],
+                changed: [
+                    {
+                        key: 'openrouter:changed-model:default',
+                        changedFields: ['pricing'],
+                        changedKinds: ['pricing_changed'],
+                    },
+                ],
+            },
             openai: { object: 'list', data: [{ id: 'new-model', object: 'model' }] },
         });
         routeGatewayModels.mockReset();
@@ -1254,6 +1271,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('projections=1');
         expect(ctx.output()).toContain('openai=1');
         expect(ctx.output()).toContain('added=1');
+        expect(ctx.output()).toContain('changed=1');
+        expect(ctx.output()).toContain('pricing_changed');
         expect(ctx.output()).toContain('openrouter:new-model:default');
     });
 

@@ -21,6 +21,7 @@ export {
     createCatalogImportRun,
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
+    summarizeCanonicalModelProjectionDiff,
 } from './import-runs.js';
 export {
     CEREBRAS_PUBLIC_MODELS_CATALOG_URL,

@@ -637,7 +637,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] Criar refresh por overlay de conta/organização quando houver secretRef configurado, mantendo snapshot público e
   snapshot account-scoped separados.
 - [x] Criar diff entre snapshots: modelos novos, removidos e campos alterados.
-- [ ] Expandir diff entre snapshots para depreciação explícita, preço alterado, limits alterados, capabilities
+- [x] Expandir diff entre snapshots para depreciação explícita, preço alterado, limits alterados, capabilities
   alteradas.
 - [ ] Emitir eventos:
   - `model_gateway:catalog:import_started`;
@@ -2074,3 +2074,61 @@ Próxima direção:
 
 - Avançar para Groq docs/model card enrichment ou para diff semântico de catálogo (`price/limits/capabilities`
   alterados).
+
+## 39. Continuidade 2026-05-25 — diff semântico de catálogo
+
+Implementado neste corte:
+
+- `diffCanonicalModelProjections()` agora mantém `changedFields` e acrescenta `changedKinds`.
+- `changedKinds` classifica mudanças em:
+  - `pricing_changed`;
+  - `limits_changed`;
+  - `capabilities_changed`;
+  - `lifecycle_changed`;
+  - `deprecation_changed`;
+  - `modalities_changed`;
+  - `account_overlay_changed`;
+  - `routing_changed`;
+  - `provider_metadata_changed`;
+  - `metadata_changed`.
+- O diff continua storage-neutral e secret-safe, mas passa a ser útil para governança operacional:
+  - preço mudou;
+  - contexto/limites mudaram;
+  - capability mudou;
+  - lifecycle/deprecation mudou.
+- O catálogo de eventos ganhou nomes canônicos para a governança futura de refresh:
+  - `model_gateway:catalog:import_started`;
+  - `model_gateway:catalog:import_completed`;
+  - `model_gateway:catalog:model_added`;
+  - `model_gateway:catalog:model_changed`;
+  - `model_gateway:catalog:model_removed`;
+  - `model_gateway:catalog:conflict_detected`.
+- `buildCatalogRefreshCompletedEvent()` e `projectCatalogRefreshCompletedMetrics()` projetam refresh/diff em evento e
+  métricas sem raw payload.
+- `summarizeCanonicalModelProjectionDiff()` virou helper canônico para resumir diff:
+  - `addedCount`;
+  - `removedCount`;
+  - `changedCount`;
+  - `changedKinds`;
+  - `changedKindCounts`, contando quantos modelos mudaram por tipo semântico.
+- `/byok gateway catalog refresh` agora mostra `diff kinds` e inclui `changedKinds` por item alterado.
+
+Separação arquitetural reafirmada:
+
+- Diff semântico não troca modelo ativo automaticamente.
+- Ele gera sinal auditável para operador, terminal e eventos futuros.
+- Runtime probes continuam sendo etapa posterior quando uma mudança de capability ou lifecycle exigir reprovação.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  (`102` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5625` testes totais, `5592` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T17-16-08-564Z/summary.md`).
+
+Próxima direção:
+
+- Validar, commitar/pushar e depois evoluir emissão real de eventos por run/model/conflict ou diff UX dedicado.

@@ -20,6 +20,7 @@ import {
     buildEnvByokModelGatewaySnapshot,
     buildModelGatewayOperatorProjection,
     buildProviderModelId,
+    buildCatalogRefreshCompletedEvent,
     buildProbeCompletedEvent,
     buildRegistrySnapshotEvent,
     buildRouteDecisionEvent,
@@ -37,6 +38,7 @@ import {
     projectProbeCompletedMetrics,
     projectRouteDecisionMetrics,
     projectModelGatewayMetrics,
+    projectCatalogRefreshCompletedMetrics,
     redactSecretRecord,
     redactSecretText,
     recordByokProviderModelAgentProbeSuccess,
@@ -93,6 +95,7 @@ import {
     runConfiguredByokStreamingProbe,
     runConfiguredByokVisionProbe,
     scoreGatewayModelCandidate,
+    summarizeCanonicalModelProjectionDiff,
     toOpenAIModelCatalogEntry,
     toOpenAIModelCatalogList,
     toCopilotModelInfoList,
@@ -497,6 +500,43 @@ describe('model-gateway foundation', () => {
         assert.equal(ledger[0].decisionId, event.decisionId);
     });
 
+    it('projects catalog refresh diff kinds into stable observability event and metrics', () => {
+        const event = buildCatalogRefreshCompletedEvent({
+            source: 'unit-test',
+            storePath: 'data/copilot/model-gateway/catalog.json',
+            importerIds: ['openrouter-models', 'cerebras-public-models'],
+            snapshot: {
+                projections: [{ providerModel: 'a' }, { providerModel: 'b' }],
+                providerProjections: [{ subjectProviderId: 'openai' }],
+                importRuns: [{ status: 'completed' }],
+                conflicts: [{ fieldPath: 'pricing.inputUsdPerMillion' }],
+            },
+            diff: {
+                added: ['cerebras:gpt-oss-120b:default'],
+                removed: [],
+                changed: [
+                    { key: 'a', changedKinds: ['pricing_changed', 'limits_changed'] },
+                    { key: 'b', changedKinds: ['pricing_changed'] },
+                ],
+            },
+            openai: { object: 'list', data: [{ id: 'a' }, { id: 'b' }] },
+        });
+        const metrics = projectCatalogRefreshCompletedMetrics(event);
+
+        assert.equal(event.type, 'model_gateway:catalog:import_completed');
+        assert.deepEqual(event.importerIds, ['openrouter-models', 'cerebras-public-models']);
+        assert.deepEqual(event.changedKinds, ['pricing_changed', 'limits_changed']);
+        assert.equal(event.addedCount, 1);
+        assert.equal(event.changedCount, 2);
+        assert.equal(event.conflictCount, 1);
+        assert.deepEqual(event.changedKindCounts, { pricing_changed: 2, limits_changed: 1 });
+        assert.equal(metrics.counters['model_gateway.catalog.refresh.completed'], 1);
+        assert.equal(metrics.counters['model_gateway.catalog.diff.pricing_changed'], 2);
+        assert.equal(metrics.counters['model_gateway.catalog.diff.limits_changed'], 1);
+        assert.equal(metrics.gauges['model_gateway.catalog.projections'], 2);
+        assert.equal(metrics.gauges['model_gateway.catalog.conflicts'], 1);
+    });
+
     it('publishes a boolean pre-K compatibility gate for the current migration layer', () => {
         const report = buildModelGatewayPreKCompatibilityReport();
 
@@ -759,9 +799,52 @@ describe('model-gateway foundation', () => {
             {
                 key: 'openrouter:openai/gpt-oss-120b:default',
                 changedFields: ['limits'],
+                changedKinds: ['limits_changed'],
             },
         ]);
         assert.equal(JSON.stringify({ rawRef, run }).includes('sk-secret-that-must-not-leak'), false);
+    });
+
+    it('classifies semantic catalog diff kinds for pricing, capabilities and lifecycle changes', () => {
+        const previous = [
+            createCanonicalModelProjection({
+                providerId: 'cerebras',
+                providerModel: 'gpt-oss-120b',
+                lifecycle: { status: 'active' },
+                capabilities: { tools: true },
+                pricing: { inputUsdPerMillion: 0.35 },
+            }),
+        ];
+        const next = [
+            createCanonicalModelProjection({
+                providerId: 'cerebras',
+                providerModel: 'gpt-oss-120b',
+                lifecycle: { status: 'retired' },
+                capabilities: { tools: true, structuredOutputs: true },
+                pricing: { inputUsdPerMillion: 0.45 },
+            }),
+        ];
+        const diff = diffCanonicalModelProjections(previous, next);
+
+        assert.deepEqual(diff.changed, [
+            {
+                key: 'cerebras:gpt-oss-120b:default',
+                changedFields: ['capabilities', 'lifecycle', 'pricing'],
+                changedKinds: ['capabilities_changed', 'deprecation_changed', 'lifecycle_changed', 'pricing_changed'],
+            },
+        ]);
+        assert.deepEqual(summarizeCanonicalModelProjectionDiff(diff), {
+            addedCount: 0,
+            removedCount: 0,
+            changedCount: 1,
+            changedKinds: ['capabilities_changed', 'deprecation_changed', 'lifecycle_changed', 'pricing_changed'],
+            changedKindCounts: {
+                capabilities_changed: 1,
+                deprecation_changed: 1,
+                lifecycle_changed: 1,
+                pricing_changed: 1,
+            },
+        });
     });
 
     it('persists a redacted JSON catalog snapshot before the SQLite store', async () => {
