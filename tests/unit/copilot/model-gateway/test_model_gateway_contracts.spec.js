@@ -57,6 +57,11 @@ import {
     BYOK_AGENT_PROBE_TOOL,
     BYOK_VISION_PROBE_DISPLAY_NAME,
     BYOK_VISION_PROBE_MIME_TYPE,
+    createCanonicalModelProjection,
+    createModelMetadataEvidence,
+    createModelRouteOption,
+    createProviderAccountOverlay,
+    createProviderCatalogSource,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
     runConfiguredByokJsonProbe,
@@ -476,6 +481,62 @@ describe('model-gateway foundation', () => {
         assert.ok(report.checks.every((check) => typeof check.passed === 'boolean'));
         assert.ok(report.checks.some((check) => check.id === 'sdk_provider_config_boundary'));
         assert.ok(report.checks.some((check) => check.id === 'route_trace_attributes_are_stable'));
+    });
+
+    it('creates secret-safe universal catalog evidence contracts', () => {
+        const source = createProviderCatalogSource({
+            id: 'kilo-public-models',
+            providerId: 'kilo',
+            kind: 'gateway',
+            url: 'https://api.kilo.ai/api/gateway/models',
+            authMode: 'none',
+            refreshPolicy: 'scheduled',
+            ttlSeconds: 3600,
+        });
+        const evidence = createModelMetadataEvidence({
+            evidenceId: 'ev-1',
+            providerId: 'kilo',
+            providerModel: 'anthropic/claude-sonnet-4.5',
+            routeProfile: 'kilo-free',
+            fieldPath: 'capabilities.tools',
+            value: { tools: true, Authorization: 'Bearer sk-secret-that-must-not-leak' },
+            sourceId: source.id,
+            sourceKind: source.kind,
+            confidence: 'catalog',
+            observedAt: '2026-05-25T00:00:00.000Z',
+        });
+        const route = createModelRouteOption({
+            providerId: 'kilo',
+            providerModel: 'anthropic/claude-sonnet-4.5',
+            selectorKind: 'gateway_auto',
+            selectorSyntax: 'provider/model',
+            providerSpecific: { header: 'x-kilocode-mode', token: 'secret-token-that-must-not-leak' },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'kilo',
+            accountScope: 'org',
+            secretRef: 'KILO_API_KEY',
+            enabledModels: ['anthropic/claude-sonnet-4.5'],
+            policyHeaders: { Authorization: 'Bearer sk-secret-that-must-not-leak' },
+        });
+        const projection = createCanonicalModelProjection({
+            providerId: 'kilo',
+            providerModel: 'anthropic/claude-sonnet-4.5',
+            capabilities: { tools: true, vision: true },
+            supportedParameters: ['tools', 'stream'],
+            provenanceByField: { 'capabilities.tools': evidence.evidenceId },
+            confidenceByField: { 'capabilities.tools': evidence.confidence },
+            accountOverlayRefs: [overlay.secretRef],
+        });
+
+        assert.equal(source.providerId, 'kilo');
+        assert.equal(evidence.redactionStatus, 'sanitized');
+        assert.equal(route.selectorKind, 'gateway_auto');
+        assert.equal(overlay.redactionStatus, 'sanitized');
+        assert.deepEqual(projection.modalities, { input: ['text'], output: ['text'] });
+        const serialized = JSON.stringify({ evidence, route, overlay, projection });
+        assert.equal(serialized.includes('sk-secret-that-must-not-leak'), false);
+        assert.equal(serialized.includes('secret-token-that-must-not-leak'), false);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {

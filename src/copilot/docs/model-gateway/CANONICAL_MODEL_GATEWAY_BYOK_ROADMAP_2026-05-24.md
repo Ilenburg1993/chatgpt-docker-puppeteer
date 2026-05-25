@@ -495,7 +495,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 
 ### Faixa K — Banco universal de catálogo e evidências
 
-- [ ] Criar `catalog/contracts` com `ProviderCatalogSource`, `ModelMetadataEvidence`, `ModelRouteOption` e
+- [x] Criar `catalog/contracts` com `ProviderCatalogSource`, `ModelMetadataEvidence`, `ModelRouteOption` e
   `CanonicalModelProjection`.
 - [ ] Criar store SQLite `data/copilot/model-gateway/catalog.sqlite`.
 - [ ] Manter `registry.json` como export/snapshot redigido, não como banco completo.
@@ -922,5 +922,39 @@ Validação deste corte:
 
 Próxima direção:
 
-1. Commit/push deste fechamento A-J.
-2. Começar K com contratos de catálogo/evidências sem quebrar A-J.
+1. Começar K com contratos de catálogo/evidências sem quebrar A-J.
+
+## 12. Continuidade 2026-05-25 — início da Faixa K por contratos puros
+
+Pedido permanente: após fechar A-J, avançar para K com transformações estruturais, mantendo barrels e checkboxes
+booleanos.
+
+Implementado neste corte:
+
+- Criado `src/copilot/model-gateway/catalog/contracts.js`.
+- Criado barrel `src/copilot/model-gateway/catalog/index.js`.
+- O barrel raiz `#copilot/model-gateway` passou a exportar os contratos de catálogo.
+- Contratos criados:
+  - `ProviderCatalogSource`;
+  - `ModelMetadataEvidence`;
+  - `ModelRouteOption`;
+  - `ProviderAccountOverlay`;
+  - `CanonicalModelProjection`.
+- As factories normalizam `providerId`, timestamps, listas, seletor de rota e defaults seguros.
+- Evidências, route options, overlays e projections sanitizam valores antes de serialização; payload bruto continua fora
+  do contrato e deve entrar depois apenas por `rawPayloadRef` redigido.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`32` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5604` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T14-22-10-569Z/summary.md`).
+
+Próxima direção:
+
+1. Commit/push deste início de K.
+2. Em seguida, avançar K para merge field-wise/provenance sem ainda acoplar SQLite.

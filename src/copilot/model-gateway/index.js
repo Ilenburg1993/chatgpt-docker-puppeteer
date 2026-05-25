@@ -9,6 +9,15 @@
  */
 
 export {
+    MODEL_GATEWAY_CATALOG_CONFIDENCE,
+    MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+    createCanonicalModelProjection,
+    createModelMetadataEvidence,
+    createModelRouteOption,
+    createProviderAccountOverlay,
+    createProviderCatalogSource,
+} from './catalog/index.js';
+export {
     MODEL_GATEWAY_SCHEMA_VERSION,
     MODEL_GATEWAY_VERIFICATION_CONFIDENCE,
     buildProviderModelId,
