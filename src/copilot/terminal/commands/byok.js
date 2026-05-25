@@ -26,6 +26,7 @@ import {
     applyModelGatewayEligibilityToSnapshot,
     evaluateModelGatewayCatalogEligibility,
     explainModelGatewayCatalogEntry,
+    explainModelGatewayProviderEntry,
     explainModelGatewayEligibilityDecision,
     flushByokProviderHealth,
     JsonModelGatewayCatalogStore,
@@ -1528,7 +1529,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>> | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway provider explain <provider> | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1922,6 +1923,51 @@ async function renderByokGatewayCatalogExplain(println, selector) {
 }
 
 /**
+ * @param {(text: string) => void} println
+ * @param {string | null} selector
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayProviderExplain(println, selector) {
+    const normalizedSelector = optionalScalarString(selector);
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    println(`\n  \x1b[36mBYOK model-gateway provider explain\x1b[0m`);
+    println(`  \x1b[90mstore=${store.filePath} · selector=${normalizedSelector ?? '-'} · runtime=nao\x1b[0m\n`);
+    if (!normalizedSelector) {
+        println('    \x1b[33mInforme um provider id ou display name.\x1b[0m\n');
+        return;
+    }
+    const explanation = explainModelGatewayProviderEntry(await store.readSnapshot(), normalizedSelector);
+    if (!explanation.found) {
+        println(`    \x1b[33mProvider não encontrado.\x1b[0m  \x1b[90mnext=${explanation.nextActions.join(',')}\x1b[0m\n`);
+        return;
+    }
+    println(`    \x1b[33m${explanation.providerId}\x1b[0m`);
+    println(
+        `      \x1b[90msources=${explanation.sources.length} · providerEvidence=${explanation.providerEvidences.length} · models=${explanation.projections.length} · routes=${explanation.routeOptions.length} · overlays=${explanation.accountOverlays.length} · conflicts=${explanation.conflicts.length}\x1b[0m`,
+    );
+    println(
+        `      \x1b[90mfreshness newest=${explanation.freshness.newestSourceAt ?? '-'} · oldest=${explanation.freshness.oldestSourceAt ?? '-'}\x1b[0m`,
+    );
+    if (explanation.providerProjection) {
+        println(
+            `      \x1b[90mdisplay=${optionalScalarString(explanation.providerProjection['displayName']) ?? '-'} · subject=${optionalScalarString(explanation.providerProjection['subjectProviderId']) ?? '-'}\x1b[0m`,
+        );
+    }
+    for (const source of explanation.sources.slice(0, 4)) {
+        println(
+            `      \x1b[90msource ${optionalScalarString(source['id']) ?? '-'} · kind=${optionalScalarString(source['kind']) ?? '-'} · auth=${optionalScalarString(source['authMode']) ?? '-'} · refresh=${optionalScalarString(source['refreshPolicy']) ?? '-'}\x1b[0m`,
+        );
+    }
+    const firstConflict = explanation.conflicts[0] ?? null;
+    if (firstConflict) {
+        println(
+            `      \x1b[90mconflict ${optionalScalarString(firstConflict['projectionKey']) ?? '-'} · field=${optionalScalarString(firstConflict['fieldPath']) ?? '-'}\x1b[0m`,
+        );
+    }
+    println(`      \x1b[90mnext=${explanation.nextActions.slice(0, 6).join(',') || '-'}\x1b[0m\n`);
+}
+
+/**
  * @param {string[]} rest
  * @returns {{ query: string; providerId: string | undefined; onlyEligible: boolean; requireTools: boolean; requireStreaming: boolean; requireReasoning: boolean; limit: number }}
  */
@@ -2099,6 +2145,38 @@ async function renderByokGatewayCatalogConflicts(println) {
     if (snapshot.conflicts.length > 20) {
         println(`\n  \x1b[90mexibindo 20/${snapshot.conflicts.length}; refine depois com /models explain <provider:model>.\x1b[0m`);
     }
+    println('');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayCatalogFreshness(println, rest) {
+    const args = parseGatewayCatalogListArgs(rest);
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const snapshot = await store.readSnapshot();
+    const sources = snapshot.sources
+        .filter((source) => matchesGatewayCatalogRecordSelector(source, args.selector))
+        .map((source) => ({
+            source,
+            at: optionalScalarString(source['updatedAt']) ?? optionalScalarString(source['createdAt']) ?? '-',
+        }))
+        .sort((a, b) => b.at.localeCompare(a.at));
+    println(`\n  \x1b[36mBYOK model-gateway catalog freshness\x1b[0m`);
+    println(`  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · sources=${sources.length}/${snapshot.sources.length}\x1b[0m\n`);
+    if (sources.length === 0) {
+        println('    \x1b[33mNenhuma source encontrada para o filtro informado.\x1b[0m\n');
+        return;
+    }
+    for (const item of sources.slice(0, args.limit)) {
+        const source = item.source;
+        println(
+            `    \x1b[33m${optionalScalarString(source['id']) ?? '-'}\x1b[0m  \x1b[90mprovider=${optionalScalarString(source['providerId']) ?? '-'} · kind=${optionalScalarString(source['kind']) ?? '-'} · auth=${optionalScalarString(source['authMode']) ?? '-'} · refresh=${optionalScalarString(source['refreshPolicy']) ?? '-'} · at=${item.at}\x1b[0m`,
+        );
+    }
+    if (sources.length > args.limit) println(`\n  \x1b[90mexibindo ${args.limit}/${sources.length}; use filtro ou limite numerico.\x1b[0m`);
     println('');
 }
 
@@ -2657,6 +2735,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayCatalogConflicts(println);
             return;
         }
+        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(freshness|fresh|fontes|sources)$/iu.test(rest[1] ?? '')) {
+            await renderByokGatewayCatalogFreshness(println, rest.slice(2));
+            return;
+        }
         if (
             /^(catalog|catalogo)$/iu.test(rest[0] ?? '') &&
             /^(sqlite|sql|mirror|migrate|migrar|sync-sqlite)$/iu.test(rest[1] ?? '')
@@ -2697,6 +2779,13 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         }
         if (/^(overlays|overlay|accounts|account|contas)$/iu.test(rest[0] ?? '')) {
             await renderByokGatewayOverlays(println, rest.slice(1));
+            return;
+        }
+        if (
+            /^(provider|providers|provedor|provedores)$/iu.test(rest[0] ?? '') &&
+            /^(explain|explicar|describe|show)$/iu.test(rest[1] ?? '')
+        ) {
+            await renderByokGatewayProviderExplain(println, rest.slice(2).join(' ') || null);
             return;
         }
         if (/^(eligibility|elegibilidade|eligible|exclusion|exclusao|exclusão)$/iu.test(rest[0] ?? '')) {

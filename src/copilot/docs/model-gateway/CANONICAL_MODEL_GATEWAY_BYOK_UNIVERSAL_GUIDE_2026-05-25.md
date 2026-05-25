@@ -1495,12 +1495,12 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Endpoint inventory.
 - [x] Search/filter.
 - [x] Explain por modelo.
-- [ ] Explain por provider.
+- [x] Explain por provider.
 - [x] Mostrar route options.
 - [x] Mostrar overlays.
 - [x] Mostrar projection OpenAI.
-- [ ] Mostrar conflito por campo.
-- [ ] Mostrar freshness por source.
+- [x] Mostrar conflito por campo.
+- [x] Mostrar freshness por source.
 
 ### Faixa Q — Elegibilidade Pré-Runtime
 
@@ -1851,11 +1851,11 @@ Separação arquitetural reafirmada:
 Validação deste corte:
 
 - [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
-  com `85` testes.
+  com `86` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS `npm run lint:copilot`.
 - [x] PASS `git diff --check`.
-- [x] PASS `npm run test:copilot` com `5662` testes totais, `5629` passed,
+- [x] PASS `npm run test:copilot` com `5663` testes totais, `5630` passed,
   `33` pending, `0` failed e `0` warnings/errors.
 
 Próxima direção:
@@ -1875,3 +1875,7 @@ Próxima direção:
   sem runtime.
 - [x] Expor `/byok gateway overlays [filtro] [n]` para inspecionar account
   overlays sem vazar segredos.
+- [x] Criar `explainModelGatewayProviderEntry()` para unir sources, provider
+  evidences, projections, routes, overlays, conflicts e freshness por provider.
+- [x] Expor `/byok gateway provider explain <provider>`.
+- [x] Expor `/byok gateway catalog freshness [filtro] [n]`.

@@ -248,3 +248,99 @@ export function explainModelGatewayCatalogEntry(snapshot, selector, options = {}
         nextActions: [...new Set(nextActions.length > 0 ? nextActions : ['candidate_can_be_ranked'])],
     };
 }
+
+/**
+ * @param {ReturnType<typeof import('./json-catalog-store.js').normalizeStoredCatalogSnapshot>} snapshot
+ * @param {string} selector
+ * @returns {{
+ *   found: boolean;
+ *   selector: string;
+ *   providerId: string | null;
+ *   providerProjection: Record<string, any> | null;
+ *   sources: Record<string, any>[];
+ *   providerEvidences: Record<string, any>[];
+ *   projections: Record<string, any>[];
+ *   routeOptions: Record<string, any>[];
+ *   accountOverlays: Record<string, any>[];
+ *   conflicts: Record<string, any>[];
+ *   freshness: { newestSourceAt: string | null; oldestSourceAt: string | null; sourceCount: number };
+ *   nextActions: string[];
+ * }}
+ */
+export function explainModelGatewayProviderEntry(snapshot, selector) {
+    const normalizedSelector = optionalString(selector) ?? '';
+    const normalized = normalizedSelector.toLowerCase();
+    const providerProjection =
+        snapshot.providerProjections.find((provider) =>
+            [
+                optionalString(provider['providerId']),
+                optionalString(provider['subjectProviderId']),
+                optionalString(provider['displayName']),
+            ]
+                .filter((item) => item !== null)
+                .some((item) => String(item).toLowerCase().includes(normalized)),
+        ) ?? null;
+    const providerId =
+        optionalString(providerProjection?.['providerId']) ??
+        optionalString(providerProjection?.['subjectProviderId']) ??
+        (snapshot.projections.find((projection) => optionalString(projection['providerId'])?.toLowerCase().includes(normalized))?.[
+            'providerId'
+        ] ?? null);
+    const providerIdText = optionalString(providerId);
+    if (!providerIdText) {
+        return {
+            found: false,
+            selector: normalizedSelector,
+            providerId: null,
+            providerProjection: null,
+            sources: [],
+            providerEvidences: [],
+            projections: [],
+            routeOptions: [],
+            accountOverlays: [],
+            conflicts: [],
+            freshness: { newestSourceAt: null, oldestSourceAt: null, sourceCount: 0 },
+            nextActions: ['refresh_catalog_or_use_provider_id'],
+        };
+    }
+    const sources = snapshot.sources.filter((source) => optionalString(source['providerId']) === providerIdText);
+    const providerEvidences = snapshot.providerEvidences.filter(
+        (evidence) =>
+            optionalString(evidence['providerId']) === providerIdText ||
+            optionalString(evidence['subjectProviderId']) === providerIdText,
+    );
+    const projections = snapshot.projections.filter((projection) => optionalString(projection['providerId']) === providerIdText);
+    const routeOptions = snapshot.routeOptions.filter((route) => optionalString(route['providerId']) === providerIdText);
+    const accountOverlays = snapshot.accountOverlays.filter((overlay) => optionalString(overlay['providerId']) === providerIdText);
+    const projectionKeys = new Set(projections.map(projectionKey));
+    const conflicts = snapshot.conflicts.filter((conflict) =>
+        projectionKeys.has(optionalString(conflict['projectionKey']) ?? ''),
+    );
+    const sourceDates = sources
+        .map((source) => optionalString(source['updatedAt']) ?? optionalString(source['createdAt']))
+        .filter((item) => item !== null)
+        .sort();
+    return {
+        found: true,
+        selector: normalizedSelector,
+        providerId: providerIdText,
+        providerProjection,
+        sources,
+        providerEvidences,
+        projections,
+        routeOptions,
+        accountOverlays,
+        conflicts,
+        freshness: {
+            newestSourceAt: sourceDates[sourceDates.length - 1] ?? null,
+            oldestSourceAt: sourceDates[0] ?? null,
+            sourceCount: sources.length,
+        },
+        nextActions: [
+            ...(sources.length === 0 ? ['refresh_provider_catalog_sources'] : []),
+            ...(accountOverlays.length === 0 ? ['collect_account_overlay_for_provider'] : []),
+            ...(routeOptions.length === 0 ? ['collect_route_options_for_provider'] : []),
+            ...(conflicts.length > 0 ? ['inspect_provider_conflicts'] : []),
+        ],
+    };
+}

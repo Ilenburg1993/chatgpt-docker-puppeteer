@@ -92,6 +92,7 @@ export {
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
     explainModelGatewayCatalogEntry,
+    explainModelGatewayProviderEntry,
     mergeModelMetadataEvidence,
     mergeProviderMetadataEvidence,
     normalizeAccountOverlayControls,

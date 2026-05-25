@@ -17,7 +17,7 @@ export {
     createProviderMetadataEvidence,
 } from './contracts.js';
 export { createDefaultModelGatewayCatalogImporters } from './default-importers.js';
-export { explainModelGatewayCatalogEntry } from './explain.js';
+export { explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry } from './explain.js';
 export {
     createCatalogImportRun,
     createSanitizedRawPayloadRef,
