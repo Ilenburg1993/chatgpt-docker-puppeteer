@@ -578,7 +578,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] Complementar `GroqModelsImporter` com seeds/docs oficiais de pricing, model cards, built-in tools e limites de
   rate por tier/modelo.
 - [x] Implementar `OllamaCatalogImporter` para `/api/tags` + `/api/show`.
-- [ ] Implementar `HuggingFaceInferenceProvidersImporter` para catálogo de providers/modelos/rotas.
+- [x] Implementar `HuggingFaceInferenceProvidersImporter` para catálogo de providers/modelos/rotas.
 - [ ] Implementar `CloudflareWorkersAiCatalogImporter` para unified catalog/Workers AI docs.
 - [x] Implementar `KiloGatewayCatalogImporter` para `https://api.kilo.ai/api/gateway/models`, capturando ids
   `provider/model`, provider upstream, pricing, context window, features, rotas gratuitas e endpoints auxiliares.
@@ -2617,3 +2617,69 @@ Próxima direção:
 
 - Continuar para Hugging Face ou Cloudflare. Hugging Face exige preservar rotas `:fastest`, `:cheapest`,
   `:preferred` e provider explícito; Cloudflare exige separar Workers AI direto de AI Gateway.
+
+## 50. Continuidade 2026-05-25 — importer Hugging Face Inference Providers
+
+Investigação oficial:
+
+- A documentação oficial do Hugging Face Inference Providers confirma o router OpenAI-compatible em
+  `https://router.huggingface.co/v1`.
+- O comportamento default do router é selecionar o provider mais rápido, equivalente a `:fastest`.
+- O operador pode escolher política via sufixo no model id: `:fastest`, `:cheapest` ou `:preferred`.
+- O operador também pode escolher provider explícito anexando o provider ao model id, por exemplo
+  `openai/gpt-oss-120b:sambanova`.
+- A documentação pública descreve `GET /v1/models` como listagem de modelos com metadados por provider, incluindo
+  preço, contexto, latência e throughput quando disponíveis.
+
+Implementado neste corte:
+
+- Novo `HuggingFaceInferenceProvidersImporter` para `https://router.huggingface.co/v1/models`.
+- O importer aceita modo público ou autenticado; na composição padrão entra quando `HF_TOKEN` ou
+  `HUGGINGFACE_API_TOKEN` estão presentes.
+- O parser é tolerante aos shapes `data[]`, `models[]`, `providers[]`, `provider_mapping[]`,
+  `inferenceProviders[]` e `providerMapping[]`.
+- O payload vira evidências para:
+  - `displayName`;
+  - aliases normalizados e `huggingFaceId`;
+  - `limits.contextWindowTokens` como máximo entre providers;
+  - capabilities `chat`, `tools` e `structuredOutputs` quando qualquer provider declara suporte;
+  - `providerMetadata.ownedBy=huggingface`;
+  - `providerMetadata.huggingface.providers` com provider, routing badges, preço, contexto, latência, throughput,
+    tools e structured outputs;
+  - `providerMetadata.huggingface.fastestProvider` e `cheapestProvider`;
+  - `openai.owned_by=huggingface`.
+- O importer também emite `ModelRouteOption` para:
+  - `model:fastest`;
+  - `model:cheapest`;
+  - `model:preferred`;
+  - `model:{provider}` para cada provider explícito do catálogo.
+- Rotas preservam `routeLayer=openai_compatible_aggregator`, `openAICompatibleBaseUrl`, política de seleção e hints de
+  provider; rotas explícitas preservam provider e pricing normalizado em `providerSpecific`.
+- Quando autenticado, o importer emite `ProviderAccountOverlay` com modelos visíveis e `routePolicySuffixes`, sem
+  serializar token.
+- Barrels de importers, catálogo e root exportam `HUGGINGFACE_ROUTER_BASE_URL`,
+  `HUGGINGFACE_ROUTER_MODELS_URL`, `HUGGINGFACE_ROUTE_POLICY_SUFFIXES` e
+  `createHuggingFaceInferenceProvidersImporter()`.
+
+Separação arquitetural reafirmada:
+
+- O catálogo Hugging Face modela seleção por provider/política, não prova runtime.
+- `:fastest` e `:cheapest` são políticas dinâmicas do router; os providers sugeridos são hints observados no catálogo,
+  não garantias absolutas de execução futura.
+- A camada runtime/probes ainda deve validar disponibilidade real do token, 404 por modelo/região, tool calling e
+  structured outputs.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`60` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5637` testes totais, `5604` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T19-47-23-006Z/summary.md`).
+
+Próxima direção:
+
+- Continuar para Cloudflare Workers AI/AI Gateway, separando catálogo público Workers AI, gateway universal e possíveis
+  overlays de conta/gateway.

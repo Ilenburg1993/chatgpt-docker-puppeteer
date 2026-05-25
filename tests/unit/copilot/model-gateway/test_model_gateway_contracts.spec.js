@@ -65,6 +65,7 @@ import {
     createCerebrasPublicModelsImporter,
     createGeminiModelsImporter,
     createGroqModelsImporter,
+    createHuggingFaceInferenceProvidersImporter,
     createMistralModelsImporter,
     createOllamaCatalogImporter,
     createOpenAICompatibleModelsImporter,
@@ -1890,6 +1891,79 @@ describe('model-gateway foundation', () => {
         assert.equal(snapshot.routeOptions[0].normalizedPolicy.openAICompatibleBaseUrl, 'https://api.groq.com/openai/v1');
     });
 
+    it('imports Hugging Face Inference Providers variants and route selectors', async () => {
+        const secret = 'hf-secret-that-must-not-leak';
+        /** @type {string | null} */
+        let authorizationHeader = null;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (_url, init) => {
+                authorizationHeader = /** @type {{ authorization?: string }} */ (init)?.headers?.authorization ?? null;
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        data: [
+                            {
+                                id: 'openai/gpt-oss-120b',
+                                name: 'OpenAI GPT OSS 120B',
+                                providers: [
+                                    {
+                                        provider: 'groq',
+                                        routing: ['fastest'],
+                                        pricing: { input: 0.1, output: 0.5 },
+                                        context_length: 131072,
+                                        latency: 0.16,
+                                        throughput: 810,
+                                        tools: true,
+                                        structured: false,
+                                    },
+                                    {
+                                        provider: 'together',
+                                        routing: ['cheapest', 'preferred'],
+                                        pricing: { input: 0.09, output: 0.45 },
+                                        context_length: 131072,
+                                        latency: 0.62,
+                                        throughput: 44,
+                                        tools: true,
+                                        structured: true,
+                                    },
+                                ],
+                            },
+                        ],
+                    }),
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [
+                createHuggingFaceInferenceProvidersImporter({
+                    fetchImpl: fakeFetch,
+                    apiKey: secret,
+                    secretRef: 'HF_TOKEN',
+                }),
+            ],
+            now: () => new Date('2026-05-25T14:05:00.000Z'),
+        });
+        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+        const bySelector = new Map(snapshot.routeOptions.map((route) => [route.selectorSyntax, route]));
+
+        assert.equal(authorizationHeader, `Bearer ${secret}`);
+        assert.equal(JSON.stringify(snapshot).includes(secret), false);
+        assert.equal(snapshot.sources[0].providerId, 'huggingface');
+        assert.equal(byPath.get('limits.contextWindowTokens'), 131072);
+        assert.equal(byPath.get('capabilities.tools'), true);
+        assert.equal(byPath.get('capabilities.structuredOutputs'), true);
+        assert.equal(byPath.get('providerMetadata.huggingface.fastestProvider'), 'groq');
+        assert.equal(byPath.get('providerMetadata.huggingface.cheapestProvider'), 'together');
+        assert.equal(bySelector.get('openai/gpt-oss-120b:fastest')?.normalizedPolicy.selectedProviderHint, 'groq');
+        assert.equal(bySelector.get('openai/gpt-oss-120b:cheapest')?.normalizedPolicy.selectedProviderHint, 'together');
+        assert.equal(bySelector.get('openai/gpt-oss-120b:preferred')?.normalizedPolicy.selectedProviderHint, 'together');
+        assert.equal(bySelector.get('openai/gpt-oss-120b:groq')?.selectorKind, 'provider_explicit');
+        assert.equal(bySelector.get('openai/gpt-oss-120b:together')?.providerSpecific.huggingFaceProvider, 'together');
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['openai/gpt-oss-120b']);
+        assert.deepEqual(snapshot.accountOverlays[0].providerMetadata.routePolicySuffixes, ['fastest', 'cheapest', 'preferred']);
+    });
+
     it('extracts Cerebras public rich model metadata without proving runtime access', async () => {
         const fakeFetch = /** @type {typeof fetch} */ (
             async () =>
@@ -2268,6 +2342,10 @@ describe('model-gateway foundation', () => {
             env: { OLLAMA_BASE_URL: 'http://127.0.0.1:11434' },
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ models: [] }) })),
         });
+        const huggingFaceAuthenticated = createDefaultModelGatewayCatalogImporters({
+            env: { HF_TOKEN: 'hf-secret-that-must-not-leak' },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+        });
 
         assert.deepEqual(
             importers.map((importer) => importer.id),
@@ -2283,6 +2361,7 @@ describe('model-gateway foundation', () => {
         assert.equal(anthropicAuthenticated.some((importer) => importer.id === 'anthropic-models'), true);
         assert.equal(geminiAuthenticated.some((importer) => importer.id === 'gemini-models'), true);
         assert.equal(ollamaLocal.some((importer) => importer.id === 'ollama-catalog'), true);
+        assert.equal(huggingFaceAuthenticated.some((importer) => importer.id === 'huggingface-inference-providers'), true);
         assert.equal(JSON.stringify(importers).includes(secret), false);
         assert.equal(JSON.stringify(groqAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(genericAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
@@ -2290,6 +2369,7 @@ describe('model-gateway foundation', () => {
         assert.equal(JSON.stringify(mistralAuthenticated).includes('mistral-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(anthropicAuthenticated).includes('anthropic-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(geminiAuthenticated).includes('gemini-secret-that-must-not-leak'), false);
+        assert.equal(JSON.stringify(huggingFaceAuthenticated).includes('hf-secret-that-must-not-leak'), false);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {

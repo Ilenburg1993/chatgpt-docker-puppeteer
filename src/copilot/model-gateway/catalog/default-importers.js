@@ -13,6 +13,7 @@ import {
     createCerebrasPublicModelsImporter,
     createGeminiModelsImporter,
     createGroqModelsImporter,
+    createHuggingFaceInferenceProvidersImporter,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
     createMistralModelsImporter,
@@ -126,6 +127,16 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                 fetchImpl: options.fetchImpl,
                 apiKey: groqSecret.value,
                 secretRef: groqSecret.key,
+            }),
+        );
+    }
+    const huggingFaceSecret = readEnvSecret(env, ['HF_TOKEN', 'HUGGINGFACE_API_TOKEN']);
+    if (includeAuthenticated && huggingFaceSecret) {
+        importers.push(
+            createHuggingFaceInferenceProvidersImporter({
+                fetchImpl: options.fetchImpl,
+                apiKey: huggingFaceSecret.value,
+                secretRef: huggingFaceSecret.key,
             }),
         );
     }

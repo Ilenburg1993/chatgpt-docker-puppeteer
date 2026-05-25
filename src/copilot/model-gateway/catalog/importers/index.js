@@ -26,6 +26,12 @@ export {
     createGroqModelsImporter,
 } from './groq-models-importer.js';
 export {
+    HUGGINGFACE_ROUTE_POLICY_SUFFIXES,
+    HUGGINGFACE_ROUTER_BASE_URL,
+    HUGGINGFACE_ROUTER_MODELS_URL,
+    createHuggingFaceInferenceProvidersImporter,
+} from './huggingface-inference-providers-importer.js';
+export {
     KILO_GATEWAY_MODELS_CATALOG_URL,
     createKiloGatewayModelsImporter,
 } from './kilo-gateway-models-importer.js';
