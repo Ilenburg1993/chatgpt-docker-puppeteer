@@ -14,6 +14,7 @@ import {
     createChutesModelsImporter,
     createCloudflareWorkersAiCatalogImporter,
     createGeminiModelsImporter,
+    createGroqDocsModelsImporter,
     createGroqModelsImporter,
     createHuggingFaceInferenceProvidersImporter,
     createKiloGatewayModelsImporter,
@@ -70,6 +71,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             createKiloGatewayModelsImporter({ fetchImpl: options.fetchImpl }),
             createKiloGatewayProvidersImporter({ fetchImpl: options.fetchImpl }),
             createCerebrasPublicModelsImporter({ fetchImpl: options.fetchImpl }),
+            createGroqDocsModelsImporter({ fetchImpl: options.fetchImpl }),
             createCloudflareWorkersAiCatalogImporter({
                 fetchImpl: options.fetchImpl,
                 apiToken: includeAuthenticated ? cloudflareSecret?.value : undefined,

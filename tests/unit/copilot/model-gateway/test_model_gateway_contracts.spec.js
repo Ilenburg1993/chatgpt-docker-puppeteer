@@ -66,6 +66,7 @@ import {
     createChutesModelsImporter,
     createCloudflareWorkersAiCatalogImporter,
     createGeminiModelsImporter,
+    createGroqDocsModelsImporter,
     createGroqModelsImporter,
     createHuggingFaceInferenceProvidersImporter,
     createMistralModelsImporter,
@@ -2070,6 +2071,104 @@ describe('model-gateway foundation', () => {
         assert.equal(snapshot.accountOverlays[0].providerMetadata.batchEndpoint, '/openai/v1/batches');
     });
 
+    it('imports Groq public docs pricing, rate limits and speed as separate catalog evidence', async () => {
+        const modelsHtml = `
+            <table>
+                <tr>
+                    <th>MODEL ID</th><th>SPEED (T/SEC)</th><th>PRICE PER 1M TOKENS</th>
+                    <th>RATE LIMITS</th><th>CONTEXT WINDOW</th><th>MAX OUTPUT</th><th>FILE SIZE</th>
+                </tr>
+                <tr>
+                    <td>
+                        <div id="openai/gpt-oss-120b">
+                            <a>OpenAI GPT-OSS 120B</a>
+                            <span class="font-mono">openai/gpt-oss-120b</span>
+                        </div>
+                    </td>
+                    <td>500</td>
+                    <td><span>$0.15 input</span><span>$0.60 output</span></td>
+                    <td><span>250K TPM</span><span>1K RPM</span></td>
+                    <td>131,072</td>
+                    <td>65,536</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>
+                        <div id="whisper-large-v3-turbo">
+                            <a>Whisper Large V3 Turbo</a>
+                            <span class="font-mono">whisper-large-v3-turbo</span>
+                        </div>
+                    </td>
+                    <td>216</td>
+                    <td><span>$0.04 per hour</span></td>
+                    <td><span>400 RPM</span></td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>100 MB</td>
+                </tr>
+            </table>
+        `;
+        const pricingHtml = `
+            <main>
+                <section>
+                    openai/gpt-oss-120b $$0.15 Uncached Input Tokens $$0.075 Cached Input Tokens $$0.60 Output Tokens
+                    openai/gpt-oss-20b $$0.075 Uncached Input Tokens $$0.0375 Cached Input Tokens $$0.30 Output Tokens
+                </section>
+                <section>
+                    Built-In Tools Basic Search $$5 / 1000 requests
+                    Advanced Search $$8 / 1000 requests
+                    Visit Website $$1 / 1000 requests
+                    Code Execution $$0.18 / hour
+                    Browser Automation $$0.08 / hour
+                </section>
+            </main>
+        `;
+        const requestUrls = /** @type {string[]} */ ([]);
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (url) => {
+                requestUrls.push(String(url));
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    text: async () => (String(url).includes('/pricing') ? pricingHtml : modelsHtml),
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createGroqDocsModelsImporter({ fetchImpl: fakeFetch })],
+            now: () => new Date('2026-05-25T20:55:00.000Z'),
+        });
+        const byModel = new Map(
+            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+        );
+        const byProviderPath = new Map(snapshot.providerEvidences.map((item) => [item.fieldPath, item.value]));
+
+        assert.deepEqual(requestUrls, ['https://console.groq.com/docs/models', 'https://groq.com/pricing']);
+        assert.equal(snapshot.sources[0].kind, 'public_docs');
+        assert.equal(snapshot.sources[0].authMode, 'none');
+        assert.equal(snapshot.importRuns[0].rowCount, 2);
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:displayName'), 'OpenAI GPT-OSS 120B');
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:limits.contextWindowTokens'), 131072);
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:limits.maxOutputTokens'), 65536);
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:limits.tokensPerMinute'), 250000);
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:limits.requestsPerMinute'), 1000);
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:pricing.inputUsdPerMillion'), 0.15);
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:pricing.cacheReadUsdPerMillion'), 0.075);
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:pricing.outputUsdPerMillion'), 0.6);
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:capabilities.reasoning'), true);
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:providerMetadata.groqDocs.speedTokensPerSecond'), 500);
+        assert.equal(byModel.get('groq:whisper-large-v3-turbo:capabilities.asr'), true);
+        assert.deepEqual(byModel.get('groq:whisper-large-v3-turbo:modalities.input'), ['audio']);
+        assert.equal(byModel.get('groq:whisper-large-v3-turbo:providerMetadata.groqDocs.fileSizeLimit'), '100 MB');
+        assert.deepEqual(byProviderPath.get('providerMetadata.groqDocs.builtInToolPricing'), {
+            basicSearchUsdPerThousandRequests: 5,
+            advancedSearchUsdPerThousandRequests: 8,
+            visitWebsiteUsdPerThousandRequests: 1,
+            codeExecutionUsdPerHour: 0.18,
+            browserAutomationUsdPerHour: 0.08,
+        });
+    });
+
     it('imports Hugging Face Inference Providers variants and route selectors', async () => {
         const secret = 'hf-secret-that-must-not-leak';
         /** @type {string | null} */
@@ -2772,6 +2871,7 @@ describe('model-gateway foundation', () => {
                 'kilo-gateway-models',
                 'kilo-gateway-providers',
                 'cerebras-public-models',
+                'groq-docs-models',
                 'cloudflare-workers-ai-catalog',
                 'openai-models',
             ],
@@ -2783,6 +2883,7 @@ describe('model-gateway foundation', () => {
                 'kilo-gateway-models',
                 'kilo-gateway-providers',
                 'cerebras-public-models',
+                'groq-docs-models',
                 'cloudflare-workers-ai-catalog',
             ],
         );

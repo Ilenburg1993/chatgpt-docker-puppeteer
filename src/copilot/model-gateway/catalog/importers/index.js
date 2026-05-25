@@ -33,6 +33,11 @@ export {
     createGeminiModelsImporter,
 } from './gemini-models-importer.js';
 export {
+    GROQ_DOCS_MODELS_URL,
+    GROQ_PRICING_URL,
+    createGroqDocsModelsImporter,
+} from './groq-docs-models-importer.js';
+export {
     GROQ_MODELS_CATALOG_URL,
     GROQ_OPENAI_BASE_URL,
     createGroqModelsImporter,

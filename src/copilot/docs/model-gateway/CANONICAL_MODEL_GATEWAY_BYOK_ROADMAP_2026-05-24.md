@@ -3078,3 +3078,76 @@ Validação deste corte até agora:
 Próxima direção:
 
 - Commitar/pushar este pacote e continuar para parser docs-pricing Groq ou seeds oficiais de provider.
+
+## 57. Continuidade 2026-05-25 — importer público Groq docs/pricing como camada de metadados globais
+
+Investigação oficial:
+
+- A página pública `https://console.groq.com/docs/models` expõe uma tabela rica de modelos com `MODEL ID`, velocidade
+  em tokens/segundo, preço por 1M tokens, rate limits, context window, max output e limite de arquivo quando aplicável.
+- A página pública `https://groq.com/pricing` expõe preços de prompt caching para famílias como `openai/gpt-oss-*` e
+  custos de built-in tools como web search, visit website, code execution e browser automation.
+- Essas páginas são docs globais: são excelentes para preencher o banco normalizado, mas não provam que a key do
+  operador tem acesso efetivo, quota atual ou comportamento runtime.
+
+Implementado neste corte:
+
+- Criado `GroqDocsModelsImporter` separado do importer autenticado `/openai/v1/models`.
+- O importer busca, em paralelo:
+  - `https://console.groq.com/docs/models`;
+  - `https://groq.com/pricing`.
+- A tabela pública de modelos vira evidências de catálogo para:
+  - `displayName`;
+  - aliases;
+  - `limits.contextWindowTokens`;
+  - `limits.maxOutputTokens`;
+  - `limits.tokensPerMinute`;
+  - `limits.requestsPerMinute`;
+  - modalidades text/audio conforme família;
+  - capabilities de chat/streaming/tools/json/reasoning/ASR/TTS/compound por hint de família;
+  - pricing input/output por 1M tokens;
+  - metadata Groq Docs: docs URL, velocidade em tokens/segundo, file-size limit, pricing bruto normalizado e rate limits.
+- A página de pricing complementa:
+  - `pricing.cacheReadUsdPerMillion` quando o modelo tem cached input declarado;
+  - provider evidence `providerMetadata.groqDocs.builtInToolPricing` para Basic Search, Advanced Search, Visit Website,
+    Code Execution e Browser Automation.
+- `createDefaultModelGatewayCatalogImporters()` agora inclui `groq-docs-models` quando `includePublic=true`.
+- Os barrels de importers, catálogo e root exportam `GROQ_DOCS_MODELS_URL`, `GROQ_PRICING_URL` e
+  `createGroqDocsModelsImporter()`.
+- O inventário de endpoints Groq agora declara explicitamente as duas fontes públicas:
+  - models docs como `global_pricing_limits_rate_limits_speed`;
+  - pricing docs como `global_pricing_prompt_caching_builtin_tools`.
+- Teste contratual novo cobre HTML de docs/pricing com:
+  - `openai/gpt-oss-120b`;
+  - price input/output/cache read;
+  - TPM/RPM;
+  - context/max output;
+  - velocidade;
+  - built-in tool pricing;
+  - modelo ASR `whisper-large-v3-turbo` com modalidade audio.
+
+Separação arquitetural reafirmada:
+
+- Fonte pública de docs responde “o que o provider declara publicamente”.
+- Fonte autenticada responde “o que esta conta enxerga pelo endpoint”.
+- Runtime probes respondem “o que a key realmente consegue executar agora”.
+- A seleção inicial pode usar docs + authenticated catalog + overlays, mas promoção para perfis críticos deve continuar
+  dependente de probes de chat básico, stream, JSON, tools, reasoning e limites práticos.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`66` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- Smoke live com as páginas reais do Groq:
+  - `15` linhas parseadas;
+  - `openai/gpt-oss-120b` encontrado;
+  - input/cache/output `0.15/0.075/0.6`;
+  - `250000` TPM e `1000` RPM;
+  - built-in tools extraídos.
+
+Próxima direção:
+
+- Rodar `npm run test:copilot`, corrigir qualquer falha, commit/push deste bloco e continuar para o próximo provider ou
+  para seeds oficiais complementares de preço/limite sem misturar metadados com runtime.
