@@ -30,6 +30,8 @@ export {
     diffCanonicalModelProjections,
     mergeModelMetadataEvidence,
     normalizeCatalogModalities,
+    normalizeModelAliases,
+    normalizeModelLifecycle,
     normalizeModelModalities,
     normalizeModelTokenLimits,
     normalizeOpenAICompatibleModelCapabilities,

@@ -41,6 +41,8 @@ export {
 } from './openai-schema.js';
 export {
     normalizeCatalogModalities,
+    normalizeModelAliases,
+    normalizeModelLifecycle,
     normalizeModelModalities,
     normalizeModelTokenLimits,
     normalizeOpenAICompatibleModelCapabilities,

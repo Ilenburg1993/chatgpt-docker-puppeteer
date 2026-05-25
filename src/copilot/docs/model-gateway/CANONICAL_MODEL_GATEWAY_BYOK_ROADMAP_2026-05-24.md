@@ -564,8 +564,10 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   explícitas.
 - [ ] Expandir normalizador de pricing para image/audio e moedas não-USD quando providers oferecerem esses campos.
 - [ ] Expandir normalizador de limites para burst/concurrency/account quotas quando providers oferecerem esses campos.
-- [ ] Criar normalizador de lifecycle: active, preview, beta, deprecated, retired, replacement, expiresAt.
-- [ ] Criar parser de aliases/versionamento (`latest`, datas `YYYY-MM`, famílias, tamanho, quantização).
+- [x] Criar normalizador de lifecycle: active, preview, scheduled_retirement/retired, createdAt, expiresAt e
+  knowledgeCutoff.
+- [x] Criar parser inicial de aliases/versionamento (`latest`, data compacta `YYYYMMDD` e data `YYYY-MM-DD`).
+- [ ] Expandir parser de aliases/versionamento para famílias, tamanho, quantização, instruct/coder/reasoning e variants.
 - [ ] Criar normalizador de providers/gateways que separe `direct_provider`, `aggregator`, `gateway`,
   `openai_compatible_proxy`, `local_daemon` e `sdk_native`.
 - [ ] Criar normalizador de overlays de conta: allow/block lists, organization headers, spending limits, quotas, free
@@ -1483,3 +1485,57 @@ Próxima direção:
 
 - Commitar/pushar este corte.
 - Depois, avançar lifecycle/aliases e começar a modelar explicitamente overlays account-scoped para acesso efetivo.
+
+## 26. Continuidade 2026-05-25 — lifecycle, aliases e preservação ampla do payload útil
+
+Implementado neste corte:
+
+- `src/copilot/model-gateway/catalog/normalizers.js` ganhou:
+  - `normalizeModelAliases()`;
+  - `normalizeModelLifecycle()`.
+- `normalizeModelAliases()` preserva ids e aliases sem tentar selecionar modelo:
+  - `providerModel`;
+  - `canonicalSlug`;
+  - `huggingFaceId`;
+  - `version` extraída de `YYYYMMDD` ou `YYYY-MM-DD`;
+  - `isLatestAlias` quando o id é alias instável como `latest`.
+- `normalizeModelLifecycle()` transforma metadata temporal em fatos auditáveis:
+  - `createdAt`;
+  - `expiresAt`;
+  - `knowledgeCutoff`;
+  - `providerStatus`;
+  - `channel=preview` por hint de nome;
+  - `status=active`, `scheduled_retirement` ou `retired`.
+- O `OpenRouterModelsImporter` agora preserva mais campos oferecidos pelo endpoint em evidências:
+  - aliases/version;
+  - lifecycle/status;
+  - `providerMetadata.openrouter.createdUnix`;
+  - `providerMetadata.openrouter.canonicalSlug`;
+  - `providerMetadata.openrouter.modality`;
+  - `providerMetadata.openrouter.tokenizer`;
+  - `providerMetadata.openrouter.instructType`;
+  - `providerMetadata.openrouter.defaultParameters`;
+  - `providerMetadata.openrouter.supportedVoices`;
+  - `providerMetadata.openrouter.perRequestLimits`;
+  - `providerMetadata.openrouter.detailsPath`.
+
+Separação arquitetural reafirmada:
+
+- Alias instável, preview, expiração e parâmetros default são metadados de catálogo.
+- Eles podem afetar seleção e ordem de preferência depois, mas não provam acesso, execução, tool calling nem streaming.
+- Acesso efetivo por token/conta, modelo pago liberado, cota real e sucesso de chamada entram em overlay/runtime.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`44` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5617` testes totais, `5584` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T15-53-37-408Z/summary.md`).
+
+Próxima direção:
+
+- Depois, avançar `accountScoped`/overlays: diferenciar catálogo público, modelos disponíveis para a key do operador,
+  quotas efetivas e provas runtime.

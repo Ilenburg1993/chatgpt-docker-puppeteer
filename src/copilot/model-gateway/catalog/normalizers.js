@@ -199,3 +199,79 @@ export function normalizeUsdPricing(input = {}) {
           }
         : {};
 }
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function isoDate(value) {
+    const number = finiteNumber(value);
+    const date = number !== null ? new Date(number > 10_000_000_000 ? number : number * 1000) : new Date(String(value ?? ''));
+    return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function compactDateVersion(value) {
+    const text = scalarString(value);
+    if (!text) return null;
+    const dashed = text.match(/(?:^|[-_/])(\d{4})-(\d{2})-(\d{2})(?:$|[-_/])/u);
+    if (dashed) return `${dashed[1]}-${dashed[2]}-${dashed[3]}`;
+    const compact = text.match(/(?:^|[-_/])(\d{4})(\d{2})(\d{2})(?:$|[-_/])/u);
+    if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`;
+    return null;
+}
+
+/**
+ * @param {object} [input]
+ * @param {unknown} [input.providerModel]
+ * @param {unknown} [input.canonicalSlug]
+ * @param {unknown} [input.huggingFaceId]
+ * @returns {Record<string, string | boolean>}
+ */
+export function normalizeModelAliases(input = {}) {
+    const providerModel = scalarString(input.providerModel);
+    const canonicalSlug = scalarString(input.canonicalSlug);
+    const huggingFaceId = scalarString(input.huggingFaceId);
+    const version = compactDateVersion(canonicalSlug) ?? compactDateVersion(providerModel);
+    /** @type {Record<string, string | boolean>} */
+    const aliases = {};
+    if (providerModel) aliases['providerModel'] = providerModel;
+    if (canonicalSlug) aliases['canonicalSlug'] = canonicalSlug;
+    if (huggingFaceId) aliases['huggingFaceId'] = huggingFaceId;
+    if (version) aliases['version'] = version;
+    if (providerModel && /(?:^|[-_/])latest(?:$|[-_/])/iu.test(providerModel)) aliases['isLatestAlias'] = true;
+    return aliases;
+}
+
+/**
+ * @param {object} [input]
+ * @param {unknown} [input.created]
+ * @param {unknown} [input.expiresAt]
+ * @param {unknown} [input.knowledgeCutoff]
+ * @param {unknown} [input.providerModel]
+ * @param {unknown} [input.lifecycle]
+ * @param {number} [input.nowMs]
+ * @returns {Record<string, string | boolean>}
+ */
+export function normalizeModelLifecycle(input = {}) {
+    const createdAt = isoDate(input.created);
+    const expiresAt = isoDate(input.expiresAt);
+    const knowledgeCutoff = isoDate(input.knowledgeCutoff) ?? scalarString(input.knowledgeCutoff);
+    const providerLifecycle = scalarString(input.lifecycle);
+    const providerModel = scalarString(input.providerModel) ?? '';
+    const nowMs = typeof input.nowMs === 'number' && Number.isFinite(input.nowMs) ? input.nowMs : Date.now();
+    /** @type {Record<string, string | boolean>} */
+    const lifecycle = {};
+    if (createdAt) lifecycle['createdAt'] = createdAt;
+    if (expiresAt) lifecycle['expiresAt'] = expiresAt;
+    if (knowledgeCutoff) lifecycle['knowledgeCutoff'] = knowledgeCutoff;
+    if (providerLifecycle) lifecycle['providerStatus'] = providerLifecycle;
+    if (providerModel && /(?:preview|beta|experimental|exp)(?:$|[-_/])/iu.test(providerModel)) lifecycle['channel'] = 'preview';
+    if (expiresAt && Date.parse(expiresAt) <= nowMs) lifecycle['status'] = 'retired';
+    else if (expiresAt) lifecycle['status'] = 'scheduled_retirement';
+    else lifecycle['status'] = 'active';
+    return lifecycle;
+}

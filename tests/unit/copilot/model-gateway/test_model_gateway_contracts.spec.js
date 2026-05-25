@@ -70,6 +70,8 @@ import {
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
     mergeModelMetadataEvidence,
+    normalizeModelAliases,
+    normalizeModelLifecycle,
     normalizeModelModalities,
     normalizeModelTokenLimits,
     normalizeOpenAICompatibleModelCapabilities,
@@ -835,8 +837,11 @@ describe('model-gateway foundation', () => {
                                 description: 'coding model',
                                 context_length: 256000,
                                 architecture: {
+                                    modality: 'text+image->text',
                                     input_modalities: ['text', 'image'],
                                     output_modalities: ['text'],
+                                    tokenizer: 'Grok',
+                                    instruct_type: null,
                                 },
                                 pricing: {
                                     prompt: '0.000001',
@@ -850,6 +855,17 @@ describe('model-gateway foundation', () => {
                                     is_moderated: false,
                                 },
                                 supported_parameters: ['tools', 'tool_choice', 'response_format', 'structured_outputs'],
+                                default_parameters: {
+                                    temperature: null,
+                                    top_p: null,
+                                    top_k: null,
+                                    frequency_penalty: null,
+                                    presence_penalty: null,
+                                    repetition_penalty: null,
+                                },
+                                links: {
+                                    details: '/api/v1/models/x-ai/grok-build-0.1-20260520/endpoints',
+                                },
                             },
                         ],
                     }),
@@ -877,6 +893,17 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('capabilities.forcedToolChoice'), true);
         assert.equal(byPath.get('capabilities.structuredOutputs'), true);
         assert.equal(byPath.get('capabilities.vision'), true);
+        assert.equal(byPath.get('aliases.version'), '2026-05-20');
+        assert.equal(byPath.get('lifecycle.status'), 'active');
+        assert.equal(byPath.get('providerMetadata.openrouter.detailsPath'), '/api/v1/models/x-ai/grok-build-0.1-20260520/endpoints');
+        assert.deepEqual(byPath.get('providerMetadata.openrouter.defaultParameters'), {
+            temperature: null,
+            top_p: null,
+            top_k: null,
+            frequency_penalty: null,
+            presence_penalty: null,
+            repetition_penalty: null,
+        });
     });
 
     it('extracts account-scoped OpenAI model identity without serializing the API key', async () => {
@@ -1002,6 +1029,39 @@ describe('model-gateway foundation', () => {
                 outputUsdPerMillion: 2,
                 cacheReadUsdPerMillion: 0.2,
                 webSearchUsdPerRequest: 0.005,
+            },
+        );
+    });
+
+    it('normalizes aliases, version hints and lifecycle without proving runtime access', () => {
+        assert.deepEqual(
+            normalizeModelAliases({
+                providerModel: 'codestral-latest',
+                canonicalSlug: 'mistral/codestral-20260520',
+                huggingFaceId: 'mistralai/Codestral',
+            }),
+            {
+                providerModel: 'codestral-latest',
+                canonicalSlug: 'mistral/codestral-20260520',
+                huggingFaceId: 'mistralai/Codestral',
+                version: '2026-05-20',
+                isLatestAlias: true,
+            },
+        );
+        assert.deepEqual(
+            normalizeModelLifecycle({
+                created: 1779376861,
+                expiresAt: '2026-05-26T00:00:00.000Z',
+                knowledgeCutoff: '2025-12-01T00:00:00.000Z',
+                providerModel: 'vendor/model-preview',
+                nowMs: Date.parse('2026-05-25T00:00:00.000Z'),
+            }),
+            {
+                createdAt: '2026-05-21T15:21:01.000Z',
+                expiresAt: '2026-05-26T00:00:00.000Z',
+                knowledgeCutoff: '2025-12-01T00:00:00.000Z',
+                channel: 'preview',
+                status: 'scheduled_retirement',
             },
         );
     });

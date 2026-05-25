@@ -13,6 +13,8 @@ import {
     createModelMetadataEvidence,
 } from '../contracts.js';
 import {
+    normalizeModelAliases,
+    normalizeModelLifecycle,
     normalizeModelModalities,
     normalizeModelTokenLimits,
     normalizeOpenAICompatibleModelCapabilities,
@@ -81,12 +83,32 @@ function readTopProvider(row) {
 
 /**
  * @param {Record<string, unknown>} row
+ * @returns {Record<string, unknown>}
+ */
+function readLinks(row) {
+    return isRecord(row['links']) ? row['links'] : {};
+}
+
+/**
+ * @param {Record<string, unknown>} row
  * @returns {Array<{ fieldPath: string; value: unknown }>}
  */
 function modelEvidenceValues(row) {
     const architecture = readArchitecture(row);
     const pricing = readPricing(row);
     const topProvider = readTopProvider(row);
+    const links = readLinks(row);
+    const aliases = normalizeModelAliases({
+        providerModel: row['id'],
+        canonicalSlug: row['canonical_slug'],
+        huggingFaceId: row['hugging_face_id'],
+    });
+    const lifecycle = normalizeModelLifecycle({
+        created: row['created'],
+        expiresAt: row['expiration_date'],
+        knowledgeCutoff: row['knowledge_cutoff'],
+        providerModel: row['id'],
+    });
     const modalities = normalizeModelModalities({
         input: architecture['input_modalities'],
         output: architecture['output_modalities'],
@@ -111,8 +133,8 @@ function modelEvidenceValues(row) {
     });
     const values = [
         { fieldPath: 'displayName', value: stringValue(row['name']) },
-        { fieldPath: 'aliases.canonicalSlug', value: stringValue(row['canonical_slug']) },
-        { fieldPath: 'aliases.huggingFaceId', value: stringValue(row['hugging_face_id']) },
+        ...Object.entries(aliases).map(([key, value]) => ({ fieldPath: `aliases.${key}`, value })),
+        ...Object.entries(lifecycle).map(([key, value]) => ({ fieldPath: `lifecycle.${key}`, value })),
         { fieldPath: 'description', value: stringValue(row['description']) },
         ...Object.entries(limits).map(([key, value]) => ({ fieldPath: `limits.${key}`, value })),
         { fieldPath: 'modalities.input', value: modalities.input },
@@ -120,6 +142,15 @@ function modelEvidenceValues(row) {
         { fieldPath: 'supportedParameters', value: supportedParameters },
         ...Object.entries(capabilities).map(([key, value]) => ({ fieldPath: `capabilities.${key}`, value })),
         ...Object.entries(normalizedPricing).map(([key, value]) => ({ fieldPath: `pricing.${key}`, value })),
+        { fieldPath: 'providerMetadata.openrouter.createdUnix', value: row['created'] },
+        { fieldPath: 'providerMetadata.openrouter.canonicalSlug', value: row['canonical_slug'] },
+        { fieldPath: 'providerMetadata.openrouter.modality', value: architecture['modality'] },
+        { fieldPath: 'providerMetadata.openrouter.tokenizer', value: architecture['tokenizer'] },
+        { fieldPath: 'providerMetadata.openrouter.instructType', value: architecture['instruct_type'] },
+        { fieldPath: 'providerMetadata.openrouter.defaultParameters', value: row['default_parameters'] },
+        { fieldPath: 'providerMetadata.openrouter.supportedVoices', value: row['supported_voices'] },
+        { fieldPath: 'providerMetadata.openrouter.perRequestLimits', value: row['per_request_limits'] },
+        { fieldPath: 'providerMetadata.openrouter.detailsPath', value: links['details'] },
         { fieldPath: 'routingHints.openrouterTopProvider', value: topProvider },
     ];
     return values.filter((item) => {
