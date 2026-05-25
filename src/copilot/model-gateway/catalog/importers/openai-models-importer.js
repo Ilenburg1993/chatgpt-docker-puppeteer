@@ -11,9 +11,10 @@
 import {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
     createModelMetadataEvidence,
+    createModelRouteOption,
     createProviderAccountOverlay,
 } from '../contracts.js';
-import { normalizeAccountOverlayControls } from '../normalizers.js';
+import { normalizeAccountOverlayControls, normalizeModelAliases, normalizeModelLifecycle } from '../normalizers.js';
 
 export const OPENAI_MODELS_CATALOG_URL = 'https://api.openai.com/v1/models';
 
@@ -52,14 +53,78 @@ function parseOpenAiRows(raw) {
 }
 
 /**
- * @param {unknown} value
- * @returns {string | null}
+ * @param {string} providerModel
+ * @returns {{ family: string; wireApi: string; tier: string | null }}
  */
-function unixSecondsToIso(value) {
-    const seconds = finiteNumber(value);
-    if (seconds === null) return null;
-    const date = new Date(seconds * 1000);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+function modelFamily(providerModel) {
+    const lower = providerModel.toLowerCase();
+    if (lower.startsWith('text-embedding') || lower.includes('embedding')) {
+        return { family: 'embedding', wireApi: 'openai_embeddings', tier: null };
+    }
+    if (lower.startsWith('whisper') || lower.includes('transcribe')) {
+        return { family: 'audio', wireApi: 'openai_audio_transcriptions', tier: 'asr' };
+    }
+    if (lower.startsWith('tts') || lower.includes('speech')) {
+        return { family: 'audio', wireApi: 'openai_audio_speech', tier: 'tts' };
+    }
+    if (lower.startsWith('dall-e') || lower.startsWith('gpt-image')) {
+        return { family: 'image', wireApi: 'openai_images', tier: null };
+    }
+    if (lower.startsWith('o') || lower.startsWith('gpt-5') || lower.includes('reasoning')) {
+        return { family: 'reasoning', wireApi: 'openai_responses', tier: null };
+    }
+    return { family: 'chat', wireApi: 'openai_responses', tier: null };
+}
+
+/**
+ * @param {string} providerModel
+ * @returns {Record<string, boolean>}
+ */
+function capabilitiesFromModelId(providerModel) {
+    const lower = providerModel.toLowerCase();
+    const family = modelFamily(providerModel);
+    /** @type {Record<string, boolean>} */
+    const capabilities = {};
+    if (family.family === 'embedding') capabilities['embeddings'] = true;
+    if (family.tier === 'asr') capabilities['asr'] = true;
+    if (family.tier === 'tts') capabilities['tts'] = true;
+    if (family.family === 'image') capabilities['imageGeneration'] = true;
+    if (family.family === 'reasoning') capabilities['reasoning'] = true;
+    if (family.family === 'chat' || family.family === 'reasoning') {
+        capabilities['chat'] = true;
+        capabilities['streaming'] = true;
+        capabilities['tools'] = true;
+        capabilities['structuredOutputs'] = true;
+    }
+    if (lower.includes('vision') || lower.includes('gpt-4o') || lower.includes('gpt-5')) capabilities['vision'] = true;
+    return capabilities;
+}
+
+/**
+ * @param {Record<string, unknown>} record
+ * @returns {Array<{ fieldPath: string; value: unknown }>}
+ */
+function modelEvidenceValues(record) {
+    const providerModel = stringValue(record['id']);
+    if (!providerModel) return [];
+    const aliases = normalizeModelAliases({ providerModel });
+    const lifecycle = normalizeModelLifecycle({ created: record['created'], providerModel });
+    const family = modelFamily(providerModel);
+    const capabilities = capabilitiesFromModelId(providerModel);
+    return [
+        { fieldPath: 'displayName', value: providerModel },
+        ...Object.entries(aliases).map(([key, value]) => ({ fieldPath: `aliases.${key}`, value })),
+        { fieldPath: 'aliases.openaiModelId', value: providerModel },
+        ...Object.entries(lifecycle).map(([key, value]) => ({ fieldPath: `lifecycle.${key}`, value })),
+        ...Object.entries(capabilities).map(([key, value]) => ({ fieldPath: `capabilities.${key}`, value })),
+        { fieldPath: 'providerMetadata.ownedBy', value: stringValue(record['owned_by']) },
+        { fieldPath: 'providerMetadata.openai.object', value: stringValue(record['object']) },
+        { fieldPath: 'providerMetadata.openai.family', value: family.family },
+        { fieldPath: 'providerMetadata.openai.wireApi', value: family.wireApi },
+        { fieldPath: 'providerMetadata.openai.tier', value: family.tier },
+        { fieldPath: 'openai.created', value: finiteNumber(record['created']) },
+        { fieldPath: 'openai.owned_by', value: stringValue(record['owned_by']) ?? 'openai' },
+    ].filter((item) => item.value !== null && item.value !== undefined);
 }
 
 /**
@@ -103,13 +168,7 @@ export function createOpenAIModelsImporter(options = {}) {
                 const record = /** @type {Record<string, unknown>} */ (row);
                 const providerModel = stringValue(record['id']);
                 if (!providerModel) return [];
-                const values = [
-                    { fieldPath: 'displayName', value: providerModel },
-                    { fieldPath: 'aliases.openaiModelId', value: providerModel },
-                    { fieldPath: 'lifecycle.createdAt', value: unixSecondsToIso(record['created']) },
-                    { fieldPath: 'providerMetadata.ownedBy', value: stringValue(record['owned_by']) },
-                ].filter((item) => item.value !== null && item.value !== undefined);
-                return values.map((item) =>
+                return modelEvidenceValues(record).map((item) =>
                     createModelMetadataEvidence({
                         evidenceId: `${sourceId}:${providerModel}:${item.fieldPath}`,
                         providerId: 'openai',
@@ -122,6 +181,35 @@ export function createOpenAIModelsImporter(options = {}) {
                         rawPayloadRef: context.rawPayloadRef,
                     }),
                 );
+            });
+        },
+        toRouteOptions(rows, context) {
+            const sourceId = stringValue(context.source['id']) ?? 'openai-models';
+            return rows.flatMap((row) => {
+                const record = isRecord(row) ? row : {};
+                const providerModel = stringValue(record['id']);
+                if (!providerModel) return [];
+                const family = modelFamily(providerModel);
+                const capabilities = capabilitiesFromModelId(providerModel);
+                return [
+                    createModelRouteOption({
+                        providerId: 'openai',
+                        providerModel,
+                        selectorKind: 'exact_model',
+                        selectorSyntax: providerModel,
+                        sourceId,
+                        sourceKind: 'authenticated_api',
+                        confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG,
+                        normalizedPolicy: {
+                            routeLayer: 'direct_provider',
+                            wireApi: family.wireApi,
+                            family: family.family,
+                            supportsResponses: family.wireApi === 'openai_responses',
+                            supportsTools: capabilities['tools'] === true,
+                            supportsStreaming: capabilities['streaming'] === true,
+                        },
+                    }),
+                ];
             });
         },
         toAccountOverlays(rows, context) {

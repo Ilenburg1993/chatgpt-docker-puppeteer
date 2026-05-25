@@ -561,12 +561,14 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Criar runner storage-neutral de importers que monta `ProviderCatalogSource`, `rawPayloadRef`, evidências,
   `CatalogImportRun` e snapshot JSON secret-safe antes dos importers específicos.
 - [x] Implementar `OpenAIModelsImporter` para `/v1/models` account-scoped.
+- [x] Emitir route options e hints de família/capabilities para `OpenAIModelsImporter` sem depender de docs hardcoded
+  voláteis.
 - [ ] Complementar `OpenAIModelsImporter` com seeds/docs oficiais de capabilities e famílias.
 - [x] Implementar `OpenRouterModelsImporter` para `/api/v1/models`, preservando `supported_parameters`, pricing,
   context, top provider e per-request limits.
 - [x] Implementar `AnthropicModelsImporter` para lista oficial de modelos account-scoped.
-- [ ] Complementar `AnthropicModelsImporter` com `GET /v1/models/{model_id}`, aliases resolvidos e docs de
-  limites/capabilities por família.
+- [x] Complementar `AnthropicModelsImporter` com `GET /v1/models/{model_id}`, aliases resolvidos e hints de família.
+- [ ] Complementar `AnthropicModelsImporter` com docs oficiais de limites/capabilities por família.
 - [x] Implementar `GeminiModelsImporter` para `models.list`/`models.get`, capturando token limits,
   `supportedGenerationMethods`, `thinking` e parâmetros.
 - [ ] Complementar `GeminiModelsImporter` com seeds/docs oficiais de modalidades, capabilities de família e
@@ -2961,3 +2963,68 @@ Validação deste corte até agora:
 Próxima direção:
 
 - Commitar/pushar este bloco maior e continuar para os próximos importers/enriquecimentos de metadata de providers.
+
+## 55. Continuidade 2026-05-25 — enriquecimento oficial Anthropic/OpenAI sem hardcode volátil
+
+Investigação oficial:
+
+- A documentação Anthropic de Models API declara `GET /v1/models` para listar modelos disponíveis por conta e
+  `GET /v1/models/{model_id}` para obter informação de um modelo específico ou resolver alias para id concreto.
+- A documentação OpenAI Models API declara `GET /v1/models` e `GET /v1/models/{model}` como superfície de identidade;
+  ela não entrega, sozinha, todo o mapa de capabilities/runtime.
+- Portanto, o caminho seguro agora é enriquecer com campos que vêm da própria API e com heurísticas controladas por id,
+  deixando seeds oficiais de preço/limite/capability para um importer/docs seed dedicado posterior.
+
+Implementado neste corte:
+
+- `AnthropicModelsImporter` agora aceita `includeModelDetails` com default `true`.
+- Depois de paginar `/v1/models`, o importer chama `GET /v1/models/{model_id}` para cada modelo visível.
+- O detalhe por modelo é mesclado preservando `requested_id`, permitindo detectar/resolver alias quando o provider
+  retornar um id diferente do solicitado.
+- O importer Anthropic passa a emitir evidências adicionais:
+  - `aliases.anthropicModelId`;
+  - `aliases.anthropicRequestedModel` quando houver resolução de alias;
+  - capability hints `chat`, `streaming`, `tools`, `reasoning`, `batch` e `promptCaching`;
+  - metadata `providerMetadata.anthropic.family`, `tier`, `generation`, `supportsBatch` e `supportsPromptCaching`.
+- Rotas Anthropic agora preservam `family`, `tier`, `supportsStreaming` e `supportsTools` dentro de
+  `normalizedPolicy`, além de `wireApi=anthropic_messages`.
+- `OpenAIModelsImporter` agora usa normalizadores compartilhados para aliases/lifecycle.
+- O importer OpenAI passa a emitir capability hints por família de id:
+  - embeddings;
+  - ASR/TTS;
+  - image generation;
+  - chat/streaming/tools/structured outputs;
+  - reasoning.
+- O importer OpenAI agora emite `ModelRouteOption` `exact_model` por modelo com:
+  - `routeLayer=direct_provider`;
+  - `wireApi` (`openai_responses`, `openai_embeddings`, `openai_images`, `openai_audio_transcriptions`,
+    `openai_audio_speech`);
+  - `family`;
+  - `supportsResponses`, `supportsTools` e `supportsStreaming`.
+- Os testes de contratos cobrem:
+  - paginação Anthropic + dois retrieves;
+  - redaction de segredo;
+  - metadata/capabilities/route policy Anthropic;
+  - route option e capability hints OpenAI.
+
+Separação arquitetural reafirmada:
+
+- `GET /v1/models` e retrieve de modelo continuam sendo catálogo/identidade/availability por conta.
+- Capability hints por id são úteis para seleção inicial e explicabilidade, mas probes continuam obrigatórios para
+  provar chat, tools, streaming, JSON, reasoning, vision e limites efetivos.
+- Seeds/docs oficiais de preço/limite/capability devem entrar como fonte separada, com confidence de docs/static seed,
+  para não misturar conta com documentação global.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`65` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5642` testes totais, `5609` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T20-42-09-260Z/summary.md`).
+
+Próxima direção:
+
+- Commitar/pushar e continuar para seeds oficiais ou Groq pricing/model cards.

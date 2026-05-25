@@ -1393,10 +1393,16 @@ describe('model-gateway foundation', () => {
         assert.equal(snapshot.accountOverlays[0].secretRef, 'OPENAI_API_KEY');
         assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['gpt-test']);
         assert.equal(snapshot.accountOverlays[0].providerMetadata.semantics, 'account_visible_models');
+        assert.equal(snapshot.routeOptions[0].providerId, 'openai');
+        assert.equal(snapshot.routeOptions[0].selectorKind, 'exact_model');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.wireApi, 'openai_responses');
         assert.equal(snapshot.importRuns[0].status, 'completed');
         assert.equal(byPath.get('displayName'), 'gpt-test');
         assert.equal(byPath.get('lifecycle.createdAt'), '2026-05-21T15:21:01.000Z');
+        assert.equal(byPath.get('capabilities.chat'), true);
+        assert.equal(byPath.get('capabilities.tools'), true);
         assert.equal(byPath.get('providerMetadata.ownedBy'), 'openai');
+        assert.equal(byPath.get('providerMetadata.openai.family'), 'chat');
     });
 
     it('imports generic OpenAI-compatible model lists as identity, route and account overlay metadata', async () => {
@@ -1645,16 +1651,43 @@ describe('model-gateway foundation', () => {
         const fakeFetch = /** @type {typeof fetch} */ (
             async (url, init) => {
                 const headers = /** @type {{ 'x-api-key'?: string; 'anthropic-version'?: string }} */ (init)?.headers ?? {};
+                const parsedUrl = new URL(String(url));
                 requests.push({
                     url: String(url),
                     apiKey: headers['x-api-key'] ?? null,
                     apiVersion: headers['anthropic-version'] ?? null,
                 });
+                if (parsedUrl.pathname.endsWith('/v1/models/claude-sonnet-4-5-20250929')) {
+                    return /** @type {Response} */ ({
+                        ok: true,
+                        status: 200,
+                        json: async () => ({
+                            id: 'claude-sonnet-4-5-20250929',
+                            type: 'model',
+                            display_name: 'Claude Sonnet 4.5',
+                            created_at: '2025-09-29T00:00:00.000Z',
+                            supports_batch: true,
+                            supports_prompt_caching: true,
+                        }),
+                    });
+                }
+                if (parsedUrl.pathname.endsWith('/v1/models/claude-haiku-4-5-20251001')) {
+                    return /** @type {Response} */ ({
+                        ok: true,
+                        status: 200,
+                        json: async () => ({
+                            id: 'claude-haiku-4-5-20251001',
+                            type: 'model',
+                            display_name: 'Claude Haiku 4.5',
+                            created_at: '2025-10-01T00:00:00.000Z',
+                        }),
+                    });
+                }
                 return /** @type {Response} */ ({
                     ok: true,
                     status: 200,
                     json: async () =>
-                        requests.length === 1
+                        !parsedUrl.searchParams.get('after_id')
                             ? {
                                   data: [
                                       {
@@ -1696,9 +1729,11 @@ describe('model-gateway foundation', () => {
             snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
         );
 
-        assert.equal(requests.length, 2);
+        assert.equal(requests.length, 4);
         assert.equal(requests[0].apiKey, secret);
         assert.equal(requests[0].apiVersion, '2023-06-01');
+        assert.equal(requests[2].url.endsWith('/v1/models/claude-sonnet-4-5-20250929'), true);
+        assert.equal(requests[3].url.endsWith('/v1/models/claude-haiku-4-5-20251001'), true);
         assert.equal(new URL(requests[0].url).searchParams.get('limit'), '1000');
         assert.equal(new URL(requests[1].url).searchParams.get('after_id'), 'claude-sonnet-4-5-20250929');
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
@@ -1712,13 +1747,20 @@ describe('model-gateway foundation', () => {
         assert.equal(snapshot.accountOverlays[0].providerMetadata.anthropicVersion, '2023-06-01');
         assert.equal(snapshot.routeOptions[0].selectorKind, 'exact_model');
         assert.equal(snapshot.routeOptions[0].normalizedPolicy.wireApi, 'anthropic_messages');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.supportsTools, true);
         assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:displayName'), 'Claude Sonnet 4.5');
         assert.equal(
             byModel.get('anthropic:claude-sonnet-4-5-20250929:lifecycle.createdAt'),
             '2025-09-29T00:00:00.000Z',
         );
+        assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:capabilities.tools'), true);
+        assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:capabilities.reasoning'), true);
+        assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:capabilities.batch'), true);
+        assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:capabilities.promptCaching'), true);
         assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:providerMetadata.ownedBy'), 'anthropic');
         assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:providerMetadata.anthropic.type'), 'model');
+        assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:providerMetadata.anthropic.tier'), 'sonnet');
+        assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:providerMetadata.anthropic.generation'), '4.5');
     });
 
     it('imports Gemini list and get metadata with limits, methods and route policy', async () => {
