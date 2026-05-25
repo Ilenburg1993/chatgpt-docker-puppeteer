@@ -14,6 +14,7 @@ export {
     createProviderAccountOverlay,
     createProviderCatalogSource,
 } from './contracts.js';
+export { createDefaultModelGatewayCatalogImporters } from './default-importers.js';
 export {
     createCatalogImportRun,
     createSanitizedRawPayloadRef,

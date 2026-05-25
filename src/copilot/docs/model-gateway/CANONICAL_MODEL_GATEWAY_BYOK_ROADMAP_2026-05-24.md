@@ -588,6 +588,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 
 - [x] Criar refresh programático de catálogo com importers, replacement de evidências por fonte, rebuild de projections,
   diff e resposta OpenAI-compatible.
+- [x] Criar composição padrão de importers públicos/autenticados para refresh programático sem vazar segredo.
 - [ ] Criar comando terminal correspondente para `model-gateway catalog refresh`.
 - [ ] Criar refresh incremental por provider, com cache TTL por fonte.
 - [ ] Criar refresh por overlay de conta/organização quando houver secretRef configurado, mantendo snapshot público e
@@ -1319,3 +1320,32 @@ Próxima direção:
 
 - Commitar/pushar este corte.
 - Depois, criar comando terminal ou script programático fino para acionar refresh OpenRouter/OpenAI e inspecionar diff.
+
+## 22. Continuidade 2026-05-25 — composição padrão de importers
+
+Implementado neste corte:
+
+- Criado `src/copilot/model-gateway/catalog/default-importers.js`.
+- Exportado `createDefaultModelGatewayCatalogImporters()` pelo barrel de catálogo e pelo barrel raiz.
+- A composição padrão inclui:
+  - `OpenRouterModelsImporter`, público, sempre que `includePublic=true`;
+  - `OpenAIModelsImporter`, autenticado, apenas quando `OPENAI_API_KEY` ou `COPILOT_OPENAI_API_KEY` existe e
+    `includeAuthenticated=true`.
+- A API aceita `fetchImpl` injetável, permitindo terminal, scripts e testes usarem o mesmo pipeline sem rede implícita.
+- A API key fica fechada no importer e não aparece em JSON/stringificação de importers, snapshot, evidence ou output.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`41` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5613` testes, `0` falhas, `warnings/errors unique=0 total=0`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T15-23-21-473Z/summary.md`).
+
+Próxima direção:
+
+- Commitar/pushar este corte.
+- Depois, expor o refresh em comando/superfície operacional, começando por uma saída resumida de diff e contagem
+  OpenAI-compatible.

@@ -19,6 +19,7 @@ export {
     JsonModelGatewayCatalogStore,
     createCanonicalModelProjection,
     createCatalogImportRun,
+    createDefaultModelGatewayCatalogImporters,
     createModelMetadataEvidence,
     createModelRouteOption,
     createOpenAIModelsImporter,

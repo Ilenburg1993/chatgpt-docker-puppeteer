@@ -62,6 +62,7 @@ import {
     createOpenRouterModelsImporter,
     createCanonicalModelProjection,
     createCatalogImportRun,
+    createDefaultModelGatewayCatalogImporters,
     createModelMetadataEvidence,
     createModelRouteOption,
     createProviderAccountOverlay,
@@ -1012,6 +1013,29 @@ describe('model-gateway foundation', () => {
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
+    });
+
+    it('builds default public and authenticated catalog importers without exposing secrets', () => {
+        const secret = 'sk-openai-secret-that-must-not-leak';
+        const importers = createDefaultModelGatewayCatalogImporters({
+            env: { OPENAI_API_KEY: secret },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+        });
+        const publicOnly = createDefaultModelGatewayCatalogImporters({
+            env: {},
+            includeAuthenticated: true,
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+        });
+
+        assert.deepEqual(
+            importers.map((importer) => importer.id),
+            ['openrouter-models', 'openai-models'],
+        );
+        assert.deepEqual(
+            publicOnly.map((importer) => importer.id),
+            ['openrouter-models'],
+        );
+        assert.equal(JSON.stringify(importers).includes(secret), false);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {
