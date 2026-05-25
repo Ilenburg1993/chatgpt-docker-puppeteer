@@ -507,6 +507,8 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   static_seed > heuristic.
 - [x] Criar testes que provem que fonte mais pobre e mais recente não apaga metadata rica de fonte anterior.
 - [ ] Criar teste de regressão para nunca serializar segredo no catalog DB, snapshot ou evento.
+- [ ] Criar store inicial redigido e storage-neutral antes do SQLite, para validar contrato, migração e diffs sem decidir
+  prematuramente o backend permanente.
 
 ### Faixa L — Importers de catálogos oficiais e agregadores
 
@@ -1020,3 +1022,35 @@ Próxima direção:
 
 1. Commit/push deste corte storage-neutral.
 2. Avançar K para um store JSON/SQLite mínimo ou para importers dry-run, dependendo do menor risco arquitetural.
+
+## 15. Continuidade 2026-05-25 — limpeza do warning `sdk stream failed`
+
+Investigação:
+
+- O warning recorrente `[erro] sdk stream failed` não era falha real do SDK nem regressão do model-gateway.
+- A origem era `tests/unit/copilot/test_terminal_dialog_engine.spec.js`: o teste simulava
+  `runTerminalDialogTurnDetailed` rejeitando com `Error('sdk stream failed')`, mas importava o output real do terminal.
+- O engine se comportava corretamente ao capturar a exceção e liberar display state; o problema era o spec vazar
+  `println()` para `process.stdout`, fazendo o runner compacto classificar uma falha esperada como warning global.
+
+Correção:
+
+- O spec do engine agora captura `process.stdout.write` durante a execução do arquivo e restaura no `afterAll`.
+- Isso preserva o engine real, mantém o teste de falha esperado, não silencia warnings de outros specs e remove o ruído
+  falso do relatório global.
+
+Validação:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/test_terminal_dialog_engine.spec.js`
+  (`22` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5606` testes, `0` falhas, `warnings/errors unique=0 total=0`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T14-40-55-032Z/summary.md`).
+
+Decisão de roadmap:
+
+- O próximo avanço de K deve criar um store inicial redigido/storage-neutral antes de SQLite. Isso reduz risco: primeiro
+  validamos serialização, redaction, import runs, raw refs, diffs e merge em arquivo simples; depois migramos a mesma
+  interface para SQLite sem trocar contrato.

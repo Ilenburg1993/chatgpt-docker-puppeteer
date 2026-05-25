@@ -6,7 +6,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const configMocks = vi.hoisted(() => ({
     readConfiguredByokSummary: vi.fn(() => ({
@@ -153,10 +153,18 @@ vi.mock('../../../src/copilot/terminal/dialog/turn-display.js', () => ({
 let mod;
 /** @type {string} */
 let src;
+/** @type {import('vitest').MockInstance | null} */
+let stdoutWriteSpy = null;
 
 beforeAll(async () => {
+    stdoutWriteSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     mod = await import('../../../src/copilot/terminal/dialog/engine.js');
     src = await readFile(new URL('../../../src/copilot/terminal/dialog/engine.js', import.meta.url), 'utf-8');
+});
+
+afterAll(() => {
+    stdoutWriteSpy?.mockRestore();
+    stdoutWriteSpy = null;
 });
 
 describe('terminal/dialog/engine.js — contrato', () => {
