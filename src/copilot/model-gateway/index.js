@@ -27,6 +27,7 @@ export {
     createKiloGatewayProvidersImporter,
     createModelMetadataEvidence,
     createModelRouteOption,
+    createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
     createProviderAccountOverlay,

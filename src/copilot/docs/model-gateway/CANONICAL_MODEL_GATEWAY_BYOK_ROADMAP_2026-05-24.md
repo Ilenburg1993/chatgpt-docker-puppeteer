@@ -543,7 +543,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   diferença entre Kilo Gateway, Kilo Code e providers BYOK internos.
 - [ ] Implementar `CerebrasModelsImporter` para `/v1/models` + catálogo público.
 - [ ] Implementar `NvidiaNimCatalogImporter` para docs/API catalog quando disponível.
-- [ ] Permitir importers `OpenAICompatibleGenericImporter` para vLLM, LiteLLM, Chutes, Z.AI e endpoints locais sem
+- [x] Permitir importers `OpenAICompatibleGenericImporter` para vLLM, LiteLLM, Chutes, Z.AI e endpoints locais sem
   importer especializado.
 - [x] Criar modo `accountScoped` para importers autenticados que retornam modelos habilitados por plano, organização,
   quota ou BYOK interno, sem serializar segredo.
@@ -1898,3 +1898,41 @@ Validação deste corte:
 Próxima direção:
 
 - Seguir para Hugging Face route selectors ou outro importer direto.
+
+## 36. Continuidade 2026-05-25 — importer genérico OpenAI-compatible
+
+Implementado neste corte:
+
+- Novo `createOpenAICompatibleModelsImporter()` para endpoints `/models` compatíveis com OpenAI.
+- O importer exige `providerId` e `url` ou `baseUrl`.
+- Quando há `apiKey`, a fonte vira account-scoped e gera:
+  - model evidences de identidade;
+  - `routeOptions` `exact_model`;
+  - `accountOverlays` com `enabledModels`;
+  - `providerMetadata.openAICompatible=true`.
+- Quando não há `apiKey`, continua útil como catálogo identity-only público/local.
+- A saída continua separada:
+  - `/models` genérico não prova capabilities ricas;
+  - provider docs/catálogos ricos complementam metadata;
+  - probes runtime validam execução real.
+
+Uso previsto:
+
+- Groq `/openai/v1/models`;
+- Cerebras `/v1/models`;
+- Chutes/Z.AI/LiteLLM/vLLM/servidores locais OpenAI-compatible;
+- endpoints privados do operador que ainda não justificam importer especializado.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`49` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5622` testes totais, `5589` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T16-41-32-578Z/summary.md`).
+
+Próxima direção:
+
+- Escolher entre Groq/Cerebras via generic importer ou Hugging Face route selectors.

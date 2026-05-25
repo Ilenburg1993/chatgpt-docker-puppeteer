@@ -58,6 +58,7 @@ import {
     BYOK_VISION_PROBE_DISPLAY_NAME,
     BYOK_VISION_PROBE_MIME_TYPE,
     JsonModelGatewayCatalogStore,
+    createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
     createCanonicalModelProjection,
@@ -1179,6 +1180,55 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('displayName'), 'gpt-test');
         assert.equal(byPath.get('lifecycle.createdAt'), '2026-05-21T15:21:01.000Z');
         assert.equal(byPath.get('providerMetadata.ownedBy'), 'openai');
+    });
+
+    it('imports generic OpenAI-compatible model lists as identity, route and account overlay metadata', async () => {
+        const secret = 'generic-secret-that-must-not-leak';
+        /** @type {string | null} */
+        let authorizationHeader = null;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (_url, init) => {
+                authorizationHeader = /** @type {{ headers?: { authorization?: string } }} */ (init)?.headers?.authorization ?? null;
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        data: [
+                            {
+                                id: 'llama-3.3-70b-versatile',
+                                object: 'model',
+                                created: 1779376861,
+                                owned_by: 'meta',
+                            },
+                        ],
+                    }),
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [
+                createOpenAICompatibleModelsImporter({
+                    providerId: 'groq',
+                    baseUrl: 'https://api.groq.com/openai/v1',
+                    fetchImpl: fakeFetch,
+                    apiKey: secret,
+                    secretRef: 'GROQ_API_KEY',
+                }),
+            ],
+            now: () => new Date('2026-05-25T12:40:00.000Z'),
+        });
+        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+
+        assert.equal(authorizationHeader, `Bearer ${secret}`);
+        assert.equal(JSON.stringify(snapshot).includes(secret), false);
+        assert.equal(snapshot.sources[0].url, 'https://api.groq.com/openai/v1/models');
+        assert.equal(snapshot.sources[0].authMode, 'api_key');
+        assert.equal(snapshot.routeOptions[0].selectorKind, 'exact_model');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.routeLayer, 'openai_compatible');
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['llama-3.3-70b-versatile']);
+        assert.equal(snapshot.accountOverlays[0].providerMetadata.openAICompatible, true);
+        assert.equal(byPath.get('displayName'), 'llama-3.3-70b-versatile');
+        assert.equal(byPath.get('providerMetadata.ownedBy'), 'meta');
     });
 
     it('normalizes universal projections to OpenAI model schema with gateway extensions', () => {

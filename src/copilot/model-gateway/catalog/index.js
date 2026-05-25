@@ -29,6 +29,7 @@ export {
     OPENROUTER_MODELS_CATALOG_URL,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
+    createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
 } from './importers/index.js';

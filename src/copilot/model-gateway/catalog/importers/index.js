@@ -13,6 +13,7 @@ export {
     KILO_GATEWAY_PROVIDERS_CATALOG_URL,
     createKiloGatewayProvidersImporter,
 } from './kilo-gateway-providers-importer.js';
+export { createOpenAICompatibleModelsImporter } from './openai-compatible-models-importer.js';
 export {
     OPENAI_MODELS_CATALOG_URL,
     createOpenAIModelsImporter,
