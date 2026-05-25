@@ -9,7 +9,12 @@
  */
 
 import {
+    MODEL_GATEWAY_CATALOG_CONFLICT_DETECTED,
     MODEL_GATEWAY_CATALOG_IMPORT_COMPLETED,
+    MODEL_GATEWAY_CATALOG_IMPORT_STARTED,
+    MODEL_GATEWAY_CATALOG_MODEL_ADDED,
+    MODEL_GATEWAY_CATALOG_MODEL_CHANGED,
+    MODEL_GATEWAY_CATALOG_MODEL_REMOVED,
     MODEL_GATEWAY_PROBE_COMPLETED,
     MODEL_GATEWAY_REGISTRY_SNAPSHOT,
     MODEL_GATEWAY_ROUTE_DECISION,
@@ -346,6 +351,32 @@ function uniqueStringList(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {Record<string, any>}
+ */
+function asRecord(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, any>} */ (value) : {};
+}
+
+/**
+ * @param {{
+ *     source?: string;
+ *     storePath?: string | null;
+ *     importerIds?: string[];
+ * }} input
+ * @returns {{ type: string; timestamp: number; source: string; storePath: string | null; importerIds: string[] }}
+ */
+export function buildCatalogRefreshStartedEvent(input) {
+    return {
+        type: MODEL_GATEWAY_CATALOG_IMPORT_STARTED,
+        timestamp: Date.now(),
+        source: optionalString(input.source) ?? 'catalog-refresh',
+        storePath: optionalString(input.storePath),
+        importerIds: uniqueStringList(input.importerIds),
+    };
+}
+
+/**
  * @param {{
  *     source?: string;
  *     storePath?: string | null;
@@ -417,5 +448,88 @@ export function projectCatalogRefreshCompletedMetrics(event) {
             'model_gateway.catalog.diff.removed': event.removedCount,
             'model_gateway.catalog.diff.changed': event.changedCount,
         },
+    };
+}
+
+/**
+ * @param {{
+ *     source?: string;
+ *     storePath?: string | null;
+ *     diff: { added?: string[]; removed?: string[]; changed?: Array<{ key?: string; changedFields?: string[]; changedKinds?: string[] }> };
+ * }} input
+ * @returns {Array<{ type: string; timestamp: number; source: string; storePath: string | null; key: string; changedFields?: string[]; changedKinds?: string[] }>}
+ */
+export function buildCatalogRefreshModelEvents(input) {
+    const timestamp = Date.now();
+    const source = optionalString(input.source) ?? 'catalog-refresh';
+    const storePath = optionalString(input.storePath);
+    const events = [];
+    for (const key of uniqueStringList(input.diff.added)) {
+        events.push({ type: MODEL_GATEWAY_CATALOG_MODEL_ADDED, timestamp, source, storePath, key });
+    }
+    for (const key of uniqueStringList(input.diff.removed)) {
+        events.push({ type: MODEL_GATEWAY_CATALOG_MODEL_REMOVED, timestamp, source, storePath, key });
+    }
+    for (const item of Array.isArray(input.diff.changed) ? input.diff.changed : []) {
+        const key = optionalString(item.key);
+        if (!key) continue;
+        events.push({
+            type: MODEL_GATEWAY_CATALOG_MODEL_CHANGED,
+            timestamp,
+            source,
+            storePath,
+            key,
+            changedFields: uniqueStringList(item.changedFields),
+            changedKinds: uniqueStringList(item.changedKinds),
+        });
+    }
+    return events;
+}
+
+/**
+ * @param {{
+ *     source?: string;
+ *     storePath?: string | null;
+ *     snapshot: { conflicts?: unknown[] };
+ * }} input
+ * @returns {Array<{ type: string; timestamp: number; source: string; storePath: string | null; projectionKey: string | null; fieldPath: string | null; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }>}
+ */
+export function buildCatalogConflictDetectedEvents(input) {
+    const timestamp = Date.now();
+    const source = optionalString(input.source) ?? 'catalog-refresh';
+    const storePath = optionalString(input.storePath);
+    return (Array.isArray(input.snapshot.conflicts) ? input.snapshot.conflicts : []).map((conflict) => {
+        const record = asRecord(conflict);
+        return {
+            type: MODEL_GATEWAY_CATALOG_CONFLICT_DETECTED,
+            timestamp,
+            source,
+            storePath,
+            projectionKey: optionalString(record['projectionKey']),
+            fieldPath: optionalString(record['fieldPath']),
+            selectedEvidenceId: optionalString(record['selectedEvidenceId']),
+            conflictingEvidenceIds: uniqueStringList(record['conflictingEvidenceIds']),
+        };
+    });
+}
+
+/**
+ * @param {Parameters<typeof buildCatalogRefreshCompletedEvent>[0]} input
+ * @returns {{
+ *     completedEvent: ReturnType<typeof buildCatalogRefreshCompletedEvent>;
+ *     modelEvents: ReturnType<typeof buildCatalogRefreshModelEvents>;
+ *     conflictEvents: ReturnType<typeof buildCatalogConflictDetectedEvents>;
+ *     events: Array<{ type: string; [key: string]: unknown }>;
+ * }}
+ */
+export function buildCatalogRefreshEventBatch(input) {
+    const modelEvents = buildCatalogRefreshModelEvents(input);
+    const conflictEvents = buildCatalogConflictDetectedEvents(input);
+    const completedEvent = buildCatalogRefreshCompletedEvent(input);
+    return {
+        completedEvent,
+        modelEvents,
+        conflictEvents,
+        events: [...modelEvents, ...conflictEvents, completedEvent],
     };
 }

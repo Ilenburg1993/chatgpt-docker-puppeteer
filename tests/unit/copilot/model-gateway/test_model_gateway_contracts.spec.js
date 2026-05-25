@@ -21,6 +21,7 @@ import {
     buildModelGatewayOperatorProjection,
     buildProviderModelId,
     buildCatalogRefreshCompletedEvent,
+    buildCatalogRefreshEventBatch,
     buildProbeCompletedEvent,
     buildRegistrySnapshotEvent,
     buildRouteDecisionEvent,
@@ -535,6 +536,75 @@ describe('model-gateway foundation', () => {
         assert.equal(metrics.counters['model_gateway.catalog.diff.limits_changed'], 1);
         assert.equal(metrics.gauges['model_gateway.catalog.projections'], 2);
         assert.equal(metrics.gauges['model_gateway.catalog.conflicts'], 1);
+    });
+
+    it('builds stable per-model and conflict events for catalog refreshes', () => {
+        const batch = buildCatalogRefreshEventBatch({
+            source: 'unit-test',
+            storePath: 'data/copilot/model-gateway/catalog.json',
+            importerIds: ['openrouter-models'],
+            snapshot: {
+                projections: [],
+                providerProjections: [],
+                importRuns: [],
+                conflicts: [
+                    {
+                        projectionKey: 'openrouter:model-a:default',
+                        fieldPath: 'pricing.inputUsdPerMillion',
+                        selectedEvidenceId: 'catalog-price',
+                        conflictingEvidenceIds: ['heuristic-price'],
+                    },
+                ],
+            },
+            diff: {
+                added: ['openrouter:model-added:default'],
+                removed: ['openrouter:model-removed:default'],
+                changed: [
+                    {
+                        key: 'openrouter:model-changed:default',
+                        changedFields: ['pricing'],
+                        changedKinds: ['pricing_changed'],
+                    },
+                ],
+            },
+            openai: { object: 'list', data: [] },
+        });
+
+        assert.equal(batch.completedEvent.type, 'model_gateway:catalog:import_completed');
+        assert.deepEqual(
+            batch.modelEvents.map((event) => event.type),
+            [
+                'model_gateway:catalog:model_added',
+                'model_gateway:catalog:model_removed',
+                'model_gateway:catalog:model_changed',
+            ],
+        );
+        assert.deepEqual(batch.modelEvents[2], {
+            type: 'model_gateway:catalog:model_changed',
+            timestamp: batch.modelEvents[2].timestamp,
+            source: 'unit-test',
+            storePath: 'data/copilot/model-gateway/catalog.json',
+            key: 'openrouter:model-changed:default',
+            changedFields: ['pricing'],
+            changedKinds: ['pricing_changed'],
+        });
+        assert.deepEqual(batch.conflictEvents[0], {
+            type: 'model_gateway:catalog:conflict_detected',
+            timestamp: batch.conflictEvents[0].timestamp,
+            source: 'unit-test',
+            storePath: 'data/copilot/model-gateway/catalog.json',
+            projectionKey: 'openrouter:model-a:default',
+            fieldPath: 'pricing.inputUsdPerMillion',
+            selectedEvidenceId: 'catalog-price',
+            conflictingEvidenceIds: ['heuristic-price'],
+        });
+        assert.deepEqual(batch.events.map((event) => event.type), [
+            'model_gateway:catalog:model_added',
+            'model_gateway:catalog:model_removed',
+            'model_gateway:catalog:model_changed',
+            'model_gateway:catalog:conflict_detected',
+            'model_gateway:catalog:import_completed',
+        ]);
     });
 
     it('publishes a boolean pre-K compatibility gate for the current migration layer', () => {

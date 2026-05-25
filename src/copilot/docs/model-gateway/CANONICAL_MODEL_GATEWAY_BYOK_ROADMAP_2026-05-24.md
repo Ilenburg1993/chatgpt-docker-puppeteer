@@ -639,7 +639,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Criar diff entre snapshots: modelos novos, removidos e campos alterados.
 - [x] Expandir diff entre snapshots para depreciação explícita, preço alterado, limits alterados, capabilities
   alteradas.
-- [ ] Emitir eventos:
+- [x] Emitir eventos:
   - `model_gateway:catalog:import_started`;
   - `model_gateway:catalog:import_completed`;
   - `model_gateway:catalog:model_added`;
@@ -2132,3 +2132,43 @@ Validação deste corte:
 Próxima direção:
 
 - Validar, commitar/pushar e depois evoluir emissão real de eventos por run/model/conflict ou diff UX dedicado.
+
+## 40. Continuidade 2026-05-25 — emissão real de eventos de catálogo
+
+Implementado neste corte:
+
+- A camada de observabilidade passou a ter builders canônicos para eventos de refresh:
+  - `buildCatalogRefreshStartedEvent()`;
+  - `buildCatalogRefreshModelEvents()`;
+  - `buildCatalogConflictDetectedEvents()`;
+  - `buildCatalogRefreshEventBatch()`.
+- `buildCatalogRefreshEventBatch()` organiza a sequência pós-refresh sem raw payload:
+  - eventos por modelo adicionado/removido/alterado;
+  - eventos por conflito de evidência;
+  - evento agregado `model_gateway:catalog:import_completed` ao final.
+- `/byok gateway catalog refresh` agora aceita `eventBus` como as probes e o roteamento:
+  - emite `model_gateway:catalog:import_started` antes da coleta;
+  - emite o batch de modelo/conflito/completed depois do refresh;
+  - continua usando o mesmo batch para exibir `diff kinds` no terminal.
+- A checkbox de eventos da Faixa O foi marcada como concluída para o contrato atual.
+
+Separação arquitetural reafirmada:
+
+- `refreshModelGatewayCatalog()` permanece storage-neutral e não conhece `eventBus`.
+- A camada de observabilidade transforma resultado de refresh em eventos estáveis.
+- O terminal apenas emite eventos quando recebe um bus; sem bus, a experiência CLI continua determinística.
+- Eventos de catálogo não executam probes, não promovem modelo e não alteram seleção ativa.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  (`103` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5626` testes totais, `5593` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T17-22-13-918Z/summary.md`).
+
+Próxima direção:
+
+- Commitar/pushar e avançar para UX de diff dedicada ou seleção de probes recomendadas por diff.

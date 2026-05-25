@@ -12,7 +12,8 @@ import fs from 'node:fs/promises';
 
 import { config as loadDotenv } from 'dotenv';
 import {
-    buildCatalogRefreshCompletedEvent,
+    buildCatalogRefreshEventBatch,
+    buildCatalogRefreshStartedEvent,
     buildModelGatewayPreKCompatibilityReport,
     buildRouteDecisionEvent,
     buildProbeCompletedEvent,
@@ -1610,11 +1611,17 @@ function renderByokGatewayPreKGate(println) {
 
 /**
  * @param {(text: string) => void} println
+ * @param {ByokCommandContext['eventBus']} [eventBus]
  * @returns {Promise<void>}
  */
-async function renderByokGatewayCatalogRefresh(println) {
+async function renderByokGatewayCatalogRefresh(println, eventBus = null) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const importers = createDefaultModelGatewayCatalogImporters({ env: process.env });
+    const refreshContext = {
+        source: 'terminal-byok',
+        storePath: store.filePath,
+        importerIds: importers.map((importer) => importer.id),
+    };
     println(`\n  \x1b[36mBYOK model-gateway catalog refresh\x1b[0m`);
     println(
         `  \x1b[90mstore=${store.filePath} · importers=${importers.map((importer) => importer.id).join(',') || '-'} · schema=OpenAI+x_model_gateway\x1b[0m\n`,
@@ -1624,23 +1631,23 @@ async function renderByokGatewayCatalogRefresh(println) {
         return;
     }
     try {
+        eventBus?.emit?.(buildCatalogRefreshStartedEvent(refreshContext));
         const result = await refreshModelGatewayCatalog({ store, importers });
-        const refreshEvent = buildCatalogRefreshCompletedEvent({
-            source: 'terminal-byok',
-            storePath: store.filePath,
-            importerIds: importers.map((importer) => importer.id),
+        const refreshEvents = buildCatalogRefreshEventBatch({
+            ...refreshContext,
             snapshot: result.snapshot,
             diff: result.diff,
             openai: result.openai,
         });
+        for (const event of refreshEvents.events) eventBus?.emit?.(event);
         println(
             `    \x1b[32mrefresh concluído\x1b[0m  \x1b[90mprojections=${result.snapshot.projections.length} · openai=${result.openai.data.length} · runs=${result.snapshot.importRuns.length}\x1b[0m`,
         );
         println(
             `    \x1b[90mdiff: added=${result.diff.added.length} · removed=${result.diff.removed.length} · changed=${result.diff.changed.length}\x1b[0m`,
         );
-        if (refreshEvent.changedKinds.length > 0) {
-            println(`    \x1b[90mdiff kinds: ${refreshEvent.changedKinds.join(',')}\x1b[0m`);
+        if (refreshEvents.completedEvent.changedKinds.length > 0) {
+            println(`    \x1b[90mdiff kinds: ${refreshEvents.completedEvent.changedKinds.join(',')}\x1b[0m`);
         }
         for (const id of result.diff.added.slice(0, 5)) println(`      \x1b[32m+\x1b[0m ${id}`);
         for (const id of result.diff.removed.slice(0, 5)) println(`      \x1b[31m-\x1b[0m ${id}`);
@@ -2069,7 +2076,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
 
     if (sub === 'gateway' || sub === 'gate' || sub === 'migration') {
         if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(refresh|reload|sync|atualizar)$/iu.test(rest[1] ?? '')) {
-            await renderByokGatewayCatalogRefresh(println);
+            await renderByokGatewayCatalogRefresh(println, eventBus);
             return;
         }
         if (/^(endpoints|endpoint|catalog|catalogo|sources)$/iu.test(rest[0] ?? '')) {

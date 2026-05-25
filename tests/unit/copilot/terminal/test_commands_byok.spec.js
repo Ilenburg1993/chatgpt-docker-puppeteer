@@ -2,13 +2,23 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshCompletedEvent, buildModelGatewayPreKCompatibilityReport, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listProviderEndpointInventory, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, resolveProviderEndpointInventory, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreKCompatibilityReport, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listProviderEndpointInventory, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, resolveProviderEndpointInventory, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, writeFile } =
     vi.hoisted(() => ({
-        buildCatalogRefreshCompletedEvent: vi.fn((input) => ({
-            type: 'model_gateway:catalog:import_completed',
-            changedKinds: [
+        buildCatalogRefreshEventBatch: vi.fn((input) => {
+            const changedKinds = [
                 ...new Set((input.diff?.changed ?? []).flatMap((item) => item.changedKinds ?? [])),
-            ],
+            ];
+            return {
+                completedEvent: { type: 'model_gateway:catalog:import_completed', changedKinds },
+                events: [
+                    { type: 'model_gateway:catalog:model_changed', key: 'openrouter:changed-model:default', changedKinds },
+                    { type: 'model_gateway:catalog:import_completed', changedKinds },
+                ],
+            };
+        }),
+        buildCatalogRefreshStartedEvent: vi.fn((input) => ({
+            type: 'model_gateway:catalog:import_started',
+            importerIds: input.importerIds ?? [],
         })),
         buildModelGatewayPreKCompatibilityReport: vi.fn(() => ({
             stage: 'pre-k',
@@ -196,7 +206,8 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
 }));
 
 vi.mock('#copilot/model-gateway', () => ({
-    buildCatalogRefreshCompletedEvent,
+    buildCatalogRefreshEventBatch,
+    buildCatalogRefreshStartedEvent,
     buildModelGatewayPreKCompatibilityReport,
     buildProbeCompletedEvent: buildProbeCompletedEvent,
     buildRouteDecisionEvent,
@@ -344,6 +355,8 @@ describe('terminal /byok command', () => {
             openai: { object: 'list', data: [{ id: 'new-model', object: 'model' }] },
         });
         routeGatewayModels.mockReset();
+        buildCatalogRefreshEventBatch.mockClear();
+        buildCatalogRefreshStartedEvent.mockClear();
         buildRouteDecisionEvent.mockClear();
         recordModelGatewayRouteDecision.mockClear();
         buildProbeCompletedEvent.mockClear();
@@ -1260,12 +1273,26 @@ describe('terminal /byok command', () => {
     it('executa refresh do catálogo model-gateway com saída OpenAI-compatible resumida', async () => {
         mockProjection();
         const ctx = mockCtx();
+        const eventBus = { emit: vi.fn() };
 
-        await cmdByok({ println: ctx.println }, 'gateway catalog refresh');
+        await cmdByok({ println: ctx.println, eventBus }, 'gateway catalog refresh');
 
         expect(JsonModelGatewayCatalogStore).toHaveBeenCalledWith({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
         expect(createDefaultModelGatewayCatalogImporters).toHaveBeenCalledWith({ env: process.env });
         expect(refreshModelGatewayCatalog).toHaveBeenCalled();
+        expect(buildCatalogRefreshStartedEvent).toHaveBeenCalledWith(
+            expect.objectContaining({ source: 'terminal-byok', importerIds: ['openrouter-models', 'openai-models'] }),
+        );
+        expect(buildCatalogRefreshEventBatch).toHaveBeenCalledWith(
+            expect.objectContaining({
+                source: 'terminal-byok',
+                importerIds: ['openrouter-models', 'openai-models'],
+                diff: expect.objectContaining({ added: ['openrouter:new-model:default'] }),
+            }),
+        );
+        expect(eventBus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:catalog:import_started' }));
+        expect(eventBus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:catalog:model_changed' }));
+        expect(eventBus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:catalog:import_completed' }));
         expect(ctx.output()).toContain('BYOK model-gateway catalog refresh');
         expect(ctx.output()).toContain('schema=OpenAI+x_model_gateway');
         expect(ctx.output()).toContain('projections=1');
