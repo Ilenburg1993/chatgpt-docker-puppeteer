@@ -554,8 +554,10 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   `x_model_gateway` para metadados universais ricos.
 - [x] Preservar no merge/projection metadados ricos essenciais para o schema OpenAI estendido: `description`,
   `aliases.*`, `lifecycle.*` e `providerMetadata.*`.
-- [ ] Criar normalizador de modalidades: text, image, audio, video, pdf, embedding, rerank, asr, tts, image-generation.
-- [ ] Criar normalizador de capabilities agentic: streaming, tools, forcedToolChoice, parallelToolCalls, JSON mode,
+- [x] Criar normalizador de modalidades: text, image, audio, video, pdf, embedding, rerank, asr, tts, image-generation.
+- [x] Criar normalizador de capability hints OpenAI-compatible vindos de catálogo: streaming, tools,
+  forcedToolChoice, parallelToolCalls, JSON mode, JSON schema/structured outputs, reasoning, multimodal e search/code.
+- [ ] Criar normalizador de capabilities agentic runtime: streaming, tools, forcedToolChoice, parallelToolCalls, JSON mode,
   JSON schema, structured outputs, reasoning effort, reasoning budget, code execution, web/search grounding.
 - [ ] Criar normalizador de limites: context window, max output, max request, TPM, RPM, daily requests e burst.
 - [ ] Criar normalizador de pricing: input/output/cache/read/write/request/image/audio, moeda e unidade.
@@ -1383,3 +1385,48 @@ Próxima direção:
 - Commitar/pushar este corte.
 - Depois, avançar normalizadores finos de Faixa M: modalidades/capabilities/limits/pricing com vocabulário OpenAI
   estendido e evidências sempre rastreáveis.
+
+## 24. Continuidade 2026-05-25 — normalizadores de modalidades e capability hints
+
+Implementado neste corte:
+
+- Criado `src/copilot/model-gateway/catalog/normalizers.js`.
+- Exportados pelo barrel de catálogo e pelo barrel raiz:
+  - `normalizeCatalogModalities()`;
+  - `parseModelModalityExpression()`;
+  - `normalizeModelModalities()`;
+  - `normalizeOpenAICompatibleModelCapabilities()`.
+- O normalizador de modalidades converte vocabulários variados para o conjunto canônico:
+  `text`, `image`, `audio`, `video`, `pdf`, `embedding`, `rerank`, `asr`, `tts`, `image-generation`.
+- `parseModelModalityExpression()` entende expressões estilo OpenRouter, como `text+image->text`.
+- `normalizeOpenAICompatibleModelCapabilities()` extrai hints de catálogo a partir de `supported_parameters` e
+  modalidades:
+  - `tools`;
+  - `forcedToolChoice`;
+  - `parallelToolCalls`;
+  - `jsonMode`;
+  - `structuredOutputs`;
+  - `reasoningEffort`;
+  - `streaming`;
+  - `vision`;
+  - `audio`;
+  - `video`;
+  - `codeExecution`;
+  - `webSearch`.
+- O `OpenRouterModelsImporter` agora usa esses normalizers e emite evidências `capabilities.*` como confidence
+  `catalog`. Isso melhora seleção pré-probe sem confundir catálogo com `probe_verified`.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`42` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5615` testes, `0` falhas, `warnings/errors unique=0 total=0`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T15-34-20-304Z/summary.md`).
+
+Próxima direção:
+
+- Commitar/pushar este corte.
+- Depois, continuar Faixa M em limites/pricing normalizados com unidade/currency explícitas no `x_model_gateway`.

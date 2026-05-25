@@ -70,6 +70,8 @@ import {
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
     mergeModelMetadataEvidence,
+    normalizeModelModalities,
+    normalizeOpenAICompatibleModelCapabilities,
     rankCatalogEvidenceConfidence,
     refreshModelGatewayCatalog,
     runCatalogImporters,
@@ -865,6 +867,10 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('pricing.outputUsdPerMillion'), 2);
         assert.deepEqual(byPath.get('modalities.input'), ['text', 'image']);
         assert.ok(/** @type {string[]} */ (byPath.get('supportedParameters')).includes('tools'));
+        assert.equal(byPath.get('capabilities.tools'), true);
+        assert.equal(byPath.get('capabilities.forcedToolChoice'), true);
+        assert.equal(byPath.get('capabilities.structuredOutputs'), true);
+        assert.equal(byPath.get('capabilities.vision'), true);
     });
 
     it('extracts account-scoped OpenAI model identity without serializing the API key', async () => {
@@ -937,6 +943,28 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(entry.x_model_gateway.supported_parameters, ['tools', 'tool_choice', 'response_format']);
         assert.equal(/** @type {{ contextWindowTokens: number }} */ (entry.x_model_gateway.limits).contextWindowTokens, 256000);
         assert.deepEqual(list, { object: 'list', data: [entry] });
+    });
+
+    it('normalizes OpenAI-compatible modalities and catalog capability hints', () => {
+        const modalities = normalizeModelModalities({
+            expression: 'text+image->text',
+            input: ['text', 'vision'],
+        });
+        const capabilities = normalizeOpenAICompatibleModelCapabilities({
+            supportedParameters: ['tools', 'tool_choice', 'structured_outputs', 'include_reasoning', 'response_format'],
+            inputModalities: modalities.input,
+            outputModalities: modalities.output,
+        });
+
+        assert.deepEqual(modalities, { input: ['text', 'image'], output: ['text'] });
+        assert.deepEqual(capabilities, {
+            tools: true,
+            forcedToolChoice: true,
+            jsonMode: true,
+            structuredOutputs: true,
+            reasoningEffort: true,
+            vision: true,
+        });
     });
 
     it('refreshes catalog snapshots, replaces source evidence, diffs projections and emits OpenAI schema', async () => {

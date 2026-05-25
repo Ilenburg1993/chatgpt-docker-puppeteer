@@ -12,6 +12,10 @@ import {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
     createModelMetadataEvidence,
 } from '../contracts.js';
+import {
+    normalizeModelModalities,
+    normalizeOpenAICompatibleModelCapabilities,
+} from '../normalizers.js';
 
 export const OPENROUTER_MODELS_CATALOG_URL = 'https://openrouter.ai/api/v1/models';
 
@@ -99,6 +103,17 @@ function modelEvidenceValues(row) {
     const architecture = readArchitecture(row);
     const pricing = readPricing(row);
     const topProvider = readTopProvider(row);
+    const modalities = normalizeModelModalities({
+        input: architecture['input_modalities'],
+        output: architecture['output_modalities'],
+        expression: architecture['modality'],
+    });
+    const supportedParameters = stringList(row['supported_parameters']);
+    const capabilities = normalizeOpenAICompatibleModelCapabilities({
+        supportedParameters,
+        inputModalities: modalities.input,
+        outputModalities: modalities.output,
+    });
     const values = [
         { fieldPath: 'displayName', value: stringValue(row['name']) },
         { fieldPath: 'aliases.canonicalSlug', value: stringValue(row['canonical_slug']) },
@@ -106,9 +121,10 @@ function modelEvidenceValues(row) {
         { fieldPath: 'description', value: stringValue(row['description']) },
         { fieldPath: 'limits.contextWindowTokens', value: finiteNumber(row['context_length']) ?? finiteNumber(topProvider['context_length']) },
         { fieldPath: 'limits.maxOutputTokens', value: finiteNumber(topProvider['max_completion_tokens']) },
-        { fieldPath: 'modalities.input', value: stringList(architecture['input_modalities']) },
-        { fieldPath: 'modalities.output', value: stringList(architecture['output_modalities']) },
-        { fieldPath: 'supportedParameters', value: stringList(row['supported_parameters']) },
+        { fieldPath: 'modalities.input', value: modalities.input },
+        { fieldPath: 'modalities.output', value: modalities.output },
+        { fieldPath: 'supportedParameters', value: supportedParameters },
+        ...Object.entries(capabilities).map(([key, value]) => ({ fieldPath: `capabilities.${key}`, value })),
         { fieldPath: 'pricing.inputUsdPerMillion', value: usdPerMillion(pricing['prompt']) },
         { fieldPath: 'pricing.outputUsdPerMillion', value: usdPerMillion(pricing['completion']) },
         { fieldPath: 'pricing.cacheReadUsdPerMillion', value: usdPerMillion(pricing['input_cache_read']) },
@@ -171,4 +187,3 @@ export function createOpenRouterModelsImporter(options = {}) {
         },
     };
 }
-

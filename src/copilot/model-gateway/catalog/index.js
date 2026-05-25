@@ -39,4 +39,10 @@ export {
     toOpenAIModelCatalogEntry,
     toOpenAIModelCatalogList,
 } from './openai-schema.js';
+export {
+    normalizeCatalogModalities,
+    normalizeModelModalities,
+    normalizeOpenAICompatibleModelCapabilities,
+    parseModelModalityExpression,
+} from './normalizers.js';
 export { refreshModelGatewayCatalog } from './refresh.js';
