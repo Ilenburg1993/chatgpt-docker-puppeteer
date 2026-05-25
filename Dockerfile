@@ -35,7 +35,7 @@
 # =============================================================================
 # STAGE 1 — deps-prod: instala apenas dependências de produção
 # =============================================================================
-FROM node:24-bookworm-slim AS deps-prod
+FROM node:26-bookworm-slim AS deps-prod
 
 WORKDIR /app
 
@@ -55,7 +55,7 @@ RUN PUPPETEER_SKIP_DOWNLOAD=true \
 # Como dist/ está no .gitignore e .dockerignore, é necessário compilar aqui.
 # Este stage instala ALL deps (incluindo devDependencies) para ter Vite disponível.
 # =============================================================================
-FROM node:24-bookworm-slim AS dashboard-builder
+FROM node:26-bookworm-slim AS dashboard-builder
 
 WORKDIR /app
 
@@ -78,7 +78,7 @@ RUN npm run dashboard:build
 # =============================================================================
 # STAGE 3 — production: imagem final mínima
 # =============================================================================
-FROM node:24-bookworm-slim AS production
+FROM node:26-bookworm-slim AS production
 
 # Metadados OCI (https://github.com/opencontainers/image-spec)
 LABEL org.opencontainers.image.title="ChatGPT Docker Puppeteer"
