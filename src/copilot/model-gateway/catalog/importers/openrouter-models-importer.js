@@ -11,6 +11,7 @@
 import {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
     createModelMetadataEvidence,
+    createModelRouteOption,
 } from '../contracts.js';
 import {
     normalizeModelAliases,
@@ -204,6 +205,34 @@ export function createOpenRouterModelsImporter(options = {}) {
                         rawPayloadRef: context.rawPayloadRef,
                     }),
                 );
+            });
+        },
+        toRouteOptions(rows, context) {
+            const sourceId = stringValue(context.source['id']) ?? 'openrouter-models';
+            return rows.flatMap((row) => {
+                const record = /** @type {Record<string, unknown>} */ (row);
+                const providerModel = stringValue(record['id']);
+                if (!providerModel) return [];
+                return [
+                    createModelRouteOption({
+                        providerId: 'openrouter',
+                        providerModel,
+                        selectorKind: 'aggregator_auto',
+                        selectorSyntax: providerModel,
+                        sourceId,
+                        sourceKind: 'public_api',
+                        confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.CATALOG,
+                        providerSpecific: {
+                            topProvider: readTopProvider(record),
+                        },
+                        normalizedPolicy: {
+                            routeLayer: 'aggregator',
+                            autoSelection: true,
+                            supportsProviderOrder: true,
+                            supportsFallbackChain: true,
+                        },
+                    }),
+                ];
             });
         },
     };

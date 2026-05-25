@@ -579,7 +579,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 
 - [x] Criar `ModelRouteOption` para modelar rotas exatas, aliases, provider-auto, aggregator-auto, cheapest, fastest,
   preferred-provider e fallback-chain.
-- [ ] Representar seleção automática de OpenRouter como rota própria, sem apagar provider upstream quando conhecido.
+- [x] Representar seleção automática de OpenRouter como rota própria, sem apagar provider upstream quando conhecido.
 - [ ] Representar Kilo Gateway como rota própria `gateway_auto`/`exact_model`, incluindo `provider/model`,
   `x-kilocode-mode`, `X-KiloCode-OrganizationId`, `X-KiloCode-TaskId`, BYOK interno e falha sem fallback quando a key
   BYOK interna falhar.
@@ -1834,3 +1834,36 @@ Validação deste corte:
 Próxima direção:
 
 - Expandir route options para OpenRouter aggregator auto/provider order e Hugging Face cheapest/fastest/preferred.
+
+## 34. Continuidade 2026-05-25 — OpenRouter aggregator route options
+
+Implementado neste corte:
+
+- `OpenRouterModelsImporter` agora emite `routeOptions` por modelo:
+  - `selectorKind=aggregator_auto`;
+  - `selectorSyntax=<providerModel>`;
+  - `normalizedPolicy.routeLayer=aggregator`;
+  - `normalizedPolicy.autoSelection=true`;
+  - `normalizedPolicy.supportsProviderOrder=true`;
+  - `normalizedPolicy.supportsFallbackChain=true`;
+  - `providerSpecific.topProvider` preserva o hint público do catálogo.
+
+Separação arquitetural reafirmada:
+
+- OpenRouter auto routing é metadata de rota/aggregator.
+- Provider order e fallback-chain são políticas possíveis de seleção, não prova runtime.
+- Probes posteriores ainda decidem se a rota realmente executa chat/stream/tools/JSON/visão.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`48` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T16-33-36-452Z/summary.md`).
+
+Próxima direção:
+
+- Avaliar Hugging Face/Kilo route variants restantes.

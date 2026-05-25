@@ -966,6 +966,8 @@ describe('model-gateway foundation', () => {
 
         assert.equal(snapshot.sources[0].url, 'https://openrouter.ai/api/v1/models');
         assert.equal(snapshot.importRuns[0].status, 'completed');
+        assert.equal(snapshot.routeOptions[0].selectorKind, 'aggregator_auto');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.supportsFallbackChain, true);
         assert.equal(byPath.get('limits.contextWindowTokens'), 256000);
         assert.equal(byPath.get('limits.maxOutputTokens'), 65536);
         assert.equal(byPath.get('pricing.inputUsdPerMillion'), 1);
