@@ -77,6 +77,8 @@ import {
     runConfiguredByokStreamingProbe,
     runConfiguredByokVisionProbe,
     scoreGatewayModelCandidate,
+    toOpenAIModelCatalogEntry,
+    toOpenAIModelCatalogList,
     toCopilotModelInfoList,
 } from '../../../../src/copilot/model-gateway/index.js';
 
@@ -582,13 +584,35 @@ describe('model-gateway foundation', () => {
             confidence: 'manual',
             observedAt: '2026-05-25T01:00:00.000Z',
         });
+        const canonicalSlug = createModelMetadataEvidence({
+            evidenceId: 'catalog-alias',
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            fieldPath: 'aliases.canonicalSlug',
+            value: 'openai/gpt-oss-120b-20260520',
+            sourceId: 'openrouter-models',
+            sourceKind: 'public_api',
+            confidence: 'catalog',
+        });
+        const ownedBy = createModelMetadataEvidence({
+            evidenceId: 'owner',
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            fieldPath: 'providerMetadata.ownedBy',
+            value: 'openai',
+            sourceId: 'openrouter-models',
+            sourceKind: 'public_api',
+            confidence: 'catalog',
+        });
 
-        const merged = mergeModelMetadataEvidence([newerHeuristic, olderCatalog, manualTools]);
+        const merged = mergeModelMetadataEvidence([newerHeuristic, olderCatalog, manualTools, canonicalSlug, ownedBy]);
 
         assert.equal(rankCatalogEvidenceConfidence('manual') > rankCatalogEvidenceConfidence('catalog'), true);
         assert.equal(merged.projection.providerId, 'openrouter');
         assert.equal(merged.projection.limits.contextWindowTokens, 131072);
         assert.equal(merged.projection.capabilities.tools, true);
+        assert.equal(merged.projection.aliases.canonicalSlug, 'openai/gpt-oss-120b-20260520');
+        assert.equal(merged.projection.providerMetadata.ownedBy, 'openai');
         assert.equal(merged.projection.provenanceByField['limits.contextWindowTokens'], 'catalog-context');
         assert.equal(merged.projection.confidenceByField['limits.contextWindowTokens'], 'catalog');
         assert.deepEqual(merged.conflicts, [
@@ -877,6 +901,40 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('displayName'), 'gpt-test');
         assert.equal(byPath.get('lifecycle.createdAt'), '2026-05-21T15:21:01.000Z');
         assert.equal(byPath.get('providerMetadata.ownedBy'), 'openai');
+    });
+
+    it('normalizes universal projections to OpenAI model schema with gateway extensions', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'openrouter',
+            providerModel: 'x-ai/grok-build-0.1',
+            displayName: 'xAI: Grok Build 0.1',
+            description: 'coding model',
+            lifecycle: { createdAt: '2026-05-21T15:21:01.000Z' },
+            aliases: { canonicalSlug: 'x-ai/grok-build-0.1-20260520' },
+            modalities: { input: ['text', 'image'], output: ['text'] },
+            capabilities: { tools: true, structuredOutputs: true },
+            supportedParameters: ['tools', 'tool_choice', 'response_format'],
+            limits: { contextWindowTokens: 256000, maxOutputTokens: 65536 },
+            pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 2 },
+            providerMetadata: { ownedBy: 'x-ai' },
+            routingHints: { openrouterTopProvider: { is_moderated: false } },
+            provenanceByField: { 'limits.contextWindowTokens': 'openrouter-context' },
+            confidenceByField: { 'limits.contextWindowTokens': 'catalog' },
+        });
+        const entry = toOpenAIModelCatalogEntry(projection);
+        const list = toOpenAIModelCatalogList([projection]);
+
+        assert.equal(entry.id, 'x-ai/grok-build-0.1');
+        assert.equal(entry.object, 'model');
+        assert.equal(entry.created, 1779376861);
+        assert.equal(entry.owned_by, 'x-ai');
+        assert.equal(entry.x_model_gateway.provider_id, 'openrouter');
+        assert.equal(entry.x_model_gateway.display_name, 'xAI: Grok Build 0.1');
+        assert.deepEqual(entry.x_model_gateway.aliases, { canonicalSlug: 'x-ai/grok-build-0.1-20260520' });
+        assert.deepEqual(entry.x_model_gateway.modalities, { input: ['text', 'image'], output: ['text'] });
+        assert.deepEqual(entry.x_model_gateway.supported_parameters, ['tools', 'tool_choice', 'response_format']);
+        assert.equal(/** @type {{ contextWindowTokens: number }} */ (entry.x_model_gateway.limits).contextWindowTokens, 256000);
+        assert.deepEqual(list, { object: 'list', data: [entry] });
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {

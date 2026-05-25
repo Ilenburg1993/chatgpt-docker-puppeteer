@@ -32,3 +32,9 @@ export {
     normalizeStoredCatalogSnapshot,
 } from './json-catalog-store.js';
 export { mergeModelMetadataEvidence, rankCatalogEvidenceConfidence } from './merge.js';
+export {
+    OPENAI_MODEL_LIST_OBJECT,
+    OPENAI_MODEL_OBJECT,
+    toOpenAIModelCatalogEntry,
+    toOpenAIModelCatalogList,
+} from './openai-schema.js';

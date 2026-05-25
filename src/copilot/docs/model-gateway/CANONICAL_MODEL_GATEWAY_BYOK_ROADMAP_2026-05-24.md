@@ -550,6 +550,10 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 
 ### Faixa M — Normalização, enriquecimento e heurísticas controladas
 
+- [x] Criar projeção OpenAI-compatible de catálogo (`id`, `object`, `created`, `owned_by`) com extensão
+  `x_model_gateway` para metadados universais ricos.
+- [x] Preservar no merge/projection metadados ricos essenciais para o schema OpenAI estendido: `description`,
+  `aliases.*`, `lifecycle.*` e `providerMetadata.*`.
 - [ ] Criar normalizador de modalidades: text, image, audio, video, pdf, embedding, rerank, asr, tts, image-generation.
 - [ ] Criar normalizador de capabilities agentic: streaming, tools, forcedToolChoice, parallelToolCalls, JSON mode,
   JSON schema, structured outputs, reasoning effort, reasoning budget, code execution, web/search grounding.
@@ -1220,3 +1224,61 @@ Validação deste corte até agora:
 - PASS `npm run test:copilot`
   (`5610` testes, `0` falhas, `warnings/errors unique=0 total=0`;
   resumo `artifacts/test-runs/copilot/2026-05-25T15-03-50-067Z/summary.md`).
+
+## 20. Continuidade 2026-05-25 — normalização para schema OpenAI com extensão rica
+
+Investigação/ajuste conceitual:
+
+- O gateway deve ser universal na ingestão e rico na metadata, mas a superfície interoperável deve falar primeiro a
+  linguagem OpenAI-compatible.
+- O schema público mínimo passa a ser o equivalente ao Models API:
+  - `id`;
+  - `object`;
+  - `created`;
+  - `owned_by`.
+- Tudo que é nosso, rico ou provider-specific fica em `x_model_gateway`, sem poluir o contrato OpenAI básico.
+- Também foi identificado um gap: evidências `aliases.*`, `lifecycle.*`, `description` e `providerMetadata.*` eram
+  produzidas, mas a projection descartava parte delas por normalizar `aliases` e `lifecycle` de modo estreito demais.
+
+Implementado neste corte:
+
+- Criado `src/copilot/model-gateway/catalog/openai-schema.js`.
+- Exportados pelo barrel de catálogo e pelo barrel raiz:
+  - `OPENAI_MODEL_OBJECT`;
+  - `OPENAI_MODEL_LIST_OBJECT`;
+  - `toOpenAIModelCatalogEntry()`;
+  - `toOpenAIModelCatalogList()`.
+- `toOpenAIModelCatalogEntry()` gera:
+  - `id`: provider-local model id;
+  - `object: "model"`;
+  - `created`: unix timestamp quando houver `openai.created` ou `lifecycle.createdAt`;
+  - `owned_by`: `openai.owned_by`, `providerMetadata.ownedBy` ou `providerId`.
+- `x_model_gateway` carrega metadata ampla em estilo OpenAI-friendly/snake_case:
+  - ids do gateway/provider;
+  - display/description;
+  - lifecycle/aliases/family;
+  - modalidades/capabilities/parâmetros;
+  - limits/pricing/rate limits/data policy;
+  - provider metadata/routing hints;
+  - overlays, provenance e confidence por campo.
+- `createCanonicalModelProjection()` agora preserva:
+  - `description`;
+  - `aliases` como array ou mapa rico;
+  - `lifecycle` como string ou objeto;
+  - `providerMetadata`;
+  - `openai`.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`39` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5611` testes, `0` falhas, `warnings/errors unique=0 total=0`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T15-14-46-640Z/summary.md`).
+
+Próxima direção:
+
+- Commitar/pushar este corte.
+- Em seguida, conectar refresh/diff programático para gerar snapshots OpenAI-compatible a partir dos importers reais.

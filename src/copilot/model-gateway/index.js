@@ -12,6 +12,8 @@ export {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
     MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
+    OPENAI_MODEL_LIST_OBJECT,
+    OPENAI_MODEL_OBJECT,
     OPENAI_MODELS_CATALOG_URL,
     OPENROUTER_MODELS_CATALOG_URL,
     JsonModelGatewayCatalogStore,
@@ -29,6 +31,8 @@ export {
     normalizeStoredCatalogSnapshot,
     rankCatalogEvidenceConfidence,
     runCatalogImporters,
+    toOpenAIModelCatalogEntry,
+    toOpenAIModelCatalogList,
 } from './catalog/index.js';
 export {
     MODEL_GATEWAY_SCHEMA_VERSION,

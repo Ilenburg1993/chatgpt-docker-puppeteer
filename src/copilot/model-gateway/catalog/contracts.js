@@ -232,8 +232,9 @@ export function createProviderAccountOverlay(input) {
  * @param {string} input.providerModel
  * @param {string} [input.routeProfile]
  * @param {string} [input.displayName]
- * @param {string} [input.lifecycle]
- * @param {string[]} [input.aliases]
+ * @param {string} [input.description]
+ * @param {string | Record<string, unknown>} [input.lifecycle]
+ * @param {string[] | Record<string, unknown>} [input.aliases]
  * @param {string} [input.family]
  * @param {{ input?: string[]; output?: string[] }} [input.modalities]
  * @param {Record<string, unknown>} [input.capabilities]
@@ -244,6 +245,8 @@ export function createProviderAccountOverlay(input) {
  * @param {Record<string, unknown>} [input.rateLimits]
  * @param {Record<string, unknown>} [input.dataPolicy]
  * @param {string} [input.license]
+ * @param {Record<string, unknown>} [input.providerMetadata]
+ * @param {Record<string, unknown>} [input.openai]
  * @param {Record<string, unknown>} [input.provenanceByField]
  * @param {Record<string, unknown>} [input.confidenceByField]
  * @param {Record<string, unknown>} [input.routingHints]
@@ -253,14 +256,20 @@ export function createProviderAccountOverlay(input) {
 export function createCanonicalModelProjection(input) {
     const providerModel = optionalString(input.providerModel);
     if (!providerModel) throw new Error('[model-gateway/catalog] projection providerModel is required');
+    const lifecycleText = optionalString(input.lifecycle);
     return {
         schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
         providerId: normalizeProviderId(input.providerId),
         providerModel,
         routeProfile: optionalString(input.routeProfile),
         displayName: optionalString(input.displayName) ?? providerModel,
-        lifecycle: optionalString(input.lifecycle) ?? 'unknown',
-        aliases: stringList(input.aliases),
+        description: optionalString(input.description),
+        lifecycle: lifecycleText ?? (isRecord(input.lifecycle) ? sanitizeJsonValue(input.lifecycle) : 'unknown'),
+        aliases: Array.isArray(input.aliases)
+            ? stringList(input.aliases)
+            : isRecord(input.aliases)
+              ? sanitizeJsonValue(input.aliases)
+              : [],
         family: optionalString(input.family),
         modalities: {
             input: stringList(input.modalities?.input).length > 0 ? stringList(input.modalities?.input) : ['text'],
@@ -274,6 +283,8 @@ export function createCanonicalModelProjection(input) {
         rateLimits: isRecord(input.rateLimits) ? sanitizeJsonValue(input.rateLimits) : {},
         dataPolicy: isRecord(input.dataPolicy) ? sanitizeJsonValue(input.dataPolicy) : {},
         license: optionalString(input.license),
+        providerMetadata: isRecord(input.providerMetadata) ? sanitizeJsonValue(input.providerMetadata) : {},
+        openai: isRecord(input.openai) ? sanitizeJsonValue(input.openai) : {},
         provenanceByField: isRecord(input.provenanceByField) ? sanitizeJsonValue(input.provenanceByField) : {},
         confidenceByField: isRecord(input.confidenceByField) ? sanitizeJsonValue(input.confidenceByField) : {},
         routingHints: isRecord(input.routingHints) ? sanitizeJsonValue(input.routingHints) : {},
