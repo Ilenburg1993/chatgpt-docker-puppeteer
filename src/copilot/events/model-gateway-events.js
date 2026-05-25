@@ -14,6 +14,7 @@ export const MODEL_GATEWAY_CATALOG_MODEL_ADDED = 'model_gateway:catalog:model_ad
 export const MODEL_GATEWAY_CATALOG_MODEL_CHANGED = 'model_gateway:catalog:model_changed';
 export const MODEL_GATEWAY_CATALOG_MODEL_REMOVED = 'model_gateway:catalog:model_removed';
 export const MODEL_GATEWAY_CATALOG_CONFLICT_DETECTED = 'model_gateway:catalog:conflict_detected';
+export const MODEL_GATEWAY_ELIGIBILITY_EVALUATED = 'model_gateway:eligibility:evaluated';
 export const MODEL_GATEWAY_ROUTE_DECISION = 'model_gateway:route:decision';
 export const MODEL_GATEWAY_PROBE_COMPLETED = 'model_gateway:probe:completed';
 export const MODEL_GATEWAY_PROVIDER_FAILURE = 'model_gateway:provider:failure';
@@ -28,6 +29,7 @@ export const MODEL_GATEWAY_EVENTS = Object.freeze([
     MODEL_GATEWAY_CATALOG_MODEL_CHANGED,
     MODEL_GATEWAY_CATALOG_MODEL_REMOVED,
     MODEL_GATEWAY_CATALOG_CONFLICT_DETECTED,
+    MODEL_GATEWAY_ELIGIBILITY_EVALUATED,
     MODEL_GATEWAY_ROUTE_DECISION,
     MODEL_GATEWAY_PROBE_COMPLETED,
     MODEL_GATEWAY_PROVIDER_FAILURE,

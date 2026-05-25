@@ -14,6 +14,7 @@ import { config as loadDotenv } from 'dotenv';
 import {
     buildCatalogRefreshEventBatch,
     buildCatalogRefreshStartedEvent,
+    buildEligibilityEvaluatedEvent,
     buildModelGatewayPreKCompatibilityReport,
     buildRouteDecisionEvent,
     buildProbeCompletedEvent,
@@ -22,7 +23,8 @@ import {
     createDefaultModelGatewayCatalogImporters,
     createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
-    evaluateModelGatewayEligibility,
+    applyModelGatewayEligibilityToSnapshot,
+    evaluateModelGatewayCatalogEligibility,
     explainModelGatewayEligibilityDecision,
     flushByokProviderHealth,
     JsonModelGatewayCatalogStore,
@@ -1795,29 +1797,6 @@ async function renderByokGatewayCatalogConflicts(println) {
 
 /**
  * @param {Record<string, any>} projection
- * @param {Record<string, any>[]} routeOptions
- * @returns {Record<string, any> | null}
- */
-function findCatalogRouteOptionForProjection(projection, routeOptions) {
-    const key = [
-        optionalScalarString(projection['providerId']) ?? 'unknown-provider',
-        optionalScalarString(projection['providerModel']) ?? 'unknown-model',
-        optionalScalarString(projection['routeProfile']) ?? 'default',
-    ].join(':');
-    return (
-        routeOptions.find(
-            (route) =>
-                [
-                    optionalScalarString(route['providerId']) ?? 'unknown-provider',
-                    optionalScalarString(route['providerModel']) ?? 'unknown-model',
-                    optionalScalarString(route['routeProfile']) ?? 'default',
-                ].join(':') === key,
-        ) ?? null
-    );
-}
-
-/**
- * @param {Record<string, any>} projection
  * @param {string | null} selector
  * @returns {boolean}
  */
@@ -1836,45 +1815,79 @@ function matchesCatalogEligibilitySelector(projection, selector) {
 
 /**
  * @param {string[]} rest
- * @returns {{ selector: string | null; limit: number; strict: boolean }}
+ * @returns {{ selector: string | null; limit: number; strict: boolean; persist: boolean }}
  */
 function parseByokGatewayEligibilityArgs(rest) {
     const strict = rest.some((item) => /^(strict|block|bloquear|--strict)$/iu.test(item));
+    const persist = rest.some((item) => /^(refresh|persist|write|sync|salvar|gravar)$/iu.test(item));
     const numeric = rest.map((item) => Number(item)).find((value) => Number.isFinite(value) && value > 0);
     const selector =
         rest
             .map(optionalScalarString)
-            .find((item) => item && !/^(strict|block|bloquear|--strict)$/iu.test(item) && Number.isNaN(Number(item))) ?? null;
+            .find(
+                (item) =>
+                    item &&
+                    !/^(strict|block|bloquear|--strict|refresh|persist|write|sync|salvar|gravar)$/iu.test(item) &&
+                    Number.isNaN(Number(item)),
+            ) ?? null;
     return {
         selector,
         limit: Math.min(Math.floor(numeric ?? 16), 100),
         strict,
+        persist,
     };
 }
 
 /**
  * @param {(text: string) => void} println
  * @param {string[]} rest
+ * @param {ByokCommandContext['eventBus']} [eventBus]
  * @returns {Promise<void>}
  */
-async function renderByokGatewayEligibility(println, rest) {
+async function renderByokGatewayEligibility(println, rest, eventBus = null) {
     const args = parseByokGatewayEligibilityArgs(rest);
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const snapshot = await store.readSnapshot();
-    const projections = snapshot.projections.filter((projection) => matchesCatalogEligibilitySelector(projection, args.selector));
     const secretRegistry = createEnvSecretRegistry();
-    const decisions = projections.map((projection) => {
-        const routeOption = findCatalogRouteOptionForProjection(projection, snapshot.routeOptions);
-        return evaluateModelGatewayEligibility({
-            projection,
-            ...(routeOption ? { routeOption } : {}),
-            accountOverlays: snapshot.accountOverlays,
-            secretRegistry,
-            policy: {
-                unknownAccessPolicy: args.strict ? 'block' : 'allow_probe',
-            },
-        });
+    const evaluated = evaluateModelGatewayCatalogEligibility({
+        snapshot,
+        secretRegistry,
+        policy: {
+            unknownAccessPolicy: args.strict ? 'block' : 'allow_probe',
+        },
     });
+    if (args.persist) {
+        await store.writeSnapshot(applyModelGatewayEligibilityToSnapshot(snapshot, evaluated.decisions, evaluated.run));
+    }
+    eventBus?.emit?.(
+        buildEligibilityEvaluatedEvent({
+            source: 'terminal-byok',
+            storePath: store.filePath,
+            run: evaluated.run,
+            summary: evaluated.summary,
+            persisted: args.persist,
+        }),
+    );
+    const projectionKeys = new Set(
+        snapshot.projections
+            .filter((projection) => matchesCatalogEligibilitySelector(projection, args.selector))
+            .map((projection) =>
+                [
+                    optionalScalarString(projection['providerId']) ?? 'unknown-provider',
+                    optionalScalarString(projection['providerModel']) ?? 'unknown-model',
+                    optionalScalarString(projection['routeProfile']) ?? 'default',
+                ].join(':'),
+            ),
+    );
+    const decisions = evaluated.decisions.filter((decision) =>
+        projectionKeys.has(
+            [
+                optionalScalarString(decision['providerId']) ?? 'unknown-provider',
+                optionalScalarString(decision['providerModel']) ?? 'unknown-model',
+                optionalScalarString(decision['routeProfile']) ?? 'default',
+            ].join(':'),
+        ),
+    );
     const explained = decisions.map(explainModelGatewayEligibilityDecision);
     const excludedCount = explained.filter((item) => item.status === 'excluded').length;
     const unknownCount = explained.filter((item) => item.status === 'unknown').length;
@@ -1882,7 +1895,7 @@ async function renderByokGatewayEligibility(println, rest) {
 
     println(`\n  \x1b[36mBYOK model-gateway eligibility\x1b[0m`);
     println(
-        `  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · policy=${args.strict ? 'strict/block_unknown' : 'allow_probe_unknown'} · total=${explained.length} · eligible=${eligibleCount} · unknown=${unknownCount} · excluded=${excludedCount}\x1b[0m\n`,
+        `  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · policy=${args.strict ? 'strict/block_unknown' : 'allow_probe_unknown'} · persist=${args.persist ? 'sim' : 'nao'} · total=${explained.length} · eligible=${eligibleCount} · unknown=${unknownCount} · excluded=${excludedCount}\x1b[0m\n`,
     );
     if (snapshot.projections.length === 0) {
         println('    \x1b[33mNenhum snapshot de catálogo encontrado. Rode /byok gateway catalog refresh primeiro.\x1b[0m\n');
@@ -1891,6 +1904,12 @@ async function renderByokGatewayEligibility(println, rest) {
     if (explained.length === 0) {
         println('    \x1b[33mNenhum modelo encontrado para o filtro informado.\x1b[0m\n');
         return;
+    }
+    if (args.persist) {
+        const run = asRecord(evaluated.run);
+        println(
+            `    \x1b[32melegibilidade persistida\x1b[0m  \x1b[90mrun=${optionalScalarString(run['runId']) ?? '-'} · decisions=${evaluated.decisions.length}\x1b[0m`,
+        );
     }
     for (const item of explained.slice(0, args.limit)) {
         const color = item.status === 'eligible' ? '\x1b[32m' : item.status === 'unknown' ? '\x1b[33m' : '\x1b[31m';
@@ -2332,7 +2351,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             return;
         }
         if (/^(eligibility|elegibilidade|eligible|exclusion|exclusao|exclusão)$/iu.test(rest[0] ?? '')) {
-            await renderByokGatewayEligibility(println, rest.slice(1));
+            await renderByokGatewayEligibility(println, rest.slice(1), eventBus);
             return;
         }
         if (/^(endpoints|endpoint|catalog|catalogo|sources)$/iu.test(rest[0] ?? '')) {

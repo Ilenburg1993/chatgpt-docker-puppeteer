@@ -522,8 +522,8 @@ Se a tarefa não exige imagem, vision é no máximo bônus ou superfície a vali
 - [x] Ledger de route decision.
 - [x] Métricas de catálogo.
 - [x] Eventos sem prompt content.
-- [ ] Eventos de eligibility.
-- [ ] Métricas de exclusão pré-runtime.
+- [x] Eventos iniciais de eligibility.
+- [x] Métricas iniciais de exclusão pré-runtime.
 - [ ] Métricas de cobertura de metadados por provider.
 
 ### 5.12 Testes
@@ -1129,10 +1129,13 @@ Campos mínimos:
 Campos futuros:
 
 - `route_options`;
-- `eligibility`;
 - `runtime_health`;
 - `probe_summary`;
 - `selection_summary`.
+
+Campos opcionais ja suportados:
+
+- `eligibility`;
 
 ### 9.3 Regra De Compatibilidade
 
@@ -1382,10 +1385,11 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Eventos de catalog refresh.
 - [x] Eventos de model added/removed/changed.
 - [x] Eventos de conflict.
-- [ ] Eventos de eligibility.
+- [x] Evento `model_gateway:eligibility:evaluated`.
 - [ ] Métricas de coverage.
 - [ ] Métricas de provider freshness.
-- [ ] Métricas de exclusion reasons.
+- [x] Métricas agregadas de eligible/unknown/excluded.
+- [ ] Métricas por exclusion reason.
 
 ### Faixa J — Pre-K Gate
 
@@ -1518,7 +1522,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Criar explain helper.
 - [x] Criar testes unitários iniciais.
 - [x] Criar terminal view inicial.
-- [ ] Persistir decisões em store.
+- [x] Persistir decisões em store JSON como camada derivada.
 
 ### Faixa R — SQLite
 
@@ -1532,6 +1536,8 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [ ] Testar downgrade/unknown schema.
 - [ ] Criar índices por provider/model/route/account.
 - [ ] Criar views OpenAI schema.
+- [x] Preparar snapshot JSON com `modelEligibilityRuns` e
+  `modelEligibilityDecisions`, mantendo a futura migração SQLite separável.
 
 ### Faixa S — Account Access
 
@@ -1748,7 +1754,7 @@ Validação deste corte:
   com `77` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS `npm run lint:copilot`.
-- [x] PASS `npm run test:copilot` com `5654` testes totais, `5621` passed,
+- [x] PASS `npm run test:copilot` com `5656` testes totais, `5623` passed,
   `33` pending, `0` failed e `0` warnings/errors.
 
 Próxima direção:
@@ -1756,6 +1762,39 @@ Próxima direção:
 - [x] Integrar `evaluateModelGatewayEligibility()` ao policy engine como barreira
   opcional, preservando rejeições `eligibility:<reason>`.
 - [x] Criar explain helper para terminal e observability.
-- [ ] Persistir eligibility decisions no próximo store.
+- [x] Persistir eligibility decisions no snapshot JSON atual.
 - [ ] Planejar SQLite já incluindo catálogo, overlays, eligibility, probes e
   route decisions como camadas lógicas separadas.
+
+---
+
+## 18. Continuidade 2026-05-25 — Eligibility Persistida E Observável
+
+Implementado neste corte:
+
+- [x] Adicionados `modelEligibilityRuns` e `modelEligibilityDecisions` ao snapshot
+  JSON redacted.
+- [x] Criado `createModelEligibilityRun()`.
+- [x] Criado batch evaluator `evaluateModelGatewayCatalogEligibility()`.
+- [x] Criado `applyModelGatewayEligibilityToSnapshot()` para materializar a
+  camada derivada sem alterar catálogo canônico.
+- [x] Terminal `/byok gateway eligibility refresh|persist|write|sync` passa a
+  persistir decisões no snapshot.
+- [x] Terminal emite evento de eligibility quando avalia a camada.
+- [x] Criado evento `model_gateway:eligibility:evaluated`.
+- [x] Criadas métricas `model_gateway.eligibility.*`.
+
+Separação preservada:
+
+- [x] Catálogo continua sendo fonte de metadados.
+- [x] Overlays continuam sendo fatos de conta.
+- [x] Eligibility é materializada como camada derivada.
+- [x] Nenhum runtime probe é executado pela eligibility.
+
+Próxima direção:
+
+- [x] Expor `modelEligibilityDecisions` no OpenAI `x_model_gateway` somente como
+  summary opcional, sem poluir o schema base.
+- [ ] Criar explain por modelo combinando projection, route options, overlays,
+  eligibility e probes.
+- [ ] Projetar o schema SQLite com tabelas separadas para a camada derivada.

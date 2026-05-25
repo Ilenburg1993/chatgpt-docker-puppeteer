@@ -15,6 +15,7 @@ import {
     MODEL_GATEWAY_CATALOG_MODEL_ADDED,
     MODEL_GATEWAY_CATALOG_MODEL_CHANGED,
     MODEL_GATEWAY_CATALOG_MODEL_REMOVED,
+    MODEL_GATEWAY_ELIGIBILITY_EVALUATED,
     MODEL_GATEWAY_PROBE_COMPLETED,
     MODEL_GATEWAY_REGISTRY_SNAPSHOT,
     MODEL_GATEWAY_ROUTE_DECISION,
@@ -28,6 +29,7 @@ export {
     MODEL_GATEWAY_CATALOG_MODEL_ADDED,
     MODEL_GATEWAY_CATALOG_MODEL_CHANGED,
     MODEL_GATEWAY_CATALOG_MODEL_REMOVED,
+    MODEL_GATEWAY_ELIGIBILITY_EVALUATED,
     MODEL_GATEWAY_EVENTS,
     MODEL_GATEWAY_MODEL_IMPORTED,
     MODEL_GATEWAY_PROBE_COMPLETED,
@@ -337,6 +339,70 @@ export function projectRouteDecisionMetrics(event) {
             'model_gateway.route.fallback': event.fallbackChain.length,
             'model_gateway.route.estimated_input_tokens': event.estimatedInputTokens ?? 0,
             'model_gateway.route.estimated_cost_usd': event.estimatedCostUsd ?? 0,
+        },
+    };
+}
+
+/**
+ * @param {{
+ *     source?: string;
+ *     storePath?: string | null;
+ *     run?: Record<string, any> | null;
+ *     summary?: { modelCount?: number; eligibleCount?: number; unknownCount?: number; excludedCount?: number };
+ *     persisted?: boolean;
+ * }} input
+ * @returns {{
+ *     type: string;
+ *     timestamp: number;
+ *     source: string;
+ *     storePath: string | null;
+ *     runId: string | null;
+ *     policyProfile: string;
+ *     taskProfile: string;
+ *     accountScope: string;
+ *     persisted: boolean;
+ *     modelCount: number;
+ *     eligibleCount: number;
+ *     unknownCount: number;
+ *     excludedCount: number;
+ * }}
+ */
+export function buildEligibilityEvaluatedEvent(input) {
+    const run = asRecord(input.run);
+    const summary = asRecord(input.summary);
+    return {
+        type: MODEL_GATEWAY_ELIGIBILITY_EVALUATED,
+        timestamp: Date.now(),
+        source: optionalString(input.source) ?? 'eligibility-refresh',
+        storePath: optionalString(input.storePath),
+        runId: optionalString(run['runId']),
+        policyProfile: optionalString(run['policyProfile']) ?? 'default',
+        taskProfile: optionalString(run['taskProfile']) ?? 'default',
+        accountScope: optionalString(run['accountScope']) ?? 'default',
+        persisted: input.persisted === true,
+        modelCount: finiteNumber(summary['modelCount']) ?? finiteNumber(run['modelCount']) ?? 0,
+        eligibleCount: finiteNumber(summary['eligibleCount']) ?? finiteNumber(run['eligibleCount']) ?? 0,
+        unknownCount: finiteNumber(summary['unknownCount']) ?? finiteNumber(run['unknownCount']) ?? 0,
+        excludedCount: finiteNumber(summary['excludedCount']) ?? finiteNumber(run['excludedCount']) ?? 0,
+    };
+}
+
+/**
+ * @param {ReturnType<typeof buildEligibilityEvaluatedEvent>} event
+ * @returns {{ counters: Record<string, number>; gauges: Record<string, number> }}
+ */
+export function projectEligibilityEvaluatedMetrics(event) {
+    return {
+        counters: {
+            'model_gateway.eligibility.evaluated': 1,
+            [`model_gateway.eligibility.${event.persisted ? 'persisted' : 'previewed'}`]: 1,
+            [`model_gateway.eligibility.policy.${event.policyProfile}`]: 1,
+        },
+        gauges: {
+            'model_gateway.eligibility.models': event.modelCount,
+            'model_gateway.eligibility.eligible': event.eligibleCount,
+            'model_gateway.eligibility.unknown': event.unknownCount,
+            'model_gateway.eligibility.excluded': event.excludedCount,
         },
     };
 }

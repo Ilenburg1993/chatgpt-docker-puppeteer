@@ -185,6 +185,9 @@ export async function refreshModelGatewayCatalog(input = {}) {
     return {
         snapshot: normalizeStoredCatalogSnapshot(snapshot),
         diff,
-        openai: toOpenAIModelCatalogList(projections, { providerProjections }),
+        openai: toOpenAIModelCatalogList(projections, {
+            providerProjections,
+            eligibilityDecisions: previous.modelEligibilityDecisions,
+        }),
     };
 }

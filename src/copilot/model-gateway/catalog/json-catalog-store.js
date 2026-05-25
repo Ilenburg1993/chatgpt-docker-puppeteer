@@ -33,6 +33,8 @@ const CATALOG_ARRAY_FIELDS = Object.freeze([
     'importRuns',
     'rawPayloadRefs',
     'conflicts',
+    'modelEligibilityRuns',
+    'modelEligibilityDecisions',
 ]);
 
 /**
@@ -96,6 +98,8 @@ function readRecordArray(value) {
  *     importRuns: Record<string, any>[];
  *     rawPayloadRefs: Record<string, any>[];
  *     conflicts: Record<string, any>[];
+ *     modelEligibilityRuns: Record<string, any>[];
+ *     modelEligibilityDecisions: Record<string, any>[];
  * }}
  */
 export function normalizeStoredCatalogSnapshot(snapshot) {
@@ -113,6 +117,8 @@ export function normalizeStoredCatalogSnapshot(snapshot) {
         importRuns: [],
         rawPayloadRefs: [],
         conflicts: [],
+        modelEligibilityRuns: [],
+        modelEligibilityDecisions: [],
     };
     if (!isRecord(snapshot) || snapshot['schemaVersion'] !== MODEL_GATEWAY_CATALOG_SCHEMA_VERSION) return empty;
     return {
@@ -129,6 +135,8 @@ export function normalizeStoredCatalogSnapshot(snapshot) {
         importRuns: readRecordArray(snapshot['importRuns']),
         rawPayloadRefs: readRecordArray(snapshot['rawPayloadRefs']),
         conflicts: readRecordArray(snapshot['conflicts']),
+        modelEligibilityRuns: readRecordArray(snapshot['modelEligibilityRuns']),
+        modelEligibilityDecisions: readRecordArray(snapshot['modelEligibilityDecisions']),
     };
 }
 

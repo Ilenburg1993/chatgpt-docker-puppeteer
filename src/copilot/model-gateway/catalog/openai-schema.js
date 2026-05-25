@@ -9,6 +9,7 @@
  */
 
 import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
+import { explainModelGatewayEligibilityDecision } from '../eligibility/index.js';
 
 export const OPENAI_MODEL_OBJECT = 'model';
 export const OPENAI_MODEL_LIST_OBJECT = 'list';
@@ -122,11 +123,51 @@ function findProviderProjection(projection, providerProjections) {
 
 /**
  * @param {Record<string, any>} projection
- * @param {{ providerProjections?: Record<string, any>[] }} [options]
+ * @param {Record<string, any>[]} eligibilityDecisions
+ * @returns {Record<string, any> | null}
+ */
+function findEligibilityDecision(projection, eligibilityDecisions) {
+    const providerId = typeof projection['providerId'] === 'string' ? projection['providerId'] : null;
+    const providerModel = typeof projection['providerModel'] === 'string' ? projection['providerModel'] : null;
+    const routeProfile = typeof projection['routeProfile'] === 'string' && projection['routeProfile'] ? projection['routeProfile'] : null;
+    if (!providerId || !providerModel) return null;
+    return (
+        eligibilityDecisions.find(
+            (decision) =>
+                decision['providerId'] === providerId &&
+                decision['providerModel'] === providerModel &&
+                (decision['routeProfile'] ?? null) === routeProfile,
+        ) ?? null
+    );
+}
+
+/**
+ * @param {Record<string, any> | null} decision
+ * @returns {Record<string, unknown> | null}
+ */
+function buildEligibilityExtension(decision) {
+    if (!decision) return null;
+    const explanation = explainModelGatewayEligibilityDecision(decision);
+    return {
+        include: explanation.include,
+        status: explanation.status,
+        disposition: explanation.disposition,
+        primary_reason: explanation.primaryReason,
+        hard_exclusions: explanation.hardExclusions,
+        soft_penalties: explanation.softPenalties,
+        required_runtime_probes: explanation.requiredRuntimeProbes,
+        next_actions: explanation.nextActions,
+    };
+}
+
+/**
+ * @param {Record<string, any>} projection
+ * @param {{ providerProjections?: Record<string, any>[]; eligibilityDecisions?: Record<string, any>[] }} [options]
  * @returns {Record<string, unknown>}
  */
 function buildGatewayExtension(projection, options = {}) {
     const providerProjection = findProviderProjection(projection, options.providerProjections ?? []);
+    const eligibility = findEligibilityDecision(projection, options.eligibilityDecisions ?? []);
     return {
         schema_version: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
         gateway_id: `${projection['providerId'] ?? 'unknown'}:${projection['providerModel'] ?? projection['id'] ?? 'unknown'}`,
@@ -149,6 +190,7 @@ function buildGatewayExtension(projection, options = {}) {
         license: projection['license'] ?? null,
         provider_metadata: projection['providerMetadata'] ?? {},
         provider_projection: buildProviderProjectionExtension(providerProjection),
+        eligibility: buildEligibilityExtension(eligibility),
         routing_hints: projection['routingHints'] ?? {},
         account_overlay_refs: projection['accountOverlayRefs'] ?? [],
         provenance_by_field: projection['provenanceByField'] ?? {},
@@ -158,7 +200,7 @@ function buildGatewayExtension(projection, options = {}) {
 
 /**
  * @param {Record<string, any>} projection
- * @param {{ providerProjections?: Record<string, any>[] }} [options]
+ * @param {{ providerProjections?: Record<string, any>[]; eligibilityDecisions?: Record<string, any>[] }} [options]
  * @returns {{ id: string; object: 'model'; created: number | null; owned_by: string; x_model_gateway: Record<string, unknown> }}
  */
 export function toOpenAIModelCatalogEntry(projection, options = {}) {
@@ -174,7 +216,7 @@ export function toOpenAIModelCatalogEntry(projection, options = {}) {
 
 /**
  * @param {Record<string, any>[]} projections
- * @param {{ providerProjections?: Record<string, any>[] }} [options]
+ * @param {{ providerProjections?: Record<string, any>[]; eligibilityDecisions?: Record<string, any>[] }} [options]
  * @returns {{ object: 'list'; data: ReturnType<typeof toOpenAIModelCatalogEntry>[] }}
  */
 export function toOpenAIModelCatalogList(projections, options = {}) {

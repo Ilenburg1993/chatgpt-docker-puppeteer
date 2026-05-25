@@ -22,10 +22,12 @@ import {
     buildProviderModelId,
     buildCatalogRefreshCompletedEvent,
     buildCatalogRefreshEventBatch,
+    buildEligibilityEvaluatedEvent,
     buildProbeCompletedEvent,
     buildRegistrySnapshotEvent,
     buildRouteDecisionEvent,
     buildRouteDecisionTraceAttributes,
+    applyModelGatewayEligibilityToSnapshot,
     createModelRecord,
     createEnvSecretRegistry,
     buildModelGatewayOnListModelsHandler,
@@ -40,6 +42,7 @@ import {
     projectRouteDecisionMetrics,
     projectModelGatewayMetrics,
     projectCatalogRefreshCompletedMetrics,
+    projectEligibilityEvaluatedMetrics,
     redactSecretRecord,
     redactSecretText,
     recordByokProviderModelAgentProbeSuccess,
@@ -85,6 +88,7 @@ import {
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
     createModelEligibilityDecision,
+    createModelEligibilityRun,
     createModelMetadataEvidence,
     createModelRouteOption,
     createProviderAccountOverlay,
@@ -106,6 +110,7 @@ import {
     normalizeUsdPricing,
     rankCatalogEvidenceConfidence,
     recommendCatalogDiffProbes,
+    evaluateModelGatewayCatalogEligibility,
     evaluateModelGatewayEligibility,
     refreshModelGatewayCatalog,
     runCatalogImporters,
@@ -597,6 +602,39 @@ describe('model-gateway foundation', () => {
         assert.equal(metrics.gauges['model_gateway.catalog.conflicts'], 1);
     });
 
+    it('projects eligibility evaluation into stable observability event and metrics', () => {
+        const event = buildEligibilityEvaluatedEvent({
+            source: 'unit-test',
+            storePath: 'data/copilot/model-gateway/catalog.json',
+            persisted: true,
+            run: createModelEligibilityRun({
+                runId: 'eligibility-run-1',
+                policyProfile: 'strict-account',
+                taskProfile: 'repo_agent',
+                accountScope: 'default',
+                modelCount: 3,
+                eligibleCount: 1,
+                unknownCount: 1,
+                excludedCount: 1,
+            }),
+        });
+        const metrics = projectEligibilityEvaluatedMetrics(event);
+
+        assert.equal(event.type, 'model_gateway:eligibility:evaluated');
+        assert.equal(event.runId, 'eligibility-run-1');
+        assert.equal(event.policyProfile, 'strict-account');
+        assert.equal(event.taskProfile, 'repo_agent');
+        assert.equal(event.persisted, true);
+        assert.equal(event.modelCount, 3);
+        assert.equal(event.eligibleCount, 1);
+        assert.equal(event.unknownCount, 1);
+        assert.equal(event.excludedCount, 1);
+        assert.equal(metrics.counters['model_gateway.eligibility.evaluated'], 1);
+        assert.equal(metrics.counters['model_gateway.eligibility.persisted'], 1);
+        assert.equal(metrics.counters['model_gateway.eligibility.policy.strict-account'], 1);
+        assert.equal(metrics.gauges['model_gateway.eligibility.excluded'], 1);
+    });
+
     it('builds stable per-model and conflict events for catalog refreshes', () => {
         const batch = buildCatalogRefreshEventBatch({
             source: 'unit-test',
@@ -1070,6 +1108,22 @@ describe('model-gateway foundation', () => {
                 evidences: [evidence],
                 projections: [projection],
                 rawPayloadRefs: [rawRef],
+                modelEligibilityRuns: [
+                    createModelEligibilityRun({
+                        runId: 'eligibility-run-1',
+                        modelCount: 1,
+                        eligibleCount: 1,
+                        policyInputs: { authorization: 'Bearer sk-secret-that-must-not-leak' },
+                    }),
+                ],
+                modelEligibilityDecisions: [
+                    createModelEligibilityDecision({
+                        providerId: 'openrouter',
+                        providerModel: 'm',
+                        include: true,
+                        reasons: ['account_overlay_available'],
+                    }),
+                ],
                 importRuns: [
                     createCatalogImportRun({
                         runId: 'run-1',
@@ -1091,6 +1145,9 @@ describe('model-gateway foundation', () => {
             assert.equal(loaded.projections[0].limits.contextWindowTokens, 131072);
             assert.equal(loaded.rawPayloadRefs.length, 1);
             assert.equal(loaded.importRuns.length, 1);
+            assert.equal(loaded.modelEligibilityRuns.length, 1);
+            assert.equal(loaded.modelEligibilityDecisions.length, 1);
+            assert.equal(JSON.stringify(loaded.modelEligibilityRuns).includes('sk-secret-that-must-not-leak'), false);
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -2758,7 +2815,18 @@ describe('model-gateway foundation', () => {
             providerMetadata: { headquarters: 'US' },
         });
         const entry = toOpenAIModelCatalogEntry(projection);
-        const list = toOpenAIModelCatalogList([projection], { providerProjections: [providerProjection] });
+        const list = toOpenAIModelCatalogList([projection], {
+            providerProjections: [providerProjection],
+            eligibilityDecisions: [
+                createModelEligibilityDecision({
+                    providerId: 'openrouter',
+                    providerModel: 'x-ai/grok-build-0.1',
+                    include: false,
+                    hardExclusions: ['account_model_not_visible'],
+                    requiredRuntimeProbes: ['chat'],
+                }),
+            ],
+        });
 
         assert.equal(entry.id, 'x-ai/grok-build-0.1');
         assert.equal(entry.object, 'model');
@@ -2773,6 +2841,16 @@ describe('model-gateway foundation', () => {
         assert.equal(entry.x_model_gateway.provider_projection, null);
         assert.equal(list.data[0].x_model_gateway.provider_projection?.subject_provider_id, 'x-ai');
         assert.deepEqual(list.data[0].x_model_gateway.provider_projection?.data_policy, { retainsPrompts: false });
+        assert.deepEqual(list.data[0].x_model_gateway.eligibility, {
+            include: false,
+            status: 'excluded',
+            disposition: 'excluded',
+            primary_reason: 'account_model_not_visible',
+            hard_exclusions: ['account_model_not_visible'],
+            soft_penalties: [],
+            required_runtime_probes: ['chat'],
+            next_actions: ['refresh_account_overlay_or_choose_visible_model'],
+        });
     });
 
     it('normalizes OpenAI-compatible modalities and catalog capability hints', () => {
@@ -3205,6 +3283,57 @@ describe('model-gateway foundation', () => {
             'run_low_cost_access_probe',
             'run_runtime_probes:chat,json',
         ]);
+    });
+
+    it('evaluates and applies catalog-wide eligibility as a derived snapshot layer', async () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'openai',
+            providerModel: 'gpt-visible',
+            pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 4 },
+        });
+        const hidden = createCanonicalModelProjection({
+            providerId: 'openai',
+            providerModel: 'gpt-hidden',
+            pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 4 },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'openai',
+            secretRef: 'OPENAI_API_KEY',
+            enabledModels: ['gpt-visible'],
+        });
+        const snapshot = {
+            projections: [hidden, projection],
+            routeOptions: [
+                createModelRouteOption({
+                    providerId: 'openai',
+                    providerModel: 'gpt-visible',
+                    selectorKind: 'exact_model',
+                    normalizedPolicy: { routeLayer: 'direct_provider', wireApi: 'openai_responses' },
+                }),
+            ],
+            accountOverlays: [overlay],
+        };
+        const evaluated = evaluateModelGatewayCatalogEligibility({
+            snapshot,
+            secretRegistry: { has: () => true },
+            policy: { unknownAccessPolicy: 'block', policyProfile: 'strict-account' },
+            now: () => new Date('2026-05-25T22:30:00.000Z'),
+        });
+
+        assert.equal(evaluated.summary.modelCount, 2);
+        assert.equal(evaluated.summary.eligibleCount, 1);
+        assert.equal(evaluated.summary.excludedCount, 1);
+        assert.equal(evaluated.run.policyProfile, 'strict-account');
+        assert.equal(evaluated.decisions.find((decision) => decision.providerModel === 'gpt-visible')?.include, true);
+        assert.deepEqual(
+            evaluated.decisions.find((decision) => decision.providerModel === 'gpt-hidden')?.hardExclusions,
+            ['account_model_not_visible'],
+        );
+
+        const nextSnapshot = applyModelGatewayEligibilityToSnapshot(snapshot, evaluated.decisions, evaluated.run);
+        assert.equal(nextSnapshot.source, 'eligibility-refresh');
+        assert.equal(nextSnapshot.modelEligibilityRuns.length, 1);
+        assert.equal(nextSnapshot.modelEligibilityDecisions.length, 2);
     });
 
     it('refreshes catalog snapshots, replaces source evidence, diffs projections and emits OpenAI schema', async () => {

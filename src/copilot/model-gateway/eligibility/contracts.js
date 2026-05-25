@@ -47,6 +47,11 @@ export const MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS = Object.freeze({
     CAPABILITY_UNVERIFIED: 'capability_unverified',
 });
 
+export const MODEL_GATEWAY_ELIGIBILITY_RUN_STATUS = Object.freeze({
+    COMPLETED: 'completed',
+    FAILED: 'failed',
+});
+
 /**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
@@ -152,6 +157,56 @@ export function createModelEligibilityDecision(input) {
         expiresAt: normalizeIsoDate(input.expiresAt),
         redactionStatus: 'sanitized',
     };
+}
+
+/**
+ * @param {object} input
+ * @param {string} input.runId
+ * @param {string} [input.status]
+ * @param {string} [input.policyProfile]
+ * @param {string} [input.taskProfile]
+ * @param {string} [input.accountScope]
+ * @param {string | number | Date} [input.startedAt]
+ * @param {string | number | Date} [input.completedAt]
+ * @param {number} [input.modelCount]
+ * @param {number} [input.eligibleCount]
+ * @param {number} [input.unknownCount]
+ * @param {number} [input.excludedCount]
+ * @param {string[]} [input.errors]
+ * @param {Record<string, unknown>} [input.policyInputs]
+ * @returns {object}
+ */
+export function createModelEligibilityRun(input) {
+    const runId = optionalString(input.runId);
+    if (!runId) throw new Error('[model-gateway/eligibility] runId is required');
+    const startedAt = normalizeIsoDate(input.startedAt) ?? new Date().toISOString();
+    const completedAt = normalizeIsoDate(input.completedAt) ?? startedAt;
+    return {
+        schemaVersion: MODEL_GATEWAY_ELIGIBILITY_SCHEMA_VERSION,
+        runId,
+        status: optionalString(input.status) ?? MODEL_GATEWAY_ELIGIBILITY_RUN_STATUS.COMPLETED,
+        policyProfile: optionalString(input.policyProfile) ?? 'default',
+        taskProfile: optionalString(input.taskProfile) ?? 'default',
+        accountScope: optionalString(input.accountScope) ?? 'default',
+        startedAt,
+        completedAt,
+        modelCount: nonNegativeInteger(input.modelCount),
+        eligibleCount: nonNegativeInteger(input.eligibleCount),
+        unknownCount: nonNegativeInteger(input.unknownCount),
+        excludedCount: nonNegativeInteger(input.excludedCount),
+        errors: stringList(input.errors),
+        policyInputs: isRecord(input.policyInputs) ? sanitizeJsonValue(input.policyInputs) : {},
+        redactionStatus: 'sanitized',
+    };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number}
+ */
+function nonNegativeInteger(value) {
+    const number = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+    return Number.isFinite(number) && number > 0 ? Math.floor(number) : 0;
 }
 
 /**
