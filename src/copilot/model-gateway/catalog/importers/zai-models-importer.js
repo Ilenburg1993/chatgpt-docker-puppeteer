@@ -18,6 +18,7 @@ import {
 import {
     normalizeAccountOverlayControls,
     normalizeModelAliases,
+    normalizeModelIdentityTraits,
     normalizeModelLifecycle,
     normalizeModelModalities,
     normalizeOpenAICompatibleModelCapabilities,
@@ -204,6 +205,11 @@ function modalitiesForRow(row) {
 function modelEvidenceValues(row) {
     const modalities = modalitiesForRow(row);
     const aliases = normalizeModelAliases({ providerModel: row.id, canonicalSlug: row.id });
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel: row.id,
+        displayName: row.displayName,
+        canonicalSlug: row.id,
+    });
     const lifecycle = normalizeModelLifecycle({ providerModel: row.id });
     const pricing = normalizeUsdPricing({
         inputPerTokenUsd: perMillionToPerToken(row.inputUsdPerMillion),
@@ -229,6 +235,7 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.zai.cacheWriteNote', value: row.cacheWriteNote },
         { fieldPath: 'providerMetadata.zai.builtInWebSearchUsdPerUse', value: ZAI_BUILT_IN_WEB_SEARCH_USD_PER_USE },
         { fieldPath: 'providerMetadata.zai.sourceLine', value: row.sourceLine },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
         { fieldPath: 'openai.owned_by', value: 'zai' },
     ];
     return values.filter((item) => {

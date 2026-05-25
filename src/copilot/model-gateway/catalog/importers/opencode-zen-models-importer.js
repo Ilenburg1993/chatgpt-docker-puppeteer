@@ -18,6 +18,7 @@ import {
 import {
     normalizeAccountOverlayControls,
     normalizeModelAliases,
+    normalizeModelIdentityTraits,
     normalizeModelLifecycle,
     normalizeUsdPricing,
 } from '../normalizers.js';
@@ -173,6 +174,10 @@ function modelEvidenceValues(row, nowMs) {
               cacheWritePerTokenUsd: typeof pricingSeed['cacheWriteUsdPerMillion'] === 'number' ? pricingSeed['cacheWriteUsdPerMillion'] / 1_000_000 : null,
           });
     const aliases = normalizeModelAliases({ providerModel, canonicalSlug: `opencode/${providerModel}` });
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel,
+        canonicalSlug: `opencode/${providerModel}`,
+    });
     const lifecycle = normalizeModelLifecycle({
         created: row['created'],
         expiresAt: OPENCODE_DEPRECATION_SEED[/** @type {keyof typeof OPENCODE_DEPRECATION_SEED} */ (providerModel)],
@@ -204,6 +209,7 @@ function modelEvidenceValues(row, nowMs) {
         { fieldPath: 'providerMetadata.opencode.wireApi', value: endpoint.wireApi },
         { fieldPath: 'providerMetadata.opencode.aiSdkPackage', value: endpoint.aiSdkPackage },
         { fieldPath: 'providerMetadata.opencode.family', value: endpoint.family },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
         {
             fieldPath: 'providerMetadata.opencode.free',
             value: free || null,

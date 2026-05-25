@@ -9,7 +9,12 @@
  */
 
 import { MODEL_GATEWAY_CATALOG_CONFIDENCE, createModelMetadataEvidence, createModelRouteOption } from '../contracts.js';
-import { normalizeModelAliases, normalizeModelLifecycle, normalizeUsdPricing } from '../normalizers.js';
+import {
+    normalizeModelAliases,
+    normalizeModelIdentityTraits,
+    normalizeModelLifecycle,
+    normalizeUsdPricing,
+} from '../normalizers.js';
 import {
     OPENCODE_ZEN_BASE_URL,
     OPENCODE_ZEN_CHAT_COMPLETIONS_URL,
@@ -203,6 +208,11 @@ function modelEvidenceValues(row, nowMs) {
             typeof pricing['cacheWriteUsdPerMillion'] === 'number' ? pricing['cacheWriteUsdPerMillion'] / 1_000_000 : null,
     });
     const aliases = normalizeModelAliases({ providerModel, canonicalSlug: `opencode/${providerModel}` });
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel,
+        displayName: row['displayName'],
+        canonicalSlug: `opencode/${providerModel}`,
+    });
     const capabilities = capabilitiesForModel(providerModel);
     const values = [
         { fieldPath: 'displayName', value: stringValue(row['displayName']) ?? providerModel },
@@ -218,6 +228,7 @@ function modelEvidenceValues(row, nowMs) {
         { fieldPath: 'providerMetadata.opencode.aiSdkPackage', value: stringValue(row['aiSdkPackage']) },
         { fieldPath: 'providerMetadata.opencode.family', value: policy.family },
         { fieldPath: 'providerMetadata.opencode.pricingTiers', value: row['pricingTiers'] },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
     ];
     return values.filter((item) => {
         if (item.value === null || item.value === undefined) return false;

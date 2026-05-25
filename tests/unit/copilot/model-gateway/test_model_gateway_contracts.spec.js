@@ -1410,6 +1410,7 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('capabilities.tools'), true);
         assert.equal(byPath.get('providerMetadata.ownedBy'), 'openai');
         assert.equal(byPath.get('providerMetadata.openai.family'), 'chat');
+        assert.equal(byPath.get('providerMetadata.modelTraits.family'), 'gpt');
     });
 
     it('imports generic OpenAI-compatible model lists as identity, route and account overlay metadata', async () => {
@@ -1459,6 +1460,9 @@ describe('model-gateway foundation', () => {
         assert.equal(snapshot.accountOverlays[0].providerMetadata.openAICompatible, true);
         assert.equal(byPath.get('displayName'), 'llama-3.3-70b-versatile');
         assert.equal(byPath.get('providerMetadata.ownedBy'), 'meta');
+        assert.equal(byPath.get('providerMetadata.modelTraits.family'), 'llama');
+        assert.equal(byPath.get('providerMetadata.modelTraits.generation'), '3.3');
+        assert.equal(byPath.get('providerMetadata.modelTraits.parameterCountBillions'), 70);
     });
 
     it('imports Chutes rich model metadata beyond generic OpenAI-compatible identity', async () => {
@@ -1586,6 +1590,9 @@ describe('model-gateway foundation', () => {
         assert.equal(byModelPath.get('glm-4.7-flash:pricing.inputUsdPerMillion'), 0);
         assert.deepEqual(byModelPath.get('glm-5v-turbo:modalities.input'), ['text', 'image']);
         assert.equal(byModelPath.get('glm-5v-turbo:capabilities.vision'), true);
+        assert.equal(byModelPath.get('glm-5v-turbo:providerMetadata.modelTraits.family'), 'glm');
+        assert.equal(byModelPath.get('glm-5v-turbo:providerMetadata.modelTraits.generation'), '5v');
+        assert.equal(byModelPath.get('glm-5v-turbo:providerMetadata.modelTraits.tier'), 'turbo');
         assert.equal(byModelPath.get('glm-5.1:providerMetadata.zai.openApiUrl'), 'https://docs.z.ai/openapi.json');
     });
 
@@ -1652,6 +1659,7 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('lifecycle.replacementModel'), 'mistral-large-next');
         assert.deepEqual(byPath.get('aliases.mistralAliases'), ['mistral-large-latest', 'mistral-large-2512']);
         assert.equal(byPath.get('providerMetadata.mistral.defaultTemperature'), 0.7);
+        assert.equal(byPath.get('providerMetadata.modelTraits.family'), 'mistral');
     });
 
     it('imports paginated Anthropic model identity with account overlay metadata', async () => {
@@ -1771,6 +1779,9 @@ describe('model-gateway foundation', () => {
         assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:providerMetadata.anthropic.type'), 'model');
         assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:providerMetadata.anthropic.tier'), 'sonnet');
         assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:providerMetadata.anthropic.generation'), '4.5');
+        assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:providerMetadata.modelTraits.family'), 'claude');
+        assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:providerMetadata.modelTraits.tier'), 'sonnet');
+        assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:providerMetadata.modelTraits.generation'), '4.5');
     });
 
     it('imports Gemini list and get metadata with limits, methods and route policy', async () => {
@@ -1882,6 +1893,9 @@ describe('model-gateway foundation', () => {
         assert.equal(byModel.get('gemini:gemini-2.5-flash:capabilities.streaming'), true);
         assert.equal(byModel.get('gemini:gemini-2.5-flash:capabilities.reasoning'), true);
         assert.equal(byModel.get('gemini:gemini-2.5-flash:providerMetadata.gemini.version'), '002');
+        assert.equal(byModel.get('gemini:gemini-2.5-flash:providerMetadata.modelTraits.family'), 'gemini');
+        assert.equal(byModel.get('gemini:gemini-2.5-flash:providerMetadata.modelTraits.generation'), '2.5');
+        assert.equal(byModel.get('gemini:gemini-2.5-flash:providerMetadata.modelTraits.tier'), 'flash');
         assert.deepEqual(byModel.get('gemini:gemini-2.5-flash:providerMetadata.gemini.supportedGenerationMethods'), [
             'generateContent',
             'streamGenerateContent',
@@ -2242,6 +2256,8 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('capabilities.structuredOutputs'), true);
         assert.equal(byPath.get('providerMetadata.huggingface.fastestProvider'), 'groq');
         assert.equal(byPath.get('providerMetadata.huggingface.cheapestProvider'), 'together');
+        assert.equal(byPath.get('providerMetadata.modelTraits.family'), 'gpt-oss');
+        assert.equal(byPath.get('providerMetadata.modelTraits.parameterCountBillions'), 120);
         assert.equal(bySelector.get('openai/gpt-oss-120b:fastest')?.normalizedPolicy.selectedProviderHint, 'groq');
         assert.equal(bySelector.get('openai/gpt-oss-120b:cheapest')?.normalizedPolicy.selectedProviderHint, 'together');
         assert.equal(bySelector.get('openai/gpt-oss-120b:preferred')?.normalizedPolicy.selectedProviderHint, 'together');
@@ -2294,7 +2310,12 @@ describe('model-gateway foundation', () => {
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
         assert.equal(snapshot.sources[0].providerId, 'opencode');
         assert.equal(byModel.get('opencode:gpt-5.1-codex:providerMetadata.opencode.wireApi'), 'openai_responses');
+        assert.equal(byModel.get('opencode:gpt-5.1-codex:providerMetadata.modelTraits.family'), 'gpt');
+        assert.equal(byModel.get('opencode:gpt-5.1-codex:providerMetadata.modelTraits.generation'), '5.1');
+        assert.equal(byModel.get('opencode:gpt-5.1-codex:providerMetadata.modelTraits.tier'), 'codex');
         assert.equal(byModel.get('opencode:claude-sonnet-4-5:providerMetadata.opencode.wireApi'), 'anthropic_messages');
+        assert.equal(byModel.get('opencode:claude-sonnet-4-5:providerMetadata.modelTraits.family'), 'claude');
+        assert.equal(byModel.get('opencode:claude-sonnet-4-5:providerMetadata.modelTraits.tier'), 'sonnet');
         assert.equal(byModel.get('opencode:gemini-3.5-flash:providerMetadata.opencode.wireApi'), 'google_generative_model');
         assert.equal(byModel.get('opencode:glm-5.1:providerMetadata.opencode.wireApi'), 'openai_chat_completions');
         assert.equal(byModel.get('opencode:deepseek-v4-flash-free:providerMetadata.opencode.free'), true);
@@ -2366,6 +2387,8 @@ describe('model-gateway foundation', () => {
         assert.equal(byModel.get('opencode:gpt-5.1-codex:pricing.cacheReadUsdPerMillion'), 0.107);
         assert.equal(byModel.get('opencode:gpt-5.1-codex:lifecycle.status'), 'scheduled_retirement');
         assert.equal(byModel.get('opencode:gpt-5.1-codex:lifecycle.expiresAt'), '2026-07-23T00:00:00.000Z');
+        assert.equal(byModel.get('opencode:gpt-5.1-codex:providerMetadata.modelTraits.family'), 'gpt');
+        assert.equal(byModel.get('opencode:gpt-5.1-codex:providerMetadata.modelTraits.tier'), 'codex');
         assert.equal(byModel.get('opencode:claude-sonnet-4-5:pricing.outputUsdPerMillion'), 15);
         assert.deepEqual(byModel.get('opencode:claude-sonnet-4-5:providerMetadata.opencode.pricingTiers'), [
             {
@@ -2551,7 +2574,15 @@ describe('model-gateway foundation', () => {
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
         assert.equal(snapshot.sources[0].providerId, 'nvidia-nim');
         assert.equal(byModel.get('nvidia-nim:openai/gpt-oss-120b:capabilities.reasoning'), true);
+        assert.equal(byModel.get('nvidia-nim:openai/gpt-oss-120b:providerMetadata.modelTraits.family'), 'gpt-oss');
+        assert.equal(byModel.get('nvidia-nim:openai/gpt-oss-120b:providerMetadata.modelTraits.parameterCountBillions'), 120);
         assert.equal(byModel.get('nvidia-nim:nvidia/nemotron-nano-12b-v2-vl:capabilities.vision'), true);
+        assert.equal(byModel.get('nvidia-nim:nvidia/nemotron-nano-12b-v2-vl:providerMetadata.modelTraits.family'), 'nemotron');
+        assert.equal(byModel.get('nvidia-nim:nvidia/nemotron-nano-12b-v2-vl:providerMetadata.modelTraits.tier'), 'nano');
+        assert.deepEqual(
+            byModel.get('nvidia-nim:nvidia/nemotron-nano-12b-v2-vl:providerMetadata.modelTraits.modalityHints'),
+            ['vision'],
+        );
         assert.deepEqual(byModel.get('nvidia-nim:openai/gpt-oss-120b:providerMetadata.nvidia.managementEndpoints'), [
             '/v1/health/ready',
             '/v1/metadata',

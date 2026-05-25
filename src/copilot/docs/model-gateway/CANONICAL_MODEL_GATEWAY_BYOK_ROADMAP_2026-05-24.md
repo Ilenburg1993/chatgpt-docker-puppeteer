@@ -3393,3 +3393,66 @@ Próxima direção:
 
 - Rodar suíte completa, commitar/pushar e continuar expandindo a aplicação dos traits para outros importers e para
   normalizadores de pricing/limites/provider-route quando novas fontes trouxerem dados mais ricos.
+
+## 62. Continuidade 2026-05-25 — aplicação ampla dos traits aos importers restantes
+
+Problema identificado após o corte 61:
+
+- A API transversal existia, mas ainda estava aplicada primeiro aos importers mais ricos/recentes.
+- Importers centrais, como OpenAI, Anthropic, Gemini, Mistral, NVIDIA NIM, Hugging Face, OpenCode, Z.AI e o genérico
+  OpenAI-compatible, ainda emitiam apenas metadata provider-specific para família/tier/tamanho.
+- Isso criava assimetria no banco universal: fontes diferentes podiam ter o mesmo fato técnico, mas em caminhos
+  diferentes, exigindo lógica especial na seleção por metadados.
+
+Implementado neste corte:
+
+- `providerMetadata.modelTraits.*` agora também é emitido por:
+  - OpenAI authenticated `/v1/models`;
+  - generic OpenAI-compatible `/models`;
+  - Anthropic authenticated `/v1/models` + detalhes;
+  - Gemini `models.list`/`models.get`;
+  - Mistral `/v1/models`;
+  - NVIDIA NIM hosted/self-hosted;
+  - Hugging Face Inference Providers Router;
+  - OpenCode Zen `/models`;
+  - OpenCode Zen docs;
+  - Z.AI docs/pricing.
+- Campos provider-specific foram preservados:
+  - `providerMetadata.openai.*`;
+  - `providerMetadata.anthropic.*`;
+  - `providerMetadata.gemini.*`;
+  - `providerMetadata.mistral.*`;
+  - `providerMetadata.nvidia.*`;
+  - `providerMetadata.huggingface.*`;
+  - `providerMetadata.opencode.*`;
+  - `providerMetadata.zai.*`.
+- Ajuste importante em Gemini:
+  - `providerMetadata.gemini.version` continua preservado como versão interna do provider;
+  - `modelTraits.generation` passa a vir do id/base model (`gemini-2.5-flash` -> `2.5`), não do campo `version=002`.
+
+Testes ampliados:
+
+- OpenAI: `gpt-test` emite `modelTraits.family=gpt`.
+- Generic OpenAI-compatible: `llama-3.3-70b-versatile` emite família, geração e 70B.
+- Z.AI: `glm-5v-turbo` emite família `glm`, geração `5v` e tier `turbo`.
+- Mistral: `mistral-large-latest` emite família `mistral`.
+- Anthropic: `claude-sonnet-4-5-20250929` emite família, tier e geração.
+- Gemini: `gemini-2.5-flash` emite família, geração e tier.
+- Hugging Face: `openai/gpt-oss-120b` emite família `gpt-oss` e 120B.
+- OpenCode API/docs: `gpt-5.1-codex` emite família, geração e tier; Claude emite família/tier.
+- NVIDIA NIM: `gpt-oss-120b` emite 120B; `nemotron-nano-12b-v2-vl` emite família/tier e hint vision.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`69` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5646` total, `5613` passed, `33` pending, `0` failed, `0` warnings/errors;
+  summary `artifacts/test-runs/copilot/2026-05-25T21-34-41-524Z/summary.md`).
+
+Próxima direção:
+
+- Rodar suíte completa, commitar/pushar e continuar para normalização de route/provider traits, começando por campos que
+  ainda ficam espalhados entre `normalizedPolicy`, `providerSpecific` e provider metadata.

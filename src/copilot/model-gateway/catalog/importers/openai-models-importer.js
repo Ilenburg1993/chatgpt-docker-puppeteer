@@ -14,7 +14,12 @@ import {
     createModelRouteOption,
     createProviderAccountOverlay,
 } from '../contracts.js';
-import { normalizeAccountOverlayControls, normalizeModelAliases, normalizeModelLifecycle } from '../normalizers.js';
+import {
+    normalizeAccountOverlayControls,
+    normalizeModelAliases,
+    normalizeModelIdentityTraits,
+    normalizeModelLifecycle,
+} from '../normalizers.js';
 
 export const OPENAI_MODELS_CATALOG_URL = 'https://api.openai.com/v1/models';
 
@@ -110,6 +115,11 @@ function modelEvidenceValues(record) {
     const aliases = normalizeModelAliases({ providerModel });
     const lifecycle = normalizeModelLifecycle({ created: record['created'], providerModel });
     const family = modelFamily(providerModel);
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel,
+        family: family.family === 'chat' || family.family === 'reasoning' ? null : family.family,
+        tier: family.tier,
+    });
     const capabilities = capabilitiesFromModelId(providerModel);
     return [
         { fieldPath: 'displayName', value: providerModel },
@@ -122,6 +132,7 @@ function modelEvidenceValues(record) {
         { fieldPath: 'providerMetadata.openai.family', value: family.family },
         { fieldPath: 'providerMetadata.openai.wireApi', value: family.wireApi },
         { fieldPath: 'providerMetadata.openai.tier', value: family.tier },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
         { fieldPath: 'openai.created', value: finiteNumber(record['created']) },
         { fieldPath: 'openai.owned_by', value: stringValue(record['owned_by']) ?? 'openai' },
     ].filter((item) => item.value !== null && item.value !== undefined);

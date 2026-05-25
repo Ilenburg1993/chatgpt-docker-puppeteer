@@ -17,6 +17,7 @@ import {
 import {
     normalizeAccountOverlayControls,
     normalizeModelAliases,
+    normalizeModelIdentityTraits,
     normalizeModelLifecycle,
     normalizeModelModalities,
     normalizeModelTokenLimits,
@@ -104,6 +105,11 @@ function modelEvidenceValues(row) {
         providerModel: row['id'],
         canonicalSlug: row['root'],
     });
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel: row['id'],
+        displayName: row['name'],
+        canonicalSlug: row['root'],
+    });
     const deprecation = stringValue(row['deprecation']);
     const lifecycle = normalizeModelLifecycle({
         created: row['created'],
@@ -138,6 +144,7 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.mistral.type', value: stringValue(row['TYPE']) ?? stringValue(row['type']) },
         { fieldPath: 'providerMetadata.mistral.archived', value: row['archived'] },
         { fieldPath: 'providerMetadata.mistral.defaultTemperature', value: finiteNumber(row['default_model_temperature']) },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
         { fieldPath: 'openai.created', value: unixSecondsToIso(row['created']) },
         { fieldPath: 'openai.owned_by', value: stringValue(row['owned_by']) },
     ];

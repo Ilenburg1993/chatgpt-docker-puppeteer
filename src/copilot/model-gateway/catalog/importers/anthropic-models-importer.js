@@ -14,7 +14,12 @@ import {
     createModelRouteOption,
     createProviderAccountOverlay,
 } from '../contracts.js';
-import { normalizeAccountOverlayControls, normalizeModelAliases, normalizeModelLifecycle } from '../normalizers.js';
+import {
+    normalizeAccountOverlayControls,
+    normalizeModelAliases,
+    normalizeModelIdentityTraits,
+    normalizeModelLifecycle,
+} from '../normalizers.js';
 
 export const ANTHROPIC_MODELS_CATALOG_URL = 'https://api.anthropic.com/v1/models';
 export const ANTHROPIC_MODELS_API_VERSION = '2023-06-01';
@@ -114,6 +119,13 @@ function modelEvidenceValues(row) {
     const aliases = normalizeModelAliases({ providerModel });
     const lifecycle = normalizeModelLifecycle({ created: row['created_at'], providerModel });
     const family = providerModel ? modelFamily(providerModel) : { family: 'unknown', tier: null, generation: null };
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel,
+        displayName: row['display_name'],
+        family: family.family === 'unknown' ? null : family.family,
+        tier: family.tier,
+        generation: family.generation,
+    });
     const capabilities = providerModel ? capabilitiesFromModel(providerModel, row) : {};
     const values = [
         { fieldPath: 'displayName', value: stringValue(row['display_name']) ?? providerModel },
@@ -129,6 +141,7 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.anthropic.generation', value: family.generation },
         { fieldPath: 'providerMetadata.anthropic.supportsBatch', value: row['supports_batch'] ?? row['supports_batches'] },
         { fieldPath: 'providerMetadata.anthropic.supportsPromptCaching', value: row['supports_prompt_caching'] ?? row['prompt_caching'] },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
         { fieldPath: 'openai.created', value: stringValue(row['created_at']) },
         { fieldPath: 'openai.owned_by', value: 'anthropic' },
     ];

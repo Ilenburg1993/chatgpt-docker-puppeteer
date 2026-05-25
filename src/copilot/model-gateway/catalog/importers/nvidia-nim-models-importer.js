@@ -14,7 +14,12 @@ import {
     createModelRouteOption,
     createProviderAccountOverlay,
 } from '../contracts.js';
-import { normalizeAccountOverlayControls, normalizeModelAliases, normalizeModelLifecycle } from '../normalizers.js';
+import {
+    normalizeAccountOverlayControls,
+    normalizeModelAliases,
+    normalizeModelIdentityTraits,
+    normalizeModelLifecycle,
+} from '../normalizers.js';
 
 export const NVIDIA_NIM_BASE_URL = 'https://integrate.api.nvidia.com/v1';
 export const NVIDIA_NIM_MODELS_CATALOG_URL = `${NVIDIA_NIM_BASE_URL}/models`;
@@ -87,6 +92,7 @@ function modelEvidenceValues(row) {
     const aliases = normalizeModelAliases({ providerModel });
     const lifecycle = normalizeModelLifecycle({ created: finiteNumber(row['created']), providerModel });
     const capabilities = providerModel ? capabilitiesFromModelId(providerModel) : {};
+    const identityTraits = normalizeModelIdentityTraits({ providerModel });
     const values = [
         { fieldPath: 'displayName', value: providerModel },
         ...Object.entries(aliases).map(([key, value]) => ({ fieldPath: `aliases.${key}`, value })),
@@ -96,6 +102,7 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.nvidia.object', value: stringValue(row['object']) },
         { fieldPath: 'providerMetadata.nvidia.managementEndpoints', value: [...NVIDIA_NIM_MANAGEMENT_ENDPOINTS] },
         { fieldPath: 'providerMetadata.nvidia.hostedBaseUrl', value: NVIDIA_NIM_BASE_URL },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
         { fieldPath: 'openai.created', value: finiteNumber(row['created']) },
         { fieldPath: 'openai.owned_by', value: stringValue(row['owned_by']) ?? 'nvidia' },
     ];

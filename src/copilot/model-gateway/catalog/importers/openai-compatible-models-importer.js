@@ -14,7 +14,11 @@ import {
     createModelRouteOption,
     createProviderAccountOverlay,
 } from '../contracts.js';
-import { normalizeAccountOverlayControls, normalizeModelLifecycle } from '../normalizers.js';
+import {
+    normalizeAccountOverlayControls,
+    normalizeModelIdentityTraits,
+    normalizeModelLifecycle,
+} from '../normalizers.js';
 
 /**
  * @param {unknown} value
@@ -61,12 +65,14 @@ function modelEvidenceValues(row) {
         created: created && created > 0 ? created : null,
         providerModel,
     });
+    const identityTraits = normalizeModelIdentityTraits({ providerModel });
     const values = [
         { fieldPath: 'displayName', value: providerModel },
         { fieldPath: 'aliases.providerModel', value: providerModel },
         ...Object.entries(lifecycle).map(([key, value]) => ({ fieldPath: `lifecycle.${key}`, value })),
         { fieldPath: 'providerMetadata.ownedBy', value: stringValue(row['owned_by']) ?? stringValue(row['ownedBy']) },
         { fieldPath: 'providerMetadata.object', value: stringValue(row['object']) },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
     ];
     return values.filter((item) => item.value !== null && item.value !== undefined);
 }

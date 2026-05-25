@@ -17,6 +17,7 @@ import {
 import {
     normalizeAccountOverlayControls,
     normalizeModelAliases,
+    normalizeModelIdentityTraits,
     normalizeModelTokenLimits,
 } from '../normalizers.js';
 
@@ -156,6 +157,11 @@ function modelEvidenceValues(row) {
         providerModel,
         canonicalSlug: stringValue(row['baseModelId']),
     });
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel,
+        displayName: row['displayName'],
+        canonicalSlug: row['baseModelId'],
+    });
     const limits = normalizeModelTokenLimits({
         contextWindowTokens: row['inputTokenLimit'],
         maxOutputTokens: row['outputTokenLimit'],
@@ -177,6 +183,7 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.gemini.maxTemperature', value: finiteNumber(row['maxTemperature']) },
         { fieldPath: 'providerMetadata.gemini.topP', value: finiteNumber(row['topP']) },
         { fieldPath: 'providerMetadata.gemini.topK', value: finiteNumber(row['topK']) },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
         { fieldPath: 'openai.owned_by', value: 'google' },
     ];
     return values.filter((item) => item.value !== null && item.value !== undefined);

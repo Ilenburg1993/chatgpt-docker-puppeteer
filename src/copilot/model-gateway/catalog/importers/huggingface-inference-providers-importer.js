@@ -17,6 +17,7 @@ import {
 import {
     normalizeAccountOverlayControls,
     normalizeModelAliases,
+    normalizeModelIdentityTraits,
     normalizeModelTokenLimits,
     normalizeUsdPricing,
 } from '../normalizers.js';
@@ -151,6 +152,11 @@ function modelEvidenceValues(row) {
     const providerModel = stringValue(row['id']) ?? stringValue(row['model']);
     const variants = providerRows(row).map(normalizedProviderVariant).filter((item) => stringValue(item['provider']));
     const aliases = normalizeModelAliases({ providerModel, huggingFaceId: providerModel });
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel,
+        displayName: row['name'],
+        huggingFaceId: providerModel,
+    });
     const limits = normalizeModelTokenLimits({ contextWindowTokens: maxContextWindow(variants) });
     const tools = variants.some((item) => item['tools'] === true);
     const structuredOutputs = variants.some((item) => item['structuredOutputs'] === true);
@@ -165,6 +171,7 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.huggingface.providers', value: variants },
         { fieldPath: 'providerMetadata.huggingface.fastestProvider', value: providerForPolicy(variants, 'fastest') },
         { fieldPath: 'providerMetadata.huggingface.cheapestProvider', value: providerForPolicy(variants, 'cheapest') },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
         { fieldPath: 'openai.owned_by', value: 'huggingface' },
     ];
     return values.filter((item) => item.value !== null && item.value !== undefined);
