@@ -3260,3 +3260,64 @@ Próxima direção:
 
 - Rodar lint e suíte completa, commitar/pushar este refactor estrutural e continuar para Cloudflare/NVIDIA/docs oficiais
   ou para normalizadores globais de pricing/limites.
+
+## 60. Continuidade 2026-05-25 — Cloudflare Workers AI markdown catalog rico
+
+Investigação oficial:
+
+- A página `https://developers.cloudflare.com/ai/models/` declara explicitamente que agentes devem consumir a versão
+  Markdown, via `Accept: text/markdown` ou `index.md`.
+- A versão Markdown lista atualmente `137` modelos com cartões que incluem:
+  - id/path do modelo;
+  - task type;
+  - autor/provider;
+  - hosting `Hosted` ou `Proxied`;
+  - descrição;
+  - badges como `Function calling`, `Reasoning`, `Vision`, `Batch`, `LoRA`, `Partner`, `Real-time` e
+    `Planned deprecation`;
+  - contexto em linguagem natural quando declarado, por exemplo `262.1k context window`.
+
+Implementado neste corte:
+
+- `CloudflareWorkersAiCatalogImporter` agora prefere `text/markdown` no `Accept`.
+- O parser de string diferencia Markdown oficial de fallback HTML simples.
+- O parser Markdown extrai cartões por link `https://developers.cloudflare.com/ai/models/...`.
+- Cada cartão vira row estruturada com:
+  - `id`;
+  - `display_name`/`name`;
+  - `task`;
+  - `author`;
+  - `hosting`;
+  - `description`;
+  - `docs_url`;
+  - `context_window` quando a descrição declara context window;
+  - `capabilities` a partir de badges/texto.
+- A inferência de modalidades Cloudflare foi refinada para:
+  - `Text-to-Speech` como `text -> audio`;
+  - `Text-to-Video` como `text -> video`;
+  - `Image-to-Video` como `image -> video`;
+  - ASR/speech como `audio -> text`.
+- Teste contratual novo cobre Markdown Cloudflare com:
+  - modelo Workers AI hosted `@cf/openai/gpt-oss-120b`;
+  - modelo proxied `inworld/tts-2`;
+  - task, author, hosting, contexto, tools/function calling, reasoning, real-time e modalidade TTS.
+
+Separação arquitetural reafirmada:
+
+- O catálogo Markdown é uma fonte pública oficial de metadados globais.
+- Configuração de conta/API token/AI Gateway continua sendo overlay de operador.
+- O fato de um modelo ser `Proxied` ou `Hosted` ajuda a selecionar rota, mas runtime probes continuam necessários para
+  provar acesso e comportamento por conta.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`68` testes).
+- Smoke live:
+  - `137` rows parseadas da página oficial Markdown;
+  - `@cf/openai/gpt-oss-120b` com task `Text Generation`, author `OpenAI`, hosting `Hosted`;
+  - `@cf/moonshotai/kimi-k2.6` com context `262100`, function calling, reasoning e vision.
+
+Próxima direção:
+
+- Rodar strict/lint/test completo, commitar/pushar e continuar para próximo enriquecimento Cloudflare/NVIDIA/docs oficiais.

@@ -56,6 +56,110 @@ function booleanValue(value) {
     return null;
 }
 
+const CLOUDFLARE_TASK_TYPES = Object.freeze([
+    'Automatic Speech Recognition',
+    'Voice Activity Detection',
+    'Image Classification',
+    'Music Generation',
+    'Object Detection',
+    'Text Classification',
+    'Text Embeddings',
+    'Text Generation',
+    'Text-to-Image',
+    'Text-to-Speech',
+    'Text-to-Video',
+    'Image-to-Text',
+    'Image-to-Video',
+    'Summarization',
+    'Translation',
+]);
+
+/**
+ * @param {string} value
+ * @returns {number | null}
+ */
+function compactTokenCount(value) {
+    const match = value.replace(/,/gu, '').match(/(\d+(?:\.\d+)?)\s*([kmb])?/iu);
+    if (!match) return null;
+    const amount = Number(match[1]);
+    if (!Number.isFinite(amount)) return null;
+    const suffix = match[2]?.toLowerCase();
+    const multiplier = suffix === 'k' ? 1_000 : suffix === 'm' ? 1_000_000 : suffix === 'b' ? 1_000_000_000 : 1;
+    return Math.round(amount * multiplier);
+}
+
+/**
+ * @param {string} text
+ * @returns {Record<string, boolean>}
+ */
+function capabilitiesFromText(text) {
+    /** @type {Record<string, boolean>} */
+    const capabilities = {};
+    if (/function calling|tool calling/iu.test(text)) capabilities['function_calling'] = true;
+    if (/reasoning/iu.test(text)) capabilities['reasoning'] = true;
+    if (/vision|multimodal|image inputs?/iu.test(text)) capabilities['vision'] = true;
+    if (/\bbatch\b/iu.test(text)) capabilities['batch'] = true;
+    if (/\blora\b/iu.test(text)) capabilities['lora'] = true;
+    if (/real[- ]time/iu.test(text)) capabilities['real_time'] = true;
+    return capabilities;
+}
+
+/**
+ * @param {string} text
+ * @returns {number | null}
+ */
+function contextWindowFromText(text) {
+    const match = text.match(/(\d+(?:[,.]\d+)?\s*[kKmMbB]?|\d{4,})\s*(?:token\s+)?context window/iu);
+    return match?.[1] ? compactTokenCount(match[1]) : null;
+}
+
+/**
+ * @param {string} markdown
+ * @returns {Record<string, unknown>[]}
+ */
+function parseRowsFromMarkdown(markdown) {
+    /** @type {Record<string, unknown>[]} */
+    const rows = [];
+    const linkPattern = /\[([\s\S]*?)\]\(https:\/\/developers\.cloudflare\.com\/ai\/models\/([^)]*?)\/\)/gu;
+    for (const match of markdown.matchAll(linkPattern)) {
+        const rawText = match[1] ?? '';
+        const path = match[2] ?? '';
+        const id = decodeURIComponent(path);
+        if (!id) continue;
+        const text = rawText
+            .replace(/!\[[^\]]*\]\([^)]*\)/gu, '')
+            .replace(/[📌\\]/gu, '')
+            .replace(/\s+/gu, ' ')
+            .trim();
+        const taskPattern = new RegExp(
+            `(${CLOUDFLARE_TASK_TYPES.map((task) => task.replace(/[\\^$*+?.()|[\]{}]/gu, '\\$&')).join('|')})\\s*•\\s*([^•]+)\\s*•\\s*(Hosted|Proxied)`,
+            'iu',
+        );
+        const taskMatch = text.match(taskPattern);
+        const displayName = (taskMatch?.index ? text.slice(0, taskMatch.index).trim() : '') || id.split('/').at(-1) || id;
+        const task = taskMatch?.[1]?.trim() ?? null;
+        const author = taskMatch?.[2]?.trim() ?? null;
+        const hosting = taskMatch?.[3]?.trim() ?? null;
+        const description = taskMatch ? text.slice((taskMatch.index ?? 0) + taskMatch[0].length).trim() : text;
+        rows.push({
+            id,
+            model: id,
+            display_name: displayName,
+            name: displayName,
+            task,
+            author,
+            hosting,
+            platform: 'Cloudflare AI',
+            description,
+            docs_url: `https://developers.cloudflare.com/ai/models/${path}/`,
+            context_window: contextWindowFromText(description),
+            capabilities: capabilitiesFromText(`${description} ${text}`),
+            markdownCardText: text,
+        });
+    }
+    return rows;
+}
+
 /**
  * @param {string} html
  * @returns {Record<string, unknown>[]}
@@ -78,7 +182,9 @@ function parseRowsFromHtml(html) {
  * @returns {Record<string, unknown>[]}
  */
 function parseCloudflareRows(raw) {
-    if (typeof raw === 'string') return parseRowsFromHtml(raw);
+    if (typeof raw === 'string') {
+        return raw.includes('https://developers.cloudflare.com/ai/models/') ? parseRowsFromMarkdown(raw) : parseRowsFromHtml(raw);
+    }
     const candidates = [
         isRecord(raw) ? raw['data'] : null,
         isRecord(raw) ? raw['models'] : null,
@@ -131,6 +237,9 @@ function capabilitiesFromRow(row) {
 function modalitiesFromTask(task, capabilities) {
     const normalizedTask = (task ?? '').toLowerCase();
     if (normalizedTask.includes('text-to-image')) return normalizeModelModalities({ input: ['text'], output: ['image'] });
+    if (normalizedTask.includes('text-to-speech')) return normalizeModelModalities({ input: ['text'], output: ['audio'] });
+    if (normalizedTask.includes('text-to-video')) return normalizeModelModalities({ input: ['text'], output: ['video'] });
+    if (normalizedTask.includes('image-to-video')) return normalizeModelModalities({ input: ['image'], output: ['video'] });
     if (normalizedTask.includes('image-to-text')) return normalizeModelModalities({ input: ['image'], output: ['text'] });
     if (normalizedTask.includes('speech') || normalizedTask.includes('audio')) return normalizeModelModalities({ input: ['audio'], output: ['text'] });
     if (capabilities['vision']) return normalizeModelModalities({ input: ['text', 'image'], output: ['text'] });
@@ -218,8 +327,8 @@ export function createCloudflareWorkersAiCatalogImporter(options = {}) {
         async fetchRaw() {
             if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Cloudflare Workers AI catalog import');
             const headers = options.apiToken
-                ? { accept: 'application/json,text/html', authorization: `Bearer ${options.apiToken}` }
-                : { accept: 'application/json,text/html' };
+                ? { accept: 'application/json,text/markdown,text/html', authorization: `Bearer ${options.apiToken}` }
+                : { accept: 'application/json,text/markdown,text/html' };
             const response = await fetchImpl(url, { headers });
             if (!response.ok) throw new Error(`Cloudflare Workers AI catalog fetch failed with HTTP ${response.status}`);
             const contentType = response.headers?.get?.('content-type') ?? '';

@@ -2381,6 +2381,45 @@ describe('model-gateway foundation', () => {
         assert.equal(byRoute.get('gemini-3.5-flash')?.normalizedPolicy.aiSdkPackage, '@ai-sdk/google');
     });
 
+    it('imports Cloudflare markdown model cards with task, hosting and capability metadata', async () => {
+        /** @type {string | null} */
+        let acceptHeader = null;
+        const markdown = `
+            [![OpenAI logo](https://developers.cloudflare.com/_astro/openai.svg)gpt-oss-120bText Generation • OpenAI • HostedOpenAI open-weight model with a 128k context window for agentic workloads.Function callingReasoning](https://developers.cloudflare.com/ai/models/@cf/openai/gpt-oss-120b/)
+            [![Inworld logo](https://developers.cloudflare.com/_astro/inworld.svg)tts-2Text-to-Speech • Inworld • ProxiedNatural steering for speech generation.Real-time](https://developers.cloudflare.com/ai/models/inworld/tts-2/)
+        `;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (_url, init) => {
+                acceptHeader = /** @type {{ headers?: { accept?: string } }} */ (init)?.headers?.accept ?? null;
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    headers: new Headers({ 'content-type': 'text/markdown' }),
+                    text: async () => markdown,
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createCloudflareWorkersAiCatalogImporter({ fetchImpl: fakeFetch })],
+            now: () => new Date('2026-05-25T15:15:00.000Z'),
+        });
+        const byModel = new Map(
+            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+        );
+
+        assert.equal(acceptHeader?.includes('text/markdown'), true);
+        assert.equal(snapshot.importRuns[0].rowCount, 2);
+        assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:displayName'), 'gpt-oss-120b');
+        assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:providerMetadata.cloudflare.task'), 'Text Generation');
+        assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:providerMetadata.cloudflare.author'), 'OpenAI');
+        assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:providerMetadata.cloudflare.hosting'), 'Hosted');
+        assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:limits.contextWindowTokens'), 128000);
+        assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:capabilities.tools'), true);
+        assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:capabilities.reasoning'), true);
+        assert.deepEqual(byModel.get('cloudflare-workers-ai:inworld/tts-2:modalities.output'), ['audio']);
+        assert.equal(byModel.get('cloudflare-workers-ai:inworld/tts-2:capabilities.realTime'), true);
+    });
+
     it('imports Cloudflare Workers AI catalog metadata and gateway route options', async () => {
         const secret = 'cloudflare-secret-that-must-not-leak';
         /** @type {string | null} */
