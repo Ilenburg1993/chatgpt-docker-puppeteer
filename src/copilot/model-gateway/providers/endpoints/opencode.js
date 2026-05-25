@@ -6,6 +6,12 @@ export const OPENCODE_PROVIDER_ENDPOINTS = Object.freeze({
     baseUrls: Object.freeze(['https://opencode.ai/zen/v1']),
     modelCatalogSources: Object.freeze([
         Object.freeze({
+            kind: 'public_docs',
+            method: 'GET',
+            url: 'https://opencode.ai/docs/zen/',
+            richness: 'global_endpoint_pricing_tiers_deprecation_privacy',
+        }),
+        Object.freeze({
             kind: 'public_or_authenticated_api',
             method: 'GET',
             url: 'https://opencode.ai/zen/v1/models',

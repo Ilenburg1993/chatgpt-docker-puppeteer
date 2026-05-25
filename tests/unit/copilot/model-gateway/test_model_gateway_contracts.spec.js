@@ -72,6 +72,7 @@ import {
     createMistralModelsImporter,
     createNvidiaNimModelsImporter,
     createOllamaCatalogImporter,
+    createOpenCodeZenDocsImporter,
     createOpenCodeZenModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
@@ -2308,6 +2309,78 @@ describe('model-gateway foundation', () => {
         assert.equal(snapshot.accountOverlays[0].secretRef, 'OPENCODE_API_KEY');
     });
 
+    it('imports OpenCode Zen public docs with endpoint, pricing tier and deprecation metadata', async () => {
+        const docsHtml = `
+            <table>
+                <thead><tr><th>Model</th><th>Model ID</th><th>Endpoint</th><th>AI SDK Package</th></tr></thead>
+                <tbody>
+                    <tr><td>GPT 5.1 Codex</td><td>gpt-5.1-codex</td><td><code>https://opencode.ai/zen/v1/responses</code></td><td><code>@ai-sdk/openai</code></td></tr>
+                    <tr><td>Claude Sonnet 4.5</td><td>claude-sonnet-4-5</td><td><code>https://opencode.ai/zen/v1/messages</code></td><td><code>@ai-sdk/anthropic</code></td></tr>
+                    <tr><td>Gemini 3.5 Flash</td><td>gemini-3.5-flash</td><td><code>https://opencode.ai/zen/v1/models/gemini-3.5-flash</code></td><td><code>@ai-sdk/google</code></td></tr>
+                    <tr><td>GLM 5.1</td><td>glm-5.1</td><td><code>https://opencode.ai/zen/v1/chat/completions</code></td><td><code>@ai-sdk/openai-compatible</code></td></tr>
+                </tbody>
+            </table>
+            <table>
+                <thead><tr><th>Model</th><th>Input</th><th>Output</th><th>Cached Read</th><th>Cached Write</th></tr></thead>
+                <tbody>
+                    <tr><td>GPT 5.1 Codex</td><td>$1.07</td><td>$8.50</td><td>$0.107</td><td>-</td></tr>
+                    <tr><td>Claude Sonnet 4.5 (&lt;= 200K tokens)</td><td>$3.00</td><td>$15.00</td><td>$0.30</td><td>$3.75</td></tr>
+                    <tr><td>Claude Sonnet 4.5 (> 200K tokens)</td><td>$6.00</td><td>$22.50</td><td>$0.60</td><td>$7.50</td></tr>
+                    <tr><td>GLM 5.1</td><td>$1.40</td><td>$4.40</td><td>$0.26</td><td>-</td></tr>
+                </tbody>
+            </table>
+            <table>
+                <thead><tr><th>Model</th><th>Deprecation date</th></tr></thead>
+                <tbody><tr><td>GPT 5.1 Codex</td><td>July 23, 2026</td></tr></tbody>
+            </table>
+        `;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async () =>
+                /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    text: async () => docsHtml,
+                })
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createOpenCodeZenDocsImporter({ fetchImpl: fakeFetch, now: () => new Date('2026-05-25T15:00:00.000Z') })],
+            now: () => new Date('2026-05-25T15:00:00.000Z'),
+        });
+        const byModel = new Map(
+            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+        );
+        const byRoute = new Map(snapshot.routeOptions.map((route) => [route.providerModel, route]));
+
+        assert.equal(snapshot.sources[0].kind, 'public_docs');
+        assert.equal(snapshot.importRuns[0].rowCount, 4);
+        assert.equal(byModel.get('opencode:gpt-5.1-codex:displayName'), 'GPT 5.1 Codex');
+        assert.equal(byModel.get('opencode:gpt-5.1-codex:pricing.inputUsdPerMillion'), 1.07);
+        assert.equal(byModel.get('opencode:gpt-5.1-codex:pricing.cacheReadUsdPerMillion'), 0.107);
+        assert.equal(byModel.get('opencode:gpt-5.1-codex:lifecycle.status'), 'scheduled_retirement');
+        assert.equal(byModel.get('opencode:gpt-5.1-codex:lifecycle.expiresAt'), '2026-07-23T00:00:00.000Z');
+        assert.equal(byModel.get('opencode:claude-sonnet-4-5:pricing.outputUsdPerMillion'), 15);
+        assert.deepEqual(byModel.get('opencode:claude-sonnet-4-5:providerMetadata.opencode.pricingTiers'), [
+            {
+                label: '<= 200K tokens',
+                inputUsdPerMillion: 3,
+                outputUsdPerMillion: 15,
+                cacheReadUsdPerMillion: 0.3,
+                cacheWriteUsdPerMillion: 3.75,
+            },
+            {
+                label: '> 200K tokens',
+                inputUsdPerMillion: 6,
+                outputUsdPerMillion: 22.5,
+                cacheReadUsdPerMillion: 0.6,
+                cacheWriteUsdPerMillion: 7.5,
+            },
+        ]);
+        assert.equal(byModel.get('opencode:glm-5.1:providerMetadata.opencode.wireApi'), 'openai_chat_completions');
+        assert.equal(byRoute.get('gpt-5.1-codex')?.normalizedPolicy.docsDerived, true);
+        assert.equal(byRoute.get('claude-sonnet-4-5')?.normalizedPolicy.wireApi, 'anthropic_messages');
+        assert.equal(byRoute.get('gemini-3.5-flash')?.normalizedPolicy.aiSdkPackage, '@ai-sdk/google');
+    });
+
     it('imports Cloudflare Workers AI catalog metadata and gateway route options', async () => {
         const secret = 'cloudflare-secret-that-must-not-leak';
         /** @type {string | null} */
@@ -2872,6 +2945,7 @@ describe('model-gateway foundation', () => {
                 'kilo-gateway-providers',
                 'cerebras-public-models',
                 'groq-docs-models',
+                'opencode-zen-docs',
                 'cloudflare-workers-ai-catalog',
                 'openai-models',
             ],
@@ -2884,6 +2958,7 @@ describe('model-gateway foundation', () => {
                 'kilo-gateway-providers',
                 'cerebras-public-models',
                 'groq-docs-models',
+                'opencode-zen-docs',
                 'cloudflare-workers-ai-catalog',
             ],
         );

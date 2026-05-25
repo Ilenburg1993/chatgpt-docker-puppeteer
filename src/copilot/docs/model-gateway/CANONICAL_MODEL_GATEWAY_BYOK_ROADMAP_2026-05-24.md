@@ -3151,3 +3151,70 @@ Próxima direção:
 
 - Rodar `npm run test:copilot`, corrigir qualquer falha, commit/push deste bloco e continuar para o próximo provider ou
   para seeds oficiais complementares de preço/limite sem misturar metadados com runtime.
+
+## 58. Continuidade 2026-05-25 — OpenCode Zen docs importer e rebaixamento de seeds estáticos
+
+Investigação oficial:
+
+- `https://opencode.ai/zen/v1/models` retorna atualmente um payload OpenAI-shaped identity-only: `id`, `object`,
+  `created` e `owned_by`.
+- `https://opencode.ai/docs/zen/` contém a superfície rica:
+  - tabela de modelos com `Model`, `Model ID`, endpoint runtime e pacote AI SDK;
+  - tabela de preços por 1M tokens com input, output, cached read e cached write;
+  - linhas por tier, por exemplo `<= 200K tokens` e `> 200K tokens`;
+  - tabela de depreciação;
+  - notas operacionais/privacidade para modelos free e trial.
+
+Implementado neste corte:
+
+- Criado `OpenCodeZenDocsImporter` para a página pública `https://opencode.ai/docs/zen/`.
+- O importer parseia tabelas HTML reais e emite evidências `public_docs` para:
+  - display name;
+  - aliases, incluindo `opencode/<model>`;
+  - lifecycle de depreciação;
+  - pricing input/output/cache read/cache write;
+  - capabilities de chat/tools/reasoning/code por família;
+  - metadata OpenCode: docs URL, endpoint, wire API, pacote AI SDK, família e `pricingTiers`.
+- O importer emite `ModelRouteOption` `exact_model` derivado da tabela oficial, com:
+  - endpoint exato;
+  - `wireApi`;
+  - família;
+  - pacote AI SDK;
+  - `docsDerived=true`.
+- `OpenCodeZenModelsImporter` continua como importer API/account-scoped, mas seeds antigos de preço/free/depreciação
+  agora são marcados como `static_seed`, para que docs oficiais (`docs`) vençam no merge quando disponíveis.
+- `createDefaultModelGatewayCatalogImporters()` agora inclui `opencode-zen-docs` quando `includePublic=true`.
+- Os barrels de importers, catálogo e root exportam `OPENCODE_ZEN_DOCS_URL` e `createOpenCodeZenDocsImporter()`.
+- O inventário de endpoints OpenCode declara a fonte docs como
+  `global_endpoint_pricing_tiers_deprecation_privacy`.
+- Teste contratual novo cobre:
+  - endpoints Responses/Messages/Gemini model/chat completions;
+  - pricing por 1M tokens;
+  - cached read/write;
+  - pricing tiers;
+  - depreciação;
+  - route option derivada de docs.
+
+Separação arquitetural reafirmada:
+
+- API `/zen/v1/models` responde identidade/visibilidade de modelos.
+- Docs oficiais respondem endpoint, pricing e depreciação globais.
+- Account overlay com `OPENCODE_API_KEY` responde existência de key/configuração do operador.
+- Runtime probes continuam responsáveis por provar que a key realmente consegue chamar cada endpoint/família.
+
+Validação deste corte até agora:
+
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`67` testes).
+- Smoke live com `https://opencode.ai/docs/zen/`:
+  - `41` linhas docs parseadas;
+  - preço de `gpt-5.5` extraído;
+  - `2` tiers de `claude-sonnet-4-5`;
+  - depreciação de `gpt-5.1-codex` em `2026-07-23T00:00:00.000Z`;
+  - wire API de `glm-5.1` como `openai_chat_completions`.
+
+Próxima direção:
+
+- Rodar lint e suíte completa, corrigir regressões, commit/push, e continuar para outro enriquecimento de provider ou para
+  normalizadores globais de pricing/limites/aliases.

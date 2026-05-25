@@ -156,7 +156,7 @@ function capabilitiesForModel(providerModel) {
 /**
  * @param {Record<string, unknown>} row
  * @param {number} nowMs
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {Array<{ fieldPath: string; value: unknown; confidence?: string }>}
  */
 function modelEvidenceValues(row, nowMs) {
     const providerModel = stringValue(row['id']);
@@ -184,17 +184,36 @@ function modelEvidenceValues(row, nowMs) {
         { fieldPath: 'displayName', value: providerModel },
         ...Object.entries(aliases).map(([key, value]) => ({ fieldPath: `aliases.${key}`, value })),
         { fieldPath: 'aliases.opencodeConfigModel', value: `opencode/${providerModel}` },
-        ...Object.entries(lifecycle).map(([key, value]) => ({ fieldPath: `lifecycle.${key}`, value })),
+        ...Object.entries(lifecycle).map(([key, value]) => ({
+            fieldPath: `lifecycle.${key}`,
+            value,
+            confidence:
+                OPENCODE_DEPRECATION_SEED[/** @type {keyof typeof OPENCODE_DEPRECATION_SEED} */ (providerModel)] && key !== 'createdAt'
+                    ? MODEL_GATEWAY_CATALOG_CONFIDENCE.STATIC_SEED
+                    : undefined,
+        })),
         ...Object.entries(capabilities).map(([key, value]) => ({ fieldPath: `capabilities.${key}`, value })),
-        ...Object.entries(pricing).map(([key, value]) => ({ fieldPath: `pricing.${key}`, value })),
+        ...Object.entries(pricing).map(([key, value]) => ({
+            fieldPath: `pricing.${key}`,
+            value,
+            confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.STATIC_SEED,
+        })),
         { fieldPath: 'providerMetadata.ownedBy', value: stringValue(row['owned_by']) ?? 'opencode' },
         { fieldPath: 'providerMetadata.opencode.object', value: stringValue(row['object']) },
         { fieldPath: 'providerMetadata.opencode.endpoint', value: endpoint.endpoint },
         { fieldPath: 'providerMetadata.opencode.wireApi', value: endpoint.wireApi },
         { fieldPath: 'providerMetadata.opencode.aiSdkPackage', value: endpoint.aiSdkPackage },
         { fieldPath: 'providerMetadata.opencode.family', value: endpoint.family },
-        { fieldPath: 'providerMetadata.opencode.free', value: free || null },
-        { fieldPath: 'providerMetadata.opencode.priceTierNote', value: stringValue(pricingSeed['priceTierNote']) },
+        {
+            fieldPath: 'providerMetadata.opencode.free',
+            value: free || null,
+            confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.STATIC_SEED,
+        },
+        {
+            fieldPath: 'providerMetadata.opencode.priceTierNote',
+            value: stringValue(pricingSeed['priceTierNote']),
+            confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.STATIC_SEED,
+        },
         { fieldPath: 'openai.created', value: row['created'] },
         { fieldPath: 'openai.owned_by', value: stringValue(row['owned_by']) ?? 'opencode' },
     ];
@@ -250,9 +269,11 @@ export function createOpenCodeZenModelsImporter(options = {}) {
                         value: item.value,
                         sourceId,
                         sourceKind,
-                        confidence: options.apiKey
-                            ? MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG
-                            : MODEL_GATEWAY_CATALOG_CONFIDENCE.CATALOG,
+                        confidence:
+                            item.confidence ??
+                            (options.apiKey
+                                ? MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG
+                                : MODEL_GATEWAY_CATALOG_CONFIDENCE.CATALOG),
                         rawPayloadRef: context.rawPayloadRef,
                     }),
                 );

@@ -22,6 +22,7 @@ import {
     createMistralModelsImporter,
     createNvidiaNimModelsImporter,
     createOllamaCatalogImporter,
+    createOpenCodeZenDocsImporter,
     createOpenCodeZenModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
@@ -72,6 +73,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             createKiloGatewayProvidersImporter({ fetchImpl: options.fetchImpl }),
             createCerebrasPublicModelsImporter({ fetchImpl: options.fetchImpl }),
             createGroqDocsModelsImporter({ fetchImpl: options.fetchImpl }),
+            createOpenCodeZenDocsImporter({ fetchImpl: options.fetchImpl }),
             createCloudflareWorkersAiCatalogImporter({
                 fetchImpl: options.fetchImpl,
                 apiToken: includeAuthenticated ? cloudflareSecret?.value : undefined,

@@ -75,6 +75,10 @@ export {
     createOllamaCatalogImporter,
 } from './ollama-catalog-importer.js';
 export {
+    OPENCODE_ZEN_DOCS_URL,
+    createOpenCodeZenDocsImporter,
+} from './opencode-zen-docs-importer.js';
+export {
     OPENCODE_ZEN_BASE_URL,
     OPENCODE_ZEN_CHAT_COMPLETIONS_URL,
     OPENCODE_ZEN_MESSAGES_URL,
