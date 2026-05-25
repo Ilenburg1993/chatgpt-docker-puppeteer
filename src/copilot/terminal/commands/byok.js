@@ -30,6 +30,7 @@ import {
     JsonModelGatewayCatalogStore,
     listByokProviderModelHealth,
     listProviderEndpointInventory,
+    mirrorModelGatewayCatalogSnapshotToSqlite,
     readByokProviderHealthState,
     readByokProviderModelHealth,
     recommendCatalogDiffProbes,
@@ -47,7 +48,9 @@ import {
     runConfiguredByokJsonProbe,
     runConfiguredByokStreamingProbe,
     runConfiguredByokVisionProbe,
+    SqliteModelGatewayCatalogStore,
     summarizeCanonicalModelProjectionDiff,
+    toOpenAIModelCatalogList,
 } from '#copilot/model-gateway';
 
 import { discoverConfiguredByokModelsFromEnv, readConfiguredByokProfilesFromEnv } from '#copilot/config';
@@ -1522,7 +1525,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts> | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]> | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1762,6 +1765,68 @@ async function renderByokGatewayCatalogDiff(println) {
             println(`      \x1b[90m? ${recommendation.key}: ${recommendation.probeKinds.join(',')} · ${recommendation.reasons.slice(0, 4).join(',')}\x1b[0m`);
             println(`        \x1b[90m${recommendation.commands[0]}\x1b[0m`);
         }
+    }
+    println('');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayCatalogSqliteMirror(println) {
+    const jsonStore = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const sqliteStore = new SqliteModelGatewayCatalogStore();
+    println(`\n  \x1b[36mBYOK model-gateway catalog SQLite mirror\x1b[0m`);
+    println(
+        `  \x1b[90mjson=${jsonStore.filePath} · sqlite=copilot.sqlite · modo=mirror-redacted · sem rede\x1b[0m\n`,
+    );
+    const result = await mirrorModelGatewayCatalogSnapshotToSqlite({
+        sourceStore: jsonStore,
+        sqliteStore,
+    });
+    const counts = result.sqliteCounts;
+    println(
+        `    \x1b[32msnapshot espelhado no SQLite\x1b[0m  \x1b[90msource=${result.sqliteSnapshot.source} · projections=${counts.projections} · evidences=${counts.evidences} · routeOptions=${counts.routeOptions} · overlays=${counts.accountOverlays} · eligibility=${counts.modelEligibilityDecisions}\x1b[0m`,
+    );
+    println(
+        `    \x1b[90mproviders=${counts.providerProjections} · providerEvidence=${counts.providerEvidences} · rawRefs=${counts.rawPayloadRefs} · conflicts=${counts.conflicts} · importRuns=${counts.importRuns}\x1b[0m`,
+    );
+    println(
+        '    \x1b[90mJSON permanece como export/debug; SQLite agora materializa as camadas normalizadas para consultas futuras.\x1b[0m\n',
+    );
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {{ sqlite?: boolean }} [options]
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayCatalogOpenAISchema(println, options = {}) {
+    const useSqlite = options.sqlite === true;
+    const jsonStore = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const snapshot = useSqlite ? null : await jsonStore.readSnapshot();
+    const openaiList = useSqlite
+        ? await new SqliteModelGatewayCatalogStore().readOpenAIModelCatalogList()
+        : toOpenAIModelCatalogList(snapshot?.projections ?? [], {
+              providerProjections: snapshot?.providerProjections ?? [],
+              eligibilityDecisions: snapshot?.modelEligibilityDecisions ?? [],
+          });
+    println(`\n  \x1b[36mBYOK model-gateway OpenAI schema\x1b[0m`);
+    println(
+        `  \x1b[90mfonte=${useSqlite ? 'sqlite' : 'json'} · object=${openaiList.object} · models=${openaiList.data.length} · extensão=x_model_gateway\x1b[0m\n`,
+    );
+    for (const model of openaiList.data.slice(0, 12)) {
+        const gateway = asRecord(model.x_model_gateway);
+        const providerId = optionalScalarString(gateway['provider_id']) ?? '-';
+        const providerModel = optionalScalarString(gateway['provider_model']) ?? model.id;
+        const eligibility = asRecord(gateway['eligibility']);
+        const eligibilityStatus = optionalScalarString(eligibility['status']) ?? '-';
+        println(
+            `    \x1b[33m${model.id}\x1b[0m  \x1b[90mprovider=${providerId} · providerModel=${providerModel} · eligibility=${eligibilityStatus}\x1b[0m`,
+        );
+    }
+    if (openaiList.data.length > 12) {
+        println(`\n  \x1b[90mexibindo 12/${openaiList.data.length}; use JSON/SQLite store para export completo.\x1b[0m`);
     }
     println('');
 }
@@ -2348,6 +2413,22 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         }
         if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(conflicts|conflitos)$/iu.test(rest[1] ?? '')) {
             await renderByokGatewayCatalogConflicts(println);
+            return;
+        }
+        if (
+            /^(catalog|catalogo)$/iu.test(rest[0] ?? '') &&
+            /^(sqlite|sql|mirror|migrate|migrar|sync-sqlite)$/iu.test(rest[1] ?? '')
+        ) {
+            await renderByokGatewayCatalogSqliteMirror(println);
+            return;
+        }
+        if (
+            /^(catalog|catalogo)$/iu.test(rest[0] ?? '') &&
+            /^(openai|schema|export|models-list)$/iu.test(rest[1] ?? '')
+        ) {
+            await renderByokGatewayCatalogOpenAISchema(println, {
+                sqlite: rest.slice(2).some((item) => /^(sqlite|sql)$/iu.test(item)),
+            });
             return;
         }
         if (/^(eligibility|elegibilidade|eligible|exclusion|exclusao|exclusão)$/iu.test(rest[0] ?? '')) {

@@ -119,3 +119,7 @@ export {
     MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,
     MODEL_GATEWAY_SQLITE_TABLES,
 } from './sqlite-schema.js';
+export {
+    mirrorModelGatewayCatalogSnapshotToSqlite,
+    summarizeModelGatewayCatalogSnapshot,
+} from './sqlite-migration.js';

@@ -513,7 +513,7 @@ Se a tarefa não exige imagem, vision é no máximo bônus ou superfície a vali
 - [ ] UX de explicação por modelo juntando catálogo, overlay, eligibility e
   probes.
 - [ ] Busca rica por metadados.
-- [ ] Export OpenAI schema visível.
+- [x] Export OpenAI schema visível via `/byok gateway catalog openai`.
 
 ### 5.11 Observabilidade
 
@@ -1377,7 +1377,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [ ] `/byok gateway overlays`.
 - [x] `/byok gateway eligibility`.
 - [ ] `/byok gateway routes`.
-- [ ] Export OpenAI schema por comando.
+- [x] Export OpenAI schema por comando.
 
 ### Faixa I — Observabilidade
 
@@ -1498,7 +1498,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [ ] Explain por provider.
 - [ ] Mostrar route options.
 - [ ] Mostrar overlays.
-- [ ] Mostrar projection OpenAI.
+- [x] Mostrar projection OpenAI.
 - [ ] Mostrar conflito por campo.
 - [ ] Mostrar freshness por source.
 
@@ -1530,13 +1530,13 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Definir schema SQLite.
 - [x] Criar migrations.
 - [x] Criar `SqliteModelGatewayCatalogStore`.
-- [ ] Migrar JSON snapshot para SQLite.
+- [x] Migrar JSON snapshot para SQLite por mirror explícito.
 - [x] Manter export JSON para debug.
 - [x] Testar redaction.
 - [x] Testar idempotência.
 - [ ] Testar downgrade/unknown schema.
 - [x] Criar índices por provider/model/route/account.
-- [ ] Criar views OpenAI schema.
+- [x] Criar views OpenAI schema.
 - [x] Preparar snapshot JSON com `modelEligibilityRuns` e
   `modelEligibilityDecisions`, mantendo a futura migração SQLite separável.
 
@@ -1821,6 +1821,14 @@ Implementado neste corte:
 - [x] Adicionados testes que executam o schema em SQLite in-memory.
 - [x] Adicionado store `SqliteModelGatewayCatalogStore` com round-trip redacted
   e idempotente do snapshot atual.
+- [x] Criada ponte `mirrorModelGatewayCatalogSnapshotToSqlite()` para materializar
+  o snapshot JSON atual no SQLite sem apagar o JSON.
+- [x] Exposto `/byok gateway catalog sqlite` como comando sem rede para executar
+  o mirror e mostrar contagens.
+- [x] Criada view OpenAI schema a partir do SQLite via
+  `SqliteModelGatewayCatalogStore.readOpenAIModelCatalogList()`.
+- [x] Exposto `/byok gateway catalog openai [sqlite]` para inspecionar a lista
+  OpenAI-compatible com extensão `x_model_gateway`.
 - [x] Adicionados testes de migrations gerais criando as tabelas do
   model-gateway.
 
@@ -1834,19 +1842,19 @@ Separação arquitetural reafirmada:
 
 Validação deste corte:
 
-- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/test_copilot_db.spec.js`
-  com `119` testes.
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `82` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS `npm run lint:copilot`.
 - [x] PASS `git diff --check`.
-- [x] PASS `npm run test:copilot` com `5658` testes totais, `5625` passed,
+- [x] PASS `npm run test:copilot` com `5659` testes totais, `5626` passed,
   `33` pending, `0` failed e `0` warnings/errors.
 
 Próxima direção:
 
 - [x] Criar `SqliteModelGatewayCatalogStore` lendo/escrevendo esse schema sem
   remover o JSON store de debug.
-- [ ] Criar migração de snapshot JSON para SQLite com redaction preservada.
-- [ ] Criar views/projeções OpenAI schema sobre o store SQLite.
+- [x] Criar migração de snapshot JSON para SQLite com redaction preservada.
+- [x] Criar views/projeções OpenAI schema sobre o store SQLite.
 - [ ] Criar explain por modelo combinando projection, route options, overlays,
   eligibility, health e probes.

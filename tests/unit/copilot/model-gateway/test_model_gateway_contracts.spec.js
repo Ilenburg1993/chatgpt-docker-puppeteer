@@ -49,6 +49,7 @@ import {
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
     listModelGatewayRouteDecisions,
+    mirrorModelGatewayCatalogSnapshotToSqlite,
     recordModelGatewayRouteDecision,
     resolveModelGatewayProviderAdapter,
     resolveProviderEndpointInventory,
@@ -123,6 +124,7 @@ import {
     runConfiguredByokStreamingProbe,
     runConfiguredByokVisionProbe,
     scoreGatewayModelCandidate,
+    summarizeModelGatewayCatalogSnapshot,
     summarizeCanonicalModelProjectionDiff,
     toOpenAIModelCatalogEntry,
     toOpenAIModelCatalogList,
@@ -1372,6 +1374,7 @@ describe('model-gateway foundation', () => {
             await store.writeSnapshot(snapshot);
             await store.writeSnapshot(snapshot);
             const loaded = await store.readSnapshot();
+            const openai = await store.readOpenAIModelCatalogList();
             const serializedRows = /** @type {{ payload: string | null } | undefined} */ (
                 db.prepare(
                     `
@@ -1395,10 +1398,69 @@ describe('model-gateway foundation', () => {
             assert.equal(loaded.projections.length, 1);
             assert.equal(loaded.modelEligibilityRuns.length, 1);
             assert.equal(loaded.modelEligibilityDecisions.length, 1);
+            assert.equal(openai.object, 'list');
+            assert.equal(openai.data.length, 1);
+            assert.equal(openai.data[0].x_model_gateway.eligibility.status, 'eligible');
             assert.equal(JSON.stringify(loaded).includes('sk-secret-that-must-not-leak'), false);
             assert.equal(JSON.stringify(serializedRows).includes('secret-token-that-must-not-leak'), false);
         } finally {
             db.close();
+        }
+    });
+
+    it('mirrors the debug JSON catalog snapshot into SQLite without changing the source snapshot', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-model-sqlite-mirror-'));
+        const db = new Database(':memory:');
+        try {
+            const filePath = join(dir, 'catalog.json');
+            const jsonStore = new JsonModelGatewayCatalogStore({ filePath });
+            const sqliteStore = new SqliteModelGatewayCatalogStore({ db });
+            const projection = createCanonicalModelProjection({
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                capabilities: { tools: true, streaming: true },
+            });
+            const route = createModelRouteOption({
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                selectorKind: 'provider_model',
+                selectorSyntax: 'openai/gpt-oss-120b',
+                normalizedPolicy: { routeLayer: 'gateway', wireApi: 'openai_chat_completions' },
+            });
+
+            await jsonStore.writeSnapshot({
+                source: 'json-source',
+                projections: [projection],
+                routeOptions: [route],
+                modelEligibilityDecisions: [
+                    createModelEligibilityDecision({
+                        providerId: 'openrouter',
+                        providerModel: 'openai/gpt-oss-120b',
+                        include: true,
+                        reasons: ['account_overlay_available'],
+                    }),
+                ],
+            });
+
+            const mirrored = await mirrorModelGatewayCatalogSnapshotToSqlite({
+                sourceStore: jsonStore,
+                sqliteStore,
+            });
+            const jsonAfter = await jsonStore.readSnapshot();
+            const sqliteSummary = summarizeModelGatewayCatalogSnapshot(mirrored.sqliteSnapshot);
+
+            assert.equal(mirrored.sourceSnapshot.source, 'json-source');
+            assert.equal(mirrored.sqliteSnapshot.source, 'json-source');
+            assert.deepEqual(mirrored.sourceCounts, mirrored.sqliteCounts);
+            assert.equal(sqliteSummary.projections, 1);
+            assert.equal(sqliteSummary.routeOptions, 1);
+            assert.equal(sqliteSummary.modelEligibilityDecisions, 1);
+            assert.equal(jsonAfter.projections.length, 1);
+            assert.equal(jsonAfter.routeOptions.length, 1);
+        } finally {
+            db.close();
+            await rm(dir, { recursive: true, force: true });
         }
     });
 

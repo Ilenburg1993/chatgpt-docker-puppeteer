@@ -13,6 +13,7 @@ import Database from 'better-sqlite3';
 import { getCopilotDb } from '../../db/sqlite.js';
 import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
+import { toOpenAIModelCatalogList } from './openai-schema.js';
 import { MODEL_GATEWAY_SQLITE_SCHEMA_SQL } from './sqlite-schema.js';
 
 const ACTIVE_SNAPSHOT_ID = 'active';
@@ -231,6 +232,17 @@ export class SqliteModelGatewayCatalogStore {
                 'copilot_model_gateway_eligibility_decisions',
                 'decision_key',
             ),
+        });
+    }
+
+    /**
+     * @returns {Promise<ReturnType<typeof toOpenAIModelCatalogList>>}
+     */
+    async readOpenAIModelCatalogList() {
+        const snapshot = await this.readSnapshot();
+        return toOpenAIModelCatalogList(snapshot.projections, {
+            providerProjections: snapshot.providerProjections,
+            eligibilityDecisions: snapshot.modelEligibilityDecisions,
         });
     }
 
