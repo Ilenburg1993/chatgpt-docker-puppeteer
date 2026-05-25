@@ -506,9 +506,11 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Implementar precedência por campo: manual > probe > authenticated catalog > official docs > aggregator >
   static_seed > heuristic.
 - [x] Criar testes que provem que fonte mais pobre e mais recente não apaga metadata rica de fonte anterior.
-- [ ] Criar teste de regressão para nunca serializar segredo no catalog DB, snapshot ou evento.
-- [ ] Criar store inicial redigido e storage-neutral antes do SQLite, para validar contrato, migração e diffs sem decidir
+- [x] Criar teste de regressão para nunca serializar segredo no snapshot JSON inicial de catálogo.
+- [ ] Criar teste de regressão para nunca serializar segredo no catalog DB ou evento.
+- [x] Criar store inicial redigido e storage-neutral antes do SQLite, para validar contrato, migração e diffs sem decidir
   prematuramente o backend permanente.
+- [x] Persistir import runs e raw payload refs sanitizados no snapshot JSON inicial.
 
 ### Faixa L — Importers de catálogos oficiais e agregadores
 
@@ -1054,3 +1056,41 @@ Decisão de roadmap:
 - O próximo avanço de K deve criar um store inicial redigido/storage-neutral antes de SQLite. Isso reduz risco: primeiro
   validamos serialização, redaction, import runs, raw refs, diffs e merge em arquivo simples; depois migramos a mesma
   interface para SQLite sem trocar contrato.
+
+## 16. Continuidade 2026-05-25 — store JSON redigido do catálogo
+
+Implementado neste corte:
+
+- Criado `src/copilot/model-gateway/catalog/json-catalog-store.js`.
+- Exportados pelo barrel de catálogo e pelo barrel raiz:
+  - `DEFAULT_MODEL_GATEWAY_CATALOG_PATH`;
+  - `JsonModelGatewayCatalogStore`;
+  - `normalizeStoredCatalogSnapshot()`.
+- O store grava snapshot versionado em `data/copilot/model-gateway/catalog.json` por padrão, com os arrays canônicos
+  `sources`, `evidences`, `routeOptions`, `accountOverlays`, `projections`, `importRuns`, `rawPayloadRefs` e
+  `conflicts`.
+- A normalização rejeita schema version incompatível e sempre devolve shape completo, reduzindo risco para importers e
+  migração futura para SQLite.
+- A sanitização do store usa chaves sensíveis exatas (`authorization`, `apiKey`, `secret`, `token`, bearer/access token)
+  e redação de texto, preservando metadados legítimos com nomes como `contextWindowTokens`.
+- O teste de regressão cobre persistência de source/evidence/projection/raw ref/import run, ausência de segredo no
+  arquivo bruto e preservação de `limits.contextWindowTokens`.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`35` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5607` testes, `0` falhas, `warnings/errors unique=0 total=0`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T14-47-41-535Z/summary.md`).
+
+Decisão de roadmap:
+
+- O JSON store fecha a primeira persistência storage-neutral da Faixa K sem congelar backend. A próxima etapa robusta
+  deve ser escolher entre dois caminhos complementares:
+  1. criar importers dry-run por provider que escrevam este snapshot;
+  2. criar o store SQLite com a mesma semântica e migrar o teste secret-safe para DB.
+- `registry.json` continua snapshot operacional legado; o catálogo JSON/SQLite passa a ser a camada de fatos,
+  evidências e runs. Nenhum importer deve escrever segredo bruto em projection, raw payload ou run.

@@ -19,4 +19,9 @@ export {
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
 } from './import-runs.js';
+export {
+    DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
+    JsonModelGatewayCatalogStore,
+    normalizeStoredCatalogSnapshot,
+} from './json-catalog-store.js';
 export { mergeModelMetadataEvidence, rankCatalogEvidenceConfidence } from './merge.js';

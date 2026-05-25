@@ -57,6 +57,7 @@ import {
     BYOK_AGENT_PROBE_TOOL,
     BYOK_VISION_PROBE_DISPLAY_NAME,
     BYOK_VISION_PROBE_MIME_TYPE,
+    JsonModelGatewayCatalogStore,
     createCanonicalModelProjection,
     createCatalogImportRun,
     createModelMetadataEvidence,
@@ -649,6 +650,70 @@ describe('model-gateway foundation', () => {
             },
         ]);
         assert.equal(JSON.stringify({ rawRef, run }).includes('sk-secret-that-must-not-leak'), false);
+    });
+
+    it('persists a redacted JSON catalog snapshot before the SQLite store', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-model-catalog-'));
+        try {
+            const filePath = join(dir, 'catalog.json');
+            const source = createProviderCatalogSource({
+                id: 'openrouter-models',
+                providerId: 'openrouter',
+                kind: 'public_api',
+                url: 'https://openrouter.ai/api/v1/models',
+            });
+            const rawRef = createSanitizedRawPayloadRef({
+                providerId: 'openrouter',
+                sourceId: source.id,
+                payload: { Authorization: 'Bearer sk-secret-that-must-not-leak', data: [{ id: 'm' }] },
+            });
+            const evidence = createModelMetadataEvidence({
+                evidenceId: 'ev-price',
+                providerId: 'openrouter',
+                providerModel: 'm',
+                fieldPath: 'pricing.inputUsdPerMillion',
+                value: 0,
+                sourceId: source.id,
+                rawPayloadRef: rawRef.rawPayloadRef,
+            });
+            const projection = createCanonicalModelProjection({
+                providerId: 'openrouter',
+                providerModel: 'm',
+                limits: { contextWindowTokens: 131072 },
+                pricing: { inputUsdPerMillion: 0 },
+            });
+            const store = new JsonModelGatewayCatalogStore({ filePath });
+
+            await store.writeSnapshot({
+                source: 'unit-test',
+                sources: [source],
+                evidences: [evidence],
+                projections: [projection],
+                rawPayloadRefs: [rawRef],
+                importRuns: [
+                    createCatalogImportRun({
+                        runId: 'run-1',
+                        providerId: 'openrouter',
+                        sourceId: source.id,
+                        rowCount: 1,
+                        errors: ['sk-secret-that-must-not-leak'],
+                    }),
+                ],
+            });
+            const raw = await readFile(filePath, 'utf8');
+            const loaded = await store.readSnapshot();
+
+            assert.equal(raw.includes('sk-secret-that-must-not-leak'), false);
+            assert.equal(loaded.source, 'unit-test');
+            assert.equal(loaded.sources.length, 1);
+            assert.equal(loaded.evidences.length, 1);
+            assert.equal(loaded.projections.length, 1);
+            assert.equal(loaded.projections[0].limits.contextWindowTokens, 131072);
+            assert.equal(loaded.rawPayloadRefs.length, 1);
+            assert.equal(loaded.importRuns.length, 1);
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {

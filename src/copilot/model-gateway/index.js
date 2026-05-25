@@ -11,6 +11,8 @@
 export {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
     MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+    DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
+    JsonModelGatewayCatalogStore,
     createCanonicalModelProjection,
     createCatalogImportRun,
     createModelMetadataEvidence,
@@ -20,6 +22,7 @@ export {
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
     mergeModelMetadataEvidence,
+    normalizeStoredCatalogSnapshot,
     rankCatalogEvidenceConfidence,
 } from './catalog/index.js';
 export {
