@@ -26,6 +26,7 @@ import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
  * @property {() => Promise<unknown> | unknown} fetchRaw
  * @property {(raw: unknown) => Promise<unknown[]> | unknown[]} parseRows
  * @property {(rows: unknown[], context: { source: Record<string, any>; rawPayloadRef: string }) => Promise<Record<string, any>[]> | Record<string, any>[]} toEvidenceFacts
+ * @property {(rows: unknown[], context: { source: Record<string, any>; rawPayloadRef: string }) => Promise<Record<string, any>[]> | Record<string, any>[]} [toProviderEvidenceFacts]
  * @property {(rows: unknown[], context: { source: Record<string, any>; rawPayloadRef: string }) => Promise<Record<string, any>[]> | Record<string, any>[]} [toAccountOverlays]
  */
 
@@ -128,6 +129,8 @@ export async function runCatalogImporters(input = {}) {
         /** @type {Record<string, any>[]} */
         let rawPayloadRefs = [];
         /** @type {Record<string, any>[]} */
+        let providerEvidences = [];
+        /** @type {Record<string, any>[]} */
         let evidences = [];
         /** @type {Record<string, any>[]} */
         let accountOverlays = [];
@@ -143,6 +146,7 @@ export async function runCatalogImporters(input = {}) {
             });
             const rows = await importer.parseRows(raw);
             const context = { source, rawPayloadRef: rawRef.rawPayloadRef };
+            providerEvidences = importer.toProviderEvidenceFacts ? await importer.toProviderEvidenceFacts(rows, context) : [];
             evidences = await importer.toEvidenceFacts(rows, context);
             accountOverlays = importer.toAccountOverlays ? await importer.toAccountOverlays(rows, context) : [];
             rawPayloadRefs = [rawRef];
@@ -171,6 +175,11 @@ export async function runCatalogImporters(input = {}) {
         snapshot = {
             ...snapshot,
             sources: upsertMany(snapshot.sources, [source], (item) => String(item['id'])),
+            providerEvidences: upsertMany(
+                snapshot.providerEvidences,
+                providerEvidences,
+                (item) => String(item['evidenceId'] ?? JSON.stringify(item)),
+            ),
             evidences: upsertMany(snapshot.evidences, evidences, (item) => String(item['evidenceId'] ?? JSON.stringify(item))),
             accountOverlays: upsertMany(snapshot.accountOverlays, accountOverlays, accountOverlayKey),
             rawPayloadRefs: upsertMany(snapshot.rawPayloadRefs, rawPayloadRefs, (item) => String(item['rawPayloadRef'])),

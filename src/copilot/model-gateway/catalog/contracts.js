@@ -165,6 +165,49 @@ export function createModelMetadataEvidence(input) {
 
 /**
  * @param {object} input
+ * @param {string} input.evidenceId
+ * @param {string} input.providerId
+ * @param {string} input.subjectProviderId
+ * @param {string} input.fieldPath
+ * @param {unknown} input.value
+ * @param {unknown} [input.normalizedValue]
+ * @param {string} input.sourceId
+ * @param {string} [input.sourceKind]
+ * @param {string} [input.confidence]
+ * @param {string | number | Date} [input.observedAt]
+ * @param {string | number | Date | null} [input.expiresAt]
+ * @param {string} [input.rawPayloadRef]
+ * @returns {object}
+ */
+export function createProviderMetadataEvidence(input) {
+    const evidenceId = optionalString(input.evidenceId);
+    const subjectProviderId = optionalString(input.subjectProviderId);
+    const fieldPath = optionalString(input.fieldPath);
+    const sourceId = optionalString(input.sourceId);
+    if (!evidenceId) throw new Error('[model-gateway/catalog] provider evidenceId is required');
+    if (!subjectProviderId) throw new Error('[model-gateway/catalog] subjectProviderId is required');
+    if (!fieldPath) throw new Error('[model-gateway/catalog] provider fieldPath is required');
+    if (!sourceId) throw new Error('[model-gateway/catalog] provider sourceId is required');
+    return {
+        schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+        evidenceId,
+        providerId: normalizeProviderId(input.providerId),
+        subjectProviderId: normalizeProviderId(subjectProviderId),
+        fieldPath,
+        value: sanitizeJsonValue(input.value),
+        normalizedValue: sanitizeJsonValue(input.normalizedValue ?? input.value),
+        sourceId,
+        sourceKind: optionalString(input.sourceKind) ?? 'unknown',
+        confidence: optionalString(input.confidence) ?? MODEL_GATEWAY_CATALOG_CONFIDENCE.UNKNOWN,
+        observedAt: normalizeIsoDate(input.observedAt) ?? new Date().toISOString(),
+        expiresAt: normalizeIsoDate(input.expiresAt),
+        rawPayloadRef: optionalString(input.rawPayloadRef),
+        redactionStatus: 'sanitized',
+    };
+}
+
+/**
+ * @param {object} input
  * @param {string} input.providerId
  * @param {string} input.providerModel
  * @param {string} [input.routeProfile]

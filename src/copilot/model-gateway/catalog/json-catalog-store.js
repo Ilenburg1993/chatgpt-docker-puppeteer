@@ -24,6 +24,7 @@ export const DEFAULT_MODEL_GATEWAY_CATALOG_PATH = join(
 
 const CATALOG_ARRAY_FIELDS = Object.freeze([
     'sources',
+    'providerEvidences',
     'evidences',
     'routeOptions',
     'accountOverlays',
@@ -85,6 +86,7 @@ function readRecordArray(value) {
  *     generatedAt: string | null;
  *     source: string;
  *     sources: Record<string, any>[];
+ *     providerEvidences: Record<string, any>[];
  *     evidences: Record<string, any>[];
  *     routeOptions: Record<string, any>[];
  *     accountOverlays: Record<string, any>[];
@@ -100,6 +102,7 @@ export function normalizeStoredCatalogSnapshot(snapshot) {
         generatedAt: null,
         source: 'empty',
         sources: [],
+        providerEvidences: [],
         evidences: [],
         routeOptions: [],
         accountOverlays: [],
@@ -114,6 +117,7 @@ export function normalizeStoredCatalogSnapshot(snapshot) {
         generatedAt: typeof snapshot['generatedAt'] === 'string' ? snapshot['generatedAt'] : null,
         source: typeof snapshot['source'] === 'string' ? snapshot['source'] : 'unknown',
         sources: readRecordArray(snapshot['sources']),
+        providerEvidences: readRecordArray(snapshot['providerEvidences']),
         evidences: readRecordArray(snapshot['evidences']),
         routeOptions: readRecordArray(snapshot['routeOptions']),
         accountOverlays: readRecordArray(snapshot['accountOverlays']),

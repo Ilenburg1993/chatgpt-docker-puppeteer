@@ -539,7 +539,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] Implementar `CloudflareWorkersAiCatalogImporter` para unified catalog/Workers AI docs.
 - [x] Implementar `KiloGatewayCatalogImporter` para `https://api.kilo.ai/api/gateway/models`, capturando ids
   `provider/model`, provider upstream, pricing, context window, features, rotas gratuitas e endpoints auxiliares.
-- [ ] Implementar `KiloGatewayProvidersImporter` para `/providers` quando disponível, preservando provider upstream e
+- [x] Implementar `KiloGatewayProvidersImporter` para `/providers` quando disponível, preservando provider upstream e
   diferença entre Kilo Gateway, Kilo Code e providers BYOK internos.
 - [ ] Implementar `CerebrasModelsImporter` para `/v1/models` + catálogo público.
 - [ ] Implementar `NvidiaNimCatalogImporter` para docs/API catalog quando disponível.
@@ -1671,3 +1671,49 @@ Próxima direção:
 
 - Implementar `KiloGatewayProvidersImporter` para `/providers` e criar o primeiro contrato de metadata de
   provider/gateway, sem forçar tudo dentro de evidence por modelo.
+
+## 30. Continuidade 2026-05-25 — provider metadata evidence e Kilo `/providers`
+
+Implementado neste corte:
+
+- Novo contrato `createProviderMetadataEvidence()` para fatos de provider/gateway que não pertencem a um modelo
+  específico.
+- O snapshot JSON ganhou `providerEvidences`, preservado pelo store com a mesma sanitização/redaction das outras
+  coleções.
+- `CatalogImporter` agora pode retornar `toProviderEvidenceFacts(rows, context)`, além de model evidences e
+  account overlays.
+- Novo `KiloGatewayProvidersImporter` para `https://api.kilo.ai/api/gateway/providers`:
+  - preserva `displayName`;
+  - preserva `providerMetadata.kilo.name`;
+  - preserva `providerMetadata.kilo.slug`;
+  - preserva `providerMetadata.kilo.headquarters`;
+  - preserva `providerMetadata.kilo.datacenters`;
+  - preserva `providerMetadata.kilo.iconUrl`;
+  - normaliza `dataPolicy.training`, `dataPolicy.retainsPrompts` e `dataPolicy.canPublish`.
+- Os importers padrão agora incluem:
+  - OpenRouter `/models`;
+  - Kilo `/models`;
+  - Kilo `/providers`;
+  - OpenAI `/v1/models` quando houver key.
+
+Separação arquitetural reafirmada:
+
+- `providerEvidences` descrevem providers upstream e políticas compartilhadas.
+- `evidences` continuam descrevendo modelos/rotas.
+- `accountOverlays` continuam descrevendo conta/key/plano.
+- `runtime probes` continuam sendo a única fonte de prova de execução real.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`47` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5620` testes totais, `5587` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T16-15-51-069Z/summary.md`).
+
+Próxima direção:
+
+- Avançar o contrato de providers/gateways para projeção consolidada e uso na normalização OpenAI
+  `x_model_gateway`, sem bloquear a etapa runtime.

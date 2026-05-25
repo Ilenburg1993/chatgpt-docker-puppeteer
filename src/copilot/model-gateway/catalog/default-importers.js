@@ -10,6 +10,7 @@
 
 import {
     createKiloGatewayModelsImporter,
+    createKiloGatewayProvidersImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
 } from './importers/index.js';
@@ -42,6 +43,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
         importers.push(
             createOpenRouterModelsImporter({ fetchImpl: options.fetchImpl }),
             createKiloGatewayModelsImporter({ fetchImpl: options.fetchImpl }),
+            createKiloGatewayProvidersImporter({ fetchImpl: options.fetchImpl }),
         );
     }
     const openAiSecret = readOpenAiSecret(env);

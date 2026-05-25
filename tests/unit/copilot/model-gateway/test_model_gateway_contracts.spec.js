@@ -64,10 +64,12 @@ import {
     createCatalogImportRun,
     createDefaultModelGatewayCatalogImporters,
     createKiloGatewayModelsImporter,
+    createKiloGatewayProvidersImporter,
     createModelMetadataEvidence,
     createModelRouteOption,
     createProviderAccountOverlay,
     createProviderCatalogSource,
+    createProviderMetadataEvidence,
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
     mergeModelMetadataEvidence,
@@ -526,6 +528,17 @@ describe('model-gateway foundation', () => {
             confidence: 'catalog',
             observedAt: '2026-05-25T00:00:00.000Z',
         });
+        const providerEvidence = createProviderMetadataEvidence({
+            evidenceId: 'provider-ev-1',
+            providerId: 'kilo',
+            subjectProviderId: 'anthropic',
+            fieldPath: 'dataPolicy.retainsPrompts',
+            value: { retainsPrompts: false, token: 'secret-token-that-must-not-leak' },
+            sourceId: source.id,
+            sourceKind: source.kind,
+            confidence: 'catalog',
+            observedAt: '2026-05-25T00:00:00.000Z',
+        });
         const route = createModelRouteOption({
             providerId: 'kilo',
             providerModel: 'anthropic/claude-sonnet-4.5',
@@ -552,10 +565,12 @@ describe('model-gateway foundation', () => {
 
         assert.equal(source.providerId, 'kilo');
         assert.equal(evidence.redactionStatus, 'sanitized');
+        assert.equal(providerEvidence.subjectProviderId, 'anthropic');
+        assert.equal(providerEvidence.redactionStatus, 'sanitized');
         assert.equal(route.selectorKind, 'gateway_auto');
         assert.equal(overlay.redactionStatus, 'sanitized');
         assert.deepEqual(projection.modalities, { input: ['text'], output: ['text'] });
-        const serialized = JSON.stringify({ evidence, route, overlay, projection });
+        const serialized = JSON.stringify({ evidence, providerEvidence, route, overlay, projection });
         assert.equal(serialized.includes('sk-secret-that-must-not-leak'), false);
         assert.equal(serialized.includes('secret-token-that-must-not-leak'), false);
     });
@@ -989,6 +1004,48 @@ describe('model-gateway foundation', () => {
         });
     });
 
+    it('extracts Kilo Gateway provider metadata separately from model evidence', async () => {
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async () =>
+                /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => [
+                        {
+                            name: 'Arcee AI',
+                            displayName: 'Arcee AI',
+                            slug: 'arcee-ai',
+                            dataPolicy: {
+                                training: false,
+                                retainsPrompts: false,
+                                canPublish: false,
+                            },
+                            headquarters: 'US',
+                            datacenters: ['US'],
+                            icon: {
+                                url: 'https://example.test/arcee.png',
+                            },
+                        },
+                    ],
+                })
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createKiloGatewayProvidersImporter({ fetchImpl: fakeFetch })],
+            now: () => new Date('2026-05-25T12:35:00.000Z'),
+        });
+        const byPath = new Map(snapshot.providerEvidences.map((item) => [item.fieldPath, item.value]));
+
+        assert.equal(snapshot.sources[0].url, 'https://api.kilo.ai/api/gateway/providers');
+        assert.equal(snapshot.evidences.length, 0);
+        assert.equal(snapshot.providerEvidences.length, 9);
+        assert.equal(snapshot.providerEvidences[0].subjectProviderId, 'arcee-ai');
+        assert.equal(byPath.get('displayName'), 'Arcee AI');
+        assert.equal(byPath.get('dataPolicy.training'), false);
+        assert.equal(byPath.get('dataPolicy.retainsPrompts'), false);
+        assert.deepEqual(byPath.get('providerMetadata.kilo.datacenters'), ['US']);
+        assert.equal(byPath.get('providerMetadata.kilo.iconUrl'), 'https://example.test/arcee.png');
+    });
+
     it('extracts account-scoped OpenAI model identity without serializing the API key', async () => {
         const secret = 'sk-openai-secret-that-must-not-leak';
         /** @type {string | null} */
@@ -1292,11 +1349,11 @@ describe('model-gateway foundation', () => {
 
         assert.deepEqual(
             importers.map((importer) => importer.id),
-            ['openrouter-models', 'kilo-gateway-models', 'openai-models'],
+            ['openrouter-models', 'kilo-gateway-models', 'kilo-gateway-providers', 'openai-models'],
         );
         assert.deepEqual(
             publicOnly.map((importer) => importer.id),
-            ['openrouter-models', 'kilo-gateway-models'],
+            ['openrouter-models', 'kilo-gateway-models', 'kilo-gateway-providers'],
         );
         assert.equal(JSON.stringify(importers).includes(secret), false);
     });

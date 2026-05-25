@@ -13,6 +13,7 @@ export {
     createModelRouteOption,
     createProviderAccountOverlay,
     createProviderCatalogSource,
+    createProviderMetadataEvidence,
 } from './contracts.js';
 export { createDefaultModelGatewayCatalogImporters } from './default-importers.js';
 export {
@@ -22,9 +23,11 @@ export {
 } from './import-runs.js';
 export {
     KILO_GATEWAY_MODELS_CATALOG_URL,
+    KILO_GATEWAY_PROVIDERS_CATALOG_URL,
     OPENAI_MODELS_CATALOG_URL,
     OPENROUTER_MODELS_CATALOG_URL,
     createKiloGatewayModelsImporter,
+    createKiloGatewayProvidersImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
 } from './importers/index.js';
