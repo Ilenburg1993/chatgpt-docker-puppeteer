@@ -162,6 +162,7 @@ export {
     runConfiguredByokJsonProbe,
     runConfiguredByokStreamingProbe,
     runConfiguredByokVisionProbe,
+    recommendCatalogDiffProbes,
 } from './probes/index.js';
 export {
     MODEL_GATEWAY_CATALOG_CONFLICT_DETECTED,

@@ -88,6 +88,7 @@ import {
     normalizeOpenAICompatibleModelCapabilities,
     normalizeUsdPricing,
     rankCatalogEvidenceConfidence,
+    recommendCatalogDiffProbes,
     refreshModelGatewayCatalog,
     runCatalogImporters,
     runConfiguredByokAgentProbe,
@@ -915,6 +916,57 @@ describe('model-gateway foundation', () => {
                 pricing_changed: 1,
             },
         });
+    });
+
+    it('recommends explicit runtime probes from high-value catalog diffs without executing them', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            capabilities: {
+                tools: true,
+                streaming: true,
+                jsonMode: true,
+                vision: true,
+                reasoningEffort: true,
+            },
+            modalities: { input: ['text', 'image'], output: ['text'] },
+            limits: { contextWindowTokens: 131072, maxOutputTokens: 8192 },
+        });
+        const recommendations = recommendCatalogDiffProbes({
+            projections: [projection],
+            diff: {
+                added: ['openrouter:openai/gpt-oss-120b:default'],
+                changed: [],
+            },
+        });
+
+        assert.deepEqual(recommendations, [
+            {
+                key: 'openrouter:openai/gpt-oss-120b:default',
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                routeProfile: 'default',
+                priority: 'high',
+                probeKinds: ['chat', 'streaming', 'json', 'agent', 'vision'],
+                reasons: [
+                    'agentic_capability',
+                    'structured_output_capability',
+                    'streaming_capability',
+                    'vision_capability',
+                    'reasoning_capability',
+                    'large_context',
+                    'large_output',
+                    'new_model',
+                ],
+                commands: [
+                    '/byok probe chat model:openai/gpt-oss-120b',
+                    '/byok probe streaming model:openai/gpt-oss-120b',
+                    '/byok probe json model:openai/gpt-oss-120b',
+                    '/byok probe agent model:openai/gpt-oss-120b',
+                    '/byok probe vision model:openai/gpt-oss-120b',
+                ],
+            },
+        ]);
     });
 
     it('persists a redacted JSON catalog snapshot before the SQLite store', async () => {

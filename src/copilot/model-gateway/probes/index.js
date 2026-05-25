@@ -24,3 +24,4 @@ export {
     BYOK_VISION_PROBE_MIME_TYPE,
     runConfiguredByokVisionProbe,
 } from './vision-probe.js';
+export { recommendCatalogDiffProbes } from './recommendations.js';

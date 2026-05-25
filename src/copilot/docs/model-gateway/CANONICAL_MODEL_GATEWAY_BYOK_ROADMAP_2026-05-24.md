@@ -646,7 +646,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   - `model_gateway:catalog:model_changed`;
   - `model_gateway:catalog:model_removed`;
   - `model_gateway:catalog:conflict_detected`.
-- [ ] Sugerir probes automaticamente para modelos novos de alto valor ou com capability agentic provável.
+- [x] Sugerir probes automaticamente para modelos novos de alto valor ou com capability agentic provável.
 - [ ] Nunca trocar modelo ativo automaticamente por causa de catálogo novo; gerar recomendação auditável.
 
 ### Faixa P — UX de exploração do catálogo universal
@@ -2172,3 +2172,46 @@ Validação deste corte até agora:
 Próxima direção:
 
 - Commitar/pushar e avançar para UX de diff dedicada ou seleção de probes recomendadas por diff.
+
+## 41. Continuidade 2026-05-25 — recomendações de probes derivadas do diff
+
+Implementado neste corte:
+
+- Novo `recommendCatalogDiffProbes()` em `model-gateway/probes/recommendations.js`.
+- A função recebe somente `diff` + `projections` e retorna recomendações explícitas:
+  - `key`;
+  - `providerId`;
+  - `providerModel`;
+  - `routeProfile`;
+  - `priority`;
+  - `probeKinds`;
+  - `reasons`;
+  - `commands`.
+- Regras atuais:
+  - modelos novos de alto valor sugerem `chat` e probes específicas para `streaming`, `json`, `agent` e `vision`
+    quando a projeção de metadata indica essas superfícies;
+  - mudanças em capabilities/limits/modalidades também podem sugerir reprova runtime;
+  - mudanças só de preço/lifecycle não executam probes por si mesmas.
+- `/byok gateway catalog refresh` agora mostra `probe suggestions` após o diff quando houver recomendações.
+- A checkbox da Faixa O para sugestão de probes foi marcada como concluída para o contrato inicial.
+
+Separação arquitetural reafirmada:
+
+- Metadata continua sendo fase anterior.
+- `recommendCatalogDiffProbes()` não executa runtime, não chama SDK e não altera health.
+- Os comandos sugeridos apontam para `/byok probe ...`, mantendo execução explícita pelo operador.
+- Vision é tratada como superfície a validar quando metadata indicar suporte; ela não exclui automaticamente modelos.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  (`104` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5627` testes totais, `5594` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T17-28-07-810Z/summary.md`).
+
+Próxima direção:
+
+- Commitar/pushar e avançar para UX `/models catalog diff`.

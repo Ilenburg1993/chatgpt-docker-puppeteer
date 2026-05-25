@@ -27,6 +27,7 @@ import {
     listProviderEndpointInventory,
     readByokProviderHealthState,
     readByokProviderModelHealth,
+    recommendCatalogDiffProbes,
     recordByokProviderModelAgentProbeFailure,
     recordByokProviderModelAgentProbeSuccess,
     recordByokProviderModelCallFailure,
@@ -1648,6 +1649,20 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null) {
         );
         if (refreshEvents.completedEvent.changedKinds.length > 0) {
             println(`    \x1b[90mdiff kinds: ${refreshEvents.completedEvent.changedKinds.join(',')}\x1b[0m`);
+        }
+        const probeRecommendations = recommendCatalogDiffProbes({
+            diff: result.diff,
+            projections: result.snapshot.projections,
+            limit: 5,
+        });
+        if (probeRecommendations.length > 0) {
+            println(`    \x1b[90mprobe suggestions: ${probeRecommendations.length}\x1b[0m`);
+            for (const recommendation of probeRecommendations) {
+                println(
+                    `      \x1b[90m? ${recommendation.key}: ${recommendation.probeKinds.join(',')} · ${recommendation.priority} · ${recommendation.reasons.slice(0, 4).join(',')}\x1b[0m`,
+                );
+                println(`        \x1b[90m${recommendation.commands[0]}\x1b[0m`);
+            }
         }
         for (const id of result.diff.added.slice(0, 5)) println(`      \x1b[32m+\x1b[0m ${id}`);
         for (const id of result.diff.removed.slice(0, 5)) println(`      \x1b[31m-\x1b[0m ${id}`);
