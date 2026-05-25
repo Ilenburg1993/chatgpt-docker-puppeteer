@@ -580,7 +580,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Criar `ModelRouteOption` para modelar rotas exatas, aliases, provider-auto, aggregator-auto, cheapest, fastest,
   preferred-provider e fallback-chain.
 - [x] Representar seleção automática de OpenRouter como rota própria, sem apagar provider upstream quando conhecido.
-- [ ] Representar Kilo Gateway como rota própria `gateway_auto`/`exact_model`, incluindo `provider/model`,
+- [x] Representar Kilo Gateway como rota própria `gateway_auto`/`exact_model`, incluindo `provider/model`,
   `x-kilocode-mode`, `X-KiloCode-OrganizationId`, `X-KiloCode-TaskId`, BYOK interno e falha sem fallback quando a key
   BYOK interna falhar.
 - [ ] Representar sufixos/seletores de Hugging Face Inference Providers, incluindo provider explícito e políticas de
@@ -1867,3 +1867,34 @@ Validação deste corte:
 Próxima direção:
 
 - Avaliar Hugging Face/Kilo route variants restantes.
+
+## 35. Continuidade 2026-05-25 — Kilo route policies explícitas
+
+Implementado neste corte:
+
+- `KiloGatewayModelsImporter` passou a enriquecer `routeOptions` com políticas específicas do gateway:
+  - `providerSpecific.acceptedHeaders` com `x-kilocode-mode`, `X-KiloCode-OrganizationId` e `X-KiloCode-TaskId`;
+  - `providerSpecific.supportsInternalByok=true`;
+  - `normalizedPolicy.supportsOrganizationOverlay=true`;
+  - `normalizedPolicy.supportsTaskId=true`;
+  - `normalizedPolicy.internalByokProviderFailureFallback=false`.
+
+Separação arquitetural reafirmada:
+
+- Esses campos dizem como a rota deve ser montada/selecionada.
+- Eles não autorizam runtime nem provam sucesso de chamada.
+- A falha sem fallback de BYOK interno fica registrada como política de rota para o seletor respeitar depois.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`48` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T16-36-46-683Z/summary.md`).
+
+Próxima direção:
+
+- Seguir para Hugging Face route selectors ou outro importer direto.

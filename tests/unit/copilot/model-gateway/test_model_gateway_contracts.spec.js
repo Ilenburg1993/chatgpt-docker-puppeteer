@@ -1074,6 +1074,12 @@ describe('model-gateway foundation', () => {
                 ['kilo-auto/frontier', 'gateway_auto'],
             ],
         );
+        assert.deepEqual(snapshot.routeOptions[0].providerSpecific.acceptedHeaders, [
+            'x-kilocode-mode',
+            'X-KiloCode-OrganizationId',
+            'X-KiloCode-TaskId',
+        ]);
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.internalByokProviderFailureFallback, false);
         assert.equal(byPath.get('displayName'), 'Claude Sonnet 4.6');
         assert.equal(byPath.get('limits.contextWindowTokens'), 200000);
         assert.equal(byPath.get('limits.maxOutputTokens'), 64000);

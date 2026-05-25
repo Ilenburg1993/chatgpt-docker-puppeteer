@@ -242,10 +242,19 @@ export function createKiloGatewayModelsImporter(options = {}) {
                         providerSpecific: {
                             upstreamProvider: upstreamProviderFromModel(providerModel),
                             requiresKiloCodeModeHeader: selectorKind === 'gateway_auto',
+                            acceptedHeaders: [
+                                'x-kilocode-mode',
+                                'X-KiloCode-OrganizationId',
+                                'X-KiloCode-TaskId',
+                            ],
+                            supportsInternalByok: true,
                         },
                         normalizedPolicy: {
                             routeLayer: 'gateway',
                             autoSelection: selectorKind === 'gateway_auto',
+                            supportsOrganizationOverlay: true,
+                            supportsTaskId: true,
+                            internalByokProviderFailureFallback: false,
                         },
                     }),
                 ];
