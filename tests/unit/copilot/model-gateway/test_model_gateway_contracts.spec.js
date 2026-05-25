@@ -3786,6 +3786,77 @@ describe('model-gateway foundation', () => {
         assert.equal(blocked.hardExclusions.includes('account_access_unknown'), true);
     });
 
+    it('blocks models before runtime when catalog pricing exceeds hard budget policy', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'openai',
+            providerModel: 'gpt-premium',
+            pricing: { inputUsdPerMillion: 9, outputUsdPerMillion: 60, requestUsd: 0.01 },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'openai',
+            secretRef: 'OPENAI_API_KEY',
+            enabledModels: ['gpt-premium'],
+        });
+
+        const decision = evaluateModelGatewayEligibility({
+            projection,
+            accountOverlays: [overlay],
+            secretRegistry: { has: () => true },
+            policy: {
+                maxInputUsdPerMillion: 5,
+                maxOutputUsdPerMillion: 50,
+                maxRequestUsd: 0.02,
+            },
+        });
+
+        assert.equal(decision.include, false);
+        assert.equal(decision.disposition, 'excluded');
+        assert.equal(decision.hardExclusions.includes('budget_exceeded:inputUsdPerMillion'), true);
+        assert.equal(decision.hardExclusions.includes('budget_exceeded:outputUsdPerMillion'), true);
+        assert.equal(decision.hardExclusions.includes('budget_exceeded:requestUsd'), false);
+        assert.equal(decision.policyInputs['budget']['observedPricing']['inputUsdPerMillion'], 9);
+        assert.equal(
+            explainModelGatewayEligibilityDecision(decision).nextActions.includes('choose_lower_cost_model_or_raise_budget'),
+            true,
+        );
+    });
+
+    it('keeps models eligible with soft budget penalties when only preferences are exceeded', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'anthropic',
+            providerModel: 'claude-balanced',
+            pricing: { inputUsdPerMillion: 3, outputUsdPerMillion: 14 },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'anthropic',
+            secretRef: 'ANTHROPIC_API_KEY',
+            enabledModels: ['claude-balanced'],
+        });
+
+        const decision = evaluateModelGatewayEligibility({
+            projection,
+            accountOverlays: [overlay],
+            secretRegistry: { has: () => true },
+            policy: {
+                maxInputUsdPerMillion: 10,
+                maxOutputUsdPerMillion: 20,
+                preferredInputUsdPerMillion: 2,
+                preferredOutputUsdPerMillion: 10,
+            },
+        });
+
+        assert.equal(decision.include, true);
+        assert.equal(decision.disposition, 'eligible');
+        assert.deepEqual(decision.hardExclusions, []);
+        assert.equal(decision.softPenalties.includes('price_above_preference:inputUsdPerMillion'), true);
+        assert.equal(decision.softPenalties.includes('price_above_preference:outputUsdPerMillion'), true);
+        assert.equal(decision.reasons.includes('budget_within_hard_limits'), true);
+        assert.equal(
+            explainModelGatewayEligibilityDecision(decision).nextActions.includes('prefer_lower_cost_model_when_possible'),
+            true,
+        );
+    });
+
     it('excludes Cloudflare gateway routes before runtime when account or gateway config is missing', () => {
         const projection = createCanonicalModelProjection({
             providerId: 'cloudflare-workers-ai',

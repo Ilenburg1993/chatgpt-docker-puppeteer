@@ -20,8 +20,48 @@ const DEFAULT_POLICY = Object.freeze({
     treatEnabledModelsAsClosed: true,
     allowRetired: false,
     excludeFailedHealth: true,
+    requireKnownPricing: false,
     defaultRuntimeProbes: Object.freeze(['chat']),
 });
+
+const BUDGET_PRICE_FIELDS = Object.freeze([
+    Object.freeze({
+        field: 'inputUsdPerMillion',
+        pricingKeys: Object.freeze(['inputUsdPerMillion', 'promptUsdPerMillion', 'input_usd_per_million']),
+        maxPolicyKey: 'maxInputUsdPerMillion',
+        preferredPolicyKey: 'preferredInputUsdPerMillion',
+    }),
+    Object.freeze({
+        field: 'outputUsdPerMillion',
+        pricingKeys: Object.freeze(['outputUsdPerMillion', 'completionUsdPerMillion', 'output_usd_per_million']),
+        maxPolicyKey: 'maxOutputUsdPerMillion',
+        preferredPolicyKey: 'preferredOutputUsdPerMillion',
+    }),
+    Object.freeze({
+        field: 'cacheReadUsdPerMillion',
+        pricingKeys: Object.freeze(['cacheReadUsdPerMillion', 'cache_read_usd_per_million']),
+        maxPolicyKey: 'maxCacheReadUsdPerMillion',
+        preferredPolicyKey: 'preferredCacheReadUsdPerMillion',
+    }),
+    Object.freeze({
+        field: 'cacheWriteUsdPerMillion',
+        pricingKeys: Object.freeze(['cacheWriteUsdPerMillion', 'cache_write_usd_per_million']),
+        maxPolicyKey: 'maxCacheWriteUsdPerMillion',
+        preferredPolicyKey: 'preferredCacheWriteUsdPerMillion',
+    }),
+    Object.freeze({
+        field: 'requestUsd',
+        pricingKeys: Object.freeze(['requestUsd', 'request_usd']),
+        maxPolicyKey: 'maxRequestUsd',
+        preferredPolicyKey: 'preferredRequestUsd',
+    }),
+    Object.freeze({
+        field: 'webSearchUsdPerRequest',
+        pricingKeys: Object.freeze(['webSearchUsdPerRequest', 'web_search_usd_per_request']),
+        maxPolicyKey: 'maxWebSearchUsdPerRequest',
+        preferredPolicyKey: 'preferredWebSearchUsdPerRequest',
+    }),
+]);
 
 /**
  * @param {unknown} value
@@ -37,6 +77,15 @@ function isRecord(value) {
  */
 function optionalString(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function optionalNumber(value) {
+    const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN;
+    return Number.isFinite(number) ? number : null;
 }
 
 /**
@@ -62,6 +111,79 @@ function truthy(value) {
  */
 function keyToken(value) {
     return String(value ?? '').trim().toLowerCase();
+}
+
+/**
+ * @param {Record<string, any>} pricing
+ * @param {readonly string[]} keys
+ * @returns {number | null}
+ */
+function pricingNumber(pricing, keys) {
+    for (const key of keys) {
+        const value = optionalNumber(pricing[key]);
+        if (value !== null) return value;
+    }
+    return null;
+}
+
+/**
+ * @param {Record<string, any>} policy
+ * @returns {Record<string, number | boolean>}
+ */
+function budgetPolicyInputs(policy) {
+    const entries = BUDGET_PRICE_FIELDS.flatMap((spec) => [
+        [spec.maxPolicyKey, optionalNumber(policy[spec.maxPolicyKey])],
+        [spec.preferredPolicyKey, optionalNumber(policy[spec.preferredPolicyKey])],
+    ]).filter(([, value]) => value !== null);
+    return {
+        requireKnownPricing: policy['requireKnownPricing'] === true,
+        ...Object.fromEntries(entries),
+    };
+}
+
+/**
+ * @param {Record<string, any>} pricing
+ * @param {Record<string, any>} policy
+ * @returns {{ hard: string[]; soft: string[]; reasons: string[]; observed: Record<string, number> }}
+ */
+function evaluateBudgetPolicy(pricing, policy) {
+    const hard = [];
+    const soft = [];
+    const reasons = [];
+    /** @type {Record<string, number>} */
+    const observed = {};
+    let checkedHardLimit = false;
+    let checkedPreference = false;
+    let missingRequiredPrice = false;
+
+    for (const spec of BUDGET_PRICE_FIELDS) {
+        const price = pricingNumber(pricing, spec.pricingKeys);
+        const max = optionalNumber(policy[spec.maxPolicyKey]);
+        const preferred = optionalNumber(policy[spec.preferredPolicyKey]);
+        if (price !== null) observed[spec.field] = price;
+        if (max !== null) checkedHardLimit = true;
+        if (preferred !== null) checkedPreference = true;
+
+        if (price === null) {
+            if (policy['requireKnownPricing'] === true && (max !== null || preferred !== null)) missingRequiredPrice = true;
+            continue;
+        }
+        if (max !== null && price > max) hard.push(`${MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.BUDGET_EXCEEDED}:${spec.field}`);
+        if (preferred !== null && price > preferred) {
+            soft.push(`${MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.PRICE_ABOVE_PREFERENCE}:${spec.field}`);
+        }
+    }
+
+    if (policy['requireKnownPricing'] === true && (Object.keys(pricing).length === 0 || missingRequiredPrice)) {
+        hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.PRICE_UNKNOWN);
+    }
+    if (checkedHardLimit && hard.every((reason) => !reason.startsWith(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.BUDGET_EXCEEDED))) {
+        reasons.push('budget_within_hard_limits');
+    }
+    if (checkedPreference && soft.every((reason) => !reason.startsWith(MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.PRICE_ABOVE_PREFERENCE))) {
+        reasons.push('budget_within_preferences');
+    }
+    return { hard, soft, reasons, observed };
 }
 
 /**
@@ -279,6 +401,10 @@ export function evaluateModelGatewayEligibility(input) {
 
     const pricing = isRecord(projection['pricing']) ? projection['pricing'] : {};
     if (Object.keys(pricing).length === 0) soft.push(MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.PRICE_UNKNOWN);
+    const budgetDecision = evaluateBudgetPolicy(pricing, policy);
+    hard.push(...budgetDecision.hard);
+    soft.push(...budgetDecision.soft);
+    reasons.push(...budgetDecision.reasons);
     const confidenceByField = isRecord(projection['confidenceByField']) ? projection['confidenceByField'] : {};
     if (Object.values(confidenceByField).some((value) => value === 'heuristic' || value === 'unknown')) {
         soft.push(MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.LOW_CONFIDENCE);
@@ -331,6 +457,10 @@ export function evaluateModelGatewayEligibility(input) {
             treatEnabledModelsAsClosed: policy['treatEnabledModelsAsClosed'],
             allowRetired: policy['allowRetired'],
             excludeFailedHealth: policy['excludeFailedHealth'],
+            budget: {
+                ...budgetPolicyInputs(policy),
+                observedPricing: budgetDecision.observed,
+            },
         },
     });
 }

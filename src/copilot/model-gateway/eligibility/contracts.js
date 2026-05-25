@@ -35,6 +35,8 @@ export const MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS = Object.freeze({
     CLOUDFLARE_GATEWAY_ID_MISSING: 'cloudflare_gateway_id_missing',
     OLLAMA_LOCAL_MODEL_NOT_INSTALLED: 'ollama_local_model_not_installed',
     HEALTH_FATAL: 'health_fatal',
+    PRICE_UNKNOWN: 'price_unknown',
+    BUDGET_EXCEEDED: 'budget_exceeded',
 });
 
 export const MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS = Object.freeze({
@@ -45,6 +47,7 @@ export const MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS = Object.freeze({
     PREVIEW_MODEL: 'preview_model',
     ROUTE_AUTO_SELECTS_UPSTREAM: 'route_auto_selects_upstream',
     CAPABILITY_UNVERIFIED: 'capability_unverified',
+    PRICE_ABOVE_PREFERENCE: 'price_above_preference',
 });
 
 export const MODEL_GATEWAY_ELIGIBILITY_RUN_STATUS = Object.freeze({

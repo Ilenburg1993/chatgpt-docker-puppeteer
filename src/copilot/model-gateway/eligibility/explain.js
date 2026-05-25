@@ -54,6 +54,9 @@ function nextActions(hardExclusions, softPenalties, runtimeProbes) {
     if (hardExclusions.includes('cloudflare_gateway_id_missing')) actions.push('configure_cloudflare_ai_gateway_id');
     if (hardExclusions.includes('ollama_local_model_not_installed')) actions.push('pull_or_select_installed_ollama_model');
     if (hardExclusions.includes('health_fatal')) actions.push('wait_or_clear_fatal_provider_health_after_fix');
+    if (hardExclusions.includes('price_unknown')) actions.push('refresh_pricing_or_relax_known_price_policy');
+    if (hardExclusions.some((reason) => reason.startsWith('budget_exceeded'))) actions.push('choose_lower_cost_model_or_raise_budget');
+    if (softPenalties.some((reason) => reason.startsWith('price_above_preference'))) actions.push('prefer_lower_cost_model_when_possible');
     if (hardExclusions.length === 0 && softPenalties.includes('account_visibility_unknown')) actions.push('run_low_cost_access_probe');
     if (hardExclusions.length === 0 && runtimeProbes.length > 0) actions.push(`run_runtime_probes:${runtimeProbes.join(',')}`);
     if (actions.length === 0 && hardExclusions.length === 0) actions.push('candidate_can_be_ranked');

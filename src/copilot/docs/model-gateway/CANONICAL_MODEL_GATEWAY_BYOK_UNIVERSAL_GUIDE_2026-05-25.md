@@ -989,7 +989,7 @@ Podem excluir dependendo da política:
 - modelo preview/beta;
 - modelo deprecated com data futura;
 - preço desconhecido;
-- preço acima do orçamento;
+- preço acima do orçamento hard declarado pela policy;
 - contexto abaixo do mínimo da tarefa;
 - max output abaixo do mínimo da tarefa;
 - data policy incompatível;
@@ -1010,6 +1010,7 @@ Não devem excluir automaticamente:
 - ausência de vision para tarefa textual;
 - ausência de audio para tarefa textual;
 - ausência de preço;
+- preço acima da preferência, mas dentro do limite hard;
 - confidence baixa;
 - metadata só heurística;
 - contexto menor, mas ainda suficiente;
@@ -1518,7 +1519,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Integrar provider allow/block.
 - [x] Integrar model allow/block.
 - [x] Integrar policy de unknown access.
-- [ ] Integrar budget hard/soft.
+- [x] Integrar budget hard/soft.
 - [x] Integrar health fatal por classificação pré-runtime inicial.
 - [x] Criar explain helper.
 - [x] Criar testes unitários iniciais.
@@ -1879,3 +1880,53 @@ Próxima direção:
   evidences, projections, routes, overlays, conflicts e freshness por provider.
 - [x] Expor `/byok gateway provider explain <provider>`.
 - [x] Expor `/byok gateway catalog freshness [filtro] [n]`.
+
+---
+
+## 20. Continuidade 2026-05-25 — Budget Hard/Soft Na Eligibility
+
+Implementado neste corte:
+
+- [x] Adicionados motivos formais `budget_exceeded` e `price_unknown` como hard
+  exclusions possíveis.
+- [x] Adicionado motivo formal `price_above_preference` como soft penalty.
+- [x] `evaluateModelGatewayEligibility()` passa a ler preços normalizados de
+  catálogo sem executar provider.
+- [x] Budget hard suporta `maxInputUsdPerMillion`,
+  `maxOutputUsdPerMillion`, `maxCacheReadUsdPerMillion`,
+  `maxCacheWriteUsdPerMillion`, `maxRequestUsd` e
+  `maxWebSearchUsdPerRequest`.
+- [x] Budget soft suporta os pares `preferred*` equivalentes para ranking e
+  explicação, sem excluir candidatos por si só.
+- [x] `requireKnownPricing=true` pode transformar preço ausente em hard
+  exclusion quando a policy exige preço conhecido antes de qualquer runtime.
+- [x] `policyInputs.budget` registra limites/preferências observáveis e
+  `observedPricing`, preservando redaction.
+- [x] `explainModelGatewayEligibilityDecision()` agora orienta:
+  `choose_lower_cost_model_or_raise_budget`,
+  `refresh_pricing_or_relax_known_price_policy` e
+  `prefer_lower_cost_model_when_possible`.
+
+Separação preservada:
+
+- [x] A decisão usa apenas metadados normalizados de preço.
+- [x] Nenhum probe runtime é executado para calcular custo.
+- [x] O catálogo canônico não recebe flags de exclusão account-scoped.
+- [x] Budget é policy/account scoped dentro de eligibility derivada.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `88` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS `npm run lint:copilot`.
+- [x] PASS `git diff --check`.
+- [x] PASS `npm run test:copilot` com `5665` testes totais, `5632` passed,
+  `33` pending, `0` failed e `0` warnings/errors.
+
+Próxima direção:
+
+- [ ] Integrar `EnvSecretRegistry` concreto nos consumidores de eligibility.
+- [ ] Persistir policy profiles de budget reutilizáveis para seleção terminal.
+- [ ] Fazer selection/ranking final consumir penalties de budget de forma
+  transparente ao lado de health/probes.
