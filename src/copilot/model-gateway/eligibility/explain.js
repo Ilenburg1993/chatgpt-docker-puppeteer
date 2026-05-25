@@ -50,6 +50,9 @@ function nextActions(hardExclusions, softPenalties, runtimeProbes) {
     if (hardExclusions.some((reason) => reason.startsWith('secret_missing'))) actions.push('configure_required_secret');
     if (hardExclusions.includes('account_model_not_visible')) actions.push('refresh_account_overlay_or_choose_visible_model');
     if (hardExclusions.includes('account_access_unknown')) actions.push('collect_account_overlay_before_runtime');
+    if (hardExclusions.includes('account_overlay_expired') || softPenalties.includes('account_overlay_expired')) actions.push('refresh_account_overlay');
+    if (hardExclusions.includes('account_quota_exhausted')) actions.push('wait_for_quota_or_choose_another_account');
+    if (hardExclusions.includes('account_spending_exhausted')) actions.push('raise_spending_limit_or_choose_free_model');
     if (hardExclusions.includes('cloudflare_account_id_missing')) actions.push('configure_cloudflare_account_id');
     if (hardExclusions.includes('cloudflare_gateway_id_missing')) actions.push('configure_cloudflare_ai_gateway_id');
     if (hardExclusions.includes('ollama_local_model_not_installed')) actions.push('pull_or_select_installed_ollama_model');

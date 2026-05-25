@@ -28,9 +28,12 @@ export const MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS = Object.freeze({
     MODEL_RETIRED: 'model_retired',
     SECRET_MISSING: 'secret_missing',
     ACCOUNT_OVERLAY_MISSING: 'account_overlay_missing',
+    ACCOUNT_OVERLAY_EXPIRED: 'account_overlay_expired',
     ACCOUNT_ACCESS_UNKNOWN: 'account_access_unknown',
     ACCOUNT_MODEL_BLOCKED: 'account_model_blocked',
     ACCOUNT_MODEL_NOT_VISIBLE: 'account_model_not_visible',
+    ACCOUNT_QUOTA_EXHAUSTED: 'account_quota_exhausted',
+    ACCOUNT_SPENDING_EXHAUSTED: 'account_spending_exhausted',
     CLOUDFLARE_ACCOUNT_ID_MISSING: 'cloudflare_account_id_missing',
     CLOUDFLARE_GATEWAY_ID_MISSING: 'cloudflare_gateway_id_missing',
     OLLAMA_LOCAL_MODEL_NOT_INSTALLED: 'ollama_local_model_not_installed',
@@ -41,6 +44,7 @@ export const MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS = Object.freeze({
 
 export const MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS = Object.freeze({
     ACCOUNT_OVERLAY_MISSING: 'account_overlay_missing',
+    ACCOUNT_OVERLAY_EXPIRED: 'account_overlay_expired',
     ACCOUNT_VISIBILITY_UNKNOWN: 'account_visibility_unknown',
     PRICE_UNKNOWN: 'price_unknown',
     LOW_CONFIDENCE: 'low_confidence',

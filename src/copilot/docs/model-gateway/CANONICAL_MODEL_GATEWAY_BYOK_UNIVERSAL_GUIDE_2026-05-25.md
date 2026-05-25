@@ -1549,7 +1549,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Resolver de acesso por provider.
 - [ ] Account overlay refresh separado.
 - [ ] Access confidence.
-- [ ] Access expiration.
+- [x] Access expiration.
 - [ ] Access failure classification.
 - [ ] Account model visibility explain.
 - [ ] Multi-account/workspace.
@@ -2026,6 +2026,41 @@ Validação deste corte:
 
 - [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   com `91` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS `npm run lint:copilot`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 24. Continuidade 2026-05-25 — Expiração E Controles De Conta
+
+Implementado neste corte:
+
+- [x] `resolveModelGatewayAccountAccess()` classifica overlays expirados.
+- [x] Overlay expirado deixa de provar visibilidade por padrão e vira
+  `account_overlay_expired` soft, preservando `allow_probe` quando a policy
+  permite explorar unknowns.
+- [x] `requireFreshAccountOverlay=true` pode transformar overlay expirado em hard
+  exclusion.
+- [x] `allowExpiredAccountOverlay=true` permite políticas que aceitam overlays
+  expirados como evidência fraca.
+- [x] `quota.dailyRequests=0`, `quota.dailyTokens=0` ou
+  `quota.remainingCreditsUsd=0` geram `account_quota_exhausted`.
+- [x] `spendingLimits.remainingUsd=0` gera `account_spending_exhausted`.
+- [x] Eligibility propaga o status de account access em `policyInputs`.
+- [x] Explain sugere refresh de overlay, troca de conta/modelo ou ajuste de
+  spending conforme o bloqueio.
+
+Separação preservada:
+
+- [x] Expiração e quota são fatos de conta, não metadados globais do modelo.
+- [x] A decisão continua pré-runtime e não chama provider.
+- [x] Overlay expirado não apaga o catálogo e não vira prova runtime negativa.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `92` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS `npm run lint:copilot`.
 - [x] PASS `git diff --check`.

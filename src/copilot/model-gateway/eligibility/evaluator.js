@@ -277,6 +277,7 @@ function isFatalHealth(health) {
  * @param {{ has(ref: string): boolean }} [input.secretRegistry]
  * @param {Record<string, any>} [input.policy]
  * @param {Record<string, any>} [input.health]
+ * @param {string | number | Date} [input.now]
  * @returns {ReturnType<typeof createModelEligibilityDecision>}
  */
 export function evaluateModelGatewayEligibility(input) {
@@ -299,9 +300,12 @@ export function evaluateModelGatewayEligibility(input) {
         secretRegistry: input.secretRegistry,
         secretRef: optionalString(policy['secretRef']) ?? optionalString(routePolicyRecord['secretRef']),
         requireAccountOverlay: policy['requireAccountOverlay'] === true,
+        requireFreshAccountOverlay: policy['requireFreshAccountOverlay'] === true,
+        allowExpiredAccountOverlay: policy['allowExpiredAccountOverlay'] === true,
         unknownAccessPolicy: policy['unknownAccessPolicy'],
         treatEnabledModelsAsClosed: policy['treatEnabledModelsAsClosed'],
         localPrivate: truthy(routeTraitsRecord['localPrivate']),
+        now: input.now,
     });
     const overlays = access.overlays;
     const overlayMetadata = mergedOverlayMetadata(overlays);

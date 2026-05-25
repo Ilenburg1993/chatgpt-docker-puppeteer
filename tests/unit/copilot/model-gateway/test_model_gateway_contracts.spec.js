@@ -3810,6 +3810,48 @@ describe('model-gateway foundation', () => {
         assert.ok(blocked.hardReasons.includes('account_model_blocked'));
     });
 
+    it('classifies expired overlays and exhausted account controls before runtime', () => {
+        const expiredOverlay = createProviderAccountOverlay({
+            providerId: 'openai',
+            secretRef: 'OPENAI_API_KEY',
+            enabledModels: ['gpt-visible'],
+            expiresAt: '2026-05-24T00:00:00.000Z',
+        });
+        const stale = resolveModelGatewayAccountAccess({
+            providerId: 'openai',
+            providerModel: 'gpt-visible',
+            accountOverlays: [expiredOverlay],
+            secretRegistry: createEnvSecretRegistry({ env: { OPENAI_API_KEY: 'sk-test' } }),
+            now: '2026-05-25T00:00:00.000Z',
+        });
+        assert.equal(stale.status, 'expired');
+        assert.equal(stale.canAttempt, true);
+        assert.ok(stale.softReasons.includes('account_overlay_expired'));
+        assert.ok(stale.softReasons.includes('account_overlay_missing'));
+
+        const quotaOverlay = createProviderAccountOverlay({
+            providerId: 'openai',
+            secretRef: 'OPENAI_API_KEY',
+            enabledModels: ['gpt-visible'],
+            quota: { dailyRequests: 0 },
+            spendingLimits: { remainingUsd: 0 },
+        });
+        const exhausted = evaluateModelGatewayEligibility({
+            projection: createCanonicalModelProjection({
+                providerId: 'openai',
+                providerModel: 'gpt-visible',
+                pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 4 },
+            }),
+            accountOverlays: [quotaOverlay],
+            secretRegistry: createEnvSecretRegistry({ env: { OPENAI_API_KEY: 'sk-test' } }),
+            now: '2026-05-25T00:00:00.000Z',
+        });
+        assert.equal(exhausted.include, false);
+        assert.ok(exhausted.hardExclusions.includes('account_quota_exhausted'));
+        assert.ok(exhausted.hardExclusions.includes('account_spending_exhausted'));
+        assert.equal(exhausted.policyInputs['accountAccess']['status'], 'spending_exhausted');
+    });
+
     it('evaluates hard pre-runtime exclusions from secrets, account overlays and access visibility', () => {
         const projection = createCanonicalModelProjection({
             providerId: 'openai',
