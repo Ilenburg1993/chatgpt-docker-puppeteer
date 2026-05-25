@@ -589,7 +589,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Criar refresh programático de catálogo com importers, replacement de evidências por fonte, rebuild de projections,
   diff e resposta OpenAI-compatible.
 - [x] Criar composição padrão de importers públicos/autenticados para refresh programático sem vazar segredo.
-- [ ] Criar comando terminal correspondente para `model-gateway catalog refresh`.
+- [x] Criar comando terminal correspondente para `model-gateway catalog refresh`.
 - [ ] Criar refresh incremental por provider, com cache TTL por fonte.
 - [ ] Criar refresh por overlay de conta/organização quando houver secretRef configurado, mantendo snapshot público e
   snapshot account-scoped separados.
@@ -1349,3 +1349,37 @@ Próxima direção:
 - Commitar/pushar este corte.
 - Depois, expor o refresh em comando/superfície operacional, começando por uma saída resumida de diff e contagem
   OpenAI-compatible.
+
+## 23. Continuidade 2026-05-25 — comando terminal de refresh do catálogo
+
+Implementado neste corte:
+
+- Adicionado `/byok gateway catalog refresh`.
+- O comando usa:
+  - `JsonModelGatewayCatalogStore(DEFAULT_MODEL_GATEWAY_CATALOG_PATH)`;
+  - `createDefaultModelGatewayCatalogImporters({ env: process.env })`;
+  - `refreshModelGatewayCatalog({ store, importers })`.
+- A saída mostra apenas resumo operacional:
+  - path do store;
+  - importers habilitados;
+  - schema `OpenAI+x_model_gateway`;
+  - contagem de projections, itens OpenAI e runs;
+  - diff resumido com até 5 adicionados/removidos/alterados.
+- O comando não imprime raw payload, headers, API keys nem corpo de catálogo. A API key da OpenAI permanece fechada no
+  importer e o snapshot continua passando pela sanitização do store.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  (`50` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5614` testes, `0` falhas, `warnings/errors unique=0 total=0`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T15-28-45-902Z/summary.md`).
+
+Próxima direção:
+
+- Commitar/pushar este corte.
+- Depois, avançar normalizadores finos de Faixa M: modalidades/capabilities/limits/pricing com vocabulário OpenAI
+  estendido e evidências sempre rastreáveis.

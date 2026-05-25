@@ -17,7 +17,10 @@ import {
     buildProbeCompletedEvent,
     classifyByokProviderFailure,
     clearByokProviderModelHealth,
+    createDefaultModelGatewayCatalogImporters,
+    DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     flushByokProviderHealth,
+    JsonModelGatewayCatalogStore,
     listByokProviderModelHealth,
     listProviderEndpointInventory,
     readByokProviderHealthState,
@@ -28,6 +31,7 @@ import {
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
     recordModelGatewayRouteDecision,
+    refreshModelGatewayCatalog,
     resolveProviderEndpointInventory,
     routeGatewayModels,
     runConfiguredByokAgentProbe,
@@ -1509,7 +1513,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog refresh | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1601,6 +1605,39 @@ function renderByokGatewayPreKGate(println) {
         println(`    ${mark} \x1b[33m${check.id}\x1b[0m  \x1b[90mfaixa=${check.track} · ${check.summary}\x1b[0m`);
     }
     println('\n  \x1b[90mEste gate fecha a camada A-J; catálogo universal, SQLite e importers profundos continuam nas Faixas K+.\x1b[0m\n');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayCatalogRefresh(println) {
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const importers = createDefaultModelGatewayCatalogImporters({ env: process.env });
+    println(`\n  \x1b[36mBYOK model-gateway catalog refresh\x1b[0m`);
+    println(
+        `  \x1b[90mstore=${store.filePath} · importers=${importers.map((importer) => importer.id).join(',') || '-'} · schema=OpenAI+x_model_gateway\x1b[0m\n`,
+    );
+    if (importers.length === 0) {
+        println('    \x1b[33mNenhum importer habilitado. Configure rede/credenciais ou rode apenas fontes públicas quando disponíveis.\x1b[0m\n');
+        return;
+    }
+    try {
+        const result = await refreshModelGatewayCatalog({ store, importers });
+        println(
+            `    \x1b[32mrefresh concluído\x1b[0m  \x1b[90mprojections=${result.snapshot.projections.length} · openai=${result.openai.data.length} · runs=${result.snapshot.importRuns.length}\x1b[0m`,
+        );
+        println(
+            `    \x1b[90mdiff: added=${result.diff.added.length} · removed=${result.diff.removed.length} · changed=${result.diff.changed.length}\x1b[0m`,
+        );
+        for (const id of result.diff.added.slice(0, 5)) println(`      \x1b[32m+\x1b[0m ${id}`);
+        for (const id of result.diff.removed.slice(0, 5)) println(`      \x1b[31m-\x1b[0m ${id}`);
+        for (const item of result.diff.changed.slice(0, 5)) println(`      \x1b[33m~\x1b[0m ${item.key} (${item.changedFields.join(',')})`);
+        println('\n  \x1b[90mSaída interoperável disponível como OpenAI Models list em memória; snapshot interno ficou em data/copilot/model-gateway/catalog.json.\x1b[0m\n');
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        println(`    \x1b[31mrefresh falhou: ${message}\x1b[0m\n`);
+    }
 }
 
 /**
@@ -2016,7 +2053,11 @@ export async function cmdByok({ println, eventBus = null }, arg) {
     }
 
     if (sub === 'gateway' || sub === 'gate' || sub === 'migration') {
-        if (/^(endpoints|endpoint|catalog|sources)$/iu.test(rest[0] ?? '')) {
+        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(refresh|reload|sync|atualizar)$/iu.test(rest[1] ?? '')) {
+            await renderByokGatewayCatalogRefresh(println);
+            return;
+        }
+        if (/^(endpoints|endpoint|catalog|catalogo|sources)$/iu.test(rest[0] ?? '')) {
             renderByokProviderEndpointInventory(println, rest.slice(1));
             return;
         }
