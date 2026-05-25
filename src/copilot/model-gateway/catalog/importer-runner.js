@@ -27,6 +27,7 @@ import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
  * @property {(raw: unknown) => Promise<unknown[]> | unknown[]} parseRows
  * @property {(rows: unknown[], context: { source: Record<string, any>; rawPayloadRef: string }) => Promise<Record<string, any>[]> | Record<string, any>[]} toEvidenceFacts
  * @property {(rows: unknown[], context: { source: Record<string, any>; rawPayloadRef: string }) => Promise<Record<string, any>[]> | Record<string, any>[]} [toProviderEvidenceFacts]
+ * @property {(rows: unknown[], context: { source: Record<string, any>; rawPayloadRef: string }) => Promise<Record<string, any>[]> | Record<string, any>[]} [toRouteOptions]
  * @property {(rows: unknown[], context: { source: Record<string, any>; rawPayloadRef: string }) => Promise<Record<string, any>[]> | Record<string, any>[]} [toAccountOverlays]
  */
 
@@ -108,6 +109,22 @@ function accountOverlayKey(overlay) {
 }
 
 /**
+ * @param {Record<string, any>} option
+ * @returns {string}
+ */
+function routeOptionKey(option) {
+    return [
+        option['providerId'],
+        option['providerModel'],
+        option['routeProfile'] ?? 'default',
+        option['selectorKind'],
+        option['selectorSyntax'],
+    ]
+        .filter((item) => typeof item === 'string' && item)
+        .join(':') || JSON.stringify(option);
+}
+
+/**
  * @param {object} [input]
  * @param {CatalogImporter[]} [input.importers]
  * @param {unknown} [input.snapshot]
@@ -133,6 +150,8 @@ export async function runCatalogImporters(input = {}) {
         /** @type {Record<string, any>[]} */
         let evidences = [];
         /** @type {Record<string, any>[]} */
+        let routeOptions = [];
+        /** @type {Record<string, any>[]} */
         let accountOverlays = [];
         /** @type {Record<string, any>} */
         let run;
@@ -148,6 +167,7 @@ export async function runCatalogImporters(input = {}) {
             const context = { source, rawPayloadRef: rawRef.rawPayloadRef };
             providerEvidences = importer.toProviderEvidenceFacts ? await importer.toProviderEvidenceFacts(rows, context) : [];
             evidences = await importer.toEvidenceFacts(rows, context);
+            routeOptions = importer.toRouteOptions ? await importer.toRouteOptions(rows, context) : [];
             accountOverlays = importer.toAccountOverlays ? await importer.toAccountOverlays(rows, context) : [];
             rawPayloadRefs = [rawRef];
             run = createCatalogImportRun({
@@ -181,6 +201,7 @@ export async function runCatalogImporters(input = {}) {
                 (item) => String(item['evidenceId'] ?? JSON.stringify(item)),
             ),
             evidences: upsertMany(snapshot.evidences, evidences, (item) => String(item['evidenceId'] ?? JSON.stringify(item))),
+            routeOptions: upsertMany(snapshot.routeOptions, routeOptions, routeOptionKey),
             accountOverlays: upsertMany(snapshot.accountOverlays, accountOverlays, accountOverlayKey),
             rawPayloadRefs: upsertMany(snapshot.rawPayloadRefs, rawPayloadRefs, (item) => String(item['rawPayloadRef'])),
             importRuns: [...snapshot.importRuns, run],

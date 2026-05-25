@@ -577,7 +577,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 
 ### Faixa N — Modelagem de auto-seleção e rotas
 
-- [ ] Criar `ModelRouteOption` para modelar rotas exatas, aliases, provider-auto, aggregator-auto, cheapest, fastest,
+- [x] Criar `ModelRouteOption` para modelar rotas exatas, aliases, provider-auto, aggregator-auto, cheapest, fastest,
   preferred-provider e fallback-chain.
 - [ ] Representar seleção automática de OpenRouter como rota própria, sem apagar provider upstream quando conhecido.
 - [ ] Representar Kilo Gateway como rota própria `gateway_auto`/`exact_model`, incluindo `provider/model`,
@@ -1800,3 +1800,37 @@ Próxima direção:
 
 - Avaliar `ModelRouteOption`/route candidates para representar `kilo-auto/*`, provider/model, aggregator auto e
   fallback-chain como metadata de rota, não runtime.
+
+## 33. Continuidade 2026-05-25 — route options no pipeline de catálogo
+
+Implementado neste corte:
+
+- `createModelRouteOption()` ganhou `sourceId`, `sourceKind` e `confidence`.
+- `CatalogImporter` agora pode retornar `toRouteOptions(rows, context)`.
+- `runCatalogImporters()` coleta e faz upsert de `routeOptions`.
+- `refreshModelGatewayCatalog()` retém/substitui route options por fonte atualizada, como já faz com evidências.
+- `KiloGatewayModelsImporter` emite route options:
+  - `provider_model` para ids `provider/model`;
+  - `gateway_auto` para ids `kilo-auto/*`;
+  - `normalizedPolicy.routeLayer=gateway`;
+  - `normalizedPolicy.autoSelection=true` para rotas auto.
+
+Separação arquitetural reafirmada:
+
+- `routeOptions` descrevem como uma rota pode ser selecionada.
+- `routeOptions` não provam que a rota funciona.
+- Runtime probes continuam necessários para promover uma rota a confiável/saudável.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`48` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T16-30-33-137Z/summary.md`).
+
+Próxima direção:
+
+- Expandir route options para OpenRouter aggregator auto/provider order e Hugging Face cheapest/fastest/preferred.

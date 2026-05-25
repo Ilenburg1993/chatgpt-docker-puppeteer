@@ -239,6 +239,9 @@ export function createCanonicalProviderProjection(input) {
  * @param {string} [input.routeProfile]
  * @param {string} [input.selectorKind]
  * @param {string} [input.selectorSyntax]
+ * @param {string} [input.sourceId]
+ * @param {string} [input.sourceKind]
+ * @param {string} [input.confidence]
  * @param {Record<string, unknown>} [input.providerSpecific]
  * @param {Record<string, unknown>} [input.normalizedPolicy]
  * @returns {object}
@@ -253,6 +256,9 @@ export function createModelRouteOption(input) {
         routeProfile: optionalString(input.routeProfile),
         selectorKind: optionalString(input.selectorKind) ?? 'exact_model',
         selectorSyntax: optionalString(input.selectorSyntax) ?? providerModel,
+        sourceId: optionalString(input.sourceId),
+        sourceKind: optionalString(input.sourceKind) ?? 'unknown',
+        confidence: optionalString(input.confidence) ?? MODEL_GATEWAY_CATALOG_CONFIDENCE.UNKNOWN,
         providerSpecific: isRecord(input.providerSpecific) ? sanitizeJsonValue(input.providerSpecific) : {},
         normalizedPolicy: isRecord(input.normalizedPolicy) ? sanitizeJsonValue(input.normalizedPolicy) : {},
     };

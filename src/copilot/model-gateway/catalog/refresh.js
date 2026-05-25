@@ -139,6 +139,7 @@ export async function refreshModelGatewayCatalog(input = {}) {
     const retainedProviderEvidences = previous.providerEvidences.filter(
         (evidence) => !refreshedSourceIds.has(String(evidence['sourceId'])),
     );
+    const retainedRouteOptions = previous.routeOptions.filter((option) => !refreshedSourceIds.has(String(option['sourceId'])));
     const retainedRawPayloadRefs = previous.rawPayloadRefs.filter((rawRef) => !refreshedSourceIds.has(String(rawRef['sourceId'])));
     const combinedEvidences = [...retainedEvidences, ...imported.evidences];
     const combinedProviderEvidences = [...retainedProviderEvidences, ...imported.providerEvidences];
@@ -151,6 +152,17 @@ export async function refreshModelGatewayCatalog(input = {}) {
         sources: upsertMany(previous.sources, imported.sources, (item) => String(item['id'])),
         providerEvidences: combinedProviderEvidences,
         evidences: combinedEvidences,
+        routeOptions: upsertMany(retainedRouteOptions, imported.routeOptions, (item) =>
+            [
+                item['providerId'],
+                item['providerModel'],
+                item['routeProfile'] ?? 'default',
+                item['selectorKind'],
+                item['selectorSyntax'],
+            ]
+                .filter((part) => typeof part === 'string' && part)
+                .join(':'),
+        ),
         rawPayloadRefs: [...retainedRawPayloadRefs, ...imported.rawPayloadRefs],
         importRuns: [...previous.importRuns, ...imported.importRuns],
         providerProjections,

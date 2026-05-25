@@ -12,6 +12,7 @@
 import {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
     createModelMetadataEvidence,
+    createModelRouteOption,
 } from '../contracts.js';
 import {
     normalizeModelAliases,
@@ -99,6 +100,17 @@ function upstreamProviderFromModel(providerModel) {
     const id = stringValue(providerModel);
     if (!id || !id.includes('/')) return null;
     return id.split('/')[0] ?? null;
+}
+
+/**
+ * @param {unknown} providerModel
+ * @returns {string}
+ */
+function selectorKindForKiloModel(providerModel) {
+    const id = stringValue(providerModel) ?? '';
+    if (id.startsWith('kilo-auto/')) return 'gateway_auto';
+    if (id.includes('/')) return 'provider_model';
+    return 'exact_model';
 }
 
 /**
@@ -209,6 +221,34 @@ export function createKiloGatewayModelsImporter(options = {}) {
                         rawPayloadRef: context.rawPayloadRef,
                     }),
                 );
+            });
+        },
+        toRouteOptions(rows, context) {
+            const sourceId = stringValue(context.source['id']) ?? 'kilo-gateway-models';
+            return rows.flatMap((row) => {
+                const record = /** @type {Record<string, unknown>} */ (row);
+                const providerModel = stringValue(record['id']);
+                if (!providerModel) return [];
+                const selectorKind = selectorKindForKiloModel(providerModel);
+                return [
+                    createModelRouteOption({
+                        providerId: 'kilo',
+                        providerModel,
+                        selectorKind,
+                        selectorSyntax: providerModel,
+                        sourceId,
+                        sourceKind: 'public_gateway_api',
+                        confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.CATALOG,
+                        providerSpecific: {
+                            upstreamProvider: upstreamProviderFromModel(providerModel),
+                            requiresKiloCodeModeHeader: selectorKind === 'gateway_auto',
+                        },
+                        normalizedPolicy: {
+                            routeLayer: 'gateway',
+                            autoSelection: selectorKind === 'gateway_auto',
+                        },
+                    }),
+                ];
             });
         },
     };

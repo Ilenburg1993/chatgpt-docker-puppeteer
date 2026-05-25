@@ -1033,6 +1033,22 @@ describe('model-gateway foundation', () => {
                             preferredIndex: 1,
                             isFree: false,
                         },
+                        {
+                            id: 'kilo-auto/frontier',
+                            name: 'Auto Frontier',
+                            description: 'Highest performance and capability for any task',
+                            architecture: {
+                                input_modalities: ['text'],
+                                output_modalities: ['text'],
+                            },
+                            context_length: 1000000,
+                            supported_parameters: ['tools', 'reasoning'],
+                            pricing: {
+                                prompt: '0.000005',
+                                completion: '0.000025',
+                            },
+                            isFree: false,
+                        },
                     ],
                 })
         );
@@ -1040,11 +1056,22 @@ describe('model-gateway foundation', () => {
             importers: [createKiloGatewayModelsImporter({ fetchImpl: fakeFetch })],
             now: () => new Date('2026-05-25T12:30:00.000Z'),
         });
-        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+        const byPath = new Map(
+            snapshot.evidences
+                .filter((item) => item.providerModel === 'anthropic/claude-sonnet-4.6')
+                .map((item) => [item.fieldPath, item.value]),
+        );
 
         assert.equal(snapshot.sources[0].url, 'https://api.kilo.ai/api/gateway/models');
         assert.equal(snapshot.sources[0].trustTier, 'provider_catalog');
         assert.equal(snapshot.importRuns[0].status, 'completed');
+        assert.deepEqual(
+            snapshot.routeOptions.map((option) => [option.providerModel, option.selectorKind]),
+            [
+                ['anthropic/claude-sonnet-4.6', 'provider_model'],
+                ['kilo-auto/frontier', 'gateway_auto'],
+            ],
+        );
         assert.equal(byPath.get('displayName'), 'Claude Sonnet 4.6');
         assert.equal(byPath.get('limits.contextWindowTokens'), 200000);
         assert.equal(byPath.get('limits.maxOutputTokens'), 64000);
