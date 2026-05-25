@@ -9,6 +9,11 @@ export { OpenAICompatibleAdapter, openAICompatibleAdapter } from './openai-compa
 export { ANTHROPIC_BASE_URL, ANTHROPIC_PROVIDER_ID, AnthropicAdapter, anthropicAdapter } from './anthropic-adapter.js';
 export { GEMINI_OPENAI_BASE_URL, GEMINI_PROVIDER_ID, GeminiAdapter, geminiAdapter } from './gemini-adapter.js';
 export {
+    MODEL_GATEWAY_PROVIDER_ENDPOINT_INVENTORY,
+    listProviderEndpointInventory,
+    resolveProviderEndpointInventory,
+} from './endpoints/index.js';
+export {
     OPENAI_PROVIDER_FAMILY_SPECS,
     OpenAIProviderFamilyAdapter,
     openAIProviderFamilyAdapters,

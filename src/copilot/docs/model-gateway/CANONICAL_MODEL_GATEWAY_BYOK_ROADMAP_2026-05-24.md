@@ -784,7 +784,9 @@ Decisões consolidadas:
    e carrega razão auditável `missing_soft_capability:vision`.
 4. Todo provider OpenAI-compatible passa a ter spec próprio em `src/copilot/model-gateway/providers/specs/<provider>.js`.
    Isso prepara importers por família, endpoints próprios, overlays de conta e quirks sem acoplar tudo ao adapter.
-5. A seleção final continuará em três camadas:
+5. O inventário de endpoints fica separado dos adapters em `src/copilot/model-gateway/providers/endpoints/<provider>.js`.
+   Ele não decide capability; ele só diz onde coletar catálogo, overlay e runtime evidence.
+6. A seleção final continuará em três camadas:
    - metadata coletada/projetada;
    - prova runtime básica;
    - prova runtime específica do workflow.
@@ -834,6 +836,10 @@ Alterações implementadas neste corte:
 - Teste de contrato garante que modelo text-only continua candidato para perfil `vision`, enquanto multimodal ranqueia
   acima.
 - Specs OpenAI-compatible foram extraídos para um arquivo por provider e reexportados pelo índice de specs.
+- Inventário de endpoints por provider foi criado em `providers/endpoints/*`, cobrindo OpenAI, OpenRouter, Anthropic,
+  Gemini, Ollama, Kilo, Groq, Mistral, Hugging Face, Cloudflare, NVIDIA NIM, Cerebras, Chutes e Z.AI.
+- O barrel do `model-gateway` exporta `listProviderEndpointInventory()` e `resolveProviderEndpointInventory()`, para a
+  futura Faixa K/L começar pelos endpoints oficiais sem depender de dispatch de adapter.
 
 Validação parcial:
 
@@ -843,3 +849,10 @@ Validação parcial:
 - PASS `npm run test:copilot`
   (`5599` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
   resumo `artifacts/test-runs/copilot/2026-05-25T13-54-07-233Z/summary.md`).
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  após inventário de endpoints (`30` testes).
+- PASS `npm run typecheck:strict:src.copilot` após inventário de endpoints.
+- PASS `npm run lint:copilot` após inventário de endpoints.
+- PASS `npm run test:copilot` após inventário de endpoints
+  (`5600` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T14-00-03-450Z/summary.md`).

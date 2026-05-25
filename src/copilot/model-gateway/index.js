@@ -43,6 +43,7 @@ export {
     GEMINI_OPENAI_BASE_URL,
     GEMINI_PROVIDER_ID,
     GeminiAdapter,
+    MODEL_GATEWAY_PROVIDER_ENDPOINT_INVENTORY,
     OPENROUTER_BASE_URL,
     OPENROUTER_DEFAULT_HEADERS,
     OPENROUTER_PROVIDER_ID,
@@ -57,12 +58,14 @@ export {
     createDefaultProviderAdapterRegistry,
     defaultProviderAdapterRegistry,
     geminiAdapter,
+    listProviderEndpointInventory,
     OpenAICompatibleAdapter,
     OpenRouterAdapter,
     ollamaAdapter,
     openAICompatibleAdapter,
     openAIProviderFamilyAdapters,
     openRouterAdapter,
+    resolveProviderEndpointInventory,
     resolveModelGatewayProviderAdapter,
 } from './providers/index.js';
 export {

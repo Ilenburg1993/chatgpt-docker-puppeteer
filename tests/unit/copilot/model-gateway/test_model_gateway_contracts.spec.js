@@ -11,6 +11,7 @@ import { afterEach, describe, it } from 'vitest';
 
 import {
     JsonModelGatewayRegistryStore,
+    listProviderEndpointInventory,
     listModelGatewayTaskProfiles,
     ModelGatewayRegistry,
     MODEL_GATEWAY_TASK_PROFILES,
@@ -42,6 +43,7 @@ import {
     listModelGatewayRouteDecisions,
     recordModelGatewayRouteDecision,
     resolveModelGatewayProviderAdapter,
+    resolveProviderEndpointInventory,
     resolveModelGatewayTaskProfile,
     resetByokProviderHealthForTests,
     resetModelGatewayRouteDecisionLedgerForTests,
@@ -714,6 +716,39 @@ describe('model-gateway foundation', () => {
             assert.equal(overrides.gateway?.providerFamily, fixture.expectedAdapter);
             assert.equal(JSON.stringify({ provider, model, gateway: overrides.gateway }).includes(fixture.secretValue), false);
         }
+    });
+
+    it('keeps a provider endpoint inventory separate from adapter dispatch', () => {
+        const endpointInventory = listProviderEndpointInventory();
+        const ids = new Set(endpointInventory.map((item) => item.providerId));
+        for (const expected of [
+            'openai',
+            'openrouter',
+            'anthropic',
+            'gemini',
+            'ollama',
+            'kilo',
+            'groq',
+            'mistral',
+            'huggingface',
+            'cloudflare-workers-ai',
+            'nvidia-nim',
+            'cerebras',
+            'chutes',
+            'zai',
+        ]) {
+            assert.ok(ids.has(expected), `endpoint inventory missing ${expected}`);
+        }
+
+        const kilo = resolveProviderEndpointInventory('kilo');
+        const hf = resolveProviderEndpointInventory('huggingface');
+        const cloudflare = resolveProviderEndpointInventory('cloudflare-workers-ai');
+
+        assert.equal(kilo?.providerKind, 'gateway');
+        assert.ok(kilo?.modelCatalogSources.some((source) => source.url.endsWith('/api/gateway/models')));
+        assert.ok(hf?.routeSelectors.includes('fastest'));
+        assert.ok(hf?.routeSelectors.includes('cheapest'));
+        assert.ok(cloudflare?.routeSelectors.includes('gateway_fallback'));
     });
 
     it('builds an SDK onListModels handler from gateway records without exposing secrets', async () => {
