@@ -1517,7 +1517,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh|diff> | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog diff|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh|diff|conflicts> | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1750,6 +1750,35 @@ async function renderByokGatewayCatalogDiff(println) {
             println(`      \x1b[90m? ${recommendation.key}: ${recommendation.probeKinds.join(',')} · ${recommendation.reasons.slice(0, 4).join(',')}\x1b[0m`);
             println(`        \x1b[90m${recommendation.commands[0]}\x1b[0m`);
         }
+    }
+    println('');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayCatalogConflicts(println) {
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    println(`\n  \x1b[36mBYOK model-gateway catalog conflicts\x1b[0m`);
+    println(`  \x1b[90mstore=${store.filePath} · fonte=snapshot persistido · sem rede\x1b[0m\n`);
+    const snapshot = await store.readSnapshot();
+    if (snapshot.conflicts.length === 0) {
+        println('    \x1b[32mNenhum conflito de evidência no snapshot atual.\x1b[0m\n');
+        return;
+    }
+    for (const conflict of snapshot.conflicts.slice(0, 20)) {
+        const record = asRecord(conflict);
+        const projectionKey = optionalScalarString(record['projectionKey']) ?? 'projection?';
+        const fieldPath = optionalScalarString(record['fieldPath']) ?? 'field?';
+        const selected = optionalScalarString(record['selectedEvidenceId']) ?? '-';
+        const conflicting = Array.isArray(record['conflictingEvidenceIds'])
+            ? record['conflictingEvidenceIds'].map(String).slice(0, 4).join(',')
+            : '-';
+        println(`    \x1b[33m${projectionKey}\x1b[0m  \x1b[90mfield=${fieldPath} · selected=${selected} · conflicts=${conflicting}\x1b[0m`);
+    }
+    if (snapshot.conflicts.length > 20) {
+        println(`\n  \x1b[90mexibindo 20/${snapshot.conflicts.length}; refine depois com /models explain <provider:model>.\x1b[0m`);
     }
     println('');
 }
@@ -2175,6 +2204,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayCatalogDiff(println);
             return;
         }
+        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(conflicts|conflitos)$/iu.test(rest[1] ?? '')) {
+            await renderByokGatewayCatalogConflicts(println);
+            return;
+        }
         if (/^(endpoints|endpoint|catalog|catalogo|sources)$/iu.test(rest[0] ?? '')) {
             renderByokProviderEndpointInventory(println, rest.slice(1));
             return;
@@ -2356,6 +2389,13 @@ export async function cmdByok({ println, eventBus = null }, arg) {
     if (sub === 'models') {
         if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(diff|changes|mudancas|mudanças)$/iu.test(rest[1] ?? '')) {
             await renderByokGatewayCatalogDiff(println);
+            return;
+        }
+        if (
+            /^(conflicts|conflitos)$/iu.test(rest[0] ?? '') ||
+            (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(conflicts|conflitos)$/iu.test(rest[1] ?? ''))
+        ) {
+            await renderByokGatewayCatalogConflicts(println);
             return;
         }
         if (/^(route|select|rank)$/iu.test(rest[0] ?? '')) {

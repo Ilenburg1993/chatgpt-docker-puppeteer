@@ -655,7 +655,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] `/models catalog diff`.
 - [ ] `/models search <query>`.
 - [ ] `/models explain <provider:model>`.
-- [ ] `/models conflicts`.
+- [x] `/models conflicts`.
 - [x] `/models route <profile> --show-rejected`.
 - [ ] `/models gateways` com Kilo, OpenRouter, Cloudflare AI Gateway, LiteLLM e outros gateways/proxies configurados.
 - [ ] `/models account-overlays` para mostrar modelos habilitados/bloqueados por conta ou organização sem expor secrets.
@@ -2255,3 +2255,38 @@ Validação deste corte até agora:
 Próxima direção:
 
 - Commitar/pushar e avançar para `/models catalog refresh [provider]` ou `/models conflicts`.
+
+## 43. Continuidade 2026-05-25 — UX de conflitos do catálogo
+
+Implementado neste corte:
+
+- Nova UX sem rede para conflitos persistidos:
+  - `/byok gateway catalog conflicts`;
+  - `/models conflicts`;
+  - `/models catalog conflicts`.
+- A tela lê `snapshot.conflicts` e mostra:
+  - `projectionKey`;
+  - `fieldPath`;
+  - evidência selecionada;
+  - evidências conflitantes.
+- A checkbox `/models conflicts` da Faixa P foi marcada como concluída.
+
+Separação arquitetural reafirmada:
+
+- Conflito de evidência não é falha runtime.
+- A tela não chama importers, não executa probes e não altera seleção ativa.
+- O objetivo é orientar normalização/manual override futuro e explicar por que um campo foi escolhido.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  (`107` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5630` testes totais, `5597` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T17-39-10-309Z/summary.md`).
+
+Próxima direção:
+
+- Validar, commitar/pushar e avançar para `/models catalog refresh [provider]`.

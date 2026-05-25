@@ -104,7 +104,14 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                 readSnapshot: vi.fn(() =>
                     Promise.resolve({
                         projections: [{ providerModel: 'new-model' }],
-                        conflicts: [],
+                        conflicts: [
+                            {
+                                projectionKey: 'openrouter:changed-model:default',
+                                fieldPath: 'capabilities.tools',
+                                selectedEvidenceId: 'catalog-tools',
+                                conflictingEvidenceIds: ['heuristic-tools'],
+                            },
+                        ],
                         importRuns: [
                             {
                                 runId: 'model-gateway:catalog-refresh:2026-05-25T17:00:00.000Z',
@@ -1388,6 +1395,19 @@ describe('terminal /byok command', () => {
 
         expect(refreshModelGatewayCatalog).not.toHaveBeenCalled();
         expect(ctx.output()).toContain('BYOK model-gateway catalog diff');
+    });
+
+    it('exibe conflitos persistidos do catálogo via /models conflicts', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models conflicts');
+
+        expect(refreshModelGatewayCatalog).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('BYOK model-gateway catalog conflicts');
+        expect(ctx.output()).toContain('capabilities.tools');
+        expect(ctx.output()).toContain('catalog-tools');
+        expect(ctx.output()).toContain('heuristic-tools');
     });
 
     it('mostra health operacional persistido de BYOK', async () => {
