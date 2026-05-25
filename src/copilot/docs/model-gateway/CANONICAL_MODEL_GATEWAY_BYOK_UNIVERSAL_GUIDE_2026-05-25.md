@@ -1515,7 +1515,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Integrar policy de unknown access.
 - [ ] Integrar budget hard/soft.
 - [x] Integrar health fatal por classificação pré-runtime inicial.
-- [ ] Criar explain helper.
+- [x] Criar explain helper.
 - [x] Criar testes unitários iniciais.
 - [ ] Criar terminal view.
 - [ ] Persistir decisões em store.
@@ -1722,6 +1722,8 @@ Implementado neste corte:
 - [x] Adicionados testes de eligibility no contrato principal.
 - [x] Integrado o policy engine para consumir eligibility opcionalmente durante
   o scoring.
+- [x] Criado helper `explainModelGatewayEligibilityDecision()` para terminal e
+  observability.
 
 Coberturas novas:
 
@@ -1735,21 +1737,22 @@ Coberturas novas:
   runtime.
 - [x] Candidato inelegível é mantido em `rejected` com motivo
   `eligibility:<reason>`.
+- [x] Explicação estruturada traz `summary`, `primaryReason` e `nextActions`.
 
 Validação deste corte:
 
 - [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
-  com `76` testes.
+  com `77` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS `npm run lint:copilot`.
-- [x] PASS `npm run test:copilot` com `5653` testes totais, `5620` passed,
+- [x] PASS `npm run test:copilot` com `5654` testes totais, `5621` passed,
   `33` pending, `0` failed e `0` warnings/errors.
 
 Próxima direção:
 
 - [x] Integrar `evaluateModelGatewayEligibility()` ao policy engine como barreira
   opcional, preservando rejeições `eligibility:<reason>`.
-- [ ] Criar explain helper para terminal e observability.
+- [x] Criar explain helper para terminal e observability.
 - [ ] Persistir eligibility decisions no próximo store.
 - [ ] Planejar SQLite já incluindo catálogo, overlays, eligibility, probes e
   route decisions como camadas lógicas separadas.

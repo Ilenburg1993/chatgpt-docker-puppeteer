@@ -94,6 +94,7 @@ import {
     diffCanonicalModelProjections,
     mergeModelMetadataEvidence,
     mergeProviderMetadataEvidence,
+    explainModelGatewayEligibilityDecision,
     normalizeAccountOverlayControls,
     normalizeModelAliases,
     normalizeModelIdentityTraits,
@@ -3165,6 +3166,45 @@ describe('model-gateway foundation', () => {
         assert.equal(decision.include, false);
         assert.equal(decision.hardExclusions.includes('account_model_not_visible'), true);
         assert.equal(decision.hardExclusions.includes('ollama_local_model_not_installed'), true);
+    });
+
+    it('explains eligibility decisions with stable next actions for terminal rendering', () => {
+        const missingSecret = createModelEligibilityDecision({
+            providerId: 'openai',
+            providerModel: 'gpt-paid',
+            secretRef: 'OPENAI_API_KEY',
+            include: false,
+            hardExclusions: ['secret_missing:OPENAI_API_KEY', 'account_model_not_visible'],
+            requiredRuntimeProbes: ['chat'],
+        });
+
+        assert.deepEqual(explainModelGatewayEligibilityDecision(missingSecret), {
+            key: 'openai:gpt-paid:default:exact_model:gpt-paid',
+            include: false,
+            disposition: 'excluded',
+            status: 'excluded',
+            primaryReason: 'secret_missing:OPENAI_API_KEY',
+            hardExclusions: ['secret_missing:OPENAI_API_KEY', 'account_model_not_visible'],
+            softPenalties: [],
+            reasons: [],
+            requiredRuntimeProbes: ['chat'],
+            nextActions: ['configure_required_secret', 'refresh_account_overlay_or_choose_visible_model'],
+            summary: 'excluded:secret_missing:OPENAI_API_KEY',
+        });
+
+        const unknownAllowed = createModelEligibilityDecision({
+            providerId: 'openrouter',
+            providerModel: 'new/model',
+            include: true,
+            disposition: 'unknown_policy_allows_probe',
+            softPenalties: ['account_visibility_unknown'],
+            requiredRuntimeProbes: ['chat', 'json'],
+        });
+
+        assert.deepEqual(explainModelGatewayEligibilityDecision(unknownAllowed).nextActions, [
+            'run_low_cost_access_probe',
+            'run_runtime_probes:chat,json',
+        ]);
     });
 
     it('refreshes catalog snapshots, replaces source evidence, diffs projections and emits OpenAI schema', async () => {

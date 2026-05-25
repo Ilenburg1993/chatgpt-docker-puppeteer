@@ -145,6 +145,7 @@ export {
     MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS,
     createModelEligibilityDecision,
     evaluateModelGatewayEligibility,
+    explainModelGatewayEligibilityDecision,
 } from './eligibility/index.js';
 export {
     MODEL_GATEWAY_PRE_K_STAGE,

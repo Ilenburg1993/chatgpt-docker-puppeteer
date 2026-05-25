@@ -13,3 +13,4 @@ export {
     createModelEligibilityDecision,
 } from './contracts.js';
 export { evaluateModelGatewayEligibility } from './evaluator.js';
+export { explainModelGatewayEligibilityDecision } from './explain.js';
