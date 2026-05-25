@@ -6,6 +6,10 @@
  */
 
 export {
+    KILO_GATEWAY_MODELS_CATALOG_URL,
+    createKiloGatewayModelsImporter,
+} from './kilo-gateway-models-importer.js';
+export {
     OPENAI_MODELS_CATALOG_URL,
     createOpenAIModelsImporter,
 } from './openai-models-importer.js';

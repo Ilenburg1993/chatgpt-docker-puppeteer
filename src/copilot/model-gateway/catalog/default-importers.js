@@ -9,6 +9,7 @@
  */
 
 import {
+    createKiloGatewayModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
 } from './importers/index.js';
@@ -37,7 +38,12 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     const includeAuthenticated = options.includeAuthenticated ?? true;
     /** @type {import('./importer-runner.js').CatalogImporter[]} */
     const importers = [];
-    if (includePublic) importers.push(createOpenRouterModelsImporter({ fetchImpl: options.fetchImpl }));
+    if (includePublic) {
+        importers.push(
+            createOpenRouterModelsImporter({ fetchImpl: options.fetchImpl }),
+            createKiloGatewayModelsImporter({ fetchImpl: options.fetchImpl }),
+        );
+    }
     const openAiSecret = readOpenAiSecret(env);
     if (includeAuthenticated && openAiSecret) {
         importers.push(

@@ -537,7 +537,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] Implementar `OllamaCatalogImporter` para `/api/tags` + `/api/show`.
 - [ ] Implementar `HuggingFaceInferenceProvidersImporter` para catálogo de providers/modelos/rotas.
 - [ ] Implementar `CloudflareWorkersAiCatalogImporter` para unified catalog/Workers AI docs.
-- [ ] Implementar `KiloGatewayCatalogImporter` para `https://api.kilo.ai/api/gateway/models`, capturando ids
+- [x] Implementar `KiloGatewayCatalogImporter` para `https://api.kilo.ai/api/gateway/models`, capturando ids
   `provider/model`, provider upstream, pricing, context window, features, rotas gratuitas e endpoints auxiliares.
 - [ ] Implementar `KiloGatewayProvidersImporter` para `/providers` quando disponível, preservando provider upstream e
   diferença entre Kilo Gateway, Kilo Code e providers BYOK internos.
@@ -1624,3 +1624,50 @@ Próxima direção:
 
 - Expandir providers/importers para preencher esse contrato quando endpoints autenticados oferecerem quotas,
   saldo, plano, allow/block lists ou BYOK interno.
+
+## 29. Continuidade 2026-05-25 — primeiro gateway catalog importer: Kilo `/models`
+
+Investigação consolidada neste corte:
+
+- Documentação oficial Kilo confirma `https://api.kilo.ai/api/gateway` como base OpenAI-compatible.
+- `GET https://api.kilo.ai/api/gateway/models` é público e retorna modelos com formato `provider/model-name`,
+  pricing, context window e supported features.
+- `GET /providers` também é público e deve virar uma segunda fonte para metadados de provider upstream, data policy,
+  datacenters, ícones e políticas.
+- O runtime Kilo continua separado em `/chat/completions` e FIM; nada deste corte promove capacidade runtime.
+
+Implementado neste corte:
+
+- Novo `KiloGatewayModelsImporter`:
+  - aceita payload array direto ou `{ data: [...] }`;
+  - preserva `displayName`, `description`, aliases, lifecycle e modalidades;
+  - normaliza limits (`contextWindowTokens`, `maxOutputTokens`);
+  - normaliza pricing USD por milhão/request/search quando o catálogo oferece esses campos;
+  - infere capability hints de `supported_parameters`, inclusive `tools`, `vision`, `pdf` e `reasoningEffort`;
+  - preserva `providerMetadata.kilo.upstreamProvider`, `isFree`, `preferredIndex`, `tokenizer`, `opencode` e
+    `rawPricing`;
+  - preserva `routingHints.kiloTopProvider`.
+- `createDefaultModelGatewayCatalogImporters()` agora inclui Kilo junto com OpenRouter nas fontes públicas padrão.
+- Barrels do catálogo e de `src/copilot/model-gateway` exportam o importer e a URL canônica.
+
+Separação arquitetural reafirmada:
+
+- Kilo `/models` alimenta o banco universal de metadata normalizada para OpenAI schema + `x_model_gateway`.
+- Rotas `kilo-auto/*`, modelos free e provider/model são metadata/route candidates, não provas de chamada.
+- `x-kilocode-mode`, organização, BYOK interno, allow/block lists e saldo entram em overlays; chat/stream/tools entram
+  nos probes runtime posteriores.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`46` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5619` testes totais, `5586` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T16-10-25-239Z/summary.md`).
+
+Próxima direção:
+
+- Implementar `KiloGatewayProvidersImporter` para `/providers` e criar o primeiro contrato de metadata de
+  provider/gateway, sem forçar tudo dentro de evidence por modelo.

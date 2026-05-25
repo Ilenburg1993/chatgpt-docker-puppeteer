@@ -63,6 +63,7 @@ import {
     createCanonicalModelProjection,
     createCatalogImportRun,
     createDefaultModelGatewayCatalogImporters,
+    createKiloGatewayModelsImporter,
     createModelMetadataEvidence,
     createModelRouteOption,
     createProviderAccountOverlay,
@@ -919,6 +920,75 @@ describe('model-gateway foundation', () => {
         });
     });
 
+    it('extracts Kilo Gateway public model metadata without proving runtime access', async () => {
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async () =>
+                /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => [
+                        {
+                            id: 'anthropic/claude-sonnet-4.6',
+                            name: 'Claude Sonnet 4.6',
+                            created: 1779376861,
+                            description: 'Balanced performance and cost',
+                            architecture: {
+                                input_modalities: ['text', 'image', 'pdf'],
+                                output_modalities: ['text'],
+                                tokenizer: 'Claude',
+                            },
+                            top_provider: {
+                                is_moderated: false,
+                                context_length: 200000,
+                                max_completion_tokens: 64000,
+                            },
+                            pricing: {
+                                prompt: '0.000003',
+                                completion: '0.000015',
+                                input_cache_read: '0.0000003',
+                                input_cache_write: '0.00000375',
+                                request: '0',
+                                web_search: '0',
+                            },
+                            context_length: 200000,
+                            supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
+                            opencode: {
+                                ai_sdk_provider: 'anthropic',
+                                family: 'claude',
+                                prompt: 'anthropic',
+                            },
+                            preferredIndex: 1,
+                            isFree: false,
+                        },
+                    ],
+                })
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createKiloGatewayModelsImporter({ fetchImpl: fakeFetch })],
+            now: () => new Date('2026-05-25T12:30:00.000Z'),
+        });
+        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+
+        assert.equal(snapshot.sources[0].url, 'https://api.kilo.ai/api/gateway/models');
+        assert.equal(snapshot.sources[0].trustTier, 'provider_catalog');
+        assert.equal(snapshot.importRuns[0].status, 'completed');
+        assert.equal(byPath.get('displayName'), 'Claude Sonnet 4.6');
+        assert.equal(byPath.get('limits.contextWindowTokens'), 200000);
+        assert.equal(byPath.get('limits.maxOutputTokens'), 64000);
+        assert.deepEqual(byPath.get('modalities.input'), ['text', 'image', 'pdf']);
+        assert.equal(byPath.get('capabilities.tools'), true);
+        assert.equal(byPath.get('capabilities.reasoningEffort'), true);
+        assert.equal(byPath.get('pricing.inputUsdPerMillion'), 3);
+        assert.equal(byPath.get('pricing.outputUsdPerMillion'), 15);
+        assert.equal(byPath.get('providerMetadata.kilo.upstreamProvider'), 'anthropic');
+        assert.equal(byPath.get('providerMetadata.kilo.isFree'), false);
+        assert.deepEqual(byPath.get('providerMetadata.kilo.opencode'), {
+            ai_sdk_provider: 'anthropic',
+            family: 'claude',
+            prompt: 'anthropic',
+        });
+    });
+
     it('extracts account-scoped OpenAI model identity without serializing the API key', async () => {
         const secret = 'sk-openai-secret-that-must-not-leak';
         /** @type {string | null} */
@@ -1222,11 +1292,11 @@ describe('model-gateway foundation', () => {
 
         assert.deepEqual(
             importers.map((importer) => importer.id),
-            ['openrouter-models', 'openai-models'],
+            ['openrouter-models', 'kilo-gateway-models', 'openai-models'],
         );
         assert.deepEqual(
             publicOnly.map((importer) => importer.id),
-            ['openrouter-models'],
+            ['openrouter-models', 'kilo-gateway-models'],
         );
         assert.equal(JSON.stringify(importers).includes(secret), false);
     });
