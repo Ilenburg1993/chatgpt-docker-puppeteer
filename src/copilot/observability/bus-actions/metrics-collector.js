@@ -93,8 +93,12 @@ export function createMetricsCollector({ bus, metrics }) {
         metrics.recordGauge('model_gateway.models', evt.modelCount ?? 0);
         metrics.recordGauge('model_gateway.models.enabled', evt.enabledModelCount ?? 0);
     });
-    on('model_gateway:route:decision', () => {
+    on('model_gateway:route:decision', (evt) => {
         metrics.recordCounter('model_gateway.route.decision', 1);
+        metrics.recordCounter(evt.selected === false ? 'model_gateway.route.unselected' : 'model_gateway.route.selected', 1);
+        metrics.recordGauge('model_gateway.route.candidates', evt.candidateCount ?? 0);
+        metrics.recordGauge('model_gateway.route.rejected', evt.rejectedCount ?? 0);
+        metrics.recordGauge('model_gateway.route.fallback', Array.isArray(evt.fallbackChain) ? evt.fallbackChain.length : 0);
     });
     on('model_gateway:probe:completed', (evt) => {
         metrics.recordCounter(evt.ok === false ? 'model_gateway.probe.failed' : 'model_gateway.probe.ok', 1);

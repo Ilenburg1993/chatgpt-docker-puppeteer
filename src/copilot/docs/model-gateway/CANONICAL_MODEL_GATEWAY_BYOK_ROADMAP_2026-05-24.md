@@ -465,7 +465,8 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Gateway emite eventos estabilizados.
 - [x] Event catalog inclui `model-gateway-events`.
 - [x] Metrics collector registra counters/gauges de snapshot, route, probe e failure.
-- [ ] Usage ledger registra `sessionId`, `providerId`, `modelId`, `routeProfile`, tokens, custo estimado, fallback e failure.
+- [x] Usage ledger registra `sessionId`, `providerId`, `modelId`, `routeProfile`, tokens, custo estimado, fallback e failure
+  para decisões de rota, sem prompt, headers, raw payload ou secrets.
 - [ ] Traces incluem `llm.provider`, `llm.model`, `llm.gateway.model_id`, `llm.route.decision_id`.
 - [x] Observability não lê secrets nem raw provider payload para inferir decisão.
 
@@ -476,6 +477,11 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] Discovery migra para importers.
 - [ ] `terminal/byok/*` vira renderer/command layer.
 - [ ] Antigos exports recebem marcação de deprecated apenas quando consumidores já migraram.
+- [x] Gate pré-K definido: nenhuma depreciação remove ou quebra exports SDK/config atuais; terminal usa gateway para
+  rota/probes/health quando disponível, mas mantém compat de env/presets até os importers universais existirem.
+- [x] Critério de live `llm-b`: antes de promover modelo vivo, rodar `/models route <profile>`, `/byok probe chat`,
+  `/byok probe streaming`, `/byok probe json`, `/byok probe vision` quando multimodal, e `/byok probe agent` para
+  perfis agentic; promoção só via `/byok use` + `/byok model` + nova sessão SDK.
 
 ### Faixa K — Banco universal de catálogo e evidências
 
@@ -709,6 +715,13 @@ Implementado neste corte:
 - Os filtros de catálogo/roteamento agora cobrem `tools`, `streaming` e `probe-ok`, além de free/paid/unknown, vision,
   reasoning, contexto, request budget e provider.
 - `renderModelTags()` passou a expor `source=` e `confidence=` quando o catálogo fornece esses metadados.
+- Faixa I ganhou `buildRouteDecisionEvent()`, `projectRouteDecisionMetrics()` e um ledger bounded em processo para
+  decisões de rota, persistindo apenas metadados sanitizados de decisão/fallback/tokens estimados/custo estimado.
+- `/models route <profile>` agora emite `model_gateway:route:decision`, grava o ledger e mostra `decisionId` no terminal.
+- Metrics collector passou a registrar seleção/não seleção e gauges de candidatos, rejeitados e fallback para decisões
+  de rota.
+- Faixa J ganhou o gate pré-K: manter compatibilidade SDK/config, não quebrar presets/env legados antes dos importers
+  universais, e exigir matriz de probes antes de promoção em lives `llm-b`.
 
 Validação deste corte:
 
@@ -720,10 +733,15 @@ Validação deste corte:
 - PASS `npm run test:copilot` após Faixa H
   (`5597` testes, `0` falhas; warning remanescente: `[erro] sdk stream failed`;
   resumo `artifacts/test-runs/copilot/2026-05-25T00-06-10-929Z/summary.md`).
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  após ledger de rota (`75` testes).
+- PASS `npm run typecheck:strict:src.copilot` após ledger de rota.
+- PASS `npm run lint:copilot` após ledger de rota.
+- PASS `npm run test:copilot` após ledger/contrato J
+  (`5598` testes, `0` falhas; warning remanescente: `[erro] sdk stream failed`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T00-13-42-683Z/summary.md`).
 
 Próxima fatia antes de K:
 
-1. Criar usage ledger mínimo da Faixa I para registrar decisão/routeProfile/fallback/failure sem tokens sensíveis.
-2. Completar Faixa J como contrato operacional para `llm-b` lives: matriz de probes, comandos, critérios de promoção e
-   critérios de rollback.
-3. Rodar lives `terminal:llm-b:live-test` com probes apenas após I-J estarem funcionais.
+1. Executar lives `terminal:llm-b:live-test` com a matriz de probes definida.
+2. Só depois avançar para K: banco universal, evidence ledger persistente e importers profundos.

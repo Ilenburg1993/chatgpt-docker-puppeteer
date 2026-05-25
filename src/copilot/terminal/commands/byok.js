@@ -12,6 +12,7 @@ import fs from 'node:fs/promises';
 
 import { config as loadDotenv } from 'dotenv';
 import {
+    buildRouteDecisionEvent,
     buildProbeCompletedEvent,
     classifyByokProviderFailure,
     clearByokProviderModelHealth,
@@ -24,6 +25,7 @@ import {
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
+    recordModelGatewayRouteDecision,
     routeGatewayModels,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
@@ -873,9 +875,10 @@ function normalizeRouteDiscoveryFilters(filters, rawArgs, projection) {
  * @param {(text: string) => void} println
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
  * @param {string[]} rest
+ * @param {ByokCommandContext['eventBus']} [eventBus]
  * @returns {Promise<void>}
  */
-async function renderByokModelRoute(println, projection, rest) {
+async function renderByokModelRoute(println, projection, rest, eventBus = null) {
     const requestedProfile = optionalScalarString(rest[1]);
     const hasExplicitProfile = requestedProfile !== null && !requestedProfile.startsWith('-');
     const profileId = hasExplicitProfile ? requestedProfile : 'repo_agent';
@@ -917,9 +920,22 @@ async function renderByokModelRoute(println, projection, rest) {
         println('    \x1b[90mPerfis conhecidos: cheap_chat, code, repo_agent, tool_agent, json_extraction, vision, deep_reasoning, local_private.\x1b[0m\n');
         return;
     }
+    const decisionEvent = buildRouteDecisionEvent({
+        taskProfile: profileId,
+        routeProfile: projection.summary.profile ?? null,
+        mode: strict ? 'strict' : 'pre-probe',
+        source: 'terminal.models.route',
+        route,
+        estimatedInputTokens: runtimeBudget?.estimatedRequestTokens ?? null,
+        estimatedOutputTokens: null,
+        estimatedCostUsd: null,
+        failure: route.selected ? null : 'no_candidate_selected',
+    });
+    recordModelGatewayRouteDecision(decisionEvent);
+    eventBus?.emit?.(decisionEvent);
 
     println(
-        `  \x1b[90madmissão=${route.candidates.length}/${candidates.length} · rejeitados=${route.rejected.length} · fallback=${route.fallbackChain.length}\x1b[0m\n`,
+        `  \x1b[90mdecision=${decisionEvent.decisionId} · admissão=${route.candidates.length}/${candidates.length} · rejeitados=${route.rejected.length} · fallback=${route.fallbackChain.length}\x1b[0m\n`,
     );
     if (!route.selected) {
         println(
@@ -2112,7 +2128,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
 
     if (sub === 'models') {
         if (/^(route|select|rank)$/iu.test(rest[0] ?? '')) {
-            await renderByokModelRoute(println, projection, rest);
+            await renderByokModelRoute(println, projection, rest, eventBus);
             return;
         }
         const forceRefresh = rest.some((item) => ['refresh', 'force', '--refresh', '--force'].includes(item.toLowerCase()));

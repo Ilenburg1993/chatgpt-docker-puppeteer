@@ -117,6 +117,13 @@ export {
     MODEL_GATEWAY_ROUTE_DECISION,
     buildProbeCompletedEvent,
     buildRegistrySnapshotEvent,
+    buildRouteDecisionEvent,
     projectProbeCompletedMetrics,
+    projectRouteDecisionMetrics,
     projectModelGatewayMetrics,
 } from './observability/events.js';
+export {
+    listModelGatewayRouteDecisions,
+    recordModelGatewayRouteDecision,
+    resetModelGatewayRouteDecisionLedgerForTests,
+} from './observability/route-decision-ledger.js';

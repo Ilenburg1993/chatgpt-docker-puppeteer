@@ -8,7 +8,11 @@
  * @module copilot/model-gateway/observability/events
  */
 
-import { MODEL_GATEWAY_PROBE_COMPLETED, MODEL_GATEWAY_REGISTRY_SNAPSHOT } from '#copilot/events';
+import {
+    MODEL_GATEWAY_PROBE_COMPLETED,
+    MODEL_GATEWAY_REGISTRY_SNAPSHOT,
+    MODEL_GATEWAY_ROUTE_DECISION,
+} from '#copilot/events';
 
 export {
     MODEL_GATEWAY_EVENTS,
@@ -142,6 +146,143 @@ export function projectProbeCompletedMetrics(event) {
             'model_gateway.probe.final_chars': event.finalChars,
             'model_gateway.probe.errors': event.errorCount,
             'model_gateway.probe.warnings': event.warningCount,
+        },
+    };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function optionalString(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function finiteNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * @param {unknown[]} values
+ * @param {number} limit
+ * @returns {string[]}
+ */
+function safeStringList(values, limit) {
+    return values.map(optionalString).filter((item) => item !== null).slice(0, limit);
+}
+
+/**
+ * @param {Record<string, any> | null | undefined} selected
+ * @returns {{ gatewayModelId: string | null; providerId: string | null; modelId: string | null; score: number | null; reasons: string[] }}
+ */
+function summarizeSelectedRouteCandidate(selected) {
+    if (!selected) {
+        return { gatewayModelId: null, providerId: null, modelId: null, score: null, reasons: [] };
+    }
+    const model = selected['model'] ?? {};
+    return {
+        gatewayModelId: optionalString(model['id']),
+        providerId: optionalString(model['providerId']),
+        modelId: optionalString(model['providerModel']) ?? optionalString(model['id']),
+        score: finiteNumber(selected['score']),
+        reasons: safeStringList(Array.isArray(selected['reasons']) ? selected['reasons'] : [], 8),
+    };
+}
+
+/**
+ * @param {{
+ *     taskProfile: string;
+ *     routeProfile?: string | null;
+ *     mode?: string;
+ *     source?: string;
+ *     sessionId?: string | null;
+ *     route: {
+ *         selected?: Record<string, any> | null;
+ *         candidates?: unknown[];
+ *         rejected?: unknown[];
+ *         fallbackChain?: unknown[];
+ *     };
+ *     estimatedInputTokens?: number | null;
+ *     estimatedOutputTokens?: number | null;
+ *     estimatedCostUsd?: number | null;
+ *     failure?: string | null;
+ * }} input
+ * @returns {{
+ *     type: string;
+ *     timestamp: number;
+ *     decisionId: string;
+ *     taskProfile: string;
+ *     routeProfile: string | null;
+ *     mode: string;
+ *     source: string;
+ *     sessionId: string | null;
+ *     selected: boolean;
+ *     gatewayModelId: string | null;
+ *     providerId: string | null;
+ *     modelId: string | null;
+ *     score: number | null;
+ *     reasons: string[];
+ *     candidateCount: number;
+ *     rejectedCount: number;
+ *     fallbackChain: string[];
+ *     estimatedInputTokens: number | null;
+ *     estimatedOutputTokens: number | null;
+ *     estimatedCostUsd: number | null;
+ *     failure: string | null;
+ * }}
+ */
+export function buildRouteDecisionEvent(input) {
+    const selected = summarizeSelectedRouteCandidate(input.route.selected ?? null);
+    const timestamp = Date.now();
+    const taskProfile = optionalString(input.taskProfile) ?? 'unknown';
+    const routeProfile = optionalString(input.routeProfile);
+    const modelId = selected.modelId ?? 'none';
+    return {
+        type: MODEL_GATEWAY_ROUTE_DECISION,
+        timestamp,
+        decisionId: `route-${timestamp}-${taskProfile}-${modelId}`.replace(/[^a-zA-Z0-9._:-]+/gu, '-'),
+        taskProfile,
+        routeProfile,
+        mode: optionalString(input.mode) ?? 'unknown',
+        source: optionalString(input.source) ?? 'model-gateway',
+        sessionId: optionalString(input.sessionId),
+        selected: selected.modelId !== null,
+        gatewayModelId: selected.gatewayModelId,
+        providerId: selected.providerId,
+        modelId: selected.modelId,
+        score: selected.score,
+        reasons: selected.reasons,
+        candidateCount: Array.isArray(input.route.candidates) ? input.route.candidates.length : 0,
+        rejectedCount: Array.isArray(input.route.rejected) ? input.route.rejected.length : 0,
+        fallbackChain: safeStringList(Array.isArray(input.route.fallbackChain) ? input.route.fallbackChain : [], 12),
+        estimatedInputTokens: finiteNumber(input.estimatedInputTokens),
+        estimatedOutputTokens: finiteNumber(input.estimatedOutputTokens),
+        estimatedCostUsd: finiteNumber(input.estimatedCostUsd),
+        failure: optionalString(input.failure),
+    };
+}
+
+/**
+ * @param {ReturnType<typeof buildRouteDecisionEvent>} event
+ * @returns {{ counters: Record<string, number>; gauges: Record<string, number> }}
+ */
+export function projectRouteDecisionMetrics(event) {
+    return {
+        counters: {
+            'model_gateway.route.decision': 1,
+            [`model_gateway.route.${event.selected ? 'selected' : 'unselected'}`]: 1,
+            [`model_gateway.route.mode.${event.mode || 'unknown'}`]: 1,
+        },
+        gauges: {
+            'model_gateway.route.candidates': event.candidateCount,
+            'model_gateway.route.rejected': event.rejectedCount,
+            'model_gateway.route.fallback': event.fallbackChain.length,
+            'model_gateway.route.estimated_input_tokens': event.estimatedInputTokens ?? 0,
+            'model_gateway.route.estimated_cost_usd': event.estimatedCostUsd ?? 0,
         },
     };
 }

@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildProbeCompletedEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, rename, setTerminalModelProjection, writeFile } =
+const { buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, writeFile } =
     vi.hoisted(() => ({
         buildProbeCompletedEvent: vi.fn((input) => ({
             type: 'model_gateway:probe:completed',
@@ -10,6 +10,25 @@ const { buildProbeCompletedEvent, chmod, classifyByokProviderFailure, clearByokP
             ok: input.result?.ok === true,
             status: input.result?.status ?? 'unknown',
             providerAttempted: input.providerAttempted !== false,
+        })),
+        buildRouteDecisionEvent: vi.fn((input) => ({
+            type: 'model_gateway:route:decision',
+            decisionId: 'route-test',
+            taskProfile: input.taskProfile,
+            routeProfile: input.routeProfile ?? null,
+            mode: input.mode ?? 'unknown',
+            source: input.source ?? 'test',
+            selected: Boolean(input.route?.selected),
+            candidateCount: input.route?.candidates?.length ?? 0,
+            rejectedCount: input.route?.rejected?.length ?? 0,
+            fallbackChain: input.route?.fallbackChain ?? [],
+            providerId: input.route?.selected?.model?.providerId ?? null,
+            modelId: input.route?.selected?.model?.providerModel ?? null,
+            gatewayModelId: input.route?.selected?.model?.id ?? null,
+            estimatedInputTokens: input.estimatedInputTokens ?? null,
+            estimatedOutputTokens: input.estimatedOutputTokens ?? null,
+            estimatedCostUsd: input.estimatedCostUsd ?? null,
+            failure: input.failure ?? null,
         })),
         chmod: vi.fn(),
         classifyByokProviderFailure: vi.fn((error) => ({
@@ -68,6 +87,7 @@ const { buildProbeCompletedEvent, chmod, classifyByokProviderFailure, clearByokP
         recordByokProviderModelProbeResult: vi.fn(),
         recordByokProviderModelAgentProbeFailure: vi.fn(),
         recordByokProviderModelAgentProbeSuccess: vi.fn(),
+        recordModelGatewayRouteDecision: vi.fn((event) => event),
         rename: vi.fn(),
         setTerminalModelProjection: vi.fn(),
         writeFile: vi.fn(),
@@ -100,6 +120,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
 
 vi.mock('#copilot/model-gateway', () => ({
     buildProbeCompletedEvent: buildProbeCompletedEvent,
+    buildRouteDecisionEvent,
     classifyByokProviderFailure,
     clearByokProviderModelHealth,
     flushByokProviderHealth,
@@ -111,6 +132,7 @@ vi.mock('#copilot/model-gateway', () => ({
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
+    recordModelGatewayRouteDecision,
     routeGatewayModels,
     runConfiguredByokChatProbe: runConfiguredByokChatProbe,
     runConfiguredByokAgentProbe: runConfiguredByokAgentProbe,
@@ -199,6 +221,8 @@ describe('terminal /byok command', () => {
         });
         loadDotenv.mockReset();
         routeGatewayModels.mockReset();
+        buildRouteDecisionEvent.mockClear();
+        recordModelGatewayRouteDecision.mockClear();
         buildProbeCompletedEvent.mockClear();
         runConfiguredByokChatProbe.mockReset();
         runConfiguredByokAgentProbe.mockReset();
@@ -1365,8 +1389,9 @@ describe('terminal /byok command', () => {
             summary: { enabled: true, ready: true, profile: 'kilo-free' },
         });
         const ctx = mockCtx();
+        const eventBus = { emit: vi.fn() };
 
-        await cmdByok({ println: ctx.println }, 'models route repo_agent --show-rejected');
+        await cmdByok({ println: ctx.println, eventBus }, 'models route repo_agent --show-rejected');
 
         expect(routeGatewayModels).toHaveBeenCalledWith(
             [
@@ -1386,11 +1411,23 @@ describe('terminal /byok command', () => {
             expect.objectContaining({ routeProfile: 'kilo-free', excludeFailed: true, requireAgentProbeOk: false }),
         );
         expect(ctx.output()).toContain('BYOK model route');
+        expect(ctx.output()).toContain('decision=route-test');
         expect(ctx.output()).toContain('modo=pre-probe');
         expect(ctx.output()).toContain('selecionado');
         expect(ctx.output()).toContain('kilo-auto/free');
         expect(ctx.output()).toContain('fallback chain');
         expect(ctx.output()).toContain('missing_capability:tools');
+        expect(buildRouteDecisionEvent).toHaveBeenCalledWith(
+            expect.objectContaining({
+                taskProfile: 'repo_agent',
+                routeProfile: 'kilo-free',
+                mode: 'pre-probe',
+                source: 'terminal.models.route',
+                failure: null,
+            }),
+        );
+        expect(recordModelGatewayRouteDecision).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:route:decision' }));
+        expect(eventBus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:route:decision', decisionId: 'route-test' }));
     });
 
     it('usa a projection do model gateway quando a descoberta remota cai para catálogo estático', async () => {

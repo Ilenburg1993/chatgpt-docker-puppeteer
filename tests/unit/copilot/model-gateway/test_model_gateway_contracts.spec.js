@@ -20,6 +20,7 @@ import {
     buildProviderModelId,
     buildProbeCompletedEvent,
     buildRegistrySnapshotEvent,
+    buildRouteDecisionEvent,
     createModelRecord,
     createEnvSecretRegistry,
     buildModelGatewayOnListModelsHandler,
@@ -31,15 +32,19 @@ import {
     openRouterAdapter,
     persistEnvByokModelGatewaySnapshot,
     projectProbeCompletedMetrics,
+    projectRouteDecisionMetrics,
     projectModelGatewayMetrics,
     redactSecretRecord,
     redactSecretText,
     recordByokProviderModelAgentProbeSuccess,
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
+    listModelGatewayRouteDecisions,
+    recordModelGatewayRouteDecision,
     resolveModelGatewayProviderAdapter,
     resolveModelGatewayTaskProfile,
     resetByokProviderHealthForTests,
+    resetModelGatewayRouteDecisionLedgerForTests,
     routeGatewayModels,
     BYOK_AGENT_PROBE_ANSWER,
     BYOK_AGENT_PROBE_QUESTION,
@@ -127,6 +132,7 @@ const PROVIDER_FAMILY_ENV_FIXTURES = Object.freeze([
 describe('model-gateway foundation', () => {
     afterEach(() => {
         resetByokProviderHealthForTests();
+        resetModelGatewayRouteDecisionLedgerForTests();
     });
 
     it('keeps provider/model identity distinct from provider-local SDK ids', () => {
@@ -351,6 +357,63 @@ describe('model-gateway foundation', () => {
         assert.equal(metrics.counters['model_gateway.probe.kind.streaming'], 1);
         assert.equal(metrics.counters['model_gateway.probe.status.no-delta'], 1);
         assert.equal(metrics.gauges['model_gateway.probe.final_chars'], 32);
+    });
+
+    it('records route decisions as a sanitized usage ledger event', () => {
+        const route = routeGatewayModels(
+            [
+                createModelRecord({
+                    providerId: 'kilo',
+                    providerModel: 'kilo-auto/free',
+                    capabilities: { tools: true, reasoningEffort: true },
+                    limits: { contextWindowTokens: 200000 },
+                    pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+                    routing: { tier: 'free' },
+                    verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+                }),
+                createModelRecord({
+                    providerId: 'tiny',
+                    providerModel: 'chat-only',
+                    capabilities: { tools: false },
+                    limits: { contextWindowTokens: 4000 },
+                    verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+                }),
+            ],
+            'repo_agent',
+            { routeProfile: 'kilo-free', requireAgentProbeOk: false },
+        );
+        const event = buildRouteDecisionEvent({
+            taskProfile: 'repo_agent',
+            routeProfile: 'kilo-free',
+            mode: 'pre-probe',
+            source: 'unit-test',
+            route,
+            estimatedInputTokens: 12345,
+            estimatedOutputTokens: null,
+            estimatedCostUsd: null,
+            // @ts-expect-error event builder intentionally ignores content-bearing caller fields.
+            prompt: 'do not persist this prompt',
+        });
+        const metrics = projectRouteDecisionMetrics(event);
+        const recorded = recordModelGatewayRouteDecision(event);
+        const ledger = listModelGatewayRouteDecisions({ limit: 5 });
+
+        assert.equal(event.type, 'model_gateway:route:decision');
+        assert.equal(event.taskProfile, 'repo_agent');
+        assert.equal(event.routeProfile, 'kilo-free');
+        assert.equal(event.selected, true);
+        assert.equal(event.providerId, 'kilo');
+        assert.equal(event.modelId, 'kilo-auto/free');
+        assert.equal(event.candidateCount, 1);
+        assert.equal(event.rejectedCount, 1);
+        assert.equal(event.estimatedInputTokens, 12345);
+        assert.equal(JSON.stringify(event).includes('do not persist'), false);
+        assert.equal(metrics.counters['model_gateway.route.decision'], 1);
+        assert.equal(metrics.counters['model_gateway.route.selected'], 1);
+        assert.equal(metrics.gauges['model_gateway.route.candidates'], 1);
+        assert.equal(recorded.decisionId, event.decisionId);
+        assert.equal(ledger.length, 1);
+        assert.equal(ledger[0].decisionId, event.decisionId);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {
