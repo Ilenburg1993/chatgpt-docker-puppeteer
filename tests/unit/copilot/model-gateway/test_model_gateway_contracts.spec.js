@@ -1498,6 +1498,10 @@ describe('model-gateway foundation', () => {
             includeAuthenticated: true,
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
+        const genericAuthenticated = createDefaultModelGatewayCatalogImporters({
+            env: { GROQ_KEY: 'gsk-secret-that-must-not-leak' },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+        });
 
         assert.deepEqual(
             importers.map((importer) => importer.id),
@@ -1507,7 +1511,9 @@ describe('model-gateway foundation', () => {
             publicOnly.map((importer) => importer.id),
             ['openrouter-models', 'kilo-gateway-models', 'kilo-gateway-providers'],
         );
+        assert.equal(genericAuthenticated.some((importer) => importer.id === 'groq-openai-compatible-models'), true);
         assert.equal(JSON.stringify(importers).includes(secret), false);
+        assert.equal(JSON.stringify(genericAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {

@@ -1936,3 +1936,30 @@ Validação deste corte:
 Próxima direção:
 
 - Escolher entre Groq/Cerebras via generic importer ou Hugging Face route selectors.
+
+## 37. Continuidade 2026-05-25 — composição account-scoped OpenAI-compatible
+
+Implementado neste corte:
+
+- `createDefaultModelGatewayCatalogImporters()` usa o generic importer quando encontra keys conhecidas:
+  - Groq: `GROQ_API_KEY`/`GROQ_KEY`;
+  - Cerebras: `CEREBRAS_API_KEY`/`CEREBRAS_KEY`;
+  - Chutes: `CHUTES_API_KEY`/`CHUTES_AI`;
+  - Z.AI: `ZAI_API_KEY`/`Z_AI_KEY`.
+- O valor secreto continua preso em closure e não aparece em JSON/stringify.
+- Cada importer gerado coleta `/models` como visão account-scoped identity-only, com `accountOverlays` e
+  `routeOptions`, sem promover capabilities ricas.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`49` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5622` testes totais, `5589` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T16-45-06-288Z/summary.md`).
+
+Próxima direção:
+
+- Complementar Groq/Cerebras com docs/catálogos de limites quando disponíveis.
