@@ -103,6 +103,7 @@ export {
     normalizeAccountOverlayControls,
     normalizeCatalogModalities,
     normalizeModelAliases,
+    normalizeModelIdentityTraits,
     normalizeModelLifecycle,
     normalizeModelModalities,
     normalizeModelTokenLimits,

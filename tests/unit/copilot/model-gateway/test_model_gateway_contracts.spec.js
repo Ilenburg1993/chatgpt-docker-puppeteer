@@ -95,6 +95,7 @@ import {
     mergeProviderMetadataEvidence,
     normalizeAccountOverlayControls,
     normalizeModelAliases,
+    normalizeModelIdentityTraits,
     normalizeModelLifecycle,
     normalizeModelModalities,
     normalizeModelTokenLimits,
@@ -1204,6 +1205,7 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('capabilities.vision'), true);
         assert.equal(byPath.get('aliases.version'), '2026-05-20');
         assert.equal(byPath.get('lifecycle.status'), 'active');
+        assert.equal(byPath.get('providerMetadata.modelTraits.family'), 'grok');
         assert.equal(byPath.get('providerMetadata.openrouter.detailsPath'), '/api/v1/models/x-ai/grok-build-0.1-20260520/endpoints');
         assert.deepEqual(byPath.get('providerMetadata.openrouter.defaultParameters'), {
             temperature: null,
@@ -1309,6 +1311,9 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('pricing.inputUsdPerMillion'), 3);
         assert.equal(byPath.get('pricing.outputUsdPerMillion'), 15);
         assert.equal(byPath.get('providerMetadata.kilo.upstreamProvider'), 'anthropic');
+        assert.equal(byPath.get('providerMetadata.modelTraits.family'), 'claude');
+        assert.equal(byPath.get('providerMetadata.modelTraits.tier'), 'sonnet');
+        assert.equal(byPath.get('providerMetadata.modelTraits.generation'), '4.6');
         assert.equal(byPath.get('providerMetadata.kilo.isFree'), false);
         assert.deepEqual(byPath.get('providerMetadata.kilo.opencode'), {
             ai_sdk_provider: 'anthropic',
@@ -1526,6 +1531,9 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('pricing.outputUsdPerMillion'), 0.312);
         assert.equal(byPath.get('pricing.cacheReadUsdPerMillion'), 0.052);
         assert.equal(byPath.get('providerMetadata.chutes.quantization'), 'fp8');
+        assert.equal(byPath.get('providerMetadata.modelTraits.family'), 'qwen');
+        assert.equal(byPath.get('providerMetadata.modelTraits.parameterCountBillions'), 32);
+        assert.equal(byPath.get('providerMetadata.modelTraits.quantization'), 'fp8');
     });
 
     it('imports Z.AI pricing docs as normalized OpenAI-compatible catalog metadata', async () => {
@@ -2416,6 +2424,8 @@ describe('model-gateway foundation', () => {
         assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:limits.contextWindowTokens'), 128000);
         assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:capabilities.tools'), true);
         assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:capabilities.reasoning'), true);
+        assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:providerMetadata.modelTraits.family'), 'gpt-oss');
+        assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:providerMetadata.modelTraits.parameterCountBillions'), 120);
         assert.deepEqual(byModel.get('cloudflare-workers-ai:inworld/tts-2:modalities.output'), ['audio']);
         assert.equal(byModel.get('cloudflare-workers-ai:inworld/tts-2:capabilities.realTime'), true);
     });
@@ -2769,6 +2779,53 @@ describe('model-gateway foundation', () => {
                 knowledgeCutoff: '2025-12-01T00:00:00.000Z',
                 channel: 'preview',
                 status: 'scheduled_retirement',
+            },
+        );
+    });
+
+    it('normalizes provider-neutral model identity traits without proving capabilities', () => {
+        assert.deepEqual(
+            normalizeModelIdentityTraits({
+                providerModel: 'Qwen/Qwen3-32B-TEE',
+                canonicalSlug: 'Qwen/Qwen3-32B',
+                quantization: 'FP8',
+            }),
+            {
+                family: 'qwen',
+                series: 'qwen3',
+                generation: '3',
+                sizeLabel: '32b',
+                parameterCountBillions: 32,
+                quantization: 'fp8',
+                architectureHints: ['confidential_compute'],
+            },
+        );
+
+        assert.deepEqual(
+            normalizeModelIdentityTraits({
+                providerModel: 'mistralai/Mixtral-8x7B-Instruct-v0.1',
+            }),
+            {
+                family: 'mixtral',
+                series: 'mixtral',
+                sizeLabel: '8x7b',
+                parameterCountBillions: 56,
+                expertCount: 8,
+                expertParameterCountBillions: 7,
+                architectureHints: ['instruction_tuned', 'mixture_of_experts'],
+            },
+        );
+
+        assert.deepEqual(
+            normalizeModelIdentityTraits({
+                providerModel: '@cf/openai/gpt-oss-120b',
+                displayName: 'gpt-oss-120b',
+            }),
+            {
+                family: 'gpt-oss',
+                series: 'gpt-oss',
+                sizeLabel: '120b',
+                parameterCountBillions: 120,
             },
         );
     });

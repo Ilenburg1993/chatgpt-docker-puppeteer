@@ -18,6 +18,7 @@ import {
 import {
     normalizeAccountOverlayControls,
     normalizeModelAliases,
+    normalizeModelIdentityTraits,
     normalizeModelLifecycle,
     normalizeModelModalities,
     normalizeModelTokenLimits,
@@ -114,6 +115,12 @@ function modelEvidenceValues(row) {
         canonicalSlug: row['root'],
         huggingFaceId: row['root'],
     });
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel,
+        canonicalSlug: row['root'],
+        huggingFaceId: row['root'],
+        quantization: row['quantization'],
+    });
     const lifecycle = normalizeModelLifecycle({
         created: row['created'],
         providerModel,
@@ -170,6 +177,7 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.chutes.supportedFeatures', value: supportedFeatures },
         { fieldPath: 'providerMetadata.chutes.supportedSamplingParameters', value: supportedParameters },
         { fieldPath: 'providerMetadata.chutes.permission', value: row['permission'] },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
         { fieldPath: 'openai.created', value: finiteNumber(row['created']) },
         { fieldPath: 'openai.owned_by', value: stringValue(row['owned_by']) ?? 'chutes' },
     ];

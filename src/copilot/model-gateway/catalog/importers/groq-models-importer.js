@@ -17,6 +17,7 @@ import {
 import {
     normalizeAccountOverlayControls,
     normalizeModelAliases,
+    normalizeModelIdentityTraits,
     normalizeModelLifecycle,
     normalizeModelModalities,
     normalizeModelTokenLimits,
@@ -115,6 +116,7 @@ function modelEvidenceValues(row) {
         providerModel,
     });
     const aliases = normalizeModelAliases({ providerModel });
+    const identityTraits = normalizeModelIdentityTraits({ providerModel });
     const limits = normalizeModelTokenLimits({
         contextWindowTokens: row['context_window'],
         maxOutputTokens: row['max_completion_tokens'],
@@ -135,6 +137,7 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.groq.maxCompletionTokens', value: finiteNumber(row['max_completion_tokens']) },
         { fieldPath: 'providerMetadata.groq.publicApps', value: row['public_apps'] ?? null },
         { fieldPath: 'providerMetadata.groq.batchEndpoint', value: '/openai/v1/batches' },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
         { fieldPath: 'openai.created', value: finiteNumber(row['created']) },
         { fieldPath: 'openai.owned_by', value: stringValue(row['owned_by']) ?? 'groq' },
     ];

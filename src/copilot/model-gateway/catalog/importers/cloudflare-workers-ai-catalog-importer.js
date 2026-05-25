@@ -19,6 +19,7 @@ import {
     normalizeAccountOverlayControls,
     normalizeCatalogModalities,
     normalizeModelAliases,
+    normalizeModelIdentityTraits,
     normalizeModelModalities,
     normalizeModelTokenLimits,
 } from '../normalizers.js';
@@ -271,6 +272,11 @@ function modelEvidenceValues(row) {
     const task = stringValue(row['task']) ?? stringValue(row['task_type']);
     const modalities = modalitiesFromTask(task, capabilities);
     const aliases = normalizeModelAliases({ providerModel: id, huggingFaceId: stringValue(row['hugging_face_id']) });
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel: id,
+        displayName: stringValue(row['display_name']) ?? stringValue(row['name']),
+        huggingFaceId: stringValue(row['hugging_face_id']),
+    });
     const limits = normalizeModelTokenLimits({
         contextWindowTokens: row['context_window'] ?? row['context_length'],
         maxOutputTokens: row['max_output_tokens'] ?? row['max_tokens'],
@@ -291,6 +297,7 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.cloudflare.partner', value: booleanValue(row['partner']) },
         { fieldPath: 'providerMetadata.cloudflare.docsUrl', value: stringValue(row['docs_url']) ?? stringValue(row['url']) },
         { fieldPath: 'providerMetadata.cloudflare.rawCapabilities', value: row['capabilities'] },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
         { fieldPath: 'openai.owned_by', value: 'cloudflare' },
     ];
     return values.filter((item) => {

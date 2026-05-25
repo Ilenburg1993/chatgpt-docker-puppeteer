@@ -10,7 +10,13 @@
  */
 
 import { MODEL_GATEWAY_CATALOG_CONFIDENCE, createModelMetadataEvidence, createProviderMetadataEvidence } from '../contracts.js';
-import { normalizeModelAliases, normalizeModelModalities, normalizeModelTokenLimits, normalizeUsdPricing } from '../normalizers.js';
+import {
+    normalizeModelAliases,
+    normalizeModelIdentityTraits,
+    normalizeModelModalities,
+    normalizeModelTokenLimits,
+    normalizeUsdPricing,
+} from '../normalizers.js';
 import { decodeHtmlEntities, htmlTableCells, htmlTableRows, htmlText } from './html-docs-parser.js';
 
 export const GROQ_DOCS_MODELS_URL = 'https://console.groq.com/docs/models';
@@ -280,6 +286,10 @@ function modelEvidenceValues(row) {
     const rateLimits = isRecord(row['rateLimits']) ? row['rateLimits'] : {};
     const limits = isRecord(row['limits']) ? row['limits'] : {};
     const aliases = normalizeModelAliases({ providerModel });
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel,
+        displayName: row['displayName'],
+    });
     const modalities = modalitiesFromModelId(providerModel);
     const normalizedLimits = normalizeModelTokenLimits({
         contextWindowTokens: limits['contextWindowTokens'],
@@ -311,6 +321,7 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.groqDocs.pricing', value: pricing },
         { fieldPath: 'providerMetadata.groqDocs.promptCachingPricing', value: promptCaching },
         { fieldPath: 'providerMetadata.groqDocs.sourceText', value: stringValue(row['sourceText']) },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
     ];
     return values.filter((item) => {
         if (item.value === null || item.value === undefined) return false;

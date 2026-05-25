@@ -15,6 +15,7 @@ import {
 } from '../contracts.js';
 import {
     normalizeModelAliases,
+    normalizeModelIdentityTraits,
     normalizeModelLifecycle,
     normalizeModelModalities,
     normalizeModelTokenLimits,
@@ -104,6 +105,12 @@ function modelEvidenceValues(row) {
         canonicalSlug: row['canonical_slug'],
         huggingFaceId: row['hugging_face_id'],
     });
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel: row['id'],
+        displayName: row['name'],
+        canonicalSlug: row['canonical_slug'],
+        huggingFaceId: row['hugging_face_id'],
+    });
     const lifecycle = normalizeModelLifecycle({
         created: row['created'],
         expiresAt: row['expiration_date'],
@@ -152,6 +159,7 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.openrouter.supportedVoices', value: row['supported_voices'] },
         { fieldPath: 'providerMetadata.openrouter.perRequestLimits', value: row['per_request_limits'] },
         { fieldPath: 'providerMetadata.openrouter.detailsPath', value: links['details'] },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
         { fieldPath: 'routingHints.openrouterTopProvider', value: topProvider },
     ];
     return values.filter((item) => {

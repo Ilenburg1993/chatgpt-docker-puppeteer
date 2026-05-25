@@ -326,6 +326,278 @@ function nonNegativeNumberRecord(fields) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function normalizedIdentityToken(value) {
+    const text = scalarString(value);
+    return text ? text.toLowerCase().replace(/[_\s]+/gu, '-').replace(/-+/gu, '-') : null;
+}
+
+/**
+ * @param {unknown[]} values
+ * @returns {string}
+ */
+function identitySearchText(values) {
+    return values
+        .map((value) => scalarString(value))
+        .filter((value) => value !== null)
+        .join(' ')
+        .toLowerCase()
+        .replace(/[_:/@]+/gu, '-')
+        .replace(/\s+/gu, '-');
+}
+
+/** @type {readonly (readonly [string, RegExp])[]} */
+const MODEL_FAMILY_PATTERNS = Object.freeze([
+    ['gpt-oss', /(?:^|-)gpt-?oss(?:-|$)/u],
+    ['gpt', /(?:^|-)gpt(?:-|$)/u],
+    ['o', /(?:^|-)o\d+(?:-|$)/u],
+    ['claude', /(?:^|-)claude(?:-|$)/u],
+    ['gemini', /(?:^|-)gemini(?:-|$)/u],
+    ['llama', /(?:^|-)llama(?:-|$)/u],
+    ['qwen', /(?:^|-)qwen(?:\d|2\.5|3)?(?:-|$)/u],
+    ['deepseek', /(?:^|-)deepseek(?:-|$)/u],
+    ['mistral', /(?:^|-)mistral(?:-|$)/u],
+    ['mixtral', /(?:^|-)mixtral(?:-|$)/u],
+    ['codestral', /(?:^|-)codestral(?:-|$)/u],
+    ['kimi', /(?:^|-)kimi(?:-|$)/u],
+    ['glm', /(?:^|-)glm(?:-|$)/u],
+    ['grok', /(?:^|-)grok(?:-|$)/u],
+    ['command', /(?:^|-)command(?:-|$)/u],
+    ['nemotron', /(?:^|-)nemotron(?:-|$)/u],
+    ['whisper', /(?:^|-)whisper(?:-|$)/u],
+    ['tts', /(?:^|-)tts(?:-|$)/u],
+    ['embedding', /(?:^|-)(?:embed|embedding|embeddings)(?:-|$)/u],
+]);
+
+const MODEL_TIER_TOKENS = Object.freeze([
+    'opus',
+    'sonnet',
+    'haiku',
+    'mini',
+    'nano',
+    'micro',
+    'flash',
+    'pro',
+    'ultra',
+    'turbo',
+    'max',
+    'lite',
+    'codex',
+    'versatile',
+    'instant',
+]);
+
+/**
+ * @param {string} text
+ * @returns {string | null}
+ */
+function inferModelFamily(text) {
+    for (const [family, pattern] of MODEL_FAMILY_PATTERNS) {
+        if (pattern.test(text)) return family;
+    }
+    return null;
+}
+
+/**
+ * @param {string} text
+ * @param {string | null} family
+ * @returns {string | null}
+ */
+function inferModelGeneration(text, family) {
+    const familyPatterns =
+        family === 'claude'
+            ? [/(?:^|-)claude-(?:opus|sonnet|haiku)-(\d+(?:\.\d+)?)(?:-|$)/u, /(?:^|-)claude-(\d+(?:\.\d+)?)(?:-|$)/u]
+            : family === 'gpt'
+              ? [/(?:^|-)gpt-(\d+(?:\.\d+)?)(?:-|$)/u]
+              : family === 'o'
+                ? [/(?:^|-)o(\d+(?:\.\d+)?)(?:-|$)/u]
+                : family === 'llama'
+                  ? [/(?:^|-)llama-(\d+(?:\.\d+)?)(?:-|$)/u]
+                  : family === 'qwen'
+                    ? [/(?:^|-)qwen-?(\d+(?:\.\d+)?)(?:-|$)/u]
+                    : family === 'gemini'
+                      ? [/(?:^|-)gemini-(\d+(?:\.\d+)?)(?:-|$)/u]
+                      : family === 'glm'
+                        ? [/(?:^|-)glm-(\d+(?:\.\d+)?[v]?)(?:-|$)/u]
+                        : family === 'grok'
+                          ? [/(?:^|-)grok-(\d+(?:\.\d+)?)(?:-|$)/u]
+                          : [];
+    for (const pattern of familyPatterns) {
+        const match = text.match(pattern);
+        if (match?.[1]) return match[1];
+    }
+    return null;
+}
+
+/**
+ * @param {string} text
+ * @returns {string | null}
+ */
+function inferModelTier(text) {
+    for (const tier of MODEL_TIER_TOKENS) {
+        if (new RegExp(`(?:^|-)${tier}(?:-|$)`, 'u').test(text)) return tier;
+    }
+    return null;
+}
+
+/**
+ * @param {string} text
+ * @param {string | null} family
+ * @param {string | null} generation
+ * @returns {string | null}
+ */
+function inferModelSeries(text, family, generation) {
+    const special = text.match(/(?:^|-)(gpt-oss|qwen\d+(?:\.\d+)?|llama-\d+(?:\.\d+)?|gemini-\d+(?:\.\d+)?|glm-\d+(?:\.\d+)?v?|grok-\d+(?:\.\d+)?)(?:-|$)/u);
+    if (special?.[1]) return special[1];
+    return family && generation ? `${family}-${generation}` : family;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {{ label: string | null; parameterCountBillions: number | null; expertCount: number | null; expertParameterCountBillions: number | null; activeParameterCountBillions: number | null }}
+ */
+function parseParameterScale(value) {
+    const text = scalarString(value)?.toLowerCase().replace(/[_\s]+/gu, '-') ?? '';
+    /** @type {{ label: string | null; parameterCountBillions: number | null; expertCount: number | null; expertParameterCountBillions: number | null; activeParameterCountBillions: number | null }} */
+    const result = {
+        label: null,
+        parameterCountBillions: null,
+        expertCount: null,
+        expertParameterCountBillions: null,
+        activeParameterCountBillions: null,
+    };
+    const expert = text.match(/(?:^|-)(\d+)x(\d+(?:\.\d+)?)b(?:-|$)/u);
+    if (expert?.[1] && expert[2]) {
+        result.expertCount = Number(expert[1]);
+        result.expertParameterCountBillions = Number(expert[2]);
+        result.parameterCountBillions = Math.round(result.expertCount * result.expertParameterCountBillions * 1000) / 1000;
+        result.label = `${expert[1]}x${expert[2]}b`;
+    }
+    const active = text.match(/(?:^|-)a(\d+(?:\.\d+)?)b(?:-|$)/u);
+    if (active?.[1]) result.activeParameterCountBillions = Number(active[1]);
+    const size = text.match(/(?:^|-)(\d+(?:\.\d+)?)([bm])(?:-|$)/u);
+    if (size?.[1] && size[2]) {
+        const amount = Number(size[1]);
+        result.label = result.label ?? `${size[1]}${size[2]}`;
+        result.parameterCountBillions =
+            result.parameterCountBillions ?? (size[2] === 'm' ? Math.round((amount / 1000) * 1000) / 1000 : amount);
+    }
+    return result;
+}
+
+/**
+ * @param {string} text
+ * @param {unknown} explicit
+ * @returns {string | null}
+ */
+function inferQuantization(text, explicit) {
+    const explicitValue = normalizedIdentityToken(explicit);
+    if (explicitValue) return explicitValue;
+    const match = text.match(/(?:^|-)(fp8|fp16|bf16|int8|int4|q[2-8](?:-[a-z0-9]+)*|awq|gptq)(?:-|$)/u);
+    return match?.[1] ?? null;
+}
+
+/**
+ * @param {string} text
+ * @returns {string[]}
+ */
+function inferModalityHints(text) {
+    /** @type {string[]} */
+    const hints = [];
+    if (/(?:^|-)(?:vision|vl|llava|image-to-text|multimodal)(?:-|$)/u.test(text)) hints.push('vision');
+    if (/(?:^|-)(?:whisper|asr|stt|transcription)(?:-|$)/u.test(text)) hints.push('asr');
+    if (/(?:^|-)(?:tts|speech|playai|orpheus)(?:-|$)/u.test(text)) hints.push('tts');
+    if (/(?:^|-)(?:embed|embedding|embeddings)(?:-|$)/u.test(text)) hints.push('embedding');
+    if (/(?:^|-)(?:rerank|reranker)(?:-|$)/u.test(text)) hints.push('rerank');
+    if (/(?:^|-)(?:text-to-image|image-generation)(?:-|$)/u.test(text)) hints.push('image-generation');
+    return [...new Set(hints)];
+}
+
+/**
+ * @param {string} text
+ * @returns {string[]}
+ */
+function inferArchitectureHints(text) {
+    /** @type {string[]} */
+    const hints = [];
+    if (/(?:^|-)(?:r1|reasoning|thinking)(?:-|$)/u.test(text)) hints.push('reasoning_family');
+    if (/(?:^|-)(?:instruct|chat)(?:-|$)/u.test(text)) hints.push('instruction_tuned');
+    if (/(?:^|-)(?:distill|distilled)(?:-|$)/u.test(text)) hints.push('distilled');
+    if (/(?:^|-)(?:moe)(?:-|$)/u.test(text) || /(?:^|-)\d+x\d+(?:\.\d+)?b(?:-|$)/u.test(text)) hints.push('mixture_of_experts');
+    if (/(?:^|-)(?:tee|confidential-compute)(?:-|$)/u.test(text)) hints.push('confidential_compute');
+    return [...new Set(hints)];
+}
+
+/**
+ * @param {object} [input]
+ * @param {unknown} [input.providerModel]
+ * @param {unknown} [input.displayName]
+ * @param {unknown} [input.canonicalSlug]
+ * @param {unknown} [input.huggingFaceId]
+ * @param {unknown} [input.family]
+ * @param {unknown} [input.series]
+ * @param {unknown} [input.generation]
+ * @param {unknown} [input.tier]
+ * @param {unknown} [input.parameterSize]
+ * @param {unknown} [input.parameterCountBillions]
+ * @param {unknown} [input.activeParameterCountBillions]
+ * @param {unknown} [input.quantization]
+ * @returns {Record<string, string | number | string[]>}
+ */
+export function normalizeModelIdentityTraits(input = {}) {
+    const text = identitySearchText([
+        input.providerModel,
+        input.displayName,
+        input.canonicalSlug,
+        input.huggingFaceId,
+        input.family,
+        input.series,
+        input.parameterSize,
+        input.quantization,
+    ]);
+    const explicitFamily = normalizedIdentityToken(input.family);
+    const family = explicitFamily ?? inferModelFamily(text);
+    const generation = normalizedIdentityToken(input.generation) ?? inferModelGeneration(text, family);
+    const tier = normalizedIdentityToken(input.tier) ?? inferModelTier(text);
+    const series = normalizedIdentityToken(input.series) ?? inferModelSeries(text, family, generation);
+    const scaleFromExplicit = parseParameterScale(input.parameterSize);
+    const scaleFromText = parseParameterScale(text);
+    const parameterCountBillions = finiteNumber(input.parameterCountBillions) ?? scaleFromExplicit.parameterCountBillions ?? scaleFromText.parameterCountBillions;
+    const activeParameterCountBillions =
+        finiteNumber(input.activeParameterCountBillions) ??
+        scaleFromExplicit.activeParameterCountBillions ??
+        scaleFromText.activeParameterCountBillions;
+    const quantization = inferQuantization(text, input.quantization);
+    const modalityHints = inferModalityHints(text);
+    const architectureHints = inferArchitectureHints(text);
+    const sizeLabel = scaleFromExplicit.label ?? scaleFromText.label;
+    const expertCount = scaleFromExplicit.expertCount ?? scaleFromText.expertCount;
+    const expertParameterCountBillions =
+        scaleFromExplicit.expertParameterCountBillions ?? scaleFromText.expertParameterCountBillions;
+    /** @type {Record<string, string | number | string[]>} */
+    const traits = {};
+    if (family) traits['family'] = family;
+    if (series) traits['series'] = series;
+    if (generation) traits['generation'] = generation;
+    if (tier) traits['tier'] = tier;
+    if (sizeLabel) traits['sizeLabel'] = sizeLabel;
+    if (parameterCountBillions !== null && parameterCountBillions >= 0) traits['parameterCountBillions'] = parameterCountBillions;
+    if (activeParameterCountBillions !== null && activeParameterCountBillions >= 0) {
+        traits['activeParameterCountBillions'] = activeParameterCountBillions;
+    }
+    if (expertCount !== null && expertCount >= 0) traits['expertCount'] = expertCount;
+    if (expertParameterCountBillions !== null && expertParameterCountBillions >= 0) {
+        traits['expertParameterCountBillions'] = expertParameterCountBillions;
+    }
+    if (quantization) traits['quantization'] = quantization;
+    if (modalityHints.length > 0) traits['modalityHints'] = modalityHints;
+    if (architectureHints.length > 0) traits['architectureHints'] = architectureHints;
+    return traits;
+}
+
+/**
  * @param {object} [input]
  * @param {unknown} [input.enabledModels]
  * @param {unknown} [input.blockedModels]

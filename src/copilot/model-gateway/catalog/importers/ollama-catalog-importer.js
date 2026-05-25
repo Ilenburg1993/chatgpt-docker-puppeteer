@@ -17,6 +17,7 @@ import {
 import {
     normalizeAccountOverlayControls,
     normalizeModelAliases,
+    normalizeModelIdentityTraits,
     normalizeModelModalities,
     normalizeModelTokenLimits,
 } from '../normalizers.js';
@@ -157,6 +158,12 @@ function modelEvidenceValues(row) {
         contextWindowTokens: resolveContextLength(modelInfo, parameters),
     });
     const aliases = normalizeModelAliases({ providerModel });
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel,
+        family: details['family'],
+        parameterSize: details['parameter_size'],
+        quantization: details['quantization_level'],
+    });
     const values = [
         { fieldPath: 'displayName', value: providerModel },
         ...Object.entries(aliases).map(([key, value]) => ({ fieldPath: `aliases.${key}`, value })),
@@ -178,6 +185,7 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.ollama.template', value: stringValue(row['template']) },
         { fieldPath: 'providerMetadata.ollama.license', value: stringValue(row['license']) },
         { fieldPath: 'providerMetadata.ollama.modelInfo', value: Object.keys(modelInfo).length > 0 ? modelInfo : null },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
         { fieldPath: 'openai.owned_by', value: 'local' },
     ];
     return values.filter((item) => item.value !== null && item.value !== undefined);

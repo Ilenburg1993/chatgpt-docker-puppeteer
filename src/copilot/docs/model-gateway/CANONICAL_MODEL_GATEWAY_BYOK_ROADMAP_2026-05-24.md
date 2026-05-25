@@ -621,7 +621,10 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Criar normalizador de lifecycle: active, preview, scheduled_retirement/retired, createdAt, expiresAt e
   knowledgeCutoff.
 - [x] Criar parser inicial de aliases/versionamento (`latest`, data compacta `YYYYMMDD` e data `YYYY-MM-DD`).
-- [ ] Expandir parser de aliases/versionamento para famílias, tamanho, quantização, instruct/coder/reasoning e variants.
+- [x] Criar normalizador transversal de identidade técnica do modelo para família, série, geração, tier, tamanho,
+  parâmetros, MoE, quantização, modalidade e hints arquiteturais leves em `providerMetadata.modelTraits.*`.
+- [ ] Expandir parser de aliases/versionamento para variants provider-specific, datas de release complexas e aliases
+  comerciais que não aparecem no id técnico.
 - [ ] Criar normalizador de providers/gateways que separe `direct_provider`, `aggregator`, `gateway`,
   `openai_compatible_proxy`, `local_daemon` e `sdk_native`.
 - [x] Criar normalizador de overlays de conta: allow/block lists, organization headers, spending limits, quotas, free
@@ -3321,3 +3324,72 @@ Validação deste corte até agora:
 Próxima direção:
 
 - Rodar strict/lint/test completo, commitar/pushar e continuar para próximo enriquecimento Cloudflare/NVIDIA/docs oficiais.
+
+## 61. Continuidade 2026-05-25 — normalizador transversal de traits técnicos
+
+Problema identificado:
+
+- Vários importers já inferiam, cada um de um jeito, família, tier, geração, tamanho de parâmetros, quantização e pistas
+  de modalidade a partir de ids como `claude-sonnet-4.6`, `Qwen/Qwen3-32B-TEE`, `@cf/openai/gpt-oss-120b` e tags
+  Ollama.
+- Esses fatos pertencem à camada de metadados normalizados, não à camada de probes runtime.
+- Repetir heurísticas por provider dificultaria usar o catálogo como primeiro filtro universal antes da seleção runtime.
+
+Implementado neste corte:
+
+- Criado `normalizeModelIdentityTraits()` em `catalog/normalizers.js`.
+- O normalizador emite evidências leves e sobrescrevíveis em `providerMetadata.modelTraits.*`, incluindo:
+  - `family`;
+  - `series`;
+  - `generation`;
+  - `tier`;
+  - `sizeLabel`;
+  - `parameterCountBillions`;
+  - `activeParameterCountBillions`;
+  - `expertCount`;
+  - `expertParameterCountBillions`;
+  - `quantization`;
+  - `modalityHints`;
+  - `architectureHints`.
+- A função foi exportada pelos barrels `catalog/index.js` e `model-gateway/index.js`.
+- Os importers ricos passaram a anexar esses traits como evidências de catálogo:
+  - OpenRouter;
+  - Kilo Gateway;
+  - Cloudflare Workers AI;
+  - Chutes;
+  - Cerebras public catalog;
+  - Ollama local;
+  - Groq authenticated;
+  - Groq docs/pricing.
+- O normalizador separa metadados técnicos de capabilities provadas:
+  - `vision`, `tts`, `asr`, `embedding` entram como `modalityHints`, não como filtro excludente;
+  - `reasoning_family`, `instruction_tuned`, `distilled`, `mixture_of_experts` e `confidential_compute` entram como
+    hints arquiteturais, não como prova de sucesso agentic;
+  - acesso por key, plano pago e funcionamento básico continuam sendo overlay/probe runtime.
+
+Testes adicionados:
+
+- Teste direto para `normalizeModelIdentityTraits()` cobrindo:
+  - Qwen 32B com TEE/FP8;
+  - Mixtral `8x7B` com MoE;
+  - Cloudflare/OpenAI `gpt-oss-120b`.
+- Asserts em importers garantindo emissão de traits para:
+  - OpenRouter/Grok;
+  - Kilo/Claude Sonnet;
+  - Chutes/Qwen;
+  - Cloudflare/gpt-oss.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`69` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5646` total, `5613` passed, `33` pending, `0` failed, `0` warnings/errors;
+  summary `artifacts/test-runs/copilot/2026-05-25T21-28-53-459Z/summary.md`).
+
+Próxima direção:
+
+- Rodar suíte completa, commitar/pushar e continuar expandindo a aplicação dos traits para outros importers e para
+  normalizadores de pricing/limites/provider-route quando novas fontes trouxerem dados mais ricos.

@@ -16,6 +16,7 @@ import {
 } from '../contracts.js';
 import {
     normalizeModelAliases,
+    normalizeModelIdentityTraits,
     normalizeModelLifecycle,
     normalizeModelModalities,
     normalizeModelTokenLimits,
@@ -123,6 +124,10 @@ function modelEvidenceValues(row) {
     const topProvider = readTopProvider(row);
     const created = finiteNumber(row['created']);
     const aliases = normalizeModelAliases({ providerModel: row['id'] });
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel: row['id'],
+        displayName: row['name'],
+    });
     const lifecycle = normalizeModelLifecycle({
         created: created && created > 0 ? created : null,
         providerModel: row['id'],
@@ -168,6 +173,7 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.kilo.tokenizer', value: architecture['tokenizer'] },
         { fieldPath: 'providerMetadata.kilo.opencode', value: row['opencode'] },
         { fieldPath: 'providerMetadata.kilo.rawPricing', value: pricing },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
         { fieldPath: 'routingHints.kiloTopProvider', value: topProvider },
     ];
     return values.filter((item) => {

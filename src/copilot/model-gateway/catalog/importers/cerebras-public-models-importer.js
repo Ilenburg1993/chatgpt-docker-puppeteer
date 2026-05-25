@@ -15,6 +15,7 @@ import {
 } from '../contracts.js';
 import {
     normalizeModelAliases,
+    normalizeModelIdentityTraits,
     normalizeModelLifecycle,
     normalizeModelModalities,
     normalizeModelTokenLimits,
@@ -107,6 +108,12 @@ function modelEvidenceValues(row) {
         providerModel: row['id'],
         huggingFaceId: row['hugging_face_id'],
     });
+    const identityTraits = normalizeModelIdentityTraits({
+        providerModel: row['id'],
+        displayName: row['name'],
+        huggingFaceId: row['hugging_face_id'],
+        quantization: row['quantization'],
+    });
     const lifecycle = normalizeModelLifecycle({
         created: row['created'],
         providerModel: row['id'],
@@ -144,6 +151,7 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.cerebras.deprecated', value: row['deprecated'] },
         { fieldPath: 'providerMetadata.cerebras.preview', value: row['preview'] },
         { fieldPath: 'providerMetadata.cerebras.quantization', value: stringValue(row['quantization']) },
+        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
     ];
     return values.filter((item) => {
         if (item.value === null || item.value === undefined) return false;
