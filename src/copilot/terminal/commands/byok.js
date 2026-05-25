@@ -1517,7 +1517,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh|diff|conflicts> | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts> | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1614,11 +1614,18 @@ function renderByokGatewayPreKGate(println) {
 /**
  * @param {(text: string) => void} println
  * @param {ByokCommandContext['eventBus']} [eventBus]
+ * @param {string | null} [selector]
  * @returns {Promise<void>}
  */
-async function renderByokGatewayCatalogRefresh(println, eventBus = null) {
+async function renderByokGatewayCatalogRefresh(println, eventBus = null, selector = null) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
-    const importers = createDefaultModelGatewayCatalogImporters({ env: process.env });
+    const allImporters = createDefaultModelGatewayCatalogImporters({ env: process.env });
+    const normalizedSelector = optionalScalarString(selector)?.toLowerCase() ?? null;
+    const importers = normalizedSelector
+        ? allImporters.filter((importer) =>
+              [importer.id, importer.providerId].some((value) => String(value ?? '').toLowerCase().includes(normalizedSelector)),
+          )
+        : allImporters;
     const refreshContext = {
         source: 'terminal-byok',
         storePath: store.filePath,
@@ -1626,10 +1633,10 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null) {
     };
     println(`\n  \x1b[36mBYOK model-gateway catalog refresh\x1b[0m`);
     println(
-        `  \x1b[90mstore=${store.filePath} · importers=${importers.map((importer) => importer.id).join(',') || '-'} · schema=OpenAI+x_model_gateway\x1b[0m\n`,
+        `  \x1b[90mstore=${store.filePath} · selector=${normalizedSelector ?? '-'} · importers=${importers.map((importer) => importer.id).join(',') || '-'} · schema=OpenAI+x_model_gateway\x1b[0m\n`,
     );
     if (importers.length === 0) {
-        println('    \x1b[33mNenhum importer habilitado. Configure rede/credenciais ou rode apenas fontes públicas quando disponíveis.\x1b[0m\n');
+        println('    \x1b[33mNenhum importer habilitado para este seletor. Configure rede/credenciais, remova o filtro ou use uma fonte pública disponível.\x1b[0m\n');
         return;
     }
     try {
@@ -2197,7 +2204,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
 
     if (sub === 'gateway' || sub === 'gate' || sub === 'migration') {
         if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(refresh|reload|sync|atualizar)$/iu.test(rest[1] ?? '')) {
-            await renderByokGatewayCatalogRefresh(println, eventBus);
+            await renderByokGatewayCatalogRefresh(println, eventBus, rest[2] ?? null);
             return;
         }
         if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(diff|changes|mudancas|mudanças)$/iu.test(rest[1] ?? '')) {
@@ -2387,6 +2394,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
     }
 
     if (sub === 'models') {
+        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(refresh|reload|sync|atualizar)$/iu.test(rest[1] ?? '')) {
+            await renderByokGatewayCatalogRefresh(println, eventBus, rest[2] ?? null);
+            return;
+        }
         if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(diff|changes|mudancas|mudanças)$/iu.test(rest[1] ?? '')) {
             await renderByokGatewayCatalogDiff(println);
             return;

@@ -651,7 +651,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 
 ### Faixa P — UX de exploração do catálogo universal
 
-- [ ] `/models catalog refresh [provider]`.
+- [x] `/models catalog refresh [provider]`.
 - [x] `/models catalog diff`.
 - [ ] `/models search <query>`.
 - [ ] `/models explain <provider:model>`.
@@ -2290,3 +2290,29 @@ Validação deste corte até agora:
 Próxima direção:
 
 - Validar, commitar/pushar e avançar para `/models catalog refresh [provider]`.
+
+## 44. Continuidade 2026-05-25 — `/models catalog refresh [provider]`
+
+Implementado neste corte:
+
+- `/models catalog refresh [provider]` foi encaminhado para o refresh universal.
+- `/byok gateway catalog refresh [provider]` também aceita o mesmo seletor.
+- O seletor filtra importers por `id` ou `providerId`, permitindo refresh focado por provider/importer antes do TTL/cache
+  incremental completo.
+- A saída do refresh agora mostra `selector=<valor>` para deixar claro quando a coleta foi filtrada.
+- A checkbox `/models catalog refresh [provider]` da Faixa P foi marcada como concluída.
+
+Separação arquitetural reafirmada:
+
+- O filtro escolhe quais importers coletar; ele não altera critérios de seleção runtime.
+- O refresh focado continua gerando diff, eventos e sugestões de probes da mesma forma que o refresh completo.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  (`108` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5631` testes totais, `5598` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T17-43-17-128Z/summary.md`).

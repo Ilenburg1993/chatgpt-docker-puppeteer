@@ -1387,6 +1387,22 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('probe suggestions: 1');
     });
 
+    it('encaminha /models catalog refresh com filtro de provider/importer', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models catalog refresh openrouter');
+
+        expect(refreshModelGatewayCatalog).toHaveBeenCalledWith(
+            expect.objectContaining({
+                importers: [expect.objectContaining({ id: 'openrouter-models' })],
+            }),
+        );
+        expect(ctx.output()).toContain('selector=openrouter');
+        expect(ctx.output()).toContain('openrouter-models');
+        expect(ctx.output()).not.toContain('openai-models · schema');
+    });
+
     it('encaminha /models catalog diff para a mesma UX persistida', async () => {
         mockProjection();
         const ctx = mockCtx();
