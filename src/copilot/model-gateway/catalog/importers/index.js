@@ -19,6 +19,10 @@ export {
 } from './kilo-gateway-providers-importer.js';
 export { createOpenAICompatibleModelsImporter } from './openai-compatible-models-importer.js';
 export {
+    MISTRAL_MODELS_CATALOG_URL,
+    createMistralModelsImporter,
+} from './mistral-models-importer.js';
+export {
     OPENAI_MODELS_CATALOG_URL,
     createOpenAIModelsImporter,
 } from './openai-models-importer.js';

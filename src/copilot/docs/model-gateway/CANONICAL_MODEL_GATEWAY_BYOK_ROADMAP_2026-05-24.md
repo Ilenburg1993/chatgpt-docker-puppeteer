@@ -567,7 +567,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] Implementar `AnthropicModelsImporter` para lista oficial de modelos e docs complementares.
 - [ ] Implementar `GeminiModelsImporter` para `models.list`/`models.get`, capturando token limits,
   `supportedGenerationMethods`, `thinking` e parâmetros.
-- [ ] Implementar `MistralModelsImporter` para `/v1/models`, capturando capabilities, aliases,
+- [x] Implementar `MistralModelsImporter` para `/v1/models`, capturando capabilities, aliases,
   `max_context_length`, deprecation e replacement.
 - [ ] Implementar `GroqModelsImporter` para `/openai/v1/models` e docs de limites.
 - [ ] Implementar `OllamaCatalogImporter` para `/api/tags` + `/api/show`.
@@ -2316,3 +2316,54 @@ Validação deste corte até agora:
 - PASS `npm run test:copilot`
   (`5631` testes totais, `5598` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
   summary `artifacts/test-runs/copilot/2026-05-25T17-43-17-128Z/summary.md`).
+
+## 45. Continuidade 2026-05-25 — importer autenticado Mistral
+
+Investigação oficial:
+
+- A documentação da Mistral confirma `GET /v1/models` como listagem de modelos disponíveis para o usuário.
+- O endpoint usa `Authorization: Bearer <key>`.
+- A resposta documentada inclui `id`, `capabilities`, `created`, `owned_by`, `name`, `description`,
+  `max_context_length`, `aliases`, `deprecation`, `deprecation_replacement_model`, `default_model_temperature`,
+  `TYPE` e `archived`.
+- Também há `GET /v1/models/{model_id}` para detalhe por modelo, reservado para uma fase posterior de enriquecimento
+  incremental por modelo.
+
+Implementado neste corte:
+
+- Novo `MistralModelsImporter` para `https://api.mistral.ai/v1/models`.
+- O importer é account-scoped/autenticado e usa `MISTRAL_API_KEY` ou `MISTRAL_KEY` na composição padrão.
+- O payload vira evidências para:
+  - `displayName`;
+  - `description`;
+  - aliases normalizados e aliases Mistral;
+  - lifecycle created/retirement/replacement;
+  - `limits.contextWindowTokens`;
+  - modalidades text/image quando `vision=true`;
+  - capabilities `chat`, `tools`, `codeCompletion`, `vision`, `classification`, `fineTuning`;
+  - `providerMetadata.ownedBy` e campos Mistral específicos;
+  - campos OpenAI-compatible `openai.created` e `openai.owned_by`.
+- O importer também emite:
+  - `ModelRouteOption` `exact_model`;
+  - `ProviderAccountOverlay` com modelos habilitados pela key, sem serializar segredo.
+- Barrels de importers, catálogo e root exportam `MISTRAL_MODELS_CATALOG_URL` e `createMistralModelsImporter()`.
+
+Separação arquitetural reafirmada:
+
+- Capabilities vindas de `/v1/models` têm confiança `authenticated_catalog`, não `probe_verified`.
+- A conta/key prova visibilidade do modelo, não sucesso de chat/tools/vision.
+- Probes continuam sendo a fase posterior para promoção runtime.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`55` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5632` testes totais, `5599` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T19-14-56-748Z/summary.md`).
+
+Próxima direção:
+
+- Rodar suíte completa, commitar/pushar e seguir para Anthropic, Gemini ou Groq especializado.

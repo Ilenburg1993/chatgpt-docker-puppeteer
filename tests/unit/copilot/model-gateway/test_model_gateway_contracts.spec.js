@@ -62,6 +62,7 @@ import {
     BYOK_VISION_PROBE_MIME_TYPE,
     JsonModelGatewayCatalogStore,
     createCerebrasPublicModelsImporter,
+    createMistralModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
@@ -1437,6 +1438,71 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('providerMetadata.ownedBy'), 'meta');
     });
 
+    it('imports Mistral model cards with capabilities, aliases and deprecation metadata', async () => {
+        const secret = 'mistral-secret-that-must-not-leak';
+        /** @type {string | null} */
+        let authorizationHeader = null;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (_url, init) => {
+                authorizationHeader = /** @type {{ headers?: { authorization?: string } }} */ (init)?.headers?.authorization ?? null;
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        object: 'list',
+                        data: [
+                            {
+                                id: 'mistral-large-latest',
+                                object: 'model',
+                                created: 1779376861,
+                                owned_by: 'mistral',
+                                name: 'Mistral Large Latest',
+                                description: 'Frontier model with tool and vision support.',
+                                root: 'mistral-large-2512',
+                                capabilities: {
+                                    completion_chat: true,
+                                    completion_fim: true,
+                                    function_calling: true,
+                                    fine_tuning: false,
+                                    vision: true,
+                                    classification: false,
+                                },
+                                max_context_length: 131072,
+                                aliases: ['mistral-large-latest', 'mistral-large-2512'],
+                                deprecation: '2026-12-31T00:00:00.000Z',
+                                deprecation_replacement_model: 'mistral-large-next',
+                                default_model_temperature: 0.7,
+                                TYPE: 'base',
+                                archived: false,
+                            },
+                        ],
+                    }),
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createMistralModelsImporter({ fetchImpl: fakeFetch, apiKey: secret, secretRef: 'MISTRAL_API_KEY' })],
+            now: () => new Date('2026-05-25T12:45:00.000Z'),
+        });
+        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+
+        assert.equal(authorizationHeader, `Bearer ${secret}`);
+        assert.equal(JSON.stringify(snapshot).includes(secret), false);
+        assert.equal(snapshot.sources[0].providerId, 'mistral');
+        assert.equal(snapshot.accountOverlays[0].secretRef, 'MISTRAL_API_KEY');
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['mistral-large-latest']);
+        assert.equal(snapshot.routeOptions[0].selectorKind, 'exact_model');
+        assert.equal(byPath.get('limits.contextWindowTokens'), 131072);
+        assert.equal(byPath.get('capabilities.tools'), true);
+        assert.equal(byPath.get('capabilities.vision'), true);
+        assert.equal(byPath.get('capabilities.codeCompletion'), true);
+        assert.deepEqual(byPath.get('modalities.input'), ['text', 'image']);
+        assert.equal(byPath.get('lifecycle.status'), 'scheduled_retirement');
+        assert.equal(byPath.get('lifecycle.replacementModel'), 'mistral-large-next');
+        assert.deepEqual(byPath.get('aliases.mistralAliases'), ['mistral-large-latest', 'mistral-large-2512']);
+        assert.equal(byPath.get('providerMetadata.mistral.defaultTemperature'), 0.7);
+    });
+
     it('extracts Cerebras public rich model metadata without proving runtime access', async () => {
         const fakeFetch = /** @type {typeof fetch} */ (
             async () =>
@@ -1795,6 +1861,10 @@ describe('model-gateway foundation', () => {
             env: { GROQ_KEY: 'gsk-secret-that-must-not-leak' },
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
+        const mistralAuthenticated = createDefaultModelGatewayCatalogImporters({
+            env: { MISTRAL_KEY: 'mistral-secret-that-must-not-leak' },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+        });
 
         assert.deepEqual(
             importers.map((importer) => importer.id),
@@ -1805,8 +1875,10 @@ describe('model-gateway foundation', () => {
             ['openrouter-models', 'kilo-gateway-models', 'kilo-gateway-providers', 'cerebras-public-models'],
         );
         assert.equal(genericAuthenticated.some((importer) => importer.id === 'groq-openai-compatible-models'), true);
+        assert.equal(mistralAuthenticated.some((importer) => importer.id === 'mistral-models'), true);
         assert.equal(JSON.stringify(importers).includes(secret), false);
         assert.equal(JSON.stringify(genericAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
+        assert.equal(JSON.stringify(mistralAuthenticated).includes('mistral-secret-that-must-not-leak'), false);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {

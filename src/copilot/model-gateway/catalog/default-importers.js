@@ -12,6 +12,7 @@ import {
     createCerebrasPublicModelsImporter,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
+    createMistralModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
@@ -82,6 +83,16 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                 fetchImpl: options.fetchImpl,
                 apiKey: openAiSecret.value,
                 secretRef: openAiSecret.key,
+            }),
+        );
+    }
+    const mistralSecret = readEnvSecret(env, ['MISTRAL_API_KEY', 'MISTRAL_KEY']);
+    if (includeAuthenticated && mistralSecret) {
+        importers.push(
+            createMistralModelsImporter({
+                fetchImpl: options.fetchImpl,
+                apiKey: mistralSecret.value,
+                secretRef: mistralSecret.key,
             }),
         );
     }
