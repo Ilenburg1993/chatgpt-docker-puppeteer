@@ -525,7 +525,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Criar runner storage-neutral de importers que monta `ProviderCatalogSource`, `rawPayloadRef`, evidências,
   `CatalogImportRun` e snapshot JSON secret-safe antes dos importers específicos.
 - [ ] Implementar `OpenAIModelsImporter` para `/v1/models` + seeds oficiais complementares.
-- [ ] Implementar `OpenRouterModelsImporter` para `/api/v1/models`, preservando `supported_parameters`, pricing,
+- [x] Implementar `OpenRouterModelsImporter` para `/api/v1/models`, preservando `supported_parameters`, pricing,
   context, top provider e per-request limits.
 - [ ] Implementar `AnthropicModelsImporter` para lista oficial de modelos e docs complementares.
 - [ ] Implementar `GeminiModelsImporter` para `models.list`/`models.get`, capturando token limits,
@@ -1133,3 +1133,54 @@ Decisão de roadmap:
 - Faixa L agora tem a espinha dorsal para importers reais. O próximo passo deve ser `OpenAIModelsImporter` ou
   `OpenRouterModelsImporter`; OpenRouter tende a entregar mais metadados por payload e é bom para provar parsing rico,
   enquanto OpenAI é o menor importer autenticado para provar `/v1/models`.
+
+## 18. Continuidade 2026-05-25 — primeiro importer real: OpenRouter
+
+Investigação:
+
+- O endpoint público `https://openrouter.ai/api/v1/models` respondeu com payload `{ data: [...] }` e, na amostra local,
+  `357` modelos.
+- Cada row pode trazer `id`, `canonical_slug`, `name`, `description`, `context_length`, `architecture`,
+  `pricing`, `top_provider`, `per_request_limits`, `supported_parameters`, `default_parameters`, `knowledge_cutoff`,
+  `expiration_date` e links de endpoints.
+- Este é um bom primeiro importer real porque combina identidade, preço, contexto, modalidades, parâmetros suportados e
+  hints de provedor superior sem exigir segredo.
+
+Implementado neste corte:
+
+- Criado `src/copilot/model-gateway/catalog/importers/openrouter-models-importer.js`.
+- Criado barrel `src/copilot/model-gateway/catalog/importers/index.js`.
+- Exportados pelo barrel de catálogo e pelo barrel raiz:
+  - `OPENROUTER_MODELS_CATALOG_URL`;
+  - `createOpenRouterModelsImporter()`.
+- O importer usa `fetch` injetável, mantém `requiresAuth=false`, `sourceKind=public_api`, TTL de uma hora e a URL
+  pública oficial.
+- `parseRows()` extrai rows de `data`.
+- `toEvidenceFacts()` emite evidências field-wise para:
+  - `displayName`;
+  - aliases (`canonicalSlug`, `huggingFaceId`);
+  - `description`;
+  - `limits.contextWindowTokens`;
+  - `limits.maxOutputTokens`;
+  - `modalities.input`/`modalities.output`;
+  - `supportedParameters`;
+  - preços por milhão de tokens de input/output/cache e web search por request;
+  - `routingHints.openrouterTopProvider`.
+- Importante: suporte a `tools`, `tool_choice` ou `structured_outputs` vindo do catálogo segue como evidência
+  `catalog`, não como `probe_verified`; promoção agentic ainda depende dos probes da camada de runtime.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`37` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5609` testes, `0` falhas, `warnings/errors unique=0 total=0`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T14-58-58-311Z/summary.md`).
+
+Próxima direção:
+
+- Commitar/pushar este corte.
+- Depois, implementar `OpenAIModelsImporter` como o menor importer autenticado e/ou criar um comando programático de
+  refresh que permita rodar `OpenRouterModelsImporter` em snapshot JSON com diff.

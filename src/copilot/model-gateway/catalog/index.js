@@ -19,6 +19,10 @@ export {
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
 } from './import-runs.js';
+export {
+    OPENROUTER_MODELS_CATALOG_URL,
+    createOpenRouterModelsImporter,
+} from './importers/index.js';
 export { runCatalogImporters } from './importer-runner.js';
 export {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,

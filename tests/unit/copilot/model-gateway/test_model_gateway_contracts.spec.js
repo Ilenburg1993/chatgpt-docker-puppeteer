@@ -58,6 +58,7 @@ import {
     BYOK_VISION_PROBE_DISPLAY_NAME,
     BYOK_VISION_PROBE_MIME_TYPE,
     JsonModelGatewayCatalogStore,
+    createOpenRouterModelsImporter,
     createCanonicalModelProjection,
     createCatalogImportRun,
     createModelMetadataEvidence,
@@ -786,6 +787,57 @@ describe('model-gateway foundation', () => {
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
+    });
+
+    it('extracts rich OpenRouter model metadata as catalog evidence', async () => {
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async () =>
+                /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        data: [
+                            {
+                                id: 'x-ai/grok-build-0.1',
+                                canonical_slug: 'x-ai/grok-build-0.1-20260520',
+                                name: 'xAI: Grok Build 0.1',
+                                description: 'coding model',
+                                context_length: 256000,
+                                architecture: {
+                                    input_modalities: ['text', 'image'],
+                                    output_modalities: ['text'],
+                                },
+                                pricing: {
+                                    prompt: '0.000001',
+                                    completion: '0.000002',
+                                    input_cache_read: '0.0000002',
+                                    web_search: '0.005',
+                                },
+                                top_provider: {
+                                    context_length: 256000,
+                                    max_completion_tokens: 65536,
+                                    is_moderated: false,
+                                },
+                                supported_parameters: ['tools', 'tool_choice', 'response_format', 'structured_outputs'],
+                            },
+                        ],
+                    }),
+                })
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createOpenRouterModelsImporter({ fetchImpl: fakeFetch })],
+            now: () => new Date('2026-05-25T12:10:00.000Z'),
+        });
+        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+
+        assert.equal(snapshot.sources[0].url, 'https://openrouter.ai/api/v1/models');
+        assert.equal(snapshot.importRuns[0].status, 'completed');
+        assert.equal(byPath.get('limits.contextWindowTokens'), 256000);
+        assert.equal(byPath.get('limits.maxOutputTokens'), 65536);
+        assert.equal(byPath.get('pricing.inputUsdPerMillion'), 1);
+        assert.equal(byPath.get('pricing.outputUsdPerMillion'), 2);
+        assert.deepEqual(byPath.get('modalities.input'), ['text', 'image']);
+        assert.ok(/** @type {string[]} */ (byPath.get('supportedParameters')).includes('tools'));
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {
