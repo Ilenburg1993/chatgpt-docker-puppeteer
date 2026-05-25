@@ -590,8 +590,12 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Implementar `CerebrasModelsImporter` para `/v1/models` + catálogo público.
 - [x] Implementar `NvidiaNimModelsImporter` para `/v1/models`, preservando hosted/self-hosted e endpoints de gestão
   NIM.
-- [x] Permitir importers `OpenAICompatibleGenericImporter` para vLLM, LiteLLM, Chutes, Z.AI e endpoints locais sem
-  importer especializado.
+- [x] Implementar `ChutesModelsImporter` para `/v1/models`, capturando pricing, modalidades, features, limites,
+  quantização e confidential compute.
+- [x] Implementar `ZaiModelsImporter` para docs/pricing oficiais, normalizando famílias GLM em rotas
+  OpenAI-compatible e preservando OpenAPI como fonte de runtime schema.
+- [x] Permitir importers `OpenAICompatibleGenericImporter` para vLLM, LiteLLM e endpoints locais/privados sem importer
+  especializado.
 - [x] Criar modo `accountScoped` para importers autenticados que retornam modelos habilitados por plano, organização,
   quota ou BYOK interno, sem serializar segredo.
 
@@ -2877,3 +2881,83 @@ Validação deste corte até agora:
 Próxima direção:
 
 - Continuar para Chutes/Z.AI especializados ou para enriquecimento de seeds oficiais de OpenAI/Anthropic/Gemini/Groq.
+
+## 54. Continuidade 2026-05-25 — importers especializados Chutes e Z.AI
+
+Investigação oficial/operacional:
+
+- Chutes expõe um catálogo público OpenAI-compatible em `https://llm.chutes.ai/v1/models`.
+- Esse catálogo contém `id`, `root`, `owned_by`, `pricing`, `price`, `context_length`, `max_model_len`,
+  `max_output_length`, `input_modalities`, `output_modalities`, `supported_features`,
+  `supported_sampling_parameters`, `quantization`, `chute_id` e `confidential_compute`.
+- Chutes reporta pricing como USD por milhão de tokens; o normalizador interno continua usando entrada por token e
+  armazena projeção final em `pricing.*UsdPerMillion`.
+- Z.AI publica pricing oficial em `https://docs.z.ai/guides/overview/pricing.md` e OpenAPI em
+  `https://docs.z.ai/openapi.json`.
+- O OpenAPI Z.AI descreve `POST /paas/v4/chat/completions`; a base runtime OpenAI-compatible do gateway permanece
+  `https://api.z.ai/api/paas/v4`.
+- A tabela pública de Z.AI separa modelos textuais e vision, com preços de input, cached input, cache write e output;
+  acesso efetivo por key/plano continua sendo propriedade de runtime/probe.
+
+Implementado neste corte:
+
+- Novo `ChutesModelsImporter` para `https://llm.chutes.ai/v1/models`.
+- O importer funciona público ou autenticado; quando `CHUTES_API_KEY` ou `CHUTES_AI` está presente, envia Bearer token
+  e emite overlay account-scoped sem serializar segredo.
+- O payload Chutes vira evidências para:
+  - aliases por `id`/`root`;
+  - lifecycle por `created`;
+  - `limits.contextWindowTokens` e `limits.maxOutputTokens`;
+  - `modalities.input`/`modalities.output`;
+  - `supportedParameters`;
+  - capabilities `chat`, `streaming`, `tools`, `jsonMode`, `structuredOutputs`, `reasoning`,
+    `confidentialCompute`, `vision`, `audio` e `video` quando declaradas;
+  - pricing por input/output/cache read/cache write;
+  - metadata Chutes: `root`, `parent`, `chuteId`, `quantization`, `maxModelLen`, `confidentialCompute`,
+    `supportedFeatures`, `supportedSamplingParameters` e `permission`;
+  - campos OpenAI-compatible `openai.created` e `openai.owned_by`.
+- O importer Chutes emite rota `exact_model` com `routeLayer=openai_compatible`,
+  `openAICompatibleBaseUrl=https://llm.chutes.ai/v1` e flag `confidentialCompute`.
+- Novo `ZaiModelsImporter` para `https://docs.z.ai/guides/overview/pricing.md`.
+- O importer parseia tabelas Markdown de text/vision models e normaliza ids como `GLM-5.1 -> glm-5.1` e
+  `GLM-5V-Turbo -> glm-5v-turbo`.
+- O payload Z.AI vira evidências para:
+  - display name;
+  - aliases normalizados;
+  - modalidades text/vision;
+  - capabilities `chat`, `streaming`, `tools`, `jsonMode`, `forcedToolChoice`, `reasoning` e `vision` quando aplicável;
+  - pricing de input/output/cache read e preço do built-in web search;
+  - metadata Z.AI: seção de docs, pricing source, OpenAPI URL, base OpenAI-compatible, nota de cache write e linha
+    original sanitizada.
+- O importer Z.AI emite rota `exact_model` com `routeLayer=openai_compatible`,
+  `openAICompatibleBaseUrl=https://api.z.ai/api/paas/v4`, endpoint `/chat/completions`, `acceptLanguage=en-US,en`,
+  `supportsTools`, `supportsThinking` e `visionFamily`.
+- A composição padrão deixou de usar o generic importer para Chutes/Z.AI e agora usa:
+  - `CHUTES_API_KEY`/`CHUTES_AI` -> `ChutesModelsImporter`;
+  - `ZAI_API_KEY`/`Z_AI_KEY` -> `ZaiModelsImporter`.
+- Os barrels de importers, catálogo e root exportam as constantes e factories de Chutes/Z.AI.
+- O inventário de endpoints agora declara:
+  - Chutes `/v1/models` como fonte pública/autenticada rica;
+  - Z.AI pricing markdown e OpenAPI como fontes separadas.
+
+Separação arquitetural reafirmada:
+
+- Metadados de catálogo respondem “o que o provider declara existir e como selecionar inicialmente”.
+- Overlay account-scoped responde “temos uma key/configuração para montar rota por conta”.
+- Runtime probes respondem “esta key realmente tem acesso ao modelo, responde chat básico, faz tools, stream, JSON,
+  reasoning e demais capacidades sob as condições atuais”.
+- Vision continua sendo metadata/soft preference, nunca gate excludente automático.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`65` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5642` testes totais, `5609` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T20-35-14-097Z/summary.md`).
+
+Próxima direção:
+
+- Commitar/pushar este bloco maior e continuar para os próximos importers/enriquecimentos de metadata de providers.

@@ -15,6 +15,11 @@ export {
     createCerebrasPublicModelsImporter,
 } from './cerebras-public-models-importer.js';
 export {
+    CHUTES_MODELS_CATALOG_URL,
+    CHUTES_OPENAI_BASE_URL,
+    createChutesModelsImporter,
+} from './chutes-models-importer.js';
+export {
     CLOUDFLARE_AI_GATEWAY_UNIVERSAL_URL,
     CLOUDFLARE_WORKERS_AI_MODELS_CATALOG_URL,
     CLOUDFLARE_WORKERS_AI_OPENAI_BASE_URL,
@@ -80,3 +85,11 @@ export {
     OPENROUTER_MODELS_CATALOG_URL,
     createOpenRouterModelsImporter,
 } from './openrouter-models-importer.js';
+export {
+    ZAI_BUILT_IN_WEB_SEARCH_USD_PER_USE,
+    ZAI_CHAT_COMPLETIONS_PATH,
+    ZAI_DOCS_PRICING_URL,
+    ZAI_OPENAI_BASE_URL,
+    ZAI_OPENAPI_URL,
+    createZaiModelsImporter,
+} from './zai-models-importer.js';

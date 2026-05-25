@@ -27,6 +27,8 @@ export {
     ANTHROPIC_MODELS_API_VERSION,
     ANTHROPIC_MODELS_CATALOG_URL,
     CEREBRAS_PUBLIC_MODELS_CATALOG_URL,
+    CHUTES_MODELS_CATALOG_URL,
+    CHUTES_OPENAI_BASE_URL,
     CLOUDFLARE_AI_GATEWAY_UNIVERSAL_URL,
     CLOUDFLARE_WORKERS_AI_MODELS_CATALOG_URL,
     CLOUDFLARE_WORKERS_AI_OPENAI_BASE_URL,
@@ -56,8 +58,14 @@ export {
     OPENCODE_ZEN_RESPONSES_URL,
     OPENAI_MODELS_CATALOG_URL,
     OPENROUTER_MODELS_CATALOG_URL,
+    ZAI_BUILT_IN_WEB_SEARCH_USD_PER_USE,
+    ZAI_CHAT_COMPLETIONS_PATH,
+    ZAI_DOCS_PRICING_URL,
+    ZAI_OPENAI_BASE_URL,
+    ZAI_OPENAPI_URL,
     createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
+    createChutesModelsImporter,
     createCloudflareWorkersAiCatalogImporter,
     createGeminiModelsImporter,
     createGroqModelsImporter,
@@ -71,6 +79,7 @@ export {
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
+    createZaiModelsImporter,
 } from './importers/index.js';
 export { runCatalogImporters } from './importer-runner.js';
 export {

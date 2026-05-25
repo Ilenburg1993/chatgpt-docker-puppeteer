@@ -6,10 +6,16 @@ export const ZAI_PROVIDER_ENDPOINTS = Object.freeze({
     baseUrls: Object.freeze(['https://api.z.ai/api/paas/v4']),
     modelCatalogSources: Object.freeze([
         Object.freeze({
-            kind: 'docs_or_authenticated_api_tbd',
+            kind: 'docs_pricing_markdown',
             method: 'GET',
-            url: 'https://docs.z.ai/guides/',
-            richness: 'needs_endpoint_split_investigation',
+            url: 'https://docs.z.ai/guides/overview/pricing.md',
+            richness: 'model_prices_sections_cache_and_builtin_tool_prices',
+        }),
+        Object.freeze({
+            kind: 'openapi',
+            method: 'GET',
+            url: 'https://docs.z.ai/openapi.json',
+            richness: 'runtime_schema_tool_streaming_and_multimodal_parameters',
         }),
     ]),
     runtimeEndpoints: Object.freeze([

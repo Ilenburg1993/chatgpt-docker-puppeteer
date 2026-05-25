@@ -63,6 +63,7 @@ import {
     JsonModelGatewayCatalogStore,
     createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
+    createChutesModelsImporter,
     createCloudflareWorkersAiCatalogImporter,
     createGeminiModelsImporter,
     createGroqModelsImporter,
@@ -74,6 +75,7 @@ import {
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
+    createZaiModelsImporter,
     createCanonicalModelProjection,
     createCanonicalProviderProjection,
     createCatalogImportRun,
@@ -1446,6 +1448,131 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('providerMetadata.ownedBy'), 'meta');
     });
 
+    it('imports Chutes rich model metadata beyond generic OpenAI-compatible identity', async () => {
+        const secret = 'chutes-secret-that-must-not-leak';
+        /** @type {string | null} */
+        let authorizationHeader = null;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (_url, init) => {
+                authorizationHeader = /** @type {{ headers?: { authorization?: string } }} */ (init)?.headers?.authorization ?? null;
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        object: 'list',
+                        data: [
+                            {
+                                id: 'Qwen/Qwen3-32B-TEE',
+                                root: 'Qwen/Qwen3-32B',
+                                object: 'model',
+                                parent: null,
+                                created: 1779376861,
+                                pricing: {
+                                    prompt: 0.104,
+                                    completion: 0.312,
+                                    input_cache_read: 0.052,
+                                },
+                                chute_id: 'qwen3-32b-tee',
+                                owned_by: 'chutes',
+                                quantization: 'fp8',
+                                max_model_len: 262144,
+                                context_length: 262144,
+                                input_modalities: ['text', 'image'],
+                                max_output_length: 32768,
+                                output_modalities: ['text'],
+                                supported_features: ['json_mode', 'tools', 'structured_outputs', 'reasoning'],
+                                confidential_compute: true,
+                                supported_sampling_parameters: ['temperature', 'top_p', 'stream'],
+                            },
+                        ],
+                    }),
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createChutesModelsImporter({ fetchImpl: fakeFetch, apiKey: secret, secretRef: 'CHUTES_AI' })],
+            now: () => new Date('2026-05-25T20:30:00.000Z'),
+        });
+        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+
+        assert.equal(authorizationHeader, `Bearer ${secret}`);
+        assert.equal(JSON.stringify(snapshot).includes(secret), false);
+        assert.equal(snapshot.sources[0].providerId, 'chutes');
+        assert.equal(snapshot.sources[0].url, 'https://llm.chutes.ai/v1/models');
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['Qwen/Qwen3-32B-TEE']);
+        assert.equal(snapshot.accountOverlays[0].secretRef, 'CHUTES_AI');
+        assert.equal(snapshot.accountOverlays[0].providerMetadata.publicCatalogAvailable, true);
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.openAICompatibleBaseUrl, 'https://llm.chutes.ai/v1');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.confidentialCompute, true);
+        assert.equal(byPath.get('aliases.providerModel'), 'Qwen/Qwen3-32B-TEE');
+        assert.equal(byPath.get('aliases.canonicalSlug'), 'Qwen/Qwen3-32B');
+        assert.equal(byPath.get('limits.contextWindowTokens'), 262144);
+        assert.equal(byPath.get('limits.maxOutputTokens'), 32768);
+        assert.deepEqual(byPath.get('modalities.input'), ['text', 'image']);
+        assert.equal(byPath.get('capabilities.tools'), true);
+        assert.equal(byPath.get('capabilities.jsonMode'), true);
+        assert.equal(byPath.get('capabilities.structuredOutputs'), true);
+        assert.equal(byPath.get('capabilities.reasoning'), true);
+        assert.equal(byPath.get('capabilities.confidentialCompute'), true);
+        assert.equal(byPath.get('pricing.inputUsdPerMillion'), 0.104);
+        assert.equal(byPath.get('pricing.outputUsdPerMillion'), 0.312);
+        assert.equal(byPath.get('pricing.cacheReadUsdPerMillion'), 0.052);
+        assert.equal(byPath.get('providerMetadata.chutes.quantization'), 'fp8');
+    });
+
+    it('imports Z.AI pricing docs as normalized OpenAI-compatible catalog metadata', async () => {
+        const secret = 'zai-secret-that-must-not-leak';
+        /** @type {string | null} */
+        let acceptHeader = null;
+        const markdown = [
+            '### Text Models',
+            '| Model | Input | Cached Input | Cache Write | Output |',
+            '| --- | --- | --- | --- | --- |',
+            '| GLM-5.1 | $1.4 | $0.26 | Limited-time Free | $4.4 |',
+            '| GLM-4.7-Flash | Free | Free | Free | Free |',
+            '',
+            '### Vision Models',
+            '| Model | Input | Cached Input | Cache Write | Output |',
+            '| --- | --- | --- | --- | --- |',
+            '| GLM-5V-Turbo | $1.2 | $0.24 | Limited-time Free | $4 |',
+        ].join('\n');
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (_url, init) => {
+                acceptHeader = /** @type {{ headers?: { accept?: string } }} */ (init)?.headers?.accept ?? null;
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    text: async () => markdown,
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createZaiModelsImporter({ fetchImpl: fakeFetch, apiKey: secret, secretRef: 'Z_AI_KEY' })],
+            now: () => new Date('2026-05-25T20:35:00.000Z'),
+        });
+        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item.providerModel}:${item.fieldPath}`, item.value]));
+
+        assert.equal(acceptHeader?.includes('text/markdown'), true);
+        assert.equal(JSON.stringify(snapshot).includes(secret), false);
+        assert.equal(snapshot.sources[0].providerId, 'zai');
+        assert.equal(snapshot.sources[0].kind, 'public_docs');
+        assert.equal(snapshot.sources[0].authMode, 'none');
+        assert.equal(snapshot.sources[0].url, 'https://docs.z.ai/guides/overview/pricing.md');
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['glm-5.1', 'glm-4.7-flash', 'glm-5v-turbo']);
+        assert.equal(snapshot.accountOverlays[0].secretRef, 'Z_AI_KEY');
+        assert.equal(snapshot.accountOverlays[0].providerMetadata.openAICompatible, true);
+        assert.equal(snapshot.routeOptions.find((route) => route.providerModel === 'glm-5.1')?.normalizedPolicy.supportsThinking, true);
+        assert.equal(snapshot.routeOptions.find((route) => route.providerModel === 'glm-5v-turbo')?.normalizedPolicy.visionFamily, true);
+        assert.equal(byModelPath.get('glm-5.1:displayName'), 'GLM-5.1');
+        assert.equal(byModelPath.get('glm-5.1:pricing.inputUsdPerMillion'), 1.4);
+        assert.equal(byModelPath.get('glm-5.1:pricing.cacheReadUsdPerMillion'), 0.26);
+        assert.equal(byModelPath.get('glm-5.1:pricing.outputUsdPerMillion'), 4.4);
+        assert.equal(byModelPath.get('glm-4.7-flash:pricing.inputUsdPerMillion'), 0);
+        assert.deepEqual(byModelPath.get('glm-5v-turbo:modalities.input'), ['text', 'image']);
+        assert.equal(byModelPath.get('glm-5v-turbo:capabilities.vision'), true);
+        assert.equal(byModelPath.get('glm-5.1:providerMetadata.zai.openApiUrl'), 'https://docs.z.ai/openapi.json');
+    });
+
     it('imports Mistral model cards with capabilities, aliases and deprecation metadata', async () => {
         const secret = 'mistral-secret-that-must-not-leak';
         /** @type {string | null} */
@@ -2576,6 +2703,18 @@ describe('model-gateway foundation', () => {
             env: { NVIDIA_KEY: 'nvidia-secret-that-must-not-leak' },
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
+        const chutesAuthenticated = createDefaultModelGatewayCatalogImporters({
+            env: { CHUTES_AI: 'chutes-secret-that-must-not-leak' },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+        });
+        const zaiAuthenticated = createDefaultModelGatewayCatalogImporters({
+            env: { Z_AI_KEY: 'zai-secret-that-must-not-leak' },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({
+                ok: true,
+                status: 200,
+                text: async () => '',
+            })),
+        });
 
         assert.deepEqual(
             importers.map((importer) => importer.id),
@@ -2608,6 +2747,8 @@ describe('model-gateway foundation', () => {
         assert.equal(openCodeAuthenticated.some((importer) => importer.id === 'opencode-zen-models'), true);
         assert.equal(cloudflareAuthenticated.some((importer) => importer.id === 'cloudflare-workers-ai-catalog'), true);
         assert.equal(nvidiaAuthenticated.some((importer) => importer.id === 'nvidia-nim-models'), true);
+        assert.equal(chutesAuthenticated.some((importer) => importer.id === 'chutes-models'), true);
+        assert.equal(zaiAuthenticated.some((importer) => importer.id === 'zai-models'), true);
         assert.equal(JSON.stringify(importers).includes(secret), false);
         assert.equal(JSON.stringify(groqAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(genericAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
@@ -2619,6 +2760,8 @@ describe('model-gateway foundation', () => {
         assert.equal(JSON.stringify(openCodeAuthenticated).includes('opencode-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(cloudflareAuthenticated).includes('cloudflare-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(nvidiaAuthenticated).includes('nvidia-secret-that-must-not-leak'), false);
+        assert.equal(JSON.stringify(chutesAuthenticated).includes('chutes-secret-that-must-not-leak'), false);
+        assert.equal(JSON.stringify(zaiAuthenticated).includes('zai-secret-that-must-not-leak'), false);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {

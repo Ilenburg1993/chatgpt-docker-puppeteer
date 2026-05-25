@@ -11,6 +11,7 @@
 import {
     createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
+    createChutesModelsImporter,
     createCloudflareWorkersAiCatalogImporter,
     createGeminiModelsImporter,
     createGroqModelsImporter,
@@ -24,6 +25,7 @@ import {
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
+    createZaiModelsImporter,
 } from './importers/index.js';
 
 const OPENAI_COMPATIBLE_ACCOUNT_SOURCES = Object.freeze([
@@ -31,16 +33,6 @@ const OPENAI_COMPATIBLE_ACCOUNT_SOURCES = Object.freeze([
         providerId: 'cerebras',
         baseUrl: 'https://api.cerebras.ai/v1',
         envKeys: Object.freeze(['CEREBRAS_API_KEY', 'CEREBRAS_KEY']),
-    }),
-    Object.freeze({
-        providerId: 'chutes',
-        baseUrl: 'https://llm.chutes.ai/v1',
-        envKeys: Object.freeze(['CHUTES_API_KEY', 'CHUTES_AI']),
-    }),
-    Object.freeze({
-        providerId: 'zai',
-        baseUrl: 'https://api.z.ai/api/paas/v4',
-        envKeys: Object.freeze(['ZAI_API_KEY', 'Z_AI_KEY']),
     }),
 ]);
 
@@ -168,6 +160,26 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                 fetchImpl: options.fetchImpl,
                 apiKey: nvidiaSecret.value,
                 secretRef: nvidiaSecret.key,
+            }),
+        );
+    }
+    const chutesSecret = readEnvSecret(env, ['CHUTES_API_KEY', 'CHUTES_AI']);
+    if (includeAuthenticated && chutesSecret) {
+        importers.push(
+            createChutesModelsImporter({
+                fetchImpl: options.fetchImpl,
+                apiKey: chutesSecret.value,
+                secretRef: chutesSecret.key,
+            }),
+        );
+    }
+    const zaiSecret = readEnvSecret(env, ['ZAI_API_KEY', 'Z_AI_KEY']);
+    if (includeAuthenticated && zaiSecret) {
+        importers.push(
+            createZaiModelsImporter({
+                fetchImpl: options.fetchImpl,
+                apiKey: zaiSecret.value,
+                secretRef: zaiSecret.key,
             }),
         );
     }
