@@ -652,7 +652,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 ### Faixa P — UX de exploração do catálogo universal
 
 - [ ] `/models catalog refresh [provider]`.
-- [ ] `/models catalog diff`.
+- [x] `/models catalog diff`.
 - [ ] `/models search <query>`.
 - [ ] `/models explain <provider:model>`.
 - [ ] `/models conflicts`.
@@ -2215,3 +2215,43 @@ Validação deste corte até agora:
 Próxima direção:
 
 - Commitar/pushar e avançar para UX `/models catalog diff`.
+
+## 42. Continuidade 2026-05-25 — UX persistida de diff do catálogo
+
+Implementado neste corte:
+
+- `refreshModelGatewayCatalog()` agora persiste um import run agregado:
+  - `providerId=model-gateway`;
+  - `sourceId=catalog-refresh`;
+  - `diff` completo do refresh;
+  - `rowCount` das projections finais.
+- Nova UX sem rede:
+  - `/byok gateway catalog diff`;
+  - `/models catalog diff`.
+- A UX lê o último diff persistido no snapshot JSON e mostra:
+  - added/removed/changed;
+  - `changedKinds`;
+  - conflitos atuais do snapshot;
+  - sugestões de probes derivadas do diff/projections.
+- A checkbox `/models catalog diff` da Faixa P foi marcada como concluída.
+
+Separação arquitetural reafirmada:
+
+- `catalog diff` não chama importers e não toca rede.
+- O diff exibido é o último resultado persistido do refresh.
+- Sugestões continuam explícitas e não executam probes automaticamente.
+- O run agregado prepara a futura migração SQLite sem exigir mudança no contrato de CLI.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  (`106` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5629` testes totais, `5596` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T17-34-38-974Z/summary.md`).
+
+Próxima direção:
+
+- Commitar/pushar e avançar para `/models catalog refresh [provider]` ou `/models conflicts`.

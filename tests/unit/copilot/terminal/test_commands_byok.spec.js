@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreKCompatibilityReport, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listProviderEndpointInventory, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, recommendCatalogDiffProbes, resolveProviderEndpointInventory, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreKCompatibilityReport, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listProviderEndpointInventory, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, recommendCatalogDiffProbes, resolveProviderEndpointInventory, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -29,6 +29,13 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                 commands: ['/byok probe agent model:changed-model'],
             },
         ]),
+        summarizeCanonicalModelProjectionDiff: vi.fn((diff) => ({
+            addedCount: diff.added?.length ?? 0,
+            removedCount: diff.removed?.length ?? 0,
+            changedCount: diff.changed?.length ?? 0,
+            changedKinds: [...new Set((diff.changed ?? []).flatMap((item) => item.changedKinds ?? []))],
+            changedKindCounts: {},
+        })),
         buildModelGatewayPreKCompatibilityReport: vi.fn(() => ({
             stage: 'pre-k',
             ready: true,
@@ -92,7 +99,33 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
         discoverConfiguredByokModelsFromEnv: vi.fn(),
         flushByokProviderHealth: vi.fn(() => Promise.resolve()),
         JsonModelGatewayCatalogStore: vi.fn(function JsonModelGatewayCatalogStore() {
-            return { filePath: 'data/copilot/model-gateway/catalog.json' };
+            return {
+                filePath: 'data/copilot/model-gateway/catalog.json',
+                readSnapshot: vi.fn(() =>
+                    Promise.resolve({
+                        projections: [{ providerModel: 'new-model' }],
+                        conflicts: [],
+                        importRuns: [
+                            {
+                                runId: 'model-gateway:catalog-refresh:2026-05-25T17:00:00.000Z',
+                                providerId: 'model-gateway',
+                                sourceId: 'catalog-refresh',
+                                diff: {
+                                    added: ['openrouter:new-model:default'],
+                                    removed: [],
+                                    changed: [
+                                        {
+                                            key: 'openrouter:changed-model:default',
+                                            changedFields: ['capabilities'],
+                                            changedKinds: ['capabilities_changed'],
+                                        },
+                                    ],
+                                },
+                            },
+                        ],
+                    }),
+                ),
+            };
         }),
         listByokProviderModelHealth: vi.fn(() => []),
         listProviderEndpointInventory: vi.fn(() => [
@@ -245,6 +278,7 @@ vi.mock('#copilot/model-gateway', () => ({
     runConfiguredByokJsonProbe: runConfiguredByokJsonProbe,
     runConfiguredByokStreamingProbe: runConfiguredByokStreamingProbe,
     runConfiguredByokVisionProbe: runConfiguredByokVisionProbe,
+    summarizeCanonicalModelProjectionDiff,
 }));
 
 const { cmdByok } = await import('../../../../src/copilot/terminal/commands/byok.js');
@@ -368,6 +402,7 @@ describe('terminal /byok command', () => {
         buildCatalogRefreshEventBatch.mockClear();
         buildCatalogRefreshStartedEvent.mockClear();
         recommendCatalogDiffProbes.mockClear();
+        summarizeCanonicalModelProjectionDiff.mockClear();
         buildRouteDecisionEvent.mockClear();
         recordModelGatewayRouteDecision.mockClear();
         buildProbeCompletedEvent.mockClear();
@@ -1321,6 +1356,38 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('probe suggestions: 1');
         expect(ctx.output()).toContain('/byok probe agent model:changed-model');
         expect(ctx.output()).toContain('openrouter:new-model:default');
+    });
+
+    it('exibe o último diff persistido do catálogo sem refazer rede', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway catalog diff');
+
+        expect(refreshModelGatewayCatalog).not.toHaveBeenCalled();
+        expect(summarizeCanonicalModelProjectionDiff).toHaveBeenCalled();
+        expect(recommendCatalogDiffProbes).toHaveBeenCalledWith(
+            expect.objectContaining({
+                diff: expect.objectContaining({ added: ['openrouter:new-model:default'] }),
+                projections: [{ providerModel: 'new-model' }],
+                limit: 8,
+            }),
+        );
+        expect(ctx.output()).toContain('BYOK model-gateway catalog diff');
+        expect(ctx.output()).toContain('sem rede');
+        expect(ctx.output()).toContain('added=1');
+        expect(ctx.output()).toContain('capabilities_changed');
+        expect(ctx.output()).toContain('probe suggestions: 1');
+    });
+
+    it('encaminha /models catalog diff para a mesma UX persistida', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models catalog diff');
+
+        expect(refreshModelGatewayCatalog).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('BYOK model-gateway catalog diff');
     });
 
     it('mostra health operacional persistido de BYOK', async () => {

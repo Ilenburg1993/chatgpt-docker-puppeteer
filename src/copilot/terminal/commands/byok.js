@@ -42,6 +42,7 @@ import {
     runConfiguredByokJsonProbe,
     runConfiguredByokStreamingProbe,
     runConfiguredByokVisionProbe,
+    summarizeCanonicalModelProjectionDiff,
 } from '#copilot/model-gateway';
 
 import { discoverConfiguredByokModelsFromEnv, readConfiguredByokProfilesFromEnv } from '#copilot/config';
@@ -1516,7 +1517,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog refresh | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh|diff> | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog diff|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1675,6 +1676,82 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null) {
         const message = error instanceof Error ? error.message : String(error);
         println(`    \x1b[31mrefresh falhou: ${message}\x1b[0m\n`);
     }
+}
+
+/**
+ * @param {ReturnType<InstanceType<typeof JsonModelGatewayCatalogStore>['readSnapshot']> extends Promise<infer T> ? T : never} snapshot
+ * @returns {Record<string, any> | null}
+ */
+function findLatestCatalogRefreshRun(snapshot) {
+    return [...snapshot.importRuns]
+        .reverse()
+        .find((run) => run['providerId'] === 'model-gateway' && run['sourceId'] === 'catalog-refresh' && run['diff']) ?? null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {{ added: string[]; removed: string[]; changed: Array<{ key: string; changedFields: string[]; changedKinds: string[] }> }}
+ */
+function normalizeCatalogDiffForDisplay(value) {
+    const record = asRecord(value);
+    const changed = Array.isArray(record['changed'])
+        ? record['changed'].filter((item) => item && typeof item === 'object').map((item) => {
+              const changedRecord = /** @type {Record<string, any>} */ (item);
+              return {
+                  key: optionalScalarString(changedRecord['key']) ?? 'unknown',
+                  changedFields: Array.isArray(changedRecord['changedFields'])
+                      ? changedRecord['changedFields'].map(String)
+                      : [],
+                  changedKinds: Array.isArray(changedRecord['changedKinds'])
+                      ? changedRecord['changedKinds'].map(String)
+                      : [],
+              };
+          })
+        : [];
+    return {
+        added: Array.isArray(record['added']) ? record['added'].map(String) : [],
+        removed: Array.isArray(record['removed']) ? record['removed'].map(String) : [],
+        changed,
+    };
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayCatalogDiff(println) {
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    println(`\n  \x1b[36mBYOK model-gateway catalog diff\x1b[0m`);
+    println(`  \x1b[90mstore=${store.filePath} · fonte=ultimo refresh persistido · sem rede\x1b[0m\n`);
+    const snapshot = await store.readSnapshot();
+    const latestRun = findLatestCatalogRefreshRun(snapshot);
+    if (!latestRun) {
+        println('    \x1b[33mNenhum diff persistido encontrado. Rode /byok gateway catalog refresh primeiro.\x1b[0m\n');
+        return;
+    }
+    const diff = normalizeCatalogDiffForDisplay(latestRun['diff']);
+    const summary = summarizeCanonicalModelProjectionDiff(diff);
+    const recommendations = recommendCatalogDiffProbes({ diff, projections: snapshot.projections, limit: 8 });
+    println(
+        `    \x1b[90mrun=${latestRun['runId'] ?? '-'} · added=${summary.addedCount} · removed=${summary.removedCount} · changed=${summary.changedCount} · conflicts=${snapshot.conflicts.length}\x1b[0m`,
+    );
+    if (summary.changedKinds.length > 0) {
+        println(`    \x1b[90mdiff kinds: ${summary.changedKinds.join(',')}\x1b[0m`);
+    }
+    for (const id of diff.added.slice(0, 8)) println(`      \x1b[32m+\x1b[0m ${id}`);
+    for (const id of diff.removed.slice(0, 8)) println(`      \x1b[31m-\x1b[0m ${id}`);
+    for (const item of diff.changed.slice(0, 8)) {
+        const kinds = item.changedKinds.length > 0 ? ` · ${item.changedKinds.join(',')}` : '';
+        println(`      \x1b[33m~\x1b[0m ${item.key} (${item.changedFields.join(',')}${kinds})`);
+    }
+    if (recommendations.length > 0) {
+        println(`\n    \x1b[90mprobe suggestions: ${recommendations.length}\x1b[0m`);
+        for (const recommendation of recommendations.slice(0, 5)) {
+            println(`      \x1b[90m? ${recommendation.key}: ${recommendation.probeKinds.join(',')} · ${recommendation.reasons.slice(0, 4).join(',')}\x1b[0m`);
+            println(`        \x1b[90m${recommendation.commands[0]}\x1b[0m`);
+        }
+    }
+    println('');
 }
 
 /**
@@ -2094,6 +2171,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayCatalogRefresh(println, eventBus);
             return;
         }
+        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(diff|changes|mudancas|mudanças)$/iu.test(rest[1] ?? '')) {
+            await renderByokGatewayCatalogDiff(println);
+            return;
+        }
         if (/^(endpoints|endpoint|catalog|catalogo|sources)$/iu.test(rest[0] ?? '')) {
             renderByokProviderEndpointInventory(println, rest.slice(1));
             return;
@@ -2273,6 +2354,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
     }
 
     if (sub === 'models') {
+        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(diff|changes|mudancas|mudanças)$/iu.test(rest[1] ?? '')) {
+            await renderByokGatewayCatalogDiff(println);
+            return;
+        }
         if (/^(route|select|rank)$/iu.test(rest[0] ?? '')) {
             await renderByokModelRoute(println, projection, rest, eventBus);
             return;

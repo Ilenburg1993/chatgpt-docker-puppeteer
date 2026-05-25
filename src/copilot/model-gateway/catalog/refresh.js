@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/catalog/refresh
  */
 
-import { diffCanonicalModelProjections } from './import-runs.js';
+import { createCatalogImportRun, diffCanonicalModelProjections } from './import-runs.js';
 import { runCatalogImporters } from './importer-runner.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { mergeModelMetadataEvidence, mergeProviderMetadataEvidence } from './merge.js';
@@ -129,10 +129,12 @@ function buildProviderProjectionsFromEvidence(evidences) {
  * }>}
  */
 export async function refreshModelGatewayCatalog(input = {}) {
+    const now = input.now ?? (() => new Date());
+    const startedAt = now();
     const previous = input.store ? await input.store.readSnapshot() : normalizeStoredCatalogSnapshot(input.snapshot);
     const imported = await runCatalogImporters({
         importers: input.importers ?? [],
-        now: input.now,
+        now,
     });
     const refreshedSourceIds = new Set(imported.sources.map((source) => String(source['id'])));
     const retainedEvidences = previous.evidences.filter((evidence) => !refreshedSourceIds.has(String(evidence['sourceId'])));
@@ -146,6 +148,16 @@ export async function refreshModelGatewayCatalog(input = {}) {
     const { projections, conflicts } = buildProjectionsFromEvidence(combinedEvidences);
     const { providerProjections, providerConflicts } = buildProviderProjectionsFromEvidence(combinedProviderEvidences);
     const diff = diffCanonicalModelProjections(previous.projections, projections);
+    const refreshRun = createCatalogImportRun({
+        runId: `model-gateway:catalog-refresh:${startedAt.toISOString()}`,
+        providerId: 'model-gateway',
+        sourceId: 'catalog-refresh',
+        status: 'completed',
+        startedAt,
+        completedAt: now(),
+        rowCount: projections.length,
+        diff,
+    });
     const snapshot = {
         ...previous,
         source: 'catalog-refresh',
@@ -164,7 +176,7 @@ export async function refreshModelGatewayCatalog(input = {}) {
                 .join(':'),
         ),
         rawPayloadRefs: [...retainedRawPayloadRefs, ...imported.rawPayloadRefs],
-        importRuns: [...previous.importRuns, ...imported.importRuns],
+        importRuns: [...previous.importRuns, ...imported.importRuns, refreshRun],
         providerProjections,
         projections,
         conflicts: [...providerConflicts, ...conflicts],

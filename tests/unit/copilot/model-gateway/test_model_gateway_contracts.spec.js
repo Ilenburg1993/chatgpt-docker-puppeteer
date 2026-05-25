@@ -1771,6 +1771,10 @@ describe('model-gateway foundation', () => {
                 ['local-model', 'new-model'],
             );
             assert.equal(result.openai.data.find((entry) => entry.id === 'new-model')?.object, 'model');
+            const refreshRun = stored.importRuns.find((run) => run.providerId === 'model-gateway' && run.sourceId === 'catalog-refresh');
+            assert.equal(refreshRun?.status, 'completed');
+            assert.deepEqual(refreshRun?.diff?.added, ['openrouter:new-model:default']);
+            assert.deepEqual(refreshRun?.diff?.removed, ['openrouter:old-model:default']);
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
