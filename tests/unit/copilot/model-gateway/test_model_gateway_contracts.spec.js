@@ -64,6 +64,7 @@ import {
     BYOK_VISION_PROBE_DISPLAY_NAME,
     BYOK_VISION_PROBE_MIME_TYPE,
     JsonModelGatewayCatalogStore,
+    SqliteModelGatewayCatalogStore,
     createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
     createChutesModelsImporter,
@@ -89,6 +90,8 @@ import {
     createKiloGatewayProvidersImporter,
     createModelEligibilityDecision,
     createModelEligibilityRun,
+    MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
+    MODEL_GATEWAY_SQLITE_TABLES,
     createModelMetadataEvidence,
     createModelRouteOption,
     createProviderAccountOverlay,
@@ -1150,6 +1153,252 @@ describe('model-gateway foundation', () => {
             assert.equal(JSON.stringify(loaded.modelEligibilityRuns).includes('sk-secret-that-must-not-leak'), false);
         } finally {
             await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('defines an executable SQLite schema for normalized catalog, overlay and eligibility layers', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            db.pragma('foreign_keys = ON');
+            db.exec(MODEL_GATEWAY_SQLITE_SCHEMA_SQL);
+
+            const tableRows = db
+                .prepare(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'copilot_model_gateway_%' ORDER BY name",
+                )
+                .all()
+                .map(/** @param {{ name: string }} row */ (row) => row.name);
+            const tableNames = new Set(tableRows);
+
+            for (const table of MODEL_GATEWAY_SQLITE_TABLES) {
+                assert.equal(tableNames.has(table), true, `${table} should exist`);
+                assert.equal(MODEL_GATEWAY_SQLITE_SCHEMA_SQL.includes(` ${table} `), true);
+            }
+
+            db.prepare(
+                `
+                    INSERT INTO copilot_model_gateway_catalog_sources
+                        (source_id, provider_id, source_kind, auth_mode, trust_tier, refresh_policy, observed_at_ms, payload_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+            ).run(
+                'openrouter-models',
+                'openrouter',
+                'public_api',
+                'none',
+                'catalog',
+                'scheduled',
+                1,
+                JSON.stringify({ redacted: true }),
+            );
+            db.prepare(
+                `
+                    INSERT INTO copilot_model_gateway_model_projections
+                        (projection_key, provider_id, provider_model, route_profile, display_name, lifecycle_status, updated_at_ms, payload_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+            ).run(
+                'openrouter:model-a:default',
+                'openrouter',
+                'model-a',
+                'default',
+                'Model A',
+                'active',
+                2,
+                JSON.stringify({ id: 'model-a' }),
+            );
+            db.prepare(
+                `
+                    INSERT INTO copilot_model_gateway_eligibility_runs
+                        (run_id, policy_profile, task_profile, account_scope, status, started_at_ms, completed_at_ms,
+                         model_count, eligible_count, unknown_count, excluded_count, payload_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+            ).run('eligibility-run-1', 'strict-account', 'repo_agent', 'default', 'completed', 3, 4, 1, 1, 0, 0, '{}');
+            db.prepare(
+                `
+                    INSERT INTO copilot_model_gateway_eligibility_decisions
+                        (decision_key, run_id, provider_id, provider_model, route_profile, selector_kind, account_scope,
+                         policy_profile, task_profile, include, disposition, primary_reason, observed_at_ms, payload_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+            ).run(
+                'strict-account:repo_agent:default:openrouter:model-a:default:exact_model',
+                'eligibility-run-1',
+                'openrouter',
+                'model-a',
+                'default',
+                'exact_model',
+                'default',
+                'strict-account',
+                'repo_agent',
+                1,
+                'eligible',
+                'account_overlay_available',
+                5,
+                '{}',
+            );
+            db.prepare(
+                `
+                    INSERT INTO copilot_model_gateway_runtime_probe_runs
+                        (run_id, probe_profile, account_scope, status, started_at_ms, completed_at_ms,
+                         model_count, success_count, failure_count, skipped_count, payload_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+            ).run('probe-run-1', 'cheap-basic', 'default', 'completed', 6, 7, 1, 1, 0, 0, '{}');
+            db.prepare(
+                `
+                    INSERT INTO copilot_model_gateway_runtime_probe_results
+                        (result_key, run_id, provider_id, provider_model, route_profile, probe_kind, wire_api,
+                         ok, status, observed_at_ms, payload_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+            ).run(
+                'probe-run-1:openrouter:model-a:chat',
+                'probe-run-1',
+                'openrouter',
+                'model-a',
+                'default',
+                'chat',
+                'openai_chat_completions',
+                1,
+                'ok',
+                8,
+                '{}',
+            );
+            db.prepare(
+                `
+                    INSERT INTO copilot_model_gateway_route_decisions
+                        (decision_id, task_profile, route_profile, policy_profile, provider_id, provider_model,
+                         selected, decided_at_ms, payload_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+            ).run(
+                'route-decision-1',
+                'repo_agent',
+                'default',
+                'strict-account',
+                'openrouter',
+                'model-a',
+                1,
+                9,
+                '{}',
+            );
+
+            const row = /** @type {{ include: number, disposition: string } | undefined} */ (
+                db.prepare(
+                    `
+                        SELECT include, disposition
+                        FROM copilot_model_gateway_eligibility_decisions
+                        WHERE provider_id = ? AND provider_model = ?
+                    `,
+                ).get('openrouter', 'model-a')
+            );
+
+            assert.deepEqual(row, { include: 1, disposition: 'eligible' });
+        } finally {
+            db.close();
+        }
+    });
+
+    it('round-trips a redacted catalog snapshot through the normalized SQLite store', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const source = createProviderCatalogSource({
+                id: 'kilo-models',
+                providerId: 'kilo',
+                kind: 'gateway',
+                url: 'https://kilocode.ai/api/gateway/models',
+            });
+            const evidence = createModelMetadataEvidence({
+                evidenceId: 'kilo-model-tools',
+                providerId: 'kilo',
+                providerModel: 'anthropic/claude-sonnet-4.5',
+                fieldPath: 'capabilities.tools',
+                value: { tools: true, token: 'secret-token-that-must-not-leak' },
+                sourceId: source.id,
+                confidence: 'catalog',
+            });
+            const route = createModelRouteOption({
+                providerId: 'kilo',
+                providerModel: 'anthropic/claude-sonnet-4.5',
+                routeProfile: 'kilo-free',
+                selectorKind: 'gateway_auto',
+                selectorSyntax: 'provider/model',
+                normalizedPolicy: { routeLayer: 'gateway', wireApi: 'openai_chat_completions' },
+            });
+            const overlay = createProviderAccountOverlay({
+                providerId: 'kilo',
+                secretRef: 'KILO_API_KEY',
+                enabledModels: ['anthropic/claude-sonnet-4.5'],
+                policyHeaders: { Authorization: 'Bearer sk-secret-that-must-not-leak' },
+            });
+            const projection = createCanonicalModelProjection({
+                providerId: 'kilo',
+                providerModel: 'anthropic/claude-sonnet-4.5',
+                routeProfile: 'kilo-free',
+                capabilities: { tools: true },
+                accountOverlayRefs: [overlay.accountOverlayId],
+            });
+            const eligibility = createModelEligibilityDecision({
+                providerId: 'kilo',
+                providerModel: 'anthropic/claude-sonnet-4.5',
+                routeProfile: 'kilo-free',
+                include: true,
+                reasons: ['account_model_visible'],
+                policyInputs: { apiKey: 'sk-secret-that-must-not-leak' },
+            });
+            const store = new SqliteModelGatewayCatalogStore({ db });
+
+            const snapshot = {
+                source: 'sqlite-unit-test',
+                sources: [source],
+                evidences: [evidence],
+                routeOptions: [route],
+                accountOverlays: [overlay],
+                projections: [projection],
+                modelEligibilityRuns: [
+                    createModelEligibilityRun({
+                        runId: 'eligibility-run-sqlite',
+                        modelCount: 1,
+                        eligibleCount: 1,
+                    }),
+                ],
+                modelEligibilityDecisions: [eligibility],
+            };
+
+            await store.writeSnapshot(snapshot);
+            await store.writeSnapshot(snapshot);
+            const loaded = await store.readSnapshot();
+            const serializedRows = /** @type {{ payload: string | null } | undefined} */ (
+                db.prepare(
+                    `
+                        SELECT group_concat(payload_json, char(10)) AS payload
+                        FROM (
+                            SELECT payload_json FROM copilot_model_gateway_snapshots
+                            UNION ALL SELECT payload_json FROM copilot_model_gateway_model_evidence
+                            UNION ALL SELECT payload_json FROM copilot_model_gateway_account_overlays
+                            UNION ALL SELECT payload_json FROM copilot_model_gateway_eligibility_decisions
+                        )
+                    `,
+                )
+                    .get()
+            );
+
+            assert.equal(loaded.source, 'sqlite-unit-test');
+            assert.equal(loaded.sources.length, 1);
+            assert.equal(loaded.evidences.length, 1);
+            assert.equal(loaded.routeOptions.length, 1);
+            assert.equal(loaded.accountOverlays.length, 1);
+            assert.equal(loaded.projections.length, 1);
+            assert.equal(loaded.modelEligibilityRuns.length, 1);
+            assert.equal(loaded.modelEligibilityDecisions.length, 1);
+            assert.equal(JSON.stringify(loaded).includes('sk-secret-that-must-not-leak'), false);
+            assert.equal(JSON.stringify(serializedRows).includes('secret-token-that-must-not-leak'), false);
+        } finally {
+            db.close();
         }
     });
 

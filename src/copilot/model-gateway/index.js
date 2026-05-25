@@ -11,6 +11,9 @@
 export {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
     MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+    MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
+    MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,
+    MODEL_GATEWAY_SQLITE_TABLES,
     ANTHROPIC_MODELS_API_VERSION,
     ANTHROPIC_MODELS_CATALOG_URL,
     CEREBRAS_PUBLIC_MODELS_CATALOG_URL,
@@ -57,6 +60,7 @@ export {
     ZAI_OPENAI_BASE_URL,
     ZAI_OPENAPI_URL,
     JsonModelGatewayCatalogStore,
+    SqliteModelGatewayCatalogStore,
     createCanonicalModelProjection,
     createCanonicalProviderProjection,
     createAnthropicModelsImporter,

@@ -222,6 +222,11 @@ describe('copilot/db — in-memory integration', () => {
         assert.ok(tables.includes('copilot_conversation_turns'));
         assert.ok(tables.includes('copilot_memories'));
         assert.ok(tables.includes('copilot_todo_tasks'));
+        assert.ok(tables.includes('copilot_model_gateway_catalog_sources'));
+        assert.ok(tables.includes('copilot_model_gateway_model_projections'));
+        assert.ok(tables.includes('copilot_model_gateway_eligibility_decisions'));
+        assert.ok(tables.includes('copilot_model_gateway_runtime_probe_results'));
+        assert.ok(tables.includes('copilot_model_gateway_route_decisions'));
     });
 
     it('deve criar tabelas FTS5 virtuais', () => {

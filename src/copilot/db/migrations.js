@@ -20,6 +20,8 @@
  * @see module:copilot/conversation-hub/store
  */
 
+import { MODEL_GATEWAY_SQLITE_SCHEMA_SQL } from '../model-gateway/catalog/sqlite-schema.js';
+
 /**
  * @typedef {Object} CopilotMigration
  * @property {number} version - Versão única incremental
@@ -333,6 +335,12 @@ const COPILOT_MIGRATIONS = [
             CREATE INDEX IF NOT EXISTS idx_io_index_chunks_file
                 ON copilot_io_index_chunks(file_path, chunk_index);
         `,
+    },
+    {
+        version: 12,
+        name: 'create_model_gateway_catalog',
+        // Model Gateway R.1: schema relacional reservado para catálogo universal, overlays e eligibility pré-runtime.
+        up: MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
     },
 ];
 

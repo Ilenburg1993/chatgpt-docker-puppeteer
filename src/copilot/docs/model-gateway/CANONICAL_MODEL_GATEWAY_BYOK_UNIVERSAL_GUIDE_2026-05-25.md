@@ -423,9 +423,10 @@ Se a tarefa não exige imagem, vision é no máximo bônus ou superfície a vali
 - [x] Snapshot com sources, evidences, providerEvidences, routeOptions,
   accountOverlays, projections, providerProjections, importRuns, rawPayloadRefs e
   conflicts.
-- [ ] Store SQLite normalizado.
-- [ ] Migrations versionadas de SQLite.
-- [ ] Separação física entre catálogo global, overlays, elegibilidade e probes.
+- [x] Store SQLite normalizado inicial.
+- [x] Migrations versionadas de SQLite para schema reservado.
+- [x] Separação física planejada entre catálogo global, overlays, elegibilidade,
+  probes, health e decisões de rota.
 
 ### 5.5 Importer Runner
 
@@ -536,7 +537,7 @@ Se a tarefa não exige imagem, vision é no máximo bônus ou superfície a vali
 - [x] Cobertura de probes básicos.
 - [x] Cobertura inicial da eligibility pré-runtime: secret ausente, allow list
   fechada, unknown access policy, Cloudflare account/gateway e Ollama local.
-- [ ] Testes de SQLite.
+- [x] Testes iniciais de SQLite.
 - [x] Testes iniciais de eligibility layer.
 - [ ] Testes de seleção final usando catalog + overlay + eligibility + runtime.
 
@@ -1526,15 +1527,15 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 
 ### Faixa R — SQLite
 
-- [ ] Definir schema SQLite.
-- [ ] Criar migrations.
-- [ ] Criar `SqliteModelGatewayCatalogStore`.
+- [x] Definir schema SQLite.
+- [x] Criar migrations.
+- [x] Criar `SqliteModelGatewayCatalogStore`.
 - [ ] Migrar JSON snapshot para SQLite.
-- [ ] Manter export JSON para debug.
-- [ ] Testar redaction.
-- [ ] Testar idempotência.
+- [x] Manter export JSON para debug.
+- [x] Testar redaction.
+- [x] Testar idempotência.
 - [ ] Testar downgrade/unknown schema.
-- [ ] Criar índices por provider/model/route/account.
+- [x] Criar índices por provider/model/route/account.
 - [ ] Criar views OpenAI schema.
 - [x] Preparar snapshot JSON com `modelEligibilityRuns` e
   `modelEligibilityDecisions`, mantendo a futura migração SQLite separável.
@@ -1674,15 +1675,15 @@ Validações focadas recomendadas:
 
 A próxima etapa só estará madura quando:
 
-- [ ] existir contrato formal de eligibility;
-- [ ] eligibility tiver testes suficientes;
-- [ ] terminal conseguir mostrar decisões;
-- [ ] policy engine consumir eligibility;
+- [x] existir contrato formal de eligibility;
+- [x] eligibility tiver testes suficientes;
+- [x] terminal conseguir mostrar decisões;
+- [x] policy engine consumir eligibility;
 - [ ] probes forem recomendados somente para candidatos elegíveis ou
   explicitamente permitidos por policy de exploração;
-- [ ] SQLite tiver schema planejado para catálogo, overlay, eligibility e probes;
-- [ ] OpenAI schema continuar compatível;
-- [ ] todos os validadores passarem.
+- [x] SQLite tiver schema planejado para catálogo, overlay, eligibility e probes;
+- [x] OpenAI schema continuar compatível;
+- [x] todos os validadores passarem.
 
 ---
 
@@ -1763,7 +1764,7 @@ Próxima direção:
   opcional, preservando rejeições `eligibility:<reason>`.
 - [x] Criar explain helper para terminal e observability.
 - [x] Persistir eligibility decisions no snapshot JSON atual.
-- [ ] Planejar SQLite já incluindo catálogo, overlays, eligibility, probes e
+- [x] Planejar SQLite já incluindo catálogo, overlays, eligibility, probes e
   route decisions como camadas lógicas separadas.
 
 ---
@@ -1797,4 +1798,55 @@ Próxima direção:
   summary opcional, sem poluir o schema base.
 - [ ] Criar explain por modelo combinando projection, route options, overlays,
   eligibility e probes.
-- [ ] Projetar o schema SQLite com tabelas separadas para a camada derivada.
+- [x] Projetar o schema SQLite com tabelas separadas para a camada derivada.
+
+---
+
+## 19. Continuidade 2026-05-25 — SQLite Reservado Para Catálogo Universal
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/catalog/sqlite-schema.js`.
+- [x] Exportado o schema via barrels de `catalog` e `model-gateway`.
+- [x] Adicionada migration `create_model_gateway_catalog` em
+  `src/copilot/db/migrations.js`.
+- [x] Reservadas tabelas para catalog sources, evidências de modelo, evidências
+  de provider, projeções de modelo, projeções de provider, route options,
+  overlays de conta, import runs, raw payload refs e conflitos.
+- [x] Reservadas tabelas separadas para runs e decisões de eligibility
+  pré-runtime.
+- [x] Reservadas tabelas separadas para runs/resultados de probes runtime,
+  observações de health e decisões finais de rota.
+- [x] Criados índices iniciais por provider/model/route/account/policy/profile.
+- [x] Adicionados testes que executam o schema em SQLite in-memory.
+- [x] Adicionado store `SqliteModelGatewayCatalogStore` com round-trip redacted
+  e idempotente do snapshot atual.
+- [x] Adicionados testes de migrations gerais criando as tabelas do
+  model-gateway.
+
+Separação arquitetural reafirmada:
+
+- [x] Metadados globais entram como evidências e projeções canônicas.
+- [x] Account overlays continuam como fatos de conta, não como runtime proof.
+- [x] Eligibility continua como camada derivada pré-runtime.
+- [x] Probes runtime ficam em tabelas próprias e não mutam o catálogo canônico.
+- [x] Decisão final de rota fica separada de metadados e de probes.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/test_copilot_db.spec.js`
+  com `119` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS `npm run lint:copilot`.
+- [x] PASS `git diff --check`.
+- [x] PASS `npm run test:copilot` com `5658` testes totais, `5625` passed,
+  `33` pending, `0` failed e `0` warnings/errors.
+
+Próxima direção:
+
+- [x] Criar `SqliteModelGatewayCatalogStore` lendo/escrevendo esse schema sem
+  remover o JSON store de debug.
+- [ ] Criar migração de snapshot JSON para SQLite com redaction preservada.
+- [ ] Criar views/projeções OpenAI schema sobre o store SQLite.
+- [ ] Criar explain por modelo combinando projection, route options, overlays,
+  eligibility, health e probes.

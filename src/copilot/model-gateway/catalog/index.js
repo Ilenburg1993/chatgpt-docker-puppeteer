@@ -92,6 +92,7 @@ export {
     JsonModelGatewayCatalogStore,
     normalizeStoredCatalogSnapshot,
 } from './json-catalog-store.js';
+export { SqliteModelGatewayCatalogStore } from './sqlite-catalog-store.js';
 export { mergeModelMetadataEvidence, mergeProviderMetadataEvidence, rankCatalogEvidenceConfidence } from './merge.js';
 export {
     OPENAI_MODEL_LIST_OBJECT,
@@ -113,3 +114,8 @@ export {
     parseModelModalityExpression,
 } from './normalizers.js';
 export { refreshModelGatewayCatalog } from './refresh.js';
+export {
+    MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
+    MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,
+    MODEL_GATEWAY_SQLITE_TABLES,
+} from './sqlite-schema.js';
