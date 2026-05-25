@@ -840,6 +840,8 @@ Alterações implementadas neste corte:
   Gemini, Ollama, Kilo, Groq, Mistral, Hugging Face, Cloudflare, NVIDIA NIM, Cerebras, Chutes e Z.AI.
 - O barrel do `model-gateway` exporta `listProviderEndpointInventory()` e `resolveProviderEndpointInventory()`, para a
   futura Faixa K/L começar pelos endpoints oficiais sem depender de dispatch de adapter.
+- `/byok providers endpoints [provider]` expõe esse inventário no terminal, sem chamar rede e sem confundir mapa de
+  coleta com prova de acesso/capability.
 
 Validação parcial:
 
@@ -856,3 +858,10 @@ Validação parcial:
 - PASS `npm run test:copilot` após inventário de endpoints
   (`5600` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
   resumo `artifacts/test-runs/copilot/2026-05-25T14-00-03-450Z/summary.md`).
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  após `/byok providers endpoints` (`48` testes).
+- PASS `npm run typecheck:strict:src.copilot` após `/byok providers endpoints`.
+- PASS `npm run lint:copilot` após `/byok providers endpoints`.
+- PASS `npm run test:copilot` após `/byok providers endpoints`
+  (`5601` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T14-05-35-227Z/summary.md`).

@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, writeFile } =
+const { buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listProviderEndpointInventory, listTerminalSdkSessionInventory, loadDotenv, resolveProviderEndpointInventory, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, writeFile } =
     vi.hoisted(() => ({
         buildProbeCompletedEvent: vi.fn((input) => ({
             type: 'model_gateway:probe:completed',
@@ -44,6 +44,24 @@ const { buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokPr
         discoverConfiguredByokModelsFromEnv: vi.fn(),
         flushByokProviderHealth: vi.fn(() => Promise.resolve()),
         listByokProviderModelHealth: vi.fn(() => []),
+        listProviderEndpointInventory: vi.fn(() => [
+            {
+                providerId: 'kilo',
+                adapterId: 'kilo',
+                providerKind: 'gateway',
+                baseUrls: ['https://api.kilo.ai/api/gateway'],
+                modelCatalogSources: [
+                    {
+                        kind: 'public_gateway_api',
+                        method: 'GET',
+                        url: 'https://api.kilo.ai/api/gateway/models',
+                        richness: 'pricing_context_features',
+                    },
+                ],
+                runtimeEndpoints: [{ kind: 'chat_completions', method: 'POST', path: '/chat/completions' }],
+                routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
+            },
+        ]),
         listTerminalSdkSessionInventory: vi.fn(() =>
             Promise.resolve({
                 currentSessionId: null,
@@ -88,6 +106,26 @@ const { buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokPr
         recordByokProviderModelAgentProbeFailure: vi.fn(),
         recordByokProviderModelAgentProbeSuccess: vi.fn(),
         recordModelGatewayRouteDecision: vi.fn((event) => event),
+        resolveProviderEndpointInventory: vi.fn((providerId) =>
+            providerId === 'kilo'
+                ? {
+                      providerId: 'kilo',
+                      adapterId: 'kilo',
+                      providerKind: 'gateway',
+                      baseUrls: ['https://api.kilo.ai/api/gateway'],
+                      modelCatalogSources: [
+                          {
+                              kind: 'public_gateway_api',
+                              method: 'GET',
+                              url: 'https://api.kilo.ai/api/gateway/models',
+                              richness: 'pricing_context_features',
+                          },
+                      ],
+                      runtimeEndpoints: [{ kind: 'chat_completions', method: 'POST', path: '/chat/completions' }],
+                      routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
+                  }
+                : null,
+        ),
         rename: vi.fn(),
         setTerminalModelProjection: vi.fn(),
         writeFile: vi.fn(),
@@ -125,6 +163,7 @@ vi.mock('#copilot/model-gateway', () => ({
     clearByokProviderModelHealth,
     flushByokProviderHealth,
     listByokProviderModelHealth,
+    listProviderEndpointInventory,
     readByokProviderHealthState,
     readByokProviderModelHealth,
     recordByokProviderModelAgentProbeFailure,
@@ -133,6 +172,7 @@ vi.mock('#copilot/model-gateway', () => ({
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
     recordModelGatewayRouteDecision,
+    resolveProviderEndpointInventory,
     routeGatewayModels,
     runConfiguredByokChatProbe: runConfiguredByokChatProbe,
     runConfiguredByokAgentProbe: runConfiguredByokAgentProbe,
@@ -210,6 +250,25 @@ describe('terminal /byok command', () => {
         flushByokProviderHealth.mockResolvedValue(undefined);
         listByokProviderModelHealth.mockReset();
         listByokProviderModelHealth.mockReturnValue([]);
+        listProviderEndpointInventory.mockReset();
+        listProviderEndpointInventory.mockReturnValue([
+            {
+                providerId: 'kilo',
+                adapterId: 'kilo',
+                providerKind: 'gateway',
+                baseUrls: ['https://api.kilo.ai/api/gateway'],
+                modelCatalogSources: [
+                    {
+                        kind: 'public_gateway_api',
+                        method: 'GET',
+                        url: 'https://api.kilo.ai/api/gateway/models',
+                        richness: 'pricing_context_features',
+                    },
+                ],
+                runtimeEndpoints: [{ kind: 'chat_completions', method: 'POST', path: '/chat/completions' }],
+                routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
+            },
+        ]);
         listTerminalSdkSessionInventory.mockReset();
         listTerminalSdkSessionInventory.mockResolvedValue({
             currentSessionId: null,
@@ -260,6 +319,27 @@ describe('terminal /byok command', () => {
         recordByokProviderModelProbeResult.mockReset();
         recordByokProviderModelAgentProbeFailure.mockReset();
         recordByokProviderModelAgentProbeSuccess.mockReset();
+        resolveProviderEndpointInventory.mockReset();
+        resolveProviderEndpointInventory.mockImplementation((providerId) =>
+            providerId === 'kilo'
+                ? {
+                      providerId: 'kilo',
+                      adapterId: 'kilo',
+                      providerKind: 'gateway',
+                      baseUrls: ['https://api.kilo.ai/api/gateway'],
+                      modelCatalogSources: [
+                          {
+                              kind: 'public_gateway_api',
+                              method: 'GET',
+                              url: 'https://api.kilo.ai/api/gateway/models',
+                              richness: 'pricing_context_features',
+                          },
+                      ],
+                      runtimeEndpoints: [{ kind: 'chat_completions', method: 'POST', path: '/chat/completions' }],
+                      routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
+                  }
+                : null,
+        );
         rename.mockReset();
         setTerminalModelProjection.mockReset();
         writeFile.mockReset();
@@ -1082,6 +1162,21 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('cost=profile-free');
         expect(ctx.output()).toContain('chat=ok');
         expect(ctx.output()).not.toContain('secret');
+    });
+
+    it('mostra inventário de endpoints por provider sem chamar rede', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'providers endpoints kilo');
+
+        expect(resolveProviderEndpointInventory).toHaveBeenCalledWith('kilo');
+        expect(listProviderEndpointInventory).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('BYOK provider endpoints');
+        expect(ctx.output()).toContain('kind=gateway');
+        expect(ctx.output()).toContain('https://api.kilo.ai/api/gateway/models');
+        expect(ctx.output()).toContain('POST /chat/completions');
+        expect(ctx.output()).toContain('selectors=exact_model,gateway_auto,provider_model');
     });
 
     it('mostra health operacional persistido de BYOK', async () => {

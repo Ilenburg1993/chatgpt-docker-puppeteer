@@ -18,6 +18,7 @@ import {
     clearByokProviderModelHealth,
     flushByokProviderHealth,
     listByokProviderModelHealth,
+    listProviderEndpointInventory,
     readByokProviderHealthState,
     readByokProviderModelHealth,
     recordByokProviderModelAgentProbeFailure,
@@ -26,6 +27,7 @@ import {
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
     recordModelGatewayRouteDecision,
+    resolveProviderEndpointInventory,
     routeGatewayModels,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
@@ -1549,6 +1551,41 @@ function renderByokHealth(println) {
 }
 
 /**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {void}
+ */
+function renderByokProviderEndpointInventory(println, rest) {
+    const selector = optionalScalarString(rest.find((item) => !/^(endpoints|endpoint|catalog|sources)$/iu.test(item)));
+    const inventories = selector
+        ? [resolveProviderEndpointInventory(selector)].filter((item) => item !== null)
+        : listProviderEndpointInventory();
+
+    println(`\n  \x1b[36mBYOK provider endpoints\x1b[0m (${inventories.length})`);
+    println('  \x1b[90mInventário estático de coleta; não prova acesso nem capability. Use probes para promover confiança runtime.\x1b[0m\n');
+
+    if (inventories.length === 0) {
+        println(`    \x1b[33mProvider não encontrado no inventário: ${selector ?? '-'}.\x1b[0m\n`);
+        return;
+    }
+
+    for (const inventory of inventories) {
+        println(`    \x1b[33m${inventory.providerId}\x1b[0m  \x1b[90mkind=${inventory.providerKind} · adapter=${inventory.adapterId}\x1b[0m`);
+        println(`      \x1b[90mbase=${inventory.baseUrls.slice(0, 3).join(' · ')}${inventory.baseUrls.length > 3 ? ' · ...' : ''}\x1b[0m`);
+        const sources = inventory.modelCatalogSources
+            .slice(0, 3)
+            .map((source) => `${source.method} ${source.url} (${source.richness})`);
+        println(`      \x1b[90mcatalog=${sources.join(' · ')}${inventory.modelCatalogSources.length > 3 ? ' · ...' : ''}\x1b[0m`);
+        const runtime = inventory.runtimeEndpoints
+            .slice(0, 4)
+            .map((endpoint) => `${endpoint.method} ${endpoint.path}`);
+        println(`      \x1b[90mruntime=${runtime.join(' · ')}${inventory.runtimeEndpoints.length > 4 ? ' · ...' : ''}\x1b[0m`);
+        println(`      \x1b[90mselectors=${inventory.routeSelectors.join(',')}\x1b[0m`);
+    }
+    println('\n  \x1b[90mPróximo passo: catalog importers vão usar este mapa como fonte inicial antes de probes e seleção runtime.\x1b[0m\n');
+}
+
+/**
  * @param {string} value
  * @returns {string}
  */
@@ -2066,6 +2103,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
     if (sub === 'providers' || sub === 'provider-list') {
         if (/^(health|chat-health|status)$/iu.test(rest[0] ?? '')) {
             renderByokHealth(println);
+            return;
+        }
+        if (/^(endpoints|endpoint|catalog|sources)$/iu.test(rest[0] ?? '')) {
+            renderByokProviderEndpointInventory(println, rest.slice(1));
             return;
         }
         const presetCounts = new Map();
