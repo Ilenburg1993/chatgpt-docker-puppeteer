@@ -10,6 +10,7 @@
 
 import { evaluateGatewayModelHealthRoute, isGatewayModelAgentProbeVerified } from './health-routing.js';
 import { resolveModelGatewayTaskProfile } from './task-profiles.js';
+import { evaluateModelGatewayEligibility } from '../eligibility/index.js';
 
 const CONFIDENCE_SCORE = Object.freeze({
     unknown: 0,
@@ -86,6 +87,12 @@ function stringSet(value) {
  *     allowProviders?: string[];
  *     blockProviders?: string[];
  *     latencyMsByModelId?: Record<string, number>;
+ *     eligibilityDecisions?: Record<string, any>[];
+ *     evaluateEligibility?: boolean;
+ *     routeOptions?: Record<string, any>[];
+ *     accountOverlays?: Record<string, any>[];
+ *     secretRegistry?: { has(ref: string): boolean };
+ *     eligibilityPolicy?: Record<string, any>;
  * }} [options]
  * @returns {{
  *     model: Record<string, any>;
@@ -93,6 +100,7 @@ function stringSet(value) {
  *     score: number;
  *     reasons: string[];
  *     rejectedReasons: string[];
+ *     eligibility: Record<string, any> | null;
  *     health: ReturnType<typeof evaluateGatewayModelHealthRoute>['health'];
  * }}
  */
@@ -102,7 +110,19 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     const providerId = typeof model['providerId'] === 'string' ? model['providerId'] : '';
     const allowProviders = stringSet(options.allowProviders);
     const blockProviders = stringSet(options.blockProviders);
+    const eligibility = resolveCandidateEligibility(model, profile, options);
     let score = 100;
+
+    if (eligibility) {
+        reasons.push(`eligibility:${eligibility['disposition'] ?? 'unknown'}`);
+        if (eligibility['include'] === false) {
+            for (const reason of Array.isArray(eligibility['hardExclusions']) ? eligibility['hardExclusions'] : []) {
+                rejectedReasons.push(`eligibility:${reason}`);
+            }
+        }
+        const softPenalties = Array.isArray(eligibility['softPenalties']) ? eligibility['softPenalties'] : [];
+        score -= Math.min(40, softPenalties.length * 5);
+    }
 
     if (model['enabled'] === false) rejectedReasons.push('model_disabled');
     if (allowProviders.size > 0 && !allowProviders.has(providerId)) rejectedReasons.push('provider_not_allowed');
@@ -196,8 +216,87 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         score,
         reasons,
         rejectedReasons,
+        eligibility,
         health: healthDecision.health,
     };
+}
+
+/**
+ * @param {Record<string, any>} model
+ * @returns {string}
+ */
+function modelEligibilityKey(model) {
+    return [
+        String(model['providerId'] ?? 'unknown-provider'),
+        String(model['providerModel'] ?? model['id'] ?? 'unknown-model'),
+        String(model['routeProfile'] ?? 'default'),
+    ].join(':');
+}
+
+/**
+ * @param {Record<string, any>} route
+ * @returns {string}
+ */
+function routeEligibilityKey(route) {
+    return [
+        String(route['providerId'] ?? 'unknown-provider'),
+        String(route['providerModel'] ?? 'unknown-model'),
+        String(route['routeProfile'] ?? 'default'),
+    ].join(':');
+}
+
+/**
+ * @param {Record<string, any>} model
+ * @param {Record<string, any>[]} routes
+ * @returns {Record<string, any> | null}
+ */
+function findRouteOptionForModel(model, routes) {
+    const key = modelEligibilityKey(model);
+    return routes.find((route) => routeEligibilityKey(route) === key) ?? null;
+}
+
+/**
+ * @param {Record<string, any>} model
+ * @param {Record<string, any>[]} decisions
+ * @returns {Record<string, any> | null}
+ */
+function findEligibilityDecisionForModel(model, decisions) {
+    const key = modelEligibilityKey(model);
+    return (
+        decisions.find(
+            (decision) =>
+                [
+                    String(decision['providerId'] ?? 'unknown-provider'),
+                    String(decision['providerModel'] ?? 'unknown-model'),
+                    String(decision['routeProfile'] ?? 'default'),
+                ].join(':') === key,
+        ) ?? null
+    );
+}
+
+/**
+ * @param {Record<string, any>} model
+ * @param {Record<string, any>} profile
+ * @param {Parameters<typeof scoreGatewayModelCandidate>[2]} options
+ * @returns {Record<string, any> | null}
+ */
+function resolveCandidateEligibility(model, profile, options = {}) {
+    const precomputed = findEligibilityDecisionForModel(
+        model,
+        Array.isArray(options.eligibilityDecisions) ? options.eligibilityDecisions : [],
+    );
+    if (precomputed) return precomputed;
+    if (options.evaluateEligibility !== true) return null;
+    return evaluateModelGatewayEligibility({
+        projection: model,
+        routeOption: findRouteOptionForModel(model, Array.isArray(options.routeOptions) ? options.routeOptions : []) ?? undefined,
+        accountOverlays: Array.isArray(options.accountOverlays) ? options.accountOverlays : [],
+        secretRegistry: options.secretRegistry,
+        policy: {
+            ...(isRecord(options.eligibilityPolicy) ? options.eligibilityPolicy : {}),
+            taskProfile: typeof profile['id'] === 'string' ? profile['id'] : undefined,
+        },
+    });
 }
 
 /**

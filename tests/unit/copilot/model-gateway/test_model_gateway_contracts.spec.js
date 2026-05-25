@@ -368,6 +368,46 @@ describe('model-gateway foundation', () => {
         assert.ok(blocked.score > 0);
     });
 
+    it('can apply pre-runtime eligibility before scoring runtime candidates', () => {
+        const visible = createModelRecord({
+            providerId: 'openai',
+            providerModel: 'gpt-visible',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+            pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 4 },
+        });
+        const hidden = createModelRecord({
+            providerId: 'openai',
+            providerModel: 'gpt-hidden',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+            pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 4 },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'openai',
+            secretRef: 'OPENAI_API_KEY',
+            enabledModels: ['gpt-visible'],
+            sourceKind: 'authenticated_catalog',
+        });
+
+        const decision = routeGatewayModels([hidden, visible], 'tool_agent', {
+            evaluateEligibility: true,
+            accountOverlays: [overlay],
+            secretRegistry: { has: () => true },
+            eligibilityPolicy: { unknownAccessPolicy: 'block' },
+            requireAgentProbeOk: false,
+        });
+
+        assert.equal(decision.selected?.model['providerModel'], 'gpt-visible');
+        assert.equal(decision.candidates.length, 1);
+        assert.equal(decision.candidates[0].eligibility?.['disposition'], 'eligible');
+        assert.deepEqual(
+            decision.rejected.map((candidate) => candidate.model['providerModel']),
+            ['gpt-hidden'],
+        );
+        assert.ok(decision.rejected[0].rejectedReasons.includes('eligibility:account_model_not_visible'));
+    });
+
     it('imports current env BYOK without serializing secrets', () => {
         const env = {
             COPILOT_BYOK_ENABLED: 'true',

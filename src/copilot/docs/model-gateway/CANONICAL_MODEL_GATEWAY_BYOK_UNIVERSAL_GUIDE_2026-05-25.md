@@ -479,8 +479,8 @@ Se a tarefa não exige imagem, vision é no máximo bônus ou superfície a vali
 - [x] Provider allow/block existe.
 - [x] Health runtime já pode excluir falhas.
 - [x] Vision é soft preference em teste.
-- [ ] Policy engine ainda não consome uma entidade formal de elegibilidade
-  pré-runtime.
+- [x] Policy engine pode consumir/evaluar eligibility pré-runtime quando a opção
+  de roteamento é ativada.
 - [ ] Policy engine ainda opera principalmente em registros/projeções, não em
   route options completas + overlays + eligibility snapshots.
 
@@ -1354,8 +1354,10 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Provider allow/block.
 - [x] Vision soft preference.
 - [x] Runtime proved preference.
+- [x] Consumo opcional de eligibility decisions no scoring.
 - [ ] Consumir route options diretamente.
-- [ ] Consumir eligibility decisions.
+- [x] Avaliar eligibility on-demand a partir de projection + overlays quando
+  `evaluateEligibility` estiver ativo.
 - [ ] Emitir explicação completa catalog + overlay + eligibility + probe.
 
 ### Faixa H — Terminal
@@ -1570,7 +1572,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Fallback chain básico.
 - [x] Health-aware scoring.
 - [ ] Unificar candidate builder.
-- [ ] Usar eligibility como barreira.
+- [x] Usar eligibility como barreira opcional no policy engine.
 - [ ] Usar probes como promoção.
 - [ ] Usar route options como unidade de seleção.
 - [ ] Explicar rejeições.
@@ -1718,6 +1720,8 @@ Implementado neste corte:
 - [x] Criado evaluator puro `evaluateModelGatewayEligibility()`.
 - [x] Exportado o módulo pelo barrel principal de `model-gateway`.
 - [x] Adicionados testes de eligibility no contrato principal.
+- [x] Integrado o policy engine para consumir eligibility opcionalmente durante
+  o scoring.
 
 Coberturas novas:
 
@@ -1729,20 +1733,22 @@ Coberturas novas:
 - [x] Cloudflare AI Gateway exclui quando `accountId` ou `gatewayId` faltam.
 - [x] Ollama local usa instalação local como input de elegibilidade, sem provar
   runtime.
+- [x] Candidato inelegível é mantido em `rejected` com motivo
+  `eligibility:<reason>`.
 
 Validação deste corte:
 
 - [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
-  com `75` testes.
+  com `76` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS `npm run lint:copilot`.
-- [x] PASS `npm run test:copilot` com `5652` testes totais, `5619` passed,
+- [x] PASS `npm run test:copilot` com `5653` testes totais, `5620` passed,
   `33` pending, `0` failed e `0` warnings/errors.
 
 Próxima direção:
 
-- [ ] Integrar `evaluateModelGatewayEligibility()` ao candidate builder/policy
-  engine sem apagar a trilha de rejeições.
+- [x] Integrar `evaluateModelGatewayEligibility()` ao policy engine como barreira
+  opcional, preservando rejeições `eligibility:<reason>`.
 - [ ] Criar explain helper para terminal e observability.
 - [ ] Persistir eligibility decisions no próximo store.
 - [ ] Planejar SQLite já incluindo catálogo, overlays, eligibility, probes e
