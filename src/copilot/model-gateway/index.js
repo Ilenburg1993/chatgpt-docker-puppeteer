@@ -20,22 +20,28 @@ export {
     normalizeVerification,
     optionalPositiveInteger,
     optionalString,
-} from './contracts/records.js';
-export { ModelGatewayRegistry } from './registry/model-registry.js';
-export { importConfiguredByokFromEnv } from './registry/env-byok-compat-importer.js';
+} from './contracts/index.js';
 export {
     DEFAULT_MODEL_GATEWAY_REGISTRY_PATH,
     JsonModelGatewayRegistryStore,
+    ModelGatewayRegistry,
+    buildEnvByokModelGatewaySnapshot,
+    buildModelGatewayOperatorProjection,
+    importConfiguredByokFromEnv,
     normalizeStoredRegistrySnapshot,
-} from './registry/json-registry-store.js';
-export { buildModelGatewayOperatorProjection } from './registry/projection.js';
-export { buildEnvByokModelGatewaySnapshot, persistEnvByokModelGatewaySnapshot } from './registry/snapshot.js';
+    persistEnvByokModelGatewaySnapshot,
+} from './registry/index.js';
 export {
     DEFAULT_MODEL_GATEWAY_SECRET_ENV_KEYS,
     EnvSecretRegistry,
     createEnvSecretRegistry,
-} from './secrets/env-secret-registry.js';
-export { redactSecretRecord, redactSecretText } from './secrets/redaction.js';
+    redactSecretRecord,
+    redactSecretText,
+} from './secrets/index.js';
+export {
+    MODEL_GATEWAY_PRE_K_STAGE,
+    buildModelGatewayPreKCompatibilityReport,
+} from './migration/index.js';
 export {
     ANTHROPIC_BASE_URL,
     ANTHROPIC_PROVIDER_ID,
@@ -80,8 +86,7 @@ export {
     resolveModelGatewayTaskProfile,
     scoreGatewayModelCandidate,
 } from './routing/index.js';
-export { buildModelGatewayOnListModelsHandler } from './session/on-list-models.js';
-export { toCopilotModelInfo, toCopilotModelInfoList } from './session/copilot-model-projection.js';
+export { buildModelGatewayOnListModelsHandler, toCopilotModelInfo, toCopilotModelInfoList } from './session/index.js';
 export {
     classifyByokProviderFailure,
     clearByokProviderModelHealth,
@@ -121,12 +126,11 @@ export {
     buildProbeCompletedEvent,
     buildRegistrySnapshotEvent,
     buildRouteDecisionEvent,
+    buildRouteDecisionTraceAttributes,
     projectProbeCompletedMetrics,
     projectRouteDecisionMetrics,
     projectModelGatewayMetrics,
-} from './observability/events.js';
-export {
     listModelGatewayRouteDecisions,
     recordModelGatewayRouteDecision,
     resetModelGatewayRouteDecisionLedgerForTests,
-} from './observability/route-decision-ledger.js';
+} from './observability/index.js';

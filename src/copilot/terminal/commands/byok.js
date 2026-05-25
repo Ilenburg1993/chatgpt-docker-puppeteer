@@ -12,6 +12,7 @@ import fs from 'node:fs/promises';
 
 import { config as loadDotenv } from 'dotenv';
 import {
+    buildModelGatewayPreKCompatibilityReport,
     buildRouteDecisionEvent,
     buildProbeCompletedEvent,
     classifyByokProviderFailure,
@@ -1586,6 +1587,23 @@ function renderByokProviderEndpointInventory(println, rest) {
 }
 
 /**
+ * @param {(text: string) => void} println
+ * @returns {void}
+ */
+function renderByokGatewayPreKGate(println) {
+    const report = buildModelGatewayPreKCompatibilityReport();
+    println(`\n  \x1b[36mBYOK model-gateway pre-K gate\x1b[0m`);
+    println(
+        `  \x1b[90mstage=${report.stage} · ready=${report.ready ? 'sim' : 'nao'} · checks=${report.passed}/${report.total} · failed=${report.failed}\x1b[0m\n`,
+    );
+    for (const check of report.checks) {
+        const mark = check.passed ? '\x1b[32m[x]\x1b[0m' : '\x1b[31m[ ]\x1b[0m';
+        println(`    ${mark} \x1b[33m${check.id}\x1b[0m  \x1b[90mfaixa=${check.track} · ${check.summary}\x1b[0m`);
+    }
+    println('\n  \x1b[90mEste gate fecha a camada A-J; catálogo universal, SQLite e importers profundos continuam nas Faixas K+.\x1b[0m\n');
+}
+
+/**
  * @param {string} value
  * @returns {string}
  */
@@ -1994,6 +2012,15 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             return;
         }
         renderByokHealth(println);
+        return;
+    }
+
+    if (sub === 'gateway' || sub === 'gate' || sub === 'migration') {
+        if (/^(endpoints|endpoint|catalog|sources)$/iu.test(rest[0] ?? '')) {
+            renderByokProviderEndpointInventory(println, rest.slice(1));
+            return;
+        }
+        renderByokGatewayPreKGate(println);
         return;
     }
 

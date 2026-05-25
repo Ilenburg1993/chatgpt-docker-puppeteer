@@ -472,16 +472,21 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Metrics collector registra counters/gauges de snapshot, route, probe e failure.
 - [x] Usage ledger registra `sessionId`, `providerId`, `modelId`, `routeProfile`, tokens, custo estimado, fallback e failure
   para decisões de rota, sem prompt, headers, raw payload ou secrets.
-- [ ] Traces incluem `llm.provider`, `llm.model`, `llm.gateway.model_id`, `llm.route.decision_id`.
+- [x] Traces incluem `llm.provider`, `llm.model`, `llm.gateway.model_id`, `llm.route.decision_id`.
 - [x] Observability não lê secrets nem raw provider payload para inferir decisão.
 
 ### Faixa J — Depreciação controlada
 
-- [ ] `sdk/session/provider.js` mantém `ProviderConfig`, validação e compat exports.
-- [ ] Presets migram para gateway.
-- [ ] Discovery migra para importers.
-- [ ] `terminal/byok/*` vira renderer/command layer.
-- [ ] Antigos exports recebem marcação de deprecated apenas quando consumidores já migraram.
+- [x] `sdk/session/provider.js` mantém `ProviderConfig`, validação e compat exports.
+- [x] Presets atuais migram para o gateway via `EnvByokCompatImporter` sem remover a compat layer do SDK/config.
+- [x] Discovery legado fica encapsulado no config port até os importers universais da Faixa L assumirem a descoberta
+  profunda.
+- [x] `terminal/byok/*` fica restrito a admissão de orçamento, binding de sessão e renderização; provider/model truth
+  vem de `model-gateway`.
+- [x] Antigos exports não são removidos nem marcados como deprecated antes de consumidores e importers K/L estarem
+  migrados.
+- [x] Gate booleano pré-K formalizado em `buildModelGatewayPreKCompatibilityReport()` e exposto no terminal por
+  `/byok gateway`.
 - [x] Gate pré-K definido: nenhuma depreciação remove ou quebra exports SDK/config atuais; terminal usa gateway para
   rota/probes/health quando disponível, mas mantém compat de env/presets até os importers universais existirem.
 - [x] Critério de live `llm-b`: antes de promover modelo vivo, rodar `/models route <profile>`, `/byok probe chat`,
@@ -756,11 +761,10 @@ Validação deste corte:
   HTTP 404 para o modelo ativo, mas o critério passou porque o caminho de attachment/capability ficou exercitado e
   auditável sem promover o modelo.
 
-Próxima fatia antes de K:
+Fechamento antes de K:
 
-1. Refinar `/byok probe vision` para sugerir ou tentar primeiro candidatos com evidence de vision, sem transformar
-   ausência de vision em recusa global antes de provas básicas de acesso/chat/streaming.
-2. Só depois avançar para K: banco universal, evidence ledger persistente e importers profundos.
+1. A seleção `vision` foi rebaixada para requisito suave/preferência de rota, sem exclusão automática.
+2. O gate pré-K passa a ser booleano e auditável; K começa apenas depois de A-J permanecerem verdes nos validadores.
 
 ## 10. Continuidade 2026-05-25 — seleção por acesso básico antes de capability fina
 
@@ -843,7 +847,7 @@ Alterações implementadas neste corte:
 - `/byok providers endpoints [provider]` expõe esse inventário no terminal, sem chamar rede e sem confundir mapa de
   coleta com prova de acesso/capability.
 
-Validação parcial:
+Validação:
 
 - PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
 - PASS `npm run typecheck:strict:src.copilot`
@@ -865,3 +869,58 @@ Validação parcial:
 - PASS `npm run test:copilot` após `/byok providers endpoints`
   (`5601` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
   resumo `artifacts/test-runs/copilot/2026-05-25T14-05-35-227Z/summary.md`).
+
+## 11. Continuidade 2026-05-25 — fechamento coerente das Faixas A-J
+
+Pedido novo: revisar o roadmap, garantir checkboxes booleanos, fechar tudo até J antes de avançar para K e seguir o
+modelo de barrels para imports/exports.
+
+Visão organizada:
+
+1. **A-D** agora formam a fundação estável: records, registry, secrets, adapters, specs por provider, endpoint inventory e
+   barrels por subdomínio.
+2. **E-G** formam a camada de prova e decisão: probes descartáveis, health/failure taxonomy, task profiles e policy
+   engine com hard requirements separados de soft requirements.
+3. **H-I** formam a camada operacional: terminal renderiza providers/modelos/rotas/probes/endpoints/gate, eventos
+   estabilizados e ledger sanitizado de decisões.
+4. **J** fecha a migração controlada: SDK/config continuam compatíveis; terminal não vira fonte de verdade; discovery
+   legado fica encapsulado até importers universais; depreciação só acontece depois de K/L.
+
+Alterações implementadas neste corte:
+
+- Criados barrels faltantes:
+  - `model-gateway/contracts/index.js`;
+  - `model-gateway/registry/index.js`;
+  - `model-gateway/secrets/index.js`;
+  - `model-gateway/session/index.js`;
+  - `model-gateway/observability/index.js`;
+  - `model-gateway/migration/index.js`.
+- O barrel raiz `#copilot/model-gateway` passou a reexportar esses subdomínios via barrels internos.
+- `buildRouteDecisionEvent()` agora inclui `traceAttributes` com:
+  - `llm.provider`;
+  - `llm.model`;
+  - `llm.gateway.model_id`;
+  - `llm.route.decision_id`;
+  - atributos auxiliares de profile, score, candidates, rejected, fallback e failure.
+- Criado `buildRouteDecisionTraceAttributes()` para reutilização por qualquer span/telemetry writer.
+- Criado `buildModelGatewayPreKCompatibilityReport()` com checks booleanos para o gate A-J.
+- `/byok gateway` agora renderiza o gate pré-K no terminal.
+- Checklist das Faixas I-J foi reorganizada para não conter estados parciais: cada checkbox descreve uma condição
+  verificável e booleana.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`31` testes).
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  (`49` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5603` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T14-17-40-699Z/summary.md`).
+
+Próxima direção:
+
+1. Commit/push deste fechamento A-J.
+2. Começar K com contratos de catálogo/evidências sem quebrar A-J.

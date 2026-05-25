@@ -15,6 +15,7 @@ import {
     listModelGatewayTaskProfiles,
     ModelGatewayRegistry,
     MODEL_GATEWAY_TASK_PROFILES,
+    buildModelGatewayPreKCompatibilityReport,
     anthropicAdapter,
     buildEnvByokModelGatewaySnapshot,
     buildModelGatewayOperatorProjection,
@@ -22,6 +23,7 @@ import {
     buildProbeCompletedEvent,
     buildRegistrySnapshotEvent,
     buildRouteDecisionEvent,
+    buildRouteDecisionTraceAttributes,
     createModelRecord,
     createEnvSecretRegistry,
     buildModelGatewayOnListModelsHandler,
@@ -438,6 +440,22 @@ describe('model-gateway foundation', () => {
         assert.equal(event.candidateCount, 1);
         assert.equal(event.rejectedCount, 1);
         assert.equal(event.estimatedInputTokens, 12345);
+        assert.deepEqual(event.traceAttributes, {
+            'llm.provider': 'kilo',
+            'llm.model': 'kilo-auto/free',
+            'llm.gateway.model_id': 'kilo:kilo-auto/free',
+            'llm.route.decision_id': event.decisionId,
+            'llm.route.task_profile': 'repo_agent',
+            'llm.route.profile': 'kilo-free',
+            'llm.route.mode': 'pre-probe',
+            'llm.route.selected': true,
+            'llm.route.score': event.score,
+            'llm.route.candidates': 1,
+            'llm.route.rejected': 1,
+            'llm.route.fallback_count': 1,
+            'llm.route.failure': 'none',
+        });
+        assert.deepEqual(buildRouteDecisionTraceAttributes(event), event.traceAttributes);
         assert.equal(JSON.stringify(event).includes('do not persist'), false);
         assert.equal(metrics.counters['model_gateway.route.decision'], 1);
         assert.equal(metrics.counters['model_gateway.route.selected'], 1);
@@ -445,6 +463,19 @@ describe('model-gateway foundation', () => {
         assert.equal(recorded.decisionId, event.decisionId);
         assert.equal(ledger.length, 1);
         assert.equal(ledger[0].decisionId, event.decisionId);
+    });
+
+    it('publishes a boolean pre-K compatibility gate for the current migration layer', () => {
+        const report = buildModelGatewayPreKCompatibilityReport();
+
+        assert.equal(report.stage, 'pre-k');
+        assert.equal(report.ready, true);
+        assert.equal(report.failed, 0);
+        assert.equal(report.passed, report.total);
+        assert.ok(report.checks.length >= 8);
+        assert.ok(report.checks.every((check) => typeof check.passed === 'boolean'));
+        assert.ok(report.checks.some((check) => check.id === 'sdk_provider_config_boundary'));
+        assert.ok(report.checks.some((check) => check.id === 'route_trace_attributes_are_stable'));
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {

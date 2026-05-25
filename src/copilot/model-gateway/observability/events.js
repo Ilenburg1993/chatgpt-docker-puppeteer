@@ -233,6 +233,7 @@ function summarizeSelectedRouteCandidate(selected) {
  *     estimatedOutputTokens: number | null;
  *     estimatedCostUsd: number | null;
  *     failure: string | null;
+ *     traceAttributes: Record<string, string | number | boolean>;
  * }}
  */
 export function buildRouteDecisionEvent(input) {
@@ -241,7 +242,7 @@ export function buildRouteDecisionEvent(input) {
     const taskProfile = optionalString(input.taskProfile) ?? 'unknown';
     const routeProfile = optionalString(input.routeProfile);
     const modelId = selected.modelId ?? 'none';
-    return {
+    const event = {
         type: MODEL_GATEWAY_ROUTE_DECISION,
         timestamp,
         decisionId: `route-${timestamp}-${taskProfile}-${modelId}`.replace(/[^a-zA-Z0-9._:-]+/gu, '-'),
@@ -263,6 +264,46 @@ export function buildRouteDecisionEvent(input) {
         estimatedOutputTokens: finiteNumber(input.estimatedOutputTokens),
         estimatedCostUsd: finiteNumber(input.estimatedCostUsd),
         failure: optionalString(input.failure),
+    };
+    return {
+        ...event,
+        traceAttributes: buildRouteDecisionTraceAttributes(event),
+    };
+}
+
+/**
+ * @param {{
+ *     decisionId: string;
+ *     taskProfile: string;
+ *     routeProfile: string | null;
+ *     mode: string;
+ *     selected: boolean;
+ *     gatewayModelId: string | null;
+ *     providerId: string | null;
+ *     modelId: string | null;
+ *     score: number | null;
+ *     candidateCount: number;
+ *     rejectedCount: number;
+ *     fallbackChain: string[];
+ *     failure: string | null;
+ * }} event
+ * @returns {Record<string, string | number | boolean>}
+ */
+export function buildRouteDecisionTraceAttributes(event) {
+    return {
+        'llm.provider': event.providerId ?? 'none',
+        'llm.model': event.modelId ?? 'none',
+        'llm.gateway.model_id': event.gatewayModelId ?? 'none',
+        'llm.route.decision_id': event.decisionId,
+        'llm.route.task_profile': event.taskProfile,
+        'llm.route.profile': event.routeProfile ?? 'none',
+        'llm.route.mode': event.mode,
+        'llm.route.selected': event.selected,
+        'llm.route.score': event.score ?? 0,
+        'llm.route.candidates': event.candidateCount,
+        'llm.route.rejected': event.rejectedCount,
+        'llm.route.fallback_count': event.fallbackChain.length,
+        'llm.route.failure': event.failure ?? 'none',
     };
 }
 

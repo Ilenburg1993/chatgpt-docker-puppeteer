@@ -2,8 +2,29 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listProviderEndpointInventory, listTerminalSdkSessionInventory, loadDotenv, resolveProviderEndpointInventory, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, writeFile } =
+const { buildModelGatewayPreKCompatibilityReport, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listProviderEndpointInventory, listTerminalSdkSessionInventory, loadDotenv, resolveProviderEndpointInventory, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, writeFile } =
     vi.hoisted(() => ({
+        buildModelGatewayPreKCompatibilityReport: vi.fn(() => ({
+            stage: 'pre-k',
+            ready: true,
+            total: 2,
+            passed: 2,
+            failed: 0,
+            checks: [
+                {
+                    id: 'sdk_provider_config_boundary',
+                    track: 'J',
+                    passed: true,
+                    summary: 'SDK ProviderConfig boundary ok',
+                },
+                {
+                    id: 'route_trace_attributes_are_stable',
+                    track: 'I',
+                    passed: true,
+                    summary: 'route trace attrs ok',
+                },
+            ],
+        })),
         buildProbeCompletedEvent: vi.fn((input) => ({
             type: 'model_gateway:probe:completed',
             probeKind: input.probeKind,
@@ -157,6 +178,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
 }));
 
 vi.mock('#copilot/model-gateway', () => ({
+    buildModelGatewayPreKCompatibilityReport,
     buildProbeCompletedEvent: buildProbeCompletedEvent,
     buildRouteDecisionEvent,
     classifyByokProviderFailure,
@@ -319,6 +341,7 @@ describe('terminal /byok command', () => {
         recordByokProviderModelProbeResult.mockReset();
         recordByokProviderModelAgentProbeFailure.mockReset();
         recordByokProviderModelAgentProbeSuccess.mockReset();
+        buildModelGatewayPreKCompatibilityReport.mockClear();
         resolveProviderEndpointInventory.mockReset();
         resolveProviderEndpointInventory.mockImplementation((providerId) =>
             providerId === 'kilo'
@@ -1177,6 +1200,19 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('https://api.kilo.ai/api/gateway/models');
         expect(ctx.output()).toContain('POST /chat/completions');
         expect(ctx.output()).toContain('selectors=exact_model,gateway_auto,provider_model');
+    });
+
+    it('mostra gate pré-K do model-gateway com checks booleanos', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway');
+
+        expect(buildModelGatewayPreKCompatibilityReport).toHaveBeenCalled();
+        expect(ctx.output()).toContain('BYOK model-gateway pre-K gate');
+        expect(ctx.output()).toContain('checks=2/2');
+        expect(ctx.output()).toContain('sdk_provider_config_boundary');
+        expect(ctx.output()).toContain('route_trace_attributes_are_stable');
     });
 
     it('mostra health operacional persistido de BYOK', async () => {
