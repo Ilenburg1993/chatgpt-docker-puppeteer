@@ -3,6 +3,11 @@
 `src/copilot/model-gateway` is the canonical domain for BYOK providers, provider-local models, capability metadata,
 probes, routing decisions, health and cost policy.
 
+The living roadmap and architecture guide is
+[`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_UNIVERSAL_GUIDE_2026-05-25.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_UNIVERSAL_GUIDE_2026-05-25.md).
+Use it as the source of truth before changing importers, catalog storage, account access, eligibility, probes or runtime
+selection.
+
 It is not a replacement for the GitHub Copilot SDK wrapper. The SDK layer remains the boundary that knows how to create,
 resume and operate Copilot SDK sessions. The gateway decides what provider/model binding should be used and projects that
 decision into SDK-compatible objects.
@@ -28,4 +33,3 @@ gateway model id: openrouter:deepseek/deepseek-v4-flash:free
 
 Provider secrets never appear in model gateway records. Only redacted `secretRefs` and configured/not-configured facts are
 stored.
-

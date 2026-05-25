@@ -1611,7 +1611,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 
 - [x] Roadmap antigo preservado como histórico.
 - [x] Novo guia canônico criado.
-- [ ] Linkar README do model-gateway para este guia.
+- [x] Linkar README do model-gateway para este guia.
 - [ ] Criar changelog curto por corte.
 - [ ] Atualizar roadmap a cada transformação estrutural.
 - [ ] Manter checklist boolean.
