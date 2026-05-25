@@ -24,6 +24,7 @@ import {
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
+    routeGatewayModels,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
     runConfiguredByokJsonProbe,
@@ -177,10 +178,14 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
  *   inputModalities?: string[];
  *   outputModalities?: string[];
  *   supportsReasoning?: boolean;
+ *   capabilities?: Record<string, unknown>;
+ *   gatewayId?: string | null;
+ *   providerModel?: string | null;
+ *   confidence?: string | null;
  * } | undefined}
  */
 function getByokModelMetadata(model) {
-    return /** @type {{ byok?: { freeTier?: boolean | null; pricing?: { prompt?: number | null; completion?: number | null; request?: number | null }; rateLimits?: { maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }; provider?: string | null; profile?: string | null; source?: string; profileFreeTier?: boolean | null; profileCostSource?: string | null; profileCostDetail?: string | null; inputModalities?: string[]; outputModalities?: string[]; supportsReasoning?: boolean } }} */ (model).byok;
+    return /** @type {{ byok?: { freeTier?: boolean | null; pricing?: { prompt?: number | null; completion?: number | null; request?: number | null }; rateLimits?: { maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }; provider?: string | null; profile?: string | null; source?: string; profileFreeTier?: boolean | null; profileCostSource?: string | null; profileCostDetail?: string | null; inputModalities?: string[]; outputModalities?: string[]; supportsReasoning?: boolean; capabilities?: Record<string, unknown>; gatewayId?: string | null; providerModel?: string | null; confidence?: string | null } }} */ (model).byok;
 }
 
 /**
@@ -190,6 +195,37 @@ function getByokModelMetadata(model) {
 function supportsByokReasoning(model) {
     const meta = getByokModelMetadata(model);
     return meta?.supportsReasoning ?? Boolean(model.capabilities?.supports?.reasoningEffort);
+}
+
+/**
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
+ * @returns {boolean}
+ */
+function supportsByokTools(model) {
+    const meta = getByokModelMetadata(model);
+    return booleanField(asRecord(meta?.capabilities), 'tools', booleanField(asRecord(model.capabilities?.supports), 'tools', true));
+}
+
+/**
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
+ * @returns {boolean}
+ */
+function supportsByokStreaming(model) {
+    const meta = getByokModelMetadata(model);
+    return booleanField(asRecord(meta?.capabilities), 'streaming', booleanField(asRecord(model.capabilities?.supports), 'streaming', true));
+}
+
+/**
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
+ * @returns {boolean}
+ */
+function supportsByokVision(model) {
+    const meta = getByokModelMetadata(model);
+    return (
+        Boolean(model.capabilities?.supports?.vision) ||
+        booleanField(asRecord(meta?.capabilities), 'vision', false) ||
+        (Array.isArray(meta?.inputModalities) && meta.inputModalities.includes('image'))
+    );
 }
 
 /**
@@ -225,6 +261,123 @@ function optionalScalarString(value) {
  */
 function asRecord(value) {
     return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+}
+
+/**
+ * @param {Record<string, unknown>} record
+ * @param {string} key
+ * @param {boolean} fallback
+ * @returns {boolean}
+ */
+function booleanField(record, key, fallback) {
+    return typeof record[key] === 'boolean' ? record[key] : fallback;
+}
+
+/**
+ * O catálogo terminal vem do SDK/provedores como `RuntimeModelInfo`; o policy engine trabalha com registros do
+ * model-gateway. Esta ponte mantém a decisão inicial auditável sem exigir que cada provider exponha metadados perfeitos.
+ * Para BYOK OpenAI-compatible, tools ficam habilitadas por padrão salvo negação explícita, porque a probe agent é a
+ * etapa que deve derrubar um falso positivo antes da promoção para a sessão viva.
+ *
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
+ * @returns {Record<string, any>}
+ */
+function toGatewayRouteCandidate(model) {
+    const meta = getByokModelMetadata(model);
+    const metaRecord = asRecord(meta);
+    const metaCapabilities = asRecord(meta?.capabilities);
+    const supportRecord = asRecord(model.capabilities?.supports);
+    const providerId =
+        optionalScalarString(meta?.provider) ??
+        optionalScalarString(meta?.profile) ??
+        optionalScalarString(model.vendor) ??
+        'byok';
+    const providerModel = optionalScalarString(meta?.providerModel) ?? model.id;
+    const contextWindow =
+        finitePositiveNumber(model.capabilities?.limits?.max_context_window_tokens) ??
+        finitePositiveNumber(meta?.rateLimits?.maxRequestTokens) ??
+        null;
+    const inputModalities = Array.isArray(meta?.inputModalities) ? meta.inputModalities : [];
+    const outputModalities = Array.isArray(meta?.outputModalities) ? meta.outputModalities : ['text'];
+    const source = optionalScalarString(meta?.source) ?? 'terminal-catalog';
+    const confidence =
+        optionalScalarString(meta?.confidence) ??
+        (source === 'remote' || source === 'provider' || source === 'provider-cache' || source === 'remote-cache'
+            ? 'catalog'
+            : 'static_seed');
+    const cost = classifyByokModelCost(model);
+    const freeCost = meta?.freeTier === true || cost.kind === 'profile-free';
+
+    return {
+        id: optionalScalarString(meta?.gatewayId) ?? `${providerId}:${providerModel}`,
+        providerId,
+        providerModel,
+        displayName: model.displayName ?? model.name ?? providerModel,
+        enabled: true,
+        modalities: {
+            input: inputModalities.length > 0 ? inputModalities : ['text'],
+            output: outputModalities.length > 0 ? outputModalities : ['text'],
+        },
+        capabilities: {
+            text: true,
+            streaming: booleanField(metaCapabilities, 'streaming', true),
+            tools: booleanField(metaCapabilities, 'tools', booleanField(supportRecord, 'tools', true)),
+            forcedToolChoice: booleanField(metaCapabilities, 'forcedToolChoice', false),
+            parallelToolCalls: booleanField(metaCapabilities, 'parallelToolCalls', false),
+            structuredOutputs: booleanField(metaCapabilities, 'structuredOutputs', false),
+            jsonMode: booleanField(metaCapabilities, 'jsonMode', false),
+            jsonSchema: booleanField(metaCapabilities, 'jsonSchema', false),
+            vision:
+                Boolean(model.capabilities?.supports?.vision) ||
+                booleanField(metaCapabilities, 'vision', false) ||
+                inputModalities.includes('image'),
+            reasoningEffort: supportsByokReasoning(model) || booleanField(metaCapabilities, 'reasoningEffort', false),
+            reasoningBudgetTokens: booleanField(metaCapabilities, 'reasoningBudgetTokens', false),
+            local: booleanField(metaCapabilities, 'local', providerId.includes('ollama')),
+            privacy: booleanField(metaCapabilities, 'privacy', providerId.includes('ollama')),
+            no_remote_secrets: booleanField(metaCapabilities, 'no_remote_secrets', providerId.includes('ollama')),
+        },
+        limits: {
+            ...(contextWindow !== null ? { contextWindowTokens: contextWindow } : {}),
+            ...(finitePositiveNumber(meta?.rateLimits?.maxRequestTokens) !== null
+                ? { maxRequestTokens: finitePositiveNumber(meta?.rateLimits?.maxRequestTokens) }
+                : {}),
+            ...(finitePositiveNumber(meta?.rateLimits?.tokensPerMinute) !== null
+                ? { tokensPerMinute: finitePositiveNumber(meta?.rateLimits?.tokensPerMinute) }
+                : {}),
+            ...(finitePositiveNumber(meta?.rateLimits?.requestsPerMinute) !== null
+                ? { requestsPerMinute: finitePositiveNumber(meta?.rateLimits?.requestsPerMinute) }
+                : {}),
+            ...(finitePositiveNumber(meta?.rateLimits?.dailyRequests) !== null
+                ? { dailyRequests: finitePositiveNumber(meta?.rateLimits?.dailyRequests) }
+                : {}),
+        },
+        pricing: {
+            ...(finitePositiveNumber(meta?.pricing?.prompt) !== null
+                ? { inputUsdPerMillion: finitePositiveNumber(meta?.pricing?.prompt) }
+                : freeCost
+                  ? { inputUsdPerMillion: 0 }
+                  : {}),
+            ...(finitePositiveNumber(meta?.pricing?.completion) !== null
+                ? { outputUsdPerMillion: finitePositiveNumber(meta?.pricing?.completion) }
+                : freeCost
+                  ? { outputUsdPerMillion: 0 }
+                  : {}),
+            ...(finitePositiveNumber(meta?.pricing?.request) !== null ? { requestUsd: finitePositiveNumber(meta?.pricing?.request) } : {}),
+        },
+        routing: {
+            tier: cost.kind === 'free' || cost.kind === 'profile-free' ? 'free' : cost.kind === 'metered' ? 'paid' : 'balanced',
+            useCases: [],
+        },
+        verification: {
+            confidence,
+            sources: [source],
+        },
+        provenance: {
+            source,
+            profile: metaRecord['profile'] ?? null,
+        },
+    };
 }
 
 /**
@@ -430,7 +583,7 @@ function classifyByokModelBudget(model, runtimeBudget = null) {
 
 /**
  * @param {string[]} rest
- * @returns {{ limit: number; freeOnly: boolean; meteredOnly: boolean; unknownCostOnly: boolean; provider: string | null; vision: boolean; reasoning: boolean; minContext: number | null; minRequest: number | null; avoidLowLimit: boolean; forceRefresh: boolean; allProviders: boolean; grouped: boolean }}
+ * @returns {{ limit: number; freeOnly: boolean; meteredOnly: boolean; unknownCostOnly: boolean; provider: string | null; vision: boolean; reasoning: boolean; tools: boolean; streaming: boolean; probeVerified: boolean; minContext: number | null; minRequest: number | null; avoidLowLimit: boolean; forceRefresh: boolean; allProviders: boolean; grouped: boolean }}
  */
 function parseRecommendArgs(rest) {
     const state = {
@@ -441,6 +594,9 @@ function parseRecommendArgs(rest) {
         provider: /** @type {string | null} */ (null),
         vision: false,
         reasoning: false,
+        tools: false,
+        streaming: false,
+        probeVerified: false,
         minContext: /** @type {number | null} */ (null),
         minRequest: /** @type {number | null} */ (null),
         avoidLowLimit: false,
@@ -469,6 +625,12 @@ function parseRecommendArgs(rest) {
             state.vision = true;
         } else if (['reasoning', '--reasoning'].includes(item)) {
             state.reasoning = true;
+        } else if (['tools', 'tool', '--tools', '--tool'].includes(item)) {
+            state.tools = true;
+        } else if (['streaming', 'stream', '--streaming', '--stream'].includes(item)) {
+            state.streaming = true;
+        } else if (['probed', 'verified', 'probe-ok', 'agent-ok', '--probed', '--verified', '--probe-ok', '--agent-ok'].includes(item)) {
+            state.probeVerified = true;
         } else if (['safe', 'no-low-limit', '--safe', '--no-low-limit'].includes(item)) {
             state.avoidLowLimit = true;
         } else if (item.startsWith('provider:')) {
@@ -506,8 +668,11 @@ function matchesRecommendFilters(model, filters, runtimeBudget = null) {
         const haystack = [meta?.provider, meta?.profile, meta?.source, model.id].filter(Boolean).join(' ').toLowerCase();
         if (!haystack.includes(filters.provider)) return false;
     }
-    if (filters.vision && !model.capabilities?.supports?.vision) return false;
+    if (filters.vision && !supportsByokVision(model)) return false;
     if (filters.reasoning && !supportsByokReasoning(model)) return false;
+    if (filters.tools && !supportsByokTools(model)) return false;
+    if (filters.streaming && !supportsByokStreaming(model)) return false;
+    if (filters.probeVerified && !isByokModelAgentProbeVerified(model)) return false;
     if (filters.minContext !== null && context < filters.minContext) return false;
     if (filters.minRequest !== null && (maxRequest === null || maxRequest < filters.minRequest)) return false;
     if (filters.avoidLowLimit && classifyByokModelBudget(model, runtimeBudget).level === 'blocked') return false;
@@ -528,6 +693,9 @@ function renderByokFilterLabel(filters) {
         filters.unknownCostOnly ? 'cost?' : null,
         filters.reasoning ? 'reasoning' : null,
         filters.vision ? 'vision' : null,
+        filters.tools ? 'tools' : null,
+        filters.streaming ? 'streaming' : null,
+        filters.probeVerified ? 'probe-ok' : null,
         filters.avoidLowLimit ? 'safe' : null,
         filters.minContext !== null ? `ctx>${filters.minContext}` : null,
         filters.minRequest !== null ? `maxReq>${filters.minRequest}` : null,
@@ -685,6 +853,104 @@ function renderByokVariantSummary(variants) {
     const visible = variants.slice(0, 4);
     const overflow = variants.length > visible.length ? `,+${variants.length - visible.length}` : '';
     return `${visible.join('|')}${overflow}`;
+}
+
+/**
+ * @param {ReturnType<typeof parseRecommendArgs>} filters
+ * @param {string[]} rawArgs
+ * @param {ReturnType<typeof readTerminalByokProjection>} projection
+ * @returns {ReturnType<typeof parseRecommendArgs>}
+ */
+function normalizeRouteDiscoveryFilters(filters, rawArgs, projection) {
+    const activeOnly = rawArgs.some((item) => /^(active|current|--active|--current)$/iu.test(item));
+    if (!activeOnly && projection.profiles.length > 0) {
+        return { ...filters, allProviders: true };
+    }
+    return filters;
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {ReturnType<typeof readTerminalByokProjection>} projection
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokModelRoute(println, projection, rest) {
+    const requestedProfile = optionalScalarString(rest[1]);
+    const hasExplicitProfile = requestedProfile !== null && !requestedProfile.startsWith('-');
+    const profileId = hasExplicitProfile ? requestedProfile : 'repo_agent';
+    const routeArgs = hasExplicitProfile ? rest.slice(2) : rest.slice(1);
+    const showRejected = routeArgs.some((item) => /^(rejected|show-rejected|--rejected|--show-rejected)$/iu.test(item));
+    const strict = routeArgs.some((item) => /^(strict|verified|--strict|--verified)$/iu.test(item));
+    const filters = normalizeRouteDiscoveryFilters(parseRecommendArgs(routeArgs), routeArgs, projection);
+    const runtimeBudget = readCurrentByokRequestBudget();
+    const discovered = await discoverByokCatalogForCommand(projection, filters);
+    const modelList = rankByokModels(discovered.models.length > 0 ? discovered.models : projection.models).filter((model) =>
+        matchesRecommendFilters(model, filters, runtimeBudget),
+    );
+    const candidates = modelList.map(toGatewayRouteCandidate);
+    const filterLabel = renderByokFilterLabel(filters);
+
+    println(`\n  \x1b[36mBYOK model route\x1b[0m`);
+    println(
+        `  \x1b[90mperfil=${profileId} · modo=${strict ? 'strict/probe-verificada' : 'pre-probe'} · fonte=${discovered.sourceLabel}${discovered.profileCount > 1 ? ` · perfis=${discovered.profileCount}` : ''}${discovered.endpoint ? ` · endpoint=${discovered.endpoint}` : ''} · filtros=${filterLabel || '-'}\x1b[0m\n`,
+    );
+    for (const error of discovered.errors.slice(0, 6)) {
+        println(`  \x1b[33m  aviso: descoberta remota indisponível (${error}); usando catálogo disponível.\x1b[0m`);
+    }
+    renderByokCatalogWarnings(println, discovered.warnings);
+    if (candidates.length === 0) {
+        println('    \x1b[33mNenhum candidato encontrado para roteamento. Remova filtros, use active/current ou rode /models refresh.\x1b[0m\n');
+        return;
+    }
+
+    let route;
+    try {
+        route = routeGatewayModels(candidates, profileId, {
+            routeProfile: projection.summary.profile ?? null,
+            excludeFailed: true,
+            requireAgentProbeOk: strict,
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        println(`    \x1b[31mPerfil de rota inválido: ${message}\x1b[0m`);
+        println('    \x1b[90mPerfis conhecidos: cheap_chat, code, repo_agent, tool_agent, json_extraction, vision, deep_reasoning, local_private.\x1b[0m\n');
+        return;
+    }
+
+    println(
+        `  \x1b[90madmissão=${route.candidates.length}/${candidates.length} · rejeitados=${route.rejected.length} · fallback=${route.fallbackChain.length}\x1b[0m\n`,
+    );
+    if (!route.selected) {
+        println(
+            `    \x1b[33mNenhum modelo passou na política ${strict ? 'strict' : 'pre-probe'}. Use /models route ${profileId} --show-rejected para ver causas.\x1b[0m\n`,
+        );
+    } else {
+        const model = route.selected.model;
+        const reasons = route.selected.reasons.slice(0, 5).join(' · ') || 'sem motivo adicional';
+        const health = route.selected.health
+            ? `${renderByokHealthTag(route.selected.health)} · ${renderByokAgentProbeHealthTag(route.selected.health)}`
+            : 'health=sem registro';
+        println(`    \x1b[32mselecionado\x1b[0m ${model['providerModel'] ?? model['id']}  \x1b[90mprovider=${model['providerId']} · score=${route.selected.score}\x1b[0m`);
+        println(`      \x1b[90m${reasons} · ${health}\x1b[0m`);
+        println(
+            `      \x1b[90mpróximo passo: /byok probe agent provider:${model['providerId']} model:${model['providerModel'] ?? model['id']} e então /byok use <perfil> + /byok model <id>.\x1b[0m`,
+        );
+    }
+
+    if (route.fallbackChain.length > 0) {
+        println(`\n  \x1b[90mfallback chain: ${route.fallbackChain.slice(0, 8).join(' -> ')}${route.fallbackChain.length > 8 ? ' -> ...' : ''}\x1b[0m`);
+    }
+    if (showRejected && route.rejected.length > 0) {
+        println('\n  \x1b[90mRejeitados principais:\x1b[0m');
+        for (const rejected of route.rejected.slice(0, 8)) {
+            const model = rejected.model;
+            println(
+                `    \x1b[90m- ${model['providerModel'] ?? model['id']} (${model['providerId']}): ${rejected.rejectedReasons.join(', ') || 'sem causa'}\x1b[0m`,
+            );
+        }
+    }
+    println('');
 }
 
 /**
@@ -1039,6 +1305,8 @@ function renderModelTags(model) {
     if (meta?.rateLimits?.dailyRequests) tags.push(`RPD=${meta.rateLimits.dailyRequests}`);
     if (meta?.provider) tags.push(`provider=${meta.provider}`);
     if (meta?.profile) tags.push(`profile=${meta.profile}`);
+    if (meta?.source) tags.push(`source=${meta.source}`);
+    if (meta?.confidence) tags.push(`confidence=${meta.confidence}`);
     const health = readHealthForByokModel(model);
     if (health) tags.push(renderByokHealthTag(health), renderByokAgentProbeHealthTag(health));
     const inputs = meta?.inputModalities?.length ? meta.inputModalities.join('+') : '';
@@ -1780,6 +2048,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
     }
 
     if (sub === 'providers' || sub === 'provider-list') {
+        if (/^(health|chat-health|status)$/iu.test(rest[0] ?? '')) {
+            renderByokHealth(println);
+            return;
+        }
         const presetCounts = new Map();
         for (const profile of profiles) {
             const key = profile.preset ?? profile.providerType ?? 'custom';
@@ -1839,6 +2111,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
     }
 
     if (sub === 'models') {
+        if (/^(route|select|rank)$/iu.test(rest[0] ?? '')) {
+            await renderByokModelRoute(println, projection, rest);
+            return;
+        }
         const forceRefresh = rest.some((item) => ['refresh', 'force', '--refresh', '--force'].includes(item.toLowerCase()));
         const showAll = rest.some((item) => ['all', '--all'].includes(item.toLowerCase()));
         const filters = parseRecommendArgs(rest);

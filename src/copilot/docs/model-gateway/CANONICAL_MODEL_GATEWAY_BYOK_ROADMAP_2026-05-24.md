@@ -442,14 +442,14 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 
 ### Faixa H — Terminal UX
 
-- [ ] Comandos:
-   - `/providers list`
-   - `/providers health`
-   - `/models list`
-   - `/models route <profile>`
-   - `/byok probe <model>`
-   - `/byok recommend <profile>`
-- [ ] Filtros por:
+- [x] Comandos:
+   - `/providers list` via alias direto para `/byok providers`;
+   - `/providers health` via alias direto para health operacional BYOK;
+   - `/models list` via alias direto para `/byok models`;
+   - `/models route <profile>` via `routeGatewayModels()` com modo `pre-probe` e `strict`;
+   - `/byok probe <model>` com chat/agent/streaming/JSON/vision;
+   - `/byok recommend <profile>` via filtros de catálogo e health/probe agent.
+- [x] Filtros por:
    - free/paid/unknown;
    - vision;
    - tools;
@@ -457,8 +457,8 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
    - context window;
    - probe status;
    - provider.
-- [ ] Mostrar origem dos metadados e confiança.
-- [ ] Mostrar por que um modelo foi rejeitado.
+- [x] Mostrar origem dos metadados e confiança.
+- [x] Mostrar por que um modelo foi rejeitado.
 
 ### Faixa I — Observability
 
@@ -581,7 +581,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] `/models search <query>`.
 - [ ] `/models explain <provider:model>`.
 - [ ] `/models conflicts`.
-- [ ] `/models route <profile> --show-rejected`.
+- [x] `/models route <profile> --show-rejected`.
 - [ ] `/models gateways` com Kilo, OpenRouter, Cloudflare AI Gateway, LiteLLM e outros gateways/proxies configurados.
 - [ ] `/models account-overlays` para mostrar modelos habilitados/bloqueados por conta ou organização sem expor secrets.
 - [ ] Filtros por preço, contexto, tools, JSON schema, vision, local/private, free tier, provider, confidence,
@@ -702,6 +702,13 @@ Implementado neste corte:
 - Faixa G ganhou `scoreGatewayModelCandidate()` e `routeGatewayModels()`, com scoring determinístico por capabilities
   obrigatórias, contexto, preço, confidence, health, allow/block provider, latência opcional, fallbackChain e razões de
   rejeição.
+- Faixa H ganhou aliases diretos `/models` e `/providers`, incluindo `/providers health`, para reduzir atrito operacional
+  no terminal.
+- `/models route <profile>` agora converte o catálogo terminal (`RuntimeModelInfo`) para candidatos do model-gateway e
+  chama `routeGatewayModels()` com explicação de admissão, score, fallback chain e rejeições via `--show-rejected`.
+- Os filtros de catálogo/roteamento agora cobrem `tools`, `streaming` e `probe-ok`, além de free/paid/unknown, vision,
+  reasoning, contexto, request budget e provider.
+- `renderModelTags()` passou a expor `source=` e `confidence=` quando o catálogo fornece esses metadados.
 
 Validação deste corte:
 
@@ -710,9 +717,13 @@ Validação deste corte:
 - PASS `npm run lint:copilot`
 - PASS `npm run test:copilot` após estabilizar contratos globais de lifecycle/hooks/event adapters/mocks
   (`5596` testes, `0` falhas; warning remanescente: `[erro] sdk stream failed` registrado pelo runner compacto).
+- PASS `npm run test:copilot` após Faixa H
+  (`5597` testes, `0` falhas; warning remanescente: `[erro] sdk stream failed`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T00-06-10-929Z/summary.md`).
 
 Próxima fatia antes de K:
 
-1. Conectar `routeGatewayModels()` a uma projection/UX inicial de `/models route <profile>` ou `/byok recommend`.
-2. Criar usage ledger mínimo da Faixa I para registrar decisão/routeProfile/fallback/failure sem tokens sensíveis.
-3. Completar Faixa H/J e só então rodar lives `terminal:llm-b:live-test` com probes.
+1. Criar usage ledger mínimo da Faixa I para registrar decisão/routeProfile/fallback/failure sem tokens sensíveis.
+2. Completar Faixa J como contrato operacional para `llm-b` lives: matriz de probes, comandos, critérios de promoção e
+   critérios de rollback.
+3. Rodar lives `terminal:llm-b:live-test` com probes apenas após I-J estarem funcionais.

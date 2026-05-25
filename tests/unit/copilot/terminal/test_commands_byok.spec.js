@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildProbeCompletedEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, rename, setTerminalModelProjection, writeFile } =
+const { buildProbeCompletedEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, rename, setTerminalModelProjection, writeFile } =
     vi.hoisted(() => ({
         buildProbeCompletedEvent: vi.fn((input) => ({
             type: 'model_gateway:probe:completed',
@@ -36,6 +36,7 @@ const { buildProbeCompletedEvent, chmod, classifyByokProviderFailure, clearByokP
             }),
         ),
         loadDotenv: vi.fn(),
+        routeGatewayModels: vi.fn(),
         runConfiguredByokAgentProbe: vi.fn(),
         runConfiguredByokChatProbe: vi.fn(),
         runConfiguredByokJsonProbe: vi.fn(),
@@ -110,6 +111,7 @@ vi.mock('#copilot/model-gateway', () => ({
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
+    routeGatewayModels,
     runConfiguredByokChatProbe: runConfiguredByokChatProbe,
     runConfiguredByokAgentProbe: runConfiguredByokAgentProbe,
     runConfiguredByokJsonProbe: runConfiguredByokJsonProbe,
@@ -196,6 +198,7 @@ describe('terminal /byok command', () => {
             sessions: [],
         });
         loadDotenv.mockReset();
+        routeGatewayModels.mockReset();
         buildProbeCompletedEvent.mockClear();
         runConfiguredByokChatProbe.mockReset();
         runConfiguredByokAgentProbe.mockReset();
@@ -1274,6 +1277,120 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('ctx=200000');
         expect(ctx.output()).toContain('maxReq=6000');
         expect(ctx.output()).toContain('TPM=6000');
+    });
+
+    it('roteia modelos por perfil usando catálogo normalizado antes das probes runtime', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'kilo-auto/free',
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: true },
+                        limits: { max_context_window_tokens: 200000 },
+                    },
+                    byok: {
+                        freeTier: true,
+                        pricing: { prompt: 0, completion: 0, request: null },
+                        provider: 'kilo',
+                        profile: 'kilo-free',
+                        source: 'remote',
+                        inputModalities: ['text', 'image'],
+                        rateLimits: { maxRequestTokens: 64000, tokensPerMinute: 120000 },
+                    },
+                },
+                {
+                    id: 'tiny-chat-only',
+                    capabilities: {
+                        supports: { reasoningEffort: false, vision: false },
+                        limits: { max_context_window_tokens: 4000 },
+                    },
+                    byok: {
+                        freeTier: true,
+                        provider: 'small',
+                        profile: 'small-free',
+                        capabilities: { tools: false },
+                        source: 'remote',
+                    },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://provider.example/v1/models',
+            fromCache: false,
+            error: null,
+        });
+        routeGatewayModels.mockImplementation((candidates) => ({
+            profile: { id: 'repo_agent' },
+            selected: {
+                model: candidates[0],
+                include: true,
+                score: 275,
+                reasons: ['preferred:large_context', 'confidence:catalog'],
+                rejectedReasons: [],
+                health: null,
+            },
+            candidates: [
+                {
+                    model: candidates[0],
+                    include: true,
+                    score: 275,
+                    reasons: ['preferred:large_context', 'confidence:catalog'],
+                    rejectedReasons: [],
+                    health: null,
+                },
+            ],
+            rejected: [
+                {
+                    model: candidates[1],
+                    include: false,
+                    score: 0,
+                    reasons: [],
+                    rejectedReasons: ['missing_capability:tools', 'context_too_small:4000<64000'],
+                    health: null,
+                },
+            ],
+            fallbackChain: ['kilo:kilo-auto/free'],
+        }));
+        mockProjection({
+            profiles: [
+                {
+                    name: 'kilo-free',
+                    preset: 'kilo-code',
+                    providerType: 'openai',
+                    baseUrl: 'https://api.kilo.ai/api/gateway',
+                    model: 'kilo-auto/free',
+                    auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
+                    metadataKeys: [],
+                },
+            ],
+            summary: { enabled: true, ready: true, profile: 'kilo-free' },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models route repo_agent --show-rejected');
+
+        expect(routeGatewayModels).toHaveBeenCalledWith(
+            [
+                expect.objectContaining({
+                    providerId: 'kilo',
+                    providerModel: 'kilo-auto/free',
+                    capabilities: expect.objectContaining({ tools: true, vision: true, reasoningEffort: true }),
+                    limits: expect.objectContaining({ contextWindowTokens: 200000, maxRequestTokens: 64000 }),
+                    verification: expect.objectContaining({ confidence: 'catalog' }),
+                }),
+                expect.objectContaining({
+                    providerId: 'small',
+                    capabilities: expect.objectContaining({ tools: false }),
+                }),
+            ],
+            'repo_agent',
+            expect.objectContaining({ routeProfile: 'kilo-free', excludeFailed: true, requireAgentProbeOk: false }),
+        );
+        expect(ctx.output()).toContain('BYOK model route');
+        expect(ctx.output()).toContain('modo=pre-probe');
+        expect(ctx.output()).toContain('selecionado');
+        expect(ctx.output()).toContain('kilo-auto/free');
+        expect(ctx.output()).toContain('fallback chain');
+        expect(ctx.output()).toContain('missing_capability:tools');
     });
 
     it('usa a projection do model gateway quando a descoberta remota cai para catálogo estático', async () => {
