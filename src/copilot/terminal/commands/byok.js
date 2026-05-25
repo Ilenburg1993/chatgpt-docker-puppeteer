@@ -25,6 +25,7 @@ import {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     applyModelGatewayEligibilityToSnapshot,
     evaluateModelGatewayCatalogEligibility,
+    explainModelGatewayCatalogEntry,
     explainModelGatewayEligibilityDecision,
     flushByokProviderHealth,
     JsonModelGatewayCatalogStore,
@@ -1525,7 +1526,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]> | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>> | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1829,6 +1830,59 @@ async function renderByokGatewayCatalogOpenAISchema(println, options = {}) {
         println(`\n  \x1b[90mexibindo 12/${openaiList.data.length}; use JSON/SQLite store para export completo.\x1b[0m`);
     }
     println('');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string | null} selector
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayCatalogExplain(println, selector) {
+    const normalizedSelector = optionalScalarString(selector);
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    println(`\n  \x1b[36mBYOK model-gateway catalog explain\x1b[0m`);
+    println(`  \x1b[90mstore=${store.filePath} · selector=${normalizedSelector ?? '-'} · runtime=nao\x1b[0m\n`);
+    if (!normalizedSelector) {
+        println('    \x1b[33mInforme um modelo, provider:model ou trecho do display name.\x1b[0m\n');
+        return;
+    }
+    const snapshot = await store.readSnapshot();
+    const explanation = explainModelGatewayCatalogEntry(snapshot, normalizedSelector);
+    if (!explanation.found || !explanation.projection) {
+        println(
+            `    \x1b[33mModelo não encontrado no snapshot atual.\x1b[0m  \x1b[90mnext=${explanation.nextActions.join(',')}\x1b[0m\n`,
+        );
+        return;
+    }
+    const projection = explanation.projection;
+    const eligibility = explanation.eligibility;
+    println(`    \x1b[33m${explanation.key}\x1b[0m`);
+    println(
+        `      \x1b[90mdisplay=${optionalScalarString(projection['displayName']) ?? '-'} · lifecycle=${optionalScalarString(projection['lifecycle']) ?? '-'} · family=${optionalScalarString(projection['family']) ?? '-'}\x1b[0m`,
+    );
+    println(
+        `      \x1b[90mroutes=${explanation.routeOptions.length} · overlays=${explanation.accountOverlays.length} · eligibility=${eligibility?.status ?? '-'} · openai.id=${explanation.openai?.id ?? '-'}\x1b[0m`,
+    );
+    println(
+        `      \x1b[90mmetadata: confidenceFields=${explanation.metadataCoverage.confidenceFields} · provenanceFields=${explanation.metadataCoverage.provenanceFields} · supported=${explanation.metadataCoverage.supportedParameters} · unsupported=${explanation.metadataCoverage.unsupportedParameters}\x1b[0m`,
+    );
+    for (const route of explanation.routeOptions.slice(0, 4)) {
+        const policy = asRecord(route['normalizedPolicy']);
+        println(
+            `      \x1b[90mroute ${optionalScalarString(route['selectorKind']) ?? '-'}:${optionalScalarString(route['selectorSyntax']) ?? '-'} · layer=${optionalScalarString(policy['routeLayer']) ?? '-'} · wire=${optionalScalarString(policy['wireApi']) ?? '-'}\x1b[0m`,
+        );
+    }
+    for (const overlay of explanation.accountOverlays.slice(0, 3)) {
+        println(
+            `      \x1b[90moverlay scope=${optionalScalarString(overlay['accountScope']) ?? 'default'} · secretRef=${optionalScalarString(overlay['secretRef']) ?? '-'} · enabled=${Array.isArray(overlay['enabledModels']) ? overlay['enabledModels'].length : 0} · blocked=${Array.isArray(overlay['blockedModels']) ? overlay['blockedModels'].length : 0}\x1b[0m`,
+        );
+    }
+    if (eligibility) {
+        println(
+            `      \x1b[90meligibility ${eligibility.summary} · next=${eligibility.nextActions.slice(0, 4).join(',') || '-'}\x1b[0m`,
+        );
+    }
+    println(`      \x1b[90mnext=${explanation.nextActions.slice(0, 6).join(',') || '-'}\x1b[0m\n`);
 }
 
 /**
@@ -2429,6 +2483,13 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayCatalogOpenAISchema(println, {
                 sqlite: rest.slice(2).some((item) => /^(sqlite|sql)$/iu.test(item)),
             });
+            return;
+        }
+        if (
+            /^(catalog|catalogo)$/iu.test(rest[0] ?? '') &&
+            /^(explain|explicar|describe|show)$/iu.test(rest[1] ?? '')
+        ) {
+            await renderByokGatewayCatalogExplain(println, rest.slice(2).join(' ') || null);
             return;
         }
         if (/^(eligibility|elegibilidade|eligible|exclusion|exclusao|exclusão)$/iu.test(rest[0] ?? '')) {

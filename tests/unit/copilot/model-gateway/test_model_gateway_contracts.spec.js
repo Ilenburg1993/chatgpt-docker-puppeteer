@@ -100,6 +100,7 @@ import {
     createProviderMetadataEvidence,
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
+    explainModelGatewayCatalogEntry,
     mergeModelMetadataEvidence,
     mergeProviderMetadataEvidence,
     explainModelGatewayEligibilityDecision,
@@ -1462,6 +1463,72 @@ describe('model-gateway foundation', () => {
             db.close();
             await rm(dir, { recursive: true, force: true });
         }
+    });
+
+    it('explains a catalog model by joining projection, routes, overlays and eligibility without runtime', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            displayName: 'GPT OSS 120B',
+            capabilities: { tools: true, streaming: true },
+            supportedParameters: ['tools', 'stream'],
+            provenanceByField: { 'capabilities.tools': 'ev-tools' },
+            confidenceByField: { 'capabilities.tools': 'catalog' },
+        });
+        const route = createModelRouteOption({
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            selectorKind: 'provider_model',
+            selectorSyntax: 'openai/gpt-oss-120b',
+            normalizedPolicy: { routeLayer: 'gateway', wireApi: 'openai_chat_completions' },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'openrouter',
+            secretRef: 'OPEN_ROUTER_KEY',
+            enabledModels: ['openai/gpt-oss-120b'],
+        });
+        const eligibility = createModelEligibilityDecision({
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            include: true,
+            reasons: ['account_model_visible'],
+            requiredRuntimeProbes: ['chat', 'agent'],
+        });
+
+        const explanation = explainModelGatewayCatalogEntry(
+            {
+                sources: [],
+                providerEvidences: [],
+                evidences: [],
+                routeOptions: [route],
+                accountOverlays: [overlay],
+                providerProjections: [],
+                projections: [projection],
+                importRuns: [],
+                rawPayloadRefs: [],
+                conflicts: [],
+                modelEligibilityRuns: [],
+                modelEligibilityDecisions: [eligibility],
+                schemaVersion: 1,
+                generatedAt: null,
+                source: 'unit-test',
+            },
+            'gpt-oss',
+        );
+
+        assert.equal(explanation.found, true);
+        assert.equal(explanation.key, 'openrouter:openai/gpt-oss-120b:default');
+        assert.equal(explanation.routeOptions.length, 1);
+        assert.equal(explanation.accountOverlays.length, 1);
+        assert.equal(explanation.eligibility?.status, 'eligible');
+        assert.equal(explanation.openai?.x_model_gateway.eligibility.status, 'eligible');
+        assert.deepEqual(explanation.metadataCoverage, {
+            confidenceFields: 1,
+            provenanceFields: 1,
+            supportedParameters: 2,
+            unsupportedParameters: 0,
+        });
+        assert.ok(explanation.nextActions.includes('run_runtime_probes:chat,agent'));
     });
 
     it('runs catalog importers into a secret-safe snapshot', async () => {

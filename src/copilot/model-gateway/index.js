@@ -91,6 +91,7 @@ export {
     createProviderMetadataEvidence,
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
+    explainModelGatewayCatalogEntry,
     mergeModelMetadataEvidence,
     mergeProviderMetadataEvidence,
     normalizeAccountOverlayControls,

@@ -510,7 +510,7 @@ Se a tarefa não exige imagem, vision é no máximo bônus ou superfície a vali
 - [x] Cockpit de modelos/provedores anterior.
 - [ ] UX dedicada de account overlays.
 - [x] UX inicial de eligibility decisions via `/byok gateway eligibility`.
-- [ ] UX de explicação por modelo juntando catálogo, overlay, eligibility e
+- [x] UX de explicação por modelo juntando catálogo, overlay, eligibility e
   probes.
 - [ ] Busca rica por metadados.
 - [x] Export OpenAI schema visível via `/byok gateway catalog openai`.
@@ -1373,7 +1373,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Catalog conflicts.
 - [x] Endpoint inventory.
 - [ ] `/byok gateway catalog search`.
-- [ ] `/byok gateway catalog explain <model>`.
+- [x] `/byok gateway catalog explain <model>`.
 - [ ] `/byok gateway overlays`.
 - [x] `/byok gateway eligibility`.
 - [ ] `/byok gateway routes`.
@@ -1494,7 +1494,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Refresh/diff/conflicts no terminal.
 - [x] Endpoint inventory.
 - [ ] Search/filter.
-- [ ] Explain por modelo.
+- [x] Explain por modelo.
 - [ ] Explain por provider.
 - [ ] Mostrar route options.
 - [ ] Mostrar overlays.
@@ -1829,6 +1829,10 @@ Implementado neste corte:
   `SqliteModelGatewayCatalogStore.readOpenAIModelCatalogList()`.
 - [x] Exposto `/byok gateway catalog openai [sqlite]` para inspecionar a lista
   OpenAI-compatible com extensão `x_model_gateway`.
+- [x] Criado `explainModelGatewayCatalogEntry()` para unir projection, route
+  options, account overlays, eligibility e OpenAI projection sem runtime.
+- [x] Exposto `/byok gateway catalog explain <model>` como inspeção terminal
+  sem rede.
 - [x] Adicionados testes de migrations gerais criando as tabelas do
   model-gateway.
 
@@ -1843,11 +1847,11 @@ Separação arquitetural reafirmada:
 Validação deste corte:
 
 - [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
-  com `82` testes.
+  com `83` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS `npm run lint:copilot`.
 - [x] PASS `git diff --check`.
-- [x] PASS `npm run test:copilot` com `5659` testes totais, `5626` passed,
+- [x] PASS `npm run test:copilot` com `5660` testes totais, `5627` passed,
   `33` pending, `0` failed e `0` warnings/errors.
 
 Próxima direção:
@@ -1856,5 +1860,6 @@ Próxima direção:
   remover o JSON store de debug.
 - [x] Criar migração de snapshot JSON para SQLite com redaction preservada.
 - [x] Criar views/projeções OpenAI schema sobre o store SQLite.
-- [ ] Criar explain por modelo combinando projection, route options, overlays,
-  eligibility, health e probes.
+- [x] Criar explain por modelo combinando projection, route options, overlays e
+  eligibility.
+- [ ] Expandir explain por modelo com health e probe results persistidos.
