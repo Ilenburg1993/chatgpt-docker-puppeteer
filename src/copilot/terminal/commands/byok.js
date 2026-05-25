@@ -20,7 +20,10 @@ import {
     classifyByokProviderFailure,
     clearByokProviderModelHealth,
     createDefaultModelGatewayCatalogImporters,
+    createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
+    evaluateModelGatewayEligibility,
+    explainModelGatewayEligibilityDecision,
     flushByokProviderHealth,
     JsonModelGatewayCatalogStore,
     listByokProviderModelHealth,
@@ -1517,7 +1520,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts> | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts> | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1786,6 +1789,119 @@ async function renderByokGatewayCatalogConflicts(println) {
     }
     if (snapshot.conflicts.length > 20) {
         println(`\n  \x1b[90mexibindo 20/${snapshot.conflicts.length}; refine depois com /models explain <provider:model>.\x1b[0m`);
+    }
+    println('');
+}
+
+/**
+ * @param {Record<string, any>} projection
+ * @param {Record<string, any>[]} routeOptions
+ * @returns {Record<string, any> | null}
+ */
+function findCatalogRouteOptionForProjection(projection, routeOptions) {
+    const key = [
+        optionalScalarString(projection['providerId']) ?? 'unknown-provider',
+        optionalScalarString(projection['providerModel']) ?? 'unknown-model',
+        optionalScalarString(projection['routeProfile']) ?? 'default',
+    ].join(':');
+    return (
+        routeOptions.find(
+            (route) =>
+                [
+                    optionalScalarString(route['providerId']) ?? 'unknown-provider',
+                    optionalScalarString(route['providerModel']) ?? 'unknown-model',
+                    optionalScalarString(route['routeProfile']) ?? 'default',
+                ].join(':') === key,
+        ) ?? null
+    );
+}
+
+/**
+ * @param {Record<string, any>} projection
+ * @param {string | null} selector
+ * @returns {boolean}
+ */
+function matchesCatalogEligibilitySelector(projection, selector) {
+    if (!selector) return true;
+    const haystack = [
+        projection['providerId'],
+        projection['providerModel'],
+        projection['displayName'],
+        projection['family'],
+    ]
+        .map((value) => optionalScalarString(value)?.toLowerCase() ?? '')
+        .join(' ');
+    return haystack.includes(selector.toLowerCase());
+}
+
+/**
+ * @param {string[]} rest
+ * @returns {{ selector: string | null; limit: number; strict: boolean }}
+ */
+function parseByokGatewayEligibilityArgs(rest) {
+    const strict = rest.some((item) => /^(strict|block|bloquear|--strict)$/iu.test(item));
+    const numeric = rest.map((item) => Number(item)).find((value) => Number.isFinite(value) && value > 0);
+    const selector =
+        rest
+            .map(optionalScalarString)
+            .find((item) => item && !/^(strict|block|bloquear|--strict)$/iu.test(item) && Number.isNaN(Number(item))) ?? null;
+    return {
+        selector,
+        limit: Math.min(Math.floor(numeric ?? 16), 100),
+        strict,
+    };
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayEligibility(println, rest) {
+    const args = parseByokGatewayEligibilityArgs(rest);
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const snapshot = await store.readSnapshot();
+    const projections = snapshot.projections.filter((projection) => matchesCatalogEligibilitySelector(projection, args.selector));
+    const secretRegistry = createEnvSecretRegistry();
+    const decisions = projections.map((projection) => {
+        const routeOption = findCatalogRouteOptionForProjection(projection, snapshot.routeOptions);
+        return evaluateModelGatewayEligibility({
+            projection,
+            ...(routeOption ? { routeOption } : {}),
+            accountOverlays: snapshot.accountOverlays,
+            secretRegistry,
+            policy: {
+                unknownAccessPolicy: args.strict ? 'block' : 'allow_probe',
+            },
+        });
+    });
+    const explained = decisions.map(explainModelGatewayEligibilityDecision);
+    const excludedCount = explained.filter((item) => item.status === 'excluded').length;
+    const unknownCount = explained.filter((item) => item.status === 'unknown').length;
+    const eligibleCount = explained.filter((item) => item.status === 'eligible').length;
+
+    println(`\n  \x1b[36mBYOK model-gateway eligibility\x1b[0m`);
+    println(
+        `  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · policy=${args.strict ? 'strict/block_unknown' : 'allow_probe_unknown'} · total=${explained.length} · eligible=${eligibleCount} · unknown=${unknownCount} · excluded=${excludedCount}\x1b[0m\n`,
+    );
+    if (snapshot.projections.length === 0) {
+        println('    \x1b[33mNenhum snapshot de catálogo encontrado. Rode /byok gateway catalog refresh primeiro.\x1b[0m\n');
+        return;
+    }
+    if (explained.length === 0) {
+        println('    \x1b[33mNenhum modelo encontrado para o filtro informado.\x1b[0m\n');
+        return;
+    }
+    for (const item of explained.slice(0, args.limit)) {
+        const color = item.status === 'eligible' ? '\x1b[32m' : item.status === 'unknown' ? '\x1b[33m' : '\x1b[31m';
+        println(`    ${color}${item.status}\x1b[0m  \x1b[33m${item.key}\x1b[0m`);
+        println(`      \x1b[90m${item.summary} · disposition=${item.disposition}\x1b[0m`);
+        if (item.hardExclusions.length > 0) println(`      \x1b[90mhard=${item.hardExclusions.slice(0, 4).join(',')}\x1b[0m`);
+        if (item.softPenalties.length > 0) println(`      \x1b[90msoft=${item.softPenalties.slice(0, 4).join(',')}\x1b[0m`);
+        if (item.nextActions.length > 0) println(`      \x1b[90mnext=${item.nextActions.slice(0, 4).join(',')}\x1b[0m`);
+    }
+    if (explained.length > args.limit) {
+        println(`\n  \x1b[90mexibindo ${args.limit}/${explained.length}. Use filtro ou limite numerico para reduzir.\x1b[0m`);
     }
     println('');
 }
@@ -2213,6 +2329,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         }
         if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(conflicts|conflitos)$/iu.test(rest[1] ?? '')) {
             await renderByokGatewayCatalogConflicts(println);
+            return;
+        }
+        if (/^(eligibility|elegibilidade|eligible|exclusion|exclusao|exclusão)$/iu.test(rest[0] ?? '')) {
+            await renderByokGatewayEligibility(println, rest.slice(1));
             return;
         }
         if (/^(endpoints|endpoint|catalog|catalogo|sources)$/iu.test(rest[0] ?? '')) {

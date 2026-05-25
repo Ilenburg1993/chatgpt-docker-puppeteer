@@ -508,7 +508,7 @@ Se a tarefa não exige imagem, vision é no máximo bônus ou superfície a vali
 - [x] Pre-K gate.
 - [x] Cockpit de modelos/provedores anterior.
 - [ ] UX dedicada de account overlays.
-- [ ] UX dedicada de eligibility decisions.
+- [x] UX inicial de eligibility decisions via `/byok gateway eligibility`.
 - [ ] UX de explicação por modelo juntando catálogo, overlay, eligibility e
   probes.
 - [ ] Busca rica por metadados.
@@ -1371,7 +1371,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [ ] `/byok gateway catalog search`.
 - [ ] `/byok gateway catalog explain <model>`.
 - [ ] `/byok gateway overlays`.
-- [ ] `/byok gateway eligibility`.
+- [x] `/byok gateway eligibility`.
 - [ ] `/byok gateway routes`.
 - [ ] Export OpenAI schema por comando.
 
@@ -1517,7 +1517,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Integrar health fatal por classificação pré-runtime inicial.
 - [x] Criar explain helper.
 - [x] Criar testes unitários iniciais.
-- [ ] Criar terminal view.
+- [x] Criar terminal view inicial.
 - [ ] Persistir decisões em store.
 
 ### Faixa R — SQLite
@@ -1724,6 +1724,7 @@ Implementado neste corte:
   o scoring.
 - [x] Criado helper `explainModelGatewayEligibilityDecision()` para terminal e
   observability.
+- [x] Criada view `/byok gateway eligibility [strict] [filtro] [n]`.
 
 Coberturas novas:
 
@@ -1738,6 +1739,8 @@ Coberturas novas:
 - [x] Candidato inelegível é mantido em `rejected` com motivo
   `eligibility:<reason>`.
 - [x] Explicação estruturada traz `summary`, `primaryReason` e `nextActions`.
+- [x] Terminal mostra contagem `eligible/unknown/excluded`, policy usada e ações
+  recomendadas sem expor segredos.
 
 Validação deste corte:
 
