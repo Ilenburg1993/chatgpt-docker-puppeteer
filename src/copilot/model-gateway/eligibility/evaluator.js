@@ -14,6 +14,7 @@ import {
     MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS,
     createModelEligibilityDecision,
 } from './contracts.js';
+import { resolveModelGatewayAccountAccess } from '../account-access/index.js';
 
 const DEFAULT_POLICY = Object.freeze({
     unknownAccessPolicy: 'allow_probe',
@@ -245,40 +246,6 @@ function lifecycle(projection) {
 }
 
 /**
- * @param {Record<string, any>} overlay
- * @param {string} providerId
- * @param {string | null} accountScope
- * @returns {boolean}
- */
-function overlayMatches(overlay, providerId, accountScope) {
-    if (optionalString(overlay['providerId']) !== providerId) return false;
-    if (accountScope && optionalString(overlay['accountScope']) !== accountScope) return false;
-    return true;
-}
-
-/**
- * @param {Record<string, any>[]} overlays
- * @param {string} providerId
- * @param {string | null} accountScope
- * @returns {Record<string, any>[]}
- */
-function matchingOverlays(overlays, providerId, accountScope) {
-    return overlays.filter((overlay) => overlayMatches(overlay, providerId, accountScope));
-}
-
-/**
- * @param {Record<string, any>[]} overlays
- * @returns {string | null}
- */
-function firstSecretRef(overlays) {
-    for (const overlay of overlays) {
-        const secretRef = optionalString(overlay['secretRef']);
-        if (secretRef) return secretRef;
-    }
-    return null;
-}
-
-/**
  * @param {Record<string, any>[]} overlays
  * @returns {Record<string, any>}
  */
@@ -319,18 +286,26 @@ export function evaluateModelGatewayEligibility(input) {
     const providerModel = readProviderModel(routeOption, projection);
     const policy = /** @type {Record<string, any>} */ ({ ...DEFAULT_POLICY, ...(isRecord(input.policy) ? input.policy : {}) });
     const accountScope = optionalString(policy['accountScope']);
-    const overlays = matchingOverlays(
-        Array.isArray(input.accountOverlays) ? input.accountOverlays.filter(isRecord) : [],
-        providerId,
-        accountScope,
-    );
     const hard = [];
     const soft = [];
     const reasons = [];
     const routePolicyRecord = routePolicy(routeOption);
     const routeTraitsRecord = routeTraits(routeOption);
+    const access = resolveModelGatewayAccountAccess({
+        providerId,
+        providerModel,
+        accountScope,
+        accountOverlays: Array.isArray(input.accountOverlays) ? input.accountOverlays.filter(isRecord) : [],
+        secretRegistry: input.secretRegistry,
+        secretRef: optionalString(policy['secretRef']) ?? optionalString(routePolicyRecord['secretRef']),
+        requireAccountOverlay: policy['requireAccountOverlay'] === true,
+        unknownAccessPolicy: policy['unknownAccessPolicy'],
+        treatEnabledModelsAsClosed: policy['treatEnabledModelsAsClosed'],
+        localPrivate: truthy(routeTraitsRecord['localPrivate']),
+    });
+    const overlays = access.overlays;
     const overlayMetadata = mergedOverlayMetadata(overlays);
-    const secretRef = optionalString(policy['secretRef']) ?? optionalString(routePolicyRecord['secretRef']) ?? firstSecretRef(overlays);
+    const secretRef = access.secretRef;
 
     const allowProviders = new Set(stringList(policy['allowProviders']));
     const blockProviders = new Set(stringList(policy['blockProviders']));
@@ -347,33 +322,9 @@ export function evaluateModelGatewayEligibility(input) {
     if (lifecycleStatus === 'retired' && policy['allowRetired'] !== true) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_RETIRED);
     if (lifecycleStatus === 'preview') soft.push(MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.PREVIEW_MODEL);
 
-    if (secretRef) {
-        if (input.secretRegistry && !input.secretRegistry.has(secretRef)) {
-            hard.push(`${MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.SECRET_MISSING}:${secretRef}`);
-        } else {
-            reasons.push(`secret_configured:${secretRef}`);
-        }
-    } else if (!truthy(routeTraitsRecord['localPrivate'])) {
-        soft.push(MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.ACCOUNT_VISIBILITY_UNKNOWN);
-    }
-
-    if (overlays.length === 0) {
-        if (policy['requireAccountOverlay'] === true) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.ACCOUNT_OVERLAY_MISSING);
-        else soft.push(MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.ACCOUNT_OVERLAY_MISSING);
-        if (policy['unknownAccessPolicy'] === 'block') hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.ACCOUNT_ACCESS_UNKNOWN);
-    } else {
-        reasons.push('account_overlay_available');
-        const blocked = overlays.some((overlay) => modelListIncludes(providerModel, overlay['blockedModels']));
-        if (blocked) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.ACCOUNT_MODEL_BLOCKED);
-        const overlaysWithEnabledModels = overlays.filter((overlay) => stringList(overlay['enabledModels']).length > 0);
-        const visible = overlaysWithEnabledModels.some((overlay) => modelListIncludes(providerModel, overlay['enabledModels']));
-        if (visible) reasons.push('account_model_visible');
-        else if (overlaysWithEnabledModels.length > 0 && policy['treatEnabledModelsAsClosed'] !== false) {
-            hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.ACCOUNT_MODEL_NOT_VISIBLE);
-        } else {
-            soft.push(MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.ACCOUNT_VISIBILITY_UNKNOWN);
-        }
-    }
+    hard.push(...access.hardReasons);
+    soft.push(...access.softReasons);
+    reasons.push(...access.reasons);
 
     if (providerId === 'cloudflare-workers-ai') {
         const wireApi = optionalString(routePolicyRecord['wireApi']);
@@ -443,7 +394,7 @@ export function evaluateModelGatewayEligibility(input) {
         softPenalties: uniqueSoft,
         reasons,
         requiredRuntimeProbes: stringList(policy['defaultRuntimeProbes']),
-        overlayRefs: overlays.map((overlay) => optionalString(overlay['accountOverlayId'])).filter((id) => id !== null),
+        overlayRefs: access.overlayRefs,
         routeOptionRefs: [
             [
                 optionalString(routeOption['providerId']) ?? providerId,
@@ -457,6 +408,12 @@ export function evaluateModelGatewayEligibility(input) {
             treatEnabledModelsAsClosed: policy['treatEnabledModelsAsClosed'],
             allowRetired: policy['allowRetired'],
             excludeFailedHealth: policy['excludeFailedHealth'],
+            accountAccess: {
+                status: access.status,
+                canAttempt: access.canAttempt,
+                secretConfigured: access.secretConfigured,
+                modelVisible: access.modelVisible,
+            },
             budget: {
                 ...budgetPolicyInputs(policy),
                 observedPricing: budgetDecision.observed,

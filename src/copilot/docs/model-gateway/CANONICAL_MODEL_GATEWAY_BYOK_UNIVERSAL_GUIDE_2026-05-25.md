@@ -1546,7 +1546,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Account overlays básicos.
 - [x] Enabled/blocked models.
 - [x] Quota/rate/spending normalizers.
-- [ ] Resolver de acesso por provider.
+- [x] Resolver de acesso por provider.
 - [ ] Account overlay refresh separado.
 - [ ] Access confidence.
 - [ ] Access expiration.
@@ -1993,6 +1993,39 @@ Validação deste corte:
 
 - [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   com `90` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS `npm run lint:copilot`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 23. Continuidade 2026-05-25 — Resolver Account Access
+
+Implementado neste corte:
+
+- [x] Criado módulo `src/copilot/model-gateway/account-access`.
+- [x] Criado `resolveModelGatewayAccountAccess()` para unir provider/model,
+  account overlays, allow/blocked lists e secret registry sem runtime.
+- [x] Criado enum `MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS`.
+- [x] Exportado o módulo pelo barrel principal `model-gateway`.
+- [x] `evaluateModelGatewayEligibility()` passa a compor o resolver em vez de
+  duplicar a interpretação de overlays e secrets.
+- [x] `policyInputs.accountAccess` passa a registrar `status`, `canAttempt`,
+  `secretConfigured` e `modelVisible` sem vazar valores.
+- [x] Adicionados testes de acesso visível, secret ausente e modelo bloqueado.
+
+Separação preservada:
+
+- [x] Account access é derivado de overlay e segredo presente/ausente.
+- [x] O resolver não executa provider e não altera catálogo canônico.
+- [x] Eligibility continua responsável por lifecycle, budget, health e policy
+  global.
+- [x] O terminal segue injetando o registry concreto apenas na composição.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `91` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS `npm run lint:copilot`.
 - [x] PASS `git diff --check`.

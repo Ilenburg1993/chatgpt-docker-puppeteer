@@ -30,6 +30,7 @@ import {
     applyModelGatewayEligibilityToSnapshot,
     createModelRecord,
     createEnvSecretRegistry,
+    resolveModelGatewayAccountAccess,
     buildModelGatewayOnListModelsHandler,
     evaluateGatewayModelHealthRoute,
     geminiAdapter,
@@ -3767,6 +3768,46 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(decision.softPenalties, ['price_unknown']);
         assert.equal(decision.redactionStatus, 'sanitized');
         assert.equal(JSON.stringify(decision).includes('secret-value-that-must-not-leak'), false);
+    });
+
+    it('resolves account access from overlays and env secrets before eligibility or runtime', () => {
+        const overlay = createProviderAccountOverlay({
+            providerId: 'openai',
+            secretRef: 'OPENAI_API_KEY',
+            enabledModels: ['gpt-visible'],
+            blockedModels: ['gpt-blocked'],
+        });
+
+        const visible = resolveModelGatewayAccountAccess({
+            providerId: 'openai',
+            providerModel: 'gpt-visible',
+            accountOverlays: [overlay],
+            secretRegistry: createEnvSecretRegistry({ env: { OPENAI_API_KEY: 'sk-test' } }),
+        });
+        assert.equal(visible.status, 'visible');
+        assert.equal(visible.canAttempt, true);
+        assert.equal(visible.secretConfigured, true);
+        assert.equal(visible.modelVisible, true);
+        assert.deepEqual(visible.overlayRefs, [overlay.accountOverlayId]);
+
+        const missingSecret = resolveModelGatewayAccountAccess({
+            providerId: 'openai',
+            providerModel: 'gpt-visible',
+            accountOverlays: [overlay],
+            secretRegistry: createEnvSecretRegistry({ env: {} }),
+        });
+        assert.equal(missingSecret.status, 'missing_secret');
+        assert.equal(missingSecret.canAttempt, false);
+        assert.ok(missingSecret.hardReasons.includes('secret_missing:OPENAI_API_KEY'));
+
+        const blocked = resolveModelGatewayAccountAccess({
+            providerId: 'openai',
+            providerModel: 'gpt-blocked',
+            accountOverlays: [overlay],
+            secretRegistry: createEnvSecretRegistry({ env: { OPENAI_API_KEY: 'sk-test' } }),
+        });
+        assert.equal(blocked.status, 'blocked');
+        assert.ok(blocked.hardReasons.includes('account_model_blocked'));
     });
 
     it('evaluates hard pre-runtime exclusions from secrets, account overlays and access visibility', () => {
