@@ -423,6 +423,40 @@ describe('model-gateway foundation', () => {
         assert.ok(decision.rejected[0].rejectedReasons.includes('eligibility:account_model_not_visible'));
     });
 
+    it('uses the concrete env secret registry in pre-runtime route admission', () => {
+        const model = createModelRecord({
+            providerId: 'openai',
+            providerModel: 'gpt-needs-key',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+            pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 4 },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'openai',
+            secretRef: 'OPENAI_API_KEY',
+            enabledModels: ['gpt-needs-key'],
+            sourceKind: 'authenticated_catalog',
+        });
+
+        const missing = routeGatewayModels([model], 'tool_agent', {
+            evaluateEligibility: true,
+            accountOverlays: [overlay],
+            secretRegistry: createEnvSecretRegistry({ env: {} }),
+            requireAgentProbeOk: false,
+        });
+        assert.equal(missing.selected, null);
+        assert.ok(missing.rejected[0].rejectedReasons.includes('eligibility:secret_missing:OPENAI_API_KEY'));
+
+        const configured = routeGatewayModels([model], 'tool_agent', {
+            evaluateEligibility: true,
+            accountOverlays: [overlay],
+            secretRegistry: createEnvSecretRegistry({ env: { OPENAI_API_KEY: 'sk-test' } }),
+            requireAgentProbeOk: false,
+        });
+        assert.equal(configured.selected?.model['providerModel'], 'gpt-needs-key');
+        assert.equal(configured.selected?.eligibility?.['disposition'], 'eligible');
+    });
+
     it('imports current env BYOK without serializing secrets', () => {
         const env = {
             COPILOT_BYOK_ENABLED: 'true',

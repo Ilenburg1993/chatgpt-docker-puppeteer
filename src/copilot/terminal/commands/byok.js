@@ -911,6 +911,7 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
     const filters = normalizeRouteDiscoveryFilters(parseRecommendArgs(routeArgs), routeArgs, projection);
     const runtimeBudget = readCurrentByokRequestBudget();
     const discovered = await discoverByokCatalogForCommand(projection, filters);
+    const catalogSnapshot = await readByokGatewayCatalogSnapshotForRouting();
     const modelList = rankByokModels(discovered.models.length > 0 ? discovered.models : projection.models).filter((model) =>
         matchesRecommendFilters(model, filters, runtimeBudget),
     );
@@ -936,6 +937,13 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
             routeProfile: projection.summary.profile ?? null,
             excludeFailed: true,
             requireAgentProbeOk: strict,
+            evaluateEligibility: true,
+            routeOptions: catalogSnapshot?.routeOptions ?? [],
+            accountOverlays: catalogSnapshot?.accountOverlays ?? [],
+            secretRegistry: createEnvSecretRegistry(),
+            eligibilityPolicy: {
+                unknownAccessPolicy: strict ? 'block' : 'allow_probe',
+            },
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -1285,6 +1293,17 @@ async function discoverByokCatalogForCommand(projection, filters) {
         warnings,
         profileCount: profiles.length,
     };
+}
+
+/**
+ * @returns {Promise<Awaited<ReturnType<JsonModelGatewayCatalogStore['readSnapshot']>> | null>}
+ */
+async function readByokGatewayCatalogSnapshotForRouting() {
+    try {
+        return await new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH }).readSnapshot();
+    } catch {
+        return null;
+    }
 }
 
 /**

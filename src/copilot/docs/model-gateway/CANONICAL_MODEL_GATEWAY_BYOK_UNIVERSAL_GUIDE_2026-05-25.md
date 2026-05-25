@@ -1512,7 +1512,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Criar enum de soft penalty reasons.
 - [x] Criar evaluator puro.
 - [x] Integrar presença de segredo via interface `has(ref)`.
-- [ ] Integrar `EnvSecretRegistry` concreto nos consumidores de eligibility.
+- [x] Integrar `EnvSecretRegistry` concreto nos consumidores de eligibility.
 - [x] Integrar account overlays para enabled/blocked/visibility.
 - [x] Integrar route options e route traits.
 - [x] Integrar lifecycle retired.
@@ -1926,7 +1926,42 @@ Validação deste corte:
 
 Próxima direção:
 
-- [ ] Integrar `EnvSecretRegistry` concreto nos consumidores de eligibility.
+- [x] Integrar `EnvSecretRegistry` concreto nos consumidores de eligibility.
 - [ ] Persistir policy profiles de budget reutilizáveis para seleção terminal.
 - [ ] Fazer selection/ranking final consumir penalties de budget de forma
   transparente ao lado de health/probes.
+
+---
+
+## 21. Continuidade 2026-05-25 — EnvSecretRegistry No Roteamento Terminal
+
+Implementado neste corte:
+
+- [x] `/byok route` passa a carregar o snapshot JSON do model-gateway para
+  recuperar `routeOptions` e `accountOverlays` antes da seleção.
+- [x] `/byok route` passa a avaliar eligibility on-demand durante
+  `routeGatewayModels()`.
+- [x] O consumidor terminal passa `createEnvSecretRegistry()` concreto para que
+  `secretRef` ausente bloqueie antes do runtime.
+- [x] O modo padrão preserva máxima exploração com
+  `unknownAccessPolicy=allow_probe`.
+- [x] O modo strict/verified usa `unknownAccessPolicy=block` para inspeções
+  conservadoras.
+- [x] Adicionado teste com `createEnvSecretRegistry({ env })` provando que
+  `OPENAI_API_KEY` ausente gera `eligibility:secret_missing:*` e que a chave
+  presente libera a admissão.
+
+Separação preservada:
+
+- [x] O policy engine continua recebendo a registry por injeção.
+- [x] A camada de routing não lê segredos diretamente.
+- [x] O terminal injeta ambiente real apenas no ponto de composição.
+- [x] Eligibility segue pré-runtime e não executa provider.
+
+Validação parcial deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `89` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS `npm run lint:copilot`.
+- [x] PASS `git diff --check`.
