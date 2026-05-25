@@ -586,11 +586,14 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 
 ### Faixa O — Refresh, diffs e governança operacional
 
-- [ ] Criar `model-gateway catalog refresh` programático e comando terminal correspondente.
+- [x] Criar refresh programático de catálogo com importers, replacement de evidências por fonte, rebuild de projections,
+  diff e resposta OpenAI-compatible.
+- [ ] Criar comando terminal correspondente para `model-gateway catalog refresh`.
 - [ ] Criar refresh incremental por provider, com cache TTL por fonte.
 - [ ] Criar refresh por overlay de conta/organização quando houver secretRef configurado, mantendo snapshot público e
   snapshot account-scoped separados.
-- [ ] Criar diff entre snapshots: modelos novos, removidos, deprecados, preço alterado, limits alterados, capabilities
+- [x] Criar diff entre snapshots: modelos novos, removidos e campos alterados.
+- [ ] Expandir diff entre snapshots para depreciação explícita, preço alterado, limits alterados, capabilities
   alteradas.
 - [ ] Emitir eventos:
   - `model_gateway:catalog:import_started`;
@@ -1282,3 +1285,37 @@ Próxima direção:
 
 - Commitar/pushar este corte.
 - Em seguida, conectar refresh/diff programático para gerar snapshots OpenAI-compatible a partir dos importers reais.
+
+## 21. Continuidade 2026-05-25 — refresh programático com diff e saída OpenAI
+
+Implementado neste corte:
+
+- Criado `src/copilot/model-gateway/catalog/refresh.js`.
+- Exportado `refreshModelGatewayCatalog()` pelo barrel de catálogo e pelo barrel raiz.
+- O refresh aceita importers e store/snapshot, roda os importers via `runCatalogImporters()`, substitui evidências das
+  fontes reexecutadas e preserva evidências de fontes não tocadas, como overrides manuais ou outros providers.
+- Depois do refresh, o pipeline:
+  1. reagrupa evidências por `providerId/providerModel/routeProfile`;
+  2. chama `mergeModelMetadataEvidence()` por grupo;
+  3. reconstrói `projections`;
+  4. coleta conflitos por projection;
+  5. calcula diff contra `previous.projections`;
+  6. persiste snapshot atualizado quando há store;
+  7. retorna também `openai: { object: "list", data: [...] }`.
+- A decisão de substituir evidências por fonte no refresh é importante para detectar remoções: se uma fonte pública não
+  retorna mais um modelo, a projection daquele modelo desaparece, mas evidências manuais/de outras fontes permanecem.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`40` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5612` testes, `0` falhas, `warnings/errors unique=0 total=0`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T15-19-13-644Z/summary.md`).
+
+Próxima direção:
+
+- Commitar/pushar este corte.
+- Depois, criar comando terminal ou script programático fino para acionar refresh OpenRouter/OpenAI e inspecionar diff.

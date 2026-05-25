@@ -38,3 +38,4 @@ export {
     toOpenAIModelCatalogEntry,
     toOpenAIModelCatalogList,
 } from './openai-schema.js';
+export { refreshModelGatewayCatalog } from './refresh.js';

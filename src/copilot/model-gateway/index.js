@@ -30,6 +30,7 @@ export {
     mergeModelMetadataEvidence,
     normalizeStoredCatalogSnapshot,
     rankCatalogEvidenceConfidence,
+    refreshModelGatewayCatalog,
     runCatalogImporters,
     toOpenAIModelCatalogEntry,
     toOpenAIModelCatalogList,
