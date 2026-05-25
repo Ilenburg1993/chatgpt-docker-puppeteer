@@ -6,6 +6,11 @@
  */
 
 export {
+    ANTHROPIC_MODELS_API_VERSION,
+    ANTHROPIC_MODELS_CATALOG_URL,
+    createAnthropicModelsImporter,
+} from './anthropic-models-importer.js';
+export {
     CEREBRAS_PUBLIC_MODELS_CATALOG_URL,
     createCerebrasPublicModelsImporter,
 } from './cerebras-public-models-importer.js';

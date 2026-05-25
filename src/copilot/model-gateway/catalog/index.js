@@ -24,12 +24,15 @@ export {
     summarizeCanonicalModelProjectionDiff,
 } from './import-runs.js';
 export {
+    ANTHROPIC_MODELS_API_VERSION,
+    ANTHROPIC_MODELS_CATALOG_URL,
     CEREBRAS_PUBLIC_MODELS_CATALOG_URL,
     KILO_GATEWAY_MODELS_CATALOG_URL,
     KILO_GATEWAY_PROVIDERS_CATALOG_URL,
     MISTRAL_MODELS_CATALOG_URL,
     OPENAI_MODELS_CATALOG_URL,
     OPENROUTER_MODELS_CATALOG_URL,
+    createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,

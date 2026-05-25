@@ -9,6 +9,7 @@
  */
 
 import {
+    createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
@@ -93,6 +94,16 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                 fetchImpl: options.fetchImpl,
                 apiKey: mistralSecret.value,
                 secretRef: mistralSecret.key,
+            }),
+        );
+    }
+    const anthropicSecret = readEnvSecret(env, ['ANTHROPIC_API_KEY', 'ANTHROPIC_KEY']);
+    if (includeAuthenticated && anthropicSecret) {
+        importers.push(
+            createAnthropicModelsImporter({
+                fetchImpl: options.fetchImpl,
+                apiKey: anthropicSecret.value,
+                secretRef: anthropicSecret.key,
             }),
         );
     }

@@ -61,6 +61,7 @@ import {
     BYOK_VISION_PROBE_DISPLAY_NAME,
     BYOK_VISION_PROBE_MIME_TYPE,
     JsonModelGatewayCatalogStore,
+    createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
     createMistralModelsImporter,
     createOpenAICompatibleModelsImporter,
@@ -1503,6 +1504,89 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('providerMetadata.mistral.defaultTemperature'), 0.7);
     });
 
+    it('imports paginated Anthropic model identity with account overlay metadata', async () => {
+        const secret = 'anthropic-secret-that-must-not-leak';
+        /** @type {Array<{ url: string; apiKey: string | null; apiVersion: string | null }>} */
+        const requests = [];
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (url, init) => {
+                const headers = /** @type {{ 'x-api-key'?: string; 'anthropic-version'?: string }} */ (init)?.headers ?? {};
+                requests.push({
+                    url: String(url),
+                    apiKey: headers['x-api-key'] ?? null,
+                    apiVersion: headers['anthropic-version'] ?? null,
+                });
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () =>
+                        requests.length === 1
+                            ? {
+                                  data: [
+                                      {
+                                          id: 'claude-sonnet-4-5-20250929',
+                                          type: 'model',
+                                          display_name: 'Claude Sonnet 4.5',
+                                          created_at: '2025-09-29T00:00:00.000Z',
+                                      },
+                                  ],
+                                  has_more: true,
+                                  last_id: 'claude-sonnet-4-5-20250929',
+                              }
+                            : {
+                                  data: [
+                                      {
+                                          id: 'claude-haiku-4-5-20251001',
+                                          type: 'model',
+                                          display_name: 'Claude Haiku 4.5',
+                                          created_at: '2025-10-01T00:00:00.000Z',
+                                      },
+                                  ],
+                                  has_more: false,
+                                  last_id: 'claude-haiku-4-5-20251001',
+                              },
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [
+                createAnthropicModelsImporter({
+                    fetchImpl: fakeFetch,
+                    apiKey: secret,
+                    secretRef: 'ANTHROPIC_API_KEY',
+                }),
+            ],
+            now: () => new Date('2026-05-25T13:05:00.000Z'),
+        });
+        const byModel = new Map(
+            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+        );
+
+        assert.equal(requests.length, 2);
+        assert.equal(requests[0].apiKey, secret);
+        assert.equal(requests[0].apiVersion, '2023-06-01');
+        assert.equal(new URL(requests[0].url).searchParams.get('limit'), '1000');
+        assert.equal(new URL(requests[1].url).searchParams.get('after_id'), 'claude-sonnet-4-5-20250929');
+        assert.equal(JSON.stringify(snapshot).includes(secret), false);
+        assert.equal(snapshot.sources[0].providerId, 'anthropic');
+        assert.equal(snapshot.sources[0].authMode, 'api_key');
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, [
+            'claude-sonnet-4-5-20250929',
+            'claude-haiku-4-5-20251001',
+        ]);
+        assert.equal(snapshot.accountOverlays[0].secretRef, 'ANTHROPIC_API_KEY');
+        assert.equal(snapshot.accountOverlays[0].providerMetadata.anthropicVersion, '2023-06-01');
+        assert.equal(snapshot.routeOptions[0].selectorKind, 'exact_model');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.wireApi, 'anthropic_messages');
+        assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:displayName'), 'Claude Sonnet 4.5');
+        assert.equal(
+            byModel.get('anthropic:claude-sonnet-4-5-20250929:lifecycle.createdAt'),
+            '2025-09-29T00:00:00.000Z',
+        );
+        assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:providerMetadata.ownedBy'), 'anthropic');
+        assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:providerMetadata.anthropic.type'), 'model');
+    });
+
     it('extracts Cerebras public rich model metadata without proving runtime access', async () => {
         const fakeFetch = /** @type {typeof fetch} */ (
             async () =>
@@ -1865,6 +1949,10 @@ describe('model-gateway foundation', () => {
             env: { MISTRAL_KEY: 'mistral-secret-that-must-not-leak' },
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
+        const anthropicAuthenticated = createDefaultModelGatewayCatalogImporters({
+            env: { ANTHROPIC_KEY: 'anthropic-secret-that-must-not-leak' },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+        });
 
         assert.deepEqual(
             importers.map((importer) => importer.id),
@@ -1876,9 +1964,11 @@ describe('model-gateway foundation', () => {
         );
         assert.equal(genericAuthenticated.some((importer) => importer.id === 'groq-openai-compatible-models'), true);
         assert.equal(mistralAuthenticated.some((importer) => importer.id === 'mistral-models'), true);
+        assert.equal(anthropicAuthenticated.some((importer) => importer.id === 'anthropic-models'), true);
         assert.equal(JSON.stringify(importers).includes(secret), false);
         assert.equal(JSON.stringify(genericAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(mistralAuthenticated).includes('mistral-secret-that-must-not-leak'), false);
+        assert.equal(JSON.stringify(anthropicAuthenticated).includes('anthropic-secret-that-must-not-leak'), false);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {

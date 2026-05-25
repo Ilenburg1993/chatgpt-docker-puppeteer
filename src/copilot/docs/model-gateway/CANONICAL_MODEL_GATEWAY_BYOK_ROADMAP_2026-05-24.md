@@ -564,7 +564,9 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] Complementar `OpenAIModelsImporter` com seeds/docs oficiais de capabilities e famílias.
 - [x] Implementar `OpenRouterModelsImporter` para `/api/v1/models`, preservando `supported_parameters`, pricing,
   context, top provider e per-request limits.
-- [ ] Implementar `AnthropicModelsImporter` para lista oficial de modelos e docs complementares.
+- [x] Implementar `AnthropicModelsImporter` para lista oficial de modelos account-scoped.
+- [ ] Complementar `AnthropicModelsImporter` com `GET /v1/models/{model_id}`, aliases resolvidos e docs de
+  limites/capabilities por família.
 - [ ] Implementar `GeminiModelsImporter` para `models.list`/`models.get`, capturando token limits,
   `supportedGenerationMethods`, `thinking` e parâmetros.
 - [x] Implementar `MistralModelsImporter` para `/v1/models`, capturando capabilities, aliases,
@@ -2367,3 +2369,60 @@ Validação deste corte até agora:
 Próxima direção:
 
 - Rodar suíte completa, commitar/pushar e seguir para Anthropic, Gemini ou Groq especializado.
+
+## 46. Continuidade 2026-05-25 — importer autenticado Anthropic
+
+Investigação oficial:
+
+- A documentação oficial da Anthropic confirma `GET /v1/models` como API para listar os modelos disponíveis para uma
+  key/workspace.
+- A chamada usa headers `x-api-key` e `anthropic-version`; mantemos `2023-06-01` como default explícito.
+- A listagem é paginada por `before_id`, `after_id` e `limit`; `limit` aceita até `1000`.
+- Cada item expõe `id`, `display_name`, `created_at` e `type`.
+- A documentação também confirma `GET /v1/models/{model_id}` para resolver um modelo/alias específico. Esse detalhe
+  fica reservado para enriquecimento incremental posterior, porque a listagem já resolve a camada de visibilidade da
+  conta.
+
+Implementado neste corte:
+
+- Novo `AnthropicModelsImporter` para `https://api.anthropic.com/v1/models`.
+- O importer pagina automaticamente com `limit=1000` e cursor `after_id`, até encerrar `has_more` ou atingir um teto
+  defensivo de páginas.
+- O importer é account-scoped/autenticado e entra na composição padrão quando `ANTHROPIC_API_KEY` ou `ANTHROPIC_KEY`
+  estão presentes.
+- O payload vira evidências para:
+  - `displayName`;
+  - aliases normalizados;
+  - lifecycle `createdAt`;
+  - `providerMetadata.ownedBy`;
+  - `providerMetadata.anthropic.type`;
+  - campos OpenAI-compatible `openai.created` e `openai.owned_by`.
+- O importer também emite:
+  - `ModelRouteOption` `exact_model`;
+  - política normalizada `routeLayer=direct_provider` e `wireApi=anthropic_messages`;
+  - `ProviderAccountOverlay` com modelos visíveis pela key, endpoint e versão Anthropic, sem serializar segredo.
+- Barrels de importers, catálogo e root exportam `ANTHROPIC_MODELS_CATALOG_URL`,
+  `ANTHROPIC_MODELS_API_VERSION` e `createAnthropicModelsImporter()`.
+
+Separação arquitetural reafirmada:
+
+- A listagem Anthropic prova visibilidade account-scoped, não sucesso de chamada Messages, tools, thinking, vision ou
+  context window efetivo.
+- Capabilities finas da Anthropic permanecem dependentes de docs/seeds por família e probes runtime posteriores.
+- A rota normalizada continua OpenAI-schema-first no catálogo, mas preserva `wireApi=anthropic_messages` para o adapter
+  não confundir schema catalogado com protocolo de transporte.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`56` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5633` testes totais, `5600` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T19-22-14-066Z/summary.md`).
+
+Próxima direção:
+
+- Depois da validação/push de Anthropic, seguir para Gemini `models.list`/`models.get`, porque ele oferece metadata rica
+  de métodos suportados, input/output token limits e parâmetros diretamente na API oficial.
