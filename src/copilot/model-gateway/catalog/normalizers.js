@@ -599,6 +599,79 @@ export function normalizeModelIdentityTraits(input = {}) {
 
 /**
  * @param {object} [input]
+ * @param {unknown} [input.selectorKind]
+ * @param {unknown} [input.normalizedPolicy]
+ * @param {unknown} [input.providerSpecific]
+ * @returns {Record<string, string | boolean | string[]>}
+ */
+export function normalizeModelRoutePolicyTraits(input = {}) {
+    const selectorKind = normalizedIdentityToken(input.selectorKind) ?? 'exact-model';
+    const policy = isRecord(input.normalizedPolicy) ? input.normalizedPolicy : {};
+    const providerSpecific = isRecord(input.providerSpecific) ? input.providerSpecific : {};
+    const routeLayer = normalizedIdentityToken(policy['routeLayer']);
+    const wireApi = normalizedIdentityToken(policy['wireApi'] ?? policy['directWireApi']);
+    const selectionMode =
+        selectorKind === 'gateway-auto'
+            ? 'gateway_auto'
+            : selectorKind === 'gateway-fallback'
+              ? 'gateway_fallback'
+              : selectorKind === 'aggregator-auto'
+                ? 'aggregator_auto'
+                : selectorKind === 'provider-explicit'
+                  ? 'provider_explicit'
+                  : selectorKind === 'provider-model'
+                    ? 'provider_model'
+                    : ['fastest', 'cheapest', 'preferred'].includes(selectorKind)
+                      ? 'provider_policy'
+                      : policy['autoSelection'] === true
+                        ? 'auto'
+                        : 'exact';
+    const endpointKind =
+        routeLayer === 'gateway'
+            ? 'gateway'
+            : routeLayer?.includes('aggregator')
+              ? 'aggregator'
+              : routeLayer === 'local-daemon' || policy['localPrivate'] === true
+                ? 'local_daemon'
+                : routeLayer?.includes('openai-compatible')
+                  ? 'openai_compatible'
+                  : routeLayer === 'direct-provider'
+                    ? 'direct_provider'
+                    : null;
+    /** @type {string[]} */
+    const policyHints = [];
+    if (policy['supportsFallback'] === true || policy['supportsFallbackChain'] === true) policyHints.push('fallback');
+    if (policy['supportsRetry'] === true) policyHints.push('retry');
+    if (policy['supportsCache'] === true) policyHints.push('cache');
+    if (policy['supportsProviderOrder'] === true) policyHints.push('provider_order');
+    if (policy['supportsOrganizationOverlay'] === true) policyHints.push('organization_overlay');
+    if (policy['supportsTaskId'] === true) policyHints.push('task_id');
+    if (providerSpecific['supportsInternalByok'] === true) policyHints.push('internal_byok');
+    if (providerSpecific['huggingFaceProvider']) policyHints.push('explicit_upstream_provider');
+    if (providerSpecific['upstreamProvider']) policyHints.push('upstream_provider');
+    if (providerSpecific['topProvider']) policyHints.push('aggregator_top_provider');
+    if (Array.isArray(providerSpecific['acceptedHeaders']) && providerSpecific['acceptedHeaders'].length > 0) {
+        policyHints.push('custom_headers');
+    }
+    /** @type {Record<string, string | boolean | string[]>} */
+    const traits = {
+        selectorKind,
+        selectionMode,
+    };
+    if (routeLayer) traits['routeLayer'] = routeLayer;
+    if (endpointKind) traits['endpointKind'] = endpointKind;
+    if (wireApi) traits['wireApi'] = wireApi;
+    if (policy['openAICompatibleBaseUrl'] || endpointKind === 'openai_compatible' || routeLayer === 'openai-compatible-aggregator') {
+        traits['openAICompatible'] = true;
+    }
+    if (policy['autoSelection'] === true || selectionMode !== 'exact') traits['autoSelection'] = true;
+    if (policy['localPrivate'] === true) traits['localPrivate'] = true;
+    if (policyHints.length > 0) traits['policyHints'] = [...new Set(policyHints)];
+    return traits;
+}
+
+/**
+ * @param {object} [input]
  * @param {unknown} [input.enabledModels]
  * @param {unknown} [input.blockedModels]
  * @param {unknown} [input.byokProviderKeys]

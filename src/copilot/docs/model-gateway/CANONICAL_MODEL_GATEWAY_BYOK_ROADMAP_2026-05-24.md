@@ -625,6 +625,8 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   parâmetros, MoE, quantização, modalidade e hints arquiteturais leves em `providerMetadata.modelTraits.*`.
 - [ ] Expandir parser de aliases/versionamento para variants provider-specific, datas de release complexas e aliases
   comerciais que não aparecem no id técnico.
+- [x] Criar normalizador de route/policy traits para `ModelRouteOption.normalizedPolicy.routeTraits`, separando modo de
+  seleção, camada de rota, compatibilidade OpenAI, wire API e hints de fallback/retry/cache/headers sem provar runtime.
 - [ ] Criar normalizador de providers/gateways que separe `direct_provider`, `aggregator`, `gateway`,
   `openai_compatible_proxy`, `local_daemon` e `sdk_native`.
 - [x] Criar normalizador de overlays de conta: allow/block lists, organization headers, spending limits, quotas, free
@@ -3456,3 +3458,72 @@ Próxima direção:
 
 - Rodar suíte completa, commitar/pushar e continuar para normalização de route/provider traits, começando por campos que
   ainda ficam espalhados entre `normalizedPolicy`, `providerSpecific` e provider metadata.
+
+## 63. Continuidade 2026-05-25 — route/policy traits normalizados
+
+Problema identificado:
+
+- A identidade técnica do modelo agora está normalizada, mas a identidade da rota ainda ficava espalhada entre:
+  - `selectorKind`;
+  - `normalizedPolicy.routeLayer`;
+  - `normalizedPolicy.wireApi`;
+  - `normalizedPolicy.openAICompatibleBaseUrl`;
+  - flags de fallback/retry/cache;
+  - `providerSpecific.topProvider`, `upstreamProvider`, headers aceitos e providers explícitos.
+- Para seleção por metadados, isso exigiria lógica especial por importer antes mesmo dos probes.
+
+Implementado neste corte:
+
+- Criado `normalizeModelRoutePolicyTraits()` em `catalog/normalizers.js`.
+- `createModelRouteOption()` agora injeta `normalizedPolicy.routeTraits` quando o importer ainda não forneceu essa visão.
+- O normalizador resume, sem substituir a política original:
+  - `selectorKind`;
+  - `selectionMode`;
+  - `routeLayer`;
+  - `endpointKind`;
+  - `wireApi`;
+  - `openAICompatible`;
+  - `autoSelection`;
+  - `localPrivate`;
+  - `policyHints`.
+- `policyHints` cobre pistas como:
+  - fallback;
+  - retry;
+  - cache;
+  - provider order;
+  - organization overlay;
+  - task id;
+  - internal BYOK;
+  - upstream provider;
+  - aggregator top provider;
+  - custom headers.
+- O normalizador foi exportado pelos barrels `catalog/index.js` e `model-gateway/index.js`.
+
+Separação arquitetural:
+
+- `routeTraits` é metadata de roteamento/seleção inicial.
+- Ele não prova que fallback, tools, cache, streaming ou provider explícito funcionam em runtime.
+- A política original continua preservada em `normalizedPolicy` e `providerSpecific`, para não perder detalhes de cada
+  provider/gateway.
+
+Testes adicionados:
+
+- `createModelRouteOption()` agora prova que uma rota `gateway_auto` recebe `routeTraits` secret-safe.
+- Teste direto de `normalizeModelRoutePolicyTraits()` cobre:
+  - Cloudflare-like `gateway_fallback` com fallback/retry/cache, upstream provider e headers customizados;
+  - Hugging Face-like `fastest` com route layer `openai_compatible_aggregator`, provider policy e provider explícito.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`70` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5647` total, `5614` passed, `33` pending, `0` failed, `0` warnings/errors;
+  summary `artifacts/test-runs/copilot/2026-05-25T21-39-48-652Z/summary.md`).
+
+Próxima direção:
+
+- Rodar suíte completa, commitar/pushar e continuar para normalização de provider/gateway traits ou para enriquecer
+  projeções OpenAI-schema-first com atalhos derivados desses traits.

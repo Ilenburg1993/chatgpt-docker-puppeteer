@@ -95,6 +95,7 @@ export {
     normalizeModelIdentityTraits,
     normalizeModelLifecycle,
     normalizeModelModalities,
+    normalizeModelRoutePolicyTraits,
     normalizeModelTokenLimits,
     normalizeOpenAICompatibleModelCapabilities,
     normalizeStoredCatalogSnapshot,

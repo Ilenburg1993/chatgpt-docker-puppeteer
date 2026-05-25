@@ -98,6 +98,7 @@ import {
     normalizeModelIdentityTraits,
     normalizeModelLifecycle,
     normalizeModelModalities,
+    normalizeModelRoutePolicyTraits,
     normalizeModelTokenLimits,
     normalizeOpenAICompatibleModelCapabilities,
     normalizeUsdPricing,
@@ -697,6 +698,11 @@ describe('model-gateway foundation', () => {
         assert.equal(providerEvidence.subjectProviderId, 'anthropic');
         assert.equal(providerEvidence.redactionStatus, 'sanitized');
         assert.equal(route.selectorKind, 'gateway_auto');
+        assert.deepEqual(route.normalizedPolicy.routeTraits, {
+            selectorKind: 'gateway-auto',
+            selectionMode: 'gateway_auto',
+            autoSelection: true,
+        });
         assert.equal(overlay.redactionStatus, 'sanitized');
         assert.deepEqual(projection.modalities, { input: ['text'], output: ['text'] });
         const serialized = JSON.stringify({ evidence, providerEvidence, route, overlay, projection });
@@ -2857,6 +2863,58 @@ describe('model-gateway foundation', () => {
                 series: 'gpt-oss',
                 sizeLabel: '120b',
                 parameterCountBillions: 120,
+            },
+        );
+    });
+
+    it('normalizes route policy traits without replacing provider-specific routing metadata', () => {
+        assert.deepEqual(
+            normalizeModelRoutePolicyTraits({
+                selectorKind: 'gateway_fallback',
+                normalizedPolicy: {
+                    routeLayer: 'gateway',
+                    wireApi: 'cloudflare_ai_gateway_universal',
+                    supportsFallback: true,
+                    supportsRetry: true,
+                    supportsCache: true,
+                },
+                providerSpecific: {
+                    upstreamProvider: 'workers-ai',
+                    acceptedHeaders: ['x-custom-route'],
+                },
+            }),
+            {
+                selectorKind: 'gateway-fallback',
+                selectionMode: 'gateway_fallback',
+                routeLayer: 'gateway',
+                endpointKind: 'gateway',
+                wireApi: 'cloudflare-ai-gateway-universal',
+                autoSelection: true,
+                policyHints: ['fallback', 'retry', 'cache', 'upstream_provider', 'custom_headers'],
+            },
+        );
+
+        assert.deepEqual(
+            normalizeModelRoutePolicyTraits({
+                selectorKind: 'fastest',
+                normalizedPolicy: {
+                    routeLayer: 'openai_compatible_aggregator',
+                    openAICompatibleBaseUrl: 'https://router.huggingface.co/v1',
+                    providerSelectionPolicy: 'fastest',
+                    supportsProviderOrder: true,
+                },
+                providerSpecific: {
+                    huggingFaceProvider: 'groq',
+                },
+            }),
+            {
+                selectorKind: 'fastest',
+                selectionMode: 'provider_policy',
+                routeLayer: 'openai-compatible-aggregator',
+                endpointKind: 'aggregator',
+                openAICompatible: true,
+                autoSelection: true,
+                policyHints: ['provider_order', 'explicit_upstream_provider'],
             },
         );
     });

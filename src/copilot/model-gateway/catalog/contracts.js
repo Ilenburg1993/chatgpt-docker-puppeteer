@@ -10,6 +10,7 @@
 
 import { normalizeGatewayIdPart, optionalPositiveInteger, optionalString } from '../contracts/index.js';
 import { redactSecretRecord, redactSecretText } from '../secrets/index.js';
+import { normalizeModelRoutePolicyTraits } from './normalizers.js';
 
 export const MODEL_GATEWAY_CATALOG_SCHEMA_VERSION = 1;
 
@@ -249,18 +250,33 @@ export function createCanonicalProviderProjection(input) {
 export function createModelRouteOption(input) {
     const providerModel = optionalString(input.providerModel);
     if (!providerModel) throw new Error('[model-gateway/catalog] route providerModel is required');
+    const providerSpecific = /** @type {Record<string, unknown>} */ (
+        isRecord(input.providerSpecific) ? sanitizeJsonValue(input.providerSpecific) : {}
+    );
+    const normalizedPolicy = /** @type {Record<string, unknown>} */ (
+        isRecord(input.normalizedPolicy) ? sanitizeJsonValue(input.normalizedPolicy) : {}
+    );
+    const selectorKind = optionalString(input.selectorKind) ?? 'exact_model';
+    const routeTraits = normalizeModelRoutePolicyTraits({
+        selectorKind,
+        providerSpecific,
+        normalizedPolicy,
+    });
     return {
         schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
         providerId: normalizeProviderId(input.providerId),
         providerModel,
         routeProfile: optionalString(input.routeProfile),
-        selectorKind: optionalString(input.selectorKind) ?? 'exact_model',
+        selectorKind,
         selectorSyntax: optionalString(input.selectorSyntax) ?? providerModel,
         sourceId: optionalString(input.sourceId),
         sourceKind: optionalString(input.sourceKind) ?? 'unknown',
         confidence: optionalString(input.confidence) ?? MODEL_GATEWAY_CATALOG_CONFIDENCE.UNKNOWN,
-        providerSpecific: isRecord(input.providerSpecific) ? sanitizeJsonValue(input.providerSpecific) : {},
-        normalizedPolicy: isRecord(input.normalizedPolicy) ? sanitizeJsonValue(input.normalizedPolicy) : {},
+        providerSpecific,
+        normalizedPolicy: {
+            ...normalizedPolicy,
+            routeTraits: isRecord(normalizedPolicy['routeTraits']) ? normalizedPolicy['routeTraits'] : routeTraits,
+        },
     };
 }
 
