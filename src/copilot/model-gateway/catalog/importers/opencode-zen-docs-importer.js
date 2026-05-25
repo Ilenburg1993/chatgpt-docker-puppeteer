@@ -14,6 +14,7 @@ import {
     OPENCODE_ZEN_BASE_URL,
     OPENCODE_ZEN_CHAT_COMPLETIONS_URL,
 } from './opencode-zen-models-importer.js';
+import { htmlTables } from './html-docs-parser.js';
 
 export const OPENCODE_ZEN_DOCS_URL = 'https://opencode.ai/docs/zen/';
 
@@ -31,55 +32,6 @@ function isRecord(value) {
  */
 function stringValue(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-/**
- * @param {string} value
- * @returns {string}
- */
-function decodeHtmlEntities(value) {
-    return value
-        .replace(/&nbsp;/giu, ' ')
-        .replace(/&amp;/giu, '&')
-        .replace(/&quot;/giu, '"')
-        .replace(/&#x27;/giu, "'")
-        .replace(/&#39;/giu, "'")
-        .replace(/&le;/giu, '<=')
-        .replace(/&ge;/giu, '>=')
-        .replace(/&lt;/giu, '<')
-        .replace(/&gt;/giu, '>');
-}
-
-/**
- * @param {unknown} value
- * @returns {string}
- */
-function textFromHtml(value) {
-    return decodeHtmlEntities(
-        String(value ?? '')
-            .replace(/<!--[\s\S]*?-->/gu, '')
-            .replace(/<[^>]*>/gu, ' '),
-    )
-        .replace(/\s+/gu, ' ')
-        .trim();
-}
-
-/**
- * @param {string} rowHtml
- * @returns {string[]}
- */
-function tableCells(rowHtml) {
-    return [...rowHtml.matchAll(/<t[dh]\b[\s\S]*?<\/t[dh]>/giu)].map((match) => textFromHtml(match[0]));
-}
-
-/**
- * @param {string} html
- * @returns {string[][][]}
- */
-function htmlTables(html) {
-    return [...html.matchAll(/<table\b[\s\S]*?<\/table>/giu)].map((table) =>
-        [...table[0].matchAll(/<tr\b[\s\S]*?<\/tr>/giu)].map((row) => tableCells(row[0])).filter((cells) => cells.length > 0),
-    );
 }
 
 /**

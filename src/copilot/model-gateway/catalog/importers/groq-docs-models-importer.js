@@ -11,6 +11,7 @@
 
 import { MODEL_GATEWAY_CATALOG_CONFIDENCE, createModelMetadataEvidence, createProviderMetadataEvidence } from '../contracts.js';
 import { normalizeModelAliases, normalizeModelModalities, normalizeModelTokenLimits, normalizeUsdPricing } from '../normalizers.js';
+import { decodeHtmlEntities, htmlTableCells, htmlTableRows, htmlText } from './html-docs-parser.js';
 
 export const GROQ_DOCS_MODELS_URL = 'https://console.groq.com/docs/models';
 export const GROQ_PRICING_URL = 'https://groq.com/pricing';
@@ -35,48 +36,6 @@ function isRecord(value) {
  */
 function stringValue(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-/**
- * @param {string} value
- * @returns {string}
- */
-function decodeHtmlEntities(value) {
-    return value
-        .replace(/&nbsp;/giu, ' ')
-        .replace(/&amp;/giu, '&')
-        .replace(/&quot;/giu, '"')
-        .replace(/&#x27;/giu, "'")
-        .replace(/&#39;/giu, "'")
-        .replace(/&lt;/giu, '<')
-        .replace(/&gt;/giu, '>');
-}
-
-/**
- * @param {unknown} value
- * @returns {string}
- */
-function textFromHtml(value) {
-    return decodeHtmlEntities(String(value ?? ''))
-        .replace(/<!--[\s\S]*?-->/gu, '')
-        .replace(/<script\b[\s\S]*?<\/script>/giu, ' ')
-        .replace(/<style\b[\s\S]*?<\/style>/giu, ' ')
-        .replace(/<[^>]*>/gu, ' ')
-        .replace(/\s+/gu, ' ')
-        .trim();
-}
-
-/**
- * @param {unknown} value
- * @returns {string}
- */
-function textFromHtmlIncludingScripts(value) {
-    return decodeHtmlEntities(String(value ?? ''))
-        .replace(/<!--[\s\S]*?-->/gu, '')
-        .replace(/<[^>]*>/gu, ' ')
-        .replace(/\\(["/])/gu, '$1')
-        .replace(/\s+/gu, ' ')
-        .trim();
 }
 
 /**
@@ -114,14 +73,6 @@ function compactLimitFromText(value) {
 
 /**
  * @param {string} rowHtml
- * @returns {string[]}
- */
-function tableCells(rowHtml) {
-    return [...rowHtml.matchAll(/<t[dh]\b[\s\S]*?<\/t[dh]>/giu)].map((match) => match[0]);
-}
-
-/**
- * @param {string} rowHtml
  * @param {string} firstCellText
  * @returns {string | null}
  */
@@ -129,7 +80,7 @@ function modelIdFromRow(rowHtml, firstCellText) {
     const idAttribute = rowHtml.match(/\bid=["']([^"']+(?:\/[^"']+)?)["']/iu)?.[1];
     if (idAttribute && /^[a-z0-9_.:-]+(?:\/[a-z0-9_.:-]+)+$/iu.test(idAttribute)) return decodeHtmlEntities(idAttribute);
     const monoText = rowHtml.match(/font-mono[^>]*>([\s\S]*?)<\/span>/iu)?.[1];
-    const monoCandidate = textFromHtml(monoText);
+    const monoCandidate = htmlText(monoText);
     if (/^[a-z0-9_.:-]+(?:\/[a-z0-9_.:-]+)*$/iu.test(monoCandidate) && /[a-z]/iu.test(monoCandidate)) return monoCandidate;
     const textCandidate = firstCellText.match(/[a-z0-9][a-z0-9_.:-]*(?:\/[a-z0-9][a-z0-9_.:-]*)+/iu)?.[0];
     return textCandidate ?? null;
@@ -218,29 +169,27 @@ function modalitiesFromModelId(providerModel) {
 function parseModelRowsFromDocsHtml(html) {
     /** @type {Record<string, unknown>[]} */
     const rows = [];
-    for (const match of html.matchAll(/<tr\b[\s\S]*?<\/tr>/giu)) {
-        const rowHtml = match[0];
-        const cells = tableCells(rowHtml);
+    for (const rowHtml of htmlTableRows(html)) {
+        const cells = htmlTableCells(rowHtml);
         if (cells.length < 4) continue;
-        const cellTexts = cells.map(textFromHtml);
-        const providerModel = modelIdFromRow(rowHtml, cellTexts[0] ?? '');
+        const providerModel = modelIdFromRow(rowHtml, cells[0] ?? '');
         if (!providerModel || providerModel.toLowerCase() === 'model id') continue;
-        const speedTokensPerSecond = numberFromText(cellTexts[1] ?? '');
-        const pricing = pricingFromText(cellTexts[2] ?? '');
-        const rateLimits = rateLimitsFromText(cellTexts[3] ?? '');
-        const contextWindowTokens = numberFromText(cellTexts[4] ?? '');
-        const maxOutputTokens = numberFromText(cellTexts[5] ?? '');
-        const fileSizeLimit = stringValue(cellTexts[6]);
+        const speedTokensPerSecond = numberFromText(cells[1] ?? '');
+        const pricing = pricingFromText(cells[2] ?? '');
+        const rateLimits = rateLimitsFromText(cells[3] ?? '');
+        const contextWindowTokens = numberFromText(cells[4] ?? '');
+        const maxOutputTokens = numberFromText(cells[5] ?? '');
+        const fileSizeLimit = stringValue(cells[6]);
         rows.push({
             id: providerModel,
-            displayName: cellTexts[0]?.replace(providerModel, '').trim() || providerModel,
+            displayName: cells[0]?.replace(providerModel, '').trim() || providerModel,
             docsUrl: `${GROQ_DOCS_MODELS_URL}#${providerModel}`,
             pricing,
             rateLimits,
             limits: { contextWindowTokens, maxOutputTokens },
             speedTokensPerSecond,
             fileSizeLimit,
-            sourceText: cellTexts.join(' | '),
+            sourceText: cells.join(' | '),
         });
     }
     return rows;
@@ -308,7 +257,7 @@ function parseBuiltInToolPricing(text) {
 function parseGroqDocsRows(raw) {
     const modelsHtml = isRecord(raw) ? stringValue(raw['modelsHtml']) ?? '' : typeof raw === 'string' ? raw : '';
     const pricingHtml = isRecord(raw) ? stringValue(raw['pricingHtml']) ?? '' : '';
-    const pricingText = textFromHtmlIncludingScripts(pricingHtml);
+    const pricingText = htmlText(pricingHtml, { keepScripts: true, decodeBeforeStrip: true, unescapeJsStrings: true });
     const promptCachingPrices = parsePromptCachingPrices(pricingText);
     const builtInToolPricing = parseBuiltInToolPricing(pricingText);
     return parseModelRowsFromDocsHtml(modelsHtml).map((row, index) => {

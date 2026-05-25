@@ -3218,3 +3218,45 @@ Próxima direção:
 
 - Rodar lint e suíte completa, corrigir regressões, commit/push, e continuar para outro enriquecimento de provider ou para
   normalizadores globais de pricing/limites/aliases.
+
+## 59. Continuidade 2026-05-25 — parser HTML compartilhado para importers docs
+
+Problema identificado:
+
+- Depois dos importers `groq-docs-models` e `opencode-zen-docs`, havia duplicação de helpers para:
+  - decode de entidades HTML;
+  - extração de texto de HTML;
+  - extração de linhas/células de tabela;
+  - preservação especial de texto dentro de scripts quando páginas Next/RSC embutem dados em payloads.
+- Essa duplicação aumenta o risco de bugs divergentes em docs importers futuros, especialmente Cloudflare, NVIDIA,
+  OpenAI/Anthropic/Gemini docs e outros catálogos HTML.
+
+Implementado neste corte:
+
+- Criado `src/copilot/model-gateway/catalog/importers/html-docs-parser.js`.
+- O helper compartilhado expõe:
+  - `decodeHtmlEntities()`;
+  - `htmlText()`;
+  - `htmlTableCells()`;
+  - `htmlTableRows()`;
+  - `htmlTables()`.
+- `htmlText()` aceita opções para:
+  - preservar scripts quando a fonte usa payloads RSC/Next;
+  - controlar ordem decode/strip;
+  - desescapar strings JS embutidas.
+- `GroqDocsModelsImporter` passou a usar o helper compartilhado para tabela de modelos e pricing page com scripts.
+- `OpenCodeZenDocsImporter` passou a usar `htmlTables()` para endpoint/pricing/deprecation tables.
+
+Validação deste corte até agora:
+
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`67` testes).
+- Smoke live pós-refactor:
+  - Groq docs: `15` linhas, `openai/gpt-oss-120b` presente;
+  - OpenCode docs: `41` linhas, `gpt-5.1-codex` presente.
+
+Próxima direção:
+
+- Rodar lint e suíte completa, commitar/pushar este refactor estrutural e continuar para Cloudflare/NVIDIA/docs oficiais
+  ou para normalizadores globais de pricing/limites.
