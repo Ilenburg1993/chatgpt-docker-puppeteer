@@ -14,4 +14,9 @@ export {
     createProviderAccountOverlay,
     createProviderCatalogSource,
 } from './contracts.js';
+export {
+    createCatalogImportRun,
+    createSanitizedRawPayloadRef,
+    diffCanonicalModelProjections,
+} from './import-runs.js';
 export { mergeModelMetadataEvidence, rankCatalogEvidenceConfidence } from './merge.js';

@@ -499,6 +499,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   `CanonicalModelProjection`.
 - [ ] Criar store SQLite `data/copilot/model-gateway/catalog.sqlite`.
 - [ ] Manter `registry.json` como export/snapshot redigido, não como banco completo.
+- [x] Criar contratos storage-neutral para import runs, raw payload refs sanitizados e diff de projections antes do store.
 - [ ] Persistir import runs com status, duração, fonte, quantidade de rows, erros sanitizados e diff gerado.
 - [ ] Persistir raw payload sanitizado por hash/ref, sem segredos nem headers sensíveis.
 - [x] Criar merge field-wise com `provenanceByField` e `confidenceByField`.
@@ -988,3 +989,34 @@ Próxima direção:
 
 1. Commit/push deste merge field-wise.
 2. Avançar K para import runs/raw payload refs/diff ainda em memória ou JSON, antes do SQLite.
+
+## 14. Continuidade 2026-05-25 — import runs, raw refs e diffs sem store
+
+Implementado neste corte:
+
+- Criado `src/copilot/model-gateway/catalog/import-runs.js`.
+- Exportados pelo barrel de catálogo e pelo barrel raiz:
+  - `createSanitizedRawPayloadRef()`;
+  - `createCatalogImportRun()`;
+  - `diffCanonicalModelProjections()`.
+- `createSanitizedRawPayloadRef()` sanitiza payload, calcula `sha256:<hash>`, registra `byteLength`, `mediaType` e
+  `redactionStatus`, sem exigir persistência ainda.
+- `createCatalogImportRun()` cria registro seguro de execução com status, provider/source, contagem de rows, erros
+  sanitizados e diff sanitizado.
+- `diffCanonicalModelProjections()` calcula adicionados, removidos e campos alterados por chave
+  `providerId:providerModel:routeProfile`.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`34` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5606` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T14-32-20-372Z/summary.md`).
+
+Próxima direção:
+
+1. Commit/push deste corte storage-neutral.
+2. Avançar K para um store JSON/SQLite mínimo ou para importers dry-run, dependendo do menor risco arquitetural.

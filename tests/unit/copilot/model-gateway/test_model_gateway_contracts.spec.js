@@ -58,10 +58,13 @@ import {
     BYOK_VISION_PROBE_DISPLAY_NAME,
     BYOK_VISION_PROBE_MIME_TYPE,
     createCanonicalModelProjection,
+    createCatalogImportRun,
     createModelMetadataEvidence,
     createModelRouteOption,
     createProviderAccountOverlay,
     createProviderCatalogSource,
+    createSanitizedRawPayloadRef,
+    diffCanonicalModelProjections,
     mergeModelMetadataEvidence,
     rankCatalogEvidenceConfidence,
     runConfiguredByokAgentProbe,
@@ -591,6 +594,61 @@ describe('model-gateway foundation', () => {
                 conflictingEvidenceIds: ['heuristic-context'],
             },
         ]);
+    });
+
+    it('creates sanitized import run payload refs and diffs canonical projections', () => {
+        const rawRef = createSanitizedRawPayloadRef({
+            providerId: 'openrouter',
+            sourceId: 'openrouter-models',
+            payload: {
+                data: [{ id: 'openai/gpt-oss-120b', context: 131072 }],
+                Authorization: 'Bearer sk-secret-that-must-not-leak',
+            },
+        });
+        const run = createCatalogImportRun({
+            runId: 'run-1',
+            providerId: 'openrouter',
+            sourceId: 'openrouter-models',
+            rowCount: 1,
+            errors: [{ message: 'token sk-secret-that-must-not-leak failed' }],
+            diff: { added: ['openrouter:openai/gpt-oss-120b:default'] },
+        });
+        const previous = [
+            createCanonicalModelProjection({
+                providerId: 'openrouter',
+                providerModel: 'old-model',
+            }),
+            createCanonicalModelProjection({
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                limits: { contextWindowTokens: 8192 },
+            }),
+        ];
+        const next = [
+            createCanonicalModelProjection({
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                limits: { contextWindowTokens: 131072 },
+            }),
+            createCanonicalModelProjection({
+                providerId: 'kilo',
+                providerModel: 'anthropic/claude-sonnet-4.5',
+            }),
+        ];
+        const diff = diffCanonicalModelProjections(previous, next);
+
+        assert.match(rawRef.rawPayloadRef, /^sha256:/u);
+        assert.equal(rawRef.redactionStatus, 'sanitized');
+        assert.equal(run.redactionStatus, 'sanitized');
+        assert.deepEqual(diff.added, ['kilo:anthropic/claude-sonnet-4.5:default']);
+        assert.deepEqual(diff.removed, ['openrouter:old-model:default']);
+        assert.deepEqual(diff.changed, [
+            {
+                key: 'openrouter:openai/gpt-oss-120b:default',
+                changedFields: ['limits'],
+            },
+        ]);
+        assert.equal(JSON.stringify({ rawRef, run }).includes('sk-secret-that-must-not-leak'), false);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {
