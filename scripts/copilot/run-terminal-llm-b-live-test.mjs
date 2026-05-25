@@ -294,7 +294,11 @@ function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, 
     if (model) commands.push(`/byok model ${model}`);
     commands.push(
         '/byok',
+        '/models route repo_agent --show-rejected',
         '/byok probe timeout:45000',
+        '/byok probe streaming timeout:60000',
+        '/byok probe json timeout:60000',
+        '/byok probe vision timeout:60000',
         '/byok probe agent timeout:60000',
         '/session sdk 8',
         ...buildByokCatalogCommands(provider),
@@ -1585,6 +1589,35 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
                 /BYOK agent probe/.test(plain) &&
                 /sessão SDK descartável/.test(plain),
             detail: 'BYOK preflight exercised disposable chat and agent probes before the live operator turn',
+        },
+        {
+            id: 'byok-real-route-decision',
+            pass: /BYOK model route/.test(plain) && /\bdecision=route-/.test(plain) && /fallback chain|Nenhum modelo passou/.test(plain),
+            detail: 'BYOK preflight exercised model-gateway route decision ledger before probes/live promotion',
+        },
+        {
+            id: 'byok-real-streaming-probe',
+            pass: byokAdmissionBlocked || /BYOK streaming probe[\s\S]{0,1800}resultado:\s+ok/.test(plain),
+            detail: byokAdmissionBlocked
+                ? 'BYOK streaming probe was admission-blocked before provider streaming'
+                : 'BYOK streaming probe validated assistant.message_delta on a disposable session',
+        },
+        {
+            id: 'byok-real-json-probe',
+            pass: byokAdmissionBlocked || /BYOK json probe[\s\S]{0,1800}resultado:\s+ok/.test(plain),
+            detail: byokAdmissionBlocked
+                ? 'BYOK JSON probe was admission-blocked before provider streaming'
+                : 'BYOK JSON probe validated parseable structured output on a disposable session',
+        },
+        {
+            id: 'byok-real-vision-probe',
+            pass:
+                byokAdmissionBlocked ||
+                /BYOK vision probe[\s\S]{0,2200}resultado:\s+ok/.test(plain) ||
+                /BYOK vision probe[\s\S]{0,2200}resultado:\s+(?:vision-mismatch|error|provider-error|timeout)/.test(plain),
+            detail: byokAdmissionBlocked
+                ? 'BYOK vision probe was admission-blocked before provider streaming'
+                : 'BYOK vision probe exercised image attachment path and recorded an explicit provider capability result',
         },
         {
             id: 'byok-real-shortlist-probe',

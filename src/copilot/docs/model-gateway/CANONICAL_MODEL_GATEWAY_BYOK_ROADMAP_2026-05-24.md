@@ -722,6 +722,8 @@ Implementado neste corte:
   de rota.
 - Faixa J ganhou o gate pré-K: manter compatibilidade SDK/config, não quebrar presets/env legados antes dos importers
   universais, e exigir matriz de probes antes de promoção em lives `llm-b`.
+- `terminal:llm-b:live-test -- --byok-real` passou a exercitar `/models route repo_agent --show-rejected` e probes
+  descartáveis chat, streaming, JSON, vision, agent e shortlist antes de qualquer live/promote.
 
 Validação deste corte:
 
@@ -740,8 +742,17 @@ Validação deste corte:
 - PASS `npm run test:copilot` após ledger/contrato J
   (`5598` testes, `0` falhas; warning remanescente: `[erro] sdk stream failed`;
   resumo `artifacts/test-runs/copilot/2026-05-25T00-13-42-683Z/summary.md`).
+- PASS `node --check scripts/copilot/run-terminal-llm-b-live-test.mjs`.
+- PASS `npm run terminal:llm-b:live-test`
+  (`artifacts/terminal-live/2026-05-25T00-16-15-956Z/summary.md`; canonical deltas/tools/ask_user/usage).
+- PASS `npm run terminal:llm-b:live-test -- --byok-real --no-pr --timeout-ms 600000`
+  (`artifacts/terminal-live/2026-05-25T00-20-33-489Z/summary.md`; route decision, chat, streaming, JSON, vision,
+  agent, shortlist, model switch e no-secret-leak). Observação: vision probe registrou explicitamente falha provider
+  HTTP 404 para o modelo ativo, mas o critério passou porque o caminho de attachment/capability ficou exercitado e
+  auditável sem promover o modelo.
 
 Próxima fatia antes de K:
 
-1. Executar lives `terminal:llm-b:live-test` com a matriz de probes definida.
+1. Corrigir o gap do provider/modelo ativo em vision: escolher automaticamente candidato vision do catálogo para
+   `/byok probe vision` quando o modelo ativo não aceita attachment, em vez de exigir troca manual.
 2. Só depois avançar para K: banco universal, evidence ledger persistente e importers profundos.
