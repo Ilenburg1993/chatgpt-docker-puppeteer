@@ -501,10 +501,10 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] Manter `registry.json` como export/snapshot redigido, não como banco completo.
 - [ ] Persistir import runs com status, duração, fonte, quantidade de rows, erros sanitizados e diff gerado.
 - [ ] Persistir raw payload sanitizado por hash/ref, sem segredos nem headers sensíveis.
-- [ ] Criar merge field-wise com `provenanceByField` e `confidenceByField`.
-- [ ] Implementar precedência por campo: manual > probe > authenticated catalog > official docs > aggregator >
+- [x] Criar merge field-wise com `provenanceByField` e `confidenceByField`.
+- [x] Implementar precedência por campo: manual > probe > authenticated catalog > official docs > aggregator >
   static_seed > heuristic.
-- [ ] Criar testes que provem que fonte mais pobre e mais recente não apaga metadata rica de fonte anterior.
+- [x] Criar testes que provem que fonte mais pobre e mais recente não apaga metadata rica de fonte anterior.
 - [ ] Criar teste de regressão para nunca serializar segredo no catalog DB, snapshot ou evento.
 
 ### Faixa L — Importers de catálogos oficiais e agregadores
@@ -958,3 +958,33 @@ Próxima direção:
 
 1. Commit/push deste início de K.
 2. Em seguida, avançar K para merge field-wise/provenance sem ainda acoplar SQLite.
+
+## 13. Continuidade 2026-05-25 — merge field-wise de evidências
+
+Implementado neste corte:
+
+- Criado `src/copilot/model-gateway/catalog/merge.js`.
+- Exportados `mergeModelMetadataEvidence()` e `rankCatalogEvidenceConfidence()` pelo barrel de catálogo e pelo barrel
+  raiz do gateway.
+- `mergeModelMetadataEvidence()` agrupa evidências por `fieldPath`, escolhe vencedor por precedência de confiança,
+  desempata por `observedAt`, aplica o valor em uma `CanonicalModelProjection`, registra `provenanceByField` e
+  `confidenceByField`, e preserva conflitos em lista auditável.
+- A sanitização de valores de catálogo foi refinada para não redigir metadados legítimos como `contextWindowTokens`,
+  mantendo redaction para headers, tokens, secrets e API keys.
+- Teste cobre o caso crítico: evidência `catalog` mais antiga mantém `limits.contextWindowTokens=131072` contra uma
+  heurística mais recente e pobre.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`33` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5605` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T14-27-41-329Z/summary.md`).
+
+Próxima direção:
+
+1. Commit/push deste merge field-wise.
+2. Avançar K para import runs/raw payload refs/diff ainda em memória ou JSON, antes do SQLite.

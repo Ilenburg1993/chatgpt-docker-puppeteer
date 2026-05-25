@@ -16,6 +16,8 @@ export {
     createModelRouteOption,
     createProviderAccountOverlay,
     createProviderCatalogSource,
+    mergeModelMetadataEvidence,
+    rankCatalogEvidenceConfidence,
 } from './catalog/index.js';
 export {
     MODEL_GATEWAY_SCHEMA_VERSION,

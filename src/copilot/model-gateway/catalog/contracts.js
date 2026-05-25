@@ -56,7 +56,16 @@ function stringList(value) {
 function sanitizeJsonValue(value) {
     if (typeof value === 'string') return redactSecretText(value);
     if (Array.isArray(value)) return value.map(sanitizeJsonValue);
-    if (isRecord(value)) return redactSecretRecord(Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeJsonValue(item)])));
+    if (isRecord(value)) {
+        return Object.fromEntries(
+            Object.entries(value).map(([key, item]) => [
+                key,
+                /^(?:authorization|proxy-authorization|api[_-]?key|secret|token|bearer[_-]?token|access[_-]?token)$/iu.test(key)
+                    ? '[redacted]'
+                    : sanitizeJsonValue(item),
+            ]),
+        );
+    }
     if (value === undefined) return null;
     return value;
 }

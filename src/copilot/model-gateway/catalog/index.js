@@ -14,3 +14,4 @@ export {
     createProviderAccountOverlay,
     createProviderCatalogSource,
 } from './contracts.js';
+export { mergeModelMetadataEvidence, rankCatalogEvidenceConfidence } from './merge.js';

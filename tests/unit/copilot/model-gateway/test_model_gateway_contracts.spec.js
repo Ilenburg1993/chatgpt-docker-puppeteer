@@ -62,6 +62,8 @@ import {
     createModelRouteOption,
     createProviderAccountOverlay,
     createProviderCatalogSource,
+    mergeModelMetadataEvidence,
+    rankCatalogEvidenceConfidence,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
     runConfiguredByokJsonProbe,
@@ -537,6 +539,58 @@ describe('model-gateway foundation', () => {
         const serialized = JSON.stringify({ evidence, route, overlay, projection });
         assert.equal(serialized.includes('sk-secret-that-must-not-leak'), false);
         assert.equal(serialized.includes('secret-token-that-must-not-leak'), false);
+    });
+
+    it('merges catalog evidence field-wise without letting poorer fresh facts erase richer metadata', () => {
+        const olderCatalog = createModelMetadataEvidence({
+            evidenceId: 'catalog-context',
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            fieldPath: 'limits.contextWindowTokens',
+            value: 131072,
+            sourceId: 'openrouter-models',
+            sourceKind: 'public_api',
+            confidence: 'catalog',
+            observedAt: '2026-05-24T00:00:00.000Z',
+        });
+        const newerHeuristic = createModelMetadataEvidence({
+            evidenceId: 'heuristic-context',
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            fieldPath: 'limits.contextWindowTokens',
+            value: 8192,
+            sourceId: 'name-parser',
+            sourceKind: 'heuristic',
+            confidence: 'heuristic',
+            observedAt: '2026-05-25T00:00:00.000Z',
+        });
+        const manualTools = createModelMetadataEvidence({
+            evidenceId: 'manual-tools',
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            fieldPath: 'capabilities.tools',
+            value: true,
+            sourceId: 'operator',
+            sourceKind: 'manual',
+            confidence: 'manual',
+            observedAt: '2026-05-25T01:00:00.000Z',
+        });
+
+        const merged = mergeModelMetadataEvidence([newerHeuristic, olderCatalog, manualTools]);
+
+        assert.equal(rankCatalogEvidenceConfidence('manual') > rankCatalogEvidenceConfidence('catalog'), true);
+        assert.equal(merged.projection.providerId, 'openrouter');
+        assert.equal(merged.projection.limits.contextWindowTokens, 131072);
+        assert.equal(merged.projection.capabilities.tools, true);
+        assert.equal(merged.projection.provenanceByField['limits.contextWindowTokens'], 'catalog-context');
+        assert.equal(merged.projection.confidenceByField['limits.contextWindowTokens'], 'catalog');
+        assert.deepEqual(merged.conflicts, [
+            {
+                fieldPath: 'limits.contextWindowTokens',
+                selectedEvidenceId: 'catalog-context',
+                conflictingEvidenceIds: ['heuristic-context'],
+            },
+        ]);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {
