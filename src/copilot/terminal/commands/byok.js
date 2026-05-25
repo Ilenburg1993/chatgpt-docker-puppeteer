@@ -32,6 +32,7 @@ import {
     listByokProviderModelHealth,
     listProviderEndpointInventory,
     mirrorModelGatewayCatalogSnapshotToSqlite,
+    mirrorByokProviderHealthToSqlite,
     readByokProviderHealthState,
     readByokProviderModelHealth,
     recommendCatalogDiffProbes,
@@ -1527,7 +1528,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>> | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>> | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1800,6 +1801,20 @@ async function renderByokGatewayCatalogSqliteMirror(println) {
 
 /**
  * @param {(text: string) => void} println
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayHealthSqliteMirror(println) {
+    const sqliteStore = new SqliteModelGatewayCatalogStore();
+    println(`\n  \x1b[36mBYOK model-gateway runtime health SQLite mirror\x1b[0m`);
+    println('  \x1b[90mfonte=byok-provider-health · destino=copilot.sqlite · runtime facts separados do catálogo\x1b[0m\n');
+    const result = await mirrorByokProviderHealthToSqlite({ sqliteStore });
+    println(
+        `    \x1b[32mhealth runtime espelhado no SQLite\x1b[0m  \x1b[90mrecords=${result.records} · observations=${result.healthObservations} · probes=${result.probeResults} · run=${result.runId}\x1b[0m\n`,
+    );
+}
+
+/**
+ * @param {(text: string) => void} println
  * @param {{ sqlite?: boolean }} [options]
  * @returns {Promise<void>}
  */
@@ -1848,14 +1863,31 @@ async function renderByokGatewayCatalogExplain(println, selector) {
         return;
     }
     const snapshot = await store.readSnapshot();
-    const explanation = explainModelGatewayCatalogEntry(snapshot, normalizedSelector);
+    let explanation = explainModelGatewayCatalogEntry(snapshot, normalizedSelector);
     if (!explanation.found || !explanation.projection) {
         println(
             `    \x1b[33mModelo não encontrado no snapshot atual.\x1b[0m  \x1b[90mnext=${explanation.nextActions.join(',')}\x1b[0m\n`,
         );
         return;
     }
+    try {
+        const runtime = await new SqliteModelGatewayCatalogStore().readRuntimeHealthForModel({
+            providerId: optionalScalarString(explanation.projection['providerId']),
+            providerModel: optionalScalarString(explanation.projection['providerModel']),
+            routeProfile: optionalScalarString(explanation.projection['routeProfile']),
+        });
+        explanation = explainModelGatewayCatalogEntry(snapshot, normalizedSelector, {
+            runtimeHealthRecords: runtime.health ? [runtime.health] : [],
+            runtimeProbeResults: runtime.probes,
+        });
+    } catch {
+        // SQLite runtime mirror is optional for explain; the catalog view remains useful without it.
+    }
     const projection = explanation.projection;
+    if (!projection) {
+        println('    \x1b[33mModelo não encontrado após juntar runtime health.\x1b[0m\n');
+        return;
+    }
     const eligibility = explanation.eligibility;
     println(`    \x1b[33m${explanation.key}\x1b[0m`);
     println(
@@ -1863,6 +1895,9 @@ async function renderByokGatewayCatalogExplain(println, selector) {
     );
     println(
         `      \x1b[90mroutes=${explanation.routeOptions.length} · overlays=${explanation.accountOverlays.length} · eligibility=${eligibility?.status ?? '-'} · openai.id=${explanation.openai?.id ?? '-'}\x1b[0m`,
+    );
+    println(
+        `      \x1b[90mruntimeHealth=${explanation.runtimeHealth?.status ?? '-'} · runtimeProbes=${explanation.runtimeProbes.length}\x1b[0m`,
     );
     println(
         `      \x1b[90mmetadata: confidenceFields=${explanation.metadataCoverage.confidenceFields} · provenanceFields=${explanation.metadataCoverage.provenanceFields} · supported=${explanation.metadataCoverage.supportedParameters} · unsupported=${explanation.metadataCoverage.unsupportedParameters}\x1b[0m`,
@@ -1911,6 +1946,46 @@ function parseByokGatewayCatalogSearchArgs(rest) {
 }
 
 /**
+ * @param {Record<string, unknown>} item
+ * @param {string | null} selector
+ * @returns {boolean}
+ */
+function matchesGatewayCatalogRecordSelector(item, selector) {
+    if (!selector) return true;
+    const normalized = selector.toLowerCase();
+    return [
+        item['providerId'],
+        item['providerModel'],
+        item['routeProfile'],
+        item['selectorKind'],
+        item['selectorSyntax'],
+        item['accountScope'],
+        item['secretRef'],
+        item['sourceId'],
+        optionalScalarString(asRecord(item['normalizedPolicy'])['routeLayer']),
+        optionalScalarString(asRecord(item['normalizedPolicy'])['wireApi']),
+    ]
+        .map((value) => optionalScalarString(value)?.toLowerCase() ?? '')
+        .some((value) => value.includes(normalized));
+}
+
+/**
+ * @param {string[]} rest
+ * @returns {{ selector: string | null; limit: number }}
+ */
+function parseGatewayCatalogListArgs(rest) {
+    const numeric = rest.map((item) => Number(item)).find((value) => Number.isFinite(value) && value > 0);
+    const selector =
+        rest
+            .map(optionalScalarString)
+            .find((item) => item && Number.isNaN(Number(item))) ?? null;
+    return {
+        selector,
+        limit: Math.min(Math.floor(numeric ?? 30), 150),
+    };
+}
+
+/**
  * @param {(text: string) => void} println
  * @param {string[]} rest
  * @returns {Promise<void>}
@@ -1934,6 +2009,67 @@ async function renderByokGatewayCatalogSearch(println, rest) {
             `      \x1b[90m${result.displayName} · routes=${result.routeOptionCount} · overlays=${result.accountOverlayCount} · matched=${result.matchedFields.slice(0, 4).join(',') || '-'}\x1b[0m`,
         );
     }
+    println('');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayRoutes(println, rest) {
+    const args = parseGatewayCatalogListArgs(rest);
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const snapshot = await store.readSnapshot();
+    const routes = snapshot.routeOptions.filter((route) => matchesGatewayCatalogRecordSelector(route, args.selector));
+    println(`\n  \x1b[36mBYOK model-gateway routes\x1b[0m`);
+    println(`  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · routes=${routes.length}/${snapshot.routeOptions.length}\x1b[0m\n`);
+    if (routes.length === 0) {
+        println('    \x1b[33mNenhuma route option encontrada para o filtro informado.\x1b[0m\n');
+        return;
+    }
+    for (const route of routes.slice(0, args.limit)) {
+        const policy = asRecord(route['normalizedPolicy']);
+        println(
+            `    \x1b[33m${optionalScalarString(route['providerId']) ?? '-'}:${optionalScalarString(route['providerModel']) ?? '-'}\x1b[0m  \x1b[90mrouteProfile=${optionalScalarString(route['routeProfile']) ?? 'default'} · selector=${optionalScalarString(route['selectorKind']) ?? '-'}:${optionalScalarString(route['selectorSyntax']) ?? '-'}\x1b[0m`,
+        );
+        println(
+            `      \x1b[90mlayer=${optionalScalarString(policy['routeLayer']) ?? '-'} · wire=${optionalScalarString(policy['wireApi']) ?? '-'} · source=${optionalScalarString(route['sourceId']) ?? '-'} · confidence=${optionalScalarString(route['confidence']) ?? '-'}\x1b[0m`,
+        );
+    }
+    if (routes.length > args.limit) println(`\n  \x1b[90mexibindo ${args.limit}/${routes.length}; use filtro ou limite numerico.\x1b[0m`);
+    println('');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayOverlays(println, rest) {
+    const args = parseGatewayCatalogListArgs(rest);
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const snapshot = await store.readSnapshot();
+    const overlays = snapshot.accountOverlays.filter((overlay) =>
+        matchesGatewayCatalogRecordSelector(overlay, args.selector),
+    );
+    println(`\n  \x1b[36mBYOK model-gateway account overlays\x1b[0m`);
+    println(
+        `  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · overlays=${overlays.length}/${snapshot.accountOverlays.length} · secret-safe=sim\x1b[0m\n`,
+    );
+    if (overlays.length === 0) {
+        println('    \x1b[33mNenhum account overlay encontrado para o filtro informado.\x1b[0m\n');
+        return;
+    }
+    for (const overlay of overlays.slice(0, args.limit)) {
+        const enabled = Array.isArray(overlay['enabledModels']) ? overlay['enabledModels'].length : 0;
+        const blocked = Array.isArray(overlay['blockedModels']) ? overlay['blockedModels'].length : 0;
+        println(
+            `    \x1b[33m${optionalScalarString(overlay['providerId']) ?? '-'}\x1b[0m  \x1b[90mscope=${optionalScalarString(overlay['accountScope']) ?? 'default'} · secretRef=${optionalScalarString(overlay['secretRef']) ?? '-'} · source=${optionalScalarString(overlay['sourceId']) ?? '-'} · confidence=${optionalScalarString(overlay['confidence']) ?? '-'}\x1b[0m`,
+        );
+        println(`      \x1b[90menabled=${enabled} · blocked=${blocked} · redaction=${optionalScalarString(overlay['redactionStatus']) ?? '-'}\x1b[0m`);
+    }
+    if (overlays.length > args.limit) println(`\n  \x1b[90mexibindo ${args.limit}/${overlays.length}; use filtro ou limite numerico.\x1b[0m`);
     println('');
 }
 
@@ -2549,6 +2685,18 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             /^(search|buscar|find|filter|filtrar)$/iu.test(rest[1] ?? '')
         ) {
             await renderByokGatewayCatalogSearch(println, rest.slice(2));
+            return;
+        }
+        if (/^(health|runtime-health|probes)$/iu.test(rest[0] ?? '') && /^(sqlite|sql|mirror|sync)$/iu.test(rest[1] ?? '')) {
+            await renderByokGatewayHealthSqliteMirror(println);
+            return;
+        }
+        if (/^(routes|route|rotas)$/iu.test(rest[0] ?? '')) {
+            await renderByokGatewayRoutes(println, rest.slice(1));
+            return;
+        }
+        if (/^(overlays|overlay|accounts|account|contas)$/iu.test(rest[0] ?? '')) {
+            await renderByokGatewayOverlays(println, rest.slice(1));
             return;
         }
         if (/^(eligibility|elegibilidade|eligible|exclusion|exclusao|exclusão)$/iu.test(rest[0] ?? '')) {

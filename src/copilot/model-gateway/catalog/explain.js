@@ -96,8 +96,53 @@ function overlayMentionsProjection(overlay, projection) {
 }
 
 /**
+ * @param {Record<string, unknown>} health
+ * @returns {'ok' | 'failed' | 'unknown'}
+ */
+function summarizeRuntimeHealthStatus(health) {
+    const lastStatus = optionalString(health['lastStatus']);
+    const agentStatus = optionalString(health['agentProbeStatus']);
+    if (lastStatus === 'failed' || agentStatus === 'failed') return 'failed';
+    if (lastStatus === 'ok' || agentStatus === 'ok') return 'ok';
+    return 'unknown';
+}
+
+/**
+ * @param {Record<string, unknown>} projection
+ * @param {Record<string, unknown>[]} rows
+ * @returns {Record<string, unknown> | null}
+ */
+function findRuntimeHealth(projection, rows) {
+    return (
+        rows.find(
+            (row) =>
+                optionalString(row['providerId']) === optionalString(projection['providerId']) &&
+                optionalString(row['providerModel']) === optionalString(projection['providerModel']) &&
+                ((optionalString(row['routeProfile']) ?? 'default') === (optionalString(projection['routeProfile']) ?? 'default') ||
+                    !optionalString(row['routeProfile'])),
+        ) ?? null
+    );
+}
+
+/**
+ * @param {Record<string, unknown>} projection
+ * @param {Record<string, unknown>[]} rows
+ * @returns {Record<string, unknown>[]}
+ */
+function findRuntimeProbes(projection, rows) {
+    return rows.filter(
+        (row) =>
+            optionalString(row['providerId']) === optionalString(projection['providerId']) &&
+            optionalString(row['providerModel']) === optionalString(projection['providerModel']) &&
+            ((optionalString(row['routeProfile']) ?? 'default') === (optionalString(projection['routeProfile']) ?? 'default') ||
+                !optionalString(row['routeProfile'])),
+    );
+}
+
+/**
  * @param {ReturnType<typeof import('./json-catalog-store.js').normalizeStoredCatalogSnapshot>} snapshot
  * @param {string} selector
+ * @param {{ runtimeHealthRecords?: Record<string, unknown>[]; runtimeProbeResults?: Record<string, unknown>[] }} [options]
  * @returns {{
  *   found: boolean;
  *   selector: string;
@@ -108,6 +153,8 @@ function overlayMentionsProjection(overlay, projection) {
  *   accountOverlays: Record<string, any>[];
  *   eligibility: ReturnType<typeof explainModelGatewayEligibilityDecision> | null;
  *   providerProjection: Record<string, any> | null;
+ *   runtimeHealth: { status: 'ok' | 'failed' | 'unknown'; record: Record<string, unknown> } | null;
+ *   runtimeProbes: Record<string, unknown>[];
  *   metadataCoverage: {
  *     confidenceFields: number;
  *     provenanceFields: number;
@@ -117,7 +164,7 @@ function overlayMentionsProjection(overlay, projection) {
  *   nextActions: string[];
  * }}
  */
-export function explainModelGatewayCatalogEntry(snapshot, selector) {
+export function explainModelGatewayCatalogEntry(snapshot, selector, options = {}) {
     const normalizedSelector = optionalString(selector) ?? '';
     const projection =
         snapshot.projections.find((item) => matchesProjectionSelector(item, normalizedSelector)) ?? null;
@@ -132,6 +179,8 @@ export function explainModelGatewayCatalogEntry(snapshot, selector) {
             accountOverlays: [],
             eligibility: null,
             providerProjection: null,
+            runtimeHealth: null,
+            runtimeProbes: [],
             metadataCoverage: {
                 confidenceFields: 0,
                 provenanceFields: 0,
@@ -159,8 +208,18 @@ export function explainModelGatewayCatalogEntry(snapshot, selector) {
     const provenanceByField = isRecord(projection['provenanceByField']) ? projection['provenanceByField'] : {};
     const supportedParameters = stringList(projection['supportedParameters']);
     const unsupportedParameters = stringList(projection['unsupportedParameters']);
+    const runtimeHealthRecord = findRuntimeHealth(projection, options.runtimeHealthRecords ?? []);
+    const runtimeProbes = findRuntimeProbes(projection, options.runtimeProbeResults ?? []);
+    const runtimeHealth = runtimeHealthRecord
+        ? {
+              status: summarizeRuntimeHealthStatus(runtimeHealthRecord),
+              record: runtimeHealthRecord,
+          }
+        : null;
     const nextActions = [
         ...(eligibility?.nextActions ?? []),
+        ...(runtimeHealth?.status === 'failed' ? ['inspect_or_clear_runtime_health_after_fix'] : []),
+        ...(runtimeProbes.length === 0 ? ['run_runtime_probes_for_current_route'] : []),
         ...(routeOptions.length === 0 ? ['collect_route_options_for_model'] : []),
         ...(accountOverlays.length === 0 ? ['collect_account_overlay_for_provider'] : []),
     ];
@@ -178,6 +237,8 @@ export function explainModelGatewayCatalogEntry(snapshot, selector) {
         accountOverlays,
         eligibility,
         providerProjection,
+        runtimeHealth,
+        runtimeProbes,
         metadataCoverage: {
             confidenceFields: Object.keys(confidenceByField).length,
             provenanceFields: Object.keys(provenanceByField).length,

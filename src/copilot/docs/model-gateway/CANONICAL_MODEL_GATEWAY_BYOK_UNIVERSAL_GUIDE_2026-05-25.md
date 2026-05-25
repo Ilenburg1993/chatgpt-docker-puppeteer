@@ -1349,7 +1349,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Excluir falhas quando policy manda.
 - [x] Classificação de falhas BYOK.
 - [ ] Integrar health fatal à elegibilidade pré-runtime.
-- [ ] Persistir health em SQLite.
+- [x] Persistir health em SQLite.
 
 ### Faixa G — Policy Engine
 
@@ -1496,8 +1496,8 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Search/filter.
 - [x] Explain por modelo.
 - [ ] Explain por provider.
-- [ ] Mostrar route options.
-- [ ] Mostrar overlays.
+- [x] Mostrar route options.
+- [x] Mostrar overlays.
 - [x] Mostrar projection OpenAI.
 - [ ] Mostrar conflito por campo.
 - [ ] Mostrar freshness por source.
@@ -1851,11 +1851,11 @@ Separação arquitetural reafirmada:
 Validação deste corte:
 
 - [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
-  com `84` testes.
+  com `85` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS `npm run lint:copilot`.
 - [x] PASS `git diff --check`.
-- [x] PASS `npm run test:copilot` com `5661` testes totais, `5628` passed,
+- [x] PASS `npm run test:copilot` com `5662` testes totais, `5629` passed,
   `33` pending, `0` failed e `0` warnings/errors.
 
 Próxima direção:
@@ -1866,4 +1866,12 @@ Próxima direção:
 - [x] Criar views/projeções OpenAI schema sobre o store SQLite.
 - [x] Criar explain por modelo combinando projection, route options, overlays e
   eligibility.
-- [ ] Expandir explain por modelo com health e probe results persistidos.
+- [x] Expandir explain por modelo com health e probe results persistidos.
+- [x] Criar mirror SQLite dos fatos runtime de BYOK health/probes sem mutar o
+  catálogo canônico.
+- [x] Expor `/byok gateway health sqlite` para materializar health/probes
+  operacionais no SQLite.
+- [x] Expor `/byok gateway routes [filtro] [n]` para inspecionar route options
+  sem runtime.
+- [x] Expor `/byok gateway overlays [filtro] [n]` para inspecionar account
+  overlays sem vazar segredos.

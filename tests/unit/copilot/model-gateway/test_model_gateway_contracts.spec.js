@@ -49,6 +49,7 @@ import {
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
     listModelGatewayRouteDecisions,
+    mirrorByokProviderHealthToSqlite,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     recordModelGatewayRouteDecision,
     resolveModelGatewayProviderAdapter,
@@ -1530,6 +1531,97 @@ describe('model-gateway foundation', () => {
             unsupportedParameters: 0,
         });
         assert.ok(explanation.nextActions.includes('run_runtime_probes:chat,agent'));
+    });
+
+    it('mirrors runtime health/probe facts into SQLite and joins them into catalog explain', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            const projection = createCanonicalModelProjection({
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                capabilities: { tools: true, streaming: true },
+            });
+            const snapshot = {
+                sources: [],
+                providerEvidences: [],
+                evidences: [],
+                routeOptions: [],
+                accountOverlays: [],
+                providerProjections: [],
+                projections: [projection],
+                importRuns: [],
+                rawPayloadRefs: [],
+                conflicts: [],
+                modelEligibilityRuns: [],
+                modelEligibilityDecisions: [],
+                schemaVersion: 1,
+                generatedAt: null,
+                source: 'unit-test',
+            };
+            const healthRecord = {
+                key: 'default|openrouter|openai/gpt-oss-120b',
+                routeProfile: 'default',
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                lastStatus: 'ok',
+                lastSuccessAt: 1_000,
+                successCount: 1,
+                failureCount: 0,
+                agentProbeStatus: 'ok',
+                lastAgentProbeSuccessAt: 1_500,
+                agentProbeSuccessCount: 1,
+                agentProbeFailureCount: 0,
+                probes: {
+                    chat: {
+                        kind: 'chat',
+                        status: 'ok',
+                        ok: true,
+                        providerAttempted: true,
+                        count: 1,
+                        successCount: 1,
+                        failureCount: 0,
+                        lastAt: 1_000,
+                    },
+                    agent: {
+                        kind: 'agent',
+                        status: 'ok',
+                        ok: true,
+                        providerAttempted: true,
+                        count: 1,
+                        successCount: 1,
+                        failureCount: 0,
+                        lastAt: 1_500,
+                    },
+                },
+            };
+
+            const mirrored = await mirrorByokProviderHealthToSqlite({
+                sqliteStore: store,
+                records: [healthRecord],
+                observedAt: 2_000,
+            });
+            const runtime = await store.readRuntimeHealthForModel({
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+            });
+            const explanation = explainModelGatewayCatalogEntry(snapshot, 'gpt-oss', {
+                runtimeHealthRecords: runtime.health ? [runtime.health] : [],
+                runtimeProbeResults: runtime.probes,
+            });
+
+            assert.equal(mirrored.records, 1);
+            assert.equal(mirrored.healthObservations, 1);
+            assert.equal(mirrored.probeResults, 2);
+            assert.equal(runtime.health?.['lastStatus'], 'ok');
+            assert.equal(runtime.probes.length, 2);
+            assert.equal(explanation.runtimeHealth?.status, 'ok');
+            assert.equal(explanation.runtimeProbes.length, 2);
+            assert.equal(explanation.nextActions.includes('run_runtime_probes_for_current_route'), false);
+        } finally {
+            db.close();
+        }
     });
 
     it('searches catalog metadata before runtime using routes, overlays and eligibility as ranking hints', () => {

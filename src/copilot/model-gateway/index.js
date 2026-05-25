@@ -214,6 +214,7 @@ export {
     clearByokProviderModelHealth,
     flushByokProviderHealth,
     listByokProviderModelHealth,
+    mirrorByokProviderHealthToSqlite,
     readByokProviderHealthState,
     readByokProviderModelHealth,
     recordByokProviderModelAgentProbeFailure,

@@ -23,10 +23,6 @@ const DEFAULT_POLICY_PROFILE = 'default';
 const DEFAULT_TASK_PROFILE = 'default';
 
 const DELETE_TABLES_IN_ORDER = Object.freeze([
-    'copilot_model_gateway_route_decisions',
-    'copilot_model_gateway_health_observations',
-    'copilot_model_gateway_runtime_probe_results',
-    'copilot_model_gateway_runtime_probe_runs',
     'copilot_model_gateway_eligibility_decisions',
     'copilot_model_gateway_eligibility_runs',
     'copilot_model_gateway_conflicts',
@@ -184,6 +180,48 @@ function readPayloadRows(db, table, orderBy) {
         .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
 }
 
+/**
+ * @param {Record<string, unknown>} row
+ * @returns {number}
+ */
+function latestRuntimeAt(row) {
+    return Math.max(
+        dateMs(row['lastFailureAt']) ?? 0,
+        dateMs(row['lastSuccessAt']) ?? 0,
+        dateMs(row['lastAgentProbeFailureAt']) ?? 0,
+        dateMs(row['lastAgentProbeSuccessAt']) ?? 0,
+    );
+}
+
+/**
+ * @param {Record<string, unknown>} record
+ * @returns {string}
+ */
+function runtimeHealthStatus(record) {
+    const lastStatus = optionalString(record['lastStatus']);
+    const agentStatus = optionalString(record['agentProbeStatus']);
+    const chatFailed = lastStatus === 'failed' && (dateMs(record['lastFailureAt']) ?? 0) >= (dateMs(record['lastSuccessAt']) ?? 0);
+    const agentFailed =
+        agentStatus === 'failed' &&
+        (dateMs(record['lastAgentProbeFailureAt']) ?? 0) >= (dateMs(record['lastAgentProbeSuccessAt']) ?? 0);
+    if (chatFailed || agentFailed) return 'failed';
+    if (lastStatus === 'ok' || agentStatus === 'ok') return 'ok';
+    return 'unknown';
+}
+
+/**
+ * @param {Record<string, unknown>} record
+ * @returns {string | null}
+ */
+function runtimeFailureContext(record) {
+    return (
+        optionalString(record['lastErrorContext']) ??
+        optionalString(record['lastAgentProbeErrorContext']) ??
+        optionalString(record['lastMessage']) ??
+        optionalString(record['lastAgentProbeMessage'])
+    );
+}
+
 export class SqliteModelGatewayCatalogStore {
     /** @type {import('better-sqlite3').Database} */
     #db;
@@ -244,6 +282,154 @@ export class SqliteModelGatewayCatalogStore {
             providerProjections: snapshot.providerProjections,
             eligibilityDecisions: snapshot.modelEligibilityDecisions,
         });
+    }
+
+    /**
+     * @param {Record<string, unknown>[]} records
+     * @param {{ runId?: string; observedAt?: string | number | Date }} [options]
+     * @returns {Promise<{ runId: string; healthObservations: number; probeResults: number }>}
+     */
+    async writeRuntimeHealthRecords(records, options = {}) {
+        const observedAtMs = dateMs(options.observedAt) ?? Date.now();
+        const runId = optionalString(options.runId) ?? `model-gateway:runtime-health:${observedAtMs}`;
+        let healthObservations = 0;
+        let probeResults = 0;
+        const tx = this.#db.transaction(() => {
+            this.#db.prepare('DELETE FROM copilot_model_gateway_runtime_probe_results').run();
+            this.#db.prepare('DELETE FROM copilot_model_gateway_runtime_probe_runs').run();
+            this.#db.prepare('DELETE FROM copilot_model_gateway_health_observations').run();
+            const insertRun = this.#db.prepare(`
+                INSERT INTO copilot_model_gateway_runtime_probe_runs
+                    (run_id, probe_profile, account_scope, status, started_at_ms, completed_at_ms,
+                     model_count, success_count, failure_count, skipped_count, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+            const insertHealth = this.#db.prepare(`
+                INSERT INTO copilot_model_gateway_health_observations
+                    (observation_key, provider_id, provider_model, route_profile, health_scope, status,
+                     classified_failure, observed_at_ms, expires_at_ms, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+            const insertProbe = this.#db.prepare(`
+                INSERT INTO copilot_model_gateway_runtime_probe_results
+                    (result_key, run_id, provider_id, provider_model, route_profile, probe_kind, wire_api,
+                     ok, status, observed_at_ms, expires_at_ms, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+            let probeSuccessCount = 0;
+            let probeFailureCount = 0;
+            insertRun.run(
+                runId,
+                'byok-operational-health',
+                DEFAULT_ACCOUNT_SCOPE,
+                'completed',
+                observedAtMs,
+                observedAtMs,
+                records.length,
+                0,
+                0,
+                0,
+                payloadJson({ source: 'byok-provider-health', records: records.length }),
+            );
+            for (const record of records.filter(isRecord)) {
+                const observed = latestRuntimeAt(record) || observedAtMs;
+                const status = runtimeHealthStatus(record);
+                const healthKey = optionalString(record['key']) ?? `${routeProfile(record)}|${providerId(record)}|${providerModel(record)}`;
+                insertHealth.run(
+                    healthKey,
+                    providerId(record),
+                    providerModel(record),
+                    routeProfile(record),
+                    'runtime',
+                    status,
+                    runtimeFailureContext(record),
+                    observed,
+                    null,
+                    payloadJson(record),
+                );
+                healthObservations += 1;
+                const probes = isRecord(record['probes']) ? record['probes'] : {};
+                for (const [probeKind, probeValue] of Object.entries(probes)) {
+                    if (!isRecord(probeValue)) continue;
+                    const ok = probeValue['ok'] === true;
+                    if (ok) probeSuccessCount += 1;
+                    else probeFailureCount += 1;
+                    insertProbe.run(
+                        `${healthKey}:${probeKind}`,
+                        runId,
+                        providerId(record),
+                        providerModel(record),
+                        routeProfile(record),
+                        probeKind,
+                        optionalString(probeValue['wireApi']),
+                        ok ? 1 : 0,
+                        optionalString(probeValue['status']) ?? 'unknown',
+                        dateMs(probeValue['lastAt']) ?? observed,
+                        null,
+                        payloadJson({ ...probeValue, providerId: providerId(record), providerModel: providerModel(record), routeProfile: routeProfile(record) }),
+                    );
+                    probeResults += 1;
+                }
+            }
+            this.#db
+                .prepare(
+                    `
+                        UPDATE copilot_model_gateway_runtime_probe_runs
+                        SET success_count = ?, failure_count = ?, payload_json = ?
+                        WHERE run_id = ?
+                    `,
+                )
+                .run(
+                    probeSuccessCount,
+                    probeFailureCount,
+                    payloadJson({ source: 'byok-provider-health', records: records.length, probeResults }),
+                    runId,
+                );
+        });
+        tx();
+        return { runId, healthObservations, probeResults };
+    }
+
+    /**
+     * @param {{ providerId?: string | null; providerModel?: string | null; routeProfile?: string | null }} input
+     * @returns {Promise<{ health: Record<string, unknown> | null; probes: Record<string, unknown>[] }>}
+     */
+    async readRuntimeHealthForModel(input) {
+        const provider = optionalString(input.providerId);
+        const model = optionalString(input.providerModel);
+        if (!provider || !model) return { health: null, probes: [] };
+        const route = optionalString(input.routeProfile) ?? DEFAULT_ROUTE_PROFILE;
+        const healthRows = this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_health_observations
+                    WHERE provider_id = ?
+                      AND provider_model = ?
+                      AND (route_profile = ? OR ? = ?)
+                    ORDER BY observed_at_ms DESC
+                    LIMIT 1
+                `,
+            )
+            .all(provider, model, route, route, DEFAULT_ROUTE_PROFILE)
+            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+        const probes = this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_runtime_probe_results
+                    WHERE provider_id = ?
+                      AND provider_model = ?
+                      AND (route_profile = ? OR ? = ?)
+                    ORDER BY observed_at_ms DESC, probe_kind ASC
+                `,
+            )
+            .all(provider, model, route, route, DEFAULT_ROUTE_PROFILE)
+            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+        return {
+            health: healthRows[0] ?? null,
+            probes,
+        };
     }
 
     /**
