@@ -40,6 +40,7 @@ export {
     toOpenAIModelCatalogList,
 } from './openai-schema.js';
 export {
+    normalizeAccountOverlayControls,
     normalizeCatalogModalities,
     normalizeModelAliases,
     normalizeModelLifecycle,

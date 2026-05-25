@@ -70,6 +70,7 @@ import {
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
     mergeModelMetadataEvidence,
+    normalizeAccountOverlayControls,
     normalizeModelAliases,
     normalizeModelLifecycle,
     normalizeModelModalities,
@@ -1080,6 +1081,55 @@ describe('model-gateway foundation', () => {
                 status: 'scheduled_retirement',
             },
         );
+    });
+
+    it('normalizes account overlay controls separately from runtime proof', () => {
+        const controls = normalizeAccountOverlayControls({
+            enabledModels: ['gpt-paid', 'gpt-paid', 'gpt-free'],
+            blockedModels: ['legacy-disabled'],
+            byokProviderKeys: ['anthropic', 'openai'],
+            dailyRequests: '1000',
+            dailyTokens: 250000,
+            monthlyBudgetUsd: '75.5',
+            remainingCreditsUsd: 12,
+            maxConcurrentRequests: 5,
+            requestsPerMinute: 60,
+            tokensPerMinute: '90000',
+            requestsPerDay: 1000,
+            hardLimitUsd: 100,
+            remainingUsd: '12.25',
+            billingStatus: 'active',
+            plan: 'team',
+            freeTier: 'false',
+            providerMetadata: { endpoint: '/account/limits' },
+        });
+
+        assert.deepEqual(controls.enabledModels, ['gpt-paid', 'gpt-free']);
+        assert.deepEqual(controls.blockedModels, ['legacy-disabled']);
+        assert.deepEqual(controls.byokProviderKeys, ['anthropic', 'openai']);
+        assert.deepEqual(controls.quota, {
+            dailyRequests: 1000,
+            dailyTokens: 250000,
+            monthlyBudgetUsd: 75.5,
+            remainingCreditsUsd: 12,
+            maxConcurrentRequests: 5,
+        });
+        assert.deepEqual(controls.rateLimits, {
+            requestsPerMinute: 60,
+            tokensPerMinute: 90000,
+            requestsPerDay: 1000,
+        });
+        assert.deepEqual(controls.spendingLimits, {
+            currency: 'USD',
+            hardLimitUsd: 100,
+            remainingUsd: 12.25,
+        });
+        assert.deepEqual(controls.providerMetadata, {
+            endpoint: '/account/limits',
+            billingStatus: 'active',
+            plan: 'team',
+            freeTier: false,
+        });
     });
 
     it('refreshes catalog snapshots, replaces source evidence, diffs projections and emits OpenAI schema', async () => {

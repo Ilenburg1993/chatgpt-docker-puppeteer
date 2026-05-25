@@ -570,7 +570,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] Expandir parser de aliases/versionamento para famílias, tamanho, quantização, instruct/coder/reasoning e variants.
 - [ ] Criar normalizador de providers/gateways que separe `direct_provider`, `aggregator`, `gateway`,
   `openai_compatible_proxy`, `local_daemon` e `sdk_native`.
-- [ ] Criar normalizador de overlays de conta: allow/block lists, organization headers, spending limits, quotas, free
+- [x] Criar normalizador de overlays de conta: allow/block lists, organization headers, spending limits, quotas, free
   tiers e BYOK interno por provider.
 - [ ] Criar heuristics engine com confidence baixa e sempre sobrescrevível por catálogo/probe/manual.
 - [ ] Criar detector de conflitos por campo e comando de operador para listar conflitos de metadata.
@@ -1585,3 +1585,42 @@ Próxima direção:
 
 - Começar a estruturar overlays account-scoped para outros providers e um contrato normalizado para quotas,
   rate limits, billing/free-tier e allow/block lists quando os endpoints oferecerem esses campos.
+
+## 28. Continuidade 2026-05-25 — normalização de controles de overlay
+
+Implementado neste corte:
+
+- `normalizeAccountOverlayControls()` cria uma camada comum para informações autenticadas por conta/key:
+  - `enabledModels`;
+  - `blockedModels`;
+  - `byokProviderKeys`;
+  - `quota.dailyRequests`, `quota.dailyTokens`, `quota.monthlyBudgetUsd`, `quota.remainingCreditsUsd`,
+    `quota.maxConcurrentRequests`;
+  - `rateLimits.requestsPerMinute`, `rateLimits.tokensPerMinute`, `rateLimits.requestsPerDay`,
+    `rateLimits.tokensPerDay`, `rateLimits.concurrentRequests`;
+  - `spendingLimits.currency`, `spendingLimits.hardLimitUsd`, `spendingLimits.softLimitUsd`,
+    `spendingLimits.remainingUsd`;
+  - `providerMetadata.billingStatus`, `providerMetadata.plan`, `providerMetadata.freeTier` e metadados nativos.
+- `OpenAIModelsImporter` já usa esse normalizador para montar o overlay de `/v1/models`.
+- O normalizador fica exportado pelos barrels do catálogo e de `src/copilot/model-gateway`.
+
+Separação arquitetural reafirmada:
+
+- Quotas, billing, plano e listas allow/block são controles de conta.
+- Esses controles podem restringir a seleção inicial, mas ainda não provam que um modelo responde uma chamada real.
+- Provas de chat/stream/tools/JSON/visão/reasoning continuam reservadas para probes runtime.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`45` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5618` testes totais, `5585` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T16-04-12-369Z/summary.md`).
+
+Próxima direção:
+
+- Expandir providers/importers para preencher esse contrato quando endpoints autenticados oferecerem quotas,
+  saldo, plano, allow/block lists ou BYOK interno.

@@ -29,6 +29,7 @@ export {
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
     mergeModelMetadataEvidence,
+    normalizeAccountOverlayControls,
     normalizeCatalogModalities,
     normalizeModelAliases,
     normalizeModelLifecycle,

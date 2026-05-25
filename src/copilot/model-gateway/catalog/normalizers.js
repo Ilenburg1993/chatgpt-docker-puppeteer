@@ -53,6 +53,41 @@ function finiteNumber(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function stringArray(value) {
+    if (!Array.isArray(value)) return [];
+    return [
+        ...new Set(
+            value
+                .map((item) => scalarString(item))
+                .filter((item) => item !== null),
+        ),
+    ];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean | null}
+ */
+function booleanValue(value) {
+    if (typeof value === 'boolean') return value;
+    const text = scalarString(value)?.toLowerCase();
+    if (text === 'true') return true;
+    if (text === 'false') return false;
+    return null;
+}
+
+/**
  * @param {unknown} values
  * @returns {string[]}
  */
@@ -274,4 +309,101 @@ export function normalizeModelLifecycle(input = {}) {
     else if (expiresAt) lifecycle['status'] = 'scheduled_retirement';
     else lifecycle['status'] = 'active';
     return lifecycle;
+}
+
+/**
+ * @param {Record<string, unknown>} fields
+ * @returns {Record<string, number>}
+ */
+function nonNegativeNumberRecord(fields) {
+    /** @type {Record<string, number>} */
+    const record = {};
+    for (const [key, value] of Object.entries(fields)) {
+        const number = finiteNumber(value);
+        if (number !== null && number >= 0) record[key] = number;
+    }
+    return record;
+}
+
+/**
+ * @param {object} [input]
+ * @param {unknown} [input.enabledModels]
+ * @param {unknown} [input.blockedModels]
+ * @param {unknown} [input.byokProviderKeys]
+ * @param {unknown} [input.dailyRequests]
+ * @param {unknown} [input.dailyTokens]
+ * @param {unknown} [input.monthlyBudgetUsd]
+ * @param {unknown} [input.remainingCreditsUsd]
+ * @param {unknown} [input.maxConcurrentRequests]
+ * @param {unknown} [input.requestsPerMinute]
+ * @param {unknown} [input.tokensPerMinute]
+ * @param {unknown} [input.requestsPerDay]
+ * @param {unknown} [input.tokensPerDay]
+ * @param {unknown} [input.concurrentRequests]
+ * @param {unknown} [input.hardLimitUsd]
+ * @param {unknown} [input.softLimitUsd]
+ * @param {unknown} [input.remainingUsd]
+ * @param {unknown} [input.currency]
+ * @param {unknown} [input.billingStatus]
+ * @param {unknown} [input.plan]
+ * @param {unknown} [input.freeTier]
+ * @param {unknown} [input.providerMetadata]
+ * @returns {{
+ *   enabledModels?: string[];
+ *   blockedModels?: string[];
+ *   byokProviderKeys?: string[];
+ *   quota: Record<string, number>;
+ *   rateLimits: Record<string, number>;
+ *   spendingLimits: Record<string, string | number>;
+ *   providerMetadata: Record<string, unknown>;
+ * }}
+ */
+export function normalizeAccountOverlayControls(input = {}) {
+    const enabledModels = stringArray(input.enabledModels);
+    const blockedModels = stringArray(input.blockedModels);
+    const byokProviderKeys = stringArray(input.byokProviderKeys);
+    const quota = nonNegativeNumberRecord({
+        dailyRequests: input.dailyRequests,
+        dailyTokens: input.dailyTokens,
+        monthlyBudgetUsd: input.monthlyBudgetUsd,
+        remainingCreditsUsd: input.remainingCreditsUsd,
+        maxConcurrentRequests: input.maxConcurrentRequests,
+    });
+    const rateLimits = nonNegativeNumberRecord({
+        requestsPerMinute: input.requestsPerMinute,
+        tokensPerMinute: input.tokensPerMinute,
+        requestsPerDay: input.requestsPerDay,
+        tokensPerDay: input.tokensPerDay,
+        concurrentRequests: input.concurrentRequests,
+    });
+    const spending = nonNegativeNumberRecord({
+        hardLimitUsd: input.hardLimitUsd,
+        softLimitUsd: input.softLimitUsd,
+        remainingUsd: input.remainingUsd,
+    });
+    const currency = scalarString(input.currency)?.toUpperCase();
+    /** @type {Record<string, string | number>} */
+    const spendingLimits = {
+        ...(Object.keys(spending).length > 0 ? { currency: currency ?? 'USD' } : {}),
+        ...spending,
+    };
+    /** @type {Record<string, unknown>} */
+    const providerMetadata = {
+        ...(isRecord(input.providerMetadata) ? input.providerMetadata : {}),
+    };
+    const billingStatus = scalarString(input.billingStatus);
+    const plan = scalarString(input.plan);
+    const freeTier = booleanValue(input.freeTier);
+    if (billingStatus) providerMetadata['billingStatus'] = billingStatus;
+    if (plan) providerMetadata['plan'] = plan;
+    if (freeTier !== null) providerMetadata['freeTier'] = freeTier;
+    return {
+        ...(enabledModels.length > 0 ? { enabledModels } : {}),
+        ...(blockedModels.length > 0 ? { blockedModels } : {}),
+        ...(byokProviderKeys.length > 0 ? { byokProviderKeys } : {}),
+        quota,
+        rateLimits,
+        spendingLimits,
+        providerMetadata,
+    };
 }

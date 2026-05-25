@@ -13,6 +13,7 @@ import {
     createModelMetadataEvidence,
     createProviderAccountOverlay,
 } from '../contracts.js';
+import { normalizeAccountOverlayControls } from '../normalizers.js';
 
 export const OPENAI_MODELS_CATALOG_URL = 'https://api.openai.com/v1/models';
 
@@ -128,6 +129,13 @@ export function createOpenAIModelsImporter(options = {}) {
             const enabledModels = rows
                 .map((row) => stringValue(isRecord(row) ? row['id'] : null))
                 .filter((id) => id !== null);
+            const controls = normalizeAccountOverlayControls({
+                enabledModels,
+                providerMetadata: {
+                    endpoint: '/v1/models',
+                    semantics: 'account_visible_models',
+                },
+            });
             return [
                 createProviderAccountOverlay({
                     accountOverlayId: `openai:${options.accountScope ?? 'default'}:${options.secretRef ?? 'OPENAI_API_KEY'}:${sourceId}`,
@@ -138,11 +146,11 @@ export function createOpenAIModelsImporter(options = {}) {
                     sourceId,
                     sourceKind: 'authenticated_api',
                     confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG,
-                    enabledModels,
-                    providerMetadata: {
-                        endpoint: '/v1/models',
-                        semantics: 'account_visible_models',
-                    },
+                    enabledModels: controls.enabledModels,
+                    quota: controls.quota,
+                    rateLimits: controls.rateLimits,
+                    spendingLimits: controls.spendingLimits,
+                    providerMetadata: controls.providerMetadata,
                 }),
             ];
         },
