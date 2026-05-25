@@ -577,6 +577,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   `max_context_length`, deprecation e replacement.
 - [x] Implementar `GroqModelsImporter` para `/openai/v1/models` e `retrieve model`, capturando `context_window`,
   `active` e metadata account-scoped.
+- [x] Complementar `GroqModelsImporter` com `max_completion_tokens`, batch endpoint e hints de tools/JSON/streaming.
 - [ ] Complementar `GroqModelsImporter` com seeds/docs oficiais de pricing, model cards, built-in tools e limites de
   rate por tier/modelo.
 - [x] Implementar `OllamaCatalogImporter` para `/api/tags` + `/api/show`.
@@ -3028,3 +3029,52 @@ Validação deste corte até agora:
 Próxima direção:
 
 - Commitar/pushar e continuar para seeds oficiais ou Groq pricing/model cards.
+
+## 56. Continuidade 2026-05-25 — Groq max output, batch e capability hints da API
+
+Investigação oficial:
+
+- A referência oficial Groq API expõe `GET /openai/v1/models/{model}` com `context_window`,
+  `max_completion_tokens`, `active` e `public_apps`.
+- A mesma referência documenta `POST /openai/v1/batches` para batch jobs sobre `/v1/chat/completions`.
+- A página oficial de pricing/modelos do Groq é rica, mas HTML/docs-pricing deve entrar como fonte separada posterior
+  para preços, model cards, velocidades, rate limits e built-in tools.
+
+Implementado neste corte:
+
+- `GroqModelsImporter` agora normaliza `max_completion_tokens` em `limits.maxOutputTokens`.
+- O importer preserva `providerMetadata.groq.maxCompletionTokens`.
+- O importer preserva `providerMetadata.groq.batchEndpoint=/openai/v1/batches`.
+- Capability hints por id foram ampliados:
+  - modelos chat recebem `chat`, `streaming`, `tools` e `jsonMode`;
+  - famílias `gpt-oss`, `qwen3` e `deepseek-r1` recebem `reasoning`;
+  - modelos `compound` recebem `webSearch` e `codeExecution`;
+  - Whisper continua ASR, sem ser tratado como chat.
+- Route options Groq agora declaram:
+  - `supportsBatch`;
+  - `supportsTools`;
+  - `supportsStreaming`;
+  - `batchEndpoint`.
+- O overlay Groq também preserva `batchEndpoint`, mantendo a informação account-scoped sem serializar segredo.
+
+Separação arquitetural reafirmada:
+
+- `max_completion_tokens` e batch endpoint vêm da API/referência e são metadados de catálogo/rota.
+- Pricing, TPS e rate limits da página oficial do Groq exigem importer docs próprio, porque são globais e não provam
+  acesso real pela key do operador.
+- Runtime probes continuam responsáveis por provar chamadas reais de chat, streaming, JSON, tools, compound systems e
+  limites práticos.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`65` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5642` testes totais, `5609` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T20-46-17-626Z/summary.md`).
+
+Próxima direção:
+
+- Commitar/pushar este pacote e continuar para parser docs-pricing Groq ou seeds oficiais de provider.

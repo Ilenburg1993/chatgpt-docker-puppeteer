@@ -2019,6 +2019,7 @@ describe('model-gateway foundation', () => {
                             owned_by: 'OpenAI',
                             active: true,
                             context_window: 131072,
+                            max_completion_tokens: 32768,
                             public_apps: ['playground'],
                         }),
                     });
@@ -2034,6 +2035,7 @@ describe('model-gateway foundation', () => {
                             owned_by: 'groq',
                             active: false,
                             context_window: 8192,
+                            max_completion_tokens: 4096,
                         }),
                     });
                 }
@@ -2054,13 +2056,18 @@ describe('model-gateway foundation', () => {
         assert.equal(requests[1].url, 'https://api.groq.com/openai/v1/models/openai%2Fgpt-oss-120b');
         assert.equal(snapshot.sources[0].providerId, 'groq');
         assert.equal(byModel.get('groq:openai/gpt-oss-120b:limits.contextWindowTokens'), 131072);
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:limits.maxOutputTokens'), 32768);
         assert.equal(byModel.get('groq:openai/gpt-oss-120b:capabilities.chat'), true);
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:capabilities.tools'), true);
         assert.equal(byModel.get('groq:openai/gpt-oss-120b:capabilities.reasoning'), true);
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:providerMetadata.groq.maxCompletionTokens'), 32768);
         assert.deepEqual(byModel.get('groq:openai/gpt-oss-120b:providerMetadata.groq.publicApps'), ['playground']);
         assert.equal(byModel.get('groq:old-model:providerMetadata.groq.active'), false);
         assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['openai/gpt-oss-120b']);
         assert.deepEqual(snapshot.accountOverlays[0].blockedModels, ['old-model']);
         assert.equal(snapshot.routeOptions[0].normalizedPolicy.openAICompatibleBaseUrl, 'https://api.groq.com/openai/v1');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.supportsBatch, true);
+        assert.equal(snapshot.accountOverlays[0].providerMetadata.batchEndpoint, '/openai/v1/batches');
     });
 
     it('imports Hugging Face Inference Providers variants and route selectors', async () => {

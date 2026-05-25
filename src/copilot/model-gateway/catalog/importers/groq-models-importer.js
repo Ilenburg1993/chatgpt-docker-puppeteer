@@ -77,9 +77,18 @@ function capabilitiesFromModelId(providerModel) {
     /** @type {Record<string, boolean>} */
     const capabilities = {};
     if (lower.includes('whisper')) capabilities['asr'] = true;
-    else capabilities['chat'] = true;
+    else {
+        capabilities['chat'] = true;
+        capabilities['streaming'] = true;
+        capabilities['tools'] = true;
+        capabilities['jsonMode'] = true;
+    }
     if (lower.includes('gpt-oss') || lower.includes('qwen3') || lower.includes('deepseek-r1')) {
         capabilities['reasoning'] = true;
+    }
+    if (lower.includes('compound')) {
+        capabilities['webSearch'] = true;
+        capabilities['codeExecution'] = true;
     }
     return capabilities;
 }
@@ -106,7 +115,10 @@ function modelEvidenceValues(row) {
         providerModel,
     });
     const aliases = normalizeModelAliases({ providerModel });
-    const limits = normalizeModelTokenLimits({ contextWindowTokens: row['context_window'] });
+    const limits = normalizeModelTokenLimits({
+        contextWindowTokens: row['context_window'],
+        maxOutputTokens: row['max_completion_tokens'],
+    });
     const capabilities = providerModel ? capabilitiesFromModelId(providerModel) : {};
     const modalities = providerModel ? modalitiesFromModelId(providerModel) : { input: ['text'], output: ['text'] };
     const values = [
@@ -120,7 +132,9 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.groq.object', value: stringValue(row['object']) },
         { fieldPath: 'providerMetadata.groq.active', value: typeof row['active'] === 'boolean' ? row['active'] : null },
         { fieldPath: 'providerMetadata.groq.contextWindow', value: finiteNumber(row['context_window']) },
+        { fieldPath: 'providerMetadata.groq.maxCompletionTokens', value: finiteNumber(row['max_completion_tokens']) },
         { fieldPath: 'providerMetadata.groq.publicApps', value: row['public_apps'] ?? null },
+        { fieldPath: 'providerMetadata.groq.batchEndpoint', value: '/openai/v1/batches' },
         { fieldPath: 'openai.created', value: finiteNumber(row['created']) },
         { fieldPath: 'openai.owned_by', value: stringValue(row['owned_by']) ?? 'groq' },
     ];
@@ -208,6 +222,7 @@ export function createGroqModelsImporter(options = {}) {
                 const record = isRecord(row) ? row : {};
                 const providerModel = stringValue(record['id']);
                 if (!providerModel) return [];
+                const capabilities = capabilitiesFromModelId(providerModel);
                 return [
                     createModelRouteOption({
                         providerId: 'groq',
@@ -221,6 +236,10 @@ export function createGroqModelsImporter(options = {}) {
                             routeLayer: 'openai_compatible',
                             openAICompatibleBaseUrl: GROQ_OPENAI_BASE_URL,
                             active: record['active'] !== false,
+                            supportsBatch: record['active'] !== false && capabilities['chat'] === true,
+                            supportsTools: capabilities['tools'] === true,
+                            supportsStreaming: capabilities['streaming'] === true,
+                            batchEndpoint: '/openai/v1/batches',
                         },
                     }),
                 ];
@@ -242,6 +261,7 @@ export function createGroqModelsImporter(options = {}) {
                 providerMetadata: {
                     endpoint: '/openai/v1/models',
                     retrieveEndpoint: '/openai/v1/models/{model}',
+                    batchEndpoint: '/openai/v1/batches',
                     semantics: 'account_visible_models',
                     openAICompatible: true,
                 },
