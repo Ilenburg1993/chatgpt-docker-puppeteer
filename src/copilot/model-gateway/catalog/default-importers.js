@@ -11,6 +11,7 @@
 import {
     createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
+    createGeminiModelsImporter,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
     createMistralModelsImporter,
@@ -104,6 +105,16 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                 fetchImpl: options.fetchImpl,
                 apiKey: anthropicSecret.value,
                 secretRef: anthropicSecret.key,
+            }),
+        );
+    }
+    const geminiSecret = readEnvSecret(env, ['GEMINI_API_KEY', 'GOOGLE_API_KEY']);
+    if (includeAuthenticated && geminiSecret) {
+        importers.push(
+            createGeminiModelsImporter({
+                fetchImpl: options.fetchImpl,
+                apiKey: geminiSecret.value,
+                secretRef: geminiSecret.key,
             }),
         );
     }

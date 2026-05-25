@@ -63,6 +63,7 @@ import {
     JsonModelGatewayCatalogStore,
     createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
+    createGeminiModelsImporter,
     createMistralModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
@@ -1587,6 +1588,126 @@ describe('model-gateway foundation', () => {
         assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:providerMetadata.anthropic.type'), 'model');
     });
 
+    it('imports Gemini list and get metadata with limits, methods and route policy', async () => {
+        const secret = 'gemini-secret-that-must-not-leak';
+        /** @type {string[]} */
+        const requestUrls = [];
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (url) => {
+                requestUrls.push(String(url));
+                const parsedUrl = new URL(String(url));
+                assert.equal(parsedUrl.searchParams.get('key'), secret);
+                if (parsedUrl.pathname.endsWith('/models') && !parsedUrl.searchParams.get('pageToken')) {
+                    return /** @type {Response} */ ({
+                        ok: true,
+                        status: 200,
+                        json: async () => ({
+                            models: [
+                                {
+                                    name: 'models/gemini-2.5-flash',
+                                    baseModelId: 'gemini-2.5-flash',
+                                    version: '001',
+                                    displayName: 'Gemini 2.5 Flash',
+                                    description: 'Fast multimodal model.',
+                                    inputTokenLimit: 1048576,
+                                    outputTokenLimit: 65536,
+                                    supportedGenerationMethods: ['generateContent', 'countTokens'],
+                                    thinking: true,
+                                    temperature: 1,
+                                    maxTemperature: 2,
+                                    topP: 0.95,
+                                    topK: 64,
+                                },
+                            ],
+                            nextPageToken: 'next-page',
+                        }),
+                    });
+                }
+                if (parsedUrl.pathname.endsWith('/models') && parsedUrl.searchParams.get('pageToken') === 'next-page') {
+                    return /** @type {Response} */ ({
+                        ok: true,
+                        status: 200,
+                        json: async () => ({
+                            models: [
+                                {
+                                    name: 'models/text-embedding-004',
+                                    baseModelId: 'text-embedding-004',
+                                    displayName: 'Text Embedding 004',
+                                    inputTokenLimit: 2048,
+                                    outputTokenLimit: 1,
+                                    supportedGenerationMethods: ['embedContent', 'batchEmbedContents'],
+                                },
+                            ],
+                        }),
+                    });
+                }
+                if (parsedUrl.pathname.endsWith('/models/gemini-2.5-flash')) {
+                    return /** @type {Response} */ ({
+                        ok: true,
+                        status: 200,
+                        json: async () => ({
+                            name: 'models/gemini-2.5-flash',
+                            baseModelId: 'gemini-2.5-flash',
+                            version: '002',
+                            displayName: 'Gemini 2.5 Flash Latest',
+                            supportedGenerationMethods: ['generateContent', 'streamGenerateContent', 'countTokens'],
+                            thinking: true,
+                        }),
+                    });
+                }
+                if (parsedUrl.pathname.endsWith('/models/text-embedding-004')) {
+                    return /** @type {Response} */ ({
+                        ok: true,
+                        status: 200,
+                        json: async () => ({
+                            name: 'models/text-embedding-004',
+                            supportedGenerationMethods: ['embedContent', 'batchEmbedContents'],
+                        }),
+                    });
+                }
+                return /** @type {Response} */ ({ ok: false, status: 404, json: async () => ({}) });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [
+                createGeminiModelsImporter({
+                    fetchImpl: fakeFetch,
+                    apiKey: secret,
+                    secretRef: 'GEMINI_API_KEY',
+                }),
+            ],
+            now: () => new Date('2026-05-25T13:20:00.000Z'),
+        });
+        const byModel = new Map(
+            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+        );
+
+        assert.equal(requestUrls.length, 4);
+        assert.equal(new URL(requestUrls[0]).searchParams.get('pageSize'), '1000');
+        assert.equal(new URL(requestUrls[1]).searchParams.get('pageToken'), 'next-page');
+        assert.equal(JSON.stringify(snapshot).includes(secret), false);
+        assert.equal(snapshot.sources[0].providerId, 'gemini');
+        assert.equal(snapshot.accountOverlays[0].secretRef, 'GEMINI_API_KEY');
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['gemini-2.5-flash', 'text-embedding-004']);
+        assert.equal(snapshot.accountOverlays[0].providerMetadata.authPlacement, 'query_key');
+        assert.equal(byModel.get('gemini:gemini-2.5-flash:displayName'), 'Gemini 2.5 Flash Latest');
+        assert.equal(byModel.get('gemini:gemini-2.5-flash:limits.contextWindowTokens'), 1048576);
+        assert.equal(byModel.get('gemini:gemini-2.5-flash:limits.maxOutputTokens'), 65536);
+        assert.equal(byModel.get('gemini:gemini-2.5-flash:capabilities.chat'), true);
+        assert.equal(byModel.get('gemini:gemini-2.5-flash:capabilities.streaming'), true);
+        assert.equal(byModel.get('gemini:gemini-2.5-flash:capabilities.reasoning'), true);
+        assert.equal(byModel.get('gemini:gemini-2.5-flash:providerMetadata.gemini.version'), '002');
+        assert.deepEqual(byModel.get('gemini:gemini-2.5-flash:providerMetadata.gemini.supportedGenerationMethods'), [
+            'generateContent',
+            'streamGenerateContent',
+            'countTokens',
+        ]);
+        assert.equal(byModel.get('gemini:text-embedding-004:capabilities.embeddings'), true);
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.routeLayer, 'openai_compatible');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.directWireApi, 'gemini_generate_content');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.resourceName, 'models/gemini-2.5-flash');
+    });
+
     it('extracts Cerebras public rich model metadata without proving runtime access', async () => {
         const fakeFetch = /** @type {typeof fetch} */ (
             async () =>
@@ -1953,6 +2074,10 @@ describe('model-gateway foundation', () => {
             env: { ANTHROPIC_KEY: 'anthropic-secret-that-must-not-leak' },
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
+        const geminiAuthenticated = createDefaultModelGatewayCatalogImporters({
+            env: { GOOGLE_API_KEY: 'gemini-secret-that-must-not-leak' },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+        });
 
         assert.deepEqual(
             importers.map((importer) => importer.id),
@@ -1965,10 +2090,12 @@ describe('model-gateway foundation', () => {
         assert.equal(genericAuthenticated.some((importer) => importer.id === 'groq-openai-compatible-models'), true);
         assert.equal(mistralAuthenticated.some((importer) => importer.id === 'mistral-models'), true);
         assert.equal(anthropicAuthenticated.some((importer) => importer.id === 'anthropic-models'), true);
+        assert.equal(geminiAuthenticated.some((importer) => importer.id === 'gemini-models'), true);
         assert.equal(JSON.stringify(importers).includes(secret), false);
         assert.equal(JSON.stringify(genericAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(mistralAuthenticated).includes('mistral-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(anthropicAuthenticated).includes('anthropic-secret-that-must-not-leak'), false);
+        assert.equal(JSON.stringify(geminiAuthenticated).includes('gemini-secret-that-must-not-leak'), false);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {

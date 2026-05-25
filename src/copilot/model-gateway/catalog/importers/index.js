@@ -15,6 +15,12 @@ export {
     createCerebrasPublicModelsImporter,
 } from './cerebras-public-models-importer.js';
 export {
+    GEMINI_MODELS_API_VERSION,
+    GEMINI_MODELS_CATALOG_URL,
+    GEMINI_OPENAI_COMPATIBLE_BASE_URL,
+    createGeminiModelsImporter,
+} from './gemini-models-importer.js';
+export {
     KILO_GATEWAY_MODELS_CATALOG_URL,
     createKiloGatewayModelsImporter,
 } from './kilo-gateway-models-importer.js';

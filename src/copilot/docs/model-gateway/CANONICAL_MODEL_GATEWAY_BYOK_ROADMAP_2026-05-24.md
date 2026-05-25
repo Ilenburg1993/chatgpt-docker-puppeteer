@@ -567,8 +567,10 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Implementar `AnthropicModelsImporter` para lista oficial de modelos account-scoped.
 - [ ] Complementar `AnthropicModelsImporter` com `GET /v1/models/{model_id}`, aliases resolvidos e docs de
   limites/capabilities por família.
-- [ ] Implementar `GeminiModelsImporter` para `models.list`/`models.get`, capturando token limits,
+- [x] Implementar `GeminiModelsImporter` para `models.list`/`models.get`, capturando token limits,
   `supportedGenerationMethods`, `thinking` e parâmetros.
+- [ ] Complementar `GeminiModelsImporter` com seeds/docs oficiais de modalidades, capabilities de família e
+  diferenças entre Gemini API direta, Vertex AI e endpoint OpenAI-compatible.
 - [x] Implementar `MistralModelsImporter` para `/v1/models`, capturando capabilities, aliases,
   `max_context_length`, deprecation e replacement.
 - [ ] Implementar `GroqModelsImporter` para `/openai/v1/models` e docs de limites.
@@ -2426,3 +2428,68 @@ Próxima direção:
 
 - Depois da validação/push de Anthropic, seguir para Gemini `models.list`/`models.get`, porque ele oferece metadata rica
   de métodos suportados, input/output token limits e parâmetros diretamente na API oficial.
+
+## 47. Continuidade 2026-05-25 — importer autenticado Gemini list/get
+
+Investigação oficial:
+
+- A documentação oficial do Google AI confirma que o endpoint Models permite listar modelos disponíveis e obter
+  metadata estendida como funcionalidades suportadas e tamanho de contexto.
+- `models.get` usa `GET https://generativelanguage.googleapis.com/v1beta/{name=models/*}` e exige que o nome corresponda
+  a um item retornado por `models.list`.
+- `models.list` usa `GET https://generativelanguage.googleapis.com/v1beta/models`, pagina por `pageSize`/`pageToken`,
+  retorna no máximo `1000` modelos por página e expõe `nextPageToken`.
+- A autenticação REST documentada para shell usa `?key=$GEMINI_API_KEY`.
+- O recurso `Model` inclui `name`, `baseModelId`, `version`, `displayName`, `description`, `inputTokenLimit`,
+  `outputTokenLimit`, `supportedGenerationMethods`, `thinking`, `temperature`, `maxTemperature`, `topP` e `topK`.
+
+Implementado neste corte:
+
+- Novo `GeminiModelsImporter` para `https://generativelanguage.googleapis.com/v1beta/models`.
+- O importer pagina `models.list` com `pageSize=1000` e `pageToken`.
+- Por padrão, cada item listado é enriquecido por `models.get`, com fallback sem falhar a importação se um detalhe
+  individual retornar erro; erros de detalhe ficam no raw payload sanitizado como `detailErrors`.
+- O importer entra na composição padrão quando `GEMINI_API_KEY` ou `GOOGLE_API_KEY` estão presentes.
+- O payload vira evidências para:
+  - `displayName`;
+  - `description`;
+  - aliases normalizados por `providerModel`, `baseModelId` e versão inferida quando houver;
+  - `limits.contextWindowTokens` e `limits.maxOutputTokens`;
+  - capabilities derivadas apenas de métodos declarados pelo endpoint: `chat`, `streaming`, `tokenCounting`,
+    `embeddings`, `batch`, `prediction` e `reasoning` quando `thinking=true`;
+  - `providerMetadata.ownedBy=google`;
+  - `providerMetadata.gemini.*` com resource name, base model, version, métodos, thinking e parâmetros;
+  - `openai.owned_by=google`.
+- O importer também emite:
+  - `ModelRouteOption` `exact_model`;
+  - política normalizada `routeLayer=openai_compatible`;
+  - `directWireApi=gemini_generate_content`;
+  - `openAICompatibleBaseUrl=https://generativelanguage.googleapis.com/v1beta/openai`;
+  - `resourceName=models/{model}`;
+  - `ProviderAccountOverlay` com modelos visíveis pela key, versão da API e `authPlacement=query_key`, sem serializar
+    segredo.
+- Barrels de importers, catálogo e root exportam `GEMINI_MODELS_CATALOG_URL`, `GEMINI_MODELS_API_VERSION`,
+  `GEMINI_OPENAI_COMPATIBLE_BASE_URL` e `createGeminiModelsImporter()`.
+
+Separação arquitetural reafirmada:
+
+- `models.list`/`models.get` oferecem metadata mais rica, mas ainda não provam runtime.
+- Métodos como `generateContent`, `streamGenerateContent`, `countTokens` e `embedContent` viram capability hints
+  autenticados; sucesso de chat/tools/vision/structured outputs continua dependendo de probes posteriores.
+- Modalidades/capabilities de família vindas da página pública de modelos permanecem como próxima camada de seeds/docs,
+  separada da camada de endpoint account-scoped.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`57` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5634` testes totais, `5601` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T19-28-42-394Z/summary.md`).
+
+Próxima direção:
+
+- Depois da suíte completa e push, seguir para Groq especializado ou Ollama. Groq fecha o caminho account-scoped
+  OpenAI-compatible com docs de limite; Ollama fecha o caminho local com `/api/tags` + `/api/show`.
