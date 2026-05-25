@@ -21,6 +21,11 @@ export {
     createGeminiModelsImporter,
 } from './gemini-models-importer.js';
 export {
+    GROQ_MODELS_CATALOG_URL,
+    GROQ_OPENAI_BASE_URL,
+    createGroqModelsImporter,
+} from './groq-models-importer.js';
+export {
     KILO_GATEWAY_MODELS_CATALOG_URL,
     createKiloGatewayModelsImporter,
 } from './kilo-gateway-models-importer.js';

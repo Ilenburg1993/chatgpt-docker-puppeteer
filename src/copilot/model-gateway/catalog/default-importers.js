@@ -12,6 +12,7 @@ import {
     createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
     createGeminiModelsImporter,
+    createGroqModelsImporter,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
     createMistralModelsImporter,
@@ -22,11 +23,6 @@ import {
 } from './importers/index.js';
 
 const OPENAI_COMPATIBLE_ACCOUNT_SOURCES = Object.freeze([
-    Object.freeze({
-        providerId: 'groq',
-        baseUrl: 'https://api.groq.com/openai/v1',
-        envKeys: Object.freeze(['GROQ_API_KEY', 'GROQ_KEY']),
-    }),
     Object.freeze({
         providerId: 'cerebras',
         baseUrl: 'https://api.cerebras.ai/v1',
@@ -120,6 +116,16 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                 fetchImpl: options.fetchImpl,
                 apiKey: geminiSecret.value,
                 secretRef: geminiSecret.key,
+            }),
+        );
+    }
+    const groqSecret = readEnvSecret(env, ['GROQ_API_KEY', 'GROQ_KEY']);
+    if (includeAuthenticated && groqSecret) {
+        importers.push(
+            createGroqModelsImporter({
+                fetchImpl: options.fetchImpl,
+                apiKey: groqSecret.value,
+                secretRef: groqSecret.key,
             }),
         );
     }

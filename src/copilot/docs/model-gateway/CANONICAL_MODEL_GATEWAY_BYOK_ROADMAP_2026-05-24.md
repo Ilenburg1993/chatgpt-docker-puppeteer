@@ -573,7 +573,10 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   diferenças entre Gemini API direta, Vertex AI e endpoint OpenAI-compatible.
 - [x] Implementar `MistralModelsImporter` para `/v1/models`, capturando capabilities, aliases,
   `max_context_length`, deprecation e replacement.
-- [ ] Implementar `GroqModelsImporter` para `/openai/v1/models` e docs de limites.
+- [x] Implementar `GroqModelsImporter` para `/openai/v1/models` e `retrieve model`, capturando `context_window`,
+  `active` e metadata account-scoped.
+- [ ] Complementar `GroqModelsImporter` com seeds/docs oficiais de pricing, model cards, built-in tools e limites de
+  rate por tier/modelo.
 - [x] Implementar `OllamaCatalogImporter` para `/api/tags` + `/api/show`.
 - [ ] Implementar `HuggingFaceInferenceProvidersImporter` para catálogo de providers/modelos/rotas.
 - [ ] Implementar `CloudflareWorkersAiCatalogImporter` para unified catalog/Workers AI docs.
@@ -2554,3 +2557,63 @@ Próxima direção:
 
 - Seguir para Groq especializado ou Hugging Face. Groq deve combinar `/openai/v1/models` account-scoped com docs de
   limites; Hugging Face exige preservar estratégias de provider/rota do Inference Providers Router.
+
+## 49. Continuidade 2026-05-25 — importer autenticado Groq list/retrieve
+
+Investigação oficial:
+
+- A API Reference oficial da Groq expõe a seção Models com `List models` e `Retrieve model`.
+- A base documentada é `https://api.groq.com/openai/v1`.
+- O endpoint de chat referencia os modelos disponíveis e usa `Authorization: Bearer $GROQ_API_KEY`.
+- A documentação de request confirma parâmetros OpenAI-compatible importantes como `tools`, `tool_choice`,
+  `parallel_tool_calls`, `response_format`, `reasoning_effort`, `reasoning_format`, `max_completion_tokens`,
+  `service_tier` e streaming.
+- A documentação de modelo/API mostra campos de modelo como `context_window`, além de `active` e `public_apps`.
+
+Implementado neste corte:
+
+- Novo `GroqModelsImporter` para `https://api.groq.com/openai/v1/models`.
+- O importer busca a lista account-scoped e, por padrão, enriquece cada item com `GET /models/{model}`.
+- IDs com slash, como `openai/gpt-oss-120b`, são codificados como segmento (`openai%2Fgpt-oss-120b`) na chamada de
+  retrieve.
+- A composição padrão passa a usar `GroqModelsImporter` para `GROQ_API_KEY`/`GROQ_KEY`; Groq sai da lista genérica
+  OpenAI-compatible para evitar duplicação.
+- O payload vira evidências para:
+  - `displayName`;
+  - aliases normalizados;
+  - lifecycle por `created` e status provider `active/inactive`;
+  - `limits.contextWindowTokens`;
+  - hints conservadores de capabilities: chat por default, ASR para modelos Whisper, reasoning para famílias
+    explicitamente nomeadas como GPT-OSS/Qwen3/DeepSeek-R1;
+  - modalidades text/text ou audio/text para Whisper;
+  - `providerMetadata.ownedBy`;
+  - `providerMetadata.groq.object`, `active`, `contextWindow`, `publicApps`;
+  - campos OpenAI-compatible `openai.created` e `openai.owned_by`.
+- O importer também emite:
+  - `ModelRouteOption` `exact_model`;
+  - política `routeLayer=openai_compatible` e `openAICompatibleBaseUrl`;
+  - `ProviderAccountOverlay` com `enabledModels` para ativos e `blockedModels` para `active=false`, sem serializar
+    segredo.
+- Barrels de importers, catálogo e root exportam `GROQ_MODELS_CATALOG_URL`, `GROQ_OPENAI_BASE_URL` e
+  `createGroqModelsImporter()`.
+
+Separação arquitetural reafirmada:
+
+- `context_window` e `active` são metadata account-scoped de catálogo, não prova runtime.
+- Tool use, built-in tools, JSON/structured outputs e reasoning continuam como enriquecimento por docs/seeds e probes
+  posteriores; o importer só infere hints mínimos a partir de famílias de modelo explícitas.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`59` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5636` testes totais, `5603` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T19-41-49-502Z/summary.md`).
+
+Próxima direção:
+
+- Continuar para Hugging Face ou Cloudflare. Hugging Face exige preservar rotas `:fastest`, `:cheapest`,
+  `:preferred` e provider explícito; Cloudflare exige separar Workers AI direto de AI Gateway.

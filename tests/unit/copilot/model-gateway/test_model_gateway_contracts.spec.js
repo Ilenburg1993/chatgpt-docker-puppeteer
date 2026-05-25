@@ -64,6 +64,7 @@ import {
     createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
     createGeminiModelsImporter,
+    createGroqModelsImporter,
     createMistralModelsImporter,
     createOllamaCatalogImporter,
     createOpenAICompatibleModelsImporter,
@@ -1798,6 +1799,97 @@ describe('model-gateway foundation', () => {
         assert.equal(snapshot.accountOverlays[0].providerMetadata.semantics, 'locally_installed_models');
     });
 
+    it('imports Groq list and retrieve metadata with context window and active overlays', async () => {
+        const secret = 'groq-secret-that-must-not-leak';
+        /** @type {Array<{ url: string; authorization: string | null }>} */
+        const requests = [];
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (url, init) => {
+                const headers = /** @type {{ authorization?: string }} */ (init)?.headers ?? {};
+                requests.push({ url: String(url), authorization: headers.authorization ?? null });
+                if (String(url).endsWith('/models')) {
+                    return /** @type {Response} */ ({
+                        ok: true,
+                        status: 200,
+                        json: async () => ({
+                            object: 'list',
+                            data: [
+                                {
+                                    id: 'openai/gpt-oss-120b',
+                                    object: 'model',
+                                    created: 1754438400,
+                                    owned_by: 'OpenAI',
+                                    active: true,
+                                    context_window: 131072,
+                                    public_apps: null,
+                                },
+                                {
+                                    id: 'old-model',
+                                    object: 'model',
+                                    created: 1700000000,
+                                    owned_by: 'groq',
+                                    active: false,
+                                    context_window: 8192,
+                                },
+                            ],
+                        }),
+                    });
+                }
+                if (String(url).endsWith('/models/openai%2Fgpt-oss-120b')) {
+                    return /** @type {Response} */ ({
+                        ok: true,
+                        status: 200,
+                        json: async () => ({
+                            id: 'openai/gpt-oss-120b',
+                            object: 'model',
+                            created: 1754438400,
+                            owned_by: 'OpenAI',
+                            active: true,
+                            context_window: 131072,
+                            public_apps: ['playground'],
+                        }),
+                    });
+                }
+                if (String(url).endsWith('/models/old-model')) {
+                    return /** @type {Response} */ ({
+                        ok: true,
+                        status: 200,
+                        json: async () => ({
+                            id: 'old-model',
+                            object: 'model',
+                            created: 1700000000,
+                            owned_by: 'groq',
+                            active: false,
+                            context_window: 8192,
+                        }),
+                    });
+                }
+                return /** @type {Response} */ ({ ok: false, status: 404, json: async () => ({}) });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createGroqModelsImporter({ fetchImpl: fakeFetch, apiKey: secret, secretRef: 'GROQ_API_KEY' })],
+            now: () => new Date('2026-05-25T13:50:00.000Z'),
+        });
+        const byModel = new Map(
+            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+        );
+
+        assert.equal(requests.length, 3);
+        assert.equal(requests.every((request) => request.authorization === `Bearer ${secret}`), true);
+        assert.equal(JSON.stringify(snapshot).includes(secret), false);
+        assert.equal(requests[1].url, 'https://api.groq.com/openai/v1/models/openai%2Fgpt-oss-120b');
+        assert.equal(snapshot.sources[0].providerId, 'groq');
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:limits.contextWindowTokens'), 131072);
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:capabilities.chat'), true);
+        assert.equal(byModel.get('groq:openai/gpt-oss-120b:capabilities.reasoning'), true);
+        assert.deepEqual(byModel.get('groq:openai/gpt-oss-120b:providerMetadata.groq.publicApps'), ['playground']);
+        assert.equal(byModel.get('groq:old-model:providerMetadata.groq.active'), false);
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['openai/gpt-oss-120b']);
+        assert.deepEqual(snapshot.accountOverlays[0].blockedModels, ['old-model']);
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.openAICompatibleBaseUrl, 'https://api.groq.com/openai/v1');
+    });
+
     it('extracts Cerebras public rich model metadata without proving runtime access', async () => {
         const fakeFetch = /** @type {typeof fetch} */ (
             async () =>
@@ -2152,8 +2244,12 @@ describe('model-gateway foundation', () => {
             includeAuthenticated: true,
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
-        const genericAuthenticated = createDefaultModelGatewayCatalogImporters({
+        const groqAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { GROQ_KEY: 'gsk-secret-that-must-not-leak' },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+        });
+        const genericAuthenticated = createDefaultModelGatewayCatalogImporters({
+            env: { CEREBRAS_KEY: 'cerebras-secret-that-must-not-leak' },
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
         const mistralAuthenticated = createDefaultModelGatewayCatalogImporters({
@@ -2181,13 +2277,16 @@ describe('model-gateway foundation', () => {
             publicOnly.map((importer) => importer.id),
             ['openrouter-models', 'kilo-gateway-models', 'kilo-gateway-providers', 'cerebras-public-models'],
         );
-        assert.equal(genericAuthenticated.some((importer) => importer.id === 'groq-openai-compatible-models'), true);
+        assert.equal(groqAuthenticated.some((importer) => importer.id === 'groq-models'), true);
+        assert.equal(genericAuthenticated.some((importer) => importer.id === 'cerebras-openai-compatible-models'), true);
         assert.equal(mistralAuthenticated.some((importer) => importer.id === 'mistral-models'), true);
         assert.equal(anthropicAuthenticated.some((importer) => importer.id === 'anthropic-models'), true);
         assert.equal(geminiAuthenticated.some((importer) => importer.id === 'gemini-models'), true);
         assert.equal(ollamaLocal.some((importer) => importer.id === 'ollama-catalog'), true);
         assert.equal(JSON.stringify(importers).includes(secret), false);
+        assert.equal(JSON.stringify(groqAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(genericAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
+        assert.equal(JSON.stringify(genericAuthenticated).includes('cerebras-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(mistralAuthenticated).includes('mistral-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(anthropicAuthenticated).includes('anthropic-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(geminiAuthenticated).includes('gemini-secret-that-must-not-leak'), false);
