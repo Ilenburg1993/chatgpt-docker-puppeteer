@@ -11,7 +11,7 @@
 import { diffCanonicalModelProjections } from './import-runs.js';
 import { runCatalogImporters } from './importer-runner.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
-import { mergeModelMetadataEvidence } from './merge.js';
+import { mergeModelMetadataEvidence, mergeProviderMetadataEvidence } from './merge.js';
 import { toOpenAIModelCatalogList } from './openai-schema.js';
 
 /**
@@ -36,6 +36,17 @@ function projectionGroupKey(evidence) {
         String(evidence['providerId'] ?? 'unknown-provider'),
         String(evidence['providerModel'] ?? 'unknown-model'),
         String(evidence['routeProfile'] ?? 'default'),
+    ].join(':');
+}
+
+/**
+ * @param {Record<string, any>} evidence
+ * @returns {string}
+ */
+function providerProjectionGroupKey(evidence) {
+    return [
+        String(evidence['providerId'] ?? 'unknown-provider'),
+        String(evidence['subjectProviderId'] ?? 'unknown-subject-provider'),
     ].join(':');
 }
 
@@ -74,6 +85,38 @@ function buildProjectionsFromEvidence(evidences) {
 }
 
 /**
+ * @param {Record<string, any>[]} evidences
+ * @returns {{ providerProjections: Record<string, any>[]; providerConflicts: Record<string, any>[] }}
+ */
+function buildProviderProjectionsFromEvidence(evidences) {
+    /** @type {Map<string, Record<string, any>[]>} */
+    const groups = new Map();
+    for (const evidence of evidences) {
+        const key = providerProjectionGroupKey(evidence);
+        const group = groups.get(key) ?? [];
+        group.push(evidence);
+        groups.set(key, group);
+    }
+    /** @type {Record<string, any>[]} */
+    const providerProjections = [];
+    /** @type {Record<string, any>[]} */
+    const providerConflicts = [];
+    for (const [key, group] of groups.entries()) {
+        const merged = mergeProviderMetadataEvidence(group);
+        providerProjections.push(merged.projection);
+        for (const conflict of merged.conflicts) {
+            providerConflicts.push({ ...conflict, projectionKey: key });
+        }
+    }
+    return {
+        providerProjections: providerProjections.sort((left, right) =>
+            `${left['providerId']}:${left['subjectProviderId']}`.localeCompare(`${right['providerId']}:${right['subjectProviderId']}`),
+        ),
+        providerConflicts,
+    };
+}
+
+/**
  * @param {object} [input]
  * @param {import('./importer-runner.js').CatalogImporter[]} [input.importers]
  * @param {unknown} [input.snapshot]
@@ -93,19 +136,26 @@ export async function refreshModelGatewayCatalog(input = {}) {
     });
     const refreshedSourceIds = new Set(imported.sources.map((source) => String(source['id'])));
     const retainedEvidences = previous.evidences.filter((evidence) => !refreshedSourceIds.has(String(evidence['sourceId'])));
+    const retainedProviderEvidences = previous.providerEvidences.filter(
+        (evidence) => !refreshedSourceIds.has(String(evidence['sourceId'])),
+    );
     const retainedRawPayloadRefs = previous.rawPayloadRefs.filter((rawRef) => !refreshedSourceIds.has(String(rawRef['sourceId'])));
     const combinedEvidences = [...retainedEvidences, ...imported.evidences];
+    const combinedProviderEvidences = [...retainedProviderEvidences, ...imported.providerEvidences];
     const { projections, conflicts } = buildProjectionsFromEvidence(combinedEvidences);
+    const { providerProjections, providerConflicts } = buildProviderProjectionsFromEvidence(combinedProviderEvidences);
     const diff = diffCanonicalModelProjections(previous.projections, projections);
     const snapshot = {
         ...previous,
         source: 'catalog-refresh',
         sources: upsertMany(previous.sources, imported.sources, (item) => String(item['id'])),
+        providerEvidences: combinedProviderEvidences,
         evidences: combinedEvidences,
         rawPayloadRefs: [...retainedRawPayloadRefs, ...imported.rawPayloadRefs],
         importRuns: [...previous.importRuns, ...imported.importRuns],
+        providerProjections,
         projections,
-        conflicts,
+        conflicts: [...providerConflicts, ...conflicts],
     };
     if (input.store) await input.store.writeSnapshot(snapshot);
     return {
@@ -114,4 +164,3 @@ export async function refreshModelGatewayCatalog(input = {}) {
         openai: toOpenAIModelCatalogList(projections),
     };
 }
-

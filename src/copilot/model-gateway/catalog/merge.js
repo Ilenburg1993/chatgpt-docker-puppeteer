@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/catalog/merge
  */
 
-import { createCanonicalModelProjection } from './contracts.js';
+import { createCanonicalModelProjection, createCanonicalProviderProjection } from './contracts.js';
 
 const CONFIDENCE_PRECEDENCE = Object.freeze({
     unknown: 0,
@@ -167,6 +167,66 @@ export function mergeModelMetadataEvidence(evidences, base = {}) {
 
     return {
         projection: createCanonicalModelProjection(projectionInput),
+        selectedEvidence,
+        conflicts,
+    };
+}
+
+/**
+ * @param {Record<string, any>[]} evidences
+ * @param {{ providerId?: string; subjectProviderId?: string; displayName?: string }} [base]
+ * @returns {{
+ *     projection: ReturnType<typeof createCanonicalProviderProjection>;
+ *     selectedEvidence: Record<string, Record<string, any>>;
+ *     conflicts: Array<{ fieldPath: string; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }>;
+ * }}
+ */
+export function mergeProviderMetadataEvidence(evidences, base = {}) {
+    const first = evidences[0] ?? {};
+    const providerId = String(base.providerId ?? first['providerId'] ?? '');
+    const subjectProviderId = String(base.subjectProviderId ?? first['subjectProviderId'] ?? '');
+    /** @type {Parameters<typeof createCanonicalProviderProjection>[0] & Record<string, any>} */
+    const projectionInput = {
+        providerId,
+        subjectProviderId,
+        ...(base.displayName ? { displayName: base.displayName } : {}),
+        provenanceByField: {},
+        confidenceByField: {},
+    };
+    /** @type {Record<string, Record<string, any>>} */
+    const selectedEvidence = {};
+    /** @type {Array<{ fieldPath: string; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }>} */
+    const conflicts = [];
+
+    for (const [fieldPath, group] of groupEvidenceByField(evidences).entries()) {
+        const sorted = [...group].sort(compareEvidence);
+        const selected = sorted[0];
+        if (!selected) continue;
+        selectedEvidence[fieldPath] = selected;
+        setNestedValue(projectionInput, fieldPath, selected['normalizedValue']);
+        const provenanceByField = /** @type {Record<string, unknown>} */ (projectionInput['provenanceByField'] ?? {});
+        const confidenceByField = /** @type {Record<string, unknown>} */ (projectionInput['confidenceByField'] ?? {});
+        provenanceByField[fieldPath] = selected['evidenceId'];
+        confidenceByField[fieldPath] = selected['confidence'] ?? 'unknown';
+        projectionInput['provenanceByField'] = provenanceByField;
+        projectionInput['confidenceByField'] = confidenceByField;
+
+        const selectedJson = stableJson(selected['normalizedValue']);
+        const conflictingEvidenceIds = sorted
+            .slice(1)
+            .filter((item) => stableJson(item['normalizedValue']) !== selectedJson)
+            .map((item) => String(item['evidenceId'] ?? 'unknown'));
+        if (conflictingEvidenceIds.length > 0) {
+            conflicts.push({
+                fieldPath,
+                selectedEvidenceId: typeof selected['evidenceId'] === 'string' ? selected['evidenceId'] : null,
+                conflictingEvidenceIds,
+            });
+        }
+    }
+
+    return {
+        projection: createCanonicalProviderProjection(projectionInput),
         selectedEvidence,
         conflicts,
     };

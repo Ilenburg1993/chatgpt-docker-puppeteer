@@ -9,6 +9,7 @@ export {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
     MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
     createCanonicalModelProjection,
+    createCanonicalProviderProjection,
     createModelMetadataEvidence,
     createModelRouteOption,
     createProviderAccountOverlay,
@@ -37,7 +38,7 @@ export {
     JsonModelGatewayCatalogStore,
     normalizeStoredCatalogSnapshot,
 } from './json-catalog-store.js';
-export { mergeModelMetadataEvidence, rankCatalogEvidenceConfidence } from './merge.js';
+export { mergeModelMetadataEvidence, mergeProviderMetadataEvidence, rankCatalogEvidenceConfidence } from './merge.js';
 export {
     OPENAI_MODEL_LIST_OBJECT,
     OPENAI_MODEL_OBJECT,

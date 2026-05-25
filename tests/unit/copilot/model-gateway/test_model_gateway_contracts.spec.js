@@ -61,6 +61,7 @@ import {
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
     createCanonicalModelProjection,
+    createCanonicalProviderProjection,
     createCatalogImportRun,
     createDefaultModelGatewayCatalogImporters,
     createKiloGatewayModelsImporter,
@@ -73,6 +74,7 @@ import {
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
     mergeModelMetadataEvidence,
+    mergeProviderMetadataEvidence,
     normalizeAccountOverlayControls,
     normalizeModelAliases,
     normalizeModelLifecycle,
@@ -645,6 +647,62 @@ describe('model-gateway foundation', () => {
                 fieldPath: 'limits.contextWindowTokens',
                 selectedEvidenceId: 'catalog-context',
                 conflictingEvidenceIds: ['heuristic-context'],
+            },
+        ]);
+    });
+
+    it('merges provider metadata evidence into provider projections', () => {
+        const displayName = createProviderMetadataEvidence({
+            evidenceId: 'provider-display',
+            providerId: 'kilo',
+            subjectProviderId: 'arcee-ai',
+            fieldPath: 'displayName',
+            value: 'Arcee AI',
+            sourceId: 'kilo-gateway-providers',
+            sourceKind: 'public_gateway_api',
+            confidence: 'catalog',
+            observedAt: '2026-05-25T00:00:00.000Z',
+        });
+        const weakerPolicy = createProviderMetadataEvidence({
+            evidenceId: 'provider-policy-weak',
+            providerId: 'kilo',
+            subjectProviderId: 'arcee-ai',
+            fieldPath: 'dataPolicy.retainsPrompts',
+            value: true,
+            sourceId: 'heuristic',
+            sourceKind: 'heuristic',
+            confidence: 'heuristic',
+            observedAt: '2026-05-25T01:00:00.000Z',
+        });
+        const catalogPolicy = createProviderMetadataEvidence({
+            evidenceId: 'provider-policy-catalog',
+            providerId: 'kilo',
+            subjectProviderId: 'arcee-ai',
+            fieldPath: 'dataPolicy.retainsPrompts',
+            value: false,
+            sourceId: 'kilo-gateway-providers',
+            sourceKind: 'public_gateway_api',
+            confidence: 'catalog',
+            observedAt: '2026-05-25T00:00:00.000Z',
+        });
+        const projection = createCanonicalProviderProjection({
+            providerId: 'kilo',
+            subjectProviderId: 'arcee-ai',
+            displayName: 'Arcee AI',
+        });
+        const merged = mergeProviderMetadataEvidence([displayName, weakerPolicy, catalogPolicy]);
+
+        assert.equal(projection.displayName, 'Arcee AI');
+        assert.equal(merged.projection.providerId, 'kilo');
+        assert.equal(merged.projection.subjectProviderId, 'arcee-ai');
+        assert.equal(merged.projection.displayName, 'Arcee AI');
+        assert.equal(merged.projection.dataPolicy.retainsPrompts, false);
+        assert.equal(merged.projection.provenanceByField['dataPolicy.retainsPrompts'], 'provider-policy-catalog');
+        assert.deepEqual(merged.conflicts, [
+            {
+                fieldPath: 'dataPolicy.retainsPrompts',
+                selectedEvidenceId: 'provider-policy-catalog',
+                conflictingEvidenceIds: ['provider-policy-weak'],
             },
         ]);
     });

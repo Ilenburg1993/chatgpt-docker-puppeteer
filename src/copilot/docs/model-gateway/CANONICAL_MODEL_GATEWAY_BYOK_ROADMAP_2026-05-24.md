@@ -1717,3 +1717,39 @@ Próxima direção:
 
 - Avançar o contrato de providers/gateways para projeção consolidada e uso na normalização OpenAI
   `x_model_gateway`, sem bloquear a etapa runtime.
+
+## 31. Continuidade 2026-05-25 — provider projections consolidadas
+
+Implementado neste corte:
+
+- Novo contrato `createCanonicalProviderProjection()` para a visão atual por `providerId + subjectProviderId`.
+- `mergeProviderMetadataEvidence()` faz merge field-wise de provider metadata com a mesma política de confiança,
+  recência, proveniência e conflito usada em model metadata.
+- O snapshot JSON ganhou `providerProjections`.
+- `refreshModelGatewayCatalog()` agora:
+  - retém provider evidences de fontes não atualizadas;
+  - substitui provider evidences de fontes atualizadas;
+  - gera `providerProjections`;
+  - inclui conflitos de provider junto com conflitos de modelo.
+
+Separação arquitetural reafirmada:
+
+- `providerEvidences` são o ledger de fatos de provider.
+- `providerProjections` são a visão atual consolidada, rápida para consulta e futura junção com modelos.
+- `projections` continuam sendo modelos/rotas normalizados para OpenAI schema + `x_model_gateway`.
+- Runtime permanece uma etapa posterior e não contamina provider/model catalog.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`48` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T16-20-39-389Z/summary.md`).
+
+Próxima direção:
+
+- Decidir a junção entre `providerProjections` e model `x_model_gateway`: leitura rápida no refresh, projection
+  materializada, ou join tardio no seletor/OpenAI list.

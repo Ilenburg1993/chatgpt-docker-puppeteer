@@ -28,6 +28,7 @@ const CATALOG_ARRAY_FIELDS = Object.freeze([
     'evidences',
     'routeOptions',
     'accountOverlays',
+    'providerProjections',
     'projections',
     'importRuns',
     'rawPayloadRefs',
@@ -90,6 +91,7 @@ function readRecordArray(value) {
  *     evidences: Record<string, any>[];
  *     routeOptions: Record<string, any>[];
  *     accountOverlays: Record<string, any>[];
+ *     providerProjections: Record<string, any>[];
  *     projections: Record<string, any>[];
  *     importRuns: Record<string, any>[];
  *     rawPayloadRefs: Record<string, any>[];
@@ -106,6 +108,7 @@ export function normalizeStoredCatalogSnapshot(snapshot) {
         evidences: [],
         routeOptions: [],
         accountOverlays: [],
+        providerProjections: [],
         projections: [],
         importRuns: [],
         rawPayloadRefs: [],
@@ -121,6 +124,7 @@ export function normalizeStoredCatalogSnapshot(snapshot) {
         evidences: readRecordArray(snapshot['evidences']),
         routeOptions: readRecordArray(snapshot['routeOptions']),
         accountOverlays: readRecordArray(snapshot['accountOverlays']),
+        providerProjections: readRecordArray(snapshot['providerProjections']),
         projections: readRecordArray(snapshot['projections']),
         importRuns: readRecordArray(snapshot['importRuns']),
         rawPayloadRefs: readRecordArray(snapshot['rawPayloadRefs']),

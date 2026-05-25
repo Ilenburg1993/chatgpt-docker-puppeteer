@@ -209,6 +209,32 @@ export function createProviderMetadataEvidence(input) {
 /**
  * @param {object} input
  * @param {string} input.providerId
+ * @param {string} input.subjectProviderId
+ * @param {string} [input.displayName]
+ * @param {Record<string, unknown>} [input.dataPolicy]
+ * @param {Record<string, unknown>} [input.providerMetadata]
+ * @param {Record<string, unknown>} [input.provenanceByField]
+ * @param {Record<string, unknown>} [input.confidenceByField]
+ * @returns {object}
+ */
+export function createCanonicalProviderProjection(input) {
+    const subjectProviderId = optionalString(input.subjectProviderId);
+    if (!subjectProviderId) throw new Error('[model-gateway/catalog] projection subjectProviderId is required');
+    return {
+        schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+        providerId: normalizeProviderId(input.providerId),
+        subjectProviderId: normalizeProviderId(subjectProviderId),
+        displayName: optionalString(input.displayName) ?? subjectProviderId,
+        dataPolicy: isRecord(input.dataPolicy) ? sanitizeJsonValue(input.dataPolicy) : {},
+        providerMetadata: isRecord(input.providerMetadata) ? sanitizeJsonValue(input.providerMetadata) : {},
+        provenanceByField: isRecord(input.provenanceByField) ? sanitizeJsonValue(input.provenanceByField) : {},
+        confidenceByField: isRecord(input.confidenceByField) ? sanitizeJsonValue(input.confidenceByField) : {},
+    };
+}
+
+/**
+ * @param {object} input
+ * @param {string} input.providerId
  * @param {string} input.providerModel
  * @param {string} [input.routeProfile]
  * @param {string} [input.selectorKind]
