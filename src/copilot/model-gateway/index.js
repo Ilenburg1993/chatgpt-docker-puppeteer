@@ -11,6 +11,7 @@
 export {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
     MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+    CEREBRAS_PUBLIC_MODELS_CATALOG_URL,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     KILO_GATEWAY_MODELS_CATALOG_URL,
     KILO_GATEWAY_PROVIDERS_CATALOG_URL,
@@ -22,6 +23,7 @@ export {
     createCanonicalModelProjection,
     createCanonicalProviderProjection,
     createCatalogImportRun,
+    createCerebrasPublicModelsImporter,
     createDefaultModelGatewayCatalogImporters,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,

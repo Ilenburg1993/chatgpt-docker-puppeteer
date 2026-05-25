@@ -58,6 +58,7 @@ import {
     BYOK_VISION_PROBE_DISPLAY_NAME,
     BYOK_VISION_PROBE_MIME_TYPE,
     JsonModelGatewayCatalogStore,
+    createCerebrasPublicModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
@@ -1231,6 +1232,89 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('providerMetadata.ownedBy'), 'meta');
     });
 
+    it('extracts Cerebras public rich model metadata without proving runtime access', async () => {
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async () =>
+                /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        object: 'list',
+                        data: [
+                            {
+                                id: 'gpt-oss-120b',
+                                object: 'model',
+                                created: 1754438400,
+                                owned_by: 'OpenAI',
+                                name: 'OpenAI GPT OSS',
+                                description: 'Efficient reasoning across science, math, and coding applications.',
+                                hugging_face_id: 'openai/gpt-oss-120b',
+                                pricing: {
+                                    prompt: '0.00000035',
+                                    completion: '0.00000075',
+                                },
+                                capabilities: {
+                                    streaming: true,
+                                    function_calling: true,
+                                    structured_outputs: true,
+                                    vision: false,
+                                    json_mode: true,
+                                    tools: true,
+                                    tool_choice: true,
+                                    parallel_tool_calls: false,
+                                    response_format: true,
+                                    reasoning: true,
+                                },
+                                supported_parameters: {
+                                    temperature: true,
+                                    top_p: true,
+                                    seed: true,
+                                    logprobs: false,
+                                    max_completion_tokens: true,
+                                },
+                                architecture: {
+                                    modality: 'text',
+                                    tokenizer: 'GPT',
+                                    instruct_type: 'harmony',
+                                },
+                                limits: {
+                                    max_context_length: 131072,
+                                    max_completion_tokens: 40960,
+                                },
+                                datacenter_locations: [],
+                                deprecated: false,
+                                preview: false,
+                                quantization: 'FP16/8 (weights only)',
+                            },
+                        ],
+                    }),
+                })
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createCerebrasPublicModelsImporter({ fetchImpl: fakeFetch })],
+            now: () => new Date('2026-05-25T12:45:00.000Z'),
+        });
+        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+
+        assert.equal(snapshot.sources[0].url, 'https://api.cerebras.ai/public/v1/models');
+        assert.equal(snapshot.sources[0].trustTier, 'provider_catalog');
+        assert.equal(snapshot.routeOptions[0].selectorKind, 'exact_model');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.routeLayer, 'direct_provider');
+        assert.equal(byPath.get('displayName'), 'OpenAI GPT OSS');
+        assert.equal(byPath.get('aliases.huggingFaceId'), 'openai/gpt-oss-120b');
+        assert.equal(byPath.get('lifecycle.createdAt'), '2025-08-06T00:00:00.000Z');
+        assert.equal(byPath.get('limits.contextWindowTokens'), 131072);
+        assert.equal(byPath.get('limits.maxOutputTokens'), 40960);
+        assert.equal(byPath.get('capabilities.tools'), true);
+        assert.equal(byPath.get('capabilities.structuredOutputs'), true);
+        assert.equal(byPath.get('capabilities.reasoningEffort'), true);
+        assert.deepEqual(byPath.get('supportedParameters'), ['temperature', 'top_p', 'seed', 'max_completion_tokens']);
+        assert.equal(byPath.get('pricing.inputUsdPerMillion'), 0.35);
+        assert.equal(byPath.get('pricing.outputUsdPerMillion'), 0.75);
+        assert.equal(byPath.get('providerMetadata.ownedBy'), 'OpenAI');
+        assert.equal(byPath.get('providerMetadata.cerebras.quantization'), 'FP16/8 (weights only)');
+    });
+
     it('normalizes universal projections to OpenAI model schema with gateway extensions', () => {
         const projection = createCanonicalModelProjection({
             providerId: 'openrouter',
@@ -1505,11 +1589,11 @@ describe('model-gateway foundation', () => {
 
         assert.deepEqual(
             importers.map((importer) => importer.id),
-            ['openrouter-models', 'kilo-gateway-models', 'kilo-gateway-providers', 'openai-models'],
+            ['openrouter-models', 'kilo-gateway-models', 'kilo-gateway-providers', 'cerebras-public-models', 'openai-models'],
         );
         assert.deepEqual(
             publicOnly.map((importer) => importer.id),
-            ['openrouter-models', 'kilo-gateway-models', 'kilo-gateway-providers'],
+            ['openrouter-models', 'kilo-gateway-models', 'kilo-gateway-providers', 'cerebras-public-models'],
         );
         assert.equal(genericAuthenticated.some((importer) => importer.id === 'groq-openai-compatible-models'), true);
         assert.equal(JSON.stringify(importers).includes(secret), false);

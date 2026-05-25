@@ -6,6 +6,10 @@
  */
 
 export {
+    CEREBRAS_PUBLIC_MODELS_CATALOG_URL,
+    createCerebrasPublicModelsImporter,
+} from './cerebras-public-models-importer.js';
+export {
     KILO_GATEWAY_MODELS_CATALOG_URL,
     createKiloGatewayModelsImporter,
 } from './kilo-gateway-models-importer.js';

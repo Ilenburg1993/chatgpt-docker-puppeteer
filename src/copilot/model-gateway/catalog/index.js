@@ -23,10 +23,12 @@ export {
     diffCanonicalModelProjections,
 } from './import-runs.js';
 export {
+    CEREBRAS_PUBLIC_MODELS_CATALOG_URL,
     KILO_GATEWAY_MODELS_CATALOG_URL,
     KILO_GATEWAY_PROVIDERS_CATALOG_URL,
     OPENAI_MODELS_CATALOG_URL,
     OPENROUTER_MODELS_CATALOG_URL,
+    createCerebrasPublicModelsImporter,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
     createOpenAICompatibleModelsImporter,

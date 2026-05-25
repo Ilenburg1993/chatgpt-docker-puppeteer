@@ -9,6 +9,7 @@
  */
 
 import {
+    createCerebrasPublicModelsImporter,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
     createOpenAICompatibleModelsImporter,
@@ -71,6 +72,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             createOpenRouterModelsImporter({ fetchImpl: options.fetchImpl }),
             createKiloGatewayModelsImporter({ fetchImpl: options.fetchImpl }),
             createKiloGatewayProvidersImporter({ fetchImpl: options.fetchImpl }),
+            createCerebrasPublicModelsImporter({ fetchImpl: options.fetchImpl }),
         );
     }
     const openAiSecret = readEnvSecret(env, ['OPENAI_API_KEY', 'COPILOT_OPENAI_API_KEY']);

@@ -213,14 +213,36 @@ ModelRouteOption
   selectorKind: exact_model | provider_auto | aggregator_auto | gateway_auto | cheapest | fastest | preferred_provider |
     fallback_chain
   selectorSyntax
+  sourceId
+  sourceKind
+  confidence
   providerSpecific
   normalizedPolicy
 
+ProviderMetadataEvidence
+  evidenceId
+  providerId
+  subjectProviderId
+  fieldPath
+  value
+  normalizedValue
+  sourceId
+  sourceKind
+  confidence
+  observedAt
+  expiresAt
+  rawPayloadRef
+  redactionStatus
+
 ProviderAccountOverlay
+  accountOverlayId
   providerId
   accountScope
   secretRef
   organizationIdRef
+  sourceId
+  sourceKind
+  confidence
   enabledModels
   blockedModels
   byokProviderKeys
@@ -228,9 +250,19 @@ ProviderAccountOverlay
   rateLimits
   spendingLimits
   policyHeaders
+  providerMetadata
   observedAt
   expiresAt
   redactionStatus
+
+CanonicalProviderProjection
+  providerId
+  subjectProviderId
+  displayName
+  dataPolicy
+  providerMetadata
+  provenanceByField
+  confidenceByField
 
 CanonicalModelProjection
   providerId
@@ -249,6 +281,8 @@ CanonicalModelProjection
   rateLimits
   dataPolicy
   license
+  providerMetadata
+  openai
   provenanceByField
   confidenceByField
   routingHints
@@ -262,6 +296,8 @@ data/copilot/model-gateway/catalog.sqlite
   catalog_import_runs
   catalog_sources
   providers
+  provider_evidences
+  provider_projections
   provider_aliases
   models
   model_aliases
@@ -541,7 +577,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   `provider/model`, provider upstream, pricing, context window, features, rotas gratuitas e endpoints auxiliares.
 - [x] Implementar `KiloGatewayProvidersImporter` para `/providers` quando disponível, preservando provider upstream e
   diferença entre Kilo Gateway, Kilo Code e providers BYOK internos.
-- [ ] Implementar `CerebrasModelsImporter` para `/v1/models` + catálogo público.
+- [x] Implementar `CerebrasModelsImporter` para `/v1/models` + catálogo público.
 - [ ] Implementar `NvidiaNimCatalogImporter` para docs/API catalog quando disponível.
 - [x] Permitir importers `OpenAICompatibleGenericImporter` para vLLM, LiteLLM, Chutes, Z.AI e endpoints locais sem
   importer especializado.
@@ -1963,3 +1999,78 @@ Validação deste corte:
 Próxima direção:
 
 - Complementar Groq/Cerebras com docs/catálogos de limites quando disponíveis.
+
+## 38. Continuidade 2026-05-25 — releitura integral, situação atual e Cerebras public catalog
+
+Investigação feita neste corte:
+
+- Este roadmap foi relido integralmente, incluindo diagnóstico, arquitetura, Faixas A-P e todos os capítulos de
+  continuidade 8-37.
+- Estado git inicial: `main` limpo e sincronizado com `origin/main`.
+- Situação arquitetural atual:
+  - A-J estão fechadas e continuam sendo o contrato de compatibilidade operacional;
+  - K-L já têm ledger JSON, import runs, raw refs, importers reais, provider evidences, provider projections,
+    account overlays e route options;
+  - M já cobre normalizadores de modalidades, capabilities de catálogo, limits, pricing, lifecycle, aliases e overlays;
+  - N já cobre route options de Kilo e OpenRouter, mas ainda falta Hugging Face, Cloudflare e aliases locais;
+  - O ainda precisa de SQLite, refresh incremental, eventos de catálogo e diff semântico;
+  - P ainda precisa UX de exploração do catálogo universal.
+- O metamodelo de 4.2 foi atualizado para refletir o que já existe no código:
+  - `ProviderMetadataEvidence`;
+  - `CanonicalProviderProjection`;
+  - `ModelRouteOption.sourceId/sourceKind/confidence`;
+  - `ProviderAccountOverlay.accountOverlayId/sourceId/sourceKind/confidence/providerMetadata`;
+  - `CanonicalModelProjection.providerMetadata/openai`.
+- O plano SQLite de 4.2 foi atualizado para incluir `provider_evidences` e `provider_projections`.
+- Investigação online/oficial:
+  - Cerebras documenta endpoint público de modelos em `https://api.cerebras.ai/public/v1/models`.
+  - O endpoint real respondeu `200 application/json` e retornou payload `object=list` com rows ricas contendo `pricing`,
+    `capabilities`, `supported_parameters`, `architecture`, `limits`, lifecycle (`deprecated`, `preview`),
+    `hugging_face_id`, `owned_by`, datacenters e quantization.
+  - Isso confirma que Cerebras não precisa depender apenas do `/v1/models` autenticado identity-only: o catálogo público
+    pode alimentar metadata rica antes de runtime.
+
+Implementado neste corte:
+
+- Novo `CerebrasPublicModelsImporter` para `https://api.cerebras.ai/public/v1/models`.
+- O importer público Cerebras emite evidências para:
+  - `displayName`;
+  - aliases e `huggingFaceId`;
+  - lifecycle;
+  - description;
+  - limits (`contextWindowTokens`, `maxOutputTokens`, RPM/TPM quando presentes);
+  - modalidades;
+  - supported parameters;
+  - capabilities (`streaming`, `tools`, `forcedToolChoice`, `parallelToolCalls`, `jsonMode`,
+    `structuredOutputs`, `reasoningEffort`, `vision`);
+  - pricing USD por milhão;
+  - `providerMetadata.ownedBy`;
+  - `providerMetadata.cerebras.*` para object, tokenizer, instruct type, datacenters, deprecated, preview e quantization.
+- O importer também emite `routeOptions` `exact_model` com `normalizedPolicy.routeLayer=direct_provider`.
+- Barrels de importers, catálogo e root exportam `CEREBRAS_PUBLIC_MODELS_CATALOG_URL` e
+  `createCerebrasPublicModelsImporter()`.
+- `createDefaultModelGatewayCatalogImporters()` inclui Cerebras public catalog quando `includePublic=true`.
+- A checkbox de Cerebras na Faixa L foi marcada como concluída porque:
+  - `/v1/models` autenticado já fica coberto pelo generic OpenAI-compatible importer quando há `CEREBRAS_API_KEY`;
+  - o catálogo público rico agora é coberto por importer dedicado.
+
+Separação arquitetural reafirmada:
+
+- Cerebras public catalog prova metadata pública rica, não acesso por conta.
+- Cerebras `/v1/models` account-scoped continua sendo overlay/listagem por key via generic importer.
+- Chat/stream/tools/JSON/reasoning reais continuam dependendo de probes runtime.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`50` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5623` testes totais, `5590` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T17-00-16-920Z/summary.md`).
+
+Próxima direção:
+
+- Avançar para Groq docs/model card enrichment ou para diff semântico de catálogo (`price/limits/capabilities`
+  alterados).
