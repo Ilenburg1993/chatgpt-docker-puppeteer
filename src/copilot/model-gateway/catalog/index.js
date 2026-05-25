@@ -20,7 +20,9 @@ export {
     diffCanonicalModelProjections,
 } from './import-runs.js';
 export {
+    OPENAI_MODELS_CATALOG_URL,
     OPENROUTER_MODELS_CATALOG_URL,
+    createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
 } from './importers/index.js';
 export { runCatalogImporters } from './importer-runner.js';

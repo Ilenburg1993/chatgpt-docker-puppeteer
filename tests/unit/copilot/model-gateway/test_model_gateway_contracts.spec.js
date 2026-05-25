@@ -58,6 +58,7 @@ import {
     BYOK_VISION_PROBE_DISPLAY_NAME,
     BYOK_VISION_PROBE_MIME_TYPE,
     JsonModelGatewayCatalogStore,
+    createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
     createCanonicalModelProjection,
     createCatalogImportRun,
@@ -838,6 +839,44 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('pricing.outputUsdPerMillion'), 2);
         assert.deepEqual(byPath.get('modalities.input'), ['text', 'image']);
         assert.ok(/** @type {string[]} */ (byPath.get('supportedParameters')).includes('tools'));
+    });
+
+    it('extracts account-scoped OpenAI model identity without serializing the API key', async () => {
+        const secret = 'sk-openai-secret-that-must-not-leak';
+        /** @type {string | null} */
+        let authorizationHeader = null;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (_url, init) => {
+                authorizationHeader = /** @type {{ headers?: { authorization?: string } }} */ (init)?.headers?.authorization ?? null;
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        data: [
+                            {
+                                id: 'gpt-test',
+                                object: 'model',
+                                created: 1779376861,
+                                owned_by: 'openai',
+                            },
+                        ],
+                    }),
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createOpenAIModelsImporter({ fetchImpl: fakeFetch, apiKey: secret })],
+            now: () => new Date('2026-05-25T12:20:00.000Z'),
+        });
+        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+
+        assert.equal(authorizationHeader, `Bearer ${secret}`);
+        assert.equal(JSON.stringify(snapshot).includes(secret), false);
+        assert.equal(snapshot.sources[0].authMode, 'api_key');
+        assert.equal(snapshot.importRuns[0].status, 'completed');
+        assert.equal(byPath.get('displayName'), 'gpt-test');
+        assert.equal(byPath.get('lifecycle.createdAt'), '2026-05-21T15:21:01.000Z');
+        assert.equal(byPath.get('providerMetadata.ownedBy'), 'openai');
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {

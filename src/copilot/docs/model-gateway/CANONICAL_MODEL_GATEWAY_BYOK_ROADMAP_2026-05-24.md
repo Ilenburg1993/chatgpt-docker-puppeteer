@@ -524,7 +524,8 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   - `toEvidenceFacts()`.
 - [x] Criar runner storage-neutral de importers que monta `ProviderCatalogSource`, `rawPayloadRef`, evidências,
   `CatalogImportRun` e snapshot JSON secret-safe antes dos importers específicos.
-- [ ] Implementar `OpenAIModelsImporter` para `/v1/models` + seeds oficiais complementares.
+- [x] Implementar `OpenAIModelsImporter` para `/v1/models` account-scoped.
+- [ ] Complementar `OpenAIModelsImporter` com seeds/docs oficiais de capabilities e famílias.
 - [x] Implementar `OpenRouterModelsImporter` para `/api/v1/models`, preservando `supported_parameters`, pricing,
   context, top provider e per-request limits.
 - [ ] Implementar `AnthropicModelsImporter` para lista oficial de modelos e docs complementares.
@@ -1184,3 +1185,38 @@ Próxima direção:
 - Commitar/pushar este corte.
 - Depois, implementar `OpenAIModelsImporter` como o menor importer autenticado e/ou criar um comando programático de
   refresh que permita rodar `OpenRouterModelsImporter` em snapshot JSON com diff.
+
+## 19. Continuidade 2026-05-25 — importer autenticado OpenAI
+
+Implementado neste corte:
+
+- Criado `src/copilot/model-gateway/catalog/importers/openai-models-importer.js`.
+- Exportados pelo barrel de importers, barrel de catálogo e barrel raiz:
+  - `OPENAI_MODELS_CATALOG_URL`;
+  - `createOpenAIModelsImporter()`.
+- O importer aponta para `https://api.openai.com/v1/models`, exige `OPENAI_API_KEY`, usa `requiresAuth=true`,
+  `sourceKind=authenticated_api` e registra `envRequirements=['OPENAI_API_KEY']`.
+- O fetch real recebe a API key apenas no header `Authorization`; a key não entra em source, raw payload, evidence,
+  import run ou snapshot.
+- `parseRows()` extrai rows de `data`.
+- `toEvidenceFacts()` emite evidências `authenticated_catalog` para:
+  - `displayName`;
+  - `aliases.openaiModelId`;
+  - `lifecycle.createdAt`;
+  - `providerMetadata.ownedBy`.
+
+Decisão arquitetural:
+
+- `/v1/models` é fonte de disponibilidade/identidade account-scoped, não de capabilities completas. Por isso o checkbox
+  de OpenAI foi dividido: importer account-scoped está fechado; seeds/docs oficiais de capacidades, famílias,
+  reasoning/tools/modalidades e depreciações seguem como tarefa separada.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`38` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5610` testes, `0` falhas, `warnings/errors unique=0 total=0`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T15-03-50-067Z/summary.md`).
