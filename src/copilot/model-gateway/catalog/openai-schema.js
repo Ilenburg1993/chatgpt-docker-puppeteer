@@ -71,9 +71,62 @@ function readOwnedBy(projection) {
 
 /**
  * @param {Record<string, any>} projection
+ * @returns {string | null}
+ */
+function readSubjectProviderId(projection) {
+    const providerMetadata = isRecord(projection['providerMetadata']) ? projection['providerMetadata'] : {};
+    const kilo = isRecord(providerMetadata['kilo']) ? providerMetadata['kilo'] : {};
+    return typeof kilo['upstreamProvider'] === 'string' && kilo['upstreamProvider']
+        ? kilo['upstreamProvider']
+        : typeof providerMetadata['ownedBy'] === 'string' && providerMetadata['ownedBy']
+          ? providerMetadata['ownedBy']
+          : typeof providerMetadata['owned_by'] === 'string' && providerMetadata['owned_by']
+            ? providerMetadata['owned_by']
+            : typeof projection['providerId'] === 'string'
+              ? projection['providerId']
+              : null;
+}
+
+/**
+ * @param {Record<string, any> | null} providerProjection
+ * @returns {Record<string, unknown> | null}
+ */
+function buildProviderProjectionExtension(providerProjection) {
+    if (!providerProjection) return null;
+    return {
+        provider_id: providerProjection['providerId'] ?? null,
+        subject_provider_id: providerProjection['subjectProviderId'] ?? null,
+        display_name: providerProjection['displayName'] ?? providerProjection['subjectProviderId'] ?? null,
+        data_policy: providerProjection['dataPolicy'] ?? {},
+        provider_metadata: providerProjection['providerMetadata'] ?? {},
+        provenance_by_field: providerProjection['provenanceByField'] ?? {},
+        confidence_by_field: providerProjection['confidenceByField'] ?? {},
+    };
+}
+
+/**
+ * @param {Record<string, any>} projection
+ * @param {Record<string, any>[]} providerProjections
+ * @returns {Record<string, any> | null}
+ */
+function findProviderProjection(projection, providerProjections) {
+    const providerId = typeof projection['providerId'] === 'string' ? projection['providerId'] : null;
+    const subjectProviderId = readSubjectProviderId(projection);
+    if (!providerId || !subjectProviderId) return null;
+    return (
+        providerProjections.find(
+            (candidate) => candidate['providerId'] === providerId && candidate['subjectProviderId'] === subjectProviderId,
+        ) ?? null
+    );
+}
+
+/**
+ * @param {Record<string, any>} projection
+ * @param {{ providerProjections?: Record<string, any>[] }} [options]
  * @returns {Record<string, unknown>}
  */
-function buildGatewayExtension(projection) {
+function buildGatewayExtension(projection, options = {}) {
+    const providerProjection = findProviderProjection(projection, options.providerProjections ?? []);
     return {
         schema_version: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
         gateway_id: `${projection['providerId'] ?? 'unknown'}:${projection['providerModel'] ?? projection['id'] ?? 'unknown'}`,
@@ -95,6 +148,7 @@ function buildGatewayExtension(projection) {
         data_policy: projection['dataPolicy'] ?? {},
         license: projection['license'] ?? null,
         provider_metadata: projection['providerMetadata'] ?? {},
+        provider_projection: buildProviderProjectionExtension(providerProjection),
         routing_hints: projection['routingHints'] ?? {},
         account_overlay_refs: projection['accountOverlayRefs'] ?? [],
         provenance_by_field: projection['provenanceByField'] ?? {},
@@ -104,27 +158,28 @@ function buildGatewayExtension(projection) {
 
 /**
  * @param {Record<string, any>} projection
+ * @param {{ providerProjections?: Record<string, any>[] }} [options]
  * @returns {{ id: string; object: 'model'; created: number | null; owned_by: string; x_model_gateway: Record<string, unknown> }}
  */
-export function toOpenAIModelCatalogEntry(projection) {
+export function toOpenAIModelCatalogEntry(projection, options = {}) {
     const openai = isRecord(projection['openai']) ? projection['openai'] : {};
     return {
         id: String(openai['id'] ?? projection['providerModel'] ?? projection['id'] ?? 'unknown'),
         object: OPENAI_MODEL_OBJECT,
         created: readCreated(projection),
         owned_by: readOwnedBy(projection),
-        x_model_gateway: buildGatewayExtension(projection),
+        x_model_gateway: buildGatewayExtension(projection, options),
     };
 }
 
 /**
  * @param {Record<string, any>[]} projections
+ * @param {{ providerProjections?: Record<string, any>[] }} [options]
  * @returns {{ object: 'list'; data: ReturnType<typeof toOpenAIModelCatalogEntry>[] }}
  */
-export function toOpenAIModelCatalogList(projections) {
+export function toOpenAIModelCatalogList(projections, options = {}) {
     return {
         object: OPENAI_MODEL_LIST_OBJECT,
-        data: projections.map(toOpenAIModelCatalogEntry),
+        data: projections.map((projection) => toOpenAIModelCatalogEntry(projection, options)),
     };
 }
-

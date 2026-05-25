@@ -1164,8 +1164,15 @@ describe('model-gateway foundation', () => {
             provenanceByField: { 'limits.contextWindowTokens': 'openrouter-context' },
             confidenceByField: { 'limits.contextWindowTokens': 'catalog' },
         });
+        const providerProjection = createCanonicalProviderProjection({
+            providerId: 'openrouter',
+            subjectProviderId: 'x-ai',
+            displayName: 'xAI',
+            dataPolicy: { retainsPrompts: false },
+            providerMetadata: { headquarters: 'US' },
+        });
         const entry = toOpenAIModelCatalogEntry(projection);
-        const list = toOpenAIModelCatalogList([projection]);
+        const list = toOpenAIModelCatalogList([projection], { providerProjections: [providerProjection] });
 
         assert.equal(entry.id, 'x-ai/grok-build-0.1');
         assert.equal(entry.object, 'model');
@@ -1177,7 +1184,9 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(entry.x_model_gateway.modalities, { input: ['text', 'image'], output: ['text'] });
         assert.deepEqual(entry.x_model_gateway.supported_parameters, ['tools', 'tool_choice', 'response_format']);
         assert.equal(/** @type {{ contextWindowTokens: number }} */ (entry.x_model_gateway.limits).contextWindowTokens, 256000);
-        assert.deepEqual(list, { object: 'list', data: [entry] });
+        assert.equal(entry.x_model_gateway.provider_projection, null);
+        assert.equal(list.data[0].x_model_gateway.provider_projection?.subject_provider_id, 'x-ai');
+        assert.deepEqual(list.data[0].x_model_gateway.provider_projection?.data_policy, { retainsPrompts: false });
     });
 
     it('normalizes OpenAI-compatible modalities and catalog capability hints', () => {

@@ -1753,3 +1753,50 @@ Próxima direção:
 
 - Decidir a junção entre `providerProjections` e model `x_model_gateway`: leitura rápida no refresh, projection
   materializada, ou join tardio no seletor/OpenAI list.
+
+## 32. Continuidade 2026-05-25 — join tardio de provider projection no schema OpenAI
+
+Decisão arquitetural:
+
+- A junção entre modelos e providers fica tardia, no momento de criar o schema OpenAI-compatible.
+- `projections` de modelo não duplicam `providerProjections`.
+- `toOpenAIModelCatalogList(projections, { providerProjections })` pode enriquecer cada `x_model_gateway` com
+  `provider_projection` quando houver match.
+- `refreshModelGatewayCatalog()` passa `providerProjections` para `toOpenAIModelCatalogList()`.
+
+Implementado neste corte:
+
+- `toOpenAIModelCatalogEntry()` e `toOpenAIModelCatalogList()` aceitam `providerProjections` opcionais.
+- `x_model_gateway.provider_projection` inclui:
+  - `provider_id`;
+  - `subject_provider_id`;
+  - `display_name`;
+  - `data_policy`;
+  - `provider_metadata`;
+  - `provenance_by_field`;
+  - `confidence_by_field`.
+- O match inicial usa:
+  - `providerMetadata.kilo.upstreamProvider`;
+  - `providerMetadata.ownedBy`/`owned_by`;
+  - fallback para `providerId`.
+
+Separação arquitetural reafirmada:
+
+- Banco persistido segue normalizado: model projection e provider projection separados.
+- API OpenAI-compatible pode entregar uma visão enriquecida pronta para consumo.
+- Seleção e runtime ainda podem escolher se usam o join materializado na resposta ou se fazem consulta própria.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`48` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T16-25-07-653Z/summary.md`).
+
+Próxima direção:
+
+- Avaliar `ModelRouteOption`/route candidates para representar `kilo-auto/*`, provider/model, aggregator auto e
+  fallback-chain como metadata de rota, não runtime.
