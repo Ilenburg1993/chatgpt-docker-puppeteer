@@ -44,6 +44,15 @@ function scalarString(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function finiteNumber(value) {
+    const number = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+    return Number.isFinite(number) ? number : null;
+}
+
+/**
  * @param {unknown} values
  * @returns {string[]}
  */
@@ -120,4 +129,73 @@ export function normalizeOpenAICompatibleModelCapabilities(input = {}) {
     if (parameters.has('code_execution')) capabilities['codeExecution'] = true;
     if (parameters.has('web_search') || parameters.has('search')) capabilities['webSearch'] = true;
     return capabilities;
+}
+
+/**
+ * @param {object} [input]
+ * @param {unknown} [input.contextWindowTokens]
+ * @param {unknown} [input.maxOutputTokens]
+ * @param {unknown} [input.maxRequestTokens]
+ * @param {unknown} [input.tokensPerMinute]
+ * @param {unknown} [input.requestsPerMinute]
+ * @param {unknown} [input.dailyRequests]
+ * @returns {Record<string, number>}
+ */
+export function normalizeModelTokenLimits(input = {}) {
+    const fields = {
+        contextWindowTokens: finiteNumber(input.contextWindowTokens),
+        maxOutputTokens: finiteNumber(input.maxOutputTokens),
+        maxRequestTokens: finiteNumber(input.maxRequestTokens),
+        tokensPerMinute: finiteNumber(input.tokensPerMinute),
+        requestsPerMinute: finiteNumber(input.requestsPerMinute),
+        dailyRequests: finiteNumber(input.dailyRequests),
+    };
+    return Object.fromEntries(
+        Object.entries(fields)
+            .filter(([, value]) => value !== null && value >= 0)
+            .map(([key, value]) => [key, /** @type {number} */ (value)]),
+    );
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function usdPerMillionTokens(value) {
+    const number = finiteNumber(value);
+    return number === null ? null : Math.round(number * 1_000_000 * 1_000_000) / 1_000_000;
+}
+
+/**
+ * @param {object} [input]
+ * @param {unknown} [input.inputPerTokenUsd]
+ * @param {unknown} [input.outputPerTokenUsd]
+ * @param {unknown} [input.cacheReadPerTokenUsd]
+ * @param {unknown} [input.cacheWritePerTokenUsd]
+ * @param {unknown} [input.requestUsd]
+ * @param {unknown} [input.webSearchUsdPerRequest]
+ * @returns {Record<string, string | number>}
+ */
+export function normalizeUsdPricing(input = {}) {
+    const fields = {
+        inputUsdPerMillion: usdPerMillionTokens(input.inputPerTokenUsd),
+        outputUsdPerMillion: usdPerMillionTokens(input.outputPerTokenUsd),
+        cacheReadUsdPerMillion: usdPerMillionTokens(input.cacheReadPerTokenUsd),
+        cacheWriteUsdPerMillion: usdPerMillionTokens(input.cacheWritePerTokenUsd),
+        requestUsd: finiteNumber(input.requestUsd),
+        webSearchUsdPerRequest: finiteNumber(input.webSearchUsdPerRequest),
+    };
+    const pricing = Object.fromEntries(
+        Object.entries(fields)
+            .filter(([, value]) => value !== null && value >= 0)
+            .map(([key, value]) => [key, /** @type {number} */ (value)]),
+    );
+    return Object.keys(pricing).length > 0
+        ? {
+              currency: 'USD',
+              tokenUnit: 'per_million_tokens',
+              requestUnit: 'per_request',
+              ...pricing,
+          }
+        : {};
 }

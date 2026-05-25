@@ -42,7 +42,9 @@ export {
 export {
     normalizeCatalogModalities,
     normalizeModelModalities,
+    normalizeModelTokenLimits,
     normalizeOpenAICompatibleModelCapabilities,
+    normalizeUsdPricing,
     parseModelModalityExpression,
 } from './normalizers.js';
 export { refreshModelGatewayCatalog } from './refresh.js';

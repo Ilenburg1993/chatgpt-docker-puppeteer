@@ -559,8 +559,11 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   forcedToolChoice, parallelToolCalls, JSON mode, JSON schema/structured outputs, reasoning, multimodal e search/code.
 - [ ] Criar normalizador de capabilities agentic runtime: streaming, tools, forcedToolChoice, parallelToolCalls, JSON mode,
   JSON schema, structured outputs, reasoning effort, reasoning budget, code execution, web/search grounding.
-- [ ] Criar normalizador de limites: context window, max output, max request, TPM, RPM, daily requests e burst.
-- [ ] Criar normalizador de pricing: input/output/cache/read/write/request/image/audio, moeda e unidade.
+- [x] Criar normalizador de limites: context window, max output, max request, TPM, RPM e daily requests.
+- [x] Criar normalizador de pricing USD para input/output/cache/read/write/request/search com moeda e unidade
+  explícitas.
+- [ ] Expandir normalizador de pricing para image/audio e moedas não-USD quando providers oferecerem esses campos.
+- [ ] Expandir normalizador de limites para burst/concurrency/account quotas quando providers oferecerem esses campos.
 - [ ] Criar normalizador de lifecycle: active, preview, beta, deprecated, retired, replacement, expiresAt.
 - [ ] Criar parser de aliases/versionamento (`latest`, datas `YYYY-MM`, famílias, tamanho, quantização).
 - [ ] Criar normalizador de providers/gateways que separe `direct_provider`, `aggregator`, `gateway`,
@@ -1430,3 +1433,53 @@ Próxima direção:
 
 - Commitar/pushar este corte.
 - Depois, continuar Faixa M em limites/pricing normalizados com unidade/currency explícitas no `x_model_gateway`.
+
+## 25. Continuidade 2026-05-25 — normalizadores de limits/pricing com unidades explícitas
+
+Implementado neste corte:
+
+- `src/copilot/model-gateway/catalog/normalizers.js` ganhou:
+  - `normalizeModelTokenLimits()`;
+  - `normalizeUsdPricing()`.
+- `normalizeModelTokenLimits()` normaliza campos de limite sem misturar com prova runtime:
+  - `contextWindowTokens`;
+  - `maxOutputTokens`;
+  - `maxRequestTokens`;
+  - `tokensPerMinute`;
+  - `requestsPerMinute`;
+  - `dailyRequests`.
+- `normalizeUsdPricing()` normaliza preço em USD com unidade explícita:
+  - `currency: "USD"`;
+  - `tokenUnit: "per_million_tokens"`;
+  - `requestUnit: "per_request"`;
+  - `inputUsdPerMillion`;
+  - `outputUsdPerMillion`;
+  - `cacheReadUsdPerMillion`;
+  - `cacheWriteUsdPerMillion`;
+  - `requestUsd`;
+  - `webSearchUsdPerRequest`.
+- O `OpenRouterModelsImporter` agora usa esses normalizers para emitir evidências `limits.*` e `pricing.*`, incluindo
+  moeda/unidade. Isso evita que o banco misture preço por token, por milhão de tokens e por request sem contexto.
+- Preços por token são arredondados em escala de 6 casas após conversão para milhão de tokens, evitando ruído binário
+  como `0.19999999999999998`.
+
+Separação arquitetural reafirmada:
+
+- `limits.*` e `pricing.*` vindos de catálogo são fatos de metadado/proveniência.
+- Acesso real, cota efetiva do token do operador, quota por organização, rate-limit dinâmico e sucesso de chamada seguem
+  na fase runtime/overlay/health, não na normalização base.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`43` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5616` testes, `0` falhas, `warnings/errors unique=0 total=0`;
+  resumo `artifacts/test-runs/copilot/2026-05-25T15-47-33-052Z/summary.md`).
+
+Próxima direção:
+
+- Commitar/pushar este corte.
+- Depois, avançar lifecycle/aliases e começar a modelar explicitamente overlays account-scoped para acesso efetivo.

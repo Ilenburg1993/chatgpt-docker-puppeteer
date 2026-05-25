@@ -14,7 +14,9 @@ import {
 } from '../contracts.js';
 import {
     normalizeModelModalities,
+    normalizeModelTokenLimits,
     normalizeOpenAICompatibleModelCapabilities,
+    normalizeUsdPricing,
 } from '../normalizers.js';
 
 export const OPENROUTER_MODELS_CATALOG_URL = 'https://openrouter.ai/api/v1/models';
@@ -33,24 +35,6 @@ function isRecord(value) {
  */
 function stringValue(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {number | null}
- */
-function finiteNumber(value) {
-    const number = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
-    return Number.isFinite(number) ? number : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {number | null}
- */
-function usdPerMillion(value) {
-    const number = finiteNumber(value);
-    return number === null ? null : number * 1_000_000;
 }
 
 /**
@@ -114,22 +98,28 @@ function modelEvidenceValues(row) {
         inputModalities: modalities.input,
         outputModalities: modalities.output,
     });
+    const limits = normalizeModelTokenLimits({
+        contextWindowTokens: row['context_length'] ?? topProvider['context_length'],
+        maxOutputTokens: topProvider['max_completion_tokens'],
+    });
+    const normalizedPricing = normalizeUsdPricing({
+        inputPerTokenUsd: pricing['prompt'],
+        outputPerTokenUsd: pricing['completion'],
+        cacheReadPerTokenUsd: pricing['input_cache_read'],
+        cacheWritePerTokenUsd: pricing['input_cache_write'],
+        webSearchUsdPerRequest: pricing['web_search'],
+    });
     const values = [
         { fieldPath: 'displayName', value: stringValue(row['name']) },
         { fieldPath: 'aliases.canonicalSlug', value: stringValue(row['canonical_slug']) },
         { fieldPath: 'aliases.huggingFaceId', value: stringValue(row['hugging_face_id']) },
         { fieldPath: 'description', value: stringValue(row['description']) },
-        { fieldPath: 'limits.contextWindowTokens', value: finiteNumber(row['context_length']) ?? finiteNumber(topProvider['context_length']) },
-        { fieldPath: 'limits.maxOutputTokens', value: finiteNumber(topProvider['max_completion_tokens']) },
+        ...Object.entries(limits).map(([key, value]) => ({ fieldPath: `limits.${key}`, value })),
         { fieldPath: 'modalities.input', value: modalities.input },
         { fieldPath: 'modalities.output', value: modalities.output },
         { fieldPath: 'supportedParameters', value: supportedParameters },
         ...Object.entries(capabilities).map(([key, value]) => ({ fieldPath: `capabilities.${key}`, value })),
-        { fieldPath: 'pricing.inputUsdPerMillion', value: usdPerMillion(pricing['prompt']) },
-        { fieldPath: 'pricing.outputUsdPerMillion', value: usdPerMillion(pricing['completion']) },
-        { fieldPath: 'pricing.cacheReadUsdPerMillion', value: usdPerMillion(pricing['input_cache_read']) },
-        { fieldPath: 'pricing.cacheWriteUsdPerMillion', value: usdPerMillion(pricing['input_cache_write']) },
-        { fieldPath: 'pricing.webSearchUsdPerRequest', value: finiteNumber(pricing['web_search']) },
+        ...Object.entries(normalizedPricing).map(([key, value]) => ({ fieldPath: `pricing.${key}`, value })),
         { fieldPath: 'routingHints.openrouterTopProvider', value: topProvider },
     ];
     return values.filter((item) => {

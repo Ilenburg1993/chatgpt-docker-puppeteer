@@ -71,7 +71,9 @@ import {
     diffCanonicalModelProjections,
     mergeModelMetadataEvidence,
     normalizeModelModalities,
+    normalizeModelTokenLimits,
     normalizeOpenAICompatibleModelCapabilities,
+    normalizeUsdPricing,
     rankCatalogEvidenceConfidence,
     refreshModelGatewayCatalog,
     runCatalogImporters,
@@ -865,6 +867,10 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('limits.maxOutputTokens'), 65536);
         assert.equal(byPath.get('pricing.inputUsdPerMillion'), 1);
         assert.equal(byPath.get('pricing.outputUsdPerMillion'), 2);
+        assert.equal(byPath.get('pricing.currency'), 'USD');
+        assert.equal(byPath.get('pricing.tokenUnit'), 'per_million_tokens');
+        assert.equal(byPath.get('pricing.requestUnit'), 'per_request');
+        assert.equal(byPath.get('pricing.webSearchUsdPerRequest'), 0.005);
         assert.deepEqual(byPath.get('modalities.input'), ['text', 'image']);
         assert.ok(/** @type {string[]} */ (byPath.get('supportedParameters')).includes('tools'));
         assert.equal(byPath.get('capabilities.tools'), true);
@@ -965,6 +971,39 @@ describe('model-gateway foundation', () => {
             reasoningEffort: true,
             vision: true,
         });
+    });
+
+    it('normalizes token limits and USD pricing units from provider catalogs', () => {
+        assert.deepEqual(
+            normalizeModelTokenLimits({
+                contextWindowTokens: '256000',
+                maxOutputTokens: 65536,
+                maxRequestTokens: '128000',
+                tokensPerMinute: undefined,
+            }),
+            {
+                contextWindowTokens: 256000,
+                maxOutputTokens: 65536,
+                maxRequestTokens: 128000,
+            },
+        );
+        assert.deepEqual(
+            normalizeUsdPricing({
+                inputPerTokenUsd: '0.000001',
+                outputPerTokenUsd: '0.000002',
+                cacheReadPerTokenUsd: '0.0000002',
+                webSearchUsdPerRequest: '0.005',
+            }),
+            {
+                currency: 'USD',
+                tokenUnit: 'per_million_tokens',
+                requestUnit: 'per_request',
+                inputUsdPerMillion: 1,
+                outputUsdPerMillion: 2,
+                cacheReadUsdPerMillion: 0.2,
+                webSearchUsdPerRequest: 0.005,
+            },
+        );
     });
 
     it('refreshes catalog snapshots, replaces source evidence, diffs projections and emits OpenAI schema', async () => {
