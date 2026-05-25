@@ -545,7 +545,7 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] Implementar `NvidiaNimCatalogImporter` para docs/API catalog quando disponível.
 - [ ] Permitir importers `OpenAICompatibleGenericImporter` para vLLM, LiteLLM, Chutes, Z.AI e endpoints locais sem
   importer especializado.
-- [ ] Criar modo `accountScoped` para importers autenticados que retornam modelos habilitados por plano, organização,
+- [x] Criar modo `accountScoped` para importers autenticados que retornam modelos habilitados por plano, organização,
   quota ou BYOK interno, sem serializar segredo.
 
 ### Faixa M — Normalização, enriquecimento e heurísticas controladas
@@ -1539,3 +1539,49 @@ Próxima direção:
 
 - Depois, avançar `accountScoped`/overlays: diferenciar catálogo público, modelos disponíveis para a key do operador,
   quotas efetivas e provas runtime.
+
+## 27. Continuidade 2026-05-25 — overlays account-scoped como camada separada de acesso
+
+Implementado neste corte:
+
+- `CatalogImporter` agora pode retornar `toAccountOverlays(rows, context)` além de `toEvidenceFacts(rows, context)`.
+- `runCatalogImporters()` persiste `accountOverlays` no snapshot com upsert próprio, mantendo:
+  - `sources` como origem do endpoint/importer;
+  - `evidences` como fatos de metadata por modelo;
+  - `accountOverlays` como visão autenticada de conta/key;
+  - `rawPayloadRefs` como referência redigida ao payload original.
+- `createProviderAccountOverlay()` ganhou campos de proveniência e confiança:
+  - `accountOverlayId`;
+  - `sourceId`;
+  - `sourceKind`;
+  - `confidence`;
+  - `providerMetadata`.
+- `OpenAIModelsImporter` agora interpreta `/v1/models` também como overlay autenticado:
+  - `enabledModels` recebe os modelos que a key atual consegue listar;
+  - `secretRef` guarda somente o nome lógico da chave (`OPENAI_API_KEY`, `COPILOT_OPENAI_API_KEY` etc.);
+  - `providerMetadata.semantics=account_visible_models` deixa explícito que isso não prova chamada runtime.
+- `createDefaultModelGatewayCatalogImporters()` preserva qual variável de ambiente originou a key OpenAI e passa essa
+  referência ao overlay sem serializar o valor secreto.
+
+Separação arquitetural reafirmada:
+
+- Catálogo público responde “o provider anuncia o modelo?”.
+- Overlay account-scoped responde “esta conta/key lista ou habilita este modelo?”.
+- Runtime probes continuam sendo a etapa posterior que responde “o modelo realmente executa chat, stream, tools,
+  JSON/structured output, reasoning, visão etc. com esta configuração?”.
+- Seleção final deve combinar as três camadas depois, junto com preferências do operador, custo, risco e saúde.
+
+Validação deste corte:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`44` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5617` testes totais, `5584` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T15-59-21-749Z/summary.md`).
+
+Próxima direção:
+
+- Começar a estruturar overlays account-scoped para outros providers e um contrato normalizado para quotas,
+  rate limits, billing/free-tier e allow/block lists quando os endpoints oferecerem esses campos.

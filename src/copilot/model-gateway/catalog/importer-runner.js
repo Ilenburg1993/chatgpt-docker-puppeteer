@@ -26,6 +26,7 @@ import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
  * @property {() => Promise<unknown> | unknown} fetchRaw
  * @property {(raw: unknown) => Promise<unknown[]> | unknown[]} parseRows
  * @property {(rows: unknown[], context: { source: Record<string, any>; rawPayloadRef: string }) => Promise<Record<string, any>[]> | Record<string, any>[]} toEvidenceFacts
+ * @property {(rows: unknown[], context: { source: Record<string, any>; rawPayloadRef: string }) => Promise<Record<string, any>[]> | Record<string, any>[]} [toAccountOverlays]
  */
 
 /**
@@ -89,6 +90,23 @@ function upsertMany(records, additions, key) {
 }
 
 /**
+ * @param {Record<string, any>} overlay
+ * @returns {string}
+ */
+function accountOverlayKey(overlay) {
+    const explicit = overlay['accountOverlayId'];
+    if (typeof explicit === 'string' && explicit) return explicit;
+    return [
+        overlay['providerId'],
+        overlay['accountScope'],
+        overlay['secretRef'],
+        overlay['sourceId'],
+    ]
+        .filter((item) => typeof item === 'string' && item)
+        .join(':') || JSON.stringify(overlay);
+}
+
+/**
  * @param {object} [input]
  * @param {CatalogImporter[]} [input.importers]
  * @param {unknown} [input.snapshot]
@@ -111,6 +129,8 @@ export async function runCatalogImporters(input = {}) {
         let rawPayloadRefs = [];
         /** @type {Record<string, any>[]} */
         let evidences = [];
+        /** @type {Record<string, any>[]} */
+        let accountOverlays = [];
         /** @type {Record<string, any>} */
         let run;
 
@@ -122,7 +142,9 @@ export async function runCatalogImporters(input = {}) {
                 payload: raw,
             });
             const rows = await importer.parseRows(raw);
-            evidences = await importer.toEvidenceFacts(rows, { source, rawPayloadRef: rawRef.rawPayloadRef });
+            const context = { source, rawPayloadRef: rawRef.rawPayloadRef };
+            evidences = await importer.toEvidenceFacts(rows, context);
+            accountOverlays = importer.toAccountOverlays ? await importer.toAccountOverlays(rows, context) : [];
             rawPayloadRefs = [rawRef];
             run = createCatalogImportRun({
                 runId: createImportRunId(importer, startedAt),
@@ -150,6 +172,7 @@ export async function runCatalogImporters(input = {}) {
             ...snapshot,
             sources: upsertMany(snapshot.sources, [source], (item) => String(item['id'])),
             evidences: upsertMany(snapshot.evidences, evidences, (item) => String(item['evidenceId'] ?? JSON.stringify(item))),
+            accountOverlays: upsertMany(snapshot.accountOverlays, accountOverlays, accountOverlayKey),
             rawPayloadRefs: upsertMany(snapshot.rawPayloadRefs, rawPayloadRefs, (item) => String(item['rawPayloadRef'])),
             importRuns: [...snapshot.importRuns, run],
         };

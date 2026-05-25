@@ -192,9 +192,13 @@ export function createModelRouteOption(input) {
 /**
  * @param {object} input
  * @param {string} input.providerId
+ * @param {string} [input.accountOverlayId]
  * @param {string} [input.accountScope]
  * @param {string} [input.secretRef]
  * @param {string} [input.organizationIdRef]
+ * @param {string} [input.sourceId]
+ * @param {string} [input.sourceKind]
+ * @param {string} [input.confidence]
  * @param {string[]} [input.enabledModels]
  * @param {string[]} [input.blockedModels]
  * @param {string[]} [input.byokProviderKeys]
@@ -202,17 +206,28 @@ export function createModelRouteOption(input) {
  * @param {Record<string, unknown>} [input.rateLimits]
  * @param {Record<string, unknown>} [input.spendingLimits]
  * @param {Record<string, unknown>} [input.policyHeaders]
+ * @param {Record<string, unknown>} [input.providerMetadata]
  * @param {string | number | Date} [input.observedAt]
  * @param {string | number | Date | null} [input.expiresAt]
  * @returns {object}
  */
 export function createProviderAccountOverlay(input) {
+    const providerId = normalizeProviderId(input.providerId);
+    const accountScope = optionalString(input.accountScope) ?? 'default';
+    const secretRef = optionalString(input.secretRef);
+    const sourceId = optionalString(input.sourceId);
     return {
         schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
-        providerId: normalizeProviderId(input.providerId),
-        accountScope: optionalString(input.accountScope) ?? 'default',
-        secretRef: optionalString(input.secretRef),
+        accountOverlayId:
+            optionalString(input.accountOverlayId) ??
+            [providerId, accountScope, secretRef, sourceId].filter(Boolean).join(':'),
+        providerId,
+        accountScope,
+        secretRef,
         organizationIdRef: optionalString(input.organizationIdRef),
+        sourceId,
+        sourceKind: optionalString(input.sourceKind) ?? 'unknown',
+        confidence: optionalString(input.confidence) ?? MODEL_GATEWAY_CATALOG_CONFIDENCE.UNKNOWN,
         enabledModels: stringList(input.enabledModels),
         blockedModels: stringList(input.blockedModels),
         byokProviderKeys: stringList(input.byokProviderKeys),
@@ -220,6 +235,7 @@ export function createProviderAccountOverlay(input) {
         rateLimits: isRecord(input.rateLimits) ? sanitizeJsonValue(input.rateLimits) : {},
         spendingLimits: isRecord(input.spendingLimits) ? sanitizeJsonValue(input.spendingLimits) : {},
         policyHeaders: isRecord(input.policyHeaders) ? redactSecretRecord(input.policyHeaders) : {},
+        providerMetadata: isRecord(input.providerMetadata) ? sanitizeJsonValue(input.providerMetadata) : {},
         observedAt: normalizeIsoDate(input.observedAt) ?? new Date().toISOString(),
         expiresAt: normalizeIsoDate(input.expiresAt),
         redactionStatus: 'sanitized',

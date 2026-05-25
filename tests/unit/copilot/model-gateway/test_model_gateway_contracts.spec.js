@@ -789,6 +789,16 @@ describe('model-gateway foundation', () => {
                                     rawPayloadRef: context.rawPayloadRef,
                                 }),
                             ),
+                        toAccountOverlays: (rows, context) => [
+                            createProviderAccountOverlay({
+                                providerId: 'openrouter',
+                                accountScope: 'public-catalog',
+                                sourceId: /** @type {{ id: string }} */ (context.source).id,
+                                sourceKind: 'public_api',
+                                confidence: 'catalog',
+                                enabledModels: rows.map((row) => /** @type {{ id: string }} */ (row).id),
+                            }),
+                        ],
                     },
                     {
                         id: 'broken-auth-catalog',
@@ -809,6 +819,7 @@ describe('model-gateway foundation', () => {
             assert.equal(raw.includes('sk-secret-that-must-not-leak'), false);
             assert.equal(raw.includes('gsk-secret-that-must-not-leak'), false);
             assert.equal(snapshot.evidences.length, 1);
+            assert.equal(snapshot.accountOverlays.length, 1);
             assert.equal(snapshot.rawPayloadRefs.length, 1);
             assert.deepEqual(
                 snapshot.importRuns.map((run) => run.status),
@@ -816,6 +827,7 @@ describe('model-gateway foundation', () => {
             );
             assert.equal(loaded.sources.length, 2);
             assert.equal(loaded.evidences[0].value, 131072);
+            assert.deepEqual(loaded.accountOverlays[0].enabledModels, ['m']);
             assert.equal(JSON.stringify(loaded.importRuns).includes('gsk-secret-that-must-not-leak'), false);
         } finally {
             await rm(dir, { recursive: true, force: true });
@@ -938,6 +950,10 @@ describe('model-gateway foundation', () => {
         assert.equal(authorizationHeader, `Bearer ${secret}`);
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
         assert.equal(snapshot.sources[0].authMode, 'api_key');
+        assert.equal(snapshot.accountOverlays.length, 1);
+        assert.equal(snapshot.accountOverlays[0].secretRef, 'OPENAI_API_KEY');
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['gpt-test']);
+        assert.equal(snapshot.accountOverlays[0].providerMetadata.semantics, 'account_visible_models');
         assert.equal(snapshot.importRuns[0].status, 'completed');
         assert.equal(byPath.get('displayName'), 'gpt-test');
         assert.equal(byPath.get('lifecycle.createdAt'), '2026-05-21T15:21:01.000Z');

@@ -15,10 +15,12 @@ import {
 
 /**
  * @param {Record<string, string | undefined>} env
- * @returns {string | null}
+ * @returns {{ key: string; value: string } | null}
  */
-function readOpenAiKey(env) {
-    return env['OPENAI_API_KEY'] ?? env['COPILOT_OPENAI_API_KEY'] ?? null;
+function readOpenAiSecret(env) {
+    if (env['OPENAI_API_KEY']) return { key: 'OPENAI_API_KEY', value: env['OPENAI_API_KEY'] };
+    if (env['COPILOT_OPENAI_API_KEY']) return { key: 'COPILOT_OPENAI_API_KEY', value: env['COPILOT_OPENAI_API_KEY'] };
+    return null;
 }
 
 /**
@@ -36,10 +38,15 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     /** @type {import('./importer-runner.js').CatalogImporter[]} */
     const importers = [];
     if (includePublic) importers.push(createOpenRouterModelsImporter({ fetchImpl: options.fetchImpl }));
-    const openAiKey = readOpenAiKey(env);
-    if (includeAuthenticated && openAiKey) {
-        importers.push(createOpenAIModelsImporter({ fetchImpl: options.fetchImpl, apiKey: openAiKey }));
+    const openAiSecret = readOpenAiSecret(env);
+    if (includeAuthenticated && openAiSecret) {
+        importers.push(
+            createOpenAIModelsImporter({
+                fetchImpl: options.fetchImpl,
+                apiKey: openAiSecret.value,
+                secretRef: openAiSecret.key,
+            }),
+        );
     }
     return importers;
 }
-

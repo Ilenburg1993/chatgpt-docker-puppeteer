@@ -11,6 +11,7 @@
 import {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
     createModelMetadataEvidence,
+    createProviderAccountOverlay,
 } from '../contracts.js';
 
 export const OPENAI_MODELS_CATALOG_URL = 'https://api.openai.com/v1/models';
@@ -64,6 +65,9 @@ function unixSecondsToIso(value) {
  * @param {object} [options]
  * @param {typeof fetch} [options.fetchImpl]
  * @param {string} [options.apiKey]
+ * @param {string} [options.secretRef]
+ * @param {string} [options.accountScope]
+ * @param {string} [options.organizationIdRef]
  * @param {string} [options.url]
  * @returns {import('../importer-runner.js').CatalogImporter}
  */
@@ -118,6 +122,29 @@ export function createOpenAIModelsImporter(options = {}) {
                     }),
                 );
             });
+        },
+        toAccountOverlays(rows, context) {
+            const sourceId = stringValue(context.source['id']) ?? 'openai-models';
+            const enabledModels = rows
+                .map((row) => stringValue(isRecord(row) ? row['id'] : null))
+                .filter((id) => id !== null);
+            return [
+                createProviderAccountOverlay({
+                    accountOverlayId: `openai:${options.accountScope ?? 'default'}:${options.secretRef ?? 'OPENAI_API_KEY'}:${sourceId}`,
+                    providerId: 'openai',
+                    accountScope: options.accountScope ?? 'default',
+                    secretRef: options.secretRef ?? 'OPENAI_API_KEY',
+                    organizationIdRef: options.organizationIdRef,
+                    sourceId,
+                    sourceKind: 'authenticated_api',
+                    confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG,
+                    enabledModels,
+                    providerMetadata: {
+                        endpoint: '/v1/models',
+                        semantics: 'account_visible_models',
+                    },
+                }),
+            ];
         },
     };
 }
