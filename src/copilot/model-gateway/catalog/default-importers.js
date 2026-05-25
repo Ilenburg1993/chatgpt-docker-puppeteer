@@ -11,6 +11,7 @@
 import {
     createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
+    createCloudflareWorkersAiCatalogImporter,
     createGeminiModelsImporter,
     createGroqModelsImporter,
     createHuggingFaceInferenceProvidersImporter,
@@ -67,6 +68,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     const env = options.env ?? process.env;
     const includePublic = options.includePublic ?? true;
     const includeAuthenticated = options.includeAuthenticated ?? true;
+    const cloudflareSecret = readEnvSecret(env, ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY', 'CLOUDFLARE_KEY']);
     /** @type {import('./importer-runner.js').CatalogImporter[]} */
     const importers = [];
     if (includePublic) {
@@ -75,6 +77,13 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             createKiloGatewayModelsImporter({ fetchImpl: options.fetchImpl }),
             createKiloGatewayProvidersImporter({ fetchImpl: options.fetchImpl }),
             createCerebrasPublicModelsImporter({ fetchImpl: options.fetchImpl }),
+            createCloudflareWorkersAiCatalogImporter({
+                fetchImpl: options.fetchImpl,
+                apiToken: includeAuthenticated ? cloudflareSecret?.value : undefined,
+                secretRef: includeAuthenticated ? cloudflareSecret?.key : undefined,
+                accountId: env['CLOUDFLARE_ACCOUNT_ID'],
+                gatewayId: env['CLOUDFLARE_AI_GATEWAY_ID'],
+            }),
         );
     }
     const ollamaBaseUrl = readEnvSecret(env, ['OLLAMA_BASE_URL', 'OLLAMA_HOST', 'COPILOT_OLLAMA_BASE_URL']);

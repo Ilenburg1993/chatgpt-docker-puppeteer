@@ -581,7 +581,8 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Implementar `HuggingFaceInferenceProvidersImporter` para catálogo de providers/modelos/rotas.
 - [x] Implementar `OpenCodeZenModelsImporter` para `https://opencode.ai/zen/v1/models`, preservando endpoints por
   família, pricing/lifecycle de docs e overlay por `OPENCODE_API_KEY`.
-- [ ] Implementar `CloudflareWorkersAiCatalogImporter` para unified catalog/Workers AI docs.
+- [x] Implementar `CloudflareWorkersAiCatalogImporter` para unified catalog/Workers AI docs, separando Workers AI direto
+  de AI Gateway universal/cache/retry/fallback.
 - [x] Implementar `KiloGatewayCatalogImporter` para `https://api.kilo.ai/api/gateway/models`, capturando ids
   `provider/model`, provider upstream, pricing, context window, features, rotas gratuitas e endpoints auxiliares.
 - [x] Implementar `KiloGatewayProvidersImporter` para `/providers` quando disponível, preservando provider upstream e
@@ -2752,3 +2753,67 @@ Validação deste corte até agora:
 Próxima direção:
 
 - Continuar para Cloudflare Workers AI/AI Gateway.
+
+## 52. Continuidade 2026-05-25 — importer Cloudflare Workers AI/AI Gateway
+
+Investigação oficial:
+
+- A documentação oficial do Cloudflare AI lista modelos Workers AI em `https://developers.cloudflare.com/ai/models/`.
+- A documentação Workers AI REST mostra execução direta por conta em
+  `https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}`.
+- A documentação AI Gateway mostra endpoint universal em
+  `https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}`.
+- O endpoint universal aceita itens com `provider`, `endpoint` e `authorization`, permitindo fallback/retry entre
+  providers/modelos.
+- A documentação REST/AI Gateway também expõe superfície OpenAI-compatible em
+  `https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1` e endpoints por provider/gateway.
+
+Implementado neste corte:
+
+- Novo `CloudflareWorkersAiCatalogImporter`.
+- O importer aceita catálogo em JSON (`data[]`, `models[]`, `result[]`) e fallback HTML tolerante para ids `@cf/...`
+  extraídos da página pública de modelos.
+- A composição padrão inclui Cloudflare como catálogo público; se `CLOUDFLARE_API_TOKEN`,
+  `CLOUDFLARE_API_KEY` ou `CLOUDFLARE_KEY` estiverem presentes, o mesmo importer vira authenticated catalog e recebe
+  `CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_AI_GATEWAY_ID` para montar overlays/rotas.
+- O payload vira evidências para:
+  - `displayName`;
+  - `description`;
+  - aliases normalizados e Hugging Face id quando houver;
+  - `limits.contextWindowTokens`/`maxOutputTokens`;
+  - capabilities por task/campos declarados: `chat`, `embeddings`, `rerank`, `vision`, `audio`, `reasoning`, `tools`,
+    `batch`, `lora`, `realTime`;
+  - modalidades derivadas de task/capabilities;
+  - `providerMetadata.ownedBy=cloudflare`;
+  - task, author/provider, platform, hosting/availability, partner flag, docs URL e capabilities brutas;
+  - `openai.owned_by=cloudflare`.
+- O importer emite duas rotas por modelo:
+  - `exact_model` para Workers AI direto, com `wireApi=workers_ai_run`, endpoint REST e base OpenAI-compatible;
+  - `gateway_fallback` para AI Gateway universal, com `wireApi=cloudflare_ai_gateway_universal`, provider
+    `workers-ai`, endpoint `@cf/...`, `supportsFallback`, `supportsRetry` e `supportsCache`.
+- O overlay de conta preserva `secretRef`, modelos habilitados, flags de account/gateway configurados e endpoints
+  documentados, sem serializar token.
+- Barrels de importers, catálogo e root exportam as constantes Cloudflare e
+  `createCloudflareWorkersAiCatalogImporter()`.
+
+Separação arquitetural reafirmada:
+
+- Catálogo público/HTML prova existência/documentação do modelo, não acesso pela conta.
+- Token/account/gateway configurados provam apenas a capacidade de montar rota account-scoped; runtime/probes ainda
+  precisam validar permissões reais, quotas, fallback, cache e streaming.
+- Workers AI direto e AI Gateway universal são rotas diferentes e devem continuar modeladas separadamente.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`62` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5639` testes totais, `5606` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T20-13-58-681Z/summary.md`).
+
+Próxima direção:
+
+- Continuar para NVIDIA NIM, ou refinar importers especializados de Chutes/Z.AI se a estratégia for fechar primeiro
+  todos os OpenAI-compatible especializados.

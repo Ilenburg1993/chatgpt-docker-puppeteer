@@ -15,6 +15,13 @@ export {
     createCerebrasPublicModelsImporter,
 } from './cerebras-public-models-importer.js';
 export {
+    CLOUDFLARE_AI_GATEWAY_UNIVERSAL_URL,
+    CLOUDFLARE_WORKERS_AI_MODELS_CATALOG_URL,
+    CLOUDFLARE_WORKERS_AI_OPENAI_BASE_URL,
+    CLOUDFLARE_WORKERS_AI_REST_BASE_URL,
+    createCloudflareWorkersAiCatalogImporter,
+} from './cloudflare-workers-ai-catalog-importer.js';
+export {
     GEMINI_MODELS_API_VERSION,
     GEMINI_MODELS_CATALOG_URL,
     GEMINI_OPENAI_COMPATIBLE_BASE_URL,

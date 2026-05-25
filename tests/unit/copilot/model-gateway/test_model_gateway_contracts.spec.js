@@ -63,6 +63,7 @@ import {
     JsonModelGatewayCatalogStore,
     createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
+    createCloudflareWorkersAiCatalogImporter,
     createGeminiModelsImporter,
     createGroqModelsImporter,
     createHuggingFaceInferenceProvidersImporter,
@@ -2031,6 +2032,79 @@ describe('model-gateway foundation', () => {
         assert.equal(snapshot.accountOverlays[0].secretRef, 'OPENCODE_API_KEY');
     });
 
+    it('imports Cloudflare Workers AI catalog metadata and gateway route options', async () => {
+        const secret = 'cloudflare-secret-that-must-not-leak';
+        /** @type {string | null} */
+        let authorizationHeader = null;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (_url, init) => {
+                authorizationHeader = /** @type {{ authorization?: string }} */ (init)?.headers?.authorization ?? null;
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    headers: new Headers({ 'content-type': 'application/json' }),
+                    json: async () => ({
+                        data: [
+                            {
+                                id: '@cf/meta/llama-3.1-8b-instruct',
+                                name: 'Llama 3.1 8B Instruct',
+                                task: 'Text Generation',
+                                author: 'Meta',
+                                platform: 'Workers AI',
+                                hosting: 'Hosted',
+                                context_window: 131072,
+                                capabilities: { function_calling: true, batch: true },
+                            },
+                            {
+                                id: '@cf/llava-hf/llava-1.5-7b-hf',
+                                name: 'LLaVA 1.5 7B',
+                                task: 'Image-to-Text',
+                                author: 'llava-hf',
+                                platform: 'Workers AI',
+                                hosting: 'Hosted',
+                                capabilities: { vision: true },
+                            },
+                        ],
+                    }),
+                    text: async () => '',
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [
+                createCloudflareWorkersAiCatalogImporter({
+                    fetchImpl: fakeFetch,
+                    apiToken: secret,
+                    secretRef: 'CLOUDFLARE_KEY',
+                    accountId: 'account-1',
+                    gatewayId: 'gateway-1',
+                }),
+            ],
+            now: () => new Date('2026-05-25T14:35:00.000Z'),
+        });
+        const byModel = new Map(
+            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+        );
+        const gatewayRoute = snapshot.routeOptions.find((route) => route.selectorKind === 'gateway_fallback');
+
+        assert.equal(authorizationHeader, `Bearer ${secret}`);
+        assert.equal(JSON.stringify(snapshot).includes(secret), false);
+        assert.equal(snapshot.sources[0].providerId, 'cloudflare-workers-ai');
+        assert.equal(byModel.get('cloudflare-workers-ai:@cf/meta/llama-3.1-8b-instruct:limits.contextWindowTokens'), 131072);
+        assert.equal(byModel.get('cloudflare-workers-ai:@cf/meta/llama-3.1-8b-instruct:capabilities.tools'), true);
+        assert.equal(byModel.get('cloudflare-workers-ai:@cf/meta/llama-3.1-8b-instruct:capabilities.batch'), true);
+        assert.deepEqual(byModel.get('cloudflare-workers-ai:@cf/llava-hf/llava-1.5-7b-hf:modalities.input'), ['image']);
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.endpoint.includes('/accounts/account-1/ai/run/@cf/meta/'), true);
+        assert.equal(gatewayRoute?.normalizedPolicy.universalEndpoint, 'https://gateway.ai.cloudflare.com/v1/account-1/gateway-1');
+        assert.equal(gatewayRoute?.normalizedPolicy.supportsFallback, true);
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, [
+            '@cf/meta/llama-3.1-8b-instruct',
+            '@cf/llava-hf/llava-1.5-7b-hf',
+        ]);
+        assert.equal(snapshot.accountOverlays[0].secretRef, 'CLOUDFLARE_KEY');
+        assert.equal(snapshot.accountOverlays[0].providerMetadata.gatewayIdConfigured, true);
+    });
+
     it('extracts Cerebras public rich model metadata without proving runtime access', async () => {
         const fakeFetch = /** @type {typeof fetch} */ (
             async () =>
@@ -2417,14 +2491,41 @@ describe('model-gateway foundation', () => {
             env: { OPENCODE_API_KEY: 'opencode-secret-that-must-not-leak' },
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
+        const cloudflareAuthenticated = createDefaultModelGatewayCatalogImporters({
+            env: {
+                CLOUDFLARE_KEY: 'cloudflare-secret-that-must-not-leak',
+                CLOUDFLARE_ACCOUNT_ID: 'account-1',
+                CLOUDFLARE_AI_GATEWAY_ID: 'gateway-1',
+            },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({
+                ok: true,
+                status: 200,
+                headers: new Headers({ 'content-type': 'application/json' }),
+                json: async () => ({ data: [] }),
+                text: async () => '',
+            })),
+        });
 
         assert.deepEqual(
             importers.map((importer) => importer.id),
-            ['openrouter-models', 'kilo-gateway-models', 'kilo-gateway-providers', 'cerebras-public-models', 'openai-models'],
+            [
+                'openrouter-models',
+                'kilo-gateway-models',
+                'kilo-gateway-providers',
+                'cerebras-public-models',
+                'cloudflare-workers-ai-catalog',
+                'openai-models',
+            ],
         );
         assert.deepEqual(
             publicOnly.map((importer) => importer.id),
-            ['openrouter-models', 'kilo-gateway-models', 'kilo-gateway-providers', 'cerebras-public-models'],
+            [
+                'openrouter-models',
+                'kilo-gateway-models',
+                'kilo-gateway-providers',
+                'cerebras-public-models',
+                'cloudflare-workers-ai-catalog',
+            ],
         );
         assert.equal(groqAuthenticated.some((importer) => importer.id === 'groq-models'), true);
         assert.equal(genericAuthenticated.some((importer) => importer.id === 'cerebras-openai-compatible-models'), true);
@@ -2434,6 +2535,7 @@ describe('model-gateway foundation', () => {
         assert.equal(ollamaLocal.some((importer) => importer.id === 'ollama-catalog'), true);
         assert.equal(huggingFaceAuthenticated.some((importer) => importer.id === 'huggingface-inference-providers'), true);
         assert.equal(openCodeAuthenticated.some((importer) => importer.id === 'opencode-zen-models'), true);
+        assert.equal(cloudflareAuthenticated.some((importer) => importer.id === 'cloudflare-workers-ai-catalog'), true);
         assert.equal(JSON.stringify(importers).includes(secret), false);
         assert.equal(JSON.stringify(groqAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(genericAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
@@ -2443,6 +2545,7 @@ describe('model-gateway foundation', () => {
         assert.equal(JSON.stringify(geminiAuthenticated).includes('gemini-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(huggingFaceAuthenticated).includes('hf-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(openCodeAuthenticated).includes('opencode-secret-that-must-not-leak'), false);
+        assert.equal(JSON.stringify(cloudflareAuthenticated).includes('cloudflare-secret-that-must-not-leak'), false);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {
