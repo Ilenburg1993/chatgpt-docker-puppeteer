@@ -68,6 +68,7 @@ import {
     createGroqModelsImporter,
     createHuggingFaceInferenceProvidersImporter,
     createMistralModelsImporter,
+    createNvidiaNimModelsImporter,
     createOllamaCatalogImporter,
     createOpenCodeZenModelsImporter,
     createOpenAICompatibleModelsImporter,
@@ -2105,6 +2106,72 @@ describe('model-gateway foundation', () => {
         assert.equal(snapshot.accountOverlays[0].providerMetadata.gatewayIdConfigured, true);
     });
 
+    it('imports NVIDIA NIM account models with OpenAI-compatible and management endpoint metadata', async () => {
+        const secret = 'nvidia-secret-that-must-not-leak';
+        /** @type {string | null} */
+        let authorizationHeader = null;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (_url, init) => {
+                authorizationHeader = /** @type {{ authorization?: string }} */ (init)?.headers?.authorization ?? null;
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        object: 'list',
+                        data: [
+                            {
+                                id: 'openai/gpt-oss-120b',
+                                object: 'model',
+                                created: 1754438400,
+                                owned_by: 'OpenAI',
+                            },
+                            {
+                                id: 'nvidia/nemotron-nano-12b-v2-vl',
+                                object: 'model',
+                                created: 1770000000,
+                                owned_by: 'nvidia',
+                            },
+                        ],
+                    }),
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [
+                createNvidiaNimModelsImporter({
+                    fetchImpl: fakeFetch,
+                    apiKey: secret,
+                    secretRef: 'NVIDIA_KEY',
+                }),
+            ],
+            now: () => new Date('2026-05-25T14:50:00.000Z'),
+        });
+        const byModel = new Map(
+            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+        );
+
+        assert.equal(authorizationHeader, `Bearer ${secret}`);
+        assert.equal(JSON.stringify(snapshot).includes(secret), false);
+        assert.equal(snapshot.sources[0].providerId, 'nvidia-nim');
+        assert.equal(byModel.get('nvidia-nim:openai/gpt-oss-120b:capabilities.reasoning'), true);
+        assert.equal(byModel.get('nvidia-nim:nvidia/nemotron-nano-12b-v2-vl:capabilities.vision'), true);
+        assert.deepEqual(byModel.get('nvidia-nim:openai/gpt-oss-120b:providerMetadata.nvidia.managementEndpoints'), [
+            '/v1/health/ready',
+            '/v1/metadata',
+            '/v1/version',
+            '/v1/metrics',
+            '/v1/license',
+            '/v1/manifest',
+        ]);
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.openAICompatibleBaseUrl, 'https://integrate.api.nvidia.com/v1');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.hostedOrSelfHosted, 'hosted');
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, [
+            'openai/gpt-oss-120b',
+            'nvidia/nemotron-nano-12b-v2-vl',
+        ]);
+        assert.equal(snapshot.accountOverlays[0].secretRef, 'NVIDIA_KEY');
+    });
+
     it('extracts Cerebras public rich model metadata without proving runtime access', async () => {
         const fakeFetch = /** @type {typeof fetch} */ (
             async () =>
@@ -2505,6 +2572,10 @@ describe('model-gateway foundation', () => {
                 text: async () => '',
             })),
         });
+        const nvidiaAuthenticated = createDefaultModelGatewayCatalogImporters({
+            env: { NVIDIA_KEY: 'nvidia-secret-that-must-not-leak' },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+        });
 
         assert.deepEqual(
             importers.map((importer) => importer.id),
@@ -2536,6 +2607,7 @@ describe('model-gateway foundation', () => {
         assert.equal(huggingFaceAuthenticated.some((importer) => importer.id === 'huggingface-inference-providers'), true);
         assert.equal(openCodeAuthenticated.some((importer) => importer.id === 'opencode-zen-models'), true);
         assert.equal(cloudflareAuthenticated.some((importer) => importer.id === 'cloudflare-workers-ai-catalog'), true);
+        assert.equal(nvidiaAuthenticated.some((importer) => importer.id === 'nvidia-nim-models'), true);
         assert.equal(JSON.stringify(importers).includes(secret), false);
         assert.equal(JSON.stringify(groqAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(genericAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
@@ -2546,6 +2618,7 @@ describe('model-gateway foundation', () => {
         assert.equal(JSON.stringify(huggingFaceAuthenticated).includes('hf-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(openCodeAuthenticated).includes('opencode-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(cloudflareAuthenticated).includes('cloudflare-secret-that-must-not-leak'), false);
+        assert.equal(JSON.stringify(nvidiaAuthenticated).includes('nvidia-secret-that-must-not-leak'), false);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {

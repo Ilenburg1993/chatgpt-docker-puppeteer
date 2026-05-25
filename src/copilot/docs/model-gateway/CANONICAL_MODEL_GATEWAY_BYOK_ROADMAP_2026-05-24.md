@@ -588,7 +588,8 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Implementar `KiloGatewayProvidersImporter` para `/providers` quando disponível, preservando provider upstream e
   diferença entre Kilo Gateway, Kilo Code e providers BYOK internos.
 - [x] Implementar `CerebrasModelsImporter` para `/v1/models` + catálogo público.
-- [ ] Implementar `NvidiaNimCatalogImporter` para docs/API catalog quando disponível.
+- [x] Implementar `NvidiaNimModelsImporter` para `/v1/models`, preservando hosted/self-hosted e endpoints de gestão
+  NIM.
 - [x] Permitir importers `OpenAICompatibleGenericImporter` para vLLM, LiteLLM, Chutes, Z.AI e endpoints locais sem
   importer especializado.
 - [x] Criar modo `accountScoped` para importers autenticados que retornam modelos habilitados por plano, organização,
@@ -2817,3 +2818,62 @@ Próxima direção:
 
 - Continuar para NVIDIA NIM, ou refinar importers especializados de Chutes/Z.AI se a estratégia for fechar primeiro
   todos os OpenAI-compatible especializados.
+
+## 53. Continuidade 2026-05-25 — importer NVIDIA NIM hosted/self-hosted
+
+Investigação oficial:
+
+- A documentação NVIDIA NIM LLM hospedada em `docs.api.nvidia.com` confirma base
+  `https://integrate.api.nvidia.com` e endpoint `POST /v1/chat/completions`.
+- A documentação de NIM LLM self-hosted confirma OpenAI-compatible `/v1/models`, `/v1/chat/completions`,
+  `/v1/completions` e, em versões recentes, `/v1/responses` e `/v1/messages`.
+- A mesma referência lista endpoints de gestão/observabilidade self-hosted:
+  `/v1/health/ready`, `/v1/metadata`, `/v1/version`, `/v1/metrics`, `/v1/license` e `/v1/manifest`.
+- O serviço hospedado `https://integrate.api.nvidia.com/v1/models` é account-scoped e usa Bearer token.
+
+Implementado neste corte:
+
+- Novo `NvidiaNimModelsImporter` para `https://integrate.api.nvidia.com/v1/models`.
+- O importer entra na composição padrão quando `NVIDIA_API_KEY` ou `NVIDIA_KEY` estão presentes.
+- O payload OpenAI-compatible vira evidências para:
+  - `displayName`;
+  - aliases normalizados;
+  - lifecycle por `created`;
+  - capabilities conservadoras por id: `chat`, `streaming`, `embeddings`, `rerank`, `vision`, `reasoning`;
+  - `providerMetadata.ownedBy`;
+  - `providerMetadata.nvidia.object`;
+  - `providerMetadata.nvidia.managementEndpoints`;
+  - `providerMetadata.nvidia.hostedBaseUrl`;
+  - campos OpenAI-compatible `openai.created` e `openai.owned_by`.
+- O importer também emite:
+  - `ModelRouteOption` `exact_model`;
+  - política `routeLayer=openai_compatible`;
+  - `openAICompatibleBaseUrl`;
+  - `managementEndpoints`;
+  - `hostedOrSelfHosted=hosted` para `integrate.api.nvidia.com`, ou `self_hosted` quando `baseUrl` customizado for
+    fornecido.
+- O overlay account-scoped preserva modelos visíveis, endpoint `/v1/models`, hosted/self-hosted e endpoints de gestão,
+  sem serializar segredo.
+- Barrels de importers, catálogo e root exportam `NVIDIA_NIM_BASE_URL`, `NVIDIA_NIM_MODELS_CATALOG_URL`,
+  `NVIDIA_NIM_MANAGEMENT_ENDPOINTS` e `createNvidiaNimModelsImporter()`.
+
+Separação arquitetural reafirmada:
+
+- `/v1/models` prova visibilidade account-scoped, não sucesso de chat/responses/messages.
+- Endpoints de gestão self-hosted são metadata de capacidade operacional; probes posteriores devem validar quais deles
+  existem no deployment real.
+- O mesmo contrato cobre hosted NVIDIA e microserviço NIM self-hosted via `baseUrl` customizado.
+
+Validação deste corte até agora:
+
+- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  (`63` testes).
+- PASS `npm run typecheck:strict:src.copilot`.
+- PASS `npm run lint:copilot`.
+- PASS `npm run test:copilot`
+  (`5640` testes totais, `5607` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
+  summary `artifacts/test-runs/copilot/2026-05-25T20-19-16-292Z/summary.md`).
+
+Próxima direção:
+
+- Continuar para Chutes/Z.AI especializados ou para enriquecimento de seeds oficiais de OpenAI/Anthropic/Gemini/Groq.

@@ -18,6 +18,7 @@ import {
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
     createMistralModelsImporter,
+    createNvidiaNimModelsImporter,
     createOllamaCatalogImporter,
     createOpenCodeZenModelsImporter,
     createOpenAICompatibleModelsImporter,
@@ -157,6 +158,16 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                 fetchImpl: options.fetchImpl,
                 apiKey: openCodeSecret.value,
                 secretRef: openCodeSecret.key,
+            }),
+        );
+    }
+    const nvidiaSecret = readEnvSecret(env, ['NVIDIA_API_KEY', 'NVIDIA_KEY']);
+    if (includeAuthenticated && nvidiaSecret) {
+        importers.push(
+            createNvidiaNimModelsImporter({
+                fetchImpl: options.fetchImpl,
+                apiKey: nvidiaSecret.value,
+                secretRef: nvidiaSecret.key,
             }),
         );
     }

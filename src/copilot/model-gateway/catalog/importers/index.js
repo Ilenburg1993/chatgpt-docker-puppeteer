@@ -52,6 +52,12 @@ export {
     createMistralModelsImporter,
 } from './mistral-models-importer.js';
 export {
+    NVIDIA_NIM_BASE_URL,
+    NVIDIA_NIM_MANAGEMENT_ENDPOINTS,
+    NVIDIA_NIM_MODELS_CATALOG_URL,
+    createNvidiaNimModelsImporter,
+} from './nvidia-nim-models-importer.js';
+export {
     OLLAMA_LOCAL_API_BASE_URL,
     OLLAMA_LOCAL_OPENAI_BASE_URL,
     OLLAMA_LOCAL_SHOW_URL,
