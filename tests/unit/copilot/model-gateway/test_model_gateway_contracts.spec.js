@@ -107,6 +107,7 @@ import {
     createOpenAiDocsModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
+    createOpenRouterKeyAccountImporter,
     createOpenRouterModelsImporter,
     createZaiModelsImporter,
     createCanonicalModelProjection,
@@ -154,6 +155,7 @@ import {
     parseGeminiDocsRows,
     parseMistralDocsRows,
     parseOpenAiDocsRows,
+    parseOpenRouterKeyRows,
     planModelGatewayCatalogRefresh,
     rankCatalogEvidenceConfidence,
     recommendCatalogDiffProbes,
@@ -2863,6 +2865,60 @@ describe('model-gateway foundation', () => {
             presence_penalty: null,
             repetition_penalty: null,
         });
+    });
+
+    it('imports OpenRouter key account limits as account overlay without proving runtime access', async () => {
+        /** @type {string | null} */
+        let authorizationHeader = null;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (_url, init) => {
+                authorizationHeader = /** @type {{ headers?: { authorization?: string } }} */ (init)?.headers?.authorization ?? null;
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        data: {
+                            label: 'repo-agent-key',
+                            usage: 12.5,
+                            limit: 50,
+                            is_free_tier: false,
+                            disabled: false,
+                            rate_limit: { requests: 1000, interval: '10s' },
+                        },
+                    }),
+                });
+            }
+        );
+
+        const parsed = parseOpenRouterKeyRows({
+            data: { label: 'repo-agent-key', usage: 12.5, limit: 50, rate_limit: { requests: 1000 } },
+        });
+        const snapshot = await runCatalogImporters({
+            importers: [
+                createOpenRouterKeyAccountImporter({
+                    fetchImpl: fakeFetch,
+                    apiKey: 'sk-or-v1-secret-that-must-not-leak',
+                    secretRef: 'OPENROUTER_API_KEY',
+                }),
+            ],
+            now: () => new Date('2026-05-25T12:40:00.000Z'),
+        });
+        const providerEvidenceByPath = new Map(snapshot.providerEvidences.map((item) => [item.fieldPath, item.value]));
+
+        assert.equal(parsed[0]?.label, 'repo-agent-key');
+        assert.equal(authorizationHeader, 'Bearer sk-or-v1-secret-that-must-not-leak');
+        assert.equal(snapshot.sources[0].url, 'https://openrouter.ai/api/v1/key');
+        assert.equal(snapshot.sources[0].authMode, 'api_key');
+        assert.equal(snapshot.evidences.length, 0);
+        assert.equal(snapshot.routeOptions.length, 0);
+        assert.equal(snapshot.accountOverlays.length, 1);
+        assert.equal(snapshot.accountOverlays[0].providerId, 'openrouter');
+        assert.equal(snapshot.accountOverlays[0].secretRef, 'OPENROUTER_API_KEY');
+        assert.equal(snapshot.accountOverlays[0].spendingLimits.remainingUsd, 37.5);
+        assert.deepEqual(snapshot.accountOverlays[0].rateLimits, { requests: 1000, interval: '10s' });
+        assert.equal(snapshot.accountOverlays[0].providerMetadata.semantics, 'account_key_credit_and_rate_limits');
+        assert.equal(providerEvidenceByPath.get('providerMetadata.openrouter.keyUsage'), 12.5);
+        assert.equal(JSON.stringify(snapshot).includes('sk-or-v1-secret-that-must-not-leak'), false);
     });
 
     it('extracts Kilo Gateway public model metadata without proving runtime access', async () => {
@@ -5928,6 +5984,10 @@ describe('model-gateway foundation', () => {
             env: { GROQ_KEY: 'gsk-secret-that-must-not-leak' },
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
+        const openRouterAuthenticated = createDefaultModelGatewayCatalogImporters({
+            env: { OPEN_ROUTER_KEY: 'openrouter-secret-that-must-not-leak' },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: {} }) })),
+        });
         const genericAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { CEREBRAS_KEY: 'cerebras-secret-that-must-not-leak' },
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
@@ -6029,6 +6089,7 @@ describe('model-gateway foundation', () => {
             ],
         );
         assert.equal(groqAuthenticated.some((importer) => importer.id === 'groq-models'), true);
+        assert.equal(openRouterAuthenticated.some((importer) => importer.id === 'openrouter-key-account'), true);
         assert.equal(genericAuthenticated.some((importer) => importer.id === 'cerebras-openai-compatible-models'), true);
         assert.equal(mistralAuthenticated.some((importer) => importer.id === 'mistral-models'), true);
         assert.equal(anthropicAuthenticated.some((importer) => importer.id === 'anthropic-models'), true);
@@ -6042,6 +6103,7 @@ describe('model-gateway foundation', () => {
         assert.equal(zaiAuthenticated.some((importer) => importer.id === 'zai-models'), true);
         assert.equal(JSON.stringify(importers).includes(secret), false);
         assert.equal(JSON.stringify(groqAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
+        assert.equal(JSON.stringify(openRouterAuthenticated).includes('openrouter-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(genericAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(genericAuthenticated).includes('cerebras-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(mistralAuthenticated).includes('mistral-secret-that-must-not-leak'), false);

@@ -120,6 +120,11 @@ export {
     parseOpenAiDocsRows,
 } from './openai-docs-models-importer.js';
 export {
+    OPENROUTER_KEY_URL,
+    createOpenRouterKeyAccountImporter,
+    parseOpenRouterKeyRows,
+} from './openrouter-key-account-importer.js';
+export {
     OPENROUTER_MODELS_CATALOG_URL,
     createOpenRouterModelsImporter,
 } from './openrouter-models-importer.js';

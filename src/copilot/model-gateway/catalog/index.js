@@ -83,6 +83,7 @@ export {
     OPENAI_MODEL_COMPARE_URL,
     OPENAI_MODELS_DOCS_URL,
     OPENAI_MODELS_CATALOG_URL,
+    OPENROUTER_KEY_URL,
     OPENROUTER_MODELS_CATALOG_URL,
     ZAI_BUILT_IN_WEB_SEARCH_USD_PER_USE,
     ZAI_CHAT_COMPLETIONS_PATH,
@@ -110,12 +111,14 @@ export {
     createOpenAiDocsModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
+    createOpenRouterKeyAccountImporter,
     createOpenRouterModelsImporter,
     createZaiModelsImporter,
     parseAnthropicDocsRows,
     parseGeminiDocsRows,
     parseMistralDocsRows,
     parseOpenAiDocsRows,
+    parseOpenRouterKeyRows,
 } from './importers/index.js';
 export { runCatalogImporters } from './importer-runner.js';
 export {

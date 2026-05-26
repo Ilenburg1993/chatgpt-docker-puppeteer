@@ -1446,7 +1446,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Anthropic docs seed.
 - [x] Gemini/Vertex docs seed.
 - [x] Mistral docs pricing seed.
-- [ ] OpenRouter account overlay importer.
+- [x] OpenRouter account overlay importer.
 - [ ] Kilo account overlay importer.
 - [ ] Cloudflare account access importer beyond configured flags.
 
@@ -3695,6 +3695,62 @@ Próximas lacunas L reforçadas:
 Validação deste corte:
 
 - [x] PASS `npm run model-gateway:test:contracts` com `132` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 61. Continuidade 2026-05-26 — OpenRouter Key Account Overlay
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a primeira lacuna account-scoped profunda da Faixa L:
+  OpenRouter já tinha catálogo público rico, mas faltava importar evidência da
+  própria key antes de runtime.
+- [x] Consultada documentação OpenRouter de limits/key endpoint, que indica
+  consulta autenticada em `https://openrouter.ai/api/v1/key` para rate limits e
+  créditos/limites da chave.
+- [x] Confirmado que isso não prova que um modelo específico roda, mas pode
+  alimentar pré-runtime/exclusão quando a key está desabilitada, limitada,
+  zerada ou sob rate limit.
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/catalog/importers/openrouter-key-account-importer.js`.
+- [x] Criado `createOpenRouterKeyAccountImporter()`.
+- [x] Criado `parseOpenRouterKeyRows()`.
+- [x] O importer consulta `/api/v1/key` com bearer token sem serializar segredo.
+- [x] O importer emite provider evidence de label, usage, limit, free tier,
+  disabled e rate limit.
+- [x] O importer emite account overlay com spending limits, remaining credits,
+  rate limits e metadata sanitizada.
+- [x] `createDefaultModelGatewayCatalogImporters()` passa a incluir
+  `openrouter-key-account` quando `OPENROUTER_API_KEY` ou `OPEN_ROUTER_KEY`
+  está configurado.
+- [x] O inventário de endpoints OpenRouter passa a declarar o source
+  `authenticated_account_api`.
+- [x] Exportado pelos barrels de `importers`, `catalog` e `model-gateway`.
+- [x] Teste unitário cobre overlay, provider evidence, remaining credits,
+  rate limits e ausência de vazamento de segredo.
+
+Separação preservada:
+
+- [x] Account overlay não prova execução de modelo.
+- [x] Account overlay não cria route option.
+- [x] Account overlay não substitui o catálogo público de modelos.
+- [x] Account overlay serve à etapa pré-runtime/exclusão antes dos probes.
+
+Próximas lacunas L reforçadas:
+
+- [ ] Kilo account overlay real de allow/block/balance.
+- [ ] Cloudflare account access importer além de flags configuradas.
+- [ ] Parser estrutural do OpenAPI da Z.AI.
+- [ ] Importer autenticado especializado para Cerebras.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `133` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.

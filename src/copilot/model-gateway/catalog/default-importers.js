@@ -30,6 +30,7 @@ import {
     createOpenAiDocsModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
+    createOpenRouterKeyAccountImporter,
     createOpenRouterModelsImporter,
     createZaiModelsImporter,
 } from './importers/index.js';
@@ -68,6 +69,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     const includePublic = options.includePublic ?? true;
     const includeAuthenticated = options.includeAuthenticated ?? true;
     const cloudflareSecret = readEnvSecret(env, ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY', 'CLOUDFLARE_KEY']);
+    const openRouterSecret = readEnvSecret(env, ['OPENROUTER_API_KEY', 'OPEN_ROUTER_KEY']);
     const openAiSecret = readEnvSecret(env, ['OPENAI_API_KEY', 'COPILOT_OPENAI_API_KEY']);
     const mistralSecret = readEnvSecret(env, ['MISTRAL_API_KEY', 'MISTRAL_KEY']);
     const anthropicSecret = readEnvSecret(env, ['ANTHROPIC_API_KEY', 'ANTHROPIC_KEY', 'CLAUDE_API_KEY']);
@@ -123,6 +125,15 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                 fetchImpl: options.fetchImpl,
                 apiKey: openAiSecret.value,
                 secretRef: openAiSecret.key,
+            }),
+        );
+    }
+    if (includeAuthenticated && openRouterSecret) {
+        importers.push(
+            createOpenRouterKeyAccountImporter({
+                fetchImpl: options.fetchImpl,
+                apiKey: openRouterSecret.value,
+                secretRef: openRouterSecret.key,
             }),
         );
     }
