@@ -140,6 +140,8 @@ import {
     toOpenAIModelCatalogList,
     toCopilotModelInfoList,
     toCopilotRouteModelInfoList,
+    estimateProbeCostUsd,
+    planCostBoundedCatalogProbes,
 } from '../../../../src/copilot/model-gateway/index.js';
 
 const PROVIDER_FAMILY_ENV_FIXTURES = Object.freeze([
@@ -1532,6 +1534,44 @@ describe('model-gateway foundation', () => {
                 ['openrouter:visible/model:default', 'eligible'],
             ],
         );
+    });
+
+    it('plans recommended probes under cost and kind constraints before runtime', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'openrouter',
+            providerModel: 'priced/model',
+            capabilities: { tools: true, streaming: true, jsonMode: true },
+            pricing: { inputUsdPerMillion: 2, outputUsdPerMillion: 10 },
+        });
+        const recommendation = {
+            key: 'openrouter:priced/model:default',
+            providerId: 'openrouter',
+            providerModel: 'priced/model',
+            routeProfile: 'default',
+            priority: 'high',
+            probeKinds: ['json', 'agent'],
+            reasons: ['structured_output_capability', 'agentic_capability'],
+            commands: ['/byok probe json model:priced/model', '/byok probe agent model:priced/model'],
+        };
+
+        assert.equal(estimateProbeCostUsd(projection, 'json'), 0.0028);
+        const plan = planCostBoundedCatalogProbes({
+            recommendations: [recommendation],
+            projections: [projection],
+            allowedProbeKinds: ['json', 'agent'],
+            maxEstimatedCostUsd: 0.003,
+        });
+
+        assert.deepEqual(
+            plan.selected.map((item) => [item.kind, item.command, item.estimatedCostUsd]),
+            [['json', '/byok probe json model:priced/model', 0.0028]],
+        );
+        assert.deepEqual(
+            plan.skipped.map((item) => [item.kind, item.reason]),
+            [['agent', 'probe_cost_limit_reached']],
+        );
+        assert.equal(plan.totalProbeCount, 1);
+        assert.equal(plan.totalEstimatedCostUsd, 0.0028);
     });
 
     it('persists a redacted JSON catalog snapshot before the SQLite store', async () => {

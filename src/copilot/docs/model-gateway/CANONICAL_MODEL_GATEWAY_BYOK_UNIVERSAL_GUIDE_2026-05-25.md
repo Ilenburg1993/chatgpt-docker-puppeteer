@@ -1471,7 +1471,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Cloudflare direct/gateway routes.
 - [x] OpenCode family endpoint routes.
 - [x] Candidate builder baseado em route options.
-- [ ] Seleção por provider upstream.
+- [x] Seleção por provider upstream.
 - [x] Seleção por route layer.
 - [x] Seleção por data policy.
 - [x] Seleção por budget.
@@ -1572,7 +1572,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [ ] Image generation probe.
 - [ ] Provider-native probes.
 - [ ] Gateway fallback probe.
-- [ ] Cost-bounded probe planner.
+- [x] Cost-bounded probe planner.
 
 ### Faixa U — Runtime Selection
 
@@ -2489,4 +2489,36 @@ Validação deste corte:
   com `104` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em `routing` e contrato unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 38. Continuidade 2026-05-26 — Cost-Bounded Probe Planner
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/probes/planner.js`.
+- [x] Criado `estimateProbeCostUsd()` para estimar custo por kind de probe a
+  partir de pricing de catálogo.
+- [x] Criado `planCostBoundedCatalogProbes()` para transformar recomendações em
+  plano executável limitado por budget, quantidade e kinds permitidos.
+- [x] O planner separa `selected` e `skipped` com razões auditáveis.
+- [x] Custos desconhecidos são bloqueados por default quando há budget máximo.
+- [x] Exportado pelos barrels `probes` e `model-gateway`.
+- [x] Adicionado teste com `json` selecionado e `agent` bloqueado por budget.
+
+Separação preservada:
+
+- [x] Planner só consome recomendações e metadados de pricing.
+- [x] Nenhuma probe é executada.
+- [x] Health/runtime proof não é alterado.
+- [x] Catálogo canônico não é mutado.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `105` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `probes/planner.js`, barrels e contrato
+  unitário.
 - [x] PASS `git diff --check`.
