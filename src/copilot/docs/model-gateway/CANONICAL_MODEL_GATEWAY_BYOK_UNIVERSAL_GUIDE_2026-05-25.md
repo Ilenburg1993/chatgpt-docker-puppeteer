@@ -1316,7 +1316,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Testes de não serialização.
 - [x] `OPENCODE_API_KEY` incluído.
 - [ ] Policy de secrets por account/workspace.
-- [ ] UX para secrets ausentes por provider.
+- [x] UX para secrets ausentes por provider.
 
 ### Faixa D — Provider Specs E Endpoints
 
@@ -2989,6 +2989,49 @@ Validação deste corte:
 - [x] PASS `make model-gateway-commands`.
 - [x] PASS `npm run model-gateway:test:contracts` com `117` testes.
 - [x] PASS `npm run model-gateway:test:terminal` com `55` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 52. Continuidade 2026-05-26 — UX De Requisitos De Env E Secrets Ausentes
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a lacuna da Faixa C sobre UX para secrets ausentes por
+  provider.
+- [x] Confirmado que o operador precisa ver aliases aceitos sem exposição de
+  valores.
+- [x] Confirmado que alguns requisitos são configuração não secreta, como
+  `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AI_GATEWAY_ID` e base URL local Ollama.
+- [x] Confirmado que esta camada deve ocorrer antes de refresh account-scoped,
+  eligibility e runtime probes.
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/secrets/requirements.js`.
+- [x] Criado `MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS`.
+- [x] Criado `evaluateModelGatewayProviderEnvRequirements()`.
+- [x] Criado `summarizeModelGatewayProviderEnvRequirements()`.
+- [x] Exportado pelos barrels `secrets` e `model-gateway`.
+- [x] Adicionado comando terminal `/byok gateway secrets [provider]`.
+- [x] Adicionado o comando ao inventário canônico da Faixa Y.
+- [x] Adicionados testes unitários de contrato e terminal.
+
+Separação preservada:
+
+- [x] A avaliação lê apenas presença/ausência de variáveis.
+- [x] Nenhum valor de segredo é retornado.
+- [x] Nenhum provider é chamado.
+- [x] Nenhum modelo é executado.
+- [x] Nenhuma eligibility decision é persistida.
+- [x] O catálogo canônico não é mutado.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `121` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `59` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.

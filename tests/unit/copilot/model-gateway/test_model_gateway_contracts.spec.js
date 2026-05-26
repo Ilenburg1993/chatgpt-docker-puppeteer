@@ -42,6 +42,7 @@ import {
     resolveModelGatewayAccountAccess,
     buildModelGatewayOnListModelsHandler,
     evaluateGatewayModelHealthRoute,
+    evaluateModelGatewayProviderEnvRequirements,
     geminiAdapter,
     ollamaAdapter,
     openAICompatibleAdapter,
@@ -152,6 +153,7 @@ import {
     summarizeCanonicalModelProjectionDiff,
     summarizeModelGatewayMetadataCoverage,
     summarizeModelGatewayProviderFreshness,
+    summarizeModelGatewayProviderEnvRequirements,
     summarizeProviderWireProbeMatrix,
     toOpenAIModelCatalogEntry,
     toOpenAIModelCatalogList,
@@ -5872,6 +5874,28 @@ describe('model-gateway foundation', () => {
         assert.ok(cloudflareGateway?.pendingProbeKinds.includes('gateway_fallback'));
         assert.equal(openCodeAnthropic?.providerNative, true);
         assert.ok(summary.pendingProbeKindCounts['provider_native'] > 0);
+    });
+
+    it('evaluates provider env requirements without exposing secret values', () => {
+        const rows = evaluateModelGatewayProviderEnvRequirements({
+            env: {
+                KILO_API_KEY: 'kilo-secret',
+                CLOUDFLARE_API_TOKEN: 'cf-secret',
+                CLOUDFLARE_ACCOUNT_ID: 'account-1',
+                OPENCODE_API_KEY: '',
+            },
+        });
+        const summary = summarizeModelGatewayProviderEnvRequirements(rows);
+        const byProvider = new Map(rows.map((row) => [row.providerId, row]));
+
+        assert.equal(byProvider.get('kilo')?.status, 'ready');
+        assert.equal(byProvider.get('cloudflare-workers-ai')?.status, 'ready');
+        assert.deepEqual(byProvider.get('cloudflare-workers-ai')?.missingRecommendedKeys, ['CLOUDFLARE_AI_GATEWAY_ID']);
+        assert.equal(byProvider.get('opencode')?.status, 'missing');
+        assert.ok(byProvider.get('opencode')?.missingRequiredKeys.includes('OPENCODE_API_KEY'));
+        assert.ok(summary.readyCount >= 2);
+        assert.equal(JSON.stringify(rows).includes('kilo-secret'), false);
+        assert.equal(JSON.stringify(rows).includes('cf-secret'), false);
     });
 
     it('audits endpoint inventory coverage against configured catalog importers', () => {

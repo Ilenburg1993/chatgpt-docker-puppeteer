@@ -132,6 +132,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Inspect normalized provider/gateway traits derived from specs and endpoint inventory.',
     },
     {
+        id: 'terminal.env-requirements',
+        phase: 'pre-runtime',
+        surface: 'terminal',
+        command: '/byok gateway env',
+        summary: 'Inspect missing provider env requirements without printing secret values.',
+    },
+    {
         id: 'terminal.probe-matrix',
         phase: 'pre-runtime',
         surface: 'terminal',

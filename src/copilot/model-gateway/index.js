@@ -168,9 +168,12 @@ export {
 export {
     DEFAULT_MODEL_GATEWAY_SECRET_ENV_KEYS,
     EnvSecretRegistry,
+    MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS,
     createEnvSecretRegistry,
+    evaluateModelGatewayProviderEnvRequirements,
     redactSecretRecord,
     redactSecretText,
+    summarizeModelGatewayProviderEnvRequirements,
 } from './secrets/index.js';
 export {
     MODEL_GATEWAY_ELIGIBILITY_DISPOSITION,
