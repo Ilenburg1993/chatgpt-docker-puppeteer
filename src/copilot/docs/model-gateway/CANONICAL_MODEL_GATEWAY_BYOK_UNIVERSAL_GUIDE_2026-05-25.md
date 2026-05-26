@@ -1398,7 +1398,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Relatório booleano de compatibilidade.
 - [x] Gate no terminal.
 - [x] Checklist A-J fechada para camada inicial.
-- [ ] Atualizar gate para K+ quando SQLite/elegibility existirem.
+- [x] Atualizar gate para K+ quando SQLite/elegibility existirem.
 
 ### Faixa K — Universal Catalog
 
@@ -2988,6 +2988,48 @@ Validação deste corte:
 - [x] PASS `make model-gateway-commands`.
 - [x] PASS `npm run model-gateway:test:contracts` com `117` testes.
 - [x] PASS `npm run model-gateway:test:terminal` com `55` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 50. Continuidade 2026-05-26 — Readiness Pré-Build K+/Y
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a lacuna da Faixa J sobre atualizar o gate quando SQLite e
+  elegibilidade existissem.
+- [x] Confirmado que o gate `pre-k` deve continuar existindo como prova
+  histórica A-J.
+- [x] Confirmado que a camada atual precisa de um readiness K+/Y próprio antes
+  do primeiro build.
+- [x] Confirmado que readiness não deve executar build, provider, modelo ou
+  probes runtime.
+
+Implementado neste corte:
+
+- [x] Criado `MODEL_GATEWAY_PREBUILD_STAGE`.
+- [x] Criado `buildModelGatewayPreBuildReadinessReport()`.
+- [x] O readiness agrega checks A-J e checks K/R/Q/O/M/Y.
+- [x] Exportado por `migration` e pelo barrel principal `model-gateway`.
+- [x] Adicionado comando terminal `/byok gateway prebuild`.
+- [x] Adicionado `/byok gateway prebuild` ao inventário canônico da Faixa Y.
+- [x] Adicionados testes unitários de contrato e terminal.
+
+Separação preservada:
+
+- [x] Readiness é relatório booleano estático da camada.
+- [x] Readiness não chama provider.
+- [x] Readiness não executa modelo.
+- [x] Readiness não executa probes runtime.
+- [x] Readiness não altera catálogo, SQLite, overlays ou health.
+- [x] Primeiro build real continua pendente e deverá usar comandos canônicos.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `119` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `57` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.

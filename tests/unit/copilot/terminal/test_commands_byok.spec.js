@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -54,6 +54,33 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                     track: 'I',
                     passed: true,
                     summary: 'route trace attrs ok',
+                },
+            ],
+        })),
+        buildModelGatewayPreBuildReadinessReport: vi.fn(() => ({
+            stage: 'prebuild',
+            ready: true,
+            total: 3,
+            passed: 3,
+            failed: 0,
+            checks: [
+                {
+                    id: 'universal_catalog_contracts_are_exported',
+                    track: 'K',
+                    passed: true,
+                    summary: 'catalog ok',
+                },
+                {
+                    id: 'provider_gateway_traits_are_metadata',
+                    track: 'M',
+                    passed: true,
+                    summary: 'traits ok',
+                },
+                {
+                    id: 'canonical_commands_are_published',
+                    track: 'Y',
+                    passed: true,
+                    summary: 'commands ok',
                 },
             ],
         })),
@@ -322,6 +349,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
 vi.mock('#copilot/model-gateway', () => ({
     buildCatalogRefreshEventBatch,
     buildCatalogRefreshStartedEvent,
+    buildModelGatewayPreBuildReadinessReport,
     buildModelGatewayPreKCompatibilityReport,
     buildModelGatewayRouteCandidates,
     buildProbeCompletedEvent: buildProbeCompletedEvent,
@@ -564,6 +592,7 @@ describe('terminal /byok command', () => {
         recordByokProviderModelProbeResult.mockReset();
         recordByokProviderModelAgentProbeFailure.mockReset();
         recordByokProviderModelAgentProbeSuccess.mockReset();
+        buildModelGatewayPreBuildReadinessReport.mockClear();
         buildModelGatewayPreKCompatibilityReport.mockClear();
         resolveProviderEndpointInventory.mockReset();
         resolveProviderEndpointInventory.mockImplementation((providerId) =>
@@ -1478,6 +1507,20 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('checks=2/2');
         expect(ctx.output()).toContain('sdk_provider_config_boundary');
         expect(ctx.output()).toContain('route_trace_attributes_are_stable');
+    });
+
+    it('mostra readiness pré-build K+ do model-gateway com checks booleanos', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway prebuild');
+
+        expect(buildModelGatewayPreBuildReadinessReport).toHaveBeenCalled();
+        expect(ctx.output()).toContain('BYOK model-gateway pre-build readiness');
+        expect(ctx.output()).toContain('checks=3/3');
+        expect(ctx.output()).toContain('universal_catalog_contracts_are_exported');
+        expect(ctx.output()).toContain('provider_gateway_traits_are_metadata');
+        expect(ctx.output()).toContain('canonical_commands_are_published');
     });
 
     it('mostra comandos canônicos do model-gateway para package, make e terminal', async () => {

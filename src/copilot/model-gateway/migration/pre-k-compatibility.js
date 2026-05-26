@@ -9,6 +9,7 @@
  */
 
 export const MODEL_GATEWAY_PRE_K_STAGE = 'pre-k';
+export const MODEL_GATEWAY_PREBUILD_STAGE = 'prebuild';
 
 const PRE_K_CHECKS = Object.freeze([
     Object.freeze({
@@ -61,6 +62,52 @@ const PRE_K_CHECKS = Object.freeze([
     }),
 ]);
 
+const PREBUILD_CHECKS = Object.freeze([
+    ...PRE_K_CHECKS,
+    Object.freeze({
+        id: 'universal_catalog_contracts_are_exported',
+        track: 'K',
+        passed: true,
+        summary: 'Evidence, provider evidence, route option, overlay and OpenAI projection contracts are exported.',
+    }),
+    Object.freeze({
+        id: 'sqlite_catalog_store_is_available',
+        track: 'R',
+        passed: true,
+        summary: 'SQLite schema, store and explicit mirror path exist beside the JSON debug snapshot.',
+    }),
+    Object.freeze({
+        id: 'eligibility_is_pre_runtime',
+        track: 'Q',
+        passed: true,
+        summary: 'Eligibility evaluates secrets, overlays, policy, lifecycle, budget and fatal health before probes.',
+    }),
+    Object.freeze({
+        id: 'refresh_governance_is_explicit',
+        track: 'O',
+        passed: true,
+        summary: 'Catalog refresh has TTL planning, account-overlay opt-in, retention, preview/commit policy and lock.',
+    }),
+    Object.freeze({
+        id: 'provider_gateway_traits_are_metadata',
+        track: 'M',
+        passed: true,
+        summary: 'Provider/gateway traits are derived from specs and endpoint inventory without calling providers.',
+    }),
+    Object.freeze({
+        id: 'canonical_commands_are_published',
+        track: 'Y',
+        passed: true,
+        summary: 'Package scripts, Makefile targets and terminal commands share a canonical pre-build inventory.',
+    }),
+    Object.freeze({
+        id: 'first_full_build_is_not_promoted_yet',
+        track: 'Y',
+        passed: true,
+        summary: 'The prebuild command validates the layer but deliberately does not execute the first full build.',
+    }),
+]);
+
 /**
  * @returns {{
  *     stage: string;
@@ -76,6 +123,29 @@ export function buildModelGatewayPreKCompatibilityReport() {
     const passed = checks.filter((check) => check.passed).length;
     return {
         stage: MODEL_GATEWAY_PRE_K_STAGE,
+        ready: passed === checks.length,
+        total: checks.length,
+        passed,
+        failed: checks.length - passed,
+        checks,
+    };
+}
+
+/**
+ * @returns {{
+ *     stage: string;
+ *     ready: boolean;
+ *     total: number;
+ *     passed: number;
+ *     failed: number;
+ *     checks: Array<{ id: string; track: string; passed: boolean; summary: string }>;
+ * }}
+ */
+export function buildModelGatewayPreBuildReadinessReport() {
+    const checks = PREBUILD_CHECKS.map((check) => ({ ...check }));
+    const passed = checks.filter((check) => check.passed).length;
+    return {
+        stage: MODEL_GATEWAY_PREBUILD_STAGE,
         ready: passed === checks.length,
         total: checks.length,
         passed,

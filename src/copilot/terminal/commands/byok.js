@@ -15,6 +15,7 @@ import {
     buildCatalogRefreshEventBatch,
     buildCatalogRefreshStartedEvent,
     buildEligibilityEvaluatedEvent,
+    buildModelGatewayPreBuildReadinessReport,
     buildModelGatewayRouteCandidates,
     buildModelGatewayPreKCompatibilityReport,
     buildRouteDecisionEvent,
@@ -1782,6 +1783,23 @@ function renderByokGatewayPreKGate(println) {
 
 /**
  * @param {(text: string) => void} println
+ * @returns {void}
+ */
+function renderByokGatewayPreBuildReadiness(println) {
+    const report = buildModelGatewayPreBuildReadinessReport();
+    println(`\n  \x1b[36mBYOK model-gateway pre-build readiness\x1b[0m`);
+    println(
+        `  \x1b[90mstage=${report.stage} · ready=${report.ready ? 'sim' : 'nao'} · checks=${report.passed}/${report.total} · failed=${report.failed}\x1b[0m\n`,
+    );
+    for (const check of report.checks) {
+        const mark = check.passed ? '\x1b[32m[x]\x1b[0m' : '\x1b[31m[ ]\x1b[0m';
+        println(`    ${mark} \x1b[33m${check.id}\x1b[0m  \x1b[90mfaixa=${check.track} · ${check.summary}\x1b[0m`);
+    }
+    println('\n  \x1b[90mEste readiness prepara o primeiro build futuro; ele não substitui probes runtime nem executa build.\x1b[0m\n');
+}
+
+/**
+ * @param {(text: string) => void} println
  * @param {string[]} rest
  * @returns {void}
  */
@@ -2916,6 +2934,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
     if (sub === 'gateway' || sub === 'gate' || sub === 'migration') {
         if (/^(commands|command|comandos|canonical|canonico|canônico|help|ajuda)$/iu.test(rest[0] ?? '')) {
             renderByokGatewayCanonicalCommands(println, rest.slice(1));
+            return;
+        }
+        if (/^(prebuild|pre-build|readiness|ready|build)$/iu.test(rest[0] ?? '')) {
+            renderByokGatewayPreBuildReadiness(println);
             return;
         }
         if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(refresh|reload|sync|atualizar)$/iu.test(rest[1] ?? '')) {

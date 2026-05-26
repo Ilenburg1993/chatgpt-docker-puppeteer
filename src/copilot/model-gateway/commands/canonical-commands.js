@@ -97,6 +97,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Show canonical package, Makefile and terminal commands inside the terminal cockpit.',
     },
     {
+        id: 'terminal.prebuild-readiness',
+        phase: 'prebuild',
+        surface: 'terminal',
+        command: '/byok gateway prebuild',
+        summary: 'Inspect the boolean K+/Y readiness gate before the first full build.',
+    },
+    {
         id: 'terminal.refresh',
         phase: 'metadata',
         surface: 'terminal',

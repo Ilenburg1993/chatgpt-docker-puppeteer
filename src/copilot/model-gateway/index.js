@@ -187,7 +187,9 @@ export {
     modelEligibilityDecisionKey,
 } from './eligibility/index.js';
 export {
+    MODEL_GATEWAY_PREBUILD_STAGE,
     MODEL_GATEWAY_PRE_K_STAGE,
+    buildModelGatewayPreBuildReadinessReport,
     buildModelGatewayPreKCompatibilityReport,
 } from './migration/index.js';
 export {

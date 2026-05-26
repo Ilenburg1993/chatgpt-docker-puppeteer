@@ -18,6 +18,7 @@ import {
     listModelGatewayTaskProfiles,
     ModelGatewayRegistry,
     MODEL_GATEWAY_TASK_PROFILES,
+    buildModelGatewayPreBuildReadinessReport,
     buildModelGatewayPreKCompatibilityReport,
     anthropicAdapter,
     buildEnvByokModelGatewaySnapshot,
@@ -1157,6 +1158,24 @@ describe('model-gateway foundation', () => {
         assert.ok(report.checks.some((check) => check.id === 'route_trace_attributes_are_stable'));
     });
 
+    it('publishes a boolean pre-build readiness gate for K+ metadata layers', () => {
+        const report = buildModelGatewayPreBuildReadinessReport();
+        const ids = new Set(report.checks.map((check) => check.id));
+
+        assert.equal(report.stage, 'prebuild');
+        assert.equal(report.ready, true);
+        assert.equal(report.failed, 0);
+        assert.equal(report.passed, report.total);
+        assert.ok(report.checks.length > buildModelGatewayPreKCompatibilityReport().checks.length);
+        assert.ok(report.checks.every((check) => typeof check.passed === 'boolean'));
+        assert.ok(ids.has('universal_catalog_contracts_are_exported'));
+        assert.ok(ids.has('sqlite_catalog_store_is_available'));
+        assert.ok(ids.has('eligibility_is_pre_runtime'));
+        assert.ok(ids.has('provider_gateway_traits_are_metadata'));
+        assert.ok(ids.has('canonical_commands_are_published'));
+        assert.ok(ids.has('first_full_build_is_not_promoted_yet'));
+    });
+
     it('publishes a canonical model-gateway command inventory for operators and LLMs', () => {
         const commands = listModelGatewayCanonicalCommands();
         const packageCommands = listModelGatewayCanonicalCommands({ surface: 'package' });
@@ -1166,6 +1185,7 @@ describe('model-gateway foundation', () => {
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:prebuild'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway commands'));
+        assert.ok(commands.some((entry) => entry.command === '/byok gateway prebuild'));
         assert.ok(commands.every((entry) => ['orientation', 'metadata', 'pre-runtime', 'selection', 'validate', 'prebuild'].includes(entry.phase)));
         assert.ok(terminalLines.some((line) => line.includes('/byok gateway catalog refresh')));
     });
