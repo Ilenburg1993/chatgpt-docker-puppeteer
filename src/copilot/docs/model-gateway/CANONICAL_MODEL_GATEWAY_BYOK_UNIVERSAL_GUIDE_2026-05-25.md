@@ -1413,7 +1413,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] SQLite store.
 - [x] Snapshot ids estáveis.
 - [x] Incremental refresh com TTL por source.
-- [ ] Tombstones.
+- [x] Tombstones.
 - [x] Raw payload storage policy.
 
 ### Faixa L — Importers
@@ -2989,6 +2989,44 @@ Validação deste corte:
 - [x] PASS `make model-gateway-commands`.
 - [x] PASS `npm run model-gateway:test:contracts` com `117` testes.
 - [x] PASS `npm run model-gateway:test:terminal` com `55` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 54. Continuidade 2026-05-26 — Tombstones De Catálogo
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a lacuna da Faixa K sobre tombstones.
+- [x] Confirmado que `diffCanonicalModelProjections()` já detectava removidos,
+  mas o snapshot não preservava registro próprio de remoção.
+- [x] Confirmado que tombstones devem ser derivados do diff, sem apagar
+  evidências históricas ou projections anteriores fora da política ativa.
+- [x] Confirmado que provider models com `:` no id exigem parsing cuidadoso da
+  chave `provider:model:routeProfile`.
+
+Implementado neste corte:
+
+- [x] Criado `createCatalogModelTombstones()`.
+- [x] Snapshot JSON passa a normalizar `modelTombstones`.
+- [x] `refreshModelGatewayCatalog()` cria tombstones para modelos removidos.
+- [x] Tombstones são upsertados por `projectionKey`.
+- [x] Exportado pelos barrels `catalog` e `model-gateway`.
+- [x] Adicionado teste unitário com provider model contendo `:`.
+
+Separação preservada:
+
+- [x] Tombstone é metadado derivado de diff.
+- [x] Tombstone não chama provider.
+- [x] Tombstone não executa modelo.
+- [x] Tombstone não altera eligibility ou runtime health.
+- [x] Tombstone preserva a última projection sanitizada como referência.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `123` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.

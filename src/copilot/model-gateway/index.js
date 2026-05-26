@@ -71,6 +71,7 @@ export {
     JsonModelGatewayCatalogStore,
     SqliteModelGatewayCatalogStore,
     applyModelGatewayCatalogRetention,
+    createCatalogModelTombstones,
     createCanonicalModelProjection,
     createCanonicalProviderProjection,
     createAnthropicModelsImporter,

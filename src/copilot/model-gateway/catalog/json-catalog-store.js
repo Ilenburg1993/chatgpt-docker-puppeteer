@@ -34,6 +34,7 @@ const CATALOG_ARRAY_FIELDS = Object.freeze([
     'importRuns',
     'rawPayloadRefs',
     'conflicts',
+    'modelTombstones',
     'modelEligibilityRuns',
     'modelEligibilityDecisions',
 ]);
@@ -134,6 +135,7 @@ export function createModelGatewayCatalogSnapshotId(snapshot) {
  *     importRuns: Record<string, any>[];
  *     rawPayloadRefs: Record<string, any>[];
  *     conflicts: Record<string, any>[];
+ *     modelTombstones: Record<string, any>[];
  *     modelEligibilityRuns: Record<string, any>[];
  *     modelEligibilityDecisions: Record<string, any>[];
  * }}
@@ -154,6 +156,7 @@ export function normalizeStoredCatalogSnapshot(snapshot) {
         importRuns: [],
         rawPayloadRefs: [],
         conflicts: [],
+        modelTombstones: [],
         modelEligibilityRuns: [],
         modelEligibilityDecisions: [],
     };
@@ -173,6 +176,7 @@ export function normalizeStoredCatalogSnapshot(snapshot) {
         importRuns: readRecordArray(snapshot['importRuns']),
         rawPayloadRefs: readRecordArray(snapshot['rawPayloadRefs']),
         conflicts: readRecordArray(snapshot['conflicts']),
+        modelTombstones: readRecordArray(snapshot['modelTombstones']),
         modelEligibilityRuns: readRecordArray(snapshot['modelEligibilityRuns']),
         modelEligibilityDecisions: readRecordArray(snapshot['modelEligibilityDecisions']),
     };

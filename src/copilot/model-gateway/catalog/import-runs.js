@@ -163,6 +163,47 @@ export function diffCanonicalModelProjections(previous, next) {
 }
 
 /**
+ * @param {object} input
+ * @param {{ removed?: string[] }} input.diff
+ * @param {Array<Record<string, any>>} input.previousProjections
+ * @param {string | number | Date} [input.observedAt]
+ * @param {string} [input.reason]
+ * @returns {Array<{ schemaVersion: number; tombstoneId: string; projectionKey: string; providerId: string | null; providerModel: string | null; routeProfile: string; displayName: string | null; reason: string; observedAt: string; lastProjection: Record<string, any> | null }>}
+ */
+export function createCatalogModelTombstones(input) {
+    const observedAt = normalizeIsoDate(input.observedAt) ?? new Date().toISOString();
+    const previousByKey = new Map(input.previousProjections.map((projection) => [projectionKey(projection), projection]));
+    return (Array.isArray(input.diff.removed) ? input.diff.removed : []).map((key) => {
+        const projection = previousByKey.get(key) ?? null;
+        const parsed = parseProjectionKey(key);
+        return {
+            schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+            tombstoneId: `tombstone:${key}:${observedAt}`,
+            projectionKey: key,
+            providerId: projection ? optionalString(projection['providerId']) : parsed.providerId,
+            providerModel: projection ? optionalString(projection['providerModel']) : parsed.providerModel,
+            routeProfile: projection ? optionalString(projection['routeProfile']) ?? 'default' : parsed.routeProfile,
+            displayName: projection ? optionalString(projection['displayName']) : null,
+            reason: optionalString(input.reason) ?? 'catalog_removed',
+            observedAt,
+            lastProjection: projection,
+        };
+    });
+}
+
+/**
+ * @param {string} key
+ * @returns {{ providerId: string | null; providerModel: string | null; routeProfile: string }}
+ */
+function parseProjectionKey(key) {
+    const parts = key.split(':');
+    const providerId = optionalString(parts.shift());
+    const routeProfile = optionalString(parts.pop()) ?? 'default';
+    const providerModel = optionalString(parts.join(':'));
+    return { providerId, providerModel, routeProfile };
+}
+
+/**
  * @param {{ added?: unknown[]; removed?: unknown[]; changed?: Array<{ changedKinds?: unknown[] }> }} diff
  * @returns {{ addedCount: number; removedCount: number; changedCount: number; changedKinds: string[]; changedKindCounts: Record<string, number> }}
  */

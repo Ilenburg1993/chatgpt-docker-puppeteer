@@ -27,6 +27,7 @@ export { explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry } fro
 export {
     MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY,
     createCatalogImportRun,
+    createCatalogModelTombstones,
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
     summarizeCanonicalModelProjectionDiff,

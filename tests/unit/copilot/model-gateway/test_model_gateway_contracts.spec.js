@@ -86,6 +86,7 @@ import {
     MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
     MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY,
     createAnthropicModelsImporter,
+    createCatalogModelTombstones,
     createCerebrasPublicModelsImporter,
     createChutesModelsImporter,
     createCloudflareWorkersAiCatalogImporter,
@@ -1483,6 +1484,32 @@ describe('model-gateway foundation', () => {
         assert.equal(forcedHashOnly.storagePolicy, MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.HASH_ONLY);
         assert.equal(forcedHashOnly.sanitizedPayload, null);
         assert.equal(JSON.stringify({ inline, hashOnly, forcedHashOnly }).includes('sk-secret-that-must-not-leak'), false);
+    });
+
+    it('creates catalog tombstones for removed projections', () => {
+        const previous = [
+            createCanonicalModelProjection({
+                providerId: 'openrouter',
+                providerModel: 'meta/llama-3.1:free',
+                displayName: 'Llama Free',
+            }),
+        ];
+        const next = [];
+        const diff = diffCanonicalModelProjections(previous, next);
+        const tombstones = createCatalogModelTombstones({
+            diff,
+            previousProjections: previous,
+            observedAt: '2026-05-26T12:00:00.000Z',
+        });
+
+        assert.deepEqual(diff.removed, ['openrouter:meta/llama-3.1:free:default']);
+        assert.equal(tombstones.length, 1);
+        assert.equal(tombstones[0].projectionKey, 'openrouter:meta/llama-3.1:free:default');
+        assert.equal(tombstones[0].providerId, 'openrouter');
+        assert.equal(tombstones[0].providerModel, 'meta/llama-3.1:free');
+        assert.equal(tombstones[0].routeProfile, 'default');
+        assert.equal(tombstones[0].reason, 'catalog_removed');
+        assert.equal(tombstones[0].lastProjection?.displayName, 'Llama Free');
     });
 
     it('classifies semantic catalog diff kinds for pricing, capabilities and lifecycle changes', () => {

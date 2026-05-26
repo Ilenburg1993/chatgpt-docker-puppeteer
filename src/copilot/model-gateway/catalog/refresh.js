@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/catalog/refresh
  */
 
-import { createCatalogImportRun, diffCanonicalModelProjections } from './import-runs.js';
+import { createCatalogImportRun, createCatalogModelTombstones, diffCanonicalModelProjections } from './import-runs.js';
 import { runCatalogImporters } from './importer-runner.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { mergeModelMetadataEvidence, mergeProviderMetadataEvidence } from './merge.js';
@@ -229,6 +229,11 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
     const { projections, conflicts } = buildProjectionsFromEvidence(combinedEvidences);
     const { providerProjections, providerConflicts } = buildProviderProjectionsFromEvidence(combinedProviderEvidences);
     const diff = diffCanonicalModelProjections(previous.projections, projections);
+    const modelTombstones = createCatalogModelTombstones({
+        diff,
+        previousProjections: previous.projections,
+        observedAt: startedAt,
+    });
     const refreshRun = createCatalogImportRun({
         runId: `model-gateway:catalog-refresh:${startedAt.toISOString()}`,
         providerId: 'model-gateway',
@@ -262,6 +267,7 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
         providerProjections,
         projections,
         conflicts: [...providerConflicts, ...conflicts],
+        modelTombstones: upsertMany(previous.modelTombstones, modelTombstones, (item) => String(item['projectionKey'])),
     };
     const retained = applyModelGatewayCatalogRetention(nextSnapshot, input.retentionPolicy);
     const snapshot = retained.snapshot;
