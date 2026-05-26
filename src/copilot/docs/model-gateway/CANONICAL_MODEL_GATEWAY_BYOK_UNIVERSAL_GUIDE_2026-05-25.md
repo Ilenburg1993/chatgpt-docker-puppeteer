@@ -3846,6 +3846,8 @@ Implementado neste corte:
   `retryAfterSeconds`/`resetAt` expirar.
 - [x] OpenRouter key overlay agora duplica crédito restante em
   `quota.remainingCreditsUsd`, mantendo `spendingLimits` como visão de budget.
+- [x] SQLite schema v2 passa a reservar e materializar snapshots separados de
+  quota, rate limit e spending account-scoped.
 
 Separação preservada:
 
@@ -3864,9 +3866,9 @@ Próximas lacunas reforçadas:
   apropriada.
 - [x] Criar UX agregada `/byok gateway accounts` para mostrar overlays e
   limits account/key sem runtime.
-- [ ] Persistir snapshots separados de `account_quota_snapshots`,
-  `account_rate_limit_snapshots` e `account_spending_snapshots` no SQLite quando
-  a camada multi-account avançar.
+- [x] Persistir snapshots separados de `account_quota_snapshots`,
+  `account_rate_limit_snapshots` e `account_spending_snapshots` no SQLite a
+  partir dos overlays atuais.
 - [ ] Criar policy explícita para tratar quota diária/mensal com reset conhecido
   de forma diferente de spending/crédito sem reset.
 - [ ] Criar backoff planner para probes/runtime usando `retryAfterSeconds` e

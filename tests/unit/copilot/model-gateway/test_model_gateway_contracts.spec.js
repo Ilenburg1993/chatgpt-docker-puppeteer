@@ -2240,6 +2240,9 @@ describe('model-gateway foundation', () => {
                 providerId: 'kilo',
                 secretRef: 'KILO_API_KEY',
                 enabledModels: ['anthropic/claude-sonnet-4.5'],
+                quota: { remainingCreditsUsd: 0 },
+                rateLimits: { remainingRequests: 0, retryAfterSeconds: 60 },
+                spendingLimits: { remainingUsd: 0 },
                 policyHeaders: { Authorization: 'Bearer sk-secret-that-must-not-leak' },
             });
             const projection = createCanonicalModelProjection({
@@ -2306,6 +2309,18 @@ describe('model-gateway foundation', () => {
             assert.equal(openai.object, 'list');
             assert.equal(openai.data.length, 1);
             assert.equal(openai.data[0].x_model_gateway.eligibility.status, 'eligible');
+            const quotaStatus = /** @type {{ status: string }} */ (
+                db.prepare('SELECT status FROM copilot_model_gateway_account_quota_snapshots').get()
+            );
+            const rateLimitStatus = /** @type {{ status: string }} */ (
+                db.prepare('SELECT status FROM copilot_model_gateway_account_rate_limit_snapshots').get()
+            );
+            const spendingStatus = /** @type {{ status: string }} */ (
+                db.prepare('SELECT status FROM copilot_model_gateway_account_spending_snapshots').get()
+            );
+            assert.equal(quotaStatus.status, 'exhausted');
+            assert.equal(rateLimitStatus.status, 'limited');
+            assert.equal(spendingStatus.status, 'exhausted');
             assert.equal(JSON.stringify(loaded).includes('sk-secret-that-must-not-leak'), false);
             assert.equal(JSON.stringify(serializedRows).includes('secret-token-that-must-not-leak'), false);
         } finally {

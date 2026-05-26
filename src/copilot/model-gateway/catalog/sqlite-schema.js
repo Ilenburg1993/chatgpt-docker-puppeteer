@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/catalog/sqlite-schema
  */
 
-export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 1;
+export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 2;
 
 export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_snapshots',
@@ -19,6 +19,9 @@ export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_provider_projections',
     'copilot_model_gateway_route_options',
     'copilot_model_gateway_account_overlays',
+    'copilot_model_gateway_account_quota_snapshots',
+    'copilot_model_gateway_account_rate_limit_snapshots',
+    'copilot_model_gateway_account_spending_snapshots',
     'copilot_model_gateway_import_runs',
     'copilot_model_gateway_raw_payload_refs',
     'copilot_model_gateway_conflicts',
@@ -143,6 +146,49 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
     ) STRICT;
     CREATE INDEX IF NOT EXISTS idx_mg_account_overlays_provider
         ON copilot_model_gateway_account_overlays(provider_id, account_scope, secret_ref);
+
+    CREATE TABLE IF NOT EXISTS copilot_model_gateway_account_quota_snapshots (
+        snapshot_key       TEXT PRIMARY KEY,
+        account_overlay_id TEXT NOT NULL,
+        provider_id        TEXT NOT NULL,
+        account_scope      TEXT NOT NULL DEFAULT 'default',
+        secret_ref         TEXT,
+        status             TEXT NOT NULL,
+        observed_at_ms     INTEGER NOT NULL,
+        expires_at_ms      INTEGER,
+        payload_json       TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS idx_mg_account_quota_snapshots_provider
+        ON copilot_model_gateway_account_quota_snapshots(provider_id, account_scope, secret_ref, observed_at_ms DESC);
+
+    CREATE TABLE IF NOT EXISTS copilot_model_gateway_account_rate_limit_snapshots (
+        snapshot_key       TEXT PRIMARY KEY,
+        account_overlay_id TEXT NOT NULL,
+        provider_id        TEXT NOT NULL,
+        account_scope      TEXT NOT NULL DEFAULT 'default',
+        secret_ref         TEXT,
+        status             TEXT NOT NULL,
+        reset_at_ms        INTEGER,
+        observed_at_ms     INTEGER NOT NULL,
+        expires_at_ms      INTEGER,
+        payload_json       TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS idx_mg_account_rate_limit_snapshots_provider
+        ON copilot_model_gateway_account_rate_limit_snapshots(provider_id, account_scope, secret_ref, status, observed_at_ms DESC);
+
+    CREATE TABLE IF NOT EXISTS copilot_model_gateway_account_spending_snapshots (
+        snapshot_key       TEXT PRIMARY KEY,
+        account_overlay_id TEXT NOT NULL,
+        provider_id        TEXT NOT NULL,
+        account_scope      TEXT NOT NULL DEFAULT 'default',
+        secret_ref         TEXT,
+        status             TEXT NOT NULL,
+        observed_at_ms     INTEGER NOT NULL,
+        expires_at_ms      INTEGER,
+        payload_json       TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS idx_mg_account_spending_snapshots_provider
+        ON copilot_model_gateway_account_spending_snapshots(provider_id, account_scope, secret_ref, status, observed_at_ms DESC);
 
     CREATE TABLE IF NOT EXISTS copilot_model_gateway_import_runs (
         run_id          TEXT PRIMARY KEY,

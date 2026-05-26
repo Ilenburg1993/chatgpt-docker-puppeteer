@@ -11,6 +11,7 @@
 import Database from 'better-sqlite3';
 
 import { getCopilotDb } from '../../db/sqlite.js';
+import { normalizeModelGatewayAccountLimitState } from '../account-access/limits.js';
 import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { toOpenAIModelCatalogList } from './openai-schema.js';
@@ -28,6 +29,9 @@ const DELETE_TABLES_IN_ORDER = Object.freeze([
     'copilot_model_gateway_conflicts',
     'copilot_model_gateway_raw_payload_refs',
     'copilot_model_gateway_import_runs',
+    'copilot_model_gateway_account_spending_snapshots',
+    'copilot_model_gateway_account_rate_limit_snapshots',
+    'copilot_model_gateway_account_quota_snapshots',
     'copilot_model_gateway_account_overlays',
     'copilot_model_gateway_route_options',
     'copilot_model_gateway_provider_projections',
@@ -539,6 +543,7 @@ export class SqliteModelGatewayCatalogStore {
             this.#writeProviderProjections(normalized.providerProjections, generatedAtMs);
             this.#writeRouteOptions(normalized.routeOptions, generatedAtMs);
             this.#writeAccountOverlays(normalized.accountOverlays, generatedAtMs);
+            this.#writeAccountLimitSnapshots(normalized.accountOverlays, generatedAtMs);
             this.#writeImportRuns(normalized.importRuns, generatedAtMs);
             this.#writeRawPayloadRefs(normalized.rawPayloadRefs, generatedAtMs);
             this.#writeConflicts(normalized.conflicts, generatedAtMs);
@@ -748,6 +753,73 @@ export class SqliteModelGatewayCatalogStore {
                 dateMs(row['observedAt']) ?? generatedAtMs,
                 dateMs(row['expiresAt']),
                 payloadJson(row),
+            );
+        }
+    }
+
+    /**
+     * @param {Record<string, unknown>[]} rows
+     * @param {number} generatedAtMs
+     */
+    #writeAccountLimitSnapshots(rows, generatedAtMs) {
+        const insertQuota = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_account_quota_snapshots
+                (snapshot_key, account_overlay_id, provider_id, account_scope, secret_ref, status,
+                 observed_at_ms, expires_at_ms, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const insertRateLimit = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_account_rate_limit_snapshots
+                (snapshot_key, account_overlay_id, provider_id, account_scope, secret_ref, status,
+                 reset_at_ms, observed_at_ms, expires_at_ms, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const insertSpending = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_account_spending_snapshots
+                (snapshot_key, account_overlay_id, provider_id, account_scope, secret_ref, status,
+                 observed_at_ms, expires_at_ms, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const row of rows) {
+            const overlayId = idOr(row, `${providerId(row)}:${optionalString(row['accountScope']) ?? DEFAULT_ACCOUNT_SCOPE}`);
+            const accountScope = optionalString(row['accountScope']) ?? DEFAULT_ACCOUNT_SCOPE;
+            const secretRef = optionalString(row['secretRef']);
+            const observedAtMs = dateMs(row['observedAt']) ?? generatedAtMs;
+            const expiresAtMs = dateMs(row['expiresAt']);
+            const limits = normalizeModelGatewayAccountLimitState(row, { now: observedAtMs });
+            insertQuota.run(
+                `${overlayId}:quota`,
+                overlayId,
+                providerId(row),
+                accountScope,
+                secretRef,
+                limits.quotaExhausted ? 'exhausted' : 'ok',
+                observedAtMs,
+                expiresAtMs,
+                payloadJson(limits.quota),
+            );
+            insertRateLimit.run(
+                `${overlayId}:rate-limit`,
+                overlayId,
+                providerId(row),
+                accountScope,
+                secretRef,
+                limits.rateLimited ? 'limited' : 'ok',
+                dateMs(limits.resetAt),
+                observedAtMs,
+                expiresAtMs,
+                payloadJson(limits.rateLimit),
+            );
+            insertSpending.run(
+                `${overlayId}:spending`,
+                overlayId,
+                providerId(row),
+                accountScope,
+                secretRef,
+                limits.spendingExhausted ? 'exhausted' : 'ok',
+                observedAtMs,
+                expiresAtMs,
+                payloadJson(limits.spending),
             );
         }
     }
