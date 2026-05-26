@@ -92,6 +92,7 @@ import {
     createAnthropicDocsModelsImporter,
     createAnthropicModelsImporter,
     createCatalogModelTombstones,
+    createCerebrasModelsImporter,
     createCerebrasPublicModelsImporter,
     createChutesModelsImporter,
     createCloudflareWorkersAiAccountImporter,
@@ -112,6 +113,7 @@ import {
     createOpenRouterKeyAccountImporter,
     createOpenRouterModelsImporter,
     createZaiModelsImporter,
+    createZaiOpenApiImporter,
     createCanonicalModelProjection,
     createCanonicalProviderProjection,
     createCatalogImportRun,
@@ -3647,6 +3649,82 @@ describe('model-gateway foundation', () => {
         assert.equal(byModelPath.get('glm-5.1:providerMetadata.zai.openApiUrl'), 'https://docs.z.ai/openapi.json');
     });
 
+    it('imports Z.AI OpenAPI as provider wire-contract metadata without model invention', async () => {
+        /** @type {string | null} */
+        let acceptHeader = null;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (_url, init) => {
+                acceptHeader = /** @type {{ headers?: { accept?: string } }} */ (init)?.headers?.accept ?? null;
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        openapi: '3.1.0',
+                        info: { title: 'Z.AI API', version: '2026-05-01' },
+                        paths: {
+                            '/chat/completions': {
+                                post: {
+                                    operationId: 'createChatCompletion',
+                                    tags: ['Chat'],
+                                    requestBody: {
+                                        content: {
+                                            'application/json': {
+                                                schema: {
+                                                    type: 'object',
+                                                    required: ['model', 'messages'],
+                                                    properties: {
+                                                        model: { type: 'string' },
+                                                        messages: { type: 'array' },
+                                                        stream: { type: 'boolean' },
+                                                        tools: { type: 'array' },
+                                                        tool_choice: {},
+                                                        response_format: {},
+                                                        web_search: {},
+                                                        thinking: {},
+                                                        input_image: {},
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    }),
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createZaiOpenApiImporter({ fetchImpl: fakeFetch })],
+            now: () => new Date('2026-05-26T14:00:00.000Z'),
+        });
+        const providerEvidence = new Map(snapshot.providerEvidences.map((item) => [String(item.fieldPath), item.value]));
+
+        assert.equal(acceptHeader, 'application/json');
+        assert.equal(snapshot.sources[0].kind, 'openapi');
+        assert.equal(snapshot.evidences.length, 0);
+        assert.equal(snapshot.routeOptions.length, 0);
+        assert.equal(providerEvidence.get('providerMetadata.zai.openapi.openapiVersion'), '3.1.0');
+        assert.equal(providerEvidence.get('providerMetadata.zai.openapi.chatCompletionsOperationId'), 'createChatCompletion');
+        assert.deepEqual(providerEvidence.get('providerMetadata.zai.openapi.chatCompletionsParameters'), [
+            'input_image',
+            'messages',
+            'model',
+            'response_format',
+            'stream',
+            'thinking',
+            'tool_choice',
+            'tools',
+            'web_search',
+        ]);
+        assert.equal(providerEvidence.get('providerMetadata.zai.openapi.capabilities.tools'), true);
+        assert.equal(providerEvidence.get('providerMetadata.zai.openapi.capabilities.forcedToolChoice'), true);
+        assert.equal(providerEvidence.get('providerMetadata.zai.openapi.capabilities.structuredOutputs'), true);
+        assert.equal(providerEvidence.get('providerMetadata.zai.openapi.capabilities.reasoning'), true);
+        assert.equal(providerEvidence.get('providerMetadata.zai.openapi.capabilities.webSearch'), true);
+        assert.equal(providerEvidence.get('providerMetadata.zai.openapi.capabilities.multimodal'), true);
+    });
+
     it('imports Mistral model cards with capabilities, aliases and deprecation metadata', async () => {
         const secret = 'mistral-secret-that-must-not-leak';
         /** @type {string | null} */
@@ -4838,6 +4916,49 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('pricing.outputUsdPerMillion'), 0.75);
         assert.equal(byPath.get('providerMetadata.ownedBy'), 'OpenAI');
         assert.equal(byPath.get('providerMetadata.cerebras.quantization'), 'FP16/8 (weights only)');
+    });
+
+    it('imports Cerebras authenticated visible models with provider-specific overlay metadata', async () => {
+        const secret = 'cerebras-secret-that-must-not-leak';
+        /** @type {string | null} */
+        let authorizationHeader = null;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (_url, init) => {
+                authorizationHeader = /** @type {{ authorization?: string }} */ (init)?.headers?.authorization ?? null;
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        object: 'list',
+                        data: [
+                            {
+                                id: 'gpt-oss-120b',
+                                object: 'model',
+                                created: 1754438400,
+                                owned_by: 'OpenAI',
+                            },
+                        ],
+                    }),
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [createCerebrasModelsImporter({ fetchImpl: fakeFetch, apiKey: secret, secretRef: 'CEREBRAS_KEY' })],
+            now: () => new Date('2026-05-26T14:30:00.000Z'),
+        });
+        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+
+        assert.equal(authorizationHeader, `Bearer ${secret}`);
+        assert.equal(JSON.stringify(snapshot).includes(secret), false);
+        assert.equal(snapshot.sources[0].kind, 'authenticated_api');
+        assert.equal(snapshot.sources[0].trustTier, 'account_scoped');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.openAICompatibleBaseUrl, 'https://api.cerebras.ai/v1');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.wireApi, 'openai_chat_completions');
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['gpt-oss-120b']);
+        assert.equal(snapshot.accountOverlays[0].secretRef, 'CEREBRAS_KEY');
+        assert.equal(snapshot.accountOverlays[0].providerMetadata.semantics, 'cerebras_account_visible_models');
+        assert.equal(byPath.get('providerMetadata.cerebras.authenticatedVisibility'), true);
+        assert.equal(byPath.get('providerMetadata.cerebras.openAICompatibleBaseUrl'), 'https://api.cerebras.ai/v1');
     });
 
     it('normalizes universal projections to OpenAI model schema with gateway extensions', () => {
@@ -6551,6 +6672,7 @@ describe('model-gateway foundation', () => {
                 'mistral-docs-models',
                 'groq-docs-models',
                 'opencode-zen-docs',
+                'zai-openapi',
                 'cloudflare-workers-ai-catalog',
                 'huggingface-inference-providers',
                 'opencode-zen-models',
@@ -6572,6 +6694,7 @@ describe('model-gateway foundation', () => {
                 'mistral-docs-models',
                 'groq-docs-models',
                 'opencode-zen-docs',
+                'zai-openapi',
                 'cloudflare-workers-ai-catalog',
                 'huggingface-inference-providers',
                 'opencode-zen-models',
@@ -6582,7 +6705,7 @@ describe('model-gateway foundation', () => {
         assert.equal(groqAuthenticated.some((importer) => importer.id === 'groq-models'), true);
         assert.equal(openRouterAuthenticated.some((importer) => importer.id === 'openrouter-key-account'), true);
         assert.equal(kiloAuthenticated.some((importer) => importer.id === 'kilo-gateway-account'), true);
-        assert.equal(genericAuthenticated.some((importer) => importer.id === 'cerebras-openai-compatible-models'), true);
+        assert.equal(genericAuthenticated.some((importer) => importer.id === 'cerebras-models'), true);
         assert.equal(mistralAuthenticated.some((importer) => importer.id === 'mistral-models'), true);
         assert.equal(anthropicAuthenticated.some((importer) => importer.id === 'anthropic-models'), true);
         assert.equal(geminiAuthenticated.some((importer) => importer.id === 'gemini-models'), true);
@@ -6632,7 +6755,7 @@ describe('model-gateway foundation', () => {
         assert.ok(audit.routeOptionImporterCount >= 10);
         assert.ok(audit.accountOverlayImporterCount >= 4);
         assert.equal(audit.providersWithoutImporters.includes('zai'), false);
-        assert.equal(audit.uncoveredCatalogSourceIds.includes('zai:catalog:openapi:GET:https://docs.z.ai/openapi.json'), true);
+        assert.equal(audit.uncoveredCatalogSourceIds.includes('zai:catalog:openapi:GET:https://docs.z.ai/openapi.json'), false);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {
@@ -7076,7 +7199,7 @@ describe('model-gateway foundation', () => {
         assert.equal(byProvider.get('openai')?.coveredCatalogSourceCount, 1);
         assert.equal(byProvider.get('kilo')?.coveredCatalogSourceCount, 3);
         assert.equal(byProvider.get('openrouter')?.coveredCatalogSourceCount, 1);
-        assert.equal(byProvider.get('zai')?.uncoveredCatalogSourceIds.includes('zai:catalog:openapi:GET:https://docs.z.ai/openapi.json'), true);
+        assert.equal(byProvider.get('zai')?.uncoveredCatalogSourceIds.includes('zai:catalog:openapi:GET:https://docs.z.ai/openapi.json'), false);
     });
 
     it('builds an SDK onListModels handler from gateway records without exposing secrets', async () => {

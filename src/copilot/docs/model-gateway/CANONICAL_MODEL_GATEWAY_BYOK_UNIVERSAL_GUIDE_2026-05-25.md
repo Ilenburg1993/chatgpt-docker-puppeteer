@@ -1279,14 +1279,14 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] OpenAPI URL preservada.
 - [x] Pricing cache/web search.
 - [x] Overlay autenticado.
-- [ ] Parser OpenAPI estrutural.
+- [x] Parser OpenAPI estrutural.
 - [ ] Runtime adapter/probes específicos.
 
 ### 10.15 Cerebras
 
 - [x] Public rich catalog.
 - [x] Account via generic OpenAI-compatible.
-- [ ] Importer autenticado especializado.
+- [x] Importer autenticado especializado.
 - [ ] Docs de rate limits e pricing reconciliados.
 
 ---
@@ -3392,8 +3392,8 @@ Próximas lacunas L identificadas:
 - [ ] OpenRouter account overlay importer profundo.
 - [x] Kilo account overlay importer conservador de token/model policy.
 - [x] Cloudflare account access importer além de flags configuradas.
-- [ ] Parser estrutural do OpenAPI da Z.AI.
-- [ ] Importer autenticado especializado para Cerebras.
+- [x] Parser estrutural do OpenAPI da Z.AI.
+- [x] Importer autenticado especializado para Cerebras.
 
 Validação deste corte:
 
@@ -3638,7 +3638,7 @@ Próximas lacunas L reforçadas:
 - [ ] Mistral docs pricing seed.
 - [x] Account overlays profundos para OpenRouter e Kilo.
 - [x] Cloudflare account access importer além de flags configuradas.
-- [ ] Parser estrutural adicional para OpenAPI docs onde o provider expõe
+- [x] Parser estrutural adicional para OpenAPI docs onde o provider expõe
   schema legível por máquina.
 
 Validação deste corte:
@@ -3699,8 +3699,8 @@ Próximas lacunas L reforçadas:
 
 - [x] Account overlays profundos para OpenRouter e Kilo.
 - [x] Cloudflare account access importer além de flags configuradas.
-- [ ] Parser estrutural do OpenAPI da Z.AI.
-- [ ] Importer autenticado especializado para Cerebras.
+- [x] Parser estrutural do OpenAPI da Z.AI.
+- [x] Importer autenticado especializado para Cerebras.
 
 Validação deste corte:
 
@@ -3755,8 +3755,8 @@ Próximas lacunas L reforçadas:
 
 - [x] Kilo account overlay conservador de token/model policy.
 - [x] Cloudflare account access importer além de flags configuradas.
-- [ ] Parser estrutural do OpenAPI da Z.AI.
-- [ ] Importer autenticado especializado para Cerebras.
+- [x] Parser estrutural do OpenAPI da Z.AI.
+- [x] Importer autenticado especializado para Cerebras.
 
 Validação deste corte:
 
@@ -4098,6 +4098,128 @@ Validação deste corte:
   com `3` testes Kilo e `140` skipped.
 - [x] PASS `npm run typecheck:strict:src.copilot -- --pretty false`.
 - [x] PASS `npm run model-gateway:test:contracts` com `143` testes.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 65. Continuidade 2026-05-26 — Z.AI OpenAPI Wire Contract
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a lacuna Z.AI: a fonte `openapi.json` existia no endpoint
+  inventory, mas o importer set ainda não a cobria.
+- [x] Confirmado que pricing docs e OpenAPI têm responsabilidades distintas:
+  pricing docs geram modelos/preços; OpenAPI gera contrato de wire API.
+- [x] Confirmado que OpenAPI não deve inventar modelos nem account access.
+- [x] Confirmado que a utilidade pré-runtime é detectar parâmetros,
+  capabilities de wire API, required fields e path coverage.
+
+Implementado neste corte:
+
+- [x] Criado `createZaiOpenApiImporter()`.
+- [x] Criado parser `parseZaiOpenApiRows()`.
+- [x] O importer busca `https://docs.z.ai/openapi.json` como `sourceKind:
+  openapi`.
+- [x] O importer extrai versão OpenAPI, título/versão de API, paths e operação
+  `POST /chat/completions`.
+- [x] O importer extrai parâmetros do request schema e required fields.
+- [x] O importer projeta capabilities provider-level para streaming, tools,
+  forced tool choice, structured outputs, JSON mode, reasoning, web search e
+  multimodal quando os campos aparecem no schema.
+- [x] O importer emite apenas `providerEvidences`; não emite model evidence,
+  route options nem account overlays.
+- [x] `createDefaultModelGatewayCatalogImporters()` passa a incluir
+  `zai-openapi` no conjunto público.
+- [x] A auditoria de coverage deixa de marcar
+  `zai:catalog:openapi:GET:https://docs.z.ai/openapi.json` como uncovered.
+- [x] Barrels `catalog/importers`, `catalog` e `model-gateway` exportam o novo
+  importer e parser.
+- [x] Teste unitário cobre parsing estrutural de schema e garante ausência de
+  model invention.
+
+Separação preservada:
+
+- [x] Modelos/preços continuam vindo do pricing docs importer.
+- [x] OpenAPI continua provider-level.
+- [x] Nenhum runtime é executado.
+- [x] Nenhum segredo é necessário.
+- [x] Account access Z.AI continua separado em overlay/probe.
+
+Impacto no roadmap:
+
+- [x] Faixa L cobre a fonte OpenAPI da Z.AI.
+- [x] Seção 10.14 marca parser OpenAPI estrutural como concluído.
+- [x] O pre-build ganha uma fonte máquina-legível de wire contract para Z.AI.
+- [ ] Ainda faltam runtime adapter/probes específicos Z.AI.
+- [ ] Ainda falta reconciliar OpenAPI real com qualquer mudança futura de
+  endpoint/Responses-like API se ela aparecer.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "Z.AI"`
+  com `2` testes Z.AI e `142` skipped.
+- [x] PASS `npm run typecheck:strict:src.copilot -- --pretty false`.
+- [x] PASS `npm run model-gateway:test:contracts` com `144` testes.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 66. Continuidade 2026-05-26 — Cerebras Authenticated Importer Especializado
+
+Auditoria executada neste corte:
+
+- [x] Revisitado Cerebras: o catálogo público rico já existe, mas o default set
+  ainda usava o importer genérico OpenAI-compatible para `/v1/models`.
+- [x] Confirmado que isso funcionava, mas escondia semântica Cerebras em uma
+  trilha genérica difícil de expandir para rate limits, pricing docs, projetos
+  e tiers.
+- [x] Confirmado que o endpoint autenticado `/v1/models` deve continuar sendo
+  account-scoped e pré-runtime: ele prova visibilidade da key, não execução.
+- [x] Consultada documentação oficial Cerebras de public models, rate limits,
+  pricing e projetos/usage monitoring como próximas fontes de metadados.
+
+Implementado neste corte:
+
+- [x] Criado `createCerebrasModelsImporter()`.
+- [x] Criado parser `parseCerebrasModelsRows()`.
+- [x] O importer consulta `https://api.cerebras.ai/v1/models` com bearer token.
+- [x] O importer emite model evidence de identidade/lifecycle/owner com
+  `providerMetadata.cerebras.authenticatedVisibility`.
+- [x] O importer emite route options OpenAI-compatible com base URL Cerebras.
+- [x] O importer emite account overlay `cerebras_account_visible_models`.
+- [x] O overlay referencia docs oficiais de rate limits e pricing sem tentar
+  transformar docs gerais em limite account-specific.
+- [x] `createDefaultModelGatewayCatalogImporters()` deixa de usar a lista
+  genérica para Cerebras e passa a usar o importer especializado.
+- [x] Barrels `catalog/importers`, `catalog` e `model-gateway` exportam o novo
+  importer e parser.
+- [x] Teste unitário cobre auth header, redaction, route option, overlay e
+  evidence Cerebras-specific.
+
+Separação preservada:
+
+- [x] `/public/v1/models` continua rico e provider-level.
+- [x] `/v1/models` autenticado continua account/key-scoped.
+- [x] Nenhum modelo é executado.
+- [x] Nenhum rate limit geral de docs vira hard exclusion de conta.
+- [x] O próximo passo de rate limits deve reconciliar docs gerais, account
+  dashboard/API se existir e runtime headers/failures.
+
+Impacto no roadmap:
+
+- [x] Seção 10.15 marca importer autenticado especializado como concluído.
+- [x] Faixa L deixa de depender do importer genérico para Cerebras.
+- [ ] Ainda falta docs de rate limits e pricing reconciliados para Cerebras.
+- [ ] Ainda falta health probe para diferenciar quota/rate limit/provedor.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "Cerebras"`
+  com `2` testes Cerebras e `143` skipped.
+- [x] PASS `npm run typecheck:strict:src.copilot -- --pretty false`.
+- [x] PASS `npm run model-gateway:test:contracts` com `145` testes.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.
 

@@ -11,6 +11,7 @@
 import {
     createAnthropicDocsModelsImporter,
     createAnthropicModelsImporter,
+    createCerebrasModelsImporter,
     createCerebrasPublicModelsImporter,
     createChutesModelsImporter,
     createCloudflareWorkersAiAccountImporter,
@@ -30,20 +31,12 @@ import {
     createOpenCodeZenDocsImporter,
     createOpenCodeZenModelsImporter,
     createOpenAiDocsModelsImporter,
-    createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterKeyAccountImporter,
     createOpenRouterModelsImporter,
     createZaiModelsImporter,
+    createZaiOpenApiImporter,
 } from './importers/index.js';
-
-const OPENAI_COMPATIBLE_ACCOUNT_SOURCES = Object.freeze([
-    Object.freeze({
-        providerId: 'cerebras',
-        baseUrl: 'https://api.cerebras.ai/v1',
-        envKeys: Object.freeze(['CEREBRAS_API_KEY', 'CEREBRAS_KEY']),
-    }),
-]);
 
 /**
  * @param {Record<string, string | undefined>} env
@@ -73,6 +66,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     const cloudflareSecret = readEnvSecret(env, ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY', 'CLOUDFLARE_KEY']);
     const openRouterSecret = readEnvSecret(env, ['OPENROUTER_API_KEY', 'OPEN_ROUTER_KEY']);
     const openAiSecret = readEnvSecret(env, ['OPENAI_API_KEY', 'COPILOT_OPENAI_API_KEY']);
+    const cerebrasSecret = readEnvSecret(env, ['CEREBRAS_API_KEY', 'CEREBRAS_KEY']);
     const mistralSecret = readEnvSecret(env, ['MISTRAL_API_KEY', 'MISTRAL_KEY']);
     const anthropicSecret = readEnvSecret(env, ['ANTHROPIC_API_KEY', 'ANTHROPIC_KEY', 'CLAUDE_API_KEY']);
     const geminiSecret = readEnvSecret(env, ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_AI_STUDIO_API_KEY']);
@@ -97,6 +91,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             createMistralDocsModelsImporter({ fetchImpl: options.fetchImpl }),
             createGroqDocsModelsImporter({ fetchImpl: options.fetchImpl }),
             createOpenCodeZenDocsImporter({ fetchImpl: options.fetchImpl }),
+            createZaiOpenApiImporter({ fetchImpl: options.fetchImpl }),
             createCloudflareWorkersAiCatalogImporter({
                 fetchImpl: options.fetchImpl,
                 apiToken: includeAuthenticated ? cloudflareSecret?.value : undefined,
@@ -128,6 +123,15 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                 fetchImpl: options.fetchImpl,
                 apiKey: openAiSecret.value,
                 secretRef: openAiSecret.key,
+            }),
+        );
+    }
+    if (includeAuthenticated && cerebrasSecret) {
+        importers.push(
+            createCerebrasModelsImporter({
+                fetchImpl: options.fetchImpl,
+                apiKey: cerebrasSecret.value,
+                secretRef: cerebrasSecret.key,
             }),
         );
     }
@@ -242,22 +246,6 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                 secretRef: zaiSecret.key,
             }),
         );
-    }
-    if (includeAuthenticated) {
-        for (const source of OPENAI_COMPATIBLE_ACCOUNT_SOURCES) {
-            const secret = readEnvSecret(env, source.envKeys);
-            if (!secret) continue;
-            importers.push(
-                createOpenAICompatibleModelsImporter({
-                    providerId: source.providerId,
-                    baseUrl: source.baseUrl,
-                    fetchImpl: options.fetchImpl,
-                    apiKey: secret.value,
-                    secretRef: secret.key,
-                    envRequirements: [secret.key],
-                }),
-            );
-        }
     }
     return importers;
 }

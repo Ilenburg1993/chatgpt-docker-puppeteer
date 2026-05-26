@@ -40,6 +40,8 @@ export {
     ANTHROPIC_MODELS_DOCS_URL,
     ANTHROPIC_PRICING_DOCS_URL,
     CEREBRAS_PUBLIC_MODELS_CATALOG_URL,
+    CEREBRAS_MODELS_CATALOG_URL,
+    CEREBRAS_OPENAI_BASE_URL,
     CHUTES_MODELS_CATALOG_URL,
     CHUTES_OPENAI_BASE_URL,
     CLOUDFLARE_AI_GATEWAY_CREDIT_BALANCE_PATH,
@@ -99,6 +101,7 @@ export {
     ZAI_OPENAPI_URL,
     createAnthropicDocsModelsImporter,
     createAnthropicModelsImporter,
+    createCerebrasModelsImporter,
     createCerebrasPublicModelsImporter,
     createChutesModelsImporter,
     createCloudflareWorkersAiAccountImporter,
@@ -123,13 +126,16 @@ export {
     createOpenRouterKeyAccountImporter,
     createOpenRouterModelsImporter,
     createZaiModelsImporter,
+    createZaiOpenApiImporter,
     parseAnthropicDocsRows,
+    parseCerebrasModelsRows,
     parseCloudflareWorkersAiAccountRows,
     parseGeminiDocsRows,
     parseKiloGatewayAccountRows,
     parseMistralDocsRows,
     parseOpenAiDocsRows,
     parseOpenRouterKeyRows,
+    parseZaiOpenApiRows,
 } from './importers/index.js';
 export { runCatalogImporters } from './importer-runner.js';
 export {

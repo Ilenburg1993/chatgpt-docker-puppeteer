@@ -18,6 +18,12 @@ export {
     createAnthropicModelsImporter,
 } from './anthropic-models-importer.js';
 export {
+    CEREBRAS_MODELS_CATALOG_URL,
+    CEREBRAS_OPENAI_BASE_URL,
+    createCerebrasModelsImporter,
+    parseCerebrasModelsRows,
+} from './cerebras-models-importer.js';
+export {
     CEREBRAS_PUBLIC_MODELS_CATALOG_URL,
     createCerebrasPublicModelsImporter,
 } from './cerebras-public-models-importer.js';
@@ -151,3 +157,7 @@ export {
     ZAI_OPENAPI_URL,
     createZaiModelsImporter,
 } from './zai-models-importer.js';
+export {
+    createZaiOpenApiImporter,
+    parseZaiOpenApiRows,
+} from './zai-openapi-importer.js';
