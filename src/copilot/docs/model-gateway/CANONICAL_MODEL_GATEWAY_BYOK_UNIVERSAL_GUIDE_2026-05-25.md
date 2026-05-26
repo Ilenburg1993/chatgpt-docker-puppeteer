@@ -3344,6 +3344,58 @@ Validação deste corte:
 
 ---
 
+## 69. Continuidade 2026-05-26 — Correção Do Build Canônico Antes Do Primeiro Build
+
+Auditoria executada neste corte:
+
+- [x] Revisitado o caminho real de `npm run build`.
+- [x] Identificado que `scripts/build/build.mjs` calculava `rootDir` como
+  `scripts/`, criando/copilando artefatos no lugar errado.
+- [x] Identificado que a entrada `pkg-entry.js` gerada continha `catch` sem
+  variável `error`, quebrando diagnóstico de erro fatal.
+- [x] Revisitado `scripts/build/build-sea.mjs` e identificado o mesmo bug de
+  `rootDir`.
+- [x] Identificado que `build-sea` chamava `scripts/pre-flight-check.mjs`, mas
+  o comando canônico existente vive em `scripts/env/pre-flight-check.mjs`.
+- [x] Confirmado que ainda não era seguro executar o primeiro build antes de
+  corrigir esses pontos.
+
+Implementado neste corte:
+
+- [x] `scripts/build/build.mjs` passa a resolver o root real do repo com
+  `scripts/build/../..`.
+- [x] `dist/` volta a ser criado no root do repo, não em `scripts/dist`.
+- [x] Instalação de produção do build passa de `npm ci --production` para
+  `npm ci --omit=dev`.
+- [x] `pkg-entry.js` gerado passa a usar `catch (error)`.
+- [x] `scripts/build/build-sea.mjs` passa a resolver o root real do repo.
+- [x] `build-sea` passa a chamar `node scripts/env/pre-flight-check.mjs`.
+- [x] Adicionado `model-gateway:build` como comando canônico
+  `prebuild + build`.
+- [x] Adicionado `make model-gateway-build`.
+- [x] Inventário canônico passa a listar package e Makefile para o primeiro
+  build.
+
+Separação preservada:
+
+- [x] Correção do build não altera catálogo.
+- [x] Correção do build não chama providers.
+- [x] Correção do build não executa modelos.
+- [x] O build canônico continua precedido por `model-gateway:prebuild`.
+
+Validação deste corte:
+
+- [x] PASS `node --check scripts/build/build.mjs`.
+- [x] PASS `node --check scripts/build/build-sea.mjs`.
+- [x] PASS teste focado de comandos canônicos.
+- [x] PASS lint focado nos scripts de build e comandos.
+- [x] PASS typecheck strict src/copilot.
+- [x] PASS lint model-gateway.
+- [x] PASS `npm run model-gateway:test:contracts` com `149` testes.
+- [x] PASS `git diff --check`.
+
+---
+
 ## 67. Continuidade 2026-05-26 — Refresh Incremental Live Sem Rebuild Completo
 
 Auditoria executada neste corte:

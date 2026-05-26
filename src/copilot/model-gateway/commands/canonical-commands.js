@@ -132,6 +132,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Print command inventory and run all scoped pre-build validators.',
     },
     {
+        id: 'prebuild.first-build',
+        phase: 'prebuild',
+        surface: 'package',
+        command: 'npm run model-gateway:build',
+        summary: 'Run the canonical pre-build sequence and then the first full build.',
+    },
+    {
         id: 'make.commands',
         phase: 'orientation',
         surface: 'make',
@@ -207,6 +214,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-prebuild',
         summary: 'Makefile alias for the pre-build command sequence.',
+    },
+    {
+        id: 'make.first-build',
+        phase: 'prebuild',
+        surface: 'make',
+        command: 'make model-gateway-build',
+        summary: 'Makefile alias for prebuild plus full build.',
     },
     {
         id: 'terminal.commands',

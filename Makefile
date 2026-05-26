@@ -218,6 +218,7 @@ help:
 	@echo "  $(CYAN)make model-gateway-commands$(NC)  Inventário canônico package/make/terminal"
 	@echo "  $(CYAN)make model-gateway-validate$(NC)  Lint + typecheck strict + testes escopados"
 	@echo "  $(CYAN)make model-gateway-prebuild$(NC)  Sequência canônica antes do primeiro build"
+	@echo "  $(CYAN)make model-gateway-build$(NC)     Prebuild + primeiro build canônico"
 	@echo "  $(CYAN)make model-gateway-terminal$(NC)  Abrir terminal llm-b para comandos /byok"
 	@echo ""
 	@echo "$(CYAN)$(BOLD)🌐 GitHub/Copilot Network:$(NC)"
@@ -1376,7 +1377,7 @@ rag-rebuild-code-config-strict:
 # MODEL GATEWAY BYOK — COMANDOS CANÔNICOS PRE-BUILD
 # =============================================================================
 
-.PHONY: model-gateway-help model-gateway-commands model-gateway-commands-json model-gateway-lint model-gateway-typecheck model-gateway-test-contracts model-gateway-test-terminal model-gateway-validate model-gateway-prebuild model-gateway-refresh model-gateway-refresh-preview model-gateway-refresh-plan model-gateway-refresh-provider model-gateway-refresh-log model-gateway-refresh-log-sqlite model-gateway-sqlite-diagnostics model-gateway-sqlite-retention model-gateway-sqlite-retention-apply model-gateway-terminal
+.PHONY: model-gateway-help model-gateway-commands model-gateway-commands-json model-gateway-lint model-gateway-typecheck model-gateway-test-contracts model-gateway-test-terminal model-gateway-validate model-gateway-prebuild model-gateway-build model-gateway-refresh model-gateway-refresh-preview model-gateway-refresh-plan model-gateway-refresh-provider model-gateway-refresh-log model-gateway-refresh-log-sqlite model-gateway-sqlite-diagnostics model-gateway-sqlite-retention model-gateway-sqlite-retention-apply model-gateway-terminal
 
 model-gateway-help: model-gateway-commands
 
@@ -1403,6 +1404,9 @@ model-gateway-validate:
 
 model-gateway-prebuild:
 	@$(NPM) run model-gateway:prebuild
+
+model-gateway-build:
+	@$(NPM) run model-gateway:build
 
 model-gateway-refresh:
 	@$(NPM) run model-gateway:refresh
