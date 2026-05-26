@@ -3455,6 +3455,78 @@ Validação deste corte:
 
 ---
 
+## 68. Continuidade 2026-05-26 — Auditoria SQLite Pré-Build E Histórico Dinâmico
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a arquitetura SQL antes do primeiro build real, cobrindo
+  schema, store, mirror JSON->SQLite, normalização de snapshot, route
+  decisions, runtime health/probes e overlays account-scoped.
+- [x] Confirmado que `writeSnapshot()` substitui a camada canônica do catálogo,
+  mas deve preservar camadas operacionais independentes como health runtime e
+  decisões de rota.
+- [x] Identificado risco de `generatedAt` nulo quando o snapshot de entrada
+  trazia `generatedAt: null`.
+- [x] Identificado risco de conflito primário quando providers/importers geram
+  evidências, rotas ou raw refs duplicados no mesmo snapshot.
+- [x] Identificado que as tabelas `account_*_snapshots` devem representar
+  histórico dinâmico de conta/key, não apenas o estado atual do overlay.
+- [x] Confirmado que alterações futuras de provider/key precisam poder ser
+  espelhadas no SQLite sem rebuild all e sem apagar runtime/route history.
+
+Implementado neste corte:
+
+- [x] `SqliteModelGatewayCatalogStore.writeSnapshot()` passa a forçar
+  `generatedAt` novo depois do spread do snapshot de entrada.
+- [x] Escritas normalizadas principais passam a usar `INSERT OR REPLACE`, de
+  modo que duplicatas internas de chaves canônicas não corrompam a transação.
+- [x] Índice relacional de projections passa a normalizar `lifecycle.status`
+  quando `lifecycle` vem como objeto estruturado.
+- [x] As tabelas de histórico account/key
+  `account_quota_snapshots`, `account_rate_limit_snapshots` e
+  `account_spending_snapshots` deixam de ser apagadas por cada mirror de
+  catálogo.
+- [x] As chaves dessas snapshots passam a incluir `observedAtMs`, preservando
+  mudanças de quota/rate/spending entre keys, contas e refreshs.
+- [x] Adicionado `SqliteModelGatewayCatalogStore.readStorageDiagnostics()`.
+- [x] O diagnóstico retorna `userVersion`, contagens por tabela,
+  active snapshot, `catalogRows`, `accountHistoryRows`, `runtimeRows` e
+  `routeDecisionRows`.
+- [x] `/byok gateway catalog sqlite` passa a exibir diagnóstico operacional do
+  SQLite depois do mirror.
+- [x] Teste cobre duplicatas de evidência no snapshot, preservação de route
+  decisions, preservação de runtime health/probes e histórico account/key entre
+  rewrites de catálogo.
+
+Separação preservada:
+
+- [x] Catálogo canônico continua substituível por snapshot ativo.
+- [x] Histórico account/key fica em tabelas próprias e não altera projections.
+- [x] Runtime health/probes continuam fora do catálogo canônico.
+- [x] Route decisions continuam fora do catálogo canônico.
+- [x] O mirror SQLite não chama provider.
+- [x] O mirror SQLite não executa modelo.
+- [x] O mirror SQLite não executa probe.
+
+Próximas lacunas:
+
+- [ ] Criar retention explícito para histórico account/key em SQLite.
+- [ ] Espelhar logs JSONL de refresh para uma tabela operacional SQLite.
+- [ ] Criar comando terminal dedicado para diagnóstico SQLite sem executar
+  mirror.
+- [ ] Adicionar diff SQL entre JSON snapshot e SQLite materializado como gate
+  formal antes do primeiro build.
+
+Validação deste corte:
+
+- [x] PASS testes focados SQLite com `8` testes.
+- [x] PASS `npm run model-gateway:test:contracts` com `147` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
 ## 55. Continuidade 2026-05-26 — Auditoria Estrutural Da Faixa L
 
 Auditoria executada neste corte:

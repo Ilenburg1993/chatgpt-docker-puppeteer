@@ -15,7 +15,7 @@ import { normalizeModelGatewayAccountLimitState } from '../account-access/limits
 import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { toOpenAIModelCatalogList } from './openai-schema.js';
-import { MODEL_GATEWAY_SQLITE_SCHEMA_SQL, MODEL_GATEWAY_SQLITE_SCHEMA_VERSION } from './sqlite-schema.js';
+import { MODEL_GATEWAY_SQLITE_SCHEMA_SQL, MODEL_GATEWAY_SQLITE_SCHEMA_VERSION, MODEL_GATEWAY_SQLITE_TABLES } from './sqlite-schema.js';
 
 const ACTIVE_SNAPSHOT_ID = 'active';
 const DEFAULT_ROUTE_PROFILE = 'default';
@@ -29,9 +29,6 @@ const DELETE_TABLES_IN_ORDER = Object.freeze([
     'copilot_model_gateway_conflicts',
     'copilot_model_gateway_raw_payload_refs',
     'copilot_model_gateway_import_runs',
-    'copilot_model_gateway_account_spending_snapshots',
-    'copilot_model_gateway_account_rate_limit_snapshots',
-    'copilot_model_gateway_account_quota_snapshots',
     'copilot_model_gateway_account_overlays',
     'copilot_model_gateway_route_options',
     'copilot_model_gateway_provider_projections',
@@ -152,6 +149,24 @@ function selectorSyntax(row) {
  */
 function modelKey(row) {
     return [providerId(row), providerModel(row), routeProfile(row)].join(':');
+}
+
+/**
+ * @param {Record<string, unknown>} row
+ * @returns {string}
+ */
+function lifecycleStatus(row) {
+    const lifecycle = row['lifecycle'];
+    if (typeof lifecycle === 'string' && lifecycle.trim()) return lifecycle.trim();
+    if (isRecord(lifecycle)) {
+        return (
+            optionalString(lifecycle['status']) ??
+            optionalString(lifecycle['state']) ??
+            optionalString(lifecycle['availability']) ??
+            'unknown'
+        );
+    }
+    return 'unknown';
 }
 
 /**
@@ -311,6 +326,84 @@ export class SqliteModelGatewayCatalogStore {
             eligibilityDecisions: snapshot.modelEligibilityDecisions,
             routeOptions: snapshot.routeOptions,
         });
+    }
+
+    /**
+     * @returns {Promise<{
+     *     schemaVersion: number;
+     *     userVersion: number;
+     *     tableCounts: Record<string, number>;
+     *     activeSnapshot: { exists: boolean; source: string | null; generatedAtMs: number | null };
+     *     catalogRows: number;
+     *     accountHistoryRows: number;
+     *     runtimeRows: number;
+     *     routeDecisionRows: number;
+     * }>}
+     */
+    async readStorageDiagnostics() {
+        /** @type {Record<string, number>} */
+        const tableCounts = {};
+        for (const table of MODEL_GATEWAY_SQLITE_TABLES) {
+            const row = /** @type {{ count: number } | undefined} */ (
+                this.#db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get()
+            );
+            tableCounts[table] = optionalInteger(row?.count) ?? 0;
+        }
+        const active = /** @type {{ source: string; generated_at_ms: number } | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT source, generated_at_ms
+                        FROM copilot_model_gateway_snapshots
+                        WHERE snapshot_id = ?
+                        LIMIT 1
+                    `,
+                )
+                .get(ACTIVE_SNAPSHOT_ID)
+        );
+        const catalogTables = [
+            'copilot_model_gateway_catalog_sources',
+            'copilot_model_gateway_model_evidence',
+            'copilot_model_gateway_provider_evidence',
+            'copilot_model_gateway_model_projections',
+            'copilot_model_gateway_provider_projections',
+            'copilot_model_gateway_route_options',
+            'copilot_model_gateway_account_overlays',
+            'copilot_model_gateway_import_runs',
+            'copilot_model_gateway_raw_payload_refs',
+            'copilot_model_gateway_conflicts',
+            'copilot_model_gateway_eligibility_runs',
+            'copilot_model_gateway_eligibility_decisions',
+        ];
+        const accountHistoryTables = [
+            'copilot_model_gateway_account_quota_snapshots',
+            'copilot_model_gateway_account_rate_limit_snapshots',
+            'copilot_model_gateway_account_spending_snapshots',
+        ];
+        const runtimeTables = [
+            'copilot_model_gateway_runtime_probe_runs',
+            'copilot_model_gateway_runtime_probe_results',
+            'copilot_model_gateway_health_observations',
+        ];
+        /**
+         * @param {string[]} tables
+         * @returns {number}
+         */
+        const sum = (tables) => tables.reduce((total, table) => total + (tableCounts[table] ?? 0), 0);
+        return {
+            schemaVersion: MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,
+            userVersion: sqliteUserVersion(this.#db),
+            tableCounts,
+            activeSnapshot: {
+                exists: Boolean(active),
+                source: active?.source ?? null,
+                generatedAtMs: optionalInteger(active?.generated_at_ms),
+            },
+            catalogRows: sum(catalogTables),
+            accountHistoryRows: sum(accountHistoryTables),
+            runtimeRows: sum(runtimeTables),
+            routeDecisionRows: tableCounts['copilot_model_gateway_route_decisions'] ?? 0,
+        };
     }
 
     /**
@@ -525,10 +618,10 @@ export class SqliteModelGatewayCatalogStore {
      */
     async writeSnapshot(snapshot) {
         const normalized = normalizeStoredCatalogSnapshot({
+            ...snapshot,
             schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
             generatedAt: new Date().toISOString(),
             source: snapshot.source ?? 'catalog',
-            ...snapshot,
         });
         const generatedAtMs = dateMs(normalized.generatedAt) ?? Date.now();
         const tx = this.#db.transaction(() => {
@@ -561,7 +654,7 @@ export class SqliteModelGatewayCatalogStore {
         this.#db
             .prepare(
                 `
-                    INSERT INTO copilot_model_gateway_snapshots
+                    INSERT OR REPLACE INTO copilot_model_gateway_snapshots
                         (snapshot_id, schema_version, source, generated_at_ms, active, payload_json)
                     VALUES (?, ?, ?, ?, ?, ?)
                 `,
@@ -582,7 +675,7 @@ export class SqliteModelGatewayCatalogStore {
      */
     #writeSources(rows, generatedAtMs) {
         const insert = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_catalog_sources
+            INSERT OR REPLACE INTO copilot_model_gateway_catalog_sources
                 (source_id, provider_id, source_kind, auth_mode, trust_tier, refresh_policy, observed_at_ms, payload_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `);
@@ -606,7 +699,7 @@ export class SqliteModelGatewayCatalogStore {
      */
     #writeModelEvidences(rows, generatedAtMs) {
         const insert = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_model_evidence
+            INSERT OR REPLACE INTO copilot_model_gateway_model_evidence
                 (evidence_id, provider_id, provider_model, route_profile, field_path, confidence, source_id,
                  observed_at_ms, expires_at_ms, payload_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -633,7 +726,7 @@ export class SqliteModelGatewayCatalogStore {
      */
     #writeProviderEvidences(rows, generatedAtMs) {
         const insert = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_provider_evidence
+            INSERT OR REPLACE INTO copilot_model_gateway_provider_evidence
                 (evidence_id, provider_id, subject_provider_id, field_path, confidence, source_id,
                  observed_at_ms, expires_at_ms, payload_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -660,7 +753,7 @@ export class SqliteModelGatewayCatalogStore {
      */
     #writeModelProjections(rows, generatedAtMs) {
         const insert = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_model_projections
+            INSERT OR REPLACE INTO copilot_model_gateway_model_projections
                 (projection_key, provider_id, provider_model, route_profile, display_name,
                  lifecycle_status, updated_at_ms, payload_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -672,7 +765,7 @@ export class SqliteModelGatewayCatalogStore {
                 providerModel(row),
                 routeProfile(row),
                 optionalString(row['displayName']) ?? providerModel(row),
-                optionalString(row['lifecycle']) ?? 'unknown',
+                lifecycleStatus(row),
                 generatedAtMs,
                 payloadJson(row),
             );
@@ -685,7 +778,7 @@ export class SqliteModelGatewayCatalogStore {
      */
     #writeProviderProjections(rows, generatedAtMs) {
         const insert = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_provider_projections
+            INSERT OR REPLACE INTO copilot_model_gateway_provider_projections
                 (projection_key, provider_id, subject_provider_id, display_name, updated_at_ms, payload_json)
             VALUES (?, ?, ?, ?, ?, ?)
         `);
@@ -708,7 +801,7 @@ export class SqliteModelGatewayCatalogStore {
      */
     #writeRouteOptions(rows, generatedAtMs) {
         const insert = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_route_options
+            INSERT OR REPLACE INTO copilot_model_gateway_route_options
                 (route_key, provider_id, provider_model, route_profile, selector_kind, selector_syntax,
                  route_layer, wire_api, source_id, updated_at_ms, payload_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -737,7 +830,7 @@ export class SqliteModelGatewayCatalogStore {
      */
     #writeAccountOverlays(rows, generatedAtMs) {
         const insert = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_account_overlays
+            INSERT OR REPLACE INTO copilot_model_gateway_account_overlays
                 (account_overlay_id, provider_id, account_scope, secret_ref, source_id, confidence,
                  observed_at_ms, expires_at_ms, payload_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -763,19 +856,19 @@ export class SqliteModelGatewayCatalogStore {
      */
     #writeAccountLimitSnapshots(rows, generatedAtMs) {
         const insertQuota = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_account_quota_snapshots
+            INSERT OR REPLACE INTO copilot_model_gateway_account_quota_snapshots
                 (snapshot_key, account_overlay_id, provider_id, account_scope, secret_ref, status,
                  observed_at_ms, expires_at_ms, payload_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const insertRateLimit = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_account_rate_limit_snapshots
+            INSERT OR REPLACE INTO copilot_model_gateway_account_rate_limit_snapshots
                 (snapshot_key, account_overlay_id, provider_id, account_scope, secret_ref, status,
                  reset_at_ms, observed_at_ms, expires_at_ms, payload_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const insertSpending = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_account_spending_snapshots
+            INSERT OR REPLACE INTO copilot_model_gateway_account_spending_snapshots
                 (snapshot_key, account_overlay_id, provider_id, account_scope, secret_ref, status,
                  observed_at_ms, expires_at_ms, payload_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -788,7 +881,7 @@ export class SqliteModelGatewayCatalogStore {
             const expiresAtMs = dateMs(row['expiresAt']);
             const limits = normalizeModelGatewayAccountLimitState(row, { now: observedAtMs });
             insertQuota.run(
-                `${overlayId}:quota`,
+                `${overlayId}:quota:${observedAtMs}`,
                 overlayId,
                 providerId(row),
                 accountScope,
@@ -799,7 +892,7 @@ export class SqliteModelGatewayCatalogStore {
                 payloadJson(limits.quota),
             );
             insertRateLimit.run(
-                `${overlayId}:rate-limit`,
+                `${overlayId}:rate-limit:${observedAtMs}`,
                 overlayId,
                 providerId(row),
                 accountScope,
@@ -811,7 +904,7 @@ export class SqliteModelGatewayCatalogStore {
                 payloadJson(limits.rateLimit),
             );
             insertSpending.run(
-                `${overlayId}:spending`,
+                `${overlayId}:spending:${observedAtMs}`,
                 overlayId,
                 providerId(row),
                 accountScope,
@@ -830,7 +923,7 @@ export class SqliteModelGatewayCatalogStore {
      */
     #writeImportRuns(rows, generatedAtMs) {
         const insert = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_import_runs
+            INSERT OR REPLACE INTO copilot_model_gateway_import_runs
                 (run_id, provider_id, source_id, status, started_at_ms, completed_at_ms, row_count, payload_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `);
@@ -854,7 +947,7 @@ export class SqliteModelGatewayCatalogStore {
      */
     #writeRawPayloadRefs(rows, generatedAtMs) {
         const insert = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_raw_payload_refs
+            INSERT OR REPLACE INTO copilot_model_gateway_raw_payload_refs
                 (raw_payload_ref, provider_id, source_id, observed_at_ms, payload_json)
             VALUES (?, ?, ?, ?, ?)
         `);
@@ -875,7 +968,7 @@ export class SqliteModelGatewayCatalogStore {
      */
     #writeConflicts(rows, generatedAtMs) {
         const insert = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_conflicts
+            INSERT OR REPLACE INTO copilot_model_gateway_conflicts
                 (conflict_key, projection_key, field_path, observed_at_ms, payload_json)
             VALUES (?, ?, ?, ?, ?)
         `);
@@ -898,7 +991,7 @@ export class SqliteModelGatewayCatalogStore {
      */
     #writeEligibilityRuns(rows, generatedAtMs) {
         const insert = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_eligibility_runs
+            INSERT OR REPLACE INTO copilot_model_gateway_eligibility_runs
                 (run_id, policy_profile, task_profile, account_scope, status, started_at_ms, completed_at_ms,
                  model_count, eligible_count, unknown_count, excluded_count, payload_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -927,7 +1020,7 @@ export class SqliteModelGatewayCatalogStore {
      */
     #writeEligibilityDecisions(rows, generatedAtMs) {
         const insert = this.#db.prepare(`
-            INSERT INTO copilot_model_gateway_eligibility_decisions
+            INSERT OR REPLACE INTO copilot_model_gateway_eligibility_decisions
                 (decision_key, run_id, provider_id, provider_model, route_profile, selector_kind, account_scope,
                  policy_profile, task_profile, include, disposition, primary_reason, observed_at_ms, expires_at_ms,
                  payload_json)

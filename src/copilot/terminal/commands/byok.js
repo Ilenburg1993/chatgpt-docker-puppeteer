@@ -2330,12 +2330,16 @@ async function renderByokGatewayCatalogSqliteMirror(println) {
         sourceStore: jsonStore,
         sqliteStore,
     });
+    const diagnostics = await sqliteStore.readStorageDiagnostics();
     const counts = result.sqliteCounts;
     println(
         `    \x1b[32msnapshot espelhado no SQLite\x1b[0m  \x1b[90msource=${result.sqliteSnapshot.source} · projections=${counts.projections} · evidences=${counts.evidences} · routeOptions=${counts.routeOptions} · overlays=${counts.accountOverlays} · eligibility=${counts.modelEligibilityDecisions}\x1b[0m`,
     );
     println(
         `    \x1b[90mproviders=${counts.providerProjections} · providerEvidence=${counts.providerEvidences} · rawRefs=${counts.rawPayloadRefs} · conflicts=${counts.conflicts} · importRuns=${counts.importRuns}\x1b[0m`,
+    );
+    println(
+        `    \x1b[90msqlite: userVersion=${diagnostics.userVersion} · catalogRows=${diagnostics.catalogRows} · accountHistoryRows=${diagnostics.accountHistoryRows} · runtimeRows=${diagnostics.runtimeRows} · routeDecisions=${diagnostics.routeDecisionRows}\x1b[0m`,
     );
     println(
         '    \x1b[90mJSON permanece como export/debug; SQLite agora materializa as camadas normalizadas para consultas futuras.\x1b[0m\n',

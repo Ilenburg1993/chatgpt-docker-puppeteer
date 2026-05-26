@@ -2383,6 +2383,117 @@ describe('model-gateway foundation', () => {
         }
     });
 
+    it('keeps SQLite operational history across catalog rewrites and tolerates duplicate snapshot keys', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            const duplicateEvidenceA = createModelMetadataEvidence({
+                evidenceId: 'duplicate-evidence',
+                providerId: 'openrouter',
+                providerModel: 'model-a',
+                fieldPath: 'displayName',
+                value: 'Model A',
+                sourceId: 'openrouter-models',
+            });
+            const duplicateEvidenceB = createModelMetadataEvidence({
+                evidenceId: 'duplicate-evidence',
+                providerId: 'openrouter',
+                providerModel: 'model-a',
+                fieldPath: 'displayName',
+                value: 'Model A Updated',
+                sourceId: 'openrouter-models',
+            });
+            const overlayOk = createProviderAccountOverlay({
+                providerId: 'openrouter',
+                secretRef: 'OPENROUTER_API_KEY',
+                observedAt: '2026-05-26T10:00:00.000Z',
+                quota: { remainingRequests: 10 },
+                rateLimits: { remainingRequests: 10 },
+                spendingLimits: { remainingUsd: 5 },
+            });
+            const overlayLimited = createProviderAccountOverlay({
+                providerId: 'openrouter',
+                secretRef: 'OPENROUTER_API_KEY',
+                observedAt: '2026-05-26T11:00:00.000Z',
+                quota: { remainingRequests: 0 },
+                rateLimits: { remainingRequests: 0, resetAt: '2026-05-26T11:05:00.000Z' },
+                spendingLimits: { remainingUsd: 0 },
+            });
+
+            await store.writeRouteDecisionEvents([{ decisionId: 'route-1', providerId: 'openrouter', modelId: 'model-a', selected: true }]);
+            await store.writeRuntimeHealthRecords([
+                {
+                    key: 'default|openrouter|model-a',
+                    providerId: 'openrouter',
+                    providerModel: 'model-a',
+                    lastStatus: 'ok',
+                    lastSuccessAt: 1_000,
+                    probes: { chat: { ok: true, status: 'ok', lastAt: 1_000 } },
+                },
+            ]);
+            await store.writeSnapshot({
+                source: 'first-catalog',
+                generatedAt: null,
+                evidences: [duplicateEvidenceA, duplicateEvidenceB],
+                accountOverlays: [overlayOk],
+                projections: [createCanonicalModelProjection({ providerId: 'openrouter', providerModel: 'model-a' })],
+            });
+            const firstLoaded = await store.readSnapshot();
+            await store.writeSnapshot({
+                source: 'second-catalog',
+                accountOverlays: [overlayLimited],
+                projections: [
+                    createCanonicalModelProjection({
+                        providerId: 'openrouter',
+                        providerModel: 'model-a',
+                        lifecycle: { status: 'active' },
+                    }),
+                ],
+            });
+
+            const loaded = await store.readSnapshot();
+            const routeDecisions = await store.readRouteDecisionEvents({ limit: 5 });
+            const runtime = await store.readRuntimeHealthForModel({ providerId: 'openrouter', providerModel: 'model-a' });
+            const diagnostics = await store.readStorageDiagnostics();
+            const quotaRows = /** @type {{ count: number } | undefined} */ (
+                db.prepare('SELECT COUNT(*) AS count FROM copilot_model_gateway_account_quota_snapshots').get()
+            );
+            const rateRows = /** @type {{ count: number } | undefined} */ (
+                db.prepare('SELECT COUNT(*) AS count FROM copilot_model_gateway_account_rate_limit_snapshots').get()
+            );
+            const latestRate = /** @type {{ status: string } | undefined} */ (
+                db.prepare(
+                    'SELECT status FROM copilot_model_gateway_account_rate_limit_snapshots ORDER BY observed_at_ms DESC LIMIT 1',
+                ).get()
+            );
+            const lifecycleRow = /** @type {{ lifecycle_status: string } | undefined} */ (
+                db.prepare('SELECT lifecycle_status FROM copilot_model_gateway_model_projections WHERE provider_model = ?').get('model-a')
+            );
+
+            assert.equal(firstLoaded.evidences.length, 1);
+            assert.equal(firstLoaded.evidences[0].value, 'Model A Updated');
+            assert.equal(loaded.source, 'second-catalog');
+            assert.equal(typeof loaded.generatedAt, 'string');
+            assert.equal(loaded.evidences.length, 0);
+            assert.equal(routeDecisions.length, 1);
+            assert.equal(routeDecisions[0].decisionId, 'route-1');
+            assert.equal(runtime.health?.['lastStatus'], 'ok');
+            assert.equal(runtime.probes.length, 1);
+            assert.equal(quotaRows?.count, 2);
+            assert.equal(rateRows?.count, 2);
+            assert.equal(latestRate?.status, 'limited');
+            assert.equal(lifecycleRow?.lifecycle_status, 'active');
+            assert.equal(diagnostics.activeSnapshot.exists, true);
+            assert.equal(diagnostics.activeSnapshot.source, 'second-catalog');
+            assert.equal(diagnostics.accountHistoryRows, 6);
+            assert.equal(diagnostics.runtimeRows, 3);
+            assert.equal(diagnostics.routeDecisionRows, 1);
+        } finally {
+            db.close();
+        }
+    });
+
     it('persists sanitized route decision events in the SQLite route-decision layer', async () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
