@@ -4609,6 +4609,122 @@ Validação deste corte:
 
 ---
 
+## 67. Continuidade 2026-05-26 — Gate Do Primeiro Build Por Falhas De Importer
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que “build” neste roadmap significa materializar o banco de
+  metadados do model gateway, não build de aplicação/dist.
+- [x] Reexecutado preview do build de metadados e isoladas três falhas antes do
+  primeiro build real: OpenAI docs `403`, Ollama local offline e Gemini key
+  expirada.
+- [x] Confirmado que a falha OpenAI era fonte oficial movida/bloqueada em
+  `platform.openai.com`; as páginas oficiais atuais respondem em
+  `developers.openai.com/docs/*`.
+- [x] Confirmado que Ollama estava configurado via `OLLAMA_BASE_URL`, mas o
+  daemon local em `host.docker.internal:11434` recusou conexão.
+- [x] Confirmado que Gemini retornou `HTTP 400` com corpo oficial indicando
+  `API key expired`, uma falha de estado da key/conta, não ausência de
+  metadados públicos Gemini.
+- [x] Reconciliado o comportamento desejado: fontes públicas de metadados
+  continuam bloqueantes; falhas account/key viram estado pré-runtime; falhas de
+  daemon local viram indisponibilidade opcional/local.
+- [x] O primeiro build canônico revelou uma falha real de paridade SQLite:
+  namespaces de modelos hospedados como `@hf/...` eram redigidos pelo JSON store
+  como se fossem secrets, causando colisão de IDs e perda de linhas no espelho
+  SQLite.
+
+Implementado neste corte:
+
+- [x] Criado `catalog/importer-failures.js`.
+- [x] A taxonomia de falhas de importers reutiliza
+  `classifyByokProviderFailure()` e acrescenta a decisão de build:
+  `blocking_metadata_source`, `account_state_unavailable`,
+  `optional_local_source_unavailable` e `allowed_by_operator`.
+- [x] `scripts/model-gateway-metadata-build.mjs` passa a reportar
+  `blockingImporterFailures`, `nonBlockingImporterFailures`,
+  `accountImporterFailures` e `optionalImporterFailures`.
+- [x] `ok` do build passa a depender apenas de paridade SQLite e falhas
+  bloqueantes; falhas account/local continuam visíveis no resumo.
+- [x] Adicionados flags estritos
+  `--fail-on-account-importer-failures` e
+  `--fail-on-local-importer-failures`.
+- [x] `runCatalogImporters()` passa a aceitar `toFailureAccountOverlays()` para
+  registrar overlays de falha sem inventar metadados de modelo.
+- [x] `createGeminiModelsImporter()` passa a preservar corpo de erro
+  sanitizado, detectar `API key expired/invalid/disabled` e criar overlay de
+  conta com `apiKeyDisabled`.
+- [x] `createOllamaCatalogImporter()` passa a criar overlay local com
+  `localDaemonReachable=false` e `disabled=true` quando o daemon configurado
+  não responde.
+- [x] `createOpenAiDocsModelsImporter()` passa a usar as páginas oficiais
+  atuais em `developers.openai.com/docs/models`,
+  `developers.openai.com/docs/pricing` e
+  `developers.openai.com/docs/models/compare`.
+- [x] `JsonModelGatewayCatalogStore` deixa de aplicar redaction textual ampla a
+  toda string e passa a preservar identificadores/projeções já sanitizados pelas
+  camadas de contrato/import run.
+- [x] Adicionado teste garantindo que IDs de modelo namespaced, como
+  `@hf/thebloke/...`, sobrevivem ao ciclo JSON store sem colapsar para
+  `[redacted]`.
+- [x] A taxonomia BYOK passou a classificar `api key expired` como falha
+  `auth`.
+- [x] Barrels `catalog` e `model-gateway` exportam o classificador de falhas de
+  importers.
+
+Separação preservada:
+
+- [x] Falhas de account/key não mutam metadados canônicos de modelos.
+- [x] Overlays de falha são account/local scoped e servem ao pré-runtime.
+- [x] Nenhum modelo é executado.
+- [x] Nenhuma probe runtime é executada.
+- [x] O primeiro build real continua pendente até preview completo sem falhas
+  bloqueantes.
+
+Resultado dos previews escopados:
+
+- [x] OpenAI docs preview: `ok=true`, `36` projections, zero falhas.
+- [x] Gemini preview: `ok=true`, `28` projections de docs, `1` account failure
+  não bloqueante com `API key expired`.
+- [x] Ollama preview: `ok=true`, zero projections, `1` optional local failure
+  não bloqueante com overlay de daemon indisponível.
+- [x] Preview completo: `ok=true`, `1312` projections, `14` overlays, zero
+  falhas bloqueantes.
+- [x] Primeiro build canônico completo: `npm run model-gateway:build` terminou
+  com `committed=yes`, `parity=true`, `1312` projections, `1312` OpenAI records
+  e `14` overlays.
+- [x] Diagnóstico SQLite pós-build: schema `3`, userVersion `3`, `25` fontes,
+  `34706` evidences de modelo, `1826` route options, `1312` projections,
+  `77` provider projections, `14` overlays e `256` refresh log events.
+
+Impacto no roadmap:
+
+- [x] Faixa Y ganha gate formal de falhas bloqueantes antes do primeiro build
+  do banco de metadados.
+- [x] Faixa K/M ganha ponte coerente entre coleta de metadados, estado dinâmico
+  de conta/key e pré-runtime.
+- [x] A camada de account/key passa a registrar key expirada/offline como dado
+  operacional, sem apagar o catálogo público.
+- [x] Preview completo executado após validações focadas.
+- [x] Primeiro build real commitado do banco executado com paridade SQLite.
+- [ ] Ainda falta revisar se outros importers autenticados devem implementar
+  `toFailureAccountOverlays()` especializado para quota/rate-limit.
+
+Validação parcial deste corte:
+
+- [x] PASS `node --check scripts/model-gateway-metadata-build.mjs`.
+- [x] PASS `node --check src/copilot/model-gateway/catalog/importer-failures.js`.
+- [x] PASS `node --check src/copilot/model-gateway/catalog/importers/gemini-models-importer.js`.
+- [x] PASS `node --check src/copilot/model-gateway/catalog/importers/ollama-catalog-importer.js`.
+- [x] PASS focused Vitest `provider model identifiers|secret-safe snapshot|failure overlays|OpenAI official docs`.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `npm run model-gateway:build` com validators canônicos, build do
+  banco, mirror SQLite, refresh log replay e retenção operacional.
+- [x] PASS `git diff --check`.
+
+---
+
 ## 54. Continuidade 2026-05-26 — Policy Engine Por Snapshot Completo
 
 Auditoria executada neste corte:

@@ -226,7 +226,7 @@ function textLooksLikeCreditsFailure(message) {
  * @returns {boolean}
  */
 function textLooksLikeAuthFailure(message) {
-    return /\b(unauthori[sz]ed|forbidden|invalid api key|api key invalid|authentication|credential|permission denied)\b/iu.test(
+    return /\b(unauthori[sz]ed|forbidden|invalid api key|api key (?:invalid|expired|disabled)|authentication|credential|permission denied)\b/iu.test(
         message,
     );
 }

@@ -25,6 +25,7 @@ export {
 
 export {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
+    MODEL_GATEWAY_CATALOG_IMPORTER_FAILURE_DISPOSITION,
     MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
     MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY,
     MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
@@ -94,6 +95,7 @@ export {
     DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION,
     applyModelGatewayCatalogRetention,
     auditCatalogImporterSet,
+    classifyModelGatewayCatalogImporterFailure,
     createCatalogModelTombstones,
     createCanonicalModelProjection,
     createCanonicalProviderProjection,

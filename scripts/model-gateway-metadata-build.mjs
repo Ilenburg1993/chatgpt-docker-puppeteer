@@ -7,6 +7,7 @@ import {
     createDefaultModelGatewayCatalogImporters,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
+    classifyModelGatewayCatalogImporterFailure,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     planModelGatewayCatalogRefresh,
     refreshModelGatewayCatalog,
@@ -62,6 +63,10 @@ Options:
   --skip-refresh-log-sqlite     Do not replay JSONL progress into SQLite.
   --skip-retention              Do not apply SQLite operational retention.
   --allow-importer-failures     Return ok=true when SQLite parity passes even if some importers failed.
+  --fail-on-account-importer-failures
+                                Treat configured account/key importer failures as build-blocking.
+  --fail-on-local-importer-failures
+                                Treat configured local daemon failures as build-blocking.
   --account-history-max-rows=<n> SQLite account/key history rows to keep per table.
   --route-decision-max-rows=<n> SQLite route decision rows to keep.
   --refresh-log-max-rows=<n>    SQLite refresh log rows to keep.
@@ -94,6 +99,7 @@ const importers = allImporters.filter((importer) => {
     const importerMatches = importerIds.size === 0 || importerIds.has(importer.id.toLowerCase());
     return providerMatches && importerMatches;
 });
+const importerById = new Map(importers.map((importer) => [importer.id, importer]));
 /** @type {Record<string, any>[]} */
 const progressEvents = [];
 
@@ -214,22 +220,47 @@ if (result.writePolicy.committed) {
 const importerFailures = progressEvents
     .filter((event) => event['phase'] === 'importer:importer_failed')
     .map((event) => ({
-        importerId: event['importer'] && typeof event['importer'] === 'object' ? event['importer']['importerId'] : event['importerId'],
-        providerId: event['providerId'],
-        sourceId: event['sourceId'],
+        importerId: String(event['importer'] && typeof event['importer'] === 'object' ? event['importer']['importerId'] : event['importerId']),
+        providerId: String(event['providerId'] ?? ''),
+        sourceId: String(event['sourceId'] ?? ''),
+        sourceKind: String(event['sourceKind'] ?? ''),
         errors: Array.isArray(event['errors']) ? event['errors'] : [],
-    }));
+    }))
+    .map((failure) => {
+        const importer = importerById.get(failure.importerId);
+        return classifyModelGatewayCatalogImporterFailure(
+            {
+                ...failure,
+                providerId: failure.providerId || importer?.providerId,
+                sourceKind: failure.sourceKind || importer?.sourceKind,
+                requiresAuth: importer?.requiresAuth,
+            },
+            {
+                allowAllImporterFailures: hasFlag('--allow-importer-failures'),
+                failOnAccountImporterFailures: hasFlag('--fail-on-account-importer-failures'),
+                failOnLocalImporterFailures: hasFlag('--fail-on-local-importer-failures'),
+            },
+        );
+    });
 const importerFailuresAllowed = hasFlag('--allow-importer-failures');
+const blockingImporterFailures = importerFailures.filter((failure) => failure.buildBlocking);
+const nonBlockingImporterFailures = importerFailures.filter((failure) => !failure.buildBlocking);
+const accountImporterFailures = importerFailures.filter((failure) => failure.disposition === 'account_state_unavailable');
+const optionalImporterFailures = importerFailures.filter((failure) => failure.disposition === 'optional_local_source_unavailable');
 const sqliteParityOk = result.writePolicy.committed ? Boolean(mirrored?.parity.ok) : true;
 const summary = {
     schema: 'model-gateway-metadata-build-summary',
-    ok: sqliteParityOk && (importerFailuresAllowed || importerFailures.length === 0),
+    ok: sqliteParityOk && blockingImporterFailures.length === 0,
     logPath,
     storePath: jsonStore.filePath,
     mode: incremental ? 'incremental' : 'full',
     committed: result.writePolicy.committed,
     importerFailuresAllowed,
     importerFailures,
+    blockingImporterFailures,
+    nonBlockingImporterFailures,
+    accountImporterFailures,
+    optionalImporterFailures,
     importers: importers.map((importer) => importer.id),
     selected: result.refreshPlan?.selected.map((item) => item.sourceId) ?? importers.map((importer) => importer.id),
     skipped: result.refreshPlan?.skipped.map((item) => item.sourceId) ?? [],

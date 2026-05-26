@@ -19,6 +19,10 @@ export {
 export { createDefaultModelGatewayCatalogImporters } from './default-importers.js';
 export { auditCatalogImporterSet, describeCatalogImporter } from './importer-audit.js';
 export {
+    MODEL_GATEWAY_CATALOG_IMPORTER_FAILURE_DISPOSITION,
+    classifyModelGatewayCatalogImporterFailure,
+} from './importer-failures.js';
+export {
     projectModelGatewayMetadataCoverageMetrics,
     projectModelGatewayProviderFreshnessMetrics,
     summarizeModelGatewayMetadataCoverage,

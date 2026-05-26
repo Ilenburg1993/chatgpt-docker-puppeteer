@@ -6,9 +6,9 @@
  * such as docs URLs, pricing hints and lifecycle words. This importer keeps that evidence separate from access.
  *
  * Sources checked 2026-05-26:
- * - https://platform.openai.com/docs/models
- * - https://platform.openai.com/docs/pricing
- * - https://platform.openai.com/docs/models/compare
+ * - https://developers.openai.com/docs/models
+ * - https://developers.openai.com/docs/pricing
+ * - https://developers.openai.com/docs/models/compare
  *
  * @module copilot/model-gateway/catalog/importers/openai-docs-models-importer
  */
@@ -23,9 +23,9 @@ import {
 } from '../normalizers.js';
 import { htmlText } from './html-docs-parser.js';
 
-export const OPENAI_MODELS_DOCS_URL = 'https://platform.openai.com/docs/models';
-export const OPENAI_PRICING_URL = 'https://platform.openai.com/docs/pricing';
-export const OPENAI_MODEL_COMPARE_URL = 'https://platform.openai.com/docs/models/compare';
+export const OPENAI_MODELS_DOCS_URL = 'https://developers.openai.com/docs/models';
+export const OPENAI_PRICING_URL = 'https://developers.openai.com/docs/pricing';
+export const OPENAI_MODEL_COMPARE_URL = 'https://developers.openai.com/docs/models/compare';
 
 const MODEL_ID_PATTERN =
     /\b(?:gpt-[a-z0-9][a-z0-9_.-]*(?:-[a-z0-9][a-z0-9_.-]*)?|o[134](?:-[a-z0-9][a-z0-9_.-]*)?|text-embedding-[a-z0-9_.-]+|omni-moderation-[a-z0-9_.-]+|computer-use-preview|whisper-1|tts-1(?:-hd)?)\b/giu;
@@ -213,7 +213,12 @@ export function createOpenAiDocsModelsImporter(options = {}) {
             if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for OpenAI docs catalog import');
             /** @param {string} url */
             const fetchText = async (url) => {
-                const response = await fetchImpl(url, { headers: { accept: 'text/html, text/plain;q=0.9, */*;q=0.1' } });
+                const response = await fetchImpl(url, {
+                    headers: {
+                        accept: 'text/html, text/plain;q=0.9, */*;q=0.1',
+                        'user-agent': 'model-gateway-catalog-importer/1.0',
+                    },
+                });
                 if (!response.ok) throw new Error(`OpenAI docs fetch failed for ${url} with HTTP ${response.status}`);
                 return response.text();
             };

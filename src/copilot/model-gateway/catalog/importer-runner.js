@@ -29,6 +29,7 @@ import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
  * @property {(rows: unknown[], context: { source: Record<string, any>; rawPayloadRef: string }) => Promise<Record<string, any>[]> | Record<string, any>[]} [toProviderEvidenceFacts]
  * @property {(rows: unknown[], context: { source: Record<string, any>; rawPayloadRef: string }) => Promise<Record<string, any>[]> | Record<string, any>[]} [toRouteOptions]
  * @property {(rows: unknown[], context: { source: Record<string, any>; rawPayloadRef: string }) => Promise<Record<string, any>[]> | Record<string, any>[]} [toAccountOverlays]
+ * @property {(error: unknown, context: { source: Record<string, any>; rawPayloadRef: string }) => Promise<Record<string, any>[]> | Record<string, any>[]} [toFailureAccountOverlays]
  */
 
 /**
@@ -290,6 +291,15 @@ export async function runCatalogImporters(input = {}) {
             });
         } catch (error) {
             const completedAt = now();
+            /** @type {string[]} */
+            const failureOverlayErrors = [];
+            if (typeof importer.toFailureAccountOverlays === 'function') {
+                try {
+                    accountOverlays = await importer.toFailureAccountOverlays(error, { source, rawPayloadRef: '' });
+                } catch (overlayError) {
+                    failureOverlayErrors.push(`failure account overlay failed: ${errorMessage(overlayError)}`);
+                }
+            }
             run = createCatalogImportRun({
                 runId: createImportRunId(importer, startedAt),
                 providerId: importer.providerId,
@@ -298,7 +308,7 @@ export async function runCatalogImporters(input = {}) {
                 startedAt,
                 completedAt,
                 rowCount: 0,
-                errors: [errorMessage(error)],
+                errors: [errorMessage(error), ...failureOverlayErrors],
             });
             const errors = Array.isArray(run['errors']) ? run['errors'].map((item) => String(item)) : ['unknown catalog importer error'];
             emitProgress(input.onProgress, {
@@ -308,6 +318,7 @@ export async function runCatalogImporters(input = {}) {
                 elapsedMs: elapsedMs(startedAt, completedAt),
                 rowCount: 0,
                 errors,
+                accountOverlayCount: accountOverlays.length,
             });
         }
 

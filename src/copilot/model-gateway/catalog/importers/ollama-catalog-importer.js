@@ -90,6 +90,14 @@ function parseOllamaRows(raw) {
 }
 
 /**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function errorMessage(error) {
+    return error instanceof Error ? error.message : typeof error === 'string' ? error : 'Ollama catalog import failed';
+}
+
+/**
  * @param {unknown} text
  * @returns {Record<string, string | number | boolean>}
  */
@@ -329,6 +337,31 @@ export function createOllamaCatalogImporter(options = {}) {
                     sourceKind: 'local_daemon',
                     confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.CATALOG,
                     enabledModels: controls.enabledModels,
+                    providerMetadata: controls.providerMetadata,
+                }),
+            ];
+        },
+        toFailureAccountOverlays(error, context) {
+            const sourceId = stringValue(context.source['id']) ?? 'ollama-catalog';
+            const controls = normalizeAccountOverlayControls({
+                providerMetadata: {
+                    endpoint: '/api/tags',
+                    semantics: 'local_daemon_failed',
+                    catalogImportStatus: 'failed',
+                    localDaemonReachable: false,
+                    disabled: true,
+                    failureMessage: errorMessage(error),
+                    openAICompatibleBaseUrl: openAIBaseUrl,
+                },
+            });
+            return [
+                createProviderAccountOverlay({
+                    accountOverlayId: `ollama-local:${options.accountScope ?? apiBaseUrl}:${sourceId}:failure`,
+                    providerId: 'ollama-local',
+                    accountScope: options.accountScope ?? apiBaseUrl,
+                    sourceId,
+                    sourceKind: 'local_daemon',
+                    confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG,
                     providerMetadata: controls.providerMetadata,
                 }),
             ];

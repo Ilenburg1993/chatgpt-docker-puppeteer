@@ -99,6 +99,57 @@ function parseGeminiRows(raw) {
 }
 
 /**
+ * @param {Response} response
+ * @param {string} operation
+ * @returns {Promise<Error>}
+ */
+async function geminiHttpError(response, operation) {
+    const text = await response.text().catch(() => '');
+    const record = (() => {
+        try {
+            const parsed = JSON.parse(text);
+            return isRecord(parsed) ? parsed : {};
+        } catch {
+            return {};
+        }
+    })();
+    const error = isRecord(record['error']) ? record['error'] : {};
+    const details = Array.isArray(error['details']) ? error['details'].filter(isRecord) : [];
+    const reason = details.map((detail) => stringValue(detail['reason'])).find((item) => item !== null);
+    const status = stringValue(error['status']);
+    const message = stringValue(error['message']) ?? text.slice(0, 300).trim();
+    return new Error(
+        `Gemini ${operation} failed with HTTP ${response.status}${message ? `: ${message}` : ''}${status ? ` [${status}${reason ? `/${reason}` : ''}]` : ''}`,
+    );
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function errorMessage(error) {
+    return error instanceof Error ? error.message : typeof error === 'string' ? error : 'Gemini catalog import failed';
+}
+
+/**
+ * @param {string} message
+ * @returns {boolean}
+ */
+function looksLikeKeyDisabled(message) {
+    return /\b(api key (?:expired|invalid|disabled)|invalid api key|permission denied|unauthori[sz]ed|forbidden|authentication)\b/iu.test(
+        message,
+    );
+}
+
+/**
+ * @param {string} message
+ * @returns {boolean}
+ */
+function looksLikeRateLimited(message) {
+    return /\b(rate limit|too many requests|quota exceeded|resource exhausted)\b/iu.test(message);
+}
+
+/**
  * @param {string} baseUrl
  * @param {string} apiKey
  * @param {string | null} pageToken
@@ -225,7 +276,7 @@ export function createGeminiModelsImporter(options = {}) {
                 const response = await fetchImpl(listUrl(url, options.apiKey, pageToken), {
                     headers: { accept: 'application/json' },
                 });
-                if (!response.ok) throw new Error(`Gemini models.list failed with HTTP ${response.status}`);
+                if (!response.ok) throw await geminiHttpError(response, 'models.list');
                 const payload = await response.json();
                 const pageRecord = isRecord(payload) ? payload : {};
                 models.push(...parseGeminiRows(pageRecord));
@@ -233,7 +284,7 @@ export function createGeminiModelsImporter(options = {}) {
                 if (!pageToken) break;
             }
             if (!includeModelDetails) return { models };
-            /** @type {Array<{ name: string; status: number }>} */
+            /** @type {Array<{ name: string; status: number; message?: string }>} */
             const detailErrors = [];
             /** @type {Record<string, unknown>[]} */
             const detailedModels = [];
@@ -247,7 +298,8 @@ export function createGeminiModelsImporter(options = {}) {
                     headers: { accept: 'application/json' },
                 });
                 if (!response.ok) {
-                    detailErrors.push({ name: resourceName, status: response.status });
+                    const error = await geminiHttpError(response, `models.get ${resourceName}`);
+                    detailErrors.push({ name: resourceName, status: response.status, message: error.message });
                     detailedModels.push(model);
                     continue;
                 }
@@ -328,6 +380,36 @@ export function createGeminiModelsImporter(options = {}) {
                     sourceKind: 'authenticated_api',
                     confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG,
                     enabledModels: controls.enabledModels,
+                    providerMetadata: controls.providerMetadata,
+                }),
+            ];
+        },
+        toFailureAccountOverlays(error, context) {
+            const sourceId = stringValue(context.source['id']) ?? 'gemini-models';
+            const message = errorMessage(error);
+            const disabled = looksLikeKeyDisabled(message);
+            const rateLimited = looksLikeRateLimited(message);
+            const controls = normalizeAccountOverlayControls({
+                providerMetadata: {
+                    endpoint: '/v1beta/models',
+                    semantics: 'account_visible_models_failed',
+                    apiVersion,
+                    authPlacement: 'query_key',
+                    catalogImportStatus: 'failed',
+                    failureMessage: message,
+                    apiKeyDisabled: disabled,
+                },
+            });
+            return [
+                createProviderAccountOverlay({
+                    accountOverlayId: `gemini:${options.accountScope ?? 'default'}:${options.secretRef ?? 'GEMINI_API_KEY'}:${sourceId}:failure`,
+                    providerId: 'gemini',
+                    accountScope: options.accountScope ?? 'default',
+                    secretRef: options.secretRef ?? 'GEMINI_API_KEY',
+                    sourceId,
+                    sourceKind: 'authenticated_api',
+                    confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG,
+                    rateLimits: rateLimited ? { limited: true } : controls.rateLimits,
                     providerMetadata: controls.providerMetadata,
                 }),
             ];

@@ -90,7 +90,9 @@ import {
     JsonModelGatewayCatalogStore,
     SqliteModelGatewayCatalogStore,
     MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+    MODEL_GATEWAY_CATALOG_IMPORTER_FAILURE_DISPOSITION,
     MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY,
+    classifyModelGatewayCatalogImporterFailure,
     createAnthropicDocsModelsImporter,
     createAnthropicModelsImporter,
     createCatalogModelTombstones,
@@ -3157,6 +3159,124 @@ describe('model-gateway foundation', () => {
         }
     });
 
+    it('preserves provider model identifiers that look like hosted model namespaces', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-model-catalog-identifiers-'));
+        try {
+            const filePath = join(dir, 'catalog.json');
+            const store = new JsonModelGatewayCatalogStore({ filePath });
+            await store.writeSnapshot({
+                source: 'test',
+                evidences: [
+                    createModelMetadataEvidence({
+                        evidenceId: 'cloudflare-workers-ai:@hf/thebloke/model-a:displayName',
+                        providerId: 'cloudflare-workers-ai',
+                        providerModel: '@hf/thebloke/model-a',
+                        fieldPath: 'displayName',
+                        value: '@hf/thebloke/model-a',
+                        sourceId: 'cloudflare-workers-ai-catalog',
+                    }),
+                ],
+                projections: [
+                    createCanonicalModelProjection({
+                        providerId: 'cloudflare-workers-ai',
+                        providerModel: '@hf/thebloke/model-a',
+                        displayName: '@hf/thebloke/model-a',
+                    }),
+                ],
+            });
+            const loaded = await store.readSnapshot();
+
+            assert.equal(loaded.evidences[0].providerModel, '@hf/thebloke/model-a');
+            assert.equal(loaded.evidences[0].evidenceId, 'cloudflare-workers-ai:@hf/thebloke/model-a:displayName');
+            assert.equal(loaded.projections[0].providerModel, '@hf/thebloke/model-a');
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('records account/local failure overlays without turning them into runtime proof', async () => {
+        const snapshot = await runCatalogImporters({
+            now: () => new Date('2026-05-26T19:00:00.000Z'),
+            importers: [
+                createGeminiModelsImporter({
+                    apiKey: 'gemini-secret-that-must-not-leak',
+                    secretRef: 'GEMINI_API_KEY',
+                    fetchImpl: /** @type {typeof fetch} */ (async () =>
+                        /** @type {Response} */ ({
+                            ok: false,
+                            status: 400,
+                            text: async () =>
+                                JSON.stringify({
+                                    error: {
+                                        code: 400,
+                                        message: 'API key expired. Please renew the API key.',
+                                        status: 'INVALID_ARGUMENT',
+                                        details: [{ reason: 'API_KEY_INVALID' }],
+                                    },
+                                }),
+                        })),
+                }),
+                createOllamaCatalogImporter({
+                    baseUrl: 'http://127.0.0.1:11434',
+                    fetchImpl: /** @type {typeof fetch} */ (async () => {
+                        throw new Error('fetch failed ECONNREFUSED');
+                    }),
+                }),
+            ],
+        });
+        const geminiOverlay = snapshot.accountOverlays.find((overlay) => overlay.providerId === 'gemini');
+        const ollamaOverlay = snapshot.accountOverlays.find((overlay) => overlay.providerId === 'ollama-local');
+
+        assert.deepEqual(
+            snapshot.importRuns.map((run) => run.status),
+            ['failed', 'failed'],
+        );
+        assert.equal(snapshot.projections.length, 0);
+        assert.equal(geminiOverlay?.providerMetadata.catalogImportStatus, 'failed');
+        assert.equal(geminiOverlay?.providerMetadata.apiKeyDisabled, true);
+        assert.equal(JSON.stringify(geminiOverlay).includes('gemini-secret-that-must-not-leak'), false);
+        assert.equal(ollamaOverlay?.providerMetadata.localDaemonReachable, false);
+        assert.equal(ollamaOverlay?.providerMetadata.disabled, true);
+    });
+
+    it('classifies importer failures separately for metadata, account, and local build gates', () => {
+        const publicFailure = classifyModelGatewayCatalogImporterFailure({
+            importerId: 'openai-docs-models',
+            providerId: 'openai',
+            sourceId: 'openai-docs-models',
+            sourceKind: 'official_docs',
+            errors: ['OpenAI docs fetch failed with HTTP 403'],
+        });
+        const accountFailure = classifyModelGatewayCatalogImporterFailure({
+            importerId: 'gemini-models',
+            providerId: 'gemini',
+            sourceId: 'gemini-models',
+            sourceKind: 'authenticated_api',
+            requiresAuth: true,
+            errors: ['Gemini models.list failed with HTTP 400: API key expired. Please renew the API key.'],
+        });
+        const localFailure = classifyModelGatewayCatalogImporterFailure({
+            importerId: 'ollama-catalog',
+            providerId: 'ollama-local',
+            sourceId: 'ollama-catalog',
+            sourceKind: 'local_daemon',
+            errors: ['fetch failed ECONNREFUSED'],
+        });
+
+        assert.equal(publicFailure.disposition, MODEL_GATEWAY_CATALOG_IMPORTER_FAILURE_DISPOSITION.BLOCKING_METADATA_SOURCE);
+        assert.equal(publicFailure.buildBlocking, true);
+        assert.equal(accountFailure.disposition, MODEL_GATEWAY_CATALOG_IMPORTER_FAILURE_DISPOSITION.ACCOUNT_STATE_UNAVAILABLE);
+        assert.equal(accountFailure.failureKind, 'auth');
+        assert.equal(accountFailure.buildBlocking, false);
+        assert.equal(localFailure.disposition, MODEL_GATEWAY_CATALOG_IMPORTER_FAILURE_DISPOSITION.OPTIONAL_LOCAL_SOURCE_UNAVAILABLE);
+        assert.equal(localFailure.failureKind, 'network');
+        assert.equal(localFailure.buildBlocking, false);
+        assert.equal(
+            classifyModelGatewayCatalogImporterFailure(accountFailure, { failOnAccountImporterFailures: true }).buildBlocking,
+            true,
+        );
+    });
+
     it('extracts rich OpenRouter model metadata as catalog evidence', async () => {
         const fakeFetch = /** @type {typeof fetch} */ (
             async () =>
@@ -3595,7 +3715,7 @@ describe('model-gateway foundation', () => {
         assert.equal(snapshot.sources[0].authMode, 'none');
         assert.equal(snapshot.accountOverlays.length, 0);
         assert.equal(snapshot.routeOptions.length, 0);
-        assert.equal(byModelPath.get('gpt-5.2:providerMetadata.openai.docsUrl'), 'https://platform.openai.com/docs/models');
+        assert.equal(byModelPath.get('gpt-5.2:providerMetadata.openai.docsUrl'), 'https://developers.openai.com/docs/models');
         assert.equal(byModelPath.get('gpt-5.2:pricing.inputUsdPerMillion'), 1.25);
         assert.equal(byModelPath.get('gpt-5.2:pricing.outputUsdPerMillion'), 10);
         assert.equal(byModelPath.get('gpt-5.2:capabilities.tools'), true);
