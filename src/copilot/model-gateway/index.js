@@ -10,6 +10,8 @@
 
 export {
     explainModelGatewayAccountAccess,
+    MODEL_GATEWAY_ACCOUNT_ACCESS_CONFIDENCE,
+    MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS,
     MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS,
     resolveModelGatewayAccountAccess,
 } from './account-access/index.js';

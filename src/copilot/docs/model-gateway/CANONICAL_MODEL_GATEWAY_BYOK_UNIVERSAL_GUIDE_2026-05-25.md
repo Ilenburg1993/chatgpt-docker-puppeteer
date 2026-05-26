@@ -1548,9 +1548,9 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Quota/rate/spending normalizers.
 - [x] Resolver de acesso por provider.
 - [ ] Account overlay refresh separado.
-- [ ] Access confidence.
+- [x] Access confidence.
 - [x] Access expiration.
-- [ ] Access failure classification.
+- [x] Access failure classification.
 - [x] Account model visibility explain.
 - [ ] Multi-account/workspace.
 - [ ] Region/organization support.
@@ -2417,4 +2417,37 @@ Validação deste corte:
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em `session`, `candidate-builder.js`, barrel
   principal e contrato unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 36. Continuidade 2026-05-26 — Account Access Confidence E Failure Class
+
+Implementado neste corte:
+
+- [x] `resolveModelGatewayAccountAccess()` agora retorna `accessConfidence`.
+- [x] `resolveModelGatewayAccountAccess()` agora retorna `failureClass`.
+- [x] Criados contratos exportados
+  `MODEL_GATEWAY_ACCOUNT_ACCESS_CONFIDENCE` e
+  `MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS`.
+- [x] `explainModelGatewayAccountAccess()` inclui confiança e classe de falha.
+- [x] `evaluateModelGatewayEligibility()` propaga `accessConfidence` e
+  `failureClass` em `policyInputs.accountAccess`.
+- [x] Testes cobrem `visible`, `missing_secret`, `blocked`, `not_visible`,
+  overlay expirado e decisão de eligibility com segredo ausente.
+
+Separação preservada:
+
+- [x] A classificação é pré-runtime e baseada em overlay/secret/policy.
+- [x] Nenhuma chamada de provider é feita.
+- [x] A decisão não altera catálogo canônico nem runtime health.
+- [x] Falhas de acesso agora podem orientar exclusão antes dos probes.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `102` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `account-access`, `eligibility/evaluator.js`,
+  barrel principal e contrato unitário.
 - [x] PASS `git diff --check`.

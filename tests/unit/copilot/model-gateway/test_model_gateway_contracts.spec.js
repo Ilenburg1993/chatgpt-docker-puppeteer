@@ -4179,6 +4179,8 @@ describe('model-gateway foundation', () => {
         assert.equal(visible.canAttempt, true);
         assert.equal(visible.secretConfigured, true);
         assert.equal(visible.modelVisible, true);
+        assert.equal(visible.accessConfidence, 'high');
+        assert.equal(visible.failureClass, 'none');
         assert.deepEqual(visible.overlayRefs, [overlay.accountOverlayId]);
 
         const missingSecret = resolveModelGatewayAccountAccess({
@@ -4189,6 +4191,8 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(missingSecret.status, 'missing_secret');
         assert.equal(missingSecret.canAttempt, false);
+        assert.equal(missingSecret.accessConfidence, 'high');
+        assert.equal(missingSecret.failureClass, 'secret_configuration');
         assert.ok(missingSecret.hardReasons.includes('secret_missing:OPENAI_API_KEY'));
 
         const blocked = resolveModelGatewayAccountAccess({
@@ -4198,6 +4202,8 @@ describe('model-gateway foundation', () => {
             secretRegistry: createEnvSecretRegistry({ env: { OPENAI_API_KEY: 'sk-test' } }),
         });
         assert.equal(blocked.status, 'blocked');
+        assert.equal(blocked.accessConfidence, 'high');
+        assert.equal(blocked.failureClass, 'policy_block');
         assert.ok(blocked.hardReasons.includes('account_model_blocked'));
     });
 
@@ -4218,6 +4224,8 @@ describe('model-gateway foundation', () => {
             key: 'openai:gpt-hidden:default',
             status: 'not_visible',
             canAttempt: false,
+            accessConfidence: 'high',
+            failureClass: 'model_visibility',
             primaryReason: 'account_model_not_visible',
             hardReasons: ['account_model_not_visible'],
             softReasons: [],
@@ -4244,6 +4252,8 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(stale.status, 'expired');
         assert.equal(stale.canAttempt, true);
+        assert.equal(stale.accessConfidence, 'medium');
+        assert.equal(stale.failureClass, 'account_overlay');
         assert.ok(stale.softReasons.includes('account_overlay_expired'));
         assert.ok(stale.softReasons.includes('account_overlay_missing'));
 
@@ -4303,6 +4313,8 @@ describe('model-gateway foundation', () => {
         assert.equal(decision.disposition, 'deferred_missing_secret');
         assert.deepEqual(decision.hardExclusions.sort(), ['account_model_not_visible', 'secret_missing:OPENAI_API_KEY'].sort());
         assert.deepEqual(decision.overlayRefs, [overlay.accountOverlayId]);
+        assert.equal(decision.policyInputs['accountAccess']['accessConfidence'], 'high');
+        assert.equal(decision.policyInputs['accountAccess']['failureClass'], 'secret_configuration');
         assert.equal(JSON.stringify(decision).includes('OPENAI_API_KEY'), true);
     });
 

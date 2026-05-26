@@ -72,6 +72,8 @@ function nextActions(status, hardReasons, softReasons) {
  *   key: string;
  *   status: string;
  *   canAttempt: boolean;
+ *   accessConfidence: string;
+ *   failureClass: string;
  *   primaryReason: string;
  *   hardReasons: string[];
  *   softReasons: string[];
@@ -92,6 +94,8 @@ export function explainModelGatewayAccountAccess(access) {
         key: accountAccessKey(access),
         status,
         canAttempt: access['canAttempt'] === true,
+        accessConfidence: optionalString(access['accessConfidence']) ?? 'unknown',
+        failureClass: optionalString(access['failureClass']) ?? 'unknown_access',
         primaryReason,
         hardReasons,
         softReasons,

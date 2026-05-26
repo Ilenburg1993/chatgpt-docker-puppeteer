@@ -20,6 +20,23 @@ export const MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS = Object.freeze({
     UNKNOWN: 'unknown',
 });
 
+export const MODEL_GATEWAY_ACCOUNT_ACCESS_CONFIDENCE = Object.freeze({
+    HIGH: 'high',
+    MEDIUM: 'medium',
+    LOW: 'low',
+    UNKNOWN: 'unknown',
+});
+
+export const MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS = Object.freeze({
+    NONE: 'none',
+    SECRET_CONFIGURATION: 'secret_configuration',
+    ACCOUNT_LIMITS: 'account_limits',
+    ACCOUNT_OVERLAY: 'account_overlay',
+    MODEL_VISIBILITY: 'model_visibility',
+    POLICY_BLOCK: 'policy_block',
+    UNKNOWN_ACCESS: 'unknown_access',
+});
+
 /**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
@@ -137,6 +154,63 @@ function resolveStatus(hardReasons, softReasons, modelVisible) {
 }
 
 /**
+ * @param {string} status
+ * @param {string[]} hardReasons
+ * @param {string[]} softReasons
+ * @returns {string}
+ */
+function classifyFailure(status, hardReasons, softReasons) {
+    if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.VISIBLE) return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.NONE;
+    if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.MISSING_SECRET) {
+        return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.SECRET_CONFIGURATION;
+    }
+    if (
+        status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.QUOTA_EXHAUSTED ||
+        status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.SPENDING_EXHAUSTED
+    ) {
+        return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.ACCOUNT_LIMITS;
+    }
+    if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.BLOCKED) return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.POLICY_BLOCK;
+    if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.NOT_VISIBLE) {
+        return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.MODEL_VISIBILITY;
+    }
+    if (
+        status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.EXPIRED ||
+        status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.MISSING_OVERLAY ||
+        hardReasons.includes('account_overlay_missing') ||
+        softReasons.includes('account_overlay_missing')
+    ) {
+        return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.ACCOUNT_OVERLAY;
+    }
+    return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.UNKNOWN_ACCESS;
+}
+
+/**
+ * @param {string} status
+ * @param {boolean | null} secretConfigured
+ * @param {boolean} modelVisible
+ * @param {Record<string, any>[]} overlays
+ * @returns {string}
+ */
+function resolveConfidence(status, secretConfigured, modelVisible, overlays) {
+    if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.UNKNOWN) return MODEL_GATEWAY_ACCOUNT_ACCESS_CONFIDENCE.UNKNOWN;
+    if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.EXPIRED) return MODEL_GATEWAY_ACCOUNT_ACCESS_CONFIDENCE.MEDIUM;
+    if (
+        status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.MISSING_OVERLAY ||
+        (overlays.length === 0 && status !== MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.MISSING_SECRET)
+    ) {
+        return MODEL_GATEWAY_ACCOUNT_ACCESS_CONFIDENCE.LOW;
+    }
+    if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.VISIBLE && (secretConfigured === true || modelVisible)) {
+        return MODEL_GATEWAY_ACCOUNT_ACCESS_CONFIDENCE.HIGH;
+    }
+    if (status !== MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.VISIBLE && overlays.length > 0) {
+        return MODEL_GATEWAY_ACCOUNT_ACCESS_CONFIDENCE.HIGH;
+    }
+    return MODEL_GATEWAY_ACCOUNT_ACCESS_CONFIDENCE.LOW;
+}
+
+/**
  * @param {Record<string, any>} overlay
  * @param {number} nowMs
  * @returns {boolean}
@@ -196,6 +270,8 @@ function overlayQuotaExhausted(overlay) {
  *   secretRef: string | null;
  *   secretConfigured: boolean | null;
  *   modelVisible: boolean;
+ *   accessConfidence: string;
+ *   failureClass: string;
  *   overlays: Record<string, any>[];
  *   overlayRefs: string[];
  *   hardReasons: string[];
@@ -257,6 +333,8 @@ export function resolveModelGatewayAccountAccess(input) {
     }
 
     const status = resolveStatus(hardReasons, softReasons, modelVisible);
+    const uniqueHard = [...new Set(hardReasons)];
+    const uniqueSoft = [...new Set(softReasons)];
     return {
         providerId,
         providerModel,
@@ -266,10 +344,12 @@ export function resolveModelGatewayAccountAccess(input) {
         secretRef,
         secretConfigured,
         modelVisible,
+        accessConfidence: resolveConfidence(status, secretConfigured, modelVisible, overlays),
+        failureClass: classifyFailure(status, uniqueHard, uniqueSoft),
         overlays,
         overlayRefs: overlays.map((overlay) => optionalString(overlay['accountOverlayId'])).filter((id) => id !== null),
-        hardReasons: [...new Set(hardReasons)],
-        softReasons: [...new Set(softReasons)],
+        hardReasons: uniqueHard,
+        softReasons: uniqueSoft,
         reasons: [...new Set(reasons)],
     };
 }
