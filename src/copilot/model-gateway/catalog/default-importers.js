@@ -64,6 +64,16 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     const includePublic = options.includePublic ?? true;
     const includeAuthenticated = options.includeAuthenticated ?? true;
     const cloudflareSecret = readEnvSecret(env, ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY', 'CLOUDFLARE_KEY']);
+    const openAiSecret = readEnvSecret(env, ['OPENAI_API_KEY', 'COPILOT_OPENAI_API_KEY']);
+    const mistralSecret = readEnvSecret(env, ['MISTRAL_API_KEY', 'MISTRAL_KEY']);
+    const anthropicSecret = readEnvSecret(env, ['ANTHROPIC_API_KEY', 'ANTHROPIC_KEY', 'CLAUDE_API_KEY']);
+    const geminiSecret = readEnvSecret(env, ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_AI_STUDIO_API_KEY']);
+    const groqSecret = readEnvSecret(env, ['GROQ_API_KEY', 'GROQ_KEY']);
+    const huggingFaceSecret = readEnvSecret(env, ['HF_TOKEN', 'HUGGINGFACE_API_TOKEN', 'HUGGING_FACE_API_KEY', 'HUGGING_FACE_KEY']);
+    const openCodeSecret = readEnvSecret(env, ['OPENCODE_API_KEY']);
+    const nvidiaSecret = readEnvSecret(env, ['NVIDIA_API_KEY', 'NVIDIA_KEY']);
+    const chutesSecret = readEnvSecret(env, ['CHUTES_API_KEY', 'CHUTES_AI']);
+    const zaiSecret = readEnvSecret(env, ['ZAI_API_KEY', 'Z_AI_KEY']);
     /** @type {import('./importer-runner.js').CatalogImporter[]} */
     const importers = [];
     if (includePublic) {
@@ -82,12 +92,23 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                 gatewayId: env['CLOUDFLARE_AI_GATEWAY_ID'],
             }),
         );
+        if (!includeAuthenticated || !huggingFaceSecret) {
+            importers.push(createHuggingFaceInferenceProvidersImporter({ fetchImpl: options.fetchImpl }));
+        }
+        if (!includeAuthenticated || !openCodeSecret) {
+            importers.push(createOpenCodeZenModelsImporter({ fetchImpl: options.fetchImpl }));
+        }
+        if (!includeAuthenticated || !chutesSecret) {
+            importers.push(createChutesModelsImporter({ fetchImpl: options.fetchImpl }));
+        }
+        if (!includeAuthenticated || !zaiSecret) {
+            importers.push(createZaiModelsImporter({ fetchImpl: options.fetchImpl }));
+        }
     }
     const ollamaBaseUrl = readEnvSecret(env, ['OLLAMA_BASE_URL', 'OLLAMA_HOST', 'COPILOT_OLLAMA_BASE_URL']);
     if (includePublic && ollamaBaseUrl) {
         importers.push(createOllamaCatalogImporter({ fetchImpl: options.fetchImpl, baseUrl: ollamaBaseUrl.value }));
     }
-    const openAiSecret = readEnvSecret(env, ['OPENAI_API_KEY', 'COPILOT_OPENAI_API_KEY']);
     if (includeAuthenticated && openAiSecret) {
         importers.push(
             createOpenAIModelsImporter({
@@ -97,7 +118,6 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             }),
         );
     }
-    const mistralSecret = readEnvSecret(env, ['MISTRAL_API_KEY', 'MISTRAL_KEY']);
     if (includeAuthenticated && mistralSecret) {
         importers.push(
             createMistralModelsImporter({
@@ -107,7 +127,6 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             }),
         );
     }
-    const anthropicSecret = readEnvSecret(env, ['ANTHROPIC_API_KEY', 'ANTHROPIC_KEY']);
     if (includeAuthenticated && anthropicSecret) {
         importers.push(
             createAnthropicModelsImporter({
@@ -117,7 +136,6 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             }),
         );
     }
-    const geminiSecret = readEnvSecret(env, ['GEMINI_API_KEY', 'GOOGLE_API_KEY']);
     if (includeAuthenticated && geminiSecret) {
         importers.push(
             createGeminiModelsImporter({
@@ -127,7 +145,6 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             }),
         );
     }
-    const groqSecret = readEnvSecret(env, ['GROQ_API_KEY', 'GROQ_KEY']);
     if (includeAuthenticated && groqSecret) {
         importers.push(
             createGroqModelsImporter({
@@ -137,7 +154,6 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             }),
         );
     }
-    const huggingFaceSecret = readEnvSecret(env, ['HF_TOKEN', 'HUGGINGFACE_API_TOKEN']);
     if (includeAuthenticated && huggingFaceSecret) {
         importers.push(
             createHuggingFaceInferenceProvidersImporter({
@@ -147,7 +163,6 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             }),
         );
     }
-    const openCodeSecret = readEnvSecret(env, ['OPENCODE_API_KEY']);
     if (includeAuthenticated && openCodeSecret) {
         importers.push(
             createOpenCodeZenModelsImporter({
@@ -157,7 +172,6 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             }),
         );
     }
-    const nvidiaSecret = readEnvSecret(env, ['NVIDIA_API_KEY', 'NVIDIA_KEY']);
     if (includeAuthenticated && nvidiaSecret) {
         importers.push(
             createNvidiaNimModelsImporter({
@@ -167,7 +181,6 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             }),
         );
     }
-    const chutesSecret = readEnvSecret(env, ['CHUTES_API_KEY', 'CHUTES_AI']);
     if (includeAuthenticated && chutesSecret) {
         importers.push(
             createChutesModelsImporter({
@@ -177,7 +190,6 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             }),
         );
     }
-    const zaiSecret = readEnvSecret(env, ['ZAI_API_KEY', 'Z_AI_KEY']);
     if (includeAuthenticated && zaiSecret) {
         importers.push(
             createZaiModelsImporter({

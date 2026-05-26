@@ -30,6 +30,7 @@ import {
     buildCatalogRefreshEventBatch,
     buildEligibilityEvaluatedEvent,
     auditProviderEndpointImporterCoverage,
+    auditCatalogImporterSet,
     buildProbeCompletedEvent,
     buildRegistrySnapshotEvent,
     buildRouteDecisionEvent,
@@ -124,6 +125,7 @@ import {
     createProviderMetadataEvidence,
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
+    describeCatalogImporter,
     explainModelGatewayCatalogEntry,
     explainModelGatewayProviderEntry,
     mergeModelMetadataEvidence,
@@ -949,6 +951,8 @@ describe('model-gateway foundation', () => {
             checkedEnvKeys: [accountKey, workspaceKey, 'OPENAI_API_KEY'],
             safeLabel: 'OPENAI_API_KEY=<configured:account>',
         });
+        assert.equal(createEnvSecretRegistry({ env: { ANTHROPIC_KEY: 'anthropic-key' } }).has('ANTHROPIC_KEY'), true);
+        assert.equal(createEnvSecretRegistry({ env: { HUGGINGFACE_API_TOKEN: 'hf-key' } }).has('HUGGINGFACE_API_TOKEN'), true);
     });
 
     it('imports current env BYOK without serializing secrets', () => {
@@ -5779,6 +5783,10 @@ describe('model-gateway foundation', () => {
                 'groq-docs-models',
                 'opencode-zen-docs',
                 'cloudflare-workers-ai-catalog',
+                'huggingface-inference-providers',
+                'opencode-zen-models',
+                'chutes-models',
+                'zai-models',
                 'openai-models',
             ],
         );
@@ -5792,6 +5800,10 @@ describe('model-gateway foundation', () => {
                 'groq-docs-models',
                 'opencode-zen-docs',
                 'cloudflare-workers-ai-catalog',
+                'huggingface-inference-providers',
+                'opencode-zen-models',
+                'chutes-models',
+                'zai-models',
             ],
         );
         assert.equal(groqAuthenticated.some((importer) => importer.id === 'groq-models'), true);
@@ -5819,6 +5831,30 @@ describe('model-gateway foundation', () => {
         assert.equal(JSON.stringify(nvidiaAuthenticated).includes('nvidia-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(chutesAuthenticated).includes('chutes-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(zaiAuthenticated).includes('zai-secret-that-must-not-leak'), false);
+    });
+
+    it('audits catalog importer hooks and endpoint coverage without fetching providers', () => {
+        const importers = createDefaultModelGatewayCatalogImporters({
+            env: {
+                OPENAI_API_KEY: 'sk-test',
+                OPENCODE_API_KEY: 'opencode-token',
+                CHUTES_API_KEY: 'chutes-token',
+                ZAI_API_KEY: 'zai-token',
+            },
+            fetchImpl: async () => ({}),
+        });
+        const openAiDescriptor = describeCatalogImporter(importers.find((importer) => importer.id === 'openai-models') ?? {});
+        const audit = auditCatalogImporterSet(importers, { inventories: listProviderEndpointInventory() });
+
+        assert.equal(openAiDescriptor.requiresAuth, true);
+        assert.equal(openAiDescriptor.hooks.toRouteOptions, true);
+        assert.equal(openAiDescriptor.hooks.toAccountOverlays, true);
+        assert.equal(audit.missingRequiredHooks.length, 0);
+        assert.ok(audit.publicImporterCount >= 8);
+        assert.ok(audit.routeOptionImporterCount >= 10);
+        assert.ok(audit.accountOverlayImporterCount >= 4);
+        assert.equal(audit.providersWithoutImporters.includes('zai'), false);
+        assert.equal(audit.uncoveredCatalogSourceIds.includes('zai:catalog:openapi:GET:https://docs.z.ai/openapi.json'), true);
     });
 
     it('persists a versioned JSON registry snapshot without secrets', async () => {

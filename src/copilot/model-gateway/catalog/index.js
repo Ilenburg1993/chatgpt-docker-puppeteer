@@ -17,6 +17,7 @@ export {
     createProviderMetadataEvidence,
 } from './contracts.js';
 export { createDefaultModelGatewayCatalogImporters } from './default-importers.js';
+export { auditCatalogImporterSet, describeCatalogImporter } from './importer-audit.js';
 export {
     projectModelGatewayMetadataCoverageMetrics,
     projectModelGatewayProviderFreshnessMetrics,

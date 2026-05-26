@@ -1436,6 +1436,9 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] OpenCode docs.
 - [x] Chutes.
 - [x] Z.AI.
+- [x] Auditoria canônica de importer set, hooks e cobertura de endpoints.
+- [x] Default set inclui importers públicos disponíveis sem chave para Hugging
+  Face, OpenCode, Chutes e Z.AI.
 - [ ] OpenAI official docs seed.
 - [ ] Anthropic docs seed.
 - [ ] Gemini/Vertex docs seed.
@@ -3317,6 +3320,71 @@ Validação deste corte:
 
 - [x] PASS `npm run model-gateway:test:contracts` com `126` testes.
 - [x] PASS `npm run model-gateway:test:terminal` com `59` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 55. Continuidade 2026-05-26 — Auditoria Estrutural Da Faixa L
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a Faixa L como camada inteira: factories de importers,
+  default importer set, importer runner, raw payload refs, route options,
+  account overlays e coverage contra endpoint inventory.
+- [x] Identificado que alguns importers capazes de rodar em modo público
+  ficavam fora do default set quando não havia chave.
+- [x] Identificado que faltava um contrato canônico para auditar hooks de
+  importer sem executar fetch.
+- [x] Identificado desalinhamento entre aliases aceitos por importers/default
+  set e aliases reconhecidos pelo `EnvSecretRegistry`.
+- [x] Confirmado que a auditoria deve ser pré-runtime e não pode chamar
+  providers nem modelos.
+
+Implementado neste corte:
+
+- [x] `createDefaultModelGatewayCatalogImporters()` passa a incluir importers
+  públicos para Hugging Face, OpenCode models, Chutes e Z.AI quando não há
+  variante autenticada selecionada.
+- [x] O default set evita duplicar o mesmo importer público/autenticado quando
+  uma chave está presente e `includeAuthenticated` está ativo.
+- [x] Aliases de env aceitos pelo registry passam a incluir
+  `COPILOT_OPENAI_API_KEY`, `ANTHROPIC_KEY` e `HUGGINGFACE_API_TOKEN`.
+- [x] Criado `describeCatalogImporter()`.
+- [x] Criado `auditCatalogImporterSet()`.
+- [x] A auditoria mede importers públicos/autenticados, providers cobertos,
+  hooks obrigatórios, hooks de provider evidence, route options e overlays.
+- [x] A auditoria compara importers configurados contra
+  `MODEL_GATEWAY_PROVIDER_ENDPOINT_INVENTORY`.
+- [x] Exportado pelos barrels `catalog` e `model-gateway`.
+- [x] Testes cobrem default set público ampliado, ausência de vazamento de
+  segredo, audit de hooks e coverage de endpoints.
+
+Separação preservada:
+
+- [x] Auditoria não chama `fetchRaw()`.
+- [x] Auditoria não executa provider.
+- [x] Auditoria não executa modelo.
+- [x] Auditoria não executa probes.
+- [x] Auditoria não altera snapshot.
+- [x] Segredos continuam ausentes de serialização.
+
+Próximas lacunas L identificadas:
+
+- [ ] OpenAI official docs seed de preço/limites/capabilities.
+- [ ] Anthropic docs seed completo por família.
+- [ ] Gemini/Vertex docs seed e distinção fina de superfície.
+- [ ] Mistral docs pricing seed.
+- [ ] OpenRouter account overlay importer profundo.
+- [ ] Kilo account overlay importer real de allow/block/balance.
+- [ ] Cloudflare account access importer além de flags configuradas.
+- [ ] Parser estrutural do OpenAPI da Z.AI.
+- [ ] Importer autenticado especializado para Cerebras.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `128` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.
