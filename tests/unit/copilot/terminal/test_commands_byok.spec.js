@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayProviderEnvRequirements, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeProviderWireProbeMatrix, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayProviderEnvRequirements, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeProviderWireProbeMatrix, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -259,6 +259,13 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
         createDefaultModelGatewayCatalogImporters: vi.fn(() => [{ id: 'openrouter-models' }, { id: 'openai-models' }]),
         createEnvSecretRegistry: vi.fn(() => ({ has: () => false, get: () => null, list: () => [] })),
         DEFAULT_MODEL_GATEWAY_CATALOG_PATH: 'data/copilot/model-gateway/catalog.json',
+        deriveModelGatewayRuntimeAccountOverlaysFromHealth: vi.fn(() => [
+            {
+                accountOverlayId: 'runtime-health:groq:default:limited-model:rate-limit',
+                providerId: 'groq',
+                sourceKind: 'runtime_health',
+            },
+        ]),
         discoverConfiguredByokModelsFromEnv: vi.fn(),
         evaluateModelGatewayProviderEnvRequirements: vi.fn(() => [
             {
@@ -519,6 +526,7 @@ vi.mock('#copilot/model-gateway', () => ({
     createDefaultModelGatewayCatalogImporters,
     createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
+    deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayProviderEnvRequirements,
     flushByokProviderHealth,
     JsonModelGatewayCatalogStore,
@@ -1823,8 +1831,9 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'gateway accounts openrouter');
 
+        expect(deriveModelGatewayRuntimeAccountOverlaysFromHealth).toHaveBeenCalledWith(expect.any(Array));
         expect(summarizeModelGatewayAccountOverlays).toHaveBeenCalledWith(
-            expect.anything(),
+            expect.arrayContaining([expect.objectContaining({ sourceKind: 'runtime_health' })]),
             expect.objectContaining({ selector: 'openrouter' }),
         );
         expect(ctx.output()).toContain('BYOK model-gateway accounts/keys');

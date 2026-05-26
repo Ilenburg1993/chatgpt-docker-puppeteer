@@ -26,6 +26,7 @@ import {
     createDefaultModelGatewayCatalogImporters,
     createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
+    deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     applyModelGatewayEligibilityToSnapshot,
     evaluateModelGatewayCatalogEligibility,
     evaluateModelGatewayProviderEnvRequirements,
@@ -2544,16 +2545,16 @@ async function renderByokGatewayAccounts(println, rest) {
     const args = parseGatewayCatalogListArgs(rest);
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const snapshot = await store.readSnapshot();
-    const accountSummary = summarizeModelGatewayAccountOverlays(Array.isArray(snapshot.accountOverlays) ? snapshot.accountOverlays : [], {
-        selector: args.selector,
-    });
+    const catalogOverlays = Array.isArray(snapshot.accountOverlays) ? snapshot.accountOverlays : [];
+    const runtimeOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(listByokProviderModelHealth());
+    const accountSummary = summarizeModelGatewayAccountOverlays([...catalogOverlays, ...runtimeOverlays], { selector: args.selector });
     const statusCounts = Object.entries(accountSummary.summary.statusCounts)
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([status, count]) => `${status}:${count}`)
         .join(',');
     println(`\n  \x1b[36mBYOK model-gateway accounts/keys\x1b[0m`);
     println(
-        `  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · overlays=${accountSummary.summary.matched}/${accountSummary.summary.total} · providers=${accountSummary.summary.providers} · status=${statusCounts || '-'}\x1b[0m\n`,
+        `  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · overlays=${accountSummary.summary.matched}/${accountSummary.summary.total} · runtime=${runtimeOverlays.length} · providers=${accountSummary.summary.providers} · status=${statusCounts || '-'}\x1b[0m\n`,
     );
     if (accountSummary.rows.length === 0) {
         println('    \x1b[33mNenhuma conta/key overlay encontrada para o filtro informado.\x1b[0m\n');
@@ -2561,9 +2562,11 @@ async function renderByokGatewayAccounts(println, rest) {
     }
     for (const row of accountSummary.rows.slice(0, args.limit)) {
         const retry = row.resetAt ? `reset=${row.resetAt}` : row.retryAfterSeconds ? `retry=${row.retryAfterSeconds}s` : 'reset=-';
+        const resetState = row.quotaResetExpired === true ? 'resetState=expired' : row.quotaResetActive === true ? 'resetState=active' : null;
         const remaining = [
             row.remainingUsd !== null ? `remainingUsd=${row.remainingUsd}` : null,
             row.remainingCreditsUsd !== null ? `creditsUsd=${row.remainingCreditsUsd}` : null,
+            resetState,
         ]
             .filter(Boolean)
             .join(' · ');

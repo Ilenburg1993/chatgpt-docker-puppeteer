@@ -3804,6 +3804,8 @@ Arquitetura consolidada:
   derivadas.
 - [x] Rate limit só deve excluir enquanto a janela observada ainda estiver
   ativa.
+- [x] Quota diária/mensal com reset conhecido só exclui enquanto a janela
+  observada ainda estiver ativa.
 - [x] Quota/spending sem reset conhecido permanece bloqueio hard até refresh de
   overlay, sucesso posterior, troca de conta/key ou política explícita.
 - [x] O operador deve enxergar a diferença entre `account_spending_exhausted`,
@@ -3819,6 +3821,8 @@ Implementado neste corte:
 - [x] O normalizador entende `retryAfterSeconds`, `resetAt`,
   `remainingRequests` e `remainingTokens`.
 - [x] Rate limit com reset expirado deixa de bloquear pré-runtime.
+- [x] Quota diária/mensal zerada com `resetAt` expirado deixa de bloquear
+  pré-runtime e expõe `quota.resetExpired` para UX/seleção.
 - [x] `resolveModelGatewayAccountAccess()` passa a bloquear key desabilitada.
 - [x] `resolveModelGatewayAccountAccess()` passa a bloquear rate limit account
   ativo.
@@ -3845,6 +3849,13 @@ Implementado neste corte:
   ativas de rate limit account/key ou runtime health.
 - [x] Criado `/byok gateway probes backoff` para explicar `READY` vs `DEFER`
   antes de qualquer probe runtime.
+- [x] Criado `deriveModelGatewayRuntimeAccountOverlaysFromHealth()` para
+  projetar falhas runtime já observadas de auth/crédito/rate-limit como
+  overlays account/key voláteis, sem executar provider e sem alterar metadados
+  canônicos.
+- [x] `/byok gateway accounts` passa a unir overlays persistidos do catálogo
+  com overlays voláteis derivados do runtime health, deixando visível quando um
+  bloqueio operacional recente ainda deve afetar pré-runtime.
 - [x] Probes e turnos vivos passam a gravar os campos estruturados de limite no
   health.
 - [x] Health fatal em eligibility deixa de bloquear rate limit após
@@ -3861,6 +3872,8 @@ Separação preservada:
 - [x] Headers de limite são sanitizados e não contêm segredos.
 - [x] Account/key limits continuam account-scoped.
 - [x] Runtime health continua volátil e operacional.
+- [x] Overlays derivados de runtime health continuam expiráveis e não são
+  promovidos a evidência canônica.
 - [x] SQLite runtime layer continua espelho de health/probes, não fonte de
   metadados globais.
 
@@ -3874,14 +3887,14 @@ Próximas lacunas reforçadas:
 - [x] Persistir snapshots separados de `account_quota_snapshots`,
   `account_rate_limit_snapshots` e `account_spending_snapshots` no SQLite a
   partir dos overlays atuais.
-- [ ] Criar policy explícita para tratar quota diária/mensal com reset conhecido
+- [x] Criar policy explícita para tratar quota diária/mensal com reset conhecido
   de forma diferente de spending/crédito sem reset.
 - [x] Criar backoff planner para probes/runtime usando `retryAfterSeconds` e
   `resetAt`.
 
 Validação deste corte:
 
-- [x] PASS `npm run model-gateway:test:contracts` com `138` testes.
+- [x] PASS `npm run model-gateway:test:contracts` com `139` testes.
 - [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_provider_failure.spec.js tests/unit/copilot/model-gateway/test_model_gateway_provider_health.spec.js`
   com `9` testes.
 - [x] PASS `npm run model-gateway:test:terminal` com `62` testes.

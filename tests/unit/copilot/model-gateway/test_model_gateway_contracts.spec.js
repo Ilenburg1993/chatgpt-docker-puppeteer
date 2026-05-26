@@ -132,6 +132,7 @@ import {
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
     describeCatalogImporter,
+    deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     explainModelGatewayCatalogEntry,
     explainModelGatewayProviderEntry,
     mergeModelMetadataEvidence,
@@ -5236,6 +5237,26 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(expired.status, 'ok');
         assert.equal(expired.rateLimited, false);
+
+        const exhaustedDailyQuota = createProviderAccountOverlay({
+            providerId: 'gemini',
+            secretRef: 'GEMINI_API_KEY',
+            enabledModels: ['gemini-pro'],
+            quota: { dailyRequests: 0, resetAt: '2026-05-25T00:05:00.000Z' },
+        });
+        const activeQuota = normalizeModelGatewayAccountLimitState(exhaustedDailyQuota, {
+            now: '2026-05-25T00:00:00.000Z',
+        });
+        assert.equal(activeQuota.status, 'quota_exhausted');
+        assert.equal(activeQuota.quotaExhausted, true);
+        assert.equal(activeQuota.quota.resetActive, true);
+
+        const resetQuota = normalizeModelGatewayAccountLimitState(exhaustedDailyQuota, {
+            now: '2026-05-25T00:06:00.000Z',
+        });
+        assert.equal(resetQuota.status, 'ok');
+        assert.equal(resetQuota.quotaExhausted, false);
+        assert.equal(resetQuota.quota.resetExpired, true);
     });
 
     it('blocks disabled keys and active account rate-limit windows before runtime', () => {
@@ -5279,6 +5300,43 @@ describe('model-gateway foundation', () => {
         assert.equal(rateLimitedDecision.policyInputs['accountAccess']['status'], 'rate_limited');
     });
 
+    it('derives volatile account overlays from runtime health without mutating canonical metadata', () => {
+        const overlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth([
+            {
+                key: 'groq|groq|llama',
+                providerId: 'groq',
+                providerModel: 'llama',
+                routeProfile: 'groq',
+                lastStatus: 'failed',
+                lastFailureKind: 'rate-limit',
+                lastFailureStatusCode: 429,
+                lastFailureAt: Date.parse('2026-05-25T00:00:00.000Z'),
+                lastRetryAfterSeconds: 60,
+            },
+            {
+                key: 'openrouter|openrouter|paid',
+                providerId: 'openrouter',
+                providerModel: 'paid',
+                lastStatus: 'failed',
+                lastFailureKind: 'credits',
+                lastFailureStatusCode: 402,
+                lastFailureAt: Date.parse('2026-05-25T00:00:00.000Z'),
+            },
+        ]);
+
+        assert.equal(overlays.length, 2);
+        assert.equal(overlays[0].sourceKind, 'runtime_health');
+        assert.equal(overlays[0].confidence, 'probe_failed');
+        assert.deepEqual(overlays[0].enabledModels, ['llama']);
+        assert.equal(overlays[0].rateLimits.limited, true);
+        assert.equal(overlays[0].rateLimits.retryAfterSeconds, 60);
+        assert.equal(overlays[0].rateLimits.resetAt, '2026-05-25T00:01:00.000Z');
+        assert.equal(overlays[0].expiresAt, '2026-05-25T00:01:00.000Z');
+        assert.equal(overlays[1].quota.remainingCreditsUsd, 0);
+        assert.equal(overlays[1].spendingLimits.remainingUsd, 0);
+        assert.equal(JSON.stringify(overlays).includes('sk-'), false);
+    });
+
     it('summarizes account/key overlays for operator pre-runtime visibility', () => {
         const summary = summarizeModelGatewayAccountOverlays([
             createProviderAccountOverlay({
@@ -5305,6 +5363,8 @@ describe('model-gateway foundation', () => {
         assert.equal(summary.rows[0].enabledModelCount, 2);
         assert.equal(summary.rows[0].limitStatus, 'rate_limited');
         assert.equal(summary.rows[0].resetAt, '2026-05-25T00:05:00.000Z');
+        assert.equal(summary.rows[0].quotaResetActive, false);
+        assert.equal(summary.rows[0].quotaResetExpired, false);
     });
 
     it('evaluates hard pre-runtime exclusions from secrets, account overlays and access visibility', () => {

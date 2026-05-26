@@ -154,6 +154,19 @@ function normalizeRateLimitState(rateLimits, nowMs) {
 }
 
 /**
+ * @param {{ resetAt: string | null }} quotaState
+ * @param {number} nowMs
+ * @returns {{ resetActive: boolean; resetExpired: boolean }}
+ */
+function quotaResetWindow(quotaState, nowMs) {
+    const resetMs = dateMs(quotaState.resetAt);
+    return {
+        resetActive: resetMs !== null && resetMs > nowMs,
+        resetExpired: resetMs !== null && resetMs <= nowMs,
+    };
+}
+
+/**
  * @param {Record<string, any>} overlay
  * @param {{ now?: string | number | Date }} [options]
  * @returns {{
@@ -165,7 +178,7 @@ function normalizeRateLimitState(rateLimits, nowMs) {
  *   retryAfterSeconds: number | null;
  *   resetAt: string | null;
  *   spending: { limitUsd: number | null; usageUsd: number | null; remainingUsd: number | null; unlimited: boolean };
- *   quota: { remainingCreditsUsd: number | null; dailyRequests: number | null; dailyTokens: number | null; resetAt: string | null };
+ *   quota: { remainingCreditsUsd: number | null; dailyRequests: number | null; dailyTokens: number | null; resetAt: string | null; resetActive: boolean; resetExpired: boolean };
  *   rateLimit: ReturnType<typeof normalizeRateLimitState>;
  * }}
  */
@@ -185,17 +198,20 @@ export function normalizeModelGatewayAccountLimitState(overlay, options = {}) {
         remainingCreditsUsd: firstNumber(quota, ['remainingCreditsUsd', 'remainingUsd']),
         dailyRequests: firstNumber(quota, ['dailyRequests', 'requestsPerDay']),
         dailyTokens: firstNumber(quota, ['dailyTokens', 'tokensPerDay']),
-        resetAt: isoDate(firstString(quota, ['resetAt', 'quotaResetAt', 'dailyResetAt'])),
+        resetAt: isoDate(firstString(quota, ['resetAt', 'quotaResetAt', 'dailyResetAt', 'monthlyResetAt', 'creditResetAt'])),
     };
+    const quotaWindow = quotaResetWindow(quotaState, nowMs);
+    const quotaResetNoLongerBlocks = quotaWindow.resetExpired;
     const rateLimit = normalizeRateLimitState(rateLimits, nowMs);
     const keyDisabled =
         firstBoolean(providerMetadata, ['disabled', 'keyDisabled', 'apiKeyDisabled']) === true ||
         firstBoolean(overlay, ['disabled', 'keyDisabled']) === true;
     const spendingExhausted = spending.remainingUsd !== null && spending.remainingUsd <= 0 && !spending.unlimited;
     const quotaExhausted =
-        (quotaState.remainingCreditsUsd !== null && quotaState.remainingCreditsUsd <= 0) ||
-        (quotaState.dailyRequests !== null && quotaState.dailyRequests <= 0) ||
-        (quotaState.dailyTokens !== null && quotaState.dailyTokens <= 0);
+        !quotaResetNoLongerBlocks &&
+        ((quotaState.remainingCreditsUsd !== null && quotaState.remainingCreditsUsd <= 0) ||
+            (quotaState.dailyRequests !== null && quotaState.dailyRequests <= 0) ||
+            (quotaState.dailyTokens !== null && quotaState.dailyTokens <= 0));
     const status = keyDisabled
         ? MODEL_GATEWAY_ACCOUNT_LIMIT_STATUS.KEY_DISABLED
         : spendingExhausted
@@ -214,7 +230,7 @@ export function normalizeModelGatewayAccountLimitState(overlay, options = {}) {
         retryAfterSeconds: rateLimit.retryAfterSeconds,
         resetAt: rateLimit.resetAt ?? quotaState.resetAt,
         spending,
-        quota: quotaState,
+        quota: { ...quotaState, ...quotaWindow },
         rateLimit,
     };
 }

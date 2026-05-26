@@ -70,6 +70,8 @@ function matchesSelector(selector, overlay) {
  *     limitStatus: string;
  *     retryAfterSeconds: number | null;
  *     resetAt: string | null;
+ *     quotaResetActive: boolean;
+ *     quotaResetExpired: boolean;
  *     remainingUsd: number | null;
  *     remainingCreditsUsd: number | null;
  *   }>;
@@ -103,6 +105,8 @@ export function summarizeModelGatewayAccountOverlays(overlays, options = {}) {
                 limitStatus: limits.status,
                 retryAfterSeconds: limits.retryAfterSeconds,
                 resetAt: limits.resetAt,
+                quotaResetActive: limits.quota.resetActive,
+                quotaResetExpired: limits.quota.resetExpired,
                 remainingUsd: limits.spending.remainingUsd,
                 remainingCreditsUsd: limits.quota.remainingCreditsUsd,
             };

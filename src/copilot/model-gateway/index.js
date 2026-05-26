@@ -9,6 +9,8 @@
  */
 
 export {
+    deriveModelGatewayRuntimeAccountOverlayFromHealth,
+    deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     explainModelGatewayAccountAccess,
     MODEL_GATEWAY_ACCOUNT_ACCESS_CONFIDENCE,
     MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS,
