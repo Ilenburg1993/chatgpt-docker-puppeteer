@@ -3861,6 +3861,12 @@ Implementado neste corte:
   preservando a fronteira com BYOK provider quotas.
 - [x] `/sdk quota` e `classifyTerminalSdkQuota()` passam a consumir o
   normalizador canônico, eliminando uma segunda regra paralela de percentuais.
+- [x] `evaluateModelGatewayCatalogEligibility()` passa a aceitar
+  `healthRecords`, derivar overlays account/key voláteis e repassar o health
+  correspondente para cada modelo sem executar runtime.
+- [x] `/byok gateway eligibility` passa a considerar o BYOK provider health
+  atual na avaliação em lote, mantendo o catálogo canônico separado dos fatos
+  runtime.
 - [x] Probes e turnos vivos passam a gravar os campos estruturados de limite no
   health.
 - [x] Health fatal em eligibility deixa de bloquear rate limit após
@@ -3904,7 +3910,7 @@ Próximas lacunas reforçadas:
 
 Validação deste corte:
 
-- [x] PASS `npm run model-gateway:test:contracts` com `139` testes.
+- [x] PASS `npm run model-gateway:test:contracts` com `141` testes.
 - [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_provider_failure.spec.js tests/unit/copilot/model-gateway/test_model_gateway_provider_health.spec.js`
   com `9` testes.
 - [x] PASS `npm run model-gateway:test:terminal` com `62` testes.

@@ -10,6 +10,7 @@
 
 import { createModelEligibilityRun } from './contracts.js';
 import { evaluateModelGatewayEligibility } from './evaluator.js';
+import { deriveModelGatewayRuntimeAccountOverlaysFromHealth } from '../account-access/index.js';
 
 /**
  * @param {unknown} value
@@ -48,6 +49,18 @@ function routeOptionKey(route) {
         optionalString(route['providerId']) ?? 'unknown-provider',
         optionalString(route['providerModel']) ?? 'unknown-model',
         optionalString(route['routeProfile']) ?? 'default',
+    ].join(':');
+}
+
+/**
+ * @param {Record<string, any>} health
+ * @returns {string}
+ */
+function healthRouteKey(health) {
+    return [
+        optionalString(health['providerId']) ?? optionalString(health['provider']) ?? 'unknown-provider',
+        optionalString(health['providerModel']) ?? optionalString(health['model']) ?? 'unknown-model',
+        optionalString(health['routeProfile']) ?? optionalString(health['profile']) ?? 'default',
     ].join(':');
 }
 
@@ -123,6 +136,7 @@ function summarizeDecisions(decisions) {
  * @param {Record<string, any>} input.snapshot
  * @param {{ has(ref: string): boolean }} [input.secretRegistry]
  * @param {Record<string, any>} [input.policy]
+ * @param {Record<string, any>[]} [input.healthRecords]
  * @param {() => Date} [input.now]
  * @returns {{ run: ReturnType<typeof createModelEligibilityRun>; decisions: Record<string, any>[]; summary: ReturnType<typeof summarizeDecisions> }}
  */
@@ -132,9 +146,15 @@ export function evaluateModelGatewayCatalogEligibility(input) {
     const snapshot = isRecord(input.snapshot) ? input.snapshot : {};
     const projections = Array.isArray(snapshot['projections']) ? snapshot['projections'].filter(isRecord) : [];
     const routeOptions = Array.isArray(snapshot['routeOptions']) ? snapshot['routeOptions'].filter(isRecord) : [];
-    const accountOverlays = Array.isArray(snapshot['accountOverlays']) ? snapshot['accountOverlays'].filter(isRecord) : [];
+    const snapshotAccountOverlays = Array.isArray(snapshot['accountOverlays']) ? snapshot['accountOverlays'].filter(isRecord) : [];
+    const healthRecords = Array.isArray(input.healthRecords) ? input.healthRecords.filter(isRecord) : [];
     const routesByKey = routeOptionMap(routeOptions);
     const policy = isRecord(input.policy) ? input.policy : {};
+    const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords, {
+        accountScope: optionalString(policy['accountScope']) ?? 'default',
+    });
+    const accountOverlays = [...snapshotAccountOverlays, ...runtimeAccountOverlays];
+    const healthByKey = new Map(healthRecords.map((record) => [healthRouteKey(record), record]));
     const decisions = projections.map((projection) =>
         evaluateModelGatewayEligibility({
             projection,
@@ -142,6 +162,8 @@ export function evaluateModelGatewayCatalogEligibility(input) {
             accountOverlays,
             secretRegistry: input.secretRegistry,
             policy,
+            health: healthByKey.get(projectionRouteKey(projection)),
+            now: startedAt,
         }),
     );
     const summary = summarizeDecisions(decisions);
@@ -159,6 +181,9 @@ export function evaluateModelGatewayCatalogEligibility(input) {
             policyInputs: {
                 unknownAccessPolicy: policy['unknownAccessPolicy'] ?? 'allow_probe',
                 treatEnabledModelsAsClosed: policy['treatEnabledModelsAsClosed'] ?? true,
+                accountOverlayCount: accountOverlays.length,
+                runtimeAccountOverlayCount: runtimeAccountOverlays.length,
+                healthRecordCount: healthRecords.length,
             },
         }),
         decisions,

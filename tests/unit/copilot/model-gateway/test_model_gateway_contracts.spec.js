@@ -5752,6 +5752,36 @@ describe('model-gateway foundation', () => {
         assert.equal(nextSnapshot.modelEligibilityDecisions.length, 2);
     });
 
+    it('feeds runtime health into catalog-wide eligibility without persisting provider metadata', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'groq',
+            providerModel: 'llama',
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+        });
+        const evaluated = evaluateModelGatewayCatalogEligibility({
+            snapshot: { projections: [projection], routeOptions: [], accountOverlays: [] },
+            secretRegistry: createEnvSecretRegistry({ env: { GROQ_API_KEY: 'gsk-test' } }),
+            healthRecords: [
+                {
+                    key: 'default|groq|llama',
+                    providerId: 'groq',
+                    providerModel: 'llama',
+                    lastStatus: 'failed',
+                    lastFailureKind: 'rate-limit',
+                    lastFailureAt: Date.parse('2026-05-25T22:30:00.000Z'),
+                    lastRetryAfterSeconds: 60,
+                },
+            ],
+            now: () => new Date('2026-05-25T22:30:00.000Z'),
+        });
+
+        assert.equal(evaluated.summary.excludedCount, 1);
+        assert.equal(evaluated.run.policyInputs['runtimeAccountOverlayCount'], 1);
+        assert.equal(evaluated.run.policyInputs['healthRecordCount'], 1);
+        assert.deepEqual(evaluated.decisions[0].hardExclusions, ['account_rate_limited']);
+        assert.equal(evaluated.decisions[0].policyInputs['accountAccess']['status'], 'rate_limited');
+    });
+
     it('refreshes catalog snapshots, replaces source evidence, diffs projections and emits OpenAI schema', async () => {
         const dir = await mkdtemp(join(tmpdir(), 'copilot-model-refresh-'));
         try {

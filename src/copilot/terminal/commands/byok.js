@@ -2701,6 +2701,7 @@ async function renderByokGatewayEligibility(println, rest, eventBus = null) {
     const evaluated = evaluateModelGatewayCatalogEligibility({
         snapshot,
         secretRegistry,
+        healthRecords: listByokProviderModelHealth(),
         policy: {
             unknownAccessPolicy: args.strict ? 'block' : 'allow_probe',
         },
