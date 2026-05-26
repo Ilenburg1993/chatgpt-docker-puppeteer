@@ -436,6 +436,75 @@ describe('model-gateway foundation', () => {
         assert.ok(blocked.rejected.some((candidate) => candidate.rejectedReasons.includes('route_layer_blocked:gateway')));
     });
 
+    it('selects route candidates by upstream provider metadata before runtime', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'huggingface',
+            providerModel: 'openai/gpt-oss-120b',
+            capabilities: { tools: true, streaming: true },
+            limits: { contextWindowTokens: 131_072 },
+        });
+        const candidates = buildModelGatewayRouteCandidates({
+            projections: [projection],
+            routeOptions: [
+                createModelRouteOption({
+                    providerId: 'huggingface',
+                    providerModel: 'openai/gpt-oss-120b',
+                    selectorKind: 'provider_explicit',
+                    selectorSyntax: 'openai/gpt-oss-120b:groq',
+                    providerSpecific: { huggingFaceProvider: 'groq' },
+                }),
+                createModelRouteOption({
+                    providerId: 'huggingface',
+                    providerModel: 'openai/gpt-oss-120b',
+                    selectorKind: 'provider_explicit',
+                    selectorSyntax: 'openai/gpt-oss-120b:cerebras',
+                    providerSpecific: { huggingFaceProvider: 'cerebras' },
+                }),
+            ],
+        });
+
+        const decision = routeGatewayModels(candidates, 'tool_agent', {
+            blockUpstreamProviders: ['groq'],
+            preferredUpstreamProviders: ['cerebras'],
+            requireAgentProbeOk: false,
+        });
+
+        assert.equal(decision.selected?.model['selectorSyntax'], 'openai/gpt-oss-120b:cerebras');
+        assert.ok(decision.selected?.reasons.includes('preferred_upstream_provider:cerebras'));
+        assert.ok(decision.rejected.some((candidate) => candidate.rejectedReasons.includes('upstream_provider_blocked:groq')));
+    });
+
+    it('selects candidates by normalized data policy before runtime', () => {
+        const retained = {
+            ...createModelRecord({
+                providerId: 'openrouter',
+                providerModel: 'retained-model',
+                capabilities: { tools: true, streaming: true },
+                limits: { contextWindowTokens: 64_000 },
+            }),
+            dataPolicy: { training: true, retainsPrompts: true },
+        };
+        const privateModel = {
+            ...createModelRecord({
+                providerId: 'openrouter',
+                providerModel: 'private-model',
+                capabilities: { tools: true, streaming: true },
+                limits: { contextWindowTokens: 64_000 },
+            }),
+            dataPolicy: { training: false, retainsPrompts: false },
+        };
+
+        const decision = routeGatewayModels([retained, privateModel], 'tool_agent', {
+            requiredDataPolicy: { training: false, retainsPrompts: false },
+            requireAgentProbeOk: false,
+        });
+
+        assert.equal(decision.selected?.model['id'], 'openrouter:private-model');
+        assert.ok(decision.selected?.reasons.includes('data_policy_match:training'));
+        assert.ok(decision.selected?.reasons.includes('data_policy_match:retainsPrompts'));
+        assert.ok(decision.rejected.some((candidate) => candidate.rejectedReasons.includes('data_policy_mismatch:training')));
+    });
+
     it('selects candidates by metadata budget and confidence before runtime', () => {
         const cheapCatalog = createModelRecord({
             providerId: 'openrouter',

@@ -57,6 +57,12 @@ function nextActions(reasons) {
     if (reasons.some((reason) => reason.startsWith('context_too_small:'))) actions.push('choose_larger_context_model_or_compact');
     if (reasons.some((reason) => reason.startsWith('route_layer_blocked:'))) actions.push('relax_route_layer_policy_or_choose_allowed_route');
     if (reasons.some((reason) => reason.startsWith('wire_api_blocked:'))) actions.push('relax_wire_api_policy_or_choose_allowed_adapter');
+    if (reasons.some((reason) => reason.startsWith('upstream_provider_'))) {
+        actions.push('choose_allowed_upstream_provider_or_relax_policy');
+    }
+    if (reasons.some((reason) => reason.startsWith('data_policy_'))) {
+        actions.push('choose_model_matching_data_policy_or_relax_policy');
+    }
     if (reasons.some((reason) => reason.startsWith('price_above_limit:'))) actions.push('raise_budget_or_choose_lower_cost_model');
     if (reasons.some((reason) => reason.startsWith('confidence_below_minimum:'))) actions.push('refresh_catalog_or_run_probe_to_raise_confidence');
     if (reasons.some((reason) => reason.includes('health') || reason.includes('failed'))) actions.push('wait_or_clear_provider_health_after_fix');

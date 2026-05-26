@@ -91,6 +91,14 @@ function routeTraits(route) {
 }
 
 /**
+ * @param {Record<string, any>} route
+ * @returns {Record<string, any>}
+ */
+function routeProviderSpecific(route) {
+    return isRecord(route['providerSpecific']) ? route['providerSpecific'] : {};
+}
+
+/**
  * @param {Record<string, any>} projection
  * @param {Record<string, any> | null} route
  * @returns {Record<string, any>}
@@ -103,6 +111,7 @@ function buildCandidate(projection, route) {
     const selectorSyntax = route ? optionalString(route['selectorSyntax']) ?? model : model;
     const policy = route ? routePolicy(route) : {};
     const traits = route ? routeTraits(route) : {};
+    const providerSpecific = route ? routeProviderSpecific(route) : {};
     const routeRef = route ? routeOptionRef(route) : [provider, model, profile, selectorKind, selectorSyntax].join(':');
     const canonicalModelId = optionalString(projection['id']) ?? [provider, model].join(':');
     const routeCandidateId = route ? [provider, model, profile, selectorKind, selectorSyntax].join(':') : canonicalModelId;
@@ -116,6 +125,7 @@ function buildCandidate(projection, route) {
         routeProfile: profile,
         selectorKind,
         selectorSyntax,
+        routeProviderSpecific: providerSpecific,
         routeOptionRef: routeRef,
         routeOptionRefs: [...new Set([...(Array.isArray(projection['routeOptionRefs']) ? projection['routeOptionRefs'] : []), routeRef])],
         normalizedPolicy: policy,
@@ -126,6 +136,11 @@ function buildCandidate(projection, route) {
             wireApi: optionalString(policy['wireApi']),
             selectorKind,
             selectorSyntax,
+            upstreamProvider:
+                optionalString(providerSpecific['upstreamProvider']) ??
+                optionalString(providerSpecific['huggingFaceProvider']) ??
+                optionalString(providerSpecific['topProvider']) ??
+                optionalString(policy['upstreamProvider']),
             autoSelection: traits['autoSelection'] === true || policy['autoSelection'] === true,
             supportsFallback: traits['supportsFallback'] === true || policy['supportsFallback'] === true,
         },

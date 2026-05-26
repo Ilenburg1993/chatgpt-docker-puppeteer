@@ -95,6 +95,74 @@ function routePolicyText(model, field) {
 }
 
 /**
+ * @param {Record<string, any>} model
+ * @param {string} field
+ * @returns {string}
+ */
+function routeMetadataText(model, field) {
+    const routing = isRecord(model['routing']) ? model['routing'] : {};
+    const policy = isRecord(model['normalizedPolicy']) ? model['normalizedPolicy'] : {};
+    const routeProviderSpecific = isRecord(model['routeProviderSpecific']) ? model['routeProviderSpecific'] : {};
+    const providerSpecific = isRecord(model['providerSpecific']) ? model['providerSpecific'] : {};
+    return String(routing[field] ?? policy[field] ?? routeProviderSpecific[field] ?? providerSpecific[field] ?? '').trim();
+}
+
+/**
+ * @param {Record<string, any>} model
+ * @returns {Record<string, any>}
+ */
+function dataPolicy(model) {
+    const normalizedPolicy = isRecord(model['normalizedPolicy']) ? model['normalizedPolicy'] : {};
+    const routeProviderSpecific = isRecord(model['routeProviderSpecific']) ? model['routeProviderSpecific'] : {};
+    const routePolicyData = isRecord(normalizedPolicy['dataPolicy']) ? normalizedPolicy['dataPolicy'] : {};
+    const routeProviderData = isRecord(routeProviderSpecific['dataPolicy']) ? routeProviderSpecific['dataPolicy'] : {};
+    const modelPolicyData = isRecord(model['dataPolicy']) ? model['dataPolicy'] : {};
+    return { ...modelPolicyData, ...routeProviderData, ...routePolicyData };
+}
+
+/**
+ * @param {unknown} actual
+ * @param {unknown} expected
+ * @returns {boolean}
+ */
+function policyValueMatches(actual, expected) {
+    if (typeof expected === 'boolean') return actual === expected;
+    if (typeof expected === 'string') return String(actual ?? '').trim().toLowerCase() === expected.trim().toLowerCase();
+    if (typeof expected === 'number') return actual === expected;
+    return actual === expected;
+}
+
+/**
+ * @param {Record<string, any>} model
+ * @param {Parameters<typeof scoreGatewayModelCandidate>[2]} options
+ * @param {number} baseScore
+ * @param {string[]} reasons
+ * @param {string[]} rejectedReasons
+ * @returns {number}
+ */
+function applyDataPolicyScoring(model, options, baseScore, reasons, rejectedReasons) {
+    let score = baseScore;
+    const policy = dataPolicy(model);
+    for (const [key, expected] of Object.entries(isRecord(options?.requiredDataPolicy) ? options.requiredDataPolicy : {})) {
+        if (!(key in policy)) rejectedReasons.push(`data_policy_unknown:${key}`);
+        else if (!policyValueMatches(policy[key], expected)) rejectedReasons.push(`data_policy_mismatch:${key}`);
+        else {
+            score += 12;
+            reasons.push(`data_policy_match:${key}`);
+        }
+    }
+    for (const [key, expected] of Object.entries(isRecord(options?.preferredDataPolicy) ? options.preferredDataPolicy : {})) {
+        if (key in policy && policyValueMatches(policy[key], expected)) {
+            score += 8;
+            reasons.push(`preferred_data_policy:${key}`);
+        } else if (!(key in policy)) {
+            reasons.push(`data_policy_preference_unknown:${key}`);
+        }
+    }
+    return score;
+}
+
+/**
  * @param {unknown} value
  * @returns {number | null}
  */
@@ -124,8 +192,13 @@ function stringSet(value) {
  *     blockRouteLayers?: string[];
  *     preferredWireApis?: string[];
  *     blockWireApis?: string[];
+ *     allowUpstreamProviders?: string[];
+ *     blockUpstreamProviders?: string[];
+ *     preferredUpstreamProviders?: string[];
  *     preferredSelectorKinds?: string[];
  *     blockSelectorKinds?: string[];
+ *     requiredDataPolicy?: Record<string, unknown>;
+ *     preferredDataPolicy?: Record<string, unknown>;
  *     maxPricePerMillion?: number;
  *     preferredMaxPricePerMillion?: number;
  *     minimumConfidence?: string;
@@ -161,6 +234,9 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     const blockRouteLayers = stringSet(options.blockRouteLayers);
     const preferredWireApis = stringSet(options.preferredWireApis);
     const blockWireApis = stringSet(options.blockWireApis);
+    const allowUpstreamProviders = stringSet(options.allowUpstreamProviders);
+    const blockUpstreamProviders = stringSet(options.blockUpstreamProviders);
+    const preferredUpstreamProviders = stringSet(options.preferredUpstreamProviders);
     const preferredSelectorKinds = stringSet(options.preferredSelectorKinds);
     const blockSelectorKinds = stringSet(options.blockSelectorKinds);
     const preferredProbeKinds = new Set([...profileProbeKinds(profile), ...stringSet(options.preferredProbeKinds)]);
@@ -185,9 +261,16 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     if (blockProviders.has(providerId)) rejectedReasons.push('provider_blocked');
     const routeLayer = routePolicyText(model, 'routeLayer');
     const wireApi = routePolicyText(model, 'wireApi');
+    const upstreamProvider = routeMetadataText(model, 'upstreamProvider');
     const selectorKind = String(model['selectorKind'] ?? routePolicyText(model, 'selectorKind')).trim();
     if (routeLayer && blockRouteLayers.has(routeLayer)) rejectedReasons.push(`route_layer_blocked:${routeLayer}`);
     if (wireApi && blockWireApis.has(wireApi)) rejectedReasons.push(`wire_api_blocked:${wireApi}`);
+    if (upstreamProvider && allowUpstreamProviders.size > 0 && !allowUpstreamProviders.has(upstreamProvider)) {
+        rejectedReasons.push(`upstream_provider_not_allowed:${upstreamProvider}`);
+    }
+    if (upstreamProvider && blockUpstreamProviders.has(upstreamProvider)) {
+        rejectedReasons.push(`upstream_provider_blocked:${upstreamProvider}`);
+    }
     if (selectorKind && blockSelectorKinds.has(selectorKind)) rejectedReasons.push(`selector_kind_blocked:${selectorKind}`);
     if (routeLayer && preferredRouteLayers.has(routeLayer)) {
         score += 20;
@@ -197,10 +280,15 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         score += 15;
         reasons.push(`preferred_wire_api:${wireApi}`);
     }
+    if (upstreamProvider && preferredUpstreamProviders.has(upstreamProvider)) {
+        score += 18;
+        reasons.push(`preferred_upstream_provider:${upstreamProvider}`);
+    }
     if (selectorKind && preferredSelectorKinds.has(selectorKind)) {
         score += 10;
         reasons.push(`preferred_selector_kind:${selectorKind}`);
     }
+    score = applyDataPolicyScoring(model, options, score, reasons, rejectedReasons);
 
     for (const capability of profile['requires'] ?? []) {
         if (!hasCapability(model, capability)) rejectedReasons.push(`missing_capability:${capability}`);

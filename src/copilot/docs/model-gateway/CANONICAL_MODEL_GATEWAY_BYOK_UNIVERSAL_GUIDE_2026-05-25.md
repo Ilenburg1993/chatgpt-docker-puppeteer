@@ -1213,7 +1213,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] BYOK internal hints.
 - [ ] Account overlay real de allow/block/balance.
 - [ ] Probes live com `llm-b` quando a camada J+ estiver pronta.
-- [ ] Seleção por provider upstream.
+- [x] Seleção por provider upstream.
 
 ### 10.8 Hugging Face
 
@@ -1473,7 +1473,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Candidate builder baseado em route options.
 - [ ] Seleção por provider upstream.
 - [x] Seleção por route layer.
-- [ ] Seleção por data policy.
+- [x] Seleção por data policy.
 - [x] Seleção por budget.
 - [x] Seleção por confidence.
 
@@ -2450,4 +2450,43 @@ Validação deste corte:
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em `account-access`, `eligibility/evaluator.js`,
   barrel principal e contrato unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 37. Continuidade 2026-05-26 — Seleção Por Upstream Provider E Data Policy
+
+Implementado neste corte:
+
+- [x] `buildModelGatewayRouteCandidates()` preserva `routeProviderSpecific`.
+- [x] Route candidates passam a expor `routing.upstreamProvider`.
+- [x] `scoreGatewayModelCandidate()` aceita `allowUpstreamProviders`,
+  `blockUpstreamProviders` e `preferredUpstreamProviders`.
+- [x] Rejeições de upstream geram razões auditáveis
+  `upstream_provider_not_allowed:*` e `upstream_provider_blocked:*`.
+- [x] Preferências de upstream somam score com
+  `preferred_upstream_provider:*`.
+- [x] `scoreGatewayModelCandidate()` aceita `requiredDataPolicy` e
+  `preferredDataPolicy`.
+- [x] Data policy é lida de `model.dataPolicy`, `routeProviderSpecific` e
+  `normalizedPolicy.dataPolicy`.
+- [x] Rejeições de data policy geram `data_policy_unknown:*` ou
+  `data_policy_mismatch:*`.
+- [x] `explainGatewayRouteDecision()` sugere ações para upstream/data policy.
+- [x] Testes cobrem Hugging Face provider explicit e seleção por
+  `training=false`/`retainsPrompts=false`.
+
+Separação preservada:
+
+- [x] Upstream provider é metadado de route option.
+- [x] Data policy é metadado pré-runtime.
+- [x] Nenhum provider é chamado.
+- [x] Runtime probes continuam fase posterior.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `104` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `routing` e contrato unitário.
 - [x] PASS `git diff --check`.
