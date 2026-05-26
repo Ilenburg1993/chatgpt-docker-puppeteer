@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayProviderEnvRequirements, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayProviderEnvRequirements, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -287,6 +287,10 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                 filePath: 'data/copilot/model-gateway/catalog.json',
                 readSnapshot: vi.fn(() =>
                     Promise.resolve({
+                        sources: [
+                            { id: 'openrouter-models', providerId: 'openrouter', refreshPolicy: 'ttl', ttlSeconds: 3600 },
+                            { id: 'openai-models', providerId: 'openai', refreshPolicy: 'ttl', ttlSeconds: 3600 },
+                        ],
                         projections: [{ providerModel: 'new-model' }],
                         conflicts: [
                             {
@@ -383,6 +387,35 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             }),
         ),
         loadDotenv: vi.fn(),
+        planModelGatewayCatalogRefresh: vi.fn(() => ({
+            selectedImporters: [],
+            selected: [
+                {
+                    importerId: 'openrouter-models',
+                    providerId: 'openrouter',
+                    sourceId: 'openrouter-models',
+                    sourceKind: 'public_api',
+                    refreshPolicy: 'ttl',
+                    ttlSeconds: 3600,
+                    ageSeconds: 7200,
+                    reason: 'source_ttl_expired',
+                },
+            ],
+            skipped: [
+                {
+                    importerId: 'openai-models',
+                    providerId: 'openai',
+                    sourceId: 'openai-models',
+                    sourceKind: 'authenticated_api',
+                    refreshPolicy: 'ttl',
+                    ttlSeconds: 3600,
+                    ageSeconds: 60,
+                    reason: 'source_ttl_fresh',
+                },
+            ],
+            importerCount: 2,
+            sourceCount: 2,
+        })),
         refreshModelGatewayCatalog: vi.fn(() =>
             Promise.resolve({
                 snapshot: { projections: [{ providerModel: 'new-model' }], importRuns: [{ status: 'completed' }] },
@@ -551,6 +584,7 @@ vi.mock('#copilot/model-gateway', () => ({
     listProviderEndpointInventory,
     listProviderGatewayTraits,
     listProviderWireProbeMatrix,
+    planModelGatewayCatalogRefresh,
     planModelGatewayProbeBackoff,
     readByokProviderHealthState,
     readByokProviderModelHealth,
@@ -753,6 +787,36 @@ describe('terminal /byok command', () => {
             sessions: [],
         });
         loadDotenv.mockReset();
+        planModelGatewayCatalogRefresh.mockReset();
+        planModelGatewayCatalogRefresh.mockReturnValue({
+            selectedImporters: [],
+            selected: [
+                {
+                    importerId: 'openrouter-models',
+                    providerId: 'openrouter',
+                    sourceId: 'openrouter-models',
+                    sourceKind: 'public_api',
+                    refreshPolicy: 'ttl',
+                    ttlSeconds: 3600,
+                    ageSeconds: 7200,
+                    reason: 'source_ttl_expired',
+                },
+            ],
+            skipped: [
+                {
+                    importerId: 'openai-models',
+                    providerId: 'openai',
+                    sourceId: 'openai-models',
+                    sourceKind: 'authenticated_api',
+                    refreshPolicy: 'ttl',
+                    ttlSeconds: 3600,
+                    ageSeconds: 60,
+                    reason: 'source_ttl_fresh',
+                },
+            ],
+            importerCount: 2,
+            sourceCount: 2,
+        });
         refreshModelGatewayCatalog.mockReset();
         refreshModelGatewayCatalog.mockResolvedValue({
             snapshot: { projections: [{ providerModel: 'new-model' }], importRuns: [{ status: 'completed' }] },
@@ -1965,6 +2029,29 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('projections=42');
         expect(ctx.output()).toContain('openrouter-models');
         expect(ctx.output()).toContain('failures=0');
+    });
+
+    it('planeja refresh do catálogo model-gateway sem rede e sem escrita', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway catalog refresh-plan openrouter');
+
+        expect(createDefaultModelGatewayCatalogImporters).toHaveBeenCalledWith({ env: process.env });
+        expect(planModelGatewayCatalogRefresh).toHaveBeenCalledWith(
+            expect.objectContaining({
+                importers: expect.arrayContaining([expect.objectContaining({ id: 'openrouter-models' })]),
+                sources: expect.any(Array),
+            }),
+        );
+        expect(refreshModelGatewayCatalog).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('BYOK model-gateway catalog refresh plan');
+        expect(ctx.output()).toContain('sem rede');
+        expect(ctx.output()).toContain('selected=1');
+        expect(ctx.output()).toContain('run');
+        expect(ctx.output()).toContain('openrouter-models');
+        expect(ctx.output()).toContain('source_ttl_expired');
+        expect(ctx.output()).toContain('skip openai-models');
     });
 
     it('exibe o último diff persistido do catálogo sem refazer rede', async () => {

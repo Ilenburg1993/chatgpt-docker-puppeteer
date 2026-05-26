@@ -43,6 +43,7 @@ import {
     listProviderWireProbeMatrix,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     mirrorByokProviderHealthToSqlite,
+    planModelGatewayCatalogRefresh,
     planModelGatewayProbeBackoff,
     readByokProviderHealthState,
     readByokProviderModelHealth,
@@ -1654,7 +1655,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-log|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -2140,6 +2141,43 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
         const message = error instanceof Error ? error.message : String(error);
         println(`    \x1b[31mrefresh falhou: ${message}\x1b[0m\n`);
     }
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string | null} [selector]
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayCatalogRefreshPlan(println, selector = null) {
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const allImporters = createDefaultModelGatewayCatalogImporters({ env: process.env });
+    const normalizedSelector = optionalScalarString(selector)?.toLowerCase() ?? null;
+    const importers = normalizedSelector
+        ? allImporters.filter((importer) =>
+              [importer.id, importer.providerId].some((value) => String(value ?? '').toLowerCase().includes(normalizedSelector)),
+          )
+        : allImporters;
+    println(`\n  \x1b[36mBYOK model-gateway catalog refresh plan\x1b[0m`);
+    println(`  \x1b[90mstore=${store.filePath} · selector=${normalizedSelector ?? '-'} · sem rede · sem escrita\x1b[0m\n`);
+    if (importers.length === 0) {
+        println('    \x1b[33mNenhum importer habilitado para este seletor.\x1b[0m\n');
+        return;
+    }
+    const snapshot = await store.readSnapshot();
+    const plan = planModelGatewayCatalogRefresh({
+        importers,
+        sources: snapshot.sources,
+    });
+    println(
+        `    \x1b[90mimporters=${plan.importerCount} · selected=${plan.selected.length} · skipped=${plan.skipped.length} · knownSources=${plan.sourceCount}\x1b[0m`,
+    );
+    for (const item of plan.selected.slice(0, 16)) {
+        println(`      \x1b[32mrun\x1b[0m ${item.sourceId} \x1b[90mprovider=${item.providerId} · reason=${item.reason} · ttl=${item.ttlSeconds ?? '-'} · age=${item.ageSeconds ?? '-'}\x1b[0m`);
+    }
+    for (const item of plan.skipped.slice(0, 16)) {
+        println(`      \x1b[90mskip ${item.sourceId} provider=${item.providerId} · reason=${item.reason} · ttl=${item.ttlSeconds ?? '-'} · age=${item.ageSeconds ?? '-'}\x1b[0m`);
+    }
+    println('\n  \x1b[90mUse npm run model-gateway:refresh -- --provider=<provider> --force para executar somente o provider desejado.\x1b[0m\n');
 }
 
 /**
@@ -3296,6 +3334,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         }
         if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(refresh|reload|sync|atualizar)$/iu.test(rest[1] ?? '')) {
             await renderByokGatewayCatalogRefresh(println, eventBus, rest[2] ?? null);
+            return;
+        }
+        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(refresh-plan|plan|dry-run|dryrun)$/iu.test(rest[1] ?? '')) {
+            await renderByokGatewayCatalogRefreshPlan(println, rest[2] ?? null);
             return;
         }
         if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(refresh-log|refreshlog|log|logs)$/iu.test(rest[1] ?? '')) {

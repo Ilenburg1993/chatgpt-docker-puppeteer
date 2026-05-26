@@ -6,6 +6,7 @@ import {
     createDefaultModelGatewayCatalogImporters,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
+    planModelGatewayCatalogRefresh,
     refreshModelGatewayCatalog,
 } from '../src/copilot/model-gateway/index.js';
 
@@ -25,6 +26,7 @@ const importerIds = new Set([...valuesFor('--importer'), ...valuesFor('--source'
 const sourceIds = valuesFor('--source-id');
 const preview = hasFlag('--preview');
 const commit = hasFlag('--commit') || !preview;
+const planOnly = hasFlag('--plan') || hasFlag('--dry-run');
 const incremental = !hasFlag('--all');
 const force = hasFlag('--force') || hasFlag('--all');
 const json = hasFlag('--json');
@@ -41,6 +43,7 @@ Options:
   --importer=<id>       Refresh one importer id.
   --source=<id>         Alias for --importer.
   --source-id=<id>      Force a refresh-plan source id match.
+  --plan, --dry-run     Print selected/skipped sources without fetching providers.
   --force               Ignore TTL for selected incremental sources.
   --all                 Run all selected importers instead of TTL incremental planning.
   --preview             Do not write the catalog snapshot.
@@ -125,6 +128,35 @@ if (importers.length === 0) {
 }
 
 const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+if (planOnly) {
+    const previous = await store.readSnapshot();
+    const plan = planModelGatewayCatalogRefresh({
+        importers,
+        sources: previous.sources,
+        force,
+        sourceIds: sourceIds.length > 0 ? sourceIds : undefined,
+    });
+    const summary = {
+        schema: 'model-gateway-refresh-plan',
+        logPath,
+        storePath: store.filePath,
+        incremental: true,
+        force,
+        importers: importers.map((importer) => importer.id),
+        selected: plan.selected,
+        skipped: plan.skipped,
+    };
+    appendFileSync(logPath, `${JSON.stringify({ ts: new Date().toISOString(), ...summary })}\n`, 'utf8');
+    if (json) {
+        process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+    } else {
+        process.stdout.write(`model-gateway refresh plan: selected=${summary.selected.length} skipped=${summary.skipped.length}\n`);
+        for (const item of summary.selected) process.stdout.write(`  run ${item.sourceId}: ${item.reason}\n`);
+        for (const item of summary.skipped.slice(0, 20)) process.stdout.write(`  skip ${item.sourceId}: ${item.reason}\n`);
+        process.stdout.write(`full log: ${summary.logPath}\n`);
+    }
+    process.exit(0);
+}
 const result = await refreshModelGatewayCatalog({
     store,
     importers,

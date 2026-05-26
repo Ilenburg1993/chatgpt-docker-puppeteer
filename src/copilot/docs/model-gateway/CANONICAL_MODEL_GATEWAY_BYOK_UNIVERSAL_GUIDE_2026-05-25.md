@@ -1644,6 +1644,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Sequência `model-gateway:prebuild` antes do primeiro build.
 - [x] Refresh incremental canônico via package, Makefile e terminal.
 - [x] Refresh provider-scoped para adicionar provider sem rebuild completo.
+- [x] Refresh plan/dry-run sem rede antes de executar provider.
 - [x] Logs live/JSONL do processamento de refresh de catálogo.
 - [x] Análise canônica do último log JSONL via package, Makefile e terminal.
 - [x] Testes unitários do inventário.
@@ -3375,13 +3376,17 @@ Implementado neste corte:
 - [x] O script carrega `.env.local`/`.env`, aceita `--provider`, `--providers`,
   `--importer`, `--source`, `--source-id`, `--force`, `--all`, `--preview`,
   `--commit`, `--json` e `--log`.
+- [x] O script aceita `--plan`/`--dry-run` para calcular selected/skipped por
+  TTL/source sem `fetchRaw()`.
 - [x] O script grava log completo em `logs/model-gateway-refresh/*.jsonl`.
 - [x] O script imprime progresso live no terminal e resumo final com diff,
   projections, overlays, importers selecionados e log path.
 - [x] Criado parser/summarizer puro `refresh-logs.js`.
 - [x] Criado `scripts/model-gateway-refresh-log.mjs`.
 - [x] Adicionado `model-gateway:refresh:log`.
+- [x] Adicionado `model-gateway:refresh:plan`.
 - [x] Adicionado `make model-gateway-refresh-log`.
+- [x] Adicionado `make model-gateway-refresh-plan`.
 - [x] Adicionados scripts `model-gateway:refresh` e
   `model-gateway:refresh:preview`.
 - [x] Adicionados targets `model-gateway-refresh`,
@@ -3392,11 +3397,15 @@ Implementado neste corte:
   mesmo refresh core.
 - [x] `/byok gateway catalog refresh-log` resume o último JSONL sem rede e sem
   mutar catálogo.
+- [x] `/byok gateway catalog refresh-plan [provider]` mostra selected/skipped
+  sem rede e sem escrita.
 - [x] Testes cobrem eventos de progresso no runner e no refresh.
 
 Como operar sem rebuild completo:
 
 - [x] Para provider novo ou alterado, usar primeiro
+  `npm run model-gateway:refresh:plan -- --provider=<provider> --force`.
+- [x] Em seguida, usar
   `npm run model-gateway:refresh:preview -- --provider=<provider> --force`.
 - [x] Depois de verificar o log, usar
   `npm run model-gateway:refresh -- --provider=<provider> --force`.
@@ -3413,6 +3422,7 @@ Separação preservada:
 - [x] Refresh incremental não executa modelos.
 - [x] Refresh incremental não executa probes runtime.
 - [x] Preview não muta snapshot canônico.
+- [x] Plan/dry-run não chama `fetchRaw()`.
 - [x] Commit usa lock e retention.
 - [x] Logs live não imprimem valores de segredo.
 
@@ -3431,14 +3441,16 @@ Validação deste corte:
 - [x] PASS testes focados de terminal para comandos canônicos e refresh.
 - [x] PASS testes focados de contratos para parser de log JSONL.
 - [x] PASS testes focados de terminal para `/byok gateway catalog refresh-log`.
+- [x] PASS testes focados de terminal para `/byok gateway catalog refresh-plan`.
 - [x] PASS `npm run model-gateway:test:contracts` com `146` testes.
-- [x] PASS `npm run model-gateway:test:terminal` com `63` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `64` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `node --check scripts/model-gateway-refresh.mjs`.
 - [x] PASS `node --check scripts/model-gateway-refresh-log.mjs`.
 - [x] PASS ESLint focado em `scripts/model-gateway-refresh.mjs`.
 - [x] PASS ESLint focado em `scripts/model-gateway-refresh-log.mjs`.
+- [x] PASS smoke `node scripts/model-gateway-refresh.mjs --plan --provider=openrouter --json`.
 - [x] PASS `git diff --check`.
 
 ---

@@ -90,6 +90,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Summarize the latest refresh JSONL log without touching the catalog.',
     },
     {
+        id: 'refresh.plan',
+        phase: 'metadata',
+        surface: 'package',
+        command: 'npm run model-gateway:refresh:plan -- --provider=openrouter --force',
+        summary: 'Plan selected/skipped sources before fetching providers or writing the catalog.',
+    },
+    {
         id: 'prebuild.all',
         phase: 'prebuild',
         surface: 'package',
@@ -132,6 +139,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Makefile alias for latest refresh log analysis.',
     },
     {
+        id: 'make.refresh-plan',
+        phase: 'metadata',
+        surface: 'make',
+        command: 'make model-gateway-refresh-plan',
+        summary: 'Makefile alias for no-network refresh planning.',
+    },
+    {
         id: 'make.prebuild',
         phase: 'prebuild',
         surface: 'make',
@@ -165,6 +179,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok gateway catalog refresh-log',
         summary: 'Summarize the latest refresh JSONL log from the terminal cockpit.',
+    },
+    {
+        id: 'terminal.refresh-plan',
+        phase: 'metadata',
+        surface: 'terminal',
+        command: '/byok gateway catalog refresh-plan openrouter',
+        summary: 'Plan selected/skipped importers before network or catalog writes.',
     },
     {
         id: 'terminal.diff',
