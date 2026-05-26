@@ -73,6 +73,13 @@ export {
 } from './kilo-gateway-providers-importer.js';
 export { createOpenAICompatibleModelsImporter } from './openai-compatible-models-importer.js';
 export {
+    MISTRAL_KNOWN_LIMITATIONS_DOCS_URL,
+    MISTRAL_MODELS_API_DOCS_URL,
+    MISTRAL_MODELS_DOCS_URL,
+    createMistralDocsModelsImporter,
+    parseMistralDocsRows,
+} from './mistral-docs-models-importer.js';
+export {
     MISTRAL_MODELS_CATALOG_URL,
     createMistralModelsImporter,
 } from './mistral-models-importer.js';

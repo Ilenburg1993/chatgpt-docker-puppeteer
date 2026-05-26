@@ -62,7 +62,10 @@ export {
     HUGGINGFACE_ROUTER_MODELS_URL,
     KILO_GATEWAY_MODELS_CATALOG_URL,
     KILO_GATEWAY_PROVIDERS_CATALOG_URL,
+    MISTRAL_KNOWN_LIMITATIONS_DOCS_URL,
+    MISTRAL_MODELS_API_DOCS_URL,
     MISTRAL_MODELS_CATALOG_URL,
+    MISTRAL_MODELS_DOCS_URL,
     NVIDIA_NIM_BASE_URL,
     NVIDIA_NIM_MANAGEMENT_ENDPOINTS,
     NVIDIA_NIM_MODELS_CATALOG_URL,
@@ -98,6 +101,7 @@ export {
     createHuggingFaceInferenceProvidersImporter,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
+    createMistralDocsModelsImporter,
     createMistralModelsImporter,
     createNvidiaNimModelsImporter,
     createOllamaCatalogImporter,
@@ -110,6 +114,7 @@ export {
     createZaiModelsImporter,
     parseAnthropicDocsRows,
     parseGeminiDocsRows,
+    parseMistralDocsRows,
     parseOpenAiDocsRows,
 } from './importers/index.js';
 export { runCatalogImporters } from './importer-runner.js';

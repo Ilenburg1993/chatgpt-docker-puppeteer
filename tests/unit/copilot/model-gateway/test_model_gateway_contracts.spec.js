@@ -115,6 +115,7 @@ import {
     createDefaultModelGatewayCatalogImporters,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
+    createMistralDocsModelsImporter,
     createModelGatewayCatalogSnapshotId,
     createModelEligibilityDecision,
     createModelEligibilityRun,
@@ -151,6 +152,7 @@ import {
     normalizeUsdPricing,
     parseAnthropicDocsRows,
     parseGeminiDocsRows,
+    parseMistralDocsRows,
     parseOpenAiDocsRows,
     planModelGatewayCatalogRefresh,
     rankCatalogEvidenceConfidence,
@@ -3217,6 +3219,54 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(byModelPath.get('gemini-2.5-flash-image:modalities.output'), ['image', 'text']);
     });
 
+    it('imports Mistral official docs as public pricing and limit metadata without proving access', async () => {
+        const pages = {
+            models: `
+                <main>
+                    <article>Mistral Large 3 Open mistral-large-2512 multimodal model Price $2 input $6 output Structured Outputs</article>
+                    <article>Codestral codestral-2508 coding and FIM model Price $0.30 input $0.90 output</article>
+                </main>
+            `,
+            limits: `
+                <table>
+                    <tr><td>Mistral Large</td><td>131,072 tokens</td></tr>
+                    <tr><td>Codestral</td><td>32,768 tokens</td></tr>
+                </table>
+            `,
+            api: '<code>GET /v1/models</code><code>POST /v1/chat/completions</code><code>POST /v1/fim/completions</code>',
+        };
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (url) =>
+                /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    text: async () =>
+                        String(url).includes('/known-limitations') ? pages.limits : String(url).includes('/api/') ? pages.api : pages.models,
+                })
+        );
+
+        const parsed = parseMistralDocsRows(pages);
+        const snapshot = await runCatalogImporters({
+            importers: [createMistralDocsModelsImporter({ fetchImpl: fakeFetch })],
+            now: () => new Date('2026-05-25T12:35:00.000Z'),
+        });
+        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item.providerModel}:${item.fieldPath}`, item.value]));
+
+        assert.deepEqual(parsed.map((row) => row.id), ['codestral-2508', 'mistral-large-2512']);
+        assert.equal(snapshot.sources[0].providerId, 'mistral');
+        assert.equal(snapshot.sources[0].authMode, 'none');
+        assert.equal(snapshot.accountOverlays.length, 0);
+        assert.equal(snapshot.routeOptions.length, 0);
+        assert.equal(byModelPath.get('mistral-large-2512:providerMetadata.mistral.docsUrl'), 'https://docs.mistral.ai/models/overview');
+        assert.equal(byModelPath.get('mistral-large-2512:capabilities.vision'), true);
+        assert.equal(byModelPath.get('mistral-large-2512:capabilities.structuredOutputs'), true);
+        assert.equal(byModelPath.get('mistral-large-2512:limits.contextWindowTokens'), 131_072);
+        assert.equal(byModelPath.get('mistral-large-2512:pricing.inputUsdPerMillion'), 2);
+        assert.equal(byModelPath.get('mistral-large-2512:pricing.outputUsdPerMillion'), 6);
+        assert.equal(byModelPath.get('codestral-2508:capabilities.codeCompletion'), true);
+        assert.deepEqual(byModelPath.get('codestral-2508:modalities.input'), ['text']);
+    });
+
     it('imports generic OpenAI-compatible model lists as identity, route and account overlay metadata', async () => {
         const secret = 'generic-secret-that-must-not-leak';
         /** @type {string | null} */
@@ -5947,6 +5997,7 @@ describe('model-gateway foundation', () => {
                 'openai-docs-models',
                 'anthropic-docs-models',
                 'gemini-docs-models',
+                'mistral-docs-models',
                 'groq-docs-models',
                 'opencode-zen-docs',
                 'cloudflare-workers-ai-catalog',
@@ -5967,6 +6018,7 @@ describe('model-gateway foundation', () => {
                 'openai-docs-models',
                 'anthropic-docs-models',
                 'gemini-docs-models',
+                'mistral-docs-models',
                 'groq-docs-models',
                 'opencode-zen-docs',
                 'cloudflare-workers-ai-catalog',

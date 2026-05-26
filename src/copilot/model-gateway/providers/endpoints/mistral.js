@@ -11,6 +11,12 @@ export const MISTRAL_PROVIDER_ENDPOINTS = Object.freeze({
             url: 'https://api.mistral.ai/v1/models',
             richness: 'capabilities_context_lifecycle',
         }),
+        Object.freeze({
+            kind: 'official_docs',
+            method: 'GET',
+            url: 'https://docs.mistral.ai/models/overview',
+            richness: 'identity_pricing_limits_capabilities_lifecycle_docs',
+        }),
     ]),
     runtimeEndpoints: Object.freeze([
         Object.freeze({ kind: 'chat_completions', method: 'POST', path: '/chat/completions' }),

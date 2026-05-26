@@ -1445,7 +1445,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
   sem rede.
 - [x] Anthropic docs seed.
 - [x] Gemini/Vertex docs seed.
-- [ ] Mistral docs pricing seed.
+- [x] Mistral docs pricing seed.
 - [ ] OpenRouter account overlay importer.
 - [ ] Kilo account overlay importer.
 - [ ] Cloudflare account access importer beyond configured flags.
@@ -3634,6 +3634,67 @@ Próximas lacunas L reforçadas:
 Validação deste corte:
 
 - [x] PASS `npm run model-gateway:test:contracts` com `131` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 60. Continuidade 2026-05-26 — Mistral Docs Pricing Seed
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a lacuna Mistral da Faixa L: `/v1/models` traz model cards
+  account-visible, mas os docs públicos trazem contexto de modelos, limites,
+  pricing e endpoints antes de qualquer chave.
+- [x] Consultadas fontes oficiais Mistral de models overview, known limitations
+  e API models endpoint.
+- [x] Confirmado que a evidência pública deve enriquecer metadados e não criar
+  route options, overlays ou prova de acesso.
+- [x] Identificado que o inventário Mistral registrava apenas a API autenticada
+  e precisava declarar a fonte oficial pública de docs.
+
+Fontes oficiais consultadas:
+
+- [x] `https://docs.mistral.ai/models/overview`.
+- [x] `https://docs.mistral.ai/resources/known-limitations`.
+- [x] `https://docs.mistral.ai/api/endpoint/models`.
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/catalog/importers/mistral-docs-models-importer.js`.
+- [x] Criado `createMistralDocsModelsImporter()`.
+- [x] Criado `parseMistralDocsRows()`.
+- [x] O importer busca overview, known limitations e API docs em paralelo.
+- [x] Evidências normalizadas incluem docs/API/limitations URLs, aliases,
+  lifecycle, modalidades, capabilities, context limits, pricing e model
+  identity traits.
+- [x] `createDefaultModelGatewayCatalogImporters()` passa a incluir
+  `mistral-docs-models` em modo público.
+- [x] O inventário de endpoints Mistral passa a declarar o source
+  `official_docs`.
+- [x] Exportado pelos barrels de `importers`, `catalog` e `model-gateway`.
+- [x] Teste unitário cobre pricing, limites, structured outputs,
+  code-completion e ausência de prova de acesso.
+
+Separação preservada:
+
+- [x] Docs seed não prova acesso.
+- [x] Docs seed não executa modelo.
+- [x] Docs seed não chama probes.
+- [x] Docs seed não substitui `/v1/models` autenticado.
+- [x] Docs seed é evidência global de metadados.
+
+Próximas lacunas L reforçadas:
+
+- [ ] Account overlays profundos para OpenRouter e Kilo.
+- [ ] Cloudflare account access importer além de flags configuradas.
+- [ ] Parser estrutural do OpenAPI da Z.AI.
+- [ ] Importer autenticado especializado para Cerebras.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `132` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.

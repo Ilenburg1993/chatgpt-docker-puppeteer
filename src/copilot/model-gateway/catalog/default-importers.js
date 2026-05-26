@@ -21,6 +21,7 @@ import {
     createHuggingFaceInferenceProvidersImporter,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
+    createMistralDocsModelsImporter,
     createMistralModelsImporter,
     createNvidiaNimModelsImporter,
     createOllamaCatalogImporter,
@@ -88,6 +89,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             createOpenAiDocsModelsImporter({ fetchImpl: options.fetchImpl }),
             createAnthropicDocsModelsImporter({ fetchImpl: options.fetchImpl }),
             createGeminiDocsModelsImporter({ fetchImpl: options.fetchImpl }),
+            createMistralDocsModelsImporter({ fetchImpl: options.fetchImpl }),
             createGroqDocsModelsImporter({ fetchImpl: options.fetchImpl }),
             createOpenCodeZenDocsImporter({ fetchImpl: options.fetchImpl }),
             createCloudflareWorkersAiCatalogImporter({
