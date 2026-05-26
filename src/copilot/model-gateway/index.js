@@ -221,7 +221,12 @@ export {
     resolveModelGatewayTaskProfile,
     scoreGatewayModelCandidate,
 } from './routing/index.js';
-export { buildModelGatewayOnListModelsHandler, toCopilotModelInfo, toCopilotModelInfoList } from './session/index.js';
+export {
+    buildModelGatewayOnListModelsHandler,
+    toCopilotModelInfo,
+    toCopilotModelInfoList,
+    toCopilotRouteModelInfoList,
+} from './session/index.js';
 export {
     classifyByokProviderFailure,
     clearByokProviderModelHealth,

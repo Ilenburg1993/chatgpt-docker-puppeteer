@@ -139,6 +139,7 @@ import {
     toOpenAIModelCatalogEntry,
     toOpenAIModelCatalogList,
     toCopilotModelInfoList,
+    toCopilotRouteModelInfoList,
 } from '../../../../src/copilot/model-gateway/index.js';
 
 const PROVIDER_FAMILY_ENV_FIXTURES = Object.freeze([
@@ -349,6 +350,46 @@ describe('model-gateway foundation', () => {
         assert.equal(candidates[1]['routing']['supportsFallback'], true);
         assert.equal(candidates[1]['provenance']['candidateSource'], 'route_option');
         assert.ok(candidates[1]['routeOptionRef'].includes('gateway_fallback'));
+    });
+
+    it('projects route-option candidates to SDK model info without losing selector metadata', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'huggingface',
+            providerModel: 'openai/gpt-oss-120b',
+            displayName: 'GPT OSS via Hugging Face',
+            capabilities: { tools: true, streaming: true },
+            limits: { contextWindowTokens: 131_072 },
+            pricing: { inputUsdPerMillion: 0.15, outputUsdPerMillion: 0.6 },
+        });
+        const fastest = createModelRouteOption({
+            providerId: 'huggingface',
+            providerModel: 'openai/gpt-oss-120b',
+            selectorKind: 'fastest',
+            selectorSyntax: 'openai/gpt-oss-120b:fastest',
+            normalizedPolicy: {
+                routeLayer: 'provider_router',
+                wireApi: 'openai_chat_completions',
+                autoSelection: true,
+            },
+        });
+
+        const [model] = toCopilotRouteModelInfoList({
+            projections: [projection],
+            routeOptions: [fastest],
+        });
+
+        const byok = /** @type {Record<string, any>} */ (model.byok ?? {});
+        assert.equal(model.id, 'openai/gpt-oss-120b:fastest');
+        assert.equal(byok['gatewayId'], 'huggingface:openai/gpt-oss-120b');
+        assert.equal(byok['routeCandidateId'], 'huggingface:openai/gpt-oss-120b:default:fastest:openai/gpt-oss-120b:fastest');
+        assert.equal(byok['providerModel'], 'openai/gpt-oss-120b');
+        assert.equal(byok['sdkModelId'], 'openai/gpt-oss-120b:fastest');
+        assert.equal(byok['selectorKind'], 'fastest');
+        assert.equal(byok['selectorSyntax'], 'openai/gpt-oss-120b:fastest');
+        assert.equal(byok['routeLayer'], 'provider_router');
+        assert.equal(byok['wireApi'], 'openai_chat_completions');
+        assert.equal(byok['autoSelection'], true);
+        assert.ok(String(model.policy?.terms).includes('selector:fastest'));
     });
 
     it('scores and blocks route candidates by route layer and wire API metadata', () => {

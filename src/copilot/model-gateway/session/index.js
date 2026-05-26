@@ -5,5 +5,5 @@
  * @module copilot/model-gateway/session
  */
 
-export { toCopilotModelInfo, toCopilotModelInfoList } from './copilot-model-projection.js';
+export { toCopilotModelInfo, toCopilotModelInfoList, toCopilotRouteModelInfoList } from './copilot-model-projection.js';
 export { buildModelGatewayOnListModelsHandler } from './on-list-models.js';

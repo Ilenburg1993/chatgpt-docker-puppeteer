@@ -104,9 +104,13 @@ function buildCandidate(projection, route) {
     const policy = route ? routePolicy(route) : {};
     const traits = route ? routeTraits(route) : {};
     const routeRef = route ? routeOptionRef(route) : [provider, model, profile, selectorKind, selectorSyntax].join(':');
+    const canonicalModelId = optionalString(projection['id']) ?? [provider, model].join(':');
+    const routeCandidateId = route ? [provider, model, profile, selectorKind, selectorSyntax].join(':') : canonicalModelId;
     return {
         ...projection,
-        id: [provider, model, profile, selectorKind, selectorSyntax].join(':'),
+        id: routeCandidateId,
+        canonicalModelId,
+        routeCandidateId,
         providerId: provider,
         providerModel: model,
         routeProfile: profile,

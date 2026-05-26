@@ -9,7 +9,7 @@
  */
 
 import { buildEnvByokModelGatewaySnapshot } from '../registry/snapshot.js';
-import { toCopilotModelInfoList } from './copilot-model-projection.js';
+import { toCopilotRouteModelInfoList } from './copilot-model-projection.js';
 
 /**
  * @param {Record<string, string | undefined>} [env]
@@ -21,6 +21,10 @@ export function buildModelGatewayOnListModelsHandler(env = process.env) {
     if (initialActive.enabled !== true) return undefined;
     return async () => {
         const snapshot = buildEnvByokModelGatewaySnapshot(env);
-        return toCopilotModelInfoList(snapshot.models);
+        const snapshotRecord = /** @type {Record<string, any>} */ (snapshot);
+        return toCopilotRouteModelInfoList({
+            projections: snapshot.models,
+            routeOptions: Array.isArray(snapshotRecord['routeOptions']) ? snapshotRecord['routeOptions'] : [],
+        });
     };
 }

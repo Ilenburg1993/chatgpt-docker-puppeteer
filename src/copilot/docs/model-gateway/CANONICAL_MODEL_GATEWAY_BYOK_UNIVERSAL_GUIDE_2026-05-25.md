@@ -1585,7 +1585,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Usar route options como unidade de seleção.
 - [x] Explicar rejeições.
 - [x] Persistir decisão final.
-- [ ] SDK projection final por route option.
+- [x] SDK projection final por route option.
 
 ### Faixa V — Live Validation
 
@@ -2379,4 +2379,42 @@ Validação deste corte:
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em `health-routing.js`, `policy-engine.js`,
   barrels e contrato unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 35. Continuidade 2026-05-26 — SDK Projection Final Por Route Option
+
+Implementado neste corte:
+
+- [x] `toCopilotModelInfo()` passou a usar `selectorSyntax` como `id` SDK
+  quando a entrada for route candidate.
+- [x] `byok.gatewayId` permanece o identificador canônico do modelo.
+- [x] `byok.routeCandidateId` identifica a rota selecionável específica.
+- [x] `byok` agora preserva `sdkModelId`, `routeProfile`, `routeOptionRef`,
+  `routeOptionRefs`, `selectorKind`, `selectorSyntax`, `routeLayer`, `wireApi`,
+  `autoSelection` e `supportsFallback`.
+- [x] `toCopilotRouteModelInfoList()` projeta `projections + routeOptions` via
+  `buildModelGatewayRouteCandidates()`.
+- [x] `buildModelGatewayOnListModelsHandler()` usa route options quando
+  disponíveis e conserva projection-only fallback.
+- [x] `buildModelGatewayRouteCandidates()` separa `canonicalModelId` de
+  `routeCandidateId`.
+- [x] Adicionado teste para selector `fastest` do Hugging Face e preservação de
+  metadados de rota na projeção SDK.
+
+Separação preservada:
+
+- [x] SDK recebe o `selectorSyntax` necessário para provider/gateway.
+- [x] Catálogo canônico continua identificado por `gatewayId`.
+- [x] Route option é transportada como metadata BYOK, não como mutação do modelo.
+- [x] Projection-only mantém compatibilidade com o handler anterior.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `102` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `session`, `candidate-builder.js`, barrel
+  principal e contrato unitário.
 - [x] PASS `git diff --check`.
