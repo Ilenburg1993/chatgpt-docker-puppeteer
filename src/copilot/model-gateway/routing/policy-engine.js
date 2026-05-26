@@ -16,6 +16,7 @@ import {
     listGatewayModelVerifiedProbeKinds,
 } from './health-routing.js';
 import { buildModelGatewayRouteCandidates } from './candidate-builder.js';
+import { MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON } from './local-provider-opt-in.js';
 import { resolveModelGatewayTaskProfile } from './task-profiles.js';
 import { evaluateModelGatewayEligibility } from '../eligibility/index.js';
 
@@ -326,7 +327,7 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         !providerExplicitlyAllowsLocal(providerId, allowProviders) &&
         !preferredRouteLayers.has('local_daemon')
     ) {
-        rejectedReasons.push('local_provider_requires_explicit_request');
+        rejectedReasons.push(MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON);
     }
     if (routeLayer && blockRouteLayers.has(routeLayer)) rejectedReasons.push(`route_layer_blocked:${routeLayer}`);
     if (wireApi && blockWireApis.has(wireApi)) rejectedReasons.push(`wire_api_blocked:${wireApi}`);

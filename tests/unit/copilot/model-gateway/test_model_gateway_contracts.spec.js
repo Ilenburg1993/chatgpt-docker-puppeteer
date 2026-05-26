@@ -18,6 +18,7 @@ import {
     listModelGatewayCanonicalCommands,
     MODEL_GATEWAY_CANONICAL_COMMAND_PHASES,
     listModelGatewayTaskProfiles,
+    MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
     ModelGatewayRegistry,
     MODEL_GATEWAY_TASK_PROFILES,
     buildModelGatewayPreBuildReadinessReport,
@@ -62,6 +63,7 @@ import {
     projectModelGatewayMetadataCoverageMetrics,
     projectModelGatewayProviderFreshnessMetrics,
     renderModelGatewayCanonicalCommandLines,
+    renderModelGatewayLocalProviderOptInGuidance,
     redactSecretRecord,
     redactSecretText,
     recordByokProviderModelAgentProbeSuccess,
@@ -188,6 +190,7 @@ import {
     summarizeCanonicalModelProjectionDiff,
     summarizeModelGatewayRefreshLogText,
     summarizeModelGatewayAccountOverlays,
+    summarizeModelGatewayLocalProviderOptInBlocks,
     summarizeModelGatewaySdkQuotaSnapshots,
     summarizeModelGatewayMetadataCoverage,
     summarizeModelGatewayProviderFreshness,
@@ -383,6 +386,35 @@ describe('model-gateway foundation', () => {
             'no_remote_secrets',
         ]);
         assert.equal(resolveModelGatewayTaskProfile('missing'), null);
+    });
+
+    it('centralizes local provider opt-in diagnostics for terminal and scripts', () => {
+        const summary = summarizeModelGatewayLocalProviderOptInBlocks({
+            summary: {
+                rejectedReasonCounts: {
+                    [MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON]: 2,
+                },
+            },
+            profiles: [
+                {
+                    profileId: 'cheap_chat',
+                    topRejectedReasons: [MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON],
+                },
+                {
+                    profileId: 'repo_agent',
+                    topRejectedReasons: ['missing_capability:tools'],
+                },
+            ],
+        });
+
+        assert.equal(summary.hasBlocks, true);
+        assert.equal(summary.rejectedCount, 2);
+        assert.deepEqual(summary.blockedProfileIds, ['cheap_chat']);
+        assert.equal(summary.reason, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON);
+        assert.match(
+            renderModelGatewayLocalProviderOptInGuidance({ profileIds: summary.blockedProfileIds }),
+            /provider:ollama/,
+        );
     });
 
     it('builds route-option candidates as the pre-runtime selection unit', () => {

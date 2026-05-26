@@ -8,7 +8,9 @@ import {
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
     listByokProviderModelHealth,
+    renderModelGatewayLocalProviderOptInGuidance,
     summarizeModelGatewayRuntimeAccountOverlays,
+    summarizeModelGatewayLocalProviderOptInBlocks,
 } from '../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
@@ -102,6 +104,7 @@ const selection = auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
 });
 const dispositions = selectedDispositions(selection);
 const supplyWarningCount = selection.profiles.reduce((sum, profile) => sum + profile.supplyWarnings.length, 0);
+const localProviderOptIn = summarizeModelGatewayLocalProviderOptInBlocks(selection);
 const summary = {
     schema: 'model-gateway-effective-selection',
     ok: integrity.ok && selection.ok && (!failOnSupplyWarning || supplyWarningCount === 0),
@@ -126,6 +129,7 @@ const summary = {
         ...selection,
         selectedDispositions: dispositions,
         supplyWarningCount,
+        localProviderOptIn,
     },
     nextCommands: [
         'npm run model-gateway:selection:audit -- --strict --fail-on-unselected',
@@ -167,6 +171,9 @@ if (json) {
         if (Array.isArray(profile.supplyWarnings) && profile.supplyWarnings.length > 0) {
             process.stdout.write(`    warnings=${profile.supplyWarnings.slice(0, 8).join(',')}\n`);
         }
+    }
+    if (localProviderOptIn.hasBlocks) {
+        process.stdout.write(`\n${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderOptIn.blockedProfileIds })}\n`);
     }
 }
 

@@ -5,6 +5,8 @@ import {
     auditModelGatewayCatalogSnapshotIntegrity,
     auditModelGatewayPreRuntimeSelection,
     createEnvSecretRegistry,
+    renderModelGatewayLocalProviderOptInGuidance,
+    summarizeModelGatewayLocalProviderOptInBlocks,
 } from '../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
@@ -46,12 +48,14 @@ const selection = auditModelGatewayPreRuntimeSelection(snapshot, {
     profiles: readProfiles(),
     secretRegistry: createEnvSecretRegistry(),
 });
+const localProviderOptIn = summarizeModelGatewayLocalProviderOptInBlocks(selection);
 const summary = {
     storePath: store.filePath,
     snapshotId: snapshot.snapshotId,
     generatedAt: snapshot.generatedAt,
     integrity,
     supplyWarningCount: selection.profiles.reduce((sum, profile) => sum + profile.supplyWarnings.length, 0),
+    localProviderOptIn,
     selection,
 };
 
@@ -84,6 +88,9 @@ if (json) {
         if (profile.supplyWarnings.length > 0) {
             process.stdout.write(`    warnings=${profile.supplyWarnings.slice(0, 8).join(',')}\n`);
         }
+    }
+    if (localProviderOptIn.hasBlocks) {
+        process.stdout.write(`\n${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderOptIn.blockedProfileIds })}\n`);
     }
 }
 

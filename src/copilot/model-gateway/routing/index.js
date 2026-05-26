@@ -19,6 +19,11 @@ export {
     readGatewayModelProbeHealth,
 } from './health-routing.js';
 export {
+    MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
+    renderModelGatewayLocalProviderOptInGuidance,
+    summarizeModelGatewayLocalProviderOptInBlocks,
+} from './local-provider-opt-in.js';
+export {
     MODEL_GATEWAY_TASK_PROFILES,
     listModelGatewayTaskProfiles,
     resolveModelGatewayTaskProfile,

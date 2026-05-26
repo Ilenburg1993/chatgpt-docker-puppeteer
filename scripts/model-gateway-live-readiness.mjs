@@ -14,7 +14,9 @@ import {
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
     listByokProviderModelHealth,
+    renderModelGatewayLocalProviderOptInGuidance,
     summarizeModelGatewayRuntimeAccountOverlays,
+    summarizeModelGatewayLocalProviderOptInBlocks,
 } from '../src/copilot/model-gateway/index.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -141,6 +143,11 @@ const effectiveSelectedDispositions = selectedDispositions(effectiveStrictSelect
 const allowProbeSupplyWarnings = supplyWarningSummary(allowProbeSelection);
 const strictAccessSupplyWarnings = supplyWarningSummary(strictAccessSelection);
 const effectiveStrictSupplyWarnings = supplyWarningSummary(effectiveStrictSelection);
+const localProviderOptIn = {
+    allowProbe: summarizeModelGatewayLocalProviderOptInBlocks(allowProbeSelection),
+    strictAccess: summarizeModelGatewayLocalProviderOptInBlocks(strictAccessSelection),
+    effectiveStrict: summarizeModelGatewayLocalProviderOptInBlocks(effectiveStrictSelection),
+};
 const strictOnlyKnownAccess =
     strictAccessSelection.ok &&
     strictSelectedDispositions.length > 0 &&
@@ -222,6 +229,7 @@ const summary = {
             profiles: allowProbeSelection.summary.profileCount,
             providers: allowProbeSelection.summary.selectedProviders,
             supplyWarnings: allowProbeSupplyWarnings,
+            localProviderOptIn: localProviderOptIn.allowProbe,
         },
         strictAccess: {
             ok: strictAccessSelection.ok,
@@ -230,6 +238,7 @@ const summary = {
             providers: strictAccessSelection.summary.selectedProviders,
             dispositions: strictSelectedDispositions,
             supplyWarnings: strictAccessSupplyWarnings,
+            localProviderOptIn: localProviderOptIn.strictAccess,
         },
         effectiveStrict: {
             ok: effectiveStrictSelection.ok,
@@ -238,6 +247,7 @@ const summary = {
             providers: effectiveStrictSelection.summary.selectedProviders,
             dispositions: effectiveSelectedDispositions,
             supplyWarnings: effectiveStrictSupplyWarnings,
+            localProviderOptIn: localProviderOptIn.effectiveStrict,
             healthRecords: healthRecords.length,
             runtimeAccountOverlays: runtimeAccountOverlays.length,
             runtimeAccountOverlaySummary,
@@ -256,6 +266,9 @@ if (json) {
     process.stdout.write(`model-gateway live readiness: ok=${summary.ok ? 'yes' : 'no'}\n`);
     for (const check of checks) {
         process.stdout.write(`  ${check.ok ? 'OK' : 'FAIL'} ${check.id}: ${check.detail}\n`);
+    }
+    if (localProviderOptIn.effectiveStrict.hasBlocks) {
+        process.stdout.write(`\n${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderOptIn.effectiveStrict.blockedProfileIds })}\n`);
     }
     process.stdout.write('\nrecommended live order:\n');
     commands.forEach((command, index) => process.stdout.write(`  ${index + 1}. ${command}\n`));

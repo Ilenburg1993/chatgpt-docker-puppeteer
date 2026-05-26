@@ -6235,6 +6235,12 @@ Implementado neste corte:
   já aponta explicitamente para Ollama/loopback.
 - [x] A descoberta terminal passa a deduplicar candidatos por provider/modelo ao
   combinar perfis configurados com fallback do catálogo gateway.
+- [x] A razão `local_provider_requires_explicit_request` passa a viver em helper
+  exportado do `model-gateway`, evitando strings paralelas no terminal/scripts.
+- [x] Scripts `model-gateway-selection-audit`,
+  `model-gateway-effective-selection` e `model-gateway-live-readiness` passam a
+  incluir resumo `localProviderOptIn` no JSON e orientação textual quando houver
+  bloqueio local.
 - [x] O terminal passa a imprimir uma orientação acionável quando houver rejeição
   por `local_provider_requires_explicit_request`.
 - [x] A mensagem de fallback do terminal foi corrigida para apontar para
@@ -6247,6 +6253,7 @@ Implementado neste corte:
   provider local sem perfil correspondente.
 - [x] Teste terminal cobre `active/current` como opt-in local quando o seletor
   ativo é Ollama.
+- [x] Teste de contratos cobre o helper central de opt-in local.
 
 Separação arquitetural preservada:
 
@@ -6256,10 +6263,18 @@ Separação arquitetural preservada:
 - [x] O catálogo canônico continua independente da decisão temporária de seleção.
 - [x] A orientação operacional vive no terminal; a regra de seleção continua
   centralizada no policy engine.
+- [x] Scripts de auditoria continuam sem executar providers/modelos.
 
 Validação deste corte:
 
 - [x] PASS `npm run model-gateway:test:terminal` com `72` testes.
+- [x] PASS `npm run model-gateway:test:contracts` com `161` testes.
 - [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.
+- [x] PASS `node scripts/model-gateway-selection-audit.mjs --profile=cheap_chat`.
+- [x] PASS `node scripts/model-gateway-effective-selection.mjs --profile
+  cheap_chat`.
+- [x] PASS `node scripts/model-gateway-live-readiness.mjs`.
+- [x] PASS `node --check` para `model-gateway-selection-audit`,
+  `model-gateway-effective-selection` e `model-gateway-live-readiness`.

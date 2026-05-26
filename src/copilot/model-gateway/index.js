@@ -306,13 +306,16 @@ export {
     isGatewayModelProbeVerified,
     listGatewayModelVerifiedProbeKinds,
     listModelGatewayTaskProfiles,
+    MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
     MODEL_GATEWAY_TASK_PROFILES,
     readGatewayModelHealth,
     readGatewayModelProbeHealth,
+    renderModelGatewayLocalProviderOptInGuidance,
     routeGatewayModels,
     routeModelGatewayCatalogSnapshot,
     resolveModelGatewayTaskProfile,
     scoreGatewayModelCandidate,
+    summarizeModelGatewayLocalProviderOptInBlocks,
 } from './routing/index.js';
 export {
     buildModelGatewayOnListModelsHandler,

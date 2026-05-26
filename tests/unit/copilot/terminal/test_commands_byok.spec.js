@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -88,6 +88,25 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             byFailureKind: { 'rate-limit': 1 },
             items: [],
         })),
+        MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON: 'local_provider_requires_explicit_request',
+        summarizeModelGatewayLocalProviderOptInBlocks: vi.fn((selection) => {
+            const blockedProfileIds = (selection.profiles ?? [])
+                .filter((profile) => (profile.topRejectedReasons ?? []).includes('local_provider_requires_explicit_request'))
+                .map((profile) => profile.profileId);
+            const rejectedCount = selection.summary?.rejectedReasonCounts?.['local_provider_requires_explicit_request'] ?? 0;
+            return {
+                reason: 'local_provider_requires_explicit_request',
+                blockedProfileIds,
+                blockedProfileCount: blockedProfileIds.length,
+                rejectedCount,
+                hasBlocks: blockedProfileIds.length > 0 || rejectedCount > 0,
+            };
+        }),
+        renderModelGatewayLocalProviderOptInGuidance: vi.fn((options = {}) => {
+            const profileId = options.profileId ?? options.profileIds?.[0] ?? 'repo_agent';
+            const profileSuffix = Array.isArray(options.profileIds) && options.profileIds.length > 0 ? ` nos perfis ${options.profileIds.join(',')}` : '';
+            return `Ollama/local foi bloqueado por padrão${profileSuffix}. Para usar modelos locais, peça explicitamente: /byok models route ${profileId} provider:ollama, /byok models route local_private ou /byok models route local_private_strict.`;
+        }),
         buildModelGatewayPreKCompatibilityReport: vi.fn(() => ({
             stage: 'pre-k',
             ready: true,
@@ -772,6 +791,7 @@ vi.mock('#copilot/model-gateway', () => ({
     listProviderWireProbeMatrix,
     mirrorByokProviderHealthToSqlite,
     mirrorModelGatewayCatalogSnapshotToSqlite,
+    MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
     planModelGatewayCatalogRefresh,
     planModelGatewayProbeBackoff,
     readByokProviderHealthState,
@@ -785,6 +805,7 @@ vi.mock('#copilot/model-gateway', () => ({
     refreshModelGatewayCatalog,
     recommendCatalogDiffProbes,
     renderModelGatewayCanonicalCommandLines,
+    renderModelGatewayLocalProviderOptInGuidance,
     resolveProviderEndpointInventory,
     resolveProviderGatewayTraits,
     routeGatewayModels,
@@ -797,6 +818,7 @@ vi.mock('#copilot/model-gateway', () => ({
     runConfiguredByokVisionProbe: runConfiguredByokVisionProbe,
     planModelGatewayProbeBackoff,
     summarizeModelGatewayAccountOverlays,
+    summarizeModelGatewayLocalProviderOptInBlocks,
     summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewayProviderEnvRequirements,
     summarizeModelGatewayRefreshLogText,

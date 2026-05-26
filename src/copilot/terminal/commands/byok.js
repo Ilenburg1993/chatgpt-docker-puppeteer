@@ -45,6 +45,7 @@ import {
     listProviderWireProbeMatrix,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     mirrorByokProviderHealthToSqlite,
+    MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
     planModelGatewayCatalogRefresh,
     planModelGatewayProbeBackoff,
     readByokProviderHealthState,
@@ -59,6 +60,7 @@ import {
     refreshModelGatewayCatalog,
     resolveProviderGatewayTraits,
     resolveProviderEndpointInventory,
+    renderModelGatewayLocalProviderOptInGuidance,
     renderModelGatewayCanonicalCommandLines,
     routeGatewayModels,
     runConfiguredByokAgentProbe,
@@ -69,6 +71,7 @@ import {
     searchModelGatewayCatalogEntries,
     SqliteModelGatewayCatalogStore,
     summarizeModelGatewayAccountOverlays,
+    summarizeModelGatewayLocalProviderOptInBlocks,
     summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewayRefreshLogText,
     summarizeModelGatewayProviderEnvRequirements,
@@ -101,7 +104,6 @@ const DEFAULT_BYOK_SHORTLIST_PROBE_LIMIT = 3;
 const BYOK_LOW_REQUEST_TOKEN_LIMIT = 8_000;
 const BYOK_COMFORTABLE_REQUEST_TOKEN_LIMIT = 32_000;
 const BYOK_RECOMMEND_RESPONSE_RESERVE_TOKENS = 1_024;
-const LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON = 'local_provider_requires_explicit_request';
 const BYOK_RUNTIME_SELECTOR_ENV_KEYS = Object.freeze([
     'COPILOT_BYOK_PROFILE',
     'COPILOT_BYOK_PROVIDER_PRESET',
@@ -1008,7 +1010,7 @@ function activeProjectionSuggestsLocalProvider(projection) {
  * @returns {boolean}
  */
 function hasLocalProviderExplicitRequestRejection(route) {
-    return Array.isArray(route.rejected) && route.rejected.some((item) => item.rejectedReasons?.includes(LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON));
+    return Array.isArray(route.rejected) && route.rejected.some((item) => item.rejectedReasons?.includes(MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON));
 }
 
 /**
@@ -1017,9 +1019,7 @@ function hasLocalProviderExplicitRequestRejection(route) {
  * @returns {void}
  */
 function renderByokLocalProviderOptInHint(println, profileId) {
-    println(
-        `  \x1b[33mOllama/local foi bloqueado por padrão. Para usar modelos locais, peça explicitamente: /byok models route ${profileId} provider:ollama, /byok models route local_private ou /byok models route local_private_strict.\x1b[0m`,
-    );
+    println(`  \x1b[33m${renderModelGatewayLocalProviderOptInGuidance({ profileId })}\x1b[0m`);
 }
 
 /**
@@ -2659,13 +2659,9 @@ async function renderByokGatewaySelectionAudit(println, rest) {
             println(`      \x1b[33mwarnings=${profile.supplyWarnings.slice(0, 6).join(',')}\x1b[0m`);
         }
     }
-    const profilesWithLocalProviderBlock = selection.profiles
-        .filter((profile) => profile.topRejectedReasons.includes(LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON))
-        .map((profile) => profile.profileId);
-    if (profilesWithLocalProviderBlock.length > 0) {
-        println(
-            `\n  \x1b[33mOllama/local foi bloqueado por padrão nos perfis ${profilesWithLocalProviderBlock.slice(0, 6).join(',')}. Use um pedido explícito de provider/local_private para liberar candidatos locais.\x1b[0m`,
-        );
+    const localProviderBlocks = summarizeModelGatewayLocalProviderOptInBlocks(selection);
+    if (localProviderBlocks.hasBlocks) {
+        println(`\n  \x1b[33m${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderBlocks.blockedProfileIds })}\x1b[0m`);
     }
     println(
         `\n  \x1b[90mEsta auditoria encerra a etapa ${args.effective ? 'efetiva sem novas probes' : 'pré-runtime'}: ela rankeia por metadados/overlays/policy${args.effective ? ' e health já observado' : ''}; probes live ficam para a fase seguinte.\x1b[0m\n`,
