@@ -77,6 +77,10 @@ import { redactSecretRecord, redactSecretText } from '../../core/index.js';
  * @property {{ id: string | null; inCatalog: boolean | null; authoritative: boolean }} configuredModel
  */
 
+/**
+ * @typedef {ByokModelDiscoveryResult & { expiresAt: number; ttlMs: number }} ByokModelDiscoveryCacheResult
+ */
+
 /** @type {readonly string[]} */
 export const BYOK_ENV_KEYS = Object.freeze([
     'COPILOT_BYOK_ENABLED',
@@ -1731,6 +1735,39 @@ export async function discoverConfiguredByokModelsFromEnv(env = process.env, opt
             configuredModel: summarizeConfiguredByokModelCatalog(state.model, staticModels, false),
         };
     }
+}
+
+/**
+ * Retorna apenas o cache vivo de descoberta remota do profile BYOK atual. A função é deliberadamente síncrona e não faz
+ * fetch: cockpits como `/byok status` podem usar metadados remotos já observados sem transformar status em operação de
+ * rede nem sobrepor o banco canônico com uma prova runtime.
+ *
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {ByokModelDiscoveryCacheResult | null}
+ */
+export function readConfiguredByokModelDiscoveryCacheFromEnv(env = process.env) {
+    const state = readConfiguredByokState(env);
+    if (!state.enabled || !state.ready || !state.provider || !state.model) return null;
+    if (state.provider.type !== PROVIDER_TYPES.OPENAI) return null;
+    const effectiveEnv = resolveProfileEnv(env).env;
+    const discoveryEnabled = parseBoolean(effectiveEnv['COPILOT_BYOK_MODEL_DISCOVERY_ENABLED']) ?? true;
+    if (!discoveryEnabled) return null;
+    const endpoint = resolveByokModelsEndpoint(state.provider, effectiveEnv);
+    const cacheKey = byokDiscoveryCacheKey(endpoint, state.provider);
+    const cached = BYOK_MODEL_DISCOVERY_CACHE.get(cacheKey);
+    if (!cached) return null;
+    const now = Date.now();
+    if (cached.expiresAt <= now) return null;
+    return {
+        models: cached.models,
+        source: 'remote-cache',
+        endpoint,
+        fromCache: true,
+        error: null,
+        configuredModel: summarizeConfiguredByokModelCatalog(state.model, cached.models, true),
+        expiresAt: cached.expiresAt,
+        ttlMs: Math.max(0, cached.expiresAt - now),
+    };
 }
 
 /**

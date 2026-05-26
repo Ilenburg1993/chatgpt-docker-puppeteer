@@ -77,7 +77,11 @@ import {
     toOpenAIModelCatalogList,
 } from '#copilot/model-gateway';
 
-import { discoverConfiguredByokModelsFromEnv, readConfiguredByokProfilesFromEnv } from '#copilot/config';
+import {
+    discoverConfiguredByokModelsFromEnv,
+    readConfiguredByokModelDiscoveryCacheFromEnv,
+    readConfiguredByokProfilesFromEnv,
+} from '#copilot/config';
 import {
     listTerminalSdkSessionInventory,
     readTerminalByokGatewayProjectionFromEnv,
@@ -1568,12 +1572,84 @@ function renderProfileAuth(profile) {
 }
 
 /**
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
+ * @param {ReturnType<typeof readTerminalByokProjection>['summary']} summary
+ * @param {string} source
+ * @returns {{
+ *     source: string;
+ *     modelId: string;
+ *     reasoningEffort: boolean;
+ *     sdkReasoningEffort: boolean;
+ *     vision: boolean;
+ *     contextWindowTokens: number;
+ *     differsFromProviderDefault: boolean;
+ * }}
+ */
+function buildByokStatusModelCapabilityProjection(model, summary, source) {
+    const contextWindowTokens =
+        finitePositiveNumber(model.capabilities?.limits?.max_context_window_tokens) ??
+        summary.capabilities.contextWindowTokens;
+    const reasoningEffort = supportsByokReasoning(model);
+    const sdkReasoningEffort = Boolean(model.capabilities?.supports?.reasoningEffort);
+    const vision = supportsByokVision(model);
+    return {
+        source,
+        modelId: model.id,
+        reasoningEffort,
+        sdkReasoningEffort,
+        vision,
+        contextWindowTokens,
+        differsFromProviderDefault:
+            reasoningEffort !== summary.capabilities.reasoningEffort ||
+            sdkReasoningEffort !== (summary.capabilities.sdkReasoningEffort ?? summary.capabilities.reasoningEffort) ||
+            vision !== summary.capabilities.vision ||
+            contextWindowTokens !== summary.capabilities.contextWindowTokens,
+    };
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalByokProjection>} projection
+ * @returns {{
+ *     source: string;
+ *     modelId: string | null;
+ *     reasoningEffort: boolean;
+ *     sdkReasoningEffort: boolean;
+ *     vision: boolean;
+ *     contextWindowTokens: number;
+ *     differsFromProviderDefault: boolean;
+ * }}
+ */
+function resolveByokStatusCapabilities(projection) {
+    const { summary } = projection;
+    const cached = readConfiguredByokModelDiscoveryCacheFromEnv(process.env);
+    const cachedModel = cached?.models.find((model) => model.id === summary.model) ?? null;
+    if (cachedModel) {
+        return buildByokStatusModelCapabilityProjection(cachedModel, summary, 'provider-cache:model');
+    }
+    const localModels = chooseByokCatalogModels(projection.gatewayModels, projection.models);
+    const localModel = localModels.find((model) => model.id === summary.model) ?? null;
+    if (localModel) {
+        return buildByokStatusModelCapabilityProjection(localModel, summary, 'model-gateway:model');
+    }
+    return {
+        source: 'provider-default',
+        modelId: summary.model,
+        reasoningEffort: summary.capabilities.reasoningEffort,
+        sdkReasoningEffort: summary.capabilities.sdkReasoningEffort ?? summary.capabilities.reasoningEffort,
+        vision: summary.capabilities.vision,
+        contextWindowTokens: summary.capabilities.contextWindowTokens,
+        differsFromProviderDefault: false,
+    };
+}
+
+/**
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
  * @param {(text: string) => void} println
  * @returns {Promise<void>}
  */
 async function renderStatus(projection, println) {
     const { summary } = projection;
+    const statusCapabilities = resolveByokStatusCapabilities(projection);
     println('\n  \x1b[36mBYOK status\x1b[0m');
     println(`    enabled:       ${yesNo(summary.enabled)}`);
     println(`    ready:         ${yesNo(summary.ready)}`);
@@ -1588,8 +1664,13 @@ async function renderStatus(projection, println) {
         `    auth:          apiKey=${yesNo(summary.auth.apiKeyConfigured)} · bearer=${yesNo(summary.auth.bearerTokenConfigured)} · headers=${yesNo(summary.auth.headersConfigured)}`,
     );
     println(
-        `    capabilities:  reasoning=${yesNo(summary.capabilities.reasoningEffort)} · sdkReasoning=${yesNo(summary.capabilities.sdkReasoningEffort ?? summary.capabilities.reasoningEffort)} · vision=${yesNo(summary.capabilities.vision)} · ctx=${summary.capabilities.contextWindowTokens}`,
+        `    capabilities:  reasoning=${yesNo(statusCapabilities.reasoningEffort)} · sdkReasoning=${yesNo(statusCapabilities.sdkReasoningEffort)} · vision=${yesNo(statusCapabilities.vision)} · ctx=${statusCapabilities.contextWindowTokens}`,
     );
+    if (statusCapabilities.modelId) {
+        println(
+            `    modelCaps:     \x1b[33m${statusCapabilities.modelId} · source=${statusCapabilities.source}${statusCapabilities.differsFromProviderDefault ? ' · overrides provider defaults' : ''}\x1b[0m`,
+        );
+    }
     const limitParts = [
         summary.limits?.maxRequestTokens ? `maxReq=${summary.limits.maxRequestTokens}` : null,
         summary.limits?.tokensPerMinute ? `TPM=${summary.limits.tokensPerMinute}` : null,

@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -630,6 +630,7 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             error: null,
         })),
         readByokProviderModelHealth: vi.fn(() => null),
+        readConfiguredByokModelDiscoveryCacheFromEnv: vi.fn(() => null),
         readConfiguredByokProfilesFromEnv: vi.fn(() => ({})),
         readFile: vi.fn(),
         readdir: vi.fn(),
@@ -727,6 +728,7 @@ vi.mock('dotenv', () => ({
 
 vi.mock('#copilot/config', () => ({
     discoverConfiguredByokModelsFromEnv,
+    readConfiguredByokModelDiscoveryCacheFromEnv,
     readConfiguredByokProfilesFromEnv,
 }));
 
@@ -865,6 +867,8 @@ function mockCtx() {
 describe('terminal /byok command', () => {
     afterEach(() => {
         discoverConfiguredByokModelsFromEnv.mockReset();
+        readConfiguredByokModelDiscoveryCacheFromEnv.mockReset();
+        readConfiguredByokModelDiscoveryCacheFromEnv.mockReturnValue(null);
         auditCatalogImporterSet.mockClear();
         auditModelGatewayCatalogSnapshotIntegrity.mockClear();
         auditModelGatewayPreRuntimeSelection.mockClear();
@@ -1199,6 +1203,45 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('/session sdk next new');
         expect(ctx.output()).toContain('/restart reinicia só o dialog loop');
         expect(ctx.output()).not.toContain('secret');
+    });
+
+    it('usa metadados remotos cacheados do modelo ativo no status sem herdar vision do provider', async () => {
+        readConfiguredByokModelDiscoveryCacheFromEnv.mockReturnValue({
+            models: [
+                {
+                    id: 'kilo-auto/free',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 256000 } },
+                    byok: { source: 'remote', supportsReasoning: true, inputModalities: ['text'], outputModalities: ['text'] },
+                },
+            ],
+            source: 'remote-cache',
+            endpoint: 'https://api.kilo.ai/api/gateway/models',
+            fromCache: true,
+            error: null,
+            configuredModel: { id: 'kilo-auto/free', inCatalog: true, authoritative: true },
+            expiresAt: Date.now() + 60_000,
+            ttlMs: 60_000,
+        });
+        mockProjection({
+            summary: {
+                enabled: true,
+                ready: true,
+                profile: 'kilo',
+                preset: 'kilo-code',
+                providerType: 'openai',
+                baseUrl: 'https://api.kilo.ai/api/gateway',
+                model: 'kilo-auto/free',
+                auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
+                modelList: { configured: true, count: 3 },
+                capabilities: { reasoningEffort: true, sdkReasoningEffort: true, vision: true, contextWindowTokens: 200000 },
+            },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'status');
+
+        expect(ctx.output()).toMatch(/vision=.*nao.*ctx=256000/su);
+        expect(ctx.output()).toContain('source=provider-cache:model · overrides provider defaults');
     });
 
     it('distingue seleção BYOK preparada do provider vivo que ainda precisa de novo boot', async () => {

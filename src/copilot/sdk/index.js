@@ -432,6 +432,7 @@ export {
     discoverConfiguredByokModelsFromEnv,
     isValidProviderType,
     openaiProvider,
+    readConfiguredByokModelDiscoveryCacheFromEnv,
     readConfiguredByokModelsFromEnv,
     readConfiguredByokProfileSummaries,
     readConfiguredByokProfilesFromEnv,

@@ -26,6 +26,7 @@ export {
     discoverConfiguredByokModelsFromEnv,
     getSectionDescription,
     getSectionNames,
+    readConfiguredByokModelDiscoveryCacheFromEnv,
     readConfiguredByokModelsFromEnv,
     readConfiguredByokProfileSummaries,
     readConfiguredByokProfilesFromEnv,

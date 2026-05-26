@@ -3346,6 +3346,93 @@ Validação deste corte:
 
 ---
 
+## 54. Continuidade 2026-05-26 — Live Real Kilo E Correção De Capabilities Ativas
+
+Auditoria executada neste corte:
+
+- [x] Rodado teste live real seguro com `llm-b`, BYOK real, profile `kilo`,
+  modelo `kilo-auto/free` e sem abrir turno de usuário.
+- [x] Confirmado que chat probe, streaming probe, JSON probe, agent probe,
+  shortlist probe, binding SDK e SSE archive passaram em execução real.
+- [x] Confirmado que `/byok probe vision` falhou para `kilo-auto/free` com HTTP
+  404, enquanto o catálogo remoto marcava o modelo como `no-vision`.
+- [x] Identificado gap de cockpit: `/byok status` mostrava `vision=sim` e
+  `ctx=200000` herdados do default do provider `kilo-code`, apesar do modelo
+  ativo remoto expor `no-vision` e `ctx=256000`.
+- [x] Confirmado o princípio arquitetural: `vision` não deve excluir
+  automaticamente um modelo geral; deve ser uma capability/prova separada para
+  perfis que realmente exigem imagem.
+- [x] Identificado ruído de rota live: o comando real usava todos os perfis por
+  padrão e emitia avisos de discovery/catálogo irrelevantes para um teste que já
+  havia fixado `provider:kilo-code`.
+
+Resultado live real:
+
+- [x] PASS
+  `npm run terminal:llm-b:live-test -- --byok-real --no-pr --byok-real-profile kilo --byok-real-alt-profile kilo --byok-real-model kilo-auto/free --timeout-ms=600000`.
+- [x] Artefato:
+  `artifacts/terminal-live/2026-05-26T20-52-56-406Z/summary.md`.
+- [x] Duração: `131505ms`.
+- [x] Exit code: `0`.
+- [x] Critérios: `45/45` aprovados.
+- [x] Chat real descartável: ok.
+- [x] Streaming real descartável: ok.
+- [x] JSON real descartável: ok.
+- [x] Agent real descartável com tools e `ask_user`: ok.
+- [x] Shortlist real descartável: ok para `openrouter/free` via `kilo-code`.
+- [x] Vision real descartável: falha explícita registrada como capability
+  negativa do modelo ativo, não como falha global de BYOK.
+- [x] SSE archive: conectado, monotônico, sem erros.
+- [x] Secret scan: nenhum vazamento detectado entre `25` valores locais.
+- [x] Uso BYOK: não classificado como Premium Request.
+
+Implementado neste corte:
+
+- [x] Criada leitura síncrona cache-only
+  `readConfiguredByokModelDiscoveryCacheFromEnv()`.
+- [x] A leitura cache-only não faz fetch, não executa provider e não altera o
+  banco canônico.
+- [x] `/byok status` passa a preferir metadados do modelo ativo vindos do cache
+  remoto vivo de discovery.
+- [x] Quando há divergência entre default do provider e modelo ativo, `/byok
+  status` imprime `modelCaps` com a fonte e marca `overrides provider defaults`.
+- [x] Para `kilo-auto/free`, o cockpit passa a poder refletir `vision=nao` e
+  `ctx=256000` depois de discovery remoto, alinhando status, catálogo e probe.
+- [x] O runner live real passa a usar
+  `/models route repo_agent active --show-rejected provider:<provider>` quando o
+  provider real é conhecido.
+- [x] O plano live deixa de comparar todos os perfis em um teste já focado no
+  provider ativo, reduzindo ruído e chamadas remotas laterais.
+- [x] Barrels de `sdk/session`, `sdk`, `config/byok`, `config/index` e
+  `config/sdk-config-port` foram atualizados para preservar o modelo de
+  imports/exports canônico.
+- [x] Teste unitário cobre o caso em que cache remoto do modelo ativo derruba
+  `vision` herdado do provider e corrige a janela de contexto exibida.
+
+Separação preservada:
+
+- [x] Metadado remoto cacheado informa cockpit e pré-runtime.
+- [x] Falha de vision fica registrada como prova de capability, sem remover o
+  modelo do catálogo universal.
+- [x] Runtime probe continua separado de coleta/normalização de metadados.
+- [x] Seleção pré-runtime pode usar capability negativa para perfis multimodais
+  sem bloquear perfis textuais, agentic ou JSON.
+- [x] O banco canônico não é reescrito por resultado de probe live.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  com `67` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `67` testes.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+- [x] PASS `npm run model-gateway:live:plan -- --no-write`.
+- [x] PASS dry-run live real:
+  `npm run terminal:llm-b:live-test -- --byok-real --no-pr --byok-real-profile kilo --byok-real-alt-profile kilo --byok-real-model kilo-auto/free --dry-run --timeout-ms=600000`.
+
+---
+
 ## 75. Continuidade 2026-05-26 — Seleção Efetiva Sem Novas Probes
 
 Auditoria executada neste corte:

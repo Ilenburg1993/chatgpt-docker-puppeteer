@@ -298,13 +298,18 @@ function buildByokCatalogCommands(provider) {
     ];
 }
 
+function buildByokRouteCommand(provider) {
+    const providerFilter = provider ? ` provider:${provider}` : '';
+    return `/models route repo_agent active --show-rejected${providerFilter}`;
+}
+
 function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, provider, altProvider }) {
     const commands = ['/session sdk 8', '/byok reload', '/byok env', '/byok providers', '/byok health', '/byok profiles'];
     if (profile) commands.push(`/byok use ${profile}`);
     if (model) commands.push(`/byok model ${model}`);
     commands.push(
         '/byok',
-        '/models route repo_agent --show-rejected',
+        buildByokRouteCommand(provider),
         '/byok probe timeout:45000',
         '/byok probe streaming timeout:60000',
         '/byok probe json timeout:60000',

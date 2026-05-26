@@ -13,6 +13,7 @@ export {
     BYOK_SECRET_ENV_KEYS,
     buildConfiguredByokModelListHandler,
     discoverConfiguredByokModelsFromEnv,
+    readConfiguredByokModelDiscoveryCacheFromEnv,
     readConfiguredByokModelsFromEnv,
     readConfiguredByokProfileSummaries,
     readConfiguredByokProfilesFromEnv,
