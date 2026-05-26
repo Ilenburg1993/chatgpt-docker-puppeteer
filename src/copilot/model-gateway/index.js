@@ -117,11 +117,14 @@ export {
     normalizeStoredCatalogSnapshot,
     normalizeUsdPricing,
     mirrorModelGatewayCatalogSnapshotToSqlite,
+    ModelGatewayCatalogRefreshLockError,
     planModelGatewayCatalogRefresh,
     parseModelModalityExpression,
     projectModelGatewayMetadataCoverageMetrics,
     rankCatalogEvidenceConfidence,
     refreshModelGatewayCatalog,
+    isModelGatewayCatalogRefreshLocked,
+    resolveModelGatewayCatalogRefreshLockKey,
     runCatalogImporters,
     searchModelGatewayCatalogEntries,
     summarizeModelGatewayCatalogSnapshot,
@@ -129,6 +132,7 @@ export {
     summarizeModelGatewayMetadataCoverage,
     toOpenAIModelCatalogEntry,
     toOpenAIModelCatalogList,
+    withModelGatewayCatalogRefreshLock,
 } from './catalog/index.js';
 export {
     MODEL_GATEWAY_SCHEMA_VERSION,

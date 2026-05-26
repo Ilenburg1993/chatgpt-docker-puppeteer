@@ -13,6 +13,7 @@ import { runCatalogImporters } from './importer-runner.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { mergeModelMetadataEvidence, mergeProviderMetadataEvidence } from './merge.js';
 import { toOpenAIModelCatalogList } from './openai-schema.js';
+import { resolveModelGatewayCatalogRefreshLockKey, withModelGatewayCatalogRefreshLock } from './refresh-lock.js';
 import { planModelGatewayCatalogRefresh } from './refresh-plan.js';
 import { applyModelGatewayCatalogRetention } from './retention.js';
 
@@ -147,6 +148,7 @@ function buildProviderProjectionsFromEvidence(evidences) {
  * @param {boolean} [input.refreshAccountOverlays]
  * @param {import('./retention.js').ModelGatewayCatalogRetentionPolicy} [input.retentionPolicy]
  * @param {string} [input.writePolicy]
+ * @param {string | false} [input.lockKey]
  * @returns {Promise<{
  *     snapshot: ReturnType<typeof normalizeStoredCatalogSnapshot>;
  *     diff: ReturnType<typeof diffCanonicalModelProjections>;
@@ -155,9 +157,40 @@ function buildProviderProjectionsFromEvidence(evidences) {
  *     overlayRefresh: { enabled: boolean; imported: number; retained: number; total: number };
  *     retention: ReturnType<typeof applyModelGatewayCatalogRetention>['summary'];
  *     writePolicy: { mode: string; storeAvailable: boolean; committed: boolean };
+ *     refreshLock: { enabled: boolean; key: string | null };
  * }>}
  */
 export async function refreshModelGatewayCatalog(input = {}) {
+    const resolvedLockKey = input.lockKey === false
+        ? null
+        : (typeof input.lockKey === 'string' && input.lockKey.trim()) || resolveModelGatewayCatalogRefreshLockKey(input.store);
+    if (resolvedLockKey) {
+        return withModelGatewayCatalogRefreshLock(resolvedLockKey, async () => ({
+            ...(await refreshModelGatewayCatalogUnlocked(input)),
+            refreshLock: { enabled: true, key: resolvedLockKey },
+        }));
+    }
+    return {
+        ...(await refreshModelGatewayCatalogUnlocked(input)),
+        refreshLock: { enabled: false, key: null },
+    };
+}
+
+/**
+ * @param {object} [input]
+ * @param {import('./importer-runner.js').CatalogImporter[]} [input.importers]
+ * @param {unknown} [input.snapshot]
+ * @param {{ readSnapshot(): Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>>; writeSnapshot(snapshot: object): Promise<void> }} [input.store]
+ * @param {() => Date} [input.now]
+ * @param {boolean} [input.incremental]
+ * @param {boolean} [input.force]
+ * @param {string[]} [input.sourceIds]
+ * @param {boolean} [input.refreshAccountOverlays]
+ * @param {import('./retention.js').ModelGatewayCatalogRetentionPolicy} [input.retentionPolicy]
+ * @param {string} [input.writePolicy]
+ * @returns {Promise<Omit<Awaited<ReturnType<typeof refreshModelGatewayCatalog>>, 'refreshLock'>>}
+ */
+async function refreshModelGatewayCatalogUnlocked(input = {}) {
     const now = input.now ?? (() => new Date());
     const startedAt = now();
     const writePolicy = input.writePolicy === 'commit' ? 'commit' : 'preview';

@@ -151,6 +151,7 @@ import {
     estimateProbeCostUsd,
     planCostBoundedCatalogProbes,
     applyModelGatewayCatalogRetention,
+    isModelGatewayCatalogRefreshLocked,
 } from '../../../../src/copilot/model-gateway/index.js';
 
 const PROVIDER_FAMILY_ENV_FIXTURES = Object.freeze([
@@ -4918,6 +4919,44 @@ describe('model-gateway foundation', () => {
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
+    });
+
+    it('guards concurrent catalog refreshes with a process-local lock key', async () => {
+        /** @type {(() => void) | null} */
+        let releaseFetch = null;
+        const blockedFetch = new Promise((resolve) => {
+            releaseFetch = () => resolve({ data: [] });
+        });
+        const first = refreshModelGatewayCatalog({
+            snapshot: { schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION },
+            lockKey: 'unit-refresh-lock',
+            importers: [
+                {
+                    id: 'slow-source',
+                    providerId: 'openrouter',
+                    sourceKind: 'public_api',
+                    requiresAuth: false,
+                    fetchRaw: () => blockedFetch,
+                    parseRows: () => [],
+                    toEvidenceFacts: () => [],
+                },
+            ],
+        });
+
+        assert.equal(isModelGatewayCatalogRefreshLocked('unit-refresh-lock'), true);
+        const secondError = await refreshModelGatewayCatalog({
+            snapshot: { schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION },
+            lockKey: 'unit-refresh-lock',
+            importers: [],
+        }).catch((error) => error);
+
+        assert.equal(secondError?.name, 'ModelGatewayCatalogRefreshLockError');
+        assert.equal(secondError?.code, 'MODEL_GATEWAY_CATALOG_REFRESH_LOCKED');
+        releaseFetch?.();
+        const firstResult = await first;
+
+        assert.deepEqual(firstResult.refreshLock, { enabled: true, key: 'unit-refresh-lock' });
+        assert.equal(isModelGatewayCatalogRefreshLocked('unit-refresh-lock'), false);
     });
 
     it('plans incremental catalog refreshes from source TTL before any fetch is attempted', () => {

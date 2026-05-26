@@ -1767,6 +1767,7 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
             incremental: true,
             refreshAccountOverlays: true,
             writePolicy: 'commit',
+            lockKey: store.filePath,
             retentionPolicy: {
                 maxImportRuns: 200,
                 maxRawPayloadRefs: 200,

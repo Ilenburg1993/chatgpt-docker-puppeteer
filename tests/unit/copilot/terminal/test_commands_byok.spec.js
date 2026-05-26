@@ -1361,6 +1361,7 @@ describe('terminal /byok command', () => {
                 incremental: true,
                 refreshAccountOverlays: true,
                 writePolicy: 'commit',
+                lockKey: DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
                 retentionPolicy: expect.objectContaining({ maxImportRuns: 200 }),
             }),
         );

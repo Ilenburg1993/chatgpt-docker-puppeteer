@@ -116,6 +116,12 @@ export {
     normalizeUsdPricing,
     parseModelModalityExpression,
 } from './normalizers.js';
+export {
+    ModelGatewayCatalogRefreshLockError,
+    isModelGatewayCatalogRefreshLocked,
+    resolveModelGatewayCatalogRefreshLockKey,
+    withModelGatewayCatalogRefreshLock,
+} from './refresh-lock.js';
 export { planModelGatewayCatalogRefresh } from './refresh-plan.js';
 export { refreshModelGatewayCatalog } from './refresh.js';
 export { applyModelGatewayCatalogRetention } from './retention.js';

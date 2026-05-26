@@ -1486,7 +1486,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] TTL por source.
 - [x] Refresh incremental.
 - [x] Refresh overlay separado de refresh público.
-- [ ] Lock de refresh.
+- [x] Lock de refresh.
 - [x] Retention policy.
 - [x] No automatic active swap sem policy.
 
@@ -2756,5 +2756,54 @@ Validação deste corte:
   com `54` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em refresh, retention, terminal BYOK, barrels e
+  contratos unitários.
+- [x] PASS `git diff --check`.
+
+---
+
+## 44. Continuidade 2026-05-26 — Lock Process-Local De Refresh
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que restava apenas `Lock de refresh` aberto na Faixa O.
+- [x] Confirmado que o primeiro nível necessário é impedir overlap dentro do
+  processo terminal/Node atual.
+- [x] Confirmado que lock durável cross-process pode evoluir depois sob o
+  mesmo contrato, sem mudar o pipeline de metadados.
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/catalog/refresh-lock.js`.
+- [x] Criado `ModelGatewayCatalogRefreshLockError`.
+- [x] Criado `withModelGatewayCatalogRefreshLock()`.
+- [x] Criado `isModelGatewayCatalogRefreshLocked()`.
+- [x] Criado `resolveModelGatewayCatalogRefreshLockKey()` para derivar chave
+  de store por `filePath` ou `databasePath`.
+- [x] `refreshModelGatewayCatalog()` passa a aceitar `lockKey`.
+- [x] `lockKey: false` permite desativar lock explicitamente.
+- [x] Se não houver `lockKey` explícito, stores com path usam lock automático
+  por path.
+- [x] O resultado do refresh passa a expor `refreshLock`.
+- [x] O terminal BYOK passa `lockKey: store.filePath`.
+- [x] Exportado pelos barrels de `catalog` e `model-gateway`.
+- [x] Adicionado teste de concorrência bloqueando refresh simultâneo pela
+  mesma chave.
+- [x] Atualizado teste do terminal para exigir lockKey explícito.
+
+Separação preservada:
+
+- [x] Lock coordena coleta/escrita de metadados.
+- [x] Lock não executa provider/model/runtime.
+- [x] Lock não altera elegibilidade ou health.
+- [x] Lock não envolve segredo nem payload bruto.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `115` testes.
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  com `54` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em refresh, refresh lock, terminal BYOK, barrels e
   contratos unitários.
 - [x] PASS `git diff --check`.
