@@ -3320,3 +3320,53 @@ Validação deste corte:
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.
+
+---
+
+## 53. Continuidade 2026-05-26 — Uso Das Taxonomias Em Coverage E Search
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que as taxonomias M recém-criadas não deveriam ficar apenas
+  como helpers exportados.
+- [x] Confirmado que coverage deve medir completude de taxonomias antes de
+  seleção e probes.
+- [x] Confirmado que search pré-runtime deve usar capability taxonomy
+  runtime-agentic, não somente flags cruas de provider.
+- [x] Confirmado que provider/gateway traits deve consumir a richness
+  padronizada de endpoints para não duplicar parsing livre.
+
+Implementado neste corte:
+
+- [x] `summarizeModelGatewayMetadataCoverage()` passa a contar modelos com
+  runtime-agentic taxonomy, pricing taxonomy, rate-limit taxonomy e data-policy
+  taxonomy.
+- [x] `projectModelGatewayMetadataCoverageMetrics()` passa a emitir gauges
+  globais e por provider para essas taxonomias.
+- [x] `searchModelGatewayCatalogEntries()` passa a filtrar tools, streaming e
+  reasoning a partir de `normalizeRuntimeAgenticCapabilityTaxonomy()`.
+- [x] `createProviderGatewayTraits()` passa a usar
+  `normalizeProviderEndpointRichness()`.
+- [x] Provider/gateway traits passam a expor `richnessCategories`.
+- [x] Metadata flags de provider traits passam a derivar de categorias
+  padronizadas, incluindo lifecycle, data policy e runtime.
+- [x] Terminal `/byok gateway provider traits` passa a mostrar categorias de
+  richness junto das tags originais.
+- [x] Testes unitários cobrem coverage por taxonomia, search por reasoning via
+  taxonomy e richness categories em provider traits.
+
+Separação preservada:
+
+- [x] Coverage continua lendo apenas snapshot/metadados.
+- [x] Search continua pré-runtime e não chama provider.
+- [x] Provider traits continuam derivados de specs/endpoints.
+- [x] Nenhum runtime probe é executado.
+- [x] Nenhum segredo é serializado.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `126` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `59` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.

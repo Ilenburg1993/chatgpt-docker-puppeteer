@@ -8,6 +8,8 @@
  * @module copilot/model-gateway/catalog/search
  */
 
+import { normalizeRuntimeAgenticCapabilityTaxonomy } from './normalizers.js';
+
 /**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
@@ -159,6 +161,11 @@ export function searchModelGatewayCatalogEntries(snapshot, options = {}) {
         .map((projection) => {
             const textScore = scoreProjectionText(projection, terms);
             const capabilities = isRecord(projection['capabilities']) ? projection['capabilities'] : {};
+            const runtimeAgentic = normalizeRuntimeAgenticCapabilityTaxonomy({
+                capabilities,
+                supportedParameters: projection['supportedParameters'],
+                modalities: projection['modalities'],
+            });
             const eligibility = findEligibility(projection, decisions);
             const eligibilityStatus =
                 eligibility?.['include'] === true
@@ -187,16 +194,17 @@ export function searchModelGatewayCatalogEntries(snapshot, options = {}) {
                 accountOverlayCount,
                 eligibilityStatus,
                 capabilities,
+                runtimeAgentic,
                 projection,
             };
         })
         .filter((item) => item.matched)
         .filter((item) => !providerFilter || item.providerId.toLowerCase() === providerFilter)
         .filter((item) => !options.onlyEligible || item.eligibilityStatus === 'eligible')
-        .filter((item) => !options.requireTools || item.capabilities['tools'] === true)
-        .filter((item) => !options.requireStreaming || item.capabilities['streaming'] === true)
-        .filter((item) => !options.requireReasoning || item.capabilities['reasoningEffort'] === true)
+        .filter((item) => !options.requireTools || item.runtimeAgentic['tools'] === true)
+        .filter((item) => !options.requireStreaming || item.runtimeAgentic['streaming'] === true)
+        .filter((item) => !options.requireReasoning || item.runtimeAgentic['reasoning'] === true)
         .sort((a, b) => b.score - a.score || a.key.localeCompare(b.key))
         .slice(0, limit)
-        .map(({ matched, capabilities, ...item }) => item);
+        .map(({ matched, capabilities, runtimeAgentic, ...item }) => item);
 }

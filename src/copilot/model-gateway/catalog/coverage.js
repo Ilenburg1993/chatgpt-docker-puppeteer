@@ -8,6 +8,13 @@
  * @module copilot/model-gateway/catalog/coverage
  */
 
+import {
+    normalizeDataPolicyTaxonomy,
+    normalizeModelPricingTaxonomy,
+    normalizeRateLimitTaxonomy,
+    normalizeRuntimeAgenticCapabilityTaxonomy,
+} from './normalizers.js';
+
 /**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
@@ -55,6 +62,47 @@ function providerModel(row) {
  */
 function hasRecord(row, key) {
     return isRecord(row[key]) && Object.keys(row[key]).length > 0;
+}
+
+/**
+ * @param {Record<string, any>} row
+ * @returns {boolean}
+ */
+function hasRuntimeAgenticTaxonomy(row) {
+    const taxonomy = normalizeRuntimeAgenticCapabilityTaxonomy({
+        capabilities: row['capabilities'],
+        supportedParameters: row['supportedParameters'],
+        modalities: row['modalities'],
+    });
+    return Array.isArray(taxonomy['capabilityFamilies']) && taxonomy['capabilityFamilies'].length > 0;
+}
+
+/**
+ * @param {Record<string, any>} row
+ * @returns {boolean}
+ */
+function hasPricingTaxonomy(row) {
+    return isRecord(row['pricing']) && Object.keys(normalizeModelPricingTaxonomy(row['pricing'])).length > 0;
+}
+
+/**
+ * @param {Record<string, any>} row
+ * @returns {boolean}
+ */
+function hasRateLimitTaxonomy(row) {
+    const rateInput = {
+        ...(isRecord(row['limits']) ? row['limits'] : {}),
+        ...(isRecord(row['rateLimits']) ? row['rateLimits'] : {}),
+    };
+    return Object.keys(normalizeRateLimitTaxonomy(rateInput)).length > 0;
+}
+
+/**
+ * @param {Record<string, any>} row
+ * @returns {boolean}
+ */
+function hasDataPolicyTaxonomy(row) {
+    return isRecord(row['dataPolicy']) && Object.keys(normalizeDataPolicyTaxonomy(row['dataPolicy'])).length > 0;
 }
 
 /**
@@ -195,9 +243,13 @@ export function projectModelGatewayProviderFreshnessMetrics(summary) {
  *   pricingKnownModelCount: number;
  *   limitsKnownModelCount: number;
  *   dataPolicyKnownModelCount: number;
+ *   runtimeAgenticTaxonomyModelCount: number;
+ *   pricingTaxonomyModelCount: number;
+ *   rateLimitTaxonomyModelCount: number;
+ *   dataPolicyTaxonomyModelCount: number;
  *   routeCoverageRatio: number;
  *   overlayCoverageRatio: number;
- *   providers: Array<{ providerId: string; modelCount: number; modelEvidenceCount: number; providerEvidenceCount: number; routeOptionCount: number; accountOverlayCount: number; eligibilityDecisionCount: number; pricingKnownModelCount: number; limitsKnownModelCount: number; dataPolicyKnownModelCount: number; routeCoverageRatio: number; overlayAvailable: boolean }>;
+ *   providers: Array<{ providerId: string; modelCount: number; modelEvidenceCount: number; providerEvidenceCount: number; routeOptionCount: number; accountOverlayCount: number; eligibilityDecisionCount: number; pricingKnownModelCount: number; limitsKnownModelCount: number; dataPolicyKnownModelCount: number; runtimeAgenticTaxonomyModelCount: number; pricingTaxonomyModelCount: number; rateLimitTaxonomyModelCount: number; dataPolicyTaxonomyModelCount: number; routeCoverageRatio: number; overlayAvailable: boolean }>;
  * }}
  */
 export function summarizeModelGatewayMetadataCoverage(snapshot) {
@@ -226,6 +278,10 @@ export function summarizeModelGatewayMetadataCoverage(snapshot) {
             pricingKnownModelCount: countRows(providerProjections, (row) => hasRecord(row, 'pricing')),
             limitsKnownModelCount: countRows(providerProjections, (row) => hasRecord(row, 'limits')),
             dataPolicyKnownModelCount: countRows(providerProjections, (row) => hasRecord(row, 'dataPolicy')),
+            runtimeAgenticTaxonomyModelCount: countRows(providerProjections, hasRuntimeAgenticTaxonomy),
+            pricingTaxonomyModelCount: countRows(providerProjections, hasPricingTaxonomy),
+            rateLimitTaxonomyModelCount: countRows(providerProjections, hasRateLimitTaxonomy),
+            dataPolicyTaxonomyModelCount: countRows(providerProjections, hasDataPolicyTaxonomy),
             routeCoverageRatio: providerModels.size === 0 ? 0 : providerRoutedModels.size / providerModels.size,
             overlayAvailable: overlayProviders.has(id),
         };
@@ -241,6 +297,10 @@ export function summarizeModelGatewayMetadataCoverage(snapshot) {
         pricingKnownModelCount: countRows(projections, (row) => hasRecord(row, 'pricing')),
         limitsKnownModelCount: countRows(projections, (row) => hasRecord(row, 'limits')),
         dataPolicyKnownModelCount: countRows(projections, (row) => hasRecord(row, 'dataPolicy')),
+        runtimeAgenticTaxonomyModelCount: countRows(projections, hasRuntimeAgenticTaxonomy),
+        pricingTaxonomyModelCount: countRows(projections, hasPricingTaxonomy),
+        rateLimitTaxonomyModelCount: countRows(projections, hasRateLimitTaxonomy),
+        dataPolicyTaxonomyModelCount: countRows(projections, hasDataPolicyTaxonomy),
         routeCoverageRatio: projections.length === 0 ? 0 : routedModels.size / providerModelSet(projections).size,
         overlayCoverageRatio: providers.length === 0 ? 0 : overlayProviders.size / providers.length,
         providers: providerSummaries,
@@ -264,6 +324,10 @@ export function projectModelGatewayMetadataCoverageMetrics(summary) {
         'model_gateway.catalog.coverage.models.pricing_known': summary.pricingKnownModelCount,
         'model_gateway.catalog.coverage.models.limits_known': summary.limitsKnownModelCount,
         'model_gateway.catalog.coverage.models.data_policy_known': summary.dataPolicyKnownModelCount,
+        'model_gateway.catalog.coverage.models.runtime_agentic_taxonomy': summary.runtimeAgenticTaxonomyModelCount,
+        'model_gateway.catalog.coverage.models.pricing_taxonomy': summary.pricingTaxonomyModelCount,
+        'model_gateway.catalog.coverage.models.rate_limit_taxonomy': summary.rateLimitTaxonomyModelCount,
+        'model_gateway.catalog.coverage.models.data_policy_taxonomy': summary.dataPolicyTaxonomyModelCount,
         'model_gateway.catalog.coverage.route_ratio': summary.routeCoverageRatio,
         'model_gateway.catalog.coverage.overlay_ratio': summary.overlayCoverageRatio,
     };
@@ -274,6 +338,10 @@ export function projectModelGatewayMetadataCoverageMetrics(summary) {
         gauges[`${prefix}.route_ratio`] = provider.routeCoverageRatio;
         gauges[`${prefix}.overlays`] = provider.accountOverlayCount;
         gauges[`${prefix}.eligibility_decisions`] = provider.eligibilityDecisionCount;
+        gauges[`${prefix}.runtime_agentic_taxonomy`] = provider.runtimeAgenticTaxonomyModelCount;
+        gauges[`${prefix}.pricing_taxonomy`] = provider.pricingTaxonomyModelCount;
+        gauges[`${prefix}.rate_limit_taxonomy`] = provider.rateLimitTaxonomyModelCount;
+        gauges[`${prefix}.data_policy_taxonomy`] = provider.dataPolicyTaxonomyModelCount;
     }
     return {
         counters: { 'model_gateway.catalog.coverage.snapshot': 1 },

@@ -8,7 +8,11 @@
  * @module copilot/model-gateway/providers/traits
  */
 
-import { MODEL_GATEWAY_PROVIDER_ENDPOINT_INVENTORY, resolveProviderEndpointInventory } from './endpoints/index.js';
+import {
+    MODEL_GATEWAY_PROVIDER_ENDPOINT_INVENTORY,
+    normalizeProviderEndpointRichness,
+    resolveProviderEndpointInventory,
+} from './endpoints/index.js';
 import { OPENAI_PROVIDER_FAMILY_SPECS } from './specs/index.js';
 
 /**
@@ -26,18 +30,6 @@ function optionalString(value) {
 function stringList(value) {
     if (!Array.isArray(value)) return [];
     return [...new Set(value.map(optionalString).filter((item) => item !== null))];
-}
-
-/**
- * @param {string | null | undefined} value
- * @returns {string[]}
- */
-function splitTags(value) {
-    if (!value) return [];
-    return value
-        .split(/[_\s,|/+-]+/u)
-        .map((item) => item.trim())
-        .filter(Boolean);
 }
 
 /**
@@ -89,9 +81,9 @@ export function createProviderGatewayTraits(inventory, spec = null) {
     const specGateway = spec?.['gateway'] && typeof spec['gateway'] === 'object' ? /** @type {Record<string, unknown>} */ (spec['gateway']) : {};
     const catalogKinds = uniqueSorted(catalogSources.map((source) => optionalString(source?.['kind'])).filter((item) => item !== null));
     const runtimeKinds = uniqueSorted(runtimeEndpoints.map((endpoint) => optionalString(endpoint?.['kind'])).filter((item) => item !== null));
-    const richnessTags = uniqueSorted(
-        catalogSources.flatMap((source) => splitTags(optionalString(source?.['richness']))),
-    );
+    const richnessSummaries = catalogSources.map((source) => normalizeProviderEndpointRichness(source?.['richness']));
+    const richnessTags = uniqueSorted(richnessSummaries.flatMap((summary) => summary.tags));
+    const richnessCategories = uniqueSorted(richnessSummaries.flatMap((summary) => summary.categories));
     const publicCatalogSourceCount = catalogSources.filter((source) => isPublicCatalogKind(optionalString(source?.['kind']) ?? '')).length;
     const authenticatedCatalogSourceCount = catalogSources.filter((source) =>
         isAuthenticatedCatalogKind(optionalString(source?.['kind']) ?? ''),
@@ -126,6 +118,7 @@ export function createProviderGatewayTraits(inventory, spec = null) {
         runtimeKinds,
         routeSelectors,
         richnessTags,
+        richnessCategories,
         capabilities: {
             chatCompletions: runtimeKinds.includes('chat_completions'),
             responses: runtimeKinds.includes('responses'),
@@ -148,10 +141,13 @@ export function createProviderGatewayTraits(inventory, spec = null) {
             selectorSyntax: optionalString(specGateway['selectorSyntax']),
         },
         metadata: {
-            hasPricingMetadata: richnessTags.includes('pricing'),
-            hasContextMetadata: richnessTags.includes('context'),
-            hasFeatureMetadata: richnessTags.includes('features') || richnessTags.includes('capabilities'),
-            hasProviderMetadata: richnessTags.includes('provider') || richnessTags.includes('upstream'),
+            hasPricingMetadata: richnessCategories.includes('pricing'),
+            hasContextMetadata: richnessTags.includes('context') || richnessCategories.includes('limits'),
+            hasFeatureMetadata: richnessCategories.includes('capabilities'),
+            hasProviderMetadata: richnessCategories.includes('identity') || richnessCategories.includes('routing'),
+            hasLifecycleMetadata: richnessCategories.includes('lifecycle'),
+            hasDataPolicyMetadata: richnessCategories.includes('dataPolicy'),
+            hasRuntimeMetadata: richnessCategories.includes('runtime'),
             hasAccountVisibilityMetadata: catalogKinds.some((kind) => /account|authenticated/iu.test(kind)),
         },
     };

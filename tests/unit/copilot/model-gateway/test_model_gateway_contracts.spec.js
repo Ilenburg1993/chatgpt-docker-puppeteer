@@ -1768,8 +1768,11 @@ describe('model-gateway foundation', () => {
         const projection = createCanonicalModelProjection({
             providerId: 'openrouter',
             providerModel: 'policy-rich',
+            capabilities: { tools: true, structuredOutputs: true },
+            supportedParameters: ['tools', 'response_format'],
             limits: { contextWindowTokens: 128_000 },
             pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 2 },
+            rateLimits: { requestsPerMinute: 60, tokensPerMinute: 120_000 },
             dataPolicy: { training: false, retainsPrompts: false },
         });
         const evidence = createModelMetadataEvidence({
@@ -1810,7 +1813,13 @@ describe('model-gateway foundation', () => {
         assert.equal(summary.providers[0]?.routeCoverageRatio, 1);
         assert.equal(summary.pricingKnownModelCount, 1);
         assert.equal(summary.dataPolicyKnownModelCount, 1);
+        assert.equal(summary.runtimeAgenticTaxonomyModelCount, 1);
+        assert.equal(summary.pricingTaxonomyModelCount, 1);
+        assert.equal(summary.rateLimitTaxonomyModelCount, 1);
+        assert.equal(summary.dataPolicyTaxonomyModelCount, 1);
         assert.equal(metrics.gauges['model_gateway.catalog.coverage.provider.openrouter.route_options'], 1);
+        assert.equal(metrics.gauges['model_gateway.catalog.coverage.models.runtime_agentic_taxonomy'], 1);
+        assert.equal(metrics.gauges['model_gateway.catalog.coverage.provider.openrouter.rate_limit_taxonomy'], 1);
         assert.equal(metrics.gauges['model_gateway.catalog.coverage.route_ratio'], 1);
     });
 
@@ -2541,7 +2550,7 @@ describe('model-gateway foundation', () => {
                 generatedAt: null,
                 source: 'unit-test',
             },
-            { query: 'gpt oss', requireTools: true, onlyEligible: true, limit: 5 },
+            { query: 'gpt oss', requireTools: true, requireReasoning: true, onlyEligible: true, limit: 5 },
         );
 
         assert.equal(results.length, 1);
@@ -6121,8 +6130,11 @@ describe('model-gateway foundation', () => {
         assert.equal(kilo?.['runtimeEndpointCount'], 2);
         assert.equal(/** @type {Record<string, any>} */ (kilo?.['routing'] ?? {})['supportsGatewayByok'], true);
         assert.equal(/** @type {Record<string, any>} */ (kilo?.['capabilities'] ?? {})['fim'], true);
+        assert.ok(/** @type {string[]} */ (kilo?.['richnessCategories'] ?? []).includes('pricing'));
+        assert.equal(/** @type {Record<string, any>} */ (kilo?.['metadata'] ?? {})['hasPricingMetadata'], true);
         assert.equal(openRouter?.['topology'], 'aggregator');
         assert.equal(/** @type {Record<string, any>} */ (openRouter?.['routing'] ?? {})['supportsFallback'], true);
+        assert.ok(/** @type {string[]} */ (openRouter?.['richnessCategories'] ?? []).includes('routing'));
         assert.equal(ollama?.['topology'], 'local_daemon');
         assert.equal(ollama?.['localPrivate'], true);
         assert.equal(resolveProviderGatewayTraits('missing-provider'), null);

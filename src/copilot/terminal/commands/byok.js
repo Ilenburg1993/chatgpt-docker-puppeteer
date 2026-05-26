@@ -1748,6 +1748,7 @@ function renderByokProviderGatewayTraits(println, rest) {
         const metadata = asRecord(item['metadata']);
         const routeSelectors = Array.isArray(item['routeSelectors']) ? item['routeSelectors'].slice(0, 6).join(',') : '-';
         const richnessTags = Array.isArray(item['richnessTags']) ? item['richnessTags'].slice(0, 8).join(',') : '-';
+        const richnessCategories = Array.isArray(item['richnessCategories']) ? item['richnessCategories'].slice(0, 8).join(',') : '-';
         println(
             `    \x1b[33m${optionalScalarString(item['providerId']) ?? '-'}\x1b[0m  \x1b[90mtopology=${optionalScalarString(item['topology']) ?? '-'} · kind=${optionalScalarString(item['providerKind']) ?? '-'} · openaiCompat=${item['openAICompatible'] === true ? 'sim' : 'nao'}\x1b[0m`,
         );
@@ -1763,7 +1764,7 @@ function renderByokProviderGatewayTraits(println, rest) {
         println(
             `      \x1b[90mrouting=auto:${routing['supportsAutoSelection'] === true ? 'sim' : 'nao'},fallback:${routing['supportsFallback'] === true ? 'sim' : 'nao'},providerOrder:${routing['supportsProviderOrder'] === true ? 'sim' : 'nao'},byok:${routing['supportsGatewayByok'] === true ? 'sim' : 'nao'} · metadata=pricing:${metadata['hasPricingMetadata'] === true ? 'sim' : 'nao'},context:${metadata['hasContextMetadata'] === true ? 'sim' : 'nao'},provider:${metadata['hasProviderMetadata'] === true ? 'sim' : 'nao'}\x1b[0m`,
         );
-        println(`      \x1b[90mrichness=${richnessTags}\x1b[0m`);
+        println(`      \x1b[90mrichness=${richnessTags} · categories=${richnessCategories}\x1b[0m`);
     }
     println('\n  \x1b[90mUse estes traits como filtro inicial; eligibility e probes continuam em fases separadas.\x1b[0m\n');
 }

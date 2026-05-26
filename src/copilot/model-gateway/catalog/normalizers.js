@@ -753,20 +753,26 @@ function moneyPerMillion(perToken, perMillion) {
  * @param {unknown} [input.outputPerMillion]
  * @param {unknown} [input.cacheReadPerMillion]
  * @param {unknown} [input.cacheWritePerMillion]
+ * @param {unknown} [input.inputUsdPerMillion]
+ * @param {unknown} [input.outputUsdPerMillion]
+ * @param {unknown} [input.cacheReadUsdPerMillion]
+ * @param {unknown} [input.cacheWriteUsdPerMillion]
  * @param {unknown} [input.request]
+ * @param {unknown} [input.requestUsd]
  * @param {unknown} [input.webSearchPerRequest]
+ * @param {unknown} [input.webSearchUsdPerRequest]
  * @param {unknown} [input.exchangeRateToUsd]
  * @returns {Record<string, unknown>}
  */
 export function normalizeModelPricingTaxonomy(input = {}) {
     const currency = scalarString(input.currency)?.toUpperCase() ?? 'USD';
     const fields = {
-        inputPerMillion: moneyPerMillion(input.inputPerToken, input.inputPerMillion),
-        outputPerMillion: moneyPerMillion(input.outputPerToken, input.outputPerMillion),
-        cacheReadPerMillion: moneyPerMillion(input.cacheReadPerToken, input.cacheReadPerMillion),
-        cacheWritePerMillion: moneyPerMillion(input.cacheWritePerToken, input.cacheWritePerMillion),
-        request: finiteNumber(input.request),
-        webSearchPerRequest: finiteNumber(input.webSearchPerRequest),
+        inputPerMillion: moneyPerMillion(input.inputPerToken, input.inputPerMillion ?? input.inputUsdPerMillion),
+        outputPerMillion: moneyPerMillion(input.outputPerToken, input.outputPerMillion ?? input.outputUsdPerMillion),
+        cacheReadPerMillion: moneyPerMillion(input.cacheReadPerToken, input.cacheReadPerMillion ?? input.cacheReadUsdPerMillion),
+        cacheWritePerMillion: moneyPerMillion(input.cacheWritePerToken, input.cacheWritePerMillion ?? input.cacheWriteUsdPerMillion),
+        request: finiteNumber(input.request ?? input.requestUsd),
+        webSearchPerRequest: finiteNumber(input.webSearchPerRequest ?? input.webSearchUsdPerRequest),
     };
     const money = Object.fromEntries(
         Object.entries(fields)
