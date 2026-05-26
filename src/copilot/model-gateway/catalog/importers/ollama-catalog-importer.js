@@ -176,6 +176,8 @@ function modelEvidenceValues(row) {
         { fieldPath: 'displayName', value: providerModel },
         ...Object.entries(aliases).map(([key, value]) => ({ fieldPath: `aliases.${key}`, value })),
         ...Object.entries(limits).map(([key, value]) => ({ fieldPath: `limits.${key}`, value })),
+        { fieldPath: 'capabilities.text', value: true },
+        { fieldPath: 'capabilities.streaming', value: true },
         ...Object.entries(capabilities).map(([key, value]) => ({ fieldPath: `capabilities.${key}`, value })),
         { fieldPath: 'capabilities.local', value: true },
         { fieldPath: 'capabilities.privacy', value: true },
@@ -306,7 +308,8 @@ export function createOllamaCatalogImporter(options = {}) {
                         sourceKind: 'local_daemon',
                         confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.CATALOG,
                         normalizedPolicy: {
-                            routeLayer: 'openai_compatible',
+                            routeLayer: 'local_daemon',
+                            wireApi: 'openai_chat_completions',
                             runtimeKind: 'local',
                             localPrivate: true,
                             nativeApiBaseUrl: apiBaseUrl,

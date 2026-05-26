@@ -5034,6 +5034,8 @@ describe('model-gateway foundation', () => {
         assert.equal(snapshot.sources[0].kind, 'local_daemon');
         assert.equal(snapshot.evidences[0].confidence, 'catalog');
         assert.equal(byPath.get('limits.contextWindowTokens'), 8192);
+        assert.equal(byPath.get('capabilities.text'), true);
+        assert.equal(byPath.get('capabilities.streaming'), true);
         assert.equal(byPath.get('capabilities.chat'), true);
         assert.equal(byPath.get('capabilities.vision'), true);
         assert.equal(byPath.get('capabilities.local'), true);
@@ -5047,6 +5049,8 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('providerMetadata.ollama.quantizationLevel'), 'Q4_K_M');
         assert.deepEqual(byPath.get('providerMetadata.ollama.parameters'), { temperature: 0.7, num_ctx: 8192 });
         assert.equal(snapshot.routeOptions[0].providerId, 'ollama-local');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.routeLayer, 'local_daemon');
+        assert.equal(snapshot.routeOptions[0].normalizedPolicy.wireApi, 'openai_chat_completions');
         assert.equal(snapshot.routeOptions[0].normalizedPolicy.localPrivate, true);
         assert.equal(snapshot.routeOptions[0].normalizedPolicy.openAICompatibleBaseUrl, 'http://127.0.0.1:11434/v1');
         assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['gemma3:4b']);

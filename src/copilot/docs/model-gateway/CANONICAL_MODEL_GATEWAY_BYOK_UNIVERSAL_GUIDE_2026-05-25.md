@@ -6250,6 +6250,10 @@ Implementado neste corte:
   `local/privacy/no_remote_secrets` zerados.
 - [x] Rechecado sem iniciar Ollama: `local_private_strict` falha antes de
   runtime quando não há supply local, sem tentar executar modelo.
+- [x] Corrigido gap do importer Ollama local: evidências agora declaram
+  explicitamente `capabilities.text=true` e `capabilities.streaming=true`.
+- [x] Route options do Ollama local passam a separar topologia e wire:
+  `routeLayer=local_daemon` e `wireApi=openai_chat_completions`.
 - [x] O terminal passa a imprimir uma orientação acionável quando houver rejeição
   por `local_provider_requires_explicit_request`.
 - [x] A mensagem de fallback do terminal foi corrigida para apontar para
@@ -6263,6 +6267,8 @@ Implementado neste corte:
 - [x] Teste terminal cobre `active/current` como opt-in local quando o seletor
   ativo é Ollama.
 - [x] Teste de contratos cobre o helper central de opt-in local.
+- [x] Teste do importer Ollama cobre `text`, `streaming`, `local_daemon` e
+  `openai_chat_completions`.
 
 Separação arquitetural preservada:
 
