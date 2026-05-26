@@ -91,6 +91,13 @@ export {
     createOpenAIModelsImporter,
 } from './openai-models-importer.js';
 export {
+    OPENAI_MODEL_COMPARE_URL,
+    OPENAI_MODELS_DOCS_URL,
+    OPENAI_PRICING_URL as OPENAI_DOCS_PRICING_URL,
+    createOpenAiDocsModelsImporter,
+    parseOpenAiDocsRows,
+} from './openai-docs-models-importer.js';
+export {
     OPENROUTER_MODELS_CATALOG_URL,
     createOpenRouterModelsImporter,
 } from './openrouter-models-importer.js';

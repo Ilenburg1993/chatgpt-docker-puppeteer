@@ -24,6 +24,7 @@ import {
     createOllamaCatalogImporter,
     createOpenCodeZenDocsImporter,
     createOpenCodeZenModelsImporter,
+    createOpenAiDocsModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
@@ -82,6 +83,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             createKiloGatewayModelsImporter({ fetchImpl: options.fetchImpl }),
             createKiloGatewayProvidersImporter({ fetchImpl: options.fetchImpl }),
             createCerebrasPublicModelsImporter({ fetchImpl: options.fetchImpl }),
+            createOpenAiDocsModelsImporter({ fetchImpl: options.fetchImpl }),
             createGroqDocsModelsImporter({ fetchImpl: options.fetchImpl }),
             createOpenCodeZenDocsImporter({ fetchImpl: options.fetchImpl }),
             createCloudflareWorkersAiCatalogImporter({

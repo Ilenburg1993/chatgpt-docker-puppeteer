@@ -69,6 +69,9 @@ export {
     OPENCODE_ZEN_MESSAGES_URL,
     OPENCODE_ZEN_MODELS_URL,
     OPENCODE_ZEN_RESPONSES_URL,
+    OPENAI_DOCS_PRICING_URL,
+    OPENAI_MODEL_COMPARE_URL,
+    OPENAI_MODELS_DOCS_URL,
     OPENAI_MODELS_CATALOG_URL,
     OPENROUTER_MODELS_CATALOG_URL,
     ZAI_BUILT_IN_WEB_SEARCH_USD_PER_USE,
@@ -91,10 +94,12 @@ export {
     createOllamaCatalogImporter,
     createOpenCodeZenDocsImporter,
     createOpenCodeZenModelsImporter,
+    createOpenAiDocsModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
     createZaiModelsImporter,
+    parseOpenAiDocsRows,
 } from './importers/index.js';
 export { runCatalogImporters } from './importer-runner.js';
 export {

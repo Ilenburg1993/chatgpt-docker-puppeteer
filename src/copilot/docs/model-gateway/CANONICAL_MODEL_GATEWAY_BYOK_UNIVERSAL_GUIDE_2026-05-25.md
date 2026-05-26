@@ -1156,7 +1156,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Route options.
 - [x] Capability hints por família.
 - [x] Account overlay por modelos visíveis.
-- [ ] Docs seed oficial de preço/limites/capabilities.
+- [x] Docs seed oficial de preço/limites/capabilities.
 - [ ] Integração plena com Responses runtime.
 - [ ] Elegibilidade account-scoped.
 
@@ -1439,7 +1439,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Auditoria canônica de importer set, hooks e cobertura de endpoints.
 - [x] Default set inclui importers públicos disponíveis sem chave para Hugging
   Face, OpenCode, Chutes e Z.AI.
-- [ ] OpenAI official docs seed.
+- [x] OpenAI official docs seed.
 - [ ] Anthropic docs seed.
 - [ ] Gemini/Vertex docs seed.
 - [ ] Mistral docs pricing seed.
@@ -3385,6 +3385,56 @@ Próximas lacunas L identificadas:
 Validação deste corte:
 
 - [x] PASS `npm run model-gateway:test:contracts` com `128` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 56. Continuidade 2026-05-26 — OpenAI Official Docs Seed
+
+Auditoria executada neste corte:
+
+- [x] Consultadas fontes oficiais OpenAI para confirmar a superfície pública de
+  modelos, pricing e comparação de modelos.
+- [x] Confirmado que `/v1/models` continua sendo fonte account-scoped de
+  visibilidade, enquanto docs públicos devem entrar apenas como evidência
+  global de metadados.
+- [x] Confirmado que o seed não deve criar account overlay, route option ou
+  prova de acesso.
+
+Fontes oficiais consultadas:
+
+- [x] `https://platform.openai.com/docs/models`.
+- [x] `https://platform.openai.com/docs/pricing`.
+- [x] `https://platform.openai.com/docs/models/compare`.
+- [x] `https://platform.openai.com/docs/api-reference/models/list`.
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/catalog/importers/openai-docs-models-importer.js`.
+- [x] Criado `createOpenAiDocsModelsImporter()`.
+- [x] Criado `parseOpenAiDocsRows()`.
+- [x] O importer busca docs de modelos, pricing e comparação em paralelo.
+- [x] O parser extrai ids OpenAI-like e gera evidências de docs URL, pricing
+  quando presente, lifecycle, modalidades, capabilities e model traits.
+- [x] O default importer set passa a incluir `openai-docs-models` em modo
+  público.
+- [x] Exportado pelos barrels de `importers`, `catalog` e `model-gateway`.
+- [x] Teste unitário cobre parsing, pricing, lifecycle deprecated, embeddings e
+  ausência de overlays/routes.
+
+Separação preservada:
+
+- [x] Docs seed não prova acesso.
+- [x] Docs seed não executa modelo.
+- [x] Docs seed não chama probes.
+- [x] Docs seed não substitui account overlay autenticado.
+- [x] Docs seed é evidência global de metadados.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `129` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.

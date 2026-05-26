@@ -102,6 +102,7 @@ import {
     createOllamaCatalogImporter,
     createOpenCodeZenDocsImporter,
     createOpenCodeZenModelsImporter,
+    createOpenAiDocsModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
     createOpenRouterModelsImporter,
@@ -146,6 +147,7 @@ import {
     normalizeDataPolicyTaxonomy,
     normalizeStoredCatalogSnapshot,
     normalizeUsdPricing,
+    parseOpenAiDocsRows,
     planModelGatewayCatalogRefresh,
     rankCatalogEvidenceConfidence,
     recommendCatalogDiffProbes,
@@ -3053,6 +3055,42 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('providerMetadata.modelTraits.family'), 'gpt');
     });
 
+    it('imports OpenAI official docs as public metadata seed without proving account access', async () => {
+        const pages = {
+            models: '<main>GPT-5.2 model id gpt-5.2. text-embedding-3-small embeddings. GPT-4.5 Preview gpt-4.5-preview Deprecated.</main>',
+            pricing: '<section>gpt-5.2 $1.25 input $10 output text-embedding-3-small $0.02 input</section>',
+            compare: '<table><tr><td>gpt-5.2</td><td>recommended coding and agentic tasks with reasoning</td></tr></table>',
+        };
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (url) =>
+                /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    text: async () =>
+                        String(url).includes('/pricing') ? pages.pricing : String(url).includes('/compare') ? pages.compare : pages.models,
+                })
+        );
+
+        const parsed = parseOpenAiDocsRows(pages);
+        const snapshot = await runCatalogImporters({
+            importers: [createOpenAiDocsModelsImporter({ fetchImpl: fakeFetch })],
+            now: () => new Date('2026-05-25T12:20:00.000Z'),
+        });
+        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item.providerModel}:${item.fieldPath}`, item.value]));
+
+        assert.deepEqual(parsed.map((row) => row.id), ['gpt-4.5', 'gpt-4.5-preview', 'gpt-5.2', 'text-embedding-3-small']);
+        assert.equal(snapshot.sources[0].providerId, 'openai');
+        assert.equal(snapshot.sources[0].authMode, 'none');
+        assert.equal(snapshot.accountOverlays.length, 0);
+        assert.equal(snapshot.routeOptions.length, 0);
+        assert.equal(byModelPath.get('gpt-5.2:providerMetadata.openai.docsUrl'), 'https://platform.openai.com/docs/models');
+        assert.equal(byModelPath.get('gpt-5.2:pricing.inputUsdPerMillion'), 1.25);
+        assert.equal(byModelPath.get('gpt-5.2:pricing.outputUsdPerMillion'), 10);
+        assert.equal(byModelPath.get('gpt-5.2:capabilities.tools'), true);
+        assert.equal(byModelPath.get('text-embedding-3-small:modalities.output')?.[0], 'embedding');
+        assert.equal(byModelPath.get('gpt-4.5-preview:lifecycle.providerStatus'), 'deprecated');
+    });
+
     it('imports generic OpenAI-compatible model lists as identity, route and account overlay metadata', async () => {
         const secret = 'generic-secret-that-must-not-leak';
         /** @type {string | null} */
@@ -5780,6 +5818,7 @@ describe('model-gateway foundation', () => {
                 'kilo-gateway-models',
                 'kilo-gateway-providers',
                 'cerebras-public-models',
+                'openai-docs-models',
                 'groq-docs-models',
                 'opencode-zen-docs',
                 'cloudflare-workers-ai-catalog',
@@ -5797,6 +5836,7 @@ describe('model-gateway foundation', () => {
                 'kilo-gateway-models',
                 'kilo-gateway-providers',
                 'cerebras-public-models',
+                'openai-docs-models',
                 'groq-docs-models',
                 'opencode-zen-docs',
                 'cloudflare-workers-ai-catalog',
