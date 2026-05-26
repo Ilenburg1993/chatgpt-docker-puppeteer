@@ -8141,8 +8141,21 @@ describe('model-gateway foundation', () => {
                 KILO_API_KEY: 'kilo-secret',
                 CLOUDFLARE_API_TOKEN: 'cf-secret',
                 CLOUDFLARE_ACCOUNT_ID: 'account-1',
+                OLLAMA_BASE_URL: 'http://127.0.0.1:11434',
                 OPENCODE_API_KEY: '',
             },
+        });
+        const ollamaAliasRows = evaluateModelGatewayProviderEnvRequirements({
+            env: { OLLAMA_HOST: 'http://localhost:11434' },
+            providerId: 'ollama',
+        });
+        const ollamaLocalRows = evaluateModelGatewayProviderEnvRequirements({
+            env: { OLLAMA_HOST: 'http://localhost:11434' },
+            providerId: 'ollama-local',
+        });
+        const ollamaCloudRows = evaluateModelGatewayProviderEnvRequirements({
+            env: {},
+            providerId: 'ollama-cloud',
         });
         const summary = summarizeModelGatewayProviderEnvRequirements(rows);
         const byProvider = new Map(rows.map((row) => [row.providerId, row]));
@@ -8150,9 +8163,16 @@ describe('model-gateway foundation', () => {
         assert.equal(byProvider.get('kilo')?.status, 'ready');
         assert.equal(byProvider.get('cloudflare-workers-ai')?.status, 'ready');
         assert.deepEqual(byProvider.get('cloudflare-workers-ai')?.missingRecommendedKeys, ['CLOUDFLARE_AI_GATEWAY_ID']);
+        assert.equal(byProvider.get('ollama-local')?.status, 'ready');
+        assert.deepEqual(byProvider.get('ollama-local')?.providerAliases, ['ollama']);
+        assert.equal(byProvider.get('ollama-cloud')?.status, 'missing');
+        assert.deepEqual(ollamaAliasRows.map((row) => row.providerId), ['ollama-local']);
+        assert.deepEqual(ollamaLocalRows.map((row) => row.providerId), ['ollama-local']);
+        assert.deepEqual(ollamaCloudRows.map((row) => row.providerId), ['ollama-cloud']);
+        assert.deepEqual(ollamaCloudRows[0].missingRequiredKeys, ['OLLAMA_CLOUD_API_KEY']);
         assert.equal(byProvider.get('opencode')?.status, 'missing');
         assert.ok(byProvider.get('opencode')?.missingRequiredKeys.includes('OPENCODE_API_KEY'));
-        assert.ok(summary.readyCount >= 2);
+        assert.ok(summary.readyCount >= 3);
         assert.equal(JSON.stringify(rows).includes('kilo-secret'), false);
         assert.equal(JSON.stringify(rows).includes('cf-secret'), false);
     });

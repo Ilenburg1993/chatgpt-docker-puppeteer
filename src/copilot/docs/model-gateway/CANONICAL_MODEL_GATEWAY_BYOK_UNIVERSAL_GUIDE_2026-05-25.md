@@ -3018,6 +3018,68 @@ Validação deste corte:
 
 ---
 
+## 57. Continuidade 2026-05-26 — Requisitos Env Ollama Local/Cloud
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a lacuna deixada no corte anterior sobre `ollama-local` na
+  matriz de requisitos de ambiente.
+- [x] Confirmado que `ollama-local` e `ollama-cloud` não devem compartilhar a
+  mesma linha de requisito porque um depende de daemon/base URL e o outro de
+  API key.
+- [x] Confirmado que o seletor humano `ollama` ainda precisa funcionar como
+  alias operacional para o caso local.
+
+Implementado neste corte:
+
+- [x] A matriz de requisitos passa a expor `ollama-local` como provider
+  canônico para daemon local.
+- [x] `ollama-local` aceita `ollama` como alias de filtro.
+- [x] A matriz passa a expor `ollama-cloud` com requisito
+  `OLLAMA_CLOUD_API_KEY`.
+- [x] As linhas avaliadas passam a carregar `providerAliases` sem incluir
+  valores de secrets.
+- [x] Testes cobrem filtro por `ollama`, filtro por `ollama-local`, filtro por
+  `ollama-cloud` e ausência de vazamento de segredo.
+- [x] O script `model-gateway-selection-audit.mjs` passa a imprimir
+  `capabilitySupply` e `supplyWarnings` também no modo textual.
+- [x] O script `model-gateway-selection-audit.mjs` passa a aceitar
+  `--fail-on-supply-warning` para gates futuros de política estrita.
+- [x] O terminal `/byok gateway env` passa a mostrar aliases de provider
+  quando a linha canônica aceita seletores humanos alternativos.
+
+Separação arquitetural preservada:
+
+- [x] Requisitos de env continuam sendo apenas diagnóstico e pré-runtime.
+- [x] Nenhum importer é executado por essa avaliação.
+- [x] Nenhum provider é chamado.
+- [x] Nenhum modelo é executado.
+- [x] O catálogo canônico não é mutado.
+- [x] `--fail-on-supply-warning` apenas altera o exit code do diagnóstico e não
+  executa runtime.
+
+Próximas lacunas:
+
+- [ ] Avaliar policy futura para impedir seleção remota quando o operador pedir
+  `local_private` em modo estrito local.
+
+Validação deste corte:
+
+- [x] PASS `node --check scripts/model-gateway-selection-audit.mjs`.
+- [x] PASS `node --check scripts/model-gateway-effective-selection.mjs`.
+- [x] PASS `node scripts/model-gateway-selection-audit.mjs
+  --profile=local_private`.
+- [x] PASS esperado com exit `1` para
+  `node scripts/model-gateway-selection-audit.mjs --profile=local_private
+  --fail-on-supply-warning`.
+- [x] PASS `npm run model-gateway:test:contracts` com `159` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `67` testes.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
 ## 54. Continuidade 2026-05-26 — Tombstones De Catálogo
 
 Auditoria executada neste corte:

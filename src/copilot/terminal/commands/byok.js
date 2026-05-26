@@ -2049,8 +2049,9 @@ function renderByokGatewayEnvRequirements(println, rest) {
         const configured = row.configuredKeys.length > 0 ? row.configuredKeys.join(',') : '-';
         const missing = row.missingRequiredKeys.length > 0 ? row.missingRequiredKeys.join(',') : '-';
         const recommended = row.missingRecommendedKeys.length > 0 ? row.missingRecommendedKeys.join(',') : '-';
+        const aliases = Array.isArray(row.providerAliases) && row.providerAliases.length > 0 ? ` · aliases=${row.providerAliases.join(',')}` : '';
         println(
-            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mstatus=${row.status} · required=${row.satisfiedRequiredGroupCount}/${row.requiredGroupCount} · recommended=${row.satisfiedRecommendedGroupCount}/${row.recommendedGroupCount}\x1b[0m`,
+            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mstatus=${row.status} · required=${row.satisfiedRequiredGroupCount}/${row.requiredGroupCount} · recommended=${row.satisfiedRecommendedGroupCount}/${row.recommendedGroupCount}${aliases}\x1b[0m`,
         );
         println(`      \x1b[90mconfigured=${configured} · missingRequired=${missing} · missingRecommended=${recommended}\x1b[0m`);
     }

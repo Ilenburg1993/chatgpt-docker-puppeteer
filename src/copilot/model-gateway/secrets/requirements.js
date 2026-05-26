@@ -45,9 +45,11 @@ export const MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS = Object.freeze([
     Object.freeze({ providerId: 'zai', groups: Object.freeze([anySecret('api_key', ['ZAI_API_KEY', 'Z_AI_KEY'])]) }),
     Object.freeze({ providerId: 'opencode', groups: Object.freeze([anySecret('api_key', ['OPENCODE_API_KEY'])]) }),
     Object.freeze({
-        providerId: 'ollama',
+        providerId: 'ollama-local',
+        providerAliases: Object.freeze(['ollama']),
         groups: Object.freeze([allConfig('local_base_url', ['OLLAMA_BASE_URL', 'OLLAMA_HOST', 'COPILOT_OLLAMA_BASE_URL'], { mode: 'any' })]),
     }),
+    Object.freeze({ providerId: 'ollama-cloud', groups: Object.freeze([anySecret('api_key', ['OLLAMA_CLOUD_API_KEY'])]) }),
 ]);
 
 /**
@@ -76,6 +78,15 @@ function allConfig(id, keys, options = {}) {
  */
 function optionalString(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * @param {object} entry
+ * @returns {string[]}
+ */
+function providerAliases(entry) {
+    const aliases = /** @type {{ providerAliases?: unknown }} */ (entry).providerAliases;
+    return Array.isArray(aliases) ? aliases.map(optionalString).filter((item) => item !== null) : [];
 }
 
 /**
@@ -110,7 +121,7 @@ function evaluateGroup(env, group) {
 /**
  * @param {object} [options]
  * @param {Record<string, string | undefined>} [options.env]
- * @param {readonly { providerId: string; groups: readonly { id: string; kind: string; mode: string; keys: readonly string[]; required: boolean }[] }[]} [options.requirements]
+ * @param {readonly { providerId: string; providerAliases?: readonly string[]; groups: readonly { id: string; kind: string; mode: string; keys: readonly string[]; required: boolean }[] }[]} [options.requirements]
  * @param {string} [options.providerId]
  * @returns {Array<{
  *   providerId: string;
@@ -130,7 +141,11 @@ export function evaluateModelGatewayProviderEnvRequirements(options = {}) {
     const providerFilter = optionalString(options.providerId)?.toLowerCase() ?? null;
     const requirements = options.requirements ?? MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS;
     return requirements
-        .filter((entry) => !providerFilter || entry.providerId === providerFilter)
+        .filter((entry) => {
+            if (!providerFilter) return true;
+            const ids = [entry.providerId, ...providerAliases(entry)].map((item) => item.toLowerCase());
+            return ids.includes(providerFilter);
+        })
         .map((entry) => {
             const groups = entry.groups.map((group) => evaluateGroup(env, group));
             const requiredGroups = groups.filter((group) => group.required);
@@ -143,6 +158,7 @@ export function evaluateModelGatewayProviderEnvRequirements(options = {}) {
             const status = satisfiedRequiredGroupCount === requiredGroups.length ? 'ready' : satisfiedRequiredGroupCount > 0 ? 'partial' : 'missing';
             return {
                 providerId: entry.providerId,
+                providerAliases: providerAliases(entry),
                 status,
                 requiredGroupCount: requiredGroups.length,
                 satisfiedRequiredGroupCount,

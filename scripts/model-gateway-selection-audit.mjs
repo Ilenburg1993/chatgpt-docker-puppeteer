@@ -11,7 +11,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-selection-audit.mjs [--json] [--strict] [--profile=<id>] [--profiles=a,b] [--fail-on-unselected]
+    process.stdout.write(`Usage: node scripts/model-gateway-selection-audit.mjs [--json] [--strict] [--profile=<id>] [--profiles=a,b] [--fail-on-unselected] [--fail-on-supply-warning]
 
 Audit metadata-first model-gateway route selection from the persisted catalog. This does not fetch providers, execute
 runtime probes or call models.
@@ -28,9 +28,16 @@ function readProfiles() {
     return profiles.map((profile) => profile.trim()).filter(Boolean);
 }
 
+function formatCountMap(counts) {
+    return Object.entries(counts ?? {})
+        .map(([key, count]) => `${key}:${count}`)
+        .join(',') || '-';
+}
+
 const json = argSet.has('--json');
 const strict = argSet.has('--strict');
 const failOnUnselected = argSet.has('--fail-on-unselected');
+const failOnSupplyWarning = argSet.has('--fail-on-supply-warning');
 const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
 const snapshot = await store.readSnapshot();
 const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
@@ -44,6 +51,7 @@ const summary = {
     snapshotId: snapshot.snapshotId,
     generatedAt: snapshot.generatedAt,
     integrity,
+    supplyWarningCount: selection.profiles.reduce((sum, profile) => sum + profile.supplyWarnings.length, 0),
     selection,
 };
 
@@ -68,7 +76,15 @@ if (json) {
         if (!selected && profile.topRejectedReasons.length > 0) {
             process.stdout.write(`    top rejected: ${profile.topRejectedReasons.slice(0, 5).join(', ')}\n`);
         }
+        if (profile.capabilitySupply) {
+            process.stdout.write(
+                `    supply required=${formatCountMap(profile.capabilitySupply.required)} soft=${formatCountMap(profile.capabilitySupply.softRequired)} preferred=${formatCountMap(profile.capabilitySupply.preferred)}\n`,
+            );
+        }
+        if (profile.supplyWarnings.length > 0) {
+            process.stdout.write(`    warnings=${profile.supplyWarnings.slice(0, 8).join(',')}\n`);
+        }
     }
 }
 
-if (!integrity.ok || (failOnUnselected && !selection.ok)) process.exit(1);
+if (!integrity.ok || (failOnUnselected && !selection.ok) || (failOnSupplyWarning && summary.supplyWarningCount > 0)) process.exit(1);
