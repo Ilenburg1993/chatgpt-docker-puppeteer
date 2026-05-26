@@ -13,6 +13,7 @@ import {
     JsonModelGatewayRegistryStore,
     listProviderEndpointInventory,
     listProviderEndpointSourceRecords,
+    listProviderGatewayTraits,
     listModelGatewayCanonicalCommands,
     listModelGatewayTaskProfiles,
     ModelGatewayRegistry,
@@ -65,6 +66,7 @@ import {
     recordModelGatewayRouteDecision,
     resolveModelGatewayProviderAdapter,
     resolveProviderEndpointInventory,
+    resolveProviderGatewayTraits,
     resolveModelGatewayTaskProfile,
     resetByokProviderHealthForTests,
     resetModelGatewayRouteDecisionLedgerForTests,
@@ -5805,6 +5807,28 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(cloudflareRuntime?.['placeholders'], ['account_id', 'model']);
         assert.equal(cloudflareRuntime?.['hasPlaceholders'], true);
         assert.equal(cloudflareRuntime?.['target'], 'runtime');
+    });
+
+    it('normalizes provider and gateway traits as pre-runtime metadata', () => {
+        const traits = listProviderGatewayTraits();
+        const byProvider = new Map(traits.map((item) => [item['providerId'], item]));
+        const kilo = resolveProviderGatewayTraits('kilo');
+        const openRouter = byProvider.get('openrouter');
+        const ollama = byProvider.get('ollama');
+
+        assert.equal(traits.length, listProviderEndpointInventory().length);
+        assert.equal(kilo?.['topology'], 'gateway');
+        assert.equal(kilo?.['gatewayManaged'], true);
+        assert.equal(kilo?.['openAICompatible'], true);
+        assert.equal(kilo?.['catalogSourceCount'], 2);
+        assert.equal(kilo?.['runtimeEndpointCount'], 2);
+        assert.equal(/** @type {Record<string, any>} */ (kilo?.['routing'] ?? {})['supportsGatewayByok'], true);
+        assert.equal(/** @type {Record<string, any>} */ (kilo?.['capabilities'] ?? {})['fim'], true);
+        assert.equal(openRouter?.['topology'], 'aggregator');
+        assert.equal(/** @type {Record<string, any>} */ (openRouter?.['routing'] ?? {})['supportsFallback'], true);
+        assert.equal(ollama?.['topology'], 'local_daemon');
+        assert.equal(ollama?.['localPrivate'], true);
+        assert.equal(resolveProviderGatewayTraits('missing-provider'), null);
     });
 
     it('audits endpoint inventory coverage against configured catalog importers', () => {

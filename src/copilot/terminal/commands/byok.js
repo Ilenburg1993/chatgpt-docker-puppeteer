@@ -33,6 +33,7 @@ import {
     JsonModelGatewayCatalogStore,
     listByokProviderModelHealth,
     listModelGatewayCanonicalCommands,
+    listProviderGatewayTraits,
     listProviderEndpointInventory,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     mirrorByokProviderHealthToSqlite,
@@ -46,6 +47,7 @@ import {
     recordByokProviderModelProbeResult,
     recordModelGatewayRouteDecision,
     refreshModelGatewayCatalog,
+    resolveProviderGatewayTraits,
     resolveProviderEndpointInventory,
     renderModelGatewayCanonicalCommandLines,
     routeGatewayModels,
@@ -1639,7 +1641,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway provider explain <provider> | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway provider <traits|explain> [provider] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1714,6 +1716,51 @@ function renderByokProviderEndpointInventory(println, rest) {
         println(`      \x1b[90mselectors=${inventory.routeSelectors.join(',')}\x1b[0m`);
     }
     println('\n  \x1b[90mPróximo passo: catalog importers vão usar este mapa como fonte inicial antes de probes e seleção runtime.\x1b[0m\n');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {void}
+ */
+function renderByokProviderGatewayTraits(println, rest) {
+    const selector = optionalScalarString(rest.find((item) => !/^(traits|trait|caracteristicas|características)$/iu.test(item)));
+    const traits = selector
+        ? [resolveProviderGatewayTraits(selector)].filter((item) => item !== null)
+        : listProviderGatewayTraits();
+
+    println(`\n  \x1b[36mBYOK provider/gateway traits\x1b[0m (${traits.length})`);
+    println('  \x1b[90mMetadados pré-runtime derivados de specs/endpoints; não provam acesso, saúde ou execução do modelo.\x1b[0m\n');
+
+    if (traits.length === 0) {
+        println(`    \x1b[33mProvider não encontrado para traits: ${selector ?? '-'}.\x1b[0m\n`);
+        return;
+    }
+
+    for (const item of traits) {
+        const capabilities = asRecord(item['capabilities']);
+        const routing = asRecord(item['routing']);
+        const metadata = asRecord(item['metadata']);
+        const routeSelectors = Array.isArray(item['routeSelectors']) ? item['routeSelectors'].slice(0, 6).join(',') : '-';
+        const richnessTags = Array.isArray(item['richnessTags']) ? item['richnessTags'].slice(0, 8).join(',') : '-';
+        println(
+            `    \x1b[33m${optionalScalarString(item['providerId']) ?? '-'}\x1b[0m  \x1b[90mtopology=${optionalScalarString(item['topology']) ?? '-'} · kind=${optionalScalarString(item['providerKind']) ?? '-'} · openaiCompat=${item['openAICompatible'] === true ? 'sim' : 'nao'}\x1b[0m`,
+        );
+        println(
+            `      \x1b[90mcatalog=${item['catalogSourceCount'] ?? 0} · runtime=${item['runtimeEndpointCount'] ?? 0} · public=${item['publicCatalogSourceCount'] ?? 0} · auth=${item['authenticatedCatalogSourceCount'] ?? 0} · parameterized=${item['parameterizedCatalogSourceCount'] ?? 0}\x1b[0m`,
+        );
+        println(
+            `      \x1b[90mruntimeKinds=${Array.isArray(item['runtimeKinds']) ? item['runtimeKinds'].join(',') || '-' : '-'} · selectors=${routeSelectors}\x1b[0m`,
+        );
+        println(
+            `      \x1b[90mcapabilities=chat:${capabilities['chatCompletions'] === true ? 'sim' : 'nao'},responses:${capabilities['responses'] === true ? 'sim' : 'nao'},fim:${capabilities['fim'] === true ? 'sim' : 'nao'},embeddings:${capabilities['embeddings'] === true ? 'sim' : 'nao'}\x1b[0m`,
+        );
+        println(
+            `      \x1b[90mrouting=auto:${routing['supportsAutoSelection'] === true ? 'sim' : 'nao'},fallback:${routing['supportsFallback'] === true ? 'sim' : 'nao'},providerOrder:${routing['supportsProviderOrder'] === true ? 'sim' : 'nao'},byok:${routing['supportsGatewayByok'] === true ? 'sim' : 'nao'} · metadata=pricing:${metadata['hasPricingMetadata'] === true ? 'sim' : 'nao'},context:${metadata['hasContextMetadata'] === true ? 'sim' : 'nao'},provider:${metadata['hasProviderMetadata'] === true ? 'sim' : 'nao'}\x1b[0m`,
+        );
+        println(`      \x1b[90mrichness=${richnessTags}\x1b[0m`);
+    }
+    println('\n  \x1b[90mUse estes traits como filtro inicial; eligibility e probes continuam em fases separadas.\x1b[0m\n');
 }
 
 /**
@@ -2927,6 +2974,13 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         }
         if (/^(overlays|overlay|accounts|account|contas)$/iu.test(rest[0] ?? '')) {
             await renderByokGatewayOverlays(println, rest.slice(1));
+            return;
+        }
+        if (
+            /^(provider|providers|provedor|provedores)$/iu.test(rest[0] ?? '') &&
+            /^(traits|trait|caracteristicas|características)$/iu.test(rest[1] ?? '')
+        ) {
+            renderByokProviderGatewayTraits(println, rest.slice(2));
             return;
         }
         if (

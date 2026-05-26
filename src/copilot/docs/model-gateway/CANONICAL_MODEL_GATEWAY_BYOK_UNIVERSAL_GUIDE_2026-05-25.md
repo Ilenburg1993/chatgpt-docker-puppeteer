@@ -1455,7 +1455,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Account overlay controls.
 - [x] Model identity traits.
 - [x] Route policy traits.
-- [ ] Provider/gateway traits normalizados como camada própria.
+- [x] Provider/gateway traits normalizados como camada própria.
 - [ ] Capability taxonomy runtime-agentic.
 - [ ] Pricing multi-currency.
 - [ ] Rate limit taxonomy completa.
@@ -2988,6 +2988,48 @@ Validação deste corte:
 - [x] PASS `make model-gateway-commands`.
 - [x] PASS `npm run model-gateway:test:contracts` com `117` testes.
 - [x] PASS `npm run model-gateway:test:terminal` com `55` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 49. Continuidade 2026-05-26 — Traits Provider/Gateway Pré-Runtime
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a lacuna aberta da Faixa M sobre traits provider/gateway.
+- [x] Confirmado que o inventário de endpoints já possuía fatos suficientes
+  para derivar topologia, seletor, fontes de catálogo e runtime kinds.
+- [x] Confirmado que esses traits devem ser metadados pré-runtime, não prova de
+  acesso, saúde ou capability executada.
+- [x] Confirmado que o terminal precisava expor a camada de traits para operador
+  humano e LLM antes do primeiro build.
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/providers/traits.js`.
+- [x] Criado `createProviderGatewayTraits()` para normalizar inventário/specs.
+- [x] Criado `listProviderGatewayTraits()`.
+- [x] Criado `resolveProviderGatewayTraits()`.
+- [x] Exportado pelos barrels `providers` e `model-gateway`.
+- [x] Adicionado comando terminal `/byok gateway provider traits [provider]`.
+- [x] Adicionado o comando ao inventário canônico da Faixa Y.
+- [x] Adicionados testes unitários de contrato e terminal.
+
+Separação preservada:
+
+- [x] Traits derivam apenas de specs estáticas e inventário de endpoints.
+- [x] Nenhum provider é chamado.
+- [x] Nenhum modelo é executado.
+- [x] Nenhuma decisão de eligibility é persistida.
+- [x] Nenhum catálogo canônico é mutado.
+- [x] Runtime probes continuam fase posterior e separada.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `118` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `56` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.

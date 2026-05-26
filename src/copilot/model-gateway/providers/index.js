@@ -15,6 +15,7 @@ export {
     listProviderEndpointSourceRecords,
     resolveProviderEndpointInventory,
 } from './endpoints/index.js';
+export { createProviderGatewayTraits, listProviderGatewayTraits, resolveProviderGatewayTraits } from './traits.js';
 export {
     OPENAI_PROVIDER_FAMILY_SPECS,
     OpenAIProviderFamilyAdapter,

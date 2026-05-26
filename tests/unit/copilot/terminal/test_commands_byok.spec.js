@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -160,6 +160,25 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                 routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
             },
         ]),
+        listProviderGatewayTraits: vi.fn(() => [
+            {
+                providerId: 'kilo',
+                providerKind: 'gateway',
+                topology: 'gateway',
+                openAICompatible: true,
+                catalogSourceCount: 1,
+                runtimeEndpointCount: 1,
+                publicCatalogSourceCount: 1,
+                authenticatedCatalogSourceCount: 0,
+                parameterizedCatalogSourceCount: 0,
+                runtimeKinds: ['chat_completions'],
+                routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
+                richnessTags: ['context', 'features', 'pricing'],
+                capabilities: { chatCompletions: true, responses: false, fim: false, embeddings: false },
+                routing: { supportsAutoSelection: true, supportsFallback: false, supportsProviderOrder: false, supportsGatewayByok: false },
+                metadata: { hasPricingMetadata: true, hasContextMetadata: true, hasProviderMetadata: false },
+            },
+        ]),
         listTerminalSdkSessionInventory: vi.fn(() =>
             Promise.resolve({
                 currentSessionId: null,
@@ -244,6 +263,32 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                   }
                 : null,
         ),
+        resolveProviderGatewayTraits: vi.fn((providerId) =>
+            providerId === 'kilo'
+                ? {
+                      providerId: 'kilo',
+                      providerKind: 'gateway',
+                      topology: 'gateway',
+                      openAICompatible: true,
+                      catalogSourceCount: 1,
+                      runtimeEndpointCount: 1,
+                      publicCatalogSourceCount: 1,
+                      authenticatedCatalogSourceCount: 0,
+                      parameterizedCatalogSourceCount: 0,
+                      runtimeKinds: ['chat_completions'],
+                      routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
+                      richnessTags: ['context', 'features', 'pricing'],
+                      capabilities: { chatCompletions: true, responses: false, fim: false, embeddings: false },
+                      routing: {
+                          supportsAutoSelection: true,
+                          supportsFallback: false,
+                          supportsProviderOrder: false,
+                          supportsGatewayByok: false,
+                      },
+                      metadata: { hasPricingMetadata: true, hasContextMetadata: true, hasProviderMetadata: false },
+                  }
+                : null,
+        ),
         rename: vi.fn(),
         setTerminalModelProjection: vi.fn(),
         writeFile: vi.fn(),
@@ -291,6 +336,7 @@ vi.mock('#copilot/model-gateway', () => ({
     listByokProviderModelHealth,
     listModelGatewayCanonicalCommands,
     listProviderEndpointInventory,
+    listProviderGatewayTraits,
     readByokProviderHealthState,
     readByokProviderModelHealth,
     recordByokProviderModelAgentProbeFailure,
@@ -303,6 +349,7 @@ vi.mock('#copilot/model-gateway', () => ({
     recommendCatalogDiffProbes,
     renderModelGatewayCanonicalCommandLines,
     resolveProviderEndpointInventory,
+    resolveProviderGatewayTraits,
     routeGatewayModels,
     runConfiguredByokChatProbe: runConfiguredByokChatProbe,
     runConfiguredByokAgentProbe: runConfiguredByokAgentProbe,
@@ -411,6 +458,26 @@ describe('terminal /byok command', () => {
                 routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
             },
         ]);
+        listProviderGatewayTraits.mockReset();
+        listProviderGatewayTraits.mockReturnValue([
+            {
+                providerId: 'kilo',
+                providerKind: 'gateway',
+                topology: 'gateway',
+                openAICompatible: true,
+                catalogSourceCount: 1,
+                runtimeEndpointCount: 1,
+                publicCatalogSourceCount: 1,
+                authenticatedCatalogSourceCount: 0,
+                parameterizedCatalogSourceCount: 0,
+                runtimeKinds: ['chat_completions'],
+                routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
+                richnessTags: ['context', 'features', 'pricing'],
+                capabilities: { chatCompletions: true, responses: false, fim: false, embeddings: false },
+                routing: { supportsAutoSelection: true, supportsFallback: false, supportsProviderOrder: false, supportsGatewayByok: false },
+                metadata: { hasPricingMetadata: true, hasContextMetadata: true, hasProviderMetadata: false },
+            },
+        ]);
         listTerminalSdkSessionInventory.mockReset();
         listTerminalSdkSessionInventory.mockResolvedValue({
             currentSessionId: null,
@@ -516,6 +583,33 @@ describe('terminal /byok command', () => {
                       ],
                       runtimeEndpoints: [{ kind: 'chat_completions', method: 'POST', path: '/chat/completions' }],
                       routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
+                  }
+                : null,
+        );
+        resolveProviderGatewayTraits.mockReset();
+        resolveProviderGatewayTraits.mockImplementation((providerId) =>
+            providerId === 'kilo'
+                ? {
+                      providerId: 'kilo',
+                      providerKind: 'gateway',
+                      topology: 'gateway',
+                      openAICompatible: true,
+                      catalogSourceCount: 1,
+                      runtimeEndpointCount: 1,
+                      publicCatalogSourceCount: 1,
+                      authenticatedCatalogSourceCount: 0,
+                      parameterizedCatalogSourceCount: 0,
+                      runtimeKinds: ['chat_completions'],
+                      routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
+                      richnessTags: ['context', 'features', 'pricing'],
+                      capabilities: { chatCompletions: true, responses: false, fim: false, embeddings: false },
+                      routing: {
+                          supportsAutoSelection: true,
+                          supportsFallback: false,
+                          supportsProviderOrder: false,
+                          supportsGatewayByok: false,
+                      },
+                      metadata: { hasPricingMetadata: true, hasContextMetadata: true, hasProviderMetadata: false },
                   }
                 : null,
         );
@@ -1356,6 +1450,21 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('https://api.kilo.ai/api/gateway/models');
         expect(ctx.output()).toContain('POST /chat/completions');
         expect(ctx.output()).toContain('selectors=exact_model,gateway_auto,provider_model');
+    });
+
+    it('mostra traits provider/gateway normalizados sem chamar runtime', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway provider traits kilo');
+
+        expect(resolveProviderGatewayTraits).toHaveBeenCalledWith('kilo');
+        expect(listProviderGatewayTraits).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('BYOK provider/gateway traits');
+        expect(ctx.output()).toContain('topology=gateway');
+        expect(ctx.output()).toContain('openaiCompat=sim');
+        expect(ctx.output()).toContain('runtimeKinds=chat_completions');
+        expect(ctx.output()).toContain('metadata=pricing:sim');
     });
 
     it('mostra gate pré-K do model-gateway com checks booleanos', async () => {

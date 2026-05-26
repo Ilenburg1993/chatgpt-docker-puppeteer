@@ -211,8 +211,10 @@ export {
     anthropicAdapter,
     auditProviderEndpointImporterCoverage,
     createDefaultProviderAdapterRegistry,
+    createProviderGatewayTraits,
     defaultProviderAdapterRegistry,
     geminiAdapter,
+    listProviderGatewayTraits,
     listProviderEndpointInventory,
     listProviderEndpointSourceRecords,
     OpenAICompatibleAdapter,
@@ -221,6 +223,7 @@ export {
     openAICompatibleAdapter,
     openAIProviderFamilyAdapters,
     openRouterAdapter,
+    resolveProviderGatewayTraits,
     resolveProviderEndpointInventory,
     resolveModelGatewayProviderAdapter,
 } from './providers/index.js';

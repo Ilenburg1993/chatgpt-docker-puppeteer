@@ -118,6 +118,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Inspect source freshness and TTL state without network.',
     },
     {
+        id: 'terminal.provider-traits',
+        phase: 'metadata',
+        surface: 'terminal',
+        command: '/byok gateway provider traits',
+        summary: 'Inspect normalized provider/gateway traits derived from specs and endpoint inventory.',
+    },
+    {
         id: 'terminal.sqlite',
         phase: 'metadata',
         surface: 'terminal',
