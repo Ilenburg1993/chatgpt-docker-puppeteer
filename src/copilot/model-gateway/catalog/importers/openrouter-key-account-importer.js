@@ -146,6 +146,7 @@ export function createOpenRouterKeyAccountImporter(options = {}) {
             return rows.map((row) => {
                 const record = /** @type {Record<string, unknown>} */ (row);
                 const rateLimit = isRecord(record['rate_limit']) ? record['rate_limit'] : {};
+                const spending = spendingLimits(record);
                 return createProviderAccountOverlay({
                     accountOverlayId: `openrouter:${options.accountScope ?? 'default'}:${options.secretRef ?? 'OPENROUTER_API_KEY'}:${sourceId}`,
                     providerId: 'openrouter',
@@ -154,7 +155,10 @@ export function createOpenRouterKeyAccountImporter(options = {}) {
                     sourceId,
                     sourceKind: 'authenticated_account_api',
                     confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG,
-                    spendingLimits: spendingLimits(record),
+                    quota: {
+                        ...(typeof spending.remainingUsd === 'number' ? { remainingCreditsUsd: spending.remainingUsd } : {}),
+                    },
+                    spendingLimits: spending,
                     rateLimits: rateLimit,
                     providerMetadata: {
                         endpoint: '/api/v1/key',

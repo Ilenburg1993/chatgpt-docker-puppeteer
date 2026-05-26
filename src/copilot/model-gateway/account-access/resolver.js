@@ -8,6 +8,8 @@
  * @module copilot/model-gateway/account-access/resolver
  */
 
+import { normalizeModelGatewayAccountLimitState } from './limits.js';
+
 export const MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS = Object.freeze({
     VISIBLE: 'visible',
     BLOCKED: 'blocked',
@@ -15,8 +17,10 @@ export const MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS = Object.freeze({
     MISSING_SECRET: 'missing_secret',
     MISSING_OVERLAY: 'missing_overlay',
     EXPIRED: 'expired',
+    KEY_DISABLED: 'key_disabled',
     QUOTA_EXHAUSTED: 'quota_exhausted',
     SPENDING_EXHAUSTED: 'spending_exhausted',
+    RATE_LIMITED: 'rate_limited',
     UNKNOWN: 'unknown',
 });
 
@@ -31,6 +35,7 @@ export const MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS = Object.freeze({
     NONE: 'none',
     SECRET_CONFIGURATION: 'secret_configuration',
     ACCOUNT_LIMITS: 'account_limits',
+    ACCOUNT_KEY: 'account_key',
     ACCOUNT_OVERLAY: 'account_overlay',
     MODEL_VISIBILITY: 'model_visibility',
     POLICY_BLOCK: 'policy_block',
@@ -51,15 +56,6 @@ function isRecord(value) {
  */
 function optionalString(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {number | null}
- */
-function optionalNumber(value) {
-    const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN;
-    return Number.isFinite(number) ? number : null;
 }
 
 /**
@@ -139,8 +135,10 @@ function firstSecretRef(overlays) {
  */
 function resolveStatus(hardReasons, softReasons, modelVisible) {
     if (hardReasons.some((reason) => reason.startsWith('secret_missing'))) return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.MISSING_SECRET;
+    if (hardReasons.includes('account_key_disabled')) return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.KEY_DISABLED;
     if (hardReasons.includes('account_spending_exhausted')) return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.SPENDING_EXHAUSTED;
     if (hardReasons.includes('account_quota_exhausted')) return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.QUOTA_EXHAUSTED;
+    if (hardReasons.includes('account_rate_limited')) return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.RATE_LIMITED;
     if (hardReasons.includes('account_model_blocked')) return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.BLOCKED;
     if (hardReasons.includes('account_model_not_visible')) return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.NOT_VISIBLE;
     if (hardReasons.includes('account_overlay_expired')) return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.EXPIRED;
@@ -166,10 +164,12 @@ function classifyFailure(status, hardReasons, softReasons) {
     }
     if (
         status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.QUOTA_EXHAUSTED ||
-        status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.SPENDING_EXHAUSTED
+        status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.SPENDING_EXHAUSTED ||
+        status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.RATE_LIMITED
     ) {
         return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.ACCOUNT_LIMITS;
     }
+    if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.KEY_DISABLED) return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.ACCOUNT_KEY;
     if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.BLOCKED) return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.POLICY_BLOCK;
     if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.NOT_VISIBLE) {
         return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.MODEL_VISIBILITY;
@@ -224,28 +224,6 @@ function overlayExpired(overlay, nowMs) {
  * @param {Record<string, any>} overlay
  * @returns {boolean}
  */
-function overlaySpendingExhausted(overlay) {
-    const spending = isRecord(overlay['spendingLimits']) ? overlay['spendingLimits'] : {};
-    const remainingUsd = optionalNumber(spending['remainingUsd']);
-    return remainingUsd !== null && remainingUsd <= 0;
-}
-
-/**
- * @param {Record<string, any>} overlay
- * @returns {boolean}
- */
-function overlayQuotaExhausted(overlay) {
-    const quota = isRecord(overlay['quota']) ? overlay['quota'] : {};
-    const remainingCreditsUsd = optionalNumber(quota['remainingCreditsUsd']);
-    const dailyRequests = optionalNumber(quota['dailyRequests']);
-    const dailyTokens = optionalNumber(quota['dailyTokens']);
-    return (
-        (remainingCreditsUsd !== null && remainingCreditsUsd <= 0) ||
-        (dailyRequests !== null && dailyRequests <= 0) ||
-        (dailyTokens !== null && dailyTokens <= 0)
-    );
-}
-
 /**
  * @param {object} input
  * @param {string} input.providerId
@@ -310,8 +288,11 @@ export function resolveModelGatewayAccountAccess(input) {
         else softReasons.push('account_overlay_expired');
     }
 
-    if (overlays.some(overlaySpendingExhausted)) hardReasons.push('account_spending_exhausted');
-    if (overlays.some(overlayQuotaExhausted)) hardReasons.push('account_quota_exhausted');
+    const limitStates = overlays.map((overlay) => normalizeModelGatewayAccountLimitState(overlay, { now: nowMs }));
+    if (limitStates.some((state) => state.keyDisabled)) hardReasons.push('account_key_disabled');
+    if (limitStates.some((state) => state.spendingExhausted)) hardReasons.push('account_spending_exhausted');
+    if (limitStates.some((state) => state.quotaExhausted)) hardReasons.push('account_quota_exhausted');
+    if (limitStates.some((state) => state.rateLimited)) hardReasons.push('account_rate_limited');
 
     if (overlays.length === 0) {
         if (input.requireAccountOverlay === true) hardReasons.push('account_overlay_missing');

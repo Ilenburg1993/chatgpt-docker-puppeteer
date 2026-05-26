@@ -1351,6 +1351,8 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Classificação de falhas BYOK.
 - [x] Integrar health fatal à elegibilidade pré-runtime.
 - [x] Persistir health em SQLite.
+- [x] Preservar `retry-after`, status HTTP e reset window em falhas runtime.
+- [x] Não manter rate-limit fatal após expiração da janela observada.
 
 ### Faixa G — Policy Engine
 
@@ -1558,6 +1560,10 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Access expiration.
 - [x] Access failure classification.
 - [x] Account model visibility explain.
+- [x] Separação explícita entre limite estático de catálogo, overlay dinâmico
+  account/key e falha volátil de runtime.
+- [x] Bloqueio pré-runtime por key desabilitada.
+- [x] Bloqueio pré-runtime por rate limit account/key vigente.
 - [ ] Multi-account/workspace.
 - [ ] Region/organization support.
 
@@ -3751,6 +3757,123 @@ Próximas lacunas L reforçadas:
 Validação deste corte:
 
 - [x] PASS `npm run model-gateway:test:contracts` com `133` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 62. Continuidade 2026-05-26 — Quotas Dinâmicas, Rate Limits E Falhas Runtime
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a pergunta central: quando a quota acaba durante runtime, a
+  chamada para, mas o sistema precisa registrar se isso é crédito/spend, quota,
+  rate limit temporário, key desabilitada ou erro genérico.
+- [x] Confirmado que esses fatos não pertencem ao catálogo canônico global.
+- [x] Confirmado que o banco canônico deve continuar guardando metadados raros
+  e estáveis, enquanto account overlays e runtime health guardam fatos
+  dinâmicos e expiráveis.
+- [x] Consultada a documentação OpenAI de rate limits e error codes: `429` pode
+  significar tanto envio rápido demais quanto quota/crédito/spend esgotado, e
+  limites são vistos na página de limits da organização.
+- [x] Consultada a documentação OpenRouter de limits: `/api/v1/key` é o endpoint
+  oficial para rate limit e créditos restantes da key.
+- [x] Consultada a documentação Anthropic de rate limits: `429` vem com
+  `retry-after` e headers `anthropic-ratelimit-*` com remaining/reset.
+- [x] Consultada a documentação Gemini/Vertex: Gemini API avalia RPM/TPM/RPD por
+  projeto e RPD reseta à meia-noite Pacific Time; Vertex pode usar quota
+  padrão, DSQ ou Provisioned Throughput.
+- [x] Consultada a documentação Groq: headers `retry-after`,
+  `x-ratelimit-*` expõem remaining/reset, e spend limit pode bloquear a org.
+- [x] Consultada a documentação Mistral: rate limits variam por tier/modelo,
+  aplicam por API key e expõem `X-RateLimit-Remaining`.
+- [x] Consultada a documentação Cloudflare Workers AI: limites são por tipo de
+  tarefa, alguns por modelo, e modelos beta podem ter limites menores.
+
+Arquitetura consolidada:
+
+- [x] Metadados globais continuam em evidences/projections do catálogo.
+- [x] Estado account/key fica em `accountOverlays`, com TTL curto e refresh
+  separado.
+- [x] Estado de falha runtime fica em BYOK provider health e SQLite runtime
+  layer, não em canonical projections.
+- [x] Elegibilidade pré-runtime consome overlays e health como barreiras
+  derivadas.
+- [x] Rate limit só deve excluir enquanto a janela observada ainda estiver
+  ativa.
+- [x] Quota/spending sem reset conhecido permanece bloqueio hard até refresh de
+  overlay, sucesso posterior, troca de conta/key ou política explícita.
+- [x] O operador deve enxergar a diferença entre `account_spending_exhausted`,
+  `account_quota_exhausted`, `account_rate_limited`, `account_key_disabled` e
+  `health_fatal`.
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/account-access/limits.js`.
+- [x] Criado `MODEL_GATEWAY_ACCOUNT_LIMIT_STATUS`.
+- [x] Criado `normalizeModelGatewayAccountLimitState()`.
+- [x] O normalizador separa spending, quota, rate limit e key disabled.
+- [x] O normalizador entende `retryAfterSeconds`, `resetAt`,
+  `remainingRequests` e `remainingTokens`.
+- [x] Rate limit com reset expirado deixa de bloquear pré-runtime.
+- [x] `resolveModelGatewayAccountAccess()` passa a bloquear key desabilitada.
+- [x] `resolveModelGatewayAccountAccess()` passa a bloquear rate limit account
+  ativo.
+- [x] Eligibility passa a receber status `key_disabled` e `rate_limited`.
+- [x] `MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS` passa a incluir
+  `account_key_disabled` e `account_rate_limited`.
+- [x] `explainModelGatewayAccountAccess()` passa a sugerir ações específicas
+  para key desabilitada e rate limit.
+- [x] `classifyByokProviderFailure()` passa a extrair `retry-after`,
+  `x-ratelimit-*` e headers Anthropic de reset/remaining quando disponíveis.
+- [x] `classifyByokProviderFailure()` passa a preservar `retryAfterSeconds`,
+  `resetAt`, `statusCode` e `limitHeaders`.
+- [x] BYOK provider health foi evoluído para schema v3.
+- [x] Health passa a persistir `lastFailureKind`, `lastFailureStatusCode`,
+  `lastRetryAfterSeconds` e `lastResetAt`.
+- [x] Sucesso posterior limpa os campos de falha runtime atuais, preservando
+  contadores/histórico.
+- [x] Terminal `/byok health` passa a mostrar kind/status/retry/reset quando
+  houver falha dinâmica.
+- [x] Probes e turnos vivos passam a gravar os campos estruturados de limite no
+  health.
+- [x] Health fatal em eligibility deixa de bloquear rate limit após
+  `retryAfterSeconds`/`resetAt` expirar.
+- [x] OpenRouter key overlay agora duplica crédito restante em
+  `quota.remainingCreditsUsd`, mantendo `spendingLimits` como visão de budget.
+
+Separação preservada:
+
+- [x] Nenhum runtime probe é executado por esse corte.
+- [x] Nenhum resultado runtime altera o catálogo canônico.
+- [x] Headers de limite são sanitizados e não contêm segredos.
+- [x] Account/key limits continuam account-scoped.
+- [x] Runtime health continua volátil e operacional.
+- [x] SQLite runtime layer continua espelho de health/probes, não fonte de
+  metadados globais.
+
+Próximas lacunas reforçadas:
+
+- [ ] Criar importers account/key de limites para Groq, Anthropic e Gemini
+  quando houver endpoint autenticado documentado ou API administrativa
+  apropriada.
+- [ ] Criar UX agregada `/byok gateway accounts` para mostrar overlays,
+  limits, health volátil e eligibility por conta/key.
+- [ ] Persistir snapshots separados de `account_quota_snapshots`,
+  `account_rate_limit_snapshots` e `account_spending_snapshots` no SQLite quando
+  a camada multi-account avançar.
+- [ ] Criar policy explícita para tratar quota diária/mensal com reset conhecido
+  de forma diferente de spending/crédito sem reset.
+- [ ] Criar backoff planner para probes/runtime usando `retryAfterSeconds` e
+  `resetAt`.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `136` testes.
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_provider_failure.spec.js tests/unit/copilot/model-gateway/test_model_gateway_provider_health.spec.js`
+  com `9` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `60` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.

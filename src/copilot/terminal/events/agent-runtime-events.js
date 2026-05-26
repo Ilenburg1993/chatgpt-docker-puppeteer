@@ -553,6 +553,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                     byokError.failure && byokError.failure.kind !== 'unknown'
                         ? byokError.failure.errorContext
                         : `session.${errorType}`,
+                failureKind: byokError.failure?.kind ?? null,
+                failureStatusCode: byokError.failure?.statusCode ?? null,
+                retryAfterSeconds: byokError.failure?.retryAfterSeconds ?? null,
+                resetAt: byokError.failure?.resetAt ?? null,
                 timestamp: now,
             });
             completeTerminalTurnMaterialization({
@@ -622,6 +626,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         }
 
         if (isByokModelCall) {
+            const failure = classifyByokProviderFailure(Object.assign(new Error(msg), { status: evt?.['status'] }));
             recordByokProviderModelCallFailure({
                 routeProfile: typeof evt?.['byokProfile'] === 'string' ? evt['byokProfile'] : null,
                 providerId:
@@ -633,6 +638,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                 providerModel: typeof evt?.['byokModel'] === 'string' ? evt['byokModel'] : null,
                 message: msg,
                 errorContext,
+                failureKind: failure.kind,
+                failureStatusCode: failure.statusCode,
+                retryAfterSeconds: failure.retryAfterSeconds,
+                resetAt: failure.resetAt,
                 timestamp: now,
             });
             completeTerminalTurnMaterialization({

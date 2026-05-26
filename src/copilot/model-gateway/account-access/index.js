@@ -6,6 +6,7 @@
  */
 
 export { explainModelGatewayAccountAccess } from './explain.js';
+export { MODEL_GATEWAY_ACCOUNT_LIMIT_STATUS, normalizeModelGatewayAccountLimitState } from './limits.js';
 export {
     MODEL_GATEWAY_ACCOUNT_ACCESS_CONFIDENCE,
     MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS,

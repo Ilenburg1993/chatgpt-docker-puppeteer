@@ -91,6 +91,16 @@ function optionalNumber(value) {
 
 /**
  * @param {unknown} value
+ * @returns {number | null}
+ */
+function dateMs(value) {
+    if (value === null || value === undefined) return null;
+    const date = value instanceof Date ? value : new Date(/** @type {string | number} */ (value));
+    return Number.isFinite(date.getTime()) ? date.getTime() : null;
+}
+
+/**
+ * @param {unknown} value
  * @returns {string[]}
  */
 function stringList(value) {
@@ -270,15 +280,29 @@ function errorContextText(value) {
 
 /**
  * @param {Record<string, any>} health
+ * @param {number} nowMs
  * @returns {boolean}
  */
-function isFatalHealth(health) {
+function isFatalHealth(health, nowMs) {
     const status = optionalString(health['lastStatus']);
     const failureContext = [errorContextText(health['lastErrorContext']), errorContextText(health['lastMessage'])].filter(Boolean).join(' ');
-    return (
-        status === 'failed' &&
-        /(?:auth|unauthori[sz]ed|permission|forbidden|not[_ -]?found|quota|billing|rate[_ -]?limit)/iu.test(failureContext)
-    );
+    if (status !== 'failed') return false;
+    if (!/(?:auth|unauthori[sz]ed|permission|forbidden|not[_ -]?found|quota|billing|rate[_ -]?limit)/iu.test(failureContext)) {
+        return false;
+    }
+    const resetAtMs = dateMs(health['lastResetAt']);
+    if (resetAtMs !== null && resetAtMs <= nowMs) return false;
+    const retryAfterSeconds = optionalNumber(health['lastRetryAfterSeconds']);
+    const lastFailureAtMs = dateMs(health['lastFailureAt']);
+    if (
+        retryAfterSeconds !== null &&
+        retryAfterSeconds > 0 &&
+        lastFailureAtMs !== null &&
+        lastFailureAtMs + retryAfterSeconds * 1000 <= nowMs
+    ) {
+        return false;
+    }
+    return true;
 }
 
 /**
@@ -295,6 +319,7 @@ function isFatalHealth(health) {
 export function evaluateModelGatewayEligibility(input) {
     const projection = isRecord(input.projection) ? input.projection : {};
     const routeOption = isRecord(input.routeOption) ? input.routeOption : {};
+    const nowMs = dateMs(input.now) ?? Date.now();
     const providerId = readProviderId(routeOption, projection);
     const providerModel = readProviderModel(routeOption, projection);
     const policy = /** @type {Record<string, any>} */ ({ ...DEFAULT_POLICY, ...(isRecord(input.policy) ? input.policy : {}) });
@@ -362,7 +387,7 @@ export function evaluateModelGatewayEligibility(input) {
         if (!installed) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.OLLAMA_LOCAL_MODEL_NOT_INSTALLED);
     }
 
-    if (policy['excludeFailedHealth'] !== false && isRecord(input.health) && isFatalHealth(input.health)) {
+    if (policy['excludeFailedHealth'] !== false && isRecord(input.health) && isFatalHealth(input.health, nowMs)) {
         hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.HEALTH_FATAL);
     }
 

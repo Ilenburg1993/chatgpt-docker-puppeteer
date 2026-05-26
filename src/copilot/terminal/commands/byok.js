@@ -1196,7 +1196,9 @@ function readHealthForByokProfile(profile) {
 function renderByokHealthTag(health) {
     if (!health) return 'chat=?';
     if (isByokHealthCurrentlyFailed(health)) {
-        return `chat=failed(${renderByokChatHealthEvidence(health.lastErrorContext)},${formatByokHealthAge(health.lastFailureAt)}${health.failureCount > 1 ? `,x${health.failureCount}` : ''})`;
+        const limit = health.lastResetAt ? `,reset=${health.lastResetAt}` : health.lastRetryAfterSeconds ? `,retry=${health.lastRetryAfterSeconds}s` : '';
+        const failure = health.lastFailureKind ? `${health.lastFailureKind}:` : '';
+        return `chat=failed(${failure}${renderByokChatHealthEvidence(health.lastErrorContext)},${formatByokHealthAge(health.lastFailureAt)}${limit}${health.failureCount > 1 ? `,x${health.failureCount}` : ''})`;
     }
     if (health.lastStatus !== 'ok') return 'chat=?';
     return `chat=ok(${renderByokChatHealthEvidence(health.lastSuccessContext)},${formatByokHealthAge(health.lastSuccessAt)}${health.successCount > 1 ? `,x${health.successCount}` : ''})`;
@@ -1680,6 +1682,15 @@ function renderByokHealth(println) {
         println(`      \x1b[90m${parts.join(' · ')}\x1b[0m`);
         if (record.lastMessage) println(`      \x1b[90multimo erro=${record.lastMessage}\x1b[0m`);
         if (record.lastErrorContext) println(`      \x1b[90mcontexto=${record.lastErrorContext}\x1b[0m`);
+        if (record.lastFailureKind || record.lastFailureStatusCode || record.lastRetryAfterSeconds || record.lastResetAt) {
+            const failureBits = [
+                record.lastFailureKind ? `kind=${record.lastFailureKind}` : null,
+                record.lastFailureStatusCode ? `http=${record.lastFailureStatusCode}` : null,
+                record.lastRetryAfterSeconds ? `retryAfter=${record.lastRetryAfterSeconds}s` : null,
+                record.lastResetAt ? `resetAt=${record.lastResetAt}` : null,
+            ].filter(Boolean);
+            println(`      \x1b[90mlimite/falha=${failureBits.join(' · ')}\x1b[0m`);
+        }
         if (record.lastAgentProbeMessage) println(`      \x1b[90multimo erro agent=${record.lastAgentProbeMessage}\x1b[0m`);
         if (record.lastAgentProbeErrorContext) println(`      \x1b[90mcontexto agent=${record.lastAgentProbeErrorContext}\x1b[0m`);
     }
@@ -2755,6 +2766,10 @@ async function recordByokProbeHealth(mode, probe) {
         providerAttempted,
         message: probe.errors[0] ?? null,
         errorContext: probe.providerFailure?.errorContext ?? `byok_${mode}_probe`,
+        failureKind: probe.providerFailure?.kind ?? null,
+        failureStatusCode: probe.providerFailure?.statusCode ?? null,
+        retryAfterSeconds: probe.providerFailure?.retryAfterSeconds ?? null,
+        resetAt: probe.providerFailure?.resetAt ?? null,
     });
     if (mode !== 'chat' && mode !== 'agent') return providerAttempted;
     if (mode === 'agent' && probe.ok) {
@@ -2775,6 +2790,10 @@ async function recordByokProbeHealth(mode, probe) {
             ...healthIdentity,
             message: probe.errors[0] ?? `probe ${probe.status}`,
             errorContext: probe.providerFailure?.errorContext ?? 'byok_probe',
+            failureKind: probe.providerFailure?.kind ?? null,
+            failureStatusCode: probe.providerFailure?.statusCode ?? null,
+            retryAfterSeconds: probe.providerFailure?.retryAfterSeconds ?? null,
+            resetAt: probe.providerFailure?.resetAt ?? null,
         });
     }
     await flushByokProviderHealth();

@@ -236,6 +236,7 @@ function runtimeHealthStatus(record) {
  */
 function runtimeFailureContext(record) {
     return (
+        optionalString(record['lastFailureKind']) ??
         optionalString(record['lastErrorContext']) ??
         optionalString(record['lastAgentProbeErrorContext']) ??
         optionalString(record['lastMessage']) ??

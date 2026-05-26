@@ -61,6 +61,12 @@ function nextActions(status, hardReasons, softReasons) {
     if (status === 'spending_exhausted' || hardReasons.includes('account_spending_exhausted')) {
         actions.push('raise_spending_limit_or_choose_free_model');
     }
+    if (status === 'rate_limited' || hardReasons.includes('account_rate_limited')) {
+        actions.push('wait_for_rate_limit_reset_or_choose_another_route');
+    }
+    if (status === 'key_disabled' || hardReasons.includes('account_key_disabled')) {
+        actions.push('enable_or_replace_provider_key');
+    }
     if (status === 'unknown' || softReasons.includes('account_visibility_unknown')) actions.push('run_low_cost_access_probe');
     if (actions.length === 0 && status === 'visible') actions.push('account_access_can_enter_eligibility');
     return [...new Set(actions)];

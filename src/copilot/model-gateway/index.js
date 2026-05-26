@@ -13,6 +13,8 @@ export {
     MODEL_GATEWAY_ACCOUNT_ACCESS_CONFIDENCE,
     MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS,
     MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS,
+    MODEL_GATEWAY_ACCOUNT_LIMIT_STATUS,
+    normalizeModelGatewayAccountLimitState,
     resolveModelGatewayAccountAccess,
 } from './account-access/index.js';
 

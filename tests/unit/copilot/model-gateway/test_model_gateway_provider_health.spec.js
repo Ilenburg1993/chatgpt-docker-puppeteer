@@ -47,6 +47,10 @@ describe('BYOK provider chat health state', () => {
             providerModel: 'gpt-oss-120b',
             message: 'Provider rejected request with Bearer abcdefghijklmnopqrstuvwxyz012345',
             errorContext: 'model_call',
+            failureKind: 'rate-limit',
+            failureStatusCode: 429,
+            retryAfterSeconds: 30,
+            resetAt: '2026-05-25T00:01:00.000Z',
             timestamp: 1_700_000_000_000,
         });
         await flushByokProviderHealth();
@@ -65,6 +69,10 @@ describe('BYOK provider chat health state', () => {
         expect(health?.failureCount).toBe(1);
         expect(health?.lastMessage).toContain('[redacted]');
         expect(health?.lastMessage).not.toContain('abcdefghijklmnopqrstuvwxyz012345');
+        expect(health?.lastFailureKind).toBe('rate-limit');
+        expect(health?.lastFailureStatusCode).toBe(429);
+        expect(health?.lastRetryAfterSeconds).toBe(30);
+        expect(health?.lastResetAt).toBe('2026-05-25T00:01:00.000Z');
         expect(readByokProviderHealthState().records).toBe(1);
     });
 
@@ -100,6 +108,7 @@ describe('BYOK provider chat health state', () => {
         expect(health?.successCount).toBe(1);
         expect(health?.lastFailureAt).toBe(1_700_000_000_000);
         expect(health?.lastSuccessAt).toBe(1_700_000_010_000);
+        expect(health?.lastFailureKind).toBeNull();
         expect(health?.lastSuccessContext).toBe('llm.usage');
     });
 
@@ -197,6 +206,9 @@ describe('BYOK provider chat health state', () => {
             providerAttempted: true,
             message: 'sem delta',
             errorContext: 'byok_streaming_probe',
+            failureKind: 'rate-limit',
+            failureStatusCode: 429,
+            retryAfterSeconds: 10,
             timestamp: 1_700_000_040_000,
         });
         recordByokProviderModelProbeResult({
@@ -225,6 +237,9 @@ describe('BYOK provider chat health state', () => {
                 ok: false,
                 failureCount: 1,
                 lastMessage: 'sem delta',
+                lastFailureKind: 'rate-limit',
+                lastFailureStatusCode: 429,
+                lastRetryAfterSeconds: 10,
             }),
         );
         expect(health?.probes?.['json']).toEqual(

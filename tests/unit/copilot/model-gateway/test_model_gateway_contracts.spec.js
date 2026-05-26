@@ -41,6 +41,7 @@ import {
     createEnvSecretRegistry,
     explainModelGatewayAccountAccess,
     explainGatewayRouteDecision,
+    normalizeModelGatewayAccountLimitState,
     resolveModelGatewayAccountAccess,
     buildModelGatewayOnListModelsHandler,
     evaluateGatewayModelHealthRoute,
@@ -5150,6 +5151,71 @@ describe('model-gateway foundation', () => {
         assert.equal(exhausted.policyInputs['accountAccess']['status'], 'spending_exhausted');
     });
 
+    it('normalizes dynamic account key limits separately from canonical metadata', () => {
+        const activeLimitedOverlay = createProviderAccountOverlay({
+            providerId: 'openrouter',
+            secretRef: 'OPENROUTER_API_KEY',
+            enabledModels: ['anthropic/claude'],
+            rateLimits: {
+                remainingRequests: 0,
+                resetAt: '2026-05-25T00:05:00.000Z',
+            },
+        });
+        const active = normalizeModelGatewayAccountLimitState(activeLimitedOverlay, {
+            now: '2026-05-25T00:00:00.000Z',
+        });
+        assert.equal(active.status, 'rate_limited');
+        assert.equal(active.rateLimited, true);
+        assert.equal(active.resetAt, '2026-05-25T00:05:00.000Z');
+
+        const expired = normalizeModelGatewayAccountLimitState(activeLimitedOverlay, {
+            now: '2026-05-25T00:06:00.000Z',
+        });
+        assert.equal(expired.status, 'ok');
+        assert.equal(expired.rateLimited, false);
+    });
+
+    it('blocks disabled keys and active account rate-limit windows before runtime', () => {
+        const keyDisabled = resolveModelGatewayAccountAccess({
+            providerId: 'openrouter',
+            providerModel: 'anthropic/claude',
+            accountOverlays: [
+                createProviderAccountOverlay({
+                    providerId: 'openrouter',
+                    secretRef: 'OPENROUTER_API_KEY',
+                    enabledModels: ['anthropic/claude'],
+                    providerMetadata: { disabled: true },
+                }),
+            ],
+            secretRegistry: createEnvSecretRegistry({ env: { OPENROUTER_API_KEY: 'sk-or-test' } }),
+        });
+        assert.equal(keyDisabled.status, 'key_disabled');
+        assert.equal(keyDisabled.canAttempt, false);
+        assert.equal(keyDisabled.failureClass, 'account_key');
+        assert.ok(keyDisabled.hardReasons.includes('account_key_disabled'));
+
+        const rateLimitedDecision = evaluateModelGatewayEligibility({
+            projection: createCanonicalModelProjection({
+                providerId: 'openrouter',
+                providerModel: 'anthropic/claude',
+                pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 3 },
+            }),
+            accountOverlays: [
+                createProviderAccountOverlay({
+                    providerId: 'openrouter',
+                    secretRef: 'OPENROUTER_API_KEY',
+                    enabledModels: ['anthropic/claude'],
+                    rateLimits: { retryAfterSeconds: 60 },
+                }),
+            ],
+            secretRegistry: createEnvSecretRegistry({ env: { OPENROUTER_API_KEY: 'sk-or-test' } }),
+            now: '2026-05-25T00:00:00.000Z',
+        });
+        assert.equal(rateLimitedDecision.include, false);
+        assert.ok(rateLimitedDecision.hardExclusions.includes('account_rate_limited'));
+        assert.equal(rateLimitedDecision.policyInputs['accountAccess']['status'], 'rate_limited');
+    });
+
     it('evaluates hard pre-runtime exclusions from secrets, account overlays and access visibility', () => {
         const projection = createCanonicalModelProjection({
             providerId: 'openai',
@@ -5213,6 +5279,33 @@ describe('model-gateway foundation', () => {
         assert.equal(decision.disposition, 'excluded');
         assert.equal(decision.hardExclusions.includes('health_fatal'), true);
         assert.equal(explainModelGatewayEligibilityDecision(decision).nextActions.includes('wait_or_clear_fatal_provider_health_after_fix'), true);
+    });
+
+    it('does not keep rate-limit runtime health fatal after its reset window expires', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'groq',
+            providerModel: 'openai/gpt-oss-120b',
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'groq',
+            secretRef: 'GROQ_API_KEY',
+            enabledModels: ['openai/gpt-oss-120b'],
+        });
+        const decision = evaluateModelGatewayEligibility({
+            projection,
+            accountOverlays: [overlay],
+            secretRegistry: createEnvSecretRegistry({ env: { GROQ_API_KEY: 'gsk-test' } }),
+            health: {
+                lastStatus: 'failed',
+                lastFailureAt: 1_700_000_000_000,
+                lastErrorContext: 'provider.rate_limit',
+                lastRetryAfterSeconds: 30,
+            },
+            now: 1_700_000_031_000,
+        });
+        assert.equal(decision.include, true);
+        assert.equal(decision.hardExclusions.includes('health_fatal'), false);
     });
 
     it('allows unknown account visibility only when policy permits a cheap runtime probe', () => {

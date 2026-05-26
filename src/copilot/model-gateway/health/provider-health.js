@@ -16,7 +16,8 @@ import { dirname, join } from 'node:path';
 import { redactSecretText } from '#copilot/core';
 
 const MAX_BYOK_PROVIDER_HEALTH_RECORDS = 200;
-const BYOK_PROVIDER_HEALTH_SCHEMA_VERSION = 2;
+const BYOK_PROVIDER_HEALTH_SCHEMA_VERSION = 3;
+const PREVIOUS_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION = 2;
 const LEGACY_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION = 1;
 const DEFAULT_BYOK_PROVIDER_HEALTH_PATH = join(process.cwd(), 'data', 'copilot-terminal', 'byok-provider-health.json');
 
@@ -36,6 +37,10 @@ const DEFAULT_BYOK_PROVIDER_HEALTH_PATH = join(process.cwd(), 'data', 'copilot-t
  * @property {number | null} lastSuccessAt
  * @property {string | null} lastMessage
  * @property {string | null} lastErrorContext
+ * @property {string | null} lastFailureKind
+ * @property {number | null} lastFailureStatusCode
+ * @property {number | null} lastRetryAfterSeconds
+ * @property {string | null} lastResetAt
  * @property {string | null} lastSuccessContext
  * @property {'failed' | 'ok' | null} agentProbeStatus
  * @property {number} agentProbeFailureCount
@@ -59,6 +64,10 @@ const DEFAULT_BYOK_PROVIDER_HEALTH_PATH = join(process.cwd(), 'data', 'copilot-t
  * @property {number | null} lastAt
  * @property {string | null} lastMessage
  * @property {string | null} lastErrorContext
+ * @property {string | null} lastFailureKind
+ * @property {number | null} lastFailureStatusCode
+ * @property {number | null} lastRetryAfterSeconds
+ * @property {string | null} lastResetAt
  */
 
 /** @type {Map<string, ByokProviderHealthRecord>} */
@@ -167,6 +176,25 @@ function normalizeTimestamp(value) {
 
 /**
  * @param {unknown} value
+ * @returns {number | null}
+ */
+function normalizeOptionalNumber(value) {
+    const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN;
+    return Number.isFinite(number) ? number : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function normalizeIsoTimestamp(value) {
+    if (value === null || value === undefined) return null;
+    const date = value instanceof Date ? value : new Date(/** @type {string | number} */ (value));
+    return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+/**
+ * @param {unknown} value
  * @returns {'failed' | 'ok' | null}
  */
 function normalizeStatus(value) {
@@ -201,6 +229,10 @@ function normalizeProbeRecord(kind, value) {
         lastAt: normalizeTimestamp(value['lastAt']),
         lastMessage: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastMessage'])),
         lastErrorContext: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastErrorContext'])),
+        lastFailureKind: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastFailureKind'])),
+        lastFailureStatusCode: normalizeOptionalNumber(value['lastFailureStatusCode']),
+        lastRetryAfterSeconds: normalizeOptionalNumber(value['lastRetryAfterSeconds']),
+        lastResetAt: normalizeIsoTimestamp(value['lastResetAt']),
     };
 }
 
@@ -255,6 +287,10 @@ function normalizeRecord(value) {
         lastSuccessAt: normalizeTimestamp(value['lastSuccessAt']),
         lastMessage: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastMessage'])),
         lastErrorContext: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastErrorContext'])),
+        lastFailureKind: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastFailureKind'])),
+        lastFailureStatusCode: normalizeOptionalNumber(value['lastFailureStatusCode']),
+        lastRetryAfterSeconds: normalizeOptionalNumber(value['lastRetryAfterSeconds']),
+        lastResetAt: normalizeIsoTimestamp(value['lastResetAt']),
         lastSuccessContext: sanitizeHealthText(
             /** @type {string | null | undefined} */ (value['lastSuccessContext']),
         ),
@@ -302,7 +338,7 @@ function hydrateByokProviderHealthFromDisk() {
         const parsed = JSON.parse(raw);
         if (
             !isRecord(parsed) ||
-            ![BYOK_PROVIDER_HEALTH_SCHEMA_VERSION, LEGACY_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION].includes(
+            ![BYOK_PROVIDER_HEALTH_SCHEMA_VERSION, PREVIOUS_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION, LEGACY_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION].includes(
                 /** @type {number} */ (parsed['schemaVersion']),
             )
         ) {
@@ -377,7 +413,7 @@ export async function flushByokProviderHealth() {
 }
 
 /**
- * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; message?: string | null; errorContext?: string | null; timestamp?: number }} input
+ * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; message?: string | null; errorContext?: string | null; failureKind?: string | null; failureStatusCode?: number | null; retryAfterSeconds?: number | null; resetAt?: string | number | Date | null; timestamp?: number }} input
  * @returns {void}
  */
 export function recordByokProviderModelCallFailure(input) {
@@ -397,6 +433,10 @@ export function recordByokProviderModelCallFailure(input) {
         lastSuccessAt: previous?.lastSuccessAt ?? null,
         lastMessage: sanitizeHealthText(input.message) ?? previous?.lastMessage ?? null,
         lastErrorContext: sanitizeHealthText(input.errorContext) ?? previous?.lastErrorContext ?? null,
+        lastFailureKind: sanitizeHealthText(input.failureKind) ?? previous?.lastFailureKind ?? null,
+        lastFailureStatusCode: normalizeOptionalNumber(input.failureStatusCode) ?? previous?.lastFailureStatusCode ?? null,
+        lastRetryAfterSeconds: normalizeOptionalNumber(input.retryAfterSeconds) ?? previous?.lastRetryAfterSeconds ?? null,
+        lastResetAt: normalizeIsoTimestamp(input.resetAt) ?? previous?.lastResetAt ?? null,
         lastSuccessContext: previous?.lastSuccessContext ?? null,
         agentProbeStatus: previous?.agentProbeStatus ?? null,
         agentProbeFailureCount: previous?.agentProbeFailureCount ?? 0,
@@ -432,6 +472,10 @@ export function recordByokProviderModelCallSuccess(input) {
         lastSuccessAt: now,
         lastMessage: null,
         lastErrorContext: null,
+        lastFailureKind: null,
+        lastFailureStatusCode: null,
+        lastRetryAfterSeconds: null,
+        lastResetAt: null,
         lastSuccessContext: sanitizeHealthText(input.successContext) ?? previous?.lastSuccessContext ?? null,
         agentProbeStatus: previous?.agentProbeStatus ?? null,
         agentProbeFailureCount: previous?.agentProbeFailureCount ?? 0,
@@ -467,6 +511,10 @@ export function recordByokProviderModelAgentProbeFailure(input) {
         lastSuccessAt: previous?.lastSuccessAt ?? null,
         lastMessage: previous?.lastMessage ?? null,
         lastErrorContext: previous?.lastErrorContext ?? null,
+        lastFailureKind: previous?.lastFailureKind ?? null,
+        lastFailureStatusCode: previous?.lastFailureStatusCode ?? null,
+        lastRetryAfterSeconds: previous?.lastRetryAfterSeconds ?? null,
+        lastResetAt: previous?.lastResetAt ?? null,
         lastSuccessContext: previous?.lastSuccessContext ?? null,
         agentProbeStatus: 'failed',
         agentProbeFailureCount: (previous?.agentProbeFailureCount ?? 0) + 1,
@@ -503,6 +551,10 @@ export function recordByokProviderModelAgentProbeSuccess(input) {
         lastSuccessAt: previous?.lastSuccessAt ?? null,
         lastMessage: previous?.lastMessage ?? null,
         lastErrorContext: previous?.lastErrorContext ?? null,
+        lastFailureKind: previous?.lastFailureKind ?? null,
+        lastFailureStatusCode: previous?.lastFailureStatusCode ?? null,
+        lastRetryAfterSeconds: previous?.lastRetryAfterSeconds ?? null,
+        lastResetAt: previous?.lastResetAt ?? null,
         lastSuccessContext: previous?.lastSuccessContext ?? null,
         agentProbeStatus: 'ok',
         agentProbeFailureCount: previous?.agentProbeFailureCount ?? 0,
@@ -518,7 +570,7 @@ export function recordByokProviderModelAgentProbeSuccess(input) {
 }
 
 /**
- * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; probeKind: string; status: string; ok?: boolean; providerAttempted?: boolean; message?: string | null; errorContext?: string | null; timestamp?: number }} input
+ * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; probeKind: string; status: string; ok?: boolean; providerAttempted?: boolean; message?: string | null; errorContext?: string | null; failureKind?: string | null; failureStatusCode?: number | null; retryAfterSeconds?: number | null; resetAt?: string | number | Date | null; timestamp?: number }} input
  * @returns {void}
  */
 export function recordByokProviderModelProbeResult(input) {
@@ -543,6 +595,14 @@ export function recordByokProviderModelProbeResult(input) {
         lastAt: now,
         lastMessage: sanitizeHealthText(input.message) ?? previousProbe?.lastMessage ?? null,
         lastErrorContext: sanitizeHealthText(input.errorContext) ?? previousProbe?.lastErrorContext ?? null,
+        lastFailureKind: ok ? null : sanitizeHealthText(input.failureKind) ?? previousProbe?.lastFailureKind ?? null,
+        lastFailureStatusCode: ok
+            ? null
+            : normalizeOptionalNumber(input.failureStatusCode) ?? previousProbe?.lastFailureStatusCode ?? null,
+        lastRetryAfterSeconds: ok
+            ? null
+            : normalizeOptionalNumber(input.retryAfterSeconds) ?? previousProbe?.lastRetryAfterSeconds ?? null,
+        lastResetAt: ok ? null : normalizeIsoTimestamp(input.resetAt) ?? previousProbe?.lastResetAt ?? null,
     };
     _byokProviderHealthByKey.set(key, {
         key,
@@ -554,6 +614,10 @@ export function recordByokProviderModelProbeResult(input) {
         lastSuccessAt: previous?.lastSuccessAt ?? null,
         lastMessage: previous?.lastMessage ?? null,
         lastErrorContext: previous?.lastErrorContext ?? null,
+        lastFailureKind: previous?.lastFailureKind ?? null,
+        lastFailureStatusCode: previous?.lastFailureStatusCode ?? null,
+        lastRetryAfterSeconds: previous?.lastRetryAfterSeconds ?? null,
+        lastResetAt: previous?.lastResetAt ?? null,
         lastSuccessContext: previous?.lastSuccessContext ?? null,
         agentProbeStatus: previous?.agentProbeStatus ?? null,
         agentProbeFailureCount: previous?.agentProbeFailureCount ?? 0,

@@ -38,4 +38,28 @@ describe('model-gateway BYOK provider failure taxonomy', () => {
         );
         expect(classifyByokProviderFailure(new Error('unexpected provider envelope')).kind).toBe('unknown');
     });
+
+    it('preserva retry-after e headers de limite para health e exclusão temporária', () => {
+        const failure = classifyByokProviderFailure(
+            Object.assign(new Error('too many requests'), {
+                status: 429,
+                headers: {
+                    'retry-after': '42',
+                    'x-ratelimit-remaining-requests': '0',
+                    'x-ratelimit-reset-tokens': '7.5s',
+                },
+            }),
+        );
+
+        expect(failure.kind).toBe('rate-limit');
+        expect(failure.retryAfterSeconds).toBe(42);
+        expect(failure.resetAt).toEqual(expect.any(String));
+        expect(failure.limitHeaders).toEqual(
+            expect.objectContaining({
+                'retry-after': 42,
+                'x-ratelimit-remaining-requests': 0,
+                'x-ratelimit-reset-tokens': '7.5s',
+            }),
+        );
+    });
 });

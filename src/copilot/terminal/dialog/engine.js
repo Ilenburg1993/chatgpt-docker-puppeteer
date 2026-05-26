@@ -1135,6 +1135,10 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 providerModel: byokFailure.model,
                 message: byokFailure.message,
                 errorContext: byokFailure.errorContext,
+                failureKind: byokFailure.failure.kind,
+                failureStatusCode: byokFailure.failure.statusCode,
+                retryAfterSeconds: byokFailure.failure.retryAfterSeconds,
+                resetAt: byokFailure.failure.resetAt,
                 timestamp: now,
             });
             completeTerminalTurnMaterialization({ timestamp: now, status: 'failed' });

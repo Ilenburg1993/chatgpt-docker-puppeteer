@@ -25,6 +25,9 @@ import { toError } from '#copilot/core';
  * @property {string} operatorLabel
  * @property {string} operatorAction
  * @property {boolean} external
+ * @property {number | null} retryAfterSeconds
+ * @property {string | null} resetAt
+ * @property {Record<string, string | number>} limitHeaders
  */
 
 /**
@@ -34,7 +37,8 @@ import { toError } from '#copilot/core';
 function readStructuredStatusCode(error) {
     if (!error || typeof error !== 'object') return null;
     const record = /** @type {Record<string, unknown>} */ (error);
-    const candidates = [record['status'], record['statusCode'], record['responseStatus'], record['httpStatus']];
+    const response = record['response'] && typeof record['response'] === 'object' ? /** @type {Record<string, unknown>} */ (record['response']) : {};
+    const candidates = [record['status'], record['statusCode'], record['responseStatus'], record['httpStatus'], response['status'], response['statusCode']];
     for (const candidate of candidates) {
         if (typeof candidate === 'number' && Number.isInteger(candidate) && candidate >= 100 && candidate <= 599) {
             return candidate;
@@ -64,6 +68,147 @@ function readFailureCode(error) {
     if (!error || typeof error !== 'object') return '';
     const code = Reflect.get(error, 'code');
     return typeof code === 'string' || typeof code === 'number' ? String(code) : '';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function stringValue(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function finiteNumber(value) {
+    const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN;
+    return Number.isFinite(number) ? number : null;
+}
+
+/**
+ * @param {string} value
+ * @returns {number | null}
+ */
+function parseRetryAfterSeconds(value) {
+    const seconds = Number(value.trim());
+    if (Number.isFinite(seconds)) return Math.max(0, seconds);
+    const date = new Date(value);
+    return Number.isFinite(date.getTime()) ? Math.max(0, Math.ceil((date.getTime() - Date.now()) / 1000)) : null;
+}
+
+/**
+ * @param {string} value
+ * @returns {number | null}
+ */
+function parseDurationSeconds(value) {
+    const trimmed = value.trim();
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric)) return Math.max(0, numeric);
+    const match = trimmed.match(/^(?:(\d+(?:\.\d+)?)h)?(?:(\d+(?:\.\d+)?)m)?(?:(\d+(?:\.\d+)?)s)?$/iu);
+    if (!match) return null;
+    const hours = Number(match[1] ?? 0);
+    const minutes = Number(match[2] ?? 0);
+    const seconds = Number(match[3] ?? 0);
+    const total = hours * 3600 + minutes * 60 + seconds;
+    return Number.isFinite(total) && total >= 0 ? total : null;
+}
+
+/**
+ * @param {unknown} headers
+ * @param {string} name
+ * @returns {string | null}
+ */
+function readHeader(headers, name) {
+    if (!headers) return null;
+    const lower = name.toLowerCase();
+    const getter = Reflect.get(Object(headers), 'get');
+    if (typeof getter === 'function') {
+        const value = getter.call(headers, name) ?? getter.call(headers, lower);
+        return stringValue(value);
+    }
+    if (!isRecord(headers)) return null;
+    for (const [key, value] of Object.entries(headers)) {
+        if (key.toLowerCase() === lower) return stringValue(value) ?? (typeof value === 'number' ? String(value) : null);
+    }
+    return null;
+}
+
+/**
+ * @param {unknown} error
+ * @returns {unknown[]}
+ */
+function readHeaderSources(error) {
+    if (!isRecord(error)) return [];
+    const response = isRecord(error['response']) ? error['response'] : {};
+    const cause = isRecord(error['cause']) ? error['cause'] : {};
+    return [error['headers'], response['headers'], cause['headers']].filter(Boolean);
+}
+
+/**
+ * @param {unknown} error
+ * @param {string} message
+ * @returns {{ retryAfterSeconds: number | null; resetAt: string | null; limitHeaders: Record<string, string | number> }}
+ */
+function readLimitHints(error, message) {
+    const limitHeaders = /** @type {Record<string, string | number>} */ ({});
+    const headerSources = readHeaderSources(error);
+    const headerNames = [
+        'retry-after',
+        'x-ratelimit-reset',
+        'x-ratelimit-reset-requests',
+        'x-ratelimit-reset-tokens',
+        'x-ratelimit-remaining-requests',
+        'x-ratelimit-remaining-tokens',
+        'anthropic-ratelimit-requests-reset',
+        'anthropic-ratelimit-tokens-reset',
+        'anthropic-ratelimit-input-tokens-reset',
+        'anthropic-ratelimit-output-tokens-reset',
+    ];
+    for (const headers of headerSources) {
+        for (const name of headerNames) {
+            const value = readHeader(headers, name);
+            if (value !== null) limitHeaders[name] = finiteNumber(value) ?? value;
+        }
+    }
+    const retryHeader = headerSources.map((headers) => readHeader(headers, 'retry-after')).find((value) => value !== null);
+    const retryAfterSeconds =
+        retryHeader !== undefined && retryHeader !== null
+            ? parseRetryAfterSeconds(retryHeader)
+            : (() => {
+                  const match = message.match(/\b(?:retry(?:\s+after)?|try again in)\s+(\d+(?:\.\d+)?)\s*(seconds?|secs?|s|minutes?|mins?|m)\b/iu);
+                  if (!match) return null;
+                  const value = Number(match[1]);
+                  return /m(?:in(?:ute)?s?)?/iu.test(match[2] ?? 's') ? value * 60 : value;
+              })();
+    const resetHeader = headerSources
+        .flatMap((headers) => ['x-ratelimit-reset', 'x-ratelimit-reset-requests', 'x-ratelimit-reset-tokens'].map((name) => readHeader(headers, name)))
+        .find((value) => value !== null);
+    const resetFromHeader =
+        resetHeader !== undefined && resetHeader !== null
+            ? (() => {
+                  const date = new Date(resetHeader);
+                  if (Number.isFinite(date.getTime())) return date.toISOString();
+                  const seconds = parseDurationSeconds(resetHeader);
+                  return seconds !== null ? new Date(Date.now() + seconds * 1000).toISOString() : null;
+              })()
+            : null;
+    return {
+        retryAfterSeconds,
+        resetAt:
+            resetFromHeader ??
+            (retryAfterSeconds !== null && retryAfterSeconds > 0 ? new Date(Date.now() + retryAfterSeconds * 1000).toISOString() : null),
+        limitHeaders,
+    };
 }
 
 /**
@@ -118,13 +263,20 @@ function textLooksLikeNetworkFailure(message, code) {
  * @param {ByokProviderFailureKind} kind
  * @param {number | null} statusCode
  * @param {string} message
+ * @param {{ retryAfterSeconds: number | null; resetAt: string | null; limitHeaders: Record<string, string | number> }} limitHints
  * @returns {ByokProviderFailure}
  */
-function buildFailure(kind, statusCode, message) {
+function buildFailure(kind, statusCode, message, limitHints) {
     const http = statusCode ? `HTTP ${statusCode}` : null;
+    const base = {
+        retryAfterSeconds: limitHints.retryAfterSeconds,
+        resetAt: limitHints.resetAt,
+        limitHeaders: limitHints.limitHeaders,
+    };
     switch (kind) {
         case 'credits':
             return {
+                ...base,
                 kind,
                 message,
                 statusCode,
@@ -136,6 +288,7 @@ function buildFailure(kind, statusCode, message) {
             };
         case 'rate-limit':
             return {
+                ...base,
                 kind,
                 message,
                 statusCode,
@@ -147,6 +300,7 @@ function buildFailure(kind, statusCode, message) {
             };
         case 'auth':
             return {
+                ...base,
                 kind,
                 message,
                 statusCode,
@@ -158,6 +312,7 @@ function buildFailure(kind, statusCode, message) {
             };
         case 'model-or-route':
             return {
+                ...base,
                 kind,
                 message,
                 statusCode,
@@ -169,6 +324,7 @@ function buildFailure(kind, statusCode, message) {
             };
         case 'timeout':
             return {
+                ...base,
                 kind,
                 message,
                 statusCode,
@@ -180,6 +336,7 @@ function buildFailure(kind, statusCode, message) {
             };
         case 'network':
             return {
+                ...base,
                 kind,
                 message,
                 statusCode,
@@ -191,6 +348,7 @@ function buildFailure(kind, statusCode, message) {
             };
         case 'upstream':
             return {
+                ...base,
                 kind,
                 message,
                 statusCode,
@@ -202,6 +360,7 @@ function buildFailure(kind, statusCode, message) {
             };
         default:
             return {
+                ...base,
                 kind: 'unknown',
                 message,
                 statusCode,
@@ -226,26 +385,27 @@ export function classifyByokProviderFailure(error) {
     const message = err.message || 'erro BYOK sem mensagem';
     const statusCode = readStructuredStatusCode(error) ?? readMessageStatusCode(message);
     const code = readFailureCode(error);
-    if (statusCode === 402 || textLooksLikeCreditsFailure(message)) {
-        return buildFailure('credits', statusCode, message);
+    const limitHints = readLimitHints(error, message);
+    if (statusCode === 402 || /(?:insufficient_quota|quota_exceeded|credits?_exhausted)/iu.test(code) || textLooksLikeCreditsFailure(message)) {
+        return buildFailure('credits', statusCode, message, limitHints);
     }
     if (statusCode === 429 || textLooksLikeRateLimitFailure(message)) {
-        return buildFailure('rate-limit', statusCode, message);
+        return buildFailure('rate-limit', statusCode, message, limitHints);
     }
     if (statusCode === 401 || statusCode === 403 || textLooksLikeAuthFailure(message)) {
-        return buildFailure('auth', statusCode, message);
+        return buildFailure('auth', statusCode, message, limitHints);
     }
     if (statusCode === 404) {
-        return buildFailure('model-or-route', statusCode, message);
+        return buildFailure('model-or-route', statusCode, message, limitHints);
     }
     if (textLooksLikeTimeoutFailure(message)) {
-        return buildFailure('timeout', statusCode, message);
+        return buildFailure('timeout', statusCode, message, limitHints);
     }
     if (textLooksLikeNetworkFailure(message, code)) {
-        return buildFailure('network', statusCode, message);
+        return buildFailure('network', statusCode, message, limitHints);
     }
     if (statusCode !== null && statusCode >= 500) {
-        return buildFailure('upstream', statusCode, message);
+        return buildFailure('upstream', statusCode, message, limitHints);
     }
-    return buildFailure('unknown', statusCode, message);
+    return buildFailure('unknown', statusCode, message, limitHints);
 }
