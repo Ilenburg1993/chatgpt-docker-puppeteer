@@ -14,6 +14,7 @@ import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { mergeModelMetadataEvidence, mergeProviderMetadataEvidence } from './merge.js';
 import { toOpenAIModelCatalogList } from './openai-schema.js';
 import { planModelGatewayCatalogRefresh } from './refresh-plan.js';
+import { applyModelGatewayCatalogRetention } from './retention.js';
 
 /**
  * @template {Record<string, any>} T
@@ -49,6 +50,23 @@ function providerProjectionGroupKey(evidence) {
         String(evidence['providerId'] ?? 'unknown-provider'),
         String(evidence['subjectProviderId'] ?? 'unknown-subject-provider'),
     ].join(':');
+}
+
+/**
+ * @param {Record<string, any>} overlay
+ * @returns {string}
+ */
+function accountOverlayKey(overlay) {
+    const explicit = overlay['accountOverlayId'];
+    if (typeof explicit === 'string' && explicit) return explicit;
+    return [
+        overlay['providerId'],
+        overlay['accountScope'],
+        overlay['secretRef'],
+        overlay['sourceId'],
+    ]
+        .filter((part) => typeof part === 'string' && part)
+        .join(':') || JSON.stringify(overlay);
 }
 
 /**
@@ -126,11 +144,15 @@ function buildProviderProjectionsFromEvidence(evidences) {
  * @param {boolean} [input.incremental]
  * @param {boolean} [input.force]
  * @param {string[]} [input.sourceIds]
+ * @param {boolean} [input.refreshAccountOverlays]
+ * @param {import('./retention.js').ModelGatewayCatalogRetentionPolicy} [input.retentionPolicy]
  * @returns {Promise<{
  *     snapshot: ReturnType<typeof normalizeStoredCatalogSnapshot>;
  *     diff: ReturnType<typeof diffCanonicalModelProjections>;
  *     openai: ReturnType<typeof toOpenAIModelCatalogList>;
  *     refreshPlan?: ReturnType<typeof planModelGatewayCatalogRefresh>;
+ *     overlayRefresh: { enabled: boolean; imported: number; retained: number; total: number };
+ *     retention: ReturnType<typeof applyModelGatewayCatalogRetention>['summary'];
  * }>}
  */
 export async function refreshModelGatewayCatalog(input = {}) {
@@ -157,6 +179,12 @@ export async function refreshModelGatewayCatalog(input = {}) {
     );
     const retainedRouteOptions = previous.routeOptions.filter((option) => !refreshedSourceIds.has(String(option['sourceId'])));
     const retainedRawPayloadRefs = previous.rawPayloadRefs.filter((rawRef) => !refreshedSourceIds.has(String(rawRef['sourceId'])));
+    const retainedAccountOverlays = input.refreshAccountOverlays === true
+        ? previous.accountOverlays.filter((overlay) => !refreshedSourceIds.has(String(overlay['sourceId'])))
+        : previous.accountOverlays;
+    const accountOverlays = input.refreshAccountOverlays === true
+        ? upsertMany(retainedAccountOverlays, imported.accountOverlays, accountOverlayKey)
+        : retainedAccountOverlays;
     const combinedEvidences = [...retainedEvidences, ...imported.evidences];
     const combinedProviderEvidences = [...retainedProviderEvidences, ...imported.providerEvidences];
     const { projections, conflicts } = buildProjectionsFromEvidence(combinedEvidences);
@@ -172,7 +200,7 @@ export async function refreshModelGatewayCatalog(input = {}) {
         rowCount: projections.length,
         diff,
     });
-    const snapshot = {
+    const nextSnapshot = {
         ...previous,
         source: 'catalog-refresh',
         sources: upsertMany(previous.sources, imported.sources, (item) => String(item['id'])),
@@ -190,11 +218,14 @@ export async function refreshModelGatewayCatalog(input = {}) {
                 .join(':'),
         ),
         rawPayloadRefs: [...retainedRawPayloadRefs, ...imported.rawPayloadRefs],
+        accountOverlays,
         importRuns: [...previous.importRuns, ...imported.importRuns, refreshRun],
         providerProjections,
         projections,
         conflicts: [...providerConflicts, ...conflicts],
     };
+    const retained = applyModelGatewayCatalogRetention(nextSnapshot, input.retentionPolicy);
+    const snapshot = retained.snapshot;
     if (input.store) await input.store.writeSnapshot(snapshot);
     const output = {
         snapshot: normalizeStoredCatalogSnapshot(snapshot),
@@ -203,6 +234,13 @@ export async function refreshModelGatewayCatalog(input = {}) {
             providerProjections,
             eligibilityDecisions: previous.modelEligibilityDecisions,
         }),
+        overlayRefresh: {
+            enabled: input.refreshAccountOverlays === true,
+            imported: imported.accountOverlays.length,
+            retained: retainedAccountOverlays.length,
+            total: accountOverlays.length,
+        },
+        retention: retained.summary,
     };
     if (refreshPlan) return { ...output, refreshPlan };
     return output;

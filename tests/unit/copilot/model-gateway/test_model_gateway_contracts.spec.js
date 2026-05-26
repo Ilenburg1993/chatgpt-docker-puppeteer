@@ -150,6 +150,7 @@ import {
     toCopilotRouteModelInfoList,
     estimateProbeCostUsd,
     planCostBoundedCatalogProbes,
+    applyModelGatewayCatalogRetention,
 } from '../../../../src/copilot/model-gateway/index.js';
 
 const PROVIDER_FAMILY_ENV_FIXTURES = Object.freeze([
@@ -5030,6 +5031,146 @@ describe('model-gateway foundation', () => {
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
+    });
+
+    it('separates public catalog refresh from account overlay refresh by default', async () => {
+        const previousOverlay = createProviderAccountOverlay({
+            providerId: 'openai',
+            accountScope: 'default',
+            secretRef: 'OPENAI_API_KEY',
+            sourceId: 'openai-models',
+            sourceKind: 'account_api',
+            enabledModels: ['gpt-old-visible'],
+        });
+        const importer = {
+            id: 'openai-models',
+            providerId: 'openai',
+            sourceKind: 'account_api',
+            requiresAuth: true,
+            fetchRaw: () => ({ data: [{ id: 'gpt-new-visible' }] }),
+            parseRows: (raw) => /** @type {{ data: unknown[] }} */ (raw).data,
+            toEvidenceFacts: (rows, context) =>
+                rows.map((row) =>
+                    createModelMetadataEvidence({
+                        evidenceId: 'openai-new-visible-name',
+                        providerId: 'openai',
+                        providerModel: /** @type {{ id: string }} */ (row).id,
+                        fieldPath: 'displayName',
+                        value: 'GPT New Visible',
+                        sourceId: /** @type {{ id: string }} */ (context.source).id,
+                        confidence: 'account',
+                        rawPayloadRef: context.rawPayloadRef,
+                    }),
+                ),
+            toAccountOverlays: (rows, context) => [
+                createProviderAccountOverlay({
+                    providerId: 'openai',
+                    accountScope: 'default',
+                    secretRef: 'OPENAI_API_KEY',
+                    sourceId: /** @type {{ id: string }} */ (context.source).id,
+                    sourceKind: 'account_api',
+                    enabledModels: rows.map((row) => /** @type {{ id: string }} */ (row).id),
+                }),
+            ],
+        };
+
+        const publicRefresh = await refreshModelGatewayCatalog({
+            snapshot: {
+                schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+                accountOverlays: [previousOverlay],
+            },
+            now: () => new Date('2026-05-25T12:00:00.000Z'),
+            importers: [importer],
+        });
+
+        assert.equal(publicRefresh.overlayRefresh.enabled, false);
+        assert.equal(publicRefresh.overlayRefresh.imported, 1);
+        assert.deepEqual(publicRefresh.snapshot.accountOverlays[0]?.enabledModels, ['gpt-old-visible']);
+
+        const accountRefresh = await refreshModelGatewayCatalog({
+            snapshot: {
+                schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+                accountOverlays: [previousOverlay],
+            },
+            refreshAccountOverlays: true,
+            now: () => new Date('2026-05-25T12:00:00.000Z'),
+            importers: [importer],
+        });
+
+        assert.equal(accountRefresh.overlayRefresh.enabled, true);
+        assert.equal(accountRefresh.overlayRefresh.imported, 1);
+        assert.deepEqual(accountRefresh.snapshot.accountOverlays[0]?.enabledModels, ['gpt-new-visible']);
+    });
+
+    it('applies retention policy to refresh operational history without pruning canonical metadata', async () => {
+        const retained = applyModelGatewayCatalogRetention(
+            {
+                importRuns: [
+                    { runId: 'old', completedAt: '2026-05-25T10:00:00.000Z' },
+                    { runId: 'new', completedAt: '2026-05-25T12:00:00.000Z' },
+                ],
+                rawPayloadRefs: [
+                    { rawPayloadRef: 'raw-old', observedAt: '2026-05-25T10:00:00.000Z' },
+                    { rawPayloadRef: 'raw-new', observedAt: '2026-05-25T12:00:00.000Z' },
+                ],
+                conflicts: [
+                    { conflictId: 'conflict-old', observedAt: '2026-05-25T10:00:00.000Z' },
+                    { conflictId: 'conflict-new', observedAt: '2026-05-25T12:00:00.000Z' },
+                ],
+                modelEligibilityRuns: [
+                    { runId: 'eligibility-old', completedAt: '2026-05-25T10:00:00.000Z' },
+                    { runId: 'eligibility-new', completedAt: '2026-05-25T12:00:00.000Z' },
+                ],
+                projections: [createCanonicalModelProjection({ providerId: 'openrouter', providerModel: 'kept-model' })],
+                evidences: [
+                    createModelMetadataEvidence({
+                        evidenceId: 'kept-evidence',
+                        providerId: 'openrouter',
+                        providerModel: 'kept-model',
+                        fieldPath: 'displayName',
+                        value: 'Kept Model',
+                        sourceId: 'source',
+                        confidence: 'catalog',
+                    }),
+                ],
+            },
+            {
+                maxImportRuns: 1,
+                maxRawPayloadRefs: 1,
+                maxConflicts: 1,
+                maxModelEligibilityRuns: 1,
+            },
+        );
+
+        assert.equal(retained.summary.enabled, true);
+        assert.deepEqual(retained.snapshot.importRuns.map((run) => run['runId']), ['new']);
+        assert.deepEqual(retained.snapshot.rawPayloadRefs.map((rawRef) => rawRef['rawPayloadRef']), ['raw-new']);
+        assert.deepEqual(retained.snapshot.conflicts.map((conflict) => conflict['conflictId']), ['conflict-new']);
+        assert.deepEqual(retained.snapshot.modelEligibilityRuns.map((run) => run['runId']), ['eligibility-new']);
+        assert.equal(retained.snapshot.projections.length, 1);
+        assert.equal(retained.snapshot.evidences.length, 1);
+
+        const refresh = await refreshModelGatewayCatalog({
+            snapshot: {
+                schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+                importRuns: [
+                    createCatalogImportRun({
+                        runId: 'previous-run',
+                        providerId: 'openrouter',
+                        sourceId: 'openrouter-models',
+                        status: 'completed',
+                        startedAt: '2026-05-25T10:00:00.000Z',
+                        completedAt: '2026-05-25T10:00:01.000Z',
+                    }),
+                ],
+            },
+            retentionPolicy: { maxImportRuns: 1 },
+            now: () => new Date('2026-05-25T12:00:00.000Z'),
+            importers: [],
+        });
+
+        assert.equal(refresh.retention.importRuns.pruned, 1);
+        assert.deepEqual(refresh.snapshot.importRuns.map((run) => run['sourceId']), ['catalog-refresh']);
     });
 
     it('builds default public and authenticated catalog importers without exposing secrets', () => {

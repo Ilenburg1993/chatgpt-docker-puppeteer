@@ -1485,9 +1485,9 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Store redacted.
 - [x] TTL por source.
 - [x] Refresh incremental.
-- [ ] Refresh overlay separado de refresh público.
+- [x] Refresh overlay separado de refresh público.
 - [ ] Lock de refresh.
-- [ ] Retention policy.
+- [x] Retention policy.
 - [ ] No automatic active swap sem policy.
 
 ### Faixa P — UX De Catálogo
@@ -2625,5 +2625,90 @@ Validação deste corte:
   com `111` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em refresh planner, refresh, barrels e contrato
+  unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 41. Continuidade 2026-05-26 — Refresh Separado De Account Overlays
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que `runCatalogImporters()` já coleta `accountOverlays`.
+- [x] Confirmado que `refreshModelGatewayCatalog()` ainda não incorporava
+  `accountOverlays` importados.
+- [x] Confirmado o risco arquitetural: refresh público e refresh account-scoped
+  ficavam indistintos na API programática.
+- [x] Confirmado que a correção pertence à Faixa O e à camada pré-runtime.
+
+Implementado neste corte:
+
+- [x] `refreshModelGatewayCatalog()` passa a expor `refreshAccountOverlays`.
+- [x] O default preserva overlays anteriores e ignora overlays importados pelo
+  refresh público.
+- [x] Quando `refreshAccountOverlays: true`, overlays dos sources atualizados
+  são substituídos pelos overlays importados.
+- [x] O resultado passa a expor `overlayRefresh` com `enabled`, `imported`,
+  `retained` e `total`.
+- [x] Adicionado teste garantindo que refresh público preserva overlay antigo.
+- [x] Adicionado teste garantindo que refresh account-scoped substitui overlay
+  do source atualizado.
+
+Separação preservada:
+
+- [x] Refresh público de catálogo não altera visibilidade/account overlay.
+- [x] Refresh de overlay exige opt-in explícito.
+- [x] A decisão continua antes de probes/runtime.
+- [x] Nenhuma chave ou segredo é exposto no relatório.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `112` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `catalog/refresh.js` e contrato unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 42. Continuidade 2026-05-26 — Retention Policy De Histórico Operacional
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que `importRuns`, `rawPayloadRefs`, `conflicts` e
+  `modelEligibilityRuns` crescem como histórico operacional.
+- [x] Confirmado que projections, evidences, routes, overlays e decisions
+  canônicas não devem ser podados por uma policy genérica de histórico.
+- [x] Confirmado que retention pertence à governança de catálogo, antes de
+  qualquer etapa runtime.
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/catalog/retention.js`.
+- [x] Criado `applyModelGatewayCatalogRetention()`.
+- [x] Policy aceita `maxImportRuns`, `maxRawPayloadRefs`, `maxConflicts` e
+  `maxModelEligibilityRuns`.
+- [x] Retention preserva os registros mais recentes por `completedAt`,
+  `startedAt`, `observedAt`, `createdAt` ou `timestamp`.
+- [x] Retention retorna summary com `before`, `after` e `pruned`.
+- [x] `refreshModelGatewayCatalog()` passa a aceitar `retentionPolicy`.
+- [x] O resultado do refresh passa a expor `retention`.
+- [x] Exportado pelos barrels de `catalog` e `model-gateway`.
+- [x] Adicionados testes cobrindo pruning direto e integração com refresh.
+
+Separação preservada:
+
+- [x] Retention não remove catálogo canônico.
+- [x] Retention não remove evidências canônicas.
+- [x] Retention não remove route options.
+- [x] Retention não remove account overlays.
+- [x] Retention não executa provider/model/runtime.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `113` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em refresh, retention, barrels e contrato
   unitário.
 - [x] PASS `git diff --check`.

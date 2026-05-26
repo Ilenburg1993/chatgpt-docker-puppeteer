@@ -118,6 +118,7 @@ export {
 } from './normalizers.js';
 export { planModelGatewayCatalogRefresh } from './refresh-plan.js';
 export { refreshModelGatewayCatalog } from './refresh.js';
+export { applyModelGatewayCatalogRetention } from './retention.js';
 export {
     MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
     MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,

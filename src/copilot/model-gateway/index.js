@@ -69,6 +69,7 @@ export {
     ZAI_OPENAPI_URL,
     JsonModelGatewayCatalogStore,
     SqliteModelGatewayCatalogStore,
+    applyModelGatewayCatalogRetention,
     createCanonicalModelProjection,
     createCanonicalProviderProjection,
     createAnthropicModelsImporter,
