@@ -31,6 +31,7 @@ import {
     applyModelGatewayEligibilityToSnapshot,
     createModelRecord,
     createEnvSecretRegistry,
+    explainModelGatewayAccountAccess,
     resolveModelGatewayAccountAccess,
     buildModelGatewayOnListModelsHandler,
     evaluateGatewayModelHealthRoute,
@@ -3913,6 +3914,33 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(blocked.status, 'blocked');
         assert.ok(blocked.hardReasons.includes('account_model_blocked'));
+    });
+
+    it('explains account model visibility with stable next actions', () => {
+        const overlay = createProviderAccountOverlay({
+            providerId: 'openai',
+            secretRef: 'OPENAI_API_KEY',
+            enabledModels: ['gpt-visible'],
+        });
+        const access = resolveModelGatewayAccountAccess({
+            providerId: 'openai',
+            providerModel: 'gpt-hidden',
+            accountOverlays: [overlay],
+            secretRegistry: createEnvSecretRegistry({ env: { OPENAI_API_KEY: 'sk-test' } }),
+        });
+
+        assert.deepEqual(explainModelGatewayAccountAccess(access), {
+            key: 'openai:gpt-hidden:default',
+            status: 'not_visible',
+            canAttempt: false,
+            primaryReason: 'account_model_not_visible',
+            hardReasons: ['account_model_not_visible'],
+            softReasons: [],
+            reasons: ['secret_configured:OPENAI_API_KEY', 'account_overlay_available'],
+            overlayRefs: [overlay.accountOverlayId],
+            nextActions: ['choose_visible_model_or_refresh_overlay'],
+            summary: 'not_visible:account_model_not_visible',
+        });
     });
 
     it('classifies expired overlays and exhausted account controls before runtime', () => {

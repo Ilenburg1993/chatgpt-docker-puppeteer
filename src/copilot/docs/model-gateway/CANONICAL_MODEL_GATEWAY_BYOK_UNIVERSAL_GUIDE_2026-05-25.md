@@ -1551,7 +1551,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [ ] Access confidence.
 - [x] Access expiration.
 - [ ] Access failure classification.
-- [ ] Account model visibility explain.
+- [x] Account model visibility explain.
 - [ ] Multi-account/workspace.
 - [ ] Region/organization support.
 
@@ -2188,4 +2188,33 @@ Validação deste corte:
 
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em `byok.js` e `recommendations.js`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 29. Continuidade 2026-05-26 — Explain De Account Access
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/account-access/explain.js`.
+- [x] Criado `explainModelGatewayAccountAccess()` com `summary`,
+  `primaryReason`, `hardReasons`, `softReasons`, `overlayRefs` e
+  `nextActions` estáveis.
+- [x] Exportado pelo barrel `account-access` e pelo barrel principal
+  `model-gateway`.
+- [x] Adicionado teste de modelo não visível em allow list fechada de overlay.
+
+Separação preservada:
+
+- [x] O explain só formata fatos derivados pelo resolver.
+- [x] O explain não executa provider e não lê segredos.
+- [x] Eligibility pode continuar compondo account access sem duplicar UX.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `95` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `account-access`, barrel principal e contrato
+  unitário.
 - [x] PASS `git diff --check`.

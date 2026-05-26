@@ -8,7 +8,11 @@
  * @module copilot/model-gateway
  */
 
-export { MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS, resolveModelGatewayAccountAccess } from './account-access/index.js';
+export {
+    explainModelGatewayAccountAccess,
+    MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS,
+    resolveModelGatewayAccountAccess,
+} from './account-access/index.js';
 
 export {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
