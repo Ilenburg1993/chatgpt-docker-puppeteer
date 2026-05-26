@@ -482,8 +482,8 @@ Se a tarefa não exige imagem, vision é no máximo bônus ou superfície a vali
 - [x] Vision é soft preference em teste.
 - [x] Policy engine pode consumir/evaluar eligibility pré-runtime quando a opção
   de roteamento é ativada.
-- [ ] Policy engine ainda opera principalmente em registros/projeções, não em
-  route options completas + overlays + eligibility snapshots.
+- [x] Policy engine possui entrada canônica para snapshot completo com route
+  options, overlays e eligibility decisions.
 
 ### 5.9 Probes
 
@@ -3317,6 +3317,47 @@ Validação deste corte:
 
 - [x] PASS `npm run model-gateway:test:contracts` com `126` testes.
 - [x] PASS `npm run model-gateway:test:terminal` com `59` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 54. Continuidade 2026-05-26 — Policy Engine Por Snapshot Completo
+
+Auditoria executada neste corte:
+
+- [x] Revisitado o item antigo que dizia que o policy engine ainda operava
+  principalmente em registros/projeções soltos.
+- [x] Confirmado que `buildModelGatewayRouteCandidates()` já tratava route
+  options como unidade de seleção, mas faltava uma entrada única para snapshot.
+- [x] Confirmado que a entrada canônica deve consumir projections, route
+  options, account overlays e eligibility decisions juntas, sem runtime.
+
+Implementado neste corte:
+
+- [x] Criado `routeModelGatewayCatalogSnapshot()`.
+- [x] A nova entrada constrói candidatos a partir de `snapshot.projections` e
+  `snapshot.routeOptions`.
+- [x] A nova entrada passa `accountOverlays` e `modelEligibilityDecisions` para
+  o policy engine.
+- [x] O retorno expõe `snapshotContext` com contagens de projections, rotas,
+  overlays, eligibility decisions e candidatos.
+- [x] Exportado pelos barrels `routing` e `model-gateway`.
+- [x] Teste unitário cobre seleção por snapshot completo com route option,
+  overlay e eligibility decision.
+
+Separação preservada:
+
+- [x] A função é puramente pré-runtime.
+- [x] Nenhum provider é chamado.
+- [x] Nenhum modelo é executado.
+- [x] Nenhuma probe runtime é executada.
+- [x] O catálogo canônico não é mutado.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `127` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.

@@ -23,4 +23,4 @@ export {
     listModelGatewayTaskProfiles,
     resolveModelGatewayTaskProfile,
 } from './task-profiles.js';
-export { routeGatewayModels, scoreGatewayModelCandidate } from './policy-engine.js';
+export { routeGatewayModels, routeModelGatewayCatalogSnapshot, scoreGatewayModelCandidate } from './policy-engine.js';

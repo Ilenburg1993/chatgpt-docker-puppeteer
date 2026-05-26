@@ -75,6 +75,7 @@ import {
     resetByokProviderHealthForTests,
     resetModelGatewayRouteDecisionLedgerForTests,
     routeGatewayModels,
+    routeModelGatewayCatalogSnapshot,
     BYOK_AGENT_PROBE_ANSWER,
     BYOK_AGENT_PROBE_QUESTION,
     BYOK_AGENT_PROBE_READ_PATH,
@@ -382,6 +383,54 @@ describe('model-gateway foundation', () => {
         assert.equal(candidates[1]['routing']['supportsFallback'], true);
         assert.equal(candidates[1]['provenance']['candidateSource'], 'route_option');
         assert.ok(candidates[1]['routeOptionRef'].includes('gateway_fallback'));
+    });
+
+    it('routes a complete catalog snapshot through route options, overlays and eligibility', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            capabilities: { streaming: true },
+            limits: { contextWindowTokens: 131_072 },
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+        });
+        const routeOption = createModelRouteOption({
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            selectorKind: 'provider_explicit',
+            selectorSyntax: 'openai/gpt-oss-120b:groq',
+            normalizedPolicy: { routeLayer: 'openai_compatible_aggregator', wireApi: 'openai_chat_completions' },
+            providerSpecific: { upstreamProvider: 'groq' },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'openrouter',
+            enabledModels: ['openai/gpt-oss-120b'],
+        });
+        const eligibility = createModelEligibilityDecision({
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            include: true,
+        });
+
+        const route = routeModelGatewayCatalogSnapshot(
+            {
+                projections: [projection],
+                routeOptions: [routeOption],
+                accountOverlays: [overlay],
+                modelEligibilityDecisions: [eligibility],
+            },
+            'cheap_chat',
+            { evaluateEligibility: true, requireAgentProbeOk: false },
+        );
+
+        assert.equal(route.selected?.model['selectorKind'], 'provider_explicit');
+        assert.equal(route.selected?.eligibility?.['disposition'], 'eligible');
+        assert.deepEqual(route.snapshotContext, {
+            projectionCount: 1,
+            routeOptionCount: 1,
+            accountOverlayCount: 1,
+            eligibilityDecisionCount: 1,
+            candidateCount: 1,
+        });
     });
 
     it('projects route-option candidates to SDK model info without losing selector metadata', () => {

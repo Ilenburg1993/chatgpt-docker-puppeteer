@@ -258,6 +258,7 @@ export {
     readGatewayModelHealth,
     readGatewayModelProbeHealth,
     routeGatewayModels,
+    routeModelGatewayCatalogSnapshot,
     resolveModelGatewayTaskProfile,
     scoreGatewayModelCandidate,
 } from './routing/index.js';

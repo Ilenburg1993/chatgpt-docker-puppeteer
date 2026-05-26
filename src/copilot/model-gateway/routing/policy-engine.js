@@ -15,6 +15,7 @@ import {
     isGatewayModelProbeVerified,
     listGatewayModelVerifiedProbeKinds,
 } from './health-routing.js';
+import { buildModelGatewayRouteCandidates } from './candidate-builder.js';
 import { resolveModelGatewayTaskProfile } from './task-profiles.js';
 import { evaluateModelGatewayEligibility } from '../eligibility/index.js';
 
@@ -563,5 +564,41 @@ export function routeGatewayModels(models, profileInput, options = {}) {
         candidates,
         rejected,
         fallbackChain: candidates.map((candidate) => String(candidate.model['id'] ?? candidate.model['providerModel'] ?? 'unknown')),
+    };
+}
+
+/**
+ * @param {Record<string, any>} snapshot
+ * @param {string | Record<string, any>} profileInput
+ * @param {Parameters<typeof routeGatewayModels>[2] & { includeProjectionOnly?: boolean }} [options]
+ * @returns {ReturnType<typeof routeGatewayModels> & { snapshotContext: Record<string, number> }}
+ */
+export function routeModelGatewayCatalogSnapshot(snapshot, profileInput, options = {}) {
+    const projections = Array.isArray(snapshot['projections']) ? snapshot['projections'].filter(isRecord) : [];
+    const routeOptions = Array.isArray(snapshot['routeOptions']) ? snapshot['routeOptions'].filter(isRecord) : [];
+    const accountOverlays = Array.isArray(snapshot['accountOverlays']) ? snapshot['accountOverlays'].filter(isRecord) : [];
+    const eligibilityDecisions = Array.isArray(snapshot['modelEligibilityDecisions'])
+        ? snapshot['modelEligibilityDecisions'].filter(isRecord)
+        : [];
+    const candidates = buildModelGatewayRouteCandidates({
+        projections,
+        routeOptions,
+        includeProjectionOnly: options['includeProjectionOnly'] !== false,
+    });
+    const route = routeGatewayModels(candidates, profileInput, {
+        ...options,
+        routeOptions,
+        accountOverlays,
+        eligibilityDecisions,
+    });
+    return {
+        ...route,
+        snapshotContext: {
+            projectionCount: projections.length,
+            routeOptionCount: routeOptions.length,
+            accountOverlayCount: accountOverlays.length,
+            eligibilityDecisionCount: eligibilityDecisions.length,
+            candidateCount: candidates.length,
+        },
     };
 }
