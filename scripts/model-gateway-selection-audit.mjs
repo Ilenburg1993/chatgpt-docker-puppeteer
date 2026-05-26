@@ -13,7 +13,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-selection-audit.mjs [--json] [--strict] [--profile=<id>] [--profiles=a,b] [--fail-on-unselected] [--fail-on-supply-warning]
+    process.stdout.write(`Usage: node scripts/model-gateway-selection-audit.mjs [--json] [--strict] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--fail-on-unselected] [--fail-on-supply-warning]
 
 Audit metadata-first model-gateway route selection from the persisted catalog. This does not fetch providers, execute
 runtime probes or call models.
@@ -21,12 +21,22 @@ runtime probes or call models.
     process.exit(0);
 }
 
+function readArg(name, fallback = '') {
+    const prefix = `${name}=`;
+    for (let index = 0; index < args.length; index += 1) {
+        const arg = args[index];
+        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
+        if (arg === name) return args[index + 1] ?? fallback;
+    }
+    return fallback;
+}
+
 function readProfiles() {
     const profiles = [];
-    for (const arg of args) {
-        if (arg.startsWith('--profile=')) profiles.push(arg.slice('--profile='.length));
-        if (arg.startsWith('--profiles=')) profiles.push(...arg.slice('--profiles='.length).split(','));
-    }
+    const profile = readArg('--profile');
+    const profileList = readArg('--profiles');
+    if (profile) profiles.push(profile);
+    if (profileList) profiles.push(...profileList.split(','));
     return profiles.map((profile) => profile.trim()).filter(Boolean);
 }
 

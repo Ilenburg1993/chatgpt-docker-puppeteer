@@ -6241,6 +6241,15 @@ Implementado neste corte:
   `model-gateway-effective-selection` e `model-gateway-live-readiness` passam a
   incluir resumo `localProviderOptIn` no JSON e orientação textual quando houver
   bloqueio local.
+- [x] `model-gateway-selection-audit` passa a aceitar `--profile valor` e
+  `--profiles a,b`, alinhando o parser ao `model-gateway-effective-selection`.
+- [x] Ajuda textual de `model-gateway-effective-selection` passa a documentar
+  `--profile valor`, que já era suportado.
+- [x] Rechecado sem iniciar Ollama: `local_private` continua perfil flexível,
+  seleciona remoto quando não há supply local e emite warnings de
+  `local/privacy/no_remote_secrets` zerados.
+- [x] Rechecado sem iniciar Ollama: `local_private_strict` falha antes de
+  runtime quando não há supply local, sem tentar executar modelo.
 - [x] O terminal passa a imprimir uma orientação acionável quando houver rejeição
   por `local_provider_requires_explicit_request`.
 - [x] A mensagem de fallback do terminal foi corrigida para apontar para
@@ -6273,8 +6282,18 @@ Validação deste corte:
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.
 - [x] PASS `node scripts/model-gateway-selection-audit.mjs --profile=cheap_chat`.
+- [x] PASS `node scripts/model-gateway-selection-audit.mjs --profile
+  cheap_chat`.
+- [x] PASS `node scripts/model-gateway-selection-audit.mjs --profiles
+  cheap_chat,repo_agent`.
 - [x] PASS `node scripts/model-gateway-effective-selection.mjs --profile
   cheap_chat`.
+- [x] PASS `node scripts/model-gateway-selection-audit.mjs --profile
+  local_private`.
+- [x] PASS esperado com exit `1` para `node scripts/model-gateway-selection-audit.mjs
+  --profile local_private_strict --fail-on-unselected`.
+- [x] PASS `node scripts/model-gateway-effective-selection.mjs --profile
+  local_private`.
 - [x] PASS `node scripts/model-gateway-live-readiness.mjs`.
 - [x] PASS `node --check` para `model-gateway-selection-audit`,
   `model-gateway-effective-selection` e `model-gateway-live-readiness`.
