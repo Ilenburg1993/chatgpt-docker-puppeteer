@@ -18,6 +18,7 @@ import {
     normalizeTerminalUserInputCompletedEvent,
     normalizeTerminalUserInputRequestedEvent,
 } from '../frontend/gateways/index.js';
+import { summarizeModelGatewaySdkQuotaSnapshots } from '#copilot/model-gateway';
 
 /** @typedef {'pending' | 'completed' | 'cleared'} SdkInteractionStatus */
 
@@ -645,15 +646,8 @@ export function clearTerminalPermissions() {
  * @returns {'ok' | 'warn' | 'bad'}
  */
 export function classifyTerminalSdkQuota(result) {
-    const data = objectOrNull(result) ?? {};
-    const snapshots = objectOrNull(data['quotaSnapshots']) ?? {};
-    let worst = 1;
-    for (const snapshot of Object.values(snapshots)) {
-        const snap = objectOrNull(snapshot) ?? {};
-        const remaining = Number(snap['remainingPercentage']);
-        if (Number.isFinite(remaining)) worst = Math.min(worst, remaining);
-    }
-    if (worst <= 0.05) return 'bad';
-    if (worst <= 0.2) return 'warn';
+    const quota = summarizeModelGatewaySdkQuotaSnapshots(result);
+    if (quota.summary.blocked > 0 || quota.summary.status === 'critical') return 'bad';
+    if (quota.summary.status === 'warn' || quota.summary.status === 'exhausted') return 'warn';
     return 'ok';
 }

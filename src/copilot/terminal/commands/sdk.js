@@ -8,6 +8,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#copilot/core';
+import { summarizeModelGatewaySdkQuotaSnapshots } from '#copilot/model-gateway';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
 import {
@@ -1199,15 +1200,14 @@ async function renderSdkQuota({ println }, runtimeId, opts = {}) {
     }
     const data = objectOrNull(result) ?? {};
     const snapshots = objectOrNull(data['quotaSnapshots']) ?? {};
+    const quotaSummary = summarizeModelGatewaySdkQuotaSnapshots(result);
     const state = classifyTerminalSdkQuota(result);
     const color = state === 'bad' ? '\x1b[31m' : state === 'warn' ? '\x1b[33m' : '\x1b[32m';
     if (!opts.compact) println('\n  \x1b[36mQuota SDK\x1b[0m');
-    for (const [name, snapshot] of Object.entries(snapshots)) {
-        const snap = objectOrNull(snapshot) ?? {};
-        const remaining = Number(snap['remainingPercentage']);
-        const pct = Number.isFinite(remaining) ? `${(remaining * 100).toFixed(1)}%` : '?';
+    for (const row of quotaSummary.rows) {
+        const pct = row.remainingPercentage === null ? '?' : `${row.remainingPercentage.toFixed(1)}%`;
         println(
-            `  ${color}${name}\x1b[0m  restante=\x1b[33m${pct}\x1b[0m  reset=\x1b[90m${snap['resetDate'] ?? '-'}\x1b[0m`,
+            `  ${color}${row.quotaId}\x1b[0m  restante=\x1b[33m${pct}\x1b[0m  reset=\x1b[90m${row.resetAt ?? '-'}\x1b[0m  escopo=\x1b[90m${row.scope}\x1b[0m`,
         );
     }
     if (Object.keys(snapshots).length === 0) println('  \x1b[90mSem snapshots de quota no retorno SDK.\x1b[0m');

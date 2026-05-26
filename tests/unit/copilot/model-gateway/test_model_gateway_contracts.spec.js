@@ -175,6 +175,7 @@ import {
     summarizeModelGatewayCatalogSnapshot,
     summarizeCanonicalModelProjectionDiff,
     summarizeModelGatewayAccountOverlays,
+    summarizeModelGatewaySdkQuotaSnapshots,
     summarizeModelGatewayMetadataCoverage,
     summarizeModelGatewayProviderFreshness,
     summarizeModelGatewayProviderEnvRequirements,
@@ -5365,6 +5366,37 @@ describe('model-gateway foundation', () => {
         assert.equal(summary.rows[0].resetAt, '2026-05-25T00:05:00.000Z');
         assert.equal(summary.rows[0].quotaResetActive, false);
         assert.equal(summary.rows[0].quotaResetExpired, false);
+    });
+
+    it('normalizes SDK AssistantUsage quota as host entitlement, not BYOK provider quota', () => {
+        const summary = summarizeModelGatewaySdkQuotaSnapshots({
+            quotaSnapshots: {
+                premium_interactions: {
+                    entitlementRequests: 1000,
+                    usedRequests: 990,
+                    overage: 0,
+                    remainingPercentage: 1,
+                    resetDate: '2026-06-01',
+                    usageAllowedWithExhaustedQuota: false,
+                    overageAllowedWithExhaustedQuota: false,
+                },
+                chat: {
+                    remainingPercentage: 0,
+                    usageAllowedWithExhaustedQuota: true,
+                },
+            },
+        });
+
+        assert.equal(summary.summary.total, 2);
+        assert.equal(summary.rows[0].remainingFraction, 1);
+        assert.equal(summary.rows[0].remainingPercentage, 100);
+        assert.equal(summary.rows[0].scope, 'copilot_sdk_entitlement');
+        assert.equal(summary.rows[0].appliesToByokProviderRuntime, false);
+        assert.equal(summary.rows[0].canBlockSdkNativeRoute, false);
+        assert.equal(summary.rows[1].status, 'exhausted');
+        assert.equal(summary.rows[1].canBlockSdkNativeRoute, false);
+        assert.equal(summary.summary.status, 'exhausted');
+        assert.equal(summary.summary.appliesToByokProviderRuntime, false);
     });
 
     it('evaluates hard pre-runtime exclusions from secrets, account overlays and access visibility', () => {

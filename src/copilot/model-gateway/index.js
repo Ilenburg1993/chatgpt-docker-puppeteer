@@ -16,9 +16,11 @@ export {
     MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS,
     MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS,
     MODEL_GATEWAY_ACCOUNT_LIMIT_STATUS,
+    MODEL_GATEWAY_SDK_QUOTA_STATUS,
     normalizeModelGatewayAccountLimitState,
     resolveModelGatewayAccountAccess,
     summarizeModelGatewayAccountOverlays,
+    summarizeModelGatewaySdkQuotaSnapshots,
 } from './account-access/index.js';
 
 export {

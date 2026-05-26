@@ -3856,6 +3856,11 @@ Implementado neste corte:
 - [x] `/byok gateway accounts` passa a unir overlays persistidos do catálogo
   com overlays voláteis derivados do runtime health, deixando visível quando um
   bloqueio operacional recente ainda deve afetar pré-runtime.
+- [x] Criado `summarizeModelGatewaySdkQuotaSnapshots()` para normalizar
+  `AssistantUsageQuotaSnapshot` em uma visão `copilot_sdk_entitlement`,
+  preservando a fronteira com BYOK provider quotas.
+- [x] `/sdk quota` e `classifyTerminalSdkQuota()` passam a consumir o
+  normalizador canônico, eliminando uma segunda regra paralela de percentuais.
 - [x] Probes e turnos vivos passam a gravar os campos estruturados de limite no
   health.
 - [x] Health fatal em eligibility deixa de bloquear rate limit após
@@ -3874,6 +3879,11 @@ Separação preservada:
 - [x] Runtime health continua volátil e operacional.
 - [x] Overlays derivados de runtime health continuam expiráveis e não são
   promovidos a evidência canônica.
+- [x] `AssistantUsageQuotaSnapshot` do SDK é tratado como entitlement
+  GitHub/Copilot host-scoped, não como quota de provider BYOK.
+- [x] A quota SDK pode orientar rotas Copilot-native e diagnóstico do operador,
+  mas não deve bloquear nem pontuar OpenRouter/Groq/Gemini/etc. como se fosse
+  account overlay BYOK.
 - [x] SQLite runtime layer continua espelho de health/probes, não fonte de
   metadados globais.
 
