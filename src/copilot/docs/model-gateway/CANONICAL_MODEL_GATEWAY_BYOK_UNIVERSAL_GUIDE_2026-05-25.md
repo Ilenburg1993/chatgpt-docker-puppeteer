@@ -6318,3 +6318,204 @@ Validação deste corte:
   --dry-run --timeout-ms=600000 --out-dir artifacts/terminal-live/prelive-dry-run`,
   confirmando `/byok models route ... provider:kilo-code` e ausência de
   seleção default de `ollama-local`.
+
+---
+
+## 58. Continuidade 2026-05-26 — Live BYOK Real Sem Turno Após Gate Local
+
+Auditoria executada neste corte:
+
+- [x] Repetida seleção efetiva strict antes do live real, sem executar novas
+  probes e sem tocar provider.
+- [x] Repetido readiness live antes do live real, confirmando catálogo íntegro,
+  paridade JSON/SQLite por chaves, seleção strict/effective e runner presente.
+- [x] Confirmado que a seleção default não escolhe `ollama-local` e que o
+  opt-in local continua exigindo pedido explícito do operador.
+- [x] Executado live real `llm-b` com BYOK real e `--no-pr`, ainda sem abrir
+  turno de usuário.
+- [x] Reauditado o log plain do live real para procurar `FAIL`, `ERROR`,
+  `HTTP 404`, `quota`, `secret`, `token`, `ollama-local` e sinais fracos que os
+  critérios automáticos poderiam não classificar.
+
+Resultado live real `--no-pr`:
+
+- [x] PASS
+  `npm run terminal:llm-b:live-test -- --byok-real --no-pr --timeout-ms=600000 --out-dir artifacts/terminal-live/live-byok-real-no-pr-2026-05-26`.
+- [x] Artefato:
+  `artifacts/terminal-live/live-byok-real-no-pr-2026-05-26/summary.md`.
+- [x] Duração: `95217ms`.
+- [x] Exit code: `0`.
+- [x] Critérios: `48/48` aprovados.
+- [x] Chat probe descartável real: ok em `kilo-auto/free`.
+- [x] Streaming probe descartável real: ok em `kilo-auto/free`.
+- [x] JSON probe descartável real: ok em `kilo-auto/free`.
+- [x] Agent probe descartável real: ok com tools representativas e `ask_user`.
+- [x] Shortlist agent descartável real: ok para `openrouter/free` via
+  `kilo-code`.
+- [x] Route ledger real: `/byok models route repo_agent active --show-rejected
+  provider:kilo-code` exibiu `decision=route-*`, admissão, rejeitados e fallback
+  chain.
+- [x] Model switch real: `kilo-auto/free -> qwen3-coder-next ->
+  kilo-auto/free` foi confirmado por `session.model_changed`.
+- [x] Alt provider switch real: `ollama-cloud` foi exercitado como provider
+  remoto/cloud, com boundary claro de sessão viva vs seleção preparada.
+- [x] `ollama-local` apareceu apenas como preset sem credencial e comando
+  explícito, sem seleção default e sem chamada ao daemon local.
+- [x] Secret scan: `25` valores locais verificados contra o output, sem
+  vazamento.
+- [x] SSE público: conectado, ids monotônicos, sem envelope interno e sem erros.
+- [x] `/errors 10`: zero erros rastreados ao final do live.
+
+Achados interpretados:
+
+- [x] `/byok probe vision` para `kilo-auto/free` falhou com HTTP `404` do
+  provider, coerente com o catálogo remoto exibindo o modelo como `no-vision`.
+- [x] A falha de vision foi aceita como prova explícita de capability, não como
+  falha global de BYOK.
+- [x] A política de seleção continua correta: `vision` não é exclusão global
+  automática para perfis textuais, JSON, code ou repo-agent.
+- [x] A recomendação `safe` pós-probe passou a refletir saúde recente: modelos
+  com `agent=ok` sobem, modelos com `agent=failed` permanecem visíveis mas não
+  são promovidos.
+- [x] A troca para `ollama-cloud` mostrou corretamente a fronteira entre
+  prepared selection e live binding; rebind de provider/perfil continua exigindo
+  nova sessão SDK.
+
+Separação preservada:
+
+- [x] O live real sem PR executou probes descartáveis, mas não abriu turno de
+  usuário.
+- [x] O banco canônico de metadados não foi reescrito pelo resultado de probes.
+- [x] Health/probes reais permanecem camada observacional volátil, separada de
+  coleta/normalização de metadados.
+- [x] Capabilities negativas observadas continuam alimentando pré-runtime sem
+  corromper o catálogo universal.
+- [x] Provedores locais continuam suportados, mas não selecionados por default.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:selection:effective -- --strict --fail`.
+- [x] PASS `npm run model-gateway:live:readiness`.
+- [x] PASS `npm run terminal:llm-b:live-test -- --byok-real --no-pr
+  --timeout-ms=600000 --out-dir artifacts/terminal-live/live-byok-real-no-pr-2026-05-26`.
+
+Próximas lacunas:
+
+- [x] Repetir readiness depois dos probes reais para confirmar que overlays de
+  health recentes continuam não promovendo runtime para o catálogo canônico.
+- [x] Rodar `git diff --check` após esta atualização documental.
+- [x] Só avançar para `--byok-real` completo com turno real se a auditoria
+  pós-live continuar verde e o plano limitar provider/modelo para evitar
+  chamadas laterais desnecessárias.
+
+---
+
+## 59. Continuidade 2026-05-26 — Live BYOK Real Completo Com Turno Canônico
+
+Auditoria executada neste corte:
+
+- [x] Revisitado `scripts/copilot/run-terminal-llm-b-live-test.mjs` antes da
+  fase completa para confirmar o fluxo exato: preflight BYOK real, contenção em
+  caso de probe crítica falha e só então turno canônico.
+- [x] Rodado dry-run explícito da fase completa para garantir escopo restrito a
+  `kilo`/`kilo-code`/`kilo-auto/free`.
+- [x] Evitada alternância lateral para outros providers no teste completo:
+  `--byok-real-alt-profile kilo` torna o alternativo vazio.
+- [x] Mantida a decisão de não iniciar Ollama local; `ollama-local` permaneceu
+  apenas como provider suportado por opt-in explícito.
+- [x] Executado live BYOK real completo com turno de usuário, tools reais,
+  `ask_user` real, continuação pós-ask e export.
+
+Comando executado:
+
+- [x] PASS
+  `npm run terminal:llm-b:live-test -- --byok-real --byok-real-profile kilo --byok-real-alt-profile kilo --byok-real-model kilo-auto/free --timeout-ms=900000 --out-dir artifacts/terminal-live/live-byok-real-full-2026-05-26`.
+
+Resultado live completo:
+
+- [x] Artefato:
+  `artifacts/terminal-live/live-byok-real-full-2026-05-26/summary.md`.
+- [x] Duração: `144826ms`.
+- [x] Exit code: `0`.
+- [x] Critérios: `58/58` aprovados.
+- [x] SSE conectado com `476` eventos e `466` eventos públicos com ids
+  monotônicos.
+- [x] TraceIds públicos: `terminal:*`, `turn:0`, `turn:1`, `turn:2`, `turn:3`.
+- [x] Export Markdown criado com `2140` caracteres.
+- [x] Sem erro terminal rastreado.
+- [x] Sem vazamento entre `25` valores locais de segredo verificados.
+
+Provas funcionais do turno:
+
+- [x] Telemetria do turno real classificou `byok_user_message`, com
+  `premiumRequest=false`.
+- [x] `report_intent` real foi chamado com o intent canônico.
+- [x] `read_file_content` real leu `package.json` linhas `1-3`.
+- [x] Bloco público com `DELTA-CANONICAL-1` até `DELTA-CANONICAL-8` foi
+  materializado.
+- [x] `ask_user` real foi materializado como prompt persistente, não simulado
+  em texto.
+- [x] Resposta humana sintética `SIM` foi registrada sem virar fala da LLM.
+- [x] Continuação pós-ask em `ask_user_continuation` emitiu exatamente
+  `POST-ASK-CANONICAL-FINAL: usuário confirmou SIM`.
+- [x] `/usage now` pós-turno mostrou BYOK sem Premium Request.
+- [x] `/tools diag` confirmou chamadas reais de `report_intent`,
+  `read_file_content` e I/O local sem erros.
+- [x] `/activity 40` expôs tools, arquivo lido, interação humana, streaming e
+  trace do turno.
+
+Provas BYOK/gateway:
+
+- [x] Preflight repetiu chat, streaming, JSON, vision, agent e shortlist
+  descartáveis antes do turno real.
+- [x] Chat/streaming/JSON/agent continuaram ok em `kilo-auto/free`.
+- [x] Vision continuou falhando com HTTP `404`, mantido como prova negativa de
+  capability, não como falha global do provider.
+- [x] `/byok models route repo_agent active --show-rejected provider:kilo-code`
+  exibiu decisão `route-*`, admissão, rejeitados e fallback.
+- [x] `/byok model kilo-auto/free` manteve o modelo ativo e boundary alinhado.
+- [x] `/byok providers` pós-turno mostrou `kilo` com `chat=ok(turno)` recente.
+- [x] `/byok health` registrou `kilo|kilo-code|kilo-auto/free` com
+  `chat=ok(turno)` e `agent=ok`, preservando `vision=failed` como sinal
+  separado.
+- [x] `/byok recommend reasoning safe 8` pós-turno refletiu health recente e
+  manteve recomendações restritas ao provider ativo/cacheado.
+
+Separação preservada:
+
+- [x] O turno real atualizou health operacional volátil, não o banco canônico de
+  metadados.
+- [x] Runtime proof segue fora da camada de coleta/normalização universal.
+- [x] Capabilities positivas e negativas de runtime permanecem critérios de
+  pré-runtime/seleção observada, não fatos imutáveis do modelo.
+- [x] `ollama-cloud` e `ollama-local` permanecem separados; o teste completo não
+  usou nenhum dos dois.
+- [x] Local Ollama continua suportado, mas ausente de defaults.
+
+Próximas lacunas:
+
+- [x] Repetir `model-gateway:live:readiness` após o turno completo para
+  confirmar que health recente não foi promovido indevidamente para o catálogo.
+- [x] Auditar `terminal.plain.log` da fase completa por sinais fracos:
+  `FAIL`, `ERROR`, `quota`, `provider`, `secret`, `token`, `ollama-local` e
+  `Premium Request`.
+- [ ] Registrar qualquer gap residual de warnings de tool instructions em faixa
+  própria, sem misturar com o gateway de metadados.
+- [x] Rodar `git diff --check` e commit/push do guia atualizado.
+
+Fechamento pós-live:
+
+- [x] PASS `npm run model-gateway:live:readiness` após o turno completo.
+- [x] Readiness pós-turno manteve `runtime proof count remains zero before live
+  tests`, indicando que a prova runtime não foi promovida para o catálogo
+  canônico.
+- [x] Readiness pós-turno manteve `runtimeOverlays=2 active=0 expired=2`; os
+  overlays atuais seguem apenas históricos/expirados para `chutes` e `gemini`.
+- [x] Auditoria textual do log completo confirmou que `ollama-local` aparece
+  apenas como profile/preset e comandos explícitos, sem execução local.
+- [x] Auditoria textual confirmou que as referências a `failed` são health
+  operacional/histórico ou `vision=failed`, sem erro terminal ativo.
+- [x] Auditoria textual confirmou telemetria `sem Premium Request` e
+  `premiumRequest=false` nos eventos `llm.usage`.
+- [x] Auditoria textual não encontrou vazamento de segredo; o critério
+  automático também verificou `25` valores locais.
