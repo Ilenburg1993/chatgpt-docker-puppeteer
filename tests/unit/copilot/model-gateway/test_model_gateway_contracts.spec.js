@@ -509,6 +509,9 @@ describe('model-gateway foundation', () => {
         assert.equal(audit.summary.selectedSelectorKinds.provider_explicit, 2);
         assert.equal(audit.profiles[0].selected?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
         assert.equal(audit.profiles[0].decisionLayers['runtimeProbeProofCount'], 0);
+        assert.deepEqual(audit.profiles[0].capabilitySupply.required, { text: 1, streaming: 1, tools: 1 });
+        assert.equal(audit.profiles[0].capabilitySupply.preferred.reasoningEffort, 1);
+        assert.equal(audit.profiles[0].supplyWarnings.includes('preferred_supply_zero:runtime_proved'), true);
 
         const strictAudit = auditModelGatewayPreRuntimeSelection(
             {
@@ -541,6 +544,19 @@ describe('model-gateway foundation', () => {
             ),
             true,
         );
+
+        const localPrivateAudit = auditModelGatewayPreRuntimeSelection(snapshot, {
+            profiles: ['local_private'],
+            secretRegistry: { has: () => true },
+        });
+        assert.equal(localPrivateAudit.profiles[0].capabilitySupply.preferred.local, 0);
+        assert.equal(localPrivateAudit.profiles[0].capabilitySupply.preferred.privacy, 0);
+        assert.equal(localPrivateAudit.profiles[0].capabilitySupply.preferred.no_remote_secrets, 0);
+        assert.deepEqual(localPrivateAudit.profiles[0].supplyWarnings, [
+            'preferred_supply_zero:local',
+            'preferred_supply_zero:privacy',
+            'preferred_supply_zero:no_remote_secrets',
+        ]);
     });
 
     it('projects route-option candidates to SDK model info without losing selector metadata', () => {
@@ -4805,7 +4821,12 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('limits.contextWindowTokens'), 8192);
         assert.equal(byPath.get('capabilities.chat'), true);
         assert.equal(byPath.get('capabilities.vision'), true);
+        assert.equal(byPath.get('capabilities.local'), true);
+        assert.equal(byPath.get('capabilities.privacy'), true);
+        assert.equal(byPath.get('capabilities.no_remote_secrets'), true);
         assert.deepEqual(byPath.get('modalities.input'), ['text', 'image']);
+        assert.equal(byPath.get('providerMetadata.runtimeKind'), 'local');
+        assert.equal(byPath.get('providerMetadata.localPrivate'), true);
         assert.equal(byPath.get('providerMetadata.ollama.digest'), 'sha256-local-digest');
         assert.equal(byPath.get('providerMetadata.ollama.family'), 'gemma3');
         assert.equal(byPath.get('providerMetadata.ollama.quantizationLevel'), 'Q4_K_M');
@@ -6340,6 +6361,7 @@ describe('model-gateway foundation', () => {
         assert.equal(overlays[1].quota.remainingCreditsUsd, 0);
         assert.equal(overlays[1].spendingLimits.remainingUsd, 0);
         assert.equal(overlays[2].providerId, 'chutes');
+        assert.equal(overlays[2].secretRef, 'CHUTES_API_KEY');
         assert.equal(overlays[2].providerMetadata.failureKind, 'credits');
         const summary = summarizeModelGatewayRuntimeAccountOverlays(overlays, {
             maxItems: 2,
@@ -6366,6 +6388,39 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(JSON.stringify(overlays).includes('sk-'), false);
         assert.equal(JSON.stringify(summary).includes('sk-'), false);
+    });
+
+    it('maps runtime-health overlays to canonical provider secret refs without provider-specific ad hoc callers', () => {
+        const overlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth([
+            {
+                providerId: 'cerebras',
+                providerModel: 'llama3.1-8b',
+                lastStatus: 'failed',
+                lastFailureKind: 'auth',
+                lastFailureStatusCode: 401,
+            },
+            {
+                providerId: 'kilo-code',
+                providerModel: 'kilo-auto/free',
+                lastStatus: 'failed',
+                lastMessage: 'provider rate limit: 429',
+                lastRetryAfterSeconds: 15,
+            },
+            {
+                providerId: 'ollama-cloud',
+                providerModel: 'gpt-oss:120b',
+                lastStatus: 'failed',
+                lastErrorContext: 'provider.credits',
+            },
+        ]);
+
+        assert.equal(overlays.length, 3);
+        assert.equal(overlays[0].secretRef, 'CEREBRAS_API_KEY');
+        assert.equal(overlays[0].providerMetadata.disabled, true);
+        assert.equal(overlays[1].secretRef, 'KILO_CODE_API_KEY');
+        assert.equal(overlays[1].rateLimits.retryAfterSeconds, 15);
+        assert.equal(overlays[2].secretRef, 'OLLAMA_CLOUD_API_KEY');
+        assert.equal(overlays[2].quota.remainingCreditsUsd, 0);
     });
 
     it('summarizes account/key overlays for operator pre-runtime visibility', () => {

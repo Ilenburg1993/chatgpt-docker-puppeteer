@@ -56,6 +56,12 @@ function selectedDispositions(selection) {
     ].sort();
 }
 
+function formatCountMap(counts) {
+    return Object.entries(counts ?? {})
+        .map(([key, count]) => `${key}:${count}`)
+        .join(',') || '-';
+}
+
 const json = argSet.has('--json');
 const strict = argSet.has('--strict') || !argSet.has('--allow-probe');
 const fail = argSet.has('--fail');
@@ -150,6 +156,14 @@ if (json) {
             ? `${selected['providerId']}:${selected['providerModel']} selector=${selected['selectorKind']} score=${selected['score'] ?? '-'}`
             : `none next=${profile.nextActions.slice(0, 3).join(',') || '-'}`;
         process.stdout.write(`  ${profile.profileId}: ${label}\n`);
+        if (profile.capabilitySupply) {
+            process.stdout.write(
+                `    supply required=${formatCountMap(profile.capabilitySupply.required)} soft=${formatCountMap(profile.capabilitySupply.softRequired)} preferred=${formatCountMap(profile.capabilitySupply.preferred)}\n`,
+            );
+        }
+        if (Array.isArray(profile.supplyWarnings) && profile.supplyWarnings.length > 0) {
+            process.stdout.write(`    warnings=${profile.supplyWarnings.slice(0, 8).join(',')}\n`);
+        }
     }
 }
 

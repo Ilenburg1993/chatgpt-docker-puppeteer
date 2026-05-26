@@ -16,13 +16,18 @@ const DEFAULT_RUNTIME_OVERLAY_TTL_SECONDS = 3600;
 /** @type {Readonly<Record<string, string>>} */
 const DEFAULT_SECRET_REF_BY_PROVIDER = Object.freeze({
     anthropic: 'ANTHROPIC_API_KEY',
+    cerebras: 'CEREBRAS_API_KEY',
+    chutes: 'CHUTES_API_KEY',
     'cloudflare-workers-ai': 'CLOUDFLARE_API_TOKEN',
     gemini: 'GEMINI_API_KEY',
     groq: 'GROQ_API_KEY',
     huggingface: 'HF_TOKEN',
     kilo: 'KILO_API_KEY',
+    'kilo-code': 'KILO_CODE_API_KEY',
+    'kilo-gateway': 'KILO_API_KEY',
     mistral: 'MISTRAL_API_KEY',
     'nvidia-nim': 'NVIDIA_API_KEY',
+    'ollama-cloud': 'OLLAMA_CLOUD_API_KEY',
     opencode: 'OPENCODE_API_KEY',
     openai: 'OPENAI_API_KEY',
     openrouter: 'OPENROUTER_API_KEY',

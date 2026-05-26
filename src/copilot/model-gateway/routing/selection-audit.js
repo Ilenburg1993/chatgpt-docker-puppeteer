@@ -74,6 +74,79 @@ function countBy(rows, key) {
 }
 
 /**
+ * @param {Record<string, unknown>} row
+ * @returns {Record<string, unknown>}
+ */
+function rowCapabilities(row) {
+    return isRecord(row['capabilities']) ? row['capabilities'] : {};
+}
+
+/**
+ * @param {Record<string, unknown>} row
+ * @param {string} capability
+ * @returns {boolean}
+ */
+function hasCapability(row, capability) {
+    const capabilities = rowCapabilities(row);
+    if (capability === 'text') return capabilities['text'] !== false;
+    if (capability === 'free') {
+        const routing = isRecord(row['routing']) ? row['routing'] : {};
+        const pricing = isRecord(row['pricing']) ? row['pricing'] : {};
+        return routing['tier'] === 'free' || pricing['inputUsdPerMillion'] === 0;
+    }
+    return capabilities[capability] === true;
+}
+
+/**
+ * @param {Array<Record<string, any>>} candidates
+ * @param {Record<string, any> | null} profile
+ * @returns {{
+ *   candidateCount: number;
+ *   required: Record<string, number>;
+ *   softRequired: Record<string, number>;
+ *   preferred: Record<string, number>;
+ * }}
+ */
+function capabilitySupply(candidates, profile) {
+    const rows = candidates.map((candidate) => (isRecord(candidate['model']) ? candidate['model'] : {}));
+    /** @type {Record<string, number>} */
+    const required = {};
+    /** @type {Record<string, number>} */
+    const softRequired = {};
+    /** @type {Record<string, number>} */
+    const preferred = {};
+    if (!profile) return { candidateCount: rows.length, required, softRequired, preferred };
+    for (const capability of stringList(profile['requires'])) {
+        required[capability] = rows.filter((row) => hasCapability(row, capability)).length;
+    }
+    for (const capability of stringList(profile['softRequires'])) {
+        softRequired[capability] = rows.filter((row) => hasCapability(row, capability)).length;
+    }
+    for (const capability of stringList(profile['prefers'])) {
+        preferred[capability] = rows.filter((row) => hasCapability(row, capability)).length;
+    }
+    return { candidateCount: rows.length, required, softRequired, preferred };
+}
+
+/**
+ * @param {ReturnType<typeof capabilitySupply>} supply
+ * @returns {string[]}
+ */
+function capabilitySupplyWarnings(supply) {
+    const warnings = [];
+    for (const [capability, count] of Object.entries(supply.required)) {
+        if (count === 0) warnings.push(`required_supply_zero:${capability}`);
+    }
+    for (const [capability, count] of Object.entries(supply.softRequired)) {
+        if (count === 0) warnings.push(`soft_supply_zero:${capability}`);
+    }
+    for (const [capability, count] of Object.entries(supply.preferred)) {
+        if (count === 0) warnings.push(`preferred_supply_zero:${capability}`);
+    }
+    return warnings;
+}
+
+/**
  * @param {Record<string, number>[]} countRecords
  * @returns {Record<string, number>}
  */
@@ -129,6 +202,13 @@ function resolveProfileIds(options = {}) {
  *     fallbackChain: string[];
  *     topRejectedReasons: string[];
  *     nextActions: string[];
+ *     capabilitySupply: {
+ *       candidateCount: number;
+ *       required: Record<string, number>;
+ *       softRequired: Record<string, number>;
+ *       preferred: Record<string, number>;
+ *     };
+ *     supplyWarnings: string[];
  *     decisionLayers: Record<string, unknown>;
  *     snapshotContext: Record<string, number>;
  *   }>;
@@ -153,8 +233,10 @@ export function auditModelGatewayPreRuntimeSelection(snapshot, options = {}) {
         };
         if (options.includeProjectionOnly !== undefined) routeOptions.includeProjectionOnly = options.includeProjectionOnly;
         if (options.secretRegistry !== undefined) routeOptions.secretRegistry = options.secretRegistry;
+        const profile = resolveModelGatewayTaskProfile(profileId);
         const route = routeModelGatewayCatalogSnapshot(snapshot, profileId, routeOptions);
         const explanation = explainGatewayRouteDecision(route);
+        const supply = capabilitySupply(route.candidates, profile);
         return {
             profileId,
             selected: selectedSummary(route.selected),
@@ -163,6 +245,8 @@ export function auditModelGatewayPreRuntimeSelection(snapshot, options = {}) {
             fallbackChain: route.fallbackChain.slice(0, 12),
             topRejectedReasons: explanation.topRejectedReasons,
             nextActions: explanation.nextActions,
+            capabilitySupply: supply,
+            supplyWarnings: capabilitySupplyWarnings(supply),
             decisionLayers: explanation.decisionLayers,
             snapshotContext: route.snapshotContext,
             rejectedReasonCounts: explanation.rejectedReasonCounts,

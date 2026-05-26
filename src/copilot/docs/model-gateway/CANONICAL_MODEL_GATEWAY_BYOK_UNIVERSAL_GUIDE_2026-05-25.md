@@ -5787,3 +5787,81 @@ Validação deste corte:
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.
+
+---
+
+## 56. Continuidade 2026-05-26 — Overlays Voláteis E Sinais Local/Private
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a fronteira entre catálogo canônico, overlays de conta/key e
+  seleção pré-runtime.
+- [x] Confirmado que falhas observadas em runtime não devem reescrever
+  metadados canônicos do modelo.
+- [x] Confirmado que overlays voláteis precisam carregar `secretRef` canônico
+  para permitir explicação e exclusão pré-runtime por auth, créditos e rate
+  limit.
+- [x] Confirmado que provedores novos já importados ainda estavam incompletos no
+  mapa padrão de secret refs voláteis.
+- [x] Confirmado que modelos Ollama locais tinham `localPrivate` na rota e
+  overlay, mas não expunham `local`, `privacy` e `no_remote_secrets` como
+  capabilities pesquisáveis do catálogo.
+
+Implementado neste corte:
+
+- [x] `runtime-overlays` passa a mapear `cerebras` para `CEREBRAS_API_KEY`.
+- [x] `runtime-overlays` passa a mapear `chutes` para `CHUTES_API_KEY`.
+- [x] `runtime-overlays` passa a mapear `kilo-code` para
+  `KILO_CODE_API_KEY`.
+- [x] `runtime-overlays` passa a mapear `kilo-gateway` para `KILO_API_KEY`.
+- [x] `runtime-overlays` passa a mapear `ollama-cloud` para
+  `OLLAMA_CLOUD_API_KEY`.
+- [x] O importer local do Ollama passa a emitir `capabilities.local`.
+- [x] O importer local do Ollama passa a emitir `capabilities.privacy`.
+- [x] O importer local do Ollama passa a emitir
+  `capabilities.no_remote_secrets`.
+- [x] O importer local do Ollama passa a emitir
+  `providerMetadata.runtimeKind = local`.
+- [x] O importer local do Ollama passa a emitir
+  `providerMetadata.localPrivate = true`.
+- [x] A auditoria pré-runtime passa a emitir `capabilitySupply` por perfil,
+  separando contagem de candidatos para capabilities requeridas, soft-required
+  e preferidas.
+- [x] `local_private` agora consegue denunciar claramente quando o snapshot
+  atual não tem supply local/private antes de qualquer probe runtime.
+- [x] O terminal `/byok gateway selection audit` passa a mostrar supply por
+  perfil.
+- [x] O script `model-gateway-effective-selection.mjs` passa a mostrar supply
+  por perfil no modo textual.
+- [x] A auditoria passa a emitir `supplyWarnings` quando uma capability
+  requerida, soft-required ou preferida tem supply zero entre candidatos
+  viáveis.
+- [x] `local_private` deixa explícito o caso perigoso em que a seleção ainda
+  encontra candidatos remotos, mas o supply de `local`, `privacy` e
+  `no_remote_secrets` está zerado.
+
+Separação arquitetural preservada:
+
+- [x] Metadados locais do Ollama continuam vindo apenas de `/api/tags` e
+  `/api/show`.
+- [x] A existência local instalada continua sendo catálogo/account overlay, não
+  prova de runtime.
+- [x] Falhas de quota/auth/rate limit continuam voláteis e expiráveis.
+- [x] Nenhum segredo real é serializado.
+- [x] Nenhum provider é chamado por esta mudança.
+- [x] Nenhum modelo é executado por esta mudança.
+
+Próximas lacunas:
+
+- [ ] Avaliar se `ollama-local` deve aparecer explicitamente na matriz de
+  requisitos de ambiente ou continuar representado pelo grupo `ollama`.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `159` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `67` testes.
+- [x] PASS `npm run model-gateway:selection:effective -- --profile
+  local_private`.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.

@@ -2532,6 +2532,15 @@ async function renderByokGatewaySelectionAudit(println, rest) {
     }
     for (const profile of selection.profiles) {
         const selected = profile.selected;
+        const supply = profile.capabilitySupply;
+        const supplyLine =
+            supply && typeof supply === 'object'
+                ? [
+                      `required=${formatCountMap(supply.required ?? {})}`,
+                      `soft=${formatCountMap(supply.softRequired ?? {})}`,
+                      `preferred=${formatCountMap(supply.preferred ?? {})}`,
+                  ].join(' · ')
+                : '';
         if (selected) {
             println(
                 `    \x1b[32m${profile.profileId}\x1b[0m  \x1b[90m${selected['providerId']}:${selected['providerModel']} · selector=${selected['selectorKind']} · score=${selected['score'] ?? '-'} · candidates=${profile.candidateCount} · rejected=${profile.rejectedCount}\x1b[0m`,
@@ -2543,6 +2552,10 @@ async function renderByokGatewaySelectionAudit(println, rest) {
             if (profile.topRejectedReasons.length > 0) {
                 println(`      \x1b[90mrejected=${profile.topRejectedReasons.slice(0, 5).join(',')}\x1b[0m`);
             }
+        }
+        if (supplyLine) println(`      \x1b[90msupply ${supplyLine}\x1b[0m`);
+        if (Array.isArray(profile.supplyWarnings) && profile.supplyWarnings.length > 0) {
+            println(`      \x1b[33mwarnings=${profile.supplyWarnings.slice(0, 6).join(',')}\x1b[0m`);
         }
     }
     println(
