@@ -88,11 +88,13 @@ import {
     SqliteModelGatewayCatalogStore,
     MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
     MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY,
+    createAnthropicDocsModelsImporter,
     createAnthropicModelsImporter,
     createCatalogModelTombstones,
     createCerebrasPublicModelsImporter,
     createChutesModelsImporter,
     createCloudflareWorkersAiCatalogImporter,
+    createGeminiDocsModelsImporter,
     createGeminiModelsImporter,
     createGroqDocsModelsImporter,
     createGroqModelsImporter,
@@ -147,6 +149,8 @@ import {
     normalizeDataPolicyTaxonomy,
     normalizeStoredCatalogSnapshot,
     normalizeUsdPricing,
+    parseAnthropicDocsRows,
+    parseGeminiDocsRows,
     parseOpenAiDocsRows,
     planModelGatewayCatalogRefresh,
     rankCatalogEvidenceConfidence,
@@ -3091,6 +3095,128 @@ describe('model-gateway foundation', () => {
         assert.equal(byModelPath.get('gpt-4.5-preview:lifecycle.providerStatus'), 'deprecated');
     });
 
+    it('imports Anthropic official docs as public metadata seed without proving account access', async () => {
+        const pages = {
+            models: `
+                <main>
+                    <table>
+                        <tr><th>Model</th><th>Anthropic API</th><th>AWS Bedrock</th><th>GCP Vertex AI</th></tr>
+                        <tr><td>Claude Sonnet 4</td><td>claude-sonnet-4-20250514</td><td>anthropic.claude-sonnet-4-20250514-v1:0</td><td>claude-sonnet-4@20250514</td></tr>
+                        <tr><td>Claude Haiku 3.5</td><td>claude-3-5-haiku-20241022 (claude-3-5-haiku-latest)</td><td>anthropic.claude-3-5-haiku-20241022-v1:0</td><td>claude-3-5-haiku@20241022</td></tr>
+                    </table>
+                    <section>Claude Sonnet 4 Text and image input Text output 200K context window 1M context beta Extended thinking Priority Tier Max output 64000 tokens</section>
+                    <section>Claude Haiku 3.5 Text and image input Text output 200K context window Max output 8192 tokens</section>
+                </main>
+            `,
+            pricing: `
+                <table>
+                    <tr><th>Model</th><th>Base Input Tokens</th><th>5m Cache Writes</th><th>1h Cache Writes</th><th>Cache Hits & Refreshes</th><th>Output Tokens</th></tr>
+                    <tr><td>Claude Sonnet 4</td><td>$3 / MTok</td><td>$3.75 / MTok</td><td>$6 / MTok</td><td>$0.30 / MTok</td><td>$15 / MTok</td></tr>
+                    <tr><td>Claude Haiku 3.5</td><td>$0.80 / MTok</td><td>$1 / MTok</td><td>$1.6 / MTok</td><td>$0.08 / MTok</td><td>$4 / MTok</td></tr>
+                </table>
+            `,
+            api: '<code>GET /v1/models</code><code>claude-sonnet-4-20250514</code>',
+        };
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (url) =>
+                /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    text: async () =>
+                        String(url).includes('/pricing') ? pages.pricing : String(url).includes('/api/') ? pages.api : pages.models,
+                })
+        );
+
+        const parsed = parseAnthropicDocsRows(pages);
+        const snapshot = await runCatalogImporters({
+            importers: [createAnthropicDocsModelsImporter({ fetchImpl: fakeFetch })],
+            now: () => new Date('2026-05-25T12:25:00.000Z'),
+        });
+        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item.providerModel}:${item.fieldPath}`, item.value]));
+
+        assert.deepEqual(parsed.map((row) => row.id), [
+            'claude-3-5-haiku-20241022',
+            'claude-3-5-haiku-latest',
+            'claude-sonnet-4-20250514',
+        ]);
+        assert.equal(snapshot.sources[0].providerId, 'anthropic');
+        assert.equal(snapshot.sources[0].authMode, 'none');
+        assert.equal(snapshot.accountOverlays.length, 0);
+        assert.equal(snapshot.routeOptions.length, 0);
+        assert.equal(byModelPath.get('claude-sonnet-4-20250514:providerMetadata.anthropic.docsUrl'), 'https://docs.anthropic.com/en/docs/about-claude/models/overview');
+        assert.equal(byModelPath.get('claude-sonnet-4-20250514:capabilities.reasoning'), true);
+        assert.equal(byModelPath.get('claude-sonnet-4-20250514:capabilities.vision'), true);
+        assert.equal(byModelPath.get('claude-sonnet-4-20250514:limits.contextWindowTokens'), 1_000_000);
+        assert.equal(byModelPath.get('claude-sonnet-4-20250514:limits.maxOutputTokens'), 64_000);
+        assert.equal(byModelPath.get('claude-sonnet-4-20250514:pricing.inputUsdPerMillion'), 3);
+        assert.equal(byModelPath.get('claude-sonnet-4-20250514:pricing.outputUsdPerMillion'), 15);
+        assert.equal(byModelPath.get('claude-3-5-haiku-20241022:pricing.cacheReadUsdPerMillion'), 0.08);
+        assert.equal(byModelPath.get('claude-3-5-haiku-20241022:providerMetadata.modelTraits.tier'), 'haiku');
+    });
+
+    it('imports Gemini official docs as public metadata seed across Developer API, Vertex and OpenAI surfaces', async () => {
+        const pages = {
+            models: `
+                <main>
+                    <h2>Gemini 2.5 Pro</h2>
+                    <p>gemini-2.5-pro supports complex reasoning, coding, tools, multimodal input and a 1 million token context window.</p>
+                    <h2>Gemini 2.5 Flash Image</h2>
+                    <p>gemini-2.5-flash-image generates high-quality images and supports conversational editing.</p>
+                </main>
+            `,
+            pricing: `
+                <section>
+                    <h2>Gemini 2.5 Pro</h2>
+                    <p>Input price $1.25 Output price $10.00 Context caching price $0.31</p>
+                    <h2>Gemini 2.5 Flash Image</h2>
+                    <p>Input price $0.30 Output image $30.00 Context caching price $0.03</p>
+                </section>
+            `,
+            openai: '<code>base_url="https://generativelanguage.googleapis.com/v1beta/openai/"</code><code>model="gemini-2.5-flash"</code>',
+            vertex: '<main>Gemini 2.5 Pro on Vertex AI features agentic workflows, autonomous coding and multimodal tasks.</main>',
+        };
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (url) =>
+                /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    text: async () =>
+                        String(url).includes('/pricing')
+                            ? pages.pricing
+                            : String(url).includes('/openai')
+                              ? pages.openai
+                              : String(url).includes('cloud.google.com')
+                                ? pages.vertex
+                                : pages.models,
+                })
+        );
+
+        const parsed = parseGeminiDocsRows(pages);
+        const snapshot = await runCatalogImporters({
+            importers: [createGeminiDocsModelsImporter({ fetchImpl: fakeFetch })],
+            now: () => new Date('2026-05-25T12:30:00.000Z'),
+        });
+        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item.providerModel}:${item.fieldPath}`, item.value]));
+
+        assert.deepEqual(parsed.map((row) => row.id), ['gemini-2.5-flash', 'gemini-2.5-flash-image', 'gemini-2.5-pro']);
+        assert.equal(snapshot.sources[0].providerId, 'gemini');
+        assert.equal(snapshot.sources[0].authMode, 'none');
+        assert.equal(snapshot.accountOverlays.length, 0);
+        assert.equal(snapshot.routeOptions.length, 0);
+        assert.equal(byModelPath.get('gemini-2.5-pro:providerMetadata.gemini.docsUrl'), 'https://ai.google.dev/gemini-api/docs/models');
+        assert.deepEqual(byModelPath.get('gemini-2.5-pro:providerMetadata.gemini.surfaces'), [
+            'developer_api',
+            'vertex_ai',
+            'openai_compatible',
+        ]);
+        assert.equal(byModelPath.get('gemini-2.5-pro:capabilities.reasoning'), true);
+        assert.equal(byModelPath.get('gemini-2.5-pro:limits.contextWindowTokens'), 1_000_000);
+        assert.equal(byModelPath.get('gemini-2.5-pro:pricing.inputUsdPerMillion'), 1.25);
+        assert.equal(byModelPath.get('gemini-2.5-pro:pricing.outputUsdPerMillion'), 10);
+        assert.equal(byModelPath.get('gemini-2.5-flash-image:capabilities.imageGeneration'), true);
+        assert.deepEqual(byModelPath.get('gemini-2.5-flash-image:modalities.output'), ['image', 'text']);
+    });
+
     it('imports generic OpenAI-compatible model lists as identity, route and account overlay metadata', async () => {
         const secret = 'generic-secret-that-must-not-leak';
         /** @type {string | null} */
@@ -5819,6 +5945,8 @@ describe('model-gateway foundation', () => {
                 'kilo-gateway-providers',
                 'cerebras-public-models',
                 'openai-docs-models',
+                'anthropic-docs-models',
+                'gemini-docs-models',
                 'groq-docs-models',
                 'opencode-zen-docs',
                 'cloudflare-workers-ai-catalog',
@@ -5837,6 +5965,8 @@ describe('model-gateway foundation', () => {
                 'kilo-gateway-providers',
                 'cerebras-public-models',
                 'openai-docs-models',
+                'anthropic-docs-models',
+                'gemini-docs-models',
                 'groq-docs-models',
                 'opencode-zen-docs',
                 'cloudflare-workers-ai-catalog',

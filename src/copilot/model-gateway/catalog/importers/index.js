@@ -6,6 +6,13 @@
  */
 
 export {
+    ANTHROPIC_MODELS_API_DOCS_URL,
+    ANTHROPIC_MODELS_DOCS_URL,
+    ANTHROPIC_PRICING_DOCS_URL,
+    createAnthropicDocsModelsImporter,
+    parseAnthropicDocsRows,
+} from './anthropic-docs-models-importer.js';
+export {
     ANTHROPIC_MODELS_API_VERSION,
     ANTHROPIC_MODELS_CATALOG_URL,
     createAnthropicModelsImporter,
@@ -26,6 +33,14 @@ export {
     CLOUDFLARE_WORKERS_AI_REST_BASE_URL,
     createCloudflareWorkersAiCatalogImporter,
 } from './cloudflare-workers-ai-catalog-importer.js';
+export {
+    GEMINI_MODELS_DOCS_URL,
+    GEMINI_OPENAI_COMPATIBILITY_DOCS_URL,
+    GEMINI_PRICING_DOCS_URL,
+    GEMINI_VERTEX_MODELS_DOCS_URL,
+    createGeminiDocsModelsImporter,
+    parseGeminiDocsRows,
+} from './gemini-docs-models-importer.js';
 export {
     GEMINI_MODELS_API_VERSION,
     GEMINI_MODELS_CATALOG_URL,

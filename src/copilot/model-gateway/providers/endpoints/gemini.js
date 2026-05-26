@@ -14,6 +14,12 @@ export const GEMINI_PROVIDER_ENDPOINTS = Object.freeze({
             url: 'https://generativelanguage.googleapis.com/v1beta/models',
             richness: 'limits_methods_parameters',
         }),
+        Object.freeze({
+            kind: 'official_docs',
+            method: 'GET',
+            url: 'https://ai.google.dev/gemini-api/docs/models',
+            richness: 'identity_pricing_limits_capabilities_routing_docs_vertex_openai',
+        }),
     ]),
     runtimeEndpoints: Object.freeze([
         Object.freeze({ kind: 'generate_content', method: 'POST', path: '/models/{model}:generateContent' }),

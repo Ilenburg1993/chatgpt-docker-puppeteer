@@ -9,10 +9,12 @@
  */
 
 import {
+    createAnthropicDocsModelsImporter,
     createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
     createChutesModelsImporter,
     createCloudflareWorkersAiCatalogImporter,
+    createGeminiDocsModelsImporter,
     createGeminiModelsImporter,
     createGroqDocsModelsImporter,
     createGroqModelsImporter,
@@ -84,6 +86,8 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
             createKiloGatewayProvidersImporter({ fetchImpl: options.fetchImpl }),
             createCerebrasPublicModelsImporter({ fetchImpl: options.fetchImpl }),
             createOpenAiDocsModelsImporter({ fetchImpl: options.fetchImpl }),
+            createAnthropicDocsModelsImporter({ fetchImpl: options.fetchImpl }),
+            createGeminiDocsModelsImporter({ fetchImpl: options.fetchImpl }),
             createGroqDocsModelsImporter({ fetchImpl: options.fetchImpl }),
             createOpenCodeZenDocsImporter({ fetchImpl: options.fetchImpl }),
             createCloudflareWorkersAiCatalogImporter({

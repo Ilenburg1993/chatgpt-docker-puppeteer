@@ -1443,8 +1443,8 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Comando terminal canônico `/byok gateway importers [provider]` para
   auditoria local de hooks, importers configurados e cobertura de endpoints
   sem rede.
-- [ ] Anthropic docs seed.
-- [ ] Gemini/Vertex docs seed.
+- [x] Anthropic docs seed.
+- [x] Gemini/Vertex docs seed.
 - [ ] Mistral docs pricing seed.
 - [ ] OpenRouter account overlay importer.
 - [ ] Kilo account overlay importer.
@@ -3499,6 +3499,141 @@ Validação deste corte:
 
 - [x] PASS `npm run model-gateway:test:terminal` com `60` testes.
 - [x] PASS `npm run model-gateway:test:contracts` com `129` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 58. Continuidade 2026-05-26 — Anthropic Official Docs Seed
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a lacuna Anthropic da Faixa L: o importer autenticado
+  `/v1/models` prova visibilidade account-scoped, mas não carrega sozinho
+  pricing, limites, aliases Bedrock/Vertex e notas de capability publicadas nos
+  docs.
+- [x] Consultadas fontes oficiais Anthropic de overview de modelos, pricing e
+  API de listagem de modelos.
+- [x] Confirmado que a fonte pública precisa ser evidência global de metadados,
+  sem route option, sem account overlay e sem prova de acesso.
+- [x] Identificado que o inventário de endpoints Anthropic registrava apenas a
+  API autenticada e precisava declarar também o seed oficial de docs para que a
+  auditoria de importers enxergasse cobertura.
+
+Fontes oficiais consultadas:
+
+- [x] `https://docs.anthropic.com/en/docs/about-claude/models/overview`.
+- [x] `https://docs.anthropic.com/en/docs/about-claude/pricing`.
+- [x] `https://docs.anthropic.com/en/api/models-list`.
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/catalog/importers/anthropic-docs-models-importer.js`.
+- [x] Criado `createAnthropicDocsModelsImporter()`.
+- [x] Criado `parseAnthropicDocsRows()`.
+- [x] O importer busca overview, pricing e docs da API em paralelo.
+- [x] O parser extrai ids Claude versionados e aliases `latest`, evitando
+  promover aliases cloud como ids primários.
+- [x] Evidências normalizadas incluem docs/pricing/API URLs, aliases,
+  lifecycle, modalidades, capabilities, token limits, pricing, cloud aliases e
+  model identity traits.
+- [x] `createDefaultModelGatewayCatalogImporters()` passa a incluir
+  `anthropic-docs-models` em modo público.
+- [x] O inventário de endpoints Anthropic passa a declarar o source
+  `official_docs`.
+- [x] Exportado pelos barrels de `importers`, `catalog` e `model-gateway`.
+- [x] Teste unitário cobre parsing, pricing, context/output limits,
+  capabilities, ausência de route options/overlays e ausência de prova de
+  acesso.
+
+Separação preservada:
+
+- [x] Docs seed não prova acesso.
+- [x] Docs seed não executa modelo.
+- [x] Docs seed não chama probes.
+- [x] Docs seed não substitui `/v1/models` autenticado.
+- [x] Docs seed é evidência global de metadados.
+
+Próximas lacunas L reforçadas:
+
+- [ ] Gemini/Vertex docs seed e distinção entre Gemini Developer API,
+  Vertex AI e OpenAI-compatible surface.
+- [ ] Mistral docs pricing seed.
+- [ ] OpenRouter/Kilo account overlays profundos.
+- [ ] Cloudflare account access importer além de flags configuradas.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `130` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 59. Continuidade 2026-05-26 — Gemini Vertex/OpenAI Docs Seed
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a lacuna Gemini/Vertex da Faixa L: a API
+  `generativelanguage.googleapis.com/v1beta/models` é account/key-scoped,
+  enquanto os docs públicos carregam metadados que precisam entrar antes de
+  qualquer prova de acesso.
+- [x] Confirmado que Gemini exige separar ao menos três superfícies:
+  Developer API, Vertex AI e OpenAI-compatible endpoint.
+- [x] Consultadas fontes oficiais Google AI/Google Cloud de modelos, pricing,
+  OpenAI compatibility e Vertex AI models.
+- [x] Identificado que o inventário Gemini registrava apenas a API autenticada
+  e precisava declarar também a fonte oficial pública de docs.
+
+Fontes oficiais consultadas:
+
+- [x] `https://ai.google.dev/gemini-api/docs/models`.
+- [x] `https://ai.google.dev/gemini-api/docs/pricing`.
+- [x] `https://ai.google.dev/gemini-api/docs/openai`.
+- [x] `https://cloud.google.com/vertex-ai/generative-ai/docs/models`.
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/catalog/importers/gemini-docs-models-importer.js`.
+- [x] Criado `createGeminiDocsModelsImporter()`.
+- [x] Criado `parseGeminiDocsRows()`.
+- [x] O importer busca models docs, pricing, OpenAI compatibility e Vertex AI
+  models em paralelo.
+- [x] O parser extrai ids `gemini-*` explícitos e converte headings públicos
+  `Gemini 2.5 Pro` para ids normalizados.
+- [x] Evidências normalizadas incluem docs/pricing/OpenAI/Vertex URLs,
+  superfícies, lifecycle, modalidades, capabilities, token limits, pricing e
+  model identity traits.
+- [x] `createDefaultModelGatewayCatalogImporters()` passa a incluir
+  `gemini-docs-models` em modo público.
+- [x] O inventário de endpoints Gemini passa a declarar o source
+  `official_docs`.
+- [x] Exportado pelos barrels de `importers`, `catalog` e `model-gateway`.
+- [x] Teste unitário cobre Developer API, Vertex e OpenAI-compatible surfaces,
+  pricing, context limits, multimodalidade e ausência de prova de acesso.
+
+Separação preservada:
+
+- [x] Docs seed não prova acesso.
+- [x] Docs seed não executa modelo.
+- [x] Docs seed não chama probes.
+- [x] Docs seed não substitui `models.list` autenticado.
+- [x] Docs seed mantém Developer API, Vertex AI e OpenAI-compatible como
+  metadados, não como runtime selecionado.
+
+Próximas lacunas L reforçadas:
+
+- [ ] Mistral docs pricing seed.
+- [ ] Account overlays profundos para OpenRouter e Kilo.
+- [ ] Cloudflare account access importer além de flags configuradas.
+- [ ] Parser estrutural adicional para OpenAPI docs onde o provider expõe
+  schema legível por máquina.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `131` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.
