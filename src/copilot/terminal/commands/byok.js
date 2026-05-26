@@ -101,6 +101,7 @@ const DEFAULT_BYOK_SHORTLIST_PROBE_LIMIT = 3;
 const BYOK_LOW_REQUEST_TOKEN_LIMIT = 8_000;
 const BYOK_COMFORTABLE_REQUEST_TOKEN_LIMIT = 32_000;
 const BYOK_RECOMMEND_RESPONSE_RESERVE_TOKENS = 1_024;
+const LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON = 'local_provider_requires_explicit_request';
 const BYOK_RUNTIME_SELECTOR_ENV_KEYS = Object.freeze([
     'COPILOT_BYOK_PROFILE',
     'COPILOT_BYOK_PROVIDER_PRESET',
@@ -757,6 +758,18 @@ function parseRecommendArgs(rest) {
 
 /**
  * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
+ * @param {string | null | undefined} provider
+ * @returns {boolean}
+ */
+function matchesByokProviderFilter(model, provider) {
+    if (!provider) return true;
+    const meta = getByokModelMetadata(model);
+    const haystack = [meta?.provider, meta?.profile, meta?.source, model.id].filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(provider.toLowerCase());
+}
+
+/**
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @param {ReturnType<typeof parseRecommendArgs>} filters
  * @param {ReturnType<typeof estimateCurrentByokRequestBudget>} [runtimeBudget]
  * @returns {boolean}
@@ -769,10 +782,7 @@ function matchesRecommendFilters(model, filters, runtimeBudget = null) {
     if (filters.freeOnly && cost.kind !== 'free' && cost.kind !== 'profile-free') return false;
     if (filters.meteredOnly && cost.kind !== 'metered') return false;
     if (filters.unknownCostOnly && cost.kind !== 'unknown') return false;
-    if (filters.provider) {
-        const haystack = [meta?.provider, meta?.profile, meta?.source, model.id].filter(Boolean).join(' ').toLowerCase();
-        if (!haystack.includes(filters.provider)) return false;
-    }
+    if (!matchesByokProviderFilter(model, filters.provider)) return false;
     if (filters.vision && !supportsByokVision(model)) return false;
     if (filters.reasoning && !supportsByokReasoning(model)) return false;
     if (filters.tools && !supportsByokTools(model)) return false;
@@ -975,6 +985,44 @@ function normalizeRouteDiscoveryFilters(filters, rawArgs, projection) {
 }
 
 /**
+ * @param {string[]} rawArgs
+ * @returns {boolean}
+ */
+function routeArgsRequestActiveProjection(rawArgs) {
+    return rawArgs.some((item) => /^(active|current|--active|--current)$/iu.test(item));
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalByokProjection>} projection
+ * @returns {boolean}
+ */
+function activeProjectionSuggestsLocalProvider(projection) {
+    const summary = projection.summary;
+    return [summary.profile, summary.preset, summary.providerType, summary.baseUrl]
+        .filter(Boolean)
+        .some((value) => /\bollama(?:-local)?\b|localhost|127\.0\.0\.1|0\.0\.0\.0/iu.test(String(value)));
+}
+
+/**
+ * @param {{ rejected?: Array<{ rejectedReasons?: string[] }> }} route
+ * @returns {boolean}
+ */
+function hasLocalProviderExplicitRequestRejection(route) {
+    return Array.isArray(route.rejected) && route.rejected.some((item) => item.rejectedReasons?.includes(LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON));
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string} profileId
+ * @returns {void}
+ */
+function renderByokLocalProviderOptInHint(println, profileId) {
+    println(
+        `  \x1b[33mOllama/local foi bloqueado por padrão. Para usar modelos locais, peça explicitamente: /byok models route ${profileId} provider:ollama, /byok models route local_private ou /byok models route local_private_strict.\x1b[0m`,
+    );
+}
+
+/**
  * @param {(text: string) => void} println
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
  * @param {string[]} rest
@@ -989,6 +1037,7 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
     const showRejected = routeArgs.some((item) => /^(rejected|show-rejected|--rejected|--show-rejected)$/iu.test(item));
     const strict = routeArgs.some((item) => /^(strict|verified|--strict|--verified)$/iu.test(item));
     const filters = normalizeRouteDiscoveryFilters(parseRecommendArgs(routeArgs), routeArgs, projection);
+    const activeLocalOptIn = routeArgsRequestActiveProjection(routeArgs) && activeProjectionSuggestsLocalProvider(projection);
     const runtimeBudget = readCurrentByokRequestBudget();
     const discovered = await discoverByokCatalogForCommand(projection, filters);
     const catalogSnapshot = await readByokGatewayCatalogSnapshotForRouting();
@@ -1021,6 +1070,8 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
             routeOptions: catalogSnapshot?.routeOptions ?? [],
             accountOverlays: catalogSnapshot?.accountOverlays ?? [],
             secretRegistry: createEnvSecretRegistry(),
+            allowProviders: filters.provider ? [filters.provider] : [],
+            allowLocalProviders: activeLocalOptIn,
             eligibilityPolicy: {
                 unknownAccessPolicy: strict ? 'block' : 'allow_probe',
             },
@@ -1051,7 +1102,7 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
     );
     if (!route.selected) {
         println(
-            `    \x1b[33mNenhum modelo passou na política ${strict ? 'strict' : 'pre-probe'}. Use /models route ${profileId} --show-rejected para ver causas.\x1b[0m\n`,
+            `    \x1b[33mNenhum modelo passou na política ${strict ? 'strict' : 'pre-probe'}. Use /byok models route ${profileId} --show-rejected para ver causas.\x1b[0m\n`,
         );
     } else {
         const model = route.selected.model;
@@ -1064,6 +1115,10 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
         println(
             `      \x1b[90mpróximo passo: /byok probe agent provider:${model['providerId']} model:${model['providerModel'] ?? model['id']} e então /byok use <perfil> + /byok model <id>.\x1b[0m`,
         );
+    }
+
+    if (hasLocalProviderExplicitRequestRejection(route)) {
+        renderByokLocalProviderOptInHint(println, profileId);
     }
 
     if (route.fallbackChain.length > 0) {
@@ -1274,6 +1329,38 @@ function chooseByokCatalogModels(primary, fallback) {
 }
 
 /**
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
+ * @returns {string}
+ */
+function byokCatalogModelIdentity(model) {
+    const meta = getByokModelMetadata(model);
+    return [
+        optionalScalarString(meta?.provider) ?? optionalScalarString(meta?.profile) ?? 'byok',
+        optionalScalarString(meta?.providerModel) ?? model.id,
+    ]
+        .join(':')
+        .toLowerCase();
+}
+
+/**
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo[]} models
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo[]} additions
+ * @returns {number}
+ */
+function appendUniqueByokCatalogModels(models, additions) {
+    const seen = new Set(models.map(byokCatalogModelIdentity));
+    let added = 0;
+    for (const model of additions) {
+        const identity = byokCatalogModelIdentity(model);
+        if (seen.has(identity)) continue;
+        seen.add(identity);
+        models.push(model);
+        added += 1;
+    }
+    return added;
+}
+
+/**
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
  * @param {ReturnType<typeof parseRecommendArgs>} filters
  * @returns {Array<ReturnType<typeof readTerminalByokProjection>['profiles'][number]>}
@@ -1362,6 +1449,19 @@ async function discoverByokCatalogForCommand(projection, filters) {
                 }),
             );
         }
+    }
+    if (filters.provider) {
+        const gatewayFallbackModels = chooseByokCatalogModels(projection.gatewayModels, projection.models)
+            .map((model) =>
+                withByokCatalogSource(model, {
+                    profileName: projection.summary.profile,
+                    preset: projection.summary.preset,
+                    providerType: projection.summary.providerType,
+                }),
+            )
+            .filter((model) => matchesByokProviderFilter(model, filters.provider));
+        const added = appendUniqueByokCatalogModels(models, gatewayFallbackModels);
+        if (added > 0) sourceCounts.set('model-gateway-static', (sourceCounts.get('model-gateway-static') ?? 0) + added);
     }
     const sourceLabel =
         [...sourceCounts.entries()]
@@ -2558,6 +2658,14 @@ async function renderByokGatewaySelectionAudit(println, rest) {
         if (Array.isArray(profile.supplyWarnings) && profile.supplyWarnings.length > 0) {
             println(`      \x1b[33mwarnings=${profile.supplyWarnings.slice(0, 6).join(',')}\x1b[0m`);
         }
+    }
+    const profilesWithLocalProviderBlock = selection.profiles
+        .filter((profile) => profile.topRejectedReasons.includes(LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON))
+        .map((profile) => profile.profileId);
+    if (profilesWithLocalProviderBlock.length > 0) {
+        println(
+            `\n  \x1b[33mOllama/local foi bloqueado por padrão nos perfis ${profilesWithLocalProviderBlock.slice(0, 6).join(',')}. Use um pedido explícito de provider/local_private para liberar candidatos locais.\x1b[0m`,
+        );
     }
     println(
         `\n  \x1b[90mEsta auditoria encerra a etapa ${args.effective ? 'efetiva sem novas probes' : 'pré-runtime'}: ela rankeia por metadados/overlays/policy${args.effective ? ' e health já observado' : ''}; probes live ficam para a fase seguinte.\x1b[0m\n`,

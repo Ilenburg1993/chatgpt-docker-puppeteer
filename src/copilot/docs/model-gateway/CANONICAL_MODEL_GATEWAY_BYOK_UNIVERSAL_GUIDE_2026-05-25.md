@@ -6206,3 +6206,60 @@ Validação deste corte:
 - [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.
+
+---
+
+## 57. Continuidade 2026-05-26 — Operabilidade Do Opt-In Local
+
+Auditoria executada neste corte:
+
+- [x] Revisitado o caminho terminal `models route` depois da regra que bloqueia
+  provedores locais por padrão.
+- [x] Identificado que `provider:ollama` filtrava candidatos no terminal, mas
+  ainda não era repassado ao motor de policy como allow-list explícita.
+- [x] Confirmado que isso poderia fazer um pedido explícito de Ollama local
+  continuar rejeitado por `local_provider_requires_explicit_request`.
+- [x] Confirmado que o terminal precisava explicar a rejeição local padrão sem
+  exigir que o operador inferisse a policy a partir de uma razão técnica.
+
+Implementado neste corte:
+
+- [x] `/byok models route ... provider:ollama` passa a repassar
+  `allowProviders: ['ollama']` para `routeGatewayModels()`.
+- [x] A alias `ollama` agora completa o fluxo terminal -> policy para liberar
+  `ollama-local` quando houver pedido explícito.
+- [x] `provider:ollama` deixa de depender exclusivamente de haver um perfil
+  Ollama configurado no `.env`: quando o catálogo/projeção gateway já contém
+  `ollama-local`, o terminal usa essa projeção como fallback pré-runtime.
+- [x] `active/current` passa a contar como opt-in local quando a projeção ativa
+  já aponta explicitamente para Ollama/loopback.
+- [x] A descoberta terminal passa a deduplicar candidatos por provider/modelo ao
+  combinar perfis configurados com fallback do catálogo gateway.
+- [x] O terminal passa a imprimir uma orientação acionável quando houver rejeição
+  por `local_provider_requires_explicit_request`.
+- [x] A mensagem de fallback do terminal foi corrigida para apontar para
+  `/byok models route`, mantendo o namespace canônico.
+- [x] A auditoria terminal de seleção passa a agrupar perfis afetados por
+  bloqueio local padrão e apontar para opt-in explícito.
+- [x] Teste terminal cobre `provider:ollama` como opt-in explícito e verifica a
+  mensagem de bloqueio local padrão.
+- [x] Teste terminal cobre fallback do catálogo gateway para pedido explícito de
+  provider local sem perfil correspondente.
+- [x] Teste terminal cobre `active/current` como opt-in local quando o seletor
+  ativo é Ollama.
+
+Separação arquitetural preservada:
+
+- [x] Nenhum Ollama local é iniciado.
+- [x] Nenhum endpoint local é chamado.
+- [x] A seleção local continua bloqueada nos defaults sem opt-in.
+- [x] O catálogo canônico continua independente da decisão temporária de seleção.
+- [x] A orientação operacional vive no terminal; a regra de seleção continua
+  centralizada no policy engine.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:terminal` com `72` testes.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.

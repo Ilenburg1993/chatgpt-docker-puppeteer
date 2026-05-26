@@ -2230,6 +2230,51 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('provider_explicit');
     });
 
+    it('explica bloqueio local padrão na auditoria de seleção pré-runtime', async () => {
+        auditModelGatewayPreRuntimeSelection.mockReturnValueOnce({
+            schema: 'model-gateway-pre-runtime-selection-audit',
+            ok: true,
+            mode: 'allow_probe_unknown',
+            snapshotContext: {
+                projectionCount: 1,
+                routeOptionCount: 1,
+                accountOverlayCount: 0,
+                eligibilityDecisionCount: 0,
+                candidateCount: 1,
+            },
+            summary: {
+                profileCount: 1,
+                selectedProfileCount: 0,
+                unselectedProfileCount: 1,
+                candidateCount: 1,
+                rejectedCount: 1,
+                selectedProviders: {},
+                selectedSelectorKinds: {},
+                rejectedReasonCounts: { local_provider_requires_explicit_request: 1 },
+            },
+            profiles: [
+                {
+                    profileId: 'cheap_chat',
+                    selected: null,
+                    candidateCount: 1,
+                    rejectedCount: 1,
+                    fallbackChain: [],
+                    topRejectedReasons: ['local_provider_requires_explicit_request'],
+                    nextActions: ['request_local_provider_explicitly'],
+                    decisionLayers: { runtimeProbeProofCount: 0 },
+                    snapshotContext: {},
+                },
+            ],
+        });
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway selection audit cheap_chat');
+
+        expect(ctx.output()).toContain('local_provider_requires_explicit_request');
+        expect(ctx.output()).toContain('Ollama/local foi bloqueado por padrão nos perfis cheap_chat');
+    });
+
     it('mostra seleção efetiva com health observado sem persistir nem executar probes', async () => {
         mockProjection();
         const ctx = mockCtx();
@@ -2811,6 +2856,216 @@ describe('terminal /byok command', () => {
         );
         expect(recordModelGatewayRouteDecision).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:route:decision' }));
         expect(eventBus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:route:decision', decisionId: 'route-test' }));
+    });
+
+    it('trata provider:ollama como opt-in explícito e explica bloqueio local padrão', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'gemma3:4b',
+                    capabilities: {
+                        supports: { reasoningEffort: false, vision: false },
+                        limits: { max_context_window_tokens: 8192 },
+                    },
+                    byok: {
+                        provider: 'ollama-local',
+                        providerModel: 'gemma3:4b',
+                        profile: 'ollama',
+                        capabilities: { tools: true, streaming: true },
+                        source: 'model-gateway',
+                    },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'http://localhost:11434/api/tags',
+            fromCache: false,
+            error: null,
+        });
+        routeGatewayModels.mockImplementation((candidates) => ({
+            profile: { id: 'repo_agent' },
+            selected: null,
+            candidates: [],
+            rejected: [
+                {
+                    model: candidates[0],
+                    include: false,
+                    score: 0,
+                    reasons: [],
+                    rejectedReasons: ['local_provider_requires_explicit_request'],
+                    health: null,
+                },
+            ],
+            fallbackChain: [],
+        }));
+        mockProjection({
+            profiles: [
+                {
+                    name: 'ollama',
+                    preset: 'ollama-local',
+                    providerType: 'openai',
+                    baseUrl: 'http://localhost:11434/v1',
+                    model: 'gemma3:4b',
+                    auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false },
+                    metadataKeys: [],
+                },
+            ],
+            summary: { enabled: true, ready: true, profile: 'remote-default' },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models route repo_agent provider:ollama --show-rejected');
+
+        expect(routeGatewayModels).toHaveBeenCalledWith(
+            expect.any(Array),
+            'repo_agent',
+            expect.objectContaining({ allowProviders: ['ollama'] }),
+        );
+        expect(ctx.output()).toContain('Ollama/local foi bloqueado por padrão');
+        expect(ctx.output()).toContain('/byok models route repo_agent provider:ollama');
+        expect(ctx.output()).toContain('local_provider_requires_explicit_request');
+    });
+
+    it('usa catálogo gateway como fallback para provider explícito sem perfil correspondente', async () => {
+        routeGatewayModels.mockImplementation((candidates) => ({
+            profile: { id: 'repo_agent' },
+            selected: {
+                model: candidates[0],
+                include: true,
+                score: 120,
+                reasons: ['provider_allowed'],
+                rejectedReasons: [],
+                health: null,
+            },
+            candidates: [
+                {
+                    model: candidates[0],
+                    include: true,
+                    score: 120,
+                    reasons: ['provider_allowed'],
+                    rejectedReasons: [],
+                    health: null,
+                },
+            ],
+            rejected: [],
+            fallbackChain: ['ollama-local:gemma3:4b'],
+        }));
+        mockProjection({
+            profiles: [
+                {
+                    name: 'remote-default',
+                    preset: 'openrouter',
+                    providerType: 'openai',
+                    baseUrl: 'https://openrouter.ai/api/v1',
+                    model: 'openai/gpt-4.1-mini',
+                    auth: { apiKeyConfigured: true, bearerTokenConfigured: false, headersConfigured: false },
+                    metadataKeys: [],
+                },
+            ],
+            gatewayModels: [
+                {
+                    id: 'gemma3:4b',
+                    capabilities: {
+                        supports: { reasoningEffort: false, vision: false },
+                        limits: { max_context_window_tokens: 8192 },
+                    },
+                    byok: {
+                        provider: 'ollama-local',
+                        providerModel: 'gemma3:4b',
+                        profile: 'ollama',
+                        capabilities: { local: true, privacy: true, no_remote_secrets: true, tools: true, streaming: true },
+                        source: 'model-gateway',
+                    },
+                },
+            ],
+            summary: { enabled: true, ready: true, profile: 'remote-default' },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models route repo_agent provider:ollama');
+
+        expect(routeGatewayModels).toHaveBeenCalledWith(
+            [
+                expect.objectContaining({
+                    providerId: 'ollama-local',
+                    providerModel: 'gemma3:4b',
+                    capabilities: expect.objectContaining({ local: true, privacy: true, no_remote_secrets: true }),
+                }),
+            ],
+            'repo_agent',
+            expect.objectContaining({ allowProviders: ['ollama'] }),
+        );
+        expect(ctx.output()).toContain('fonte=model-gateway-static=1');
+        expect(ctx.output()).toContain('selecionado');
+        expect(ctx.output()).toContain('ollama-local');
+    });
+
+    it('trata active/current como opt-in local quando a projeção ativa é Ollama', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'gemma3:4b',
+                    capabilities: {
+                        supports: { reasoningEffort: false, vision: false },
+                        limits: { max_context_window_tokens: 8192 },
+                    },
+                    byok: {
+                        provider: 'ollama-local',
+                        providerModel: 'gemma3:4b',
+                        capabilities: { local: true, privacy: true, no_remote_secrets: true, tools: true, streaming: true },
+                        source: 'remote',
+                    },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'http://localhost:11434/api/tags',
+            fromCache: false,
+            error: null,
+        });
+        routeGatewayModels.mockImplementation((candidates) => ({
+            profile: { id: 'repo_agent' },
+            selected: {
+                model: candidates[0],
+                include: true,
+                score: 120,
+                reasons: ['active_local_profile'],
+                rejectedReasons: [],
+                health: null,
+            },
+            candidates: [
+                {
+                    model: candidates[0],
+                    include: true,
+                    score: 120,
+                    reasons: ['active_local_profile'],
+                    rejectedReasons: [],
+                    health: null,
+                },
+            ],
+            rejected: [],
+            fallbackChain: ['ollama-local:gemma3:4b'],
+        }));
+        mockProjection({
+            summary: {
+                enabled: true,
+                ready: true,
+                profile: 'ollama',
+                preset: 'ollama-local',
+                providerType: 'openai',
+                baseUrl: 'http://localhost:11434/v1',
+                model: 'gemma3:4b',
+            },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models route repo_agent active');
+
+        expect(routeGatewayModels).toHaveBeenCalledWith(
+            expect.any(Array),
+            'repo_agent',
+            expect.objectContaining({ allowLocalProviders: true }),
+        );
+        expect(ctx.output()).toContain('selecionado');
+        expect(ctx.output()).toContain('ollama-local');
     });
 
     it('usa a projection do model gateway quando a descoberta remota cai para catálogo estático', async () => {
