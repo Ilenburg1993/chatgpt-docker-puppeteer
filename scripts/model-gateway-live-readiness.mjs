@@ -83,13 +83,15 @@ const parity = compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSn
 const secretRegistry = createEnvSecretRegistry();
 const healthRecords = listByokProviderModelHealth();
 const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords);
+const evaluationNow = new Date();
 const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, {
-    now: sourceSnapshot.generatedAt,
+    now: evaluationNow,
 });
 const effectiveEligibility = evaluateModelGatewayCatalogEligibility({
     snapshot: sourceSnapshot,
     secretRegistry,
     healthRecords,
+    now: () => evaluationNow,
     policy: {
         unknownAccessPolicy: 'block',
         policyProfile: 'live-readiness-effective-strict',

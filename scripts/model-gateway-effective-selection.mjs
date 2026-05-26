@@ -65,13 +65,15 @@ const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
 const secretRegistry = createEnvSecretRegistry();
 const healthRecords = listByokProviderModelHealth();
 const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords);
+const evaluationNow = new Date();
 const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, {
-    now: snapshot.generatedAt,
+    now: evaluationNow,
 });
 const evaluated = evaluateModelGatewayCatalogEligibility({
     snapshot,
     secretRegistry,
     healthRecords,
+    now: () => evaluationNow,
     policy: {
         unknownAccessPolicy: strict ? 'block' : 'allow_probe',
         policyProfile: strict ? 'effective-strict-no-runtime' : 'effective-allow-probe-no-runtime',

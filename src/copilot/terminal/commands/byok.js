@@ -2405,15 +2405,16 @@ async function renderByokGatewaySelectionAudit(println, rest) {
     const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
     const healthRecords = args.effective ? listByokProviderModelHealth() : [];
     const runtimeOverlays = args.effective ? deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords) : [];
-    const runtimeOverlaySummaryNow = optionalScalarString(snapshot.generatedAt) ?? undefined;
+    const evaluationNow = new Date();
     const runtimeOverlaySummary = args.effective
-        ? summarizeModelGatewayRuntimeAccountOverlays(runtimeOverlays, { now: runtimeOverlaySummaryNow })
+        ? summarizeModelGatewayRuntimeAccountOverlays(runtimeOverlays, { now: evaluationNow })
         : null;
     const effectiveEligibility = args.effective
         ? evaluateModelGatewayCatalogEligibility({
               snapshot,
               secretRegistry: createEnvSecretRegistry(),
               healthRecords,
+              now: () => evaluationNow,
               policy: {
                   unknownAccessPolicy: args.strict ? 'block' : 'allow_probe',
                   policyProfile: args.strict ? 'terminal-effective-strict-no-runtime' : 'terminal-effective-allow-probe-no-runtime',

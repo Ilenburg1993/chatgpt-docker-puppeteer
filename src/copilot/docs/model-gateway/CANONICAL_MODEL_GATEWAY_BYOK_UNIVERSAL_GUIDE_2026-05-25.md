@@ -5380,6 +5380,8 @@ Implementado neste corte:
 - [x] `evaluateModelGatewayCatalogEligibility()` passa a registrar
   `runtimeAccountOverlayActiveCount` e
   `runtimeAccountOverlayExpiredCount` em `policyInputs`.
+- [x] Scripts e terminal alinham summary e eligibility ao mesmo `evaluationNow`,
+  evitando classificar expiração pelo `generatedAt` antigo do catálogo.
 - [x] Testes unitários cobrem summary seguro, policy inputs ativo/expirado e
   saída terminal efetiva.
 
@@ -5411,6 +5413,8 @@ Validação parcial deste corte:
 - [x] PASS `node --check tests/unit/copilot/terminal/test_commands_byok.spec.js`.
 - [x] PASS focused Vitest `runtime health|catalog-wide eligibility`.
 - [x] PASS focused Vitest `seleção efetiva`.
+- [x] PASS `node scripts/model-gateway-effective-selection.mjs --json --strict --fail`
+  com `active=0`, `expired=2` e `selected=8/8`.
 - [x] PASS `npm run model-gateway:test:contracts` com `157` testes.
 - [x] PASS `npm run model-gateway:test:terminal` com `66` testes.
 - [x] PASS `npm run model-gateway:live:readiness`.

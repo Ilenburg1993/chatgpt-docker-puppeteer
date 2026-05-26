@@ -2188,6 +2188,7 @@ describe('terminal /byok command', () => {
                 snapshot: expect.any(Object),
                 secretRegistry: expect.any(Object),
                 healthRecords: expect.any(Array),
+                now: expect.any(Function),
                 policy: expect.objectContaining({
                     unknownAccessPolicy: 'block',
                     policyProfile: 'terminal-effective-strict-no-runtime',
@@ -2196,7 +2197,7 @@ describe('terminal /byok command', () => {
         );
         expect(applyModelGatewayEligibilityToSnapshot).not.toHaveBeenCalled();
         expect(summarizeModelGatewayRuntimeAccountOverlays).toHaveBeenCalledWith(expect.any(Array), {
-            now: expect.any(String),
+            now: expect.any(Date),
         });
         expect(auditModelGatewayPreRuntimeSelection).toHaveBeenCalledWith(
             expect.objectContaining({
