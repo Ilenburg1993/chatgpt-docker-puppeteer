@@ -1391,7 +1391,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Métricas de coverage.
 - [x] Métricas de provider freshness.
 - [x] Métricas agregadas de eligible/unknown/excluded.
-- [ ] Métricas por exclusion reason.
+- [x] Métricas por exclusion reason.
 
 ### Faixa J — Pre-K Gate
 
@@ -2847,4 +2847,50 @@ Validação deste corte:
   com `116` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em coverage, barrels e contrato unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 46. Continuidade 2026-05-26 — Métricas Por Exclusion Reason
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que a Faixa I ainda tinha `Métricas por exclusion reason`
+  aberto.
+- [x] Confirmado que decisões de eligibility já carregam `hardExclusions`,
+  `softPenalties` e `disposition`.
+- [x] Confirmado que o evento `model_gateway:eligibility:evaluated` ainda
+  expunha apenas totais agregados.
+
+Implementado neste corte:
+
+- [x] `buildEligibilityEvaluatedEvent()` passa a aceitar `decisions`.
+- [x] O evento passa a carregar `hardReasonCounts`.
+- [x] O evento passa a carregar `softReasonCounts`.
+- [x] O evento passa a carregar `dispositionCounts`.
+- [x] `projectEligibilityEvaluatedMetrics()` passa a emitir gauges por
+  `model_gateway.eligibility.exclusion_reason.hard.<reason>`.
+- [x] `projectEligibilityEvaluatedMetrics()` passa a emitir gauges por
+  `model_gateway.eligibility.exclusion_reason.soft.<reason>`.
+- [x] `projectEligibilityEvaluatedMetrics()` passa a emitir gauges por
+  `model_gateway.eligibility.disposition.<disposition>`.
+- [x] Terminal BYOK passa as decisões para o evento de eligibility.
+- [x] Teste unitário cobre hard reasons, soft reasons e disposition.
+
+Separação preservada:
+
+- [x] Métricas são derivadas de eligibility pré-runtime.
+- [x] Métricas não chamam provider/model.
+- [x] Métricas não alteram snapshot.
+- [x] Métricas sanitizam labels para nomes estáveis.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `116` testes.
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  com `54` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em observability events, terminal BYOK e contrato
+  unitário.
 - [x] PASS `git diff --check`.

@@ -2370,6 +2370,7 @@ async function renderByokGatewayEligibility(println, rest, eventBus = null) {
             storePath: store.filePath,
             run: evaluated.run,
             summary: evaluated.summary,
+            decisions: evaluated.decisions,
             persisted: args.persist,
         }),
     );

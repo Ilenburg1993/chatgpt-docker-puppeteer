@@ -1034,6 +1034,21 @@ describe('model-gateway foundation', () => {
                 unknownCount: 1,
                 excludedCount: 1,
             }),
+            decisions: [
+                createModelEligibilityDecision({
+                    providerId: 'openrouter',
+                    providerModel: 'visible-model',
+                    include: true,
+                    disposition: 'eligible',
+                }),
+                createModelEligibilityDecision({
+                    providerId: 'openrouter',
+                    providerModel: 'blocked-model',
+                    include: false,
+                    hardExclusions: ['account_model_not_visible', 'secret_missing:OPENROUTER_API_KEY'],
+                    softPenalties: ['price_unknown'],
+                }),
+            ],
         });
         const metrics = projectEligibilityEvaluatedMetrics(event);
 
@@ -1050,6 +1065,10 @@ describe('model-gateway foundation', () => {
         assert.equal(metrics.counters['model_gateway.eligibility.persisted'], 1);
         assert.equal(metrics.counters['model_gateway.eligibility.policy.strict-account'], 1);
         assert.equal(metrics.gauges['model_gateway.eligibility.excluded'], 1);
+        assert.equal(metrics.gauges['model_gateway.eligibility.exclusion_reason.hard.account_model_not_visible'], 1);
+        assert.equal(metrics.gauges['model_gateway.eligibility.exclusion_reason.hard.secret_missing:openrouter_api_key'], 1);
+        assert.equal(metrics.gauges['model_gateway.eligibility.exclusion_reason.soft.price_unknown'], 1);
+        assert.equal(metrics.gauges['model_gateway.eligibility.disposition.eligible'], 1);
     });
 
     it('builds stable per-model and conflict events for catalog refreshes', () => {

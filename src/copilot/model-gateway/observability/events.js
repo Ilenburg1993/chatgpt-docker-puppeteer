@@ -349,6 +349,7 @@ export function projectRouteDecisionMetrics(event) {
  *     storePath?: string | null;
  *     run?: Record<string, any> | null;
  *     summary?: { modelCount?: number; eligibleCount?: number; unknownCount?: number; excludedCount?: number };
+ *     decisions?: Record<string, any>[];
  *     persisted?: boolean;
  * }} input
  * @returns {{
@@ -365,11 +366,15 @@ export function projectRouteDecisionMetrics(event) {
  *     eligibleCount: number;
  *     unknownCount: number;
  *     excludedCount: number;
+ *     hardReasonCounts: Record<string, number>;
+ *     softReasonCounts: Record<string, number>;
+ *     dispositionCounts: Record<string, number>;
  * }}
  */
 export function buildEligibilityEvaluatedEvent(input) {
     const run = asRecord(input.run);
     const summary = asRecord(input.summary);
+    const reasonSummary = summarizeEligibilityDecisionReasons(input.decisions);
     return {
         type: MODEL_GATEWAY_ELIGIBILITY_EVALUATED,
         timestamp: Date.now(),
@@ -384,7 +389,49 @@ export function buildEligibilityEvaluatedEvent(input) {
         eligibleCount: finiteNumber(summary['eligibleCount']) ?? finiteNumber(run['eligibleCount']) ?? 0,
         unknownCount: finiteNumber(summary['unknownCount']) ?? finiteNumber(run['unknownCount']) ?? 0,
         excludedCount: finiteNumber(summary['excludedCount']) ?? finiteNumber(run['excludedCount']) ?? 0,
+        hardReasonCounts: reasonSummary.hardReasonCounts,
+        softReasonCounts: reasonSummary.softReasonCounts,
+        dispositionCounts: reasonSummary.dispositionCounts,
     };
+}
+
+/**
+ * @param {unknown} reason
+ * @returns {string | null}
+ */
+function metricReason(reason) {
+    const value = optionalString(reason);
+    return value ? value.toLowerCase().replace(/[^a-z0-9_.:-]+/gu, '_') : null;
+}
+
+/**
+ * @param {Record<string, number>} counts
+ * @param {unknown} reason
+ * @returns {void}
+ */
+function incrementReason(counts, reason) {
+    const key = metricReason(reason);
+    if (!key) return;
+    counts[key] = (counts[key] ?? 0) + 1;
+}
+
+/**
+ * @param {unknown} decisions
+ * @returns {{ hardReasonCounts: Record<string, number>; softReasonCounts: Record<string, number>; dispositionCounts: Record<string, number> }}
+ */
+function summarizeEligibilityDecisionReasons(decisions) {
+    /** @type {Record<string, number>} */
+    const hardReasonCounts = {};
+    /** @type {Record<string, number>} */
+    const softReasonCounts = {};
+    /** @type {Record<string, number>} */
+    const dispositionCounts = {};
+    for (const decision of Array.isArray(decisions) ? decisions.map(asRecord).filter((record) => Object.keys(record).length > 0) : []) {
+        incrementReason(dispositionCounts, decision['disposition']);
+        for (const reason of uniqueStringList(decision['hardExclusions'])) incrementReason(hardReasonCounts, reason);
+        for (const reason of uniqueStringList(decision['softPenalties'])) incrementReason(softReasonCounts, reason);
+    }
+    return { hardReasonCounts, softReasonCounts, dispositionCounts };
 }
 
 /**
@@ -392,18 +439,29 @@ export function buildEligibilityEvaluatedEvent(input) {
  * @returns {{ counters: Record<string, number>; gauges: Record<string, number> }}
  */
 export function projectEligibilityEvaluatedMetrics(event) {
+    /** @type {Record<string, number>} */
+    const gauges = {
+        'model_gateway.eligibility.models': event.modelCount,
+        'model_gateway.eligibility.eligible': event.eligibleCount,
+        'model_gateway.eligibility.unknown': event.unknownCount,
+        'model_gateway.eligibility.excluded': event.excludedCount,
+    };
+    for (const [reason, count] of Object.entries(event.hardReasonCounts)) {
+        gauges[`model_gateway.eligibility.exclusion_reason.hard.${reason}`] = count;
+    }
+    for (const [reason, count] of Object.entries(event.softReasonCounts)) {
+        gauges[`model_gateway.eligibility.exclusion_reason.soft.${reason}`] = count;
+    }
+    for (const [disposition, count] of Object.entries(event.dispositionCounts)) {
+        gauges[`model_gateway.eligibility.disposition.${disposition}`] = count;
+    }
     return {
         counters: {
             'model_gateway.eligibility.evaluated': 1,
             [`model_gateway.eligibility.${event.persisted ? 'persisted' : 'previewed'}`]: 1,
             [`model_gateway.eligibility.policy.${event.policyProfile}`]: 1,
         },
-        gauges: {
-            'model_gateway.eligibility.models': event.modelCount,
-            'model_gateway.eligibility.eligible': event.eligibleCount,
-            'model_gateway.eligibility.unknown': event.unknownCount,
-            'model_gateway.eligibility.excluded': event.excludedCount,
-        },
+        gauges,
     };
 }
 
