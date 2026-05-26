@@ -1470,7 +1470,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Hugging Face route policies.
 - [x] Cloudflare direct/gateway routes.
 - [x] OpenCode family endpoint routes.
-- [ ] Candidate builder baseado em route options.
+- [x] Candidate builder baseado em route options.
 - [ ] Seleção por provider upstream.
 - [ ] Seleção por route layer.
 - [ ] Seleção por data policy.
@@ -1579,7 +1579,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Score básico.
 - [x] Fallback chain básico.
 - [x] Health-aware scoring.
-- [ ] Unificar candidate builder.
+- [x] Unificar candidate builder.
 - [x] Usar eligibility como barreira opcional no policy engine.
 - [ ] Usar probes como promoção.
 - [ ] Usar route options como unidade de seleção.
@@ -1856,6 +1856,7 @@ Validação deste corte:
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS `npm run lint:copilot`.
 - [x] PASS `git diff --check`.
+
 - [x] PASS `npm run test:copilot` com `5663` testes totais, `5630` passed,
   `33` pending, `0` failed e `0` warnings/errors.
 
@@ -2063,4 +2064,40 @@ Validação deste corte:
   com `92` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS `npm run lint:copilot`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 25. Continuidade 2026-05-26 — Candidate Builder Por Route Option
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/routing/candidate-builder.js`.
+- [x] Criado `buildModelGatewayRouteCandidates()` para transformar projections
+  e route options em candidatos de seleção sem runtime.
+- [x] Uma projection com múltiplas route options gera múltiplos candidatos
+  distintos, cada um com `selectorKind`, `selectorSyntax`, `routeOptionRef`,
+  `normalizedPolicy`, `routeTraits`, `routing.routeLayer` e `routing.wireApi`.
+- [x] Projection sem route option ainda pode entrar como fallback
+  `candidateSource=projection`.
+- [x] Exportado pelo barrel `routing` e pelo barrel principal
+  `model-gateway`.
+- [x] Adicionado teste de Cloudflare direct/gateway para garantir route option
+  como unidade pré-runtime.
+
+Separação preservada:
+
+- [x] O builder usa só metadados normalizados.
+- [x] O builder não executa provider e não lê segredos.
+- [x] Runtime probes continuam fase posterior.
+- [x] Eligibility continua recebendo route option/candidato como contexto, sem
+  mutar catálogo.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `93` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `candidate-builder.js`, barrels e contrato
+  unitário.
 - [x] PASS `git diff --check`.

@@ -200,6 +200,7 @@ export {
     resolveModelGatewayProviderAdapter,
 } from './providers/index.js';
 export {
+    buildModelGatewayRouteCandidates,
     evaluateGatewayModelHealthRoute,
     isGatewayModelAgentProbeHealthFailed,
     isGatewayModelAgentProbeVerified,

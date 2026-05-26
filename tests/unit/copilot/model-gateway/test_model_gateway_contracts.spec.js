@@ -27,6 +27,7 @@ import {
     buildRegistrySnapshotEvent,
     buildRouteDecisionEvent,
     buildRouteDecisionTraceAttributes,
+    buildModelGatewayRouteCandidates,
     applyModelGatewayEligibilityToSnapshot,
     createModelRecord,
     createEnvSecretRegistry,
@@ -302,6 +303,49 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.requires, ['text', 'streaming']);
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.softRequires, ['vision']);
         assert.equal(resolveModelGatewayTaskProfile('missing'), null);
+    });
+
+    it('builds route-option candidates as the pre-runtime selection unit', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'cloudflare-workers-ai',
+            providerModel: '@cf/openai/gpt-oss-120b',
+            capabilities: { tools: true, streaming: true },
+            limits: { contextWindowTokens: 131_072 },
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+        });
+        const direct = createModelRouteOption({
+            providerId: 'cloudflare-workers-ai',
+            providerModel: '@cf/openai/gpt-oss-120b',
+            selectorKind: 'exact_model',
+            selectorSyntax: '@cf/openai/gpt-oss-120b',
+            normalizedPolicy: { routeLayer: 'direct_provider', wireApi: 'workers_ai_run' },
+        });
+        const gateway = createModelRouteOption({
+            providerId: 'cloudflare-workers-ai',
+            providerModel: '@cf/openai/gpt-oss-120b',
+            selectorKind: 'gateway_fallback',
+            selectorSyntax: 'cloudflare-gateway:@cf/openai/gpt-oss-120b',
+            normalizedPolicy: {
+                routeLayer: 'gateway',
+                wireApi: 'cloudflare_ai_gateway_universal',
+                supportsFallback: true,
+            },
+        });
+
+        const candidates = buildModelGatewayRouteCandidates({
+            projections: [projection],
+            routeOptions: [direct, gateway],
+        });
+
+        assert.equal(candidates.length, 2);
+        assert.deepEqual(
+            candidates.map((candidate) => candidate['selectorKind']),
+            ['exact_model', 'gateway_fallback'],
+        );
+        assert.equal(candidates[1]['routing']['routeLayer'], 'gateway');
+        assert.equal(candidates[1]['routing']['supportsFallback'], true);
+        assert.equal(candidates[1]['provenance']['candidateSource'], 'route_option');
+        assert.ok(candidates[1]['routeOptionRef'].includes('gateway_fallback'));
     });
 
     it('treats vision as a soft routing preference rather than a hard admission gate', () => {

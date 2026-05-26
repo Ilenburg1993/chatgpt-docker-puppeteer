@@ -5,6 +5,7 @@
  * @module copilot/model-gateway/routing
  */
 
+export { buildModelGatewayRouteCandidates } from './candidate-builder.js';
 export {
     evaluateGatewayModelHealthRoute,
     isGatewayModelAgentProbeHealthFailed,
