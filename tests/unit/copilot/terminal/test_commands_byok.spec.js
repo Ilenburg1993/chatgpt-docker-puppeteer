@@ -2199,6 +2199,16 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('/byok gateway commands');
     });
 
+    it('filtra comandos canônicos do model-gateway pela fase live-readiness', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway commands live-readiness');
+
+        expect(listModelGatewayCanonicalCommands).toHaveBeenCalledWith({ surface: undefined, phase: 'live-readiness' });
+        expect(renderModelGatewayCanonicalCommandLines).toHaveBeenCalledWith({ surface: undefined, phase: 'live-readiness' });
+    });
+
     it('mostra auditoria de seleção pré-runtime do model-gateway sem executar probes', async () => {
         mockProjection();
         const ctx = mockCtx();

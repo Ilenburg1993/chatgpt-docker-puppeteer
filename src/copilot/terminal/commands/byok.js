@@ -2102,7 +2102,7 @@ function renderByokGatewayPreBuildReadiness(println) {
  */
 function renderByokGatewayCanonicalCommands(println, rest) {
     const surface = rest.find((item) => /^(package|make|terminal)$/iu.test(item))?.toLowerCase();
-    const phase = rest.find((item) => /^(orientation|metadata|pre-runtime|selection|validate|prebuild)$/iu.test(item))?.toLowerCase();
+    const phase = rest.find((item) => /^(orientation|metadata|pre-runtime|selection|validate|prebuild|live-readiness)$/iu.test(item))?.toLowerCase();
     const commands = listModelGatewayCanonicalCommands({ surface, phase });
     println(`\n  \x1b[36mBYOK model-gateway canonical commands\x1b[0m`);
     println(

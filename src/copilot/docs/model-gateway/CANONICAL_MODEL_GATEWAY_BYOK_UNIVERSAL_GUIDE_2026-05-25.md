@@ -1918,6 +1918,8 @@ Implementado neste corte:
   solicitado.
 - [x] O inventário canônico passa a listar
   `npm run model-gateway:live:plan -- --local-private-strict`.
+- [x] O cockpit `/byok gateway commands live-readiness` passa a filtrar a fase
+  `live-readiness`.
 
 Separação arquitetural preservada:
 
@@ -1929,8 +1931,8 @@ Separação arquitetural preservada:
 
 Próximas lacunas:
 
-- [ ] Avaliar se o terminal deve ganhar atalho textual para gerar o live plan
-  local/private estrito diretamente do cockpit.
+- [ ] Avaliar se o terminal deve ganhar execução direta do script de live plan
+  ou continuar apenas apontando os comandos canônicos package/make.
 
 Validação deste corte:
 
@@ -1941,6 +1943,7 @@ Validação deste corte:
   --local-private-strict --fail`.
 - [x] PASS `npm run model-gateway:commands -- --phase=live-readiness`.
 - [x] PASS `npm run model-gateway:test:contracts` com `159` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `68` testes.
 - [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.
