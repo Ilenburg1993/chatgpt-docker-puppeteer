@@ -2162,3 +2162,30 @@ Validação deste corte:
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em `recommendations.js` e contrato unitário.
 - [x] PASS `git diff --check`.
+
+---
+
+## 28. Continuidade 2026-05-26 — Terminal Probe Suggestions Com Eligibility
+
+Implementado neste corte:
+
+- [x] `/byok gateway catalog refresh` passa eligibility decisions persistidas ao
+  recomendador de probes quando elas existem no snapshot.
+- [x] `/byok gateway catalog diff` passa eligibility decisions persistidas ao
+  recomendador de probes quando elas existem no snapshot.
+- [x] Quando há decisões de eligibility, recomendações exigem uma decisão
+  conhecida e pulam modelos hard-excluded.
+- [x] Quando não há decisões de eligibility no snapshot, o modo legado continua
+  recomendando probes a partir de diffs de catálogo.
+
+Separação preservada:
+
+- [x] O terminal apenas filtra sugestões; não executa probes.
+- [x] Eligibility continua pré-runtime.
+- [x] Runtime proof continua posterior.
+
+Validação deste corte:
+
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `byok.js` e `recommendations.js`.
+- [x] PASS `git diff --check`.

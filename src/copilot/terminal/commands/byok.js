@@ -1364,6 +1364,25 @@ async function readByokGatewayCatalogSnapshotForRouting() {
 }
 
 /**
+ * @param {Record<string, any>} snapshot
+ * @param {Record<string, any>} diff
+ * @param {number} limit
+ * @returns {Parameters<typeof recommendCatalogDiffProbes>[0]}
+ */
+function buildByokProbeRecommendationInput(snapshot, diff, limit) {
+    const eligibilityDecisions = Array.isArray(snapshot['modelEligibilityDecisions'])
+        ? snapshot['modelEligibilityDecisions'].filter(asRecord)
+        : [];
+    return {
+        diff,
+        projections: Array.isArray(snapshot['projections']) ? snapshot['projections'].filter(asRecord) : [],
+        eligibilityDecisions,
+        requireEligibilityDecision: eligibilityDecisions.length > 0,
+        limit,
+    };
+}
+
+/**
  * @param {Awaited<ReturnType<typeof discoverConfiguredByokModelsFromEnv>>} discovered
  * @param {{ profile: string | null | undefined; provider: string | null | undefined }} source
  * @returns {string[]}
@@ -1746,11 +1765,7 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
         if (refreshEvents.completedEvent.changedKinds.length > 0) {
             println(`    \x1b[90mdiff kinds: ${refreshEvents.completedEvent.changedKinds.join(',')}\x1b[0m`);
         }
-        const probeRecommendations = recommendCatalogDiffProbes({
-            diff: result.diff,
-            projections: result.snapshot.projections,
-            limit: 5,
-        });
+        const probeRecommendations = recommendCatalogDiffProbes(buildByokProbeRecommendationInput(result.snapshot, result.diff, 5));
         if (probeRecommendations.length > 0) {
             println(`    \x1b[90mprobe suggestions: ${probeRecommendations.length}\x1b[0m`);
             for (const recommendation of probeRecommendations) {
@@ -1826,7 +1841,7 @@ async function renderByokGatewayCatalogDiff(println) {
     }
     const diff = normalizeCatalogDiffForDisplay(latestRun['diff']);
     const summary = summarizeCanonicalModelProjectionDiff(diff);
-    const recommendations = recommendCatalogDiffProbes({ diff, projections: snapshot.projections, limit: 8 });
+    const recommendations = recommendCatalogDiffProbes(buildByokProbeRecommendationInput(snapshot, diff, 8));
     println(
         `    \x1b[90mrun=${latestRun['runId'] ?? '-'} · added=${summary.addedCount} · removed=${summary.removedCount} · changed=${summary.changedCount} · conflicts=${snapshot.conflicts.length}\x1b[0m`,
     );
