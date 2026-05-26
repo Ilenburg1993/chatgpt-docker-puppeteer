@@ -829,6 +829,40 @@ describe('model-gateway foundation', () => {
         assert.ok(decision.candidates[1].reasons.includes('missing_soft_capability:vision'));
     });
 
+    it('penalizes failed preferred probes without making vision a hard gate', () => {
+        const failedVision = createModelRecord({
+            providerId: 'kilo',
+            providerModel: 'kilo-auto/free',
+            capabilities: { streaming: true, vision: true },
+            limits: { contextWindowTokens: 256_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        const unprovedVision = createModelRecord({
+            providerId: 'kilo',
+            providerModel: 'openrouter/free',
+            capabilities: { streaming: true, vision: true },
+            limits: { contextWindowTokens: 200_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        recordByokProviderModelProbeResult({
+            routeProfile: 'vision',
+            providerId: 'kilo',
+            providerModel: 'kilo-auto/free',
+            probeKind: 'vision',
+            status: 'failed',
+            ok: false,
+            providerAttempted: true,
+            timestamp: 90,
+        });
+
+        const decision = routeGatewayModels([failedVision, unprovedVision], 'vision', { routeProfile: 'vision' });
+
+        assert.equal(decision.selected?.model['id'], 'kilo:openrouter/free');
+        assert.equal(decision.rejected.length, 0);
+        const failed = decision.candidates.find((candidate) => candidate.model['id'] === 'kilo:kilo-auto/free');
+        assert.ok(failed?.reasons.includes('preferred_probe_failed:vision'));
+    });
+
     it('scores and explains gateway route decisions before runtime probes', () => {
         const weak = createModelRecord({
             providerId: 'openrouter',

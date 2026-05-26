@@ -495,8 +495,8 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         id: 'terminal.route',
         phase: 'selection',
         surface: 'terminal',
-        command: '/byok models route repo_agent --show-rejected',
-        summary: 'Preview metadata-aware route selection before runtime probes.',
+        command: '/byok models route repo_agent active --show-rejected provider:<provider>',
+        summary: 'Preview focused metadata-aware route selection for the active provider before runtime probes.',
     },
 ]);
 

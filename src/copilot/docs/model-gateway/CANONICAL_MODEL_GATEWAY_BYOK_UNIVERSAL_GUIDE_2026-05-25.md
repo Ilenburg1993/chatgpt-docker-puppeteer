@@ -3433,6 +3433,56 @@ Validação deste corte:
 
 ---
 
+## 55. Continuidade 2026-05-26 — Provas Negativas Suaves Na Seleção Pré-Runtime
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que `vision` permanece soft capability nos task profiles.
+- [x] Confirmado que a seleção pré-runtime não deve excluir automaticamente um
+  modelo textual ou agentic apenas porque vision não foi provado.
+- [x] Confirmado que um probe negativo de uma capability preferida deve ter
+  peso real na ordenação, sem virar hard gate global.
+- [x] Confirmado que `profileProbeKinds()` já deriva probes preferidos a partir
+  de `requires`, `softRequires` e `prefers`.
+- [x] Confirmado que probes verificados já recebiam bônus, mas probes preferidos
+  falhos não recebiam penalidade simétrica.
+
+Implementado neste corte:
+
+- [x] `scoreGatewayModelCandidate()` passa a adicionar
+  `preferred_probe_failed:<kind>` quando há prova negativa de probe preferido.
+- [x] A prova negativa reduz score, mas não adiciona `rejectedReasons`.
+- [x] Um modelo com vision falho pode continuar elegível para perfis textuais,
+  JSON, code e repo agent.
+- [x] Para perfil `vision`, outro modelo vision sem falha observada passa a
+  vencer o modelo com `preferred_probe_failed:vision`, mantendo ambos como
+  candidatos.
+- [x] Comando canônico de rota focada atualizado para
+  `/byok models route repo_agent active --show-rejected provider:<provider>`.
+- [x] Ajuda do terminal passa a explicitar `route <perfil> active
+  --show-rejected provider:<provider>` dentro de `/byok models`.
+- [x] Teste unitário cobre a penalização sem hard gate.
+
+Separação preservada:
+
+- [x] A política continua pura e determinística.
+- [x] Nenhum provider é chamado.
+- [x] Nenhuma probe nova é executada.
+- [x] A prova negativa vem apenas de health já observado.
+- [x] O catálogo canônico continua imutável durante seleção.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `158` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `67` testes.
+- [x] PASS `npm run model-gateway:selection:effective -- --strict --fail`.
+- [x] PASS `npm run model-gateway:live:readiness`.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
 ## 75. Continuidade 2026-05-26 — Seleção Efetiva Sem Novas Probes
 
 Auditoria executada neste corte:

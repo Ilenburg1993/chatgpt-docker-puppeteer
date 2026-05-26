@@ -354,6 +354,9 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
             if (isGatewayModelProbeVerified(healthDecision.health, kind)) {
                 score += 35;
                 reasons.push(`preferred_probe_verified:${kind}`);
+            } else if (isGatewayModelProbeFailed(healthDecision.health, kind)) {
+                score -= 30;
+                reasons.push(`preferred_probe_failed:${kind}`);
             }
         }
         for (const kind of blockFailedProbeKinds) {
