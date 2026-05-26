@@ -1379,6 +1379,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] `/byok gateway catalog explain <model>`.
 - [x] `/byok gateway overlays`.
 - [x] `/byok gateway accounts`.
+- [x] `/byok gateway probes backoff`.
 - [x] `/byok gateway eligibility`.
 - [x] `/byok gateway routes`.
 - [x] Export OpenAI schema por comando.
@@ -3840,6 +3841,10 @@ Implementado neste corte:
 - [x] Criado `/byok gateway accounts [filtro] [n]` para mostrar status
   account/key normalizado a partir dos overlays.
 - [x] Criado `summarizeModelGatewayAccountOverlays()` para UX/LLM sem runtime.
+- [x] Criado `planModelGatewayProbeBackoff()` para adiar probes durante janelas
+  ativas de rate limit account/key ou runtime health.
+- [x] Criado `/byok gateway probes backoff` para explicar `READY` vs `DEFER`
+  antes de qualquer probe runtime.
 - [x] Probes e turnos vivos passam a gravar os campos estruturados de limite no
   health.
 - [x] Health fatal em eligibility deixa de bloquear rate limit após
@@ -3871,15 +3876,15 @@ Próximas lacunas reforçadas:
   partir dos overlays atuais.
 - [ ] Criar policy explícita para tratar quota diária/mensal com reset conhecido
   de forma diferente de spending/crédito sem reset.
-- [ ] Criar backoff planner para probes/runtime usando `retryAfterSeconds` e
+- [x] Criar backoff planner para probes/runtime usando `retryAfterSeconds` e
   `resetAt`.
 
 Validação deste corte:
 
-- [x] PASS `npm run model-gateway:test:contracts` com `137` testes.
+- [x] PASS `npm run model-gateway:test:contracts` com `138` testes.
 - [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_provider_failure.spec.js tests/unit/copilot/model-gateway/test_model_gateway_provider_health.spec.js`
   com `9` testes.
-- [x] PASS `npm run model-gateway:test:terminal` com `61` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `62` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.

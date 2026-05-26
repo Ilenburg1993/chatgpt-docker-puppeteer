@@ -325,6 +325,7 @@ export {
     estimateProbeCostUsd,
     listProviderWireProbeMatrix,
     planCostBoundedCatalogProbes,
+    planModelGatewayProbeBackoff,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
     runConfiguredByokJsonProbe,

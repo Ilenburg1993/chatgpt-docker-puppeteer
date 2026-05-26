@@ -153,6 +153,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Inspect provider/wire-API probe applicability before any runtime execution.',
     },
     {
+        id: 'terminal.probe-backoff',
+        phase: 'pre-runtime',
+        surface: 'terminal',
+        command: '/byok gateway probes backoff',
+        summary: 'Plan probe deferrals from known account/key and runtime rate-limit windows.',
+    },
+    {
         id: 'terminal.sqlite',
         phase: 'metadata',
         surface: 'terminal',

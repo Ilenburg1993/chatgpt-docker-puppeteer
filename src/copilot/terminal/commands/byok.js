@@ -41,6 +41,7 @@ import {
     listProviderWireProbeMatrix,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     mirrorByokProviderHealthToSqlite,
+    planModelGatewayProbeBackoff,
     readByokProviderHealthState,
     readByokProviderModelHealth,
     recommendCatalogDiffProbes,
@@ -1893,6 +1894,52 @@ function renderByokGatewayProbeMatrix(println, rest) {
 /**
  * @param {(text: string) => void} println
  * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayProbeBackoff(println, rest) {
+    const args = parseGatewayCatalogListArgs(rest);
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const snapshot = await store.readSnapshot();
+    const latestRun = findLatestCatalogRefreshRun(snapshot);
+    const diff = latestRun ? normalizeCatalogDiffForDisplay(latestRun['diff']) : { added: [], removed: [], changed: [] };
+    const recommendations = recommendCatalogDiffProbes(buildByokProbeRecommendationInput(snapshot, diff, args.limit));
+    const filteredRecommendations = recommendations.filter((recommendation) =>
+        matchesGatewayCatalogRecordSelector(/** @type {Record<string, unknown>} */ (recommendation), args.selector),
+    );
+    const plan = planModelGatewayProbeBackoff({
+        recommendations: filteredRecommendations,
+        accountOverlays: Array.isArray(snapshot.accountOverlays) ? snapshot.accountOverlays : [],
+        healthRecords: listByokProviderModelHealth(),
+    });
+    const reasonCounts = Object.entries(plan.summary.reasonCounts)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([reason, count]) => `${reason}:${count}`)
+        .join(',');
+    println(`\n  \x1b[36mBYOK probe backoff planner\x1b[0m`);
+    println(
+        `  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · recommendations=${filteredRecommendations.length}/${recommendations.length} · ready=${plan.summary.ready} · deferred=${plan.summary.deferred} · reasons=${reasonCounts || '-'}\x1b[0m\n`,
+    );
+    if (filteredRecommendations.length === 0) {
+        println('    \x1b[33mNenhuma recomendação de probe disponível no último diff persistido.\x1b[0m\n');
+        return;
+    }
+    for (const item of plan.deferred.slice(0, args.limit)) {
+        const retry = item.resetAt ? `reset=${item.resetAt}` : item.retryAfterSeconds ? `retry=${item.retryAfterSeconds}s` : 'reset=-';
+        println(
+            `    \x1b[33mDEFER\x1b[0m ${item.key}  \x1b[90mreason=${item.reason} · ${retry} · provider=${item.providerId}\x1b[0m`,
+        );
+    }
+    for (const item of plan.ready.slice(0, Math.max(0, args.limit - plan.deferred.length))) {
+        println(
+            `    \x1b[32mREADY\x1b[0m ${item.key}  \x1b[90mprobes=${item.probeKinds.join(',') || '-'} · reasons=${item.reasons.slice(0, 3).join(',') || '-'}\x1b[0m`,
+        );
+    }
+    println('  \x1b[90mPlanner não executa provider/modelo; ele só evita probes durante janelas dinâmicas conhecidas.\x1b[0m\n');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
  * @returns {void}
  */
 function renderByokGatewayEnvRequirements(println, rest) {
@@ -3202,6 +3249,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         }
         if (/^(health|runtime-health|probes)$/iu.test(rest[0] ?? '') && /^(sqlite|sql|mirror|sync)$/iu.test(rest[1] ?? '')) {
             await renderByokGatewayHealthSqliteMirror(println);
+            return;
+        }
+        if (/^(probes|probe)$/iu.test(rest[0] ?? '') && /^(backoff|retry|defer|adiar)$/iu.test(rest[1] ?? '')) {
+            await renderByokGatewayProbeBackoff(println, rest.slice(2));
             return;
         }
         if (/^(probes|probe)$/iu.test(rest[0] ?? '') && /^(matrix|matriz|plan|planner)$/iu.test(rest[1] ?? '')) {

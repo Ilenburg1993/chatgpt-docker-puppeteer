@@ -24,6 +24,7 @@ export {
     BYOK_VISION_PROBE_MIME_TYPE,
     runConfiguredByokVisionProbe,
 } from './vision-probe.js';
+export { planModelGatewayProbeBackoff } from './backoff-planner.js';
 export { estimateProbeCostUsd, planCostBoundedCatalogProbes } from './planner.js';
 export {
     MODEL_GATEWAY_IMPLEMENTED_PROBE_KINDS,

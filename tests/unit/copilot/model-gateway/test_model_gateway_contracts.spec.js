@@ -184,6 +184,7 @@ import {
     toCopilotRouteModelInfoList,
     estimateProbeCostUsd,
     planCostBoundedCatalogProbes,
+    planModelGatewayProbeBackoff,
     applyModelGatewayCatalogRetention,
     isModelGatewayCatalogRefreshLocked,
     resolveModelDeprecationAlias,
@@ -1827,6 +1828,52 @@ describe('model-gateway foundation', () => {
         );
         assert.equal(plan.totalProbeCount, 1);
         assert.equal(plan.totalEstimatedCostUsd, 0.0028);
+    });
+
+    it('defers recommended probes during active account or runtime rate-limit windows', () => {
+        const recommendations = [
+            {
+                key: 'openrouter:priced/model:default',
+                providerId: 'openrouter',
+                providerModel: 'priced/model',
+                routeProfile: 'default',
+                probeKinds: ['chat'],
+                reasons: ['catalog_changed'],
+            },
+            {
+                key: 'groq:fast/model:default',
+                providerId: 'groq',
+                providerModel: 'fast/model',
+                routeProfile: 'default',
+                probeKinds: ['json'],
+                reasons: ['capabilities_changed'],
+            },
+        ];
+        const plan = planModelGatewayProbeBackoff({
+            recommendations,
+            accountOverlays: [
+                createProviderAccountOverlay({
+                    providerId: 'openrouter',
+                    rateLimits: { remainingRequests: 0, resetAt: '2026-05-25T00:05:00.000Z' },
+                }),
+            ],
+            healthRecords: [
+                {
+                    providerId: 'groq',
+                    providerModel: 'fast/model',
+                    routeProfile: 'default',
+                    lastFailureKind: 'rate-limit',
+                    lastFailureAt: Date.parse('2026-05-25T00:00:30.000Z'),
+                    lastResetAt: '2026-05-25T00:03:00.000Z',
+                },
+            ],
+            now: '2026-05-25T00:00:00.000Z',
+        });
+
+        assert.equal(plan.summary.ready, 0);
+        assert.equal(plan.summary.deferred, 2);
+        assert.deepEqual(plan.deferred.map((item) => item.reason).sort(), ['account_rate_limited', 'runtime_rate_limited']);
+        assert.equal(plan.deferred[0].resetAt, '2026-05-25T00:05:00.000Z');
     });
 
     it('summarizes metadata coverage by provider before runtime', () => {
