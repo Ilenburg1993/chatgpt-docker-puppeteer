@@ -61,6 +61,7 @@ Options:
   --source-id=<id>              Force a refresh-plan source id match.
   --skip-refresh-log-sqlite     Do not replay JSONL progress into SQLite.
   --skip-retention              Do not apply SQLite operational retention.
+  --allow-importer-failures     Return ok=true when SQLite parity passes even if some importers failed.
   --account-history-max-rows=<n> SQLite account/key history rows to keep per table.
   --route-decision-max-rows=<n> SQLite route decision rows to keep.
   --refresh-log-max-rows=<n>    SQLite refresh log rows to keep.
@@ -93,6 +94,8 @@ const importers = allImporters.filter((importer) => {
     const importerMatches = importerIds.size === 0 || importerIds.has(importer.id.toLowerCase());
     return providerMatches && importerMatches;
 });
+/** @type {Record<string, any>[]} */
+const progressEvents = [];
 
 /**
  * @param {Record<string, any>} event
@@ -100,6 +103,7 @@ const importers = allImporters.filter((importer) => {
  */
 function recordProgress(event) {
     const entry = { ts: new Date().toISOString(), schema: 'model-gateway-metadata-build-progress', ...event };
+    progressEvents.push(entry);
     appendFileSync(logPath, `${JSON.stringify(entry)}\n`, 'utf8');
     if (!json) {
         const pct = typeof entry['progressPct'] === 'number' ? `${String(entry['progressPct']).padStart(3)}%` : ' --%';
@@ -207,13 +211,25 @@ if (result.writePolicy.committed) {
     sqliteDiagnostics = await sqliteStore.readStorageDiagnostics();
 }
 
+const importerFailures = progressEvents
+    .filter((event) => event['phase'] === 'importer:importer_failed')
+    .map((event) => ({
+        importerId: event['importer'] && typeof event['importer'] === 'object' ? event['importer']['importerId'] : event['importerId'],
+        providerId: event['providerId'],
+        sourceId: event['sourceId'],
+        errors: Array.isArray(event['errors']) ? event['errors'] : [],
+    }));
+const importerFailuresAllowed = hasFlag('--allow-importer-failures');
+const sqliteParityOk = result.writePolicy.committed ? Boolean(mirrored?.parity.ok) : true;
 const summary = {
     schema: 'model-gateway-metadata-build-summary',
-    ok: result.writePolicy.committed ? Boolean(mirrored?.parity.ok) : true,
+    ok: sqliteParityOk && (importerFailuresAllowed || importerFailures.length === 0),
     logPath,
     storePath: jsonStore.filePath,
     mode: incremental ? 'incremental' : 'full',
     committed: result.writePolicy.committed,
+    importerFailuresAllowed,
+    importerFailures,
     importers: importers.map((importer) => importer.id),
     selected: result.refreshPlan?.selected.map((item) => item.sourceId) ?? importers.map((importer) => importer.id),
     skipped: result.refreshPlan?.skipped.map((item) => item.sourceId) ?? [],

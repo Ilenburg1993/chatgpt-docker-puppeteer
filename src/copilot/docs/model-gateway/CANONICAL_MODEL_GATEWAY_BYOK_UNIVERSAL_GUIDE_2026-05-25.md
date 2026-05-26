@@ -3422,6 +3422,11 @@ Implementado neste corte:
 - [x] Em modo commit, o build materializa o snapshot JSON canônico, espelha
   JSON para SQLite, valida paridade, grava o refresh log no SQLite, aplica
   retenção operacional e retorna diagnóstico SQLite.
+- [x] O resumo do build passa a expor `importerFailures`.
+- [x] Falhas de importer tornam `ok=false` por padrão, mesmo com paridade
+  JSON/SQLite, evitando aprovar um banco consistente porém incompleto.
+- [x] Adicionado escape explícito `--allow-importer-failures` para builds
+  exploratórios/temporários.
 - [x] `model-gateway:build` passa a significar
   `model-gateway:prebuild + model-gateway:metadata:build`.
 - [x] Adicionados `model-gateway:metadata:build:plan`,
@@ -3461,6 +3466,8 @@ Validação deste corte:
 - [x] PASS `npm run model-gateway:test:terminal` com `64` testes.
 - [x] PASS smoke provider-scoped `model-gateway-metadata-build --plan
   --provider=openrouter --json` sem rede.
+- [x] PASS `node --check scripts/model-gateway-metadata-build.mjs` após
+  critério de falha de importer.
 - [x] PASS `git diff --check`.
 
 ---
