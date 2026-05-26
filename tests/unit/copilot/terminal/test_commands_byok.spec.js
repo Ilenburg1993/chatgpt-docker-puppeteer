@@ -2278,7 +2278,7 @@ describe('terminal /byok command', () => {
         expect(recommendCatalogDiffProbes).toHaveBeenCalledWith(
             expect.objectContaining({
                 diff: expect.objectContaining({ added: ['openrouter:new-model:default'] }),
-                projections: [{ providerModel: 'new-model' }],
+                projections: [expect.objectContaining({ providerModel: 'new-model' })],
                 limit: 8,
             }),
         );

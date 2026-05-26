@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/catalog/sqlite-schema
  */
 
-export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 3;
+export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 4;
 
 export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_snapshots',
@@ -248,6 +248,7 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
         provider_model  TEXT NOT NULL,
         route_profile   TEXT NOT NULL DEFAULT 'default',
         selector_kind   TEXT NOT NULL,
+        selector_syntax TEXT NOT NULL DEFAULT '',
         account_scope   TEXT NOT NULL DEFAULT 'default',
         policy_profile  TEXT NOT NULL DEFAULT 'default',
         task_profile    TEXT NOT NULL DEFAULT 'default',
@@ -260,7 +261,7 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
         FOREIGN KEY (run_id) REFERENCES copilot_model_gateway_eligibility_runs(run_id) ON DELETE SET NULL
     ) STRICT;
     CREATE INDEX IF NOT EXISTS idx_mg_eligibility_decisions_model
-        ON copilot_model_gateway_eligibility_decisions(provider_id, provider_model, route_profile);
+        ON copilot_model_gateway_eligibility_decisions(provider_id, provider_model, route_profile, selector_kind, selector_syntax);
     CREATE INDEX IF NOT EXISTS idx_mg_eligibility_decisions_policy
         ON copilot_model_gateway_eligibility_decisions(policy_profile, task_profile, account_scope, include);
 

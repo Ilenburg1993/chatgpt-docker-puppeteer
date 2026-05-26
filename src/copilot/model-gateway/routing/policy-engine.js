@@ -207,6 +207,7 @@ function stringSet(value) {
  *     requiredProbeKinds?: string[];
  *     blockFailedProbeKinds?: string[];
  *     requireRuntimeProof?: boolean;
+ *     requireKnownEligibility?: boolean;
  *     ignoreRuntimeHealth?: boolean;
  *     latencyMsByModelId?: Record<string, number>;
  *     eligibilityDecisions?: Record<string, any>[];
@@ -256,6 +257,13 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         }
         const softPenalties = Array.isArray(eligibility['softPenalties']) ? eligibility['softPenalties'] : [];
         score -= Math.min(40, softPenalties.length * 5);
+    }
+    if (options.requireKnownEligibility === true) {
+        const disposition = String(eligibility?.['disposition'] ?? 'missing_decision');
+        if (!eligibility) rejectedReasons.push('eligibility:missing_decision');
+        else if (eligibility['include'] !== true || disposition !== 'eligible') {
+            rejectedReasons.push(`eligibility:not_known_access:${disposition}`);
+        }
     }
 
     if (model['enabled'] === false) rejectedReasons.push('model_disabled');

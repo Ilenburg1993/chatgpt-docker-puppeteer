@@ -106,6 +106,44 @@ function ensureCompatibleSqliteSchemaVersion(db) {
 }
 
 /**
+ * @param {import('better-sqlite3').Database} db
+ * @param {string} table
+ * @param {string} column
+ * @returns {boolean}
+ */
+function sqliteTableHasColumn(db, table, column) {
+    const rows = /** @type {unknown[]} */ (db.pragma(`table_info(${table})`));
+    return rows.some((row) => isRecord(row) && optionalString(row['name']) === column);
+}
+
+/**
+ * @param {import('better-sqlite3').Database} db
+ * @returns {void}
+ */
+function migrateModelGatewaySqliteSchema(db) {
+    if (
+        !sqliteTableHasColumn(
+            db,
+            'copilot_model_gateway_eligibility_decisions',
+            'selector_syntax',
+        )
+    ) {
+        db.exec(`
+            ALTER TABLE copilot_model_gateway_eligibility_decisions
+                ADD COLUMN selector_syntax TEXT NOT NULL DEFAULT '';
+        `);
+    }
+    db.exec(`
+        DROP INDEX IF EXISTS idx_mg_eligibility_decisions_model;
+        UPDATE copilot_model_gateway_eligibility_decisions
+        SET selector_syntax = COALESCE(NULLIF(json_extract(payload_json, '$.selectorSyntax'), ''), provider_model)
+        WHERE selector_syntax = '';
+        CREATE INDEX IF NOT EXISTS idx_mg_eligibility_decisions_model
+            ON copilot_model_gateway_eligibility_decisions(provider_id, provider_model, route_profile, selector_kind, selector_syntax);
+    `);
+}
+
+/**
  * @param {unknown} value
  * @returns {number | null}
  */
@@ -246,6 +284,21 @@ function lifecycleStatus(row) {
  */
 function routeKey(row) {
     return [modelKey(row), selectorKind(row), selectorSyntax(row)].join(':');
+}
+
+/**
+ * @param {Record<string, unknown>} row
+ * @returns {string}
+ */
+function eligibilityDecisionKey(row) {
+    return [
+        optionalString(row['policyProfile']) ?? DEFAULT_POLICY_PROFILE,
+        optionalString(row['taskProfile']) ?? DEFAULT_TASK_PROFILE,
+        optionalString(row['accountScope']) ?? DEFAULT_ACCOUNT_SCOPE,
+        modelKey(row),
+        selectorKind(row),
+        selectorSyntax(row),
+    ].join(':');
 }
 
 /**
@@ -437,6 +490,7 @@ export class SqliteModelGatewayCatalogStore {
         this.#db.pragma('foreign_keys = ON');
         ensureCompatibleSqliteSchemaVersion(this.#db);
         this.#db.exec(MODEL_GATEWAY_SQLITE_SCHEMA_SQL);
+        migrateModelGatewaySqliteSchema(this.#db);
         this.#db.pragma(`user_version = ${MODEL_GATEWAY_SQLITE_SCHEMA_VERSION}`);
     }
 
@@ -1348,26 +1402,21 @@ export class SqliteModelGatewayCatalogStore {
     #writeEligibilityDecisions(rows, generatedAtMs) {
         const insert = this.#db.prepare(`
             INSERT OR REPLACE INTO copilot_model_gateway_eligibility_decisions
-                (decision_key, run_id, provider_id, provider_model, route_profile, selector_kind, account_scope,
-                 policy_profile, task_profile, include, disposition, primary_reason, observed_at_ms, expires_at_ms,
-                 payload_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (decision_key, run_id, provider_id, provider_model, route_profile, selector_kind, selector_syntax,
+                 account_scope, policy_profile, task_profile, include, disposition, primary_reason, observed_at_ms,
+                 expires_at_ms, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const row of rows) {
             const reasons = Array.isArray(row['reasons']) ? row['reasons'] : [];
             insert.run(
-                [
-                    optionalString(row['policyProfile']) ?? DEFAULT_POLICY_PROFILE,
-                    optionalString(row['taskProfile']) ?? DEFAULT_TASK_PROFILE,
-                    optionalString(row['accountScope']) ?? DEFAULT_ACCOUNT_SCOPE,
-                    modelKey(row),
-                    selectorKind(row),
-                ].join(':'),
+                eligibilityDecisionKey(row),
                 optionalString(row['runId']),
                 providerId(row),
                 providerModel(row),
                 routeProfile(row),
                 selectorKind(row),
+                selectorSyntax(row),
                 optionalString(row['accountScope']) ?? DEFAULT_ACCOUNT_SCOPE,
                 optionalString(row['policyProfile']) ?? DEFAULT_POLICY_PROFILE,
                 optionalString(row['taskProfile']) ?? DEFAULT_TASK_PROFILE,

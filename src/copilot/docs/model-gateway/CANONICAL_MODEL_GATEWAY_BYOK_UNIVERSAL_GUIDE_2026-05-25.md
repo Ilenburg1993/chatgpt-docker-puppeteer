@@ -3346,6 +3346,148 @@ Validação deste corte:
 
 ---
 
+## 73. Continuidade 2026-05-26 — Gate Por Chaves E Strict Access Pré-Runtime
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que paridade apenas por contagem é necessária, mas não
+  suficiente, porque duas tabelas podem ter o mesmo tamanho e chaves
+  divergentes.
+- [x] Confirmado que `--strict` de seleção ainda aceitava decisões persistidas
+  `unknown_policy_allows_probe`, o que misturava acesso conhecido com
+  candidato permitido apenas para probe futuro.
+- [x] Confirmado que a etapa ainda deve ser totalmente pré-runtime: sem provider,
+  sem modelo, sem probe e sem mutação de health.
+
+Implementado neste corte:
+
+- [x] `compareModelGatewayCatalogSnapshotParity()` passa a comparar chaves
+  canônicas além das contagens.
+- [x] O gate de paridade retorna `keyMismatches` com amostras
+  `missingFromSqlite` e `missingFromSource`.
+- [x] Chaves cobrem sources, evidences, provider evidences, route options,
+  account overlays, provider projections, model projections, import runs,
+  raw payload refs, conflicts, eligibility runs e eligibility decisions.
+- [x] `ok` da paridade agora exige `snapshotId`, contagens e chaves.
+- [x] `scoreGatewayModelCandidate()` ganhou `requireKnownEligibility`.
+- [x] `auditModelGatewayPreRuntimeSelection(..., { strict: true })` passa a
+  operar em modo `strict_access_only`.
+- [x] `strict_access_only` rejeita `unknown_policy_allows_probe` persistido com
+  `eligibility:not_known_access:unknown_policy_allows_probe`.
+- [x] Testes cobrem mismatch por chave com mesma contagem e strict recusando
+  acesso desconhecido.
+- [x] Teste de importer atualizado para a arquitetura atual de fallback
+  account/key: falhas autenticadas podem materializar overlay seguro sem vazar
+  segredo.
+
+Resultado operacional:
+
+- [x] PASS `npm run model-gateway:metadata:build` com gate por chaves ativo.
+- [x] `parity=true`.
+- [x] PASS `npm run model-gateway:selection:audit -- --strict --json`.
+- [x] Strict audit atual seleciona `8/8` perfis apenas com
+  `eligibilityDisposition=eligible`.
+- [x] Runtime proof count permanece `0`, como esperado antes dos live tests.
+
+Validação deste corte:
+
+- [x] PASS `node --check` para policy engine, selection audit, SQLite migration
+  e contracts test.
+- [x] PASS focused Vitest de mirror SQLite e strict selection.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `npm run model-gateway:test:contracts` com `157` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `65` testes.
+
+Próximas lacunas:
+
+- [x] Rodar `model-gateway:test:terminal` após a atualização do texto/mode do
+  terminal selection audit.
+- [ ] Criar plano formal de live tests `llm-b` em fases, começando por no-pr e
+  fixture antes de BYOK real.
+- [ ] Só executar live tests depois de confirmar catalog integrity, SQLite
+  parity por chaves, selection audit allow-probe e strict-access.
+
+---
+
+## 72. Continuidade 2026-05-26 — Paridade SQLite De Eligibility Por Rota
+
+Auditoria executada neste corte:
+
+- [x] Reexecutado o build canônico do banco de metadados após a materialização
+  de eligibility por route option.
+- [x] Identificado bug estrutural no SQLite: `modelEligibilityDecisions` tinha
+  `1923` decisões no JSON canônico, mas apenas `1793` no SQLite.
+- [x] Confirmado que a perda não vinha de normalização nem de redaction; vinha
+  da chave relacional de eligibility, que incluía `selectorKind`, mas não
+  incluía `selectorSyntax`.
+- [x] Confirmado que providers com múltiplas rotas para o mesmo modelo e mesmo
+  tipo de seletor colidiam no `INSERT OR REPLACE`.
+- [x] Confirmado que o bug afetava somente a materialização SQL da camada
+  derivada; o snapshot JSON continuava íntegro.
+
+Implementado neste corte:
+
+- [x] SQLite schema elevado para `user_version = 4`.
+- [x] `copilot_model_gateway_eligibility_decisions` passa a ter coluna
+  relacional `selector_syntax`.
+- [x] Índice de modelo de eligibility passa a cobrir
+  `provider_id`, `provider_model`, `route_profile`, `selector_kind` e
+  `selector_syntax`.
+- [x] Migração automática adiciona `selector_syntax` em bancos v3 existentes.
+- [x] Migração preenche `selector_syntax` a partir de
+  `payload_json.$.selectorSyntax`, caindo para `provider_model` quando ausente.
+- [x] Chave de decisão SQLite passa a incluir a sintaxe completa do seletor.
+- [x] Teste SQLite cobre duas decisões de eligibility para o mesmo modelo,
+  mesmo `routeProfile` e mesmo `selectorKind`, mas com `selectorSyntax`
+  diferente.
+
+Separação preservada:
+
+- [x] Correção altera somente persistência/migração SQL e teste.
+- [x] Nenhum importer foi alterado para mascarar a falha.
+- [x] Nenhum runtime probe foi executado.
+- [x] Nenhum provider/modelo foi chamado para decidir a paridade.
+- [x] JSON canônico continua sendo lido e comparado contra SQLite como gate.
+
+Resultado do build canônico após correção:
+
+- [x] PASS `npm run model-gateway:metadata:build`.
+- [x] `committed=yes`.
+- [x] `parity=true`.
+- [x] `projections=1314`.
+- [x] `openai=1314`.
+- [x] `accountOverlays=14`.
+- [x] SQLite diagnostics: `schemaVersion=4`, `userVersion=4`.
+- [x] SQLite diagnostics: `copilot_model_gateway_eligibility_decisions=1923`.
+- [x] Integrity audit: `ok=true`.
+- [x] Selection audit: `ok=true`, `8/8` profiles selected, runtime proof count
+  ainda `0`.
+
+Validação deste corte:
+
+- [x] PASS `node --check src/copilot/model-gateway/catalog/sqlite-catalog-store.js`.
+- [x] PASS `node --check src/copilot/model-gateway/catalog/sqlite-schema.js`.
+- [x] PASS `node --check tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`.
+- [x] PASS focused Vitest para SQLite round-trip, schema guard e mirror.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `npm run model-gateway:catalog:integrity`.
+- [x] PASS `npm run model-gateway:selection:audit`.
+- [x] PASS `npm run model-gateway:sqlite:diagnostics`.
+
+Próximas lacunas:
+
+- [x] Criar gate SQL explícito que compare amostras de chaves, não apenas
+  contagens, para `routeOptions`, `modelEligibilityDecisions`,
+  `accountOverlays` e projections.
+- [x] Evoluir seleção pré-runtime para oferecer modo `strict_access_only`
+  operacional, além do modo atual `allow_probe_unknown`.
+- [ ] Planejar os testes live com `scripts/copilot/run-terminal-llm-b-live-test.mjs`
+  somente depois de o gate SQL por chaves e a seleção strict passarem.
+
+---
+
 ## 71. Continuidade 2026-05-26 — Auditoria De Seleção Pré-Runtime
 
 Auditoria executada neste corte:

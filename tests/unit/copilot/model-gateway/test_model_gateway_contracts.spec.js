@@ -507,6 +507,38 @@ describe('model-gateway foundation', () => {
         assert.equal(audit.summary.selectedSelectorKinds.provider_explicit, 2);
         assert.equal(audit.profiles[0].selected?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
         assert.equal(audit.profiles[0].decisionLayers['runtimeProbeProofCount'], 0);
+
+        const strictAudit = auditModelGatewayPreRuntimeSelection(
+            {
+                ...snapshot,
+                modelEligibilityDecisions: [
+                    createModelEligibilityDecision({
+                        providerId: 'openrouter',
+                        providerModel: 'openai/gpt-oss-120b',
+                        selectorKind: 'provider_explicit',
+                        selectorSyntax: 'openai/gpt-oss-120b:groq',
+                        include: true,
+                        disposition: 'unknown_policy_allows_probe',
+                        reasons: ['unknown_account_access'],
+                    }),
+                ],
+            },
+            {
+                strict: true,
+                profiles: ['repo_agent'],
+                secretRegistry: { has: () => true },
+            },
+        );
+
+        assert.equal(strictAudit.mode, 'strict_access_only');
+        assert.equal(strictAudit.ok, false);
+        assert.equal(strictAudit.summary.selectedProfileCount, 0);
+        assert.equal(
+            strictAudit.profiles[0].topRejectedReasons.includes(
+                'eligibility:not_known_access:unknown_policy_allows_probe',
+            ),
+            true,
+        );
     });
 
     it('projects route-option candidates to SDK model info without losing selector metadata', () => {
@@ -2373,8 +2405,16 @@ describe('model-gateway foundation', () => {
                 providerId: 'kilo',
                 providerModel: 'anthropic/claude-sonnet-4.5',
                 routeProfile: 'kilo-free',
-                selectorKind: 'gateway_auto',
-                selectorSyntax: 'provider/model',
+                selectorKind: 'gateway_policy',
+                selectorSyntax: 'anthropic/claude-sonnet-4.5:fastest',
+                normalizedPolicy: { routeLayer: 'gateway', wireApi: 'openai_chat_completions' },
+            });
+            const economyRoute = createModelRouteOption({
+                providerId: 'kilo',
+                providerModel: 'anthropic/claude-sonnet-4.5',
+                routeProfile: 'kilo-free',
+                selectorKind: 'gateway_policy',
+                selectorSyntax: 'anthropic/claude-sonnet-4.5:economy',
                 normalizedPolicy: { routeLayer: 'gateway', wireApi: 'openai_chat_completions' },
             });
             const overlay = createProviderAccountOverlay({
@@ -2397,6 +2437,18 @@ describe('model-gateway foundation', () => {
                 providerId: 'kilo',
                 providerModel: 'anthropic/claude-sonnet-4.5',
                 routeProfile: 'kilo-free',
+                selectorKind: 'gateway_policy',
+                selectorSyntax: 'anthropic/claude-sonnet-4.5:fastest',
+                include: true,
+                reasons: ['account_model_visible'],
+                policyInputs: { apiKey: 'sk-secret-that-must-not-leak' },
+            });
+            const economyEligibility = createModelEligibilityDecision({
+                providerId: 'kilo',
+                providerModel: 'anthropic/claude-sonnet-4.5',
+                routeProfile: 'kilo-free',
+                selectorKind: 'gateway_policy',
+                selectorSyntax: 'anthropic/claude-sonnet-4.5:economy',
                 include: true,
                 reasons: ['account_model_visible'],
                 policyInputs: { apiKey: 'sk-secret-that-must-not-leak' },
@@ -2407,17 +2459,17 @@ describe('model-gateway foundation', () => {
                 source: 'sqlite-unit-test',
                 sources: [source],
                 evidences: [evidence],
-                routeOptions: [route],
+                routeOptions: [route, economyRoute],
                 accountOverlays: [overlay],
                 projections: [projection],
                 modelEligibilityRuns: [
                     createModelEligibilityRun({
                         runId: 'eligibility-run-sqlite',
-                        modelCount: 1,
-                        eligibleCount: 1,
+                        modelCount: 2,
+                        eligibleCount: 2,
                     }),
                 ],
-                modelEligibilityDecisions: [eligibility],
+                modelEligibilityDecisions: [eligibility, economyEligibility],
             };
 
             await store.writeSnapshot(snapshot);
@@ -2442,11 +2494,19 @@ describe('model-gateway foundation', () => {
             assert.equal(loaded.source, 'sqlite-unit-test');
             assert.equal(loaded.sources.length, 1);
             assert.equal(loaded.evidences.length, 1);
-            assert.equal(loaded.routeOptions.length, 1);
+            assert.equal(loaded.routeOptions.length, 2);
             assert.equal(loaded.accountOverlays.length, 1);
             assert.equal(loaded.projections.length, 1);
             assert.equal(loaded.modelEligibilityRuns.length, 1);
-            assert.equal(loaded.modelEligibilityDecisions.length, 1);
+            assert.equal(loaded.modelEligibilityDecisions.length, 2);
+            assert.deepEqual(
+                loaded.modelEligibilityDecisions.map((decision) => decision.selectorSyntax).sort(),
+                ['anthropic/claude-sonnet-4.5:economy', 'anthropic/claude-sonnet-4.5:fastest'],
+            );
+            assert.equal(
+                db.prepare('SELECT COUNT(*) AS count FROM copilot_model_gateway_eligibility_decisions').get().count,
+                2,
+            );
             assert.equal(openai.object, 'list');
             assert.equal(openai.data.length, 1);
             assert.equal(openai.data[0].x_model_gateway.eligibility.status, 'eligible');
@@ -2808,6 +2868,7 @@ describe('model-gateway foundation', () => {
             assert.equal(mirrored.parity.ok, true);
             assert.equal(mirrored.parity.snapshotIdMatches, true);
             assert.deepEqual(mirrored.parity.countMismatches, []);
+            assert.deepEqual(mirrored.parity.keyMismatches, []);
             assert.equal(sqliteSummary.projections, 1);
             assert.equal(sqliteSummary.routeOptions, 1);
             assert.equal(sqliteSummary.modelEligibilityDecisions, 1);
@@ -2822,6 +2883,31 @@ describe('model-gateway foundation', () => {
             );
             assert.equal(mismatch.ok, false);
             assert.deepEqual(mismatch.countMismatches, [{ field: 'projections', source: 1, sqlite: 0 }]);
+            assert.equal(mismatch.keyMismatches.some((row) => row.field === 'projections'), true);
+
+            const routeKeyMismatch = compareModelGatewayCatalogSnapshotParity(
+                mirrored.sourceSnapshot,
+                normalizeStoredCatalogSnapshot({
+                    ...mirrored.sqliteSnapshot,
+                    routeOptions: [
+                        {
+                            ...mirrored.sqliteSnapshot.routeOptions[0],
+                            selectorSyntax: 'openai/gpt-oss-120b:changed',
+                        },
+                    ],
+                }),
+            );
+            assert.equal(routeKeyMismatch.ok, false);
+            assert.deepEqual(routeKeyMismatch.countMismatches, []);
+            assert.deepEqual(routeKeyMismatch.keyMismatches, [
+                {
+                    field: 'routeOptions',
+                    missingFromSqlite: ['openrouter:openai/gpt-oss-120b:default:provider_model:openai/gpt-oss-120b'],
+                    missingFromSource: [
+                        'openrouter:openai/gpt-oss-120b:default:provider_model:openai/gpt-oss-120b:changed',
+                    ],
+                },
+            ]);
         } finally {
             db.close();
             await rm(dir, { recursive: true, force: true });
@@ -3188,7 +3274,7 @@ describe('model-gateway foundation', () => {
             assert.equal(raw.includes('sk-secret-that-must-not-leak'), false);
             assert.equal(raw.includes('gsk-secret-that-must-not-leak'), false);
             assert.equal(snapshot.evidences.length, 1);
-            assert.equal(snapshot.accountOverlays.length, 1);
+            assert.equal(snapshot.accountOverlays.length, 2);
             assert.equal(snapshot.rawPayloadRefs.length, 1);
             assert.deepEqual(
                 snapshot.importRuns.map((run) => run.status),
@@ -3196,7 +3282,20 @@ describe('model-gateway foundation', () => {
             );
             assert.equal(loaded.sources.length, 2);
             assert.equal(loaded.evidences[0].value, 131072);
-            assert.deepEqual(loaded.accountOverlays[0].enabledModels, ['m']);
+            assert.deepEqual(
+                loaded.accountOverlays.find((overlay) => overlay['providerId'] === 'openrouter')?.['enabledModels'],
+                ['m'],
+            );
+            assert.equal(
+                loaded.accountOverlays.some(
+                    (overlay) =>
+                        overlay['providerId'] === 'groq' &&
+                        overlay['sourceId'] === 'broken-auth-catalog' &&
+                        overlay['providerMetadata']?.['catalogImportStatus'] === 'failed' &&
+                        overlay['providerMetadata']?.['failureMessage'] === 'token [redacted] rejected',
+                ),
+                true,
+            );
             assert.equal(JSON.stringify(loaded.importRuns).includes('gsk-secret-that-must-not-leak'), false);
             assert.ok(progressEvents.some((event) => event['phase'] === 'importer_started' && event['importerId'] === 'openrouter-models'));
             assert.ok(progressEvents.some((event) => event['phase'] === 'facts_built' && event['evidenceCount'] === 1));

@@ -109,7 +109,7 @@ function resolveProfileIds(options = {}) {
  * @returns {{
  *   schema: 'model-gateway-pre-runtime-selection-audit';
  *   ok: boolean;
- *   mode: 'strict_block_unknown' | 'allow_probe_unknown';
+ *   mode: 'strict_access_only' | 'allow_probe_unknown';
  *   snapshotContext: Record<string, number>;
  *   summary: {
  *     profileCount: number;
@@ -143,6 +143,7 @@ export function auditModelGatewayPreRuntimeSelection(snapshot, options = {}) {
             evaluateEligibility: true,
             requireAgentProbeOk: false,
             requireRuntimeProof: false,
+            requireKnownEligibility: strict,
             ignoreRuntimeHealth: true,
             eligibilityPolicy: {
                 ...(isRecord(options.eligibilityPolicy) ? options.eligibilityPolicy : {}),
@@ -172,7 +173,7 @@ export function auditModelGatewayPreRuntimeSelection(snapshot, options = {}) {
     return {
         schema: 'model-gateway-pre-runtime-selection-audit',
         ok: selectedProfileCount === profileAudits.length,
-        mode: strict ? 'strict_block_unknown' : 'allow_probe_unknown',
+        mode: strict ? 'strict_access_only' : 'allow_probe_unknown',
         snapshotContext:
             profileAudits[0]?.snapshotContext ??
             {
