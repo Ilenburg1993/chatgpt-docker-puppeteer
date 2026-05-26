@@ -206,6 +206,7 @@ export {
 export {
     buildModelGatewayRouteCandidates,
     evaluateGatewayModelHealthRoute,
+    explainGatewayRouteDecision,
     isGatewayModelAgentProbeHealthFailed,
     isGatewayModelAgentProbeVerified,
     isGatewayModelChatHealthFailed,

@@ -32,6 +32,7 @@ import {
     createModelRecord,
     createEnvSecretRegistry,
     explainModelGatewayAccountAccess,
+    explainGatewayRouteDecision,
     resolveModelGatewayAccountAccess,
     buildModelGatewayOnListModelsHandler,
     evaluateGatewayModelHealthRoute,
@@ -430,6 +431,49 @@ describe('model-gateway foundation', () => {
         assert.ok(decision.selected?.reasons.includes('price_within_preference:4<=5'));
         assert.ok(decision.rejected.some((candidate) => candidate.rejectedReasons.includes('price_above_limit:50>20')));
         assert.ok(decision.rejected.some((candidate) => candidate.rejectedReasons.includes('confidence_below_minimum:static_seed<catalog')));
+    });
+
+    it('explains route rejections with stable summaries and next actions', () => {
+        const weak = createModelRecord({
+            providerId: 'openrouter',
+            providerModel: 'weak-chat',
+            capabilities: { tools: false, streaming: true },
+            limits: { contextWindowTokens: 16_000 },
+            pricing: { inputUsdPerMillion: 40, outputUsdPerMillion: 40 },
+            verification: { confidence: 'static_seed', sources: ['seed'] },
+        });
+        const route = routeGatewayModels([weak], 'tool_agent', {
+            maxPricePerMillion: 20,
+            minimumConfidence: 'catalog',
+            requireAgentProbeOk: false,
+        });
+
+        assert.deepEqual(explainGatewayRouteDecision(route), {
+            selected: false,
+            selectedId: null,
+            candidateCount: 0,
+            rejectedCount: 1,
+            fallbackChain: [],
+            rejectedReasonCounts: {
+                'missing_capability:tools': 1,
+                'context_too_small:16000<32000': 1,
+                'confidence_below_minimum:static_seed<catalog': 1,
+                'price_above_limit:80>20': 1,
+            },
+            topRejectedReasons: [
+                'confidence_below_minimum:static_seed<catalog',
+                'context_too_small:16000<32000',
+                'missing_capability:tools',
+                'price_above_limit:80>20',
+            ],
+            nextActions: [
+                'choose_model_with_required_capabilities',
+                'choose_larger_context_model_or_compact',
+                'raise_budget_or_choose_lower_cost_model',
+                'refresh_catalog_or_run_probe_to_raise_confidence',
+            ],
+            summary: 'unselected:confidence_below_minimum:static_seed<catalog',
+        });
     });
 
     it('treats vision as a soft routing preference rather than a hard admission gate', () => {

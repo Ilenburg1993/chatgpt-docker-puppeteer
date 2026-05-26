@@ -1583,7 +1583,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Usar eligibility como barreira opcional no policy engine.
 - [ ] Usar probes como promoção.
 - [x] Usar route options como unidade de seleção.
-- [ ] Explicar rejeições.
+- [x] Explicar rejeições.
 - [x] Persistir decisão final.
 - [ ] SDK projection final por route option.
 
@@ -2315,5 +2315,33 @@ Validação deste corte:
   com `98` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em `sqlite-catalog-store.js`, `byok.js` e contrato
+  unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 33. Continuidade 2026-05-26 — Explain De Route Rejections
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/routing/explain.js`.
+- [x] Criado `explainGatewayRouteDecision()` com resumo estável de decisão,
+  contagem de rejeições, top reasons, fallback chain e next actions.
+- [x] Exportado pelo barrel `routing` e pelo barrel principal `model-gateway`.
+- [x] Adicionado teste de rejeições por capability, contexto, budget e
+  confidence.
+
+Separação preservada:
+
+- [x] O explain só formata resultado do policy engine.
+- [x] Nenhum provider é chamado.
+- [x] Runtime proof e catálogo canônico permanecem separados.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `99` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `routing/explain.js`, barrels e contrato
   unitário.
 - [x] PASS `git diff --check`.

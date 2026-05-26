@@ -6,6 +6,7 @@
  */
 
 export { buildModelGatewayRouteCandidates } from './candidate-builder.js';
+export { explainGatewayRouteDecision } from './explain.js';
 export {
     evaluateGatewayModelHealthRoute,
     isGatewayModelAgentProbeHealthFailed,
