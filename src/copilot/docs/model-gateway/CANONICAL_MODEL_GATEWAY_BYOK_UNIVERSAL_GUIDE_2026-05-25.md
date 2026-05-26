@@ -1440,6 +1440,9 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Default set inclui importers públicos disponíveis sem chave para Hugging
   Face, OpenCode, Chutes e Z.AI.
 - [x] OpenAI official docs seed.
+- [x] Comando terminal canônico `/byok gateway importers [provider]` para
+  auditoria local de hooks, importers configurados e cobertura de endpoints
+  sem rede.
 - [ ] Anthropic docs seed.
 - [ ] Gemini/Vertex docs seed.
 - [ ] Mistral docs pricing seed.
@@ -3434,6 +3437,67 @@ Separação preservada:
 
 Validação deste corte:
 
+- [x] PASS `npm run model-gateway:test:contracts` com `129` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 57. Continuidade 2026-05-26 — Terminal Importer Audit
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a Faixa L sob o ponto de vista operacional: não basta existir
+  `auditCatalogImporterSet()`; o operador humano e a LLM precisam conseguir
+  consultar a cobertura ativa do ambiente sem abrir código e sem executar rede.
+- [x] Confirmado que o comando deve montar o mesmo default importer set usado
+  pelo refresh, mas parar antes de `fetchRaw()`.
+- [x] Confirmado que a saída deve cruzar importers configurados com
+  `MODEL_GATEWAY_PROVIDER_ENDPOINT_INVENTORY`, preservando a separação entre
+  inventário de coleta, evidência de metadados, overlays account-scoped e
+  provas runtime.
+- [x] Confirmado que o comando não pode imprimir valores de segredo; apenas
+  nomes de variáveis e hooks declarados.
+
+Implementado neste corte:
+
+- [x] Criado `/byok gateway importers [provider]`.
+- [x] O comando instancia `createDefaultModelGatewayCatalogImporters({ env:
+  process.env })` e filtra por provider quando solicitado.
+- [x] O comando chama `auditCatalogImporterSet()` com o inventário completo ou
+  provider-específico.
+- [x] A saída mostra total de importers configurados, providers cobertos,
+  importers públicos/autenticados, hooks de provider evidence, route options e
+  account overlays.
+- [x] A saída mostra `endpointCoverage`, `uncoveredCatalogSources`,
+  `providersWithoutImporters` e `missingRequiredHooks`.
+- [x] O comando foi adicionado ao help do `/byok`.
+- [x] O comando foi adicionado ao inventário canônico de comandos
+  `MODEL_GATEWAY_CANONICAL_COMMANDS`.
+- [x] Teste de terminal cobre auditoria provider-específica sem rede e sem
+  vazamento de segredo.
+
+Separação preservada:
+
+- [x] O comando não chama `fetchRaw()`.
+- [x] O comando não chama provider.
+- [x] O comando não executa modelo.
+- [x] O comando não executa probes.
+- [x] O comando não altera snapshot.
+- [x] O comando não persiste decisões de elegibilidade.
+
+Próximas lacunas L reforçadas:
+
+- [ ] Usar a saída do comando como gate antes do primeiro build real.
+- [ ] Criar importers de docs para Anthropic, Gemini/Vertex e Mistral seguindo
+  o mesmo padrão de seed público da OpenAI.
+- [ ] Criar overlays account-scoped profundos para OpenRouter e Kilo.
+- [ ] Expandir Cloudflare de flags configuradas para evidência account-scoped.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:terminal` com `60` testes.
 - [x] PASS `npm run model-gateway:test:contracts` com `129` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.

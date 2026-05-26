@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayProviderEnvRequirements, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayProviderEnvRequirements, summarizeProviderWireProbeMatrix, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayProviderEnvRequirements, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayProviderEnvRequirements, summarizeProviderWireProbeMatrix, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -125,6 +125,67 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             estimatedOutputTokens: input.estimatedOutputTokens ?? null,
             estimatedCostUsd: input.estimatedCostUsd ?? null,
             failure: input.failure ?? null,
+        })),
+        auditCatalogImporterSet: vi.fn((importers) => ({
+            importerCount: importers.length,
+            providerCount: 1,
+            publicImporterCount: 1,
+            authenticatedImporterCount: 1,
+            routeOptionImporterCount: 1,
+            accountOverlayImporterCount: 1,
+            providerEvidenceImporterCount: 1,
+            descriptors: [
+                {
+                    id: 'kilo-gateway-models',
+                    providerId: 'kilo',
+                    sourceKind: 'public_gateway_api',
+                    requiresAuth: false,
+                    url: 'https://api.kilo.ai/api/gateway/models',
+                    command: null,
+                    envRequirements: [],
+                    refreshPolicy: 'ttl',
+                    ttlSeconds: 21600,
+                    hooks: {
+                        fetchRaw: true,
+                        parseRows: true,
+                        toEvidenceFacts: true,
+                        toProviderEvidenceFacts: false,
+                        toRouteOptions: true,
+                        toAccountOverlays: false,
+                    },
+                },
+                {
+                    id: 'kilo-gateway-providers',
+                    providerId: 'kilo',
+                    sourceKind: 'public_gateway_api',
+                    requiresAuth: true,
+                    url: 'https://api.kilo.ai/api/gateway/providers',
+                    command: null,
+                    envRequirements: ['KILO_API_KEY'],
+                    refreshPolicy: 'ttl',
+                    ttlSeconds: 21600,
+                    hooks: {
+                        fetchRaw: true,
+                        parseRows: true,
+                        toEvidenceFacts: true,
+                        toProviderEvidenceFacts: true,
+                        toRouteOptions: false,
+                        toAccountOverlays: true,
+                    },
+                },
+            ],
+            endpointCoverage: [
+                {
+                    providerId: 'kilo',
+                    catalogSourceCount: 2,
+                    importerCount: 2,
+                    coveredCatalogSourceCount: 1,
+                    uncoveredCatalogSourceIds: ['kilo:catalog:public_docs:get:https-api-kilo-ai-docs'],
+                },
+            ],
+            providersWithoutImporters: [],
+            uncoveredCatalogSourceIds: ['kilo:catalog:public_docs:get:https-api-kilo-ai-docs'],
+            missingRequiredHooks: [],
         })),
         chmod: vi.fn(),
         classifyByokProviderFailure: vi.fn((error) => ({
@@ -387,6 +448,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
 }));
 
 vi.mock('#copilot/model-gateway', () => ({
+    auditCatalogImporterSet,
     buildCatalogRefreshEventBatch,
     buildCatalogRefreshStartedEvent,
     buildModelGatewayPreBuildReadinessReport,
@@ -493,6 +555,7 @@ function mockCtx() {
 describe('terminal /byok command', () => {
     afterEach(() => {
         discoverConfiguredByokModelsFromEnv.mockReset();
+        auditCatalogImporterSet.mockClear();
         chmod.mockReset();
         chmod.mockResolvedValue(undefined);
         clearByokProviderModelHealth.mockReset();
@@ -1611,6 +1674,37 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('status=missing');
         expect(ctx.output()).toContain('missingRequired=KILO_API_KEY,KILO_CODE_API_KEY');
         expect(ctx.output()).not.toContain('kilo-secret');
+    });
+
+    it('audita importers configurados e cobertura de endpoints sem chamar rede', async () => {
+        mockProjection();
+        createDefaultModelGatewayCatalogImporters.mockReturnValue([
+            { id: 'kilo-gateway-models', providerId: 'kilo', sourceKind: 'public_gateway_api' },
+            { id: 'kilo-gateway-providers', providerId: 'kilo', sourceKind: 'public_gateway_api' },
+            { id: 'openai-models', providerId: 'openai', sourceKind: 'authenticated_api' },
+        ]);
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway importers kilo');
+
+        expect(createDefaultModelGatewayCatalogImporters).toHaveBeenCalledWith({ env: process.env });
+        expect(resolveProviderEndpointInventory).toHaveBeenCalledWith('kilo');
+        expect(auditCatalogImporterSet).toHaveBeenCalledWith(
+            [
+                { id: 'kilo-gateway-models', providerId: 'kilo', sourceKind: 'public_gateway_api' },
+                { id: 'kilo-gateway-providers', providerId: 'kilo', sourceKind: 'public_gateway_api' },
+            ],
+            { inventories: [expect.objectContaining({ providerId: 'kilo' })] },
+        );
+        expect(ctx.output()).toContain('BYOK model-gateway importer audit');
+        expect(ctx.output()).toContain('selector=kilo');
+        expect(ctx.output()).toContain('importers=2/3');
+        expect(ctx.output()).toContain('providerEvidence=1');
+        expect(ctx.output()).toContain('accountOverlays=1');
+        expect(ctx.output()).toContain('kilo-gateway-models');
+        expect(ctx.output()).toContain('hooks=fetchRaw,parseRows,toEvidenceFacts,toRouteOptions');
+        expect(ctx.output()).toContain('uncoveredCatalogSources=kilo:catalog:public_docs:get:https-api-kilo-ai-docs');
+        expect(ctx.output()).not.toContain('secret');
     });
 
     it('mostra gate pré-K do model-gateway com checks booleanos', async () => {

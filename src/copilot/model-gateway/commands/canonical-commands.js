@@ -139,6 +139,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Inspect missing provider env requirements without printing secret values.',
     },
     {
+        id: 'terminal.importers-audit',
+        phase: 'metadata',
+        surface: 'terminal',
+        command: '/byok gateway importers',
+        summary: 'Audit configured catalog importers, hooks and endpoint coverage without fetching providers.',
+    },
+    {
         id: 'terminal.probe-matrix',
         phase: 'pre-runtime',
         surface: 'terminal',

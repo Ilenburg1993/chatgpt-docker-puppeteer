@@ -20,6 +20,7 @@ import {
     buildModelGatewayPreKCompatibilityReport,
     buildRouteDecisionEvent,
     buildProbeCompletedEvent,
+    auditCatalogImporterSet,
     classifyByokProviderFailure,
     clearByokProviderModelHealth,
     createDefaultModelGatewayCatalogImporters,
@@ -1646,7 +1647,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1721,6 +1722,75 @@ function renderByokProviderEndpointInventory(println, rest) {
         println(`      \x1b[90mselectors=${inventory.routeSelectors.join(',')}\x1b[0m`);
     }
     println('\n  \x1b[90mPróximo passo: catalog importers vão usar este mapa como fonte inicial antes de probes e seleção runtime.\x1b[0m\n');
+}
+
+/**
+ * @param {Record<string, any>} importer
+ * @param {string | null} selector
+ * @returns {boolean}
+ */
+function matchesByokImporterSelector(importer, selector) {
+    if (!selector) return true;
+    const providerId = optionalScalarString(importer['providerId']);
+    if (!providerId) return false;
+    return providerId === selector || providerId === `${selector}-local`;
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {void}
+ */
+function renderByokGatewayImporterAudit(println, rest) {
+    const selector = optionalScalarString(rest.find((item) => !/^(importers|importer|audit|auditoria|coverage|cobertura)$/iu.test(item)));
+    const allImporters = createDefaultModelGatewayCatalogImporters({ env: process.env });
+    const importers = allImporters.filter((importer) => matchesByokImporterSelector(importer, selector));
+    const inventories = selector
+        ? [resolveProviderEndpointInventory(selector)].filter((item) => item !== null)
+        : listProviderEndpointInventory();
+    const audit = auditCatalogImporterSet(importers, { inventories });
+    const coverageRows = audit.endpointCoverage;
+    const coveredSourceCount = coverageRows.reduce((total, row) => total + row.coveredCatalogSourceCount, 0);
+    const totalSourceCount = coverageRows.reduce((total, row) => total + row.catalogSourceCount, 0);
+
+    println(`\n  \x1b[36mBYOK model-gateway importer audit\x1b[0m`);
+    println(
+        `  \x1b[90mselector=${selector ?? '-'} · importers=${audit.importerCount}/${allImporters.length} · providers=${audit.providerCount} · public=${audit.publicImporterCount} · auth=${audit.authenticatedImporterCount}\x1b[0m`,
+    );
+    println(
+        `  \x1b[90mproviderEvidence=${audit.providerEvidenceImporterCount} · routeOptions=${audit.routeOptionImporterCount} · accountOverlays=${audit.accountOverlayImporterCount} · endpointCoverage=${coveredSourceCount}/${totalSourceCount}\x1b[0m`,
+    );
+    println('  \x1b[90mAuditoria local e pré-runtime; não chama fetchRaw, não usa rede, não executa provider/modelo e não imprime segredos.\x1b[0m\n');
+
+    if (selector && inventories.length === 0) {
+        println(`    \x1b[33mProvider não encontrado no inventário: ${selector}.\x1b[0m\n`);
+        return;
+    }
+
+    if (audit.descriptors.length === 0) {
+        println(`    \x1b[33mNenhum importer configurado para ${selector ?? 'o ambiente atual'}.\x1b[0m\n`);
+    } else {
+        for (const descriptor of audit.descriptors.slice(0, 32)) {
+            const hookTags = Object.entries(descriptor.hooks)
+                .filter(([, enabled]) => enabled)
+                .map(([hook]) => hook)
+                .join(',');
+            const envRequirements = descriptor.envRequirements.length > 0 ? descriptor.envRequirements.join(',') : '-';
+            println(
+                `    \x1b[33m${descriptor.id}\x1b[0m  \x1b[90mprovider=${descriptor.providerId} · source=${descriptor.sourceKind} · auth=${descriptor.requiresAuth ? 'sim' : 'nao'} · ttl=${descriptor.ttlSeconds ?? '-'}\x1b[0m`,
+            );
+            println(`      \x1b[90mhooks=${hookTags || '-'} · env=${envRequirements}\x1b[0m`);
+        }
+        if (audit.descriptors.length > 32) println(`\n  \x1b[90mexibindo 32/${audit.descriptors.length}; filtre com provider id.\x1b[0m`);
+    }
+
+    const uncovered = audit.uncoveredCatalogSourceIds.slice(0, 12).join(', ');
+    const missingHooks = audit.missingRequiredHooks.slice(0, 12).join(', ');
+    const providersWithoutImporters = audit.providersWithoutImporters.slice(0, 12).join(', ');
+    println(`\n  \x1b[90muncoveredCatalogSources=${uncovered || '-'}\x1b[0m`);
+    println(`  \x1b[90mprovidersWithoutImporters=${providersWithoutImporters || '-'}\x1b[0m`);
+    println(`  \x1b[90mmissingRequiredHooks=${missingHooks || '-'}\x1b[0m`);
+    println('  \x1b[90mUse isto antes de catalog refresh para decidir quais importers/docs/account overlays devem ser aprofundados.\x1b[0m\n');
 }
 
 /**
@@ -3075,6 +3145,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         }
         if (/^(secrets|secret|env|requirements|requisitos|missing)$/iu.test(rest[0] ?? '')) {
             renderByokGatewayEnvRequirements(println, rest.slice(1));
+            return;
+        }
+        if (/^(importers|importer|imports|audit-importers|auditoria-importers)$/iu.test(rest[0] ?? '')) {
+            renderByokGatewayImporterAudit(println, rest.slice(1));
             return;
         }
         if (/^(routes|route|rotas)$/iu.test(rest[0] ?? '')) {
