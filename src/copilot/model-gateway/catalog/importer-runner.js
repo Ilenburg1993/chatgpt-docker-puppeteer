@@ -130,6 +130,7 @@ function routeOptionKey(option) {
  * @param {unknown} [input.snapshot]
  * @param {{ writeSnapshot(snapshot: object): Promise<void> }} [input.store]
  * @param {() => Date} [input.now]
+ * @param {{ mode?: string; maxInlineBytes?: number }} [input.rawPayloadStoragePolicy]
  * @returns {Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>>}
  */
 export async function runCatalogImporters(input = {}) {
@@ -162,6 +163,7 @@ export async function runCatalogImporters(input = {}) {
                 providerId: importer.providerId,
                 sourceId: String(source['id']),
                 payload: raw,
+                storagePolicy: input.rawPayloadStoragePolicy,
             });
             const rows = await importer.parseRows(raw);
             const context = { source, rawPayloadRef: rawRef.rawPayloadRef };

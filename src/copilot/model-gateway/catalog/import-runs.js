@@ -14,6 +14,11 @@ import { optionalPositiveInteger, optionalString } from '../contracts/index.js';
 import { redactSecretText } from '../secrets/index.js';
 import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 
+export const MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY = Object.freeze({
+    INLINE_SANITIZED: 'inline_sanitized',
+    HASH_ONLY: 'hash_only',
+});
+
 /**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
@@ -70,7 +75,8 @@ function sha256(value) {
  * @param {string} input.sourceId
  * @param {unknown} input.payload
  * @param {string} [input.mediaType]
- * @returns {{ schemaVersion: number; rawPayloadRef: string; providerId: string; sourceId: string; mediaType: string; byteLength: number; sanitizedPayload: unknown; redactionStatus: string }}
+ * @param {{ mode?: string; maxInlineBytes?: number }} [input.storagePolicy]
+ * @returns {{ schemaVersion: number; rawPayloadRef: string; providerId: string; sourceId: string; mediaType: string; byteLength: number; payloadSha256: string; storagePolicy: string; sanitizedPayload: unknown; redactionStatus: string }}
  */
 export function createSanitizedRawPayloadRef(input) {
     const providerId = optionalString(input.providerId);
@@ -79,14 +85,21 @@ export function createSanitizedRawPayloadRef(input) {
     if (!sourceId) throw new Error('[model-gateway/catalog] raw payload sourceId is required');
     const sanitizedPayload = sanitizePayload(input.payload);
     const serialized = stableJson(sanitizedPayload);
+    const digest = sha256(serialized);
+    const byteLength = Buffer.byteLength(serialized, 'utf8');
+    const policyMode = optionalString(input.storagePolicy?.mode) ?? MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.INLINE_SANITIZED;
+    const maxInlineBytes = optionalPositiveInteger(input.storagePolicy?.maxInlineBytes);
+    const inlineAllowed = policyMode !== MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.HASH_ONLY && (maxInlineBytes === null || byteLength <= maxInlineBytes);
     return {
         schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
-        rawPayloadRef: `sha256:${sha256(serialized)}`,
+        rawPayloadRef: `sha256:${digest}`,
         providerId,
         sourceId,
         mediaType: optionalString(input.mediaType) ?? 'application/json',
-        byteLength: Buffer.byteLength(serialized, 'utf8'),
-        sanitizedPayload,
+        byteLength,
+        payloadSha256: digest,
+        storagePolicy: inlineAllowed ? MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.INLINE_SANITIZED : MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.HASH_ONLY,
+        sanitizedPayload: inlineAllowed ? sanitizedPayload : null,
         redactionStatus: 'sanitized',
     };
 }

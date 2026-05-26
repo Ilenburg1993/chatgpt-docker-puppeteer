@@ -146,6 +146,7 @@ function buildProviderProjectionsFromEvidence(evidences) {
  * @param {boolean} [input.force]
  * @param {string[]} [input.sourceIds]
  * @param {boolean} [input.refreshAccountOverlays]
+ * @param {{ mode?: string; maxInlineBytes?: number }} [input.rawPayloadStoragePolicy]
  * @param {import('./retention.js').ModelGatewayCatalogRetentionPolicy} [input.retentionPolicy]
  * @param {string} [input.writePolicy]
  * @param {string | false} [input.lockKey]
@@ -186,6 +187,7 @@ export async function refreshModelGatewayCatalog(input = {}) {
  * @param {boolean} [input.force]
  * @param {string[]} [input.sourceIds]
  * @param {boolean} [input.refreshAccountOverlays]
+ * @param {{ mode?: string; maxInlineBytes?: number }} [input.rawPayloadStoragePolicy]
  * @param {import('./retention.js').ModelGatewayCatalogRetentionPolicy} [input.retentionPolicy]
  * @param {string} [input.writePolicy]
  * @returns {Promise<Omit<Awaited<ReturnType<typeof refreshModelGatewayCatalog>>, 'refreshLock'>>}
@@ -207,6 +209,7 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
     const imported = await runCatalogImporters({
         importers: refreshPlan?.selectedImporters ?? input.importers ?? [],
         now,
+        rawPayloadStoragePolicy: input.rawPayloadStoragePolicy,
     });
     const refreshedSourceIds = new Set(imported.sources.map((source) => String(source['id'])));
     const retainedEvidences = previous.evidences.filter((evidence) => !refreshedSourceIds.has(String(evidence['sourceId'])));

@@ -84,6 +84,7 @@ import {
     JsonModelGatewayCatalogStore,
     SqliteModelGatewayCatalogStore,
     MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+    MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY,
     createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
     createChutesModelsImporter,
@@ -1452,6 +1453,36 @@ describe('model-gateway foundation', () => {
             },
         ]);
         assert.equal(JSON.stringify({ rawRef, run }).includes('sk-secret-that-must-not-leak'), false);
+    });
+
+    it('applies raw payload storage policy before persistence', () => {
+        const inline = createSanitizedRawPayloadRef({
+            providerId: 'openrouter',
+            sourceId: 'openrouter-models',
+            payload: { data: [{ id: 'm' }] },
+            storagePolicy: { maxInlineBytes: 1024 },
+        });
+        const hashOnly = createSanitizedRawPayloadRef({
+            providerId: 'openrouter',
+            sourceId: 'openrouter-models',
+            payload: { data: [{ id: 'm', token: 'sk-secret-that-must-not-leak', text: 'x'.repeat(128) }] },
+            storagePolicy: { maxInlineBytes: 8 },
+        });
+        const forcedHashOnly = createSanitizedRawPayloadRef({
+            providerId: 'openrouter',
+            sourceId: 'openrouter-models',
+            payload: { data: [{ id: 'm' }] },
+            storagePolicy: { mode: MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.HASH_ONLY },
+        });
+
+        assert.equal(inline.storagePolicy, MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.INLINE_SANITIZED);
+        assert.notEqual(inline.sanitizedPayload, null);
+        assert.equal(hashOnly.storagePolicy, MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.HASH_ONLY);
+        assert.equal(hashOnly.sanitizedPayload, null);
+        assert.match(hashOnly.payloadSha256, /^[a-f0-9]{64}$/u);
+        assert.equal(forcedHashOnly.storagePolicy, MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.HASH_ONLY);
+        assert.equal(forcedHashOnly.sanitizedPayload, null);
+        assert.equal(JSON.stringify({ inline, hashOnly, forcedHashOnly }).includes('sk-secret-that-must-not-leak'), false);
     });
 
     it('classifies semantic catalog diff kinds for pricing, capabilities and lifecycle changes', () => {

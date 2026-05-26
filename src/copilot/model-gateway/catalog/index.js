@@ -25,6 +25,7 @@ export {
 } from './coverage.js';
 export { explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry } from './explain.js';
 export {
+    MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY,
     createCatalogImportRun,
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,

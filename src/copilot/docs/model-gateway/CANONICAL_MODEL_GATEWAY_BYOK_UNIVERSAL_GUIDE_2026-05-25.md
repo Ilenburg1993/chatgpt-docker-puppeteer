@@ -1414,7 +1414,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Snapshot ids estáveis.
 - [x] Incremental refresh com TTL por source.
 - [ ] Tombstones.
-- [ ] Raw payload storage policy.
+- [x] Raw payload storage policy.
 
 ### Faixa L — Importers
 
@@ -2989,6 +2989,48 @@ Validação deste corte:
 - [x] PASS `make model-gateway-commands`.
 - [x] PASS `npm run model-gateway:test:contracts` com `117` testes.
 - [x] PASS `npm run model-gateway:test:terminal` com `55` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 53. Continuidade 2026-05-26 — Raw Payload Storage Policy
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a lacuna da Faixa K sobre política de armazenamento para raw
+  payload refs.
+- [x] Confirmado que `createSanitizedRawPayloadRef()` já redigia payloads, mas
+  sempre preservava o payload sanitizado inline.
+- [x] Confirmado que precisamos de modo hash-only e limite de bytes antes de
+  ampliar refresh/importers.
+- [x] Confirmado que a política deve ser aplicada antes de JSON/SQLite.
+
+Implementado neste corte:
+
+- [x] Criado `MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY`.
+- [x] `createSanitizedRawPayloadRef()` passa a aceitar `storagePolicy`.
+- [x] Adicionado `payloadSha256`.
+- [x] Adicionado `storagePolicy` no raw payload ref.
+- [x] Modo `hash_only` remove `sanitizedPayload` e preserva hash/tamanho.
+- [x] `runCatalogImporters()` passa a aceitar `rawPayloadStoragePolicy`.
+- [x] `refreshModelGatewayCatalog()` propaga `rawPayloadStoragePolicy`.
+- [x] Exportado pelo barrel de `catalog` e `model-gateway`.
+- [x] Adicionado teste unitário de inline/hash-only/limite.
+
+Separação preservada:
+
+- [x] A política não altera evidences nem projections.
+- [x] A política não chama provider.
+- [x] A política não executa modelo.
+- [x] A política não altera eligibility ou runtime health.
+- [x] Hash/tamanho continuam disponíveis para auditoria.
+- [x] Segredos continuam redigidos antes de qualquer armazenamento.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `122` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.
