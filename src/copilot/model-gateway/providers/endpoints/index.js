@@ -23,7 +23,12 @@ import { OPENCODE_PROVIDER_ENDPOINTS } from './opencode.js';
 import { OPENAI_PROVIDER_ENDPOINTS } from './openai.js';
 import { OPENROUTER_PROVIDER_ENDPOINTS } from './openrouter.js';
 import { ZAI_PROVIDER_ENDPOINTS } from './zai.js';
-export { auditProviderEndpointImporterCoverage, listProviderEndpointSourceRecords } from './source-records.js';
+export {
+    MODEL_GATEWAY_ENDPOINT_RICHNESS_CATEGORIES,
+    auditProviderEndpointImporterCoverage,
+    listProviderEndpointSourceRecords,
+    normalizeProviderEndpointRichness,
+} from './source-records.js';
 
 /**
  * @typedef {object} ProviderEndpointSource

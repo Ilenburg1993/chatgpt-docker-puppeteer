@@ -45,6 +45,77 @@ function reasonCounts(reasons) {
 }
 
 /**
+ * @param {Record<string, any> | null} health
+ * @returns {{ status: string | null; verifiedProbes: string[]; failedProbes: string[] }}
+ */
+function probeSummary(health) {
+    const probes = isRecord(health?.['probes']) ? health['probes'] : {};
+    const verifiedProbes = [];
+    const failedProbes = [];
+    for (const [kind, probe] of Object.entries(probes)) {
+        if (!isRecord(probe)) continue;
+        if (probe['status'] === 'ok') verifiedProbes.push(kind);
+        if (probe['status'] === 'failed') failedProbes.push(kind);
+    }
+    return {
+        status: optionalString(health?.['lastStatus']) ?? null,
+        verifiedProbes: verifiedProbes.sort(),
+        failedProbes: failedProbes.sort(),
+    };
+}
+
+/**
+ * @param {Record<string, any>} candidate
+ * @returns {Record<string, unknown>}
+ */
+function candidateSummary(candidate) {
+    const model = isRecord(candidate['model']) ? candidate['model'] : {};
+    const eligibility = isRecord(candidate['eligibility']) ? candidate['eligibility'] : null;
+    const health = isRecord(candidate['health']) ? candidate['health'] : null;
+    const normalizedPolicy = isRecord(model['normalizedPolicy']) ? model['normalizedPolicy'] : {};
+    return {
+        id: candidateId(candidate),
+        providerId: optionalString(model['providerId']),
+        providerModel: optionalString(model['providerModel'] ?? model['id']),
+        routeProfile: optionalString(model['routeProfile']),
+        routeLayer: optionalString(normalizedPolicy['routeLayer']),
+        wireApi: optionalString(normalizedPolicy['wireApi'] ?? normalizedPolicy['directWireApi']),
+        score: typeof candidate['score'] === 'number' ? candidate['score'] : null,
+        included: candidate['include'] === true,
+        rejectedReasons: Array.isArray(candidate['rejectedReasons'])
+            ? candidate['rejectedReasons'].map(optionalString).filter((item) => item !== null)
+            : [],
+        positiveReasons: Array.isArray(candidate['reasons']) ? candidate['reasons'].map(optionalString).filter((item) => item !== null) : [],
+        eligibility: eligibility
+            ? {
+                  include: eligibility['include'] === true,
+                  disposition: optionalString(eligibility['disposition']),
+                  hardExclusions: Array.isArray(eligibility['hardExclusions']) ? eligibility['hardExclusions'].map(String) : [],
+                  softPenalties: Array.isArray(eligibility['softPenalties']) ? eligibility['softPenalties'].map(String) : [],
+                  overlayRefs: Array.isArray(eligibility['overlayRefs']) ? eligibility['overlayRefs'].map(String) : [],
+              }
+            : null,
+        probes: probeSummary(health),
+    };
+}
+
+/**
+ * @param {Record<string, any>[]} candidates
+ * @returns {Record<string, unknown>}
+ */
+function decisionLayers(candidates) {
+    const summaries = candidates.map(candidateSummary);
+    return {
+        catalogCandidateCount: summaries.length,
+        eligibilityEvaluatedCount: summaries.filter((summary) => summary['eligibility'] !== null).length,
+        healthRecordCount: summaries.filter((summary) => isRecord(summary['probes']) && summary['probes']['status'] !== null).length,
+        runtimeProbeProofCount: summaries.filter(
+            (summary) => isRecord(summary['probes']) && Array.isArray(summary['probes']['verifiedProbes']) && summary['probes']['verifiedProbes'].length > 0,
+        ).length,
+    };
+}
+
+/**
  * @param {string[]} reasons
  * @returns {string[]}
  */
@@ -81,6 +152,10 @@ function nextActions(reasons) {
  *   fallbackChain: string[];
  *   rejectedReasonCounts: Record<string, number>;
  *   topRejectedReasons: string[];
+ *   selectedSummary: Record<string, unknown> | null;
+ *   candidateSummaries: Record<string, unknown>[];
+ *   rejectedSummaries: Record<string, unknown>[];
+ *   decisionLayers: Record<string, unknown>;
  *   nextActions: string[];
  *   summary: string;
  * }}
@@ -98,6 +173,7 @@ export function explainGatewayRouteDecision(route) {
         .slice(0, 8)
         .map(([reason]) => reason);
     const selectedId = selected ? candidateId(selected) : null;
+    const allCandidates = [...candidates, ...rejected];
     return {
         selected: selected !== null,
         selectedId,
@@ -106,6 +182,10 @@ export function explainGatewayRouteDecision(route) {
         fallbackChain: Array.isArray(route['fallbackChain']) ? route['fallbackChain'].map(String) : [],
         rejectedReasonCounts: counts,
         topRejectedReasons,
+        selectedSummary: selected ? candidateSummary(selected) : null,
+        candidateSummaries: candidates.map(candidateSummary),
+        rejectedSummaries: rejected.map(candidateSummary),
+        decisionLayers: decisionLayers(allCandidates),
         nextActions: nextActions(topRejectedReasons),
         summary: selectedId ? `selected:${selectedId}` : `unselected:${topRejectedReasons[0] ?? 'no_candidate'}`,
     };

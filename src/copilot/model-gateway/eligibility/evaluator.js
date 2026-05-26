@@ -257,12 +257,24 @@ function mergedOverlayMetadata(overlays) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function errorContextText(value) {
+    const text = optionalString(value);
+    if (text) return text;
+    if (Array.isArray(value)) return value.map(errorContextText).filter(Boolean).join(' ');
+    if (isRecord(value)) return Object.values(value).map(errorContextText).filter(Boolean).join(' ');
+    return '';
+}
+
+/**
  * @param {Record<string, any>} health
  * @returns {boolean}
  */
 function isFatalHealth(health) {
     const status = optionalString(health['lastStatus']);
-    const failureContext = optionalString(health['lastErrorContext']) ?? optionalString(health['lastMessage']) ?? '';
+    const failureContext = [errorContextText(health['lastErrorContext']), errorContextText(health['lastMessage'])].filter(Boolean).join(' ');
     return (
         status === 'failed' &&
         /(?:auth|unauthori[sz]ed|permission|forbidden|not[_ -]?found|quota|billing|rate[_ -]?limit)/iu.test(failureContext)

@@ -45,6 +45,18 @@ function stringList(value) {
     return [...new Set(value.map(optionalString).filter((item) => item !== null))];
 }
 
+export const MODEL_GATEWAY_ENDPOINT_RICHNESS_CATEGORIES = Object.freeze({
+    identity: Object.freeze(['identity', 'owner', 'provider', 'upstream', 'catalog', 'docs', 'openapi']),
+    pricing: Object.freeze(['pricing', 'price', 'prices', 'tiers', 'cost', 'cache', 'caching', 'web', 'search']),
+    limits: Object.freeze(['limits', 'rate', 'context', 'tokens', 'parameters', 'quota']),
+    capabilities: Object.freeze(['features', 'feature', 'capabilities', 'capability', 'modalities', 'multimodal', 'tool', 'tools', 'vision', 'audio']),
+    routing: Object.freeze(['route', 'routing', 'provider', 'upstream', 'fallback', 'gateway', 'selectors']),
+    lifecycle: Object.freeze(['lifecycle', 'deprecation', 'deprecated', 'retirement', 'status']),
+    dataPolicy: Object.freeze(['privacy', 'policy', 'confidential', 'compute', 'retention', 'byok']),
+    runtime: Object.freeze(['runtime', 'schema', 'streaming', 'endpoint', 'operational', 'setup']),
+    account: Object.freeze(['account', 'authenticated', 'local', 'daemon']),
+});
+
 /**
  * @param {string} locator
  * @returns {string[]}
@@ -60,6 +72,38 @@ function placeholders(locator) {
 function richnessTags(richness) {
     if (!richness) return [];
     return [...new Set(richness.split(/[_\s,|/+-]+/u).map((item) => item.trim()).filter(Boolean))].sort();
+}
+
+/**
+ * @param {unknown} value
+ * @returns {{ raw: string | null; tags: string[]; categories: string[]; coverage: Record<string, boolean | number> }}
+ */
+export function normalizeProviderEndpointRichness(value) {
+    const raw = optionalString(value);
+    const tags = richnessTags(raw);
+    const tagSet = new Set(tags.map((tag) => tag.toLowerCase()));
+    const categories = Object.entries(MODEL_GATEWAY_ENDPOINT_RICHNESS_CATEGORIES)
+        .filter(([, aliases]) => aliases.some((alias) => tagSet.has(alias)))
+        .map(([category]) => category)
+        .sort();
+    return {
+        raw,
+        tags,
+        categories,
+        coverage: {
+            tagCount: tags.length,
+            categoryCount: categories.length,
+            hasIdentity: categories.includes('identity'),
+            hasPricing: categories.includes('pricing'),
+            hasLimits: categories.includes('limits'),
+            hasCapabilities: categories.includes('capabilities'),
+            hasRouting: categories.includes('routing'),
+            hasLifecycle: categories.includes('lifecycle'),
+            hasDataPolicy: categories.includes('dataPolicy'),
+            hasRuntime: categories.includes('runtime'),
+            hasAccount: categories.includes('account'),
+        },
+    };
 }
 
 /**
@@ -101,6 +145,7 @@ function endpointSourceRecord(inventory, target, source) {
     const locator = optionalString(source['url']) ?? optionalString(source['path']) ?? '';
     const placeholderNames = placeholders(locator);
     const richness = optionalString(source['richness']);
+    const richnessSummary = normalizeProviderEndpointRichness(richness);
     return {
         id: [providerId, target, kind, method, idPart(locator || kind)].join(':'),
         providerId,
@@ -118,7 +163,9 @@ function endpointSourceRecord(inventory, target, source) {
         placeholders: placeholderNames,
         hasPlaceholders: placeholderNames.length > 0,
         richness,
-        richnessTags: richnessTags(richness),
+        richnessTags: richnessSummary.tags,
+        richnessCategories: richnessSummary.categories,
+        richnessCoverage: richnessSummary.coverage,
         routeSelectors: stringList(inventory['routeSelectors']),
         baseUrls: stringList(inventory['baseUrls']),
     };

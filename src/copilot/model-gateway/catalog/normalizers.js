@@ -672,6 +672,227 @@ export function normalizeModelRoutePolicyTraits(input = {}) {
 
 /**
  * @param {object} [input]
+ * @param {unknown} [input.capabilities]
+ * @param {unknown} [input.supportedParameters]
+ * @param {unknown} [input.modalities]
+ * @param {unknown} [input.routeTraits]
+ * @returns {Record<string, boolean | string | string[]>}
+ */
+export function normalizeRuntimeAgenticCapabilityTaxonomy(input = {}) {
+    const capabilities = isRecord(input.capabilities) ? input.capabilities : {};
+    const modalities = isRecord(input.modalities) ? input.modalities : {};
+    const routeTraits = isRecord(input.routeTraits) ? input.routeTraits : {};
+    const supportedParameters = new Set(
+        stringArray(input.supportedParameters).map((value) => value.toLowerCase().replace(/[-\s]+/gu, '_')),
+    );
+    const inputModalities = normalizeCatalogModalities(modalities['input']);
+    const outputModalities = normalizeCatalogModalities(modalities['output']);
+    /**
+     * @param {string[]} fieldNames
+     * @returns {boolean}
+     */
+    const bool = (fieldNames) =>
+        fieldNames.some((fieldName) => capabilities[fieldName] === true || routeTraits[fieldName] === true || supportedParameters.has(fieldName));
+    const taxonomy = {
+        tools: bool(['tools', 'tool_use', 'function_calling']),
+        forcedToolChoice: bool(['forcedToolChoice', 'forced_tool_choice', 'tool_choice']),
+        parallelToolCalls: bool(['parallelToolCalls', 'parallel_tool_calls']),
+        jsonMode: bool(['jsonMode', 'json_mode', 'response_format']),
+        structuredOutputs: bool(['structuredOutputs', 'structured_outputs', 'json_schema']),
+        reasoning: bool(['reasoning', 'reasoningEffort', 'reasoning_effort', 'include_reasoning']),
+        streaming: bool(['streaming', 'stream']),
+        webSearch: bool(['webSearch', 'web_search', 'search']),
+        codeExecution: bool(['codeExecution', 'code_execution']),
+        vision: capabilities['vision'] === true || inputModalities.includes('image'),
+        audio: capabilities['audio'] === true || inputModalities.includes('audio') || outputModalities.includes('audio'),
+    };
+    const agenticLevel = taxonomy.parallelToolCalls
+        ? 'parallel_tools'
+        : taxonomy.forcedToolChoice
+          ? 'controlled_tools'
+          : taxonomy.tools
+            ? 'basic_tools'
+            : taxonomy.reasoning
+              ? 'reasoning_only'
+              : 'none';
+    const families = [];
+    if (taxonomy.tools) families.push('tools');
+    if (taxonomy.reasoning) families.push('reasoning');
+    if (taxonomy.structuredOutputs || taxonomy.jsonMode) families.push('structured_outputs');
+    if (taxonomy.webSearch) families.push('web_search');
+    if (taxonomy.codeExecution) families.push('code_execution');
+    if (taxonomy.vision) families.push('vision');
+    if (taxonomy.audio) families.push('audio');
+    return {
+        ...taxonomy,
+        agenticLevel,
+        capabilityFamilies: families,
+    };
+}
+
+/**
+ * @param {unknown} perToken
+ * @param {unknown} perMillion
+ * @returns {number | null}
+ */
+function moneyPerMillion(perToken, perMillion) {
+    const explicitPerMillion = finiteNumber(perMillion);
+    if (explicitPerMillion !== null) return explicitPerMillion;
+    const token = finiteNumber(perToken);
+    return token === null ? null : Math.round(token * 1_000_000 * 1_000_000) / 1_000_000;
+}
+
+/**
+ * @param {object} [input]
+ * @param {unknown} [input.currency]
+ * @param {unknown} [input.inputPerToken]
+ * @param {unknown} [input.outputPerToken]
+ * @param {unknown} [input.cacheReadPerToken]
+ * @param {unknown} [input.cacheWritePerToken]
+ * @param {unknown} [input.inputPerMillion]
+ * @param {unknown} [input.outputPerMillion]
+ * @param {unknown} [input.cacheReadPerMillion]
+ * @param {unknown} [input.cacheWritePerMillion]
+ * @param {unknown} [input.request]
+ * @param {unknown} [input.webSearchPerRequest]
+ * @param {unknown} [input.exchangeRateToUsd]
+ * @returns {Record<string, unknown>}
+ */
+export function normalizeModelPricingTaxonomy(input = {}) {
+    const currency = scalarString(input.currency)?.toUpperCase() ?? 'USD';
+    const fields = {
+        inputPerMillion: moneyPerMillion(input.inputPerToken, input.inputPerMillion),
+        outputPerMillion: moneyPerMillion(input.outputPerToken, input.outputPerMillion),
+        cacheReadPerMillion: moneyPerMillion(input.cacheReadPerToken, input.cacheReadPerMillion),
+        cacheWritePerMillion: moneyPerMillion(input.cacheWritePerToken, input.cacheWritePerMillion),
+        request: finiteNumber(input.request),
+        webSearchPerRequest: finiteNumber(input.webSearchPerRequest),
+    };
+    const money = Object.fromEntries(
+        Object.entries(fields)
+            .filter(([, value]) => value !== null && value >= 0)
+            .map(([key, value]) => [key, /** @type {number} */ (value)]),
+    );
+    const exchangeRateToUsd = finiteNumber(input.exchangeRateToUsd);
+    const usd =
+        currency === 'USD'
+            ? Object.fromEntries(
+                  Object.entries({
+                      inputUsdPerMillion: money['inputPerMillion'],
+                      outputUsdPerMillion: money['outputPerMillion'],
+                      cacheReadUsdPerMillion: money['cacheReadPerMillion'],
+                      cacheWriteUsdPerMillion: money['cacheWritePerMillion'],
+                      requestUsd: money['request'],
+                      webSearchUsdPerRequest: money['webSearchPerRequest'],
+                  }).filter(([, value]) => typeof value === 'number'),
+              )
+            : exchangeRateToUsd !== null
+              ? Object.fromEntries(
+                    Object.entries(money)
+                        .filter(([, value]) => typeof value === 'number')
+                        .map(([key, value]) => [`${key}Usd`, Math.round(Number(value) * exchangeRateToUsd * 1_000_000) / 1_000_000]),
+                )
+              : {};
+    return {
+        ...(Object.keys(money).length > 0 ? { currency, tokenUnit: 'per_million_tokens', requestUnit: 'per_request', ...money } : {}),
+        ...(exchangeRateToUsd !== null ? { exchangeRateToUsd } : {}),
+        ...(Object.keys(usd).length > 0 ? { usd } : {}),
+    };
+}
+
+/**
+ * @param {Record<string, unknown>} [input]
+ * @returns {Record<string, unknown>}
+ */
+export function normalizeRateLimitTaxonomy(input = {}) {
+    const requests = nonNegativeNumberRecord({
+        perSecond: input['requestsPerSecond'],
+        perMinute: input['requestsPerMinute'],
+        perHour: input['requestsPerHour'],
+        perDay: input['requestsPerDay'] ?? input['dailyRequests'],
+        burst: input['requestBurst'],
+    });
+    const tokens = nonNegativeNumberRecord({
+        perSecond: input['tokensPerSecond'],
+        perMinute: input['tokensPerMinute'],
+        perHour: input['tokensPerHour'],
+        perDay: input['tokensPerDay'] ?? input['dailyTokens'],
+        burst: input['tokenBurst'],
+    });
+    const concurrency = nonNegativeNumberRecord({
+        maxConcurrentRequests: input['maxConcurrentRequests'] ?? input['concurrentRequests'],
+        maxConcurrentStreams: input['maxConcurrentStreams'],
+    });
+    const retry = nonNegativeNumberRecord({
+        retryAfterSeconds: input['retryAfterSeconds'],
+        cooldownSeconds: input['cooldownSeconds'],
+    });
+    const providerPolicy = scalarString(input['providerPolicy']);
+    return {
+        ...(Object.keys(requests).length > 0 ? { requests } : {}),
+        ...(Object.keys(tokens).length > 0 ? { tokens } : {}),
+        ...(Object.keys(concurrency).length > 0 ? { concurrency } : {}),
+        ...(Object.keys(retry).length > 0 ? { retry } : {}),
+        ...(providerPolicy ? { providerPolicy } : {}),
+    };
+}
+
+/**
+ * @param {Record<string, unknown>} [input]
+ * @returns {Record<string, unknown>}
+ */
+export function normalizeDataPolicyTaxonomy(input = {}) {
+    const policy = {
+        retainsPrompts: booleanValue(input['retainsPrompts'] ?? input['retention']),
+        trainsOnPrompts: booleanValue(input['trainsOnPrompts'] ?? input['training']),
+        zeroDataRetention: booleanValue(input['zeroDataRetention'] ?? input['zdr']),
+        privateDeployment: booleanValue(input['privateDeployment'] ?? input['private']),
+        confidentialCompute: booleanValue(input['confidentialCompute'] ?? input['tee']),
+        byokRequired: booleanValue(input['byokRequired']),
+    };
+    return {
+        ...Object.fromEntries(Object.entries(policy).filter(([, value]) => value !== null)),
+        ...(scalarString(input['dataResidency']) ? { dataResidency: scalarString(input['dataResidency']) } : {}),
+        ...(scalarString(input['region']) ? { region: scalarString(input['region']) } : {}),
+        ...(scalarString(input['retentionPeriod']) ? { retentionPeriod: scalarString(input['retentionPeriod']) } : {}),
+        ...(stringArray(input['compliance']).length > 0 ? { compliance: stringArray(input['compliance']) } : {}),
+    };
+}
+
+/**
+ * @param {Record<string, unknown>} [input]
+ * @returns {Record<string, unknown>}
+ */
+export function resolveModelDeprecationAlias(input = {}) {
+    const aliases = isRecord(input['aliases']) ? input['aliases'] : {};
+    const lifecycle = isRecord(input['lifecycle']) ? input['lifecycle'] : {};
+    const providerModel = scalarString(input['providerModel']);
+    const canonicalSlug = scalarString(aliases['canonicalSlug'] ?? input['canonicalSlug']);
+    const aliasTarget = scalarString(aliases['aliasTarget'] ?? aliases['target'] ?? input['aliasTarget']);
+    const replacementModel = scalarString(lifecycle['replacementModel'] ?? input['replacementModel']);
+    const expiresAt = isoDate(lifecycle['expiresAt'] ?? input['expiresAt']);
+    const providerStatus = scalarString(lifecycle['providerStatus'] ?? lifecycle['status'] ?? input['status']);
+    const explicitDeprecated = booleanValue(input['deprecated']);
+    const explicitRetired = booleanValue(input['retired']);
+    const inferredDeprecated = /(?:deprecated|deprecat)/iu.test(providerStatus ?? '') || (expiresAt ? Date.parse(expiresAt) > Date.now() : false);
+    const inferredRetired = providerStatus === 'retired' || providerStatus === 'removed' || (expiresAt ? Date.parse(expiresAt) <= Date.now() : false);
+    const deprecated = explicitDeprecated ?? inferredDeprecated;
+    const retired = explicitRetired ?? inferredRetired;
+    return {
+        providerModel,
+        canonicalModel: aliasTarget ?? canonicalSlug ?? providerModel ?? null,
+        isAlias: Boolean(aliasTarget && aliasTarget !== providerModel),
+        aliasTarget: aliasTarget ?? null,
+        replacementModel: replacementModel ?? null,
+        deprecated,
+        retired,
+        expiresAt,
+        providerStatus: providerStatus ?? null,
+    };
+}
+
+/**
+ * @param {object} [input]
  * @param {unknown} [input.enabledModels]
  * @param {unknown} [input.blockedModels]
  * @param {unknown} [input.byokProviderKeys]

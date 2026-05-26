@@ -2112,6 +2112,7 @@ async function renderByokGatewayCatalogOpenAISchema(println, options = {}) {
         : toOpenAIModelCatalogList(snapshot?.projections ?? [], {
               providerProjections: snapshot?.providerProjections ?? [],
               eligibilityDecisions: snapshot?.modelEligibilityDecisions ?? [],
+              routeOptions: snapshot?.routeOptions ?? [],
           });
     println(`\n  \x1b[36mBYOK model-gateway OpenAI schema\x1b[0m`);
     println(
@@ -2123,8 +2124,9 @@ async function renderByokGatewayCatalogOpenAISchema(println, options = {}) {
         const providerModel = optionalScalarString(gateway['provider_model']) ?? model.id;
         const eligibility = asRecord(gateway['eligibility']);
         const eligibilityStatus = optionalScalarString(eligibility['status']) ?? '-';
+        const routeOptionCount = Array.isArray(gateway['route_options']) ? gateway['route_options'].length : 0;
         println(
-            `    \x1b[33m${model.id}\x1b[0m  \x1b[90mprovider=${providerId} · providerModel=${providerModel} · eligibility=${eligibilityStatus}\x1b[0m`,
+            `    \x1b[33m${model.id}\x1b[0m  \x1b[90mprovider=${providerId} · providerModel=${providerModel} · routes=${routeOptionCount} · eligibility=${eligibilityStatus}\x1b[0m`,
         );
     }
     if (openaiList.data.length > 12) {

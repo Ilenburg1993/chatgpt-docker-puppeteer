@@ -304,6 +304,7 @@ export class SqliteModelGatewayCatalogStore {
         return toOpenAIModelCatalogList(snapshot.projections, {
             providerProjections: snapshot.providerProjections,
             eligibilityDecisions: snapshot.modelEligibilityDecisions,
+            routeOptions: snapshot.routeOptions,
         });
     }
 

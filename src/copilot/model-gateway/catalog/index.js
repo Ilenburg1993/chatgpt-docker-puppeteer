@@ -117,11 +117,16 @@ export {
     normalizeModelIdentityTraits,
     normalizeModelLifecycle,
     normalizeModelModalities,
+    normalizeModelPricingTaxonomy,
     normalizeModelRoutePolicyTraits,
     normalizeModelTokenLimits,
     normalizeOpenAICompatibleModelCapabilities,
+    normalizeRateLimitTaxonomy,
+    normalizeRuntimeAgenticCapabilityTaxonomy,
+    normalizeDataPolicyTaxonomy,
     normalizeUsdPricing,
     parseModelModalityExpression,
+    resolveModelDeprecationAlias,
 } from './normalizers.js';
 export {
     ModelGatewayCatalogRefreshLockError,

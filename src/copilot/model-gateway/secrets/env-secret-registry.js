@@ -48,6 +48,8 @@ export const DEFAULT_MODEL_GATEWAY_SECRET_ENV_KEYS = Object.freeze([
     'KILO_CODE_API_KEY',
 ]);
 
+export const MODEL_GATEWAY_SECRET_SCOPE_PRECEDENCE = Object.freeze(['account', 'workspace', 'global']);
+
 /**
  * @param {unknown} value
  * @returns {string | null}
@@ -58,18 +60,64 @@ function optionalString(value) {
     return trimmed.length > 0 ? trimmed : null;
 }
 
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function scopeToken(value) {
+    const text = optionalString(value);
+    if (!text) return null;
+    const token = text
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/gu, '_')
+        .replace(/^_+|_+$/gu, '');
+    return token || null;
+}
+
+/**
+ * @param {{ scope: 'account' | 'workspace'; scopeId: string; ref: string }} input
+ * @returns {string}
+ */
+export function buildScopedSecretEnvKey(input) {
+    const scopeId = scopeToken(input.scopeId) ?? 'DEFAULT';
+    return `COPILOT_BYOK_${input.scope.toUpperCase()}_${scopeId}__${input.ref}`;
+}
+
 export class EnvSecretRegistry {
     /** @type {Record<string, string | undefined>} */
     #env;
     /** @type {Set<string>} */
     #keys;
+    /** @type {string | null} */
+    #accountId;
+    /** @type {string | null} */
+    #workspaceId;
 
     /**
-     * @param {{ env?: Record<string, string | undefined>; keys?: readonly string[] }} [options]
+     * @param {{ env?: Record<string, string | undefined>; keys?: readonly string[]; accountId?: string; workspaceId?: string }} [options]
      */
     constructor(options = {}) {
         this.#env = options.env ?? process.env;
         this.#keys = new Set(options.keys ?? DEFAULT_MODEL_GATEWAY_SECRET_ENV_KEYS);
+        this.#accountId = optionalString(options.accountId);
+        this.#workspaceId = optionalString(options.workspaceId);
+    }
+
+    /**
+     * @param {string} ref
+     * @returns {Array<{ scope: 'account' | 'workspace' | 'global'; envKey: string }>}
+     */
+    candidateRefs(ref) {
+        const key = optionalString(ref);
+        if (!key || !this.#keys.has(key)) return [];
+        /** @type {Array<{ scope: 'account' | 'workspace' | 'global'; envKey: string }>} */
+        const candidates = [];
+        if (this.#accountId) candidates.push({ scope: 'account', envKey: buildScopedSecretEnvKey({ scope: 'account', scopeId: this.#accountId, ref: key }) });
+        if (this.#workspaceId) {
+            candidates.push({ scope: 'workspace', envKey: buildScopedSecretEnvKey({ scope: 'workspace', scopeId: this.#workspaceId, ref: key }) });
+        }
+        candidates.push({ scope: 'global', envKey: key });
+        return candidates;
     }
 
     /**
@@ -77,9 +125,11 @@ export class EnvSecretRegistry {
      * @returns {string | undefined}
      */
     get(ref) {
-        const key = optionalString(ref);
-        if (!key || !this.#keys.has(key)) return undefined;
-        return optionalString(this.#env[key]) ?? undefined;
+        for (const candidate of this.candidateRefs(ref)) {
+            const value = optionalString(this.#env[candidate.envKey]);
+            if (value) return value;
+        }
+        return undefined;
     }
 
     /**
@@ -92,20 +142,24 @@ export class EnvSecretRegistry {
 
     /**
      * @param {string} ref
-     * @returns {{ ref: string; configured: boolean; source: 'env'; safeLabel: string }}
+     * @returns {{ ref: string; configured: boolean; source: 'env'; scope: 'account' | 'workspace' | 'global' | null; checkedEnvKeys: string[]; safeLabel: string }}
      */
     describe(ref) {
         const key = optionalString(ref) ?? '';
+        const candidates = this.candidateRefs(key);
+        const configured = candidates.find((candidate) => optionalString(this.#env[candidate.envKey]) !== null) ?? null;
         return {
             ref: key,
-            configured: this.has(key),
+            configured: configured !== null,
             source: 'env',
-            safeLabel: key ? `${key}=<${this.has(key) ? 'configured' : 'missing'}>` : '<invalid-ref>',
+            scope: configured?.scope ?? null,
+            checkedEnvKeys: candidates.map((candidate) => candidate.envKey),
+            safeLabel: key ? `${key}=<${configured ? `configured:${configured.scope}` : 'missing'}>` : '<invalid-ref>',
         };
     }
 
     /**
-     * @returns {Array<{ ref: string; configured: boolean; source: 'env'; safeLabel: string }>}
+     * @returns {Array<ReturnType<EnvSecretRegistry['describe']>>}
      */
     listConfigured() {
         return [...this.#keys].map((key) => this.describe(key)).filter((entry) => entry.configured);
@@ -113,7 +167,7 @@ export class EnvSecretRegistry {
 }
 
 /**
- * @param {{ env?: Record<string, string | undefined>; keys?: readonly string[] }} [options]
+ * @param {{ env?: Record<string, string | undefined>; keys?: readonly string[]; accountId?: string; workspaceId?: string }} [options]
  * @returns {EnvSecretRegistry}
  */
 export function createEnvSecretRegistry(options = {}) {

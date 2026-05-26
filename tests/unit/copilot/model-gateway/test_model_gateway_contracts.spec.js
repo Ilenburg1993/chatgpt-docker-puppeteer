@@ -24,6 +24,7 @@ import {
     anthropicAdapter,
     buildEnvByokModelGatewaySnapshot,
     buildModelGatewayOperatorProjection,
+    buildScopedSecretEnvKey,
     buildProviderModelId,
     buildCatalogRefreshCompletedEvent,
     buildCatalogRefreshEventBatch,
@@ -132,9 +133,14 @@ import {
     normalizeModelIdentityTraits,
     normalizeModelLifecycle,
     normalizeModelModalities,
+    normalizeModelPricingTaxonomy,
     normalizeModelRoutePolicyTraits,
     normalizeModelTokenLimits,
+    normalizeProviderEndpointRichness,
     normalizeOpenAICompatibleModelCapabilities,
+    normalizeRateLimitTaxonomy,
+    normalizeRuntimeAgenticCapabilityTaxonomy,
+    normalizeDataPolicyTaxonomy,
     normalizeStoredCatalogSnapshot,
     normalizeUsdPricing,
     planModelGatewayCatalogRefresh,
@@ -165,6 +171,7 @@ import {
     planCostBoundedCatalogProbes,
     applyModelGatewayCatalogRetention,
     isModelGatewayCatalogRefreshLocked,
+    resolveModelDeprecationAlias,
 } from '../../../../src/copilot/model-gateway/index.js';
 
 const PROVIDER_FAMILY_ENV_FIXTURES = Object.freeze([
@@ -583,8 +590,19 @@ describe('model-gateway foundation', () => {
             minimumConfidence: 'catalog',
             requireAgentProbeOk: false,
         });
+        const explanation = explainGatewayRouteDecision(route);
 
-        assert.deepEqual(explainGatewayRouteDecision(route), {
+        assert.deepEqual({
+            selected: explanation.selected,
+            selectedId: explanation.selectedId,
+            candidateCount: explanation.candidateCount,
+            rejectedCount: explanation.rejectedCount,
+            fallbackChain: explanation.fallbackChain,
+            rejectedReasonCounts: explanation.rejectedReasonCounts,
+            topRejectedReasons: explanation.topRejectedReasons,
+            nextActions: explanation.nextActions,
+            summary: explanation.summary,
+        }, {
             selected: false,
             selectedId: null,
             candidateCount: 0,
@@ -609,6 +627,18 @@ describe('model-gateway foundation', () => {
                 'refresh_catalog_or_run_probe_to_raise_confidence',
             ],
             summary: 'unselected:confidence_below_minimum:static_seed<catalog',
+        });
+        assert.equal(explanation.rejectedSummaries[0]?.['id'], 'openrouter:weak-chat');
+        assert.deepEqual(explanation.rejectedSummaries[0]?.['probes'], {
+            status: null,
+            verifiedProbes: [],
+            failedProbes: [],
+        });
+        assert.deepEqual(explanation.decisionLayers, {
+            catalogCandidateCount: 1,
+            eligibilityEvaluatedCount: 0,
+            healthRecordCount: 0,
+            runtimeProbeProofCount: 0,
         });
     });
 
@@ -840,6 +870,36 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(configured.selected?.model['providerModel'], 'gpt-needs-key');
         assert.equal(configured.selected?.eligibility?.['disposition'], 'eligible');
+    });
+
+    it('resolves account and workspace scoped env secrets before global refs', () => {
+        const workspaceKey = buildScopedSecretEnvKey({ scope: 'workspace', scopeId: 'workspace-alpha', ref: 'OPENAI_API_KEY' });
+        const accountKey = buildScopedSecretEnvKey({ scope: 'account', scopeId: 'acct-42', ref: 'OPENAI_API_KEY' });
+        const registry = createEnvSecretRegistry({
+            accountId: 'acct-42',
+            workspaceId: 'workspace-alpha',
+            env: {
+                OPENAI_API_KEY: 'global-key',
+                [workspaceKey]: 'workspace-key',
+                [accountKey]: 'account-key',
+            },
+        });
+
+        assert.equal(workspaceKey, 'COPILOT_BYOK_WORKSPACE_WORKSPACE_ALPHA__OPENAI_API_KEY');
+        assert.equal(accountKey, 'COPILOT_BYOK_ACCOUNT_ACCT_42__OPENAI_API_KEY');
+        assert.equal(registry.get('OPENAI_API_KEY'), 'account-key');
+        assert.deepEqual(
+            registry.candidateRefs('OPENAI_API_KEY').map((candidate) => candidate.scope),
+            ['account', 'workspace', 'global'],
+        );
+        assert.deepEqual(registry.describe('OPENAI_API_KEY'), {
+            ref: 'OPENAI_API_KEY',
+            configured: true,
+            source: 'env',
+            scope: 'account',
+            checkedEnvKeys: [accountKey, workspaceKey, 'OPENAI_API_KEY'],
+            safeLabel: 'OPENAI_API_KEY=<configured:account>',
+        });
     });
 
     it('imports current env BYOK without serializing secrets', () => {
@@ -4226,9 +4286,25 @@ describe('model-gateway foundation', () => {
             dataPolicy: { retainsPrompts: false },
             providerMetadata: { headquarters: 'US' },
         });
+        const routeOption = createModelRouteOption({
+            providerId: 'openrouter',
+            providerModel: 'x-ai/grok-build-0.1',
+            selectorKind: 'provider-explicit',
+            selectorSyntax: 'x-ai/grok-build-0.1:groq',
+            sourceId: 'openrouter-models',
+            sourceKind: 'public_api',
+            confidence: 'catalog',
+            normalizedPolicy: {
+                routeLayer: 'openai_compatible_aggregator',
+                openAICompatibleBaseUrl: 'https://openrouter.ai/api/v1',
+                wireApi: 'openai_chat_completions',
+            },
+            providerSpecific: { upstreamProvider: 'groq' },
+        });
         const entry = toOpenAIModelCatalogEntry(projection);
         const list = toOpenAIModelCatalogList([projection], {
             providerProjections: [providerProjection],
+            routeOptions: [routeOption],
             eligibilityDecisions: [
                 createModelEligibilityDecision({
                     providerId: 'openrouter',
@@ -4253,6 +4329,9 @@ describe('model-gateway foundation', () => {
         assert.equal(entry.x_model_gateway.provider_projection, null);
         assert.equal(list.data[0].x_model_gateway.provider_projection?.subject_provider_id, 'x-ai');
         assert.deepEqual(list.data[0].x_model_gateway.provider_projection?.data_policy, { retainsPrompts: false });
+        assert.equal(list.data[0].x_model_gateway.route_options?.[0]?.selector_kind, 'provider-explicit');
+        assert.equal(list.data[0].x_model_gateway.route_options?.[0]?.route_traits.openAICompatible, true);
+        assert.deepEqual(list.data[0].x_model_gateway.route_options?.[0]?.provider_specific, { upstreamProvider: 'groq' });
         assert.deepEqual(list.data[0].x_model_gateway.eligibility, {
             include: false,
             status: 'excluded',
@@ -4448,6 +4527,104 @@ describe('model-gateway foundation', () => {
                 openAICompatible: true,
                 autoSelection: true,
                 policyHints: ['provider_order', 'explicit_upstream_provider'],
+            },
+        );
+    });
+
+    it('normalizes runtime-agentic, pricing, rate, data-policy and alias taxonomies as metadata', () => {
+        assert.deepEqual(
+            normalizeRuntimeAgenticCapabilityTaxonomy({
+                supportedParameters: ['tools', 'tool_choice', 'parallel_tool_calls', 'response_format'],
+                capabilities: { structuredOutputs: true, reasoningEffort: true },
+                modalities: { input: ['text', 'image'], output: ['text'] },
+            }),
+            {
+                tools: true,
+                forcedToolChoice: true,
+                parallelToolCalls: true,
+                jsonMode: true,
+                structuredOutputs: true,
+                reasoning: true,
+                streaming: false,
+                webSearch: false,
+                codeExecution: false,
+                vision: true,
+                audio: false,
+                agenticLevel: 'parallel_tools',
+                capabilityFamilies: ['tools', 'reasoning', 'structured_outputs', 'vision'],
+            },
+        );
+        assert.deepEqual(
+            normalizeModelPricingTaxonomy({
+                currency: 'EUR',
+                inputPerToken: '0.000001',
+                outputPerMillion: 2,
+                request: 0.01,
+                exchangeRateToUsd: 1.1,
+            }),
+            {
+                currency: 'EUR',
+                tokenUnit: 'per_million_tokens',
+                requestUnit: 'per_request',
+                inputPerMillion: 1,
+                outputPerMillion: 2,
+                request: 0.01,
+                exchangeRateToUsd: 1.1,
+                usd: {
+                    inputPerMillionUsd: 1.1,
+                    outputPerMillionUsd: 2.2,
+                    requestUsd: 0.011,
+                },
+            },
+        );
+        assert.deepEqual(
+            normalizeRateLimitTaxonomy({
+                requestsPerMinute: 60,
+                tokensPerDay: 1_000_000,
+                maxConcurrentRequests: 8,
+                retryAfterSeconds: 30,
+            }),
+            {
+                requests: { perMinute: 60 },
+                tokens: { perDay: 1_000_000 },
+                concurrency: { maxConcurrentRequests: 8 },
+                retry: { retryAfterSeconds: 30 },
+            },
+        );
+        assert.deepEqual(
+            normalizeDataPolicyTaxonomy({
+                retainsPrompts: 'false',
+                training: 'false',
+                zeroDataRetention: true,
+                confidentialCompute: true,
+                dataResidency: 'EU',
+                compliance: ['SOC2', 'SOC2', 'HIPAA'],
+            }),
+            {
+                retainsPrompts: false,
+                trainsOnPrompts: false,
+                zeroDataRetention: true,
+                confidentialCompute: true,
+                dataResidency: 'EU',
+                compliance: ['SOC2', 'HIPAA'],
+            },
+        );
+        assert.deepEqual(
+            resolveModelDeprecationAlias({
+                providerModel: 'gpt-latest',
+                aliases: { aliasTarget: 'gpt-5.1' },
+                lifecycle: { status: 'deprecated', replacementModel: 'gpt-5.2', expiresAt: '2026-06-01T00:00:00.000Z' },
+            }),
+            {
+                providerModel: 'gpt-latest',
+                canonicalModel: 'gpt-5.1',
+                isAlias: true,
+                aliasTarget: 'gpt-5.1',
+                replacementModel: 'gpt-5.2',
+                deprecated: true,
+                retired: false,
+                expiresAt: '2026-06-01T00:00:00.000Z',
+                providerStatus: 'deprecated',
             },
         );
     });
@@ -4677,6 +4854,33 @@ describe('model-gateway foundation', () => {
         assert.equal(decision.policyInputs['accountAccess']['accessConfidence'], 'high');
         assert.equal(decision.policyInputs['accountAccess']['failureClass'], 'secret_configuration');
         assert.equal(JSON.stringify(decision).includes('OPENAI_API_KEY'), true);
+    });
+
+    it('integrates fatal runtime health classification into pre-runtime eligibility', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'openai',
+            providerModel: 'gpt-billing-blocked',
+            pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 4 },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'openai',
+            secretRef: 'OPENAI_API_KEY',
+            enabledModels: ['gpt-billing-blocked'],
+        });
+        const decision = evaluateModelGatewayEligibility({
+            projection,
+            accountOverlays: [overlay],
+            secretRegistry: createEnvSecretRegistry({ env: { OPENAI_API_KEY: 'sk-test' } }),
+            health: {
+                lastStatus: 'failed',
+                lastErrorContext: { code: 'insufficient_quota', message: 'billing required' },
+            },
+        });
+
+        assert.equal(decision.include, false);
+        assert.equal(decision.disposition, 'excluded');
+        assert.equal(decision.hardExclusions.includes('health_fatal'), true);
+        assert.equal(explainModelGatewayEligibilityDecision(decision).nextActions.includes('wait_or_clear_fatal_provider_health_after_fix'), true);
     });
 
     it('allows unknown account visibility only when policy permits a cheap runtime probe', () => {
@@ -5882,6 +6086,17 @@ describe('model-gateway foundation', () => {
             'schema',
             'streaming',
             'tool',
+        ]);
+        assert.deepEqual(byId.get('zai:catalog:openapi:GET:https://docs.z.ai/openapi.json')?.['richnessCategories'], [
+            'capabilities',
+            'limits',
+            'runtime',
+        ]);
+        assert.equal(byId.get('zai:catalog:openapi:GET:https://docs.z.ai/openapi.json')?.['richnessCoverage']?.['hasRuntime'], true);
+        assert.deepEqual(normalizeProviderEndpointRichness('pricing_context_features_rate_limits').categories, [
+            'capabilities',
+            'limits',
+            'pricing',
         ]);
         const cloudflareRuntime = records.find(
             (record) => record['providerId'] === 'cloudflare-workers-ai' && record['target'] === 'runtime' && record['kind'] === 'workers_ai_run',

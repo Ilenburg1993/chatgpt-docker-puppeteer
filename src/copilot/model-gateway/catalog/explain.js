@@ -232,6 +232,7 @@ export function explainModelGatewayCatalogEntry(snapshot, selector, options = {}
         openai: toOpenAIModelCatalogEntry(projection, {
             providerProjections: providerProjection ? [providerProjection] : [],
             eligibilityDecisions: eligibilityDecision ? [eligibilityDecision] : [],
+            routeOptions,
         }),
         routeOptions,
         accountOverlays,

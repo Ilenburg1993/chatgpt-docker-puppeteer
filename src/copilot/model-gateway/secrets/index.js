@@ -8,6 +8,8 @@
 export {
     DEFAULT_MODEL_GATEWAY_SECRET_ENV_KEYS,
     EnvSecretRegistry,
+    MODEL_GATEWAY_SECRET_SCOPE_PRECEDENCE,
+    buildScopedSecretEnvKey,
     createEnvSecretRegistry,
 } from './env-secret-registry.js';
 export {

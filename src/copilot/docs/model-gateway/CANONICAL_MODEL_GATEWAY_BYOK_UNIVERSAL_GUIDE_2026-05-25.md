@@ -1306,7 +1306,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Projetar modelos gateway para `ModelInfo`.
 - [x] Separar adapters de provider.
 - [x] Evitar preset logic espalhado no SDK.
-- [ ] Completar projeção OpenAI-first para todas as rotas novas.
+- [x] Completar projeção OpenAI-first para todas as rotas novas.
 
 ### Faixa C — Segredos
 
@@ -1315,7 +1315,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] `secretRef` em vez de valor.
 - [x] Testes de não serialização.
 - [x] `OPENCODE_API_KEY` incluído.
-- [ ] Policy de secrets por account/workspace.
+- [x] Policy de secrets por account/workspace.
 - [x] UX para secrets ausentes por provider.
 
 ### Faixa D — Provider Specs E Endpoints
@@ -1324,7 +1324,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Um arquivo por provider em `providers/endpoints`.
 - [x] Inventário central.
 - [x] Separação entre catalog sources e runtime endpoints.
-- [ ] Completar richness padronizado por endpoint.
+- [x] Completar richness padronizado por endpoint.
 - [x] Adicionar schema de endpoint source.
 - [x] Testar inventário contra importers existentes.
 
@@ -1349,7 +1349,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Agent health.
 - [x] Excluir falhas quando policy manda.
 - [x] Classificação de falhas BYOK.
-- [ ] Integrar health fatal à elegibilidade pré-runtime.
+- [x] Integrar health fatal à elegibilidade pré-runtime.
 - [x] Persistir health em SQLite.
 
 ### Faixa G — Policy Engine
@@ -1363,7 +1363,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Consumir route options diretamente.
 - [x] Avaliar eligibility on-demand a partir de projection + overlays quando
   `evaluateEligibility` estiver ativo.
-- [ ] Emitir explicação completa catalog + overlay + eligibility + probe.
+- [x] Emitir explicação completa catalog + overlay + eligibility + probe.
 
 ### Faixa H — Terminal
 
@@ -1456,11 +1456,11 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Model identity traits.
 - [x] Route policy traits.
 - [x] Provider/gateway traits normalizados como camada própria.
-- [ ] Capability taxonomy runtime-agentic.
-- [ ] Pricing multi-currency.
-- [ ] Rate limit taxonomy completa.
-- [ ] Data policy taxonomy.
-- [ ] Deprecation/alias resolver robusto.
+- [x] Capability taxonomy runtime-agentic.
+- [x] Pricing multi-currency.
+- [x] Rate limit taxonomy completa.
+- [x] Data policy taxonomy.
+- [x] Deprecation/alias resolver robusto.
 
 ### Faixa N — Route Options E Seleção Por Metadados
 
@@ -3243,6 +3243,80 @@ Validação deste corte:
 
 - [x] PASS `npm run model-gateway:test:contracts` com `120` testes.
 - [x] PASS `npm run model-gateway:test:terminal` com `58` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 52. Continuidade 2026-05-26 — Fechamento B/C/D/F/G/M Pré-Runtime
+
+Auditoria executada neste corte:
+
+- [x] Revisitadas as faixas B, C, D, F, G e M após os cortes de route options,
+  provider traits, matrix de probes, tombstones e raw payload policy.
+- [x] Confirmado que a projeção OpenAI-first precisava carregar rotas
+  candidatas completas em `x_model_gateway`, sem alterar o SDK vanilla.
+- [x] Confirmado que secrets precisavam de precedência account/workspace/global
+  antes de runtime, sem serializar valores.
+- [x] Confirmado que endpoint richness precisava deixar de ser apenas string
+  livre e virar taxonomia consumível por coverage, importers e planejamento.
+- [x] Confirmado que fatal health já existia conceitualmente, mas precisava
+  classificar contextos estruturados de erro antes de liberar runtime.
+- [x] Confirmado que a Faixa M precisava separar capability runtime-agentic,
+  pricing multi-currency, rate limits, data policy e alias/deprecation resolver.
+
+Implementado neste corte:
+
+- [x] `toOpenAIModelCatalogEntry()` e `toOpenAIModelCatalogList()` passam a
+  aceitar `routeOptions`.
+- [x] `x_model_gateway.route_options` passa a expor seletor, sintaxe,
+  policy normalizada, route traits e metadados provider-specific sanitizados.
+- [x] JSON store, SQLite store, refresh, explain e terminal passam route options
+  para a projeção OpenAI-first.
+- [x] O terminal `/byok gateway catalog openai` mostra contagem de rotas por
+  modelo exportado.
+- [x] Criado `MODEL_GATEWAY_ENDPOINT_RICHNESS_CATEGORIES`.
+- [x] Criado `normalizeProviderEndpointRichness()`.
+- [x] Endpoint source records passam a expor `richnessCategories` e
+  `richnessCoverage`.
+- [x] `EnvSecretRegistry` passa a resolver secrets por precedência account,
+  workspace e global.
+- [x] Criado `buildScopedSecretEnvKey()` para chaves como
+  `COPILOT_BYOK_ACCOUNT_ACCT_42__OPENAI_API_KEY`.
+- [x] `describe()` passa a expor labels seguros, escopo resolvido e env keys
+  checadas sem retornar valor de segredo.
+- [x] A elegibilidade fatal health passa a ler contextos estruturados de erro,
+  como `{ code, message }`, e não apenas strings.
+- [x] `explainGatewayRouteDecision()` passa a emitir summaries de candidatos,
+  rejeições, eligibility, overlay refs, health/probes e decision layers.
+- [x] Criado `normalizeRuntimeAgenticCapabilityTaxonomy()`.
+- [x] Criado `normalizeModelPricingTaxonomy()` com multi-currency e conversão
+  opcional para USD.
+- [x] Criado `normalizeRateLimitTaxonomy()`.
+- [x] Criado `normalizeDataPolicyTaxonomy()`.
+- [x] Criado `resolveModelDeprecationAlias()`.
+- [x] Exportado tudo pelos barrels canônicos `catalog`, `providers`, `secrets`
+  e `model-gateway`.
+- [x] Adicionados testes unitários cobrindo OpenAI route options, endpoint
+  richness, secret scope policy, fatal health estruturado, route explanation e
+  novas taxonomias M.
+
+Separação preservada:
+
+- [x] A projeção OpenAI-first continua sendo export/compatibilidade, não SDK
+  fork.
+- [x] Route options em `x_model_gateway` são metadados sanitizados, não segredo.
+- [x] Endpoint richness é metadado estático de inventário.
+- [x] Secret scope policy resolve presença/precedência, sem persistir valores.
+- [x] Fatal health só decide elegibilidade pré-runtime; não executa provider.
+- [x] Taxonomias M não provam acesso nem capability executada.
+- [x] Runtime probes continuam fase posterior e separada.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `126` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `59` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.

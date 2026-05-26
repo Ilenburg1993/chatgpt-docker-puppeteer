@@ -278,6 +278,7 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
         openai: toOpenAIModelCatalogList(projections, {
             providerProjections,
             eligibilityDecisions: previous.modelEligibilityDecisions,
+            routeOptions: snapshot['routeOptions'],
         }),
         overlayRefresh: {
             enabled: input.refreshAccountOverlays === true,

@@ -24,6 +24,14 @@ function isRecord(value) {
 
 /**
  * @param {unknown} value
+ * @returns {string | null}
+ */
+function optionalString(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * @param {unknown} value
  * @returns {number | null}
  */
 function unixSeconds(value) {
@@ -129,7 +137,7 @@ function findProviderProjection(projection, providerProjections) {
 function findEligibilityDecision(projection, eligibilityDecisions) {
     const providerId = typeof projection['providerId'] === 'string' ? projection['providerId'] : null;
     const providerModel = typeof projection['providerModel'] === 'string' ? projection['providerModel'] : null;
-    const routeProfile = typeof projection['routeProfile'] === 'string' && projection['routeProfile'] ? projection['routeProfile'] : null;
+    const routeProfile = optionalString(projection['routeProfile']);
     if (!providerId || !providerModel) return null;
     return (
         eligibilityDecisions.find(
@@ -162,12 +170,52 @@ function buildEligibilityExtension(decision) {
 
 /**
  * @param {Record<string, any>} projection
- * @param {{ providerProjections?: Record<string, any>[]; eligibilityDecisions?: Record<string, any>[] }} [options]
+ * @param {Record<string, any>[]} routeOptions
+ * @returns {Record<string, any>[]}
+ */
+function findRouteOptions(projection, routeOptions) {
+    const providerId = optionalString(projection['providerId']);
+    const providerModel = optionalString(projection['providerModel']);
+    const routeProfile = optionalString(projection['routeProfile']);
+    if (!providerId || !providerModel) return [];
+    return routeOptions.filter(
+        (route) =>
+            optionalString(route['providerId']) === providerId &&
+            optionalString(route['providerModel']) === providerModel &&
+            optionalString(route['routeProfile']) === routeProfile,
+    );
+}
+
+/**
+ * @param {Record<string, any>} route
+ * @returns {Record<string, unknown>}
+ */
+function buildRouteOptionExtension(route) {
+    const normalizedPolicy = isRecord(route['normalizedPolicy']) ? route['normalizedPolicy'] : {};
+    return {
+        provider_id: route['providerId'] ?? null,
+        provider_model: route['providerModel'] ?? null,
+        route_profile: route['routeProfile'] ?? null,
+        selector_kind: route['selectorKind'] ?? null,
+        selector_syntax: route['selectorSyntax'] ?? null,
+        source_id: route['sourceId'] ?? null,
+        source_kind: route['sourceKind'] ?? null,
+        confidence: route['confidence'] ?? null,
+        normalized_policy: normalizedPolicy,
+        route_traits: isRecord(normalizedPolicy['routeTraits']) ? normalizedPolicy['routeTraits'] : {},
+        provider_specific: isRecord(route['providerSpecific']) ? route['providerSpecific'] : {},
+    };
+}
+
+/**
+ * @param {Record<string, any>} projection
+ * @param {{ providerProjections?: Record<string, any>[]; eligibilityDecisions?: Record<string, any>[]; routeOptions?: Record<string, any>[] }} [options]
  * @returns {Record<string, unknown>}
  */
 function buildGatewayExtension(projection, options = {}) {
     const providerProjection = findProviderProjection(projection, options.providerProjections ?? []);
     const eligibility = findEligibilityDecision(projection, options.eligibilityDecisions ?? []);
+    const routeOptions = findRouteOptions(projection, options.routeOptions ?? []);
     return {
         schema_version: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
         gateway_id: `${projection['providerId'] ?? 'unknown'}:${projection['providerModel'] ?? projection['id'] ?? 'unknown'}`,
@@ -190,6 +238,7 @@ function buildGatewayExtension(projection, options = {}) {
         license: projection['license'] ?? null,
         provider_metadata: projection['providerMetadata'] ?? {},
         provider_projection: buildProviderProjectionExtension(providerProjection),
+        route_options: routeOptions.map(buildRouteOptionExtension),
         eligibility: buildEligibilityExtension(eligibility),
         routing_hints: projection['routingHints'] ?? {},
         account_overlay_refs: projection['accountOverlayRefs'] ?? [],
@@ -200,7 +249,7 @@ function buildGatewayExtension(projection, options = {}) {
 
 /**
  * @param {Record<string, any>} projection
- * @param {{ providerProjections?: Record<string, any>[]; eligibilityDecisions?: Record<string, any>[] }} [options]
+ * @param {{ providerProjections?: Record<string, any>[]; eligibilityDecisions?: Record<string, any>[]; routeOptions?: Record<string, any>[] }} [options]
  * @returns {{ id: string; object: 'model'; created: number | null; owned_by: string; x_model_gateway: Record<string, unknown> }}
  */
 export function toOpenAIModelCatalogEntry(projection, options = {}) {
@@ -216,7 +265,7 @@ export function toOpenAIModelCatalogEntry(projection, options = {}) {
 
 /**
  * @param {Record<string, any>[]} projections
- * @param {{ providerProjections?: Record<string, any>[]; eligibilityDecisions?: Record<string, any>[] }} [options]
+ * @param {{ providerProjections?: Record<string, any>[]; eligibilityDecisions?: Record<string, any>[]; routeOptions?: Record<string, any>[] }} [options]
  * @returns {{ object: 'list'; data: ReturnType<typeof toOpenAIModelCatalogEntry>[] }}
  */
 export function toOpenAIModelCatalogList(projections, options = {}) {
