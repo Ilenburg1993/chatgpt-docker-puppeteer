@@ -188,6 +188,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Inspect account overlays without exposing secrets.',
     },
     {
+        id: 'terminal.accounts',
+        phase: 'pre-runtime',
+        surface: 'terminal',
+        command: '/byok gateway accounts',
+        summary: 'Inspect account/key limit status from overlays before runtime.',
+    },
+    {
         id: 'terminal.eligibility',
         phase: 'pre-runtime',
         surface: 'terminal',

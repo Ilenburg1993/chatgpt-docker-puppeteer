@@ -173,6 +173,7 @@ import {
     searchModelGatewayCatalogEntries,
     summarizeModelGatewayCatalogSnapshot,
     summarizeCanonicalModelProjectionDiff,
+    summarizeModelGatewayAccountOverlays,
     summarizeModelGatewayMetadataCoverage,
     summarizeModelGatewayProviderFreshness,
     summarizeModelGatewayProviderEnvRequirements,
@@ -5214,6 +5215,34 @@ describe('model-gateway foundation', () => {
         assert.equal(rateLimitedDecision.include, false);
         assert.ok(rateLimitedDecision.hardExclusions.includes('account_rate_limited'));
         assert.equal(rateLimitedDecision.policyInputs['accountAccess']['status'], 'rate_limited');
+    });
+
+    it('summarizes account/key overlays for operator pre-runtime visibility', () => {
+        const summary = summarizeModelGatewayAccountOverlays([
+            createProviderAccountOverlay({
+                providerId: 'openrouter',
+                accountScope: 'default',
+                secretRef: 'OPENROUTER_API_KEY',
+                enabledModels: ['a', 'b'],
+                rateLimits: { remainingRequests: 0, resetAt: '2026-05-25T00:05:00.000Z' },
+            }),
+            createProviderAccountOverlay({
+                providerId: 'groq',
+                accountScope: 'org',
+                secretRef: 'GROQ_API_KEY',
+                spendingLimits: { remainingUsd: 12 },
+            }),
+        ], {
+            now: '2026-05-25T00:00:00.000Z',
+        });
+
+        assert.equal(summary.summary.total, 2);
+        assert.equal(summary.summary.providers, 2);
+        assert.equal(summary.summary.statusCounts['rate_limited'], 1);
+        assert.equal(summary.summary.statusCounts['ok'], 1);
+        assert.equal(summary.rows[0].enabledModelCount, 2);
+        assert.equal(summary.rows[0].limitStatus, 'rate_limited');
+        assert.equal(summary.rows[0].resetAt, '2026-05-25T00:05:00.000Z');
     });
 
     it('evaluates hard pre-runtime exclusions from secrets, account overlays and access visibility', () => {

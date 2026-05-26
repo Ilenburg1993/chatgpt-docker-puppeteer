@@ -1378,6 +1378,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] `/byok gateway catalog search`.
 - [x] `/byok gateway catalog explain <model>`.
 - [x] `/byok gateway overlays`.
+- [x] `/byok gateway accounts`.
 - [x] `/byok gateway eligibility`.
 - [x] `/byok gateway routes`.
 - [x] Export OpenAI schema por comando.
@@ -3836,6 +3837,9 @@ Implementado neste corte:
   contadores/histórico.
 - [x] Terminal `/byok health` passa a mostrar kind/status/retry/reset quando
   houver falha dinâmica.
+- [x] Criado `/byok gateway accounts [filtro] [n]` para mostrar status
+  account/key normalizado a partir dos overlays.
+- [x] Criado `summarizeModelGatewayAccountOverlays()` para UX/LLM sem runtime.
 - [x] Probes e turnos vivos passam a gravar os campos estruturados de limite no
   health.
 - [x] Health fatal em eligibility deixa de bloquear rate limit após
@@ -3858,8 +3862,8 @@ Próximas lacunas reforçadas:
 - [ ] Criar importers account/key de limites para Groq, Anthropic e Gemini
   quando houver endpoint autenticado documentado ou API administrativa
   apropriada.
-- [ ] Criar UX agregada `/byok gateway accounts` para mostrar overlays,
-  limits, health volátil e eligibility por conta/key.
+- [x] Criar UX agregada `/byok gateway accounts` para mostrar overlays e
+  limits account/key sem runtime.
 - [ ] Persistir snapshots separados de `account_quota_snapshots`,
   `account_rate_limit_snapshots` e `account_spending_snapshots` no SQLite quando
   a camada multi-account avançar.
@@ -3870,10 +3874,10 @@ Próximas lacunas reforçadas:
 
 Validação deste corte:
 
-- [x] PASS `npm run model-gateway:test:contracts` com `136` testes.
+- [x] PASS `npm run model-gateway:test:contracts` com `137` testes.
 - [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_provider_failure.spec.js tests/unit/copilot/model-gateway/test_model_gateway_provider_health.spec.js`
   com `9` testes.
-- [x] PASS `npm run model-gateway:test:terminal` com `60` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `61` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.

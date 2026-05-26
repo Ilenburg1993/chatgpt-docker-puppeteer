@@ -62,6 +62,7 @@ import {
     runConfiguredByokVisionProbe,
     searchModelGatewayCatalogEntries,
     SqliteModelGatewayCatalogStore,
+    summarizeModelGatewayAccountOverlays,
     summarizeModelGatewayProviderEnvRequirements,
     summarizeProviderWireProbeMatrix,
     summarizeCanonicalModelProjectionDiff,
@@ -1649,7 +1650,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -2489,6 +2490,51 @@ async function renderByokGatewayOverlays(println, rest) {
 
 /**
  * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayAccounts(println, rest) {
+    const args = parseGatewayCatalogListArgs(rest);
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const snapshot = await store.readSnapshot();
+    const accountSummary = summarizeModelGatewayAccountOverlays(Array.isArray(snapshot.accountOverlays) ? snapshot.accountOverlays : [], {
+        selector: args.selector,
+    });
+    const statusCounts = Object.entries(accountSummary.summary.statusCounts)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([status, count]) => `${status}:${count}`)
+        .join(',');
+    println(`\n  \x1b[36mBYOK model-gateway accounts/keys\x1b[0m`);
+    println(
+        `  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · overlays=${accountSummary.summary.matched}/${accountSummary.summary.total} · providers=${accountSummary.summary.providers} · status=${statusCounts || '-'}\x1b[0m\n`,
+    );
+    if (accountSummary.rows.length === 0) {
+        println('    \x1b[33mNenhuma conta/key overlay encontrada para o filtro informado.\x1b[0m\n');
+        return;
+    }
+    for (const row of accountSummary.rows.slice(0, args.limit)) {
+        const retry = row.resetAt ? `reset=${row.resetAt}` : row.retryAfterSeconds ? `retry=${row.retryAfterSeconds}s` : 'reset=-';
+        const remaining = [
+            row.remainingUsd !== null ? `remainingUsd=${row.remainingUsd}` : null,
+            row.remainingCreditsUsd !== null ? `creditsUsd=${row.remainingCreditsUsd}` : null,
+        ]
+            .filter(Boolean)
+            .join(' · ');
+        println(
+            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mscope=${row.accountScope} · secretRef=${row.secretRef ?? '-'} · status=${row.limitStatus} · ${retry}\x1b[0m`,
+        );
+        println(
+            `      \x1b[90msource=${row.sourceId ?? '-'} · kind=${row.sourceKind} · confidence=${row.confidence} · enabled=${row.enabledModelCount} · blocked=${row.blockedModelCount} · ${remaining || 'remaining=-'}\x1b[0m`,
+        );
+    }
+    if (accountSummary.rows.length > args.limit) {
+        println(`\n  \x1b[90mexibindo ${args.limit}/${accountSummary.rows.length}; use filtro ou limite numerico.\x1b[0m`);
+    }
+    println('  \x1b[90mEsta visão é account/key-scoped e não executa modelo; runtime health continua em /byok health.\x1b[0m\n');
+}
+
+/**
+ * @param {(text: string) => void} println
  * @returns {Promise<void>}
  */
 async function renderByokGatewayCatalogConflicts(println) {
@@ -3174,7 +3220,11 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayRoutes(println, rest.slice(1));
             return;
         }
-        if (/^(overlays|overlay|accounts|account|contas)$/iu.test(rest[0] ?? '')) {
+        if (/^(accounts|account|contas|keys|key|account-keys|account-limits)$/iu.test(rest[0] ?? '')) {
+            await renderByokGatewayAccounts(println, rest.slice(1));
+            return;
+        }
+        if (/^(overlays|overlay)$/iu.test(rest[0] ?? '')) {
             await renderByokGatewayOverlays(println, rest.slice(1));
             return;
         }

@@ -16,6 +16,7 @@ export {
     MODEL_GATEWAY_ACCOUNT_LIMIT_STATUS,
     normalizeModelGatewayAccountLimitState,
     resolveModelGatewayAccountAccess,
+    summarizeModelGatewayAccountOverlays,
 } from './account-access/index.js';
 
 export {

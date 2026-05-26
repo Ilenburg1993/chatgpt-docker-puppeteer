@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayProviderEnvRequirements, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayProviderEnvRequirements, summarizeProviderWireProbeMatrix, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayProviderEnvRequirements, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeProviderWireProbeMatrix, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -50,6 +50,35 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             missingCount: 1,
             missingRequiredKeyCounts: { KILO_API_KEY: 1, KILO_CODE_API_KEY: 1 },
             missingRecommendedKeyCounts: {},
+        })),
+        summarizeModelGatewayAccountOverlays: vi.fn(() => ({
+            rows: [
+                {
+                    accountOverlayId: 'openrouter:default:OPENROUTER_API_KEY',
+                    providerId: 'openrouter',
+                    accountScope: 'default',
+                    secretRef: 'OPENROUTER_API_KEY',
+                    sourceId: 'openrouter-key-account',
+                    sourceKind: 'authenticated_account_api',
+                    confidence: 'authenticated_catalog',
+                    enabledModelCount: 2,
+                    blockedModelCount: 0,
+                    observedAt: '2026-05-25T00:00:00.000Z',
+                    expiresAt: null,
+                    limitStatus: 'rate_limited',
+                    retryAfterSeconds: 60,
+                    resetAt: '2026-05-25T00:01:00.000Z',
+                    remainingUsd: 12,
+                    remainingCreditsUsd: 12,
+                },
+            ],
+            summary: {
+                total: 1,
+                visible: 1,
+                matched: 1,
+                providers: 1,
+                statusCounts: { rate_limited: 1 },
+            },
         })),
         buildModelGatewayPreKCompatibilityReport: vi.fn(() => ({
             stage: 'pre-k',
@@ -488,6 +517,7 @@ vi.mock('#copilot/model-gateway', () => ({
     runConfiguredByokJsonProbe: runConfiguredByokJsonProbe,
     runConfiguredByokStreamingProbe: runConfiguredByokStreamingProbe,
     runConfiguredByokVisionProbe: runConfiguredByokVisionProbe,
+    summarizeModelGatewayAccountOverlays,
     summarizeModelGatewayProviderEnvRequirements,
     summarizeCanonicalModelProjectionDiff,
     summarizeProviderWireProbeMatrix,
@@ -1732,6 +1762,23 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('universal_catalog_contracts_are_exported');
         expect(ctx.output()).toContain('provider_gateway_traits_are_metadata');
         expect(ctx.output()).toContain('canonical_commands_are_published');
+    });
+
+    it('mostra contas e limites account/key do model-gateway sem executar runtime', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway accounts openrouter');
+
+        expect(summarizeModelGatewayAccountOverlays).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ selector: 'openrouter' }),
+        );
+        expect(ctx.output()).toContain('BYOK model-gateway accounts/keys');
+        expect(ctx.output()).toContain('status=rate_limited');
+        expect(ctx.output()).toContain('secretRef=OPENROUTER_API_KEY');
+        expect(ctx.output()).toContain('reset=2026-05-25T00:01:00.000Z');
+        expect(ctx.output()).toContain('runtime health continua em /byok health');
     });
 
     it('mostra comandos canônicos do model-gateway para package, make e terminal', async () => {
