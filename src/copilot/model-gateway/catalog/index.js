@@ -17,7 +17,12 @@ export {
     createProviderMetadataEvidence,
 } from './contracts.js';
 export { createDefaultModelGatewayCatalogImporters } from './default-importers.js';
-export { projectModelGatewayMetadataCoverageMetrics, summarizeModelGatewayMetadataCoverage } from './coverage.js';
+export {
+    projectModelGatewayMetadataCoverageMetrics,
+    projectModelGatewayProviderFreshnessMetrics,
+    summarizeModelGatewayMetadataCoverage,
+    summarizeModelGatewayProviderFreshness,
+} from './coverage.js';
 export { explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry } from './explain.js';
 export {
     createCatalogImportRun,

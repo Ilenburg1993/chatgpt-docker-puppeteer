@@ -1389,7 +1389,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Eventos de conflict.
 - [x] Evento `model_gateway:eligibility:evaluated`.
 - [x] Métricas de coverage.
-- [ ] Métricas de provider freshness.
+- [x] Métricas de provider freshness.
 - [x] Métricas agregadas de eligible/unknown/excluded.
 - [ ] Métricas por exclusion reason.
 
@@ -1547,7 +1547,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Enabled/blocked models.
 - [x] Quota/rate/spending normalizers.
 - [x] Resolver de acesso por provider.
-- [ ] Account overlay refresh separado.
+- [x] Account overlay refresh separado.
 - [x] Access confidence.
 - [x] Access expiration.
 - [x] Access failure classification.
@@ -2806,4 +2806,45 @@ Validação deste corte:
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em refresh, refresh lock, terminal BYOK, barrels e
   contratos unitários.
+- [x] PASS `git diff --check`.
+
+---
+
+## 45. Continuidade 2026-05-26 — Provider Freshness Metrics
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que a Faixa O ficou completa.
+- [x] Confirmado que `Account overlay refresh separado` da Faixa S foi
+  resolvido pelo corte de `refreshAccountOverlays`.
+- [x] Confirmado que `Métricas de provider freshness` permanecia aberto na
+  Faixa I.
+- [x] Confirmado que freshness é derivável de `sources` e `ttlSeconds`, sem
+  rede e sem runtime.
+
+Implementado neste corte:
+
+- [x] Criado `summarizeModelGatewayProviderFreshness()`.
+- [x] Criado `projectModelGatewayProviderFreshnessMetrics()`.
+- [x] Freshness agrega source count, TTL known count e expired source count.
+- [x] Freshness por provider expõe newest, oldest e average age em segundos.
+- [x] Métricas globais usam prefixo `model_gateway.catalog.freshness`.
+- [x] Métricas por provider usam prefixo
+  `model_gateway.catalog.freshness.provider.<provider>`.
+- [x] Exportado pelos barrels de `catalog` e `model-gateway`.
+- [x] Adicionado teste unitário de freshness multi-provider.
+
+Separação preservada:
+
+- [x] Freshness usa apenas metadados de source.
+- [x] Freshness não altera snapshot.
+- [x] Freshness não chama provider.
+- [x] Freshness não executa probes/runtime.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `116` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em coverage, barrels e contrato unitário.
 - [x] PASS `git diff --check`.

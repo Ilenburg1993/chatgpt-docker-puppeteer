@@ -50,6 +50,7 @@ import {
     projectCatalogRefreshCompletedMetrics,
     projectEligibilityEvaluatedMetrics,
     projectModelGatewayMetadataCoverageMetrics,
+    projectModelGatewayProviderFreshnessMetrics,
     redactSecretRecord,
     redactSecretText,
     recordByokProviderModelAgentProbeSuccess,
@@ -144,6 +145,7 @@ import {
     summarizeModelGatewayCatalogSnapshot,
     summarizeCanonicalModelProjectionDiff,
     summarizeModelGatewayMetadataCoverage,
+    summarizeModelGatewayProviderFreshness,
     toOpenAIModelCatalogEntry,
     toOpenAIModelCatalogList,
     toCopilotModelInfoList,
@@ -1632,6 +1634,46 @@ describe('model-gateway foundation', () => {
         assert.equal(summary.dataPolicyKnownModelCount, 1);
         assert.equal(metrics.gauges['model_gateway.catalog.coverage.provider.openrouter.route_options'], 1);
         assert.equal(metrics.gauges['model_gateway.catalog.coverage.route_ratio'], 1);
+    });
+
+    it('projects provider freshness metrics from catalog sources before runtime', () => {
+        const summary = summarizeModelGatewayProviderFreshness(
+            {
+                sources: [
+                    {
+                        id: 'openrouter-models',
+                        providerId: 'openrouter',
+                        kind: 'public_api',
+                        ttlSeconds: 3600,
+                        updatedAt: '2026-05-25T11:45:00.000Z',
+                    },
+                    {
+                        id: 'openrouter-pricing',
+                        providerId: 'openrouter',
+                        kind: 'docs_seed',
+                        ttlSeconds: 3600,
+                        updatedAt: '2026-05-25T10:00:00.000Z',
+                    },
+                    {
+                        id: 'kilo-models',
+                        providerId: 'kilo',
+                        kind: 'gateway',
+                        updatedAt: '2026-05-25T11:00:00.000Z',
+                    },
+                ],
+            },
+            { now: new Date('2026-05-25T12:00:00.000Z') },
+        );
+        const metrics = projectModelGatewayProviderFreshnessMetrics(summary);
+
+        assert.equal(summary.providerCount, 2);
+        assert.equal(summary.sourceCount, 3);
+        assert.equal(summary.expiredSourceCount, 1);
+        assert.equal(summary.providers.find((provider) => provider.providerId === 'openrouter')?.oldestAgeSeconds, 7200);
+        assert.equal(metrics.gauges['model_gateway.catalog.freshness.sources.expired'], 1);
+        assert.equal(metrics.gauges['model_gateway.catalog.freshness.provider.openrouter.sources'], 2);
+        assert.equal(metrics.gauges['model_gateway.catalog.freshness.provider.openrouter.age_seconds.newest'], 900);
+        assert.equal(metrics.gauges['model_gateway.catalog.freshness.provider.kilo.sources.ttl_known'], 0);
     });
 
     it('creates stable catalog snapshot ids independent from array order and generated time', () => {

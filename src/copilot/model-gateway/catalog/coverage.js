@@ -67,6 +67,36 @@ function countRows(rows, predicate) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function dateMs(value) {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value.getTime();
+    if (typeof value !== 'string' || !value.trim()) return null;
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function positiveNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/**
+ * @param {Record<string, any>} source
+ * @param {Date} now
+ * @returns {number | null}
+ */
+function sourceAgeSeconds(source, now) {
+    const observedMs = dateMs(source['updatedAt']) ?? dateMs(source['createdAt']);
+    if (observedMs === null) return null;
+    return Math.max(0, Math.floor((now.getTime() - observedMs) / 1000));
+}
+
+/**
  * @param {Record<string, any>[]} rows
  * @returns {Set<string>}
  */
@@ -80,6 +110,76 @@ function providerSet(rows) {
  */
 function providerModelSet(rows) {
     return new Set(rows.map((row) => `${providerId(row)}:${providerModel(row)}`));
+}
+
+/**
+ * @param {Record<string, any>} snapshot
+ * @param {object} [options]
+ * @param {Date} [options.now]
+ * @returns {{
+ *   providerCount: number;
+ *   sourceCount: number;
+ *   expiredSourceCount: number;
+ *   ttlKnownSourceCount: number;
+ *   providers: Array<{ providerId: string; sourceCount: number; expiredSourceCount: number; ttlKnownSourceCount: number; newestAgeSeconds: number | null; oldestAgeSeconds: number | null; averageAgeSeconds: number | null }>;
+ * }}
+ */
+export function summarizeModelGatewayProviderFreshness(snapshot, options = {}) {
+    const now = options.now ?? new Date();
+    const sources = records(snapshot['sources']);
+    const providers = [...providerSet(sources)].sort();
+    const providerSummaries = providers.map((id) => {
+        const providerSources = sources.filter((source) => providerId(source) === id);
+        const ages = providerSources.map((source) => sourceAgeSeconds(source, now)).filter((age) => age !== null);
+        const expiredSourceCount = providerSources.filter((source) => {
+            const ttl = positiveNumber(source['ttlSeconds']);
+            const age = sourceAgeSeconds(source, now);
+            return ttl !== null && age !== null && age >= ttl;
+        }).length;
+        return {
+            providerId: id,
+            sourceCount: providerSources.length,
+            expiredSourceCount,
+            ttlKnownSourceCount: providerSources.filter((source) => positiveNumber(source['ttlSeconds']) !== null).length,
+            newestAgeSeconds: ages.length === 0 ? null : Math.min(...ages),
+            oldestAgeSeconds: ages.length === 0 ? null : Math.max(...ages),
+            averageAgeSeconds: ages.length === 0 ? null : Math.round(ages.reduce((sum, age) => sum + age, 0) / ages.length),
+        };
+    });
+    return {
+        providerCount: providers.length,
+        sourceCount: sources.length,
+        expiredSourceCount: providerSummaries.reduce((sum, provider) => sum + provider.expiredSourceCount, 0),
+        ttlKnownSourceCount: providerSummaries.reduce((sum, provider) => sum + provider.ttlKnownSourceCount, 0),
+        providers: providerSummaries,
+    };
+}
+
+/**
+ * @param {ReturnType<typeof summarizeModelGatewayProviderFreshness>} summary
+ * @returns {{ counters: Record<string, number>; gauges: Record<string, number> }}
+ */
+export function projectModelGatewayProviderFreshnessMetrics(summary) {
+    /** @type {Record<string, number>} */
+    const gauges = {
+        'model_gateway.catalog.freshness.providers': summary.providerCount,
+        'model_gateway.catalog.freshness.sources': summary.sourceCount,
+        'model_gateway.catalog.freshness.sources.expired': summary.expiredSourceCount,
+        'model_gateway.catalog.freshness.sources.ttl_known': summary.ttlKnownSourceCount,
+    };
+    for (const provider of summary.providers) {
+        const prefix = `model_gateway.catalog.freshness.provider.${provider.providerId}`;
+        gauges[`${prefix}.sources`] = provider.sourceCount;
+        gauges[`${prefix}.sources.expired`] = provider.expiredSourceCount;
+        gauges[`${prefix}.sources.ttl_known`] = provider.ttlKnownSourceCount;
+        if (provider.newestAgeSeconds !== null) gauges[`${prefix}.age_seconds.newest`] = provider.newestAgeSeconds;
+        if (provider.oldestAgeSeconds !== null) gauges[`${prefix}.age_seconds.oldest`] = provider.oldestAgeSeconds;
+        if (provider.averageAgeSeconds !== null) gauges[`${prefix}.age_seconds.average`] = provider.averageAgeSeconds;
+    }
+    return {
+        counters: { 'model_gateway.catalog.freshness.snapshot': 1 },
+        gauges,
+    };
 }
 
 /**
