@@ -116,6 +116,7 @@ export {
     normalizeUsdPricing,
     parseModelModalityExpression,
 } from './normalizers.js';
+export { planModelGatewayCatalogRefresh } from './refresh-plan.js';
 export { refreshModelGatewayCatalog } from './refresh.js';
 export {
     MODEL_GATEWAY_SQLITE_SCHEMA_SQL,

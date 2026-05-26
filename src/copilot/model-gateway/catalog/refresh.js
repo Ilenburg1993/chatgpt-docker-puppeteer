@@ -13,6 +13,7 @@ import { runCatalogImporters } from './importer-runner.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { mergeModelMetadataEvidence, mergeProviderMetadataEvidence } from './merge.js';
 import { toOpenAIModelCatalogList } from './openai-schema.js';
+import { planModelGatewayCatalogRefresh } from './refresh-plan.js';
 
 /**
  * @template {Record<string, any>} T
@@ -122,18 +123,31 @@ function buildProviderProjectionsFromEvidence(evidences) {
  * @param {unknown} [input.snapshot]
  * @param {{ readSnapshot(): Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>>; writeSnapshot(snapshot: object): Promise<void> }} [input.store]
  * @param {() => Date} [input.now]
+ * @param {boolean} [input.incremental]
+ * @param {boolean} [input.force]
+ * @param {string[]} [input.sourceIds]
  * @returns {Promise<{
  *     snapshot: ReturnType<typeof normalizeStoredCatalogSnapshot>;
  *     diff: ReturnType<typeof diffCanonicalModelProjections>;
  *     openai: ReturnType<typeof toOpenAIModelCatalogList>;
+ *     refreshPlan?: ReturnType<typeof planModelGatewayCatalogRefresh>;
  * }>}
  */
 export async function refreshModelGatewayCatalog(input = {}) {
     const now = input.now ?? (() => new Date());
     const startedAt = now();
     const previous = input.store ? await input.store.readSnapshot() : normalizeStoredCatalogSnapshot(input.snapshot);
+    const refreshPlan = input.incremental === true
+        ? planModelGatewayCatalogRefresh({
+            importers: input.importers ?? [],
+            sources: previous.sources,
+            now: () => startedAt,
+            force: input.force,
+            sourceIds: input.sourceIds,
+        })
+        : null;
     const imported = await runCatalogImporters({
-        importers: input.importers ?? [],
+        importers: refreshPlan?.selectedImporters ?? input.importers ?? [],
         now,
     });
     const refreshedSourceIds = new Set(imported.sources.map((source) => String(source['id'])));
@@ -182,7 +196,7 @@ export async function refreshModelGatewayCatalog(input = {}) {
         conflicts: [...providerConflicts, ...conflicts],
     };
     if (input.store) await input.store.writeSnapshot(snapshot);
-    return {
+    const output = {
         snapshot: normalizeStoredCatalogSnapshot(snapshot),
         diff,
         openai: toOpenAIModelCatalogList(projections, {
@@ -190,4 +204,6 @@ export async function refreshModelGatewayCatalog(input = {}) {
             eligibilityDecisions: previous.modelEligibilityDecisions,
         }),
     };
+    if (refreshPlan) return { ...output, refreshPlan };
+    return output;
 }

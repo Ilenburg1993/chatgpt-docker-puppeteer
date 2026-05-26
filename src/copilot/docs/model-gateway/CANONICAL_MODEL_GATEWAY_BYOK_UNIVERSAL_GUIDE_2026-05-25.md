@@ -1483,8 +1483,8 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Diff canonical projections.
 - [x] Probe recommendations.
 - [x] Store redacted.
-- [ ] TTL por source.
-- [ ] Refresh incremental.
+- [x] TTL por source.
+- [x] Refresh incremental.
 - [ ] Refresh overlay separado de refresh público.
 - [ ] Lock de refresh.
 - [ ] Retention policy.
@@ -2574,4 +2574,56 @@ Validação deste corte:
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em endpoint source records, catalog coverage,
   JSON catalog store, barrels e contrato unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 40. Continuidade 2026-05-26 — Refresh Incremental Por TTL De Source
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que sources já persistiam `refreshPolicy` e `ttlSeconds`.
+- [x] Confirmado que importers já declaram TTL em seus metadados.
+- [x] Confirmado que `refreshModelGatewayCatalog()` ainda executava todos os
+  importers sem etapa prévia de seleção.
+- [x] Confirmado que a lacuna pertence à Faixa O, sem relação direta com
+  probes/runtime.
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/catalog/refresh-plan.js`.
+- [x] Criado `planModelGatewayCatalogRefresh()` como planner puro,
+  storage-neutral e pre-runtime.
+- [x] O planner classifica importers em `selected` e `skipped`.
+- [x] Sources frescas por TTL recebem razão auditável `source_ttl_fresh`.
+- [x] Sources expiradas recebem razão auditável `source_ttl_expired`.
+- [x] Sources sem registro anterior recebem razão auditável `source_missing`.
+- [x] Refresh forçado recebe razão auditável `forced_refresh`.
+- [x] Filtro explícito por `sourceIds` recebe razão auditável
+  `source_not_requested`.
+- [x] `refreshModelGatewayCatalog({ incremental: true })` passa a executar
+  apenas os importers selecionados pelo planner.
+- [x] Refresh não incremental mantém o comportamento anterior e executa todos
+  os importers recebidos.
+- [x] O resultado do refresh incremental expõe `refreshPlan` para auditoria,
+  observabilidade e UX de terminal.
+- [x] Exportado pelos barrels de `catalog` e `model-gateway`.
+- [x] Adicionados testes de planejamento TTL e refresh incremental preservando
+  evidência fresca.
+
+Separação preservada:
+
+- [x] O planner não faz fetch.
+- [x] O planner não executa modelos.
+- [x] O planner não altera catálogo canônico.
+- [x] TTL governa somente coleta de metadados por source.
+- [x] Provas de runtime continuam fase posterior e separada.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `111` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em refresh planner, refresh, barrels e contrato
+  unitário.
 - [x] PASS `git diff --check`.

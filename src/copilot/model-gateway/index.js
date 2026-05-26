@@ -116,6 +116,7 @@ export {
     normalizeStoredCatalogSnapshot,
     normalizeUsdPricing,
     mirrorModelGatewayCatalogSnapshotToSqlite,
+    planModelGatewayCatalogRefresh,
     parseModelModalityExpression,
     projectModelGatewayMetadataCoverageMetrics,
     rankCatalogEvidenceConfidence,

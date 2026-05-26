@@ -127,6 +127,7 @@ import {
     normalizeOpenAICompatibleModelCapabilities,
     normalizeStoredCatalogSnapshot,
     normalizeUsdPricing,
+    planModelGatewayCatalogRefresh,
     rankCatalogEvidenceConfidence,
     recommendCatalogDiffProbes,
     evaluateModelGatewayCatalogEligibility,
@@ -4852,6 +4853,180 @@ describe('model-gateway foundation', () => {
             assert.equal(refreshRun?.status, 'completed');
             assert.deepEqual(refreshRun?.diff?.added, ['openrouter:new-model:default']);
             assert.deepEqual(refreshRun?.diff?.removed, ['openrouter:old-model:default']);
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('plans incremental catalog refreshes from source TTL before any fetch is attempted', () => {
+        const now = () => new Date('2026-05-25T12:00:00.000Z');
+        const importers = [
+            {
+                id: 'fresh-source',
+                providerId: 'openrouter',
+                sourceKind: 'public_api',
+                requiresAuth: false,
+                ttlSeconds: 3600,
+                fetchRaw: () => ({ data: [] }),
+                parseRows: () => [],
+                toEvidenceFacts: () => [],
+            },
+            {
+                id: 'stale-source',
+                providerId: 'kilo',
+                sourceKind: 'public_api',
+                requiresAuth: false,
+                ttlSeconds: 3600,
+                fetchRaw: () => ({ data: [] }),
+                parseRows: () => [],
+                toEvidenceFacts: () => [],
+            },
+        ];
+        const plan = planModelGatewayCatalogRefresh({
+            importers,
+            now,
+            sources: [
+                {
+                    ...createProviderCatalogSource({
+                        id: 'fresh-source',
+                        providerId: 'openrouter',
+                        kind: 'public_api',
+                        ttlSeconds: 3600,
+                    }),
+                    updatedAt: '2026-05-25T11:45:00.000Z',
+                },
+                {
+                    ...createProviderCatalogSource({
+                        id: 'stale-source',
+                        providerId: 'kilo',
+                        kind: 'public_api',
+                        ttlSeconds: 3600,
+                    }),
+                    updatedAt: '2026-05-25T10:00:00.000Z',
+                },
+            ],
+        });
+
+        assert.deepEqual(
+            plan.skipped.map((entry) => [entry.sourceId, entry.reason, entry.ageSeconds]),
+            [['fresh-source', 'source_ttl_fresh', 900]],
+        );
+        assert.deepEqual(
+            plan.selected.map((entry) => [entry.sourceId, entry.reason, entry.ageSeconds]),
+            [['stale-source', 'source_ttl_expired', 7200]],
+        );
+        assert.deepEqual(
+            plan.selectedImporters.map((importer) => importer.id),
+            ['stale-source'],
+        );
+    });
+
+    it('runs only expired sources during incremental catalog refresh while preserving fresh evidence', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-model-refresh-incremental-'));
+        try {
+            const calls = { fresh: 0, stale: 0 };
+            const filePath = join(dir, 'catalog.json');
+            const store = new JsonModelGatewayCatalogStore({ filePath });
+            await store.writeSnapshot({
+                source: 'previous',
+                sources: [
+                    {
+                        ...createProviderCatalogSource({
+                            id: 'fresh-source',
+                            providerId: 'openrouter',
+                            kind: 'public_api',
+                            ttlSeconds: 3600,
+                        }),
+                        updatedAt: '2026-05-25T11:45:00.000Z',
+                    },
+                    {
+                        ...createProviderCatalogSource({
+                            id: 'stale-source',
+                            providerId: 'kilo',
+                            kind: 'public_api',
+                            ttlSeconds: 3600,
+                        }),
+                        updatedAt: '2026-05-25T10:00:00.000Z',
+                    },
+                ],
+                evidences: [
+                    createModelMetadataEvidence({
+                        evidenceId: 'fresh-old-evidence',
+                        providerId: 'openrouter',
+                        providerModel: 'fresh-model',
+                        fieldPath: 'displayName',
+                        value: 'Fresh Model',
+                        sourceId: 'fresh-source',
+                        confidence: 'catalog',
+                    }),
+                    createModelMetadataEvidence({
+                        evidenceId: 'stale-old-evidence',
+                        providerId: 'kilo',
+                        providerModel: 'stale-old-model',
+                        fieldPath: 'displayName',
+                        value: 'Stale Old Model',
+                        sourceId: 'stale-source',
+                        confidence: 'catalog',
+                    }),
+                ],
+            });
+
+            const result = await refreshModelGatewayCatalog({
+                store,
+                incremental: true,
+                now: () => new Date('2026-05-25T12:00:00.000Z'),
+                importers: [
+                    {
+                        id: 'fresh-source',
+                        providerId: 'openrouter',
+                        sourceKind: 'public_api',
+                        requiresAuth: false,
+                        ttlSeconds: 3600,
+                        fetchRaw: () => {
+                            calls.fresh += 1;
+                            return { data: [{ id: 'should-not-fetch' }] };
+                        },
+                        parseRows: (raw) => /** @type {{ data: unknown[] }} */ (raw).data,
+                        toEvidenceFacts: () => [],
+                    },
+                    {
+                        id: 'stale-source',
+                        providerId: 'kilo',
+                        sourceKind: 'public_api',
+                        requiresAuth: false,
+                        ttlSeconds: 3600,
+                        fetchRaw: () => {
+                            calls.stale += 1;
+                            return { data: [{ id: 'stale-new-model', name: 'Stale New Model' }] };
+                        },
+                        parseRows: (raw) => /** @type {{ data: unknown[] }} */ (raw).data,
+                        toEvidenceFacts: (rows, context) =>
+                            rows.map((row) =>
+                                createModelMetadataEvidence({
+                                    evidenceId: 'stale-new-evidence',
+                                    providerId: 'kilo',
+                                    providerModel: /** @type {{ id: string }} */ (row).id,
+                                    fieldPath: 'displayName',
+                                    value: /** @type {{ name: string }} */ (row).name,
+                                    sourceId: /** @type {{ id: string }} */ (context.source).id,
+                                    confidence: 'catalog',
+                                    rawPayloadRef: context.rawPayloadRef,
+                                }),
+                            ),
+                    },
+                ],
+            });
+
+            assert.deepEqual(calls, { fresh: 0, stale: 1 });
+            assert.deepEqual(result.refreshPlan?.skipped.map((entry) => [entry.sourceId, entry.reason]), [
+                ['fresh-source', 'source_ttl_fresh'],
+            ]);
+            assert.deepEqual(result.refreshPlan?.selected.map((entry) => [entry.sourceId, entry.reason]), [
+                ['stale-source', 'source_ttl_expired'],
+            ]);
+            assert.equal(result.snapshot.projections.some((projection) => projection.providerModel === 'fresh-model'), true);
+            assert.equal(result.snapshot.projections.some((projection) => projection.providerModel === 'stale-old-model'), false);
+            assert.equal(result.snapshot.projections.some((projection) => projection.providerModel === 'stale-new-model'), true);
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
