@@ -15,6 +15,7 @@ import {
     buildCatalogRefreshEventBatch,
     buildCatalogRefreshStartedEvent,
     buildEligibilityEvaluatedEvent,
+    buildModelGatewayRouteCandidates,
     buildModelGatewayPreKCompatibilityReport,
     buildRouteDecisionEvent,
     buildProbeCompletedEvent,
@@ -403,6 +404,62 @@ function toGatewayRouteCandidate(model) {
             profile: metaRecord['profile'] ?? null,
         },
     };
+}
+
+/**
+ * @param {Record<string, any>} candidate
+ * @returns {string}
+ */
+function gatewayRouteCandidateModelKey(candidate) {
+    return [
+        optionalScalarString(candidate['providerId']) ?? 'unknown-provider',
+        optionalScalarString(candidate['providerModel']) ?? 'unknown-model',
+    ].join(':');
+}
+
+/**
+ * @param {Record<string, any>[]} candidates
+ * @param {Record<string, any> | null} catalogSnapshot
+ * @returns {Record<string, any>[]}
+ */
+function enrichGatewayRouteCandidatesWithRouteOptions(candidates, catalogSnapshot) {
+    if (!catalogSnapshot) return candidates;
+    const routeCandidates = buildModelGatewayRouteCandidates({
+        projections: Array.isArray(catalogSnapshot['projections']) ? catalogSnapshot['projections'] : [],
+        routeOptions: Array.isArray(catalogSnapshot['routeOptions']) ? catalogSnapshot['routeOptions'] : [],
+        includeProjectionOnly: false,
+    });
+    if (routeCandidates.length === 0) return candidates;
+    const routeCandidatesByModel = new Map();
+    for (const routeCandidate of routeCandidates) {
+        const key = gatewayRouteCandidateModelKey(routeCandidate);
+        const existing = routeCandidatesByModel.get(key) ?? [];
+        existing.push(routeCandidate);
+        routeCandidatesByModel.set(key, existing);
+    }
+    return candidates.flatMap((candidate) => {
+        const matches = routeCandidatesByModel.get(gatewayRouteCandidateModelKey(candidate)) ?? [];
+        if (matches.length === 0) return [candidate];
+        return matches.map(/** @param {Record<string, any>} routeCandidate */ (routeCandidate) => ({
+            ...candidate,
+            routeProfile: routeCandidate['routeProfile'],
+            selectorKind: routeCandidate['selectorKind'],
+            selectorSyntax: routeCandidate['selectorSyntax'],
+            routeOptionRef: routeCandidate['routeOptionRef'],
+            routeOptionRefs: routeCandidate['routeOptionRefs'],
+            normalizedPolicy: routeCandidate['normalizedPolicy'],
+            routeTraits: routeCandidate['routeTraits'],
+            routing: {
+                ...(asRecord(candidate['routing'])),
+                ...(asRecord(routeCandidate['routing'])),
+            },
+            provenance: {
+                ...(asRecord(candidate['provenance'])),
+                ...(asRecord(routeCandidate['provenance'])),
+                candidateSource: 'terminal_catalog_route_option',
+            },
+        }));
+    });
 }
 
 /**
@@ -915,7 +972,7 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
     const modelList = rankByokModels(discovered.models.length > 0 ? discovered.models : projection.models).filter((model) =>
         matchesRecommendFilters(model, filters, runtimeBudget),
     );
-    const candidates = modelList.map(toGatewayRouteCandidate);
+    const candidates = enrichGatewayRouteCandidatesWithRouteOptions(modelList.map(toGatewayRouteCandidate), catalogSnapshot);
     const filterLabel = renderByokFilterLabel(filters);
 
     println(`\n  \x1b[36mBYOK model route\x1b[0m`);

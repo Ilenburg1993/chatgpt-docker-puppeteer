@@ -1582,7 +1582,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Unificar candidate builder.
 - [x] Usar eligibility como barreira opcional no policy engine.
 - [ ] Usar probes como promoção.
-- [ ] Usar route options como unidade de seleção.
+- [x] Usar route options como unidade de seleção.
 - [ ] Explicar rejeições.
 - [ ] Persistir decisão final.
 - [ ] SDK projection final por route option.
@@ -2100,4 +2100,34 @@ Validação deste corte:
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em `candidate-builder.js`, barrels e contrato
   unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 26. Continuidade 2026-05-26 — Route Options Na Seleção Terminal
+
+Implementado neste corte:
+
+- [x] `/byok route` mantém a descoberta atual de modelos e filtros do operador.
+- [x] Quando existe snapshot do model-gateway, os candidatos do terminal são
+  enriquecidos por `buildModelGatewayRouteCandidates()`.
+- [x] Um mesmo provider/model pode gerar candidatos separados por
+  `selectorKind`, `selectorSyntax`, `routeOptionRef`, `routeLayer` e `wireApi`.
+- [x] Candidatos sem route option correspondente continuam disponíveis como
+  fallback de projection/runtime catalog.
+- [x] Eligibility continua recebendo `routeOptions` e `accountOverlays` do
+  snapshot, agora com candidatos já anotados com a route option selecionável.
+
+Separação preservada:
+
+- [x] O terminal só compõe metadados e filtros; não executa provider.
+- [x] Route option vira unidade de admissão e ranking antes do runtime.
+- [x] Runtime proof continua vindo depois, por probes/health.
+- [x] O SDK projection final ainda é etapa posterior.
+
+Validação deste corte:
+
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `src/copilot/terminal/commands/byok.js` e
+  `src/copilot/model-gateway/routing/candidate-builder.js`.
 - [x] PASS `git diff --check`.
