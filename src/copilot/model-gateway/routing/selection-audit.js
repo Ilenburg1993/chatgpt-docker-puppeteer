@@ -38,6 +38,14 @@ function isRecord(value) {
 }
 
 /**
+ * @param {Record<string, any>} profile
+ * @returns {boolean}
+ */
+function isDefaultAuditProfile(profile) {
+    return profile['defaultAudit'] !== false;
+}
+
+/**
  * @param {Record<string, any> | null} selected
  * @returns {Record<string, unknown> | null}
  */
@@ -166,7 +174,12 @@ function mergeCounts(countRecords) {
  */
 function resolveProfileIds(options = {}) {
     const requested = stringList(options.profiles);
-    const profileIds = requested.length > 0 ? requested : listModelGatewayTaskProfiles().map((profile) => profile.id);
+    const profileIds =
+        requested.length > 0
+            ? requested
+            : listModelGatewayTaskProfiles()
+                  .filter((profile) => isDefaultAuditProfile(profile))
+                  .map((profile) => profile.id);
     return profileIds.filter((profileId) => resolveModelGatewayTaskProfile(profileId));
 }
 

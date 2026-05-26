@@ -125,6 +125,7 @@ function evaluateGroup(env, group) {
  * @param {string} [options.providerId]
  * @returns {Array<{
  *   providerId: string;
+ *   providerAliases: string[];
  *   status: 'ready' | 'missing' | 'partial';
  *   requiredGroupCount: number;
  *   satisfiedRequiredGroupCount: number;

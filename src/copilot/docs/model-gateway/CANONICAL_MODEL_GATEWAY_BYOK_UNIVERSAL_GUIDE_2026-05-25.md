@@ -3071,6 +3071,65 @@ Validação deste corte:
 
 ---
 
+## 59. Continuidade 2026-05-26 — Perfil Local/Private Estrito
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que `local_private` atual deve continuar como perfil
+  preferencial para não quebrar readiness default enquanto o snapshot não tem
+  supply local.
+- [x] Confirmado que também precisamos de um perfil canônico hard-blocking para
+  cenários em que remoto não é aceitável.
+- [x] Confirmado que o perfil estrito não deve entrar nas auditorias default
+  até haver supply local configurado pelo operador.
+
+Implementado neste corte:
+
+- [x] Criado `local_private_strict`.
+- [x] `local_private_strict` requer `text`, `streaming`, `local`, `privacy` e
+  `no_remote_secrets`.
+- [x] `local_private_strict` usa `defaultAudit: false`.
+- [x] A auditoria pré-runtime default ignora perfis com `defaultAudit: false`
+  quando o operador não pediu perfis explicitamente.
+- [x] O terminal passa a listar `local_private_strict` nos perfis conhecidos.
+- [x] Testes cobrem falha esperada de `local_private_strict` sem supply local.
+- [x] Testes cobrem sucesso de `local_private_strict` com modelo
+  `ollama-local` instalado e capabilities locais.
+- [x] Inventário canônico inclui package command para
+  `local_private_strict`.
+- [x] Inventário canônico inclui package command para effective selection com
+  `--fail-on-supply-warning`.
+- [x] Inventário canônico inclui terminal command para seleção
+  `local_private_strict`.
+
+Separação arquitetural preservada:
+
+- [x] O perfil estrito continua sendo pré-runtime.
+- [x] Nenhum provider é chamado.
+- [x] Nenhum modelo é executado.
+- [x] Nenhuma probe runtime é executada.
+- [x] O catálogo canônico não é mutado.
+
+Próximas lacunas:
+
+- [ ] Avaliar se o live plan deve recomendar explicitamente o gate
+  `local_private_strict` quando o operador selecionar modo local.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `159` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `67` testes.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS esperado com exit `1` para
+  `node scripts/model-gateway-selection-audit.mjs
+  --profile=local_private_strict --fail-on-unselected`.
+- [x] PASS `npm run model-gateway:live:readiness`.
+- [x] PASS `npm run model-gateway:commands -- --phase=selection`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
 ## 57. Continuidade 2026-05-26 — Requisitos Env Ollama Local/Cloud
 
 Auditoria executada neste corte:

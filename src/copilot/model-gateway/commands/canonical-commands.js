@@ -184,11 +184,25 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Audit metadata-first route selection from the persisted catalog without runtime probes.',
     },
     {
+        id: 'selection.audit.local-strict',
+        phase: 'selection',
+        surface: 'package',
+        command: 'npm run model-gateway:selection:audit -- --profile=local_private_strict --fail-on-unselected',
+        summary: 'Hard-block remote candidates for the explicit local/private strict profile without runtime probes.',
+    },
+    {
         id: 'selection.effective',
         phase: 'selection',
         surface: 'package',
         command: 'npm run model-gateway:selection:effective',
         summary: 'Evaluate effective no-runtime selection with observed account/runtime health overlays.',
+    },
+    {
+        id: 'selection.effective.supply-gate',
+        phase: 'selection',
+        surface: 'package',
+        command: 'npm run model-gateway:selection:effective -- --profile local_private --fail --fail-on-supply-warning',
+        summary: 'Fail effective no-runtime selection when the local/private profile has zero local/privacy supply.',
     },
     {
         id: 'live.readiness',
@@ -490,6 +504,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok gateway selection audit effective',
         summary: 'Audit effective route selection with observed health, without executing new runtime probes.',
+    },
+    {
+        id: 'terminal.selection-local-strict',
+        phase: 'selection',
+        surface: 'terminal',
+        command: '/byok gateway selection audit strict local_private_strict',
+        summary: 'Inspect hard-blocking local/private selection from the terminal without runtime probes.',
     },
     {
         id: 'terminal.route',

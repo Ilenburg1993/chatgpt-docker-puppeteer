@@ -1028,7 +1028,7 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         println(`    \x1b[31mPerfil de rota inválido: ${message}\x1b[0m`);
-        println('    \x1b[90mPerfis conhecidos: cheap_chat, code, repo_agent, tool_agent, json_extraction, vision, deep_reasoning, local_private.\x1b[0m\n');
+        println('    \x1b[90mPerfis conhecidos: cheap_chat, code, repo_agent, tool_agent, json_extraction, vision, deep_reasoning, local_private, local_private_strict.\x1b[0m\n');
         return;
     }
     const decisionEvent = buildRouteDecisionEvent({

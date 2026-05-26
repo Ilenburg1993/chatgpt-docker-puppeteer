@@ -365,11 +365,20 @@ describe('model-gateway foundation', () => {
                 'vision',
                 'deep_reasoning',
                 'local_private',
+                'local_private_strict',
             ],
         );
         assert.equal(resolveModelGatewayTaskProfile('repo-agent')?.requireAgentProbeOk, true);
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.requires, ['text', 'streaming']);
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.softRequires, ['vision']);
+        assert.equal(MODEL_GATEWAY_TASK_PROFILES.local_private_strict.defaultAudit, false);
+        assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.local_private_strict.requires, [
+            'text',
+            'streaming',
+            'local',
+            'privacy',
+            'no_remote_secrets',
+        ]);
         assert.equal(resolveModelGatewayTaskProfile('missing'), null);
     });
 
@@ -557,6 +566,54 @@ describe('model-gateway foundation', () => {
             'preferred_supply_zero:privacy',
             'preferred_supply_zero:no_remote_secrets',
         ]);
+
+        const defaultProfileAudit = auditModelGatewayPreRuntimeSelection(snapshot, {
+            secretRegistry: { has: () => true },
+        });
+        assert.equal(defaultProfileAudit.summary.profileCount, 8);
+
+        const strictLocalPrivateAudit = auditModelGatewayPreRuntimeSelection(snapshot, {
+            profiles: ['local_private_strict'],
+            secretRegistry: { has: () => true },
+        });
+        assert.equal(strictLocalPrivateAudit.ok, false);
+        assert.equal(strictLocalPrivateAudit.profiles[0].selected, null);
+        assert.ok(strictLocalPrivateAudit.profiles[0].topRejectedReasons.includes('missing_capability:local'));
+
+        const strictLocalPrivateReady = auditModelGatewayPreRuntimeSelection(
+            {
+                projections: [
+                    createCanonicalModelProjection({
+                        providerId: 'ollama-local',
+                        providerModel: 'gemma3:4b',
+                        capabilities: { streaming: true, local: true, privacy: true, no_remote_secrets: true },
+                        limits: { contextWindowTokens: 8192 },
+                        pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+                    }),
+                ],
+                routeOptions: [
+                    createModelRouteOption({
+                        providerId: 'ollama-local',
+                        providerModel: 'gemma3:4b',
+                        selectorKind: 'exact_model',
+                        selectorSyntax: 'gemma3:4b',
+                        normalizedPolicy: { routeLayer: 'local_daemon', localPrivate: true },
+                    }),
+                ],
+                accountOverlays: [
+                    createProviderAccountOverlay({
+                        providerId: 'ollama-local',
+                        enabledModels: ['gemma3:4b'],
+                    }),
+                ],
+            },
+            {
+                profiles: ['local_private_strict'],
+                secretRegistry: { has: () => true },
+            },
+        );
+        assert.equal(strictLocalPrivateReady.ok, true);
+        assert.equal(strictLocalPrivateReady.profiles[0].selected?.['providerId'], 'ollama-local');
     });
 
     it('projects route-option candidates to SDK model info without losing selector metadata', () => {
@@ -1464,6 +1521,17 @@ describe('model-gateway foundation', () => {
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build:plan'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build:preview'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build'));
+        assert.ok(
+            packageCommands.some(
+                (entry) => entry.command === 'npm run model-gateway:selection:audit -- --profile=local_private_strict --fail-on-unselected',
+            ),
+        );
+        assert.ok(
+            packageCommands.some(
+                (entry) =>
+                    entry.command === 'npm run model-gateway:selection:effective -- --profile local_private --fail --fail-on-supply-warning',
+            ),
+        );
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:plan'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-build'));
@@ -1478,6 +1546,7 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-sqlite-retention'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway commands'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway prebuild'));
+        assert.ok(commands.some((entry) => entry.command === '/byok gateway selection audit strict local_private_strict'));
         assert.ok(commands.every((entry) => MODEL_GATEWAY_CANONICAL_COMMAND_PHASES.includes(entry.phase)));
         assert.ok(terminalLines.some((line) => line.includes('/byok gateway catalog refresh')));
     });

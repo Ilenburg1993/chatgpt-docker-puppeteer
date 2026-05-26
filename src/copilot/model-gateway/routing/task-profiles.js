@@ -74,6 +74,15 @@ export const MODEL_GATEWAY_TASK_PROFILES = Object.freeze({
         minContextWindowTokens: 8_000,
         requireAgentProbeOk: false,
     }),
+    local_private_strict: Object.freeze({
+        id: 'local_private_strict',
+        displayName: 'Local/private strict',
+        requires: Object.freeze(['text', 'streaming', 'local', 'privacy', 'no_remote_secrets']),
+        prefers: Object.freeze([]),
+        minContextWindowTokens: 8_000,
+        requireAgentProbeOk: false,
+        defaultAudit: false,
+    }),
 });
 
 /**
