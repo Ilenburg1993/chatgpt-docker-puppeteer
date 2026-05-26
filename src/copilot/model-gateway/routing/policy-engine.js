@@ -69,6 +69,17 @@ function pricePerMillion(model) {
 }
 
 /**
+ * @param {Record<string, any>} model
+ * @param {string} field
+ * @returns {string}
+ */
+function routePolicyText(model, field) {
+    const routing = isRecord(model['routing']) ? model['routing'] : {};
+    const policy = isRecord(model['normalizedPolicy']) ? model['normalizedPolicy'] : {};
+    return String(routing[field] ?? policy[field] ?? '').trim();
+}
+
+/**
  * @param {unknown} value
  * @returns {Set<string>}
  */
@@ -86,6 +97,12 @@ function stringSet(value) {
  *     requireAgentProbeOk?: boolean;
  *     allowProviders?: string[];
  *     blockProviders?: string[];
+ *     preferredRouteLayers?: string[];
+ *     blockRouteLayers?: string[];
+ *     preferredWireApis?: string[];
+ *     blockWireApis?: string[];
+ *     preferredSelectorKinds?: string[];
+ *     blockSelectorKinds?: string[];
  *     latencyMsByModelId?: Record<string, number>;
  *     eligibilityDecisions?: Record<string, any>[];
  *     evaluateEligibility?: boolean;
@@ -110,6 +127,12 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     const providerId = typeof model['providerId'] === 'string' ? model['providerId'] : '';
     const allowProviders = stringSet(options.allowProviders);
     const blockProviders = stringSet(options.blockProviders);
+    const preferredRouteLayers = stringSet(options.preferredRouteLayers);
+    const blockRouteLayers = stringSet(options.blockRouteLayers);
+    const preferredWireApis = stringSet(options.preferredWireApis);
+    const blockWireApis = stringSet(options.blockWireApis);
+    const preferredSelectorKinds = stringSet(options.preferredSelectorKinds);
+    const blockSelectorKinds = stringSet(options.blockSelectorKinds);
     const eligibility = resolveCandidateEligibility(model, profile, options);
     let score = 100;
 
@@ -127,6 +150,24 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     if (model['enabled'] === false) rejectedReasons.push('model_disabled');
     if (allowProviders.size > 0 && !allowProviders.has(providerId)) rejectedReasons.push('provider_not_allowed');
     if (blockProviders.has(providerId)) rejectedReasons.push('provider_blocked');
+    const routeLayer = routePolicyText(model, 'routeLayer');
+    const wireApi = routePolicyText(model, 'wireApi');
+    const selectorKind = String(model['selectorKind'] ?? routePolicyText(model, 'selectorKind')).trim();
+    if (routeLayer && blockRouteLayers.has(routeLayer)) rejectedReasons.push(`route_layer_blocked:${routeLayer}`);
+    if (wireApi && blockWireApis.has(wireApi)) rejectedReasons.push(`wire_api_blocked:${wireApi}`);
+    if (selectorKind && blockSelectorKinds.has(selectorKind)) rejectedReasons.push(`selector_kind_blocked:${selectorKind}`);
+    if (routeLayer && preferredRouteLayers.has(routeLayer)) {
+        score += 20;
+        reasons.push(`preferred_route_layer:${routeLayer}`);
+    }
+    if (wireApi && preferredWireApis.has(wireApi)) {
+        score += 15;
+        reasons.push(`preferred_wire_api:${wireApi}`);
+    }
+    if (selectorKind && preferredSelectorKinds.has(selectorKind)) {
+        score += 10;
+        reasons.push(`preferred_selector_kind:${selectorKind}`);
+    }
 
     for (const capability of profile['requires'] ?? []) {
         if (!hasCapability(model, capability)) rejectedReasons.push(`missing_capability:${capability}`);

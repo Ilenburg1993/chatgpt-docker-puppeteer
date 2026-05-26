@@ -1472,7 +1472,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] OpenCode family endpoint routes.
 - [x] Candidate builder baseado em route options.
 - [ ] Seleção por provider upstream.
-- [ ] Seleção por route layer.
+- [x] Seleção por route layer.
 - [ ] Seleção por data policy.
 - [ ] Seleção por budget.
 - [ ] Seleção por confidence.
@@ -2217,4 +2217,37 @@ Validação deste corte:
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em `account-access`, barrel principal e contrato
   unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 30. Continuidade 2026-05-26 — Seleção Por Route Layer E Wire API
+
+Implementado neste corte:
+
+- [x] `scoreGatewayModelCandidate()` entende `preferredRouteLayers` e
+  `blockRouteLayers`.
+- [x] `scoreGatewayModelCandidate()` entende `preferredWireApis` e
+  `blockWireApis`.
+- [x] `scoreGatewayModelCandidate()` entende `preferredSelectorKinds` e
+  `blockSelectorKinds`.
+- [x] Route layer preferida soma score; route layer bloqueada rejeita candidato.
+- [x] Wire API preferida soma score; wire API bloqueada rejeita candidato.
+- [x] Selector kind preferido soma score; selector kind bloqueado rejeita
+  candidato.
+- [x] Adicionado teste com Cloudflare direct vs gateway para garantir seleção por
+  metadados antes do runtime.
+
+Separação preservada:
+
+- [x] A seleção usa somente route metadata normalizado.
+- [x] Nenhuma probe é executada.
+- [x] O runtime proof continua posterior e separado.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `96` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `policy-engine.js` e contrato unitário.
 - [x] PASS `git diff --check`.

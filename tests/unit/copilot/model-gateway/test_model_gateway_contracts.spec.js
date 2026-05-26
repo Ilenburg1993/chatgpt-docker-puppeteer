@@ -349,6 +349,50 @@ describe('model-gateway foundation', () => {
         assert.ok(candidates[1]['routeOptionRef'].includes('gateway_fallback'));
     });
 
+    it('scores and blocks route candidates by route layer and wire API metadata', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'cloudflare-workers-ai',
+            providerModel: '@cf/openai/gpt-oss-120b',
+            capabilities: { tools: true, streaming: true },
+            limits: { contextWindowTokens: 131_072 },
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+        });
+        const candidates = buildModelGatewayRouteCandidates({
+            projections: [projection],
+            routeOptions: [
+                createModelRouteOption({
+                    providerId: 'cloudflare-workers-ai',
+                    providerModel: '@cf/openai/gpt-oss-120b',
+                    selectorKind: 'exact_model',
+                    normalizedPolicy: { routeLayer: 'direct_provider', wireApi: 'workers_ai_run' },
+                }),
+                createModelRouteOption({
+                    providerId: 'cloudflare-workers-ai',
+                    providerModel: '@cf/openai/gpt-oss-120b',
+                    selectorKind: 'gateway_fallback',
+                    selectorSyntax: 'cloudflare-gateway:@cf/openai/gpt-oss-120b',
+                    normalizedPolicy: { routeLayer: 'gateway', wireApi: 'cloudflare_ai_gateway_universal' },
+                }),
+            ],
+        });
+
+        const preferred = routeGatewayModels(candidates, 'tool_agent', {
+            preferredRouteLayers: ['gateway'],
+            preferredWireApis: ['cloudflare_ai_gateway_universal'],
+            requireAgentProbeOk: false,
+        });
+        assert.equal(preferred.selected?.model['selectorKind'], 'gateway_fallback');
+        assert.ok(preferred.selected?.reasons.includes('preferred_route_layer:gateway'));
+        assert.ok(preferred.selected?.reasons.includes('preferred_wire_api:cloudflare_ai_gateway_universal'));
+
+        const blocked = routeGatewayModels(candidates, 'tool_agent', {
+            blockRouteLayers: ['gateway'],
+            requireAgentProbeOk: false,
+        });
+        assert.equal(blocked.selected?.model['selectorKind'], 'exact_model');
+        assert.ok(blocked.rejected.some((candidate) => candidate.rejectedReasons.includes('route_layer_blocked:gateway')));
+    });
+
     it('treats vision as a soft routing preference rather than a hard admission gate', () => {
         const textOnly = createModelRecord({
             providerId: 'basic',
