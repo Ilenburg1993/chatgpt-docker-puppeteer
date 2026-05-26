@@ -300,7 +300,7 @@ function buildByokCatalogCommands(provider) {
 
 function buildByokRouteCommand(provider) {
     const providerFilter = provider ? ` provider:${provider}` : '';
-    return `/models route repo_agent active --show-rejected${providerFilter}`;
+    return `/byok models route repo_agent active --show-rejected${providerFilter}`;
 }
 
 function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, provider, altProvider }) {

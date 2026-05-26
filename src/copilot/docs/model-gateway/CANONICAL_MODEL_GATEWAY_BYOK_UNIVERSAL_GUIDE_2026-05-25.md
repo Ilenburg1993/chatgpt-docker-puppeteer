@@ -6259,6 +6259,9 @@ Implementado neste corte:
   semântica de auth.
 - [x] Failure overlays genéricos passam a distinguir `local_daemon` de fontes
   autenticadas ao atribuir confiança.
+- [x] Corrigido runner live `terminal:llm-b`: preflight BYOK real agora usa
+  `/byok models route repo_agent active --show-rejected provider:<provider>` em
+  vez do comando legado `/models route`.
 - [x] O terminal passa a imprimir uma orientação acionável quando houver rejeição
   por `local_provider_requires_explicit_request`.
 - [x] A mensagem de fallback do terminal foi corrigida para apontar para
@@ -6310,3 +6313,8 @@ Validação deste corte:
 - [x] PASS `node scripts/model-gateway-live-readiness.mjs`.
 - [x] PASS `node --check` para `model-gateway-selection-audit`,
   `model-gateway-effective-selection` e `model-gateway-live-readiness`.
+- [x] PASS `node --check scripts/copilot/run-terminal-llm-b-live-test.mjs`.
+- [x] PASS dry-run `npm run terminal:llm-b:live-test -- --byok-real --no-pr
+  --dry-run --timeout-ms=600000 --out-dir artifacts/terminal-live/prelive-dry-run`,
+  confirmando `/byok models route ... provider:kilo-code` e ausência de
+  seleção default de `ollama-local`.
