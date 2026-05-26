@@ -198,6 +198,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Check catalog integrity, SQLite parity and pre-runtime selection before terminal llm-b live tests.',
     },
     {
+        id: 'live.plan',
+        phase: 'live-readiness',
+        surface: 'package',
+        command: 'npm run model-gateway:live:plan',
+        summary: 'Materialize the no-runtime terminal llm-b live-test plan from readiness.',
+    },
+    {
         id: 'make.commands',
         phase: 'orientation',
         surface: 'make',
@@ -329,6 +336,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-live-readiness',
         summary: 'Makefile alias for the no-runtime live readiness gate.',
+    },
+    {
+        id: 'make.live-plan',
+        phase: 'live-readiness',
+        surface: 'make',
+        command: 'make model-gateway-live-plan',
+        summary: 'Makefile alias for the no-runtime terminal live-test plan.',
     },
     {
         id: 'terminal.commands',

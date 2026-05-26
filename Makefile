@@ -222,6 +222,7 @@ help:
 	@echo "  $(CYAN)make model-gateway-selection-audit$(NC)  Auditoria de seleção pré-runtime"
 	@echo "  $(CYAN)make model-gateway-effective-selection$(NC)  Seleção efetiva sem novas probes"
 	@echo "  $(CYAN)make model-gateway-live-readiness$(NC)   Gate antes dos testes live llm-b"
+	@echo "  $(CYAN)make model-gateway-live-plan$(NC)  Plano auditável antes dos testes live"
 	@echo "  $(CYAN)make model-gateway-terminal$(NC)  Abrir terminal llm-b para comandos /byok"
 	@echo ""
 	@echo "$(CYAN)$(BOLD)🌐 GitHub/Copilot Network:$(NC)"
@@ -1431,6 +1432,9 @@ model-gateway-effective-selection:
 
 model-gateway-live-readiness:
 	@$(NPM) run model-gateway:live:readiness
+
+model-gateway-live-plan:
+	@$(NPM) run model-gateway:live:plan
 
 model-gateway-refresh:
 	@$(NPM) run model-gateway:refresh

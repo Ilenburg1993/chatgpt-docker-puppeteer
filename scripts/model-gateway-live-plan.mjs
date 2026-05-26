@@ -1,0 +1,228 @@
+#!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const DEFAULT_OUT_DIR = path.join(ROOT, 'artifacts/model-gateway-live-plan');
+const args = process.argv.slice(2);
+const argSet = new Set(args);
+
+if (argSet.has('--help') || argSet.has('-h')) {
+    process.stdout.write(`Usage: node scripts/model-gateway-live-plan.mjs [--json] [--fail] [--no-write] [--allow-active-overlays] [--out-dir DIR]
+
+Create a no-runtime terminal llm-b live-test plan from model-gateway readiness. This does not start the terminal, fetch
+providers, run models or execute probes.
+`);
+    process.exit(0);
+}
+
+function readArg(name, fallback = '') {
+    const prefix = `${name}=`;
+    for (let index = 0; index < args.length; index += 1) {
+        const arg = args[index];
+        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
+        if (arg === name) return args[index + 1] ?? fallback;
+    }
+    return fallback;
+}
+
+function nowStamp() {
+    return new Date().toISOString().replace(/[:.]/gu, '-');
+}
+
+function runReadiness() {
+    const result = spawnSync(process.execPath, [path.join(ROOT, 'scripts/model-gateway-live-readiness.mjs'), '--json'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+    });
+    if (result.status !== 0) {
+        throw new Error(`model-gateway live readiness failed: ${result.stderr || result.stdout || result.status}`);
+    }
+    return JSON.parse(result.stdout);
+}
+
+function readinessCheck(readiness, id) {
+    return Array.isArray(readiness.checks) ? readiness.checks.find((check) => check.id === id) : null;
+}
+
+function effectiveOverlaySummary(readiness) {
+    return readiness?.selection?.effectiveStrict?.runtimeAccountOverlaySummary ?? {
+        total: 0,
+        activeCount: 0,
+        expiredCount: 0,
+        byProvider: {},
+        byFailureKind: {},
+        items: [],
+    };
+}
+
+function countMapText(counts) {
+    return Object.entries(counts ?? {})
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, count]) => `${key}:${count}`)
+        .join(',') || '-';
+}
+
+function buildPlan(readiness, { allowActiveOverlays = false } = {}) {
+    const overlaySummary = effectiveOverlaySummary(readiness);
+    const liveRunner = readinessCheck(readiness, 'live_runner_present');
+    const effective = readinessCheck(readiness, 'selection_effective_observed_health');
+    const runtimeNotPromoted = readinessCheck(readiness, 'runtime_not_promoted');
+    const prerequisites = [
+        {
+            id: 'readiness_ok',
+            ok: readiness.ok === true,
+            detail: 'model-gateway live readiness returned ok=true',
+        },
+        {
+            id: 'effective_selection_ok',
+            ok: effective?.ok === true,
+            detail: effective?.detail ?? 'effective observed-health selection is unavailable',
+        },
+        {
+            id: 'runtime_not_promoted',
+            ok: runtimeNotPromoted?.ok === true,
+            detail: runtimeNotPromoted?.detail ?? 'runtime proof status is unavailable',
+        },
+        {
+            id: 'live_runner_present',
+            ok: liveRunner?.ok === true,
+            detail: liveRunner?.detail ?? 'terminal live runner path is unavailable',
+        },
+        {
+            id: 'active_runtime_overlays',
+            ok: allowActiveOverlays || overlaySummary.activeCount === 0,
+            detail: `active=${overlaySummary.activeCount}, expired=${overlaySummary.expiredCount}, providers=${countMapText(overlaySummary.byProvider)}, failures=${countMapText(overlaySummary.byFailureKind)}`,
+        },
+    ];
+    const phases = [
+        {
+            id: 'control_no_pr',
+            order: 1,
+            command: 'npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000',
+            executesModelTurn: false,
+            executesRuntimeProbes: false,
+            consumesProviderQuota: false,
+            purpose: 'Validate terminal boot, session cockpit, command output, event stream and redaction without an LLM turn.',
+        },
+        {
+            id: 'byok_fixture_control_plane',
+            order: 2,
+            command: 'npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
+            executesModelTurn: false,
+            executesRuntimeProbes: false,
+            consumesProviderQuota: false,
+            purpose: 'Exercise BYOK control-plane commands against a local OpenAI-compatible fixture.',
+        },
+        {
+            id: 'byok_real_no_pr_probes',
+            order: 3,
+            command: 'npm run terminal:llm-b:live-test -- --byok-real --no-pr --timeout-ms=600000',
+            executesModelTurn: false,
+            executesRuntimeProbes: true,
+            consumesProviderQuota: true,
+            purpose: 'Run real BYOK probe commands only after readiness and fixture phases pass.',
+        },
+        {
+            id: 'byok_real_full_turn',
+            order: 4,
+            command: 'npm run terminal:llm-b:live-test -- --byok-real --timeout-ms=900000',
+            executesModelTurn: true,
+            executesRuntimeProbes: true,
+            consumesProviderQuota: true,
+            purpose: 'Run the full terminal llm-b scenario with a real assistant turn after all lower-risk phases pass.',
+        },
+    ];
+    return {
+        schema: 'model-gateway-live-plan',
+        ok: prerequisites.every((item) => item.ok),
+        generatedAt: new Date().toISOString(),
+        runtimeExecuted: false,
+        readiness: {
+            ok: readiness.ok === true,
+            snapshotId: readiness.snapshotId ?? null,
+            generatedAt: readiness.generatedAt ?? null,
+            checks: readiness.checks ?? [],
+        },
+        overlaySummary,
+        prerequisites,
+        phases,
+        nextCommand: phases[0].command,
+    };
+}
+
+function renderMarkdown(plan) {
+    const lines = [
+        '# Model Gateway Live Plan',
+        '',
+        `- ok: ${plan.ok ? 'true' : 'false'}`,
+        `- generatedAt: ${plan.generatedAt}`,
+        `- runtimeExecuted: ${plan.runtimeExecuted ? 'true' : 'false'}`,
+        `- snapshotId: ${plan.readiness.snapshotId ?? '-'}`,
+        `- overlays: total=${plan.overlaySummary.total} active=${plan.overlaySummary.activeCount} expired=${plan.overlaySummary.expiredCount}`,
+        `- providers: ${countMapText(plan.overlaySummary.byProvider)}`,
+        `- failures: ${countMapText(plan.overlaySummary.byFailureKind)}`,
+        '',
+        '## Prerequisites',
+        '',
+        ...plan.prerequisites.map((item) => `- [${item.ok ? 'x' : ' '}] ${item.id}: ${item.detail}`),
+        '',
+        '## Phases',
+        '',
+        ...plan.phases.flatMap((phase) => [
+            `### ${phase.order}. ${phase.id}`,
+            '',
+            `- command: \`${phase.command}\``,
+            `- executesModelTurn: ${phase.executesModelTurn ? 'true' : 'false'}`,
+            `- executesRuntimeProbes: ${phase.executesRuntimeProbes ? 'true' : 'false'}`,
+            `- consumesProviderQuota: ${phase.consumesProviderQuota ? 'true' : 'false'}`,
+            `- purpose: ${phase.purpose}`,
+            '',
+        ]),
+    ];
+    return `${lines.join('\n')}\n`;
+}
+
+async function writePlanArtifacts(plan, outDir) {
+    const stamp = nowStamp();
+    await mkdir(outDir, { recursive: true });
+    const jsonPath = path.join(outDir, `${stamp}.json`);
+    const markdownPath = path.join(outDir, `${stamp}.md`);
+    const latestJsonPath = path.join(outDir, 'latest.json');
+    const latestMarkdownPath = path.join(outDir, 'latest.md');
+    const json = `${JSON.stringify(plan, null, 2)}\n`;
+    const markdown = renderMarkdown(plan);
+    await writeFile(jsonPath, json, 'utf8');
+    await writeFile(markdownPath, markdown, 'utf8');
+    await writeFile(latestJsonPath, json, 'utf8');
+    await writeFile(latestMarkdownPath, markdown, 'utf8');
+    return { jsonPath, markdownPath, latestJsonPath, latestMarkdownPath };
+}
+
+const json = argSet.has('--json');
+const fail = argSet.has('--fail');
+const write = !argSet.has('--no-write');
+const allowActiveOverlays = argSet.has('--allow-active-overlays');
+const outDir = path.resolve(ROOT, readArg('--out-dir', DEFAULT_OUT_DIR));
+const readiness = runReadiness();
+const plan = buildPlan(readiness, { allowActiveOverlays });
+const artifacts = write ? await writePlanArtifacts(plan, outDir) : null;
+const summary = {
+    ...plan,
+    artifacts,
+};
+
+if (json) {
+    process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+} else {
+    process.stdout.write(
+        `model-gateway live plan: ok=${summary.ok ? 'yes' : 'no'} next="${summary.nextCommand}" runtime=no artifacts=${artifacts?.latestMarkdownPath ?? 'not-written'}\n`,
+    );
+    for (const prerequisite of summary.prerequisites) {
+        process.stdout.write(`  ${prerequisite.ok ? 'OK' : 'FAIL'} ${prerequisite.id}: ${prerequisite.detail}\n`);
+    }
+}
+
+if (fail && !summary.ok) process.exit(1);

@@ -426,6 +426,7 @@
     "model-gateway:catalog:integrity": "node scripts/model-gateway-catalog-integrity.mjs --json",
     "model-gateway:selection:effective": "node scripts/model-gateway-effective-selection.mjs --json",
     "model-gateway:live:readiness": "node scripts/model-gateway-live-readiness.mjs --json",
+    "model-gateway:live:plan": "node scripts/model-gateway-live-plan.mjs --json",
     "model-gateway:selection:audit": "node scripts/model-gateway-selection-audit.mjs --json",
     "model-gateway:prebuild": "npm run model-gateway:commands && npm run model-gateway:validate",
     "model-gateway:refresh": "node scripts/model-gateway-refresh.mjs --commit",

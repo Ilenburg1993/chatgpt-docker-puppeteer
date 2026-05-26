@@ -5432,6 +5432,81 @@ Próximas lacunas:
 
 ---
 
+## 72. Continuidade 2026-05-26 — Plano Auditável Antes Do Live LLM-B
+
+Auditoria executada neste corte:
+
+- [x] Revisitado o caminho entre readiness, seleção efetiva e
+  `scripts/copilot/run-terminal-llm-b-live-test.mjs`.
+- [x] Confirmado que `model-gateway:live:readiness` já diz se o sistema está
+  pronto, mas ainda faltava um artefato explícito com fases, riscos, consumo de
+  quota e próximo comando.
+- [x] Confirmado que o plano precisa ser no-runtime: não pode abrir terminal,
+  chamar provider, executar probes ou gastar turno/modelo.
+- [x] Confirmado que overlays runtime ativos devem bloquear o plano por
+  padrão, salvo override explícito, pois o objetivo é evitar iniciar live real
+  em cima de bloqueios account/key conhecidos.
+
+Implementado neste corte:
+
+- [x] Criado `scripts/model-gateway-live-plan.mjs`.
+- [x] O script executa readiness via `node`, não via `npm`, para obter JSON
+  limpo e sem prefixos de lifecycle.
+- [x] O plano gera `schema=model-gateway-live-plan`, `runtimeExecuted=false`,
+  `prerequisites`, `phases`, `overlaySummary` e `nextCommand`.
+- [x] Prerequisites cobrem readiness, seleção efetiva com health observado,
+  runtime não promovido, runner presente e overlays runtime ativos.
+- [x] `--allow-active-overlays` existe para cenários explícitos, mas o default
+  exige `activeCount=0`.
+- [x] Fases formais:
+  `control_no_pr`, `byok_fixture_control_plane`,
+  `byok_real_no_pr_probes` e `byok_real_full_turn`.
+- [x] Cada fase declara se executa turno de modelo, probes runtime e consumo
+  potencial de quota/provider.
+- [x] O script grava artefatos JSON e Markdown em
+  `artifacts/model-gateway-live-plan/`, incluindo `latest.json` e `latest.md`.
+- [x] Adicionado package script `model-gateway:live:plan`.
+- [x] Adicionado Make target `model-gateway-live-plan`.
+- [x] Help do Makefile lista o novo comando.
+- [x] Inventário canônico passa a expor package e Make para live plan.
+- [x] Teste de inventário canônico cobre `npm run model-gateway:live:plan` e
+  `make model-gateway-live-plan`.
+
+Resultado observado:
+
+- [x] `npm run model-gateway:live:plan` retorna `ok=true`.
+- [x] `nextCommand` é
+  `npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000`.
+- [x] Plano local possui `5` prerequisites e `4` fases.
+- [x] Plano local grava artefato auditável.
+- [x] Inventário `--phase=live-readiness` lista readiness e plan em package e
+  Make.
+
+Separação preservada:
+
+- [x] O plano não altera catálogo JSON.
+- [x] O plano não altera SQLite.
+- [x] O plano não grava health/probes runtime.
+- [x] O plano não abre terminal.
+- [x] O plano não chama provider/modelo.
+- [x] O plano não consome quota por si só.
+
+Validação parcial deste corte:
+
+- [x] PASS `node --check scripts/model-gateway-live-plan.mjs`.
+- [x] PASS `npm run model-gateway:live:plan`.
+- [x] PASS `npm run model-gateway:commands -- --phase=live-readiness`.
+- [x] PASS focused Vitest `canonical model-gateway command inventory`.
+
+Próximas lacunas:
+
+- [ ] Decidir se `model-gateway:live:plan` deve ser incluído automaticamente
+  dentro de `model-gateway:prebuild` ou permanecer manual até o primeiro live.
+- [ ] Antes do live real com `llm-b`, executar novamente readiness, live plan,
+  lint, typecheck e testes escopados.
+
+---
+
 ## 54. Continuidade 2026-05-26 — Policy Engine Por Snapshot Completo
 
 Auditoria executada neste corte:

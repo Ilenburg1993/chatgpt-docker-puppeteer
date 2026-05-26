@@ -1414,11 +1414,13 @@ describe('model-gateway foundation', () => {
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build:plan'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build:preview'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:plan'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-build'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build-plan'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build-preview'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-live-plan'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:refresh:log:sqlite -- --json'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:sqlite:retention -- --json'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:sqlite:retention:apply -- --json'));
