@@ -1159,6 +1159,67 @@ describe('model-gateway foundation', () => {
         ]);
     });
 
+    it('keeps runtime probe recommendations behind eligibility unless exploration is explicit', () => {
+        const visible = createCanonicalModelProjection({
+            providerId: 'openrouter',
+            providerModel: 'visible/model',
+            capabilities: { tools: true, streaming: true },
+            limits: { contextWindowTokens: 131072 },
+        });
+        const hidden = createCanonicalModelProjection({
+            providerId: 'openrouter',
+            providerModel: 'hidden/model',
+            capabilities: { tools: true, streaming: true },
+            limits: { contextWindowTokens: 131072 },
+        });
+        const unknown = createCanonicalModelProjection({
+            providerId: 'openrouter',
+            providerModel: 'unknown/model',
+            capabilities: { tools: true, streaming: true },
+            limits: { contextWindowTokens: 131072 },
+        });
+        const recommendations = recommendCatalogDiffProbes({
+            projections: [visible, hidden, unknown],
+            eligibilityDecisions: [
+                createModelEligibilityDecision({
+                    providerId: 'openrouter',
+                    providerModel: 'visible/model',
+                    include: true,
+                }),
+                createModelEligibilityDecision({
+                    providerId: 'openrouter',
+                    providerModel: 'hidden/model',
+                    include: false,
+                    hardExclusions: ['account_model_not_visible'],
+                }),
+                createModelEligibilityDecision({
+                    providerId: 'openrouter',
+                    providerModel: 'unknown/model',
+                    include: true,
+                    disposition: 'unknown_policy_allows_probe',
+                    softPenalties: ['account_visibility_unknown'],
+                }),
+            ],
+            requireEligibilityDecision: true,
+            diff: {
+                added: [
+                    'openrouter:visible/model:default',
+                    'openrouter:hidden/model:default',
+                    'openrouter:unknown/model:default',
+                ],
+                changed: [],
+            },
+        });
+
+        assert.deepEqual(
+            recommendations.map((item) => [item.key, item.eligibilityStatus]),
+            [
+                ['openrouter:unknown/model:default', 'unknown'],
+                ['openrouter:visible/model:default', 'eligible'],
+            ],
+        );
+    });
+
     it('persists a redacted JSON catalog snapshot before the SQLite store', async () => {
         const dir = await mkdtemp(join(tmpdir(), 'copilot-model-catalog-'));
         try {

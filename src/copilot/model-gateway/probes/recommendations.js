@@ -66,6 +66,45 @@ function projectionKey(projection) {
 }
 
 /**
+ * @param {Record<string, any>} decision
+ * @returns {string}
+ */
+function eligibilityKey(decision) {
+    return [
+        optionalString(decision['providerId']) ?? 'unknown-provider',
+        optionalString(decision['providerModel']) ?? 'unknown-model',
+        optionalString(decision['routeProfile']) ?? 'default',
+    ].join(':');
+}
+
+/**
+ * @param {Record<string, any> | null} decision
+ * @returns {'eligible' | 'unknown' | 'excluded' | null}
+ */
+function eligibilityStatus(decision) {
+    if (!decision) return null;
+    if (decision['include'] === false) return 'excluded';
+    const disposition = optionalString(decision['disposition']) ?? '';
+    return disposition.startsWith('unknown') ? 'unknown' : 'eligible';
+}
+
+/**
+ * @param {'eligible' | 'unknown' | 'excluded' | null} status
+ * @param {Record<string, any> | null} decision
+ * @param {Record<string, any>} options
+ * @returns {boolean}
+ */
+function canRecommendProbeForEligibility(status, decision, options) {
+    if (status === null) return options['requireEligibilityDecision'] !== true;
+    if (status === 'eligible') return true;
+    if (status === 'excluded') return false;
+    return (
+        options['allowUnknownEligibility'] === true ||
+        optionalString(decision?.['disposition']) === 'unknown_policy_allows_probe'
+    );
+}
+
+/**
  * @param {Record<string, any>} projection
  * @returns {{ chat: boolean; streaming: boolean; json: boolean; agent: boolean; vision: boolean; highValue: boolean; reasons: string[] }}
  */
@@ -125,12 +164,22 @@ function buildProbeCommand(projection, kind) {
  * @param {object} input
  * @param {{ added?: string[]; changed?: Array<{ key?: string; changedKinds?: string[] }> }} input.diff
  * @param {Array<Record<string, any>>} input.projections
+ * @param {Array<Record<string, any>>} [input.eligibilityDecisions]
+ * @param {boolean} [input.requireEligibilityDecision]
+ * @param {boolean} [input.allowUnknownEligibility]
  * @param {number} [input.limit]
- * @returns {Array<{ key: string; providerId: string | null; providerModel: string | null; routeProfile: string; priority: 'high' | 'medium'; probeKinds: string[]; reasons: string[]; commands: string[] }>}
+ * @returns {Array<{ key: string; providerId: string | null; providerModel: string | null; routeProfile: string; eligibilityStatus?: string; priority: 'high' | 'medium'; probeKinds: string[]; reasons: string[]; commands: string[] }>}
  */
 export function recommendCatalogDiffProbes(input) {
     const limit = finiteNumber(input.limit) ?? DEFAULT_RECOMMENDATION_LIMIT;
     const projectionsByKey = new Map(input.projections.map((projection) => [projectionKey(projection), projection]));
+    const eligibilityByKey = new Map(
+        (Array.isArray(input.eligibilityDecisions) ? input.eligibilityDecisions : []).map((decision) => [eligibilityKey(decision), decision]),
+    );
+    const eligibilityOptions = {
+        requireEligibilityDecision: input.requireEligibilityDecision === true,
+        allowUnknownEligibility: input.allowUnknownEligibility === true,
+    };
     /** @type {Map<string, string[]>} */
     const changedByKey = new Map();
     for (const item of Array.isArray(input.diff.changed) ? input.diff.changed : []) {
@@ -138,11 +187,14 @@ export function recommendCatalogDiffProbes(input) {
         if (key) changedByKey.set(key, stringList(item.changedKinds));
     }
     const candidateKeys = [...new Set([...stringList(input.diff.added), ...changedByKey.keys()])];
-    /** @type {Array<{ key: string; providerId: string | null; providerModel: string | null; routeProfile: string; priority: 'high' | 'medium'; probeKinds: string[]; reasons: string[]; commands: string[] }>} */
+    /** @type {Array<{ key: string; providerId: string | null; providerModel: string | null; routeProfile: string; eligibilityStatus?: string; priority: 'high' | 'medium'; probeKinds: string[]; reasons: string[]; commands: string[] }>} */
     const recommendations = [];
     for (const key of candidateKeys) {
         const projection = projectionsByKey.get(key);
         if (!projection) continue;
+        const eligibilityDecision = eligibilityByKey.get(key) ?? null;
+        const status = eligibilityStatus(eligibilityDecision);
+        if (!canRecommendProbeForEligibility(status, eligibilityDecision, eligibilityOptions)) continue;
         const changedKinds = changedByKey.get(key) ?? [];
         const isAdded = stringList(input.diff.added).includes(key);
         const relevantChange =
@@ -167,6 +219,7 @@ export function recommendCatalogDiffProbes(input) {
             providerId: optionalString(projection['providerId']),
             providerModel: optionalString(projection['providerModel']),
             routeProfile: optionalString(projection['routeProfile']) ?? 'default',
+            ...(status ? { eligibilityStatus: status } : {}),
             priority,
             probeKinds,
             reasons: [...new Set([...surface.reasons, ...changedKinds, isAdded ? 'new_model' : null].filter((item) => item !== null))],

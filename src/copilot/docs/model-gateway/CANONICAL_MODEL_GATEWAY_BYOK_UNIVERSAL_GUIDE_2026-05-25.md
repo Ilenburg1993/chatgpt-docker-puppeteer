@@ -1680,7 +1680,7 @@ A próxima etapa só estará madura quando:
 - [x] eligibility tiver testes suficientes;
 - [x] terminal conseguir mostrar decisões;
 - [x] policy engine consumir eligibility;
-- [ ] probes forem recomendados somente para candidatos elegíveis ou
+- [x] probes forem recomendados somente para candidatos elegíveis ou
   explicitamente permitidos por policy de exploração;
 - [x] SQLite tiver schema planejado para catálogo, overlay, eligibility e probes;
 - [x] OpenAI schema continuar compatível;
@@ -2130,4 +2130,35 @@ Validação deste corte:
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em `src/copilot/terminal/commands/byok.js` e
   `src/copilot/model-gateway/routing/candidate-builder.js`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 27. Continuidade 2026-05-26 — Probe Recommendations Com Eligibility
+
+Implementado neste corte:
+
+- [x] `recommendCatalogDiffProbes()` passa a aceitar `eligibilityDecisions`.
+- [x] `requireEligibilityDecision=true` impede recomendar probe para modelos sem
+  decisão pré-runtime conhecida.
+- [x] Modelos com eligibility `excluded` deixam de receber comandos de probe.
+- [x] Modelos `eligible` seguem recomendáveis.
+- [x] Modelos `unknown_policy_allows_probe` seguem recomendáveis como exploração
+  explicitamente permitida.
+- [x] Recomendações podem expor `eligibilityStatus` para UX/observability sem
+  poluir o catálogo canônico.
+
+Separação preservada:
+
+- [x] O recomendador continua não executando probes.
+- [x] Eligibility é só barreira pré-runtime; runtime proof vem depois.
+- [x] Catálogo canônico não recebe status account-scoped.
+- [x] O modo legado sem decisions continua funcionando para diffs simples.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `94` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `recommendations.js` e contrato unitário.
 - [x] PASS `git diff --check`.
