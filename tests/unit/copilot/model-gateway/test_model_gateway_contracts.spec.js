@@ -12,6 +12,7 @@ import { afterEach, describe, it } from 'vitest';
 import {
     JsonModelGatewayRegistryStore,
     listProviderEndpointInventory,
+    listProviderEndpointSourceRecords,
     listModelGatewayTaskProfiles,
     ModelGatewayRegistry,
     MODEL_GATEWAY_TASK_PROFILES,
@@ -23,6 +24,7 @@ import {
     buildCatalogRefreshCompletedEvent,
     buildCatalogRefreshEventBatch,
     buildEligibilityEvaluatedEvent,
+    auditProviderEndpointImporterCoverage,
     buildProbeCompletedEvent,
     buildRegistrySnapshotEvent,
     buildRouteDecisionEvent,
@@ -47,6 +49,7 @@ import {
     projectModelGatewayMetrics,
     projectCatalogRefreshCompletedMetrics,
     projectEligibilityEvaluatedMetrics,
+    projectModelGatewayMetadataCoverageMetrics,
     redactSecretRecord,
     redactSecretText,
     recordByokProviderModelAgentProbeSuccess,
@@ -72,6 +75,7 @@ import {
     BYOK_VISION_PROBE_MIME_TYPE,
     JsonModelGatewayCatalogStore,
     SqliteModelGatewayCatalogStore,
+    MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
     createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
     createChutesModelsImporter,
@@ -95,6 +99,7 @@ import {
     createDefaultModelGatewayCatalogImporters,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
+    createModelGatewayCatalogSnapshotId,
     createModelEligibilityDecision,
     createModelEligibilityRun,
     MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
@@ -120,6 +125,7 @@ import {
     normalizeModelRoutePolicyTraits,
     normalizeModelTokenLimits,
     normalizeOpenAICompatibleModelCapabilities,
+    normalizeStoredCatalogSnapshot,
     normalizeUsdPricing,
     rankCatalogEvidenceConfidence,
     recommendCatalogDiffProbes,
@@ -136,6 +142,7 @@ import {
     searchModelGatewayCatalogEntries,
     summarizeModelGatewayCatalogSnapshot,
     summarizeCanonicalModelProjectionDiff,
+    summarizeModelGatewayMetadataCoverage,
     toOpenAIModelCatalogEntry,
     toOpenAIModelCatalogList,
     toCopilotModelInfoList,
@@ -1572,6 +1579,88 @@ describe('model-gateway foundation', () => {
         );
         assert.equal(plan.totalProbeCount, 1);
         assert.equal(plan.totalEstimatedCostUsd, 0.0028);
+    });
+
+    it('summarizes metadata coverage by provider before runtime', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'openrouter',
+            providerModel: 'policy-rich',
+            limits: { contextWindowTokens: 128_000 },
+            pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 2 },
+            dataPolicy: { training: false, retainsPrompts: false },
+        });
+        const evidence = createModelMetadataEvidence({
+            evidenceId: 'ev-policy-rich',
+            providerId: 'openrouter',
+            providerModel: 'policy-rich',
+            fieldPath: 'pricing.inputUsdPerMillion',
+            value: 1,
+            sourceId: 'openrouter-models',
+        });
+        const route = createModelRouteOption({
+            providerId: 'openrouter',
+            providerModel: 'policy-rich',
+            selectorKind: 'aggregator_auto',
+            selectorSyntax: 'policy-rich',
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'openrouter',
+            secretRef: 'OPEN_ROUTER_KEY',
+            enabledModels: ['policy-rich'],
+        });
+        const decision = createModelEligibilityDecision({
+            providerId: 'openrouter',
+            providerModel: 'policy-rich',
+            include: true,
+        });
+
+        const summary = summarizeModelGatewayMetadataCoverage({
+            projections: [projection],
+            evidences: [evidence],
+            routeOptions: [route],
+            accountOverlays: [overlay],
+            modelEligibilityDecisions: [decision],
+        });
+        const metrics = projectModelGatewayMetadataCoverageMetrics(summary);
+
+        assert.equal(summary.providerCount, 1);
+        assert.equal(summary.providers[0]?.routeCoverageRatio, 1);
+        assert.equal(summary.pricingKnownModelCount, 1);
+        assert.equal(summary.dataPolicyKnownModelCount, 1);
+        assert.equal(metrics.gauges['model_gateway.catalog.coverage.provider.openrouter.route_options'], 1);
+        assert.equal(metrics.gauges['model_gateway.catalog.coverage.route_ratio'], 1);
+    });
+
+    it('creates stable catalog snapshot ids independent from array order and generated time', () => {
+        const source = createProviderCatalogSource({
+            id: 'openrouter-models',
+            providerId: 'openrouter',
+            kind: 'public_api',
+            url: 'https://openrouter.ai/api/v1/models',
+        });
+        const first = {
+            schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+            generatedAt: '2026-05-26T00:00:00.000Z',
+            source: 'first',
+            sources: [source],
+            projections: [
+                createCanonicalModelProjection({ providerId: 'openrouter', providerModel: 'b' }),
+                createCanonicalModelProjection({ providerId: 'openrouter', providerModel: 'a' }),
+            ],
+        };
+        const second = {
+            schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+            generatedAt: '2026-05-26T01:00:00.000Z',
+            source: 'second',
+            sources: [source],
+            projections: [
+                createCanonicalModelProjection({ providerId: 'openrouter', providerModel: 'a' }),
+                createCanonicalModelProjection({ providerId: 'openrouter', providerModel: 'b' }),
+            ],
+        };
+
+        assert.equal(createModelGatewayCatalogSnapshotId(first), createModelGatewayCatalogSnapshotId(second));
+        assert.equal(normalizeStoredCatalogSnapshot(first).snapshotId, createModelGatewayCatalogSnapshotId(first));
     });
 
     it('persists a redacted JSON catalog snapshot before the SQLite store', async () => {
@@ -5200,6 +5289,63 @@ describe('model-gateway foundation', () => {
         assert.ok(cloudflare?.routeSelectors.includes('gateway_fallback'));
         assert.ok(openCode?.runtimeEndpoints.some((endpoint) => endpoint.kind === 'openai_responses'));
         assert.ok(openCode?.runtimeEndpoints.some((endpoint) => endpoint.kind === 'anthropic_messages'));
+    });
+
+    it('normalizes provider endpoint inventory into stable metadata source records', () => {
+        const endpointInventory = listProviderEndpointInventory();
+        const records = listProviderEndpointSourceRecords(endpointInventory);
+        const byId = new Map(records.map((record) => [record['id'], record]));
+
+        assert.equal(records.length > endpointInventory.length, true);
+        assert.ok(byId.has('openai:catalog:authenticated_api:GET:https://api.openai.com/v1/models'));
+        assert.deepEqual(byId.get('zai:catalog:openapi:GET:https://docs.z.ai/openapi.json')?.['richnessTags'], [
+            'and',
+            'multimodal',
+            'parameters',
+            'runtime',
+            'schema',
+            'streaming',
+            'tool',
+        ]);
+        const cloudflareRuntime = records.find(
+            (record) => record['providerId'] === 'cloudflare-workers-ai' && record['target'] === 'runtime' && record['kind'] === 'workers_ai_run',
+        );
+        assert.deepEqual(cloudflareRuntime?.['placeholders'], ['account_id', 'model']);
+        assert.equal(cloudflareRuntime?.['hasPlaceholders'], true);
+        assert.equal(cloudflareRuntime?.['target'], 'runtime');
+    });
+
+    it('audits endpoint inventory coverage against configured catalog importers', () => {
+        const importers = createDefaultModelGatewayCatalogImporters({
+            env: {
+                OPENAI_API_KEY: 'sk-test',
+                ANTHROPIC_API_KEY: 'sk-ant',
+                GEMINI_API_KEY: 'sk-gemini',
+                MISTRAL_API_KEY: 'sk-mistral',
+                GROQ_API_KEY: 'sk-groq',
+                HF_TOKEN: 'hf-token',
+                OPENCODE_API_KEY: 'opencode-token',
+                NVIDIA_API_KEY: 'nvapi-token',
+                CHUTES_API_KEY: 'chutes-token',
+                ZAI_API_KEY: 'zai-token',
+                CEREBRAS_API_KEY: 'cerebras-token',
+                CLOUDFLARE_API_TOKEN: 'cf-token',
+                CLOUDFLARE_ACCOUNT_ID: 'account-1',
+                CLOUDFLARE_AI_GATEWAY_ID: 'gateway-1',
+                OLLAMA_BASE_URL: 'http://localhost:11434',
+            },
+            fetchImpl: async () => ({}),
+        });
+        const coverage = auditProviderEndpointImporterCoverage({
+            inventories: listProviderEndpointInventory(),
+            importers,
+        });
+        const byProvider = new Map(coverage.map((item) => [item.providerId, item]));
+
+        assert.equal(byProvider.get('openai')?.coveredCatalogSourceCount, 1);
+        assert.equal(byProvider.get('kilo')?.coveredCatalogSourceCount, 2);
+        assert.equal(byProvider.get('openrouter')?.coveredCatalogSourceCount, 1);
+        assert.equal(byProvider.get('zai')?.uncoveredCatalogSourceIds.includes('zai:catalog:openapi:GET:https://docs.z.ai/openapi.json'), true);
     });
 
     it('builds an SDK onListModels handler from gateway records without exposing secrets', async () => {

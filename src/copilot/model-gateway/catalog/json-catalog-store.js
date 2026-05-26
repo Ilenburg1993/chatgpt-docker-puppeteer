@@ -9,6 +9,7 @@
  */
 
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 
 import { readJson, writeJson } from '../../infra/storage/json-store.js';
 import { redactSecretText } from '../secrets/index.js';
@@ -55,6 +56,14 @@ function isSecretCatalogKey(key) {
 
 /**
  * @param {unknown} value
+ * @returns {string | null}
+ */
+function optionalString(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * @param {unknown} value
  * @returns {unknown}
  */
 function sanitizeCatalogValue(value) {
@@ -83,9 +92,36 @@ function readRecordArray(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function stableCatalogValue(value) {
+    if (Array.isArray(value)) {
+        return value.map(stableCatalogValue).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+    }
+    if (isRecord(value)) {
+        return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableCatalogValue(value[key])]));
+    }
+    return value;
+}
+
+/**
+ * @param {Record<string, unknown>} snapshot
+ * @returns {string}
+ */
+export function createModelGatewayCatalogSnapshotId(snapshot) {
+    const stablePayload = {
+        schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+        ...Object.fromEntries(CATALOG_ARRAY_FIELDS.map((field) => [field, readRecordArray(snapshot[field])])),
+    };
+    return `catalog:${createHash('sha256').update(JSON.stringify(stableCatalogValue(stablePayload))).digest('hex').slice(0, 24)}`;
+}
+
+/**
  * @param {unknown} snapshot
  * @returns {{
  *     schemaVersion: number;
+ *     snapshotId: string;
  *     generatedAt: string | null;
  *     source: string;
  *     sources: Record<string, any>[];
@@ -105,6 +141,7 @@ function readRecordArray(value) {
 export function normalizeStoredCatalogSnapshot(snapshot) {
     const empty = {
         schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+        snapshotId: createModelGatewayCatalogSnapshotId({}),
         generatedAt: null,
         source: 'empty',
         sources: [],
@@ -121,8 +158,9 @@ export function normalizeStoredCatalogSnapshot(snapshot) {
         modelEligibilityDecisions: [],
     };
     if (!isRecord(snapshot) || snapshot['schemaVersion'] !== MODEL_GATEWAY_CATALOG_SCHEMA_VERSION) return empty;
-    return {
+    const normalized = {
         ...empty,
+        snapshotId: optionalString(snapshot['snapshotId']) ?? createModelGatewayCatalogSnapshotId(snapshot),
         generatedAt: typeof snapshot['generatedAt'] === 'string' ? snapshot['generatedAt'] : null,
         source: typeof snapshot['source'] === 'string' ? snapshot['source'] : 'unknown',
         sources: readRecordArray(snapshot['sources']),
@@ -138,6 +176,8 @@ export function normalizeStoredCatalogSnapshot(snapshot) {
         modelEligibilityRuns: readRecordArray(snapshot['modelEligibilityRuns']),
         modelEligibilityDecisions: readRecordArray(snapshot['modelEligibilityDecisions']),
     };
+    normalized.snapshotId = optionalString(snapshot['snapshotId']) ?? createModelGatewayCatalogSnapshotId(normalized);
+    return normalized;
 }
 
 export class JsonModelGatewayCatalogStore {
@@ -178,6 +218,7 @@ export class JsonModelGatewayCatalogStore {
         for (const field of CATALOG_ARRAY_FIELDS) {
             next[field] = readRecordArray(/** @type {Record<string, unknown>} */ (snapshot)[field]);
         }
+        next['snapshotId'] = optionalString(/** @type {Record<string, unknown>} */ (snapshot)['snapshotId']) ?? createModelGatewayCatalogSnapshotId(next);
         await writeJson(this.#filePath, next);
     }
 }

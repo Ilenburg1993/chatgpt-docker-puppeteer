@@ -10,7 +10,9 @@ export { ANTHROPIC_BASE_URL, ANTHROPIC_PROVIDER_ID, AnthropicAdapter, anthropicA
 export { GEMINI_OPENAI_BASE_URL, GEMINI_PROVIDER_ID, GeminiAdapter, geminiAdapter } from './gemini-adapter.js';
 export {
     MODEL_GATEWAY_PROVIDER_ENDPOINT_INVENTORY,
+    auditProviderEndpointImporterCoverage,
     listProviderEndpointInventory,
+    listProviderEndpointSourceRecords,
     resolveProviderEndpointInventory,
 } from './endpoints/index.js';
 export {

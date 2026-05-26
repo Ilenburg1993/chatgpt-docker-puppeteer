@@ -1325,8 +1325,8 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Inventário central.
 - [x] Separação entre catalog sources e runtime endpoints.
 - [ ] Completar richness padronizado por endpoint.
-- [ ] Adicionar schema de endpoint source.
-- [ ] Testar inventário contra importers existentes.
+- [x] Adicionar schema de endpoint source.
+- [x] Testar inventário contra importers existentes.
 
 ### Faixa E — Probes Base
 
@@ -1388,7 +1388,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Eventos de model added/removed/changed.
 - [x] Eventos de conflict.
 - [x] Evento `model_gateway:eligibility:evaluated`.
-- [ ] Métricas de coverage.
+- [x] Métricas de coverage.
 - [ ] Métricas de provider freshness.
 - [x] Métricas agregadas de eligible/unknown/excluded.
 - [ ] Métricas por exclusion reason.
@@ -1411,7 +1411,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] OpenAI projection.
 - [x] JSON store.
 - [ ] SQLite store.
-- [ ] Snapshot ids estáveis.
+- [x] Snapshot ids estáveis.
 - [ ] Incremental refresh com TTL por source.
 - [ ] Tombstones.
 - [ ] Raw payload storage policy.
@@ -2521,4 +2521,57 @@ Validação deste corte:
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em `probes/planner.js`, barrels e contrato
   unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 39. Continuidade 2026-05-26 — Auditoria A-X E Consolidação De Metadados
+
+Auditoria executada neste corte:
+
+- [x] Guia canônico lido integralmente de ponta a ponta, linhas 1-2524.
+- [x] Faixas A-X revisadas começando pela Faixa A.
+- [x] Prioridade reafirmada para consolidação de metadados e pré-runtime.
+- [x] Lacunas escolhidas para este corte: endpoint source schema, coverage
+  metrics e snapshot ids estáveis.
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/providers/endpoints/source-records.js`.
+- [x] Criado `listProviderEndpointSourceRecords()` para projetar inventário de
+  endpoints em registros estáveis com target, kind, method, locator, auth,
+  placeholders, richness tags, route selectors e base URLs.
+- [x] Criado `auditProviderEndpointImporterCoverage()` para comparar endpoint
+  inventory com importers configurados sem rede e sem runtime.
+- [x] Exportado endpoint source schema pelos barrels de `providers` e
+  `model-gateway`.
+- [x] Criado `src/copilot/model-gateway/catalog/coverage.js`.
+- [x] Criado `summarizeModelGatewayMetadataCoverage()` para medir cobertura de
+  projections, evidences, provider evidences, route options, overlays e
+  eligibility decisions por provider.
+- [x] Criado `projectModelGatewayMetadataCoverageMetrics()` com gauges globais e
+  por provider.
+- [x] Criado `createModelGatewayCatalogSnapshotId()` para ids determinísticos de
+  snapshot de catálogo, independentes de `generatedAt`, `source` e ordem de
+  arrays.
+- [x] `normalizeStoredCatalogSnapshot()` passa a incluir `snapshotId`.
+- [x] `JsonModelGatewayCatalogStore.writeSnapshot()` passa a persistir
+  `snapshotId`.
+- [x] Adicionados testes de endpoint source records, cobertura de importers,
+  coverage metrics e snapshot id estável.
+
+Separação preservada:
+
+- [x] Endpoint source records são metadados de coleta, não adapters runtime.
+- [x] Coverage é métrica de catálogo/overlay/eligibility, não prova runtime.
+- [x] Snapshot id usa conteúdo redacted/normalizado e não inclui segredo.
+- [x] Nenhum provider é chamado.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `109` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em endpoint source records, catalog coverage,
+  JSON catalog store, barrels e contrato unitário.
 - [x] PASS `git diff --check`.
