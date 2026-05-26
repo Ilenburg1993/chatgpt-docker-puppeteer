@@ -97,6 +97,7 @@ const sourceStore = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_G
 const sqliteStore = new SqliteModelGatewayCatalogStore({ dbPath: DEFAULT_SQLITE_PATH });
 const sourceSnapshot = await sourceStore.readSnapshot();
 const sqliteSnapshot = await sqliteStore.readSnapshot();
+const sqliteDiagnostics = await sqliteStore.readStorageDiagnostics();
 const integrity = auditModelGatewayCatalogSnapshotIntegrity(sourceSnapshot);
 const parity = compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSnapshot);
 const secretRegistry = createEnvSecretRegistry();
@@ -193,6 +194,11 @@ const checks = [
         detail: 'runtime proof count remains zero before live tests',
     },
     {
+        id: 'runtime_sqlite_observability',
+        ok: true,
+        detail: `runtimeRows=${sqliteDiagnostics.runtimeRows}, healthObservations=${sqliteDiagnostics.tableCounts.copilot_model_gateway_health_observations}, probeResults=${sqliteDiagnostics.tableCounts.copilot_model_gateway_runtime_probe_results}`,
+    },
+    {
         id: 'live_runner_present',
         ok: runnerExists,
         detail: path.relative(ROOT, LIVE_RUNNER_PATH),
@@ -200,6 +206,7 @@ const checks = [
 ];
 const commands = [
     'npm run model-gateway:selection:effective -- --strict --fail',
+    'npm run model-gateway:runtime-health:mirror',
     'npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000',
     'npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
     'npm run terminal:llm-b:live-test -- --byok-real --no-pr --timeout-ms=600000',
@@ -221,6 +228,10 @@ const summary = {
         parityOk: parity.ok,
         countMismatches: parity.countMismatches,
         keyMismatches: parity.keyMismatches,
+        runtimeRows: sqliteDiagnostics.runtimeRows,
+        healthObservations: sqliteDiagnostics.tableCounts.copilot_model_gateway_health_observations,
+        runtimeProbeRuns: sqliteDiagnostics.tableCounts.copilot_model_gateway_runtime_probe_runs,
+        runtimeProbeResults: sqliteDiagnostics.tableCounts.copilot_model_gateway_runtime_probe_results,
     },
     selection: {
         allowProbe: {

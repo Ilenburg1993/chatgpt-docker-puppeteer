@@ -4,8 +4,10 @@ Data: 2026-05-24
 Escopo: `src/copilot`, GitHub Copilot SDK 0.3.0, BYOK universal, seleção de modelos, probes, sessões e observability.
 
 > Nota de continuidade 2026-05-25: este arquivo permanece como histórico completo de investigação e cortes já realizados.
-> O guia operacional canônico a partir de agora é
+> O guia operacional canônico entre 2026-05-25 e 2026-05-26 foi
 > `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_UNIVERSAL_GUIDE_2026-05-25.md`.
+> O guia canônico vivo a partir de 2026-05-26 é
+> `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_NEXT_GUIDE_2026-05-26.md`.
 
 ## 1. Diagnóstico
 

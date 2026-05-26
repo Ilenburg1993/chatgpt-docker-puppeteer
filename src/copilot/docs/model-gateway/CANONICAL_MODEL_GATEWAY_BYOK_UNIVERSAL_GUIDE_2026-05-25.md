@@ -1,5 +1,9 @@
 # Canonical Model Gateway BYOK Universal Guide — 2026-05-25
 
+> Status: legado. O guia canônico vivo a partir de 2026-05-26 é
+> `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_NEXT_GUIDE_2026-05-26.md`.
+> Este arquivo permanece como histórico detalhado da evolução anterior.
+
 Este documento passa a ser o guia operacional canônico para a evolução do
 `src/copilot/model-gateway`.
 

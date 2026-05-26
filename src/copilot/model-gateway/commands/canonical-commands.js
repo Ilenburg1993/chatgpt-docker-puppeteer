@@ -121,6 +121,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Inspect SQLite table counts and operational layers without mirroring or fetching providers.',
     },
     {
+        id: 'runtime-health.mirror',
+        phase: 'pre-runtime',
+        surface: 'package',
+        command: 'npm run model-gateway:runtime-health:mirror',
+        summary: 'Mirror already-observed BYOK health into SQLite runtime tables without provider calls or catalog mutation.',
+    },
+    {
         id: 'sqlite.retention',
         phase: 'metadata',
         surface: 'package',
@@ -296,6 +303,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Makefile alias for no-mirror SQLite diagnostics.',
     },
     {
+        id: 'make.runtime-health-mirror',
+        phase: 'pre-runtime',
+        surface: 'make',
+        command: 'make model-gateway-runtime-health-mirror',
+        summary: 'Makefile alias for mirroring already-observed BYOK runtime health into SQLite.',
+    },
+    {
         id: 'make.prebuild',
         phase: 'prebuild',
         surface: 'make',
@@ -455,6 +469,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok gateway probes backoff',
         summary: 'Plan probe deferrals from known account/key and runtime rate-limit windows.',
+    },
+    {
+        id: 'terminal.runtime-health-sqlite',
+        phase: 'pre-runtime',
+        surface: 'terminal',
+        command: '/byok gateway health sqlite',
+        summary: 'Mirror current BYOK provider/model health into SQLite runtime tables without provider calls.',
     },
     {
         id: 'terminal.sqlite',
