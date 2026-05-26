@@ -5507,6 +5507,61 @@ Próximas lacunas:
 
 ---
 
+## 73. Continuidade 2026-05-26 — Live Seguro Fases 1 E 2
+
+Auditoria executada neste corte:
+
+- [x] Confirmado por `model-gateway:live:readiness` e
+  `model-gateway:live:plan` que a árvore estava limpa, `readiness=true`,
+  `plan=true` e `activeRuntimeOverlays=0`.
+- [x] Decidido executar apenas as fases de menor risco do plano: terminal
+  control-plane `--no-pr` e BYOK fixture control-plane.
+- [x] Confirmado que essas fases não enviam turno ao modelo real.
+- [x] Confirmado que a fase fixture usa provider local descartável e token
+  artificial, sem consumir quota de provider externo.
+
+Executado neste corte:
+
+- [x] Fase 1:
+  `npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000`.
+- [x] Fase 2:
+  `npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`.
+
+Resultados observados:
+
+- [x] Fase 1 PASS em
+  `artifacts/terminal-live/2026-05-26T20-50-01-791Z/summary.md`.
+- [x] Fase 1: `22/22` critérios passaram.
+- [x] Fase 1: exit code `0`, SSE conectado, zero erros, zero tools e nenhum
+  turno explícito.
+- [x] Fase 2 PASS em
+  `artifacts/terminal-live/2026-05-26T20-50-29-482Z/summary.md`.
+- [x] Fase 2: `31/31` critérios passaram.
+- [x] Fase 2: exit code `0`, SSE conectado, zero erros, sem vazamento do token
+  fixture e nenhum turno explícito.
+- [x] Fase 2 validou `/byok`, `/byok env`, `/byok providers`,
+  `/byok health`, `/byok profiles`, refresh/listagem/recommend de modelos,
+  troca de perfil fixture, troca de modelo fixture, troca de provider fixture
+  e retorno para SDK.
+
+Separação preservada:
+
+- [x] Nenhum provider externo foi chamado pela fase fixture.
+- [x] Nenhum modelo real foi executado.
+- [x] Nenhuma probe runtime real foi executada.
+- [x] Nenhuma quota BYOK real foi consumida.
+- [x] Nenhum artefato de código foi alterado.
+
+Próximas lacunas:
+
+- [ ] Antes da fase 3 (`--byok-real --no-pr`), repetir readiness, live plan,
+  lint/typecheck/testes escopados e revisar o `byok health` atual.
+- [ ] Decidir se a fase 3 deve limitar provider/perfil/modelo explicitamente
+  para evitar probes reais em providers com histórico antigo de crédito/auth.
+- [ ] Só depois da fase 3 passar considerar a fase 4 com turno real.
+
+---
+
 ## 54. Continuidade 2026-05-26 — Policy Engine Por Snapshot Completo
 
 Auditoria executada neste corte:
