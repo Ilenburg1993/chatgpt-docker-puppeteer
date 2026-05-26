@@ -14,6 +14,30 @@ export const CLOUDFLARE_WORKERS_AI_PROVIDER_ENDPOINTS = Object.freeze({
             url: 'https://developers.cloudflare.com/ai/models/',
             richness: 'task_modality_provider_catalog',
         }),
+        Object.freeze({
+            kind: 'authenticated_account_api',
+            method: 'GET',
+            url: 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/models/search',
+            richness: 'account_visible_models',
+        }),
+        Object.freeze({
+            kind: 'authenticated_account_api',
+            method: 'GET',
+            url: 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai-gateway/gateways',
+            richness: 'account_gateway_controls',
+        }),
+        Object.freeze({
+            kind: 'authenticated_account_api',
+            method: 'GET',
+            url: 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai-gateway/gateways/{gateway_id}/provider_configs',
+            richness: 'account_provider_key_controls',
+        }),
+        Object.freeze({
+            kind: 'authenticated_account_api',
+            method: 'GET',
+            url: 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai-gateway/billing/credit-balance',
+            richness: 'account_credit_balance',
+        }),
     ]),
     runtimeEndpoints: Object.freeze([
         Object.freeze({ kind: 'workers_ai_run', method: 'POST', path: '/client/v4/accounts/{account_id}/ai/run/{model}' }),

@@ -17,6 +17,12 @@ export const KILO_PROVIDER_ENDPOINTS = Object.freeze({
             url: 'https://api.kilo.ai/api/gateway/providers',
             richness: 'provider_upstream',
         }),
+        Object.freeze({
+            kind: 'authenticated_account_api',
+            method: 'GET',
+            url: 'https://api.kilo.ai/api/gateway/models',
+            richness: 'account_visible_models_policy_if_present',
+        }),
     ]),
     runtimeEndpoints: Object.freeze([
         Object.freeze({ kind: 'chat_completions', method: 'POST', path: '/chat/completions' }),

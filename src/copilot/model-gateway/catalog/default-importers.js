@@ -13,12 +13,14 @@ import {
     createAnthropicModelsImporter,
     createCerebrasPublicModelsImporter,
     createChutesModelsImporter,
+    createCloudflareWorkersAiAccountImporter,
     createCloudflareWorkersAiCatalogImporter,
     createGeminiDocsModelsImporter,
     createGeminiModelsImporter,
     createGroqDocsModelsImporter,
     createGroqModelsImporter,
     createHuggingFaceInferenceProvidersImporter,
+    createKiloGatewayAccountImporter,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
     createMistralDocsModelsImporter,
@@ -76,6 +78,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     const geminiSecret = readEnvSecret(env, ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_AI_STUDIO_API_KEY']);
     const groqSecret = readEnvSecret(env, ['GROQ_API_KEY', 'GROQ_KEY']);
     const huggingFaceSecret = readEnvSecret(env, ['HF_TOKEN', 'HUGGINGFACE_API_TOKEN', 'HUGGING_FACE_API_KEY', 'HUGGING_FACE_KEY']);
+    const kiloSecret = readEnvSecret(env, ['KILO_API_KEY', 'KILO_CODE_API_KEY', 'KILOCODE_API_KEY']);
     const openCodeSecret = readEnvSecret(env, ['OPENCODE_API_KEY']);
     const nvidiaSecret = readEnvSecret(env, ['NVIDIA_API_KEY', 'NVIDIA_KEY']);
     const chutesSecret = readEnvSecret(env, ['CHUTES_API_KEY', 'CHUTES_AI']);
@@ -134,6 +137,28 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                 fetchImpl: options.fetchImpl,
                 apiKey: openRouterSecret.value,
                 secretRef: openRouterSecret.key,
+            }),
+        );
+    }
+    if (includeAuthenticated && kiloSecret) {
+        importers.push(
+            createKiloGatewayAccountImporter({
+                fetchImpl: options.fetchImpl,
+                apiKey: kiloSecret.value,
+                secretRef: kiloSecret.key,
+                organizationId: env['KILO_ORGANIZATION_ID'],
+                organizationIdRef: env['KILO_ORGANIZATION_ID'] ? 'KILO_ORGANIZATION_ID' : undefined,
+            }),
+        );
+    }
+    if (includeAuthenticated && cloudflareSecret && env['CLOUDFLARE_ACCOUNT_ID']) {
+        importers.push(
+            createCloudflareWorkersAiAccountImporter({
+                fetchImpl: options.fetchImpl,
+                apiToken: cloudflareSecret.value,
+                secretRef: cloudflareSecret.key,
+                accountId: env['CLOUDFLARE_ACCOUNT_ID'],
+                gatewayId: env['CLOUDFLARE_AI_GATEWAY_ID'],
             }),
         );
     }

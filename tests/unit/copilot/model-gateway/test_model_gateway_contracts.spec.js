@@ -94,6 +94,7 @@ import {
     createCatalogModelTombstones,
     createCerebrasPublicModelsImporter,
     createChutesModelsImporter,
+    createCloudflareWorkersAiAccountImporter,
     createCloudflareWorkersAiCatalogImporter,
     createGeminiDocsModelsImporter,
     createGeminiModelsImporter,
@@ -115,6 +116,7 @@ import {
     createCanonicalProviderProjection,
     createCatalogImportRun,
     createDefaultModelGatewayCatalogImporters,
+    createKiloGatewayAccountImporter,
     createKiloGatewayModelsImporter,
     createKiloGatewayProvidersImporter,
     createMistralDocsModelsImporter,
@@ -3134,6 +3136,79 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('providerMetadata.kilo.iconUrl'), 'https://example.test/arcee.png');
     });
 
+    it('extracts conservative Kilo account overlay from authenticated models and JWT claims', async () => {
+        const encode = (/** @type {Record<string, unknown>} */ value) =>
+            Buffer.from(JSON.stringify(value)).toString('base64url');
+        const secret = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({
+            env: 'production',
+            kiloUserId: 'user-1',
+            version: 3,
+            iat: 1779359562,
+            exp: 1937039562,
+            apiTokenPepper: 'must-not-leak',
+        })}.signature-that-must-not-leak`;
+        /** @type {string | null} */
+        let authorizationHeader = null;
+        /** @type {string | null} */
+        let organizationHeader = null;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (_url, init) => {
+                const headers = /** @type {{ authorization?: string; 'X-KiloCode-OrganizationId'?: string }} */ (init)?.headers ?? {};
+                authorizationHeader = headers.authorization ?? null;
+                organizationHeader = headers['X-KiloCode-OrganizationId'] ?? null;
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        data: [
+                            { id: 'kilo-auto/free', isFree: true },
+                            { id: 'anthropic/claude-sonnet-4.6', allowed: true },
+                            { id: 'openai/gpt-5.4', blocked: true },
+                            { id: 'google/gemini-3.1-pro-preview' },
+                        ],
+                        account: {
+                            remainingCreditsUsd: 12.25,
+                            byokProviderKeys: ['anthropic', 'zai'],
+                        },
+                    }),
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [
+                createKiloGatewayAccountImporter({
+                    fetchImpl: fakeFetch,
+                    apiKey: secret,
+                    secretRef: 'KILO_CODE_API_KEY',
+                    organizationId: 'org-1',
+                    organizationIdRef: 'KILO_ORGANIZATION_ID',
+                }),
+            ],
+            now: () => new Date('2026-05-26T13:30:00.000Z'),
+        });
+        const overlay = snapshot.accountOverlays[0];
+        const providerEvidence = new Map(snapshot.providerEvidences.map((item) => [String(item.fieldPath), item.value]));
+
+        assert.equal(authorizationHeader, `Bearer ${secret}`);
+        assert.equal(organizationHeader, 'org-1');
+        assert.equal(JSON.stringify(snapshot).includes('must-not-leak'), false);
+        assert.equal(JSON.stringify(snapshot).includes('signature-that-must-not-leak'), false);
+        assert.equal(snapshot.sources[0].kind, 'authenticated_account_api');
+        assert.equal(snapshot.sources[0].trustTier, 'account_scoped');
+        assert.equal(overlay.accountScope, 'user-1');
+        assert.equal(overlay.secretRef, 'KILO_CODE_API_KEY');
+        assert.deepEqual(overlay.enabledModels, ['anthropic/claude-sonnet-4.6', 'kilo-auto/free']);
+        assert.deepEqual(overlay.blockedModels, ['openai/gpt-5.4']);
+        assert.deepEqual(overlay.byokProviderKeys, ['anthropic', 'zai']);
+        assert.equal(overlay.quota.remainingCreditsUsd, 12.25);
+        assert.equal(overlay.providerMetadata.accountEndpointDocumented, false);
+        assert.equal(overlay.providerMetadata.explicitAccessFieldCount, 2);
+        assert.equal(overlay.providerMetadata.organizationIdConfigured, true);
+        assert.equal(providerEvidence.get('providerMetadata.kilo.accountApi.visibleModelCount'), 4);
+        assert.equal(providerEvidence.get('providerMetadata.kilo.accountApi.remainingCreditsUsd'), 12.25);
+        assert.equal(providerEvidence.get('providerMetadata.kilo.token.validJwtShape'), true);
+    });
+
     it('extracts account-scoped OpenAI model identity without serializing the API key', async () => {
         const secret = 'sk-openai-secret-that-must-not-leak';
         /** @type {string | null} */
@@ -4500,6 +4575,112 @@ describe('model-gateway foundation', () => {
         ]);
         assert.equal(snapshot.accountOverlays[0].secretRef, 'CLOUDFLARE_KEY');
         assert.equal(snapshot.accountOverlays[0].providerMetadata.gatewayIdConfigured, true);
+    });
+
+    it('imports Cloudflare account-scoped model, gateway, provider-key and billing metadata before runtime', async () => {
+        const secret = 'cloudflare-account-secret-that-must-not-leak';
+        /** @type {string[]} */
+        const requestedUrls = [];
+        /** @type {string | null} */
+        let authorizationHeader = null;
+        const fakeFetch = /** @type {typeof fetch} */ (
+            async (url, init) => {
+                const urlText = String(url);
+                requestedUrls.push(urlText);
+                authorizationHeader = /** @type {{ authorization?: string }} */ (init)?.headers?.authorization ?? null;
+                /** @type {unknown} */
+                let payload = { success: true, result: {} };
+                if (urlText.endsWith('/ai/models/search')) {
+                    payload = {
+                        success: true,
+                        result: [
+                            { id: '@cf/meta/llama-3.1-8b-instruct', task: 'Text Generation' },
+                            { id: '@cf/baai/bge-large-en-v1.5', task: 'Text Embeddings' },
+                        ],
+                    };
+                } else if (urlText.endsWith('/ai-gateway/gateways')) {
+                    payload = {
+                        success: true,
+                        result: [
+                            {
+                                id: 'gateway-1',
+                                name: 'production',
+                                rate_limiting_limit: 120,
+                                rate_limiting_interval: 60,
+                            },
+                        ],
+                    };
+                } else if (urlText.endsWith('/ai-gateway/gateways/gateway-1')) {
+                    payload = {
+                        success: true,
+                        result: {
+                            id: 'gateway-1',
+                            cache: true,
+                            rate_limiting_limit: 240,
+                            rate_limiting_interval: 120,
+                        },
+                    };
+                } else if (urlText.endsWith('/ai-gateway/gateways/gateway-1/provider_configs')) {
+                    payload = {
+                        success: true,
+                        result: [
+                            { provider: 'workers-ai', token_preview: 'should-redact' },
+                            { provider_slug: 'openai', secret: 'should-redact' },
+                        ],
+                    };
+                } else if (urlText.endsWith('/ai-gateway/billing/credit-balance')) {
+                    payload = { success: true, result: { balance: 37.5, currency: 'USD' } };
+                } else if (urlText.endsWith('/ai-gateway/billing/spending-limit')) {
+                    payload = { success: true, result: { enabled: true, amount: 10000 } };
+                }
+                return /** @type {Response} */ ({
+                    ok: true,
+                    status: 200,
+                    headers: { get: () => 'application/json' },
+                    json: async () => payload,
+                    text: async () => JSON.stringify(payload),
+                });
+            }
+        );
+        const snapshot = await runCatalogImporters({
+            importers: [
+                createCloudflareWorkersAiAccountImporter({
+                    fetchImpl: fakeFetch,
+                    apiToken: secret,
+                    secretRef: 'CLOUDFLARE_API_TOKEN',
+                    accountId: 'account-1',
+                    gatewayId: 'gateway-1',
+                }),
+            ],
+            now: () => new Date('2026-05-26T12:00:00.000Z'),
+        });
+
+        const overlay = snapshot.accountOverlays[0];
+        const providerEvidence = new Map(snapshot.providerEvidences.map((item) => [String(item.fieldPath), item.value]));
+
+        assert.equal(authorizationHeader, `Bearer ${secret}`);
+        assert.equal(JSON.stringify(snapshot).includes(secret), false);
+        assert.equal(JSON.stringify(snapshot).includes('should-redact'), false);
+        assert.equal(snapshot.sources[0].kind, 'authenticated_account_api');
+        assert.equal(snapshot.importRuns[0].status, 'completed');
+        assert.equal(requestedUrls.some((url) => url.endsWith('/accounts/account-1/ai/models/search')), true);
+        assert.equal(
+            requestedUrls.some((url) => url.endsWith('/accounts/account-1/ai-gateway/gateways/gateway-1/provider_configs')),
+            true,
+        );
+        assert.deepEqual(overlay.enabledModels, ['@cf/meta/llama-3.1-8b-instruct', '@cf/baai/bge-large-en-v1.5']);
+        assert.deepEqual(overlay.byokProviderKeys, ['workers-ai', 'openai']);
+        assert.equal(overlay.quota.remainingCreditsUsd, 37.5);
+        assert.equal(overlay.spendingLimits.hardLimitUsd, 100);
+        assert.equal(overlay.rateLimits.requestsPerMinute, 120);
+        assert.equal(overlay.providerMetadata.semantics, 'cloudflare_account_ai_gateway_access');
+        assert.equal(overlay.providerMetadata.selectedGatewayFound, true);
+        assert.equal(overlay.providerMetadata.providerConfigCount, 2);
+        assert.equal(providerEvidence.get('providerMetadata.cloudflare.accountApi.visibleModelCount'), 2);
+        assert.deepEqual(providerEvidence.get('providerMetadata.cloudflare.accountApi.providerConfigProviders'), [
+            'workers-ai',
+            'openai',
+        ]);
     });
 
     it('imports NVIDIA NIM account models with OpenAI-compatible and management endpoint metadata', async () => {
@@ -6294,6 +6475,10 @@ describe('model-gateway foundation', () => {
             env: { OPEN_ROUTER_KEY: 'openrouter-secret-that-must-not-leak' },
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: {} }) })),
         });
+        const kiloAuthenticated = createDefaultModelGatewayCatalogImporters({
+            env: { KILO_CODE_API_KEY: 'kilo-secret-that-must-not-leak', KILO_ORGANIZATION_ID: 'org-1' },
+            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+        });
         const genericAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { CEREBRAS_KEY: 'cerebras-secret-that-must-not-leak' },
             fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
@@ -6396,6 +6581,7 @@ describe('model-gateway foundation', () => {
         );
         assert.equal(groqAuthenticated.some((importer) => importer.id === 'groq-models'), true);
         assert.equal(openRouterAuthenticated.some((importer) => importer.id === 'openrouter-key-account'), true);
+        assert.equal(kiloAuthenticated.some((importer) => importer.id === 'kilo-gateway-account'), true);
         assert.equal(genericAuthenticated.some((importer) => importer.id === 'cerebras-openai-compatible-models'), true);
         assert.equal(mistralAuthenticated.some((importer) => importer.id === 'mistral-models'), true);
         assert.equal(anthropicAuthenticated.some((importer) => importer.id === 'anthropic-models'), true);
@@ -6404,12 +6590,14 @@ describe('model-gateway foundation', () => {
         assert.equal(huggingFaceAuthenticated.some((importer) => importer.id === 'huggingface-inference-providers'), true);
         assert.equal(openCodeAuthenticated.some((importer) => importer.id === 'opencode-zen-models'), true);
         assert.equal(cloudflareAuthenticated.some((importer) => importer.id === 'cloudflare-workers-ai-catalog'), true);
+        assert.equal(cloudflareAuthenticated.some((importer) => importer.id === 'cloudflare-workers-ai-account'), true);
         assert.equal(nvidiaAuthenticated.some((importer) => importer.id === 'nvidia-nim-models'), true);
         assert.equal(chutesAuthenticated.some((importer) => importer.id === 'chutes-models'), true);
         assert.equal(zaiAuthenticated.some((importer) => importer.id === 'zai-models'), true);
         assert.equal(JSON.stringify(importers).includes(secret), false);
         assert.equal(JSON.stringify(groqAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(openRouterAuthenticated).includes('openrouter-secret-that-must-not-leak'), false);
+        assert.equal(JSON.stringify(kiloAuthenticated).includes('kilo-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(genericAuthenticated).includes('gsk-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(genericAuthenticated).includes('cerebras-secret-that-must-not-leak'), false);
         assert.equal(JSON.stringify(mistralAuthenticated).includes('mistral-secret-that-must-not-leak'), false);
@@ -6801,7 +6989,7 @@ describe('model-gateway foundation', () => {
         assert.equal(kilo?.['topology'], 'gateway');
         assert.equal(kilo?.['gatewayManaged'], true);
         assert.equal(kilo?.['openAICompatible'], true);
-        assert.equal(kilo?.['catalogSourceCount'], 2);
+        assert.equal(kilo?.['catalogSourceCount'], 3);
         assert.equal(kilo?.['runtimeEndpointCount'], 2);
         assert.equal(/** @type {Record<string, any>} */ (kilo?.['routing'] ?? {})['supportsGatewayByok'], true);
         assert.equal(/** @type {Record<string, any>} */ (kilo?.['capabilities'] ?? {})['fim'], true);
@@ -6886,7 +7074,7 @@ describe('model-gateway foundation', () => {
         const byProvider = new Map(coverage.map((item) => [item.providerId, item]));
 
         assert.equal(byProvider.get('openai')?.coveredCatalogSourceCount, 1);
-        assert.equal(byProvider.get('kilo')?.coveredCatalogSourceCount, 2);
+        assert.equal(byProvider.get('kilo')?.coveredCatalogSourceCount, 3);
         assert.equal(byProvider.get('openrouter')?.coveredCatalogSourceCount, 1);
         assert.equal(byProvider.get('zai')?.uncoveredCatalogSourceIds.includes('zai:catalog:openapi:GET:https://docs.z.ai/openapi.json'), true);
     });

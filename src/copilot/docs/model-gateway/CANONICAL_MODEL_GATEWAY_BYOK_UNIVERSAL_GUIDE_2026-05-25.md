@@ -1211,7 +1211,9 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Providers importer.
 - [x] Route metadata de gateway.
 - [x] BYOK internal hints.
-- [ ] Account overlay real de allow/block/balance.
+- [x] Account overlay autenticado conservador de token, free models e policy
+  fields quando presentes.
+- [ ] Endpoint dedicado documentado de balance/allowlist, se Kilo publicar.
 - [ ] Probes live com `llm-b` quando a camada J+ estiver pronta.
 - [x] Seleção por provider upstream.
 
@@ -1230,7 +1232,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Workers AI direct route metadata.
 - [x] AI Gateway universal route metadata.
 - [x] Overlay com account/gateway configured.
-- [ ] Account access validation sem runtime.
+- [x] Account access validation sem runtime.
 - [ ] Gateway fallback/cache/retry probes.
 - [ ] Separação UX Workers AI direto vs AI Gateway.
 
@@ -1451,8 +1453,8 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Gemini/Vertex docs seed.
 - [x] Mistral docs pricing seed.
 - [x] OpenRouter account overlay importer.
-- [ ] Kilo account overlay importer.
-- [ ] Cloudflare account access importer beyond configured flags.
+- [x] Kilo account overlay importer.
+- [x] Cloudflare account access importer beyond configured flags.
 
 ### Faixa M — Normalização
 
@@ -3388,8 +3390,8 @@ Próximas lacunas L identificadas:
 - [ ] Gemini/Vertex docs seed e distinção fina de superfície.
 - [ ] Mistral docs pricing seed.
 - [ ] OpenRouter account overlay importer profundo.
-- [ ] Kilo account overlay importer real de allow/block/balance.
-- [ ] Cloudflare account access importer além de flags configuradas.
+- [x] Kilo account overlay importer conservador de token/model policy.
+- [x] Cloudflare account access importer além de flags configuradas.
 - [ ] Parser estrutural do OpenAPI da Z.AI.
 - [ ] Importer autenticado especializado para Cerebras.
 
@@ -3500,8 +3502,8 @@ Próximas lacunas L reforçadas:
 - [ ] Usar a saída do comando como gate antes do primeiro build real.
 - [ ] Criar importers de docs para Anthropic, Gemini/Vertex e Mistral seguindo
   o mesmo padrão de seed público da OpenAI.
-- [ ] Criar overlays account-scoped profundos para OpenRouter e Kilo.
-- [ ] Expandir Cloudflare de flags configuradas para evidência account-scoped.
+- [x] Criar overlays account-scoped profundos para OpenRouter e Kilo.
+- [x] Expandir Cloudflare de flags configuradas para evidência account-scoped.
 
 Validação deste corte:
 
@@ -3568,8 +3570,8 @@ Próximas lacunas L reforçadas:
 - [ ] Gemini/Vertex docs seed e distinção entre Gemini Developer API,
   Vertex AI e OpenAI-compatible surface.
 - [ ] Mistral docs pricing seed.
-- [ ] OpenRouter/Kilo account overlays profundos.
-- [ ] Cloudflare account access importer além de flags configuradas.
+- [x] OpenRouter/Kilo account overlays profundos.
+- [x] Cloudflare account access importer além de flags configuradas.
 
 Validação deste corte:
 
@@ -3634,8 +3636,8 @@ Separação preservada:
 Próximas lacunas L reforçadas:
 
 - [ ] Mistral docs pricing seed.
-- [ ] Account overlays profundos para OpenRouter e Kilo.
-- [ ] Cloudflare account access importer além de flags configuradas.
+- [x] Account overlays profundos para OpenRouter e Kilo.
+- [x] Cloudflare account access importer além de flags configuradas.
 - [ ] Parser estrutural adicional para OpenAPI docs onde o provider expõe
   schema legível por máquina.
 
@@ -3695,8 +3697,8 @@ Separação preservada:
 
 Próximas lacunas L reforçadas:
 
-- [ ] Account overlays profundos para OpenRouter e Kilo.
-- [ ] Cloudflare account access importer além de flags configuradas.
+- [x] Account overlays profundos para OpenRouter e Kilo.
+- [x] Cloudflare account access importer além de flags configuradas.
 - [ ] Parser estrutural do OpenAPI da Z.AI.
 - [ ] Importer autenticado especializado para Cerebras.
 
@@ -3751,8 +3753,8 @@ Separação preservada:
 
 Próximas lacunas L reforçadas:
 
-- [ ] Kilo account overlay real de allow/block/balance.
-- [ ] Cloudflare account access importer além de flags configuradas.
+- [x] Kilo account overlay conservador de token/model policy.
+- [x] Cloudflare account access importer além de flags configuradas.
 - [ ] Parser estrutural do OpenAPI da Z.AI.
 - [ ] Importer autenticado especializado para Cerebras.
 
@@ -3915,6 +3917,187 @@ Validação deste corte:
   com `9` testes.
 - [x] PASS `npm run model-gateway:test:terminal` com `62` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 63. Continuidade 2026-05-26 — Cloudflare Account Access Importer
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a lacuna Cloudflare da Faixa L: o importer anterior gerava
+  overlay apenas a partir de flags configuradas (`accountId`/`gatewayId`) e dos
+  modelos do catálogo público.
+- [x] Confirmado que isso misturava duas realidades diferentes: catálogo
+  provider-level e estado account/key.
+- [x] Confirmado que a camada correta antes do primeiro build precisa saber o
+  que a key Cloudflare enxerga no control-plane antes de qualquer probe runtime.
+- [x] Consultadas as superfícies oficiais Cloudflare para model search,
+  AI Gateway gateways, provider configs e billing/credits.
+- [x] Confirmado que a nova peça deve ser `authenticated_account_api`, manual,
+  TTL curto e sem execução de modelos.
+
+Implementado neste corte:
+
+- [x] Criado `createCloudflareWorkersAiAccountImporter()`.
+- [x] Criado parser `parseCloudflareWorkersAiAccountRows()`.
+- [x] O importer consulta `accounts/{account_id}/ai/models/search` para obter
+  modelos visíveis pela conta/key.
+- [x] O importer consulta `accounts/{account_id}/ai-gateway/gateways` e,
+  quando `CLOUDFLARE_AI_GATEWAY_ID` existe, também o gateway específico.
+- [x] O importer consulta `provider_configs` do AI Gateway para identificar
+  provider keys/configs disponíveis sem vazar tokens.
+- [x] O importer consulta billing credit balance e spending limit como
+  metadados account-scoped, sem inferir spending exausto a partir de créditos
+  quando a semântica não é suficiente.
+- [x] O overlay passa a expor `enabledModels`, `byokProviderKeys`,
+  `quota.remainingCreditsUsd`, rate-limit de gateway e spending limit quando
+  documentado.
+- [x] O overlay usa `semantics:
+  cloudflare_account_ai_gateway_access`.
+- [x] O importer falha se os endpoints core de conta (`modelsSearch` e
+  `gateways`) falham juntos, mas tolera falhas em endpoints acessórios como
+  billing/provider configs.
+- [x] O raw payload sanitiza chaves, tokens, secrets, authorization e dados de
+  pagamento antes de virar raw ref.
+- [x] `createDefaultModelGatewayCatalogImporters()` passa a incluir o importer
+  Cloudflare account-scoped quando há `CLOUDFLARE_KEY`/`CLOUDFLARE_API_TOKEN`
+  e `CLOUDFLARE_ACCOUNT_ID`.
+- [x] Barrels `catalog/importers`, `catalog` e `model-gateway` exportam o novo
+  importer e o parser.
+- [x] Endpoint inventory Cloudflare passa a listar model search, gateways,
+  provider configs e credit balance como fontes account-scoped.
+- [x] Teste unitário cobre coleta de modelos visíveis, gateway, provider keys,
+  créditos, spending limit, rate limit e sanitização de segredos.
+
+Separação preservada:
+
+- [x] O catálogo público Cloudflare continua sendo provider-level.
+- [x] O novo overlay Cloudflare é account/key-scoped.
+- [x] Nenhum modelo Cloudflare é executado.
+- [x] Nenhuma probe runtime é executada.
+- [x] A ausência de crédito não vira hard exclusion automática sem semântica de
+  saldo restante realmente aplicável.
+- [x] Gateway rate limit entra como controle pré-runtime e pode ser usado pela
+  etapa de eligibility/backoff.
+- [x] Provider configs entram como disponibilidade de provider/key no gateway,
+  não como prova de capacidade runtime.
+
+Impacto no roadmap:
+
+- [x] Faixa L agora cobre Cloudflare account access além das flags configuradas.
+- [x] A seção 10.9 passa a marcar account access validation sem runtime como
+  concluída.
+- [x] A lacuna Cloudflare em auditorias anteriores fica fechada.
+- [ ] Ainda falta probe runtime específica para gateway fallback/cache/retry.
+- [ ] Ainda falta UX de distinção explícita entre Workers AI direto e AI Gateway
+  quando a mesma projection puder ser roteada pelos dois caminhos.
+- [ ] Ainda falta endpoint dedicado Kilo documentado de balance/allowlist, se
+  ele existir fora do dashboard.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "Cloudflare"`
+  com `4` testes Cloudflare e `138` skipped.
+- [x] PASS `npm run typecheck:strict:src.copilot -- --pretty false`.
+- [x] PASS `npm run model-gateway:test:contracts` com `142` testes.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 64. Continuidade 2026-05-26 — Kilo Account Overlay Conservador
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a lacuna Kilo da Faixa L sob a lente pré-runtime: precisamos
+  separar catálogo público, token/account e prova runtime.
+- [x] Consultada a documentação Kilo Gateway de autenticação: API keys são JWTs
+  enviados via `Authorization: Bearer`, e organization tokens podem aplicar
+  allow lists, provider restrictions e spending limits.
+- [x] Consultada a documentação de modelos/provedores: `/models` e
+  `/providers` são catálogos públicos; free models existem sem crédito e
+  anonymous tem limite por IP.
+- [x] Consultada a referência de API: erros `401`, `402`, `403` e `429` são
+  runtime/operacionais; `402` representa insufficient balance e `403`
+  representa model not allowed by organization policy.
+- [x] Não foi identificado endpoint público documentado separado para
+  balance/allowlist da conta fora do dashboard.
+
+Decisão arquitetural:
+
+- [x] Não fingir que o catálogo público prova acesso pago.
+- [x] Não usar runtime probe para descobrir balance/allowlist nesta fase.
+- [x] Criar importer account-scoped conservador que autentica em `/models`,
+  decodifica claims JWT não sensíveis e aproveita campos explícitos de policy
+  se o endpoint autenticado os retornar.
+- [x] Manter free models como enabled pré-runtime porque a documentação afirma
+  que modelos free ficam disponíveis sem crédito.
+- [x] Manter modelos pagos como unknown quando não há campo explícito de
+  allow/available/enabled; eles seguem para seleção/probe posterior conforme
+  policy.
+
+Implementado neste corte:
+
+- [x] Criado `createKiloGatewayAccountImporter()`.
+- [x] Criado parser `parseKiloGatewayAccountRows()`.
+- [x] O importer faz GET autenticado em `https://api.kilo.ai/api/gateway/models`
+  com `Authorization: Bearer`.
+- [x] O importer aceita `KILO_ORGANIZATION_ID` e envia
+  `X-KiloCode-OrganizationId` quando configurado.
+- [x] O importer decodifica localmente claims JWT não sensíveis (`env`,
+  `kiloUserId`, `version`, `iat`, `exp`) sem verificar assinatura e sem
+  serializar o token.
+- [x] O importer sanitiza token, secret, api key, authorization, password,
+  pepper e credential antes do raw payload ref.
+- [x] O overlay usa `semantics:
+  kilo_authenticated_models_and_token_claims`.
+- [x] O overlay preenche `enabledModels` com modelos explicitamente allowed e
+  modelos free.
+- [x] O overlay preenche `blockedModels` apenas quando campos explícitos de
+  block/disabled/denied aparecem.
+- [x] O overlay preenche `quota.remainingCreditsUsd` somente se o response
+  autenticado trouxer saldo/credits com semântica clara.
+- [x] O overlay preenche `byokProviderKeys` somente se o response autenticado
+  trouxer provider keys/configs.
+- [x] `createDefaultModelGatewayCatalogImporters()` passa a incluir o importer
+  Kilo account-scoped quando há `KILO_API_KEY`, `KILO_CODE_API_KEY` ou
+  `KILOCODE_API_KEY`.
+- [x] Endpoint inventory Kilo passa a listar `/models` autenticado como fonte
+  account-scoped de policy quando presente.
+- [x] Barrels `catalog/importers`, `catalog` e `model-gateway` exportam o novo
+  importer e parser.
+- [x] Teste unitário cobre JWT sanitizado, org header, enabled free/allowed,
+  blocked explícito, BYOK provider keys e quota quando retornada.
+
+Separação preservada:
+
+- [x] Catálogo público Kilo continua provider-level.
+- [x] Overlay autenticado Kilo continua account/key-scoped.
+- [x] Nenhum modelo é executado.
+- [x] Nenhuma probe runtime é executada.
+- [x] `402`, `403` e `429` continuam pertencendo à camada runtime/health, não
+  ao importer de metadados.
+- [x] JWT decode local é usado apenas como identidade/expiração de token e não
+  como prova criptográfica.
+
+Impacto no roadmap:
+
+- [x] Faixa L passa a ter importer Kilo account-scoped.
+- [x] A seção 10.7 deixa de tratar Kilo como apenas catálogo público.
+- [x] A lacuna OpenRouter/Kilo account overlays fica fechada no nível
+  arquitetural atual.
+- [ ] Ainda falta descobrir endpoint dedicado Kilo de balance/allowlist caso
+  ele seja publicado no futuro.
+- [ ] Ainda falta probe live com `llm-b` depois que a camada J+ estiver pronta.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "Kilo"`
+  com `3` testes Kilo e `140` skipped.
+- [x] PASS `npm run typecheck:strict:src.copilot -- --pretty false`.
+- [x] PASS `npm run model-gateway:test:contracts` com `143` testes.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.
 
