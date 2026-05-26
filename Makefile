@@ -1376,7 +1376,7 @@ rag-rebuild-code-config-strict:
 # MODEL GATEWAY BYOK — COMANDOS CANÔNICOS PRE-BUILD
 # =============================================================================
 
-.PHONY: model-gateway-help model-gateway-commands model-gateway-commands-json model-gateway-lint model-gateway-typecheck model-gateway-test-contracts model-gateway-test-terminal model-gateway-validate model-gateway-prebuild model-gateway-refresh model-gateway-refresh-preview model-gateway-refresh-plan model-gateway-refresh-provider model-gateway-refresh-log model-gateway-terminal
+.PHONY: model-gateway-help model-gateway-commands model-gateway-commands-json model-gateway-lint model-gateway-typecheck model-gateway-test-contracts model-gateway-test-terminal model-gateway-validate model-gateway-prebuild model-gateway-refresh model-gateway-refresh-preview model-gateway-refresh-plan model-gateway-refresh-provider model-gateway-refresh-log model-gateway-sqlite-diagnostics model-gateway-terminal
 
 model-gateway-help: model-gateway-commands
 
@@ -1415,6 +1415,9 @@ model-gateway-refresh-plan:
 
 model-gateway-refresh-log:
 	@$(NPM) run model-gateway:refresh:log
+
+model-gateway-sqlite-diagnostics:
+	@$(NPM) run model-gateway:sqlite:diagnostics
 
 model-gateway-refresh-provider:
 	@if [ -z "$(PROVIDER)" ]; then \

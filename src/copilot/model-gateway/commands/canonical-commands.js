@@ -97,6 +97,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Plan selected/skipped sources before fetching providers or writing the catalog.',
     },
     {
+        id: 'sqlite.diagnostics',
+        phase: 'metadata',
+        surface: 'package',
+        command: 'npm run model-gateway:sqlite:diagnostics',
+        summary: 'Inspect SQLite table counts and operational layers without mirroring or fetching providers.',
+    },
+    {
         id: 'prebuild.all',
         phase: 'prebuild',
         surface: 'package',
@@ -144,6 +151,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-refresh-plan',
         summary: 'Makefile alias for no-network refresh planning.',
+    },
+    {
+        id: 'make.sqlite-diagnostics',
+        phase: 'metadata',
+        surface: 'make',
+        command: 'make model-gateway-sqlite-diagnostics',
+        summary: 'Makefile alias for no-mirror SQLite diagnostics.',
     },
     {
         id: 'make.prebuild',

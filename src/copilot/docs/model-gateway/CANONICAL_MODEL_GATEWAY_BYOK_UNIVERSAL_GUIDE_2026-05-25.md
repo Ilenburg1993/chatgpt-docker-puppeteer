@@ -3500,6 +3500,10 @@ Implementado neste corte:
   SQLite depois do mirror.
 - [x] `/byok gateway catalog sqlite` passa a exibir o estado de paridade do
   mirror.
+- [x] Criado `scripts/model-gateway-sqlite-diagnostics.mjs` para diagnóstico
+  SQLite sem mirror, rede, provider ou runtime.
+- [x] Adicionados `model-gateway:sqlite:diagnostics` e
+  `make model-gateway-sqlite-diagnostics`.
 - [x] Teste cobre duplicatas de evidência no snapshot, preservação de route
   decisions, preservação de runtime health/probes e histórico account/key entre
   rewrites de catálogo.
@@ -3518,7 +3522,7 @@ Próximas lacunas:
 
 - [ ] Criar retention explícito para histórico account/key em SQLite.
 - [ ] Espelhar logs JSONL de refresh para uma tabela operacional SQLite.
-- [ ] Criar comando terminal dedicado para diagnóstico SQLite sem executar
+- [x] Criar comando canônico dedicado para diagnóstico SQLite sem executar
   mirror.
 - [ ] Adicionar diff SQL entre JSON snapshot e SQLite materializado como gate
   formal antes do primeiro build.
@@ -3529,6 +3533,9 @@ Validação deste corte:
 - [x] PASS `npm run model-gateway:test:contracts` com `147` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `node --check scripts/model-gateway-sqlite-diagnostics.mjs`.
+- [x] PASS ESLint focado em `scripts/model-gateway-sqlite-diagnostics.mjs`.
+- [x] PASS smoke `node scripts/model-gateway-sqlite-diagnostics.mjs --json`.
 - [x] PASS `git diff --check`.
 
 ---
