@@ -2167,6 +2167,41 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('provider_explicit');
     });
 
+    it('mostra seleção efetiva com health observado sem persistir nem executar probes', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway selection audit effective repo_agent');
+
+        expect(evaluateModelGatewayCatalogEligibility).toHaveBeenCalledWith(
+            expect.objectContaining({
+                snapshot: expect.any(Object),
+                secretRegistry: expect.any(Object),
+                healthRecords: expect.any(Array),
+                policy: expect.objectContaining({
+                    unknownAccessPolicy: 'block',
+                    policyProfile: 'terminal-effective-strict-no-runtime',
+                }),
+            }),
+        );
+        expect(applyModelGatewayEligibilityToSnapshot).not.toHaveBeenCalled();
+        expect(auditModelGatewayPreRuntimeSelection).toHaveBeenCalledWith(
+            expect.objectContaining({
+                source: 'terminal-effective-selection-preview',
+                modelEligibilityDecisions: expect.any(Array),
+            }),
+            expect.objectContaining({
+                strict: true,
+                profiles: ['repo_agent'],
+                secretRegistry: expect.any(Object),
+            }),
+        );
+        expect(ctx.output()).toContain('mode=allow_probe_unknown+effective');
+        expect(ctx.output()).toContain('persisted=nao');
+        expect(ctx.output()).toContain('observedHealth=');
+        expect(ctx.output()).toContain('runtimeOverlays=1');
+    });
+
     it('executa refresh do catálogo model-gateway com saída OpenAI-compatible resumida', async () => {
         mockProjection();
         const ctx = mockCtx();

@@ -11,6 +11,9 @@ import {
     auditModelGatewayPreRuntimeSelection,
     compareModelGatewayCatalogSnapshotParity,
     createEnvSecretRegistry,
+    deriveModelGatewayRuntimeAccountOverlaysFromHealth,
+    evaluateModelGatewayCatalogEligibility,
+    listByokProviderModelHealth,
 } from '../src/copilot/model-gateway/index.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -77,6 +80,26 @@ const sqliteSnapshot = await sqliteStore.readSnapshot();
 const integrity = auditModelGatewayCatalogSnapshotIntegrity(sourceSnapshot);
 const parity = compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSnapshot);
 const secretRegistry = createEnvSecretRegistry();
+const healthRecords = listByokProviderModelHealth();
+const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords);
+const effectiveEligibility = evaluateModelGatewayCatalogEligibility({
+    snapshot: sourceSnapshot,
+    secretRegistry,
+    healthRecords,
+    policy: {
+        unknownAccessPolicy: 'block',
+        policyProfile: 'live-readiness-effective-strict',
+    },
+});
+const effectiveSnapshot = {
+    ...sourceSnapshot,
+    source: 'live-readiness-effective-preview',
+    modelEligibilityDecisions: effectiveEligibility.decisions,
+    modelEligibilityRuns: [
+        ...(Array.isArray(sourceSnapshot.modelEligibilityRuns) ? sourceSnapshot.modelEligibilityRuns : []),
+        effectiveEligibility.run,
+    ],
+};
 const allowProbeSelection = auditModelGatewayPreRuntimeSelection(sourceSnapshot, {
     strict: false,
     secretRegistry,
@@ -85,12 +108,21 @@ const strictAccessSelection = auditModelGatewayPreRuntimeSelection(sourceSnapsho
     strict: true,
     secretRegistry,
 });
+const effectiveStrictSelection = auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
+    strict: true,
+    secretRegistry,
+});
 const runnerExists = await fileExists(LIVE_RUNNER_PATH);
 const strictSelectedDispositions = selectedDispositions(strictAccessSelection);
+const effectiveSelectedDispositions = selectedDispositions(effectiveStrictSelection);
 const strictOnlyKnownAccess =
     strictAccessSelection.ok &&
     strictSelectedDispositions.length > 0 &&
     strictSelectedDispositions.every((disposition) => disposition === 'eligible');
+const effectiveOnlyKnownAccess =
+    effectiveStrictSelection.ok &&
+    effectiveSelectedDispositions.length > 0 &&
+    effectiveSelectedDispositions.every((disposition) => disposition === 'eligible');
 const checks = [
     {
         id: 'catalog_integrity',
@@ -113,6 +145,11 @@ const checks = [
         detail: `${strictAccessSelection.summary.selectedProfileCount}/${strictAccessSelection.summary.profileCount} profiles selected, dispositions=${strictSelectedDispositions.join(',') || 'none'}`,
     },
     {
+        id: 'selection_effective_observed_health',
+        ok: effectiveStrictSelection.ok && effectiveOnlyKnownAccess,
+        detail: `${effectiveStrictSelection.summary.selectedProfileCount}/${effectiveStrictSelection.summary.profileCount} profiles selected, runtimeOverlays=${runtimeAccountOverlays.length}, dispositions=${effectiveSelectedDispositions.join(',') || 'none'}`,
+    },
+    {
         id: 'runtime_not_promoted',
         ok: strictAccessSelection.profiles.every((profile) => optionalNumber(profile.decisionLayers['runtimeProbeProofCount']) === 0),
         detail: 'runtime proof count remains zero before live tests',
@@ -124,6 +161,7 @@ const checks = [
     },
 ];
 const commands = [
+    'npm run model-gateway:selection:effective -- --strict --fail',
     'npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000',
     'npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
     'npm run terminal:llm-b:live-test -- --byok-real --no-pr --timeout-ms=600000',
@@ -159,6 +197,16 @@ const summary = {
             profiles: strictAccessSelection.summary.profileCount,
             providers: strictAccessSelection.summary.selectedProviders,
             dispositions: strictSelectedDispositions,
+        },
+        effectiveStrict: {
+            ok: effectiveStrictSelection.ok,
+            selected: effectiveStrictSelection.summary.selectedProfileCount,
+            profiles: effectiveStrictSelection.summary.profileCount,
+            providers: effectiveStrictSelection.summary.selectedProviders,
+            dispositions: effectiveSelectedDispositions,
+            healthRecords: healthRecords.length,
+            runtimeAccountOverlays: runtimeAccountOverlays.length,
+            eligibilityDecisions: effectiveEligibility.decisions.length,
         },
     },
     livePlan: {

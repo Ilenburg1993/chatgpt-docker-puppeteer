@@ -174,6 +174,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Audit metadata-first route selection from the persisted catalog without runtime probes.',
     },
     {
+        id: 'selection.effective',
+        phase: 'selection',
+        surface: 'package',
+        command: 'npm run model-gateway:selection:effective',
+        summary: 'Evaluate effective no-runtime selection with observed account/runtime health overlays.',
+    },
+    {
         id: 'live.readiness',
         phase: 'live-readiness',
         surface: 'package',
@@ -298,6 +305,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-selection-audit',
         summary: 'Makefile alias for pre-runtime selection audit.',
+    },
+    {
+        id: 'make.effective-selection',
+        phase: 'selection',
+        surface: 'make',
+        command: 'make model-gateway-effective-selection',
+        summary: 'Makefile alias for effective no-runtime selection.',
     },
     {
         id: 'make.live-readiness',
@@ -450,8 +464,8 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         id: 'terminal.selection-audit',
         phase: 'selection',
         surface: 'terminal',
-        command: '/byok gateway selection audit',
-        summary: 'Audit route selection across task profiles without runtime probes.',
+        command: '/byok gateway selection audit effective',
+        summary: 'Audit effective route selection with observed health, without executing new runtime probes.',
     },
     {
         id: 'terminal.route',

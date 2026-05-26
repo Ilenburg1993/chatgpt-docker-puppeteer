@@ -3346,6 +3346,74 @@ Validação deste corte:
 
 ---
 
+## 75. Continuidade 2026-05-26 — Seleção Efetiva Sem Novas Probes
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que a seleção pré-runtime pura já valida catálogo,
+  overlays persistidos, secrets e decisions sem chamar provider.
+- [x] Confirmado que faltava um gate intermediário entre seleção pura e live
+  real: uma seleção efetiva que considere health/quotas já observados, mas sem
+  executar novas probes.
+- [x] Confirmado bug de composição na primeira versão do gate: usar
+  `applyModelGatewayEligibilityToSnapshot()` numa visão temporária preservava
+  decisions antigas junto das novas, permitindo que uma decision anterior
+  mascarasse health/limite atual.
+
+Implementado neste corte:
+
+- [x] Criado `scripts/model-gateway-effective-selection.mjs`.
+- [x] Adicionado package script `model-gateway:selection:effective`.
+- [x] Adicionado Make target `model-gateway-effective-selection`.
+- [x] Inventário canônico passa a listar package e make da seleção efetiva.
+- [x] Terminal `/byok gateway selection audit effective` passa a expor a mesma
+  seleção efetiva sem novas probes.
+- [x] O novo gate lê o catálogo persistido e o health local já observado.
+- [x] O gate deriva overlays voláteis de runtime health em memória.
+- [x] O gate reavalia eligibility numa snapshot temporária não-mutante.
+- [x] A snapshot temporária substitui `modelEligibilityDecisions` pelas decisions
+  efetivas calculadas neste run, em vez de acumular decisions antigas.
+- [x] O gate roda `auditModelGatewayPreRuntimeSelection()` em modo strict sobre
+  essa visão efetiva.
+- [x] O gate reporta `persisted=false` e `runtimeExecuted=false`.
+- [x] `model-gateway:live:readiness` agora inclui
+  `selection_effective_observed_health`.
+
+Separação preservada:
+
+- [x] O banco canônico JSON não é alterado.
+- [x] O SQLite não é alterado.
+- [x] Health local é apenas lido.
+- [x] Nenhum provider é chamado.
+- [x] Nenhum modelo é executado.
+- [x] Nenhuma probe é rodada.
+- [x] Quota/health observados entram apenas como exclusão/decisão temporária.
+
+Resultado:
+
+- [x] PASS `npm run model-gateway:selection:effective -- --strict --fail`.
+- [x] `healthRecordCount=17`.
+- [x] `runtimeAccountOverlayCount=0` neste estado local atual.
+- [x] `eligibilityDecisionCount=1923`.
+- [x] Seleção strict efetiva `8/8`.
+- [x] Providers selecionados: `zai=1`, `chutes=6`, `cerebras=1`.
+- [x] `selectedDispositions=["eligible"]`.
+- [x] PASS `npm run model-gateway:live:readiness` com
+  `selection_effective_observed_health`.
+- [x] PASS `npm run model-gateway:commands -- --phase=selection`.
+- [x] PASS `npm run model-gateway:test:terminal` com `66` testes.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `git diff --check`.
+
+Próximas lacunas:
+
+- [ ] Antes de `--byok-real --no-pr`, rodar de novo seleção efetiva e comparar
+  se health/quotas mudaram.
+- [ ] O live real continua bloqueado até essa comparação permanecer verde.
+
+---
+
 ## 74. Continuidade 2026-05-26 — Readiness Antes Dos Live Tests LLM-B
 
 Auditoria executada neste corte:
