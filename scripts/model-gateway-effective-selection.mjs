@@ -15,7 +15,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-effective-selection.mjs [--json] [--strict] [--profiles=a,b] [--fail]
+    process.stdout.write(`Usage: node scripts/model-gateway-effective-selection.mjs [--json] [--strict] [--profiles=a,b] [--fail] [--fail-on-supply-warning]
 
 Build a non-mutating effective selection view from the persisted metadata catalog plus already-observed account/runtime
 health. This does not fetch providers, execute models, run probes or persist eligibility decisions.
@@ -65,6 +65,7 @@ function formatCountMap(counts) {
 const json = argSet.has('--json');
 const strict = argSet.has('--strict') || !argSet.has('--allow-probe');
 const fail = argSet.has('--fail');
+const failOnSupplyWarning = argSet.has('--fail-on-supply-warning');
 const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
 const snapshot = await store.readSnapshot();
 const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
@@ -100,9 +101,10 @@ const selection = auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
     secretRegistry,
 });
 const dispositions = selectedDispositions(selection);
+const supplyWarningCount = selection.profiles.reduce((sum, profile) => sum + profile.supplyWarnings.length, 0);
 const summary = {
     schema: 'model-gateway-effective-selection',
-    ok: integrity.ok && selection.ok,
+    ok: integrity.ok && selection.ok && (!failOnSupplyWarning || supplyWarningCount === 0),
     persisted: false,
     runtimeExecuted: false,
     mode: strict ? 'strict_access_only_with_observed_health' : 'allow_probe_unknown_with_observed_health',
@@ -123,6 +125,7 @@ const summary = {
     selection: {
         ...selection,
         selectedDispositions: dispositions,
+        supplyWarningCount,
     },
     nextCommands: [
         'npm run model-gateway:selection:audit -- --strict --fail-on-unselected',

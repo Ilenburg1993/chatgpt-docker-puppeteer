@@ -24,7 +24,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-live-readiness.mjs [--json] [--fail]
+    process.stdout.write(`Usage: node scripts/model-gateway-live-readiness.mjs [--json] [--fail] [--fail-on-supply-warning]
 
 Check whether the model-gateway metadata database is ready for terminal llm-b live tests.
 This does not start the terminal, execute providers, run models or run runtime probes.
@@ -72,8 +72,25 @@ function selectedDispositions(audit) {
     ].sort();
 }
 
+/**
+ * @param {ReturnType<typeof auditModelGatewayPreRuntimeSelection>} audit
+ * @returns {{ total: number; byProfile: Record<string, number> }}
+ */
+function supplyWarningSummary(audit) {
+    /** @type {Record<string, number>} */
+    const byProfile = {};
+    for (const profile of audit.profiles) {
+        byProfile[profile.profileId] = profile.supplyWarnings.length;
+    }
+    return {
+        total: Object.values(byProfile).reduce((sum, count) => sum + count, 0),
+        byProfile,
+    };
+}
+
 const json = argSet.has('--json');
 const fail = argSet.has('--fail');
+const failOnSupplyWarning = argSet.has('--fail-on-supply-warning');
 const sourceStore = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
 const sqliteStore = new SqliteModelGatewayCatalogStore({ dbPath: DEFAULT_SQLITE_PATH });
 const sourceSnapshot = await sourceStore.readSnapshot();
@@ -121,6 +138,9 @@ const effectiveStrictSelection = auditModelGatewayPreRuntimeSelection(effectiveS
 const runnerExists = await fileExists(LIVE_RUNNER_PATH);
 const strictSelectedDispositions = selectedDispositions(strictAccessSelection);
 const effectiveSelectedDispositions = selectedDispositions(effectiveStrictSelection);
+const allowProbeSupplyWarnings = supplyWarningSummary(allowProbeSelection);
+const strictAccessSupplyWarnings = supplyWarningSummary(strictAccessSelection);
+const effectiveStrictSupplyWarnings = supplyWarningSummary(effectiveStrictSelection);
 const strictOnlyKnownAccess =
     strictAccessSelection.ok &&
     strictSelectedDispositions.length > 0 &&
@@ -154,6 +174,11 @@ const checks = [
         id: 'selection_effective_observed_health',
         ok: effectiveStrictSelection.ok && effectiveOnlyKnownAccess,
         detail: `${effectiveStrictSelection.summary.selectedProfileCount}/${effectiveStrictSelection.summary.profileCount} profiles selected, runtimeOverlays=${runtimeAccountOverlays.length} active=${runtimeAccountOverlaySummary.activeCount} expired=${runtimeAccountOverlaySummary.expiredCount}, dispositions=${effectiveSelectedDispositions.join(',') || 'none'}`,
+    },
+    {
+        id: 'selection_supply_warnings',
+        ok: !failOnSupplyWarning || effectiveStrictSupplyWarnings.total === 0,
+        detail: `allow=${allowProbeSupplyWarnings.total}, strict=${strictAccessSupplyWarnings.total}, effective=${effectiveStrictSupplyWarnings.total}`,
     },
     {
         id: 'runtime_not_promoted',
@@ -196,6 +221,7 @@ const summary = {
             selected: allowProbeSelection.summary.selectedProfileCount,
             profiles: allowProbeSelection.summary.profileCount,
             providers: allowProbeSelection.summary.selectedProviders,
+            supplyWarnings: allowProbeSupplyWarnings,
         },
         strictAccess: {
             ok: strictAccessSelection.ok,
@@ -203,6 +229,7 @@ const summary = {
             profiles: strictAccessSelection.summary.profileCount,
             providers: strictAccessSelection.summary.selectedProviders,
             dispositions: strictSelectedDispositions,
+            supplyWarnings: strictAccessSupplyWarnings,
         },
         effectiveStrict: {
             ok: effectiveStrictSelection.ok,
@@ -210,6 +237,7 @@ const summary = {
             profiles: effectiveStrictSelection.summary.profileCount,
             providers: effectiveStrictSelection.summary.selectedProviders,
             dispositions: effectiveSelectedDispositions,
+            supplyWarnings: effectiveStrictSupplyWarnings,
             healthRecords: healthRecords.length,
             runtimeAccountOverlays: runtimeAccountOverlays.length,
             runtimeAccountOverlaySummary,

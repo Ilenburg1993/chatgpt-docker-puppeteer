@@ -3018,6 +3018,59 @@ Validação deste corte:
 
 ---
 
+## 58. Continuidade 2026-05-26 — Supply Warnings Em Effective Selection E Readiness
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que a seleção efetiva é a porta correta antes de live tests,
+  porque combina catálogo, eligibility e health/overlays já observados sem
+  executar runtime novo.
+- [x] Confirmado que `supplyWarnings` não devem bloquear por padrão enquanto a
+  policy estrita local/private ainda está em desenho.
+- [x] Confirmado que precisamos de um modo opcional de falha para simular gates
+  futuros sem alterar o comportamento padrão dos comandos canônicos.
+
+Implementado neste corte:
+
+- [x] `model-gateway-effective-selection.mjs` aceita
+  `--fail-on-supply-warning`.
+- [x] `model-gateway-effective-selection.mjs` inclui `supplyWarningCount` no
+  bloco `selection`.
+- [x] `model-gateway-live-readiness.mjs` aceita `--fail-on-supply-warning`.
+- [x] `model-gateway-live-readiness.mjs` inclui o check
+  `selection_supply_warnings`.
+- [x] `model-gateway-live-readiness.mjs` expõe contagem de supply warnings em
+  allow-probe, strict-access e effective-strict.
+
+Separação arquitetural preservada:
+
+- [x] Os novos gates continuam sendo somente leitura.
+- [x] Nenhum provider é chamado.
+- [x] Nenhum modelo é executado.
+- [x] Nenhuma probe runtime é executada.
+- [x] O catálogo canônico não é mutado.
+
+Próximas lacunas:
+
+- [ ] Definir se `local_private` deve ganhar um modo canônico hard-blocking ou
+  se continuará como perfil preferencial com warning forte.
+
+Validação deste corte:
+
+- [x] PASS `node --check scripts/model-gateway-effective-selection.mjs`.
+- [x] PASS `node --check scripts/model-gateway-live-readiness.mjs`.
+- [x] PASS `npm run model-gateway:selection:effective -- --profile
+  local_private`.
+- [x] PASS `npm run model-gateway:live:readiness`.
+- [x] PASS esperado com exit `1` para
+  `node scripts/model-gateway-effective-selection.mjs --profile local_private
+  --fail --fail-on-supply-warning`.
+- [x] PASS esperado com exit `1` para
+  `node scripts/model-gateway-live-readiness.mjs --fail
+  --fail-on-supply-warning`.
+
+---
+
 ## 57. Continuidade 2026-05-26 — Requisitos Env Ollama Local/Cloud
 
 Auditoria executada neste corte:
