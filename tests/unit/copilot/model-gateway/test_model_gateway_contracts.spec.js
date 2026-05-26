@@ -3696,9 +3696,11 @@ describe('model-gateway foundation', () => {
             ['failed', 'failed'],
         );
         assert.equal(snapshot.projections.length, 0);
+        assert.equal(geminiOverlay?.confidence, 'authenticated_catalog');
         assert.equal(geminiOverlay?.providerMetadata.catalogImportStatus, 'failed');
         assert.equal(geminiOverlay?.providerMetadata.apiKeyDisabled, true);
         assert.equal(JSON.stringify(geminiOverlay).includes('gemini-secret-that-must-not-leak'), false);
+        assert.equal(ollamaOverlay?.confidence, 'catalog');
         assert.equal(ollamaOverlay?.providerMetadata.localDaemonReachable, false);
         assert.equal(ollamaOverlay?.providerMetadata.disabled, true);
     });
@@ -3727,6 +3729,7 @@ describe('model-gateway foundation', () => {
 
         assert.equal(snapshot.importRuns[0].status, 'failed');
         assert.equal(overlay.providerId, 'generic-provider');
+        assert.equal(overlay.confidence, 'authenticated_catalog');
         assert.equal(overlay.secretRef, 'GENERIC_API_KEY');
         assert.equal(overlay.providerMetadata.catalogImportStatus, 'failed');
         assert.equal(overlay.providerMetadata.failureKind, 'rate-limit');

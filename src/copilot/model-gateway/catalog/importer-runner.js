@@ -9,7 +9,7 @@
  */
 
 import { createCatalogImportRun, createSanitizedRawPayloadRef } from './import-runs.js';
-import { createProviderAccountOverlay, createProviderCatalogSource } from './contracts.js';
+import { MODEL_GATEWAY_CATALOG_CONFIDENCE, createProviderAccountOverlay, createProviderCatalogSource } from './contracts.js';
 import { classifyModelGatewayCatalogImporterFailure } from './importer-failures.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 
@@ -146,7 +146,7 @@ function createDefaultFailureAccountOverlays(importer, error, source) {
             secretRef: defaultSecretRef(importer) ?? undefined,
             sourceId,
             sourceKind: importer.sourceKind,
-            confidence: 'authenticated_catalog',
+            confidence: localDaemon ? MODEL_GATEWAY_CATALOG_CONFIDENCE.CATALOG : MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG,
             quota: creditsExhausted ? { remainingCreditsUsd: 0 } : {},
             rateLimits: rateLimited
                 ? {

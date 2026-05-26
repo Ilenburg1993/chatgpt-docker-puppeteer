@@ -6254,6 +6254,11 @@ Implementado neste corte:
   explicitamente `capabilities.text=true` e `capabilities.streaming=true`.
 - [x] Route options do Ollama local passam a separar topologia e wire:
   `routeLayer=local_daemon` e `wireApi=openai_chat_completions`.
+- [x] Failure overlay do Ollama offline deixa de usar confiança
+  `authenticated_catalog`; local daemon offline agora permanece `catalog`, sem
+  semântica de auth.
+- [x] Failure overlays genéricos passam a distinguir `local_daemon` de fontes
+  autenticadas ao atribuir confiança.
 - [x] O terminal passa a imprimir uma orientação acionável quando houver rejeição
   por `local_provider_requires_explicit_request`.
 - [x] A mensagem de fallback do terminal foi corrigida para apontar para
@@ -6269,6 +6274,8 @@ Implementado neste corte:
 - [x] Teste de contratos cobre o helper central de opt-in local.
 - [x] Teste do importer Ollama cobre `text`, `streaming`, `local_daemon` e
   `openai_chat_completions`.
+- [x] Testes cobrem confiança `catalog` para Ollama local offline e
+  `authenticated_catalog` para falhas account/key.
 
 Separação arquitetural preservada:
 

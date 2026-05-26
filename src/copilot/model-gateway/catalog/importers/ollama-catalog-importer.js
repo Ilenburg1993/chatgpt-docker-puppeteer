@@ -369,7 +369,7 @@ export function createOllamaCatalogImporter(options = {}) {
                     accountScope: options.accountScope ?? apiBaseUrl,
                     sourceId,
                     sourceKind: 'local_daemon',
-                    confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG,
+                    confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.CATALOG,
                     providerMetadata: controls.providerMetadata,
                 }),
             ];
