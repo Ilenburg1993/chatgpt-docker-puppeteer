@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { config as loadDotenv } from 'dotenv';
 import {
     createDefaultModelGatewayCatalogImporters,
+    createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
     planModelGatewayCatalogRefresh,
@@ -164,6 +165,14 @@ const result = await refreshModelGatewayCatalog({
     force,
     sourceIds: sourceIds.length > 0 ? sourceIds : undefined,
     refreshAccountOverlays: true,
+    eligibility: {
+        enabled: true,
+        secretRegistry: createEnvSecretRegistry(),
+        policy: {
+            unknownAccessPolicy: 'allow_probe',
+            policyProfile: 'refresh-default',
+        },
+    },
     writePolicy: commit ? 'commit' : 'preview',
     lockKey: store.filePath,
     retentionPolicy: {
@@ -188,6 +197,7 @@ const summary = {
     projections: result.snapshot.projections.length,
     openai: result.openai.data.length,
     overlays: result.overlayRefresh.total,
+    eligibility: result.eligibilityRefresh,
     diff: {
         added: result.diff.added.length,
         removed: result.diff.removed.length,

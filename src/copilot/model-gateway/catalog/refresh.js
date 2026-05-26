@@ -16,6 +16,7 @@ import { toOpenAIModelCatalogList } from './openai-schema.js';
 import { resolveModelGatewayCatalogRefreshLockKey, withModelGatewayCatalogRefreshLock } from './refresh-lock.js';
 import { planModelGatewayCatalogRefresh } from './refresh-plan.js';
 import { applyModelGatewayCatalogRetention } from './retention.js';
+import { applyModelGatewayEligibilityToSnapshot, evaluateModelGatewayCatalogEligibility } from '../eligibility/index.js';
 
 /**
  * @typedef {object} ModelGatewayCatalogRefreshProgressEvent
@@ -35,6 +36,7 @@ import { applyModelGatewayCatalogRetention } from './retention.js';
  * @property {number} [accountOverlayCount]
  * @property {number} [projectionCount]
  * @property {number} [providerProjectionCount]
+ * @property {number} [eligibilityDecisionCount]
  * @property {number} [addedCount]
  * @property {number} [removedCount]
  * @property {number} [changedCount]
@@ -193,6 +195,7 @@ function buildProviderProjectionsFromEvidence(evidences) {
  * @param {boolean} [input.force]
  * @param {string[]} [input.sourceIds]
  * @param {boolean} [input.refreshAccountOverlays]
+ * @param {{ enabled?: boolean; secretRegistry?: { has(ref: string): boolean }; policy?: Record<string, any>; healthRecords?: Record<string, any>[] }} [input.eligibility]
  * @param {{ mode?: string; maxInlineBytes?: number }} [input.rawPayloadStoragePolicy]
  * @param {import('./retention.js').ModelGatewayCatalogRetentionPolicy} [input.retentionPolicy]
  * @param {string} [input.writePolicy]
@@ -204,6 +207,7 @@ function buildProviderProjectionsFromEvidence(evidences) {
  *     openai: ReturnType<typeof toOpenAIModelCatalogList>;
  *     refreshPlan?: ReturnType<typeof planModelGatewayCatalogRefresh>;
  *     overlayRefresh: { enabled: boolean; imported: number; retained: number; total: number };
+ *     eligibilityRefresh: { enabled: boolean; run: Record<string, any> | null; decisionCount: number };
  *     retention: ReturnType<typeof applyModelGatewayCatalogRetention>['summary'];
  *     writePolicy: { mode: string; storeAvailable: boolean; committed: boolean };
  *     refreshLock: { enabled: boolean; key: string | null };
@@ -235,6 +239,7 @@ export async function refreshModelGatewayCatalog(input = {}) {
  * @param {boolean} [input.force]
  * @param {string[]} [input.sourceIds]
  * @param {boolean} [input.refreshAccountOverlays]
+ * @param {{ enabled?: boolean; secretRegistry?: { has(ref: string): boolean }; policy?: Record<string, any>; healthRecords?: Record<string, any>[] }} [input.eligibility]
  * @param {{ mode?: string; maxInlineBytes?: number }} [input.rawPayloadStoragePolicy]
  * @param {import('./retention.js').ModelGatewayCatalogRetentionPolicy} [input.retentionPolicy]
  * @param {string} [input.writePolicy]
@@ -372,7 +377,32 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
         conflicts: [...providerConflicts, ...conflicts],
         modelTombstones: upsertMany(previous.modelTombstones, modelTombstones, (item) => String(item['projectionKey'])),
     };
-    const retained = applyModelGatewayCatalogRetention(nextSnapshot, input.retentionPolicy);
+    const eligibilityInput = input.eligibility && typeof input.eligibility === 'object' ? input.eligibility : {};
+    const eligibilityEnabled = eligibilityInput['enabled'] === true;
+    const evaluatedEligibility = eligibilityEnabled
+        ? evaluateModelGatewayCatalogEligibility({
+              snapshot: nextSnapshot,
+              secretRegistry: eligibilityInput['secretRegistry'],
+              policy: eligibilityInput['policy'],
+              healthRecords: eligibilityInput['healthRecords'],
+              now,
+          })
+        : null;
+    const snapshotWithEligibility = evaluatedEligibility
+        ? applyModelGatewayEligibilityToSnapshot(nextSnapshot, evaluatedEligibility.decisions, evaluatedEligibility.run)
+        : nextSnapshot;
+    if (evaluatedEligibility) {
+        emitRefreshProgress(input.onProgress, {
+            phase: 'eligibility_evaluated',
+            elapsedMs: refreshElapsedMs(startedAt, now()),
+            progressPct: 82,
+            eligibilityDecisionCount: evaluatedEligibility.decisions.length,
+            projectionCount: projections.length,
+            routeOptionCount: snapshotWithEligibility['routeOptions'].length,
+            accountOverlayCount: snapshotWithEligibility['accountOverlays'].length,
+        });
+    }
+    const retained = applyModelGatewayCatalogRetention(snapshotWithEligibility, input.retentionPolicy);
     const snapshot = retained.snapshot;
     emitRefreshProgress(input.onProgress, {
         phase: 'retention_applied',
@@ -400,7 +430,7 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
         diff,
         openai: toOpenAIModelCatalogList(projections, {
             providerProjections,
-            eligibilityDecisions: previous.modelEligibilityDecisions,
+            eligibilityDecisions: snapshot['modelEligibilityDecisions'],
             routeOptions: snapshot['routeOptions'],
         }),
         overlayRefresh: {
@@ -408,6 +438,11 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
             imported: imported.accountOverlays.length,
             retained: retainedAccountOverlays.length,
             total: accountOverlays.length,
+        },
+        eligibilityRefresh: {
+            enabled: eligibilityEnabled,
+            run: evaluatedEligibility?.run ?? null,
+            decisionCount: evaluatedEligibility?.decisions.length ?? 0,
         },
         retention: retained.summary,
         writePolicy: {

@@ -2071,12 +2071,21 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
             importers,
             incremental: true,
             refreshAccountOverlays: true,
+            eligibility: {
+                enabled: true,
+                secretRegistry: createEnvSecretRegistry(),
+                policy: {
+                    unknownAccessPolicy: 'allow_probe',
+                    policyProfile: 'terminal-refresh',
+                },
+            },
             writePolicy: 'commit',
             lockKey: store.filePath,
             onProgress: (event) => {
                 const progressPct = typeof event.progressPct === 'number' ? event.progressPct : lastProgressPct;
                 const shouldPrint = event.phase === 'refresh_plan_ready' ||
                     event.phase === 'refresh_completed' ||
+                    event.phase === 'eligibility_evaluated' ||
                     event.phase === 'snapshot_written' ||
                     event.phase === 'snapshot_previewed' ||
                     event.phase.endsWith(':importer_started') ||
@@ -2092,6 +2101,7 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
                     typeof event.rowCount === 'number' ? `rows=${event.rowCount}` : '',
                     typeof event.evidenceCount === 'number' ? `evidence=${event.evidenceCount}` : '',
                     typeof event.projectionCount === 'number' ? `projections=${event.projectionCount}` : '',
+                    typeof event.eligibilityDecisionCount === 'number' ? `eligibility=${event.eligibilityDecisionCount}` : '',
                     typeof event.addedCount === 'number' ? `added=${event.addedCount}` : '',
                     typeof event.removedCount === 'number' ? `removed=${event.removedCount}` : '',
                     typeof event.changedCount === 'number' ? `changed=${event.changedCount}` : '',
@@ -2121,7 +2131,7 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
             `    \x1b[90mdiff: added=${result.diff.added.length} · removed=${result.diff.removed.length} · changed=${result.diff.changed.length}\x1b[0m`,
         );
         println(
-            `    \x1b[90mwrite=${result.writePolicy.mode} · committed=${result.writePolicy.committed ? 'sim' : 'nao'} · overlays=${result.overlayRefresh.total} · retained-runs=${result.retention.importRuns.after}\x1b[0m`,
+            `    \x1b[90mwrite=${result.writePolicy.mode} · committed=${result.writePolicy.committed ? 'sim' : 'nao'} · overlays=${result.overlayRefresh.total} · eligibility=${result.eligibilityRefresh.decisionCount} · retained-runs=${result.retention.importRuns.after}\x1b[0m`,
         );
         if (refreshEvents.completedEvent.changedKinds.length > 0) {
             println(`    \x1b[90mdiff kinds: ${refreshEvents.completedEvent.changedKinds.join(',')}\x1b[0m`);

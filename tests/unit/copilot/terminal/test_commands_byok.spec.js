@@ -568,6 +568,7 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                 diff: { added: ['openrouter:new-model:default'], removed: [], changed: [] },
                 openai: { object: 'list', data: [{ id: 'new-model', object: 'model' }] },
                 overlayRefresh: { enabled: true, imported: 0, retained: 0, total: 0 },
+                eligibilityRefresh: { enabled: true, run: { runId: 'eligibility-run' }, decisionCount: 2 },
                 retention: {
                     importRuns: { before: 1, after: 1, pruned: 0 },
                     rawPayloadRefs: { before: 0, after: 0, pruned: 0 },
@@ -1021,6 +1022,7 @@ describe('terminal /byok command', () => {
             },
             openai: { object: 'list', data: [{ id: 'new-model', object: 'model' }] },
             overlayRefresh: { enabled: true, imported: 0, retained: 0, total: 0 },
+            eligibilityRefresh: { enabled: true, run: { runId: 'eligibility-run' }, decisionCount: 2 },
             retention: {
                 importRuns: { before: 1, after: 1, pruned: 0 },
                 rawPayloadRefs: { before: 0, after: 0, pruned: 0 },

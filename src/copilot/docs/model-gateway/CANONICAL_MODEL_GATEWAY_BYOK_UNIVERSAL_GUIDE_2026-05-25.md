@@ -3400,6 +3400,22 @@ Separação preservada:
   permanece bloqueada até que DB, integrity, eligibility e selection audit
   estejam coerentes.
 
+Upgrade subsequente do mesmo corte:
+
+- [x] `refreshModelGatewayCatalog()` ganhou etapa opcional `eligibility`.
+- [x] Quando habilitada, a etapa materializa decisions route-level no snapshot
+  antes da retention e antes do write.
+- [x] `toOpenAIModelCatalogList()` do refresh passa a receber as decisions do
+  snapshot recém-avaliado, não as decisions antigas do snapshot anterior.
+- [x] `scripts/model-gateway-refresh.mjs` e
+  `scripts/model-gateway-metadata-build.mjs` habilitam a camada de eligibility
+  por padrão.
+- [x] Terminal `/byok gateway catalog refresh` também habilita a camada e mostra
+  `eligibility=<n>` no progresso/resultado.
+- [x] O refresh emite progress event `eligibility_evaluated`.
+- [x] Teste unitário cobre refresh com duas route options para o mesmo modelo e
+  decisions divergentes por rota.
+
 Plano de live futuro, ainda não executado:
 
 - [ ] Rodar primeiro `npm run model-gateway:catalog:integrity`.
@@ -3422,6 +3438,12 @@ Validação deste corte:
 - [x] Resultado do snapshot persistido: integrity `ok=true`, selection
   `ok=true`, `8/8` perfis com selecionado e `runtimeProbeProofCount=0` em
   todos os perfis.
+- [x] PASS teste focado de refresh materializando eligibility route-level.
+- [x] PASS teste focado de terminal cobrindo refresh, comandos canônicos e
+  selection audit.
+- [x] PASS `npm run model-gateway:metadata:build:plan`.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `npm run model-gateway:lint`.
 
 ---
 

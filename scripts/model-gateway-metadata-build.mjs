@@ -5,6 +5,7 @@ import { config as loadDotenv } from 'dotenv';
 import { setDbLogger } from '../src/copilot/db/sqlite.js';
 import {
     createDefaultModelGatewayCatalogImporters,
+    createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
     auditModelGatewayCatalogSnapshotIntegrity,
@@ -176,6 +177,14 @@ const result = await refreshModelGatewayCatalog({
     force,
     sourceIds: sourceIds.length > 0 ? sourceIds : undefined,
     refreshAccountOverlays: true,
+    eligibility: {
+        enabled: true,
+        secretRegistry: createEnvSecretRegistry(),
+        policy: {
+            unknownAccessPolicy: 'allow_probe',
+            policyProfile: 'build-default',
+        },
+    },
     writePolicy: commit ? 'commit' : 'preview',
     lockKey: jsonStore.filePath,
     retentionPolicy: {
@@ -270,6 +279,7 @@ const summary = {
     projections: result.snapshot.projections.length,
     openai: result.openai.data.length,
     overlays: result.overlayRefresh.total,
+    eligibility: result.eligibilityRefresh,
     diff: {
         added: result.diff.added.length,
         removed: result.diff.removed.length,

@@ -6794,6 +6794,90 @@ describe('model-gateway foundation', () => {
         }
     });
 
+    it('materializes route-level eligibility during catalog refresh when enabled', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-model-refresh-eligibility-'));
+        try {
+            const store = new JsonModelGatewayCatalogStore({ filePath: join(dir, 'catalog.json') });
+            await store.writeSnapshot({ sources: [], projections: [] });
+            /** @type {Array<Record<string, any>>} */
+            const progressEvents = [];
+            const result = await refreshModelGatewayCatalog({
+                store,
+                writePolicy: 'commit',
+                now: () => new Date('2026-05-26T20:30:00.000Z'),
+                onProgress: (event) => progressEvents.push(event),
+                refreshAccountOverlays: true,
+                eligibility: {
+                    enabled: true,
+                    secretRegistry: { has: () => true },
+                    policy: { unknownAccessPolicy: 'block', policyProfile: 'refresh-strict' },
+                },
+                importers: [
+                    {
+                        id: 'cloudflare-workers-ai-test',
+                        providerId: 'cloudflare-workers-ai',
+                        sourceKind: 'authenticated_catalog',
+                        requiresAuth: false,
+                        fetchRaw: () => [{ id: '@cf/openai/gpt-oss-120b' }],
+                        parseRows: (raw) => /** @type {unknown[]} */ (raw),
+                        toEvidenceFacts: (rows, context) =>
+                            rows.map((row) =>
+                                createModelMetadataEvidence({
+                                    evidenceId: 'cf-model',
+                                    providerId: 'cloudflare-workers-ai',
+                                    providerModel: /** @type {{ id: string }} */ (row).id,
+                                    fieldPath: 'capabilities.tools',
+                                    value: true,
+                                    sourceId: /** @type {{ id: string }} */ (context.source).id,
+                                    confidence: 'catalog',
+                                }),
+                            ),
+                        toRouteOptions: () => [
+                            createModelRouteOption({
+                                providerId: 'cloudflare-workers-ai',
+                                providerModel: '@cf/openai/gpt-oss-120b',
+                                selectorKind: 'exact_model',
+                                normalizedPolicy: { wireApi: 'workers_ai_run' },
+                            }),
+                            createModelRouteOption({
+                                providerId: 'cloudflare-workers-ai',
+                                providerModel: '@cf/openai/gpt-oss-120b',
+                                selectorKind: 'gateway_fallback',
+                                selectorSyntax: 'cloudflare-gateway:@cf/openai/gpt-oss-120b',
+                                normalizedPolicy: { wireApi: 'cloudflare_ai_gateway_universal' },
+                            }),
+                        ],
+                        toAccountOverlays: () => [
+                            createProviderAccountOverlay({
+                                providerId: 'cloudflare-workers-ai',
+                                secretRef: 'CLOUDFLARE_API_TOKEN',
+                                enabledModels: ['@cf/openai/gpt-oss-120b'],
+                                providerMetadata: { accountIdConfigured: true, gatewayIdConfigured: false },
+                            }),
+                        ],
+                    },
+                ],
+            });
+            const stored = await store.readSnapshot();
+
+            assert.equal(result.eligibilityRefresh.enabled, true);
+            assert.equal(result.eligibilityRefresh.decisionCount, 2);
+            assert.equal(stored.modelEligibilityDecisions.length, 2);
+            assert.equal(result.openai.data[0].x_model_gateway.eligibility.status, 'eligible');
+            assert.ok(progressEvents.some((event) => event['phase'] === 'eligibility_evaluated' && event['eligibilityDecisionCount'] === 2));
+            assert.ok(
+                stored.modelEligibilityDecisions.some(
+                    (decision) =>
+                        decision['selectorKind'] === 'gateway_fallback' &&
+                        Array.isArray(decision['hardExclusions']) &&
+                        decision['hardExclusions'].includes('cloudflare_gateway_id_missing'),
+                ),
+            );
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
     it('summarizes refresh JSONL logs without mutating canonical metadata', () => {
         const text = [
             JSON.stringify({ ts: '2026-05-26T12:00:00.000Z', phase: 'refresh_started', elapsedMs: 0 }),
