@@ -11,6 +11,16 @@
 
 export const MODEL_GATEWAY_CANONICAL_COMMAND_TRACK = 'Y';
 
+export const MODEL_GATEWAY_CANONICAL_COMMAND_PHASES = Object.freeze([
+    'orientation',
+    'metadata',
+    'pre-runtime',
+    'selection',
+    'live-readiness',
+    'validate',
+    'prebuild',
+]);
+
 export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
     {
         id: 'commands.text',

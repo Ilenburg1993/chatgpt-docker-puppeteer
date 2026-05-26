@@ -5260,6 +5260,86 @@ Próximas lacunas:
 
 ---
 
+## 70. Continuidade 2026-05-26 — Health Legado Como Overlay Volátil Efetivo
+
+Auditoria executada neste corte:
+
+- [x] Revisitado o caminho completo entre BYOK provider health, overlays
+  account/key derivados em memória, eligibility pré-runtime e seleção efetiva
+  sem probes.
+- [x] Confirmado que `model-gateway:selection:effective` estava correto ao não
+  mutar catálogo, mas deixava passar registros antigos de health que traziam
+  `lastFailureKind=null` e classificavam a falha apenas em `lastErrorContext`
+  ou mensagens.
+- [x] Confirmado que isso era perigoso antes do primeiro live real: falhas
+  antigas de créditos/quota poderiam ficar visíveis no `/byok health`, mas não
+  virar barreira temporária para a seleção efetiva.
+- [x] Confirmado que a correção pertence à camada volátil de account access,
+  não ao catálogo canônico nem ao banco global de metadados.
+
+Implementado neste corte:
+
+- [x] `deriveModelGatewayRuntimeAccountOverlayFromHealth()` passa a inferir
+  falhas `auth`, `credits` e `rate-limit` a partir de sinais legados.
+- [x] A inferência lê `lastFailureKind`, `lastErrorContext`, `lastMessage`,
+  `lastAgentProbeErrorContext`, `lastAgentProbeMessage` e sinais equivalentes
+  dentro de `probes`.
+- [x] `provider.credits`, `credit`, `insufficient_quota`, `quota_exhausted` e
+  `402` passam a materializar overlay volátil de créditos.
+- [x] `provider.rate_limit`, `rate-limit`, `429` e `too many requests` passam a
+  materializar overlay volátil de rate limit.
+- [x] `provider.auth`, `permission`, `unauthorized`, `forbidden`, `401` e `403`
+  passam a materializar overlay volátil de auth.
+- [x] Teste unitário cobre health legado com `lastFailureKind=null`,
+  `lastErrorContext=provider.credits` e mensagem `402`.
+- [x] Fases do inventário canônico foram promovidas a contrato exportado com
+  `MODEL_GATEWAY_CANONICAL_COMMAND_PHASES`, incluindo `live-readiness`.
+- [x] Barrels `commands` e `model-gateway` exportam a lista de fases canônicas.
+- [x] Teste de inventário canônico passa a validar contra o contrato exportado,
+  evitando divergência quando novas fases operacionais forem adicionadas.
+
+Separação preservada:
+
+- [x] Health legado continua operacional e expirável.
+- [x] Overlays derivados de health continuam voláteis e não são persistidos no
+  catálogo canônico.
+- [x] A seleção efetiva substitui decisões apenas em snapshot temporário.
+- [x] Nenhum provider é chamado.
+- [x] Nenhum modelo é executado.
+- [x] Nenhuma probe runtime é executada.
+
+Resultado observado:
+
+- [x] `npm run model-gateway:selection:effective -- --strict --fail` retorna
+  `ok=true`.
+- [x] `observedRuntime.healthRecordCount=17`.
+- [x] `observedRuntime.runtimeAccountOverlayCount=2`.
+- [x] `observedRuntime.eligibilityDecisionCount=1923`.
+- [x] Seleção efetiva continua escolhendo `8/8` perfis sem runtime.
+- [x] `npm run model-gateway:live:readiness` retorna `ok=true` com
+  `selection_effective_observed_health` usando `runtimeOverlays=2`.
+
+Validação parcial deste corte:
+
+- [x] PASS focused Vitest `runtime health`.
+- [x] PASS `node --check src/copilot/model-gateway/account-access/runtime-overlays.js`.
+- [x] PASS `node --check src/copilot/model-gateway/commands/canonical-commands.js`.
+- [x] PASS `node --check src/copilot/model-gateway/commands/index.js`.
+- [x] PASS `node --check src/copilot/model-gateway/index.js`.
+- [x] PASS `npm run model-gateway:selection:effective -- --strict --fail`.
+- [x] PASS `npm run model-gateway:live:readiness`.
+- [x] PASS `npm run model-gateway:test:contracts` com `157` testes.
+
+Próximas lacunas:
+
+- [ ] Revisar se o relatório de seleção efetiva deve expor uma seção resumida
+  dos overlays voláteis derivados, sem revelar segredo e sem tornar o output
+  pesado demais.
+- [ ] Antes do live real com `llm-b`, executar novamente readiness, lint,
+  typecheck e teste terminal escopado.
+
+---
+
 ## 54. Continuidade 2026-05-26 — Policy Engine Por Snapshot Completo
 
 Auditoria executada neste corte:

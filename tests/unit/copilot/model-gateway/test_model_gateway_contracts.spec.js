@@ -16,6 +16,7 @@ import {
     listProviderGatewayTraits,
     listProviderWireProbeMatrix,
     listModelGatewayCanonicalCommands,
+    MODEL_GATEWAY_CANONICAL_COMMAND_PHASES,
     listModelGatewayTaskProfiles,
     ModelGatewayRegistry,
     MODEL_GATEWAY_TASK_PROFILES,
@@ -1424,7 +1425,7 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-sqlite-retention'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway commands'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway prebuild'));
-        assert.ok(commands.every((entry) => ['orientation', 'metadata', 'pre-runtime', 'selection', 'validate', 'prebuild'].includes(entry.phase)));
+        assert.ok(commands.every((entry) => MODEL_GATEWAY_CANONICAL_COMMAND_PHASES.includes(entry.phase)));
         assert.ok(terminalLines.some((line) => line.includes('/byok gateway catalog refresh')));
     });
 
@@ -6279,9 +6280,19 @@ describe('model-gateway foundation', () => {
                 lastFailureStatusCode: 402,
                 lastFailureAt: Date.parse('2026-05-25T00:00:00.000Z'),
             },
+            {
+                key: 'chutes|chutes|legacy',
+                providerId: 'chutes',
+                providerModel: 'legacy',
+                lastStatus: 'failed',
+                lastFailureKind: null,
+                lastErrorContext: 'provider.credits',
+                lastMessage: '402 status code',
+                lastFailureAt: Date.parse('2026-05-25T00:00:00.000Z'),
+            },
         ]);
 
-        assert.equal(overlays.length, 2);
+        assert.equal(overlays.length, 3);
         assert.equal(overlays[0].sourceKind, 'runtime_health');
         assert.equal(overlays[0].confidence, 'probe_failed');
         assert.deepEqual(overlays[0].enabledModels, ['llama']);
@@ -6291,6 +6302,8 @@ describe('model-gateway foundation', () => {
         assert.equal(overlays[0].expiresAt, '2026-05-25T00:01:00.000Z');
         assert.equal(overlays[1].quota.remainingCreditsUsd, 0);
         assert.equal(overlays[1].spendingLimits.remainingUsd, 0);
+        assert.equal(overlays[2].providerId, 'chutes');
+        assert.equal(overlays[2].providerMetadata.failureKind, 'credits');
         assert.equal(JSON.stringify(overlays).includes('sk-'), false);
     });
 

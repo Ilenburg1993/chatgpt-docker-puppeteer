@@ -102,6 +102,45 @@ function defaultSecretRef(providerId, overrides) {
 
 /**
  * @param {Record<string, unknown>} health
+ * @returns {string[]}
+ */
+function failureSignals(health) {
+    const probes = isRecord(health['probes']) ? health['probes'] : {};
+    const probeSignals = Object.values(probes)
+        .filter(isRecord)
+        .flatMap((probe) => [
+            optionalString(probe['lastFailureKind']),
+            optionalString(probe['lastErrorContext']),
+            optionalString(probe['lastMessage']),
+        ]);
+    return [
+        optionalString(health['lastFailureKind']),
+        optionalString(health['lastErrorContext']),
+        optionalString(health['lastMessage']),
+        optionalString(health['lastAgentProbeErrorContext']),
+        optionalString(health['lastAgentProbeMessage']),
+        ...probeSignals,
+    ].filter((item) => item !== null);
+}
+
+/**
+ * @param {Record<string, unknown>} health
+ * @returns {'auth' | 'credits' | 'rate-limit' | null}
+ */
+function inferRuntimeFailureKind(health) {
+    for (const signal of failureSignals(health)) {
+        if (/^(?:auth|credits|rate-limit)$/u.test(signal)) return /** @type {'auth' | 'credits' | 'rate-limit'} */ (signal);
+        if (/provider\.credits|credit|credits|insufficient[_\s-]?quota|quota[_\s-]?exhausted|402\b/iu.test(signal)) {
+            return 'credits';
+        }
+        if (/provider\.rate[_\s-]?limit|rate[_\s-]?limit|429\b|too many requests/iu.test(signal)) return 'rate-limit';
+        if (/provider\.auth|auth|permission|unauthorized|forbidden|401\b|403\b/iu.test(signal)) return 'auth';
+    }
+    return null;
+}
+
+/**
+ * @param {Record<string, unknown>} health
  * @param {object} options
  * @param {string} [options.accountScope]
  * @param {Record<string, string>} [options.secretRefsByProvider]
@@ -109,8 +148,8 @@ function defaultSecretRef(providerId, overrides) {
  * @returns {Record<string, unknown> | null}
  */
 export function deriveModelGatewayRuntimeAccountOverlayFromHealth(health, options = {}) {
-    const failureKind = optionalString(health['lastFailureKind']);
-    if (!['auth', 'credits', 'rate-limit'].includes(failureKind ?? '')) return null;
+    const failureKind = inferRuntimeFailureKind(health);
+    if (!failureKind) return null;
     const providerId = optionalString(health['providerId']) ?? optionalString(health['provider']);
     if (!providerId) return null;
     const providerModel = optionalString(health['providerModel']) ?? optionalString(health['model']);

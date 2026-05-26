@@ -194,6 +194,7 @@ export {
 } from './catalog/index.js';
 export {
     MODEL_GATEWAY_CANONICAL_COMMANDS,
+    MODEL_GATEWAY_CANONICAL_COMMAND_PHASES,
     MODEL_GATEWAY_CANONICAL_COMMAND_TRACK,
     listModelGatewayCanonicalCommands,
     renderModelGatewayCanonicalCommandLines,
