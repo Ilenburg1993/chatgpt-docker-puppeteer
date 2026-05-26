@@ -1474,8 +1474,8 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [ ] Seleção por provider upstream.
 - [x] Seleção por route layer.
 - [ ] Seleção por data policy.
-- [ ] Seleção por budget.
-- [ ] Seleção por confidence.
+- [x] Seleção por budget.
+- [x] Seleção por confidence.
 
 ### Faixa O — Refresh E Governança
 
@@ -2248,6 +2248,39 @@ Validação deste corte:
 
 - [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   com `96` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `policy-engine.js` e contrato unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 31. Continuidade 2026-05-26 — Seleção Por Budget E Confidence
+
+Implementado neste corte:
+
+- [x] `scoreGatewayModelCandidate()` aceita `maxPricePerMillion` como limite de
+  admissão por metadados.
+- [x] `scoreGatewayModelCandidate()` aceita `preferredMaxPricePerMillion` como
+  preferência positiva de ranking.
+- [x] `scoreGatewayModelCandidate()` aceita `minimumConfidence` para excluir
+  candidatos com evidência abaixo do perfil exigido.
+- [x] Preço acima do limite gera `price_above_limit:*` antes do runtime.
+- [x] Confidence abaixo do mínimo gera `confidence_below_minimum:*` antes do
+  runtime.
+- [x] Preço dentro da preferência soma score com razão auditável.
+- [x] Adicionado teste de seleção entre cheap/catalog, expensive/manual e
+  static_seed.
+
+Separação preservada:
+
+- [x] Budget de seleção usa metadados de catálogo.
+- [x] Budget hard/soft account-scoped continua na eligibility.
+- [x] Confidence é evidência de catálogo/probe já persistida, não chamada live.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `97` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em `policy-engine.js` e contrato unitário.
 - [x] PASS `git diff --check`.

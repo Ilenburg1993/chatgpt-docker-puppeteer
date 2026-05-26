@@ -21,6 +21,15 @@ const CONFIDENCE_SCORE = Object.freeze({
     probe_failed: -80,
 });
 
+const CONFIDENCE_RANK = Object.freeze({
+    unknown: 0,
+    static_seed: 1,
+    catalog: 2,
+    manual: 3,
+    probe_verified: 4,
+    probe_failed: -1,
+});
+
 /**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
@@ -81,6 +90,14 @@ function routePolicyText(model, field) {
 
 /**
  * @param {unknown} value
+ * @returns {number | null}
+ */
+function optionNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * @param {unknown} value
  * @returns {Set<string>}
  */
 function stringSet(value) {
@@ -103,6 +120,9 @@ function stringSet(value) {
  *     blockWireApis?: string[];
  *     preferredSelectorKinds?: string[];
  *     blockSelectorKinds?: string[];
+ *     maxPricePerMillion?: number;
+ *     preferredMaxPricePerMillion?: number;
+ *     minimumConfidence?: string;
  *     latencyMsByModelId?: Record<string, number>;
  *     eligibilityDecisions?: Record<string, any>[];
  *     evaluateEligibility?: boolean;
@@ -236,12 +256,27 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     const confidence = typeof model['verification']?.['confidence'] === 'string' ? model['verification']['confidence'] : 'unknown';
     score += CONFIDENCE_SCORE[/** @type {keyof typeof CONFIDENCE_SCORE} */ (confidence)] ?? 0;
     reasons.push(`confidence:${confidence}`);
+    const minimumConfidence = String(options.minimumConfidence ?? '').trim();
+    if (minimumConfidence) {
+        const currentRank = CONFIDENCE_RANK[/** @type {keyof typeof CONFIDENCE_RANK} */ (confidence)] ?? 0;
+        const requiredRank = CONFIDENCE_RANK[/** @type {keyof typeof CONFIDENCE_RANK} */ (minimumConfidence)] ?? 0;
+        if (currentRank < requiredRank) rejectedReasons.push(`confidence_below_minimum:${confidence}<${minimumConfidence}`);
+    }
 
     const price = pricePerMillion(model);
+    const maxPrice = optionNumber(options.maxPricePerMillion);
+    const preferredMaxPrice = optionNumber(options.preferredMaxPricePerMillion);
     if (price !== null) {
+        if (maxPrice !== null && price > maxPrice) rejectedReasons.push(`price_above_limit:${price}>${maxPrice}`);
+        if (preferredMaxPrice !== null && price <= preferredMaxPrice) {
+            score += 20;
+            reasons.push(`price_within_preference:${price}<=${preferredMaxPrice}`);
+        }
         const pricePenalty = Math.min(60, Math.floor(price));
         score -= pricePenalty;
         reasons.push(`price_per_million:${price}`);
+    } else if (maxPrice !== null) {
+        reasons.push('price_unknown_for_limit');
     }
 
     const latency = finiteNumber(options.latencyMsByModelId?.[String(model['id'] ?? '')]);

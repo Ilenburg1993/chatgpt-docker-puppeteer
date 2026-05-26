@@ -393,6 +393,45 @@ describe('model-gateway foundation', () => {
         assert.ok(blocked.rejected.some((candidate) => candidate.rejectedReasons.includes('route_layer_blocked:gateway')));
     });
 
+    it('selects candidates by metadata budget and confidence before runtime', () => {
+        const cheapCatalog = createModelRecord({
+            providerId: 'openrouter',
+            providerModel: 'cheap-catalog',
+            capabilities: { tools: true, streaming: true },
+            limits: { contextWindowTokens: 128_000 },
+            pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 3 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        const expensiveManual = createModelRecord({
+            providerId: 'openrouter',
+            providerModel: 'expensive-manual',
+            capabilities: { tools: true, streaming: true },
+            limits: { contextWindowTokens: 128_000 },
+            pricing: { inputUsdPerMillion: 10, outputUsdPerMillion: 40 },
+            verification: { confidence: 'manual', sources: ['operator'] },
+        });
+        const weakSeed = createModelRecord({
+            providerId: 'openrouter',
+            providerModel: 'weak-seed',
+            capabilities: { tools: true, streaming: true },
+            limits: { contextWindowTokens: 128_000 },
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+            verification: { confidence: 'static_seed', sources: ['seed'] },
+        });
+
+        const decision = routeGatewayModels([cheapCatalog, expensiveManual, weakSeed], 'tool_agent', {
+            maxPricePerMillion: 20,
+            preferredMaxPricePerMillion: 5,
+            minimumConfidence: 'catalog',
+            requireAgentProbeOk: false,
+        });
+
+        assert.equal(decision.selected?.model['providerModel'], 'cheap-catalog');
+        assert.ok(decision.selected?.reasons.includes('price_within_preference:4<=5'));
+        assert.ok(decision.rejected.some((candidate) => candidate.rejectedReasons.includes('price_above_limit:50>20')));
+        assert.ok(decision.rejected.some((candidate) => candidate.rejectedReasons.includes('confidence_below_minimum:static_seed<catalog')));
+    });
+
     it('treats vision as a soft routing preference rather than a hard admission gate', () => {
         const textOnly = createModelRecord({
             providerId: 'basic',
