@@ -80,6 +80,24 @@ describe('registerTool', () => {
         assert.equal(entry?.readOnly, true);
     });
 
+    it('deve sintetizar instructions canônicas quando a tool não declara instructions', () => {
+        const reg = createRegistry();
+        const tool = mkTool('git_diff');
+        registerTool(reg, tool, { category: 'git', tags: ['inspect'], readOnly: true });
+        const registered = reg.entries.get('git_diff')?.tool;
+        assert.equal(registered, tool);
+        assert.match(String(/** @type {any} */ (registered)?.instructions), /Use git_diff for:/);
+        assert.match(String(/** @type {any} */ (registered)?.instructions), /Category: git; tags: inspect/);
+        assert.match(String(/** @type {any} */ (registered)?.instructions), /Read-only/);
+    });
+
+    it('deve preservar instructions explícitas declaradas pela tool', () => {
+        const reg = createRegistry();
+        const tool = /** @type {any} */ ({ ...mkTool('custom'), instructions: 'Use esta tool somente para teste.' });
+        registerTool(reg, tool, { category: 'custom', tags: ['test'] });
+        assert.equal(/** @type {any} */ (reg.entries.get('custom')?.tool)?.instructions, 'Use esta tool somente para teste.');
+    });
+
     it('deve substituir ferramenta com mesmo nome', () => {
         const reg = createRegistry();
         registerTool(reg, mkTool('tool'), { category: 'a' });

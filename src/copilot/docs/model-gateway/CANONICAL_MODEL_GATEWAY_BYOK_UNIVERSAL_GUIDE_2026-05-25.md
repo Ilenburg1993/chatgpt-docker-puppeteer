@@ -6519,3 +6519,75 @@ Fechamento pós-live:
   `premiumRequest=false` nos eventos `llm.usage`.
 - [x] Auditoria textual não encontrou vazamento de segredo; o critério
   automático também verificou `25` valores locais.
+
+---
+
+## 60. Continuidade 2026-05-26 — Pós-Live: Tool Instructions E Verifier Sem Falso Positivo
+
+Auditoria executada neste corte:
+
+- [x] O live completo revelou warning operacional em `/tools diag`: o
+  `Tool Contract Verifier` mostrava `instructions=0%` e muitos
+  `MISSING_INSTRUCTIONS`.
+- [x] Confirmado que isso não pertencia ao banco de metadados BYOK: era lacuna
+  transversal do registry de tools do terminal/SDK.
+- [x] Confirmado que o registry já tinha contrato interno para
+  `tool.instructions`, mas a maioria das tools estáticas só declarava
+  `description`.
+- [x] Confirmado que editar cem tools manualmente criaria churn e risco de
+  divergência; a raiz correta era normalizar no ponto canônico de registro.
+- [x] Após a primeira correção, identificado falso positivo residual em
+  `RISKY_SKIP_PERMISSION`: o detector procurava substrings e lia `kill` em
+  `skills` e `rm` em `permission`.
+
+Implementado neste corte:
+
+- [x] `registerTool()` passa a sintetizar `instructions` quando a tool não
+  declara guidance explícita.
+- [x] A síntese usa nome, description, categoria, tags e `readOnly`.
+- [x] Instructions explícitas continuam prevalecendo.
+- [x] A tool registrada preserva identidade do objeto original, evitando
+  surpresa em consumidores que guardam referência.
+- [x] `looksMutatingByName()` passa a tokenizar nomes antes de procurar verbos
+  mutáveis.
+- [x] `looksReadOnlyByName()` também passa a operar por tokens, cobrindo
+  prefixos/sufixos como `get`, `list`, `status`, `health`, `read` e `current`.
+- [x] `exp_skills_list` e `permission_mode_get` deixam de disparar warning
+  falso de mutação.
+- [x] `run_tests` e `permission_mode_set` continuam disparando
+  `RISKY_SKIP_PERMISSION` quando configurados de modo arriscado.
+
+Resultado operacional:
+
+- [x] Bootstrap real das `105` tools estáticas passou a reportar
+  `instructionsPct=100`.
+- [x] Bootstrap real passou a reportar `missingInstructions=0`.
+- [x] Bootstrap real passou a reportar `warnings=0`.
+- [x] O cockpit `/tools diag` fica preparado para mostrar `Tool Contract
+  Verifier ok` sem warnings de instructions em sessão nova.
+
+Separação preservada:
+
+- [x] Nenhuma regra de seleção BYOK foi alterada.
+- [x] Nenhum metadado de provider/modelo foi alterado.
+- [x] Nenhum endpoint externo foi chamado.
+- [x] A correção melhora orientação do modelo para tools, mas não muda
+  permissões nem autorização de tools.
+- [x] O verifier continua podendo alertar riscos reais de skipPermission.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run tests/unit/copilot/test_lib_tools_registry.spec.js
+  tests/unit/copilot/sdk/test_sdk_tools_registry_f28.spec.js`.
+- [x] PASS `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
+- [x] PASS `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js`.
+- [x] PASS `npx vitest run tests/unit/copilot/tools/test_tool_contract_verifier.spec.js
+  tests/unit/copilot/test_lib_tools_registry.spec.js
+  tests/unit/copilot/sdk/test_sdk_tools_registry_f28.spec.js
+  tests/unit/copilot/terminal/test_commands_tools.spec.js
+  tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
+- [x] PASS verificação direta via bootstrap: `total=105`, `warnings=0`,
+  `instructionsPct=100`, `missingInstructions=0`, `riskySkipPermissionCount=0`.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS `npm run lint:copilot`.
+- [x] PASS `git diff --check`.

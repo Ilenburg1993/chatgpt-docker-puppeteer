@@ -140,6 +140,23 @@ describe('F135 — contratos de registro', () => {
         expect(entry?.readOnly).toBe(true);
     });
 
+    it('registerTool sintetiza instructions quando ausentes', () => {
+        const t = makeTool('t1');
+        registerTool(reg, t, { category: 'git', tags: ['vcs', 'diff'], readOnly: true });
+        const instructions = String(/** @type {any} */ (reg.entries.get('t1')?.tool)?.instructions ?? '');
+        expect(instructions).toContain('Use t1 for:');
+        expect(instructions).toContain('Category: git; tags: vcs, diff.');
+        expect(instructions).toContain('Read-only:');
+    });
+
+    it('registerTool preserva instructions explícitas', () => {
+        const t = /** @type {any} */ ({ ...makeTool('with_instructions'), instructions: 'Custom tool guidance.' });
+        registerTool(reg, t, { category: 'custom', tags: ['runtime'] });
+        expect(/** @type {any} */ (reg.entries.get('with_instructions')?.tool)?.instructions).toBe(
+            'Custom tool guidance.',
+        );
+    });
+
     it('registerTool com tool inválido lança erro', () => {
         expect(() => registerTool(reg, /** @type {any} */ (null))).toThrow();
     });

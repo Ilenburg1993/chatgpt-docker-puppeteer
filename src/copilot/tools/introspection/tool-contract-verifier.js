@@ -88,12 +88,49 @@ function isUsableSchema(schema) {
 
 /**
  * @param {string} toolName
+ * @returns {string[]}
+ */
+function toolNameTokens(toolName) {
+    return String(toolName ?? '')
+        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+        .toLowerCase()
+        .split(/[^a-z0-9]+/u)
+        .filter(Boolean);
+}
+
+/**
+ * @param {string} toolName
  * @returns {boolean}
  */
 function looksMutatingByName(toolName) {
-    return /(write|create|delete|remove|patch|exec|run|toggle|set|update|commit|push|merge|checkout|reset|install|kill|stop|start|restart|clean|append|mkdir|rm|rename)/i.test(
-        toolName,
-    );
+    const mutatingTokens = new Set([
+        'write',
+        'create',
+        'delete',
+        'remove',
+        'patch',
+        'exec',
+        'run',
+        'toggle',
+        'set',
+        'update',
+        'commit',
+        'push',
+        'merge',
+        'checkout',
+        'reset',
+        'install',
+        'kill',
+        'stop',
+        'start',
+        'restart',
+        'clean',
+        'append',
+        'mkdir',
+        'rm',
+        'rename',
+    ]);
+    return toolNameTokens(toolName).some((token) => mutatingTokens.has(token));
 }
 
 /**
@@ -101,8 +138,11 @@ function looksMutatingByName(toolName) {
  * @returns {boolean}
  */
 function looksReadOnlyByName(toolName) {
-    if (/^(get|read|list|status|info|health|find|search|count|current|is_)/i.test(toolName)) return true;
-    return /(_get|_read|_list|_status|_info|_health|_current|_is)$/i.test(toolName);
+    const tokens = toolNameTokens(toolName);
+    const first = tokens[0] ?? '';
+    const last = tokens.at(-1) ?? '';
+    const readOnlyTokens = new Set(['get', 'read', 'list', 'status', 'info', 'health', 'find', 'search', 'count']);
+    return readOnlyTokens.has(first) || readOnlyTokens.has(last) || first === 'is' || last === 'current';
 }
 
 /**

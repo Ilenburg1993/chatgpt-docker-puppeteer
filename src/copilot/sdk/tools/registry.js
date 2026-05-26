@@ -38,6 +38,52 @@ import { log } from '../logger.js';
  * @property {Map<string, ToolEntry>} entries - Mapa de nome → ToolEntry
  */
 
+/**
+ * @param {string[]} tags
+ * @returns {string}
+ */
+function formatInstructionTags(tags) {
+    const cleanTags = tags.filter((tag) => typeof tag === 'string' && tag.trim().length > 0);
+    return cleanTags.length > 0 ? cleanTags.join(', ') : 'none';
+}
+
+/**
+ * Cria uma orientação operacional mínima e consistente para tools que ainda
+ * declaram apenas description/schema. Instructions explícitas da tool sempre
+ * vencem esta síntese.
+ *
+ * @param {Tool} tool
+ * @param {{ category: string; tags: string[]; readOnly: boolean }} meta
+ * @returns {string}
+ */
+function createDefaultToolInstructions(tool, meta) {
+    const description = typeof tool.description === 'string' ? tool.description.trim() : '';
+    const accessPolicy = meta.readOnly
+        ? 'Read-only: use freely for inspection; do not present it as a write or mutation.'
+        : 'Mutating or stateful: use only when the operator request or active workflow calls for this action.';
+    const tagText = formatInstructionTags(meta.tags);
+    return [
+        `Use ${tool.name} for: ${description}`,
+        `Category: ${meta.category}; tags: ${tagText}.`,
+        accessPolicy,
+        'Validate required arguments from the parameter schema before calling and report concise results/errors.',
+    ].join(' ');
+}
+
+/**
+ * @param {Tool} tool
+ * @param {{ category: string; tags: string[]; readOnly: boolean }} meta
+ * @returns {ExtendedTool}
+ */
+function ensureToolInstructions(tool, meta) {
+    const extended = /** @type {ExtendedTool} */ (tool);
+    if (typeof extended.instructions === 'string' && extended.instructions.trim().length > 0) {
+        return extended;
+    }
+    extended.instructions = createDefaultToolInstructions(tool, meta);
+    return extended;
+}
+
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
 /**
@@ -74,9 +120,8 @@ export function registerTool(registry, tool, meta = {}) {
     if (!validation.ok) {
         throw new ConfigError(`[sdk/tools-registry] registerTool: ${validation.reason}`);
     }
-    const safeTool = /** @type {Tool} */ (tool);
-
     const { category = 'uncategorized', tags = [], readOnly = false } = meta;
+    const safeTool = ensureToolInstructions(/** @type {Tool} */ (tool), { category, tags, readOnly });
 
     if (registry.entries.has(safeTool.name)) {
         log('WARN', `[sdk/tools-registry] Sobrescrevendo tool já registrada: "${safeTool.name}".`);
