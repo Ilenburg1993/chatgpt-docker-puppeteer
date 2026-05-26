@@ -10,7 +10,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-live-plan.mjs [--json] [--fail] [--no-write] [--allow-active-overlays] [--out-dir DIR]
+    process.stdout.write(`Usage: node scripts/model-gateway-live-plan.mjs [--json] [--fail] [--no-write] [--allow-active-overlays] [--local-private-strict] [--out-dir DIR]
 
 Create a no-runtime terminal llm-b live-test plan from model-gateway readiness. This does not start the terminal, fetch
 providers, run models or execute probes.
@@ -43,6 +43,22 @@ function runReadiness() {
     return JSON.parse(result.stdout);
 }
 
+function runLocalPrivateStrictSelection() {
+    const result = spawnSync(
+        process.execPath,
+        [path.join(ROOT, 'scripts/model-gateway-selection-audit.mjs'), '--profile=local_private_strict', '--fail-on-unselected'],
+        {
+            cwd: ROOT,
+            encoding: 'utf8',
+        },
+    );
+    return {
+        ok: result.status === 0,
+        status: result.status,
+        detail: (result.stderr || result.stdout || `exit=${result.status}`).trim().split(/\r?\n/u).slice(0, 4).join(' | '),
+    };
+}
+
 function readinessCheck(readiness, id) {
     return Array.isArray(readiness.checks) ? readiness.checks.find((check) => check.id === id) : null;
 }
@@ -65,8 +81,9 @@ function countMapText(counts) {
         .join(',') || '-';
 }
 
-function buildPlan(readiness, { allowActiveOverlays = false } = {}) {
+function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict = false } = {}) {
     const overlaySummary = effectiveOverlaySummary(readiness);
+    const localPrivateStrictSelection = localPrivateStrict ? runLocalPrivateStrictSelection() : null;
     const liveRunner = readinessCheck(readiness, 'live_runner_present');
     const effective = readinessCheck(readiness, 'selection_effective_observed_health');
     const runtimeNotPromoted = readinessCheck(readiness, 'runtime_not_promoted');
@@ -95,6 +112,13 @@ function buildPlan(readiness, { allowActiveOverlays = false } = {}) {
             id: 'active_runtime_overlays',
             ok: allowActiveOverlays || overlaySummary.activeCount === 0,
             detail: `active=${overlaySummary.activeCount}, expired=${overlaySummary.expiredCount}, providers=${countMapText(overlaySummary.byProvider)}, failures=${countMapText(overlaySummary.byFailureKind)}`,
+        },
+        {
+            id: 'local_private_strict_selection',
+            ok: !localPrivateStrict || localPrivateStrictSelection?.ok === true,
+            detail: localPrivateStrict
+                ? (localPrivateStrictSelection?.detail ?? 'local/private strict selection unavailable')
+                : 'not requested',
         },
     ];
     const phases = [
@@ -147,6 +171,11 @@ function buildPlan(readiness, { allowActiveOverlays = false } = {}) {
             checks: readiness.checks ?? [],
         },
         overlaySummary,
+        localPrivateStrict: {
+            requested: localPrivateStrict,
+            ok: localPrivateStrictSelection?.ok ?? null,
+            status: localPrivateStrictSelection?.status ?? null,
+        },
         prerequisites,
         phases,
         nextCommand: phases[0].command,
@@ -164,6 +193,7 @@ function renderMarkdown(plan) {
         `- overlays: total=${plan.overlaySummary.total} active=${plan.overlaySummary.activeCount} expired=${plan.overlaySummary.expiredCount}`,
         `- providers: ${countMapText(plan.overlaySummary.byProvider)}`,
         `- failures: ${countMapText(plan.overlaySummary.byFailureKind)}`,
+        `- localPrivateStrict: requested=${plan.localPrivateStrict.requested ? 'true' : 'false'} ok=${plan.localPrivateStrict.ok ?? '-'}`,
         '',
         '## Prerequisites',
         '',
@@ -205,9 +235,10 @@ const json = argSet.has('--json');
 const fail = argSet.has('--fail');
 const write = !argSet.has('--no-write');
 const allowActiveOverlays = argSet.has('--allow-active-overlays');
+const localPrivateStrict = argSet.has('--local-private-strict') || argSet.has('--require-local-private');
 const outDir = path.resolve(ROOT, readArg('--out-dir', DEFAULT_OUT_DIR));
 const readiness = runReadiness();
-const plan = buildPlan(readiness, { allowActiveOverlays });
+const plan = buildPlan(readiness, { allowActiveOverlays, localPrivateStrict });
 const artifacts = write ? await writePlanArtifacts(plan, outDir) : null;
 const summary = {
     ...plan,

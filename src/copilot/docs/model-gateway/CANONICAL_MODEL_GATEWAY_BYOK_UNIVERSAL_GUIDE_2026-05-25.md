@@ -1894,6 +1894,57 @@ Validação deste corte:
 - [x] PASS `npm run lint:copilot`.
 - [x] PASS `git diff --check`.
 
+---
+
+## 60. Continuidade 2026-05-26 — Live Plan Com Gate Local Estrito Opcional
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que o live plan deve continuar sem executar terminal,
+  provider, modelo ou probe.
+- [x] Confirmado que o modo local/private estrito precisa ser opt-in porque o
+  snapshot atual ainda não possui supply local.
+- [x] Confirmado que o operador deve poder falhar o plano antes do live quando
+  exigir local/private hard-blocking.
+
+Implementado neste corte:
+
+- [x] `model-gateway-live-plan.mjs` aceita `--local-private-strict`.
+- [x] `model-gateway-live-plan.mjs` aceita `--require-local-private` como alias.
+- [x] Quando solicitado, o plano roda seleção pré-runtime
+  `local_private_strict` como prerequisite sem executar runtime.
+- [x] O plano adiciona prerequisite `local_private_strict_selection`.
+- [x] O markdown do plano passa a registrar se `localPrivateStrict` foi
+  solicitado.
+- [x] O inventário canônico passa a listar
+  `npm run model-gateway:live:plan -- --local-private-strict`.
+
+Separação arquitetural preservada:
+
+- [x] A seleção local estrita no live plan é apenas leitura.
+- [x] Nenhum provider é chamado.
+- [x] Nenhum modelo é executado.
+- [x] Nenhuma probe runtime é executada.
+- [x] O catálogo canônico não é mutado.
+
+Próximas lacunas:
+
+- [ ] Avaliar se o terminal deve ganhar atalho textual para gerar o live plan
+  local/private estrito diretamente do cockpit.
+
+Validação deste corte:
+
+- [x] PASS `node --check scripts/model-gateway-live-plan.mjs`.
+- [x] PASS `npm run model-gateway:live:plan -- --no-write`.
+- [x] PASS esperado com exit `1` para
+  `node scripts/model-gateway-live-plan.mjs --no-write
+  --local-private-strict --fail`.
+- [x] PASS `npm run model-gateway:commands -- --phase=live-readiness`.
+- [x] PASS `npm run model-gateway:test:contracts` com `159` testes.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
 - [x] PASS `npm run test:copilot` com `5663` testes totais, `5630` passed,
   `33` pending, `0` failed e `0` warnings/errors.
 

@@ -219,6 +219,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Materialize the no-runtime terminal llm-b live-test plan from readiness.',
     },
     {
+        id: 'live.plan.local-strict',
+        phase: 'live-readiness',
+        surface: 'package',
+        command: 'npm run model-gateway:live:plan -- --local-private-strict',
+        summary: 'Materialize the live-test plan with an opt-in hard local/private prerequisite.',
+    },
+    {
         id: 'make.commands',
         phase: 'orientation',
         surface: 'make',
