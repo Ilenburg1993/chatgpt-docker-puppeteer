@@ -174,6 +174,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Audit metadata-first route selection from the persisted catalog without runtime probes.',
     },
     {
+        id: 'live.readiness',
+        phase: 'live-readiness',
+        surface: 'package',
+        command: 'npm run model-gateway:live:readiness',
+        summary: 'Check catalog integrity, SQLite parity and pre-runtime selection before terminal llm-b live tests.',
+    },
+    {
         id: 'make.commands',
         phase: 'orientation',
         surface: 'make',
@@ -291,6 +298,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-selection-audit',
         summary: 'Makefile alias for pre-runtime selection audit.',
+    },
+    {
+        id: 'make.live-readiness',
+        phase: 'live-readiness',
+        surface: 'make',
+        command: 'make model-gateway-live-readiness',
+        summary: 'Makefile alias for the no-runtime live readiness gate.',
     },
     {
         id: 'terminal.commands',

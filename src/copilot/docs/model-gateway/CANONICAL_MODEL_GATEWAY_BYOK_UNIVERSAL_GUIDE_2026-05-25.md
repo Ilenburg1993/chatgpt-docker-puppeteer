@@ -3346,6 +3346,110 @@ Validação deste corte:
 
 ---
 
+## 74. Continuidade 2026-05-26 — Readiness Antes Dos Live Tests LLM-B
+
+Auditoria executada neste corte:
+
+- [x] Revisitado `scripts/copilot/run-terminal-llm-b-live-test.mjs`.
+- [x] Confirmado que o runner já possui fases úteis: `--no-pr`,
+  `--byok-probe --byok-fixture --no-pr`, `--byok-real --no-pr` e
+  `--byok-real` completo.
+- [x] Confirmado que faltava um gate canônico imediatamente anterior ao live
+  test, sem abrir terminal e sem consumir provider/modelo.
+- [x] Confirmado que o gate deve juntar integridade, paridade JSON/SQLite por
+  chaves, seleção `allow_probe_unknown`, seleção `strict_access_only` e presença
+  do runner live.
+
+Implementado neste corte:
+
+- [x] Criado `scripts/model-gateway-live-readiness.mjs`.
+- [x] O readiness lê JSON store e SQLite store sem refresh e sem runtime.
+- [x] O readiness roda `auditModelGatewayCatalogSnapshotIntegrity()`.
+- [x] O readiness roda `compareModelGatewayCatalogSnapshotParity()` com
+  contagens e chaves.
+- [x] O readiness roda seleção pré-runtime em `allow_probe_unknown`.
+- [x] O readiness roda seleção pré-runtime em `strict_access_only`.
+- [x] O readiness exige que strict selection selecione apenas decisões
+  `eligible`.
+- [x] O readiness confirma que runtime proof count continua `0` antes de live.
+- [x] O readiness devolve o plano de execução recomendado em ordem:
+  `--no-pr`, `--byok-probe --byok-fixture --no-pr`, `--byok-real --no-pr`
+  e só então `--byok-real`.
+- [x] Adicionado package script `model-gateway:live:readiness`.
+- [x] Adicionado Make target `model-gateway-live-readiness`.
+- [x] Inventário canônico passa a listar package e make do readiness live.
+- [x] Readiness usa `data/copilot.sqlite` diretamente para preservar JSON limpo
+  sem logs operacionais antes do payload.
+- [x] Corrigido `scripts/copilot/run-terminal-llm-b-live-test.mjs` para tratar
+  `--byok-fixture` como probe BYOK control-plane mesmo quando combinado com
+  `--no-pr`.
+- [x] Corrigido `readArg()` do runner para aceitar `--flag=valor` e
+  `--flag valor`, evitando que `--out-dir <dir>` fosse ignorado.
+- [x] O roteiro fixture agora mantém filtros restritivos para provar parsing,
+  mas adiciona `/byok recommend provider:openai-compatible 5` para exigir uma
+  recomendação positiva sem depender de metadados que o endpoint OpenAI
+  `/models` não entrega.
+
+Separação preservada:
+
+- [x] Readiness não abre terminal.
+- [x] Readiness não chama provider.
+- [x] Readiness não executa modelo.
+- [x] Readiness não executa runtime probe.
+- [x] Readiness não muta JSON, SQLite, health ou route decisions.
+- [x] Fixture BYOK abre terminal, mas usa servidor local hermético e não envia
+  turno LLM nem chama provider externo.
+
+Próximas lacunas:
+
+- [x] Rodar smoke do novo readiness.
+- [x] Após readiness verde, executar live no modo `--no-pr`.
+- [x] Executar live fixture local antes de qualquer provider real.
+- [ ] Só promover para `--byok-real` completo depois de no-pr, fixture e real
+  no-pr passarem sem vazamento de segredo e sem erro terminal.
+
+Resultado live `--no-pr`:
+
+- [x] PASS `npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000`.
+- [x] Artefatos: `artifacts/terminal-live/2026-05-26T20-12-32-840Z/`.
+- [x] Exit code `0`.
+- [x] Critérios `22/22` aprovados.
+- [x] Sem turno explícito de LLM.
+- [x] Sem tools iniciadas.
+- [x] Sem erros de terminal.
+- [x] SSE conectado, ids públicos monotônicos e source envelope presente.
+
+Achado live fixture:
+
+- [x] Detectado falso positivo anterior: `--byok-fixture --no-pr` estava caindo
+  no avaliador genérico `--no-pr`, aprovando sem exercitar `/byok`.
+- [x] Corrigida a prioridade do modo no runner com `byokControlProbe`.
+- [x] PASS dry-run: `--byok-fixture --no-pr --dry-run --out-dir <dir>` agora
+  gera comandos `/byok`, ativa `codex-fixture`, descobre `/v1/models` e volta
+  para SDK.
+- [x] Primeira execução real do fixture BYOK revelou
+  `byok-recommend-visible` vermelho, porque `free reasoning safe` zera o
+  catálogo remoto OpenAI-compatible hermético.
+- [x] Ajustado roteiro para separar "filtros aceitos" de "recomendação positiva".
+
+Resultado live `--byok-probe --byok-fixture --no-pr`:
+
+- [x] PASS
+  `npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`.
+- [x] Artefatos: `artifacts/terminal-live/2026-05-26T20-17-02-559Z/`.
+- [x] Exit code `0`.
+- [x] Critérios `31/31` aprovados.
+- [x] Sem turno explícito de LLM.
+- [x] Fixture profile `codex-fixture` visível com metadados redigidos.
+- [x] Descoberta remota hermética via `/v1/models` validada.
+- [x] Trocas de modelo e provider BYOK validadas sem rebind da sessão viva.
+- [x] `/byok recommend` exibiu ação descartável `/byok probe agent`.
+- [x] `/byok use sdk` devolveu governança ao SDK Copilot.
+- [x] Sem vazamento do bearer token fixture.
+- [x] Sem erros de terminal e SSE público íntegro.
+
+---
+
 ## 73. Continuidade 2026-05-26 — Gate Por Chaves E Strict Access Pré-Runtime
 
 Auditoria executada neste corte:

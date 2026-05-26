@@ -32,8 +32,17 @@ function stripAnsi(value) {
 
 function readArg(name, fallback) {
     const prefix = `${name}=`;
-    const found = process.argv.slice(2).find((arg) => arg.startsWith(prefix));
-    return found ? found.slice(prefix.length) : fallback;
+    const args = process.argv.slice(2);
+    for (let index = 0; index < args.length; index += 1) {
+        const arg = args[index];
+        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
+        if (arg === name) {
+            const next = args[index + 1];
+            if (typeof next === 'string' && next.length > 0 && !next.startsWith('--')) return next;
+            return fallback;
+        }
+    }
+    return fallback;
 }
 
 function hasFlag(name) {
@@ -121,6 +130,7 @@ function buildByokProbeCommands({ fixtureBaseUrl = 'http://127.0.0.1:11434/v1' }
         '/byok health',
         '/byok models refresh',
         '/byok models provider:openai-compatible free reasoning safe 8',
+        '/byok recommend provider:openai-compatible 5',
         '/byok recommend free reasoning safe 5',
         '/byok model fixture/model-b',
         '/byok',
@@ -1873,6 +1883,7 @@ async function main() {
     const byokProbe = hasFlag('--byok-probe');
     const byokFixture = hasFlag('--byok-fixture');
     const byokReal = hasFlag('--byok-real');
+    const byokControlProbe = !byokReal && (byokProbe || byokFixture);
     const byokRealProfile = readArg('--byok-real-profile', '');
     const byokRealAltProfile = readArg('--byok-real-alt-profile', '');
     const byokRealModel = readArg('--byok-real-model', '');
@@ -1924,7 +1935,7 @@ async function main() {
     }
 
     if (dryRun) {
-        const prompt = byokProbe
+        const prompt = byokControlProbe
             ? buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl }).join('\n')
             : byokReal
               ? [
@@ -2106,7 +2117,7 @@ async function main() {
             if (collectSse) {
                 sseCollector = startSseCollector({ port: Number.isFinite(ssePort) ? ssePort : terminalPort });
             }
-            if (byokProbe || noPr || byokReal) {
+            if (byokControlProbe || noPr || byokReal) {
                 const commands = byokReal
                     ? [
                           '/usage now',
@@ -2114,7 +2125,7 @@ async function main() {
                           ...buildByokRealPreflightCommands(realByok ?? {}),
                           ...(noPr ? buildByokRealNoPrDiagnosticCommands() : []),
                       ]
-                    : byokProbe
+                    : byokControlProbe
                       ? ['/usage now', '/activity 12', ...buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl })]
                       : ['/usage now', '/activity 12', ...buildNoPrProbeCommands()];
                 startPromptSynchronizedCommandSequence(commands, () => {
@@ -2250,7 +2261,7 @@ async function main() {
         raw: '',
         disabled: !collectSse,
     };
-    const blocker = noPr || byokProbe
+    const blocker = noPr || byokControlProbe
         ? null
         : detectLiveBlocker(plain, {
               timedOut,
@@ -2259,10 +2270,10 @@ async function main() {
               postCommandsSent,
               sseEvents: sseSummary.events,
           });
-    const exportSummary = noPr || byokProbe || blocker ? null : await inspectExportedMarkdown(exportPath);
+    const exportSummary = noPr || byokControlProbe || blocker ? null : await inspectExportedMarkdown(exportPath);
     const baseCriteria = blocker
         ? evaluateBlockedOutput(plain, sseSummary, blocker)
-        : byokProbe
+        : byokControlProbe
           ? evaluateByokProbeOutput(plain, sseSummary, { fixture: byokFixture })
           : noPr
             ? evaluateNoPrOutput(plain, sseSummary)
