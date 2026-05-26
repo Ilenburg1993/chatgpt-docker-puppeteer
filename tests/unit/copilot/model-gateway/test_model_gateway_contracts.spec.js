@@ -14,6 +14,7 @@ import {
     listProviderEndpointInventory,
     listProviderEndpointSourceRecords,
     listProviderGatewayTraits,
+    listProviderWireProbeMatrix,
     listModelGatewayCanonicalCommands,
     listModelGatewayTaskProfiles,
     ModelGatewayRegistry,
@@ -151,6 +152,7 @@ import {
     summarizeCanonicalModelProjectionDiff,
     summarizeModelGatewayMetadataCoverage,
     summarizeModelGatewayProviderFreshness,
+    summarizeProviderWireProbeMatrix,
     toOpenAIModelCatalogEntry,
     toOpenAIModelCatalogList,
     toCopilotModelInfoList,
@@ -5849,6 +5851,27 @@ describe('model-gateway foundation', () => {
         assert.equal(ollama?.['topology'], 'local_daemon');
         assert.equal(ollama?.['localPrivate'], true);
         assert.equal(resolveProviderGatewayTraits('missing-provider'), null);
+    });
+
+    it('builds a provider/wire-API probe matrix without executing runtime probes', () => {
+        const matrix = listProviderWireProbeMatrix();
+        const summary = summarizeProviderWireProbeMatrix(matrix);
+        const byProviderWire = new Map(matrix.map((row) => [`${row.providerId}:${row.wireApi}`, row]));
+        const kiloChat = byProviderWire.get('kilo:openai_chat_completions');
+        const openAiResponses = byProviderWire.get('openai:openai_responses');
+        const cloudflareGateway = byProviderWire.get('cloudflare-workers-ai:cloudflare_ai_gateway_universal');
+        const openCodeAnthropic = byProviderWire.get('opencode:anthropic_messages');
+
+        assert.ok(matrix.length >= listProviderGatewayTraits().length);
+        assert.ok(summary.providerCount >= 10);
+        assert.ok(kiloChat?.implementedProbeKinds.includes('agent'));
+        assert.ok(kiloChat?.pendingProbeKinds.includes('forced_tool_choice'));
+        assert.ok(kiloChat?.pendingProbeKinds.includes('parallel_tool_calls'));
+        assert.ok(openAiResponses?.pendingProbeKinds.includes('reasoning'));
+        assert.equal(cloudflareGateway?.gatewaySpecific, true);
+        assert.ok(cloudflareGateway?.pendingProbeKinds.includes('gateway_fallback'));
+        assert.equal(openCodeAnthropic?.providerNative, true);
+        assert.ok(summary.pendingProbeKindCounts['provider_native'] > 0);
     });
 
     it('audits endpoint inventory coverage against configured catalog importers', () => {

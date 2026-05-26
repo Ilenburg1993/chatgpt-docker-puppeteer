@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, summarizeProviderWireProbeMatrix, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -35,6 +35,13 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             changedCount: diff.changed?.length ?? 0,
             changedKinds: [...new Set((diff.changed ?? []).flatMap((item) => item.changedKinds ?? []))],
             changedKindCounts: {},
+        })),
+        summarizeProviderWireProbeMatrix: vi.fn(() => ({
+            providerCount: 1,
+            rowCount: 1,
+            implementedProbeKindCounts: { chat: 1, streaming: 1, json: 1, agent: 1 },
+            pendingProbeKindCounts: { reasoning: 1, forced_tool_choice: 1, parallel_tool_calls: 1 },
+            providersWithPendingProbeKinds: ['kilo'],
         })),
         buildModelGatewayPreKCompatibilityReport: vi.fn(() => ({
             stage: 'pre-k',
@@ -206,6 +213,17 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                 metadata: { hasPricingMetadata: true, hasContextMetadata: true, hasProviderMetadata: false },
             },
         ]),
+        listProviderWireProbeMatrix: vi.fn(() => [
+            {
+                providerId: 'kilo',
+                topology: 'gateway',
+                runtimeKind: 'chat_completions',
+                wireApi: 'openai_chat_completions',
+                implementedProbeKinds: ['chat', 'streaming', 'json', 'agent'],
+                pendingProbeKinds: ['reasoning', 'forced_tool_choice', 'parallel_tool_calls'],
+                notes: ['runtime_probe_gap'],
+            },
+        ]),
         listTerminalSdkSessionInventory: vi.fn(() =>
             Promise.resolve({
                 currentSessionId: null,
@@ -365,6 +383,7 @@ vi.mock('#copilot/model-gateway', () => ({
     listModelGatewayCanonicalCommands,
     listProviderEndpointInventory,
     listProviderGatewayTraits,
+    listProviderWireProbeMatrix,
     readByokProviderHealthState,
     readByokProviderModelHealth,
     recordByokProviderModelAgentProbeFailure,
@@ -385,6 +404,7 @@ vi.mock('#copilot/model-gateway', () => ({
     runConfiguredByokStreamingProbe: runConfiguredByokStreamingProbe,
     runConfiguredByokVisionProbe: runConfiguredByokVisionProbe,
     summarizeCanonicalModelProjectionDiff,
+    summarizeProviderWireProbeMatrix,
 }));
 
 const { cmdByok } = await import('../../../../src/copilot/terminal/commands/byok.js');
@@ -506,6 +526,26 @@ describe('terminal /byok command', () => {
                 metadata: { hasPricingMetadata: true, hasContextMetadata: true, hasProviderMetadata: false },
             },
         ]);
+        listProviderWireProbeMatrix.mockReset();
+        listProviderWireProbeMatrix.mockReturnValue([
+            {
+                providerId: 'kilo',
+                topology: 'gateway',
+                runtimeKind: 'chat_completions',
+                wireApi: 'openai_chat_completions',
+                implementedProbeKinds: ['chat', 'streaming', 'json', 'agent'],
+                pendingProbeKinds: ['reasoning', 'forced_tool_choice', 'parallel_tool_calls'],
+                notes: ['runtime_probe_gap'],
+            },
+        ]);
+        summarizeProviderWireProbeMatrix.mockReset();
+        summarizeProviderWireProbeMatrix.mockReturnValue({
+            providerCount: 1,
+            rowCount: 1,
+            implementedProbeKindCounts: { chat: 1, streaming: 1, json: 1, agent: 1 },
+            pendingProbeKindCounts: { reasoning: 1, forced_tool_choice: 1, parallel_tool_calls: 1 },
+            providersWithPendingProbeKinds: ['kilo'],
+        });
         listTerminalSdkSessionInventory.mockReset();
         listTerminalSdkSessionInventory.mockResolvedValue({
             currentSessionId: null,
@@ -1494,6 +1534,21 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('openaiCompat=sim');
         expect(ctx.output()).toContain('runtimeKinds=chat_completions');
         expect(ctx.output()).toContain('metadata=pricing:sim');
+    });
+
+    it('mostra matriz provider/wire API de probes sem chamar runtime', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway probes matrix kilo');
+
+        expect(listProviderWireProbeMatrix).toHaveBeenCalledWith({ providerId: 'kilo' });
+        expect(summarizeProviderWireProbeMatrix).toHaveBeenCalled();
+        expect(ctx.output()).toContain('BYOK provider/wire probe matrix');
+        expect(ctx.output()).toContain('wire=openai_chat_completions');
+        expect(ctx.output()).toContain('implemented=chat,streaming,json,agent');
+        expect(ctx.output()).toContain('pending=reasoning,forced_tool_choice,parallel_tool_calls');
+        expect(ctx.output()).toContain('pendingKinds=forced_tool_choice:1, parallel_tool_calls:1, reasoning:1');
     });
 
     it('mostra gate pré-K do model-gateway com checks booleanos', async () => {

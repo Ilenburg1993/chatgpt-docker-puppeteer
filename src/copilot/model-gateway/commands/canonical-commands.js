@@ -132,6 +132,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Inspect normalized provider/gateway traits derived from specs and endpoint inventory.',
     },
     {
+        id: 'terminal.probe-matrix',
+        phase: 'pre-runtime',
+        surface: 'terminal',
+        command: '/byok gateway probes matrix',
+        summary: 'Inspect provider/wire-API probe applicability before any runtime execution.',
+    },
+    {
         id: 'terminal.sqlite',
         phase: 'metadata',
         surface: 'terminal',

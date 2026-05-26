@@ -36,6 +36,7 @@ import {
     listModelGatewayCanonicalCommands,
     listProviderGatewayTraits,
     listProviderEndpointInventory,
+    listProviderWireProbeMatrix,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     mirrorByokProviderHealthToSqlite,
     readByokProviderHealthState,
@@ -59,6 +60,7 @@ import {
     runConfiguredByokVisionProbe,
     searchModelGatewayCatalogEntries,
     SqliteModelGatewayCatalogStore,
+    summarizeProviderWireProbeMatrix,
     summarizeCanonicalModelProjectionDiff,
     toOpenAIModelCatalogList,
 } from '#copilot/model-gateway';
@@ -1642,7 +1644,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway provider <traits|explain> [provider] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway provider <traits|explain> [provider] | /byok gateway probes matrix [provider] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1762,6 +1764,45 @@ function renderByokProviderGatewayTraits(println, rest) {
         println(`      \x1b[90mrichness=${richnessTags}\x1b[0m`);
     }
     println('\n  \x1b[90mUse estes traits como filtro inicial; eligibility e probes continuam em fases separadas.\x1b[0m\n');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {void}
+ */
+function renderByokGatewayProbeMatrix(println, rest) {
+    const selector = optionalScalarString(rest.find((item) => !/^(probes|probe|matrix|matriz)$/iu.test(item)));
+    const rows = listProviderWireProbeMatrix({ providerId: selector ?? undefined });
+    const summary = summarizeProviderWireProbeMatrix(rows);
+
+    println(`\n  \x1b[36mBYOK provider/wire probe matrix\x1b[0m`);
+    println(
+        `  \x1b[90mproviders=${summary.providerCount} · rows=${summary.rowCount} · selector=${selector ?? '-'} · fase=pre-runtime-planning\x1b[0m\n`,
+    );
+
+    if (rows.length === 0) {
+        println(`    \x1b[33mNenhuma linha de matriz encontrada para ${selector ?? 'inventário atual'}.\x1b[0m\n`);
+        return;
+    }
+
+    for (const row of rows.slice(0, 24)) {
+        const implemented = Array.isArray(row['implementedProbeKinds']) ? row['implementedProbeKinds'].join(',') : '-';
+        const pending = Array.isArray(row['pendingProbeKinds']) ? row['pendingProbeKinds'].join(',') : '-';
+        const notes = Array.isArray(row['notes']) ? row['notes'].join(',') : '-';
+        println(
+            `    \x1b[33m${optionalScalarString(row['providerId']) ?? '-'}\x1b[0m  \x1b[90mwire=${optionalScalarString(row['wireApi']) ?? '-'} · runtime=${optionalScalarString(row['runtimeKind']) ?? '-'} · topology=${optionalScalarString(row['topology']) ?? '-'}\x1b[0m`,
+        );
+        println(`      \x1b[90mimplemented=${implemented || '-'} · pending=${pending || '-'} · notes=${notes || '-'}\x1b[0m`);
+    }
+    if (rows.length > 24) println(`\n  \x1b[90mexibindo 24/${rows.length}; filtre com provider id.\x1b[0m`);
+
+    const pendingKinds = Object.entries(summary.pendingProbeKindCounts)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([kind, count]) => `${kind}:${count}`)
+        .join(', ');
+    println(`\n  \x1b[90mpendingKinds=${pendingKinds || '-'}\x1b[0m`);
+    println('  \x1b[90mMatriz não executa provider/modelo; ela só orienta probes runtime futuros e seleção por policy.\x1b[0m\n');
 }
 
 /**
@@ -2988,6 +3029,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         }
         if (/^(health|runtime-health|probes)$/iu.test(rest[0] ?? '') && /^(sqlite|sql|mirror|sync)$/iu.test(rest[1] ?? '')) {
             await renderByokGatewayHealthSqliteMirror(println);
+            return;
+        }
+        if (/^(probes|probe)$/iu.test(rest[0] ?? '') && /^(matrix|matriz|plan|planner)$/iu.test(rest[1] ?? '')) {
+            renderByokGatewayProbeMatrix(println, rest.slice(2));
             return;
         }
         if (/^(routes|route|rotas)$/iu.test(rest[0] ?? '')) {

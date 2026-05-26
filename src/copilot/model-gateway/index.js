@@ -276,7 +276,10 @@ export {
     BYOK_AGENT_PROBE_TOOL,
     BYOK_VISION_PROBE_DISPLAY_NAME,
     BYOK_VISION_PROBE_MIME_TYPE,
+    MODEL_GATEWAY_IMPLEMENTED_PROBE_KINDS,
+    MODEL_GATEWAY_PLANNED_PROBE_KINDS,
     estimateProbeCostUsd,
+    listProviderWireProbeMatrix,
     planCostBoundedCatalogProbes,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
@@ -284,6 +287,7 @@ export {
     runConfiguredByokStreamingProbe,
     runConfiguredByokVisionProbe,
     recommendCatalogDiffProbes,
+    summarizeProviderWireProbeMatrix,
 } from './probes/index.js';
 export {
     MODEL_GATEWAY_CATALOG_CONFLICT_DETECTED,

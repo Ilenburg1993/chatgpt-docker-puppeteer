@@ -25,4 +25,10 @@ export {
     runConfiguredByokVisionProbe,
 } from './vision-probe.js';
 export { estimateProbeCostUsd, planCostBoundedCatalogProbes } from './planner.js';
+export {
+    MODEL_GATEWAY_IMPLEMENTED_PROBE_KINDS,
+    MODEL_GATEWAY_PLANNED_PROBE_KINDS,
+    listProviderWireProbeMatrix,
+    summarizeProviderWireProbeMatrix,
+} from './matrix.js';
 export { recommendCatalogDiffProbes } from './recommendations.js';

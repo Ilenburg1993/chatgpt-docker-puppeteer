@@ -14,6 +14,16 @@ const PROBE_TOKEN_ESTIMATES = Object.freeze({
     json: Object.freeze({ input: 800, output: 120 }),
     vision: Object.freeze({ input: 1_000, output: 160 }),
     agent: Object.freeze({ input: 1_200, output: 250 }),
+    reasoning: Object.freeze({ input: 900, output: 300 }),
+    forced_tool_choice: Object.freeze({ input: 1_200, output: 250 }),
+    parallel_tool_calls: Object.freeze({ input: 1_400, output: 300 }),
+    embeddings: Object.freeze({ input: 800, output: 0 }),
+    audio_transcription: Object.freeze({ input: 1_200, output: 200 }),
+    tts: Object.freeze({ input: 400, output: 0 }),
+    rerank: Object.freeze({ input: 1_000, output: 20 }),
+    image_generation: Object.freeze({ input: 600, output: 0 }),
+    gateway_fallback: Object.freeze({ input: 700, output: 120 }),
+    provider_native: Object.freeze({ input: 700, output: 120 }),
 });
 
 /**

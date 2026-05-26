@@ -493,7 +493,7 @@ Se a tarefa não exige imagem, vision é no máximo bônus ou superfície a vali
 - [x] Streaming probe.
 - [x] Vision probe.
 - [x] Recomendações de probes por diff de catálogo.
-- [ ] Matrix completa por provider/wire API.
+- [x] Matrix completa por provider/wire API.
 - [ ] Probes para embeddings.
 - [ ] Probes para audio.
 - [ ] Probes para rerank.
@@ -1573,6 +1573,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [ ] Provider-native probes.
 - [ ] Gateway fallback probe.
 - [x] Cost-bounded probe planner.
+- [x] Matrix provider/wire API de probes como planejamento pré-runtime.
 
 ### Faixa U — Runtime Selection
 
@@ -3072,6 +3073,53 @@ Validação deste corte:
 
 - [x] PASS `npm run model-gateway:test:contracts` com `118` testes.
 - [x] PASS `npm run model-gateway:test:terminal` com `56` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 51. Continuidade 2026-05-26 — Matrix Provider/Wire API De Probes
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a lacuna da Faixa T sobre matriz completa por provider/wire
+  API.
+- [x] Confirmado que a matriz deve ser planejamento pré-runtime, não execução de
+  probes.
+- [x] Confirmado que ela deve derivar de traits provider/gateway e endpoint
+  inventory.
+- [x] Confirmado que ela deve separar probes já implementadas de probes ainda
+  pendentes.
+
+Implementado neste corte:
+
+- [x] Criado `src/copilot/model-gateway/probes/matrix.js`.
+- [x] Criado `MODEL_GATEWAY_IMPLEMENTED_PROBE_KINDS`.
+- [x] Criado `MODEL_GATEWAY_PLANNED_PROBE_KINDS`.
+- [x] Criado `listProviderWireProbeMatrix()`.
+- [x] Criado `summarizeProviderWireProbeMatrix()`.
+- [x] Estendido cost planner para tipos planejados como `reasoning`,
+  `forced_tool_choice`, `parallel_tool_calls`, `embeddings`, audio, rerank,
+  image generation, gateway fallback e provider native.
+- [x] Exportado pelos barrels `probes` e `model-gateway`.
+- [x] Adicionado comando terminal `/byok gateway probes matrix [provider]`.
+- [x] Adicionado o comando ao inventário canônico da Faixa Y.
+- [x] Adicionados testes unitários de contrato e terminal.
+
+Separação preservada:
+
+- [x] A matriz não chama provider.
+- [x] A matriz não executa modelo.
+- [x] A matriz não executa probes runtime.
+- [x] A matriz não altera health runtime.
+- [x] A matriz não altera catálogo, SQLite, overlays ou eligibility.
+- [x] Probes pendentes continuam explicitamente pendentes.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `120` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `58` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.
