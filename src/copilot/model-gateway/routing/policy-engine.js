@@ -8,7 +8,13 @@
  * @module copilot/model-gateway/routing/policy-engine
  */
 
-import { evaluateGatewayModelHealthRoute, isGatewayModelAgentProbeVerified } from './health-routing.js';
+import {
+    evaluateGatewayModelHealthRoute,
+    isGatewayModelAgentProbeVerified,
+    isGatewayModelProbeFailed,
+    isGatewayModelProbeVerified,
+    listGatewayModelVerifiedProbeKinds,
+} from './health-routing.js';
 import { resolveModelGatewayTaskProfile } from './task-profiles.js';
 import { evaluateModelGatewayEligibility } from '../eligibility/index.js';
 
@@ -123,6 +129,10 @@ function stringSet(value) {
  *     maxPricePerMillion?: number;
  *     preferredMaxPricePerMillion?: number;
  *     minimumConfidence?: string;
+ *     preferredProbeKinds?: string[];
+ *     requiredProbeKinds?: string[];
+ *     blockFailedProbeKinds?: string[];
+ *     requireRuntimeProof?: boolean;
  *     latencyMsByModelId?: Record<string, number>;
  *     eligibilityDecisions?: Record<string, any>[];
  *     evaluateEligibility?: boolean;
@@ -153,6 +163,9 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     const blockWireApis = stringSet(options.blockWireApis);
     const preferredSelectorKinds = stringSet(options.preferredSelectorKinds);
     const blockSelectorKinds = stringSet(options.blockSelectorKinds);
+    const preferredProbeKinds = new Set([...profileProbeKinds(profile), ...stringSet(options.preferredProbeKinds)]);
+    const requiredProbeKinds = stringSet(options.requiredProbeKinds);
+    const blockFailedProbeKinds = stringSet(options.blockFailedProbeKinds);
     const eligibility = resolveCandidateEligibility(model, profile, options);
     let score = 100;
 
@@ -232,6 +245,25 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
             score += 80;
             reasons.push('agent_probe_verified');
         }
+        for (const kind of listGatewayModelVerifiedProbeKinds(healthDecision.health)) {
+            score += 10;
+            reasons.push(`runtime_probe_verified:${kind}`);
+        }
+        for (const kind of preferredProbeKinds) {
+            if (isGatewayModelProbeVerified(healthDecision.health, kind)) {
+                score += 35;
+                reasons.push(`preferred_probe_verified:${kind}`);
+            }
+        }
+        for (const kind of blockFailedProbeKinds) {
+            if (isGatewayModelProbeFailed(healthDecision.health, kind)) rejectedReasons.push(`runtime_probe_failed:${kind}`);
+        }
+    }
+    for (const kind of requiredProbeKinds) {
+        if (!isGatewayModelProbeVerified(healthDecision.health, kind)) rejectedReasons.push(`required_probe_missing:${kind}`);
+    }
+    if (options.requireRuntimeProof === true && !hasRuntimeProof(healthDecision.health)) {
+        rejectedReasons.push('runtime_proof_missing');
     }
 
     for (const preference of profile['prefers'] ?? []) {
@@ -295,6 +327,42 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         eligibility,
         health: healthDecision.health,
     };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function stringArray(value) {
+    return Array.isArray(value) ? [...stringSet(value)] : [];
+}
+
+/**
+ * @param {Record<string, any>} profile
+ * @returns {string[]}
+ */
+function profileProbeKinds(profile) {
+    const requires = stringArray(profile['requires']);
+    const softRequires = stringArray(profile['softRequires']);
+    const prefers = stringArray(profile['prefers']);
+    const kinds = [];
+    if (requires.includes('streaming')) kinds.push('streaming');
+    if (requires.includes('tools') || prefers.includes('forcedToolChoice') || prefers.includes('parallelToolCalls')) kinds.push('agent');
+    if (prefers.includes('structuredOutputs') || prefers.includes('jsonMode') || prefers.includes('jsonSchema')) kinds.push('json');
+    if (softRequires.includes('vision') || prefers.includes('vision')) kinds.push('vision');
+    return [...new Set(kinds)];
+}
+
+/**
+ * @param {ReturnType<typeof evaluateGatewayModelHealthRoute>['health']} health
+ * @returns {boolean}
+ */
+function hasRuntimeProof(health) {
+    return (
+        Boolean(health?.lastStatus === 'ok') ||
+        Boolean(health && isGatewayModelAgentProbeVerified(health)) ||
+        listGatewayModelVerifiedProbeKinds(health).length > 0
+    );
 }
 
 /**

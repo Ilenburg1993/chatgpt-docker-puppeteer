@@ -41,6 +41,57 @@ export function isGatewayModelAgentProbeVerified(health) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function normalizeProbeKind(value) {
+    return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : null;
+}
+
+/**
+ * @param {{ probes?: Record<string, { ok?: boolean; providerAttempted?: boolean }> } | null} health
+ * @param {string} kind
+ * @returns {{ ok?: boolean; providerAttempted?: boolean } | null}
+ */
+export function readGatewayModelProbeHealth(health, kind) {
+    const normalized = normalizeProbeKind(kind);
+    if (!health || !normalized || !health.probes) return null;
+    return health.probes[normalized] ?? null;
+}
+
+/**
+ * @param {{ probes?: Record<string, { ok?: boolean; providerAttempted?: boolean }> } | null} health
+ * @param {string} kind
+ * @returns {boolean}
+ */
+export function isGatewayModelProbeVerified(health, kind) {
+    const probe = readGatewayModelProbeHealth(health, kind);
+    return probe?.ok === true && probe.providerAttempted !== false;
+}
+
+/**
+ * @param {{ probes?: Record<string, { ok?: boolean; providerAttempted?: boolean }> } | null} health
+ * @param {string} kind
+ * @returns {boolean}
+ */
+export function isGatewayModelProbeFailed(health, kind) {
+    const probe = readGatewayModelProbeHealth(health, kind);
+    return probe?.ok === false && probe.providerAttempted !== false;
+}
+
+/**
+ * @param {{ probes?: Record<string, { ok?: boolean; providerAttempted?: boolean }> } | null} health
+ * @returns {string[]}
+ */
+export function listGatewayModelVerifiedProbeKinds(health) {
+    if (!health?.probes) return [];
+    return Object.entries(health.probes)
+        .filter(([, probe]) => probe.ok === true && probe.providerAttempted !== false)
+        .map(([kind]) => kind)
+        .sort();
+}
+
+/**
  * @param {Record<string, any>} model
  * @param {{ routeProfile?: string | null }} [options]
  * @returns {ReturnType<typeof readByokProviderModelHealth>}
@@ -86,4 +137,3 @@ export function evaluateGatewayModelHealthRoute(model, options = {}) {
     }
     return { include: true, reason: 'health_allowed', health };
 }
-

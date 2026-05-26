@@ -52,6 +52,7 @@ import {
     recordByokProviderModelAgentProbeSuccess,
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
+    recordByokProviderModelProbeResult,
     listModelGatewayRouteDecisions,
     mirrorByokProviderHealthToSqlite,
     mirrorModelGatewayCatalogSnapshotToSqlite,
@@ -537,6 +538,81 @@ describe('model-gateway foundation', () => {
         assert.ok(decision.selected?.reasons.includes('agent_probe_verified'));
         assert.ok(decision.selected?.reasons.includes('preferred:large_context'));
         assert.ok(decision.rejected.some((candidate) => candidate.rejectedReasons.includes('missing_capability:tools')));
+    });
+
+    it('promotes candidates with task-relevant runtime probe proofs without mutating catalog confidence', () => {
+        const catalogOnly = createModelRecord({
+            providerId: 'openrouter',
+            providerModel: 'json-catalog',
+            capabilities: { streaming: true, structuredOutputs: true, jsonMode: true },
+            limits: { contextWindowTokens: 64_000 },
+            pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 1 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        const runtimeProved = createModelRecord({
+            providerId: 'kilo',
+            providerModel: 'json-runtime',
+            capabilities: { streaming: true, structuredOutputs: true, jsonMode: true },
+            limits: { contextWindowTokens: 64_000 },
+            pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 1 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+
+        recordByokProviderModelProbeResult({
+            routeProfile: 'json_extraction',
+            providerId: 'kilo',
+            providerModel: 'json-runtime',
+            probeKind: 'json',
+            status: 'ok',
+            ok: true,
+            providerAttempted: true,
+            timestamp: 75,
+        });
+
+        const decision = routeGatewayModels([catalogOnly, runtimeProved], 'json_extraction', {
+            routeProfile: 'json_extraction',
+        });
+
+        assert.equal(decision.selected?.model['id'], 'kilo:json-runtime');
+        assert.ok(decision.selected?.reasons.includes('runtime_probe_verified:json'));
+        assert.ok(decision.selected?.reasons.includes('preferred_probe_verified:json'));
+        assert.equal(runtimeProved['verification']?.['confidence'], 'catalog');
+    });
+
+    it('can require explicit probe proofs as a pre-runtime route policy', () => {
+        const unproved = createModelRecord({
+            providerId: 'openrouter',
+            providerModel: 'json-unproved',
+            capabilities: { streaming: true, structuredOutputs: true, jsonMode: true },
+            limits: { contextWindowTokens: 64_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        const proved = createModelRecord({
+            providerId: 'kilo',
+            providerModel: 'json-proved',
+            capabilities: { streaming: true, structuredOutputs: true, jsonMode: true },
+            limits: { contextWindowTokens: 64_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+
+        recordByokProviderModelProbeResult({
+            routeProfile: 'json_extraction',
+            providerId: 'kilo',
+            providerModel: 'json-proved',
+            probeKind: 'json',
+            status: 'ok',
+            ok: true,
+            providerAttempted: true,
+            timestamp: 80,
+        });
+
+        const decision = routeGatewayModels([unproved, proved], 'json_extraction', {
+            routeProfile: 'json_extraction',
+            requiredProbeKinds: ['json'],
+        });
+
+        assert.equal(decision.selected?.model['id'], 'kilo:json-proved');
+        assert.ok(decision.rejected.some((candidate) => candidate.rejectedReasons.includes('required_probe_missing:json')));
     });
 
     it('applies provider allow/block policy to scored candidates with audit reasons', () => {

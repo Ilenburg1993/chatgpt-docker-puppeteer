@@ -1581,7 +1581,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Health-aware scoring.
 - [x] Unificar candidate builder.
 - [x] Usar eligibility como barreira opcional no policy engine.
-- [ ] Usar probes como promoção.
+- [x] Usar probes como promoção.
 - [x] Usar route options como unidade de seleção.
 - [x] Explicar rejeições.
 - [x] Persistir decisão final.
@@ -2344,4 +2344,39 @@ Validação deste corte:
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em `routing/explain.js`, barrels e contrato
   unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 34. Continuidade 2026-05-26 — Runtime Probes Como Promoção De Rota
+
+Implementado neste corte:
+
+- [x] `health-routing.js` passou a expor leitura normalizada de probes por kind.
+- [x] Adicionados predicados `isGatewayModelProbeVerified()` e
+  `isGatewayModelProbeFailed()`.
+- [x] Adicionado inventário `listGatewayModelVerifiedProbeKinds()` para o
+  policy engine consumir provas runtime sem executar provider.
+- [x] `scoreGatewayModelCandidate()` promove candidatos com probes verificados.
+- [x] Perfis de tarefa inferem probes preferidos a partir de `requires`,
+  `softRequires` e `prefers`.
+- [x] O policy engine aceita `preferredProbeKinds`, `requiredProbeKinds`,
+  `blockFailedProbeKinds` e `requireRuntimeProof`.
+- [x] Adicionados testes para promoção por probe `json` e para exclusão por
+  probe obrigatório ausente.
+
+Separação preservada:
+
+- [x] Probes continuam armazenados em health/runtime proof.
+- [x] Catálogo canônico não tem `verification.confidence` mutado pela seleção.
+- [x] Política de rota só lê fatos já registrados, sem chamar runtime.
+- [x] Probes obrigatórios são uma política explícita, não o default global.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `101` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `health-routing.js`, `policy-engine.js`,
+  barrels e contrato unitário.
 - [x] PASS `git diff --check`.

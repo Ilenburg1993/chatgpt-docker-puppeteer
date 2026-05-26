@@ -12,7 +12,11 @@ export {
     isGatewayModelAgentProbeHealthFailed,
     isGatewayModelAgentProbeVerified,
     isGatewayModelChatHealthFailed,
+    isGatewayModelProbeFailed,
+    isGatewayModelProbeVerified,
+    listGatewayModelVerifiedProbeKinds,
     readGatewayModelHealth,
+    readGatewayModelProbeHealth,
 } from './health-routing.js';
 export {
     MODEL_GATEWAY_TASK_PROFILES,
