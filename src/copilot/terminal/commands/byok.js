@@ -2005,7 +2005,9 @@ function renderByokGatewayPreBuildReadiness(println) {
         const mark = check.passed ? '\x1b[32m[x]\x1b[0m' : '\x1b[31m[ ]\x1b[0m';
         println(`    ${mark} \x1b[33m${check.id}\x1b[0m  \x1b[90mfaixa=${check.track} · ${check.summary}\x1b[0m`);
     }
-    println('\n  \x1b[90mEste readiness prepara o primeiro build futuro; ele não substitui probes runtime nem executa build.\x1b[0m\n');
+    println(
+        '\n  \x1b[90mEste readiness prepara o build do banco de metadados; ele não substitui probes runtime nem executa modelos.\x1b[0m\n',
+    );
 }
 
 /**
@@ -2026,7 +2028,9 @@ function renderByokGatewayCanonicalCommands(println, rest) {
         println(`    \x1b[33m${head}\x1b[0m`);
         if (summary) println(`      \x1b[90m${summary}\x1b[0m`);
     }
-    println('\n  \x1b[90mPrimeiro build futuro deve partir de npm run model-gateway:prebuild ou make model-gateway-prebuild.\x1b[0m\n');
+    println(
+        '\n  \x1b[90mBuild do banco de metadados deve partir de npm run model-gateway:build ou make model-gateway-build.\x1b[0m\n',
+    );
 }
 
 /**

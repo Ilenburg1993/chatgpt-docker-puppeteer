@@ -1647,6 +1647,8 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Refresh plan/dry-run sem rede antes de executar provider.
 - [x] Logs live/JSONL do processamento de refresh de catálogo.
 - [x] Análise canônica do último log JSONL via package, Makefile e terminal.
+- [x] Build canônico do banco de metadados via package/Makefile.
+- [x] Build plan/preview/commit separados para o banco de metadados.
 - [x] Testes unitários do inventário.
 - [ ] Primeiro build real usando apenas comandos canônicos.
 - [ ] Registrar resultado do primeiro build no guia.
@@ -3392,6 +3394,73 @@ Validação deste corte:
 - [x] PASS typecheck strict src/copilot.
 - [x] PASS lint model-gateway.
 - [x] PASS `npm run model-gateway:test:contracts` com `149` testes.
+- [x] PASS `git diff --check`.
+
+---
+
+## 70. Continuidade 2026-05-26 — Retificação: Build É Banco De Metadados
+
+Auditoria executada neste corte:
+
+- [x] Recentrado o escopo em `src/copilot/model-gateway`.
+- [x] Guia canônico relido integralmente para desfazer a confusão entre build
+  da aplicação e build/materialização do banco de metadados.
+- [x] Confirmado que, neste roadmap, “primeiro build” significa montar o banco
+  de catálogo/metadados: refresh, normalização, snapshot JSON, mirror SQLite,
+  replay de log operacional, retenção e diagnóstico.
+- [x] Confirmado que `npm run build`, `dist/` e SEA pertencem à aplicação
+  geral e não devem ser o caminho canônico deste trabalho.
+- [x] Identificado que `model-gateway:build` estava ambíguo e apontava para
+  `npm run build`, criando risco de acionar artefatos fora do escopo.
+
+Implementado neste corte:
+
+- [x] Criado `scripts/model-gateway-metadata-build.mjs`.
+- [x] O script de build de metadados executa refresh full por padrão, com
+  `--plan`, `--preview`, `--commit`, `--incremental`, filtros por provider,
+  importer/source e log JSONL.
+- [x] Em modo commit, o build materializa o snapshot JSON canônico, espelha
+  JSON para SQLite, valida paridade, grava o refresh log no SQLite, aplica
+  retenção operacional e retorna diagnóstico SQLite.
+- [x] `model-gateway:build` passa a significar
+  `model-gateway:prebuild + model-gateway:metadata:build`.
+- [x] Adicionados `model-gateway:metadata:build:plan`,
+  `model-gateway:metadata:build:preview` e `model-gateway:metadata:build`.
+- [x] Adicionados `make model-gateway-metadata-build-plan`,
+  `make model-gateway-metadata-build-preview` e
+  `make model-gateway-metadata-build`.
+- [x] `make model-gateway-build` passa a ser alias de prebuild + build do banco
+  de metadados.
+- [x] Inventário canônico passa a explicitar que os comandos de build do
+  model-gateway não são build da aplicação/dist.
+
+Separação preservada:
+
+- [x] Build do banco de metadados continua sendo coleta/normalização de
+  metadados.
+- [x] Build do banco de metadados não executa modelos.
+- [x] Build do banco de metadados não executa runtime probes.
+- [x] Preview não muta JSON nem SQLite.
+- [x] Plan/dry-run não chama provider.
+- [x] Commit exige comando explícito e passa por lock, retention, log e
+  paridade JSON/SQLite.
+- [x] Catálogo global, overlays account/key, logs operacionais, health runtime e
+  route decisions continuam em camadas separadas.
+
+Validação deste corte:
+
+- [x] PASS `node --check scripts/model-gateway-metadata-build.mjs`.
+- [x] PASS smoke `model-gateway:metadata:build:plan` sem rede.
+- [x] PASS teste focado de comandos canônicos.
+- [x] PASS teste focado de readiness pre-build.
+- [x] PASS teste focado de terminal para comandos canônicos.
+- [x] PASS lint focado em script novo, inventário e testes.
+- [x] PASS typecheck strict src/copilot.
+- [x] PASS lint model-gateway.
+- [x] PASS `npm run model-gateway:test:contracts` com `149` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `64` testes.
+- [x] PASS smoke provider-scoped `model-gateway-metadata-build --plan
+  --provider=openrouter --json` sem rede.
 - [x] PASS `git diff --check`.
 
 ---

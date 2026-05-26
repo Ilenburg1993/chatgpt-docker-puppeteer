@@ -3,8 +3,8 @@
  * Canonical model-gateway command inventory.
  *
  * This is documentation-as-data for humans, LLM agents, package scripts, Makefile targets and the terminal cockpit.
- * Commands listed here are intentionally pre-build: they prepare, inspect and validate the gateway before the first
- * full build is promoted as an operator workflow.
+ * Commands listed here prepare, inspect, validate and materialize the model metadata database. They do not refer to the
+ * application/dist build unless a command explicitly says so.
  *
  * @module copilot/model-gateway/commands/canonical-commands
  */
@@ -136,7 +136,28 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         phase: 'prebuild',
         surface: 'package',
         command: 'npm run model-gateway:build',
-        summary: 'Run the canonical pre-build sequence and then the first full build.',
+        summary: 'Run prebuild and then build/materialize the model metadata database.',
+    },
+    {
+        id: 'metadata-build.plan',
+        phase: 'metadata',
+        surface: 'package',
+        command: 'npm run model-gateway:metadata:build:plan',
+        summary: 'Plan the full metadata database build without fetching providers or writing stores.',
+    },
+    {
+        id: 'metadata-build.preview',
+        phase: 'metadata',
+        surface: 'package',
+        command: 'npm run model-gateway:metadata:build:preview',
+        summary: 'Run the full metadata build in preview mode without committing JSON or SQLite.',
+    },
+    {
+        id: 'metadata-build.commit',
+        phase: 'metadata',
+        surface: 'package',
+        command: 'npm run model-gateway:metadata:build',
+        summary: 'Commit the full metadata catalog build, mirror it to SQLite and apply operational retention.',
     },
     {
         id: 'make.commands',
@@ -220,7 +241,28 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         phase: 'prebuild',
         surface: 'make',
         command: 'make model-gateway-build',
-        summary: 'Makefile alias for prebuild plus full build.',
+        summary: 'Makefile alias for prebuild plus metadata database build.',
+    },
+    {
+        id: 'make.metadata-build-plan',
+        phase: 'metadata',
+        surface: 'make',
+        command: 'make model-gateway-metadata-build-plan',
+        summary: 'Makefile plan for the metadata database build.',
+    },
+    {
+        id: 'make.metadata-build-preview',
+        phase: 'metadata',
+        surface: 'make',
+        command: 'make model-gateway-metadata-build-preview',
+        summary: 'Makefile preview for the metadata database build.',
+    },
+    {
+        id: 'make.metadata-build',
+        phase: 'metadata',
+        surface: 'make',
+        command: 'make model-gateway-metadata-build',
+        summary: 'Makefile commit path for the metadata database build.',
     },
     {
         id: 'terminal.commands',
@@ -234,7 +276,7 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         phase: 'prebuild',
         surface: 'terminal',
         command: '/byok gateway prebuild',
-        summary: 'Inspect the boolean K+/Y readiness gate before the first full build.',
+        summary: 'Inspect the boolean K+/Y readiness gate before the metadata database build.',
     },
     {
         id: 'terminal.refresh',

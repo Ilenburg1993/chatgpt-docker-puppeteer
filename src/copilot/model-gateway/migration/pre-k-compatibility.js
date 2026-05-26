@@ -98,13 +98,13 @@ const PREBUILD_CHECKS = Object.freeze([
         id: 'canonical_commands_are_published',
         track: 'Y',
         passed: true,
-        summary: 'Package scripts, Makefile targets and terminal commands share a canonical pre-build inventory.',
+        summary: 'Package scripts, Makefile targets and terminal commands share a canonical model-gateway inventory.',
     }),
     Object.freeze({
-        id: 'first_full_build_is_not_promoted_yet',
+        id: 'metadata_database_build_is_explicit',
         track: 'Y',
         passed: true,
-        summary: 'The prebuild command validates the layer but deliberately does not execute the first full build.',
+        summary: 'The model-gateway build path materializes the metadata database, not the application dist build.',
     }),
 ]);
 

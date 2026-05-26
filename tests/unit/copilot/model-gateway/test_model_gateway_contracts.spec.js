@@ -1315,7 +1315,7 @@ describe('model-gateway foundation', () => {
         assert.ok(ids.has('eligibility_is_pre_runtime'));
         assert.ok(ids.has('provider_gateway_traits_are_metadata'));
         assert.ok(ids.has('canonical_commands_are_published'));
-        assert.ok(ids.has('first_full_build_is_not_promoted_yet'));
+        assert.ok(ids.has('metadata_database_build_is_explicit'));
     });
 
     it('publishes a canonical model-gateway command inventory for operators and LLMs', () => {
@@ -1326,8 +1326,14 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.length >= 20);
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:prebuild'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:build'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build:plan'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build:preview'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-build'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build-plan'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build-preview'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:refresh:log:sqlite -- --json'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:sqlite:retention -- --json'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:sqlite:retention:apply -- --json'));
