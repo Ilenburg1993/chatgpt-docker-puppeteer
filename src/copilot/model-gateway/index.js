@@ -294,6 +294,7 @@ export {
 } from './providers/index.js';
 export {
     buildModelGatewayRouteCandidates,
+    auditModelGatewayPreRuntimeSelection,
     evaluateGatewayModelHealthRoute,
     explainGatewayRouteDecision,
     isGatewayModelAgentProbeHealthFailed,

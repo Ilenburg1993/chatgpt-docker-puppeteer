@@ -39,6 +39,7 @@ import {
     applyModelGatewayEligibilityToSnapshot,
     createModelRecord,
     createEnvSecretRegistry,
+    auditModelGatewayPreRuntimeSelection,
     explainModelGatewayAccountAccess,
     explainGatewayRouteDecision,
     normalizeModelGatewayAccountLimitState,
@@ -436,6 +437,8 @@ describe('model-gateway foundation', () => {
         const eligibility = createModelEligibilityDecision({
             providerId: 'openrouter',
             providerModel: 'openai/gpt-oss-120b',
+            selectorKind: 'provider_explicit',
+            selectorSyntax: 'openai/gpt-oss-120b:groq',
             include: true,
         });
 
@@ -459,6 +462,51 @@ describe('model-gateway foundation', () => {
             eligibilityDecisionCount: 1,
             candidateCount: 1,
         });
+    });
+
+    it('audits pre-runtime selection across task profiles without requiring runtime probes', () => {
+        const snapshot = {
+            projections: [
+                createCanonicalModelProjection({
+                    providerId: 'openrouter',
+                    providerModel: 'openai/gpt-oss-120b',
+                    capabilities: { streaming: true, tools: true, reasoningEffort: true },
+                    limits: { contextWindowTokens: 131_072 },
+                    pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+                    routingHints: { tier: 'free' },
+                }),
+            ],
+            routeOptions: [
+                createModelRouteOption({
+                    providerId: 'openrouter',
+                    providerModel: 'openai/gpt-oss-120b',
+                    selectorKind: 'provider_explicit',
+                    selectorSyntax: 'openai/gpt-oss-120b:groq',
+                    normalizedPolicy: { routeLayer: 'openai_compatible_aggregator', wireApi: 'openai_chat_completions' },
+                    providerSpecific: { upstreamProvider: 'groq' },
+                }),
+            ],
+            accountOverlays: [
+                createProviderAccountOverlay({
+                    providerId: 'openrouter',
+                    secretRef: 'OPENROUTER_API_KEY',
+                    enabledModels: ['openai/gpt-oss-120b'],
+                }),
+            ],
+        };
+
+        const audit = auditModelGatewayPreRuntimeSelection(snapshot, {
+            profiles: ['repo_agent', 'tool_agent'],
+            secretRegistry: { has: () => true },
+        });
+
+        assert.equal(audit.schema, 'model-gateway-pre-runtime-selection-audit');
+        assert.equal(audit.ok, true);
+        assert.equal(audit.summary.selectedProfileCount, 2);
+        assert.equal(audit.summary.selectedProviders.openrouter, 2);
+        assert.equal(audit.summary.selectedSelectorKinds.provider_explicit, 2);
+        assert.equal(audit.profiles[0].selected?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
+        assert.equal(audit.profiles[0].decisionLayers['runtimeProbeProofCount'], 0);
     });
 
     it('projects route-option candidates to SDK model info without losing selector metadata', () => {
@@ -6559,6 +6607,70 @@ describe('model-gateway foundation', () => {
         assert.equal(nextSnapshot.source, 'eligibility-refresh');
         assert.equal(nextSnapshot.modelEligibilityRuns.length, 1);
         assert.equal(nextSnapshot.modelEligibilityDecisions.length, 2);
+    });
+
+    it('evaluates catalog eligibility per route option instead of reusing one model-level decision', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'cloudflare-workers-ai',
+            providerModel: '@cf/openai/gpt-oss-120b',
+            capabilities: { streaming: true, tools: true },
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'cloudflare-workers-ai',
+            secretRef: 'CLOUDFLARE_API_TOKEN',
+            enabledModels: ['@cf/openai/gpt-oss-120b'],
+            providerMetadata: {
+                accountIdConfigured: true,
+                gatewayIdConfigured: false,
+            },
+        });
+        const snapshot = {
+            projections: [projection],
+            routeOptions: [
+                createModelRouteOption({
+                    providerId: 'cloudflare-workers-ai',
+                    providerModel: '@cf/openai/gpt-oss-120b',
+                    selectorKind: 'exact_model',
+                    selectorSyntax: '@cf/openai/gpt-oss-120b',
+                    normalizedPolicy: { routeLayer: 'direct_provider', wireApi: 'workers_ai_run' },
+                }),
+                createModelRouteOption({
+                    providerId: 'cloudflare-workers-ai',
+                    providerModel: '@cf/openai/gpt-oss-120b',
+                    selectorKind: 'gateway_fallback',
+                    selectorSyntax: 'cloudflare-gateway:@cf/openai/gpt-oss-120b',
+                    normalizedPolicy: { routeLayer: 'gateway', wireApi: 'cloudflare_ai_gateway_universal' },
+                }),
+            ],
+            accountOverlays: [overlay],
+        };
+
+        const evaluated = evaluateModelGatewayCatalogEligibility({
+            snapshot,
+            secretRegistry: { has: () => true },
+            policy: { unknownAccessPolicy: 'block' },
+            now: () => new Date('2026-05-26T20:00:00.000Z'),
+        });
+        const direct = evaluated.decisions.find((decision) => decision.selectorKind === 'exact_model');
+        const gateway = evaluated.decisions.find((decision) => decision.selectorKind === 'gateway_fallback');
+
+        assert.equal(evaluated.summary.modelCount, 2);
+        assert.equal(direct?.include, true);
+        assert.equal(gateway?.include, false);
+        assert.deepEqual(gateway?.hardExclusions, ['cloudflare_gateway_id_missing']);
+
+        const route = routeModelGatewayCatalogSnapshot(
+            {
+                ...snapshot,
+                modelEligibilityDecisions: evaluated.decisions,
+            },
+            'tool_agent',
+            { evaluateEligibility: true, requireAgentProbeOk: false },
+        );
+
+        assert.equal(route.selected?.model['selectorKind'], 'exact_model');
+        assert.ok(route.rejected.some((candidate) => candidate.rejectedReasons.includes('eligibility:cloudflare_gateway_id_missing')));
     });
 
     it('feeds runtime health into catalog-wide eligibility without persisting provider metadata', () => {

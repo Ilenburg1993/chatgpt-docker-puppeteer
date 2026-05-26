@@ -3346,6 +3346,85 @@ Validação deste corte:
 
 ---
 
+## 71. Continuidade 2026-05-26 — Auditoria De Seleção Pré-Runtime
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a ponte entre banco de metadados íntegro, eligibility
+  pré-runtime e seleção efetiva antes de qualquer probe.
+- [x] Confirmado que o contrato de eligibility já continha `selectorKind` e
+  `selectorSyntax`, mas a resolução no policy engine ainda podia reaproveitar
+  decisões por `providerId/providerModel/routeProfile`.
+- [x] Identificado risco estrutural: uma decisão de rota `exact_model` poderia
+  ser aplicada a uma rota `gateway_fallback`, `provider_explicit` ou auto
+  selector com policy diferente.
+- [x] Confirmado que isto é especialmente sensível para Cloudflare AI Gateway,
+  Hugging Face router, OpenRouter/Kilo e rotas locais, pois a mesma projeção
+  pode ter múltiplas formas de execução.
+
+Implementado neste corte:
+
+- [x] `evaluateModelGatewayCatalogEligibility()` passa a materializar decisões
+  por route option quando há rotas normalizadas para uma projeção.
+- [x] Projeções sem route option continuam recebendo uma decisão projection-only
+  para preservar cobertura do catálogo.
+- [x] `routeGatewayModels()` e `routeModelGatewayCatalogSnapshot()` passam a
+  resolver eligibility pela chave completa da rota:
+  `providerId/providerModel/routeProfile/selectorKind/selectorSyntax`.
+- [x] O fallback de avaliação on-the-fly usa a própria route candidate como
+  route option quando não há registro explícito correspondente.
+- [x] Criado `auditModelGatewayPreRuntimeSelection()`.
+- [x] A auditoria roda seleção por perfis de tarefa sem exigir prova runtime e
+  sem executar provider/modelo.
+- [x] A auditoria de seleção ignora runtime health por padrão para não promover
+  ou bloquear candidatos com fatos da fase posterior.
+- [x] Criado `scripts/model-gateway-selection-audit.mjs`.
+- [x] Adicionado comando package `model-gateway:selection:audit`.
+- [x] Adicionado alias Makefile `make model-gateway-selection-audit`.
+- [x] Inventário canônico de comandos passou a incluir package, make e terminal
+  para auditoria de seleção.
+- [x] Terminal passou a expor `/byok gateway selection audit [strict] [profile]`.
+
+Separação preservada:
+
+- [x] O banco canônico de metadados continua sem mutação por runtime probe.
+- [x] A auditoria de seleção não chama rede, não usa fetch de provider e não
+  executa modelos.
+- [x] `requireAgentProbeOk=false` é explícito nesta fase para que seleção
+  pré-runtime não seja confundida com promoção por runtime.
+- [x] `ignoreRuntimeHealth=true` é explícito nesta fase; comandos de rota e
+  probes continuam podendo usar health runtime quando a fase permitir.
+- [x] O modo `strict` apenas muda `unknownAccessPolicy` para `block`; ele não
+  executa probes.
+- [x] A etapa live com `scripts/copilot/run-terminal-llm-b-live-test.mjs`
+  permanece bloqueada até que DB, integrity, eligibility e selection audit
+  estejam coerentes.
+
+Plano de live futuro, ainda não executado:
+
+- [ ] Rodar primeiro `npm run model-gateway:catalog:integrity`.
+- [ ] Rodar `npm run model-gateway:selection:audit`.
+- [ ] Rodar `/byok gateway selection audit strict repo_agent tool_agent` no
+  terminal.
+- [ ] Só depois iniciar `scripts/copilot/run-terminal-llm-b-live-test.mjs` em
+  modo diagnóstico sem PR quando os gates anteriores estiverem verdes.
+- [ ] Promover para probes runtime/live apenas com shortlist explícita, logs
+  completos e correção imediata dos bugs encontrados.
+
+Validação deste corte:
+
+- [x] PASS `node --check src/copilot/model-gateway/routing/selection-audit.js`.
+- [x] PASS `node --check scripts/model-gateway-selection-audit.mjs`.
+- [x] PASS teste focado de contracts para eligibility por route option e selection
+  audit.
+- [x] PASS teste focado de terminal para `/byok gateway selection audit`.
+- [x] PASS `npm run model-gateway:selection:audit`.
+- [x] Resultado do snapshot persistido: integrity `ok=true`, selection
+  `ok=true`, `8/8` perfis com selecionado e `runtimeProbeProofCount=0` em
+  todos os perfis.
+
+---
+
 ## 69. Continuidade 2026-05-26 — Correção Do Build Canônico Antes Do Primeiro Build
 
 Auditoria executada neste corte:

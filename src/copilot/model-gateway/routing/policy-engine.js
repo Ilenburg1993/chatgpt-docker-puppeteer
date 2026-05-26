@@ -207,6 +207,7 @@ function stringSet(value) {
  *     requiredProbeKinds?: string[];
  *     blockFailedProbeKinds?: string[];
  *     requireRuntimeProof?: boolean;
+ *     ignoreRuntimeHealth?: boolean;
  *     latencyMsByModelId?: Record<string, number>;
  *     eligibilityDecisions?: Record<string, any>[];
  *     evaluateEligibility?: boolean;
@@ -319,11 +320,14 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         }
     }
 
-    const healthDecision = evaluateGatewayModelHealthRoute(model, {
-        routeProfile: options.routeProfile ?? null,
-        ...(options.excludeFailed !== undefined ? { excludeFailed: options.excludeFailed } : {}),
-        requireAgentProbeOk: options.requireAgentProbeOk ?? profile['requireAgentProbeOk'] === true,
-    });
+    const healthDecision =
+        options.ignoreRuntimeHealth === true
+            ? { include: true, reason: 'runtime_health_ignored', health: null }
+            : evaluateGatewayModelHealthRoute(model, {
+                  routeProfile: options.routeProfile ?? null,
+                  ...(options.excludeFailed !== undefined ? { excludeFailed: options.excludeFailed } : {}),
+                  requireAgentProbeOk: options.requireAgentProbeOk ?? profile['requireAgentProbeOk'] === true,
+              });
     if (!healthDecision.include) rejectedReasons.push(healthDecision.reason);
     if (healthDecision.health) {
         if (healthDecision.health.lastStatus === 'ok') {
@@ -463,6 +467,8 @@ function modelEligibilityKey(model) {
         String(model['providerId'] ?? 'unknown-provider'),
         String(model['providerModel'] ?? model['id'] ?? 'unknown-model'),
         String(model['routeProfile'] ?? 'default'),
+        String(model['selectorKind'] ?? 'exact_model'),
+        String(model['selectorSyntax'] ?? model['providerModel'] ?? model['id'] ?? 'unknown-model'),
     ].join(':');
 }
 
@@ -475,6 +481,20 @@ function routeEligibilityKey(route) {
         String(route['providerId'] ?? 'unknown-provider'),
         String(route['providerModel'] ?? 'unknown-model'),
         String(route['routeProfile'] ?? 'default'),
+        String(route['selectorKind'] ?? 'exact_model'),
+        String(route['selectorSyntax'] ?? route['providerModel'] ?? 'unknown-model'),
+    ].join(':');
+}
+
+/**
+ * @param {Record<string, any>} record
+ * @returns {string}
+ */
+function modelRouteBaseKey(record) {
+    return [
+        String(record['providerId'] ?? 'unknown-provider'),
+        String(record['providerModel'] ?? record['id'] ?? 'unknown-model'),
+        String(record['routeProfile'] ?? 'default'),
     ].join(':');
 }
 
@@ -485,7 +505,9 @@ function routeEligibilityKey(route) {
  */
 function findRouteOptionForModel(model, routes) {
     const key = modelEligibilityKey(model);
-    return routes.find((route) => routeEligibilityKey(route) === key) ?? null;
+    const exact = routes.find((route) => routeEligibilityKey(route) === key);
+    if (exact) return exact;
+    return routes.find((route) => modelRouteBaseKey(route) === modelRouteBaseKey(model)) ?? null;
 }
 
 /**
@@ -502,6 +524,8 @@ function findEligibilityDecisionForModel(model, decisions) {
                     String(decision['providerId'] ?? 'unknown-provider'),
                     String(decision['providerModel'] ?? 'unknown-model'),
                     String(decision['routeProfile'] ?? 'default'),
+                    String(decision['selectorKind'] ?? 'exact_model'),
+                    String(decision['selectorSyntax'] ?? decision['providerModel'] ?? 'unknown-model'),
                 ].join(':') === key,
         ) ?? null
     );
@@ -522,7 +546,7 @@ function resolveCandidateEligibility(model, profile, options = {}) {
     if (options.evaluateEligibility !== true) return null;
     return evaluateModelGatewayEligibility({
         projection: model,
-        routeOption: findRouteOptionForModel(model, Array.isArray(options.routeOptions) ? options.routeOptions : []) ?? undefined,
+        routeOption: findRouteOptionForModel(model, Array.isArray(options.routeOptions) ? options.routeOptions : []) ?? model,
         accountOverlays: Array.isArray(options.accountOverlays) ? options.accountOverlays : [],
         secretRegistry: options.secretRegistry,
         policy: {

@@ -167,6 +167,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Audit the persisted JSON catalog for duplicate keys and redacted identities without refresh.',
     },
     {
+        id: 'selection.audit',
+        phase: 'selection',
+        surface: 'package',
+        command: 'npm run model-gateway:selection:audit',
+        summary: 'Audit metadata-first route selection from the persisted catalog without runtime probes.',
+    },
+    {
         id: 'make.commands',
         phase: 'orientation',
         surface: 'make',
@@ -277,6 +284,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-catalog-integrity',
         summary: 'Makefile alias for catalog integrity audit without refresh.',
+    },
+    {
+        id: 'make.selection-audit',
+        phase: 'selection',
+        surface: 'make',
+        command: 'make model-gateway-selection-audit',
+        summary: 'Makefile alias for pre-runtime selection audit.',
     },
     {
         id: 'terminal.commands',
@@ -417,6 +431,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok gateway eligibility refresh persist',
         summary: 'Evaluate and optionally persist pre-runtime eligibility decisions.',
+    },
+    {
+        id: 'terminal.selection-audit',
+        phase: 'selection',
+        surface: 'terminal',
+        command: '/byok gateway selection audit',
+        summary: 'Audit route selection across task profiles without runtime probes.',
     },
     {
         id: 'terminal.route',

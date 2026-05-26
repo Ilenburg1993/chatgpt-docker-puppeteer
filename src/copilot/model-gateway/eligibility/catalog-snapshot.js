@@ -96,15 +96,16 @@ function upsertMany(records, additions, key) {
 
 /**
  * @param {Record<string, any>[]} routeOptions
- * @returns {Map<string, Record<string, any>>}
+ * @returns {Map<string, Record<string, any>[]>}
  */
-function routeOptionMap(routeOptions) {
+function routeOptionsByProjectionKey(routeOptions) {
     const map = new Map();
     for (const route of routeOptions) {
         if (!isRecord(route)) continue;
         const key = routeOptionKey(route);
-        const existing = map.get(key);
-        if (!existing || existing['selectorKind'] !== 'exact_model') map.set(key, route);
+        const existing = map.get(key) ?? [];
+        existing.push(route);
+        map.set(key, existing);
     }
     return map;
 }
@@ -148,24 +149,29 @@ export function evaluateModelGatewayCatalogEligibility(input) {
     const routeOptions = Array.isArray(snapshot['routeOptions']) ? snapshot['routeOptions'].filter(isRecord) : [];
     const snapshotAccountOverlays = Array.isArray(snapshot['accountOverlays']) ? snapshot['accountOverlays'].filter(isRecord) : [];
     const healthRecords = Array.isArray(input.healthRecords) ? input.healthRecords.filter(isRecord) : [];
-    const routesByKey = routeOptionMap(routeOptions);
+    const routesByKey = routeOptionsByProjectionKey(routeOptions);
     const policy = isRecord(input.policy) ? input.policy : {};
     const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords, {
         accountScope: optionalString(policy['accountScope']) ?? 'default',
     });
     const accountOverlays = [...snapshotAccountOverlays, ...runtimeAccountOverlays];
     const healthByKey = new Map(healthRecords.map((record) => [healthRouteKey(record), record]));
-    const decisions = projections.map((projection) =>
-        evaluateModelGatewayEligibility({
-            projection,
-            routeOption: routesByKey.get(projectionRouteKey(projection)) ?? undefined,
-            accountOverlays,
-            secretRegistry: input.secretRegistry,
-            policy,
-            health: healthByKey.get(projectionRouteKey(projection)),
-            now: startedAt,
-        }),
-    );
+    const decisions = projections.flatMap((projection) => {
+        const key = projectionRouteKey(projection);
+        const matchingRoutes = routesByKey.get(key) ?? [];
+        const routes = matchingRoutes.length > 0 ? matchingRoutes : [undefined];
+        return routes.map((routeOption) =>
+            evaluateModelGatewayEligibility({
+                projection,
+                routeOption,
+                accountOverlays,
+                secretRegistry: input.secretRegistry,
+                policy,
+                health: healthByKey.get(key),
+                now: startedAt,
+            }),
+        );
+    });
     const summary = summarizeDecisions(decisions);
     const completedAt = now();
     return {
