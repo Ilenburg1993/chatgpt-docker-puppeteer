@@ -14,6 +14,7 @@ import {
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
     listByokProviderModelHealth,
+    summarizeModelGatewayRuntimeAccountOverlays,
 } from '../src/copilot/model-gateway/index.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -82,6 +83,9 @@ const parity = compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSn
 const secretRegistry = createEnvSecretRegistry();
 const healthRecords = listByokProviderModelHealth();
 const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords);
+const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, {
+    now: sourceSnapshot.generatedAt,
+});
 const effectiveEligibility = evaluateModelGatewayCatalogEligibility({
     snapshot: sourceSnapshot,
     secretRegistry,
@@ -147,7 +151,7 @@ const checks = [
     {
         id: 'selection_effective_observed_health',
         ok: effectiveStrictSelection.ok && effectiveOnlyKnownAccess,
-        detail: `${effectiveStrictSelection.summary.selectedProfileCount}/${effectiveStrictSelection.summary.profileCount} profiles selected, runtimeOverlays=${runtimeAccountOverlays.length}, dispositions=${effectiveSelectedDispositions.join(',') || 'none'}`,
+        detail: `${effectiveStrictSelection.summary.selectedProfileCount}/${effectiveStrictSelection.summary.profileCount} profiles selected, runtimeOverlays=${runtimeAccountOverlays.length} active=${runtimeAccountOverlaySummary.activeCount} expired=${runtimeAccountOverlaySummary.expiredCount}, dispositions=${effectiveSelectedDispositions.join(',') || 'none'}`,
     },
     {
         id: 'runtime_not_promoted',
@@ -206,6 +210,7 @@ const summary = {
             dispositions: effectiveSelectedDispositions,
             healthRecords: healthRecords.length,
             runtimeAccountOverlays: runtimeAccountOverlays.length,
+            runtimeAccountOverlaySummary,
             eligibilityDecisions: effectiveEligibility.decisions.length,
         },
     },

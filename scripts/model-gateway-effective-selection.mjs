@@ -8,6 +8,7 @@ import {
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
     listByokProviderModelHealth,
+    summarizeModelGatewayRuntimeAccountOverlays,
 } from '../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
@@ -64,6 +65,9 @@ const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
 const secretRegistry = createEnvSecretRegistry();
 const healthRecords = listByokProviderModelHealth();
 const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords);
+const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, {
+    now: snapshot.generatedAt,
+});
 const evaluated = evaluateModelGatewayCatalogEligibility({
     snapshot,
     secretRegistry,
@@ -104,6 +108,7 @@ const summary = {
     observedRuntime: {
         healthRecordCount: healthRecords.length,
         runtimeAccountOverlayCount: runtimeAccountOverlays.length,
+        runtimeAccountOverlaySummary,
         eligibilityDecisionCount: evaluated.decisions.length,
         eligibilitySummary: evaluated.summary,
     },
@@ -126,6 +131,13 @@ if (json) {
     );
     process.stdout.write(
         `observed: health=${healthRecords.length} runtimeOverlays=${runtimeAccountOverlays.length} eligibility=${evaluated.decisions.length}\n`,
+    );
+    process.stdout.write(
+        `volatile overlays: active=${runtimeAccountOverlaySummary.activeCount} expired=${runtimeAccountOverlaySummary.expiredCount} providers=${Object.entries(runtimeAccountOverlaySummary.byProvider)
+            .map(([providerId, count]) => `${providerId}:${count}`)
+            .join(',') || '-'} failures=${Object.entries(runtimeAccountOverlaySummary.byFailureKind)
+            .map(([failureKind, count]) => `${failureKind}:${count}`)
+            .join(',') || '-'}\n`,
     );
     process.stdout.write(
         `profiles: selected=${selection.summary.selectedProfileCount}/${selection.summary.profileCount} dispositions=${dispositions.join(',') || '-'}\n`,

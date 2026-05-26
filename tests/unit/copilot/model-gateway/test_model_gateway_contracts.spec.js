@@ -143,6 +143,7 @@ import {
     diffCanonicalModelProjections,
     describeCatalogImporter,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
+    summarizeModelGatewayRuntimeAccountOverlays,
     explainModelGatewayCatalogEntry,
     explainModelGatewayProviderEntry,
     mergeModelMetadataEvidence,
@@ -6304,7 +6305,31 @@ describe('model-gateway foundation', () => {
         assert.equal(overlays[1].spendingLimits.remainingUsd, 0);
         assert.equal(overlays[2].providerId, 'chutes');
         assert.equal(overlays[2].providerMetadata.failureKind, 'credits');
+        const summary = summarizeModelGatewayRuntimeAccountOverlays(overlays, {
+            maxItems: 2,
+            maxModelsPerOverlay: 1,
+            now: '2026-05-25T00:00:30.000Z',
+        });
+        assert.equal(summary.total, 3);
+        assert.equal(summary.activeCount, 3);
+        assert.equal(summary.expiredCount, 0);
+        assert.deepEqual(summary.byProvider, { chutes: 1, groq: 1, openrouter: 1 });
+        assert.deepEqual(summary.byFailureKind, { credits: 2, 'rate-limit': 1 });
+        assert.equal(summary.items.length, 2);
+        assert.deepEqual(summary.items[0], {
+            providerId: 'chutes',
+            failureKind: 'credits',
+            modelCount: 1,
+            models: ['legacy'],
+            sourceKind: 'runtime_health',
+            expired: false,
+            disabled: false,
+            retryAfterSeconds: null,
+            resetAt: null,
+            expiresAt: '2026-05-25T01:00:00.000Z',
+        });
         assert.equal(JSON.stringify(overlays).includes('sk-'), false);
+        assert.equal(JSON.stringify(summary).includes('sk-'), false);
     });
 
     it('summarizes account/key overlays for operator pre-runtime visibility', () => {
@@ -6810,6 +6835,8 @@ describe('model-gateway foundation', () => {
 
         assert.equal(evaluated.summary.excludedCount, 1);
         assert.equal(evaluated.run.policyInputs['runtimeAccountOverlayCount'], 1);
+        assert.equal(evaluated.run.policyInputs['runtimeAccountOverlayActiveCount'], 1);
+        assert.equal(evaluated.run.policyInputs['runtimeAccountOverlayExpiredCount'], 0);
         assert.equal(evaluated.run.policyInputs['healthRecordCount'], 1);
         assert.deepEqual(evaluated.decisions[0].hardExclusions, ['account_rate_limited']);
         assert.equal(evaluated.decisions[0].policyInputs['accountAccess']['status'], 'rate_limited');

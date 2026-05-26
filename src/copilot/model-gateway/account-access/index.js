@@ -12,6 +12,7 @@ export { summarizeModelGatewayAccountOverlays } from './summary.js';
 export {
     deriveModelGatewayRuntimeAccountOverlayFromHealth,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
+    summarizeModelGatewayRuntimeAccountOverlays,
 } from './runtime-overlays.js';
 export {
     MODEL_GATEWAY_ACCOUNT_ACCESS_CONFIDENCE,

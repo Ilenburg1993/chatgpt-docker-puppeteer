@@ -5332,9 +5332,97 @@ Validação parcial deste corte:
 
 Próximas lacunas:
 
-- [ ] Revisar se o relatório de seleção efetiva deve expor uma seção resumida
+- [x] Revisar se o relatório de seleção efetiva deve expor uma seção resumida
   dos overlays voláteis derivados, sem revelar segredo e sem tornar o output
   pesado demais.
+- [ ] Antes do live real com `llm-b`, executar novamente readiness, lint,
+  typecheck e teste terminal escopado.
+
+---
+
+## 71. Continuidade 2026-05-26 — Resumo Seguro De Overlays Voláteis
+
+Auditoria executada neste corte:
+
+- [x] Revisitada a saída de `model-gateway:selection:effective` e
+  `model-gateway:live:readiness`.
+- [x] Confirmado que `runtimeAccountOverlayCount` sozinho era insuficiente,
+  porque misturava overlays ativos e expirados.
+- [x] Confirmado que expor overlays brutos nos comandos seria pesado e criaria
+  risco desnecessário de vazamento caso um provider colocasse dado sensível em
+  metadados.
+- [x] Confirmado que a elegibilidade já filtra overlays expirados antes de
+  aplicar quota/rate/auth como bloqueio, mas a contagem operacional precisava
+  deixar essa distinção visível ao operador.
+
+Implementado neste corte:
+
+- [x] Criado `summarizeModelGatewayRuntimeAccountOverlays()`.
+- [x] O resumo informa `total`, `activeCount`, `expiredCount`,
+  `byProvider`, `byFailureKind` e amostras limitadas.
+- [x] As amostras carregam apenas `providerId`, `failureKind`, contagem/lista
+  limitada de modelos, `sourceKind`, `expired`, `disabled`, retry/reset e
+  `expiresAt`.
+- [x] O resumo não inclui `secretRef`, payload bruto, headers completos ou
+  valores de key.
+- [x] Barrels `account-access` e `model-gateway` exportam o helper.
+- [x] `model-gateway:selection:effective` passa a mostrar linha textual
+  `volatile overlays: active=... expired=... providers=... failures=...`.
+- [x] `model-gateway:selection:effective -- --json` passa a incluir
+  `observedRuntime.runtimeAccountOverlaySummary`.
+- [x] `model-gateway:live:readiness` passa a incluir o mesmo resumo em
+  `selection.effectiveStrict.runtimeAccountOverlaySummary`.
+- [x] O check `selection_effective_observed_health` passa a mostrar
+  `runtimeOverlays`, `active` e `expired`.
+- [x] Terminal `/byok gateway selection audit effective` passa a renderizar o
+  mesmo resumo curto: health observado, overlays runtime, ativos, expirados,
+  failures e providers.
+- [x] `evaluateModelGatewayCatalogEligibility()` passa a registrar
+  `runtimeAccountOverlayActiveCount` e
+  `runtimeAccountOverlayExpiredCount` em `policyInputs`.
+- [x] Testes unitários cobrem summary seguro, policy inputs ativo/expirado e
+  saída terminal efetiva.
+
+Resultado observado:
+
+- [x] Seleção efetiva local: `health=17`, `runtimeOverlays=2`,
+  `active=0`, `expired=2`.
+- [x] Providers no resumo local: `chutes:1`, `gemini:1`.
+- [x] Failure kinds no resumo local: `credits:1`, `auth:1`.
+- [x] Readiness local continua `ok=true`.
+- [x] O plano live continua com `executeNow=false`.
+
+Separação preservada:
+
+- [x] O resumo não altera catálogo JSON.
+- [x] O resumo não altera SQLite.
+- [x] O resumo não persiste eligibility decisions.
+- [x] O resumo não executa provider, modelo ou probe.
+- [x] Overlays expirados permanecem diagnósticos; não viram bloqueio de quota,
+  rate-limit ou auth ativo.
+
+Validação parcial deste corte:
+
+- [x] PASS `node --check src/copilot/model-gateway/account-access/runtime-overlays.js`.
+- [x] PASS `node --check src/copilot/model-gateway/eligibility/catalog-snapshot.js`.
+- [x] PASS `node --check scripts/model-gateway-effective-selection.mjs`.
+- [x] PASS `node --check scripts/model-gateway-live-readiness.mjs`.
+- [x] PASS `node --check src/copilot/terminal/commands/byok.js`.
+- [x] PASS `node --check tests/unit/copilot/terminal/test_commands_byok.spec.js`.
+- [x] PASS focused Vitest `runtime health|catalog-wide eligibility`.
+- [x] PASS focused Vitest `seleção efetiva`.
+- [x] PASS `npm run model-gateway:test:contracts` com `157` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `66` testes.
+- [x] PASS `npm run model-gateway:live:readiness`.
+- [x] PASS `node scripts/model-gateway-effective-selection.mjs --json --strict --fail`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `git diff --check`.
+
+Próximas lacunas:
+
+- [x] Avaliar se o terminal `/byok gateway selection audit effective` deve
+  renderizar o mesmo resumo textual curto.
 - [ ] Antes do live real com `llm-b`, executar novamente readiness, lint,
   typecheck e teste terminal escopado.
 

@@ -10,7 +10,10 @@
 
 import { createModelEligibilityRun } from './contracts.js';
 import { evaluateModelGatewayEligibility } from './evaluator.js';
-import { deriveModelGatewayRuntimeAccountOverlaysFromHealth } from '../account-access/index.js';
+import {
+    deriveModelGatewayRuntimeAccountOverlaysFromHealth,
+    summarizeModelGatewayRuntimeAccountOverlays,
+} from '../account-access/index.js';
 
 /**
  * @param {unknown} value
@@ -154,6 +157,7 @@ export function evaluateModelGatewayCatalogEligibility(input) {
     const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords, {
         accountScope: optionalString(policy['accountScope']) ?? 'default',
     });
+    const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, { now: startedAt });
     const accountOverlays = [...snapshotAccountOverlays, ...runtimeAccountOverlays];
     const healthByKey = new Map(healthRecords.map((record) => [healthRouteKey(record), record]));
     const decisions = projections.flatMap((projection) => {
@@ -189,6 +193,8 @@ export function evaluateModelGatewayCatalogEligibility(input) {
                 treatEnabledModelsAsClosed: policy['treatEnabledModelsAsClosed'] ?? true,
                 accountOverlayCount: accountOverlays.length,
                 runtimeAccountOverlayCount: runtimeAccountOverlays.length,
+                runtimeAccountOverlayActiveCount: runtimeAccountOverlaySummary.activeCount,
+                runtimeAccountOverlayExpiredCount: runtimeAccountOverlaySummary.expiredCount,
                 healthRecordCount: healthRecords.length,
             },
         }),

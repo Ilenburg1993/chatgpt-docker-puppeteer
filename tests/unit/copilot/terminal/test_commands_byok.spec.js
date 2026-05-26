@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -79,6 +79,14 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                 providers: 1,
                 statusCounts: { rate_limited: 1 },
             },
+        })),
+        summarizeModelGatewayRuntimeAccountOverlays: vi.fn(() => ({
+            total: 1,
+            activeCount: 1,
+            expiredCount: 0,
+            byProvider: { groq: 1 },
+            byFailureKind: { 'rate-limit': 1 },
+            items: [],
         })),
         buildModelGatewayPreKCompatibilityReport: vi.fn(() => ({
             stage: 'pre-k',
@@ -397,6 +405,7 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                 filePath: 'data/copilot/model-gateway/catalog.json',
                 readSnapshot: vi.fn(() =>
                     Promise.resolve({
+                        generatedAt: '2026-05-26T20:00:00.000Z',
                         sources: [
                             { id: 'openrouter-models', providerId: 'openrouter', refreshPolicy: 'ttl', ttlSeconds: 3600 },
                             { id: 'openai-models', providerId: 'openai', refreshPolicy: 'ttl', ttlSeconds: 3600 },
@@ -786,6 +795,7 @@ vi.mock('#copilot/model-gateway', () => ({
     runConfiguredByokVisionProbe: runConfiguredByokVisionProbe,
     planModelGatewayProbeBackoff,
     summarizeModelGatewayAccountOverlays,
+    summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewayProviderEnvRequirements,
     summarizeModelGatewayRefreshLogText,
     summarizeCanonicalModelProjectionDiff,
@@ -2185,6 +2195,9 @@ describe('terminal /byok command', () => {
             }),
         );
         expect(applyModelGatewayEligibilityToSnapshot).not.toHaveBeenCalled();
+        expect(summarizeModelGatewayRuntimeAccountOverlays).toHaveBeenCalledWith(expect.any(Array), {
+            now: expect.any(String),
+        });
         expect(auditModelGatewayPreRuntimeSelection).toHaveBeenCalledWith(
             expect.objectContaining({
                 source: 'terminal-effective-selection-preview',
@@ -2200,6 +2213,10 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('persisted=nao');
         expect(ctx.output()).toContain('observedHealth=');
         expect(ctx.output()).toContain('runtimeOverlays=1');
+        expect(ctx.output()).toContain('active=1');
+        expect(ctx.output()).toContain('expired=0');
+        expect(ctx.output()).toContain('failures=rate-limit:1');
+        expect(ctx.output()).toContain('providers=groq:1');
     });
 
     it('executa refresh do catálogo model-gateway com saída OpenAI-compatible resumida', async () => {

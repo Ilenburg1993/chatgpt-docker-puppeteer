@@ -69,6 +69,7 @@ import {
     searchModelGatewayCatalogEntries,
     SqliteModelGatewayCatalogStore,
     summarizeModelGatewayAccountOverlays,
+    summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewayRefreshLogText,
     summarizeModelGatewayProviderEnvRequirements,
     summarizeProviderWireProbeMatrix,
@@ -2381,6 +2382,18 @@ function parseByokGatewaySelectionAuditArgs(rest) {
 }
 
 /**
+ * @param {Record<string, number>} counts
+ * @returns {string}
+ */
+function formatCountMap(counts) {
+    const text = Object.entries(counts)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, count]) => `${key}:${count}`)
+        .join(',');
+    return text || '-';
+}
+
+/**
  * @param {(text: string) => void} println
  * @param {string[]} rest
  * @returns {Promise<void>}
@@ -2392,6 +2405,10 @@ async function renderByokGatewaySelectionAudit(println, rest) {
     const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
     const healthRecords = args.effective ? listByokProviderModelHealth() : [];
     const runtimeOverlays = args.effective ? deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords) : [];
+    const runtimeOverlaySummaryNow = optionalScalarString(snapshot.generatedAt) ?? undefined;
+    const runtimeOverlaySummary = args.effective
+        ? summarizeModelGatewayRuntimeAccountOverlays(runtimeOverlays, { now: runtimeOverlaySummaryNow })
+        : null;
     const effectiveEligibility = args.effective
         ? evaluateModelGatewayCatalogEligibility({
               snapshot,
@@ -2428,7 +2445,7 @@ async function renderByokGatewaySelectionAudit(println, rest) {
     );
     if (args.effective) {
         println(
-            `  \x1b[90mobservedHealth=${healthRecords.length} · runtimeOverlays=${runtimeOverlays.length} · effectiveEligibility=${effectiveEligibility?.decisions.length ?? 0}\x1b[0m\n`,
+            `  \x1b[90mobservedHealth=${healthRecords.length} · runtimeOverlays=${runtimeOverlays.length} · active=${runtimeOverlaySummary?.activeCount ?? 0} · expired=${runtimeOverlaySummary?.expiredCount ?? 0} · failures=${formatCountMap(runtimeOverlaySummary?.byFailureKind ?? {})} · providers=${formatCountMap(runtimeOverlaySummary?.byProvider ?? {})} · effectiveEligibility=${effectiveEligibility?.decisions.length ?? 0}\x1b[0m\n`,
         );
     }
     for (const profile of selection.profiles) {

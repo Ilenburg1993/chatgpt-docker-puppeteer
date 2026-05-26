@@ -20,6 +20,7 @@ export {
     normalizeModelGatewayAccountLimitState,
     resolveModelGatewayAccountAccess,
     summarizeModelGatewayAccountOverlays,
+    summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewaySdkQuotaSnapshots,
 } from './account-access/index.js';
 

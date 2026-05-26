@@ -211,3 +211,84 @@ export function deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords
         .map((health) => deriveModelGatewayRuntimeAccountOverlayFromHealth(health, options))
         .filter((overlay) => overlay !== null);
 }
+
+/**
+ * @param {Record<string, unknown>[]} overlays
+ * @param {object} [options]
+ * @param {number} [options.maxItems]
+ * @param {number} [options.maxModelsPerOverlay]
+ * @param {string | number | Date} [options.now]
+ * @returns {{
+ *   total: number,
+ *   activeCount: number,
+ *   expiredCount: number,
+ *   byProvider: Record<string, number>,
+ *   byFailureKind: Record<string, number>,
+ *   items: Array<{
+ *     providerId: string,
+ *     failureKind: string,
+ *     modelCount: number,
+ *     models: string[],
+ *     sourceKind: string | null,
+ *     expired: boolean,
+ *     disabled: boolean,
+ *     retryAfterSeconds: number | null,
+ *     resetAt: string | null,
+ *     expiresAt: string | null,
+ *   }>,
+ * }}
+ */
+export function summarizeModelGatewayRuntimeAccountOverlays(overlays, options = {}) {
+    const maxItems = Math.max(0, optionalNumber(options.maxItems) ?? 8);
+    const maxModelsPerOverlay = Math.max(0, optionalNumber(options.maxModelsPerOverlay) ?? 3);
+    const nowMs = dateMs(options.now) ?? Date.now();
+    /** @type {Record<string, number>} */
+    const byProvider = {};
+    /** @type {Record<string, number>} */
+    const byFailureKind = {};
+    let activeCount = 0;
+    let expiredCount = 0;
+    const normalized = (Array.isArray(overlays) ? overlays : []).filter(isRecord).map((overlay) => {
+        const providerId = optionalString(overlay['providerId']) ?? 'unknown';
+        const providerMetadata = isRecord(overlay['providerMetadata']) ? overlay['providerMetadata'] : {};
+        const rateLimits = isRecord(overlay['rateLimits']) ? overlay['rateLimits'] : {};
+        const failureKind = optionalString(providerMetadata['failureKind']) ?? 'unknown';
+        const expiresAt = optionalString(overlay['expiresAt']);
+        const expiresAtMs = dateMs(expiresAt);
+        const expired = expiresAtMs !== null && expiresAtMs <= nowMs;
+        const enabledModels = Array.isArray(overlay['enabledModels'])
+            ? overlay['enabledModels'].filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim())
+            : [];
+        byProvider[providerId] = (byProvider[providerId] ?? 0) + 1;
+        byFailureKind[failureKind] = (byFailureKind[failureKind] ?? 0) + 1;
+        if (expired) expiredCount += 1;
+        else activeCount += 1;
+        return {
+            providerId,
+            failureKind,
+            modelCount: enabledModels.length,
+            models: enabledModels.slice(0, maxModelsPerOverlay),
+            sourceKind: optionalString(overlay['sourceKind']),
+            expired,
+            disabled: providerMetadata['disabled'] === true,
+            retryAfterSeconds: optionalNumber(rateLimits['retryAfterSeconds']),
+            resetAt: optionalString(rateLimits['resetAt']),
+            expiresAt,
+        };
+    });
+    normalized.sort((left, right) => {
+        const provider = left.providerId.localeCompare(right.providerId);
+        if (provider !== 0) return provider;
+        const failure = left.failureKind.localeCompare(right.failureKind);
+        if (failure !== 0) return failure;
+        return left.models.join(',').localeCompare(right.models.join(','));
+    });
+    return {
+        total: normalized.length,
+        activeCount,
+        expiredCount,
+        byProvider,
+        byFailureKind,
+        items: normalized.slice(0, maxItems),
+    };
+}
