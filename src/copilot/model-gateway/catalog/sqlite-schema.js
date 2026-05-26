@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/catalog/sqlite-schema
  */
 
-export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 2;
+export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 3;
 
 export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_snapshots',
@@ -31,6 +31,7 @@ export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_runtime_probe_results',
     'copilot_model_gateway_health_observations',
     'copilot_model_gateway_route_decisions',
+    'copilot_model_gateway_refresh_log_events',
 ]);
 
 export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
@@ -331,4 +332,24 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
         ON copilot_model_gateway_route_decisions(task_profile, route_profile, decided_at_ms DESC);
     CREATE INDEX IF NOT EXISTS idx_mg_route_decisions_model
         ON copilot_model_gateway_route_decisions(provider_id, provider_model, selected);
+
+    CREATE TABLE IF NOT EXISTS copilot_model_gateway_refresh_log_events (
+        event_key      TEXT PRIMARY KEY,
+        run_id         TEXT NOT NULL DEFAULT 'unknown',
+        phase          TEXT NOT NULL DEFAULT 'unknown',
+        status         TEXT NOT NULL DEFAULT 'unknown',
+        provider_id    TEXT,
+        importer_id    TEXT,
+        source_id      TEXT,
+        progress_pct   INTEGER,
+        observed_at_ms INTEGER NOT NULL,
+        elapsed_ms     INTEGER,
+        payload_json   TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS idx_mg_refresh_log_events_run
+        ON copilot_model_gateway_refresh_log_events(run_id, observed_at_ms ASC);
+    CREATE INDEX IF NOT EXISTS idx_mg_refresh_log_events_status
+        ON copilot_model_gateway_refresh_log_events(status, phase, observed_at_ms DESC);
+    CREATE INDEX IF NOT EXISTS idx_mg_refresh_log_events_provider
+        ON copilot_model_gateway_refresh_log_events(provider_id, importer_id, phase, observed_at_ms DESC);
 `;

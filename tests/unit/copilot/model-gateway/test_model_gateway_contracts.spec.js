@@ -86,6 +86,7 @@ import {
     BYOK_VISION_PROBE_DISPLAY_NAME,
     BYOK_VISION_PROBE_MIME_TYPE,
     compareModelGatewayCatalogSnapshotParity,
+    DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION,
     JsonModelGatewayCatalogStore,
     SqliteModelGatewayCatalogStore,
     MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
@@ -1325,6 +1326,11 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.length >= 20);
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:prebuild'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
+        assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:refresh:log:sqlite -- --json'));
+        assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:sqlite:retention -- --json'));
+        assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:sqlite:retention:apply -- --json'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-refresh-log-sqlite'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-sqlite-retention'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway commands'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway prebuild'));
         assert.ok(commands.every((entry) => ['orientation', 'metadata', 'pre-runtime', 'selection', 'validate', 'prebuild'].includes(entry.phase)));
@@ -2228,6 +2234,26 @@ describe('model-gateway foundation', () => {
                 9,
                 '{}',
             );
+            db.prepare(
+                `
+                    INSERT INTO copilot_model_gateway_refresh_log_events
+                        (event_key, run_id, phase, status, provider_id, importer_id, source_id,
+                         progress_pct, observed_at_ms, elapsed_ms, payload_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+            ).run(
+                'refresh-log-1',
+                'refresh-run-1',
+                'importer:importer_completed',
+                'completed',
+                'openrouter',
+                'openrouter-models',
+                'openrouter-models',
+                100,
+                10,
+                500,
+                '{}',
+            );
 
             const row = /** @type {{ include: number, disposition: string } | undefined} */ (
                 db.prepare(
@@ -2490,6 +2516,7 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.accountHistoryRows, 6);
             assert.equal(diagnostics.runtimeRows, 3);
             assert.equal(diagnostics.routeDecisionRows, 1);
+            assert.equal(diagnostics.refreshLogRows, 0);
         } finally {
             db.close();
         }
@@ -2531,6 +2558,144 @@ describe('model-gateway foundation', () => {
             assert.equal(loaded[0].decisionId, event.decisionId);
             assert.equal(loaded[0].providerId, 'openrouter');
             assert.equal(JSON.stringify(loaded).includes('sk-'), false);
+        } finally {
+            db.close();
+        }
+    });
+
+    it('persists sanitized refresh JSONL events in the SQLite operational log layer', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            const text = [
+                JSON.stringify({
+                    ts: '2026-05-26T12:00:00.000Z',
+                    phase: 'refresh_started',
+                    token: 'sk-secret-that-must-not-leak',
+                }),
+                JSON.stringify({
+                    ts: '2026-05-26T12:00:01.000Z',
+                    phase: 'importer:importer_completed',
+                    importer: { providerId: 'openrouter', importerId: 'openrouter-models', sourceId: 'openrouter-models' },
+                    progress: { pct: 100 },
+                    rowCount: 2,
+                    evidenceCount: 7,
+                }),
+                JSON.stringify({
+                    ts: '2026-05-26T12:00:02.000Z',
+                    phase: 'refresh_completed',
+                    elapsedMs: 2_000,
+                    committed: true,
+                    projectionCount: 42,
+                }),
+                'not-json',
+            ].join('\n');
+
+            const summary = await store.writeRefreshLogText(text, {
+                logPath: 'logs/model-gateway-refresh/unit.jsonl',
+                runId: 'refresh-unit',
+            });
+            const loaded = await store.readRefreshLogEvents({ runId: 'refresh-unit' });
+            const diagnostics = await store.readStorageDiagnostics();
+            const serializedRows = /** @type {{ payload: string | null } | undefined} */ (
+                db.prepare('SELECT group_concat(payload_json, char(10)) AS payload FROM copilot_model_gateway_refresh_log_events').get()
+            );
+            const completedRow = /** @type {{ status: string; elapsed_ms: number } | undefined} */ (
+                db.prepare(
+                    'SELECT status, elapsed_ms FROM copilot_model_gateway_refresh_log_events WHERE phase = ?',
+                ).get('refresh_completed')
+            );
+
+            assert.equal(summary.runId, 'refresh-unit');
+            assert.equal(summary.refreshLogEvents, 3);
+            assert.equal(summary.invalidLineCount, 1);
+            assert.equal(summary.completed, true);
+            assert.equal(summary.committed, true);
+            assert.equal(loaded.length, 3);
+            assert.equal(diagnostics.refreshLogRows, 3);
+            assert.equal(completedRow?.status, 'completed');
+            assert.equal(completedRow?.elapsed_ms, 2_000);
+            assert.equal(JSON.stringify(serializedRows).includes('sk-secret-that-must-not-leak'), false);
+        } finally {
+            db.close();
+        }
+    });
+
+    it('applies explicit SQLite operational retention without touching canonical catalog rows', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            await store.writeSnapshot({
+                source: 'retention-catalog',
+                projections: [createCanonicalModelProjection({ providerId: 'openrouter', providerModel: 'model-a' })],
+            });
+            for (const table of [
+                'copilot_model_gateway_account_quota_snapshots',
+                'copilot_model_gateway_account_rate_limit_snapshots',
+                'copilot_model_gateway_account_spending_snapshots',
+            ]) {
+                const hasReset = table.includes('rate_limit');
+                const statement = db.prepare(
+                    hasReset
+                        ? `
+                            INSERT INTO ${table}
+                                (snapshot_key, account_overlay_id, provider_id, account_scope, secret_ref, status,
+                                 reset_at_ms, observed_at_ms, expires_at_ms, payload_json)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        `
+                        : `
+                            INSERT INTO ${table}
+                                (snapshot_key, account_overlay_id, provider_id, account_scope, secret_ref, status,
+                                 observed_at_ms, expires_at_ms, payload_json)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        `,
+                );
+                for (const observedAt of [1, 2, 3]) {
+                    /** @type {unknown[]} */
+                    const args = [
+                        `${table}:${observedAt}`,
+                        'overlay',
+                        'openrouter',
+                        'default',
+                        'OPENROUTER_API_KEY',
+                        'ok',
+                    ];
+                    if (hasReset) args.push(null);
+                    args.push(observedAt, null, '{}');
+                    statement.run(...args);
+                }
+            }
+            await store.writeRouteDecisionEvents([
+                { decisionId: 'route-1', timestamp: 1, providerId: 'openrouter', modelId: 'model-a', selected: true },
+                { decisionId: 'route-2', timestamp: 2, providerId: 'openrouter', modelId: 'model-b', selected: false },
+                { decisionId: 'route-3', timestamp: 3, providerId: 'openrouter', modelId: 'model-c', selected: false },
+            ]);
+            await store.writeRefreshLogEvents(
+                [
+                    { eventId: 'refresh-1', ts: 1, phase: 'refresh_started' },
+                    { eventId: 'refresh-2', ts: 2, phase: 'importer:importer_completed' },
+                    { eventId: 'refresh-3', ts: 3, phase: 'refresh_completed' },
+                ],
+                { runId: 'retention-run' },
+            );
+
+            const result = await store.applyOperationalRetention({
+                accountHistoryMaxRowsPerTable: 1,
+                routeDecisionMaxRows: 1,
+                refreshLogMaxRows: 1,
+            });
+            const diagnostics = await store.readStorageDiagnostics();
+            const loaded = await store.readSnapshot();
+
+            assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows > 1, true);
+            assert.equal(result.deletedRows, 10);
+            assert.equal(diagnostics.catalogRows > 0, true);
+            assert.equal(diagnostics.accountHistoryRows, 3);
+            assert.equal(diagnostics.routeDecisionRows, 1);
+            assert.equal(diagnostics.refreshLogRows, 1);
+            assert.equal(loaded.projections.length, 1);
         } finally {
             db.close();
         }

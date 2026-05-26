@@ -8,13 +8,17 @@
  * @module copilot/model-gateway/catalog/sqlite-catalog-store
  */
 
+import { createHash } from 'node:crypto';
+
 import Database from 'better-sqlite3';
 
 import { getCopilotDb } from '../../db/sqlite.js';
 import { normalizeModelGatewayAccountLimitState } from '../account-access/limits.js';
+import { redactSecretText } from '../secrets/index.js';
 import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { toOpenAIModelCatalogList } from './openai-schema.js';
+import { parseModelGatewayRefreshLogText, summarizeModelGatewayRefreshLogEvents } from './refresh-logs.js';
 import { MODEL_GATEWAY_SQLITE_SCHEMA_SQL, MODEL_GATEWAY_SQLITE_SCHEMA_VERSION, MODEL_GATEWAY_SQLITE_TABLES } from './sqlite-schema.js';
 
 const ACTIVE_SNAPSHOT_ID = 'active';
@@ -22,6 +26,12 @@ const DEFAULT_ROUTE_PROFILE = 'default';
 const DEFAULT_ACCOUNT_SCOPE = 'default';
 const DEFAULT_POLICY_PROFILE = 'default';
 const DEFAULT_TASK_PROFILE = 'default';
+
+export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze({
+    accountHistoryMaxRowsPerTable: 10_000,
+    routeDecisionMaxRows: 50_000,
+    refreshLogMaxRows: 200_000,
+});
 
 const DELETE_TABLES_IN_ORDER = Object.freeze([
     'copilot_model_gateway_eligibility_decisions',
@@ -65,6 +75,16 @@ function optionalInteger(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @returns {number}
+ */
+function retentionLimit(value, fallback) {
+    const limit = optionalInteger(value);
+    return limit === null ? fallback : Math.max(0, limit);
+}
+
+/**
  * @param {import('better-sqlite3').Database} db
  * @returns {number}
  */
@@ -101,6 +121,57 @@ function dateMs(value) {
  */
 function payloadJson(value) {
     return JSON.stringify(value ?? null);
+}
+
+const SENSITIVE_OPERATIONAL_KEY_RE =
+    /^(?:authorization|proxy-authorization|api[_-]?key|secret|token|bearer[_-]?token|access[_-]?token|password)$/iu;
+
+/**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function sanitizeOperationalPayload(value) {
+    if (typeof value === 'string') return redactSecretText(value);
+    if (Array.isArray(value)) return value.map(sanitizeOperationalPayload);
+    if (isRecord(value)) {
+        return Object.fromEntries(
+            Object.entries(value).map(([key, item]) => [
+                key,
+                SENSITIVE_OPERATIONAL_KEY_RE.test(key) ? '[redacted]' : sanitizeOperationalPayload(item),
+            ]),
+        );
+    }
+    if (value === undefined) return null;
+    return value;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function operationalPayloadJson(value) {
+    return JSON.stringify(sanitizeOperationalPayload(value ?? null));
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function stableJson(value) {
+    if (!value || typeof value !== 'object') return JSON.stringify(value);
+    if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+    return `{${Object.entries(/** @type {Record<string, unknown>} */ (value))
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
+        .join(',')}}`;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function sha256(value) {
+    return createHash('sha256').update(String(value)).digest('hex');
 }
 
 /**
@@ -263,6 +334,97 @@ function runtimeFailureContext(record) {
     );
 }
 
+/**
+ * @param {Record<string, unknown>} event
+ * @returns {string}
+ */
+function refreshLogPhase(event) {
+    return optionalString(event['phase']) ?? optionalString(event['schema']) ?? 'unknown';
+}
+
+/**
+ * @param {Record<string, unknown>} event
+ * @returns {Record<string, unknown>}
+ */
+function refreshLogImporter(event) {
+    return isRecord(event['importer']) ? event['importer'] : {};
+}
+
+/**
+ * @param {Record<string, unknown>} event
+ * @returns {string}
+ */
+function refreshLogStatus(event) {
+    const status = optionalString(event['status']);
+    if (status) return status;
+    const phase = refreshLogPhase(event);
+    if (phase.endsWith('_failed') || phase.includes('failed')) return 'failed';
+    if (phase.endsWith('_completed') || phase === 'refresh_completed') return 'completed';
+    if (phase.endsWith('_started') || phase === 'refresh_started') return 'started';
+    return 'observed';
+}
+
+/**
+ * @param {Record<string, unknown>} event
+ * @returns {number | null}
+ */
+function refreshLogProgressPct(event) {
+    const direct = optionalInteger(event['progressPct']);
+    if (direct !== null) return Math.max(0, Math.min(direct, 100));
+    const progress = isRecord(event['progress']) ? event['progress'] : {};
+    const nested = optionalInteger(progress['pct']);
+    return nested === null ? null : Math.max(0, Math.min(nested, 100));
+}
+
+/**
+ * @param {Record<string, unknown>} event
+ * @param {number} index
+ * @param {string} runId
+ * @returns {string}
+ */
+function refreshLogEventKey(event, index, runId) {
+    return (
+        optionalString(event['eventKey']) ??
+        optionalString(event['eventId']) ??
+        `refresh-log:${sha256(stableJson({ runId, index, event: sanitizeOperationalPayload(event) }))}`
+    );
+}
+
+/**
+ * @param {Record<string, unknown>[]} events
+ * @param {string | null | undefined} fallback
+ * @returns {string}
+ */
+function refreshLogRunId(events, fallback) {
+    const explicit = optionalString(fallback);
+    if (explicit) return explicit;
+    const first = events[0];
+    const last = events[events.length - 1] ?? first;
+    return `model-gateway-refresh:${optionalString(first?.['ts']) ?? optionalString(last?.['ts']) ?? Date.now()}`;
+}
+
+/**
+ * @param {import('better-sqlite3').Database} db
+ * @param {object} input
+ * @param {string} input.table
+ * @param {string} input.keyColumn
+ * @param {string} input.orderColumn
+ * @param {number} input.maxRows
+ * @returns {number}
+ */
+function deleteRowsKeepingLatest(db, input) {
+    const statement = db.prepare(`
+        DELETE FROM ${input.table}
+        WHERE ${input.keyColumn} IN (
+            SELECT ${input.keyColumn}
+            FROM ${input.table}
+            ORDER BY ${input.orderColumn} DESC, ${input.keyColumn} DESC
+            LIMIT -1 OFFSET ?
+        )
+    `);
+    return statement.run(input.maxRows).changes;
+}
+
 export class SqliteModelGatewayCatalogStore {
     /** @type {import('better-sqlite3').Database} */
     #db;
@@ -338,6 +500,7 @@ export class SqliteModelGatewayCatalogStore {
      *     accountHistoryRows: number;
      *     runtimeRows: number;
      *     routeDecisionRows: number;
+     *     refreshLogRows: number;
      * }>}
      */
     async readStorageDiagnostics() {
@@ -403,6 +566,170 @@ export class SqliteModelGatewayCatalogStore {
             accountHistoryRows: sum(accountHistoryTables),
             runtimeRows: sum(runtimeTables),
             routeDecisionRows: tableCounts['copilot_model_gateway_route_decisions'] ?? 0,
+            refreshLogRows: tableCounts['copilot_model_gateway_refresh_log_events'] ?? 0,
+        };
+    }
+
+    /**
+     * @param {Record<string, unknown>[]} events
+     * @param {{ runId?: string; logPath?: string }} [options]
+     * @returns {Promise<{ runId: string; refreshLogEvents: number }>}
+     */
+    async writeRefreshLogEvents(events, options = {}) {
+        const cleanEvents = events.filter(isRecord);
+        const runId = refreshLogRunId(cleanEvents, options.runId ?? options.logPath);
+        const insert = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_refresh_log_events
+                (event_key, run_id, phase, status, provider_id, importer_id, source_id, progress_pct,
+                 observed_at_ms, elapsed_ms, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(event_key) DO UPDATE SET
+                run_id = excluded.run_id,
+                phase = excluded.phase,
+                status = excluded.status,
+                provider_id = excluded.provider_id,
+                importer_id = excluded.importer_id,
+                source_id = excluded.source_id,
+                progress_pct = excluded.progress_pct,
+                observed_at_ms = excluded.observed_at_ms,
+                elapsed_ms = excluded.elapsed_ms,
+                payload_json = excluded.payload_json
+        `);
+        const tx = this.#db.transaction(() => {
+            cleanEvents.forEach((event, index) => {
+                const importer = refreshLogImporter(event);
+                insert.run(
+                    refreshLogEventKey(event, index, runId),
+                    runId,
+                    refreshLogPhase(event),
+                    refreshLogStatus(event),
+                    optionalString(event['providerId']) ?? optionalString(importer['providerId']),
+                    optionalString(event['importerId']) ?? optionalString(importer['importerId']),
+                    optionalString(event['sourceId']) ?? optionalString(importer['sourceId']),
+                    refreshLogProgressPct(event),
+                    dateMs(event['ts']) ?? dateMs(event['timestamp']) ?? Date.now(),
+                    optionalInteger(event['elapsedMs']),
+                    operationalPayloadJson(event),
+                );
+            });
+        });
+        tx();
+        return { runId, refreshLogEvents: cleanEvents.length };
+    }
+
+    /**
+     * @param {string} text
+     * @param {{ runId?: string; logPath?: string }} [options]
+     * @returns {Promise<ReturnType<typeof summarizeModelGatewayRefreshLogEvents> & { runId: string; refreshLogEvents: number }>}
+     */
+    async writeRefreshLogText(text, options = {}) {
+        const parsed = parseModelGatewayRefreshLogText(text);
+        const write = await this.writeRefreshLogEvents(parsed.events, options);
+        const summary = summarizeModelGatewayRefreshLogEvents(parsed.events, {
+            invalidLineCount: parsed.invalidLineCount,
+            logPath: options.logPath,
+        });
+        return { ...summary, ...write };
+    }
+
+    /**
+     * @param {{ runId?: string; limit?: number }} [options]
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async readRefreshLogEvents(options = {}) {
+        const limit = Math.max(1, Math.min(optionalInteger(options.limit) ?? 1_000, 50_000));
+        const runId = optionalString(options.runId);
+        const rows = runId
+            ? this.#db
+                  .prepare(
+                      `
+                          SELECT payload_json
+                          FROM copilot_model_gateway_refresh_log_events
+                          WHERE run_id = ?
+                          ORDER BY observed_at_ms ASC
+                          LIMIT ?
+                      `,
+                  )
+                  .all(runId, limit)
+            : this.#db
+                  .prepare(
+                      `
+                          SELECT payload_json
+                          FROM copilot_model_gateway_refresh_log_events
+                          ORDER BY observed_at_ms DESC
+                          LIMIT ?
+                      `,
+                  )
+                  .all(limit);
+        return rows.map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+    }
+
+    /**
+     * @param {{
+     *     accountHistoryMaxRowsPerTable?: number;
+     *     routeDecisionMaxRows?: number;
+     *     refreshLogMaxRows?: number;
+     * }} [policy]
+     * @returns {Promise<{
+     *     schema: string;
+     *     deletedRows: number;
+     *     tables: Record<string, { deletedRows: number; maxRows: number }>;
+     * }>}
+     */
+    async applyOperationalRetention(policy = {}) {
+        const accountHistoryMaxRowsPerTable = retentionLimit(
+            policy.accountHistoryMaxRowsPerTable,
+            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountHistoryMaxRowsPerTable,
+        );
+        const routeDecisionMaxRows = retentionLimit(
+            policy.routeDecisionMaxRows,
+            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.routeDecisionMaxRows,
+        );
+        const refreshLogMaxRows = retentionLimit(
+            policy.refreshLogMaxRows,
+            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows,
+        );
+        /** @type {Record<string, { deletedRows: number; maxRows: number }>} */
+        const tables = {};
+        const tx = this.#db.transaction(() => {
+            for (const table of [
+                'copilot_model_gateway_account_quota_snapshots',
+                'copilot_model_gateway_account_rate_limit_snapshots',
+                'copilot_model_gateway_account_spending_snapshots',
+            ]) {
+                const deletedRows = deleteRowsKeepingLatest(this.#db, {
+                    table,
+                    keyColumn: 'snapshot_key',
+                    orderColumn: 'observed_at_ms',
+                    maxRows: accountHistoryMaxRowsPerTable,
+                });
+                tables[table] = { deletedRows, maxRows: accountHistoryMaxRowsPerTable };
+            }
+            tables['copilot_model_gateway_route_decisions'] = {
+                deletedRows: deleteRowsKeepingLatest(this.#db, {
+                    table: 'copilot_model_gateway_route_decisions',
+                    keyColumn: 'decision_id',
+                    orderColumn: 'decided_at_ms',
+                    maxRows: routeDecisionMaxRows,
+                }),
+                maxRows: routeDecisionMaxRows,
+            };
+            tables['copilot_model_gateway_refresh_log_events'] = {
+                deletedRows: deleteRowsKeepingLatest(this.#db, {
+                    table: 'copilot_model_gateway_refresh_log_events',
+                    keyColumn: 'event_key',
+                    orderColumn: 'observed_at_ms',
+                    maxRows: refreshLogMaxRows,
+                }),
+                maxRows: refreshLogMaxRows,
+            };
+        });
+        tx();
+        const deletedRows = Object.values(tables).reduce((total, table) => total + table.deletedRows, 0);
+        return {
+            schema: 'model-gateway-sqlite-operational-retention',
+            deletedRows,
+            tables,
         };
     }
 

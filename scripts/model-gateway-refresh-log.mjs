@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { summarizeModelGatewayRefreshLogText } from '../src/copilot/model-gateway/index.js';
+import { setDbLogger } from '../src/copilot/db/sqlite.js';
+import { SqliteModelGatewayCatalogStore, summarizeModelGatewayRefreshLogText } from '../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
 const hasFlag = (name) => args.includes(name);
@@ -10,6 +11,13 @@ const valueFor = (name) => {
     const found = args.find((arg) => arg.startsWith(prefix));
     return found ? found.slice(prefix.length).trim() : null;
 };
+if (hasFlag('--json')) {
+    setDbLogger((level, msg) => {
+        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
+            process.stderr.write(`[db][${level}] ${msg}\n`);
+        }
+    });
+}
 
 if (hasFlag('--help') || hasFlag('-h')) {
     process.stdout.write(`Usage: node scripts/model-gateway-refresh-log.mjs [options]
@@ -20,11 +28,14 @@ Options:
   --log=<path>          Read an explicit JSONL log.
   --dir=<path>          Directory for --latest lookup (default logs/model-gateway-refresh).
   --latest             Read the newest JSONL log in the directory (default).
+  --sqlite              Mirror the parsed log events into the operational SQLite store.
+  --run-id=<id>         Optional stable run id for --sqlite (default: log path).
   --json               Emit machine-readable JSON.
 
 Examples:
   npm run model-gateway:refresh:log
   npm run model-gateway:refresh:log -- --json
+  npm run model-gateway:refresh:log:sqlite -- --json
   npm run model-gateway:refresh:log -- --log=logs/model-gateway-refresh/run.jsonl
 `);
     process.exit(0);
@@ -72,9 +83,16 @@ if (!logPath) {
 
 const text = await readFile(logPath, 'utf8');
 const summary = summarizeModelGatewayRefreshLogText(text, { logPath });
+const sqlite = hasFlag('--sqlite')
+    ? await new SqliteModelGatewayCatalogStore().writeRefreshLogText(text, {
+          logPath,
+          runId: valueFor('--run-id') ?? logPath,
+      })
+    : null;
+const output = { ok: summary.failures.length === 0, ...summary, ...(sqlite ? { sqlite } : {}) };
 
 if (hasFlag('--json')) {
-    process.stdout.write(`${JSON.stringify({ ok: summary.failures.length === 0, ...summary }, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
 } else {
     process.stdout.write(`model-gateway refresh log: ${logPath}\n`);
     process.stdout.write(
@@ -92,5 +110,8 @@ if (hasFlag('--json')) {
     }
     for (const failure of summary.failures.slice(0, 10)) {
         process.stdout.write(`  failure ${failure.phase} importer=${failure.importerId ?? '-'} error=${failure.errors.join('; ')}\n`);
+    }
+    if (sqlite) {
+        process.stdout.write(`sqlite: mirrored=${sqlite.refreshLogEvents} runId=${sqlite.runId}\n`);
     }
 }

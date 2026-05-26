@@ -91,6 +91,7 @@ export {
     ZAI_OPENAPI_URL,
     JsonModelGatewayCatalogStore,
     SqliteModelGatewayCatalogStore,
+    DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION,
     applyModelGatewayCatalogRetention,
     auditCatalogImporterSet,
     createCatalogModelTombstones,

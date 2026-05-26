@@ -90,6 +90,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Summarize the latest refresh JSONL log without touching the catalog.',
     },
     {
+        id: 'refresh.log-sqlite',
+        phase: 'metadata',
+        surface: 'package',
+        command: 'npm run model-gateway:refresh:log:sqlite -- --json',
+        summary: 'Mirror refresh JSONL operational events into SQLite without mutating catalog metadata.',
+    },
+    {
         id: 'refresh.plan',
         phase: 'metadata',
         surface: 'package',
@@ -102,6 +109,20 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'package',
         command: 'npm run model-gateway:sqlite:diagnostics',
         summary: 'Inspect SQLite table counts and operational layers without mirroring or fetching providers.',
+    },
+    {
+        id: 'sqlite.retention',
+        phase: 'metadata',
+        surface: 'package',
+        command: 'npm run model-gateway:sqlite:retention -- --json',
+        summary: 'Preview SQLite operational retention for account/key history, route decisions and refresh logs.',
+    },
+    {
+        id: 'sqlite.retention-apply',
+        phase: 'metadata',
+        surface: 'package',
+        command: 'npm run model-gateway:sqlite:retention:apply -- --json',
+        summary: 'Apply SQLite operational retention after reviewing diagnostics.',
     },
     {
         id: 'prebuild.all',
@@ -146,11 +167,32 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Makefile alias for latest refresh log analysis.',
     },
     {
+        id: 'make.refresh-log-sqlite',
+        phase: 'metadata',
+        surface: 'make',
+        command: 'make model-gateway-refresh-log-sqlite',
+        summary: 'Makefile alias for SQLite refresh-log replay.',
+    },
+    {
         id: 'make.refresh-plan',
         phase: 'metadata',
         surface: 'make',
         command: 'make model-gateway-refresh-plan',
         summary: 'Makefile alias for no-network refresh planning.',
+    },
+    {
+        id: 'make.sqlite-retention',
+        phase: 'metadata',
+        surface: 'make',
+        command: 'make model-gateway-sqlite-retention',
+        summary: 'Makefile dry-run for SQLite operational retention.',
+    },
+    {
+        id: 'make.sqlite-retention-apply',
+        phase: 'metadata',
+        surface: 'make',
+        command: 'make model-gateway-sqlite-retention-apply',
+        summary: 'Makefile apply path for SQLite operational retention.',
     },
     {
         id: 'make.sqlite-diagnostics',

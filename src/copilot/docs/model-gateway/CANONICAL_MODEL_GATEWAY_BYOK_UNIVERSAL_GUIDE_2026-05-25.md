@@ -3504,9 +3504,42 @@ Implementado neste corte:
   SQLite sem mirror, rede, provider ou runtime.
 - [x] Adicionados `model-gateway:sqlite:diagnostics` e
   `make model-gateway-sqlite-diagnostics`.
+- [x] Schema SQLite elevado para `user_version = 3`.
+- [x] Criada tabela operacional
+  `copilot_model_gateway_refresh_log_events`.
+- [x] A tabela de refresh log registra `run_id`, `phase`, `status`,
+  provider/importer/source, progresso, tempo observado, duração e payload
+  sanitizado.
+- [x] `SqliteModelGatewayCatalogStore.writeRefreshLogEvents()` materializa
+  eventos JSONL de refresh sem tocar no snapshot canônico.
+- [x] `SqliteModelGatewayCatalogStore.writeRefreshLogText()` parseia JSONL,
+  persiste eventos válidos e retorna resumo com linhas inválidas.
+- [x] `SqliteModelGatewayCatalogStore.readRefreshLogEvents()` recupera eventos
+  operacionais por `run_id` para auditoria posterior.
+- [x] `readStorageDiagnostics()` passa a expor `refreshLogRows`.
+- [x] `scripts/model-gateway-refresh-log.mjs` aceita `--sqlite` e `--run-id`.
+- [x] Adicionado `model-gateway:refresh:log:sqlite`.
+- [x] Adicionado `make model-gateway-refresh-log-sqlite`.
+- [x] Inventário canônico passa a listar replay SQLite dos logs de refresh.
+- [x] Criada política padrão
+  `DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION`.
+- [x] `SqliteModelGatewayCatalogStore.applyOperationalRetention()` aplica
+  retenção explícita para histórico account/key, route decisions e refresh
+  logs.
+- [x] Retenção operacional não apaga snapshot ativo, projections, sources,
+  evidences, route options nem eligibility.
+- [x] Criado `scripts/model-gateway-sqlite-retention.mjs`.
+- [x] O script de retenção é dry-run por padrão e exige `--apply` para mutar.
+- [x] Adicionados `model-gateway:sqlite:retention` e
+  `model-gateway:sqlite:retention:apply`.
+- [x] Adicionados `make model-gateway-sqlite-retention` e
+  `make model-gateway-sqlite-retention-apply`.
+- [x] Inventário canônico passa a listar dry-run e apply de retenção SQLite.
 - [x] Teste cobre duplicatas de evidência no snapshot, preservação de route
   decisions, preservação de runtime health/probes e histórico account/key entre
   rewrites de catálogo.
+- [x] Teste cobre persistência sanitizada de refresh JSONL no SQLite.
+- [x] Teste cobre retenção operacional sem tocar no catálogo canônico.
 
 Separação preservada:
 
@@ -3514,18 +3547,24 @@ Separação preservada:
 - [x] Histórico account/key fica em tabelas próprias e não altera projections.
 - [x] Runtime health/probes continuam fora do catálogo canônico.
 - [x] Route decisions continuam fora do catálogo canônico.
+- [x] Refresh logs continuam fora do catálogo canônico.
+- [x] Retenção operacional age apenas em tabelas de histórico, sem reconstruir
+  catálogo e sem tocar providers.
 - [x] O mirror SQLite não chama provider.
 - [x] O mirror SQLite não executa modelo.
 - [x] O mirror SQLite não executa probe.
+- [x] Replay SQLite de refresh log não chama provider, não executa modelo e não
+  altera projections/eligibility.
 
 Próximas lacunas:
 
-- [ ] Criar retention explícito para histórico account/key em SQLite.
-- [ ] Espelhar logs JSONL de refresh para uma tabela operacional SQLite.
+- [x] Criar retention explícito para histórico account/key em SQLite.
+- [x] Espelhar logs JSONL de refresh para uma tabela operacional SQLite.
 - [x] Criar comando canônico dedicado para diagnóstico SQLite sem executar
   mirror.
 - [ ] Adicionar diff SQL entre JSON snapshot e SQLite materializado como gate
   formal antes do primeiro build.
+- [x] Adicionar retention explícito para refresh logs operacionais em SQLite.
 
 Validação deste corte:
 
@@ -3536,6 +3575,22 @@ Validação deste corte:
 - [x] PASS `node --check scripts/model-gateway-sqlite-diagnostics.mjs`.
 - [x] PASS ESLint focado em `scripts/model-gateway-sqlite-diagnostics.mjs`.
 - [x] PASS smoke `node scripts/model-gateway-sqlite-diagnostics.mjs --json`.
+- [x] PASS `git diff --check`.
+
+Validação adicional para `user_version = 3`:
+
+- [x] PASS teste focado de contrato para `writeRefreshLogText()`.
+- [x] PASS `node --check scripts/model-gateway-refresh-log.mjs`.
+- [x] PASS `node --check scripts/model-gateway-sqlite-diagnostics.mjs`.
+- [x] PASS smoke `model-gateway:refresh:log:sqlite` com log temporário.
+- [x] PASS smoke JSON limpo em `model-gateway:sqlite:diagnostics`.
+- [x] PASS ESLint focado em schema/store/scripts/testes alterados.
+- [x] PASS typecheck strict src/copilot.
+- [x] PASS lint model-gateway.
+- [x] PASS teste focado para retenção operacional SQLite.
+- [x] PASS `node --check scripts/model-gateway-sqlite-retention.mjs`.
+- [x] PASS smoke JSON limpo em `model-gateway:sqlite:retention`.
+- [x] PASS `npm run model-gateway:test:contracts` com `149` testes.
 - [x] PASS `git diff --check`.
 
 ---

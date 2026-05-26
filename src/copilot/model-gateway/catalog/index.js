@@ -144,7 +144,7 @@ export {
     createModelGatewayCatalogSnapshotId,
     normalizeStoredCatalogSnapshot,
 } from './json-catalog-store.js';
-export { SqliteModelGatewayCatalogStore } from './sqlite-catalog-store.js';
+export { DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION, SqliteModelGatewayCatalogStore } from './sqlite-catalog-store.js';
 export { mergeModelMetadataEvidence, mergeProviderMetadataEvidence, rankCatalogEvidenceConfidence } from './merge.js';
 export {
     OPENAI_MODEL_LIST_OBJECT,
