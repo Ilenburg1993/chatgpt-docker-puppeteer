@@ -138,10 +138,12 @@ function capabilitySupply(candidates, profile) {
 
 /**
  * @param {ReturnType<typeof capabilitySupply>} supply
+ * @param {Record<string, any> | null} profile
  * @returns {string[]}
  */
-function capabilitySupplyWarnings(supply) {
+function capabilitySupplyWarnings(supply, profile) {
     const warnings = [];
+    const preferredWarnings = new Set(stringList(profile?.['supplyWarns']));
     for (const [capability, count] of Object.entries(supply.required)) {
         if (count === 0) warnings.push(`required_supply_zero:${capability}`);
     }
@@ -149,7 +151,7 @@ function capabilitySupplyWarnings(supply) {
         if (count === 0) warnings.push(`soft_supply_zero:${capability}`);
     }
     for (const [capability, count] of Object.entries(supply.preferred)) {
-        if (count === 0) warnings.push(`preferred_supply_zero:${capability}`);
+        if (count === 0 && preferredWarnings.has(capability)) warnings.push(`preferred_supply_zero:${capability}`);
     }
     return warnings;
 }
@@ -259,7 +261,7 @@ export function auditModelGatewayPreRuntimeSelection(snapshot, options = {}) {
             topRejectedReasons: explanation.topRejectedReasons,
             nextActions: explanation.nextActions,
             capabilitySupply: supply,
-            supplyWarnings: capabilitySupplyWarnings(supply),
+            supplyWarnings: capabilitySupplyWarnings(supply, profile),
             decisionLayers: explanation.decisionLayers,
             snapshotContext: route.snapshotContext,
             rejectedReasonCounts: explanation.rejectedReasonCounts,

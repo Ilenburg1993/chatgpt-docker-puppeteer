@@ -1948,6 +1948,50 @@ Validação deste corte:
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.
 
+---
+
+## 61. Continuidade 2026-05-26 — Supply Warnings Sem Ruído De Preferências Derivadas
+
+Auditoria executada neste corte:
+
+- [x] Revisitado o output de readiness após a introdução de
+  `supplyWarnings`.
+- [x] Identificado que preferências como `low_latency`, `large_context` e
+  `runtime_proved` não são necessariamente capabilities booleanas de catálogo.
+- [x] Confirmado que avisos de supply devem ser explícitos por perfil para não
+  transformar preferências derivadas em ruído de bloqueio.
+
+Implementado neste corte:
+
+- [x] `local_private` passa a declarar `supplyWarns` explicitamente.
+- [x] `supplyWarnings` para preferências só é emitido quando a preferência está
+  listada em `profile.supplyWarns`.
+- [x] Warnings de capabilities requeridas e soft-required continuam sempre
+  emitidos quando supply é zero.
+- [x] `repo_agent` deixa de gerar warning para `runtime_proved` apenas por ser
+  preferência.
+- [x] `local_private` mantém warnings fortes para `local`, `privacy` e
+  `no_remote_secrets`.
+
+Separação arquitetural preservada:
+
+- [x] A mudança é apenas de auditoria/seleção pré-runtime.
+- [x] Nenhum provider é chamado.
+- [x] Nenhum modelo é executado.
+- [x] Nenhuma probe runtime é executada.
+- [x] O catálogo canônico não é mutado.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `159` testes.
+- [x] PASS `npm run model-gateway:live:readiness`, agora com
+  `selection_supply_warnings` reduzido para `3` e concentrado em
+  `local_private`.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `npm run model-gateway:test:terminal` com `68` testes.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
 - [x] PASS `npm run test:copilot` com `5663` testes totais, `5630` passed,
   `33` pending, `0` failed e `0` warnings/errors.
 

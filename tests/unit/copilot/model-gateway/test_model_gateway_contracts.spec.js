@@ -371,6 +371,7 @@ describe('model-gateway foundation', () => {
         assert.equal(resolveModelGatewayTaskProfile('repo-agent')?.requireAgentProbeOk, true);
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.requires, ['text', 'streaming']);
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.softRequires, ['vision']);
+        assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.local_private.supplyWarns, ['local', 'privacy', 'no_remote_secrets']);
         assert.equal(MODEL_GATEWAY_TASK_PROFILES.local_private_strict.defaultAudit, false);
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.local_private_strict.requires, [
             'text',
@@ -520,7 +521,7 @@ describe('model-gateway foundation', () => {
         assert.equal(audit.profiles[0].decisionLayers['runtimeProbeProofCount'], 0);
         assert.deepEqual(audit.profiles[0].capabilitySupply.required, { text: 1, streaming: 1, tools: 1 });
         assert.equal(audit.profiles[0].capabilitySupply.preferred.reasoningEffort, 1);
-        assert.equal(audit.profiles[0].supplyWarnings.includes('preferred_supply_zero:runtime_proved'), true);
+        assert.equal(audit.profiles[0].supplyWarnings.includes('preferred_supply_zero:runtime_proved'), false);
 
         const strictAudit = auditModelGatewayPreRuntimeSelection(
             {
