@@ -137,6 +137,12 @@ export {
     withModelGatewayCatalogRefreshLock,
 } from './catalog/index.js';
 export {
+    MODEL_GATEWAY_CANONICAL_COMMANDS,
+    MODEL_GATEWAY_CANONICAL_COMMAND_TRACK,
+    listModelGatewayCanonicalCommands,
+    renderModelGatewayCanonicalCommandLines,
+} from './commands/index.js';
+export {
     MODEL_GATEWAY_SCHEMA_VERSION,
     MODEL_GATEWAY_VERIFICATION_CONFIDENCE,
     buildProviderModelId,

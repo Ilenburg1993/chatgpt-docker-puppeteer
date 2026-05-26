@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listProviderEndpointInventory, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, recommendCatalogDiffProbes, resolveProviderEndpointInventory, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listTerminalSdkSessionInventory, loadDotenv, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -137,6 +137,11 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             };
         }),
         listByokProviderModelHealth: vi.fn(() => []),
+        listModelGatewayCanonicalCommands: vi.fn(() => [
+            { surface: 'package', phase: 'prebuild', command: 'npm run model-gateway:prebuild' },
+            { surface: 'make', phase: 'prebuild', command: 'make model-gateway-prebuild' },
+            { surface: 'terminal', phase: 'orientation', command: '/byok gateway commands' },
+        ]),
         listProviderEndpointInventory: vi.fn(() => [
             {
                 providerId: 'kilo',
@@ -181,6 +186,11 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                 writePolicy: { mode: 'commit', storeAvailable: true, committed: true },
             }),
         ),
+        renderModelGatewayCanonicalCommandLines: vi.fn(() => [
+            'package  prebuild    npm run model-gateway:prebuild :: Run pre-build validators.',
+            'make     prebuild    make model-gateway-prebuild :: Run pre-build validators.',
+            'terminal orientation /byok gateway commands :: Show commands.',
+        ]),
         routeGatewayModels: vi.fn(),
         runConfiguredByokAgentProbe: vi.fn(),
         runConfiguredByokChatProbe: vi.fn(),
@@ -279,6 +289,7 @@ vi.mock('#copilot/model-gateway', () => ({
     flushByokProviderHealth,
     JsonModelGatewayCatalogStore,
     listByokProviderModelHealth,
+    listModelGatewayCanonicalCommands,
     listProviderEndpointInventory,
     readByokProviderHealthState,
     readByokProviderModelHealth,
@@ -290,6 +301,7 @@ vi.mock('#copilot/model-gateway', () => ({
     recordModelGatewayRouteDecision,
     refreshModelGatewayCatalog,
     recommendCatalogDiffProbes,
+    renderModelGatewayCanonicalCommandLines,
     resolveProviderEndpointInventory,
     routeGatewayModels,
     runConfiguredByokChatProbe: runConfiguredByokChatProbe,
@@ -374,6 +386,12 @@ describe('terminal /byok command', () => {
         JsonModelGatewayCatalogStore.mockClear();
         listByokProviderModelHealth.mockReset();
         listByokProviderModelHealth.mockReturnValue([]);
+        listModelGatewayCanonicalCommands.mockReset();
+        listModelGatewayCanonicalCommands.mockReturnValue([
+            { surface: 'package', phase: 'prebuild', command: 'npm run model-gateway:prebuild' },
+            { surface: 'make', phase: 'prebuild', command: 'make model-gateway-prebuild' },
+            { surface: 'terminal', phase: 'orientation', command: '/byok gateway commands' },
+        ]);
         listProviderEndpointInventory.mockReset();
         listProviderEndpointInventory.mockReturnValue([
             {
@@ -437,6 +455,12 @@ describe('terminal /byok command', () => {
         buildRouteDecisionEvent.mockClear();
         recordModelGatewayRouteDecision.mockClear();
         buildProbeCompletedEvent.mockClear();
+        renderModelGatewayCanonicalCommandLines.mockReset();
+        renderModelGatewayCanonicalCommandLines.mockReturnValue([
+            'package  prebuild    npm run model-gateway:prebuild :: Run pre-build validators.',
+            'make     prebuild    make model-gateway-prebuild :: Run pre-build validators.',
+            'terminal orientation /byok gateway commands :: Show commands.',
+        ]);
         runConfiguredByokChatProbe.mockReset();
         runConfiguredByokAgentProbe.mockReset();
         runConfiguredByokJsonProbe.mockReset();
@@ -1345,6 +1369,21 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('checks=2/2');
         expect(ctx.output()).toContain('sdk_provider_config_boundary');
         expect(ctx.output()).toContain('route_trace_attributes_are_stable');
+    });
+
+    it('mostra comandos canônicos do model-gateway para package, make e terminal', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway commands');
+
+        expect(listModelGatewayCanonicalCommands).toHaveBeenCalledWith({ surface: undefined, phase: undefined });
+        expect(renderModelGatewayCanonicalCommandLines).toHaveBeenCalledWith({ surface: undefined, phase: undefined });
+        expect(ctx.output()).toContain('BYOK model-gateway canonical commands');
+        expect(ctx.output()).toContain('track=Y');
+        expect(ctx.output()).toContain('npm run model-gateway:prebuild');
+        expect(ctx.output()).toContain('make model-gateway-prebuild');
+        expect(ctx.output()).toContain('/byok gateway commands');
     });
 
     it('executa refresh do catálogo model-gateway com saída OpenAI-compatible resumida', async () => {

@@ -1616,6 +1616,19 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [ ] Atualizar roadmap a cada transformação estrutural.
 - [ ] Manter checklist boolean.
 
+### Faixa Y — Comandos Canônicos E Pre-Build
+
+- [x] Inventário canônico como dados em `src/copilot/model-gateway`.
+- [x] Helper CLI em `scripts/model-gateway-canonical-commands.mjs`.
+- [x] Scripts package `model-gateway:*`.
+- [x] Targets Makefile `model-gateway-*`.
+- [x] Terminal `/byok gateway commands`.
+- [x] Comando canônico JSON para LLMs.
+- [x] Sequência `model-gateway:prebuild` antes do primeiro build.
+- [x] Testes unitários do inventário.
+- [ ] Primeiro build real usando apenas comandos canônicos.
+- [ ] Registrar resultado do primeiro build no guia.
+
 ---
 
 ## 12. Ordem Recomendada De Execução Agora
@@ -2929,4 +2942,52 @@ Separação preservada:
 
 Validação deste corte:
 
+- [x] PASS `git diff --check`.
+
+---
+
+## 48. Continuidade 2026-05-26 — Faixa Y De Comandos Canônicos Pre-Build
+
+Auditoria executada neste corte:
+
+- [x] Revisado `package.json` para identificar scripts existentes de lint,
+  typecheck, testes Copilot, terminal llm-b e build.
+- [x] Revisado `Makefile` para identificar a superfície humana de operação.
+- [x] Revisado terminal BYOK para mapear comandos de catálogo, routes,
+  overlays, eligibility e seleção.
+- [x] Confirmado que o primeiro build ainda não deve ser promovido antes de
+  consolidar a superfície canônica.
+
+Implementado neste corte:
+
+- [x] Criada a Faixa Y — Comandos Canônicos E Pre-Build.
+- [x] Criado `src/copilot/model-gateway/commands/canonical-commands.js`.
+- [x] Criado barrel `src/copilot/model-gateway/commands/index.js`.
+- [x] Exportado inventário pelo barrel principal `model-gateway`.
+- [x] Criado helper CLI `scripts/model-gateway-canonical-commands.mjs`.
+- [x] Adicionados scripts `model-gateway:commands` e
+  `model-gateway:commands:json`.
+- [x] Adicionados scripts canônicos de lint, typecheck, testes, validate e
+  prebuild.
+- [x] Adicionados targets Makefile `model-gateway-*`.
+- [x] Adicionado comando terminal `/byok gateway commands`.
+- [x] Adicionados testes unitários do inventário e do comando terminal.
+
+Separação preservada:
+
+- [x] `model-gateway:prebuild` ainda não executa build.
+- [x] Comandos canônicos explicam a preparação antes do primeiro build.
+- [x] A mesma fonte de dados alimenta package/helper/terminal.
+- [x] Nenhum provider é chamado.
+- [x] Nenhum runtime probe é executado.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:commands`.
+- [x] PASS `npm run model-gateway:commands:json`.
+- [x] PASS `make model-gateway-commands`.
+- [x] PASS `npm run model-gateway:test:contracts` com `117` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `55` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.

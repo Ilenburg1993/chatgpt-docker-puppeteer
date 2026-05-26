@@ -214,6 +214,12 @@ help:
 	@echo "  $(CYAN)make lsp-health$(NC)        Diagnóstico funcional LSP via MCP"
 	@echo "  $(CYAN)make semantic-preflight$(NC) Preflight PM2+MCP+RAG+LSP"
 	@echo ""
+	@echo "$(MAGENTA)$(BOLD)🤖 Model Gateway BYOK:$(NC)"
+	@echo "  $(CYAN)make model-gateway-commands$(NC)  Inventário canônico package/make/terminal"
+	@echo "  $(CYAN)make model-gateway-validate$(NC)  Lint + typecheck strict + testes escopados"
+	@echo "  $(CYAN)make model-gateway-prebuild$(NC)  Sequência canônica antes do primeiro build"
+	@echo "  $(CYAN)make model-gateway-terminal$(NC)  Abrir terminal llm-b para comandos /byok"
+	@echo ""
 	@echo "$(CYAN)$(BOLD)🌐 GitHub/Copilot Network:$(NC)"
 	@echo "  $(CYAN)make network-status$(NC)       Snapshots passivos de DNS/rota/manager/proxy/advisor"
 	@echo "  $(CYAN)make network-summary$(NC)      Exibir summaries/recommendations atuais"
@@ -1365,6 +1371,42 @@ rag-rebuild-code-config-strict:
 		--include-glob "**/*.yml" --include-glob "**/*.yaml" \
 		--include-glob "**/*.sh" --include-glob "**/*.ps1" \
 		--include-glob "**/Dockerfile" --include-glob "**/Makefile"
+
+# =============================================================================
+# MODEL GATEWAY BYOK — COMANDOS CANÔNICOS PRE-BUILD
+# =============================================================================
+
+.PHONY: model-gateway-help model-gateway-commands model-gateway-commands-json model-gateway-lint model-gateway-typecheck model-gateway-test-contracts model-gateway-test-terminal model-gateway-validate model-gateway-prebuild model-gateway-terminal
+
+model-gateway-help: model-gateway-commands
+
+model-gateway-commands:
+	@$(NPM) run model-gateway:commands
+
+model-gateway-commands-json:
+	@$(NPM) run model-gateway:commands:json
+
+model-gateway-lint:
+	@$(NPM) run model-gateway:lint
+
+model-gateway-typecheck:
+	@$(NPM) run model-gateway:typecheck
+
+model-gateway-test-contracts:
+	@$(NPM) run model-gateway:test:contracts
+
+model-gateway-test-terminal:
+	@$(NPM) run model-gateway:test:terminal
+
+model-gateway-validate:
+	@$(NPM) run model-gateway:validate
+
+model-gateway-prebuild:
+	@$(NPM) run model-gateway:prebuild
+
+model-gateway-terminal:
+	@echo "$(CYAN)Abra o cockpit e use: /byok gateway commands$(NC)"
+	@$(NPM) run terminal:llm-b
 
 # =============================================================================
 # 🔟 FORMATAÇÃO & LINT

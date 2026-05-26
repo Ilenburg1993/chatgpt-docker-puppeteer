@@ -13,6 +13,7 @@ import {
     JsonModelGatewayRegistryStore,
     listProviderEndpointInventory,
     listProviderEndpointSourceRecords,
+    listModelGatewayCanonicalCommands,
     listModelGatewayTaskProfiles,
     ModelGatewayRegistry,
     MODEL_GATEWAY_TASK_PROFILES,
@@ -51,6 +52,7 @@ import {
     projectEligibilityEvaluatedMetrics,
     projectModelGatewayMetadataCoverageMetrics,
     projectModelGatewayProviderFreshnessMetrics,
+    renderModelGatewayCanonicalCommandLines,
     redactSecretRecord,
     redactSecretText,
     recordByokProviderModelAgentProbeSuccess,
@@ -1151,6 +1153,19 @@ describe('model-gateway foundation', () => {
         assert.ok(report.checks.every((check) => typeof check.passed === 'boolean'));
         assert.ok(report.checks.some((check) => check.id === 'sdk_provider_config_boundary'));
         assert.ok(report.checks.some((check) => check.id === 'route_trace_attributes_are_stable'));
+    });
+
+    it('publishes a canonical model-gateway command inventory for operators and LLMs', () => {
+        const commands = listModelGatewayCanonicalCommands();
+        const packageCommands = listModelGatewayCanonicalCommands({ surface: 'package' });
+        const terminalLines = renderModelGatewayCanonicalCommandLines({ surface: 'terminal' });
+
+        assert.ok(commands.length >= 20);
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:prebuild'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
+        assert.ok(commands.some((entry) => entry.command === '/byok gateway commands'));
+        assert.ok(commands.every((entry) => ['orientation', 'metadata', 'pre-runtime', 'selection', 'validate', 'prebuild'].includes(entry.phase)));
+        assert.ok(terminalLines.some((line) => line.includes('/byok gateway catalog refresh')));
     });
 
     it('creates secret-safe universal catalog evidence contracts', () => {

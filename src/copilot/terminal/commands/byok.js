@@ -32,6 +32,7 @@ import {
     flushByokProviderHealth,
     JsonModelGatewayCatalogStore,
     listByokProviderModelHealth,
+    listModelGatewayCanonicalCommands,
     listProviderEndpointInventory,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     mirrorByokProviderHealthToSqlite,
@@ -46,6 +47,7 @@ import {
     recordModelGatewayRouteDecision,
     refreshModelGatewayCatalog,
     resolveProviderEndpointInventory,
+    renderModelGatewayCanonicalCommandLines,
     routeGatewayModels,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
@@ -1733,6 +1735,27 @@ function renderByokGatewayPreKGate(println) {
 
 /**
  * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {void}
+ */
+function renderByokGatewayCanonicalCommands(println, rest) {
+    const surface = rest.find((item) => /^(package|make|terminal)$/iu.test(item))?.toLowerCase();
+    const phase = rest.find((item) => /^(orientation|metadata|pre-runtime|selection|validate|prebuild)$/iu.test(item))?.toLowerCase();
+    const commands = listModelGatewayCanonicalCommands({ surface, phase });
+    println(`\n  \x1b[36mBYOK model-gateway canonical commands\x1b[0m`);
+    println(
+        `  \x1b[90mtrack=Y · scope=package+make+terminal · build=preparacao · surface=${surface ?? '-'} · phase=${phase ?? '-'} · commands=${commands.length}\x1b[0m\n`,
+    );
+    for (const line of renderModelGatewayCanonicalCommandLines({ surface, phase })) {
+        const [head, summary] = line.split(' :: ');
+        println(`    \x1b[33m${head}\x1b[0m`);
+        if (summary) println(`      \x1b[90m${summary}\x1b[0m`);
+    }
+    println('\n  \x1b[90mPrimeiro build futuro deve partir de npm run model-gateway:prebuild ou make model-gateway-prebuild.\x1b[0m\n');
+}
+
+/**
+ * @param {(text: string) => void} println
  * @param {ByokCommandContext['eventBus']} [eventBus]
  * @param {string | null} [selector]
  * @returns {Promise<void>}
@@ -2844,6 +2867,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
     }
 
     if (sub === 'gateway' || sub === 'gate' || sub === 'migration') {
+        if (/^(commands|command|comandos|canonical|canonico|canônico|help|ajuda)$/iu.test(rest[0] ?? '')) {
+            renderByokGatewayCanonicalCommands(println, rest.slice(1));
+            return;
+        }
         if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(refresh|reload|sync|atualizar)$/iu.test(rest[1] ?? '')) {
             await renderByokGatewayCatalogRefresh(println, eventBus, rest[2] ?? null);
             return;
