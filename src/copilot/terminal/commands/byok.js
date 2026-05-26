@@ -1761,7 +1761,19 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
     }
     try {
         eventBus?.emit?.(buildCatalogRefreshStartedEvent(refreshContext));
-        const result = await refreshModelGatewayCatalog({ store, importers });
+        const result = await refreshModelGatewayCatalog({
+            store,
+            importers,
+            incremental: true,
+            refreshAccountOverlays: true,
+            writePolicy: 'commit',
+            retentionPolicy: {
+                maxImportRuns: 200,
+                maxRawPayloadRefs: 200,
+                maxConflicts: 500,
+                maxModelEligibilityRuns: 100,
+            },
+        });
         const refreshEvents = buildCatalogRefreshEventBatch({
             ...refreshContext,
             snapshot: result.snapshot,
@@ -1774,6 +1786,9 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
         );
         println(
             `    \x1b[90mdiff: added=${result.diff.added.length} · removed=${result.diff.removed.length} · changed=${result.diff.changed.length}\x1b[0m`,
+        );
+        println(
+            `    \x1b[90mwrite=${result.writePolicy.mode} · committed=${result.writePolicy.committed ? 'sim' : 'nao'} · overlays=${result.overlayRefresh.total} · retained-runs=${result.retention.importRuns.after}\x1b[0m`,
         );
         if (refreshEvents.completedEvent.changedKinds.length > 0) {
             println(`    \x1b[90mdiff kinds: ${refreshEvents.completedEvent.changedKinds.join(',')}\x1b[0m`);

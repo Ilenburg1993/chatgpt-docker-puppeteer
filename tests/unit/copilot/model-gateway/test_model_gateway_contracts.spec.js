@@ -4813,6 +4813,7 @@ describe('model-gateway foundation', () => {
             });
             const result = await refreshModelGatewayCatalog({
                 store,
+                writePolicy: 'commit',
                 now: () => new Date('2026-05-25T12:30:00.000Z'),
                 importers: [
                     {
@@ -4850,10 +4851,70 @@ describe('model-gateway foundation', () => {
                 ['local-model', 'new-model'],
             );
             assert.equal(result.openai.data.find((entry) => entry.id === 'new-model')?.object, 'model');
+            assert.deepEqual(result.writePolicy, { mode: 'commit', storeAvailable: true, committed: true });
             const refreshRun = stored.importRuns.find((run) => run.providerId === 'model-gateway' && run.sourceId === 'catalog-refresh');
             assert.equal(refreshRun?.status, 'completed');
             assert.deepEqual(refreshRun?.diff?.added, ['openrouter:new-model:default']);
             assert.deepEqual(refreshRun?.diff?.removed, ['openrouter:old-model:default']);
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('previews catalog refreshes by default and requires explicit commit policy to write the active store', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-model-refresh-preview-'));
+        try {
+            const filePath = join(dir, 'catalog.json');
+            const store = new JsonModelGatewayCatalogStore({ filePath });
+            await store.writeSnapshot({
+                source: 'previous',
+                evidences: [
+                    createModelMetadataEvidence({
+                        evidenceId: 'previous-model',
+                        providerId: 'openrouter',
+                        providerModel: 'previous-model',
+                        fieldPath: 'displayName',
+                        value: 'Previous Model',
+                        sourceId: 'operator',
+                        confidence: 'manual',
+                    }),
+                ],
+                projections: [createCanonicalModelProjection({ providerId: 'openrouter', providerModel: 'previous-model' })],
+            });
+
+            const preview = await refreshModelGatewayCatalog({
+                store,
+                now: () => new Date('2026-05-25T12:30:00.000Z'),
+                importers: [
+                    {
+                        id: 'openrouter-models',
+                        providerId: 'openrouter',
+                        sourceKind: 'public_api',
+                        requiresAuth: false,
+                        fetchRaw: () => ({ data: [{ id: 'preview-model', name: 'Preview Model' }] }),
+                        parseRows: (raw) => /** @type {{ data: unknown[] }} */ (raw).data,
+                        toEvidenceFacts: (rows, context) =>
+                            rows.map((row) =>
+                                createModelMetadataEvidence({
+                                    evidenceId: 'preview-model-evidence',
+                                    providerId: 'openrouter',
+                                    providerModel: /** @type {{ id: string }} */ (row).id,
+                                    fieldPath: 'displayName',
+                                    value: /** @type {{ name: string }} */ (row).name,
+                                    sourceId: /** @type {{ id: string }} */ (context.source).id,
+                                    confidence: 'catalog',
+                                    rawPayloadRef: context.rawPayloadRef,
+                                }),
+                            ),
+                    },
+                ],
+            });
+            const stored = await store.readSnapshot();
+
+            assert.deepEqual(preview.writePolicy, { mode: 'preview', storeAvailable: true, committed: false });
+            assert.equal(preview.snapshot.projections.some((projection) => projection.providerModel === 'preview-model'), true);
+            assert.equal(stored.projections.some((projection) => projection.providerModel === 'preview-model'), false);
+            assert.equal(stored.projections.some((projection) => projection.providerModel === 'previous-model'), true);
         } finally {
             await rm(dir, { recursive: true, force: true });
         }

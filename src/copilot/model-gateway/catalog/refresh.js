@@ -146,6 +146,7 @@ function buildProviderProjectionsFromEvidence(evidences) {
  * @param {string[]} [input.sourceIds]
  * @param {boolean} [input.refreshAccountOverlays]
  * @param {import('./retention.js').ModelGatewayCatalogRetentionPolicy} [input.retentionPolicy]
+ * @param {string} [input.writePolicy]
  * @returns {Promise<{
  *     snapshot: ReturnType<typeof normalizeStoredCatalogSnapshot>;
  *     diff: ReturnType<typeof diffCanonicalModelProjections>;
@@ -153,11 +154,13 @@ function buildProviderProjectionsFromEvidence(evidences) {
  *     refreshPlan?: ReturnType<typeof planModelGatewayCatalogRefresh>;
  *     overlayRefresh: { enabled: boolean; imported: number; retained: number; total: number };
  *     retention: ReturnType<typeof applyModelGatewayCatalogRetention>['summary'];
+ *     writePolicy: { mode: string; storeAvailable: boolean; committed: boolean };
  * }>}
  */
 export async function refreshModelGatewayCatalog(input = {}) {
     const now = input.now ?? (() => new Date());
     const startedAt = now();
+    const writePolicy = input.writePolicy === 'commit' ? 'commit' : 'preview';
     const previous = input.store ? await input.store.readSnapshot() : normalizeStoredCatalogSnapshot(input.snapshot);
     const refreshPlan = input.incremental === true
         ? planModelGatewayCatalogRefresh({
@@ -226,7 +229,7 @@ export async function refreshModelGatewayCatalog(input = {}) {
     };
     const retained = applyModelGatewayCatalogRetention(nextSnapshot, input.retentionPolicy);
     const snapshot = retained.snapshot;
-    if (input.store) await input.store.writeSnapshot(snapshot);
+    if (input.store && writePolicy === 'commit') await input.store.writeSnapshot(snapshot);
     const output = {
         snapshot: normalizeStoredCatalogSnapshot(snapshot),
         diff,
@@ -241,6 +244,11 @@ export async function refreshModelGatewayCatalog(input = {}) {
             total: accountOverlays.length,
         },
         retention: retained.summary,
+        writePolicy: {
+            mode: writePolicy,
+            storeAvailable: Boolean(input.store),
+            committed: Boolean(input.store && writePolicy === 'commit'),
+        },
     };
     if (refreshPlan) return { ...output, refreshPlan };
     return output;

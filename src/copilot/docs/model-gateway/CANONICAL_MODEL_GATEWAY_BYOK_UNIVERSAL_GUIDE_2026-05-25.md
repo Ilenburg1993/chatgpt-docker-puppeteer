@@ -1488,7 +1488,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Refresh overlay separado de refresh público.
 - [ ] Lock de refresh.
 - [x] Retention policy.
-- [ ] No automatic active swap sem policy.
+- [x] No automatic active swap sem policy.
 
 ### Faixa P — UX De Catálogo
 
@@ -2711,4 +2711,50 @@ Validação deste corte:
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em refresh, retention, barrels e contrato
   unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 43. Continuidade 2026-05-26 — Active Swap Explícito Por Write Policy
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que `refreshModelGatewayCatalog({ store })` gravava o
+  snapshot ativo automaticamente.
+- [x] Confirmado que o terminal `/byok gateway catalog refresh` é o principal
+  consumidor que deve optar por persistência ativa.
+- [x] Confirmado que previews de refresh são necessários para diff,
+  observabilidade e seleção pré-runtime sem mutar o store.
+
+Implementado neste corte:
+
+- [x] `refreshModelGatewayCatalog()` passa a aceitar `writePolicy`.
+- [x] O modo default passa a ser `preview`.
+- [x] Escrita no store só ocorre com `writePolicy: "commit"`.
+- [x] O resultado passa a expor `writePolicy.mode`,
+  `writePolicy.storeAvailable` e `writePolicy.committed`.
+- [x] O terminal BYOK passa `writePolicy: "commit"` explicitamente.
+- [x] O terminal BYOK também torna explícitos `incremental: true`,
+  `refreshAccountOverlays: true` e `retentionPolicy`.
+- [x] A UX do terminal mostra write mode, commit, overlays e runs retidos.
+- [x] Adicionado teste garantindo que preview não escreve no store ativo.
+- [x] Atualizado teste do terminal para exigir a policy explícita.
+
+Separação preservada:
+
+- [x] Preview de refresh calcula snapshot/diff sem mutar arquivo ativo.
+- [x] Commit de refresh exige opção explícita.
+- [x] O terminal continua podendo atualizar o catálogo ativo, mas agora com
+  intenção declarada.
+- [x] Nenhuma etapa runtime/probe é executada.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `114` testes.
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  com `54` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em refresh, retention, terminal BYOK, barrels e
+  contratos unitários.
 - [x] PASS `git diff --check`.
