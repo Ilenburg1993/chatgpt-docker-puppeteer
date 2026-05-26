@@ -160,6 +160,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Commit the full metadata catalog build, mirror it to SQLite and apply operational retention.',
     },
     {
+        id: 'catalog.integrity',
+        phase: 'metadata',
+        surface: 'package',
+        command: 'npm run model-gateway:catalog:integrity',
+        summary: 'Audit the persisted JSON catalog for duplicate keys and redacted identities without refresh.',
+    },
+    {
         id: 'make.commands',
         phase: 'orientation',
         surface: 'make',
@@ -265,6 +272,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Makefile commit path for the metadata database build.',
     },
     {
+        id: 'make.catalog-integrity',
+        phase: 'metadata',
+        surface: 'make',
+        command: 'make model-gateway-catalog-integrity',
+        summary: 'Makefile alias for catalog integrity audit without refresh.',
+    },
+    {
         id: 'terminal.commands',
         phase: 'orientation',
         surface: 'terminal',
@@ -312,6 +326,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok gateway catalog freshness',
         summary: 'Inspect source freshness and TTL state without network.',
+    },
+    {
+        id: 'terminal.integrity',
+        phase: 'metadata',
+        surface: 'terminal',
+        command: '/byok gateway catalog integrity',
+        summary: 'Audit duplicate catalog keys and redacted identities from the terminal cockpit.',
     },
     {
         id: 'terminal.provider-traits',

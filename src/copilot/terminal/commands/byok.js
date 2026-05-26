@@ -22,6 +22,7 @@ import {
     buildRouteDecisionEvent,
     buildProbeCompletedEvent,
     auditCatalogImporterSet,
+    auditModelGatewayCatalogSnapshotIntegrity,
     classifyByokProviderFailure,
     clearByokProviderModelHealth,
     createDefaultModelGatewayCatalogImporters,
@@ -1655,7 +1656,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -2315,6 +2316,30 @@ async function renderByokGatewayCatalogDiff(println) {
             println(`      \x1b[90m? ${recommendation.key}: ${recommendation.probeKinds.join(',')} · ${recommendation.reasons.slice(0, 4).join(',')}\x1b[0m`);
             println(`        \x1b[90m${recommendation.commands[0]}\x1b[0m`);
         }
+    }
+    println('');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayCatalogIntegrity(println) {
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const snapshot = await store.readSnapshot();
+    const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
+    println(`\n  \x1b[36mBYOK model-gateway catalog integrity\x1b[0m`);
+    println(
+        `  \x1b[90mstore=${store.filePath} · ok=${integrity.ok ? 'sim' : 'nao'} · redactedIdentities=${integrity.redactedIdentityCount} · sem rede\x1b[0m\n`,
+    );
+    for (const [field, check] of Object.entries(integrity.duplicateChecks)) {
+        const color = check.duplicateExtraRowCount === 0 ? '\x1b[32m' : '\x1b[31m';
+        println(
+            `    ${color}${field}\x1b[0m \x1b[90mrows=${check.rowCount} · unique=${check.uniqueKeyCount} · duplicateKeys=${check.duplicateKeyCount} · extra=${check.duplicateExtraRowCount}\x1b[0m`,
+        );
+    }
+    for (const sample of integrity.redactedIdentitySamples.slice(0, 8)) {
+        println(`      \x1b[31mredacted\x1b[0m \x1b[90m${sample.field}: ${sample.id ?? sample.providerModel ?? sample.providerId ?? '-'}\x1b[0m`);
     }
     println('');
 }
@@ -3365,6 +3390,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         }
         if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(freshness|fresh|fontes|sources)$/iu.test(rest[1] ?? '')) {
             await renderByokGatewayCatalogFreshness(println, rest.slice(2));
+            return;
+        }
+        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(integrity|integridade|audit|auditoria)$/iu.test(rest[1] ?? '')) {
+            await renderByokGatewayCatalogIntegrity(println);
             return;
         }
         if (

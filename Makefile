@@ -1417,6 +1417,9 @@ model-gateway-metadata-build-plan:
 model-gateway-metadata-build-preview:
 	@$(NPM) run model-gateway:metadata:build:preview
 
+model-gateway-catalog-integrity:
+	@$(NPM) run model-gateway:catalog:integrity
+
 model-gateway-refresh:
 	@$(NPM) run model-gateway:refresh
 

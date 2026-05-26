@@ -4780,6 +4780,69 @@ Próximas lacunas:
 
 ---
 
+## 69. Continuidade 2026-05-26 — Auditor De Integridade Do Snapshot
+
+Auditoria executada neste corte:
+
+- [x] A falha de paridade do primeiro build provou que count parity no SQLite
+  é tarde demais para detectar corrupção no JSON store.
+- [x] Confirmado que precisamos de um gate anterior ao mirror SQLite, no mesmo
+  comando canônico de build do banco.
+- [x] Confirmado que os primeiros invariantes essenciais são: chaves
+  canônicas únicas, nenhum `providerModel`/`evidenceId` redigido e nenhuma
+  colisão de route/projection/account overlay.
+
+Implementado neste corte:
+
+- [x] Criado `catalog/integrity.js`.
+- [x] Criado `auditModelGatewayCatalogSnapshotIntegrity()`.
+- [x] O auditor verifica duplicatas em model evidences, provider evidences,
+  route options, model projections, provider projections e account overlays.
+- [x] O auditor detecta identidades com `[redacted]` em campos estruturais como
+  `evidenceId`, `providerId`, `providerModel`, `selectorSyntax` e
+  `accountOverlayId`.
+- [x] `scripts/model-gateway-metadata-build.mjs` passa a incluir `integrity` no
+  summary final.
+- [x] `ok` do build passa a exigir `integrity.ok=true`, além de paridade SQLite
+  e ausência de falhas bloqueantes de importer.
+- [x] Barrels `catalog` e `model-gateway` exportam o auditor.
+- [x] Teste unitário cobre snapshot saudável e snapshot corrompido com chaves
+  duplicadas/redigidas.
+- [x] Criado `scripts/model-gateway-catalog-integrity.mjs`.
+- [x] Adicionado comando package `model-gateway:catalog:integrity`.
+- [x] Adicionado alias Makefile `make model-gateway-catalog-integrity`.
+- [x] Inventário canônico inclui package, make e terminal para auditoria de
+  integridade.
+- [x] Terminal `/byok gateway catalog integrity` mostra duplicatas e identidades
+  redigidas sem rede.
+
+Resultado sobre o banco recém-criado:
+
+- [x] Auditoria local do snapshot persistido: `ok=true`.
+- [x] `evidences`: `34706` linhas e `34706` chaves únicas.
+- [x] `routeOptions`: `1826` linhas e `1826` chaves únicas.
+- [x] `projections`: `1312` linhas e `1312` chaves únicas.
+- [x] `accountOverlays`: `14` linhas e `14` chaves únicas.
+- [x] `redactedIdentityCount=0`.
+
+Validação parcial deste corte:
+
+- [x] PASS `node --check src/copilot/model-gateway/catalog/integrity.js`.
+- [x] PASS `node --check scripts/model-gateway-metadata-build.mjs`.
+- [x] PASS focused Vitest `snapshot integrity|provider model identifiers`.
+- [x] PASS `node scripts/model-gateway-metadata-build.mjs --plan --all --force --json`.
+- [x] PASS `node scripts/model-gateway-catalog-integrity.mjs --json`.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `npm run model-gateway:test:terminal`.
+
+Próximas lacunas:
+
+- [ ] Considerar thresholds por severidade quando passarmos a aceitar fontes
+  experimentais parcialmente duplicadas em staging.
+
+---
+
 ## 54. Continuidade 2026-05-26 — Policy Engine Por Snapshot Completo
 
 Auditoria executada neste corte:

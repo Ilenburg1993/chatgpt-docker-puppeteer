@@ -95,6 +95,7 @@ export {
     DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION,
     applyModelGatewayCatalogRetention,
     auditCatalogImporterSet,
+    auditModelGatewayCatalogSnapshotIntegrity,
     classifyModelGatewayCatalogImporterFailure,
     createCatalogModelTombstones,
     createCanonicalModelProjection,

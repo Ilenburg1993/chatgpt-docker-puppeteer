@@ -423,6 +423,7 @@
     "model-gateway:metadata:build": "node scripts/model-gateway-metadata-build.mjs --commit --all --force",
     "model-gateway:metadata:build:plan": "node scripts/model-gateway-metadata-build.mjs --plan --all --force --json",
     "model-gateway:metadata:build:preview": "node scripts/model-gateway-metadata-build.mjs --preview --all --force",
+    "model-gateway:catalog:integrity": "node scripts/model-gateway-catalog-integrity.mjs --json",
     "model-gateway:prebuild": "npm run model-gateway:commands && npm run model-gateway:validate",
     "model-gateway:refresh": "node scripts/model-gateway-refresh.mjs --commit",
     "model-gateway:refresh:log": "node scripts/model-gateway-refresh-log.mjs",

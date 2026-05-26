@@ -198,6 +198,7 @@ import {
     planCostBoundedCatalogProbes,
     planModelGatewayProbeBackoff,
     applyModelGatewayCatalogRetention,
+    auditModelGatewayCatalogSnapshotIntegrity,
     isModelGatewayCatalogRefreshLocked,
     resolveModelDeprecationAlias,
 } from '../../../../src/copilot/model-gateway/index.js';
@@ -3192,6 +3193,53 @@ describe('model-gateway foundation', () => {
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
+    });
+
+    it('audits catalog snapshot integrity before SQLite materialization', () => {
+        const healthy = auditModelGatewayCatalogSnapshotIntegrity({
+            schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+            evidences: [
+                createModelMetadataEvidence({
+                    evidenceId: 'openrouter:model-a:displayName',
+                    providerId: 'openrouter',
+                    providerModel: 'model-a',
+                    fieldPath: 'displayName',
+                    value: 'Model A',
+                    sourceId: 'openrouter-models',
+                }),
+            ],
+            routeOptions: [
+                createModelRouteOption({
+                    providerId: 'openrouter',
+                    providerModel: 'model-a',
+                    selectorKind: 'exact_model',
+                    selectorSyntax: 'model-a',
+                }),
+            ],
+            projections: [
+                createCanonicalModelProjection({
+                    providerId: 'openrouter',
+                    providerModel: 'model-a',
+                    displayName: 'Model A',
+                }),
+            ],
+        });
+        const corrupted = auditModelGatewayCatalogSnapshotIntegrity({
+            schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
+            evidences: [
+                { evidenceId: 'cloudflare:@[redacted]:displayName', providerId: 'cloudflare-workers-ai', providerModel: '@[redacted]', fieldPath: 'displayName' },
+                { evidenceId: 'cloudflare:@[redacted]:displayName', providerId: 'cloudflare-workers-ai', providerModel: '@[redacted]', fieldPath: 'displayName' },
+            ],
+            projections: [
+                { providerId: 'cloudflare-workers-ai', providerModel: '@[redacted]' },
+                { providerId: 'cloudflare-workers-ai', providerModel: '@[redacted]' },
+            ],
+        });
+
+        assert.equal(healthy.ok, true);
+        assert.equal(corrupted.ok, false);
+        assert.equal(corrupted.duplicateChecks.evidences.duplicateExtraRowCount, 1);
+        assert.ok(corrupted.redactedIdentityCount > 0);
     });
 
     it('records account/local failure overlays without turning them into runtime proof', async () => {

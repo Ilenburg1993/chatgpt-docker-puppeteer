@@ -7,6 +7,7 @@ import {
     createDefaultModelGatewayCatalogImporters,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
+    auditModelGatewayCatalogSnapshotIntegrity,
     classifyModelGatewayCatalogImporterFailure,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     planModelGatewayCatalogRefresh,
@@ -185,6 +186,7 @@ const result = await refreshModelGatewayCatalog({
     },
     onProgress: recordProgress,
 });
+const integrity = auditModelGatewayCatalogSnapshotIntegrity(result.snapshot);
 
 /** @type {Awaited<ReturnType<typeof mirrorModelGatewayCatalogSnapshotToSqlite>> | null} */
 let mirrored = null;
@@ -250,7 +252,7 @@ const optionalImporterFailures = importerFailures.filter((failure) => failure.di
 const sqliteParityOk = result.writePolicy.committed ? Boolean(mirrored?.parity.ok) : true;
 const summary = {
     schema: 'model-gateway-metadata-build-summary',
-    ok: sqliteParityOk && blockingImporterFailures.length === 0,
+    ok: sqliteParityOk && integrity.ok && blockingImporterFailures.length === 0,
     logPath,
     storePath: jsonStore.filePath,
     mode: incremental ? 'incremental' : 'full',
@@ -261,6 +263,7 @@ const summary = {
     nonBlockingImporterFailures,
     accountImporterFailures,
     optionalImporterFailures,
+    integrity,
     importers: importers.map((importer) => importer.id),
     selected: result.refreshPlan?.selected.map((item) => item.sourceId) ?? importers.map((importer) => importer.id),
     skipped: result.refreshPlan?.skipped.map((item) => item.sourceId) ?? [],

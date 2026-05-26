@@ -22,6 +22,7 @@ export {
     MODEL_GATEWAY_CATALOG_IMPORTER_FAILURE_DISPOSITION,
     classifyModelGatewayCatalogImporterFailure,
 } from './importer-failures.js';
+export { auditModelGatewayCatalogSnapshotIntegrity } from './integrity.js';
 export {
     projectModelGatewayMetadataCoverageMetrics,
     projectModelGatewayProviderFreshnessMetrics,
