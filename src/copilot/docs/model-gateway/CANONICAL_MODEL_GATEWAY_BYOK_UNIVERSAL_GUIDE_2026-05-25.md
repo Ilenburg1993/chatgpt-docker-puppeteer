@@ -508,7 +508,7 @@ Se a tarefa não exige imagem, vision é no máximo bônus ou superfície a vali
 - [x] Inventário de endpoints por provider.
 - [x] Pre-K gate.
 - [x] Cockpit de modelos/provedores anterior.
-- [ ] UX dedicada de account overlays.
+- [x] UX dedicada de account overlays.
 - [x] UX inicial de eligibility decisions via `/byok gateway eligibility`.
 - [x] UX de explicação por modelo juntando catálogo, overlay, eligibility e
   probes.
@@ -525,7 +525,7 @@ Se a tarefa não exige imagem, vision é no máximo bônus ou superfície a vali
 - [x] Eventos sem prompt content.
 - [x] Eventos iniciais de eligibility.
 - [x] Métricas iniciais de exclusão pré-runtime.
-- [ ] Métricas de cobertura de metadados por provider.
+- [x] Métricas de cobertura de metadados por provider.
 
 ### 5.12 Testes
 
@@ -1360,7 +1360,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Vision soft preference.
 - [x] Runtime proved preference.
 - [x] Consumo opcional de eligibility decisions no scoring.
-- [ ] Consumir route options diretamente.
+- [x] Consumir route options diretamente.
 - [x] Avaliar eligibility on-demand a partir de projection + overlays quando
   `evaluateEligibility` estiver ativo.
 - [ ] Emitir explicação completa catalog + overlay + eligibility + probe.
@@ -1375,9 +1375,9 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Endpoint inventory.
 - [x] `/byok gateway catalog search`.
 - [x] `/byok gateway catalog explain <model>`.
-- [ ] `/byok gateway overlays`.
+- [x] `/byok gateway overlays`.
 - [x] `/byok gateway eligibility`.
-- [ ] `/byok gateway routes`.
+- [x] `/byok gateway routes`.
 - [x] Export OpenAI schema por comando.
 
 ### Faixa I — Observabilidade
@@ -1410,9 +1410,9 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Conflicts.
 - [x] OpenAI projection.
 - [x] JSON store.
-- [ ] SQLite store.
+- [x] SQLite store.
 - [x] Snapshot ids estáveis.
-- [ ] Incremental refresh com TTL por source.
+- [x] Incremental refresh com TTL por source.
 - [ ] Tombstones.
 - [ ] Raw payload storage policy.
 
@@ -2893,4 +2893,40 @@ Validação deste corte:
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em observability events, terminal BYOK e contrato
   unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 47. Continuidade 2026-05-26 — Alinhamento Do Roadmap Pós-Faixa O/I
+
+Auditoria executada neste corte:
+
+- [x] Revarridos os checkboxes abertos após os commits de refresh,
+  freshness e exclusion metrics.
+- [x] Identificados itens duplicados ou antigos que já estavam implementados
+  no código e testados em cortes anteriores.
+- [x] Confirmado que `/byok gateway overlays` existe no terminal.
+- [x] Confirmado que `/byok gateway routes` existe no terminal.
+- [x] Confirmado que `SqliteModelGatewayCatalogStore` existe e é testado.
+- [x] Confirmado que refresh incremental por TTL foi implementado e testado.
+- [x] Confirmado que coverage metrics por provider foram implementadas.
+
+Atualização de checklist:
+
+- [x] Marcado `UX dedicada de account overlays`.
+- [x] Marcado `Métricas de cobertura de metadados por provider`.
+- [x] Marcado `Consumir route options diretamente`.
+- [x] Marcado `/byok gateway overlays`.
+- [x] Marcado `/byok gateway routes`.
+- [x] Marcado `SQLite store`.
+- [x] Marcado `Incremental refresh com TTL por source`.
+
+Separação preservada:
+
+- [x] Este corte não altera código.
+- [x] O guia passa a refletir melhor o estado real.
+- [x] Itens ainda abertos permanecem booleanos e acionáveis.
+
+Validação deste corte:
+
 - [x] PASS `git diff --check`.
