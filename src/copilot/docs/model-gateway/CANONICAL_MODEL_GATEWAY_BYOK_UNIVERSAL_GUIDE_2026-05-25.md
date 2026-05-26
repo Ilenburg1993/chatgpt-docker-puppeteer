@@ -1584,7 +1584,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [ ] Usar probes como promoção.
 - [x] Usar route options como unidade de seleção.
 - [ ] Explicar rejeições.
-- [ ] Persistir decisão final.
+- [x] Persistir decisão final.
 - [ ] SDK projection final por route option.
 
 ### Faixa V — Live Validation
@@ -2283,4 +2283,37 @@ Validação deste corte:
   com `97` testes.
 - [x] PASS `npm run typecheck:strict:src.copilot`.
 - [x] PASS ESLint escopado em `policy-engine.js` e contrato unitário.
+- [x] PASS `git diff --check`.
+
+---
+
+## 32. Continuidade 2026-05-26 — Persistência SQLite De Route Decisions
+
+Implementado neste corte:
+
+- [x] `SqliteModelGatewayCatalogStore.writeRouteDecisionEvents()` persiste
+  eventos finais de rota na tabela `copilot_model_gateway_route_decisions`.
+- [x] `SqliteModelGatewayCatalogStore.readRouteDecisionEvents()` lê as decisões
+  mais recentes em ordem decrescente.
+- [x] A escrita é idempotente por `decisionId`.
+- [x] `/byok route` continua emitindo evento e ledger em memória, mas também
+  tenta materializar a decisão no SQLite.
+- [x] Falha no SQLite não impede a rota, preservando UX terminal.
+- [x] Adicionado teste de persistência, leitura e idempotência da camada de route
+  decisions.
+
+Separação preservada:
+
+- [x] Route decisions ficam em tabela própria.
+- [x] Snapshot/catálogo não é mutado por decisão final.
+- [x] Runtime health/probes continuam em tabelas próprias.
+- [x] Payload persistido é evento sanitizado, sem prompt ou segredo.
+
+Validação deste corte:
+
+- [x] PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+  com `98` testes.
+- [x] PASS `npm run typecheck:strict:src.copilot`.
+- [x] PASS ESLint escopado em `sqlite-catalog-store.js`, `byok.js` e contrato
+  unitário.
 - [x] PASS `git diff --check`.

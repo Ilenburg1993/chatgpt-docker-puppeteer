@@ -1657,6 +1657,47 @@ describe('model-gateway foundation', () => {
         }
     });
 
+    it('persists sanitized route decision events in the SQLite route-decision layer', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            const model = createModelRecord({
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                capabilities: { tools: true, streaming: true },
+                limits: { contextWindowTokens: 131_072 },
+            });
+            const route = routeGatewayModels([model], 'tool_agent', { requireAgentProbeOk: false });
+            const event = buildRouteDecisionEvent({
+                taskProfile: 'tool_agent',
+                routeProfile: 'default',
+                mode: 'pre-probe',
+                source: 'unit-test',
+                route,
+                estimatedInputTokens: 123,
+                estimatedOutputTokens: 456,
+                estimatedCostUsd: 0.01,
+            });
+
+            const summary = await store.writeRouteDecisionEvents([event]);
+            await store.writeRouteDecisionEvents([event]);
+            const loaded = await store.readRouteDecisionEvents({ limit: 5 });
+            const rows = /** @type {{ count: number } | undefined} */ (
+                db.prepare('SELECT COUNT(*) AS count FROM copilot_model_gateway_route_decisions').get()
+            );
+
+            assert.deepEqual(summary, { routeDecisions: 1 });
+            assert.equal(rows?.count, 1);
+            assert.equal(loaded.length, 1);
+            assert.equal(loaded[0].decisionId, event.decisionId);
+            assert.equal(loaded[0].providerId, 'openrouter');
+            assert.equal(JSON.stringify(loaded).includes('sk-'), false);
+        } finally {
+            db.close();
+        }
+    });
+
     it('mirrors the debug JSON catalog snapshot into SQLite without changing the source snapshot', async () => {
         const { default: Database } = await import('better-sqlite3');
         const dir = await mkdtemp(join(tmpdir(), 'copilot-model-sqlite-mirror-'));

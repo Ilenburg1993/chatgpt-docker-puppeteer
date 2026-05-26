@@ -456,6 +456,64 @@ export class SqliteModelGatewayCatalogStore {
     }
 
     /**
+     * @param {Record<string, unknown>[]} events
+     * @returns {Promise<{ routeDecisions: number }>}
+     */
+    async writeRouteDecisionEvents(events) {
+        const insert = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_route_decisions
+                (decision_id, task_profile, route_profile, policy_profile, provider_id, provider_model,
+                 selected, decided_at_ms, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(decision_id) DO UPDATE SET
+                task_profile = excluded.task_profile,
+                route_profile = excluded.route_profile,
+                policy_profile = excluded.policy_profile,
+                provider_id = excluded.provider_id,
+                provider_model = excluded.provider_model,
+                selected = excluded.selected,
+                decided_at_ms = excluded.decided_at_ms,
+                payload_json = excluded.payload_json
+        `);
+        const tx = this.#db.transaction(() => {
+            for (const event of events.filter(isRecord)) {
+                insert.run(
+                    optionalString(event['decisionId']) ?? `route-decision:${dateMs(event['timestamp']) ?? Date.now()}`,
+                    optionalString(event['taskProfile']) ?? DEFAULT_TASK_PROFILE,
+                    optionalString(event['routeProfile']) ?? DEFAULT_ROUTE_PROFILE,
+                    optionalString(event['policyProfile']) ?? DEFAULT_POLICY_PROFILE,
+                    optionalString(event['providerId']),
+                    optionalString(event['modelId']),
+                    event['selected'] === true ? 1 : 0,
+                    dateMs(event['timestamp']) ?? Date.now(),
+                    payloadJson(event),
+                );
+            }
+        });
+        tx();
+        return { routeDecisions: events.filter(isRecord).length };
+    }
+
+    /**
+     * @param {{ limit?: number }} [options]
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async readRouteDecisionEvents(options = {}) {
+        const limit = Math.max(1, Math.min(optionalInteger(options.limit) ?? 50, 500));
+        return this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_route_decisions
+                    ORDER BY decided_at_ms DESC
+                    LIMIT ?
+                `,
+            )
+            .all(limit)
+            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+    }
+
+    /**
      * @param {Partial<ReturnType<typeof normalizeStoredCatalogSnapshot>> & { source?: string }} snapshot
      * @returns {Promise<void>}
      */

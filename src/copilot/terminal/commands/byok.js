@@ -1020,6 +1020,7 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
         failure: route.selected ? null : 'no_candidate_selected',
     });
     recordModelGatewayRouteDecision(decisionEvent);
+    await persistByokRouteDecisionToSqlite(decisionEvent);
     eventBus?.emit?.(decisionEvent);
 
     println(
@@ -1360,6 +1361,18 @@ async function readByokGatewayCatalogSnapshotForRouting() {
         return await new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH }).readSnapshot();
     } catch {
         return null;
+    }
+}
+
+/**
+ * @param {ReturnType<typeof buildRouteDecisionEvent>} decisionEvent
+ * @returns {Promise<void>}
+ */
+async function persistByokRouteDecisionToSqlite(decisionEvent) {
+    try {
+        await new SqliteModelGatewayCatalogStore().writeRouteDecisionEvents([decisionEvent]);
+    } catch {
+        // Route decisions are still emitted and kept in-memory if the optional SQLite mirror is unavailable.
     }
 }
 
