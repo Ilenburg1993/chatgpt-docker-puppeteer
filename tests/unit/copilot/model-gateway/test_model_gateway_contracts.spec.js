@@ -372,7 +372,9 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.requires, ['text', 'streaming']);
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.softRequires, ['vision']);
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.local_private.supplyWarns, ['local', 'privacy', 'no_remote_secrets']);
+        assert.equal(MODEL_GATEWAY_TASK_PROFILES.local_private.localProviderOptIn, true);
         assert.equal(MODEL_GATEWAY_TASK_PROFILES.local_private_strict.defaultAudit, false);
+        assert.equal(MODEL_GATEWAY_TASK_PROFILES.local_private_strict.localProviderOptIn, true);
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.local_private_strict.requires, [
             'text',
             'streaming',
@@ -573,6 +575,58 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(defaultProfileAudit.summary.profileCount, 8);
 
+        const defaultWithOllamaAudit = auditModelGatewayPreRuntimeSelection(
+            {
+                projections: [
+                    createCanonicalModelProjection({
+                        providerId: 'ollama-local',
+                        providerModel: 'gemma3:4b',
+                        capabilities: {
+                            streaming: true,
+                            tools: true,
+                            local: true,
+                            privacy: true,
+                            no_remote_secrets: true,
+                        },
+                        limits: { contextWindowTokens: 131_072 },
+                        pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+                    }),
+                    createCanonicalModelProjection({
+                        providerId: 'openrouter',
+                        providerModel: 'openai/gpt-oss-120b',
+                        capabilities: { streaming: true, tools: true, reasoningEffort: true, forcedToolChoice: true },
+                        limits: { contextWindowTokens: 131_072 },
+                        pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+                    }),
+                ],
+                routeOptions: [
+                    createModelRouteOption({
+                        providerId: 'ollama-local',
+                        providerModel: 'gemma3:4b',
+                        selectorKind: 'exact_model',
+                        selectorSyntax: 'gemma3:4b',
+                        normalizedPolicy: { routeLayer: 'local_daemon', runtimeKind: 'local', localPrivate: true },
+                    }),
+                    createModelRouteOption({
+                        providerId: 'openrouter',
+                        providerModel: 'openai/gpt-oss-120b',
+                        selectorKind: 'exact_model',
+                        selectorSyntax: 'openai/gpt-oss-120b',
+                    }),
+                ],
+                accountOverlays: [
+                    createProviderAccountOverlay({ providerId: 'ollama-local', enabledModels: ['gemma3:4b'] }),
+                    createProviderAccountOverlay({ providerId: 'openrouter', enabledModels: ['openai/gpt-oss-120b'] }),
+                ],
+            },
+            {
+                secretRegistry: { has: () => true },
+            },
+        );
+        assert.equal(defaultWithOllamaAudit.summary.profileCount, 8);
+        assert.equal(defaultWithOllamaAudit.profiles.some((profile) => profile.selected?.['providerId'] === 'ollama-local'), false);
+        assert.ok(defaultWithOllamaAudit.summary.rejectedReasonCounts['local_provider_requires_explicit_request'] > 0);
+
         const strictLocalPrivateAudit = auditModelGatewayPreRuntimeSelection(snapshot, {
             profiles: ['local_private_strict'],
             secretRegistry: { has: () => true },
@@ -699,6 +753,65 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(blocked.selected?.model['selectorKind'], 'exact_model');
         assert.ok(blocked.rejected.some((candidate) => candidate.rejectedReasons.includes('route_layer_blocked:gateway')));
+    });
+
+    it('keeps Ollama local candidates out of default routing until the operator explicitly requests local', () => {
+        const ollamaProjection = createCanonicalModelProjection({
+            providerId: 'ollama-local',
+            providerModel: 'gemma3:4b',
+            capabilities: { streaming: true, local: true, privacy: true, no_remote_secrets: true },
+            limits: { contextWindowTokens: 8192 },
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+        });
+        const remoteProjection = createCanonicalModelProjection({
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-20b',
+            capabilities: { streaming: true },
+            limits: { contextWindowTokens: 131_072 },
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+        });
+        const candidates = buildModelGatewayRouteCandidates({
+            projections: [ollamaProjection, remoteProjection],
+            routeOptions: [
+                createModelRouteOption({
+                    providerId: 'ollama-local',
+                    providerModel: 'gemma3:4b',
+                    selectorKind: 'exact_model',
+                    selectorSyntax: 'gemma3:4b',
+                    normalizedPolicy: {
+                        routeLayer: 'local_daemon',
+                        runtimeKind: 'local',
+                        localPrivate: true,
+                    },
+                }),
+                createModelRouteOption({
+                    providerId: 'openrouter',
+                    providerModel: 'openai/gpt-oss-20b',
+                    selectorKind: 'exact_model',
+                    selectorSyntax: 'openai/gpt-oss-20b',
+                    normalizedPolicy: { routeLayer: 'openai_compatible_aggregator' },
+                }),
+            ],
+        });
+
+        const defaultRoute = routeGatewayModels(candidates, 'cheap_chat', { requireAgentProbeOk: false });
+        assert.equal(defaultRoute.selected?.model['providerId'], 'openrouter');
+        assert.ok(
+            defaultRoute.rejected.some(
+                (candidate) =>
+                    candidate.model['providerId'] === 'ollama-local' &&
+                    candidate.rejectedReasons.includes('local_provider_requires_explicit_request'),
+            ),
+        );
+
+        const explicitProvider = routeGatewayModels(candidates, 'cheap_chat', {
+            allowProviders: ['ollama'],
+            requireAgentProbeOk: false,
+        });
+        assert.equal(explicitProvider.selected?.model['providerId'], 'ollama-local');
+
+        const explicitLocalProfile = routeGatewayModels(candidates, 'local_private', { requireAgentProbeOk: false });
+        assert.equal(explicitLocalProfile.selected?.model['providerId'], 'ollama-local');
     });
 
     it('selects route candidates by upstream provider metadata before runtime', () => {

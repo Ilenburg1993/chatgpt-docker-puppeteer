@@ -1992,6 +1992,75 @@ Validação deste corte:
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `git diff --check`.
 
+---
+
+## 62. Continuidade 2026-05-26 — Ollama Local Como Opt-In Explícito
+
+Auditoria executada neste corte:
+
+- [x] Reavaliado o requisito operacional: Ollama local deve ser suportado, mas
+  não selecionado por defaults.
+- [x] Confirmado que não iremos rodar daemon Ollama local agora.
+- [x] Confirmado que o catálogo/importer deve continuar pronto para quando o
+  daemon estiver disponível.
+- [x] Confirmado que seleção default poderia favorecer Ollama local por preço
+  zero/capabilities locais se o daemon estivesse populado.
+- [x] Confirmado que o bloqueio deve viver no policy engine, não no importer,
+  para preservar metadados canônicos e permitir opt-in explícito.
+
+Implementado neste corte:
+
+- [x] `scoreGatewayModelCandidate()` passa a reconhecer candidatos locais por
+  `providerId=ollama-local`, `localPrivate`, `runtimeKind=local` ou
+  `routeLayer=local_daemon`.
+- [x] Candidatos locais recebem rejeição
+  `local_provider_requires_explicit_request` quando não há opt-in explícito.
+- [x] `allowProviders: ['ollama']` passa a permitir `ollama-local` como alias
+  explícito.
+- [x] `local_private` e `local_private_strict` passam a declarar
+  `localProviderOptIn=true`.
+- [x] Auditorias default bloqueiam local mesmo quando incluem
+  `local_private`, porque perfil default não é pedido explícito do operador.
+- [x] Auditorias com `profiles: ['local_private']` ou
+  `profiles: ['local_private_strict']` liberam seleção local.
+- [x] Testes cobrem default routing selecionando remoto e rejeitando
+  `ollama-local`.
+- [x] Testes cobrem opt-in por provider alias `ollama`.
+- [x] Testes cobrem opt-in por perfil local explícito.
+- [x] Testes cobrem auditoria default sem selecionar `ollama-local` mesmo com
+  modelo local no snapshot.
+
+Separação arquitetural preservada:
+
+- [x] Ollama local continua importável e normalizável no catálogo.
+- [x] A regra altera apenas seleção pré-runtime.
+- [x] Nenhum provider é chamado.
+- [x] Nenhum daemon Ollama é iniciado.
+- [x] Nenhum modelo é executado.
+- [x] Nenhuma probe runtime é executada.
+- [x] O catálogo canônico não é mutado.
+
+Próximas lacunas:
+
+- [ ] Avaliar se os comandos `/byok models route` devem mostrar uma dica
+  explícita quando `ollama-local` for filtrado por falta de opt-in local.
+
+Validação deste corte:
+
+- [x] PASS `npm run model-gateway:test:contracts` com `160` testes.
+- [x] PASS `npm run model-gateway:selection:effective -- --profile
+  local_private`.
+- [x] PASS esperado com exit `1` para
+  `node scripts/model-gateway-selection-audit.mjs
+  --profile=local_private_strict --fail-on-unselected`.
+- [x] PASS `npm run model-gateway:live:readiness`.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS esperado com exit `1` para
+  `node scripts/model-gateway-live-plan.mjs --no-write
+  --local-private-strict --fail`.
+- [x] PASS `git diff --check`.
+
 - [x] PASS `npm run test:copilot` com `5663` testes totais, `5630` passed,
   `33` pending, `0` failed e `0` warnings/errors.
 

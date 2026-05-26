@@ -110,6 +110,52 @@ function routeMetadataText(model, field) {
 
 /**
  * @param {Record<string, any>} model
+ * @returns {boolean}
+ */
+function isLocalPrivateCandidate(model) {
+    const providerId = String(model['providerId'] ?? '').trim();
+    const routing = isRecord(model['routing']) ? model['routing'] : {};
+    const policy = isRecord(model['normalizedPolicy']) ? model['normalizedPolicy'] : {};
+    const routeTraits = isRecord(model['routeTraits']) ? model['routeTraits'] : {};
+    return (
+        providerId === 'ollama-local' ||
+        policy['localPrivate'] === true ||
+        routeTraits['localPrivate'] === true ||
+        routing['routeLayer'] === 'local_daemon' ||
+        policy['runtimeKind'] === 'local'
+    );
+}
+
+/**
+ * @param {string} providerId
+ * @param {Set<string>} allowProviders
+ * @returns {boolean}
+ */
+function providerExplicitlyAllowsLocal(providerId, allowProviders) {
+    return allowProviders.has(providerId) || (providerId === 'ollama-local' && allowProviders.has('ollama'));
+}
+
+/**
+ * @param {string} providerId
+ * @param {Set<string>} allowProviders
+ * @returns {boolean}
+ */
+function providerAllowedByAllowList(providerId, allowProviders) {
+    return allowProviders.has(providerId) || (providerId === 'ollama-local' && allowProviders.has('ollama'));
+}
+
+/**
+ * @param {Record<string, any>} profile
+ * @param {boolean | undefined} option
+ * @returns {boolean}
+ */
+function localProviderSelectionAllowed(profile, option) {
+    if (option !== undefined) return option === true;
+    return profile['localProviderOptIn'] === true;
+}
+
+/**
+ * @param {Record<string, any>} model
  * @returns {Record<string, any>}
  */
 function dataPolicy(model) {
@@ -206,6 +252,7 @@ function stringSet(value) {
  *     preferredProbeKinds?: string[];
  *     requiredProbeKinds?: string[];
  *     blockFailedProbeKinds?: string[];
+ *     allowLocalProviders?: boolean;
  *     requireRuntimeProof?: boolean;
  *     requireKnownEligibility?: boolean;
  *     ignoreRuntimeHealth?: boolean;
@@ -267,12 +314,20 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     }
 
     if (model['enabled'] === false) rejectedReasons.push('model_disabled');
-    if (allowProviders.size > 0 && !allowProviders.has(providerId)) rejectedReasons.push('provider_not_allowed');
+    if (allowProviders.size > 0 && !providerAllowedByAllowList(providerId, allowProviders)) rejectedReasons.push('provider_not_allowed');
     if (blockProviders.has(providerId)) rejectedReasons.push('provider_blocked');
     const routeLayer = routePolicyText(model, 'routeLayer');
     const wireApi = routePolicyText(model, 'wireApi');
     const upstreamProvider = routeMetadataText(model, 'upstreamProvider');
     const selectorKind = String(model['selectorKind'] ?? routePolicyText(model, 'selectorKind')).trim();
+    if (
+        isLocalPrivateCandidate(model) &&
+        !localProviderSelectionAllowed(profile, options.allowLocalProviders) &&
+        !providerExplicitlyAllowsLocal(providerId, allowProviders) &&
+        !preferredRouteLayers.has('local_daemon')
+    ) {
+        rejectedReasons.push('local_provider_requires_explicit_request');
+    }
     if (routeLayer && blockRouteLayers.has(routeLayer)) rejectedReasons.push(`route_layer_blocked:${routeLayer}`);
     if (wireApi && blockWireApis.has(wireApi)) rejectedReasons.push(`wire_api_blocked:${wireApi}`);
     if (upstreamProvider && allowUpstreamProviders.size > 0 && !allowUpstreamProviders.has(upstreamProvider)) {

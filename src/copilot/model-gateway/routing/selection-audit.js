@@ -186,6 +186,15 @@ function resolveProfileIds(options = {}) {
 }
 
 /**
+ * @param {string} profileId
+ * @param {Set<string>} requestedProfiles
+ * @returns {boolean}
+ */
+function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
+    return requestedProfiles.has(profileId) && /(?:^|_)local(?:_|$)/iu.test(profileId);
+}
+
+/**
  * @param {Record<string, any>} snapshot
  * @param {{
  *   profiles?: string[];
@@ -231,6 +240,7 @@ function resolveProfileIds(options = {}) {
  */
 export function auditModelGatewayPreRuntimeSelection(snapshot, options = {}) {
     const strict = options.strict === true;
+    const requestedProfiles = new Set(stringList(options.profiles));
     const profileIds = resolveProfileIds(options);
     const profileAudits = profileIds.map((profileId) => {
         /** @type {Parameters<typeof routeModelGatewayCatalogSnapshot>[2]} */
@@ -240,6 +250,7 @@ export function auditModelGatewayPreRuntimeSelection(snapshot, options = {}) {
             requireRuntimeProof: false,
             requireKnownEligibility: strict,
             ignoreRuntimeHealth: true,
+            allowLocalProviders: profileExplicitlyRequestsLocal(profileId, requestedProfiles),
             eligibilityPolicy: {
                 ...(isRecord(options.eligibilityPolicy) ? options.eligibilityPolicy : {}),
                 unknownAccessPolicy: strict ? 'block' : 'allow_probe',
