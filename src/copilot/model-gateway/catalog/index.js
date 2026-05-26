@@ -178,6 +178,11 @@ export {
 } from './refresh-lock.js';
 export { planModelGatewayCatalogRefresh } from './refresh-plan.js';
 export { refreshModelGatewayCatalog } from './refresh.js';
+export {
+    parseModelGatewayRefreshLogText,
+    summarizeModelGatewayRefreshLogEvents,
+    summarizeModelGatewayRefreshLogText,
+} from './refresh-logs.js';
 export { applyModelGatewayCatalogRetention } from './retention.js';
 export {
     MODEL_GATEWAY_SQLITE_SCHEMA_SQL,

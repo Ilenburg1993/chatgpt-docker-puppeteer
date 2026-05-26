@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayProviderEnvRequirements, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeProviderWireProbeMatrix, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayProviderEnvRequirements, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -423,6 +423,7 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
         readByokProviderModelHealth: vi.fn(() => null),
         readConfiguredByokProfilesFromEnv: vi.fn(() => ({})),
         readFile: vi.fn(),
+        readdir: vi.fn(),
         readTerminalByokGatewayProjectionFromEnv: vi.fn(() => ({
             gatewayModels: [],
             modelGateway: { providers: [], models: [] },
@@ -484,15 +485,30 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
         ),
         rename: vi.fn(),
         setTerminalModelProjection: vi.fn(),
+        stat: vi.fn(),
+        summarizeModelGatewayRefreshLogText: vi.fn(() => ({
+            eventCount: 6,
+            invalidLineCount: 0,
+            completed: true,
+            committed: true,
+            elapsedMs: 1200,
+            totals: { projections: 42, openai: 42, overlays: 3, added: 2, removed: 0, changed: 1 },
+            importers: {
+                'openrouter-models': { started: 1, completed: 1, failed: 0, rowCount: 2, evidenceCount: 8 },
+            },
+            failures: [],
+        })),
         writeFile: vi.fn(),
     }));
 
 vi.mock('node:fs/promises', () => ({
-    default: { readFile, writeFile, rename, chmod },
+    default: { readFile, writeFile, rename, chmod, readdir, stat },
     readFile,
     writeFile,
     rename,
     chmod,
+    readdir,
+    stat,
 }));
 
 vi.mock('dotenv', () => ({
@@ -558,6 +574,7 @@ vi.mock('#copilot/model-gateway', () => ({
     planModelGatewayProbeBackoff,
     summarizeModelGatewayAccountOverlays,
     summarizeModelGatewayProviderEnvRequirements,
+    summarizeModelGatewayRefreshLogText,
     summarizeCanonicalModelProjectionDiff,
     summarizeProviderWireProbeMatrix,
 }));
@@ -798,6 +815,21 @@ describe('terminal /byok command', () => {
         readConfiguredByokProfilesFromEnv.mockReset();
         readConfiguredByokProfilesFromEnv.mockReturnValue({});
         readFile.mockReset();
+        readdir.mockReset();
+        stat.mockReset();
+        summarizeModelGatewayRefreshLogText.mockReset();
+        summarizeModelGatewayRefreshLogText.mockReturnValue({
+            eventCount: 6,
+            invalidLineCount: 0,
+            completed: true,
+            committed: true,
+            elapsedMs: 1200,
+            totals: { projections: 42, openai: 42, overlays: 3, added: 2, removed: 0, changed: 1 },
+            importers: {
+                'openrouter-models': { started: 1, completed: 1, failed: 0, rowCount: 2, evidenceCount: 8 },
+            },
+            failures: [],
+        });
         readTerminalByokGatewayProjectionFromEnv.mockReset();
         readTerminalByokGatewayProjectionFromEnv.mockReturnValue({
             gatewayModels: [],
@@ -1907,6 +1939,32 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('probe suggestions: 1');
         expect(ctx.output()).toContain('/byok probe agent model:changed-model');
         expect(ctx.output()).toContain('openrouter:new-model:default');
+    });
+
+    it('resume o último log JSONL de refresh do catálogo model-gateway', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+        readdir.mockResolvedValue(['old.jsonl', 'latest.jsonl']);
+        stat.mockImplementation((path) =>
+            Promise.resolve({
+                isFile: () => true,
+                mtimeMs: String(path).includes('latest') ? 2 : 1,
+            }),
+        );
+        readFile.mockResolvedValue('{"phase":"refresh_completed"}\n');
+
+        await cmdByok({ println: ctx.println }, 'gateway catalog refresh-log');
+
+        expect(readFile).toHaveBeenCalledWith(expect.stringContaining('latest.jsonl'), 'utf8');
+        expect(summarizeModelGatewayRefreshLogText).toHaveBeenCalledWith('{"phase":"refresh_completed"}\n', {
+            logPath: expect.stringContaining('latest.jsonl'),
+        });
+        expect(ctx.output()).toContain('BYOK model-gateway refresh log');
+        expect(ctx.output()).toContain('events=6');
+        expect(ctx.output()).toContain('completed=sim');
+        expect(ctx.output()).toContain('projections=42');
+        expect(ctx.output()).toContain('openrouter-models');
+        expect(ctx.output()).toContain('failures=0');
     });
 
     it('exibe o último diff persistido do catálogo sem refazer rede', async () => {

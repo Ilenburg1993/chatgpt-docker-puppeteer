@@ -9,6 +9,7 @@
  */
 
 import fs from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 
 import { config as loadDotenv } from 'dotenv';
 import {
@@ -65,6 +66,7 @@ import {
     searchModelGatewayCatalogEntries,
     SqliteModelGatewayCatalogStore,
     summarizeModelGatewayAccountOverlays,
+    summarizeModelGatewayRefreshLogText,
     summarizeModelGatewayProviderEnvRequirements,
     summarizeProviderWireProbeMatrix,
     summarizeCanonicalModelProjectionDiff,
@@ -1652,7 +1654,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-log|diff|conflicts|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -2138,6 +2140,65 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
         const message = error instanceof Error ? error.message : String(error);
         println(`    \x1b[31mrefresh falhou: ${message}\x1b[0m\n`);
     }
+}
+
+/**
+ * @returns {Promise<string | null>}
+ */
+async function findLatestModelGatewayRefreshLogPath() {
+    const dir = resolve('logs/model-gateway-refresh');
+    let entries;
+    try {
+        entries = await fs.readdir(dir);
+    } catch {
+        return null;
+    }
+    /** @type {Array<{ path: string; mtimeMs: number }>} */
+    const candidates = [];
+    for (const entry of entries.filter((item) => item.endsWith('.jsonl'))) {
+        const filePath = join(dir, entry);
+        try {
+            const metadata = await fs.stat(filePath);
+            if (metadata.isFile()) candidates.push({ path: filePath, mtimeMs: metadata.mtimeMs });
+        } catch {
+            // Operational logs can rotate while the terminal is open; ignore vanished files.
+        }
+    }
+    candidates.sort((left, right) => right.mtimeMs - left.mtimeMs);
+    return candidates[0]?.path ?? null;
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayCatalogRefreshLog(println) {
+    println(`\n  \x1b[36mBYOK model-gateway refresh log\x1b[0m`);
+    const logPath = await findLatestModelGatewayRefreshLogPath();
+    if (!logPath) {
+        println('    \x1b[33mNenhum log JSONL de refresh encontrado. Rode /byok gateway catalog refresh primeiro.\x1b[0m\n');
+        return;
+    }
+    const text = await fs.readFile(logPath, 'utf8');
+    const summary = summarizeModelGatewayRefreshLogText(text, { logPath });
+    println(`  \x1b[90mlog=${logPath} · events=${summary.eventCount} · invalid=${summary.invalidLineCount}\x1b[0m\n`);
+    println(
+        `    \x1b[90mcompleted=${summary.completed ? 'sim' : 'nao'} · committed=${summary.committed ? 'sim' : 'nao'} · elapsed=${summary.elapsedMs ?? '-'}ms\x1b[0m`,
+    );
+    println(
+        `    \x1b[90mprojections=${summary.totals.projections ?? '-'} · openai=${summary.totals.openai ?? '-'} · overlays=${summary.totals.overlays ?? '-'} · added=${summary.totals.added ?? '-'} · removed=${summary.totals.removed ?? '-'} · changed=${summary.totals.changed ?? '-'}\x1b[0m`,
+    );
+    const importerEntries = Object.entries(summary.importers);
+    println(`    \x1b[90mimporters=${importerEntries.length} · failures=${summary.failures.length}\x1b[0m`);
+    for (const [importerId, importer] of importerEntries.slice(0, 12)) {
+        println(
+            `      \x1b[90m${importerId}: started=${importer.started} · completed=${importer.completed} · failed=${importer.failed} · rows=${importer.rowCount} · evidence=${importer.evidenceCount}\x1b[0m`,
+        );
+    }
+    for (const failure of summary.failures.slice(0, 8)) {
+        println(`      \x1b[31mfalha\x1b[0m \x1b[90m${failure.phase} · importer=${failure.importerId ?? '-'} · ${failure.errors.join('; ')}\x1b[0m`);
+    }
+    println('');
 }
 
 /**
@@ -3235,6 +3296,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         }
         if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(refresh|reload|sync|atualizar)$/iu.test(rest[1] ?? '')) {
             await renderByokGatewayCatalogRefresh(println, eventBus, rest[2] ?? null);
+            return;
+        }
+        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(refresh-log|refreshlog|log|logs)$/iu.test(rest[1] ?? '')) {
+            await renderByokGatewayCatalogRefreshLog(println);
             return;
         }
         if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(diff|changes|mudancas|mudanças)$/iu.test(rest[1] ?? '')) {

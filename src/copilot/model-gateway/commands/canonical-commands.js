@@ -83,6 +83,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Preview a provider refresh and write the full progress log without committing the snapshot.',
     },
     {
+        id: 'refresh.log',
+        phase: 'metadata',
+        surface: 'package',
+        command: 'npm run model-gateway:refresh:log -- --json',
+        summary: 'Summarize the latest refresh JSONL log without touching the catalog.',
+    },
+    {
         id: 'prebuild.all',
         phase: 'prebuild',
         surface: 'package',
@@ -118,6 +125,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Makefile provider-scoped refresh path for adding or updating one provider without full rebuild.',
     },
     {
+        id: 'make.refresh-log',
+        phase: 'metadata',
+        surface: 'make',
+        command: 'make model-gateway-refresh-log',
+        summary: 'Makefile alias for latest refresh log analysis.',
+    },
+    {
         id: 'make.prebuild',
         phase: 'prebuild',
         surface: 'make',
@@ -144,6 +158,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok gateway catalog refresh',
         summary: 'Commit an incremental, locked, account-overlay-aware catalog refresh.',
+    },
+    {
+        id: 'terminal.refresh-log',
+        phase: 'metadata',
+        surface: 'terminal',
+        command: '/byok gateway catalog refresh-log',
+        summary: 'Summarize the latest refresh JSONL log from the terminal cockpit.',
     },
     {
         id: 'terminal.diff',

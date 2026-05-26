@@ -163,6 +163,7 @@ import {
     parseOpenAiDocsRows,
     parseOpenRouterKeyRows,
     planModelGatewayCatalogRefresh,
+    parseModelGatewayRefreshLogText,
     rankCatalogEvidenceConfidence,
     recommendCatalogDiffProbes,
     evaluateModelGatewayCatalogEligibility,
@@ -178,6 +179,7 @@ import {
     searchModelGatewayCatalogEntries,
     summarizeModelGatewayCatalogSnapshot,
     summarizeCanonicalModelProjectionDiff,
+    summarizeModelGatewayRefreshLogText,
     summarizeModelGatewayAccountOverlays,
     summarizeModelGatewaySdkQuotaSnapshots,
     summarizeModelGatewayMetadataCoverage,
@@ -6181,6 +6183,52 @@ describe('model-gateway foundation', () => {
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
+    });
+
+    it('summarizes refresh JSONL logs without mutating canonical metadata', () => {
+        const text = [
+            JSON.stringify({ ts: '2026-05-26T12:00:00.000Z', phase: 'refresh_started', elapsedMs: 0 }),
+            JSON.stringify({
+                ts: '2026-05-26T12:00:01.000Z',
+                phase: 'importer:importer_completed',
+                importer: { importerId: 'openrouter-models', rowCount: 2, evidenceCount: 7 },
+                rowCount: 2,
+                evidenceCount: 7,
+            }),
+            JSON.stringify({
+                ts: '2026-05-26T12:00:02.000Z',
+                phase: 'importer:importer_failed',
+                importer: { importerId: 'broken-models' },
+                errors: ['token [redacted] rejected'],
+            }),
+            JSON.stringify({
+                ts: '2026-05-26T12:00:03.000Z',
+                phase: 'refresh_completed',
+                elapsedMs: 3000,
+                committed: true,
+                projectionCount: 42,
+                openai: 42,
+                overlays: 3,
+                addedCount: 2,
+                removedCount: 0,
+                changedCount: 1,
+            }),
+            'not-json',
+        ].join('\n');
+
+        const parsed = parseModelGatewayRefreshLogText(text);
+        const summary = summarizeModelGatewayRefreshLogText(text, { logPath: 'logs/model-gateway-refresh/run.jsonl' });
+
+        assert.equal(parsed.events.length, 4);
+        assert.equal(parsed.invalidLineCount, 1);
+        assert.equal(summary.completed, true);
+        assert.equal(summary.committed, true);
+        assert.equal(summary.elapsedMs, 3000);
+        assert.deepEqual(summary.totals, { projections: 42, openai: 42, overlays: 3, added: 2, removed: 0, changed: 1 });
+        assert.equal(summary.importers['openrouter-models'].completed, 1);
+        assert.equal(summary.importers['openrouter-models'].rowCount, 2);
+        assert.equal(summary.failures[0].importerId, 'broken-models');
+        assert.equal(JSON.stringify(summary).includes('secret'), false);
     });
 
     it('previews catalog refreshes by default and requires explicit commit policy to write the active store', async () => {

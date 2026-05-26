@@ -1645,6 +1645,7 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Refresh incremental canônico via package, Makefile e terminal.
 - [x] Refresh provider-scoped para adicionar provider sem rebuild completo.
 - [x] Logs live/JSONL do processamento de refresh de catálogo.
+- [x] Análise canônica do último log JSONL via package, Makefile e terminal.
 - [x] Testes unitários do inventário.
 - [ ] Primeiro build real usando apenas comandos canônicos.
 - [ ] Registrar resultado do primeiro build no guia.
@@ -3377,6 +3378,10 @@ Implementado neste corte:
 - [x] O script grava log completo em `logs/model-gateway-refresh/*.jsonl`.
 - [x] O script imprime progresso live no terminal e resumo final com diff,
   projections, overlays, importers selecionados e log path.
+- [x] Criado parser/summarizer puro `refresh-logs.js`.
+- [x] Criado `scripts/model-gateway-refresh-log.mjs`.
+- [x] Adicionado `model-gateway:refresh:log`.
+- [x] Adicionado `make model-gateway-refresh-log`.
 - [x] Adicionados scripts `model-gateway:refresh` e
   `model-gateway:refresh:preview`.
 - [x] Adicionados targets `model-gateway-refresh`,
@@ -3385,6 +3390,8 @@ Implementado neste corte:
   e provider-scoped.
 - [x] `/byok gateway catalog refresh` passa a renderizar progresso live do
   mesmo refresh core.
+- [x] `/byok gateway catalog refresh-log` resume o último JSONL sem rede e sem
+  mutar catálogo.
 - [x] Testes cobrem eventos de progresso no runner e no refresh.
 
 Como operar sem rebuild completo:
@@ -3414,7 +3421,7 @@ Lacunas futuras:
 - [ ] Espelhar o log JSONL em tabela SQLite operacional.
 - [ ] Adicionar opção de checkpoint resumido por provider para refreshs muito
   longos.
-- [ ] Adicionar comando canônico de replay/análise de log de refresh.
+- [x] Adicionar comando canônico de replay/análise de log de refresh.
 - [ ] Usar o refresh provider-scoped como gate formal antes do primeiro build
   real.
 
@@ -3422,12 +3429,16 @@ Validação deste corte:
 
 - [x] PASS testes focados de contratos para importers, refresh e comandos.
 - [x] PASS testes focados de terminal para comandos canônicos e refresh.
-- [x] PASS `npm run model-gateway:test:contracts` com `145` testes.
-- [x] PASS `npm run model-gateway:test:terminal` com `62` testes.
+- [x] PASS testes focados de contratos para parser de log JSONL.
+- [x] PASS testes focados de terminal para `/byok gateway catalog refresh-log`.
+- [x] PASS `npm run model-gateway:test:contracts` com `146` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `63` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
 - [x] PASS `node --check scripts/model-gateway-refresh.mjs`.
+- [x] PASS `node --check scripts/model-gateway-refresh-log.mjs`.
 - [x] PASS ESLint focado em `scripts/model-gateway-refresh.mjs`.
+- [x] PASS ESLint focado em `scripts/model-gateway-refresh-log.mjs`.
 - [x] PASS `git diff --check`.
 
 ---
