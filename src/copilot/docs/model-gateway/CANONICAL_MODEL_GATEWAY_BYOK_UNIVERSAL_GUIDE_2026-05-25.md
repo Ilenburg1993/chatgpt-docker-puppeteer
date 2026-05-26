@@ -4748,6 +4748,8 @@ Implementado neste corte:
   preencher `failureKind`, `failureContext` e `failureMessage`.
 - [x] Falhas `auth` marcam `apiKeyDisabled=true`.
 - [x] Falhas `rate-limit` marcam `rateLimits.limited=true`.
+- [x] Falhas `rate-limit` preservam `retryAfterSeconds`, `resetAt` e headers
+  de limite quando o erro estruturado os fornece.
 - [x] Falhas `credits` marcam `quota.remainingCreditsUsd=0`.
 - [x] Falhas `local_daemon` marcam `disabled=true` e
   `localDaemonReachable=false`.
@@ -4767,13 +4769,13 @@ Validação parcial deste corte:
 
 - [x] PASS `node --check src/copilot/model-gateway/catalog/importer-runner.js`.
 - [x] PASS focused Vitest `generic failure overlays|failure overlays|importer failures`.
+- [x] PASS focused Vitest `generic failure overlays|importer failures` após
+  preservar `retry-after`.
 - [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
 - [x] PASS `npm run model-gateway:lint`.
 
 Próximas lacunas:
 
-- [ ] Avaliar se o fallback deve registrar `retryAfterSeconds` quando headers
-  estiverem disponíveis no erro estruturado.
 - [ ] Avaliar se os importers de Cloudflare, Kilo, OpenRouter, Groq, Mistral,
   Anthropic, Cerebras, NVIDIA, Chutes e Z.AI precisam enriquecer o fallback com
   campos account-specific próprios.

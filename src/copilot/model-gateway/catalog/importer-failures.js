@@ -61,6 +61,7 @@ function isLocalDaemonSource(sourceKind) {
  * @param {boolean} [input.requiresAuth]
  * @param {unknown[]} [input.errors]
  * @param {unknown} [input.message]
+ * @param {unknown} [input.error]
  * @param {object} [options]
  * @param {boolean} [options.allowAllImporterFailures]
  * @param {boolean} [options.failOnAccountImporterFailures]
@@ -75,6 +76,9 @@ function isLocalDaemonSource(sourceKind) {
  *   failureKind: string;
  *   statusCode: number | null;
  *   errorContext: string;
+ *   retryAfterSeconds: number | null;
+ *   resetAt: string | null;
+ *   limitHeaders: Record<string, string | number>;
  *   buildBlocking: boolean;
  *   disposition: string;
  *   operatorLabel: string;
@@ -85,9 +89,11 @@ export function classifyModelGatewayCatalogImporterFailure(input, options = {}) 
     const sourceKind = optionalString(input.sourceKind);
     const requiresAuth = input.requiresAuth === true;
     const errors = stringList(input.errors);
-    const providerFailure = classifyByokProviderFailure({
-        message: errors.join('; ') || optionalString(input.message) || 'catalog importer failed',
-    });
+    const providerFailure = classifyByokProviderFailure(
+        input.error ?? {
+            message: errors.join('; ') || optionalString(input.message) || 'catalog importer failed',
+        },
+    );
     const accountScoped = isAccountScopedSource(sourceKind, requiresAuth);
     const localDaemon = isLocalDaemonSource(sourceKind);
     const allowed = options.allowAllImporterFailures === true;
@@ -110,10 +116,12 @@ export function classifyModelGatewayCatalogImporterFailure(input, options = {}) 
         failureKind: providerFailure.kind,
         statusCode: providerFailure.statusCode,
         errorContext: providerFailure.errorContext,
+        retryAfterSeconds: providerFailure.retryAfterSeconds,
+        resetAt: providerFailure.resetAt,
+        limitHeaders: providerFailure.limitHeaders,
         buildBlocking: disposition === MODEL_GATEWAY_CATALOG_IMPORTER_FAILURE_DISPOSITION.BLOCKING_METADATA_SOURCE,
         disposition,
         operatorLabel: providerFailure.operatorLabel,
         operatorAction: providerFailure.operatorAction,
     };
 }
-

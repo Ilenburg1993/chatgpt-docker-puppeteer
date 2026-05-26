@@ -132,6 +132,7 @@ function createDefaultFailureAccountOverlays(importer, error, source) {
         sourceKind: importer.sourceKind,
         requiresAuth: importer.requiresAuth,
         errors: [message],
+        error,
     });
     const localDaemon = importer.sourceKind === 'local_daemon';
     const keyDisabled = failure.failureKind === 'auth';
@@ -147,7 +148,14 @@ function createDefaultFailureAccountOverlays(importer, error, source) {
             sourceKind: importer.sourceKind,
             confidence: 'authenticated_catalog',
             quota: creditsExhausted ? { remainingCreditsUsd: 0 } : {},
-            rateLimits: rateLimited ? { limited: true } : {},
+            rateLimits: rateLimited
+                ? {
+                      limited: true,
+                      ...(failure.retryAfterSeconds !== null ? { retryAfterSeconds: failure.retryAfterSeconds } : {}),
+                      ...(failure.resetAt !== null ? { resetAt: failure.resetAt } : {}),
+                      ...failure.limitHeaders,
+                  }
+                : {},
             providerMetadata: {
                 catalogImportStatus: 'failed',
                 failureKind: failure.failureKind,

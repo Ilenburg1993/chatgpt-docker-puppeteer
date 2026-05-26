@@ -3298,7 +3298,9 @@ describe('model-gateway foundation', () => {
                     requiresAuth: true,
                     envRequirements: ['GENERIC_API_KEY'],
                     fetchRaw: () => {
-                        throw new Error('HTTP 429 rate limit exceeded');
+                        const error = new Error('HTTP 429 rate limit exceeded');
+                        Object.assign(error, { headers: { 'retry-after': '42', 'x-ratelimit-remaining-requests': '0' } });
+                        throw error;
                     },
                     parseRows: () => [],
                     toEvidenceFacts: () => [],
@@ -3313,6 +3315,8 @@ describe('model-gateway foundation', () => {
         assert.equal(overlay.providerMetadata.catalogImportStatus, 'failed');
         assert.equal(overlay.providerMetadata.failureKind, 'rate-limit');
         assert.equal(overlay.rateLimits.limited, true);
+        assert.equal(overlay.rateLimits.retryAfterSeconds, 42);
+        assert.equal(overlay.rateLimits['x-ratelimit-remaining-requests'], 0);
     });
 
     it('classifies importer failures separately for metadata, account, and local build gates', () => {
