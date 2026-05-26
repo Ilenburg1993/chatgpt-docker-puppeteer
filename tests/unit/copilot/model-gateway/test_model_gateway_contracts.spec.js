@@ -3239,6 +3239,34 @@ describe('model-gateway foundation', () => {
         assert.equal(ollamaOverlay?.providerMetadata.disabled, true);
     });
 
+    it('creates generic failure overlays for authenticated importers without a custom failure hook', async () => {
+        const snapshot = await runCatalogImporters({
+            now: () => new Date('2026-05-26T19:20:00.000Z'),
+            importers: [
+                {
+                    id: 'generic-auth-models',
+                    providerId: 'generic-provider',
+                    sourceKind: 'authenticated_api',
+                    requiresAuth: true,
+                    envRequirements: ['GENERIC_API_KEY'],
+                    fetchRaw: () => {
+                        throw new Error('HTTP 429 rate limit exceeded');
+                    },
+                    parseRows: () => [],
+                    toEvidenceFacts: () => [],
+                },
+            ],
+        });
+        const overlay = snapshot.accountOverlays[0];
+
+        assert.equal(snapshot.importRuns[0].status, 'failed');
+        assert.equal(overlay.providerId, 'generic-provider');
+        assert.equal(overlay.secretRef, 'GENERIC_API_KEY');
+        assert.equal(overlay.providerMetadata.catalogImportStatus, 'failed');
+        assert.equal(overlay.providerMetadata.failureKind, 'rate-limit');
+        assert.equal(overlay.rateLimits.limited, true);
+    });
+
     it('classifies importer failures separately for metadata, account, and local build gates', () => {
         const publicFailure = classifyModelGatewayCatalogImporterFailure({
             importerId: 'openai-docs-models',

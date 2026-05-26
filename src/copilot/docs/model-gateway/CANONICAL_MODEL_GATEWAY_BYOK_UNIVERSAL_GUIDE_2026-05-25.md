@@ -4725,6 +4725,61 @@ Validação parcial deste corte:
 
 ---
 
+## 68. Continuidade 2026-05-26 — Fallback Universal De Overlays De Falha
+
+Auditoria executada neste corte:
+
+- [x] Após o primeiro build com paridade, revisado o gap remanescente: apenas
+  Gemini e Ollama tinham `toFailureAccountOverlays()` especializado.
+- [x] Confirmado que importers autenticados de outros providers poderiam falhar
+  por auth, quota, credits, rate-limit ou rede sem deixar overlay account/key
+  legível para o pré-runtime.
+- [x] Confirmado que isso criaria paralelismo entre `importRuns` falhos e
+  `resolveModelGatewayAccountAccess()`, pois o operador veria falha no log, mas
+  a seleção pré-runtime poderia não receber um estado operacional explícito.
+
+Implementado neste corte:
+
+- [x] `runCatalogImporters()` ganhou fallback universal de failure overlay para
+  `authenticated_api`, `authenticated_account_api` e `local_daemon`.
+- [x] Hooks especializados continuam tendo precedência; se retornarem overlay,
+  o fallback genérico não duplica registros.
+- [x] O fallback usa `classifyModelGatewayCatalogImporterFailure()` para
+  preencher `failureKind`, `failureContext` e `failureMessage`.
+- [x] Falhas `auth` marcam `apiKeyDisabled=true`.
+- [x] Falhas `rate-limit` marcam `rateLimits.limited=true`.
+- [x] Falhas `credits` marcam `quota.remainingCreditsUsd=0`.
+- [x] Falhas `local_daemon` marcam `disabled=true` e
+  `localDaemonReachable=false`.
+- [x] O fallback usa o primeiro `envRequirements` como `secretRef` seguro quando
+  o importer não fornece hook especializado.
+- [x] Teste unitário cobre importer autenticado genérico sem hook especializado
+  gerando overlay de rate-limit.
+
+Separação preservada:
+
+- [x] O fallback não cria model evidence, route options ou projections.
+- [x] O fallback não executa runtime.
+- [x] O fallback não altera metadados canônicos públicos.
+- [x] O fallback apenas materializa estado account/local pré-runtime.
+
+Validação parcial deste corte:
+
+- [x] PASS `node --check src/copilot/model-gateway/catalog/importer-runner.js`.
+- [x] PASS focused Vitest `generic failure overlays|failure overlays|importer failures`.
+- [x] PASS `npm run model-gateway:typecheck -- --pretty false`.
+- [x] PASS `npm run model-gateway:lint`.
+
+Próximas lacunas:
+
+- [ ] Avaliar se o fallback deve registrar `retryAfterSeconds` quando headers
+  estiverem disponíveis no erro estruturado.
+- [ ] Avaliar se os importers de Cloudflare, Kilo, OpenRouter, Groq, Mistral,
+  Anthropic, Cerebras, NVIDIA, Chutes e Z.AI precisam enriquecer o fallback com
+  campos account-specific próprios.
+
+---
+
 ## 54. Continuidade 2026-05-26 — Policy Engine Por Snapshot Completo
 
 Auditoria executada neste corte:

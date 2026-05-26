@@ -9,7 +9,8 @@
  */
 
 import { createCatalogImportRun, createSanitizedRawPayloadRef } from './import-runs.js';
-import { createProviderCatalogSource } from './contracts.js';
+import { createProviderAccountOverlay, createProviderCatalogSource } from './contracts.js';
+import { classifyModelGatewayCatalogImporterFailure } from './importer-failures.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 
 /**
@@ -96,6 +97,89 @@ function createSourceForImporter(importer) {
         parserId: importer.id,
         trustTier: importer.requiresAuth ? 'account_scoped' : 'provider_catalog',
     });
+}
+
+/**
+ * @param {CatalogImporter} importer
+ * @returns {string | null}
+ */
+function defaultSecretRef(importer) {
+    return importer.envRequirements?.find((item) => typeof item === 'string' && item.trim()) ?? null;
+}
+
+/**
+ * @param {string} sourceKind
+ * @returns {boolean}
+ */
+function failureSourceCanProduceOverlay(sourceKind) {
+    return sourceKind === 'local_daemon' || sourceKind === 'authenticated_api' || sourceKind === 'authenticated_account_api';
+}
+
+/**
+ * @param {CatalogImporter} importer
+ * @param {unknown} error
+ * @param {Record<string, any>} source
+ * @returns {Record<string, any>[]}
+ */
+function createDefaultFailureAccountOverlays(importer, error, source) {
+    if (!importer.requiresAuth && !failureSourceCanProduceOverlay(importer.sourceKind)) return [];
+    const message = errorMessage(error);
+    const sourceId = String(source['id'] ?? importer.id);
+    const failure = classifyModelGatewayCatalogImporterFailure({
+        importerId: importer.id,
+        providerId: importer.providerId,
+        sourceId,
+        sourceKind: importer.sourceKind,
+        requiresAuth: importer.requiresAuth,
+        errors: [message],
+    });
+    const localDaemon = importer.sourceKind === 'local_daemon';
+    const keyDisabled = failure.failureKind === 'auth';
+    const rateLimited = failure.failureKind === 'rate-limit';
+    const creditsExhausted = failure.failureKind === 'credits';
+    return [
+        createProviderAccountOverlay({
+            accountOverlayId: `${importer.providerId}:default:${defaultSecretRef(importer) ?? 'no-secret'}:${sourceId}:failure`,
+            providerId: importer.providerId,
+            accountScope: 'default',
+            secretRef: defaultSecretRef(importer) ?? undefined,
+            sourceId,
+            sourceKind: importer.sourceKind,
+            confidence: 'authenticated_catalog',
+            quota: creditsExhausted ? { remainingCreditsUsd: 0 } : {},
+            rateLimits: rateLimited ? { limited: true } : {},
+            providerMetadata: {
+                catalogImportStatus: 'failed',
+                failureKind: failure.failureKind,
+                failureContext: failure.errorContext,
+                failureMessage: message,
+                ...(keyDisabled ? { apiKeyDisabled: true } : {}),
+                ...(localDaemon ? { disabled: true, localDaemonReachable: false } : {}),
+            },
+        }),
+    ];
+}
+
+/**
+ * @param {CatalogImporter} importer
+ * @param {unknown} error
+ * @param {Record<string, any>} source
+ * @returns {Promise<{ overlays: Record<string, any>[]; errors: string[] }>}
+ */
+async function createFailureAccountOverlays(importer, error, source) {
+    /** @type {Record<string, any>[]} */
+    let overlays = [];
+    /** @type {string[]} */
+    const errors = [];
+    if (typeof importer.toFailureAccountOverlays === 'function') {
+        try {
+            overlays = await importer.toFailureAccountOverlays(error, { source, rawPayloadRef: '' });
+        } catch (overlayError) {
+            errors.push(`failure account overlay failed: ${errorMessage(overlayError)}`);
+        }
+    }
+    if (overlays.length === 0) overlays = createDefaultFailureAccountOverlays(importer, error, source);
+    return { overlays, errors };
 }
 
 /**
@@ -216,7 +300,7 @@ export async function runCatalogImporters(input = {}) {
         /** @type {Record<string, any>[]} */
         let routeOptions = [];
         /** @type {Record<string, any>[]} */
-        let accountOverlays = [];
+        let accountOverlays;
         /** @type {Record<string, any>} */
         let run;
 
@@ -291,15 +375,8 @@ export async function runCatalogImporters(input = {}) {
             });
         } catch (error) {
             const completedAt = now();
-            /** @type {string[]} */
-            const failureOverlayErrors = [];
-            if (typeof importer.toFailureAccountOverlays === 'function') {
-                try {
-                    accountOverlays = await importer.toFailureAccountOverlays(error, { source, rawPayloadRef: '' });
-                } catch (overlayError) {
-                    failureOverlayErrors.push(`failure account overlay failed: ${errorMessage(overlayError)}`);
-                }
-            }
+            const failureOverlays = await createFailureAccountOverlays(importer, error, source);
+            accountOverlays = failureOverlays.overlays;
             run = createCatalogImportRun({
                 runId: createImportRunId(importer, startedAt),
                 providerId: importer.providerId,
@@ -308,7 +385,7 @@ export async function runCatalogImporters(input = {}) {
                 startedAt,
                 completedAt,
                 rowCount: 0,
-                errors: [errorMessage(error), ...failureOverlayErrors],
+                errors: [errorMessage(error), ...failureOverlays.errors],
             });
             const errors = Array.isArray(run['errors']) ? run['errors'].map((item) => String(item)) : ['unknown catalog importer error'];
             emitProgress(input.onProgress, {
