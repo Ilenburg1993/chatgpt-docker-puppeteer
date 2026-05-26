@@ -3492,8 +3492,14 @@ Implementado neste corte:
 - [x] O diagnóstico retorna `userVersion`, contagens por tabela,
   active snapshot, `catalogRows`, `accountHistoryRows`, `runtimeRows` e
   `routeDecisionRows`.
+- [x] Adicionado `compareModelGatewayCatalogSnapshotParity()` para gate explícito
+  de paridade JSON->SQLite.
+- [x] `mirrorModelGatewayCatalogSnapshotToSqlite()` passa a retornar `parity`
+  com `snapshotIdMatches` e mismatches de contagens.
 - [x] `/byok gateway catalog sqlite` passa a exibir diagnóstico operacional do
   SQLite depois do mirror.
+- [x] `/byok gateway catalog sqlite` passa a exibir o estado de paridade do
+  mirror.
 - [x] Teste cobre duplicatas de evidência no snapshot, preservação de route
   decisions, preservação de runtime health/probes e histórico account/key entre
   rewrites de catálogo.

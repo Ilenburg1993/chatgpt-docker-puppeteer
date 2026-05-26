@@ -154,6 +154,7 @@ export {
     normalizeDataPolicyTaxonomy,
     normalizeStoredCatalogSnapshot,
     normalizeUsdPricing,
+    compareModelGatewayCatalogSnapshotParity,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     ModelGatewayCatalogRefreshLockError,
     planModelGatewayCatalogRefresh,

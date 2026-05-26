@@ -85,6 +85,7 @@ import {
     BYOK_AGENT_PROBE_TOOL,
     BYOK_VISION_PROBE_DISPLAY_NAME,
     BYOK_VISION_PROBE_MIME_TYPE,
+    compareModelGatewayCatalogSnapshotParity,
     JsonModelGatewayCatalogStore,
     SqliteModelGatewayCatalogStore,
     MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
@@ -2580,11 +2581,23 @@ describe('model-gateway foundation', () => {
             assert.equal(mirrored.sourceSnapshot.source, 'json-source');
             assert.equal(mirrored.sqliteSnapshot.source, 'json-source');
             assert.deepEqual(mirrored.sourceCounts, mirrored.sqliteCounts);
+            assert.equal(mirrored.parity.ok, true);
+            assert.equal(mirrored.parity.snapshotIdMatches, true);
+            assert.deepEqual(mirrored.parity.countMismatches, []);
             assert.equal(sqliteSummary.projections, 1);
             assert.equal(sqliteSummary.routeOptions, 1);
             assert.equal(sqliteSummary.modelEligibilityDecisions, 1);
             assert.equal(jsonAfter.projections.length, 1);
             assert.equal(jsonAfter.routeOptions.length, 1);
+            const mismatch = compareModelGatewayCatalogSnapshotParity(
+                mirrored.sourceSnapshot,
+                normalizeStoredCatalogSnapshot({
+                    ...mirrored.sqliteSnapshot,
+                    projections: [],
+                }),
+            );
+            assert.equal(mismatch.ok, false);
+            assert.deepEqual(mismatch.countMismatches, [{ field: 'projections', source: 1, sqlite: 0 }]);
         } finally {
             db.close();
             await rm(dir, { recursive: true, force: true });

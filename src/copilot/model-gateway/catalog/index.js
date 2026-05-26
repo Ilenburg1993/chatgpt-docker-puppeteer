@@ -190,6 +190,7 @@ export {
     MODEL_GATEWAY_SQLITE_TABLES,
 } from './sqlite-schema.js';
 export {
+    compareModelGatewayCatalogSnapshotParity,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     summarizeModelGatewayCatalogSnapshot,
 } from './sqlite-migration.js';

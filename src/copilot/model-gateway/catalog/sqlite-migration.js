@@ -45,6 +45,37 @@ export function summarizeModelGatewayCatalogSnapshot(snapshot) {
 }
 
 /**
+ * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} sourceSnapshot
+ * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} sqliteSnapshot
+ * @returns {{
+ *   ok: boolean;
+ *   snapshotIdMatches: boolean;
+ *   sourceCounts: ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
+ *   sqliteCounts: ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
+ *   countMismatches: Array<{ field: string; source: number; sqlite: number }>;
+ * }}
+ */
+export function compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSnapshot) {
+    const sourceCounts = summarizeModelGatewayCatalogSnapshot(sourceSnapshot);
+    const sqliteCounts = summarizeModelGatewayCatalogSnapshot(sqliteSnapshot);
+    const countMismatches = Object.keys(sourceCounts)
+        .filter((field) => sourceCounts[/** @type {keyof typeof sourceCounts} */ (field)] !== sqliteCounts[/** @type {keyof typeof sqliteCounts} */ (field)])
+        .map((field) => ({
+            field,
+            source: sourceCounts[/** @type {keyof typeof sourceCounts} */ (field)],
+            sqlite: sqliteCounts[/** @type {keyof typeof sqliteCounts} */ (field)],
+        }));
+    const snapshotIdMatches = sourceSnapshot.snapshotId === sqliteSnapshot.snapshotId;
+    return {
+        ok: snapshotIdMatches && countMismatches.length === 0,
+        snapshotIdMatches,
+        sourceCounts,
+        sqliteCounts,
+        countMismatches,
+    };
+}
+
+/**
  * @param {object} input
  * @param {{ readSnapshot(): Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>> }} input.sourceStore
  * @param {{ writeSnapshot(snapshot: ReturnType<typeof normalizeStoredCatalogSnapshot>): Promise<void>; readSnapshot(): Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>> }} input.sqliteStore
@@ -53,16 +84,19 @@ export function summarizeModelGatewayCatalogSnapshot(snapshot) {
  *   sqliteSnapshot: ReturnType<typeof normalizeStoredCatalogSnapshot>;
  *   sourceCounts: ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
  *   sqliteCounts: ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
+ *   parity: ReturnType<typeof compareModelGatewayCatalogSnapshotParity>;
  * }>}
  */
 export async function mirrorModelGatewayCatalogSnapshotToSqlite(input) {
     const sourceSnapshot = normalizeStoredCatalogSnapshot(await input.sourceStore.readSnapshot());
     await input.sqliteStore.writeSnapshot(sourceSnapshot);
     const sqliteSnapshot = normalizeStoredCatalogSnapshot(await input.sqliteStore.readSnapshot());
+    const parity = compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSnapshot);
     return {
         sourceSnapshot,
         sqliteSnapshot,
-        sourceCounts: summarizeModelGatewayCatalogSnapshot(sourceSnapshot),
-        sqliteCounts: summarizeModelGatewayCatalogSnapshot(sqliteSnapshot),
+        sourceCounts: parity.sourceCounts,
+        sqliteCounts: parity.sqliteCounts,
+        parity,
     };
 }

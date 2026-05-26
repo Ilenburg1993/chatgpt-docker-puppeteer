@@ -2342,6 +2342,9 @@ async function renderByokGatewayCatalogSqliteMirror(println) {
         `    \x1b[90msqlite: userVersion=${diagnostics.userVersion} · catalogRows=${diagnostics.catalogRows} · accountHistoryRows=${diagnostics.accountHistoryRows} · runtimeRows=${diagnostics.runtimeRows} · routeDecisions=${diagnostics.routeDecisionRows}\x1b[0m`,
     );
     println(
+        `    \x1b[90mparity=${result.parity.ok ? 'ok' : 'mismatch'} · snapshotId=${result.parity.snapshotIdMatches ? 'ok' : 'diff'} · mismatches=${result.parity.countMismatches.length}\x1b[0m`,
+    );
+    println(
         '    \x1b[90mJSON permanece como export/debug; SQLite agora materializa as camadas normalizadas para consultas futuras.\x1b[0m\n',
     );
 }
