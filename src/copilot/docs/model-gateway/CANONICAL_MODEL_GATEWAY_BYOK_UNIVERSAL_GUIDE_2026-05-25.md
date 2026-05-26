@@ -1642,6 +1642,9 @@ Tudo que for nosso, rico, multi-provider ou experimental fica em
 - [x] Terminal `/byok gateway commands`.
 - [x] Comando canônico JSON para LLMs.
 - [x] Sequência `model-gateway:prebuild` antes do primeiro build.
+- [x] Refresh incremental canônico via package, Makefile e terminal.
+- [x] Refresh provider-scoped para adicionar provider sem rebuild completo.
+- [x] Logs live/JSONL do processamento de refresh de catálogo.
 - [x] Testes unitários do inventário.
 - [ ] Primeiro build real usando apenas comandos canônicos.
 - [ ] Registrar resultado do primeiro build no guia.
@@ -3335,6 +3338,96 @@ Validação deste corte:
 - [x] PASS `npm run model-gateway:test:terminal` com `59` testes.
 - [x] PASS `npm run model-gateway:typecheck`.
 - [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `git diff --check`.
+
+---
+
+## 67. Continuidade 2026-05-26 — Refresh Incremental Live Sem Rebuild Completo
+
+Auditoria executada neste corte:
+
+- [x] Confirmado que adicionar ou ajustar um provider não deve obrigar build
+  completo do sistema nem refresh completo de todos os providers.
+- [x] Confirmado que a arquitetura existente já tinha `planModelGatewayCatalogRefresh()`
+  por TTL/source, mas faltava uma superfície canônica package/Makefile com
+  filtro de provider/source e log persistente.
+- [x] Confirmado que `runCatalogImporters()` era o ponto correto para emitir
+  progresso de fetch, parse, normalização de facts e falhas, sem criar caminho
+  paralelo no script ou terminal.
+- [x] Confirmado que o refresh precisa separar `preview` de `commit`, preservar
+  lock, retention e account overlays, e nunca executar runtime probe/modelo.
+- [x] Confirmado que logs de build/refresh devem ser secret-safe e conter
+  informações suficientes para acompanhar processamento grande em tempo real.
+
+Implementado neste corte:
+
+- [x] `runCatalogImporters()` passa a aceitar `onProgress`.
+- [x] O runner emite `importer_started`, `fetch_completed`, `rows_parsed`,
+  `facts_built`, `importer_completed` e `importer_failed`.
+- [x] Erros emitidos em progresso usam a mesma sanitização de `createCatalogImportRun()`.
+- [x] `refreshModelGatewayCatalog()` passa a aceitar `onProgress`.
+- [x] O refresh emite `refresh_started`, `previous_snapshot_loaded`,
+  `refresh_plan_ready`, `importers_completed`, `projections_built`,
+  `retention_applied`, `snapshot_written`/`snapshot_previewed` e
+  `refresh_completed`.
+- [x] Criado `scripts/model-gateway-refresh.mjs`.
+- [x] O script carrega `.env.local`/`.env`, aceita `--provider`, `--providers`,
+  `--importer`, `--source`, `--source-id`, `--force`, `--all`, `--preview`,
+  `--commit`, `--json` e `--log`.
+- [x] O script grava log completo em `logs/model-gateway-refresh/*.jsonl`.
+- [x] O script imprime progresso live no terminal e resumo final com diff,
+  projections, overlays, importers selecionados e log path.
+- [x] Adicionados scripts `model-gateway:refresh` e
+  `model-gateway:refresh:preview`.
+- [x] Adicionados targets `model-gateway-refresh`,
+  `model-gateway-refresh-preview` e `model-gateway-refresh-provider`.
+- [x] Adicionados comandos canônicos package/Makefile para refresh incremental
+  e provider-scoped.
+- [x] `/byok gateway catalog refresh` passa a renderizar progresso live do
+  mesmo refresh core.
+- [x] Testes cobrem eventos de progresso no runner e no refresh.
+
+Como operar sem rebuild completo:
+
+- [x] Para provider novo ou alterado, usar primeiro
+  `npm run model-gateway:refresh:preview -- --provider=<provider> --force`.
+- [x] Depois de verificar o log, usar
+  `npm run model-gateway:refresh -- --provider=<provider> --force`.
+- [x] Alternativa Makefile:
+  `make model-gateway-refresh-provider PROVIDER=<provider> ARGS=--force`.
+- [x] Para uma fonte específica, usar
+  `npm run model-gateway:refresh -- --source=<importer-id> --force`.
+- [x] Para refresh incremental normal por TTL, usar
+  `npm run model-gateway:refresh`.
+
+Separação preservada:
+
+- [x] Refresh incremental continua sendo coleta/normalização de metadados.
+- [x] Refresh incremental não executa modelos.
+- [x] Refresh incremental não executa probes runtime.
+- [x] Preview não muta snapshot canônico.
+- [x] Commit usa lock e retention.
+- [x] Logs live não imprimem valores de segredo.
+
+Lacunas futuras:
+
+- [ ] Espelhar o log JSONL em tabela SQLite operacional.
+- [ ] Adicionar opção de checkpoint resumido por provider para refreshs muito
+  longos.
+- [ ] Adicionar comando canônico de replay/análise de log de refresh.
+- [ ] Usar o refresh provider-scoped como gate formal antes do primeiro build
+  real.
+
+Validação deste corte:
+
+- [x] PASS testes focados de contratos para importers, refresh e comandos.
+- [x] PASS testes focados de terminal para comandos canônicos e refresh.
+- [x] PASS `npm run model-gateway:test:contracts` com `145` testes.
+- [x] PASS `npm run model-gateway:test:terminal` com `62` testes.
+- [x] PASS `npm run model-gateway:typecheck`.
+- [x] PASS `npm run model-gateway:lint`.
+- [x] PASS `node --check scripts/model-gateway-refresh.mjs`.
+- [x] PASS ESLint focado em `scripts/model-gateway-refresh.mjs`.
 - [x] PASS `git diff --check`.
 
 ---

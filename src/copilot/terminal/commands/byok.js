@@ -2056,6 +2056,7 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
     }
     try {
         eventBus?.emit?.(buildCatalogRefreshStartedEvent(refreshContext));
+        let lastProgressPct = -1;
         const result = await refreshModelGatewayCatalog({
             store,
             importers,
@@ -2063,6 +2064,33 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
             refreshAccountOverlays: true,
             writePolicy: 'commit',
             lockKey: store.filePath,
+            onProgress: (event) => {
+                const progressPct = typeof event.progressPct === 'number' ? event.progressPct : lastProgressPct;
+                const shouldPrint = event.phase === 'refresh_plan_ready' ||
+                    event.phase === 'refresh_completed' ||
+                    event.phase === 'snapshot_written' ||
+                    event.phase === 'snapshot_previewed' ||
+                    event.phase.endsWith(':importer_started') ||
+                    event.phase.endsWith(':importer_completed') ||
+                    event.phase.endsWith(':importer_failed') ||
+                    progressPct - lastProgressPct >= 15;
+                if (!shouldPrint) return;
+                lastProgressPct = Math.max(lastProgressPct, progressPct);
+                const importer = event.importer && typeof event.importer === 'object' ? event.importer['importerId'] : null;
+                const counts = [
+                    typeof event.selectedCount === 'number' ? `selected=${event.selectedCount}` : '',
+                    typeof event.skippedCount === 'number' ? `skipped=${event.skippedCount}` : '',
+                    typeof event.rowCount === 'number' ? `rows=${event.rowCount}` : '',
+                    typeof event.evidenceCount === 'number' ? `evidence=${event.evidenceCount}` : '',
+                    typeof event.projectionCount === 'number' ? `projections=${event.projectionCount}` : '',
+                    typeof event.addedCount === 'number' ? `added=${event.addedCount}` : '',
+                    typeof event.removedCount === 'number' ? `removed=${event.removedCount}` : '',
+                    typeof event.changedCount === 'number' ? `changed=${event.changedCount}` : '',
+                ].filter(Boolean).join(' · ');
+                println(
+                    `    \x1b[90mprogress=${String(progressPct).padStart(3)}% · ${event.phase}${importer ? ` · importer=${importer}` : ''}${counts ? ` · ${counts}` : ''}\x1b[0m`,
+                );
+            },
             retentionPolicy: {
                 maxImportRuns: 200,
                 maxRawPayloadRefs: 200,

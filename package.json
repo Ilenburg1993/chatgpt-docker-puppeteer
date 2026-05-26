@@ -420,6 +420,8 @@
     "model-gateway:commands:json": "node scripts/model-gateway-canonical-commands.mjs --json",
     "model-gateway:lint": "node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/model-gateway src/copilot/terminal/commands/byok.js tests/unit/copilot/model-gateway tests/unit/copilot/terminal/test_commands_byok.spec.js --cache --cache-location /home/node/.cache/eslint/.eslintcache",
     "model-gateway:prebuild": "npm run model-gateway:commands && npm run model-gateway:validate",
+    "model-gateway:refresh": "node scripts/model-gateway-refresh.mjs --commit",
+    "model-gateway:refresh:preview": "node scripts/model-gateway-refresh.mjs --preview",
     "model-gateway:test:contracts": "npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js",
     "model-gateway:test:terminal": "npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js",
     "model-gateway:typecheck": "npm run typecheck:strict:src.copilot",

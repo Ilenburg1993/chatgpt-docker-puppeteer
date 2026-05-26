@@ -1376,7 +1376,7 @@ rag-rebuild-code-config-strict:
 # MODEL GATEWAY BYOK — COMANDOS CANÔNICOS PRE-BUILD
 # =============================================================================
 
-.PHONY: model-gateway-help model-gateway-commands model-gateway-commands-json model-gateway-lint model-gateway-typecheck model-gateway-test-contracts model-gateway-test-terminal model-gateway-validate model-gateway-prebuild model-gateway-terminal
+.PHONY: model-gateway-help model-gateway-commands model-gateway-commands-json model-gateway-lint model-gateway-typecheck model-gateway-test-contracts model-gateway-test-terminal model-gateway-validate model-gateway-prebuild model-gateway-refresh model-gateway-refresh-preview model-gateway-refresh-provider model-gateway-terminal
 
 model-gateway-help: model-gateway-commands
 
@@ -1403,6 +1403,19 @@ model-gateway-validate:
 
 model-gateway-prebuild:
 	@$(NPM) run model-gateway:prebuild
+
+model-gateway-refresh:
+	@$(NPM) run model-gateway:refresh
+
+model-gateway-refresh-preview:
+	@$(NPM) run model-gateway:refresh:preview
+
+model-gateway-refresh-provider:
+	@if [ -z "$(PROVIDER)" ]; then \
+		echo "$(RED)Uso: make model-gateway-refresh-provider PROVIDER=openrouter [ARGS='--force']$(NC)"; \
+		exit 2; \
+	fi
+	@$(NPM) run model-gateway:refresh -- --provider=$(PROVIDER) $(ARGS)
 
 model-gateway-terminal:
 	@echo "$(CYAN)Abra o cockpit e use: /byok gateway commands$(NC)"

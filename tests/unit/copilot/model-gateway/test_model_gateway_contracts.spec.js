@@ -2778,9 +2778,12 @@ describe('model-gateway foundation', () => {
                 new Date('2026-05-25T12:00:02.000Z'),
                 new Date('2026-05-25T12:00:03.000Z'),
             ];
+            /** @type {Array<Record<string, any>>} */
+            const progressEvents = [];
             const snapshot = await runCatalogImporters({
                 store,
                 now: () => dates.shift() ?? new Date('2026-05-25T12:00:04.000Z'),
+                onProgress: (event) => progressEvents.push(event),
                 importers: [
                     {
                         id: 'openrouter-models',
@@ -2845,6 +2848,11 @@ describe('model-gateway foundation', () => {
             assert.equal(loaded.evidences[0].value, 131072);
             assert.deepEqual(loaded.accountOverlays[0].enabledModels, ['m']);
             assert.equal(JSON.stringify(loaded.importRuns).includes('gsk-secret-that-must-not-leak'), false);
+            assert.ok(progressEvents.some((event) => event['phase'] === 'importer_started' && event['importerId'] === 'openrouter-models'));
+            assert.ok(progressEvents.some((event) => event['phase'] === 'facts_built' && event['evidenceCount'] === 1));
+            assert.ok(progressEvents.some((event) => event['phase'] === 'importer_completed' && event['progressPct'] === 50));
+            assert.ok(progressEvents.some((event) => event['phase'] === 'importer_failed' && event['progressPct'] === 100));
+            assert.equal(JSON.stringify(progressEvents).includes('gsk-secret-that-must-not-leak'), false);
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -6116,10 +6124,13 @@ describe('model-gateway foundation', () => {
                     createCanonicalModelProjection({ providerId: 'ollama', providerModel: 'local-model', displayName: 'Local Model' }),
                 ],
             });
+            /** @type {Array<Record<string, any>>} */
+            const progressEvents = [];
             const result = await refreshModelGatewayCatalog({
                 store,
                 writePolicy: 'commit',
                 now: () => new Date('2026-05-25T12:30:00.000Z'),
+                onProgress: (event) => progressEvents.push(event),
                 importers: [
                     {
                         id: 'openrouter-models',
@@ -6161,6 +6172,12 @@ describe('model-gateway foundation', () => {
             assert.equal(refreshRun?.status, 'completed');
             assert.deepEqual(refreshRun?.diff?.added, ['openrouter:new-model:default']);
             assert.deepEqual(refreshRun?.diff?.removed, ['openrouter:old-model:default']);
+            assert.ok(progressEvents.some((event) => event['phase'] === 'refresh_started' && event['writePolicy'] === 'commit'));
+            assert.ok(progressEvents.some((event) => event['phase'] === 'refresh_plan_ready' && event['selectedCount'] === 1));
+            assert.ok(progressEvents.some((event) => event['phase'] === 'importer:importer_completed'));
+            assert.ok(progressEvents.some((event) => event['phase'] === 'projections_built' && event['addedCount'] === 1));
+            assert.ok(progressEvents.some((event) => event['phase'] === 'snapshot_written' && event['committed'] === true));
+            assert.ok(progressEvents.some((event) => event['phase'] === 'refresh_completed' && event['progressPct'] === 100));
         } finally {
             await rm(dir, { recursive: true, force: true });
         }

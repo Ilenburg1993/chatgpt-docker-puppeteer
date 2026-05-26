@@ -18,6 +18,53 @@ import { planModelGatewayCatalogRefresh } from './refresh-plan.js';
 import { applyModelGatewayCatalogRetention } from './retention.js';
 
 /**
+ * @typedef {object} ModelGatewayCatalogRefreshProgressEvent
+ * @property {string} phase
+ * @property {number} elapsedMs
+ * @property {number} [progressPct]
+ * @property {string} [writePolicy]
+ * @property {string} [storePath]
+ * @property {number} [importerCount]
+ * @property {number} [selectedCount]
+ * @property {number} [skippedCount]
+ * @property {number} [rowCount]
+ * @property {number} [sourceCount]
+ * @property {number} [evidenceCount]
+ * @property {number} [providerEvidenceCount]
+ * @property {number} [routeOptionCount]
+ * @property {number} [accountOverlayCount]
+ * @property {number} [projectionCount]
+ * @property {number} [providerProjectionCount]
+ * @property {number} [addedCount]
+ * @property {number} [removedCount]
+ * @property {number} [changedCount]
+ * @property {boolean} [committed]
+ * @property {boolean} [storeAvailable]
+ * @property {Record<string, any>} [importer]
+ * @property {string[]} [selectedSourceIds]
+ * @property {string[]} [skippedSourceIds]
+ */
+
+/**
+ * @param {Date} startedAt
+ * @param {Date} observedAt
+ * @returns {number}
+ */
+function refreshElapsedMs(startedAt, observedAt) {
+    return Math.max(0, observedAt.getTime() - startedAt.getTime());
+}
+
+/**
+ * @param {((event: ModelGatewayCatalogRefreshProgressEvent) => void) | undefined} onProgress
+ * @param {ModelGatewayCatalogRefreshProgressEvent} event
+ * @returns {void}
+ */
+function emitRefreshProgress(onProgress, event) {
+    if (typeof onProgress !== 'function') return;
+    onProgress(event);
+}
+
+/**
  * @template {Record<string, any>} T
  * @param {T[]} records
  * @param {T[]} additions
@@ -150,6 +197,7 @@ function buildProviderProjectionsFromEvidence(evidences) {
  * @param {import('./retention.js').ModelGatewayCatalogRetentionPolicy} [input.retentionPolicy]
  * @param {string} [input.writePolicy]
  * @param {string | false} [input.lockKey]
+ * @param {(event: ModelGatewayCatalogRefreshProgressEvent) => void} [input.onProgress]
  * @returns {Promise<{
  *     snapshot: ReturnType<typeof normalizeStoredCatalogSnapshot>;
  *     diff: ReturnType<typeof diffCanonicalModelProjections>;
@@ -190,13 +238,32 @@ export async function refreshModelGatewayCatalog(input = {}) {
  * @param {{ mode?: string; maxInlineBytes?: number }} [input.rawPayloadStoragePolicy]
  * @param {import('./retention.js').ModelGatewayCatalogRetentionPolicy} [input.retentionPolicy]
  * @param {string} [input.writePolicy]
+ * @param {(event: ModelGatewayCatalogRefreshProgressEvent) => void} [input.onProgress]
  * @returns {Promise<Omit<Awaited<ReturnType<typeof refreshModelGatewayCatalog>>, 'refreshLock'>>}
  */
 async function refreshModelGatewayCatalogUnlocked(input = {}) {
     const now = input.now ?? (() => new Date());
     const startedAt = now();
     const writePolicy = input.writePolicy === 'commit' ? 'commit' : 'preview';
+    emitRefreshProgress(input.onProgress, {
+        phase: 'refresh_started',
+        elapsedMs: 0,
+        progressPct: 0,
+        writePolicy,
+        importerCount: (input.importers ?? []).length,
+        storeAvailable: Boolean(input.store),
+    });
     const previous = input.store ? await input.store.readSnapshot() : normalizeStoredCatalogSnapshot(input.snapshot);
+    emitRefreshProgress(input.onProgress, {
+        phase: 'previous_snapshot_loaded',
+        elapsedMs: refreshElapsedMs(startedAt, now()),
+        progressPct: 5,
+        sourceCount: previous.sources.length,
+        evidenceCount: previous.evidences.length,
+        providerEvidenceCount: previous.providerEvidences.length,
+        projectionCount: previous.projections.length,
+        accountOverlayCount: previous.accountOverlays.length,
+    });
     const refreshPlan = input.incremental === true
         ? planModelGatewayCatalogRefresh({
             importers: input.importers ?? [],
@@ -206,10 +273,36 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
             sourceIds: input.sourceIds,
         })
         : null;
+    emitRefreshProgress(input.onProgress, {
+        phase: 'refresh_plan_ready',
+        elapsedMs: refreshElapsedMs(startedAt, now()),
+        progressPct: 10,
+        selectedCount: refreshPlan?.selected.length ?? (input.importers ?? []).length,
+        skippedCount: refreshPlan?.skipped.length ?? 0,
+        selectedSourceIds: (refreshPlan?.selected ?? []).map((item) => item.sourceId),
+        skippedSourceIds: (refreshPlan?.skipped ?? []).map((item) => item.sourceId),
+    });
     const imported = await runCatalogImporters({
         importers: refreshPlan?.selectedImporters ?? input.importers ?? [],
         now,
         rawPayloadStoragePolicy: input.rawPayloadStoragePolicy,
+        onProgress: (event) => emitRefreshProgress(input.onProgress, {
+            ...event,
+            phase: `importer:${event.phase}`,
+            elapsedMs: refreshElapsedMs(startedAt, now()),
+            importer: event,
+            progressPct: 10 + Math.round((event.progressPct / 100) * 45),
+        }),
+    });
+    emitRefreshProgress(input.onProgress, {
+        phase: 'importers_completed',
+        elapsedMs: refreshElapsedMs(startedAt, now()),
+        progressPct: 55,
+        sourceCount: imported.sources.length,
+        evidenceCount: imported.evidences.length,
+        providerEvidenceCount: imported.providerEvidences.length,
+        routeOptionCount: imported.routeOptions.length,
+        accountOverlayCount: imported.accountOverlays.length,
     });
     const refreshedSourceIds = new Set(imported.sources.map((source) => String(source['id'])));
     const retainedEvidences = previous.evidences.filter((evidence) => !refreshedSourceIds.has(String(evidence['sourceId'])));
@@ -229,6 +322,16 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
     const { projections, conflicts } = buildProjectionsFromEvidence(combinedEvidences);
     const { providerProjections, providerConflicts } = buildProviderProjectionsFromEvidence(combinedProviderEvidences);
     const diff = diffCanonicalModelProjections(previous.projections, projections);
+    emitRefreshProgress(input.onProgress, {
+        phase: 'projections_built',
+        elapsedMs: refreshElapsedMs(startedAt, now()),
+        progressPct: 70,
+        projectionCount: projections.length,
+        providerProjectionCount: providerProjections.length,
+        addedCount: diff.added.length,
+        removedCount: diff.removed.length,
+        changedCount: diff.changed.length,
+    });
     const modelTombstones = createCatalogModelTombstones({
         diff,
         previousProjections: previous.projections,
@@ -271,7 +374,27 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
     };
     const retained = applyModelGatewayCatalogRetention(nextSnapshot, input.retentionPolicy);
     const snapshot = retained.snapshot;
+    emitRefreshProgress(input.onProgress, {
+        phase: 'retention_applied',
+        elapsedMs: refreshElapsedMs(startedAt, now()),
+        progressPct: 85,
+        sourceCount: snapshot['sources'].length,
+        evidenceCount: snapshot['evidences'].length,
+        providerEvidenceCount: snapshot['providerEvidences'].length,
+        routeOptionCount: snapshot['routeOptions'].length,
+        accountOverlayCount: snapshot['accountOverlays'].length,
+        projectionCount: snapshot['projections'].length,
+        providerProjectionCount: snapshot['providerProjections'].length,
+    });
     if (input.store && writePolicy === 'commit') await input.store.writeSnapshot(snapshot);
+    emitRefreshProgress(input.onProgress, {
+        phase: input.store && writePolicy === 'commit' ? 'snapshot_written' : 'snapshot_previewed',
+        elapsedMs: refreshElapsedMs(startedAt, now()),
+        progressPct: 95,
+        committed: Boolean(input.store && writePolicy === 'commit'),
+        storeAvailable: Boolean(input.store),
+        writePolicy,
+    });
     const output = {
         snapshot: normalizeStoredCatalogSnapshot(snapshot),
         diff,
@@ -293,6 +416,19 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
             committed: Boolean(input.store && writePolicy === 'commit'),
         },
     };
+    emitRefreshProgress(input.onProgress, {
+        phase: 'refresh_completed',
+        elapsedMs: refreshElapsedMs(startedAt, now()),
+        progressPct: 100,
+        committed: output.writePolicy.committed,
+        storeAvailable: output.writePolicy.storeAvailable,
+        writePolicy: output.writePolicy.mode,
+        projectionCount: output.snapshot.projections.length,
+        providerProjectionCount: output.snapshot.providerProjections.length,
+        addedCount: output.diff.added.length,
+        removedCount: output.diff.removed.length,
+        changedCount: output.diff.changed.length,
+    });
     if (refreshPlan) return { ...output, refreshPlan };
     return output;
 }

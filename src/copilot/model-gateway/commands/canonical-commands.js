@@ -62,6 +62,27 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Run the canonical scoped validation set before build preparation.',
     },
     {
+        id: 'refresh.incremental',
+        phase: 'metadata',
+        surface: 'package',
+        command: 'npm run model-gateway:refresh',
+        summary: 'Commit an incremental metadata refresh with live JSONL progress logs.',
+    },
+    {
+        id: 'refresh.provider',
+        phase: 'metadata',
+        surface: 'package',
+        command: 'npm run model-gateway:refresh -- --provider=openrouter --force',
+        summary: 'Refresh one provider/source family without a full catalog rebuild.',
+    },
+    {
+        id: 'refresh.preview',
+        phase: 'metadata',
+        surface: 'package',
+        command: 'npm run model-gateway:refresh:preview -- --provider=openrouter',
+        summary: 'Preview a provider refresh and write the full progress log without committing the snapshot.',
+    },
+    {
         id: 'prebuild.all',
         phase: 'prebuild',
         surface: 'package',
@@ -81,6 +102,20 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-validate',
         summary: 'Makefile alias for the scoped validation set.',
+    },
+    {
+        id: 'make.refresh',
+        phase: 'metadata',
+        surface: 'make',
+        command: 'make model-gateway-refresh',
+        summary: 'Makefile alias for incremental refresh with live logs.',
+    },
+    {
+        id: 'make.refresh-provider',
+        phase: 'metadata',
+        surface: 'make',
+        command: 'make model-gateway-refresh-provider PROVIDER=openrouter ARGS=--force',
+        summary: 'Makefile provider-scoped refresh path for adding or updating one provider without full rebuild.',
     },
     {
         id: 'make.prebuild',

@@ -32,6 +32,25 @@ import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
  */
 
 /**
+ * @typedef {object} CatalogImporterProgressEvent
+ * @property {string} phase
+ * @property {string} importerId
+ * @property {string} providerId
+ * @property {string} sourceId
+ * @property {string} sourceKind
+ * @property {number} index
+ * @property {number} total
+ * @property {number} progressPct
+ * @property {number} elapsedMs
+ * @property {number} [rowCount]
+ * @property {number} [evidenceCount]
+ * @property {number} [providerEvidenceCount]
+ * @property {number} [routeOptionCount]
+ * @property {number} [accountOverlayCount]
+ * @property {string[]} [errors]
+ */
+
+/**
  * @param {unknown} error
  * @returns {string}
  */
@@ -76,6 +95,37 @@ function createSourceForImporter(importer) {
         parserId: importer.id,
         trustTier: importer.requiresAuth ? 'account_scoped' : 'provider_catalog',
     });
+}
+
+/**
+ * @param {number} index
+ * @param {number} total
+ * @param {number} phaseFraction
+ * @returns {number}
+ */
+function importerProgressPct(index, total, phaseFraction) {
+    const boundedTotal = Math.max(1, total);
+    const boundedFraction = Math.min(1, Math.max(0, phaseFraction));
+    return Math.round(((Math.max(0, index - 1) + boundedFraction) / boundedTotal) * 100);
+}
+
+/**
+ * @param {Date} startedAt
+ * @param {Date} observedAt
+ * @returns {number}
+ */
+function elapsedMs(startedAt, observedAt) {
+    return Math.max(0, observedAt.getTime() - startedAt.getTime());
+}
+
+/**
+ * @param {((event: CatalogImporterProgressEvent) => void) | undefined} onProgress
+ * @param {CatalogImporterProgressEvent} event
+ * @returns {void}
+ */
+function emitProgress(onProgress, event) {
+    if (typeof onProgress !== 'function') return;
+    onProgress(event);
 }
 
 /**
@@ -131,19 +181,31 @@ function routeOptionKey(option) {
  * @param {{ writeSnapshot(snapshot: object): Promise<void> }} [input.store]
  * @param {() => Date} [input.now]
  * @param {{ mode?: string; maxInlineBytes?: number }} [input.rawPayloadStoragePolicy]
+ * @param {(event: CatalogImporterProgressEvent) => void} [input.onProgress]
  * @returns {Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>>}
  */
 export async function runCatalogImporters(input = {}) {
     const now = input.now ?? (() => new Date());
+    const importers = input.importers ?? [];
     /** @type {ReturnType<typeof normalizeStoredCatalogSnapshot>} */
     let snapshot = {
         ...normalizeStoredCatalogSnapshot(input.snapshot),
         source: 'catalog-importer-runner',
     };
 
-    for (const importer of input.importers ?? []) {
+    for (const [position, importer] of importers.entries()) {
+        const index = position + 1;
         const startedAt = now();
         const source = createSourceForImporter(importer);
+        const sourceId = String(source['id']);
+        const baseProgress = {
+            importerId: importer.id,
+            providerId: importer.providerId,
+            sourceId,
+            sourceKind: importer.sourceKind,
+            index,
+            total: importers.length,
+        };
         /** @type {Record<string, any>[]} */
         let rawPayloadRefs = [];
         /** @type {Record<string, any>[]} */
@@ -158,39 +220,94 @@ export async function runCatalogImporters(input = {}) {
         let run;
 
         try {
+            emitProgress(input.onProgress, {
+                ...baseProgress,
+                phase: 'importer_started',
+                progressPct: importerProgressPct(index, importers.length, 0),
+                elapsedMs: 0,
+            });
             const raw = await importer.fetchRaw();
+            const fetchedAt = now();
+            emitProgress(input.onProgress, {
+                ...baseProgress,
+                phase: 'fetch_completed',
+                progressPct: importerProgressPct(index, importers.length, 0.25),
+                elapsedMs: elapsedMs(startedAt, fetchedAt),
+            });
             const rawRef = createSanitizedRawPayloadRef({
                 providerId: importer.providerId,
-                sourceId: String(source['id']),
+                sourceId,
                 payload: raw,
                 storagePolicy: input.rawPayloadStoragePolicy,
             });
             const rows = await importer.parseRows(raw);
+            const rowsParsedAt = now();
+            emitProgress(input.onProgress, {
+                ...baseProgress,
+                phase: 'rows_parsed',
+                progressPct: importerProgressPct(index, importers.length, 0.45),
+                elapsedMs: elapsedMs(startedAt, rowsParsedAt),
+                rowCount: rows.length,
+            });
             const context = { source, rawPayloadRef: rawRef.rawPayloadRef };
             providerEvidences = importer.toProviderEvidenceFacts ? await importer.toProviderEvidenceFacts(rows, context) : [];
             evidences = await importer.toEvidenceFacts(rows, context);
             routeOptions = importer.toRouteOptions ? await importer.toRouteOptions(rows, context) : [];
             accountOverlays = importer.toAccountOverlays ? await importer.toAccountOverlays(rows, context) : [];
+            const factsBuiltAt = now();
+            emitProgress(input.onProgress, {
+                ...baseProgress,
+                phase: 'facts_built',
+                progressPct: importerProgressPct(index, importers.length, 0.75),
+                elapsedMs: elapsedMs(startedAt, factsBuiltAt),
+                rowCount: rows.length,
+                evidenceCount: evidences.length,
+                providerEvidenceCount: providerEvidences.length,
+                routeOptionCount: routeOptions.length,
+                accountOverlayCount: accountOverlays.length,
+            });
             rawPayloadRefs = [rawRef];
+            const completedAt = now();
             run = createCatalogImportRun({
                 runId: createImportRunId(importer, startedAt),
                 providerId: importer.providerId,
-                sourceId: String(source['id']),
+                sourceId,
                 status: 'completed',
                 startedAt,
-                completedAt: now(),
+                completedAt,
                 rowCount: rows.length,
             });
+            emitProgress(input.onProgress, {
+                ...baseProgress,
+                phase: 'importer_completed',
+                progressPct: importerProgressPct(index, importers.length, 1),
+                elapsedMs: elapsedMs(startedAt, completedAt),
+                rowCount: rows.length,
+                evidenceCount: evidences.length,
+                providerEvidenceCount: providerEvidences.length,
+                routeOptionCount: routeOptions.length,
+                accountOverlayCount: accountOverlays.length,
+            });
         } catch (error) {
+            const completedAt = now();
             run = createCatalogImportRun({
                 runId: createImportRunId(importer, startedAt),
                 providerId: importer.providerId,
-                sourceId: String(source['id']),
+                sourceId,
                 status: 'failed',
                 startedAt,
-                completedAt: now(),
+                completedAt,
                 rowCount: 0,
                 errors: [errorMessage(error)],
+            });
+            const errors = Array.isArray(run['errors']) ? run['errors'].map((item) => String(item)) : ['unknown catalog importer error'];
+            emitProgress(input.onProgress, {
+                ...baseProgress,
+                phase: 'importer_failed',
+                progressPct: importerProgressPct(index, importers.length, 1),
+                elapsedMs: elapsedMs(startedAt, completedAt),
+                rowCount: 0,
+                errors,
             });
         }
 
