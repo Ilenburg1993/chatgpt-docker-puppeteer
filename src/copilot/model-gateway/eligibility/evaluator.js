@@ -322,6 +322,7 @@ export function evaluateModelGatewayEligibility(input) {
     const nowMs = dateMs(input.now) ?? Date.now();
     const providerId = readProviderId(routeOption, projection);
     const providerModel = readProviderModel(routeOption, projection);
+    const selectorSyntax = optionalString(routeOption['selectorSyntax']) ?? optionalString(projection['selectorSyntax']) ?? providerModel;
     const policy = /** @type {Record<string, any>} */ ({ ...DEFAULT_POLICY, ...(isRecord(input.policy) ? input.policy : {}) });
     const accountScope = optionalString(policy['accountScope']);
     const hard = [];
@@ -332,6 +333,7 @@ export function evaluateModelGatewayEligibility(input) {
     const access = resolveModelGatewayAccountAccess({
         providerId,
         providerModel,
+        providerModelAliases: [selectorSyntax],
         accountScope,
         accountOverlays: Array.isArray(input.accountOverlays) ? input.accountOverlays.filter(isRecord) : [],
         secretRegistry: input.secretRegistry,
@@ -355,8 +357,11 @@ export function evaluateModelGatewayEligibility(input) {
 
     if (allowProviders.size > 0 && !allowProviders.has(providerId)) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.PROVIDER_NOT_ALLOWED);
     if (blockProviders.has(providerId)) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.PROVIDER_BLOCKED);
-    if (allowModels.size > 0 && !allowModels.has(keyToken(providerModel))) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_NOT_ALLOWED);
-    if (blockModels.has(keyToken(providerModel))) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_BLOCKED);
+    const routeIdentityTokens = [providerModel, selectorSyntax].map(keyToken);
+    if (allowModels.size > 0 && routeIdentityTokens.every((token) => !allowModels.has(token))) {
+        hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_NOT_ALLOWED);
+    }
+    if (routeIdentityTokens.some((token) => blockModels.has(token))) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_BLOCKED);
     if (projection['enabled'] === false) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_DISABLED);
 
     const lifecycleStatus = optionalString(lifecycle(projection)['status']) ?? optionalString(projection['lifecycle']);
@@ -424,7 +429,7 @@ export function evaluateModelGatewayEligibility(input) {
         providerModel,
         routeProfile: optionalString(routeOption['routeProfile']) ?? optionalString(projection['routeProfile']) ?? undefined,
         selectorKind: optionalString(routeOption['selectorKind']) ?? 'exact_model',
-        selectorSyntax: optionalString(routeOption['selectorSyntax']) ?? providerModel,
+        selectorSyntax,
         accountScope: accountScope ?? 'default',
         secretRef: secretRef ?? undefined,
         policyProfile: optionalString(policy['policyProfile']) ?? 'default',
@@ -441,7 +446,7 @@ export function evaluateModelGatewayEligibility(input) {
                 optionalString(routeOption['providerId']) ?? providerId,
                 optionalString(routeOption['providerModel']) ?? providerModel,
                 optionalString(routeOption['selectorKind']) ?? 'exact_model',
-                optionalString(routeOption['selectorSyntax']) ?? providerModel,
+                selectorSyntax,
             ].join(':'),
         ],
         policyInputs: {
@@ -454,6 +459,7 @@ export function evaluateModelGatewayEligibility(input) {
                 canAttempt: access.canAttempt,
                 secretConfigured: access.secretConfigured,
                 modelVisible: access.modelVisible,
+                modelIdentifiers: access.modelIdentifiers,
                 accessConfidence: access.accessConfidence,
                 failureClass: access.failureClass,
                 resetWindows: access.resetWindows,

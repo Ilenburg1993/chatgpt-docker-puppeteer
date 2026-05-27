@@ -2379,7 +2379,7 @@ Quota/account overlay mais rico.
 - [x] Integrar Cloudflare account/gateway.
 - [x] Integrar Ollama local installed overlay.
 - [ ] Adicionar policy presets formais.
-- [ ] Adicionar account-scoped route selector eligibility.
+- [x] Adicionar account-scoped route selector eligibility.
 - [ ] Adicionar upstream provider eligibility para gateways.
 - [ ] Adicionar route layer eligibility por task.
 - [ ] Adicionar wire API eligibility por adapter.
@@ -6543,6 +6543,38 @@ Tambem preserva o caminho para:
 - manter historico suficiente para explicar bloqueios;
 - podar sinais volateis sem apagar catalogo canonico;
 - aplicar retention em SQLite sem tocar JSON canonical.
+
+## 21.42 Mudanca 42 - Eligibility Account-Scoped Por Selector De Rota
+
+O resolver de account access deixou de comparar apenas `providerModel`.
+
+Agora ele recebe `providerModelAliases` e produz `modelIdentifiers`.
+
+No fluxo de eligibility, `selectorSyntax` entra como alias do modelo.
+
+Isso permite que account overlays expressem:
+
+- modelo base visivel;
+- selector de gateway visivel;
+- selector de gateway bloqueado;
+- politica upstream especifica sem chamada runtime.
+
+Exemplo:
+
+`providerModel = openai/gpt-oss-120b`
+
+`selectorSyntax = openai/gpt-oss-120b:fastest`
+
+Se o overlay habilita apenas `openai/gpt-oss-120b:fastest`, a rota agora fica visivel.
+
+Se o overlay bloqueia `openai/gpt-oss-120b:fastest`, a rota fica excluida mesmo que o modelo base esteja habilitado.
+
+Isso prepara:
+
+- selectors automaticos de gateway;
+- politicas fastest/cheapest/preferred;
+- account access por rota;
+- runtime selector sem perder o id que o SDK deve receber.
 
 ## 22. Fim Do Documento Inicial
 

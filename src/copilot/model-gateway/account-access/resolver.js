@@ -96,12 +96,21 @@ function keyToken(value) {
 
 /**
  * @param {string} providerModel
+ * @param {string[]} aliases
+ * @returns {string[]}
+ */
+function modelIdentityTokens(providerModel, aliases = []) {
+    return [...new Set([providerModel, ...aliases].map(optionalString).filter((item) => item !== null))];
+}
+
+/**
+ * @param {string[]} providerModelTokens
  * @param {unknown} models
  * @returns {boolean}
  */
-function modelListIncludes(providerModel, models) {
-    const target = keyToken(providerModel);
-    return stringList(models).some((model) => keyToken(model) === target);
+function modelListIncludesAny(providerModelTokens, models) {
+    const targets = new Set(providerModelTokens.map(keyToken));
+    return stringList(models).some((model) => targets.has(keyToken(model)));
 }
 
 /**
@@ -224,6 +233,7 @@ function overlayExpired(overlay, nowMs) {
  * @param {object} input
  * @param {string} input.providerId
  * @param {string} input.providerModel
+ * @param {string[]} [input.providerModelAliases]
  * @param {string | null} [input.accountScope]
  * @param {Record<string, any>[]} [input.accountOverlays]
  * @param {{ has(ref: string): boolean }} [input.secretRegistry]
@@ -244,6 +254,7 @@ function overlayExpired(overlay, nowMs) {
  *   secretRef: string | null;
  *   secretConfigured: boolean | null;
  *   modelVisible: boolean;
+ *   modelIdentifiers: string[];
  *   accessConfidence: string;
  *   failureClass: string;
  *   overlays: Record<string, any>[];
@@ -266,6 +277,7 @@ function overlayExpired(overlay, nowMs) {
 export function resolveModelGatewayAccountAccess(input) {
     const providerId = optionalString(input.providerId) ?? 'unknown-provider';
     const providerModel = optionalString(input.providerModel) ?? 'unknown-model';
+    const modelIdentifiers = modelIdentityTokens(providerModel, stringList(input.providerModelAliases));
     const requestedAccountScope = optionalString(input.accountScope);
     const accountScope = requestedAccountScope ?? 'default';
     const nowMs = dateMs(input.now) ?? Date.now();
@@ -316,11 +328,11 @@ export function resolveModelGatewayAccountAccess(input) {
         if (input.unknownAccessPolicy === 'block') hardReasons.push('account_access_unknown');
     } else {
         reasons.push('account_overlay_available');
-        if (overlays.some((overlay) => modelListIncludes(providerModel, overlay['blockedModels']))) {
+        if (overlays.some((overlay) => modelListIncludesAny(modelIdentifiers, overlay['blockedModels']))) {
             hardReasons.push('account_model_blocked');
         }
         const overlaysWithEnabledModels = overlays.filter((overlay) => stringList(overlay['enabledModels']).length > 0);
-        modelVisible = overlaysWithEnabledModels.some((overlay) => modelListIncludes(providerModel, overlay['enabledModels']));
+        modelVisible = overlaysWithEnabledModels.some((overlay) => modelListIncludesAny(modelIdentifiers, overlay['enabledModels']));
         if (modelVisible) reasons.push('account_model_visible');
         else if (overlaysWithEnabledModels.length > 0 && input.treatEnabledModelsAsClosed !== false) {
             hardReasons.push('account_model_not_visible');
@@ -341,6 +353,7 @@ export function resolveModelGatewayAccountAccess(input) {
         secretRef,
         secretConfigured,
         modelVisible,
+        modelIdentifiers,
         accessConfidence: resolveConfidence(status, secretConfigured, modelVisible, overlays),
         failureClass: classifyFailure(status, uniqueHard, uniqueSoft),
         overlays,

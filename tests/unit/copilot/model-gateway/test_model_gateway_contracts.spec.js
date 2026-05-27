@@ -7713,6 +7713,39 @@ describe('model-gateway foundation', () => {
         assert.equal(blocked.accessConfidence, 'high');
         assert.equal(blocked.failureClass, 'policy_block');
         assert.ok(blocked.hardReasons.includes('account_model_blocked'));
+
+        const selectorVisible = resolveModelGatewayAccountAccess({
+            providerId: 'openai',
+            providerModel: 'gpt-base',
+            providerModelAliases: ['gpt-base:fastest'],
+            accountOverlays: [
+                createProviderAccountOverlay({
+                    providerId: 'openai',
+                    secretRef: 'OPENAI_API_KEY',
+                    enabledModels: ['gpt-base:fastest'],
+                }),
+            ],
+            secretRegistry: createEnvSecretRegistry({ env: { OPENAI_API_KEY: 'sk-test' } }),
+        });
+        assert.equal(selectorVisible.status, 'visible');
+        assert.deepEqual(selectorVisible.modelIdentifiers, ['gpt-base', 'gpt-base:fastest']);
+
+        const selectorBlocked = resolveModelGatewayAccountAccess({
+            providerId: 'openai',
+            providerModel: 'gpt-base',
+            providerModelAliases: ['gpt-base:blocked-policy'],
+            accountOverlays: [
+                createProviderAccountOverlay({
+                    providerId: 'openai',
+                    secretRef: 'OPENAI_API_KEY',
+                    enabledModels: ['gpt-base'],
+                    blockedModels: ['gpt-base:blocked-policy'],
+                }),
+            ],
+            secretRegistry: createEnvSecretRegistry({ env: { OPENAI_API_KEY: 'sk-test' } }),
+        });
+        assert.equal(selectorBlocked.status, 'blocked');
+        assert.ok(selectorBlocked.hardReasons.includes('account_model_blocked'));
     });
 
     it('explains account model visibility with stable next actions', () => {
@@ -8273,6 +8306,54 @@ describe('model-gateway foundation', () => {
         assert.equal(decision.policyInputs['accountAccess']['failureClass'], 'secret_configuration');
         assert.equal(Array.isArray(decision.policyInputs['accountAccess']['resetWindows']), true);
         assert.equal(JSON.stringify(decision).includes('OPENAI_API_KEY'), true);
+    });
+
+    it('evaluates account-scoped selector syntax visibility before runtime', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+        });
+        const route = createModelRouteOption({
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            selectorKind: 'gateway_policy',
+            selectorSyntax: 'openai/gpt-oss-120b:fastest',
+        });
+        const visible = evaluateModelGatewayEligibility({
+            projection,
+            routeOption: route,
+            accountOverlays: [
+                createProviderAccountOverlay({
+                    providerId: 'openrouter',
+                    secretRef: 'OPENROUTER_API_KEY',
+                    enabledModels: ['openai/gpt-oss-120b:fastest'],
+                }),
+            ],
+            secretRegistry: createEnvSecretRegistry({ env: { OPENROUTER_API_KEY: 'sk-or-test' } }),
+        });
+        assert.equal(visible.include, true);
+        assert.equal(visible.selectorSyntax, 'openai/gpt-oss-120b:fastest');
+        assert.deepEqual(visible.policyInputs['accountAccess']['modelIdentifiers'], [
+            'openai/gpt-oss-120b',
+            'openai/gpt-oss-120b:fastest',
+        ]);
+
+        const blocked = evaluateModelGatewayEligibility({
+            projection,
+            routeOption: route,
+            accountOverlays: [
+                createProviderAccountOverlay({
+                    providerId: 'openrouter',
+                    secretRef: 'OPENROUTER_API_KEY',
+                    enabledModels: ['openai/gpt-oss-120b'],
+                    blockedModels: ['openai/gpt-oss-120b:fastest'],
+                }),
+            ],
+            secretRegistry: createEnvSecretRegistry({ env: { OPENROUTER_API_KEY: 'sk-or-test' } }),
+        });
+        assert.equal(blocked.include, false);
+        assert.ok(blocked.hardExclusions.includes('account_model_blocked'));
     });
 
     it('integrates fatal runtime health classification into pre-runtime eligibility', () => {
