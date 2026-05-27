@@ -45,6 +45,7 @@ import {
     buildModelGatewaySelectionDecisionTrace,
     compareModelGatewaySelectionDecisionTraces,
     compareModelGatewaySelectionAudits,
+    explainModelGatewaySelectionComparison,
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     MODEL_GATEWAY_SELECTION_POLICY_MODE,
     listModelGatewaySelectionDecisionTraceFiles,
@@ -741,6 +742,11 @@ describe('model-gateway foundation', () => {
         assert.equal(comparison.summary.changedCount, 1);
         assert.equal(comparison.summary.postRuntimeProofSelectedCount, 1);
         assert.equal(comparison.rows[0].postSelectedHasRuntimeProof, true);
+        const comparisonExplanation = explainModelGatewaySelectionComparison(comparison);
+        assert.equal(comparisonExplanation.schema, 'model-gateway-selection-comparison-explain');
+        assert.equal(comparisonExplanation.summary.reasonCounts.same_route_runtime_proved, 1);
+        assert.equal(comparisonExplanation.summary.reasonCounts.post_runtime_lost_route, 1);
+        assert.ok(comparisonExplanation.summary.nextActions.includes('record_runtime_proof_and_keep_route'));
 
         const metadataFirst = resolveModelGatewaySelectionPolicy(comparison);
         assert.equal(metadataFirst.schema, 'model-gateway-selection-policy-resolution');

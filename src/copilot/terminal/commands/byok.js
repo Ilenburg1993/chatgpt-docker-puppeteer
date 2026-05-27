@@ -42,6 +42,7 @@ import {
     explainModelGatewayCatalogEntry,
     explainModelGatewayProviderEntry,
     explainModelGatewayEligibilityDecision,
+    explainModelGatewaySelectionComparison,
     flushByokProviderHealth,
     JsonModelGatewayCatalogStore,
     listByokProviderModelHealth,
@@ -2817,6 +2818,7 @@ async function renderByokGatewaySelectionAudit(println, rest) {
           })
         : null;
     const selectionComparison = postRuntimeSelection ? compareModelGatewaySelectionAudits(selection, postRuntimeSelection) : null;
+    const selectionComparisonExplanation = selectionComparison ? explainModelGatewaySelectionComparison(selectionComparison) : null;
     const policyResolution = selectionComparison
         ? resolveModelGatewaySelectionPolicy(selectionComparison, { mode: args.selectionPolicy })
         : null;
@@ -2864,6 +2866,9 @@ async function renderByokGatewaySelectionAudit(println, rest) {
             `  \x1b[90mcompare changed=${selectionComparison?.summary.changedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0} · postProofSelected=${selectionComparison?.summary.postRuntimeProofSelectedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0}\x1b[0m\n`,
         );
         println(
+            `  \x1b[90mcompare reasons=${formatCountMap(selectionComparisonExplanation?.summary.reasonCounts ?? {})} · next=${selectionComparisonExplanation?.summary.nextActions.slice(0, 4).join(',') || '-'}\x1b[0m\n`,
+        );
+        println(
             `  \x1b[90mpolicy=${policyResolution?.mode ?? args.selectionPolicy} · finalSelected=${policyResolution?.summary.selectedCount ?? 0}/${policyResolution?.summary.profileCount ?? 0} · postWinners=${policyResolution?.summary.postRuntimeWinnerCount ?? 0} · finalChanged=${policyResolution?.summary.changedFromPreRuntimeCount ?? 0}\x1b[0m\n`,
         );
         println(
@@ -2900,6 +2905,7 @@ async function renderByokGatewaySelectionAudit(println, rest) {
         }
         if (supplyLine) println(`      \x1b[90msupply ${supplyLine}\x1b[0m`);
         const comparisonRow = selectionComparison?.rows.find((row) => row.profileId === profile.profileId);
+        const comparisonExplanation = selectionComparisonExplanation?.rows.find((row) => row.profileId === profile.profileId);
         if (comparisonRow?.changed || (args.effective && comparisonRow?.postSelected)) {
             const postSelected = comparisonRow.postSelected;
             const postLabel = postSelected
@@ -2907,6 +2913,11 @@ async function renderByokGatewaySelectionAudit(println, rest) {
                 : 'sem selecionado';
             println(
                 `      \x1b[90mpost-runtime ${comparisonRow.changed ? 'mudou' : 'igual'} -> ${postLabel} · proof=${comparisonRow.postSelectedHasRuntimeProof ? 'sim' : 'nao'}\x1b[0m`,
+            );
+        }
+        if (args.effective && comparisonExplanation) {
+            println(
+                `      \x1b[90mcompare=${comparisonExplanation.reason} · next=${comparisonExplanation.nextActions.slice(0, 3).join(',')}\x1b[0m`,
             );
         }
         if (Array.isArray(profile.supplyWarnings) && profile.supplyWarnings.length > 0) {

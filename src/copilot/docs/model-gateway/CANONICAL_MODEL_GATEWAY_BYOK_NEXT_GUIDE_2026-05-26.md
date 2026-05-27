@@ -2405,7 +2405,7 @@ Quota/account overlay mais rico.
 - [x] Selection audit.
 - [x] Effective selection com observed health.
 - [x] Persistir selection audit quando solicitado.
-- [ ] Criar explain diff entre metadata-only e effective.
+- [x] Criar explain diff entre metadata-only e effective.
 - [ ] Criar score decomposition mais estavel.
 - [ ] Criar policy para auto selectors.
 - [ ] Criar policy para gateway fallback.
@@ -6926,6 +6926,61 @@ O comando continua sem executar provider.
 Ele apenas usa health observado ja existente.
 
 Essa persistencia sera a base para diffs de selection audit e para o runtime selector real.
+
+## 21.51 Mudanca 51 - Explain Do Diff Metadata-Only Vs Effective
+
+Foi criado explain estruturado para comparison de selecao.
+
+Funcao:
+
+`explainModelGatewaySelectionComparison()`
+
+Entrada:
+
+`compareModelGatewaySelectionAudits()`
+
+Saida:
+
+- schema proprio;
+- summary;
+- reason counts;
+- next actions;
+- rows por profile.
+
+Razoes iniciais:
+
+- `both_unselected`;
+- `post_runtime_discovered_route`;
+- `post_runtime_fallback_route`;
+- `post_runtime_lost_route`;
+- `post_runtime_proved_better_route`;
+- `post_runtime_changed_route`;
+- `same_route_runtime_proved`;
+- `same_route_no_runtime_proof`.
+
+O objetivo nao e escolher vencedor.
+
+O objetivo e explicar por que a selecao efetiva difere da metadata-only.
+
+O terminal `/byok gateway selection audit effective` agora imprime:
+
+- contagem de reasons;
+- next actions;
+- reason por profile.
+
+Isso prepara o runtime selector real com diagnostico melhor.
+
+Tambem evita que toda troca seja apenas `changed=true`.
+
+Agora a camada consegue distinguir:
+
+- rota melhor provada em runtime;
+- fallback sem prova;
+- perda de rota por health;
+- mesma rota com prova;
+- mesma rota sem prova.
+
+Essa leitura sera usada para policy de auto selectors, gateway fallback e runtime proof.
 
 ## 22. Fim Do Documento Inicial
 

@@ -43,6 +43,7 @@ export {
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
     compareModelGatewaySelectionAudits,
+    explainModelGatewaySelectionComparison,
     MODEL_GATEWAY_SELECTION_POLICY_MODE,
     resolveModelGatewaySelectionPolicy,
 } from './selection-audit.js';

@@ -529,6 +529,93 @@ export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRunt
 }
 
 /**
+ * @param {Record<string, unknown>} row
+ * @returns {string}
+ */
+function selectionComparisonReason(row) {
+    const preSelected = isRecord(row['preSelected']);
+    const postSelected = isRecord(row['postSelected']);
+    if (!preSelected && !postSelected) return 'both_unselected';
+    if (!preSelected && postSelected) return row['postSelectedHasRuntimeProof'] === true ? 'post_runtime_discovered_route' : 'post_runtime_fallback_route';
+    if (preSelected && !postSelected) return 'post_runtime_lost_route';
+    if (row['changed'] === true) return row['postSelectedHasRuntimeProof'] === true ? 'post_runtime_proved_better_route' : 'post_runtime_changed_route';
+    if (row['postSelectedHasRuntimeProof'] === true) return 'same_route_runtime_proved';
+    return 'same_route_no_runtime_proof';
+}
+
+/**
+ * @param {string} reason
+ * @returns {string[]}
+ */
+function selectionComparisonNextActions(reason) {
+    if (reason === 'both_unselected') return ['inspect_pre_runtime_rejections'];
+    if (reason === 'post_runtime_discovered_route') return ['refresh_eligibility_or_prefer_runtime_proved_policy'];
+    if (reason === 'post_runtime_fallback_route') return ['inspect_metadata_filters_before_using_fallback'];
+    if (reason === 'post_runtime_lost_route') return ['keep_metadata_route_or_refresh_runtime_health'];
+    if (reason === 'post_runtime_proved_better_route') return ['consider_prefer_runtime_proved_policy'];
+    if (reason === 'post_runtime_changed_route') return ['inspect_effective_health_before_switching'];
+    if (reason === 'same_route_runtime_proved') return ['record_runtime_proof_and_keep_route'];
+    return ['candidate_can_remain_metadata_first'];
+}
+
+/**
+ * Explain how metadata-only selection differs from effective/observed selection.
+ *
+ * This helper does not choose a winner. It makes the comparison actionable for terminal, trace and future selector
+ * policy layers.
+ *
+ * @param {ReturnType<typeof compareModelGatewaySelectionAudits>} comparison
+ * @returns {{
+ *   schema: 'model-gateway-selection-comparison-explain';
+ *   ok: boolean;
+ *   summary: {
+ *     profileCount: number;
+ *     changedCount: number;
+ *     unchangedCount: number;
+ *     runtimeProofCount: number;
+ *     reasonCounts: Record<string, number>;
+ *     nextActions: string[];
+ *   };
+ *   rows: Array<{
+ *     profileId: string;
+ *     changed: boolean;
+ *     reason: string;
+ *     nextActions: string[];
+ *     preRouteKey: string | null;
+ *     postRouteKey: string | null;
+ *     postSelectedHasRuntimeProof: boolean;
+ *   }>;
+ * }}
+ */
+export function explainModelGatewaySelectionComparison(comparison) {
+    const rows = comparison.rows.map((row) => {
+        const reason = selectionComparisonReason(row);
+        return {
+            profileId: row.profileId,
+            changed: row.changed,
+            reason,
+            nextActions: selectionComparisonNextActions(reason),
+            preRouteKey: row.preRouteKey,
+            postRouteKey: row.postRouteKey,
+            postSelectedHasRuntimeProof: row.postSelectedHasRuntimeProof,
+        };
+    });
+    return {
+        schema: 'model-gateway-selection-comparison-explain',
+        ok: comparison.ok === true,
+        summary: {
+            profileCount: rows.length,
+            changedCount: rows.filter((row) => row.changed).length,
+            unchangedCount: rows.filter((row) => !row.changed).length,
+            runtimeProofCount: rows.filter((row) => row.postSelectedHasRuntimeProof).length,
+            reasonCounts: countBy(rows, 'reason'),
+            nextActions: [...new Set(rows.flatMap((row) => row.nextActions))].sort(),
+        },
+        rows,
+    };
+}
+
+/**
  * @param {unknown} value
  * @returns {'metadata_first' | 'prefer_runtime_proved' | 'require_runtime_proof'}
  */

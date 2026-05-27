@@ -332,6 +332,7 @@ export {
     executeModelGatewayRuntimeSelectorPlan,
     executeModelGatewayRuntimeSelectorPlanWithFallbacks,
     explainGatewayRouteDecision,
+    explainModelGatewaySelectionComparison,
     isGatewayModelAgentProbeHealthFailed,
     isGatewayModelAgentProbeVerified,
     isGatewayModelChatHealthFailed,
