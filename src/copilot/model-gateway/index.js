@@ -310,6 +310,7 @@ export {
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     MODEL_GATEWAY_SELECTION_POLICY_MODE,
     evaluateGatewayModelHealthRoute,
+    executeModelGatewayRuntimeSelectorPlan,
     explainGatewayRouteDecision,
     isGatewayModelAgentProbeHealthFailed,
     isGatewayModelAgentProbeVerified,

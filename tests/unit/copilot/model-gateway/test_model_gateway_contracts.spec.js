@@ -61,6 +61,7 @@ import {
     resolveModelGatewayAccountAccess,
     buildModelGatewayOnListModelsHandler,
     evaluateGatewayModelHealthRoute,
+    executeModelGatewayRuntimeSelectorPlan,
     readGatewayModelHealthFromRecords,
     evaluateModelGatewayProviderEnvRequirements,
     geminiAdapter,
@@ -743,6 +744,55 @@ describe('model-gateway foundation', () => {
         assert.equal(strictRuntimeSelectorPlan.ready, true);
         assert.equal(strictRuntimeSelectorPlan.summary.selectedProfileCount, 1);
         assert.equal(strictRuntimeSelectorPlan.summary.blockedProfileCount, 1);
+
+        const runtimeExecution = await executeModelGatewayRuntimeSelectorPlan(runtimeSelectorPlan, {
+            profileId: 'repo_agent',
+            deps: {
+                runChatProbe: async (options = {}) => ({
+                    ok: true,
+                    status: 'ok',
+                    elapsedMs: 12,
+                    model: String(options.model ?? ''),
+                    profile: 'repo_agent',
+                    preset: 'openrouter',
+                    providerType: 'openai-compatible',
+                    deltaCount: 1,
+                    deltaChars: 13,
+                    finalChars: 13,
+                    finalContent: 'BYOK_PROBE_OK',
+                    observedFinalEvent: true,
+                    sessionId: 'unit-runtime-session',
+                    errors: [],
+                    warnings: [],
+                    providerFailure: null,
+                }),
+                recordSuccess: (input) => {
+                    assert.equal(input.routeProfile, 'repo_agent');
+                    assert.equal(input.providerId, 'openrouter');
+                    assert.equal(input.providerModel, 'openai/gpt-oss-120b');
+                },
+                recordFailure: () => {
+                    throw new Error('recordFailure should not be called for ok runtime execution');
+                },
+                flushHealth: async () => {},
+            },
+        });
+        assert.equal(runtimeExecution.schema, 'model-gateway-runtime-selector-execution-result');
+        assert.equal(runtimeExecution.ok, true);
+        assert.equal(runtimeExecution.status, 'ok');
+        assert.equal(runtimeExecution.healthRecorded, true);
+
+        const blockedRuntimeExecution = await executeModelGatewayRuntimeSelectorPlan(strictRuntimeSelectorPlan, {
+            profileId: 'tool_agent',
+            deps: {
+                runChatProbe: async () => {
+                    throw new Error('runChatProbe should not be called for blocked runtime execution');
+                },
+            },
+        });
+        assert.equal(blockedRuntimeExecution.ok, false);
+        assert.equal(blockedRuntimeExecution.status, 'blocked');
+        assert.equal(blockedRuntimeExecution.error, 'runtime_selector_route_unavailable');
 
         const trace = buildModelGatewaySelectionDecisionTrace({
             snapshot,

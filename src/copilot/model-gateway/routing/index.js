@@ -30,7 +30,11 @@ export {
     resolveModelGatewayTaskProfile,
 } from './task-profiles.js';
 export { routeGatewayModels, routeModelGatewayCatalogSnapshot, scoreGatewayModelCandidate } from './policy-engine.js';
-export { buildModelGatewayRuntimeSelectorPlan, selectModelGatewayRuntimeRoute } from './runtime-selector.js';
+export {
+    buildModelGatewayRuntimeSelectorPlan,
+    executeModelGatewayRuntimeSelectorPlan,
+    selectModelGatewayRuntimeRoute,
+} from './runtime-selector.js';
 export {
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,

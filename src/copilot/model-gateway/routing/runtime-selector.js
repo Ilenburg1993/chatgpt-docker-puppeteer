@@ -7,6 +7,12 @@
  */
 
 import { buildRouteDecisionEvent } from '../observability/events.js';
+import { runConfiguredByokChatProbe } from '../probes/chat-probe.js';
+import {
+    flushByokProviderHealth,
+    recordByokProviderModelCallFailure,
+    recordByokProviderModelCallSuccess,
+} from '../health/provider-health.js';
 
 /**
  * @param {unknown} value
@@ -227,4 +233,110 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
  */
 export function selectModelGatewayRuntimeRoute(plan, profileId) {
     return plan.routes.find((route) => route.profileId === profileId && route.status === 'selected') ?? null;
+}
+
+/**
+ * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>} plan
+ * @param {{
+ *   profileId?: string;
+ *   timeoutMs?: number;
+ *   prompt?: string;
+ *   recordHealth?: boolean;
+ *   deps?: {
+ *     runChatProbe?: typeof runConfiguredByokChatProbe;
+ *     recordSuccess?: typeof recordByokProviderModelCallSuccess;
+ *     recordFailure?: typeof recordByokProviderModelCallFailure;
+ *     flushHealth?: typeof flushByokProviderHealth;
+ *   };
+ * }} [options]
+ * @returns {Promise<{
+ *   schema: 'model-gateway-runtime-selector-execution-result';
+ *   ok: boolean;
+ *   status: 'ok' | 'blocked' | 'failed';
+ *   profileId: string | null;
+ *   route: ReturnType<typeof selectModelGatewayRuntimeRoute> | null;
+ *   probe: Awaited<ReturnType<typeof runConfiguredByokChatProbe>> | null;
+ *   healthRecorded: boolean;
+ *   error: string | null;
+ * }>}
+ */
+export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {}) {
+    const requestedProfile = optionalString(options.profileId);
+    const route =
+        requestedProfile !== null
+            ? selectModelGatewayRuntimeRoute(plan, requestedProfile)
+            : (plan.routes.find((candidate) => candidate.status === 'selected') ?? null);
+    if (!route?.selected) {
+        return {
+            schema: 'model-gateway-runtime-selector-execution-result',
+            ok: false,
+            status: 'blocked',
+            profileId: requestedProfile,
+            route: null,
+            probe: null,
+            healthRecorded: false,
+            error: 'runtime_selector_route_unavailable',
+        };
+    }
+    const selected = route.selected;
+    const runChatProbe = options.deps?.runChatProbe ?? runConfiguredByokChatProbe;
+    const recordSuccess = options.deps?.recordSuccess ?? recordByokProviderModelCallSuccess;
+    const recordFailure = options.deps?.recordFailure ?? recordByokProviderModelCallFailure;
+    const flushHealth = options.deps?.flushHealth ?? flushByokProviderHealth;
+    const recordHealth = options.recordHealth !== false;
+    const providerModel = optionalString(selected['providerModel']);
+    try {
+        const probe = await runChatProbe({
+            ...(providerModel ? { model: providerModel } : {}),
+            ...(typeof options.timeoutMs === 'number' ? { timeoutMs: options.timeoutMs } : {}),
+            ...(options.prompt ? { prompt: options.prompt } : {}),
+        });
+        let healthRecorded = false;
+        const identity = {
+            routeProfile: route.profileId,
+            providerId: optionalString(selected['providerId']),
+            providerModel,
+        };
+        if (recordHealth && probe.ok) {
+            recordSuccess({
+                ...identity,
+                successContext: 'runtime_selector_chat',
+            });
+            await flushHealth();
+            healthRecorded = true;
+        } else if (recordHealth && probe.status !== 'unavailable' && probe.status !== 'admission-blocked') {
+            recordFailure({
+                ...identity,
+                message: probe.errors[0] ?? `runtime selector chat ${probe.status}`,
+                errorContext: probe.providerFailure?.errorContext ?? 'runtime_selector_chat',
+                failureKind: probe.providerFailure?.kind ?? null,
+                failureStatusCode: probe.providerFailure?.statusCode ?? null,
+                retryAfterSeconds: probe.providerFailure?.retryAfterSeconds ?? null,
+                resetAt: probe.providerFailure?.resetAt ?? null,
+            });
+            await flushHealth();
+            healthRecorded = true;
+        }
+        return {
+            schema: 'model-gateway-runtime-selector-execution-result',
+            ok: probe.ok,
+            status: probe.ok ? 'ok' : 'failed',
+            profileId: route.profileId,
+            route,
+            probe,
+            healthRecorded,
+            error: probe.ok ? null : (probe.errors[0] ?? probe.status),
+        };
+    } catch (error) {
+        return {
+            schema: 'model-gateway-runtime-selector-execution-result',
+            ok: false,
+            status: 'failed',
+            profileId: route.profileId,
+            route,
+            probe: null,
+            healthRecorded: false,
+            error: error instanceof Error ? error.message : String(error),
+        };
+    }
 }

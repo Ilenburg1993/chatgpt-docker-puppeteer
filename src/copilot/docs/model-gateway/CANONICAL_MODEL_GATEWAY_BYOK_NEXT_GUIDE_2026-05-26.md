@@ -5827,6 +5827,29 @@ Campos principais:
 
 Seleciona a rota pronta de um profile especifico.
 
+`executeModelGatewayRuntimeSelectorPlan`
+
+Executa a primeira etapa real do selector usando o probe chat canonico.
+
+Ele reutiliza:
+
+- `runConfiguredByokChatProbe`;
+- `recordByokProviderModelCallSuccess`;
+- `recordByokProviderModelCallFailure`;
+- `flushByokProviderHealth`.
+
+Isso evita criar um caminho paralelo ao terminal/probes.
+
+O executor e injetavel para testes.
+
+Ele grava health quando ha tentativa real.
+
+Ele nao executa rotas bloqueadas.
+
+Ele ainda nao implementa retry/fallback multi-rota.
+
+Essa sera a proxima expansao.
+
 ### 21.2 Integracao Ao Script Efetivo
 
 `scripts/model-gateway-effective-selection.mjs`
@@ -5876,8 +5899,9 @@ Esses pontos pertencem a proxima camada.
 - [x] Produzir route decision event sanitizado.
 - [x] Integrar plano ao script effective.
 - [x] Cobrir contratos unitarios.
-- [ ] Criar executor runtime real com retry/fallback.
-- [ ] Persistir resultado runtime no health store.
+- [x] Criar executor runtime real inicial sem retry/fallback.
+- [x] Persistir resultado runtime no health store.
+- [ ] Criar retry/fallback multi-rota.
 - [ ] Criar live tests llm-b baseados no plano.
 
 ## 22. Fim Do Documento Inicial
