@@ -3511,6 +3511,47 @@ describe('model-gateway foundation', () => {
         }
     });
 
+    it('generates unique default runtime health run ids for same-millisecond writes', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            const first = await store.writeRuntimeHealthRecords(
+                [
+                    {
+                        key: 'default|openrouter|model-a',
+                        routeProfile: 'default',
+                        providerId: 'openrouter',
+                        providerModel: 'model-a',
+                        lastStatus: 'ok',
+                        lastSuccessAt: 1_000,
+                    },
+                ],
+                { observedAt: 3_000 },
+            );
+            const second = await store.writeRuntimeHealthRecords(
+                [
+                    {
+                        key: 'default|openrouter|model-b',
+                        routeProfile: 'default',
+                        providerId: 'openrouter',
+                        providerModel: 'model-b',
+                        lastStatus: 'ok',
+                        lastSuccessAt: 1_000,
+                    },
+                ],
+                { observedAt: 3_000 },
+            );
+
+            const diagnostics = await store.readStorageDiagnostics();
+
+            assert.notEqual(first.runId, second.runId);
+            assert.equal(diagnostics.runtimeRows, 4);
+        } finally {
+            db.close();
+        }
+    });
+
     it('installs a storage-neutral runtime health SQLite mirror for new BYOK health facts', async () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');

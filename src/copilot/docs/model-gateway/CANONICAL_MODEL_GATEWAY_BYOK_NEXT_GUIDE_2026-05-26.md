@@ -3651,6 +3651,32 @@ Teste adicionado:
 
 Esse teste preserva duas observacoes que antes poderiam virar uma unica chave bruta.
 
+Mudanca 11:
+
+`runId` default de runtime health agora e monotônico por processo.
+
+Antes:
+
+`model-gateway:runtime-health:<observedAtMs>`
+
+Problema:
+
+Duas escritas no mesmo milissegundo poderiam compartilhar `runId`.
+
+Depois:
+
+`model-gateway:runtime-health:<observedAtMs>:<pid>:<sequence>`
+
+Isso preserva:
+
+- runId explicito para idempotencia intencional
+- runId default unico para mirrors normais
+- historico confiavel em bursts de eventos
+
+Teste adicionado:
+
+`generates unique default runtime health run ids for same-millisecond writes`
+
 Validacoes deste ajuste:
 
 `node --check src/copilot/model-gateway/catalog/sqlite-catalog-store.js`

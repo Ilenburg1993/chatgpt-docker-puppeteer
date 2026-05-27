@@ -26,6 +26,7 @@ const DEFAULT_ROUTE_PROFILE = 'default';
 const DEFAULT_ACCOUNT_SCOPE = 'default';
 const DEFAULT_POLICY_PROFILE = 'default';
 const DEFAULT_TASK_PROFILE = 'default';
+let _runtimeHealthRunSequence = 0;
 
 export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze({
     accountHistoryMaxRowsPerTable: 10_000,
@@ -407,6 +408,15 @@ function runtimeObservationKey(runId, key) {
  */
 function runtimeProbeResultKey(runId, key, probeKind) {
     return `runtime-probe:${sha256(stableJson({ runId, key, probeKind })).slice(0, 40)}`;
+}
+
+/**
+ * @param {number} observedAtMs
+ * @returns {string}
+ */
+function createRuntimeHealthRunId(observedAtMs) {
+    _runtimeHealthRunSequence += 1;
+    return `model-gateway:runtime-health:${observedAtMs}:${process.pid}:${_runtimeHealthRunSequence}`;
 }
 
 /**
@@ -873,7 +883,7 @@ export class SqliteModelGatewayCatalogStore {
      */
     async writeRuntimeHealthRecords(records, options = {}) {
         const observedAtMs = dateMs(options.observedAt) ?? Date.now();
-        const runId = optionalString(options.runId) ?? `model-gateway:runtime-health:${observedAtMs}`;
+        const runId = optionalString(options.runId) ?? createRuntimeHealthRunId(observedAtMs);
         let healthObservations = 0;
         let probeResults = 0;
         const tx = this.#db.transaction(() => {
