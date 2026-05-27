@@ -129,8 +129,26 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
     ];
     const phases = [
         {
-            id: 'control_no_pr',
+            id: 'runtime_selector_dry_run',
             order: 1,
+            command: 'npm run model-gateway:runtime-selector -- --fail',
+            executesModelTurn: false,
+            executesRuntimeProbes: false,
+            consumesProviderQuota: false,
+            purpose: 'Validate final route-aware runtime selector readiness before any terminal live-test phase.',
+        },
+        {
+            id: 'runtime_health_baseline',
+            order: 2,
+            command: 'npm run model-gateway:runtime-health:diff -- --write-snapshot',
+            executesModelTurn: false,
+            executesRuntimeProbes: false,
+            consumesProviderQuota: false,
+            purpose: 'Persist a baseline of already-observed runtime health so later live phases can be diffed.',
+        },
+        {
+            id: 'control_no_pr',
+            order: 3,
             command: 'npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000',
             executesModelTurn: false,
             executesRuntimeProbes: false,
@@ -139,7 +157,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         },
         {
             id: 'byok_fixture_control_plane',
-            order: 2,
+            order: 4,
             command: 'npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
             executesModelTurn: false,
             executesRuntimeProbes: false,
@@ -148,7 +166,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         },
         {
             id: 'byok_real_no_pr_probes',
-            order: 3,
+            order: 5,
             command: 'npm run terminal:llm-b:live-test -- --byok-real --no-pr --timeout-ms=600000',
             executesModelTurn: false,
             executesRuntimeProbes: true,
@@ -157,7 +175,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         },
         {
             id: 'byok_real_full_turn',
-            order: 4,
+            order: 6,
             command: 'npm run terminal:llm-b:live-test -- --byok-real --timeout-ms=900000',
             executesModelTurn: true,
             executesRuntimeProbes: true,

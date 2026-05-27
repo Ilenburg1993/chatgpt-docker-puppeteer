@@ -6147,12 +6147,14 @@ Resultado observado sem runtime:
 
 Isso confirma que ainda nao devemos saltar direto para BYOK real/full turn.
 
-A ordem correta continua:
+A ordem correta agora e:
 
-1. controle terminal sem PR;
-2. fixture BYOK;
-3. BYOK real sem PR;
-4. BYOK real full turn.
+1. runtime selector dry-run;
+2. snapshot baseline de runtime health;
+3. controle terminal sem PR;
+4. fixture BYOK;
+5. BYOK real sem PR;
+6. BYOK real full turn.
 
 ## 22. Fim Do Documento Inicial
 
