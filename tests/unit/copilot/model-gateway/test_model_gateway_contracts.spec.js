@@ -9120,7 +9120,9 @@ describe('model-gateway foundation', () => {
             assert.equal(result.eligibilityRefresh.decisionCount, 2);
             assert.equal(result.eligibilityRefresh.diffSummary.addedCount, 2);
             assert.equal(result.eligibilityRefresh.diffSummary.changedCount, 0);
+            assert.equal(result.eligibilityRefresh.run.diffSummary.addedCount, 2);
             assert.equal(stored.modelEligibilityDecisions.length, 2);
+            assert.equal(stored.modelEligibilityRuns[0]?.['diffSummary']?.['addedCount'], 2);
             assert.equal(result.openai.data[0].x_model_gateway.eligibility.status, 'eligible');
             assert.ok(
                 progressEvents.some(

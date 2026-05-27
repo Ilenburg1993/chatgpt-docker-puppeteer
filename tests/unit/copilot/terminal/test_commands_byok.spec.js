@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeSelectorPlan, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayAccountLimitOverlays, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayProviderQuotaCapabilities, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeSelectorPlan, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayAccountLimitOverlays, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayEligibilityDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayProviderQuotaCapabilities, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -35,6 +35,15 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             changedCount: diff.changed?.length ?? 0,
             changedKinds: [...new Set((diff.changed ?? []).flatMap((item) => item.changedKinds ?? []))],
             changedKindCounts: {},
+        })),
+        summarizeModelGatewayEligibilityDiff: vi.fn((diff) => ({
+            addedCount: diff.added?.length ?? 0,
+            removedCount: diff.removed?.length ?? 0,
+            changedCount: diff.changed?.length ?? 0,
+            changedKinds: [...new Set((diff.changed ?? []).flatMap((item) => item.changedKinds ?? []))],
+            changedKindCounts: {},
+            becameEligibleCount: 0,
+            becameExcludedCount: 0,
         })),
         summarizeProviderWireProbeMatrix: vi.fn(() => ({
             providerCount: 1,
@@ -674,6 +683,34 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                             },
                         ],
                         modelEligibilityDecisions: [],
+                        modelEligibilityRuns: [
+                            {
+                                runId: 'eligibility-run-1',
+                                status: 'completed',
+                                policyProfile: 'terminal-refresh',
+                                taskProfile: 'default',
+                                accountScope: 'default',
+                                completedAt: '2026-05-25T18:00:00.000Z',
+                                modelCount: 2,
+                                eligibleCount: 1,
+                                unknownCount: 0,
+                                excludedCount: 1,
+                                diff: {
+                                    added: ['openrouter:new-model:default:exact_model:new-model:default:terminal-refresh:default'],
+                                    removed: [],
+                                    changed: [
+                                        {
+                                            key: 'openrouter:changed-model:default:exact_model:changed-model:default:terminal-refresh:default',
+                                            changedFields: ['include', 'hardExclusions'],
+                                            changedKinds: ['disposition_changed', 'access_gate_changed'],
+                                            previousInclude: false,
+                                            nextInclude: true,
+                                        },
+                                    ],
+                                },
+                                diffSummary: { addedCount: 1, removedCount: 0, changedCount: 1 },
+                            },
+                        ],
                         conflicts: [
                             {
                                 projectionKey: 'openrouter:changed-model:default',
@@ -821,10 +858,26 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
         refreshModelGatewayCatalog: vi.fn(() =>
             Promise.resolve({
                 snapshot: { projections: [{ providerModel: 'new-model' }], importRuns: [{ status: 'completed' }] },
-                diff: { added: ['openrouter:new-model:default'], removed: [], changed: [] },
+                diff: {
+                    added: ['openrouter:new-model:default'],
+                    removed: [],
+                    changed: [
+                        {
+                            key: 'openrouter:changed-model:default',
+                            changedFields: ['pricing'],
+                            changedKinds: ['pricing_changed'],
+                        },
+                    ],
+                },
                 openai: { object: 'list', data: [{ id: 'new-model', object: 'model' }] },
                 overlayRefresh: { enabled: true, imported: 0, retained: 0, total: 0 },
-                eligibilityRefresh: { enabled: true, run: { runId: 'eligibility-run' }, decisionCount: 2 },
+                eligibilityRefresh: {
+                    enabled: true,
+                    run: { runId: 'eligibility-run' },
+                    decisionCount: 2,
+                    diff: { added: ['openrouter:new-model:default:exact_model:new-model:default:terminal-refresh:default'], removed: [], changed: [] },
+                    diffSummary: { addedCount: 1, removedCount: 0, changedCount: 0, changedKinds: [], becameEligibleCount: 0, becameExcludedCount: 0 },
+                },
                 retention: {
                     importRuns: { before: 1, after: 1, pruned: 0 },
                     rawPayloadRefs: { before: 0, after: 0, pruned: 0 },
@@ -1060,6 +1113,7 @@ vi.mock('#copilot/model-gateway', () => ({
     summarizeModelGatewayProviderEnvRequirements,
     summarizeModelGatewayRefreshLogText,
     summarizeCanonicalModelProjectionDiff,
+    summarizeModelGatewayEligibilityDiff,
     summarizeProviderWireProbeMatrix,
     toOpenAIModelCatalogList,
 }));
@@ -1301,7 +1355,13 @@ describe('terminal /byok command', () => {
             },
             openai: { object: 'list', data: [{ id: 'new-model', object: 'model' }] },
             overlayRefresh: { enabled: true, imported: 0, retained: 0, total: 0 },
-            eligibilityRefresh: { enabled: true, run: { runId: 'eligibility-run' }, decisionCount: 2 },
+            eligibilityRefresh: {
+                enabled: true,
+                run: { runId: 'eligibility-run' },
+                decisionCount: 2,
+                diff: { added: ['openrouter:new-model:default:exact_model:new-model:default:terminal-refresh:default'], removed: [], changed: [] },
+                diffSummary: { addedCount: 1, removedCount: 0, changedCount: 0, changedKinds: [], becameEligibleCount: 0, becameExcludedCount: 0 },
+            },
             retention: {
                 importRuns: { before: 1, after: 1, pruned: 0 },
                 rawPayloadRefs: { before: 0, after: 0, pruned: 0 },
@@ -1319,6 +1379,7 @@ describe('terminal /byok command', () => {
         buildModelGatewayRouteCandidates.mockReturnValue([]);
         recommendCatalogDiffProbes.mockClear();
         summarizeCanonicalModelProjectionDiff.mockClear();
+        summarizeModelGatewayEligibilityDiff.mockClear();
         buildRouteDecisionEvent.mockClear();
         recordModelGatewayRouteDecision.mockClear();
         buildProbeCompletedEvent.mockClear();
@@ -2758,6 +2819,7 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('added=1');
         expect(ctx.output()).toContain('changed=1');
         expect(ctx.output()).toContain('write=commit');
+        expect(ctx.output()).toContain('eligibility diff: added=1');
         expect(ctx.output()).toContain('pricing_changed');
         expect(ctx.output()).toContain('probe suggestions: 1');
         expect(ctx.output()).toContain('/byok probe agent model:changed-model');
@@ -2833,6 +2895,24 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('added=1');
         expect(ctx.output()).toContain('capabilities_changed');
         expect(ctx.output()).toContain('probe suggestions: 1');
+    });
+
+    it('exibe runs e diff persistidos de eligibility sem executar runtime', async () => {
+        mockProjection();
+        const runsCtx = mockCtx();
+        const diffCtx = mockCtx();
+
+        await cmdByok({ println: runsCtx.println }, 'gateway eligibility runs');
+        await cmdByok({ println: diffCtx.println }, 'gateway eligibility diff');
+
+        expect(refreshModelGatewayCatalog).not.toHaveBeenCalled();
+        expect(summarizeModelGatewayEligibilityDiff).toHaveBeenCalled();
+        expect(runsCtx.output()).toContain('BYOK model-gateway eligibility runs');
+        expect(runsCtx.output()).toContain('eligibility-run-1');
+        expect(runsCtx.output()).toContain('diff added=1');
+        expect(diffCtx.output()).toContain('BYOK model-gateway eligibility diff');
+        expect(diffCtx.output()).toContain('becameEligible=0');
+        expect(diffCtx.output()).toContain('disposition_changed');
     });
 
     it('encaminha /models catalog refresh com filtro de provider/importer', async () => {

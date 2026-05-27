@@ -2384,7 +2384,7 @@ Quota/account overlay mais rico.
 - [x] Adicionar route layer eligibility por task.
 - [x] Adicionar wire API eligibility por adapter.
 - [x] Adicionar unknown access explain mais acionavel.
-- [ ] Persistir runs de eligibility por build/refresh de modo mais claro.
+- [x] Persistir runs de eligibility por build/refresh de modo mais claro.
 - [x] Adicionar diff de eligibility entre builds.
 - [ ] Adicionar teste de eligibility para provider removal.
 
@@ -6790,6 +6790,62 @@ Agora e possivel auditar se uma mudanca pre-runtime veio de:
 Esta camada continua sem executar providers.
 
 Ela prepara a selecao efetiva sem contaminar o catalogo canonico.
+
+## 21.48 Mudanca 48 - Eligibility Runs Com Diff Persistido E Terminal
+
+O run de eligibility agora pode carregar:
+
+- `diff`;
+- `diffSummary`.
+
+`createModelEligibilityRun()` sanitiza esses campos.
+
+`refreshModelGatewayCatalog()` agora persiste o run enriquecido no snapshot.
+
+O payload JSON do SQLite tambem recebe esses campos via caminho existente.
+
+Nao houve alteracao destrutiva de schema SQL.
+
+O terminal recebeu novas leituras sem rede:
+
+- `/byok gateway eligibility runs`;
+- `/byok gateway eligibility diff`.
+
+`eligibility runs` mostra:
+
+- run id;
+- policy profile;
+- task profile;
+- account scope;
+- contadores de modelos;
+- diff do run quando presente.
+
+`eligibility diff` mostra:
+
+- added;
+- removed;
+- changed;
+- became eligible;
+- became excluded;
+- changed kinds;
+- amostras de added/removed/changed.
+
+Essa mudanca torna claro qual foi o ultimo estado pre-runtime persistido.
+
+Tambem ajuda o operador e a LLM a decidir se uma nova selecao precisa de:
+
+- refresh de metadados;
+- refresh de overlays;
+- ajuste de policy;
+- probes runtime posteriores.
+
+Esta frente continua pre-runtime.
+
+Ela nao executa inference.
+
+Ela nao muda catalogo canonico.
+
+Ela aumenta a auditabilidade antes do primeiro runtime selector real.
 
 ## 22. Fim Do Documento Inicial
 

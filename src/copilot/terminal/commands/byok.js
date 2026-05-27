@@ -86,6 +86,7 @@ import {
     summarizeModelGatewayProviderEnvRequirements,
     summarizeProviderWireProbeMatrix,
     summarizeCanonicalModelProjectionDiff,
+    summarizeModelGatewayEligibilityDiff,
     toOpenAIModelCatalogList,
 } from '#copilot/model-gateway';
 
@@ -1848,7 +1849,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict|runs|diff] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -2524,6 +2525,111 @@ function normalizeCatalogDiffForDisplay(value) {
         removed: Array.isArray(record['removed']) ? record['removed'].map(String) : [],
         changed,
     };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {{ added: string[]; removed: string[]; changed: Array<{ key: string; changedFields: string[]; changedKinds: string[]; previousInclude?: boolean | null; nextInclude?: boolean | null }> }}
+ */
+function normalizeEligibilityDiffForDisplay(value) {
+    const record = asRecord(value);
+    const changed = Array.isArray(record['changed'])
+        ? record['changed'].filter((item) => item && typeof item === 'object').map((item) => {
+              const changedRecord = /** @type {Record<string, any>} */ (item);
+              return {
+                  key: optionalScalarString(changedRecord['key']) ?? 'unknown',
+                  changedFields: Array.isArray(changedRecord['changedFields'])
+                      ? changedRecord['changedFields'].map(String)
+                      : [],
+                  changedKinds: Array.isArray(changedRecord['changedKinds'])
+                      ? changedRecord['changedKinds'].map(String)
+                      : [],
+                  previousInclude: typeof changedRecord['previousInclude'] === 'boolean' ? changedRecord['previousInclude'] : null,
+                  nextInclude: typeof changedRecord['nextInclude'] === 'boolean' ? changedRecord['nextInclude'] : null,
+              };
+          })
+        : [];
+    return {
+        added: Array.isArray(record['added']) ? record['added'].map(String) : [],
+        removed: Array.isArray(record['removed']) ? record['removed'].map(String) : [],
+        changed,
+    };
+}
+
+/**
+ * @param {ReturnType<InstanceType<typeof JsonModelGatewayCatalogStore>['readSnapshot']> extends Promise<infer T> ? T : never} snapshot
+ * @returns {Record<string, any> | null}
+ */
+function findLatestEligibilityRun(snapshot) {
+    const runs = Array.isArray(snapshot.modelEligibilityRuns) ? snapshot.modelEligibilityRuns : [];
+    return [...runs]
+        .reverse()
+        .find((run) => run && typeof run === 'object' && (run['diff'] || run['diffSummary'])) ?? null;
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayEligibilityRuns(println, rest) {
+    const limit = Math.min(Number(rest.find((item) => /^\d+$/u.test(item)) ?? 8), 50);
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const snapshot = await store.readSnapshot();
+    const allRuns = Array.isArray(snapshot.modelEligibilityRuns) ? snapshot.modelEligibilityRuns : [];
+    const runs = [...allRuns]
+        .sort((left, right) => String(right['completedAt'] ?? '').localeCompare(String(left['completedAt'] ?? '')))
+        .slice(0, limit);
+    println(`\n  \x1b[36mBYOK model-gateway eligibility runs\x1b[0m`);
+    println(`  \x1b[90mstore=${store.filePath} · runs=${allRuns.length} · sem runtime\x1b[0m\n`);
+    if (runs.length === 0) {
+        println('    \x1b[33mNenhum run de eligibility persistido. Rode /byok gateway catalog refresh primeiro.\x1b[0m\n');
+        return;
+    }
+    for (const run of runs) {
+        const summary = run['diffSummary'] ? summarizeModelGatewayEligibilityDiff(normalizeEligibilityDiffForDisplay(run['diff'])) : null;
+        println(
+            `    \x1b[33m${run['runId'] ?? '-'}\x1b[0m  \x1b[90mpolicy=${run['policyProfile'] ?? '-'} · task=${run['taskProfile'] ?? '-'} · account=${run['accountScope'] ?? '-'} · status=${run['status'] ?? '-'}\x1b[0m`,
+        );
+        println(
+            `      \x1b[90mcompleted=${run['completedAt'] ?? '-'} · models=${run['modelCount'] ?? 0} · eligible=${run['eligibleCount'] ?? 0} · unknown=${run['unknownCount'] ?? 0} · excluded=${run['excludedCount'] ?? 0}\x1b[0m`,
+        );
+        if (summary) {
+            println(
+                `      \x1b[90mdiff added=${summary.addedCount} · removed=${summary.removedCount} · changed=${summary.changedCount} · becameEligible=${summary.becameEligibleCount} · becameExcluded=${summary.becameExcludedCount}\x1b[0m`,
+            );
+        }
+    }
+    println('');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayEligibilityDiff(println) {
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const snapshot = await store.readSnapshot();
+    const run = findLatestEligibilityRun(snapshot);
+    println(`\n  \x1b[36mBYOK model-gateway eligibility diff\x1b[0m`);
+    println(`  \x1b[90mstore=${store.filePath} · fonte=ultimo eligibility run persistido · sem runtime\x1b[0m\n`);
+    if (!run) {
+        println('    \x1b[33mNenhum diff de eligibility persistido. Rode /byok gateway catalog refresh primeiro.\x1b[0m\n');
+        return;
+    }
+    const diff = normalizeEligibilityDiffForDisplay(run['diff']);
+    const summary = summarizeModelGatewayEligibilityDiff(diff);
+    println(
+        `    \x1b[90mrun=${run['runId'] ?? '-'} · added=${summary.addedCount} · removed=${summary.removedCount} · changed=${summary.changedCount} · becameEligible=${summary.becameEligibleCount} · becameExcluded=${summary.becameExcludedCount}\x1b[0m`,
+    );
+    if (summary.changedKinds.length > 0) println(`    \x1b[90mdiff kinds: ${summary.changedKinds.join(',')}\x1b[0m`);
+    for (const id of diff.added.slice(0, 8)) println(`      \x1b[32m+\x1b[0m ${id}`);
+    for (const id of diff.removed.slice(0, 8)) println(`      \x1b[31m-\x1b[0m ${id}`);
+    for (const item of diff.changed.slice(0, 8)) {
+        const kinds = item.changedKinds.length > 0 ? ` · ${item.changedKinds.join(',')}` : '';
+        println(`      \x1b[33m~\x1b[0m ${item.key}${kinds}`);
+    }
+    println('');
 }
 
 /**
@@ -4055,6 +4161,14 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             return;
         }
         if (/^(eligibility|elegibilidade|eligible|exclusion|exclusao|exclusão)$/iu.test(rest[0] ?? '')) {
+            if (/^(runs|run|historico|histórico|history)$/iu.test(rest[1] ?? '')) {
+                await renderByokGatewayEligibilityRuns(println, rest.slice(2));
+                return;
+            }
+            if (/^(diff|changes|mudancas|mudanças)$/iu.test(rest[1] ?? '')) {
+                await renderByokGatewayEligibilityDiff(println);
+                return;
+            }
             await renderByokGatewayEligibility(println, rest.slice(1), eventBus);
             return;
         }

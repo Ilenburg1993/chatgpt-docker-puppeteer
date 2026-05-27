@@ -19,6 +19,7 @@ import { planModelGatewayCatalogRefresh } from './refresh-plan.js';
 import { applyModelGatewayCatalogRetention } from './retention.js';
 import {
     applyModelGatewayEligibilityToSnapshot,
+    createModelEligibilityRun,
     diffModelGatewayEligibilityDecisions,
     evaluateModelGatewayCatalogEligibility,
     summarizeModelGatewayEligibilityDiff,
@@ -403,8 +404,15 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
         ? diffModelGatewayEligibilityDecisions(previous.modelEligibilityDecisions, evaluatedEligibility.decisions)
         : null;
     const eligibilityDiffSummary = eligibilityDiff ? summarizeModelGatewayEligibilityDiff(eligibilityDiff) : null;
+    const eligibilityRun = evaluatedEligibility
+        ? createModelEligibilityRun(/** @type {Parameters<typeof createModelEligibilityRun>[0]} */ ({
+              .../** @type {Record<string, any>} */ (evaluatedEligibility.run),
+              diff: eligibilityDiff,
+              diffSummary: eligibilityDiffSummary,
+          }))
+        : null;
     const snapshotWithEligibility = evaluatedEligibility
-        ? applyModelGatewayEligibilityToSnapshot(nextSnapshot, evaluatedEligibility.decisions, evaluatedEligibility.run)
+        ? applyModelGatewayEligibilityToSnapshot(nextSnapshot, evaluatedEligibility.decisions, /** @type {Record<string, any>} */ (eligibilityRun))
         : nextSnapshot;
     if (evaluatedEligibility) {
         emitRefreshProgress(input.onProgress, {
@@ -459,7 +467,7 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
         },
         eligibilityRefresh: {
             enabled: eligibilityEnabled,
-            run: evaluatedEligibility?.run ?? null,
+            run: eligibilityRun,
             decisionCount: evaluatedEligibility?.decisions.length ?? 0,
             diff: eligibilityDiff,
             diffSummary: eligibilityDiffSummary,

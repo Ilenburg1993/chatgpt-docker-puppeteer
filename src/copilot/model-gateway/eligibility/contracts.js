@@ -189,6 +189,8 @@ export function createModelEligibilityDecision(input) {
  * @param {number} [input.excludedCount]
  * @param {string[]} [input.errors]
  * @param {Record<string, unknown>} [input.policyInputs]
+ * @param {unknown} [input.diff]
+ * @param {unknown} [input.diffSummary]
  * @returns {object}
  */
 export function createModelEligibilityRun(input) {
@@ -211,6 +213,8 @@ export function createModelEligibilityRun(input) {
         excludedCount: nonNegativeInteger(input.excludedCount),
         errors: stringList(input.errors),
         policyInputs: isRecord(input.policyInputs) ? sanitizeJsonValue(input.policyInputs) : {},
+        diff: sanitizeJsonValue(input.diff ?? null),
+        diffSummary: sanitizeJsonValue(input.diffSummary ?? null),
         redactionStatus: 'sanitized',
     };
 }
