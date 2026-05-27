@@ -2489,8 +2489,8 @@ Quota/account overlay mais rico.
 - [ ] Criar teste para todos os defaults sem Ollama local.
 - [ ] Criar teste para opt-in local com daemon offline.
 - [ ] Criar teste para opt-in local com fixture de daemon online.
-- [ ] Criar comando terminal claro para habilitar local.
-- [ ] Criar explain de por que local foi bloqueado.
+- [x] Criar comando terminal claro para habilitar local.
+- [x] Criar explain de por que local foi bloqueado.
 - [ ] Criar docs de seguranca local/private.
 
 ### Faixa N - Terminal E Cockpit
@@ -7191,6 +7191,46 @@ O teste existente de Ollama/local agora cobre:
 - `excludeLocalProvidersByDefault=false` permite local.
 
 Isto torna a policy global explicita sem mudar defaults.
+
+## 21.57 Mudanca 57 - Terminal Local/Ollama Sem Runtime
+
+Foi adicionado comando:
+
+`/byok gateway local`
+
+Aliases:
+
+- `local`;
+- `ollama`;
+- `local-private`.
+
+O comando mostra:
+
+- default excluido;
+- daemon nao iniciado;
+- runtime nao executado;
+- opt-in obrigatorio;
+- reason de bloqueio;
+- policy global;
+- comandos de opt-in.
+
+Reason exibida:
+
+`local_provider_requires_explicit_request`
+
+Policy exibida:
+
+`excludeLocalProvidersByDefault:true`
+
+O comando nao altera env.
+
+O comando nao inicia Ollama.
+
+O comando nao faz probe.
+
+Ele apenas orienta o operador humano e LLM.
+
+Isto reduz ambiguidade operacional antes dos live tests.
 
 ## 22. Fim Do Documento Inicial
 

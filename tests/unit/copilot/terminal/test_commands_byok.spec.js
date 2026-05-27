@@ -2423,6 +2423,18 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('pendingKinds=forced_tool_choice:1, parallel_tool_calls:1, reasoning:1');
     });
 
+    it('mostra orientação explícita para habilitar Ollama/local sem iniciar daemon', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway local');
+
+        expect(ctx.output()).toContain('BYOK model-gateway local/Ollama');
+        expect(ctx.output()).toContain('excludeLocalProvidersByDefault:true');
+        expect(ctx.output()).toContain('local_provider_requires_explicit_request');
+        expect(ctx.output()).toContain('nao inicia Ollama');
+    });
+
     it('mostra planejamento de backoff de probes sem chamar runtime', async () => {
         mockProjection();
         const ctx = mockCtx();

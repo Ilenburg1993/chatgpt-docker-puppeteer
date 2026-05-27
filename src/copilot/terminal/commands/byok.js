@@ -1850,7 +1850,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict|runs|diff] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway local | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict|runs|diff] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -2079,6 +2079,22 @@ function renderByokProviderGatewayTraits(println, rest) {
         println(`      \x1b[90mrichness=${richnessTags} · categories=${richnessCategories}\x1b[0m`);
     }
     println('\n  \x1b[90mUse estes traits como filtro inicial; eligibility e probes continuam em fases separadas.\x1b[0m\n');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @returns {void}
+ */
+function renderByokGatewayLocalGuidance(println) {
+    println(`\n  \x1b[36mBYOK model-gateway local/Ollama\x1b[0m`);
+    println('  \x1b[90mdefault=excluido · daemon=nao_iniciado · runtime=nao · opt-in=obrigatorio\x1b[0m\n');
+    println(`    \x1b[90mreason=${MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON}\x1b[0m`);
+    println('    \x1b[90mpolicy=excludeLocalProvidersByDefault:true\x1b[0m');
+    println('    \x1b[90mopt-in provider: /byok gateway selection audit provider:ollama\x1b[0m');
+    println('    \x1b[90mopt-in profile:  /byok gateway selection audit local_private\x1b[0m');
+    println('    \x1b[90mmodelo ativo:   /byok provider ollama-local <modelo> http://127.0.0.1:11434/v1\x1b[0m');
+    println('    \x1b[90mchecagem:       /byok gateway selection audit strict local_private_strict\x1b[0m\n');
+    println('  \x1b[90mEste comando nao inicia Ollama, nao faz probe e nao altera env. Ele apenas mostra o caminho explicito.\x1b[0m\n');
 }
 
 /**
@@ -4163,6 +4179,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             /^(traits|trait|caracteristicas|características)$/iu.test(rest[1] ?? '')
         ) {
             renderByokProviderGatewayTraits(println, rest.slice(2));
+            return;
+        }
+        if (/^(local|ollama|local-private)$/iu.test(rest[0] ?? '')) {
+            renderByokGatewayLocalGuidance(println);
             return;
         }
         if (
