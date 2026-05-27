@@ -228,11 +228,15 @@ export {
     EnvSecretRegistry,
     MODEL_GATEWAY_SECRET_SCOPE_PRECEDENCE,
     MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS,
+    auditModelGatewayValueRedaction,
     buildScopedSecretEnvKey,
+    collectModelGatewaySecretAuditEnvValues,
     createEnvSecretRegistry,
     evaluateModelGatewayProviderEnvRequirements,
+    redactModelGatewayAuditedValue,
     redactSecretRecord,
     redactSecretText,
+    summarizeModelGatewayRedactionAudits,
     summarizeModelGatewayProviderEnvRequirements,
 } from './secrets/index.js';
 export {

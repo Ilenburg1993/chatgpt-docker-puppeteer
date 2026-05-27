@@ -17,4 +17,10 @@ export {
     evaluateModelGatewayProviderEnvRequirements,
     summarizeModelGatewayProviderEnvRequirements,
 } from './requirements.js';
+export {
+    auditModelGatewayValueRedaction,
+    collectModelGatewaySecretAuditEnvValues,
+    redactModelGatewayAuditedValue,
+    summarizeModelGatewayRedactionAudits,
+} from './redaction-audit.js';
 export { redactSecretRecord, redactSecretText } from './redaction.js';

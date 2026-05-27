@@ -64,6 +64,8 @@ import {
     projectModelGatewayProviderFreshnessMetrics,
     renderModelGatewayCanonicalCommandLines,
     renderModelGatewayLocalProviderOptInGuidance,
+    auditModelGatewayValueRedaction,
+    collectModelGatewaySecretAuditEnvValues,
     redactSecretRecord,
     redactSecretText,
     byokProviderHealthRecordKey,
@@ -1671,6 +1673,7 @@ describe('model-gateway foundation', () => {
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build:plan'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build:preview'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:redaction:audit -- --fail'));
         assert.ok(
             packageCommands.some(
                 (entry) => entry.command === 'npm run model-gateway:selection:audit -- --profile=local_private_strict --fail-on-unselected',
@@ -1689,6 +1692,7 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build-plan'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build-preview'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-redaction-audit'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-live-plan'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-runtime-health-mirror'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:refresh:log:sqlite -- --json'));
@@ -1748,6 +1752,7 @@ describe('model-gateway foundation', () => {
             providerId: 'kilo',
             accountScope: 'org',
             secretRef: 'KILO_API_KEY',
+            accountOverlayId: 'kilo:org:sk-overlay-secret-that-must-not-leak',
             enabledModels: ['anthropic/claude-sonnet-4.5'],
             policyHeaders: { Authorization: 'Bearer sk-secret-that-must-not-leak' },
         });
@@ -1772,10 +1777,34 @@ describe('model-gateway foundation', () => {
             autoSelection: true,
         });
         assert.equal(overlay.redactionStatus, 'sanitized');
+        assert.equal(overlay.accountOverlayId.includes('sk-overlay-secret-that-must-not-leak'), false);
         assert.deepEqual(projection.modalities, { input: ['text'], output: ['text'] });
         const serialized = JSON.stringify({ evidence, providerEvidence, route, overlay, projection });
         assert.equal(serialized.includes('sk-secret-that-must-not-leak'), false);
         assert.equal(serialized.includes('secret-token-that-must-not-leak'), false);
+    });
+
+    it('audits persisted model-gateway values for redaction leaks without returning raw secrets', () => {
+        const secret = 'sk-audit-secret-that-must-not-leak';
+        const audit = auditModelGatewayValueRedaction(
+            {
+                ok: 'plain',
+                nested: {
+                    diagnostic: `provider returned ${secret}`,
+                },
+            },
+            { additionalSecrets: [secret], surface: 'unit', rootPath: 'snapshot' },
+        );
+        const envSecrets = collectModelGatewaySecretAuditEnvValues({
+            OPENROUTER_API_KEY: secret,
+            UNRELATED: secret,
+        });
+
+        assert.equal(audit.ok, false);
+        assert.equal(audit.leakCount, 1);
+        assert.equal(audit.samples.length, 1);
+        assert.equal(JSON.stringify(audit).includes(secret), false);
+        assert.deepEqual(envSecrets, [secret]);
     });
 
     it('merges catalog evidence field-wise without letting poorer fresh facts erase richer metadata', () => {
@@ -3655,6 +3684,46 @@ describe('model-gateway foundation', () => {
             assert.equal(JSON.parse(runRow?.payload_json ?? '{}').skippedRecords, 2);
             assert.equal(serializedPayloads.includes('sk-runtime-secret-that-must-not-leak'), false);
             assert.equal(serializedPayloads.includes('sk-probe-secret-that-must-not-leak'), false);
+        } finally {
+            db.close();
+        }
+    });
+
+    it('audits SQLite payload surfaces for unredacted secret leaks without printing secrets', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        const secret = 'sk-sqlite-audit-secret-that-must-not-leak';
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            await store.writeRouteDecisionEvents([
+                {
+                    decisionId: 'route-redacted',
+                    providerId: 'openrouter',
+                    modelId: 'model-a',
+                    selected: true,
+                    diagnostic: `provider returned ${secret}`,
+                },
+            ]);
+            const clean = await store.auditStoredPayloadRedaction({ additionalSecrets: [secret] });
+
+            db.prepare(
+                `
+                    UPDATE copilot_model_gateway_route_decisions
+                    SET payload_json = ?
+                    WHERE decision_id = ?
+                `,
+            ).run(JSON.stringify({ diagnostic: `manual leak ${secret}` }), 'route-redacted');
+            const leaked = await store.auditStoredPayloadRedaction({ additionalSecrets: [secret] });
+            const repair = await store.redactStoredPayloadLeaks({ additionalSecrets: [secret] });
+            const repaired = await store.auditStoredPayloadRedaction({ additionalSecrets: [secret] });
+
+            assert.equal(clean.ok, true);
+            assert.equal(leaked.ok, false);
+            assert.equal(leaked.leakCount, 1);
+            assert.equal(JSON.stringify(leaked).includes(secret), false);
+            assert.equal(leaked.tables.copilot_model_gateway_route_decisions.leakCount, 1);
+            assert.equal(repair.updatedRows, 1);
+            assert.equal(repaired.ok, true);
         } finally {
             db.close();
         }

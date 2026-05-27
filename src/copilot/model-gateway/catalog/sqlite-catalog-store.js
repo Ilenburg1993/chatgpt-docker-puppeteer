@@ -14,7 +14,12 @@ import Database from 'better-sqlite3';
 
 import { getCopilotDb } from '../../db/sqlite.js';
 import { normalizeModelGatewayAccountLimitState } from '../account-access/limits.js';
-import { redactSecretText } from '../secrets/index.js';
+import {
+    auditModelGatewayValueRedaction,
+    redactModelGatewayAuditedValue,
+    redactSecretText,
+    summarizeModelGatewayRedactionAudits,
+} from '../secrets/index.js';
 import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { toOpenAIModelCatalogList } from './openai-schema.js';
@@ -793,6 +798,102 @@ export class SqliteModelGatewayCatalogStore {
             },
             routeDecisionRows: tableCounts['copilot_model_gateway_route_decisions'] ?? 0,
             refreshLogRows: tableCounts['copilot_model_gateway_refresh_log_events'] ?? 0,
+        };
+    }
+
+    /**
+     * @param {{ additionalSecrets?: readonly string[]; maxSamples?: number; maxRowsPerTable?: number }} [options]
+     * @returns {Promise<{
+     *     schema: 'model-gateway-sqlite-redaction-audit';
+     *     ok: boolean;
+     *     tableCount: number;
+     *     leakCount: number;
+     *     scannedStringCount: number;
+     *     sampleCount: number;
+     *     tables: Record<string, { ok: boolean; rowCount: number; scannedStringCount: number; leakCount: number; sampleCount: number; samples: Array<{ path: string; redactedSnippet: string }> }>;
+     * }>}
+     */
+    async auditStoredPayloadRedaction(options = {}) {
+        const maxRowsPerTable = Math.max(1, Math.min(optionalInteger(options.maxRowsPerTable) ?? 100_000, 1_000_000));
+        /** @type {Record<string, { ok: boolean; rowCount: number; scannedStringCount: number; leakCount: number; sampleCount: number; samples: Array<{ path: string; redactedSnippet: string }> }>} */
+        const tables = {};
+        /** @type {Array<{ ok: boolean; leakCount: number; scannedStringCount: number; sampleCount: number }>} */
+        const audits = [];
+        for (const table of MODEL_GATEWAY_SQLITE_TABLES) {
+            if (!sqliteTableHasColumn(this.#db, table, 'payload_json')) continue;
+            const rows = /** @type {Array<{ payload_json: string }>} */ (
+                this.#db
+                    .prepare(`SELECT payload_json FROM ${table} ORDER BY rowid DESC LIMIT ?`)
+                    .all(maxRowsPerTable)
+            );
+            const audit = auditModelGatewayValueRedaction(
+                rows.map((row) => parsePayload(row.payload_json)),
+                {
+                    surface: `sqlite:${table}`,
+                    rootPath: table,
+                    ...(options.additionalSecrets === undefined ? {} : { additionalSecrets: options.additionalSecrets }),
+                    ...(options.maxSamples === undefined ? {} : { maxSamples: options.maxSamples }),
+                },
+            );
+            tables[table] = {
+                ok: audit.ok,
+                rowCount: rows.length,
+                scannedStringCount: audit.scannedStringCount,
+                leakCount: audit.leakCount,
+                sampleCount: audit.sampleCount,
+                samples: audit.samples,
+            };
+            audits.push(audit);
+        }
+        const summary = summarizeModelGatewayRedactionAudits(audits);
+        return {
+            schema: 'model-gateway-sqlite-redaction-audit',
+            ok: summary.ok,
+            tableCount: Object.keys(tables).length,
+            leakCount: summary.leakCount,
+            scannedStringCount: summary.scannedStringCount,
+            sampleCount: summary.sampleCount,
+            tables,
+        };
+    }
+
+    /**
+     * @param {{ additionalSecrets?: readonly string[]; maxRowsPerTable?: number }} [options]
+     * @returns {Promise<{ schema: 'model-gateway-sqlite-redaction-repair'; updatedRows: number; tables: Record<string, { scannedRows: number; updatedRows: number }> }>}
+     */
+    async redactStoredPayloadLeaks(options = {}) {
+        const maxRowsPerTable = Math.max(1, Math.min(optionalInteger(options.maxRowsPerTable) ?? 100_000, 1_000_000));
+        /** @type {Record<string, { scannedRows: number; updatedRows: number }>} */
+        const tables = {};
+        let updatedRows = 0;
+        const tx = this.#db.transaction(() => {
+            for (const table of MODEL_GATEWAY_SQLITE_TABLES) {
+                if (!sqliteTableHasColumn(this.#db, table, 'payload_json')) continue;
+                const rows = /** @type {Array<{ rowid: number; payload_json: string }>} */ (
+                    this.#db
+                        .prepare(`SELECT rowid, payload_json FROM ${table} ORDER BY rowid DESC LIMIT ?`)
+                        .all(maxRowsPerTable)
+                );
+                const update = this.#db.prepare(`UPDATE ${table} SET payload_json = ? WHERE rowid = ?`);
+                let tableUpdatedRows = 0;
+                for (const row of rows) {
+                    const redactedValue = redactModelGatewayAuditedValue(parsePayload(row.payload_json), {
+                        ...(options.additionalSecrets === undefined ? {} : { additionalSecrets: options.additionalSecrets }),
+                    });
+                    const nextPayload = JSON.stringify(redactedValue);
+                    if (nextPayload === row.payload_json) continue;
+                    update.run(nextPayload, row.rowid);
+                    tableUpdatedRows += 1;
+                    updatedRows += 1;
+                }
+                tables[table] = { scannedRows: rows.length, updatedRows: tableUpdatedRows };
+            }
+        });
+        tx();
+        return {
+            schema: 'model-gateway-sqlite-redaction-repair',
+            updatedRows,
+            tables,
         };
     }
 

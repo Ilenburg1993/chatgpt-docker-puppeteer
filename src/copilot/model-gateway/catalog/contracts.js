@@ -307,16 +307,17 @@ export function createProviderAccountOverlay(input) {
     const accountScope = optionalString(input.accountScope) ?? 'default';
     const secretRef = optionalString(input.secretRef);
     const sourceId = optionalString(input.sourceId);
+    const accountOverlayId =
+        optionalString(input.accountOverlayId) ??
+        [providerId, accountScope, secretRef, sourceId].filter(Boolean).join(':');
     return {
         schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
-        accountOverlayId:
-            optionalString(input.accountOverlayId) ??
-            [providerId, accountScope, secretRef, sourceId].filter(Boolean).join(':'),
+        accountOverlayId: redactSecretText(accountOverlayId),
         providerId,
         accountScope,
         secretRef,
         organizationIdRef: optionalString(input.organizationIdRef),
-        sourceId,
+        sourceId: sourceId ? redactSecretText(sourceId) : null,
         sourceKind: optionalString(input.sourceKind) ?? 'unknown',
         confidence: optionalString(input.confidence) ?? MODEL_GATEWAY_CATALOG_CONFIDENCE.UNKNOWN,
         enabledModels: stringList(input.enabledModels),

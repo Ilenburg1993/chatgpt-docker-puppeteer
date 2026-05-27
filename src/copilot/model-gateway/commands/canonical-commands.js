@@ -185,6 +185,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Audit the persisted JSON catalog for duplicate keys and redacted identities without refresh.',
     },
     {
+        id: 'redaction.audit',
+        phase: 'prebuild',
+        surface: 'package',
+        command: 'npm run model-gateway:redaction:audit -- --fail',
+        summary: 'Audit JSON and SQLite model-gateway payload surfaces for unredacted secret-looking strings.',
+    },
+    {
         id: 'selection.audit',
         phase: 'selection',
         surface: 'package',
@@ -351,6 +358,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-catalog-integrity',
         summary: 'Makefile alias for catalog integrity audit without refresh.',
+    },
+    {
+        id: 'make.redaction-audit',
+        phase: 'prebuild',
+        surface: 'make',
+        command: 'make model-gateway-redaction-audit',
+        summary: 'Makefile alias for the JSON/SQLite persisted redaction audit.',
     },
     {
         id: 'make.selection-audit',

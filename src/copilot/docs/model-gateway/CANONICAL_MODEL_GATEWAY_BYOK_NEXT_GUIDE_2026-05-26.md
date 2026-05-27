@@ -4051,6 +4051,127 @@ Resultado:
 
 `4 passed`
 
+Mudanca 20:
+
+Criado gate executavel de redaction para JSON/SQLite.
+
+Motivo:
+
+Antes de build/live, precisamos saber se o banco de metadados e as camadas operacionais persistidas contem qualquer segredo bruto.
+
+So ter redaction nos writers nao basta.
+
+Tambem precisamos de auditoria repetivel para:
+
+- dados legados;
+- payloads vindos de callers imperfeitos;
+- SQLite ja materializado;
+- logs/artefatos antes de live tests;
+- chaves reais presentes no ambiente do operador.
+
+Novos elementos:
+
+- `src/copilot/model-gateway/secrets/redaction-audit.js`
+- `auditModelGatewayValueRedaction`
+- `collectModelGatewaySecretAuditEnvValues`
+- `redactModelGatewayAuditedValue`
+- `summarizeModelGatewayRedactionAudits`
+- `SqliteModelGatewayCatalogStore.auditStoredPayloadRedaction`
+- `SqliteModelGatewayCatalogStore.redactStoredPayloadLeaks`
+- `scripts/model-gateway-redaction-audit.mjs`
+- `npm run model-gateway:redaction:audit`
+- `make model-gateway-redaction-audit`
+
+Semantica:
+
+Auditoria usa detector de alta confianca.
+
+Ela verifica:
+
+- valores exatos de secrets presentes no ambiente;
+- bearer tokens fortes;
+- JWTs;
+- assignments obvios de API key/token/password;
+- prefixos fortes de providers como `sk-`, `gsk_`, `hf_`, `csk-`, `nvapi-`, `cfat_`.
+
+Ela nao deve marcar nomes legitimos de modelos como vazamento apenas por comecarem com `sk`.
+
+Licao importante:
+
+O primeiro detector baseado no redactor agressivo gerou falsos positivos em nomes legitimos de modelos e campos como `skipped`.
+
+Por isso, redaction de persistencia e deteccao de auditoria foram separadas.
+
+Persistencia pode ser mais conservadora e redigir demais.
+
+Auditoria precisa ser mais precisa para virar gate operacional.
+
+Reparo:
+
+O script aceita `--repair`.
+
+Esse modo redige somente `payload_json` de SQLite usando:
+
+- valores exatos do ambiente;
+- padroes fortes de token.
+
+Nao busca provedores.
+
+Nao roda modelos.
+
+Nao altera catalogo JSON.
+
+Nao imprime segredos crus.
+
+Descoberta real neste turno:
+
+SQLite local continha payloads antigos com valores exatos de env embutidos em refs/IDs de overlay/eligibility.
+
+Executado:
+
+`npm run model-gateway:redaction:audit -- --repair --json`
+
+Resultado observado:
+
+- `updatedRows=1624`
+- account overlays reparados
+- eligibility decisions reparadas
+- snapshot payload reparado
+
+Auditoria apos reparo:
+
+`npm run model-gateway:redaction:audit -- --json`
+
+Resultado:
+
+- `ok=true`
+- `leakCount=0`
+- `catalog.leakCount=0`
+- `sqlite.leakCount=0`
+- `scannedStringCount=1929392`
+
+Contrato futuro:
+
+`createProviderAccountOverlay` agora redige `accountOverlayId` e `sourceId` quando eles contem token/secret bruto.
+
+Isso evita que rebuilds futuros recriem o mesmo problema.
+
+Validacao focada:
+
+`node --check src/copilot/model-gateway/secrets/redaction-audit.js`
+
+`node --check src/copilot/model-gateway/catalog/contracts.js`
+
+`node --check src/copilot/model-gateway/catalog/sqlite-catalog-store.js`
+
+`node --check scripts/model-gateway-redaction-audit.mjs`
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "secret-safe universal catalog evidence|redaction leaks|SQLite payload surfaces|canonical model-gateway command inventory"`
+
+Resultado:
+
+`4 passed`
+
 Validacoes executadas:
 
 `node --check src/copilot/model-gateway/health/provider-health.js`
