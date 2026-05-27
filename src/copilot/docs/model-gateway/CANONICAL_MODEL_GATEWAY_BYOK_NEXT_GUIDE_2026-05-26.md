@@ -5850,6 +5850,29 @@ Ele ainda nao implementa retry/fallback multi-rota.
 
 Essa sera a proxima expansao.
 
+`executeModelGatewayRuntimeSelectorPlanWithFallbacks`
+
+Orquestra multiplas tentativas sobre o plano.
+
+Ele tenta:
+
+- o profile solicitado;
+- os `fallbackProfileIds` explicitos;
+- os demais profiles selecionados do plano.
+
+Ele para no primeiro sucesso.
+
+Cada tentativa usa `executeModelGatewayRuntimeSelectorPlan`, portanto:
+
+- reutiliza o probe chat canonico;
+- grava health no mesmo store;
+- preserva a semantica de bloqueio;
+- retorna detalhes de cada tentativa.
+
+Ainda nao ha retry temporal da mesma rota.
+
+Isso sera tratado junto com backoff/rate-limit.
+
 ### 21.2 Integracao Ao Script Efetivo
 
 `scripts/model-gateway-effective-selection.mjs`
@@ -5899,9 +5922,10 @@ Esses pontos pertencem a proxima camada.
 - [x] Produzir route decision event sanitizado.
 - [x] Integrar plano ao script effective.
 - [x] Cobrir contratos unitarios.
-- [x] Criar executor runtime real inicial sem retry/fallback.
+- [x] Criar executor runtime real inicial.
 - [x] Persistir resultado runtime no health store.
-- [ ] Criar retry/fallback multi-rota.
+- [x] Criar fallback multi-rota.
+- [ ] Criar retry temporal com backoff/rate-limit.
 - [ ] Criar live tests llm-b baseados no plano.
 
 ## 22. Fim Do Documento Inicial

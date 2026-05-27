@@ -311,6 +311,7 @@ export {
     MODEL_GATEWAY_SELECTION_POLICY_MODE,
     evaluateGatewayModelHealthRoute,
     executeModelGatewayRuntimeSelectorPlan,
+    executeModelGatewayRuntimeSelectorPlanWithFallbacks,
     explainGatewayRouteDecision,
     isGatewayModelAgentProbeHealthFailed,
     isGatewayModelAgentProbeVerified,

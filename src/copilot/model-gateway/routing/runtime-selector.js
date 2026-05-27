@@ -340,3 +340,86 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
         };
     }
 }
+
+/**
+ * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>} plan
+ * @param {{
+ *   profileId?: string;
+ *   fallbackProfileIds?: string[];
+ *   maxAttempts?: number;
+ *   timeoutMs?: number;
+ *   prompt?: string;
+ *   recordHealth?: boolean;
+ *   deps?: {
+ *     runChatProbe?: typeof runConfiguredByokChatProbe;
+ *     recordSuccess?: typeof recordByokProviderModelCallSuccess;
+ *     recordFailure?: typeof recordByokProviderModelCallFailure;
+ *     flushHealth?: typeof flushByokProviderHealth;
+ *   };
+ * }} [options]
+ * @returns {Promise<{
+ *   schema: 'model-gateway-runtime-selector-fallback-execution-result';
+ *   ok: boolean;
+ *   status: 'ok' | 'blocked' | 'failed';
+ *   attemptedCount: number;
+ *   selectedProfileId: string | null;
+ *   attempts: Array<Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>>;
+ *   final: Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>> | null;
+ *   error: string | null;
+ * }>}
+ */
+export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, options = {}) {
+    const selectedRoutes = plan.routes.filter((route) => route.status === 'selected');
+    const requestedProfile = optionalString(options.profileId);
+    const fallbackProfileIds = Array.isArray(options.fallbackProfileIds)
+        ? options.fallbackProfileIds.map(optionalString).filter((item) => item !== null)
+        : [];
+    const orderedProfileIds = [
+        ...(requestedProfile ? [requestedProfile] : []),
+        ...fallbackProfileIds,
+        ...selectedRoutes.map((route) => route.profileId),
+    ];
+    const uniqueProfileIds = [...new Set(orderedProfileIds)].filter((profileId) =>
+        selectedRoutes.some((route) => route.profileId === profileId),
+    );
+    const maxAttempts =
+        typeof options.maxAttempts === 'number' && Number.isFinite(options.maxAttempts) && options.maxAttempts > 0
+            ? Math.floor(options.maxAttempts)
+            : uniqueProfileIds.length;
+    const attemptProfileIds = uniqueProfileIds.slice(0, maxAttempts);
+    /** @type {Array<Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>>} */
+    const attempts = [];
+    for (const profileId of attemptProfileIds) {
+        const attempt = await executeModelGatewayRuntimeSelectorPlan(plan, {
+            profileId,
+            ...(typeof options.timeoutMs === 'number' ? { timeoutMs: options.timeoutMs } : {}),
+            ...(options.prompt ? { prompt: options.prompt } : {}),
+            ...(options.recordHealth !== undefined ? { recordHealth: options.recordHealth } : {}),
+            ...(options.deps ? { deps: options.deps } : {}),
+        });
+        attempts.push(attempt);
+        if (attempt.ok) {
+            return {
+                schema: 'model-gateway-runtime-selector-fallback-execution-result',
+                ok: true,
+                status: 'ok',
+                attemptedCount: attempts.length,
+                selectedProfileId: attempt.profileId,
+                attempts,
+                final: attempt,
+                error: null,
+            };
+        }
+    }
+    const final = attempts.at(-1) ?? null;
+    return {
+        schema: 'model-gateway-runtime-selector-fallback-execution-result',
+        ok: false,
+        status: attempts.length === 0 ? 'blocked' : 'failed',
+        attemptedCount: attempts.length,
+        selectedProfileId: null,
+        attempts,
+        final,
+        error: final?.error ?? 'runtime_selector_no_available_attempts',
+    };
+}

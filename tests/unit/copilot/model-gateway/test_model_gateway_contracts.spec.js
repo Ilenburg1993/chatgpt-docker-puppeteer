@@ -62,6 +62,7 @@ import {
     buildModelGatewayOnListModelsHandler,
     evaluateGatewayModelHealthRoute,
     executeModelGatewayRuntimeSelectorPlan,
+    executeModelGatewayRuntimeSelectorPlanWithFallbacks,
     readGatewayModelHealthFromRecords,
     evaluateModelGatewayProviderEnvRequirements,
     geminiAdapter,
@@ -793,6 +794,44 @@ describe('model-gateway foundation', () => {
         assert.equal(blockedRuntimeExecution.ok, false);
         assert.equal(blockedRuntimeExecution.status, 'blocked');
         assert.equal(blockedRuntimeExecution.error, 'runtime_selector_route_unavailable');
+
+        let fallbackProbeCalls = 0;
+        const fallbackRuntimeExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(runtimeSelectorPlan, {
+            profileId: 'repo_agent',
+            fallbackProfileIds: ['tool_agent'],
+            deps: {
+                runChatProbe: async (options = {}) => {
+                    fallbackProbeCalls += 1;
+                    return {
+                        ok: fallbackProbeCalls === 2,
+                        status: fallbackProbeCalls === 2 ? 'ok' : 'failed',
+                        elapsedMs: 10,
+                        model: String(options.model ?? ''),
+                        profile: fallbackProbeCalls === 2 ? 'tool_agent' : 'repo_agent',
+                        preset: 'openrouter',
+                        providerType: 'openai-compatible',
+                        deltaCount: fallbackProbeCalls === 2 ? 1 : 0,
+                        deltaChars: fallbackProbeCalls === 2 ? 13 : 0,
+                        finalChars: fallbackProbeCalls === 2 ? 13 : 0,
+                        finalContent: fallbackProbeCalls === 2 ? 'BYOK_PROBE_OK' : '',
+                        observedFinalEvent: fallbackProbeCalls === 2,
+                        sessionId: `unit-runtime-session-${fallbackProbeCalls}`,
+                        errors: fallbackProbeCalls === 2 ? [] : ['first route failed'],
+                        warnings: [],
+                        providerFailure: null,
+                    };
+                },
+                recordSuccess: () => {},
+                recordFailure: () => {},
+                flushHealth: async () => {},
+            },
+        });
+        assert.equal(fallbackRuntimeExecution.schema, 'model-gateway-runtime-selector-fallback-execution-result');
+        assert.equal(fallbackRuntimeExecution.ok, true);
+        assert.equal(fallbackRuntimeExecution.attemptedCount, 2);
+        assert.equal(fallbackRuntimeExecution.selectedProfileId, 'tool_agent');
+        assert.equal(fallbackRuntimeExecution.attempts[0].ok, false);
+        assert.equal(fallbackRuntimeExecution.attempts[1].ok, true);
 
         const trace = buildModelGatewaySelectionDecisionTrace({
             snapshot,

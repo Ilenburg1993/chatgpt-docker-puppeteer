@@ -33,6 +33,7 @@ export { routeGatewayModels, routeModelGatewayCatalogSnapshot, scoreGatewayModel
 export {
     buildModelGatewayRuntimeSelectorPlan,
     executeModelGatewayRuntimeSelectorPlan,
+    executeModelGatewayRuntimeSelectorPlanWithFallbacks,
     selectModelGatewayRuntimeRoute,
 } from './runtime-selector.js';
 export {
