@@ -11,7 +11,7 @@
 import { createHash } from 'node:crypto';
 
 import { optionalPositiveInteger, optionalString } from '../contracts/index.js';
-import { redactSecretText } from '../secrets/index.js';
+import { redactModelGatewayAuditedValue } from '../secrets/index.js';
 import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 
 export const MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY = Object.freeze({
@@ -32,7 +32,7 @@ function isRecord(value) {
  * @returns {unknown}
  */
 function sanitizePayload(value) {
-    if (typeof value === 'string') return redactSecretText(value);
+    if (typeof value === 'string') return redactModelGatewayAuditedValue(value);
     if (Array.isArray(value)) return value.map(sanitizePayload);
     if (isRecord(value)) {
         return Object.fromEntries(

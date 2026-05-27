@@ -1730,6 +1730,14 @@ describe('model-gateway foundation', () => {
             confidence: 'catalog',
             observedAt: '2026-05-25T00:00:00.000Z',
         });
+        const skyfallEvidence = createModelMetadataEvidence({
+            evidenceId: 'ev-skyfall',
+            providerId: 'openrouter',
+            providerModel: 'thedrummer/skyfall-36b-v2',
+            fieldPath: 'aliases.providerModel',
+            value: 'thedrummer/skyfall-36b-v2',
+            sourceId: source.id,
+        });
         const providerEvidence = createProviderMetadataEvidence({
             evidenceId: 'provider-ev-1',
             providerId: 'kilo',
@@ -1768,6 +1776,8 @@ describe('model-gateway foundation', () => {
 
         assert.equal(source.providerId, 'kilo');
         assert.equal(evidence.redactionStatus, 'sanitized');
+        assert.equal(skyfallEvidence.providerModel, 'thedrummer/skyfall-36b-v2');
+        assert.equal(skyfallEvidence.value, 'thedrummer/skyfall-36b-v2');
         assert.equal(providerEvidence.subjectProviderId, 'anthropic');
         assert.equal(providerEvidence.redactionStatus, 'sanitized');
         assert.equal(route.selectorKind, 'gateway_auto');
@@ -1779,7 +1789,7 @@ describe('model-gateway foundation', () => {
         assert.equal(overlay.redactionStatus, 'sanitized');
         assert.equal(overlay.accountOverlayId.includes('sk-overlay-secret-that-must-not-leak'), false);
         assert.deepEqual(projection.modalities, { input: ['text'], output: ['text'] });
-        const serialized = JSON.stringify({ evidence, providerEvidence, route, overlay, projection });
+        const serialized = JSON.stringify({ evidence, providerEvidence, route, overlay, projection, skyfallEvidence });
         assert.equal(serialized.includes('sk-secret-that-must-not-leak'), false);
         assert.equal(serialized.includes('secret-token-that-must-not-leak'), false);
     });

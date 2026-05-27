@@ -8,7 +8,9 @@ import {
     JsonModelGatewayCatalogStore,
     SqliteModelGatewayCatalogStore,
     auditModelGatewayCatalogSnapshotIntegrity,
+    auditModelGatewayValueRedaction,
     auditModelGatewayPreRuntimeSelection,
+    collectModelGatewaySecretAuditEnvValues,
     compareModelGatewayCatalogSnapshotParity,
     createEnvSecretRegistry,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
@@ -109,6 +111,15 @@ const sqliteSnapshot = await sqliteStore.readSnapshot();
 const sqliteDiagnostics = await sqliteStore.readStorageDiagnostics();
 const integrity = auditModelGatewayCatalogSnapshotIntegrity(sourceSnapshot);
 const parity = compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSnapshot);
+const secretAuditValues = collectModelGatewaySecretAuditEnvValues(process.env);
+const catalogRedaction = auditModelGatewayValueRedaction(sourceSnapshot, {
+    surface: 'json:catalog',
+    rootPath: 'catalog',
+    additionalSecrets: secretAuditValues,
+});
+const sqliteRedaction = await sqliteStore.auditStoredPayloadRedaction({
+    additionalSecrets: secretAuditValues,
+});
 const secretRegistry = createEnvSecretRegistry();
 const fileHealthRecords = listByokProviderModelHealth();
 let sqliteHealthRecords = [];
@@ -186,6 +197,11 @@ const checks = [
         detail: `count mismatches=${parity.countMismatches.length}, key mismatches=${parity.keyMismatches.length}`,
     },
     {
+        id: 'redaction_audit',
+        ok: catalogRedaction.ok && sqliteRedaction.ok,
+        detail: `catalogLeaks=${catalogRedaction.leakCount}, sqliteLeaks=${sqliteRedaction.leakCount}`,
+    },
+    {
         id: 'selection_allow_probe',
         ok: allowProbeSelection.ok,
         detail: `${allowProbeSelection.summary.selectedProfileCount}/${allowProbeSelection.summary.profileCount} profiles selected`,
@@ -249,6 +265,21 @@ const summary = {
         healthObservations: sqliteDiagnostics.tableCounts.copilot_model_gateway_health_observations,
         runtimeProbeRuns: sqliteDiagnostics.tableCounts.copilot_model_gateway_runtime_probe_runs,
         runtimeProbeResults: sqliteDiagnostics.tableCounts.copilot_model_gateway_runtime_probe_results,
+    },
+    redaction: {
+        ok: catalogRedaction.ok && sqliteRedaction.ok,
+        envSecretCandidateCount: secretAuditValues.length,
+        catalog: {
+            ok: catalogRedaction.ok,
+            leakCount: catalogRedaction.leakCount,
+            scannedStringCount: catalogRedaction.scannedStringCount,
+        },
+        sqlite: {
+            ok: sqliteRedaction.ok,
+            leakCount: sqliteRedaction.leakCount,
+            scannedStringCount: sqliteRedaction.scannedStringCount,
+            tableCount: sqliteRedaction.tableCount,
+        },
     },
     selection: {
         allowProbe: {

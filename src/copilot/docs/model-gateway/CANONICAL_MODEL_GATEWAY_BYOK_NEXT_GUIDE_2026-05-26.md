@@ -4172,6 +4172,150 @@ Resultado:
 
 `4 passed`
 
+Mudanca 21:
+
+Redaction audit foi conectado aos gates de build/readiness.
+
+Antes:
+
+`model-gateway:redaction:audit` existia como comando isolado.
+
+Depois:
+
+`scripts/model-gateway-live-readiness.mjs` agora inclui check:
+
+`redaction_audit`
+
+Esse check combina:
+
+- catalog JSON redaction audit;
+- SQLite payload redaction audit;
+- valores exatos de secrets presentes no ambiente;
+- detector de alta confianca para tokens.
+
+O resumo `model-gateway-live-readiness` agora tem bloco:
+
+`redaction`
+
+Com:
+
+- `ok`
+- `envSecretCandidateCount`
+- `catalog.leakCount`
+- `catalog.scannedStringCount`
+- `sqlite.leakCount`
+- `sqlite.scannedStringCount`
+- `sqlite.tableCount`
+
+`scripts/model-gateway-metadata-build.mjs` tambem passa a calcular redaction no snapshot produzido.
+
+Em modo commit, tambem audita o SQLite materializado.
+
+O campo `summary.ok` do metadata build agora exige:
+
+- integridade do catalogo;
+- paridade SQLite quando commitado;
+- redaction ok;
+- nenhuma falha bloqueante de importer.
+
+Validacao executada:
+
+`node --check scripts/model-gateway-live-readiness.mjs`
+
+`node --check scripts/model-gateway-metadata-build.mjs`
+
+`node scripts/model-gateway-metadata-build.mjs --plan --json`
+
+Resultado:
+
+- `schema=model-gateway-metadata-build-plan`
+- `ok=true`
+- `selected=25`
+
+`node scripts/model-gateway-live-readiness.mjs --json`
+
+Resultado relevante:
+
+- `redaction.ok=true`
+- `redaction.catalog.leakCount=0`
+- `redaction.sqlite.leakCount=0`
+- `redaction.sqlite.tableCount=21`
+- `redaction.sqlite.scannedStringCount=1288714`
+
+Observacao:
+
+Live readiness geral ainda retornou `ok=false` porque `catalog_integrity=false`.
+
+Isso nao vem da nova redaction.
+
+O novo check de redaction passou.
+
+Mudanca 22:
+
+Redaction de catalogo foi separada de redaction operacional agressiva.
+
+Descoberta:
+
+`model-gateway:catalog:integrity` apontou duplicatas com chaves como:
+
+- `cloudflare-workers-ai-catalog:@[redacted]:aliases.providerModel`
+- `cloudflare-workers-ai:@[redacted]:default`
+- `openrouter-models:thedrummer/[redacted]:displayName`
+
+Causa:
+
+O redactor generico era agressivo demais para identidades de catalogo.
+
+Ele podia interpretar nomes legitimos de modelos que comecam por `sk` como segredo.
+
+Exemplos afetados:
+
+- `skyfall`
+- campos/ids derivados de modelos com prefixos parecidos com tokens;
+- valores de catalogo que sao identidade publica, nao credencial.
+
+Correcao:
+
+As camadas de catalogo passaram a usar redaction de alta confianca:
+
+- `JsonModelGatewayCatalogStore`
+- `createModelMetadataEvidence`
+- `createProviderMetadataEvidence`
+- `createCanonicalProviderProjection`
+- `createProviderAccountOverlay`
+- `createCatalogImportRun`
+- `createSanitizedRawPayloadRef`
+
+Headers e chaves explicitamente sensiveis continuam redigidos.
+
+Mas strings publicas de identidade de modelo nao devem ser redigidas por coincidencia lexical.
+
+Contrato adicionado:
+
+`thedrummer/skyfall-36b-v2` deve permanecer como identidade publica de modelo.
+
+Validacao focada:
+
+`node --check src/copilot/model-gateway/catalog/json-catalog-store.js`
+
+`node --check src/copilot/model-gateway/catalog/contracts.js`
+
+`node --check src/copilot/model-gateway/catalog/import-runs.js`
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "secret-safe universal catalog evidence|redacted JSON catalog snapshot|redaction leaks"`
+
+Resultado:
+
+`3 passed`
+
+Consequencia:
+
+O catalogo persistido atual ainda contem identidades ja redigidas de builds anteriores.
+
+Isso exige rebuild/refresh de metadados para reconstruir as identidades a partir das fontes.
+
+O codigo novo evita recriar esse dano em builds futuros.
+
 Validacoes executadas:
 
 `node --check src/copilot/model-gateway/health/provider-health.js`

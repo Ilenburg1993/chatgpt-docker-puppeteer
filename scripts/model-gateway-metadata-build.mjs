@@ -9,7 +9,9 @@ import {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
     auditModelGatewayCatalogSnapshotIntegrity,
+    auditModelGatewayValueRedaction,
     classifyModelGatewayCatalogImporterFailure,
+    collectModelGatewaySecretAuditEnvValues,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     planModelGatewayCatalogRefresh,
     refreshModelGatewayCatalog,
@@ -196,6 +198,12 @@ const result = await refreshModelGatewayCatalog({
     onProgress: recordProgress,
 });
 const integrity = auditModelGatewayCatalogSnapshotIntegrity(result.snapshot);
+const secretAuditValues = collectModelGatewaySecretAuditEnvValues(process.env);
+const catalogRedaction = auditModelGatewayValueRedaction(result.snapshot, {
+    surface: 'json:catalog',
+    rootPath: 'catalog',
+    additionalSecrets: secretAuditValues,
+});
 
 /** @type {Awaited<ReturnType<typeof mirrorModelGatewayCatalogSnapshotToSqlite>> | null} */
 let mirrored = null;
@@ -205,6 +213,8 @@ let refreshLogSqlite = null;
 let sqliteRetention = null;
 /** @type {Awaited<ReturnType<SqliteModelGatewayCatalogStore['readStorageDiagnostics']>> | null} */
 let sqliteDiagnostics = null;
+/** @type {Awaited<ReturnType<SqliteModelGatewayCatalogStore['auditStoredPayloadRedaction']>> | null} */
+let sqliteRedaction = null;
 
 if (result.writePolicy.committed) {
     const sqliteStore = new SqliteModelGatewayCatalogStore();
@@ -226,6 +236,9 @@ if (result.writePolicy.committed) {
         });
     }
     sqliteDiagnostics = await sqliteStore.readStorageDiagnostics();
+    sqliteRedaction = await sqliteStore.auditStoredPayloadRedaction({
+        additionalSecrets: secretAuditValues,
+    });
 }
 
 const importerFailures = progressEvents
@@ -259,9 +272,10 @@ const nonBlockingImporterFailures = importerFailures.filter((failure) => !failur
 const accountImporterFailures = importerFailures.filter((failure) => failure.disposition === 'account_state_unavailable');
 const optionalImporterFailures = importerFailures.filter((failure) => failure.disposition === 'optional_local_source_unavailable');
 const sqliteParityOk = result.writePolicy.committed ? Boolean(mirrored?.parity.ok) : true;
+const redactionOk = catalogRedaction.ok && (sqliteRedaction?.ok ?? true);
 const summary = {
     schema: 'model-gateway-metadata-build-summary',
-    ok: sqliteParityOk && integrity.ok && blockingImporterFailures.length === 0,
+    ok: sqliteParityOk && integrity.ok && redactionOk && blockingImporterFailures.length === 0,
     logPath,
     storePath: jsonStore.filePath,
     mode: incremental ? 'incremental' : 'full',
@@ -273,6 +287,23 @@ const summary = {
     accountImporterFailures,
     optionalImporterFailures,
     integrity,
+    redaction: {
+        ok: redactionOk,
+        envSecretCandidateCount: secretAuditValues.length,
+        catalog: {
+            ok: catalogRedaction.ok,
+            leakCount: catalogRedaction.leakCount,
+            scannedStringCount: catalogRedaction.scannedStringCount,
+        },
+        sqlite: sqliteRedaction
+            ? {
+                  ok: sqliteRedaction.ok,
+                  leakCount: sqliteRedaction.leakCount,
+                  scannedStringCount: sqliteRedaction.scannedStringCount,
+                  tableCount: sqliteRedaction.tableCount,
+              }
+            : null,
+    },
     importers: importers.map((importer) => importer.id),
     selected: result.refreshPlan?.selected.map((item) => item.sourceId) ?? importers.map((importer) => importer.id),
     skipped: result.refreshPlan?.skipped.map((item) => item.sourceId) ?? [],

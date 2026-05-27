@@ -9,7 +9,7 @@
  */
 
 import { normalizeGatewayIdPart, optionalPositiveInteger, optionalString } from '../contracts/index.js';
-import { redactSecretRecord, redactSecretText } from '../secrets/index.js';
+import { redactModelGatewayAuditedValue, redactSecretRecord } from '../secrets/index.js';
 import { normalizeModelRoutePolicyTraits } from './normalizers.js';
 
 export const MODEL_GATEWAY_CATALOG_SCHEMA_VERSION = 1;
@@ -55,7 +55,7 @@ function stringList(value) {
  * @returns {unknown}
  */
 function sanitizeJsonValue(value) {
-    if (typeof value === 'string') return redactSecretText(value);
+    if (typeof value === 'string') return redactModelGatewayAuditedValue(value);
     if (Array.isArray(value)) return value.map(sanitizeJsonValue);
     if (isRecord(value)) {
         return Object.fromEntries(
@@ -312,12 +312,12 @@ export function createProviderAccountOverlay(input) {
         [providerId, accountScope, secretRef, sourceId].filter(Boolean).join(':');
     return {
         schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
-        accountOverlayId: redactSecretText(accountOverlayId),
+        accountOverlayId: /** @type {string} */ (redactModelGatewayAuditedValue(accountOverlayId)),
         providerId,
         accountScope,
         secretRef,
         organizationIdRef: optionalString(input.organizationIdRef),
-        sourceId: sourceId ? redactSecretText(sourceId) : null,
+        sourceId: sourceId ? /** @type {string} */ (redactModelGatewayAuditedValue(sourceId)) : null,
         sourceKind: optionalString(input.sourceKind) ?? 'unknown',
         confidence: optionalString(input.confidence) ?? MODEL_GATEWAY_CATALOG_CONFIDENCE.UNKNOWN,
         enabledModels: stringList(input.enabledModels),

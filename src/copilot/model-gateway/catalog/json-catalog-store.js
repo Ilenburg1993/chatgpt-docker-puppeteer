@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 
 import { readJson, writeJson } from '../../infra/storage/json-store.js';
-import { redactSecretText } from '../secrets/index.js';
+import { redactModelGatewayAuditedValue } from '../secrets/index.js';
 import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 
 export const DEFAULT_MODEL_GATEWAY_CATALOG_PATH = join(
@@ -68,7 +68,7 @@ function optionalString(value) {
  * @returns {unknown}
  */
 function sanitizeCatalogValue(value) {
-    if (typeof value === 'string') return redactSecretText(value);
+    if (typeof value === 'string') return /** @type {string} */ (redactModelGatewayAuditedValue(value));
     if (Array.isArray(value)) return value.map(sanitizeCatalogValue);
     if (isRecord(value)) {
         return Object.fromEntries(
