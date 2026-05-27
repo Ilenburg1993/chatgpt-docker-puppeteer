@@ -340,6 +340,7 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
  *     requiredProbeKinds?: string[];
  *     blockFailedProbeKinds?: string[];
  *     allowLocalProviders?: boolean;
+ *     excludeLocalProvidersByDefault?: boolean;
  *     requireRuntimeProof?: boolean;
  *     requireKnownEligibility?: boolean;
  *     ignoreRuntimeHealth?: boolean;
@@ -411,8 +412,10 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     const upstreamProvider = routeMetadataText(model, 'upstreamProvider');
     const selectorKind = String(model['selectorKind'] ?? routePolicyText(model, 'selectorKind')).trim();
     const selectorSyntax = String(model['selectorSyntax'] ?? routePolicyText(model, 'selectorSyntax') ?? model['providerModel'] ?? '').trim();
+    const excludeLocalProvidersByDefault = options.excludeLocalProvidersByDefault !== false;
     if (
         isLocalPrivateCandidate(model) &&
+        excludeLocalProvidersByDefault &&
         !localProviderSelectionAllowed(profile, options.allowLocalProviders) &&
         !providerExplicitlyAllowsLocal(providerId, allowProviders) &&
         !preferredRouteLayers.has('local_daemon')

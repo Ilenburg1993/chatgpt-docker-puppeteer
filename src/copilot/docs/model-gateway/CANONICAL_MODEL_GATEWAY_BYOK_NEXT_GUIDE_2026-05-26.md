@@ -2485,7 +2485,7 @@ Quota/account overlay mais rico.
 - [x] Criar `local_private_strict`.
 - [x] Emitir supply warnings quando nao ha supply local.
 - [ ] Decidir se `local_private` deve continuar flexivel por default.
-- [ ] Criar policy global `excludeLocalProvidersByDefault`.
+- [x] Criar policy global `excludeLocalProvidersByDefault`.
 - [ ] Criar teste para todos os defaults sem Ollama local.
 - [ ] Criar teste para opt-in local com daemon offline.
 - [ ] Criar teste para opt-in local com fixture de daemon online.
@@ -7160,6 +7160,37 @@ O comportamento continua pre-runtime.
 Nenhum provider e chamado.
 
 O teste protege gateways como Kilo, OpenRouter, HuggingFace Router e Cloudflare AI Gateway.
+
+## 21.56 Mudanca 56 - Policy Global Para Excluir Local Por Default
+
+Foi adicionada option:
+
+`excludeLocalProvidersByDefault`
+
+Default:
+
+`true`
+
+Isto preserva o comportamento atual:
+
+- Ollama/local suportado;
+- Ollama/local nao selecionado por default;
+- local selecionado apenas por opt-in explicito.
+
+Quando `excludeLocalProvidersByDefault=false`, o caller assume conscientemente a responsabilidade de permitir local sem o bloqueio global.
+
+O bloqueio por default continua emitindo:
+
+`local_provider_requires_explicit_request`
+
+O teste existente de Ollama/local agora cobre:
+
+- default remoto vence;
+- `allowProviders: ['ollama']` permite local;
+- profile `local_private` permite local;
+- `excludeLocalProvidersByDefault=false` permite local.
+
+Isto torna a policy global explicita sem mudar defaults.
 
 ## 22. Fim Do Documento Inicial
 

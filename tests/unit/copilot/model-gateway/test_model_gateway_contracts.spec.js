@@ -1390,7 +1390,7 @@ describe('model-gateway foundation', () => {
             providerId: 'ollama-local',
             providerModel: 'gemma3:4b',
             capabilities: { streaming: true, local: true, privacy: true, no_remote_secrets: true },
-            limits: { contextWindowTokens: 8192 },
+            limits: { contextWindowTokens: 131_072 },
             pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
         });
         const remoteProjection = createCanonicalModelProjection({
@@ -1442,6 +1442,12 @@ describe('model-gateway foundation', () => {
 
         const explicitLocalProfile = routeGatewayModels(candidates, 'local_private', { requireAgentProbeOk: false });
         assert.equal(explicitLocalProfile.selected?.model['providerId'], 'ollama-local');
+
+        const globalOptOut = routeGatewayModels(candidates, 'cheap_chat', {
+            excludeLocalProvidersByDefault: false,
+            requireAgentProbeOk: false,
+        });
+        assert.equal(globalOptOut.selected?.model['providerId'], 'ollama-local');
     });
 
     it('selects route candidates by upstream provider metadata before runtime', () => {
