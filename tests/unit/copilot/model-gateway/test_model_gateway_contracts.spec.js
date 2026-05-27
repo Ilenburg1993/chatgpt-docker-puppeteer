@@ -63,6 +63,7 @@ import {
     normalizeModelGatewayAccountLimitState,
     resolveModelGatewayAccountOverlayFreshnessPolicy,
     resolveModelGatewayAccountResetWindow,
+    resolveModelGatewayEligibilityPolicy,
     resolveModelGatewayAccountAccess,
     buildModelGatewayOnListModelsHandler,
     evaluateModelGatewayRuntimeSelectorRouteEnv,
@@ -210,6 +211,7 @@ import {
     recommendCatalogDiffProbes,
     evaluateModelGatewayCatalogEligibility,
     evaluateModelGatewayEligibility,
+    listModelGatewayEligibilityPolicyPresets,
     refreshModelGatewayCatalog,
     runCatalogImporters,
     runConfiguredByokAgentProbe,
@@ -7669,6 +7671,25 @@ describe('model-gateway foundation', () => {
         assert.equal(JSON.stringify(decision).includes('secret-value-that-must-not-leak'), false);
     });
 
+    it('resolves formal eligibility policy presets while preserving caller overrides', () => {
+        const presets = listModelGatewayEligibilityPolicyPresets();
+        assert.equal(presets.some((preset) => preset.id === 'fresh_account'), true);
+
+        const fresh = resolveModelGatewayEligibilityPolicy({
+            policyPreset: 'fresh-account',
+            unknownAccessPolicy: 'allow_probe',
+        });
+        assert.equal(fresh.policyPreset, 'fresh_account');
+        assert.equal(fresh.requireAccountOverlay, true);
+        assert.equal(fresh.requireFreshAccountOverlay, true);
+        assert.equal(fresh.unknownAccessPolicy, 'allow_probe');
+
+        const free = resolveModelGatewayEligibilityPolicy({ policyPreset: 'free_or_known_cost' });
+        assert.equal(free.requireKnownPricing, true);
+        assert.equal(free.maxInputUsdPerMillion, 0);
+        assert.equal(free.maxOutputUsdPerMillion, 0);
+    });
+
     it('resolves account access from overlays and env secrets before eligibility or runtime', () => {
         const overlay = createProviderAccountOverlay({
             providerId: 'openai',
@@ -8354,6 +8375,22 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(blocked.include, false);
         assert.ok(blocked.hardExclusions.includes('account_model_blocked'));
+    });
+
+    it('applies eligibility policy presets inside pre-runtime decisions', () => {
+        const decision = evaluateModelGatewayEligibility({
+            projection: createCanonicalModelProjection({
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+            }),
+            policy: { policyPreset: 'fresh_account' },
+            secretRegistry: createEnvSecretRegistry({ env: { OPENROUTER_API_KEY: 'sk-or-test' } }),
+        });
+        assert.equal(decision.include, false);
+        assert.ok(decision.hardExclusions.includes('account_overlay_missing'));
+        assert.equal(decision.policyInputs['policyPreset'], 'fresh_account');
+        assert.equal(decision.policyInputs['unknownAccessPolicy'], 'block');
     });
 
     it('integrates fatal runtime health classification into pre-runtime eligibility', () => {

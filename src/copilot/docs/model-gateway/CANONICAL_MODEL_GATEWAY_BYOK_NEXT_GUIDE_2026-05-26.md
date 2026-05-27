@@ -2378,7 +2378,7 @@ Quota/account overlay mais rico.
 - [x] Integrar health fatal conhecido.
 - [x] Integrar Cloudflare account/gateway.
 - [x] Integrar Ollama local installed overlay.
-- [ ] Adicionar policy presets formais.
+- [x] Adicionar policy presets formais.
 - [x] Adicionar account-scoped route selector eligibility.
 - [ ] Adicionar upstream provider eligibility para gateways.
 - [ ] Adicionar route layer eligibility por task.
@@ -6575,6 +6575,38 @@ Isso prepara:
 - politicas fastest/cheapest/preferred;
 - account access por rota;
 - runtime selector sem perder o id que o SDK deve receber.
+
+## 21.43 Mudanca 43 - Presets Formais De Eligibility Policy
+
+Foi criada uma camada canonica de presets para eligibility pre-runtime.
+
+Arquivo:
+
+`src/copilot/model-gateway/eligibility/policy-presets.js`
+
+Presets iniciais:
+
+- `default`;
+- `permissive_probe`;
+- `strict_account`;
+- `fresh_account`;
+- `metadata_only`;
+- `free_or_known_cost`.
+
+Helpers:
+
+- `resolveModelGatewayEligibilityPolicy()`;
+- `getModelGatewayEligibilityPolicyPreset()`;
+- `listModelGatewayEligibilityPolicyPresets()`.
+
+O evaluator agora resolve `policyPreset` antes de aplicar overrides do caller.
+
+Isto significa:
+
+- selectors e terminal podem usar nomes estaveis;
+- overrides continuam possiveis;
+- runtime selector nao precisa conhecer combinacoes internas de flags;
+- politicas como fresh account, strict account e free/known-cost deixam de ser ad hoc.
 
 ## 22. Fim Do Documento Inicial
 

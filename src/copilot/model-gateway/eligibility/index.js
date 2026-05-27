@@ -17,6 +17,12 @@ export {
 export { evaluateModelGatewayEligibility } from './evaluator.js';
 export { explainModelGatewayEligibilityDecision } from './explain.js';
 export {
+    MODEL_GATEWAY_ELIGIBILITY_POLICY_PRESET,
+    getModelGatewayEligibilityPolicyPreset,
+    listModelGatewayEligibilityPolicyPresets,
+    resolveModelGatewayEligibilityPolicy,
+} from './policy-presets.js';
+export {
     applyModelGatewayEligibilityToSnapshot,
     evaluateModelGatewayCatalogEligibility,
     modelEligibilityDecisionKey,

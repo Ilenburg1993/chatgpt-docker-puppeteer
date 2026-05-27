@@ -14,16 +14,8 @@ import {
     MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS,
     createModelEligibilityDecision,
 } from './contracts.js';
+import { resolveModelGatewayEligibilityPolicy } from './policy-presets.js';
 import { resolveModelGatewayAccountAccess } from '../account-access/index.js';
-
-const DEFAULT_POLICY = Object.freeze({
-    unknownAccessPolicy: 'allow_probe',
-    treatEnabledModelsAsClosed: true,
-    allowRetired: false,
-    excludeFailedHealth: true,
-    requireKnownPricing: false,
-    defaultRuntimeProbes: Object.freeze(['chat']),
-});
 
 const BUDGET_PRICE_FIELDS = Object.freeze([
     Object.freeze({
@@ -323,7 +315,7 @@ export function evaluateModelGatewayEligibility(input) {
     const providerId = readProviderId(routeOption, projection);
     const providerModel = readProviderModel(routeOption, projection);
     const selectorSyntax = optionalString(routeOption['selectorSyntax']) ?? optionalString(projection['selectorSyntax']) ?? providerModel;
-    const policy = /** @type {Record<string, any>} */ ({ ...DEFAULT_POLICY, ...(isRecord(input.policy) ? input.policy : {}) });
+    const policy = /** @type {Record<string, any>} */ (resolveModelGatewayEligibilityPolicy(input.policy));
     const accountScope = optionalString(policy['accountScope']);
     const hard = [];
     const soft = [];
@@ -454,6 +446,7 @@ export function evaluateModelGatewayEligibility(input) {
             treatEnabledModelsAsClosed: policy['treatEnabledModelsAsClosed'],
             allowRetired: policy['allowRetired'],
             excludeFailedHealth: policy['excludeFailedHealth'],
+            policyPreset: policy['policyPreset'],
             accountAccess: {
                 status: access.status,
                 canAttempt: access.canAttempt,
