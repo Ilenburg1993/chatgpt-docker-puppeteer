@@ -3744,6 +3744,39 @@ Teste adicionado:
 
 `does not write runtime health mirror rows when no BYOK health change is pending`
 
+Mudanca 14:
+
+SQLite diagnostics agora tem resumo runtime estruturado.
+
+Novo campo:
+
+`diagnostics.runtime`
+
+Conteudo:
+
+- `probeRuns`
+- `probeResults`
+- `healthObservations`
+- `latestProbeRunCompletedAtMs`
+- `latestProbeResultObservedAtMs`
+- `latestHealthObservedAtMs`
+- `healthStatusCounts`
+- `probeStatusCounts`
+
+Motivo:
+
+Antes havia apenas `runtimeRows`.
+
+Isso era insuficiente para decidir se o banco tinha:
+
+- historico de runs
+- resultados de probes
+- health observations
+- sinais recentes
+- concentracao de falhas
+
+`scripts/model-gateway-sqlite-diagnostics.mjs` agora imprime uma linha runtime compacta no modo humano.
+
 Validacoes deste ajuste:
 
 `node --check src/copilot/model-gateway/catalog/sqlite-catalog-store.js`

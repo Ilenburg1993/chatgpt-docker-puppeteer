@@ -627,6 +627,16 @@ export class SqliteModelGatewayCatalogStore {
      *     catalogRows: number;
      *     accountHistoryRows: number;
      *     runtimeRows: number;
+     *     runtime: {
+     *       probeRuns: number;
+     *       probeResults: number;
+     *       healthObservations: number;
+     *       latestProbeRunCompletedAtMs: number | null;
+     *       latestProbeResultObservedAtMs: number | null;
+     *       latestHealthObservedAtMs: number | null;
+     *       healthStatusCounts: Record<string, number>;
+     *       probeStatusCounts: Record<string, number>;
+     *     };
      *     routeDecisionRows: number;
      *     refreshLogRows: number;
      * }>}
@@ -676,6 +686,36 @@ export class SqliteModelGatewayCatalogStore {
             'copilot_model_gateway_runtime_probe_results',
             'copilot_model_gateway_health_observations',
         ];
+        const latestRuntime = /** @type {{ latest_probe_run_completed_at_ms: number | null; latest_probe_result_observed_at_ms: number | null; latest_health_observed_at_ms: number | null } | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT
+                            (SELECT MAX(completed_at_ms) FROM copilot_model_gateway_runtime_probe_runs) AS latest_probe_run_completed_at_ms,
+                            (SELECT MAX(observed_at_ms) FROM copilot_model_gateway_runtime_probe_results) AS latest_probe_result_observed_at_ms,
+                            (SELECT MAX(observed_at_ms) FROM copilot_model_gateway_health_observations) AS latest_health_observed_at_ms
+                    `,
+                )
+                .get()
+        );
+        const healthStatusCounts = Object.fromEntries(
+            this.#db
+                .prepare('SELECT status, COUNT(*) AS count FROM copilot_model_gateway_health_observations GROUP BY status')
+                .all()
+                .map((row) => {
+                    const item = /** @type {{ status: string; count: number }} */ (row);
+                    return [item.status, optionalInteger(item.count) ?? 0];
+                }),
+        );
+        const probeStatusCounts = Object.fromEntries(
+            this.#db
+                .prepare('SELECT status, COUNT(*) AS count FROM copilot_model_gateway_runtime_probe_results GROUP BY status')
+                .all()
+                .map((row) => {
+                    const item = /** @type {{ status: string; count: number }} */ (row);
+                    return [item.status, optionalInteger(item.count) ?? 0];
+                }),
+        );
         /**
          * @param {string[]} tables
          * @returns {number}
@@ -693,6 +733,16 @@ export class SqliteModelGatewayCatalogStore {
             catalogRows: sum(catalogTables),
             accountHistoryRows: sum(accountHistoryTables),
             runtimeRows: sum(runtimeTables),
+            runtime: {
+                probeRuns: tableCounts['copilot_model_gateway_runtime_probe_runs'] ?? 0,
+                probeResults: tableCounts['copilot_model_gateway_runtime_probe_results'] ?? 0,
+                healthObservations: tableCounts['copilot_model_gateway_health_observations'] ?? 0,
+                latestProbeRunCompletedAtMs: optionalInteger(latestRuntime?.latest_probe_run_completed_at_ms),
+                latestProbeResultObservedAtMs: optionalInteger(latestRuntime?.latest_probe_result_observed_at_ms),
+                latestHealthObservedAtMs: optionalInteger(latestRuntime?.latest_health_observed_at_ms),
+                healthStatusCounts,
+                probeStatusCounts,
+            },
             routeDecisionRows: tableCounts['copilot_model_gateway_route_decisions'] ?? 0,
             refreshLogRows: tableCounts['copilot_model_gateway_refresh_log_events'] ?? 0,
         };

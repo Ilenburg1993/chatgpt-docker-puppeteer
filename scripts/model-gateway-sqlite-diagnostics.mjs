@@ -31,6 +31,9 @@ if (args.has('--json')) {
     process.stdout.write(
         `rows: catalog=${diagnostics.catalogRows} accountHistory=${diagnostics.accountHistoryRows} runtime=${diagnostics.runtimeRows} routeDecisions=${diagnostics.routeDecisionRows}\n`,
     );
+    process.stdout.write(
+        `runtime: probeRuns=${diagnostics.runtime.probeRuns} probeResults=${diagnostics.runtime.probeResults} health=${diagnostics.runtime.healthObservations} latestHealth=${diagnostics.runtime.latestHealthObservedAtMs ?? '-'} latestProbe=${diagnostics.runtime.latestProbeResultObservedAtMs ?? '-'}\n`,
+    );
     for (const [table, count] of Object.entries(diagnostics.tableCounts)) {
         process.stdout.write(`  ${table}: ${count}\n`);
     }

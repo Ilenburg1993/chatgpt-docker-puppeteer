@@ -3460,6 +3460,15 @@ describe('model-gateway foundation', () => {
             const runtimeRecords = await store.listRuntimeHealthRecords();
 
             assert.equal(diagnostics.runtimeRows, 6);
+            assert.equal(diagnostics.runtime.probeRuns, 2);
+            assert.equal(diagnostics.runtime.probeResults, 2);
+            assert.equal(diagnostics.runtime.healthObservations, 2);
+            assert.equal(diagnostics.runtime.latestHealthObservedAtMs, 2_000);
+            assert.equal(diagnostics.runtime.latestProbeResultObservedAtMs, 2_000);
+            assert.equal(diagnostics.runtime.healthStatusCounts['ok'], 1);
+            assert.equal(diagnostics.runtime.healthStatusCounts['failed'], 1);
+            assert.equal(diagnostics.runtime.probeStatusCounts['ok'], 1);
+            assert.equal(diagnostics.runtime.probeStatusCounts['failed'], 1);
             assert.equal(runtimeRecords.length, 2);
             assert.equal(runtime.health?.['lastStatus'], 'ok');
             assert.equal(runtime.probes.length, 1);
