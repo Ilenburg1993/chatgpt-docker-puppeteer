@@ -4,7 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, it } from 'vitest';
@@ -39,6 +39,7 @@ import {
     buildRouteDecisionTraceAttributes,
     buildModelGatewayRouteCandidates,
     applyModelGatewayEligibilityToSnapshot,
+    applyModelGatewaySelectionTraceRetention,
     buildModelGatewaySelectionDecisionTrace,
     compareModelGatewaySelectionAudits,
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
@@ -749,6 +750,27 @@ describe('model-gateway foundation', () => {
             const latestPayload = JSON.parse(await readFile(String(persistedTrace.latestPath), 'utf8'));
             assert.equal(persistedPayload.schema, 'model-gateway-selection-decision-trace');
             assert.equal(latestPayload.traceId, 'unit-selection-trace');
+
+            await persistModelGatewaySelectionDecisionTrace({ ...trace, traceId: 'unit-selection-trace-b' }, { directory: traceDir });
+            await persistModelGatewaySelectionDecisionTrace({ ...trace, traceId: 'unit-selection-trace-c' }, { directory: traceDir });
+            const retentionPreview = await applyModelGatewaySelectionTraceRetention({
+                directory: traceDir,
+                maxFiles: 1,
+            });
+            assert.equal(retentionPreview.ok, true);
+            assert.equal(retentionPreview.dryRun, true);
+            assert.equal(retentionPreview.prunedCount, 2);
+            assert.equal(retentionPreview.deletedCount, 0);
+            const retentionApply = await applyModelGatewaySelectionTraceRetention({
+                directory: traceDir,
+                maxFiles: 1,
+                dryRun: false,
+            });
+            assert.equal(retentionApply.ok, true);
+            assert.equal(retentionApply.prunedCount, 2);
+            assert.equal(retentionApply.deletedCount, 2);
+            const retainedFiles = await readdir(traceDir);
+            assert.equal(retainedFiles.filter((name) => name !== 'latest.json').length, 1);
         } finally {
             await rm(traceDir, { recursive: true, force: true });
         }
@@ -1889,11 +1911,13 @@ describe('model-gateway foundation', () => {
             ),
         );
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:selection:effective:trace'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:selection:trace-retention'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:plan'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:runtime-health:mirror'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-build'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-effective-selection-trace'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-selection-trace-retention'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build-plan'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build-preview'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build'));

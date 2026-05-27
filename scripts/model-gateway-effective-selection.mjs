@@ -4,6 +4,7 @@ import {
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     JsonModelGatewayCatalogStore,
     SqliteModelGatewayCatalogStore,
+    applyModelGatewaySelectionTraceRetention,
     auditModelGatewayCatalogSnapshotIntegrity,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
@@ -26,7 +27,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-effective-selection.mjs [--json] [--strict] [--runtime-source file|sqlite|merged] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--require-runtime-proof] [--write-trace] [--trace-dir <path>] [--fail] [--fail-on-supply-warning]
+    process.stdout.write(`Usage: node scripts/model-gateway-effective-selection.mjs [--json] [--strict] [--runtime-source file|sqlite|merged] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--require-runtime-proof] [--write-trace] [--trace-dir <path>] [--prune-traces] [--trace-retention-apply] [--trace-retention-max <n>] [--fail] [--fail-on-supply-warning]
 
 Build a non-mutating effective selection view from the persisted metadata catalog plus already-observed account/runtime
 health. This does not fetch providers, execute models, run probes or persist eligibility decisions.
@@ -82,6 +83,9 @@ const selectionPolicy = requireRuntimeProof ? 'require_runtime_proof' : readArg(
 const writeTrace = argSet.has('--write-trace') || argSet.has('--persist-trace');
 const traceDir = readArg('--trace-dir', DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR);
 const traceId = readArg('--trace-id');
+const pruneTraces = argSet.has('--prune-traces') || argSet.has('--trace-retention-preview') || argSet.has('--trace-retention-apply');
+const traceRetentionApply = argSet.has('--trace-retention-apply');
+const traceRetentionMax = Number.parseInt(readArg('--trace-retention-max', '100'), 10);
 const runtimeSource = ['file', 'sqlite', 'merged'].includes(readArg('--runtime-source'))
     ? readArg('--runtime-source')
     : 'merged';
@@ -174,6 +178,13 @@ const tracePersistence = writeTrace
           latestPath: null,
           error: null,
       };
+const traceRetention = pruneTraces
+    ? await applyModelGatewaySelectionTraceRetention({
+          directory: traceDir,
+          maxFiles: traceRetentionMax,
+          dryRun: !traceRetentionApply,
+      })
+    : null;
 const dispositions = selectedDispositions(selection);
 const postRuntimeDispositions = selectedDispositions(postRuntimeSelection);
 const supplyWarningCount = selection.profiles.reduce((sum, profile) => sum + profile.supplyWarnings.length, 0);
@@ -191,6 +202,7 @@ const summary = {
         postRuntimeSelection.ok &&
         policyResolution.ok &&
         tracePersistence.ok &&
+        (traceRetention?.ok ?? true) &&
         (!failOnSupplyWarning || (supplyWarningCount === 0 && postRuntimeSupplyWarningCount === 0)),
     persisted: false,
     runtimeExecuted: false,
@@ -232,6 +244,7 @@ const summary = {
         requested: writeTrace,
         ...tracePersistence,
     },
+    selectionTraceRetention: traceRetention,
     nextCommands: [
         'npm run model-gateway:selection:audit -- --strict --fail-on-unselected',
         'npm run model-gateway:live:readiness',
@@ -285,6 +298,11 @@ if (json) {
     if (writeTrace) {
         process.stdout.write(
             `trace: written=${tracePersistence.written ? 'yes' : 'no'} path=${tracePersistence.filePath ?? '-'} latest=${tracePersistence.latestPath ?? '-'} error=${tracePersistence.error ?? '-'}\n`,
+        );
+    }
+    if (traceRetention) {
+        process.stdout.write(
+            `trace-retention: dryRun=${traceRetention.dryRun ? 'yes' : 'no'} max=${traceRetention.maxFiles} candidates=${traceRetention.candidateCount} pruned=${traceRetention.prunedCount} deleted=${traceRetention.deletedCount} error=${traceRetention.error ?? '-'}\n`,
         );
     }
     for (const row of selectionComparison.rows.filter((item) => item.changed).slice(0, 12)) {

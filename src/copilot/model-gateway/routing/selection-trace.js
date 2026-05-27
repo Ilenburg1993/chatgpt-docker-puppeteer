@@ -3,7 +3,7 @@
  * Non-mutating selection decision trace helpers.
  */
 
-import { mkdir, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 export const DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR = 'data/copilot/model-gateway/selection-traces';
@@ -39,6 +39,16 @@ function optionalNumber(value) {
 function normalizeTraceId(value) {
     const raw = optionalString(value) ?? `selection-${new Date().toISOString()}`;
     return raw.replace(/[^A-Za-z0-9_.-]+/gu, '-').replace(/^-+|-+$/gu, '').slice(0, 120) || 'selection-trace';
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @returns {number}
+ */
+function normalizePositiveInteger(value, fallback) {
+    const parsed = typeof value === 'number' ? value : Number.parseInt(String(value ?? ''), 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 /**
@@ -206,6 +216,89 @@ export async function persistModelGatewaySelectionDecisionTrace(trace, options =
             traceId,
             filePath: null,
             latestPath: null,
+            error: error instanceof Error ? error.message : String(error),
+        };
+    }
+}
+
+/**
+ * @param {{ directory?: string; maxFiles?: number; dryRun?: boolean }} [options]
+ * @returns {Promise<{
+ *   schema: 'model-gateway-selection-trace-retention';
+ *   ok: boolean;
+ *   directory: string;
+ *   dryRun: boolean;
+ *   maxFiles: number;
+ *   candidateCount: number;
+ *   retainedCount: number;
+ *   prunedCount: number;
+ *   deletedCount: number;
+ *   retained: Array<{ name: string; filePath: string; mtimeMs: number; size: number }>;
+ *   pruned: Array<{ name: string; filePath: string; mtimeMs: number; size: number }>;
+ *   error: string | null;
+ * }>}
+ */
+export async function applyModelGatewaySelectionTraceRetention(options = {}) {
+    const directory = resolve(optionalString(options.directory) ?? DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR);
+    const maxFiles = normalizePositiveInteger(options.maxFiles, 100);
+    const dryRun = options.dryRun !== false;
+    try {
+        const entries = await readdir(directory, { withFileTypes: true }).catch((error) => {
+            if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return [];
+            throw error;
+        });
+        const candidates = entries.filter(
+            (entry) => entry.isFile() && entry.name.endsWith('.json') && entry.name !== 'latest.json',
+        );
+        const files = await Promise.all(
+            candidates.map(async (entry) => {
+                const filePath = resolve(directory, entry.name);
+                const stats = await stat(filePath);
+                return {
+                    name: entry.name,
+                    filePath,
+                    mtimeMs: stats.mtimeMs,
+                    size: stats.size,
+                };
+            }),
+        );
+        files.sort((left, right) => right.mtimeMs - left.mtimeMs || right.name.localeCompare(left.name));
+        const retained = files.slice(0, maxFiles);
+        const pruned = files.slice(maxFiles);
+        let deletedCount = 0;
+        if (!dryRun) {
+            for (const file of pruned) {
+                await rm(file.filePath, { force: true });
+                deletedCount += 1;
+            }
+        }
+        return {
+            schema: 'model-gateway-selection-trace-retention',
+            ok: true,
+            directory,
+            dryRun,
+            maxFiles,
+            candidateCount: files.length,
+            retainedCount: retained.length,
+            prunedCount: pruned.length,
+            deletedCount,
+            retained,
+            pruned,
+            error: null,
+        };
+    } catch (error) {
+        return {
+            schema: 'model-gateway-selection-trace-retention',
+            ok: false,
+            directory,
+            dryRun,
+            maxFiles,
+            candidateCount: 0,
+            retainedCount: 0,
+            prunedCount: 0,
+            deletedCount: 0,
+            retained: [],
+            pruned: [],
             error: error instanceof Error ? error.message : String(error),
         };
     }

@@ -234,6 +234,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Persist a non-mutating selection decision trace for audit and future runtime handoff.',
     },
     {
+        id: 'selection.trace-retention',
+        phase: 'selection',
+        surface: 'package',
+        command: 'npm run model-gateway:selection:trace-retention',
+        summary: 'Preview retention for persisted selection decision traces without deleting by default.',
+    },
+    {
         id: 'live.readiness',
         phase: 'live-readiness',
         surface: 'package',
@@ -400,6 +407,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-effective-selection-trace',
         summary: 'Makefile alias for effective no-runtime selection with a persisted decision trace.',
+    },
+    {
+        id: 'make.selection-trace-retention',
+        phase: 'selection',
+        surface: 'make',
+        command: 'make model-gateway-selection-trace-retention',
+        summary: 'Makefile alias for selection trace retention preview.',
     },
     {
         id: 'make.live-readiness',

@@ -5654,6 +5654,26 @@ O Makefile alias novo e:
 
 O inventario canonico tambem registra esses comandos.
 
+Tambem foi adicionado:
+
+`npm run model-gateway:selection:trace-retention`
+
+E o alias:
+
+`make model-gateway-selection-trace-retention`
+
+Por default, a retencao roda em modo preview.
+
+Para aplicar remocao pelo script base, usar:
+
+`--trace-retention-apply`
+
+O limite default e `100` traces historicos, sem contar `latest.json`.
+
+O limite pode ser ajustado com:
+
+`--trace-retention-max <n>`
+
 ### 20.5 Integracao No Terminal
 
 O cockpit BYOK tambem passou a usar a mesma API.
@@ -5712,7 +5732,7 @@ Essa separacao e essencial para as proximas fases:
 - [x] Integrar inventario canonico.
 - [x] Cobrir persistencia em teste unitario.
 - [x] Adicionar comando terminal para gravar trace sob demanda.
-- [ ] Adicionar retention policy para traces.
+- [x] Adicionar retention policy para traces.
 - [ ] Adicionar diff entre traces.
 - [ ] Conectar traces ao runtime selector real.
 

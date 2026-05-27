@@ -38,6 +38,7 @@ export {
     resolveModelGatewaySelectionPolicy,
 } from './selection-audit.js';
 export {
+    applyModelGatewaySelectionTraceRetention,
     buildModelGatewaySelectionDecisionTrace,
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     persistModelGatewaySelectionDecisionTrace,

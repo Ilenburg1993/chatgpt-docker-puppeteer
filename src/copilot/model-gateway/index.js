@@ -299,6 +299,7 @@ export {
     resolveModelGatewayProviderAdapter,
 } from './providers/index.js';
 export {
+    applyModelGatewaySelectionTraceRetention,
     buildModelGatewaySelectionDecisionTrace,
     buildModelGatewayRouteCandidates,
     auditModelGatewayPostRuntimeSelection,
