@@ -2755,6 +2755,58 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('chat=ok');
     });
 
+    it('filtra health operacional BYOK por provider/model/profile', async () => {
+        readByokProviderHealthState.mockReturnValue({
+            enabled: true,
+            path: 'data/copilot-terminal/byok-provider-health.json',
+            loaded: true,
+            records: 2,
+            persistedRecords: 2,
+            flushScheduled: false,
+            flushInFlight: false,
+            dirty: false,
+            error: null,
+        });
+        listByokProviderModelHealth.mockReturnValue([
+            {
+                key: 'repo|openrouter|openai/gpt-oss-120b',
+                routeProfile: 'repo_agent',
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                lastStatus: 'failed',
+                failureCount: 1,
+                successCount: 0,
+                lastFailureAt: Date.now(),
+                lastSuccessAt: null,
+                lastMessage: 'rate limit',
+                lastErrorContext: 'provider.rate_limit',
+            },
+            {
+                key: 'tool|groq|openai/gpt-oss-120b',
+                routeProfile: 'tool_agent',
+                providerId: 'groq',
+                providerModel: 'openai/gpt-oss-120b',
+                lastStatus: 'ok',
+                failureCount: 0,
+                successCount: 1,
+                lastFailureAt: null,
+                lastSuccessAt: Date.now(),
+                lastMessage: null,
+                lastErrorContext: null,
+            },
+        ]);
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'health provider:openrouter model:openai/gpt-oss-120b profile:repo_agent');
+
+        expect(ctx.output()).toContain('filtro provider=openrouter');
+        expect(ctx.output()).toContain('BYOK operational health');
+        expect(ctx.output()).toContain('(1)');
+        expect(ctx.output()).toContain('providerId=openrouter');
+        expect(ctx.output()).not.toContain('providerId=groq');
+    });
+
     it('limpa health operacional BYOK quando solicitado', async () => {
         mockProjection();
         const ctx = mockCtx();

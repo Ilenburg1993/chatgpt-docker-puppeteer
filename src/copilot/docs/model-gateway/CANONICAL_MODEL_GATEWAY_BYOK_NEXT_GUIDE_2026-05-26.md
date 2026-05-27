@@ -2465,7 +2465,7 @@ Quota/account overlay mais rico.
 - [x] Instalar mirror SQLite no boot do terminal com drain em shutdown.
 - [x] Criar retention de health observations.
 - [x] Criar retention de runtime probe runs/results.
-- [ ] Criar explain de health por provider/modelo.
+- [x] Criar explain de health por provider/modelo.
 - [x] Criar diff de health antes/depois de live tests.
 - [x] Criar rota de limpar health por scope.
 - [ ] Criar teste de resetAt no futuro.
