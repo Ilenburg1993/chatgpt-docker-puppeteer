@@ -2463,7 +2463,8 @@ Quota/account overlay mais rico.
 - [x] Criar subscription storage-neutral para mudancas de health BYOK.
 - [x] Criar instalador debounced de mirror SQLite para health BYOK.
 - [x] Instalar mirror SQLite no boot do terminal com drain em shutdown.
-- [ ] Criar retention de health observations.
+- [x] Criar retention de health observations.
+- [x] Criar retention de runtime probe runs/results.
 - [ ] Criar explain de health por provider/modelo.
 - [ ] Criar diff de health antes/depois de live tests.
 - [ ] Criar rota de limpar health por scope.
@@ -3533,6 +3534,32 @@ O readiness report mostra:
 - sqliteHealthRecords
 - healthRecords merged
 - sqliteRuntimeError
+
+Mudanca 8:
+
+SQLite operational retention agora cobre runtime tables.
+
+Novas politicas:
+
+- `runtimeProbeRunMaxRows`
+- `runtimeProbeResultMaxRows`
+- `healthObservationMaxRows`
+
+Tabelas cobertas:
+
+- `copilot_model_gateway_runtime_probe_runs`
+- `copilot_model_gateway_runtime_probe_results`
+- `copilot_model_gateway_health_observations`
+
+Isso evita crescimento indefinido depois que o mirror instalado passar a observar execucoes live.
+
+Retencao continua operacional.
+
+Retencao nao toca catalogo canonico.
+
+Retencao nao toca metadata projections.
+
+Retencao nao exige rebuild.
 
 Proximo passo:
 

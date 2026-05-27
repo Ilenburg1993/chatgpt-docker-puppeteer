@@ -31,6 +31,9 @@ export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze(
     accountHistoryMaxRowsPerTable: 10_000,
     routeDecisionMaxRows: 50_000,
     refreshLogMaxRows: 200_000,
+    runtimeProbeRunMaxRows: 10_000,
+    runtimeProbeResultMaxRows: 100_000,
+    healthObservationMaxRows: 100_000,
 });
 
 const DELETE_TABLES_IN_ORDER = Object.freeze([
@@ -723,6 +726,9 @@ export class SqliteModelGatewayCatalogStore {
      *     accountHistoryMaxRowsPerTable?: number;
      *     routeDecisionMaxRows?: number;
      *     refreshLogMaxRows?: number;
+     *     runtimeProbeRunMaxRows?: number;
+     *     runtimeProbeResultMaxRows?: number;
+     *     healthObservationMaxRows?: number;
      * }} [policy]
      * @returns {Promise<{
      *     schema: string;
@@ -742,6 +748,18 @@ export class SqliteModelGatewayCatalogStore {
         const refreshLogMaxRows = retentionLimit(
             policy.refreshLogMaxRows,
             DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows,
+        );
+        const runtimeProbeRunMaxRows = retentionLimit(
+            policy.runtimeProbeRunMaxRows,
+            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.runtimeProbeRunMaxRows,
+        );
+        const runtimeProbeResultMaxRows = retentionLimit(
+            policy.runtimeProbeResultMaxRows,
+            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.runtimeProbeResultMaxRows,
+        );
+        const healthObservationMaxRows = retentionLimit(
+            policy.healthObservationMaxRows,
+            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.healthObservationMaxRows,
         );
         /** @type {Record<string, { deletedRows: number; maxRows: number }>} */
         const tables = {};
@@ -776,6 +794,33 @@ export class SqliteModelGatewayCatalogStore {
                     maxRows: refreshLogMaxRows,
                 }),
                 maxRows: refreshLogMaxRows,
+            };
+            tables['copilot_model_gateway_runtime_probe_results'] = {
+                deletedRows: deleteRowsKeepingLatest(this.#db, {
+                    table: 'copilot_model_gateway_runtime_probe_results',
+                    keyColumn: 'result_key',
+                    orderColumn: 'observed_at_ms',
+                    maxRows: runtimeProbeResultMaxRows,
+                }),
+                maxRows: runtimeProbeResultMaxRows,
+            };
+            tables['copilot_model_gateway_runtime_probe_runs'] = {
+                deletedRows: deleteRowsKeepingLatest(this.#db, {
+                    table: 'copilot_model_gateway_runtime_probe_runs',
+                    keyColumn: 'run_id',
+                    orderColumn: 'completed_at_ms',
+                    maxRows: runtimeProbeRunMaxRows,
+                }),
+                maxRows: runtimeProbeRunMaxRows,
+            };
+            tables['copilot_model_gateway_health_observations'] = {
+                deletedRows: deleteRowsKeepingLatest(this.#db, {
+                    table: 'copilot_model_gateway_health_observations',
+                    keyColumn: 'observation_key',
+                    orderColumn: 'observed_at_ms',
+                    maxRows: healthObservationMaxRows,
+                }),
+                maxRows: healthObservationMaxRows,
             };
         });
         tx();

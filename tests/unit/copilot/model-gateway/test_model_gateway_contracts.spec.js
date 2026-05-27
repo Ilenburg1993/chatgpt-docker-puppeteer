@@ -3075,21 +3075,75 @@ describe('model-gateway foundation', () => {
                 ],
                 { runId: 'retention-run' },
             );
+            for (const observedAt of [1, 2, 3]) {
+                db.prepare(
+                    `
+                        INSERT INTO copilot_model_gateway_runtime_probe_runs
+                            (run_id, probe_profile, account_scope, status, started_at_ms, completed_at_ms,
+                             model_count, success_count, failure_count, skipped_count, payload_json)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    `,
+                ).run(`probe-run-${observedAt}`, 'retention', 'default', 'completed', observedAt, observedAt, 1, 1, 0, 0, '{}');
+                db.prepare(
+                    `
+                        INSERT INTO copilot_model_gateway_runtime_probe_results
+                            (result_key, run_id, provider_id, provider_model, route_profile, probe_kind, ok,
+                             status, observed_at_ms, expires_at_ms, payload_json)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    `,
+                ).run(
+                    `probe-result-${observedAt}`,
+                    `probe-run-${observedAt}`,
+                    'openrouter',
+                    `model-${observedAt}`,
+                    'default',
+                    'chat',
+                    1,
+                    'ok',
+                    observedAt,
+                    null,
+                    '{}',
+                );
+                db.prepare(
+                    `
+                        INSERT INTO copilot_model_gateway_health_observations
+                            (observation_key, provider_id, provider_model, route_profile, health_scope, status,
+                             classified_failure, observed_at_ms, expires_at_ms, payload_json)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    `,
+                ).run(
+                    `health-${observedAt}`,
+                    'openrouter',
+                    `model-${observedAt}`,
+                    'default',
+                    'runtime',
+                    'ok',
+                    null,
+                    observedAt,
+                    null,
+                    '{}',
+                );
+            }
 
             const result = await store.applyOperationalRetention({
                 accountHistoryMaxRowsPerTable: 1,
                 routeDecisionMaxRows: 1,
                 refreshLogMaxRows: 1,
+                runtimeProbeRunMaxRows: 1,
+                runtimeProbeResultMaxRows: 1,
+                healthObservationMaxRows: 1,
             });
             const diagnostics = await store.readStorageDiagnostics();
             const loaded = await store.readSnapshot();
 
             assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows > 1, true);
-            assert.equal(result.deletedRows, 10);
+            assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.healthObservationMaxRows > 1, true);
+            assert.equal(result.deletedRows, 16);
             assert.equal(diagnostics.catalogRows > 0, true);
             assert.equal(diagnostics.accountHistoryRows, 3);
             assert.equal(diagnostics.routeDecisionRows, 1);
             assert.equal(diagnostics.refreshLogRows, 1);
+            assert.equal(diagnostics.runtimeRows, 3);
             assert.equal(loaded.projections.length, 1);
         } finally {
             db.close();
