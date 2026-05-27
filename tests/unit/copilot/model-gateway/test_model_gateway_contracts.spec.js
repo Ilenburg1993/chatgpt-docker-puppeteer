@@ -3552,6 +3552,61 @@ describe('model-gateway foundation', () => {
         }
     });
 
+    it('derives runtime health status and failure context from generic probe-only records', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            await store.writeRuntimeHealthRecords(
+                [
+                    {
+                        key: 'default|openrouter|model-streaming',
+                        routeProfile: 'default',
+                        providerId: 'openrouter',
+                        providerModel: 'model-streaming',
+                        probes: {
+                            streaming: {
+                                kind: 'streaming',
+                                status: 'failed',
+                                ok: false,
+                                providerAttempted: true,
+                                count: 1,
+                                successCount: 0,
+                                failureCount: 1,
+                                lastAt: 5_000,
+                                lastFailureKind: 'rate-limit',
+                                lastErrorContext: 'streaming_probe',
+                            },
+                        },
+                    },
+                ],
+                { runId: 'runtime-probe-only', observedAt: 1_000 },
+            );
+
+            const runtime = await store.readRuntimeHealthForModel({
+                providerId: 'openrouter',
+                providerModel: 'model-streaming',
+            });
+
+            assert.equal(runtime.health?.['lastStatus'], undefined);
+            assert.equal(runtime.health?.['probes'] && typeof runtime.health['probes'] === 'object', true);
+            assert.equal(runtime.probes.length, 1);
+            assert.equal(runtime.probes[0]?.['status'], 'failed');
+            const healthRow = /** @type {{ status: string; classified_failure: string; observed_at_ms: number } | undefined} */ (
+                db
+                    .prepare(
+                        'SELECT status, classified_failure, observed_at_ms FROM copilot_model_gateway_health_observations LIMIT 1',
+                    )
+                    .get()
+            );
+            assert.equal(healthRow?.status, 'failed');
+            assert.equal(healthRow?.classified_failure, 'rate-limit');
+            assert.equal(healthRow?.observed_at_ms, 5_000);
+        } finally {
+            db.close();
+        }
+    });
+
     it('installs a storage-neutral runtime health SQLite mirror for new BYOK health facts', async () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');

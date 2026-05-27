@@ -350,15 +350,35 @@ function readPayloadRows(db, table, orderBy) {
 
 /**
  * @param {Record<string, unknown>} row
+ * @returns {Record<string, unknown>[]}
+ */
+function runtimeProbeRecords(row) {
+    return isRecord(row['probes']) ? Object.values(row['probes']).filter(isRecord) : [];
+}
+
+/**
+ * @param {Record<string, unknown>} row
+ * @returns {Record<string, unknown> | null}
+ */
+function latestRuntimeProbe(row) {
+    return (
+        runtimeProbeRecords(row).sort((left, right) => (dateMs(right['lastAt']) ?? 0) - (dateMs(left['lastAt']) ?? 0))[0] ??
+        null
+    );
+}
+
+/**
+ * @param {Record<string, unknown>} row
  * @returns {number}
  */
 function latestRuntimeAt(row) {
-    return Math.max(
+    const direct = Math.max(
         dateMs(row['lastFailureAt']) ?? 0,
         dateMs(row['lastSuccessAt']) ?? 0,
         dateMs(row['lastAgentProbeFailureAt']) ?? 0,
         dateMs(row['lastAgentProbeSuccessAt']) ?? 0,
     );
+    return runtimeProbeRecords(row).reduce((max, probe) => Math.max(max, dateMs(probe['lastAt']) ?? 0), direct);
 }
 
 /**
@@ -374,6 +394,9 @@ function runtimeHealthStatus(record) {
         (dateMs(record['lastAgentProbeFailureAt']) ?? 0) >= (dateMs(record['lastAgentProbeSuccessAt']) ?? 0);
     if (chatFailed || agentFailed) return 'failed';
     if (lastStatus === 'ok' || agentStatus === 'ok') return 'ok';
+    const latestProbe = latestRuntimeProbe(record);
+    if (latestProbe?.['ok'] === true) return 'ok';
+    if (latestProbe?.['ok'] === false) return 'failed';
     return 'unknown';
 }
 
@@ -382,12 +405,16 @@ function runtimeHealthStatus(record) {
  * @returns {string | null}
  */
 function runtimeFailureContext(record) {
+    const latestProbe = latestRuntimeProbe(record);
     return (
         optionalString(record['lastFailureKind']) ??
         optionalString(record['lastErrorContext']) ??
         optionalString(record['lastAgentProbeErrorContext']) ??
         optionalString(record['lastMessage']) ??
-        optionalString(record['lastAgentProbeMessage'])
+        optionalString(record['lastAgentProbeMessage']) ??
+        optionalString(latestProbe?.['lastFailureKind']) ??
+        optionalString(latestProbe?.['lastErrorContext']) ??
+        optionalString(latestProbe?.['lastMessage'])
     );
 }
 

@@ -3677,6 +3677,40 @@ Teste adicionado:
 
 `generates unique default runtime health run ids for same-millisecond writes`
 
+Mudanca 12:
+
+Runtime health status agora considera probe-only records.
+
+Antes:
+
+Somente `lastStatus` e `agentProbeStatus` influenciavam health observation status.
+
+Problema:
+
+Probes genericos como:
+
+- streaming
+- json
+- vision
+
+podiam registrar falha real sem alterar status agregado.
+
+Nesse caso, SQLite recebia `unknown`.
+
+Depois:
+
+Quando nao ha status top-level conclusivo:
+
+- o probe mais recente `ok=true` vira health `ok`
+- o probe mais recente `ok=false` vira health `failed`
+- `observed_at_ms` usa tambem `probe.lastAt`
+- `classified_failure` pode vir de `probe.lastFailureKind`
+- fallback de contexto pode vir de `probe.lastErrorContext`
+
+Teste adicionado:
+
+`derives runtime health status and failure context from generic probe-only records`
+
 Validacoes deste ajuste:
 
 `node --check src/copilot/model-gateway/catalog/sqlite-catalog-store.js`
@@ -3692,6 +3726,12 @@ Resultado:
 Resultado:
 
 `2 passed`
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "generic probe-only records|same-millisecond|collision-resistant runtime observation keys"`
+
+Resultado:
+
+`3 passed`
 
 `node scripts/model-gateway-sqlite-retention.mjs --json --runtime-probe-run-max-rows=10000 --runtime-probe-result-max-rows=100000 --health-observation-max-rows=100000`
 
