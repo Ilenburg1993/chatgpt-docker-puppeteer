@@ -257,6 +257,7 @@ function stringSet(value) {
  *     requireRuntimeProof?: boolean;
  *     requireKnownEligibility?: boolean;
  *     ignoreRuntimeHealth?: boolean;
+ *     runtimeHealthRecords?: Record<string, any>[];
  *     latencyMsByModelId?: Record<string, number>;
  *     eligibilityDecisions?: Record<string, any>[];
  *     evaluateEligibility?: boolean;
@@ -390,6 +391,7 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
             : evaluateGatewayModelHealthRoute(model, {
                   routeProfile: options.routeProfile ?? null,
                   ...(options.excludeFailed !== undefined ? { excludeFailed: options.excludeFailed } : {}),
+                  ...(Array.isArray(options.runtimeHealthRecords) ? { runtimeHealthRecords: options.runtimeHealthRecords } : {}),
                   requireAgentProbeOk: options.requireAgentProbeOk ?? profile['requireAgentProbeOk'] === true,
               });
     if (!healthDecision.include) rejectedReasons.push(healthDecision.reason);

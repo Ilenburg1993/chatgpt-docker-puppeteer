@@ -8,7 +8,11 @@
  * @module copilot/model-gateway/routing/health-routing
  */
 
-import { listByokProviderModelHealth, readByokProviderModelHealth } from '../health/index.js';
+import {
+    byokProviderHealthRecordLastObservedAt,
+    listByokProviderModelHealth,
+    readByokProviderModelHealth,
+} from '../health/index.js';
 
 /**
  * @param {{ lastStatus: 'failed' | 'ok' | null; lastFailureAt: number | null; lastSuccessAt: number | null }} health
@@ -46,6 +50,48 @@ export function isGatewayModelAgentProbeVerified(health) {
  */
 function normalizeProbeKind(value) {
     return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function optionalString(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * @param {Record<string, any>} record
+ * @returns {{ routeProfile: string | null; providerId: string | null; providerModel: string | null }}
+ */
+function healthIdentity(record) {
+    return {
+        routeProfile: optionalString(record['routeProfile']) ?? optionalString(record['profile']),
+        providerId: optionalString(record['providerId']) ?? optionalString(record['provider']),
+        providerModel: optionalString(record['providerModel']) ?? optionalString(record['model']),
+    };
+}
+
+/**
+ * @param {Record<string, any>} record
+ * @param {{ routeProfile: string | null; providerId: string | null; providerModel: string | null }} identity
+ * @returns {boolean}
+ */
+function healthRecordMatches(record, identity) {
+    const recordIdentity = healthIdentity(record);
+    if (recordIdentity.providerId !== identity.providerId) return false;
+    if (recordIdentity.providerModel !== identity.providerModel) return false;
+    return !identity.routeProfile || recordIdentity.routeProfile === identity.routeProfile;
+}
+
+/**
+ * @param {Record<string, any>[]} records
+ * @returns {Record<string, any>[]}
+ */
+function latestHealthRecordsFirst(records) {
+    return records
+        .filter((record) => record && typeof record === 'object' && !Array.isArray(record))
+        .sort((left, right) => byokProviderHealthRecordLastObservedAt(right) - byokProviderHealthRecordLastObservedAt(left));
 }
 
 /**
@@ -113,12 +159,36 @@ export function readGatewayModelHealth(model, options = {}) {
 }
 
 /**
+ * Read model health from an explicit record set, usually the non-mutating merge of file and SQLite runtime mirrors.
+ *
+ * This keeps post-runtime/effective selection deterministic without promoting runtime facts into canonical metadata and
+ * without depending on whichever health store happens to be hydrated in the current process.
+ *
  * @param {Record<string, any>} model
- * @param {{ routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean }} [options]
+ * @param {Record<string, any>[]} records
+ * @param {{ routeProfile?: string | null }} [options]
+ * @returns {ReturnType<typeof readGatewayModelHealth>}
+ */
+export function readGatewayModelHealthFromRecords(model, records, options = {}) {
+    const providerId = optionalString(model['providerId']);
+    const providerModel = optionalString(model['providerModel']) ?? optionalString(model['id']);
+    if (!providerId || !providerModel) return null;
+    const routeProfile = optionalString(options.routeProfile);
+    const identity = { routeProfile, providerId, providerModel };
+    const latest = latestHealthRecordsFirst(records);
+    const match = latest.find((record) => healthRecordMatches(record, identity));
+    return match ? /** @type {ReturnType<typeof readGatewayModelHealth>} */ (match) : null;
+}
+
+/**
+ * @param {Record<string, any>} model
+ * @param {{ routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean; runtimeHealthRecords?: Record<string, any>[] }} [options]
  * @returns {{ include: boolean; reason: string; health: ReturnType<typeof readGatewayModelHealth> }}
  */
 export function evaluateGatewayModelHealthRoute(model, options = {}) {
-    const health = readGatewayModelHealth(model, options);
+    const health = Array.isArray(options.runtimeHealthRecords)
+        ? readGatewayModelHealthFromRecords(model, options.runtimeHealthRecords, options)
+        : readGatewayModelHealth(model, options);
     if (!health) {
         return {
             include: options.requireAgentProbeOk === true ? false : true,

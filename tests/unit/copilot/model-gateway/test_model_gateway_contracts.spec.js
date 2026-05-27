@@ -41,6 +41,7 @@ import {
     applyModelGatewayEligibilityToSnapshot,
     createModelRecord,
     createEnvSecretRegistry,
+    auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
     explainModelGatewayAccountAccess,
     explainGatewayRouteDecision,
@@ -48,6 +49,7 @@ import {
     resolveModelGatewayAccountAccess,
     buildModelGatewayOnListModelsHandler,
     evaluateGatewayModelHealthRoute,
+    readGatewayModelHealthFromRecords,
     evaluateModelGatewayProviderEnvRequirements,
     geminiAdapter,
     ollamaAdapter,
@@ -70,6 +72,7 @@ import {
     redactSecretText,
     byokProviderHealthRecordKey,
     byokProviderHealthRecordLastObservedAt,
+    listByokProviderModelHealth,
     recordByokProviderModelAgentProbeSuccess,
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
@@ -362,6 +365,53 @@ describe('model-gateway foundation', () => {
         );
     });
 
+    it('routes against explicit merged runtime health records without hydrating global health state', () => {
+        const openrouter = createModelRecord({
+            providerId: 'openrouter',
+            providerModel: 'model-a',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+        });
+        const groq = createModelRecord({
+            providerId: 'groq',
+            providerModel: 'model-b',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+        });
+        const runtimeHealthRecords = [
+            {
+                routeProfile: 'repo_agent',
+                providerId: 'openrouter',
+                providerModel: 'model-a',
+                lastStatus: 'failed',
+                lastFailureAt: 30,
+                lastSuccessAt: 10,
+                probes: {},
+            },
+            {
+                routeProfile: 'repo_agent',
+                providerId: 'groq',
+                providerModel: 'model-b',
+                lastStatus: 'ok',
+                lastSuccessAt: 40,
+                agentProbeStatus: 'ok',
+                lastAgentProbeSuccessAt: 45,
+                probes: { agent: { status: 'ok', ok: true, providerAttempted: true, lastAt: 45 } },
+            },
+        ];
+
+        const route = routeGatewayModels([openrouter, groq], 'repo_agent', {
+            routeProfile: 'repo_agent',
+            runtimeHealthRecords,
+        });
+
+        assert.equal(readGatewayModelHealthFromRecords(groq, runtimeHealthRecords, { routeProfile: 'repo_agent' })?.lastStatus, 'ok');
+        assert.equal(route.selected?.model['id'], 'groq:model-b');
+        assert.ok(route.selected?.reasons.includes('agent_probe_verified'));
+        assert.ok(route.rejected.some((candidate) => candidate.rejectedReasons.includes('chat_health_failed')));
+        assert.equal(listByokProviderModelHealth().length, 0);
+    });
+
     it('defines canonical task profiles before provider-specific scoring', () => {
         assert.deepEqual(
             listModelGatewayTaskProfiles().map((profile) => profile.id),
@@ -570,6 +620,34 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(audit.profiles[0].capabilitySupply.required, { text: 1, streaming: 1, tools: 1 });
         assert.equal(audit.profiles[0].capabilitySupply.preferred.reasoningEffort, 1);
         assert.equal(audit.profiles[0].supplyWarnings.includes('preferred_supply_zero:runtime_proved'), false);
+
+        const postRuntimeAudit = auditModelGatewayPostRuntimeSelection(snapshot, {
+            profiles: ['repo_agent'],
+            secretRegistry: { has: () => true },
+            runtimeHealthRecords: [
+                {
+                    routeProfile: 'repo_agent',
+                    providerId: 'openrouter',
+                    providerModel: 'openai/gpt-oss-120b',
+                    lastStatus: 'ok',
+                    lastSuccessAt: 100,
+                    agentProbeStatus: 'ok',
+                    lastAgentProbeSuccessAt: 110,
+                    probes: { agent: { status: 'ok', ok: true, providerAttempted: true, lastAt: 110 } },
+                },
+            ],
+        });
+
+        assert.equal(postRuntimeAudit.schema, 'model-gateway-post-runtime-selection-audit');
+        assert.equal(postRuntimeAudit.runtimeMode, 'observed_runtime_health');
+        assert.equal(postRuntimeAudit.summary.selectedProfileCount, 1);
+        assert.equal(postRuntimeAudit.summary.healthRecordCount, 1);
+        assert.equal(postRuntimeAudit.summary.runtimeProbeProofCount, 1);
+        assert.equal(postRuntimeAudit.profiles[0].selected?.['runtimeHealth']?.['agentProbeStatus'], 'ok');
+        assert.ok(
+            Array.isArray(postRuntimeAudit.profiles[0].selected?.['runtimeHealth']?.['verifiedProbes']) &&
+                postRuntimeAudit.profiles[0].selected?.['runtimeHealth']?.['verifiedProbes'].includes('agent'),
+        );
 
         const strictAudit = auditModelGatewayPreRuntimeSelection(
             {

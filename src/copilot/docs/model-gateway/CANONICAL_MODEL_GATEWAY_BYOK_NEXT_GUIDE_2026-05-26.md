@@ -4849,7 +4849,7 @@ Checklist atualizada por esta mudanca:
 - [x] Espelhar runtime health para SQLite apos probes.
 - [x] Confirmar readiness verde pos-live.
 - [x] Confirmar runtime proof nao promove facts para o catalogo canonico.
-- [ ] Criar camada de selecao pos-runtime que combine metadados, account/key state e provas runtime recentes sem misturar as tabelas canonicas.
+- [x] Criar camada de selecao pos-runtime que combine metadados, account/key state e provas runtime recentes sem misturar as tabelas canonicas.
 - [ ] Melhorar UX de vision: quando provider retorna 404 em attachment, sugerir modelos vision-capable provados ou degradar para texto explicitamente.
 - [ ] Planejar fase live full-turn com modelo real apenas depois de revisar custos/quota e risco de consumo.
 
@@ -4896,6 +4896,131 @@ Resultado observado:
 `healthRecords=17`
 
 `sqliteHealthRecords=17`
+
+Mudanca 26:
+
+Foi criada a primeira camada explicita de selecao pos-runtime.
+
+Objetivo:
+
+- manter a separacao entre catalogo canonico, account/key state e runtime proof;
+- permitir que scripts e readiness comparem selecao pre-runtime e pos-runtime;
+- usar runtime health ja observado sem executar providers;
+- usar runtime health ja espelhado em SQLite sem depender apenas do estado em memoria;
+- impedir que uma prova runtime recente seja promovida para metadata canonica.
+
+Arquitetura adicionada:
+
+- `readGatewayModelHealthFromRecords(model, records, options)` em `routing/health-routing.js`;
+- `runtimeHealthRecords` como input explicito da policy engine;
+- `auditModelGatewayPostRuntimeSelection(snapshot, options)` em `routing/selection-audit.js`;
+- export no barrel `src/copilot/model-gateway/routing/index.js`;
+- export no barrel principal `src/copilot/model-gateway/index.js`;
+- bloco `postRuntimeSelection` em `scripts/model-gateway-effective-selection.mjs`;
+- check `selection_post_runtime_observed_health` em `scripts/model-gateway-live-readiness.mjs`.
+
+Decisao importante:
+
+A auditoria pos-runtime nao recebe `routeProfile` automaticamente como o id do task profile.
+
+Motivo:
+
+- `routeProfile` nos health records vivos representa muitas vezes perfil operacional BYOK ou perfil terminal;
+- task profiles como `repo_agent`, `tool_agent` e `json_extraction` sao perfis de decisao;
+- misturar esses dois conceitos faria os health records reais de `kilo`, `openrouter/free` e afins deixarem de ser considerados;
+- quando um caller quiser filtrar por runtime route profile especifico, pode passar `runtimeRouteProfile`.
+
+Separacao de camadas apos esta mudanca:
+
+- pre-runtime selection:
+  - le metadados canonicos;
+  - le eligibility precomputada/effective;
+  - ignora runtime health para score/proof;
+  - mantem `runtimeProbeProofCount=0`;
+  - continua sendo a camada de exclusao/seleção antes de provas vivas.
+
+- effective selection:
+  - monta snapshot nao persistido;
+  - injeta eligibility derivada de account/key state e runtime account overlays;
+  - continua sem executar provider;
+  - passa a renderizar tambem uma visao pos-runtime.
+
+- post-runtime selection:
+  - usa o mesmo snapshot effective;
+  - recebe health records mesclados de arquivo e SQLite;
+  - aplica sinais como chat ok, agent probe ok e probes por tipo;
+  - nao escreve no catalogo;
+  - nao muda confidence canonica;
+  - nao transforma quota/account state em metadata fixa.
+
+Resultado observado em selecao efetiva:
+
+`npm --silent run model-gateway:selection:effective -- --json`
+
+Resumo:
+
+- `ok=true`
+- pre-runtime:
+  - `selectedProfileCount=7`
+  - `healthRecordCount=0`
+  - `runtimeProbeProofCount=0`
+  - `selectedProviders={zai:1,chutes:5,cerebras:1}`
+- pos-runtime:
+  - `selectedProfileCount=7`
+  - `healthRecordCount=49`
+  - `runtimeProbeProofCount=0`
+  - `selectedProviders={nvidia-nim:5,chutes:1,cerebras:1}`
+
+Interpretacao:
+
+- a camada pre-runtime permaneceu pura;
+- a camada pos-runtime ja consegue alterar ranking a partir de health observado;
+- os probes vivos atuais ainda nao casam como probe proof por task profile nas rotas escolhidas;
+- isso e aceitavel nesta etapa, porque post-runtime ainda e leitura/auditoria, nao decisao final automatica de runtime.
+
+Resultado observado em readiness:
+
+`npm --silent run model-gateway:live:readiness`
+
+Resumo:
+
+- `ok=true`
+- `selection_post_runtime_observed_health=true`
+- `healthMatches=49`
+- `probeProofs=0`
+- `runtime_not_promoted=true`
+- `sqlite_parity=true`
+- `redaction_audit=true`
+
+Testes focados executados:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "runtime health|pre-runtime selection|probe proofs"`
+
+Resultado:
+
+- `17 passed`
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "explicit merged runtime health|pre-runtime selection"`
+
+Resultado:
+
+- `3 passed`
+
+Checklist atualizada por esta mudanca:
+
+- [x] Ler runtime health de conjuntos explicitamente mesclados.
+- [x] Manter lookup global antigo para chamadas existentes.
+- [x] Fazer policy engine aceitar `runtimeHealthRecords`.
+- [x] Criar auditoria pos-runtime separada da pre-runtime.
+- [x] Expor auditoria pos-runtime pelos barrels.
+- [x] Integrar selection effective com bloco pos-runtime.
+- [x] Integrar live readiness com check pos-runtime.
+- [x] Provar em teste que runtime health explicito nao hidrata estado global.
+- [x] Provar em teste que pre-runtime continua com proof count zero.
+- [x] Provar em teste que pos-runtime conta health/probe sem mutar confidence.
+- [ ] Refinar semantica de probe proof por tipo quando o runtime profile operacional e diferente do task profile.
+- [ ] Criar decisao final de runtime selection com politica explicita do operador.
+- [ ] Expor no terminal um explain comparando pre-runtime vs pos-runtime.
 
 ## 19. Fim Do Documento Inicial
 

@@ -16,6 +16,7 @@ export {
     isGatewayModelProbeVerified,
     listGatewayModelVerifiedProbeKinds,
     readGatewayModelHealth,
+    readGatewayModelHealthFromRecords,
     readGatewayModelProbeHealth,
 } from './health-routing.js';
 export {
@@ -29,4 +30,4 @@ export {
     resolveModelGatewayTaskProfile,
 } from './task-profiles.js';
 export { routeGatewayModels, routeModelGatewayCatalogSnapshot, scoreGatewayModelCandidate } from './policy-engine.js';
-export { auditModelGatewayPreRuntimeSelection } from './selection-audit.js';
+export { auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection } from './selection-audit.js';

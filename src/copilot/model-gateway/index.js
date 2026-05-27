@@ -300,6 +300,7 @@ export {
 } from './providers/index.js';
 export {
     buildModelGatewayRouteCandidates,
+    auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
     evaluateGatewayModelHealthRoute,
     explainGatewayRouteDecision,
@@ -313,6 +314,7 @@ export {
     MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
     MODEL_GATEWAY_TASK_PROFILES,
     readGatewayModelHealth,
+    readGatewayModelHealthFromRecords,
     readGatewayModelProbeHealth,
     renderModelGatewayLocalProviderOptInGuidance,
     routeGatewayModels,

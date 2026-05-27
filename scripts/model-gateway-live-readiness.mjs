@@ -9,6 +9,7 @@ import {
     SqliteModelGatewayCatalogStore,
     auditModelGatewayCatalogSnapshotIntegrity,
     auditModelGatewayValueRedaction,
+    auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
     collectModelGatewaySecretAuditEnvValues,
     compareModelGatewayCatalogSnapshotParity,
@@ -166,16 +167,24 @@ const effectiveStrictSelection = auditModelGatewayPreRuntimeSelection(effectiveS
     strict: true,
     secretRegistry,
 });
+const postRuntimeEffectiveSelection = auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
+    strict: true,
+    secretRegistry,
+    runtimeHealthRecords: healthRecords,
+});
 const runnerExists = await fileExists(LIVE_RUNNER_PATH);
 const strictSelectedDispositions = selectedDispositions(strictAccessSelection);
 const effectiveSelectedDispositions = selectedDispositions(effectiveStrictSelection);
+const postRuntimeSelectedDispositions = selectedDispositions(postRuntimeEffectiveSelection);
 const allowProbeSupplyWarnings = supplyWarningSummary(allowProbeSelection);
 const strictAccessSupplyWarnings = supplyWarningSummary(strictAccessSelection);
 const effectiveStrictSupplyWarnings = supplyWarningSummary(effectiveStrictSelection);
+const postRuntimeEffectiveSupplyWarnings = supplyWarningSummary(postRuntimeEffectiveSelection);
 const localProviderOptIn = {
     allowProbe: summarizeModelGatewayLocalProviderOptInBlocks(allowProbeSelection),
     strictAccess: summarizeModelGatewayLocalProviderOptInBlocks(strictAccessSelection),
     effectiveStrict: summarizeModelGatewayLocalProviderOptInBlocks(effectiveStrictSelection),
+    postRuntimeEffective: summarizeModelGatewayLocalProviderOptInBlocks(postRuntimeEffectiveSelection),
 };
 const strictOnlyKnownAccess =
     strictAccessSelection.ok &&
@@ -185,6 +194,10 @@ const effectiveOnlyKnownAccess =
     effectiveStrictSelection.ok &&
     effectiveSelectedDispositions.length > 0 &&
     effectiveSelectedDispositions.every((disposition) => disposition === 'eligible');
+const postRuntimeOnlyKnownAccess =
+    postRuntimeEffectiveSelection.ok &&
+    postRuntimeSelectedDispositions.length > 0 &&
+    postRuntimeSelectedDispositions.every((disposition) => disposition === 'eligible');
 const checks = [
     {
         id: 'catalog_integrity',
@@ -217,9 +230,14 @@ const checks = [
         detail: `${effectiveStrictSelection.summary.selectedProfileCount}/${effectiveStrictSelection.summary.profileCount} profiles selected, runtimeOverlays=${runtimeAccountOverlays.length} active=${runtimeAccountOverlaySummary.activeCount} expired=${runtimeAccountOverlaySummary.expiredCount}, dispositions=${effectiveSelectedDispositions.join(',') || 'none'}`,
     },
     {
+        id: 'selection_post_runtime_observed_health',
+        ok: postRuntimeEffectiveSelection.ok && postRuntimeOnlyKnownAccess,
+        detail: `${postRuntimeEffectiveSelection.summary.selectedProfileCount}/${postRuntimeEffectiveSelection.summary.profileCount} profiles selected, healthMatches=${postRuntimeEffectiveSelection.summary.healthRecordCount}, probeProofs=${postRuntimeEffectiveSelection.summary.runtimeProbeProofCount}, dispositions=${postRuntimeSelectedDispositions.join(',') || 'none'}`,
+    },
+    {
         id: 'selection_supply_warnings',
-        ok: !failOnSupplyWarning || effectiveStrictSupplyWarnings.total === 0,
-        detail: `allow=${allowProbeSupplyWarnings.total}, strict=${strictAccessSupplyWarnings.total}, effective=${effectiveStrictSupplyWarnings.total}`,
+        ok: !failOnSupplyWarning || (effectiveStrictSupplyWarnings.total === 0 && postRuntimeEffectiveSupplyWarnings.total === 0),
+        detail: `allow=${allowProbeSupplyWarnings.total}, strict=${strictAccessSupplyWarnings.total}, effective=${effectiveStrictSupplyWarnings.total}, postRuntime=${postRuntimeEffectiveSupplyWarnings.total}`,
     },
     {
         id: 'runtime_not_promoted',
@@ -314,6 +332,18 @@ const summary = {
             runtimeAccountOverlays: runtimeAccountOverlays.length,
             runtimeAccountOverlaySummary,
             eligibilityDecisions: effectiveEligibility.decisions.length,
+        },
+        postRuntimeEffective: {
+            ok: postRuntimeEffectiveSelection.ok,
+            selected: postRuntimeEffectiveSelection.summary.selectedProfileCount,
+            profiles: postRuntimeEffectiveSelection.summary.profileCount,
+            providers: postRuntimeEffectiveSelection.summary.selectedProviders,
+            dispositions: postRuntimeSelectedDispositions,
+            supplyWarnings: postRuntimeEffectiveSupplyWarnings,
+            localProviderOptIn: localProviderOptIn.postRuntimeEffective,
+            healthRecordMatches: postRuntimeEffectiveSelection.summary.healthRecordCount,
+            runtimeProbeProofs: postRuntimeEffectiveSelection.summary.runtimeProbeProofCount,
+            healthRecords: healthRecords.length,
         },
     },
     livePlan: {

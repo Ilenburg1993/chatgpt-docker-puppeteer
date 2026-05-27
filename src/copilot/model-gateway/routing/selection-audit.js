@@ -53,6 +53,12 @@ function selectedSummary(selected) {
     if (!selected) return null;
     const model = isRecord(selected['model']) ? selected['model'] : {};
     const eligibility = isRecord(selected['eligibility']) ? selected['eligibility'] : {};
+    const health = isRecord(selected['health']) ? selected['health'] : {};
+    const probes = isRecord(health['probes']) ? health['probes'] : {};
+    const verifiedProbes = Object.entries(probes)
+        .filter(([, probe]) => isRecord(probe) && probe['ok'] === true && probe['providerAttempted'] !== false)
+        .map(([kind]) => kind)
+        .sort();
     return {
         id: optionalString(model['id']),
         providerId: optionalString(model['providerId']),
@@ -62,6 +68,13 @@ function selectedSummary(selected) {
         selectorSyntax: optionalString(model['selectorSyntax']) ?? optionalString(model['providerModel']) ?? optionalString(model['id']),
         score: typeof selected['score'] === 'number' && Number.isFinite(selected['score']) ? selected['score'] : null,
         eligibilityDisposition: optionalString(eligibility['disposition']),
+        runtimeHealth: isRecord(selected['health'])
+            ? {
+                  lastStatus: optionalString(health['lastStatus']),
+                  agentProbeStatus: optionalString(health['agentProbeStatus']),
+                  verifiedProbes,
+              }
+            : null,
         reasons: stringList(selected['reasons']).slice(0, 8),
     };
 }
@@ -202,11 +215,23 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
  *   includeProjectionOnly?: boolean;
  *   secretRegistry?: { has(ref: string): boolean };
  *   eligibilityPolicy?: Record<string, any>;
- * }} [options]
+ *   runtimeHealthRecords?: Record<string, any>[];
+ *   runtimeRouteProfile?: string | null;
+ *   requireRuntimeProof?: boolean;
+ *   requiredProbeKinds?: string[];
+ *   preferredProbeKinds?: string[];
+ *   blockFailedProbeKinds?: string[];
+ * }} options
+ * @param {{
+ *   schema: 'model-gateway-pre-runtime-selection-audit' | 'model-gateway-post-runtime-selection-audit';
+ *   ignoreRuntimeHealth: boolean;
+ *   runtimeMode: 'metadata_only' | 'observed_runtime_health';
+ * }} auditOptions
  * @returns {{
- *   schema: 'model-gateway-pre-runtime-selection-audit';
+ *   schema: 'model-gateway-pre-runtime-selection-audit' | 'model-gateway-post-runtime-selection-audit';
  *   ok: boolean;
  *   mode: 'strict_access_only' | 'allow_probe_unknown';
+ *   runtimeMode: 'metadata_only' | 'observed_runtime_health';
  *   snapshotContext: Record<string, number>;
  *   summary: {
  *     profileCount: number;
@@ -214,6 +239,8 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
  *     unselectedProfileCount: number;
  *     candidateCount: number;
  *     rejectedCount: number;
+ *     healthRecordCount: number;
+ *     runtimeProbeProofCount: number;
  *     selectedProviders: Record<string, number>;
  *     selectedSelectorKinds: Record<string, number>;
  *     rejectedReasonCounts: Record<string, number>;
@@ -238,18 +265,20 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
  *   }>;
  * }}
  */
-export function auditModelGatewayPreRuntimeSelection(snapshot, options = {}) {
+function auditModelGatewaySelection(snapshot, options, auditOptions) {
+    options = isRecord(options) ? options : {};
     const strict = options.strict === true;
     const requestedProfiles = new Set(stringList(options.profiles));
     const profileIds = resolveProfileIds(options);
+    const runtimeRouteProfile = optionalString(options.runtimeRouteProfile);
     const profileAudits = profileIds.map((profileId) => {
         /** @type {Parameters<typeof routeModelGatewayCatalogSnapshot>[2]} */
         const routeOptions = {
             evaluateEligibility: true,
             requireAgentProbeOk: false,
-            requireRuntimeProof: false,
+            requireRuntimeProof: options.requireRuntimeProof === true,
             requireKnownEligibility: strict,
-            ignoreRuntimeHealth: true,
+            ignoreRuntimeHealth: auditOptions.ignoreRuntimeHealth,
             allowLocalProviders: profileExplicitlyRequestsLocal(profileId, requestedProfiles),
             eligibilityPolicy: {
                 ...(isRecord(options.eligibilityPolicy) ? options.eligibilityPolicy : {}),
@@ -257,8 +286,13 @@ export function auditModelGatewayPreRuntimeSelection(snapshot, options = {}) {
                 taskProfile: profileId,
             },
         };
+        if (runtimeRouteProfile) routeOptions.routeProfile = runtimeRouteProfile;
         if (options.includeProjectionOnly !== undefined) routeOptions.includeProjectionOnly = options.includeProjectionOnly;
         if (options.secretRegistry !== undefined) routeOptions.secretRegistry = options.secretRegistry;
+        if (Array.isArray(options.runtimeHealthRecords)) routeOptions.runtimeHealthRecords = options.runtimeHealthRecords;
+        if (Array.isArray(options.requiredProbeKinds)) routeOptions.requiredProbeKinds = stringList(options.requiredProbeKinds);
+        if (Array.isArray(options.preferredProbeKinds)) routeOptions.preferredProbeKinds = stringList(options.preferredProbeKinds);
+        if (Array.isArray(options.blockFailedProbeKinds)) routeOptions.blockFailedProbeKinds = stringList(options.blockFailedProbeKinds);
         const profile = resolveModelGatewayTaskProfile(profileId);
         const route = routeModelGatewayCatalogSnapshot(snapshot, profileId, routeOptions);
         const explanation = explainGatewayRouteDecision(route);
@@ -281,9 +315,10 @@ export function auditModelGatewayPreRuntimeSelection(snapshot, options = {}) {
     const selectedRows = profileAudits.map((profile) => profile.selected).filter(isRecord);
     const selectedProfileCount = selectedRows.length;
     return {
-        schema: 'model-gateway-pre-runtime-selection-audit',
         ok: selectedProfileCount === profileAudits.length,
+        schema: auditOptions.schema,
         mode: strict ? 'strict_access_only' : 'allow_probe_unknown',
+        runtimeMode: auditOptions.runtimeMode,
         snapshotContext:
             profileAudits[0]?.snapshotContext ??
             {
@@ -299,10 +334,49 @@ export function auditModelGatewayPreRuntimeSelection(snapshot, options = {}) {
             unselectedProfileCount: profileAudits.length - selectedProfileCount,
             candidateCount: profileAudits.reduce((sum, profile) => sum + profile.candidateCount, 0),
             rejectedCount: profileAudits.reduce((sum, profile) => sum + profile.rejectedCount, 0),
+            healthRecordCount: profileAudits.reduce((sum, profile) => {
+                const value = profile.decisionLayers['healthRecordCount'];
+                return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+            }, 0),
+            runtimeProbeProofCount: profileAudits.reduce((sum, profile) => {
+                const value = profile.decisionLayers['runtimeProbeProofCount'];
+                return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+            }, 0),
             selectedProviders: countBy(selectedRows, 'providerId'),
             selectedSelectorKinds: countBy(selectedRows, 'selectorKind'),
             rejectedReasonCounts: mergeCounts(profileAudits.map((profile) => profile.rejectedReasonCounts)),
         },
         profiles: profileAudits.map(({ rejectedReasonCounts, ...profile }) => profile),
     };
+}
+
+/**
+ * @param {Parameters<typeof auditModelGatewaySelection>[0]} snapshot
+ * @param {Parameters<typeof auditModelGatewaySelection>[1]} [options]
+ * @returns {ReturnType<typeof auditModelGatewaySelection>}
+ */
+export function auditModelGatewayPreRuntimeSelection(snapshot, options = {}) {
+    return auditModelGatewaySelection(snapshot, options, {
+        schema: 'model-gateway-pre-runtime-selection-audit',
+        ignoreRuntimeHealth: true,
+        runtimeMode: 'metadata_only',
+    });
+}
+
+/**
+ * Post-runtime selection audit.
+ *
+ * This consumes already-observed runtime/account health as volatile route evidence. It does not execute models and does
+ * not write runtime facts into the canonical metadata snapshot.
+ *
+ * @param {Parameters<typeof auditModelGatewaySelection>[0]} snapshot
+ * @param {Parameters<typeof auditModelGatewaySelection>[1]} [options]
+ * @returns {ReturnType<typeof auditModelGatewaySelection>}
+ */
+export function auditModelGatewayPostRuntimeSelection(snapshot, options = {}) {
+    return auditModelGatewaySelection(snapshot, options, {
+        schema: 'model-gateway-post-runtime-selection-audit',
+        ignoreRuntimeHealth: false,
+        runtimeMode: 'observed_runtime_health',
+    });
 }

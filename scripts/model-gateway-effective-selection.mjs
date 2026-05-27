@@ -4,6 +4,7 @@ import {
     JsonModelGatewayCatalogStore,
     SqliteModelGatewayCatalogStore,
     auditModelGatewayCatalogSnapshotIntegrity,
+    auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
     createEnvSecretRegistry,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
@@ -130,12 +131,28 @@ const selection = auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
     profiles: readProfiles(),
     secretRegistry,
 });
+const postRuntimeSelection = auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
+    strict,
+    profiles: readProfiles(),
+    secretRegistry,
+    runtimeHealthRecords: healthRecords,
+});
 const dispositions = selectedDispositions(selection);
+const postRuntimeDispositions = selectedDispositions(postRuntimeSelection);
 const supplyWarningCount = selection.profiles.reduce((sum, profile) => sum + profile.supplyWarnings.length, 0);
+const postRuntimeSupplyWarningCount = postRuntimeSelection.profiles.reduce(
+    (sum, profile) => sum + profile.supplyWarnings.length,
+    0,
+);
 const localProviderOptIn = summarizeModelGatewayLocalProviderOptInBlocks(selection);
+const postRuntimeLocalProviderOptIn = summarizeModelGatewayLocalProviderOptInBlocks(postRuntimeSelection);
 const summary = {
     schema: 'model-gateway-effective-selection',
-    ok: integrity.ok && selection.ok && (!failOnSupplyWarning || supplyWarningCount === 0),
+    ok:
+        integrity.ok &&
+        selection.ok &&
+        postRuntimeSelection.ok &&
+        (!failOnSupplyWarning || (supplyWarningCount === 0 && postRuntimeSupplyWarningCount === 0)),
     persisted: false,
     runtimeExecuted: false,
     runtimeSource,
@@ -163,6 +180,12 @@ const summary = {
         selectedDispositions: dispositions,
         supplyWarningCount,
         localProviderOptIn,
+    },
+    postRuntimeSelection: {
+        ...postRuntimeSelection,
+        selectedDispositions: postRuntimeDispositions,
+        supplyWarningCount: postRuntimeSupplyWarningCount,
+        localProviderOptIn: postRuntimeLocalProviderOptIn,
     },
     nextCommands: [
         'npm run model-gateway:selection:audit -- --strict --fail-on-unselected',
@@ -205,6 +228,9 @@ if (json) {
             process.stdout.write(`    warnings=${profile.supplyWarnings.slice(0, 8).join(',')}\n`);
         }
     }
+    process.stdout.write(
+        `post-runtime: selected=${postRuntimeSelection.summary.selectedProfileCount}/${postRuntimeSelection.summary.profileCount} health=${postRuntimeSelection.summary.healthRecordCount} probeProofs=${postRuntimeSelection.summary.runtimeProbeProofCount} providers=${formatCountMap(postRuntimeSelection.summary.selectedProviders)}\n`,
+    );
     if (localProviderOptIn.hasBlocks) {
         process.stdout.write(`\n${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderOptIn.blockedProfileIds })}\n`);
     }
