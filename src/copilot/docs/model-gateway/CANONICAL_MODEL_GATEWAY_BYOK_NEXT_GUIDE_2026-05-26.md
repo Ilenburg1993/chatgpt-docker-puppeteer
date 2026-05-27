@@ -5964,7 +5964,56 @@ A saida textual mostra:
 
 Isso permite validar a ponte para runtime real sem executar runtime.
 
-### 21.3 Relacao Com Traces
+### 21.3 CLI Canonica Do Runtime Selector
+
+Foi criada a CLI:
+
+`scripts/model-gateway-runtime-selector.mjs`
+
+Comandos canonicos:
+
+- `npm run model-gateway:runtime-selector`
+- `make model-gateway-runtime-selector`
+
+Por default, ela e dry-run.
+
+Ela nao executa provider.
+
+Ela nao roda probe.
+
+Ela nao consome quota.
+
+Ela monta:
+
+- selecao efetiva strict/allow-probe;
+- selecao post-runtime com health observado;
+- policy resolution;
+- runtime selector plan;
+- readiness de env por rota;
+- sumario de overlays runtime/account;
+- proximos comandos.
+
+Execucao real exige flag explicita:
+
+`npm run model-gateway:runtime-selector -- --execute --profile <profile>`
+
+Esse modo ficou deliberadamente atras do plano, dos gates e dos live tests controlados.
+
+Ele usa `executeModelGatewayRuntimeSelectorPlanWithFallbacks`.
+
+Ele respeita:
+
+- `--attempts-per-route`;
+- `--retry-delay-ms`;
+- `--max-retry-delay-ms`;
+- `--timeout-ms`;
+- `--fallback-profiles`.
+
+O script bloqueia execucao quando o plano nao esta pronto.
+
+Assim, a entrada futura para runtime real existe, mas continua segura ate decidirmos iniciar live tests.
+
+### 21.4 Relacao Com Traces
 
 O runtime selector aceita tanto a policy resolution quanto o decision trace.
 
@@ -5976,17 +6025,16 @@ Isso e importante porque, durante testes live, poderemos:
 - auditar o evento de decisao;
 - so entao executar provider.
 
-### 21.4 Limites Intencionais
+### 21.5 Limites Intencionais
 
 Ainda faltam:
 
-- CLI segura para executar o selector real somente depois dos gates;
 - diff de health antes/depois das tentativas reais;
 - live tests llm-b.
 
 Esses pontos pertencem a proxima camada.
 
-### 21.5 Checklist Da Mudanca 33
+### 21.6 Checklist Da Mudanca 33
 
 - [x] Criar contrato nao-executor do runtime selector.
 - [x] Aceitar policy resolution como entrada.
@@ -6008,9 +6056,12 @@ Esses pontos pertencem a proxima camada.
 - [x] Injetar classificador na probe para normalizar `session.error`.
 - [x] Criar decisao dinamica de retry/fallback por failure kind.
 - [x] Conectar rate-limit/retry-after/resetAt ao retry budget.
+- [x] Criar CLI canonica dry-run para o runtime selector.
+- [x] Exigir `--execute` para chamadas reais do runtime selector.
+- [x] Integrar package script, Makefile e inventario canonico.
 - [ ] Criar live tests llm-b baseados no plano.
 
-### 21.6 Gate De Live Readiness
+### 21.7 Gate De Live Readiness
 
 O script:
 

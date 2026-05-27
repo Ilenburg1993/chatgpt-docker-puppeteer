@@ -248,6 +248,14 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Preview retention for persisted selection decision traces without deleting by default.',
     },
     {
+        id: 'runtime.selector',
+        phase: 'live-readiness',
+        surface: 'package',
+        command: 'npm run model-gateway:runtime-selector',
+        summary:
+            'Build the final route-aware runtime selector plan without provider calls; execution requires an explicit --execute flag.',
+    },
+    {
         id: 'live.readiness',
         phase: 'live-readiness',
         surface: 'package',
@@ -428,6 +436,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-selection-trace-retention',
         summary: 'Makefile alias for selection trace retention preview.',
+    },
+    {
+        id: 'make.runtime-selector',
+        phase: 'live-readiness',
+        surface: 'make',
+        command: 'make model-gateway-runtime-selector',
+        summary: 'Makefile alias for the dry-run runtime selector plan.',
     },
     {
         id: 'make.live-readiness',
