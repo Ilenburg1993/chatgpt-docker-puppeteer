@@ -260,6 +260,7 @@ export {
     applyModelGatewayEligibilityToSnapshot,
     createModelEligibilityDecision,
     createModelEligibilityRun,
+    diffModelGatewayEligibilityDecisions,
     evaluateModelGatewayCatalogEligibility,
     evaluateModelGatewayEligibility,
     explainModelGatewayEligibilityDecision,
@@ -267,6 +268,7 @@ export {
     listModelGatewayEligibilityPolicyPresets,
     modelEligibilityDecisionKey,
     resolveModelGatewayEligibilityPolicy,
+    summarizeModelGatewayEligibilityDiff,
 } from './eligibility/index.js';
 export {
     MODEL_GATEWAY_PREBUILD_STAGE,

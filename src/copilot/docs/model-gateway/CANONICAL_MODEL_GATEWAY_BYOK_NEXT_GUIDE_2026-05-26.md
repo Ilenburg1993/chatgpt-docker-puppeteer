@@ -2385,7 +2385,7 @@ Quota/account overlay mais rico.
 - [x] Adicionar wire API eligibility por adapter.
 - [x] Adicionar unknown access explain mais acionavel.
 - [ ] Persistir runs de eligibility por build/refresh de modo mais claro.
-- [ ] Adicionar diff de eligibility entre builds.
+- [x] Adicionar diff de eligibility entre builds.
 - [ ] Adicionar teste de eligibility para provider removal.
 
 ### Faixa J - Selecao Por Metadados
@@ -6709,6 +6709,87 @@ Esta frente deve permanecer pre-runtime.
 Ela nao deve chamar provider.
 
 Ela deve preparar o runtime selector real sem misturar camadas.
+
+## 21.47 Mudanca 47 - Diff Semantico De Eligibility
+
+Foi criado diff especifico para decisions de eligibility.
+
+Modulo:
+
+`src/copilot/model-gateway/eligibility/diff.js`
+
+Funcoes:
+
+- `diffModelGatewayEligibilityDecisions()`;
+- `summarizeModelGatewayEligibilityDiff()`.
+
+O diff usa a chave escopada de eligibility:
+
+- provider;
+- provider model;
+- route profile;
+- selector kind;
+- selector syntax;
+- account scope;
+- policy profile;
+- task profile.
+
+Isto evita misturar decisions de contas, politicas ou routes diferentes.
+
+O diff ignora mudancas puramente operacionais:
+
+- `observedAt`;
+- `expiresAt`;
+- `redactionStatus`;
+- `schemaVersion`.
+
+O diff classifica mudancas semanticas:
+
+- `disposition_changed`;
+- `access_gate_changed`;
+- `policy_scope_changed`;
+- `route_scope_changed`;
+- `account_overlay_changed`;
+- `metadata_evidence_changed`;
+- `runtime_probe_requirement_changed`;
+- `secret_binding_changed`;
+- `other_changed`.
+
+O summary tambem informa:
+
+- added;
+- removed;
+- changed;
+- became eligible;
+- became excluded.
+
+`refreshModelGatewayCatalog()` agora inclui:
+
+- `eligibilityRefresh.diff`;
+- `eligibilityRefresh.diffSummary`.
+
+O evento de progresso `eligibility_evaluated` agora inclui:
+
+- `eligibilityAddedCount`;
+- `eligibilityRemovedCount`;
+- `eligibilityChangedCount`.
+
+O terminal de refresh agora imprime o diff de eligibility.
+
+Isto fecha uma lacuna importante antes do runtime selector real.
+
+Agora e possivel auditar se uma mudanca pre-runtime veio de:
+
+- account overlay;
+- policy;
+- route;
+- metadado;
+- secret binding;
+- runtime probe requirement.
+
+Esta camada continua sem executar providers.
+
+Ela prepara a selecao efetiva sem contaminar o catalogo canonico.
 
 ## 22. Fim Do Documento Inicial
 

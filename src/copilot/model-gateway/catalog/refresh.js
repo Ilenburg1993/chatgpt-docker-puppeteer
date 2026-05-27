@@ -17,7 +17,12 @@ import { toOpenAIModelCatalogList } from './openai-schema.js';
 import { resolveModelGatewayCatalogRefreshLockKey, withModelGatewayCatalogRefreshLock } from './refresh-lock.js';
 import { planModelGatewayCatalogRefresh } from './refresh-plan.js';
 import { applyModelGatewayCatalogRetention } from './retention.js';
-import { applyModelGatewayEligibilityToSnapshot, evaluateModelGatewayCatalogEligibility } from '../eligibility/index.js';
+import {
+    applyModelGatewayEligibilityToSnapshot,
+    diffModelGatewayEligibilityDecisions,
+    evaluateModelGatewayCatalogEligibility,
+    summarizeModelGatewayEligibilityDiff,
+} from '../eligibility/index.js';
 
 /**
  * @typedef {object} ModelGatewayCatalogRefreshProgressEvent
@@ -38,6 +43,9 @@ import { applyModelGatewayEligibilityToSnapshot, evaluateModelGatewayCatalogElig
  * @property {number} [projectionCount]
  * @property {number} [providerProjectionCount]
  * @property {number} [eligibilityDecisionCount]
+ * @property {number} [eligibilityAddedCount]
+ * @property {number} [eligibilityRemovedCount]
+ * @property {number} [eligibilityChangedCount]
  * @property {number} [addedCount]
  * @property {number} [removedCount]
  * @property {number} [changedCount]
@@ -208,7 +216,7 @@ function buildProviderProjectionsFromEvidence(evidences) {
  *     openai: ReturnType<typeof toOpenAIModelCatalogList>;
  *     refreshPlan?: ReturnType<typeof planModelGatewayCatalogRefresh>;
  *     overlayRefresh: { enabled: boolean; imported: number; retained: number; total: number };
- *     eligibilityRefresh: { enabled: boolean; run: Record<string, any> | null; decisionCount: number };
+ *     eligibilityRefresh: { enabled: boolean; run: Record<string, any> | null; decisionCount: number; diff: ReturnType<typeof diffModelGatewayEligibilityDecisions> | null; diffSummary: ReturnType<typeof summarizeModelGatewayEligibilityDiff> | null };
  *     retention: ReturnType<typeof applyModelGatewayCatalogRetention>['summary'];
  *     writePolicy: { mode: string; storeAvailable: boolean; committed: boolean };
  *     refreshLock: { enabled: boolean; key: string | null };
@@ -391,6 +399,10 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
               now,
           })
         : null;
+    const eligibilityDiff = evaluatedEligibility
+        ? diffModelGatewayEligibilityDecisions(previous.modelEligibilityDecisions, evaluatedEligibility.decisions)
+        : null;
+    const eligibilityDiffSummary = eligibilityDiff ? summarizeModelGatewayEligibilityDiff(eligibilityDiff) : null;
     const snapshotWithEligibility = evaluatedEligibility
         ? applyModelGatewayEligibilityToSnapshot(nextSnapshot, evaluatedEligibility.decisions, evaluatedEligibility.run)
         : nextSnapshot;
@@ -400,6 +412,9 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
             elapsedMs: refreshElapsedMs(startedAt, now()),
             progressPct: 82,
             eligibilityDecisionCount: evaluatedEligibility.decisions.length,
+            eligibilityAddedCount: eligibilityDiffSummary?.addedCount ?? 0,
+            eligibilityRemovedCount: eligibilityDiffSummary?.removedCount ?? 0,
+            eligibilityChangedCount: eligibilityDiffSummary?.changedCount ?? 0,
             projectionCount: projections.length,
             routeOptionCount: snapshotWithEligibility['routeOptions'].length,
             accountOverlayCount: snapshotWithEligibility['accountOverlays'].length,
@@ -446,6 +461,8 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
             enabled: eligibilityEnabled,
             run: evaluatedEligibility?.run ?? null,
             decisionCount: evaluatedEligibility?.decisions.length ?? 0,
+            diff: eligibilityDiff,
+            diffSummary: eligibilityDiffSummary,
         },
         retention: retained.summary,
         writePolicy: {

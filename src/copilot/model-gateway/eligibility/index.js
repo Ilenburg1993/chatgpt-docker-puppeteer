@@ -16,6 +16,7 @@ export {
 } from './contracts.js';
 export { evaluateModelGatewayEligibility } from './evaluator.js';
 export { explainModelGatewayEligibilityDecision } from './explain.js';
+export { diffModelGatewayEligibilityDecisions, summarizeModelGatewayEligibilityDiff } from './diff.js';
 export {
     MODEL_GATEWAY_ELIGIBILITY_POLICY_PRESET,
     getModelGatewayEligibilityPolicyPreset,

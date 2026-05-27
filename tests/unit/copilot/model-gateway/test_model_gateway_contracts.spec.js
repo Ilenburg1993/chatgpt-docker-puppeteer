@@ -177,6 +177,7 @@ import {
     createProviderMetadataEvidence,
     createSanitizedRawPayloadRef,
     diffCanonicalModelProjections,
+    diffModelGatewayEligibilityDecisions,
     describeCatalogImporter,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     summarizeModelGatewayRuntimeAccountOverlays,
@@ -223,6 +224,7 @@ import {
     searchModelGatewayCatalogEntries,
     summarizeModelGatewayCatalogSnapshot,
     summarizeCanonicalModelProjectionDiff,
+    summarizeModelGatewayEligibilityDiff,
     summarizeModelGatewayRefreshLogText,
     summarizeModelGatewayAccountOverlayFreshness,
     summarizeModelGatewayAccountOverlays,
@@ -8759,6 +8761,57 @@ describe('model-gateway foundation', () => {
         });
     });
 
+    it('diffs pre-runtime eligibility decisions by scoped route and classifies semantic changes', () => {
+        const previous = [
+            createModelEligibilityDecision({
+                providerId: 'openrouter',
+                providerModel: 'new/model',
+                include: false,
+                hardExclusions: ['account_model_not_visible'],
+                policyProfile: 'strict-account',
+                observedAt: '2026-05-26T20:00:00.000Z',
+            }),
+            createModelEligibilityDecision({
+                providerId: 'openrouter',
+                providerModel: 'removed/model',
+                include: true,
+                policyProfile: 'strict-account',
+            }),
+        ];
+        const next = [
+            createModelEligibilityDecision({
+                providerId: 'openrouter',
+                providerModel: 'new/model',
+                include: true,
+                reasons: ['account_model_visible'],
+                policyProfile: 'strict-account',
+                overlayRefs: ['overlay-visible'],
+                observedAt: '2026-05-26T20:05:00.000Z',
+            }),
+            createModelEligibilityDecision({
+                providerId: 'openrouter',
+                providerModel: 'added/model',
+                include: false,
+                hardExclusions: ['secret_missing:OPENROUTER_API_KEY'],
+                policyProfile: 'strict-account',
+            }),
+        ];
+
+        const diff = diffModelGatewayEligibilityDecisions(previous, next);
+        const summary = summarizeModelGatewayEligibilityDiff(diff);
+
+        assert.deepEqual(diff.added, ['openrouter:added/model:default:exact_model:added/model:default:strict-account:default']);
+        assert.deepEqual(diff.removed, ['openrouter:removed/model:default:exact_model:removed/model:default:strict-account:default']);
+        assert.equal(diff.changed.length, 1);
+        assert.equal(diff.changed[0]?.key, 'openrouter:new/model:default:exact_model:new/model:default:strict-account:default');
+        assert.deepEqual(diff.changed[0]?.changedKinds.sort(), ['access_gate_changed', 'account_overlay_changed', 'disposition_changed']);
+        assert.equal(summary.addedCount, 1);
+        assert.equal(summary.removedCount, 1);
+        assert.equal(summary.changedCount, 1);
+        assert.equal(summary.becameEligibleCount, 1);
+        assert.equal(summary.becameExcludedCount, 0);
+    });
+
     it('evaluates and applies catalog-wide eligibility as a derived snapshot layer', async () => {
         const projection = createCanonicalModelProjection({
             providerId: 'openai',
@@ -9065,9 +9118,18 @@ describe('model-gateway foundation', () => {
 
             assert.equal(result.eligibilityRefresh.enabled, true);
             assert.equal(result.eligibilityRefresh.decisionCount, 2);
+            assert.equal(result.eligibilityRefresh.diffSummary.addedCount, 2);
+            assert.equal(result.eligibilityRefresh.diffSummary.changedCount, 0);
             assert.equal(stored.modelEligibilityDecisions.length, 2);
             assert.equal(result.openai.data[0].x_model_gateway.eligibility.status, 'eligible');
-            assert.ok(progressEvents.some((event) => event['phase'] === 'eligibility_evaluated' && event['eligibilityDecisionCount'] === 2));
+            assert.ok(
+                progressEvents.some(
+                    (event) =>
+                        event['phase'] === 'eligibility_evaluated' &&
+                        event['eligibilityDecisionCount'] === 2 &&
+                        event['eligibilityAddedCount'] === 2,
+                ),
+            );
             assert.ok(
                 stored.modelEligibilityDecisions.some(
                     (decision) =>

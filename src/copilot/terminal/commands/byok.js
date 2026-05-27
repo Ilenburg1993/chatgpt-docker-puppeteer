@@ -2324,6 +2324,9 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
                     typeof event.evidenceCount === 'number' ? `evidence=${event.evidenceCount}` : '',
                     typeof event.projectionCount === 'number' ? `projections=${event.projectionCount}` : '',
                     typeof event.eligibilityDecisionCount === 'number' ? `eligibility=${event.eligibilityDecisionCount}` : '',
+                    typeof event.eligibilityAddedCount === 'number' ? `elig+${event.eligibilityAddedCount}` : '',
+                    typeof event.eligibilityRemovedCount === 'number' ? `elig-${event.eligibilityRemovedCount}` : '',
+                    typeof event.eligibilityChangedCount === 'number' ? `elig~${event.eligibilityChangedCount}` : '',
                     typeof event.addedCount === 'number' ? `added=${event.addedCount}` : '',
                     typeof event.removedCount === 'number' ? `removed=${event.removedCount}` : '',
                     typeof event.changedCount === 'number' ? `changed=${event.changedCount}` : '',
@@ -2355,6 +2358,15 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
         println(
             `    \x1b[90mwrite=${result.writePolicy.mode} · committed=${result.writePolicy.committed ? 'sim' : 'nao'} · overlays=${result.overlayRefresh.total} · eligibility=${result.eligibilityRefresh.decisionCount} · retained-runs=${result.retention.importRuns.after}\x1b[0m`,
         );
+        const eligibilityDiffSummary = result.eligibilityRefresh.diffSummary;
+        if (eligibilityDiffSummary) {
+            println(
+                `    \x1b[90meligibility diff: added=${eligibilityDiffSummary.addedCount} · removed=${eligibilityDiffSummary.removedCount} · changed=${eligibilityDiffSummary.changedCount} · becameEligible=${eligibilityDiffSummary.becameEligibleCount} · becameExcluded=${eligibilityDiffSummary.becameExcludedCount}\x1b[0m`,
+            );
+            if (eligibilityDiffSummary.changedKinds.length > 0) {
+                println(`    \x1b[90meligibility diff kinds: ${eligibilityDiffSummary.changedKinds.join(',')}\x1b[0m`);
+            }
+        }
         if (refreshEvents.completedEvent.changedKinds.length > 0) {
             println(`    \x1b[90mdiff kinds: ${refreshEvents.completedEvent.changedKinds.join(',')}\x1b[0m`);
         }
