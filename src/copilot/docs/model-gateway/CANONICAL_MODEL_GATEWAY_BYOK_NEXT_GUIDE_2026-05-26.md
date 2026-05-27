@@ -4316,6 +4316,192 @@ Isso exige rebuild/refresh de metadados para reconstruir as identidades a partir
 
 O codigo novo evita recriar esse dano em builds futuros.
 
+Mudanca 23:
+
+Build real do banco de metadados passou a preservar identidade publica e barrar segredo real.
+
+Problema encontrado apos a Mudanca 22:
+
+Mesmo com redaction menos agressiva para nomes de modelo, a auditoria ainda podia interpretar referencias publicas como atribuicoes de segredo.
+
+Exemplo:
+
+`cerebras:default:CEREBRAS_API_KEY:account-overlay`
+
+O trecho `API_KEY:account-overlay` parecia uma atribuicao para a regex antiga.
+
+Isso gerava falso positivo de redaction.
+
+Pior:
+
+Se o reparo de redaction fosse aplicado de modo amplo, poderia transformar ids publicos de account overlay em `[redacted]`.
+
+Correcao:
+
+`src/copilot/model-gateway/secrets/redaction-audit.js` agora separa:
+
+- tokens reais de alta confianca;
+- valores exatos do ambiente;
+- atribuicoes que realmente parecem credenciais;
+- referencias publicas a nomes de variaveis, como `OPENAI_API_KEY`.
+
+A heuristica de atribuicao agora exige que o valor pareca segredo real.
+
+Assim:
+
+- `api_key:sk-assignment-secret-that-must-not-leak` continua vazamento;
+- `CEREBRAS_API_KEY:account-overlay` nao e vazamento;
+- `OPENAI_API_KEY` continua referencia publica a secretRef, nao segredo.
+
+`src/copilot/model-gateway/catalog/contracts.js` tambem passou a canonicalizar `accountOverlayId`.
+
+O id nao aceita mais o `accountOverlayId` recebido diretamente como fonte primaria.
+
+O formato canonico passa a ser:
+
+`providerId:accountScope:secretRef:sourceKind`
+
+Quando `sourceKind` e desconhecido:
+
+`providerId:accountScope:secretRef:account-overlay`
+
+Isso evita que um importer injete acidentalmente segredo real em identidade de overlay.
+
+`src/copilot/model-gateway/catalog/refresh.js` tambem normaliza overlays retidos de snapshots anteriores.
+
+Isso corrige o caso em que um catalogo antigo ja continha ids danificados.
+
+`scripts/model-gateway-metadata-build.mjs` agora sanitiza o snapshot resultante antes de:
+
+- escrever JSON;
+- espelhar SQLite;
+- rodar audit de integridade;
+- rodar audit de redaction.
+
+A sanitizacao do build usa segredos exatos do ambiente e padroes de token reais, mas nao redige referencias publicas do tipo `*_API_KEY`.
+
+Validacao focada executada:
+
+`node --check scripts/model-gateway-metadata-build.mjs`
+
+`node --check src/copilot/model-gateway/secrets/redaction-audit.js`
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "secret-safe universal catalog evidence|redaction leaks|public secret references|redacted JSON catalog snapshot|separates public catalog refresh"`
+
+Resultado:
+
+`5 passed`
+
+Preview estrito executado:
+
+`node scripts/model-gateway-metadata-build.mjs --preview --all --force --json`
+
+Resultado observado:
+
+- `ok=true`
+- `integrityOk=true`
+- `redactionOk=true`
+- `redactedIdentityCount=0`
+- `blocking=[]`
+- `nonBlocking=[ollama-catalog:optional_local_source_unavailable, gemini-models:account_state_unavailable]`
+
+Build real executado:
+
+`node scripts/model-gateway-metadata-build.mjs --commit --all --force --json`
+
+Resultado observado:
+
+- `ok=true`
+- `committed=true`
+- `integrityOk=true`
+- `redactionOk=true`
+- `catalogLeaks=0`
+- `sqliteLeaks=0`
+- `redactedIdentityCount=0`
+- `parityOk=true`
+- `projections=1315`
+- `overlays=14`
+- `logPath=/workspaces/chatgpt-docker-puppeteer/logs/model-gateway-metadata-build/2026-05-27T11-26-48-661Z.jsonl`
+
+Auditoria de integridade pos-build:
+
+`npm run model-gateway:catalog:integrity`
+
+Resultado observado:
+
+- `ok=true`
+- `evidences.rowCount=34737`
+- `providerEvidences.rowCount=614`
+- `routeOptions.rowCount=1846`
+- `projections.rowCount=1315`
+- `providerProjections.rowCount=77`
+- `accountOverlays.rowCount=14`
+- `redactedIdentityCount=0`
+- `snapshotId=catalog:88612faae132134557e24113`
+
+Auditoria de redaction pos-build:
+
+`npm run model-gateway:redaction:audit -- --fail`
+
+Resultado observado:
+
+- `ok=true`
+- `envSecretCandidateCount=17`
+- `leakCount=0`
+- `scannedStringCount=1937064`
+- `catalog.scannedStringCount=642762`
+- `sqlite.tableCount=21`
+- `sqlite.scannedStringCount=1294302`
+
+Selecao efetiva pre-runtime pos-build:
+
+`npm run model-gateway:selection:effective`
+
+Resultado observado:
+
+- `ok=true`
+- `runtimeExecuted=false`
+- `runtimeSource=merged`
+- `mode=strict_access_only_with_observed_health`
+- `eligibleCount=877`
+- `unknownCount=355`
+- `excludedCount=700`
+- `selectedProfileCount=8`
+- `localProviderOptIn.hasBlocks=false`
+
+Observacao sobre Ollama:
+
+O importer local `ollama-catalog` permanece nao bloqueante quando o daemon local nao esta rodando.
+
+Isso corresponde a decisao arquitetural atual:
+
+- Ollama local e suportado;
+- Ollama local nao deve ser selecionado por default;
+- Ollama local so deve entrar por pedido explicito do operador.
+
+Observacao sobre Gemini:
+
+`gemini-models` retornou `account_state_unavailable` por key invalida/expirada.
+
+Isso nao invalida o banco canonico.
+
+Isso pertence a camada de account/key state.
+
+O build deve preservar o catalogo e expor a falha ao operador sem derrubar toda a coleta de metadados.
+
+Checklist atualizada por esta mudanca:
+
+- [x] Preservar identidades publicas de modelos que parecem segredo por coincidencia lexical.
+- [x] Preservar referencias publicas a `*_API_KEY` em `secretRef` e `accountOverlayId`.
+- [x] Canonicalizar `accountOverlayId` para nao aceitar ids sensiveis vindos de importers.
+- [x] Normalizar overlays retidos de snapshots antigos.
+- [x] Fazer build real do banco de metadados apos preview verde.
+- [x] Confirmar paridade JSON/SQLite apos build real.
+- [x] Confirmar zero vazamentos em JSON e SQLite.
+- [x] Confirmar zero identidades redigidas no catalogo persistido.
+- [x] Confirmar selecao pre-runtime sem executar runtime.
+- [ ] Investigar selecao `local_private`: ela nao seleciona Ollama por default, mas ainda pode escolher remoto quando nao ha local opt-in; decidir se esse perfil deve exigir opt-in local estrito ou permanecer como preferencia fraca.
+
 Validacoes executadas:
 
 `node --check src/copilot/model-gateway/health/provider-health.js`

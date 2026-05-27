@@ -32,6 +32,8 @@ const CATALOG_SOURCE_DEFAULTS = Object.freeze({
     refreshPolicy: 'manual',
     trustTier: 'unknown',
 });
+const CATALOG_IDENTITY_SECRET_RE =
+    /\b(?:sk-(?:or-v1-)?|gsk_|hf_|csk-|nvapi-|cpk_|cfat_|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}\b/gu;
 
 /**
  * @param {unknown} value
@@ -69,6 +71,17 @@ function sanitizeJsonValue(value) {
     }
     if (value === undefined) return null;
     return value;
+}
+
+/**
+ * @param {string | null} value
+ * @param {string | null} fallback
+ * @returns {string | null}
+ */
+function sanitizeCatalogIdentity(value, fallback) {
+    if (!value) return fallback;
+    const redacted = value.replace(CATALOG_IDENTITY_SECRET_RE, '[redacted]');
+    return redacted.includes('[redacted]') ? fallback : redacted;
 }
 
 /**
@@ -307,18 +320,18 @@ export function createProviderAccountOverlay(input) {
     const accountScope = optionalString(input.accountScope) ?? 'default';
     const secretRef = optionalString(input.secretRef);
     const sourceId = optionalString(input.sourceId);
-    const accountOverlayId =
-        optionalString(input.accountOverlayId) ??
-        [providerId, accountScope, secretRef, sourceId].filter(Boolean).join(':');
+    const sourceKind = optionalString(input.sourceKind) ?? 'unknown';
+    const safeSourceId = sanitizeCatalogIdentity(sourceId, null);
+    const fallbackOverlayId = [providerId, accountScope, secretRef ?? 'no-secret', sourceKind === 'unknown' ? 'account-overlay' : sourceKind].join(':');
     return {
         schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
-        accountOverlayId: /** @type {string} */ (redactModelGatewayAuditedValue(accountOverlayId)),
+        accountOverlayId: fallbackOverlayId,
         providerId,
         accountScope,
         secretRef,
         organizationIdRef: optionalString(input.organizationIdRef),
-        sourceId: sourceId ? /** @type {string} */ (redactModelGatewayAuditedValue(sourceId)) : null,
-        sourceKind: optionalString(input.sourceKind) ?? 'unknown',
+        sourceId: safeSourceId,
+        sourceKind,
         confidence: optionalString(input.confidence) ?? MODEL_GATEWAY_CATALOG_CONFIDENCE.UNKNOWN,
         enabledModels: stringList(input.enabledModels),
         blockedModels: stringList(input.blockedModels),

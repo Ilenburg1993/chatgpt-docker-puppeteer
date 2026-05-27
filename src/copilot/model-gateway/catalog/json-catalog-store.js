@@ -12,7 +12,6 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 
 import { readJson, writeJson } from '../../infra/storage/json-store.js';
-import { redactModelGatewayAuditedValue } from '../secrets/index.js';
 import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 
 export const DEFAULT_MODEL_GATEWAY_CATALOG_PATH = join(
@@ -38,6 +37,10 @@ const CATALOG_ARRAY_FIELDS = Object.freeze([
     'modelEligibilityRuns',
     'modelEligibilityDecisions',
 ]);
+const CATALOG_STRING_BEARER_RE = /\bBearer\s+[A-Za-z0-9._~+/=-]{12,}\b/giu;
+const CATALOG_STRING_JWT_RE = /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b/gu;
+const CATALOG_STRING_PROVIDER_SECRET_RE =
+    /\b(?:sk-(?:or-v1-)?|gsk_|hf_|csk-|nvapi-|cpk_|cfat_|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}\b/gu;
 
 /**
  * @param {unknown} value
@@ -68,7 +71,12 @@ function optionalString(value) {
  * @returns {unknown}
  */
 function sanitizeCatalogValue(value) {
-    if (typeof value === 'string') return /** @type {string} */ (redactModelGatewayAuditedValue(value));
+    if (typeof value === 'string') {
+        return value
+            .replace(CATALOG_STRING_BEARER_RE, 'Bearer [redacted]')
+            .replace(CATALOG_STRING_JWT_RE, '[redacted]')
+            .replace(CATALOG_STRING_PROVIDER_SECRET_RE, '[redacted]');
+    }
     if (Array.isArray(value)) return value.map(sanitizeCatalogValue);
     if (isRecord(value)) {
         return Object.fromEntries(

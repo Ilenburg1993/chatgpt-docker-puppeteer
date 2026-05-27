@@ -14,6 +14,7 @@ import {
     collectModelGatewaySecretAuditEnvValues,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     planModelGatewayCatalogRefresh,
+    redactModelGatewayAuditedValue,
     refreshModelGatewayCatalog,
     SqliteModelGatewayCatalogStore,
 } from '../src/copilot/model-gateway/index.js';
@@ -197,9 +198,17 @@ const result = await refreshModelGatewayCatalog({
     },
     onProgress: recordProgress,
 });
-const integrity = auditModelGatewayCatalogSnapshotIntegrity(result.snapshot);
 const secretAuditValues = collectModelGatewaySecretAuditEnvValues(process.env);
-const catalogRedaction = auditModelGatewayValueRedaction(result.snapshot, {
+const sanitizedSnapshot = redactModelGatewayAuditedValue(result.snapshot, {
+    additionalSecrets: secretAuditValues,
+    includeAssignments: false,
+});
+if (result.writePolicy.committed) {
+    await jsonStore.writeSnapshot(/** @type {any} */ (sanitizedSnapshot));
+}
+const integritySnapshot = result.writePolicy.committed ? await jsonStore.readSnapshot() : sanitizedSnapshot;
+const integrity = auditModelGatewayCatalogSnapshotIntegrity(integritySnapshot);
+const catalogRedaction = auditModelGatewayValueRedaction(integritySnapshot, {
     surface: 'json:catalog',
     rootPath: 'catalog',
     additionalSecrets: secretAuditValues,

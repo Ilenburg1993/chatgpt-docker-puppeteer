@@ -13,9 +13,11 @@ const SECRET_ENV_KEY_RE = /(?:api[_-]?key|authorization|bearer|token|secret|pass
 const AUDIT_BEARER_TOKEN_RE = /\bBearer\s+[A-Za-z0-9._~+/=-]{12,}\b/giu;
 const AUDIT_JWT_TOKEN_RE = /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b/gu;
 const AUDIT_SECRET_ASSIGNMENT_RE =
-    /((?:api[_-]?key|authorization|bearer[_-]?token|access[_-]?token|token|secret|password)\s*[:=]\s*["']?)[^"',\s;]{8,}/giu;
+    /((?:api[_-]?key|authorization|bearer[_-]?token|access[_-]?token|token|secret|password)\s*[:=]\s*["']?)([^"',\s;]{8,})/giu;
 const AUDIT_PROVIDER_SECRET_RE =
     /\b(?:sk-(?:or-v1-)?|gsk_|hf_|csk-|nvapi-|cpk_|cfat_|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}\b/gu;
+const AUDIT_PROVIDER_SECRET_EXACT_RE =
+    /^(?:sk-(?:or-v1-)?|gsk_|hf_|csk-|nvapi-|cpk_|cfat_|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}$/u;
 
 /**
  * @param {unknown} value
@@ -52,34 +54,65 @@ function compactSnippet(value) {
 }
 
 /**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function looksLikeAssignedSecret(value) {
+    return (
+        AUDIT_PROVIDER_SECRET_EXACT_RE.test(value) ||
+        /^eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}$/u.test(value) ||
+        (value.length >= 20 && /[A-Za-z]/u.test(value) && /[0-9]/u.test(value))
+    );
+}
+
+/**
  * @param {string} text
  * @param {readonly string[]} additionalSecrets
+ * @param {{ includeAssignments?: boolean }} [options]
  * @returns {string}
  */
-function redactAuditText(text, additionalSecrets) {
+function redactAuditText(text, additionalSecrets, options = {}) {
     let redacted = text;
     for (const secret of additionalSecrets) redacted = redacted.split(secret).join('[redacted]');
-    return redacted
+    redacted = redacted
         .replace(AUDIT_BEARER_TOKEN_RE, 'Bearer [redacted]')
         .replace(AUDIT_JWT_TOKEN_RE, '[redacted]')
-        .replace(AUDIT_SECRET_ASSIGNMENT_RE, '$1[redacted]')
         .replace(AUDIT_PROVIDER_SECRET_RE, '[redacted]');
+    return options.includeAssignments === false
+        ? redacted
+        : redacted.replace(AUDIT_SECRET_ASSIGNMENT_RE, (match, prefix, assignedValue) =>
+              looksLikeAssignedSecret(String(assignedValue)) ? `${String(prefix)}[redacted]` : String(match),
+          );
 }
 
 /**
  * @param {unknown} value
- * @param {{ additionalSecrets?: readonly string[] }} [options]
+ * @param {{ additionalSecrets?: readonly string[]; includeAssignments?: boolean }} [options]
  * @returns {unknown}
  */
 export function redactModelGatewayAuditedValue(value, options = {}) {
     const additionalSecrets = [...new Set((options.additionalSecrets ?? []).map(optionalString).filter((item) => item !== null))];
-    if (typeof value === 'string') return redactAuditText(value, additionalSecrets);
-    if (Array.isArray(value)) return value.map((item) => redactModelGatewayAuditedValue(item, { additionalSecrets }));
+    if (typeof value === 'string') {
+        return redactAuditText(value, additionalSecrets, {
+            ...(options.includeAssignments === undefined ? {} : { includeAssignments: options.includeAssignments }),
+        });
+    }
+    if (Array.isArray(value)) {
+        return value.map((item) =>
+            redactModelGatewayAuditedValue(item, {
+                additionalSecrets,
+                ...(options.includeAssignments === undefined ? {} : { includeAssignments: options.includeAssignments }),
+            }),
+        );
+    }
     if (isRecord(value)) {
         return Object.fromEntries(
             Object.entries(value).map(([key, item]) => [
                 key,
-                redactModelGatewayAuditedValue(item, { additionalSecrets }),
+                redactModelGatewayAuditedValue(item, {
+                    additionalSecrets,
+                    ...(options.includeAssignments === undefined ? {} : { includeAssignments: options.includeAssignments }),
+                }),
             ]),
         );
     }
@@ -128,7 +161,7 @@ export function auditModelGatewayValueRedaction(value, options = {}) {
     function visit(item, path) {
         if (typeof item === 'string') {
             scannedStringCount += 1;
-            const redacted = redactAuditText(item, additionalSecrets);
+            const redacted = redactAuditText(item, additionalSecrets, { includeAssignments: true });
             if (redacted !== item) {
                 leakCount += 1;
                 if (samples.length < maxSamples) samples.push({ path, redactedSnippet: compactSnippet(redacted) });

@@ -9,6 +9,7 @@
  */
 
 import { createCatalogImportRun, createCatalogModelTombstones, diffCanonicalModelProjections } from './import-runs.js';
+import { createProviderAccountOverlay } from './contracts.js';
 import { runCatalogImporters } from './importer-runner.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { mergeModelMetadataEvidence, mergeProviderMetadataEvidence } from './merge.js';
@@ -316,9 +317,11 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
     );
     const retainedRouteOptions = previous.routeOptions.filter((option) => !refreshedSourceIds.has(String(option['sourceId'])));
     const retainedRawPayloadRefs = previous.rawPayloadRefs.filter((rawRef) => !refreshedSourceIds.has(String(rawRef['sourceId'])));
-    const retainedAccountOverlays = input.refreshAccountOverlays === true
-        ? previous.accountOverlays.filter((overlay) => !refreshedSourceIds.has(String(overlay['sourceId'])))
-        : previous.accountOverlays;
+    const retainedAccountOverlays = (
+        input.refreshAccountOverlays === true
+            ? previous.accountOverlays.filter((overlay) => !refreshedSourceIds.has(String(overlay['sourceId'])))
+            : previous.accountOverlays
+    ).map((overlay) => createProviderAccountOverlay(/** @type {Parameters<typeof createProviderAccountOverlay>[0]} */ (overlay)));
     const accountOverlays = input.refreshAccountOverlays === true
         ? upsertMany(retainedAccountOverlays, imported.accountOverlays, accountOverlayKey)
         : retainedAccountOverlays;

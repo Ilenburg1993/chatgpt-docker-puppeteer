@@ -1788,6 +1788,8 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(overlay.redactionStatus, 'sanitized');
         assert.equal(overlay.accountOverlayId.includes('sk-overlay-secret-that-must-not-leak'), false);
+        assert.equal(overlay.accountOverlayId.includes('[redacted]'), false);
+        assert.equal(overlay.accountOverlayId, 'kilo:org:KILO_API_KEY:account-overlay');
         assert.deepEqual(projection.modalities, { input: ['text'], output: ['text'] });
         const serialized = JSON.stringify({ evidence, providerEvidence, route, overlay, projection, skyfallEvidence });
         assert.equal(serialized.includes('sk-secret-that-must-not-leak'), false);
@@ -1815,6 +1817,29 @@ describe('model-gateway foundation', () => {
         assert.equal(audit.samples.length, 1);
         assert.equal(JSON.stringify(audit).includes(secret), false);
         assert.deepEqual(envSecrets, [secret]);
+    });
+
+    it('does not confuse public secret references with secret assignment leaks', () => {
+        const publicRefsAudit = auditModelGatewayValueRedaction(
+            {
+                accountOverlayId: 'cerebras:default:CEREBRAS_API_KEY:account-overlay',
+                sourceId: 'openai-compatible-account',
+                secretRef: 'OPENAI_API_KEY',
+            },
+            { surface: 'unit', rootPath: 'snapshot' },
+        );
+        const assignedSecretAudit = auditModelGatewayValueRedaction(
+            {
+                diagnostics: 'api_key:sk-assignment-secret-that-must-not-leak',
+            },
+            { surface: 'unit', rootPath: 'snapshot' },
+        );
+
+        assert.equal(publicRefsAudit.ok, true);
+        assert.equal(publicRefsAudit.leakCount, 0);
+        assert.equal(assignedSecretAudit.ok, false);
+        assert.equal(assignedSecretAudit.leakCount, 1);
+        assert.equal(JSON.stringify(assignedSecretAudit).includes('sk-assignment-secret-that-must-not-leak'), false);
     });
 
     it('merges catalog evidence field-wise without letting poorer fresh facts erase richer metadata', () => {
