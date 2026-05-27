@@ -39,6 +39,17 @@ function optionalNumber(value) {
 }
 
 /**
+ * @param {number} delayMs
+ * @returns {Promise<void>}
+ */
+function sleepMs(delayMs) {
+    if (!Number.isFinite(delayMs) || delayMs <= 0) return Promise.resolve();
+    return new Promise((resolve) => {
+        setTimeout(resolve, Math.round(delayMs));
+    });
+}
+
+/**
  * @param {Record<string, unknown> | null} route
  * @returns {string | null}
  */
@@ -347,6 +358,8 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
  *   profileId?: string;
  *   fallbackProfileIds?: string[];
  *   maxAttempts?: number;
+ *   attemptsPerRoute?: number;
+ *   retryDelayMs?: number;
  *   timeoutMs?: number;
  *   prompt?: string;
  *   recordHealth?: boolean;
@@ -355,6 +368,7 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
  *     recordSuccess?: typeof recordByokProviderModelCallSuccess;
  *     recordFailure?: typeof recordByokProviderModelCallFailure;
  *     flushHealth?: typeof flushByokProviderHealth;
+ *     sleep?: typeof sleepMs;
  *   };
  * }} [options]
  * @returns {Promise<{
@@ -386,29 +400,41 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
         typeof options.maxAttempts === 'number' && Number.isFinite(options.maxAttempts) && options.maxAttempts > 0
             ? Math.floor(options.maxAttempts)
             : uniqueProfileIds.length;
+    const attemptsPerRoute =
+        typeof options.attemptsPerRoute === 'number' && Number.isFinite(options.attemptsPerRoute) && options.attemptsPerRoute > 0
+            ? Math.floor(options.attemptsPerRoute)
+            : 1;
+    const retryDelayMs =
+        typeof options.retryDelayMs === 'number' && Number.isFinite(options.retryDelayMs) && options.retryDelayMs > 0
+            ? Math.round(options.retryDelayMs)
+            : 0;
+    const wait = options.deps?.sleep ?? sleepMs;
     const attemptProfileIds = uniqueProfileIds.slice(0, maxAttempts);
     /** @type {Array<Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>>} */
     const attempts = [];
     for (const profileId of attemptProfileIds) {
-        const attempt = await executeModelGatewayRuntimeSelectorPlan(plan, {
-            profileId,
-            ...(typeof options.timeoutMs === 'number' ? { timeoutMs: options.timeoutMs } : {}),
-            ...(options.prompt ? { prompt: options.prompt } : {}),
-            ...(options.recordHealth !== undefined ? { recordHealth: options.recordHealth } : {}),
-            ...(options.deps ? { deps: options.deps } : {}),
-        });
-        attempts.push(attempt);
-        if (attempt.ok) {
-            return {
-                schema: 'model-gateway-runtime-selector-fallback-execution-result',
-                ok: true,
-                status: 'ok',
-                attemptedCount: attempts.length,
-                selectedProfileId: attempt.profileId,
-                attempts,
-                final: attempt,
-                error: null,
-            };
+        for (let routeAttempt = 0; routeAttempt < attemptsPerRoute; routeAttempt += 1) {
+            const attempt = await executeModelGatewayRuntimeSelectorPlan(plan, {
+                profileId,
+                ...(typeof options.timeoutMs === 'number' ? { timeoutMs: options.timeoutMs } : {}),
+                ...(options.prompt ? { prompt: options.prompt } : {}),
+                ...(options.recordHealth !== undefined ? { recordHealth: options.recordHealth } : {}),
+                ...(options.deps ? { deps: options.deps } : {}),
+            });
+            attempts.push(attempt);
+            if (attempt.ok) {
+                return {
+                    schema: 'model-gateway-runtime-selector-fallback-execution-result',
+                    ok: true,
+                    status: 'ok',
+                    attemptedCount: attempts.length,
+                    selectedProfileId: attempt.profileId,
+                    attempts,
+                    final: attempt,
+                    error: null,
+                };
+            }
+            if (routeAttempt + 1 < attemptsPerRoute) await wait(retryDelayMs);
         }
     }
     const final = attempts.at(-1) ?? null;

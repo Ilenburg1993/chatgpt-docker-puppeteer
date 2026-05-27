@@ -5871,7 +5871,16 @@ Cada tentativa usa `executeModelGatewayRuntimeSelectorPlan`, portanto:
 
 Ainda nao ha retry temporal da mesma rota.
 
-Isso sera tratado junto com backoff/rate-limit.
+O retry temporal foi adicionado como opcao explicita:
+
+- `attemptsPerRoute`
+- `retryDelayMs`
+
+O default continua sendo uma tentativa por rota.
+
+Isso evita loops surpresa e deixa os live tests sob controle.
+
+O backoff/rate-limit dinamico ainda precisa ser conectado como policy superior.
 
 ### 21.2 Integracao Ao Script Efetivo
 
@@ -5925,7 +5934,8 @@ Esses pontos pertencem a proxima camada.
 - [x] Criar executor runtime real inicial.
 - [x] Persistir resultado runtime no health store.
 - [x] Criar fallback multi-rota.
-- [ ] Criar retry temporal com backoff/rate-limit.
+- [x] Criar retry temporal explicito por rota.
+- [ ] Conectar backoff/rate-limit dinamico ao retry.
 - [ ] Criar live tests llm-b baseados no plano.
 
 ## 22. Fim Do Documento Inicial

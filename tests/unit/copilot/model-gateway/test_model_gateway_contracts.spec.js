@@ -833,6 +833,48 @@ describe('model-gateway foundation', () => {
         assert.equal(fallbackRuntimeExecution.attempts[0].ok, false);
         assert.equal(fallbackRuntimeExecution.attempts[1].ok, true);
 
+        let retryProbeCalls = 0;
+        let retrySleepCalls = 0;
+        const retryRuntimeExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(runtimeSelectorPlan, {
+            profileId: 'repo_agent',
+            attemptsPerRoute: 2,
+            retryDelayMs: 5,
+            deps: {
+                runChatProbe: async (options = {}) => {
+                    retryProbeCalls += 1;
+                    return {
+                        ok: retryProbeCalls === 2,
+                        status: retryProbeCalls === 2 ? 'ok' : 'failed',
+                        elapsedMs: 10,
+                        model: String(options.model ?? ''),
+                        profile: 'repo_agent',
+                        preset: 'openrouter',
+                        providerType: 'openai-compatible',
+                        deltaCount: retryProbeCalls === 2 ? 1 : 0,
+                        deltaChars: retryProbeCalls === 2 ? 13 : 0,
+                        finalChars: retryProbeCalls === 2 ? 13 : 0,
+                        finalContent: retryProbeCalls === 2 ? 'BYOK_PROBE_OK' : '',
+                        observedFinalEvent: retryProbeCalls === 2,
+                        sessionId: `unit-runtime-retry-${retryProbeCalls}`,
+                        errors: retryProbeCalls === 2 ? [] : ['retryable route failed'],
+                        warnings: [],
+                        providerFailure: null,
+                    };
+                },
+                recordSuccess: () => {},
+                recordFailure: () => {},
+                flushHealth: async () => {},
+                sleep: async (delayMs) => {
+                    retrySleepCalls += 1;
+                    assert.equal(delayMs, 5);
+                },
+            },
+        });
+        assert.equal(retryRuntimeExecution.ok, true);
+        assert.equal(retryRuntimeExecution.attemptedCount, 2);
+        assert.equal(retryRuntimeExecution.selectedProfileId, 'repo_agent');
+        assert.equal(retrySleepCalls, 1);
+
         const trace = buildModelGatewaySelectionDecisionTrace({
             snapshot,
             integrity: { ok: true, redactedIdentityCount: 0 },
