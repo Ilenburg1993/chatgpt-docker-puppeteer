@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeSelectorPlan, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -396,6 +396,19 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             schema: 'model-gateway-selection-decision-trace',
             traceId: input.traceId ?? 'terminal-selection-trace',
             source: input.source ?? 'terminal-byok-selection-audit',
+        })),
+        buildModelGatewayRuntimeSelectorPlan: vi.fn((_policy, options = {}) => ({
+            schema: 'model-gateway-runtime-selector-plan',
+            ok: true,
+            ready: true,
+            mode: options.requireRuntimeProof ? 'require_runtime_proof' : 'metadata_first',
+            summary: {
+                profileCount: 1,
+                selectedProfileCount: 1,
+                blockedProfileCount: 0,
+                runtimeProofSelectedCount: options.requireRuntimeProof ? 1 : 0,
+            },
+            routes: [],
         })),
         persistModelGatewaySelectionDecisionTrace: vi.fn((trace) =>
             Promise.resolve({
@@ -867,6 +880,7 @@ vi.mock('#copilot/model-gateway', () => ({
     buildModelGatewayPreBuildReadinessReport,
     buildModelGatewayPreKCompatibilityReport,
     buildModelGatewayRouteCandidates,
+    buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewaySelectionDecisionTrace,
     buildProbeCompletedEvent: buildProbeCompletedEvent,
     buildRouteDecisionEvent,
@@ -996,6 +1010,7 @@ describe('terminal /byok command', () => {
         auditModelGatewayCatalogSnapshotIntegrity.mockClear();
         auditModelGatewayPostRuntimeSelection.mockClear();
         auditModelGatewayPreRuntimeSelection.mockClear();
+        buildModelGatewayRuntimeSelectorPlan.mockClear();
         buildModelGatewaySelectionDecisionTrace.mockClear();
         compareModelGatewaySelectionAudits.mockClear();
         persistModelGatewaySelectionDecisionTrace.mockClear();
@@ -2451,6 +2466,10 @@ describe('terminal /byok command', () => {
         );
         expect(compareModelGatewaySelectionAudits).toHaveBeenCalled();
         expect(resolveModelGatewaySelectionPolicy).toHaveBeenCalledWith(expect.any(Object), { mode: 'metadata_first' });
+        expect(buildModelGatewayRuntimeSelectorPlan).toHaveBeenCalledWith(expect.any(Object), {
+            source: 'terminal-byok-selection-audit',
+            requireRuntimeProof: false,
+        });
         expect(ctx.output()).toContain('mode=allow_probe_unknown+effective');
         expect(ctx.output()).toContain('persisted=nao');
         expect(ctx.output()).toContain('observedHealth=');
@@ -2458,6 +2477,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('compare changed=1/1');
         expect(ctx.output()).toContain('policy=metadata_first');
         expect(ctx.output()).toContain('finalSelected=1/1');
+        expect(ctx.output()).toContain('runtimeSelector=ready');
+        expect(ctx.output()).toContain('blocked=0');
         expect(ctx.output()).toContain('post-runtime mudou -> groq:openai/gpt-oss-120b');
         expect(ctx.output()).toContain('healthProofs=1');
         expect(ctx.output()).toContain('probeProofs=1');
@@ -2485,6 +2506,10 @@ describe('terminal /byok command', () => {
         );
         expect(resolveModelGatewaySelectionPolicy).toHaveBeenCalledWith(expect.any(Object), {
             mode: 'require_runtime_proof',
+        });
+        expect(buildModelGatewayRuntimeSelectorPlan).toHaveBeenCalledWith(expect.any(Object), {
+            source: 'terminal-byok-selection-audit',
+            requireRuntimeProof: true,
         });
         expect(ctx.output()).toContain('mode=allow_probe_unknown+effective+require-proof');
         expect(ctx.output()).toContain('policy=require_runtime_proof');
