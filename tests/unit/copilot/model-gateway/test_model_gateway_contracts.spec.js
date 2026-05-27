@@ -3564,6 +3564,51 @@ describe('model-gateway foundation', () => {
         }
     });
 
+    it('skips malformed runtime health records instead of failing the SQLite mirror write', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            const result = await store.writeRuntimeHealthRecords(
+                [
+                    {
+                        key: 'default|openrouter|model-a',
+                        routeProfile: 'default',
+                        providerId: 'openrouter',
+                        providerModel: 'model-a',
+                        lastStatus: 'ok',
+                        lastSuccessAt: 1_000,
+                    },
+                    {
+                        key: 'default|missing-provider-model|-',
+                        routeProfile: 'default',
+                        lastStatus: 'failed',
+                        lastFailureAt: 1_000,
+                    },
+                    /** @type {Record<string, unknown>} */ (null),
+                ],
+                { runId: 'runtime-malformed-records', observedAt: 1_000 },
+            );
+            const diagnostics = await store.readStorageDiagnostics();
+            const runRow = /** @type {{ model_count: number; skipped_count: number; payload_json: string } | undefined} */ (
+                db
+                    .prepare(
+                        'SELECT model_count, skipped_count, payload_json FROM copilot_model_gateway_runtime_probe_runs WHERE run_id = ?',
+                    )
+                    .get('runtime-malformed-records')
+            );
+
+            assert.equal(result.healthObservations, 1);
+            assert.equal(result.skippedRecords, 2);
+            assert.equal(diagnostics.runtime.healthObservations, 1);
+            assert.equal(runRow?.model_count, 1);
+            assert.equal(runRow?.skipped_count, 2);
+            assert.equal(JSON.parse(runRow?.payload_json ?? '{}').skippedRecords, 2);
+        } finally {
+            db.close();
+        }
+    });
+
     it('derives runtime health status and failure context from generic probe-only records', async () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
@@ -3693,6 +3738,7 @@ describe('model-gateway foundation', () => {
             assert.equal(flushed.lastRecords, 1);
             assert.equal(flushed.lastHealthObservations, 1);
             assert.equal(flushed.lastProbeResults, 1);
+            assert.equal(flushed.lastSkippedRecords, 0);
             assert.equal(runtimeRecords.length, 1);
             assert.equal(runtime.health?.['lastStatus'], 'ok');
             assert.equal(runtime.probes.length, 1);

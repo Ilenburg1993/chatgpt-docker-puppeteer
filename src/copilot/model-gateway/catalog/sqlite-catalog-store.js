@@ -419,6 +419,16 @@ function runtimeFailureContext(record) {
 }
 
 /**
+ * @param {Record<string, unknown>} record
+ * @returns {boolean}
+ */
+function isWritableRuntimeHealthRecord(record) {
+    const provider = optionalString(record['providerId']) ?? optionalString(record['provider']);
+    const model = optionalString(record['providerModel']) ?? optionalString(record['model']);
+    return Boolean(provider && model);
+}
+
+/**
  * @param {string} runId
  * @param {string} key
  * @returns {string}
@@ -994,11 +1004,14 @@ export class SqliteModelGatewayCatalogStore {
     /**
      * @param {Record<string, unknown>[]} records
      * @param {{ runId?: string; observedAt?: string | number | Date }} [options]
-     * @returns {Promise<{ runId: string; healthObservations: number; probeResults: number }>}
+     * @returns {Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords: number }>}
      */
     async writeRuntimeHealthRecords(records, options = {}) {
         const observedAtMs = dateMs(options.observedAt) ?? Date.now();
         const runId = optionalString(options.runId) ?? createRuntimeHealthRunId(observedAtMs);
+        const cleanRecords = records.filter(isRecord);
+        const writableRecords = cleanRecords.filter(isWritableRuntimeHealthRecord);
+        const skippedRecords = records.length - writableRecords.length;
         let healthObservations = 0;
         let probeResults = 0;
         const tx = this.#db.transaction(() => {
@@ -1062,13 +1075,13 @@ export class SqliteModelGatewayCatalogStore {
                 'completed',
                 observedAtMs,
                 observedAtMs,
-                records.length,
+                writableRecords.length,
                 0,
                 0,
-                0,
-                payloadJson({ source: 'byok-provider-health', records: records.length }),
+                skippedRecords,
+                payloadJson({ source: 'byok-provider-health', records: writableRecords.length, skippedRecords }),
             );
-            for (const record of records.filter(isRecord)) {
+            for (const record of writableRecords) {
                 const observed = latestRuntimeAt(record) || observedAtMs;
                 const status = runtimeHealthStatus(record);
                 const healthKey = optionalString(record['key']) ?? `${routeProfile(record)}|${providerId(record)}|${providerModel(record)}`;
@@ -1119,12 +1132,12 @@ export class SqliteModelGatewayCatalogStore {
                 .run(
                     probeSuccessCount,
                     probeFailureCount,
-                    payloadJson({ source: 'byok-provider-health', records: records.length, probeResults }),
+                    payloadJson({ source: 'byok-provider-health', records: writableRecords.length, skippedRecords, probeResults }),
                     runId,
                 );
         });
         tx();
-        return { runId, healthObservations, probeResults };
+        return { runId, healthObservations, probeResults, skippedRecords };
     }
 
     /**

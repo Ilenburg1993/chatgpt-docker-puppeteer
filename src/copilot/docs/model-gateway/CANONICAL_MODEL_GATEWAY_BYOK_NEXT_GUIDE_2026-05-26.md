@@ -3915,6 +3915,85 @@ Proximo passo:
 
 Conectar runtime persisted aos explain/readiness finais com policy clara para cada perfil.
 
+Mudanca 18:
+
+SQLite runtime health agora tolera registros malformados no mirror.
+
+Problema encontrado:
+
+O mirror de runtime health recebe fatos operacionais de uma camada viva.
+
+Essa camada pode evoluir, receber payloads parciais, sofrer bug transitorio, ou carregar registros antigos com formato incompleto.
+
+Antes desta mudanca, um registro sem provider/model podia contaminar a persistencia com valores `unknown` ou interromper o flush inteiro.
+
+Isso era ruim por tres motivos:
+
+- dado operacional ruim nao deve derrubar o terminal;
+- dado operacional ruim nao deve apagar ou impedir fatos bons do mesmo batch;
+- diagnostico precisa indicar que houve descarte, sem misturar isso com falha de probe/modelo.
+
+Nova semantica:
+
+`writeRuntimeHealthRecords` agora separa:
+
+- `records`: registros recebidos pela chamada;
+- `writableRecords`: registros estruturados com provider e model;
+- `skippedRecords`: registros nulos, nao-objeto, ou sem provider/model.
+
+Somente `writableRecords` sao gravados em:
+
+- `copilot_model_gateway_health_observations`
+- `copilot_model_gateway_runtime_probe_results`
+
+O run de persistencia registra `skipped_count`.
+
+O payload JSON do run registra `skippedRecords`.
+
+O retorno de `writeRuntimeHealthRecords` passou a incluir:
+
+- `runId`
+- `healthObservations`
+- `probeResults`
+- `skippedRecords`
+
+O mirror SQLite propaga esse contador para:
+
+- retorno de `mirrorByokProviderHealthToSqlite`
+- `ByokProviderHealthSqliteMirrorState.lastSkippedRecords`
+- store desabilitado do boot do terminal
+
+Impacto arquitetural:
+
+Runtime health passa a ter uma fronteira de saneamento explicita antes do banco relacional.
+
+Isso fortalece a fundacao de pre-runtime porque:
+
+- falhas reais de modelo continuam persistidas;
+- falhas do transport/payload nao viram falsos bloqueios de modelo;
+- runs defeituosos ficam auditaveis por `skipped_count`;
+- mirror instalado no terminal nao perde batches inteiros por um item ruim.
+
+Validacao focada:
+
+`node --check src/copilot/model-gateway/catalog/sqlite-catalog-store.js`
+
+`node --check src/copilot/model-gateway/health/sqlite-health-mirror.js`
+
+`node --check src/copilot/terminal/terminal-phases/boot-listeners.js`
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "malformed runtime health records|storage-neutral runtime health SQLite mirror|same-millisecond|generic probe-only records"`
+
+Resultado:
+
+`4 passed`
+
+`npm run model-gateway:typecheck`
+
+Resultado:
+
+`ok`
+
 Validacoes executadas:
 
 `node --check src/copilot/model-gateway/health/provider-health.js`

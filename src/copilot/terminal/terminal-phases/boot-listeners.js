@@ -70,6 +70,7 @@ function ensureModelGatewayRuntimeHealthMirror() {
                       runId: 'model-gateway:runtime-health:disabled',
                       healthObservations: 0,
                       probeResults: 0,
+                      skippedRecords: 0,
                   }),
               },
         debounceMs: optionalNonNegativeInteger(process.env['MODEL_GATEWAY_RUNTIME_HEALTH_SQLITE_MIRROR_DEBOUNCE_MS']),
