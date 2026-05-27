@@ -2771,6 +2771,7 @@ describe('terminal /byok command', () => {
             { directory: DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR },
         );
         expect(ctx.output()).toContain('tracePersisted=sim');
+        expect(ctx.output()).toContain('persisted=sim');
         expect(ctx.output()).toContain('/tmp/model-gateway-selection-trace.json');
     });
 

@@ -2404,7 +2404,7 @@ Quota/account overlay mais rico.
 - [x] Vision soft preference.
 - [x] Selection audit.
 - [x] Effective selection com observed health.
-- [ ] Persistir selection audit quando solicitado.
+- [x] Persistir selection audit quando solicitado.
 - [ ] Criar explain diff entre metadata-only e effective.
 - [ ] Criar score decomposition mais estavel.
 - [ ] Criar policy para auto selectors.
@@ -6889,6 +6889,43 @@ Foi adicionado teste explicito de provider/model removal.
 Esse comportamento e essencial para refresh incremental seguro.
 
 Tambem evita corrupcao logica quando providers forem removidos, renomeados ou deixarem de listar modelos.
+
+## 21.50 Mudanca 50 - Selection Audit Persistido Com Status Correto
+
+O terminal ja possuia caminho de persistencia para decision trace.
+
+O problema era a UX declarar `persisted=nao` mesmo quando `write-trace` gravava artefato.
+
+`/byok gateway selection audit effective write-trace` agora informa `persisted=sim` quando a gravacao ocorre.
+
+Em falha de persistencia, informa `persisted=falha`.
+
+A linha detalhada de trace continua exibindo:
+
+- `tracePersisted`;
+- caminho do arquivo;
+- caminho do latest;
+- erro quando existir.
+
+Isto fecha a lacuna operacional de saber se a auditoria de selecao foi realmente materializada.
+
+O artefato continua sendo selection decision trace.
+
+Ele contem:
+
+- snapshot;
+- integrity;
+- selecao pre-runtime;
+- selecao efetiva observada;
+- comparison;
+- policy resolution;
+- plano do selector.
+
+O comando continua sem executar provider.
+
+Ele apenas usa health observado ja existente.
+
+Essa persistencia sera a base para diffs de selection audit e para o runtime selector real.
 
 ## 22. Fim Do Documento Inicial
 

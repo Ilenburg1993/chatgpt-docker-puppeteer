@@ -2845,9 +2845,10 @@ async function renderByokGatewaySelectionAudit(println, rest) {
                   { directory: args.traceDir },
               )
             : null;
+    const persistedStatus = tracePersistence?.written === true ? 'sim' : args.writeTrace ? 'falha' : 'nao';
     println(`\n  \x1b[36mBYOK model-gateway selection audit\x1b[0m`);
     println(
-        `  \x1b[90mstore=${store.filePath} · integrity=${integrity.ok ? 'ok' : 'falha'} · mode=${selection.mode}${args.effective ? '+effective' : ''}${args.requireRuntimeProof ? '+require-proof' : ''} · runtime=nao · persisted=nao · profiles=${selection.summary.selectedProfileCount}/${selection.summary.profileCount}\x1b[0m`,
+        `  \x1b[90mstore=${store.filePath} · integrity=${integrity.ok ? 'ok' : 'falha'} · mode=${selection.mode}${args.effective ? '+effective' : ''}${args.requireRuntimeProof ? '+require-proof' : ''} · runtime=nao · persisted=${persistedStatus} · profiles=${selection.summary.selectedProfileCount}/${selection.summary.profileCount}\x1b[0m`,
     );
     println(
         `  \x1b[90mprojections=${selection.snapshotContext['projectionCount']} · routes=${selection.snapshotContext['routeOptionCount']} · overlays=${selection.snapshotContext['accountOverlayCount']} · eligibility=${selection.snapshotContext['eligibilityDecisionCount']} · candidates=${selection.snapshotContext['candidateCount']}\x1b[0m\n`,
