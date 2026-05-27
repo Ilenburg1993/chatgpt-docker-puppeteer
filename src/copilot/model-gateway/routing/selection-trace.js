@@ -3,7 +3,7 @@
  * Non-mutating selection decision trace helpers.
  */
 
-import { mkdir, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 export const DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR = 'data/copilot/model-gateway/selection-traces';
@@ -93,6 +93,51 @@ function summarizeSelectionAudit(audit) {
         runtimeMode: optionalString(record['runtimeMode']),
         summary,
     };
+}
+
+/**
+ * @param {Record<string, unknown> | null} selected
+ * @returns {string | null}
+ */
+function selectedRouteKey(selected) {
+    if (!selected) return null;
+    return [
+        optionalString(selected['providerId']) ?? 'provider:none',
+        optionalString(selected['providerModel']) ?? 'model:none',
+        optionalString(selected['selectorKind']) ?? 'selector:none',
+    ].join(':');
+}
+
+/**
+ * @param {unknown} row
+ * @returns {Record<string, unknown>}
+ */
+function normalizeTraceRow(row) {
+    const record = optionalRecord(row) ?? {};
+    const selected = optionalRecord(record['selected']);
+    return {
+        profileId: optionalString(record['profileId']) ?? 'unknown',
+        source: optionalString(record['source']) ?? 'unknown',
+        changedFromPreRuntime: record['changedFromPreRuntime'] === true,
+        hasRuntimeProof: record['hasRuntimeProof'] === true,
+        selected,
+        selectedRouteKey: selectedRouteKey(selected),
+        preSelected: optionalRecord(record['preSelected']),
+        postSelected: optionalRecord(record['postSelected']),
+    };
+}
+
+/**
+ * @param {unknown} trace
+ * @returns {Map<string, Record<string, unknown>>}
+ */
+function traceRowsByProfile(trace) {
+    const record = optionalRecord(trace) ?? {};
+    const rows = Array.isArray(record['rows']) ? record['rows'] : [];
+    return new Map(rows.map((row) => {
+        const normalized = normalizeTraceRow(row);
+        return [String(normalized['profileId']), normalized];
+    }));
 }
 
 /**
@@ -219,6 +264,126 @@ export async function persistModelGatewaySelectionDecisionTrace(trace, options =
             error: error instanceof Error ? error.message : String(error),
         };
     }
+}
+
+/**
+ * @param {string} filePath
+ * @returns {Promise<Record<string, unknown>>}
+ */
+export async function readModelGatewaySelectionDecisionTrace(filePath) {
+    const payload = JSON.parse(await readFile(resolve(filePath), 'utf8'));
+    return optionalRecord(payload) ?? {};
+}
+
+/**
+ * @param {Record<string, unknown>} leftTrace
+ * @param {Record<string, unknown>} rightTrace
+ * @returns {{
+ *   schema: 'model-gateway-selection-trace-diff';
+ *   ok: boolean;
+ *   left: { traceId: string | null; generatedAt: string | null; policyMode: string | null };
+ *   right: { traceId: string | null; generatedAt: string | null; policyMode: string | null };
+ *   summary: {
+ *     profileCount: number;
+ *     addedProfileCount: number;
+ *     removedProfileCount: number;
+ *     changedProfileCount: number;
+ *     unchangedProfileCount: number;
+ *     selectedRouteChangedCount: number;
+ *     sourceChangedCount: number;
+ *     runtimeProofChangedCount: number;
+ *   };
+ *   rows: Array<{
+ *     profileId: string;
+ *     status: 'added' | 'removed' | 'changed' | 'unchanged';
+ *     selectedRouteChanged: boolean;
+ *     sourceChanged: boolean;
+ *     runtimeProofChanged: boolean;
+ *     left: Record<string, unknown> | null;
+ *     right: Record<string, unknown> | null;
+ *   }>;
+ * }}
+ */
+export function compareModelGatewaySelectionDecisionTraces(leftTrace, rightTrace) {
+    const leftRows = traceRowsByProfile(leftTrace);
+    const rightRows = traceRowsByProfile(rightTrace);
+    const profileIds = [...new Set([...leftRows.keys(), ...rightRows.keys()])].sort();
+    const rows = profileIds.map((profileId) => {
+        const left = leftRows.get(profileId) ?? null;
+        const right = rightRows.get(profileId) ?? null;
+        const selectedRouteChanged = left?.['selectedRouteKey'] !== right?.['selectedRouteKey'];
+        const sourceChanged = left?.['source'] !== right?.['source'];
+        const runtimeProofChanged = left?.['hasRuntimeProof'] !== right?.['hasRuntimeProof'];
+        /** @type {'added' | 'removed' | 'changed' | 'unchanged'} */
+        let status = 'unchanged';
+        if (!left && right) status = 'added';
+        else if (left && !right) status = 'removed';
+        else if (selectedRouteChanged || sourceChanged || runtimeProofChanged) status = 'changed';
+        return {
+            profileId,
+            status,
+            selectedRouteChanged,
+            sourceChanged,
+            runtimeProofChanged,
+            left,
+            right,
+        };
+    });
+    const leftPolicy = optionalRecord(leftTrace['policy']);
+    const rightPolicy = optionalRecord(rightTrace['policy']);
+    return {
+        schema: 'model-gateway-selection-trace-diff',
+        ok: true,
+        left: {
+            traceId: optionalString(leftTrace['traceId']),
+            generatedAt: optionalString(leftTrace['generatedAt']),
+            policyMode: optionalString(leftPolicy?.['mode']),
+        },
+        right: {
+            traceId: optionalString(rightTrace['traceId']),
+            generatedAt: optionalString(rightTrace['generatedAt']),
+            policyMode: optionalString(rightPolicy?.['mode']),
+        },
+        summary: {
+            profileCount: rows.length,
+            addedProfileCount: rows.filter((row) => row.status === 'added').length,
+            removedProfileCount: rows.filter((row) => row.status === 'removed').length,
+            changedProfileCount: rows.filter((row) => row.status === 'changed').length,
+            unchangedProfileCount: rows.filter((row) => row.status === 'unchanged').length,
+            selectedRouteChangedCount: rows.filter((row) => row.selectedRouteChanged).length,
+            sourceChangedCount: rows.filter((row) => row.sourceChanged).length,
+            runtimeProofChangedCount: rows.filter((row) => row.runtimeProofChanged).length,
+        },
+        rows,
+    };
+}
+
+/**
+ * @param {{ directory?: string; limit?: number }} [options]
+ * @returns {Promise<Array<{ name: string; filePath: string; mtimeMs: number; size: number }>>}
+ */
+export async function listModelGatewaySelectionDecisionTraceFiles(options = {}) {
+    const directory = resolve(optionalString(options.directory) ?? DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR);
+    const limit = normalizePositiveInteger(options.limit, 50);
+    const entries = await readdir(directory, { withFileTypes: true }).catch((error) => {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return [];
+        throw error;
+    });
+    const files = await Promise.all(
+        entries
+            .filter((entry) => entry.isFile() && entry.name.endsWith('.json') && entry.name !== 'latest.json')
+            .map(async (entry) => {
+                const filePath = resolve(directory, entry.name);
+                const stats = await stat(filePath);
+                return {
+                    name: entry.name,
+                    filePath,
+                    mtimeMs: stats.mtimeMs,
+                    size: stats.size,
+                };
+            }),
+    );
+    return files.sort((left, right) => right.mtimeMs - left.mtimeMs || right.name.localeCompare(left.name)).slice(0, limit);
 }
 
 /**

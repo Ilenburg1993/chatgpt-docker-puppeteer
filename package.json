@@ -427,6 +427,7 @@
     "model-gateway:redaction:audit": "node scripts/model-gateway-redaction-audit.mjs --json",
     "model-gateway:selection:effective": "node scripts/model-gateway-effective-selection.mjs --json",
     "model-gateway:selection:effective:trace": "node scripts/model-gateway-effective-selection.mjs --json --write-trace",
+    "model-gateway:selection:trace-diff": "node scripts/model-gateway-selection-trace-diff.mjs --json",
     "model-gateway:selection:trace-retention": "node scripts/model-gateway-effective-selection.mjs --json --prune-traces",
     "model-gateway:live:readiness": "node scripts/model-gateway-live-readiness.mjs --json",
     "model-gateway:live:plan": "node scripts/model-gateway-live-plan.mjs --json",

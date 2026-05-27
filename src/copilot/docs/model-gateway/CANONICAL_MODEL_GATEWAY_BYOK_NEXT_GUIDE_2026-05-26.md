@@ -5656,6 +5656,41 @@ O inventario canonico tambem registra esses comandos.
 
 Tambem foi adicionado:
 
+`npm run model-gateway:selection:trace-diff`
+
+E o alias:
+
+`make model-gateway-selection-trace-diff`
+
+Por default, o diff compara os dois traces historicos mais recentes do diretorio.
+
+`latest.json` e ignorado para descoberta automatica, porque ele e ponteiro operacional e pode duplicar o trace mais recente.
+
+Tambem aceita:
+
+- `--left <path>`
+- `--right <path>`
+- `--trace-dir <path>`
+
+O schema retornado e:
+
+`model-gateway-selection-trace-diff`
+
+O diff mede:
+
+- perfis adicionados;
+- perfis removidos;
+- perfis alterados;
+- mudanca de rota selecionada;
+- mudanca de source;
+- mudanca de prova runtime.
+
+Esse diff e uma base importante antes do runtime selector real.
+
+Ele permite comparar duas policies ou duas execucoes de auditoria sem chamar provider e sem mutar catalogo.
+
+Tambem foi adicionado:
+
 `npm run model-gateway:selection:trace-retention`
 
 E o alias:
@@ -5733,10 +5768,119 @@ Essa separacao e essencial para as proximas fases:
 - [x] Cobrir persistencia em teste unitario.
 - [x] Adicionar comando terminal para gravar trace sob demanda.
 - [x] Adicionar retention policy para traces.
-- [ ] Adicionar diff entre traces.
-- [ ] Conectar traces ao runtime selector real.
+- [x] Adicionar diff entre traces.
+- [x] Conectar traces ao runtime selector real.
 
-## 21. Fim Do Documento Inicial
+## 21. Mudanca 33 - Base Nao-Executora Do Runtime Selector Real
+
+Com policy resolver, decision trace, retention e diff prontos, a proxima base era transformar a decisao final em um plano que o runtime real possa consumir.
+
+Foi criada a camada:
+
+`src/copilot/model-gateway/routing/runtime-selector.js`
+
+Essa camada ainda nao chama provider.
+
+Ela nao executa modelo.
+
+Ela nao roda probe.
+
+Ela nao faz retry.
+
+Ela apenas materializa:
+
+- qual profile tem rota selecionada;
+- qual profile esta bloqueado;
+- qual rota deve ser tentada primeiro;
+- se a rota tem prova runtime;
+- quais reasons explicam a decisao;
+- quais nextActions esperadas;
+- qual evento sanitizado de route decision representa essa escolha.
+
+### 21.1 APIs Criadas
+
+`buildModelGatewayRuntimeSelectorPlan`
+
+Entrada:
+
+- policy resolution; ou
+- decision trace persistido.
+
+Saida:
+
+`model-gateway-runtime-selector-plan`
+
+Campos principais:
+
+- `ok`
+- `ready`
+- `mode`
+- `sourceSchema`
+- `traceId`
+- `summary.profileCount`
+- `summary.selectedProfileCount`
+- `summary.blockedProfileCount`
+- `summary.runtimeProofSelectedCount`
+- `routes[]`
+
+`selectModelGatewayRuntimeRoute`
+
+Seleciona a rota pronta de um profile especifico.
+
+### 21.2 Integracao Ao Script Efetivo
+
+`scripts/model-gateway-effective-selection.mjs`
+
+Agora inclui:
+
+`runtimeSelectorPlan`
+
+A saida textual mostra:
+
+`runtime-selector: ready=... selected=... blocked=... proofSelected=...`
+
+Isso permite validar a ponte para runtime real sem executar runtime.
+
+### 21.3 Relacao Com Traces
+
+O runtime selector aceita tanto a policy resolution quanto o decision trace.
+
+Isso e importante porque, durante testes live, poderemos:
+
+- gerar trace;
+- comparar trace;
+- reproduzir plano de runtime a partir do trace;
+- auditar o evento de decisao;
+- so entao executar provider.
+
+### 21.4 Limites Intencionais
+
+Ainda faltam:
+
+- retry runtime real;
+- fallback chain executavel;
+- gravacao de resultado runtime no health store;
+- aplicacao de quota/rate-limit durante a chamada;
+- live tests llm-b.
+
+Esses pontos pertencem a proxima camada.
+
+### 21.5 Checklist Da Mudanca 33
+
+- [x] Criar contrato nao-executor do runtime selector.
+- [x] Aceitar policy resolution como entrada.
+- [x] Aceitar decision trace como entrada.
+- [x] Materializar rotas por profile.
+- [x] Bloquear profile sem rota final.
+- [x] Respeitar exigencia de runtime proof.
+- [x] Produzir route decision event sanitizado.
+- [x] Integrar plano ao script effective.
+- [x] Cobrir contratos unitarios.
+- [ ] Criar executor runtime real com retry/fallback.
+- [ ] Persistir resultado runtime no health store.
+- [ ] Criar live tests llm-b baseados no plano.
+
+## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
 

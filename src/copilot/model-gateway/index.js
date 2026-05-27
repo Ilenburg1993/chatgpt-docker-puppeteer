@@ -300,10 +300,12 @@ export {
 } from './providers/index.js';
 export {
     applyModelGatewaySelectionTraceRetention,
+    buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewaySelectionDecisionTrace,
     buildModelGatewayRouteCandidates,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
+    compareModelGatewaySelectionDecisionTraces,
     compareModelGatewaySelectionAudits,
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     MODEL_GATEWAY_SELECTION_POLICY_MODE,
@@ -316,6 +318,7 @@ export {
     isGatewayModelProbeVerified,
     listGatewayModelVerifiedProbeKinds,
     listModelGatewayTaskProfiles,
+    listModelGatewaySelectionDecisionTraceFiles,
     MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
     MODEL_GATEWAY_TASK_PROFILES,
     readGatewayModelHealth,
@@ -325,8 +328,10 @@ export {
     routeGatewayModels,
     routeModelGatewayCatalogSnapshot,
     persistModelGatewaySelectionDecisionTrace,
+    readModelGatewaySelectionDecisionTrace,
     resolveModelGatewaySelectionPolicy,
     resolveModelGatewayTaskProfile,
+    selectModelGatewayRuntimeRoute,
     scoreGatewayModelCandidate,
     summarizeModelGatewayLocalProviderOptInBlocks,
 } from './routing/index.js';

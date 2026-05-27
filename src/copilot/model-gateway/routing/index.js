@@ -30,6 +30,7 @@ export {
     resolveModelGatewayTaskProfile,
 } from './task-profiles.js';
 export { routeGatewayModels, routeModelGatewayCatalogSnapshot, scoreGatewayModelCandidate } from './policy-engine.js';
+export { buildModelGatewayRuntimeSelectorPlan, selectModelGatewayRuntimeRoute } from './runtime-selector.js';
 export {
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
@@ -40,6 +41,9 @@ export {
 export {
     applyModelGatewaySelectionTraceRetention,
     buildModelGatewaySelectionDecisionTrace,
+    compareModelGatewaySelectionDecisionTraces,
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
+    listModelGatewaySelectionDecisionTraceFiles,
     persistModelGatewaySelectionDecisionTrace,
+    readModelGatewaySelectionDecisionTrace,
 } from './selection-trace.js';

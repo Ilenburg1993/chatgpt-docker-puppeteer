@@ -8,6 +8,7 @@ import {
     auditModelGatewayCatalogSnapshotIntegrity,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
+    buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewaySelectionDecisionTrace,
     compareModelGatewaySelectionAudits,
     createEnvSecretRegistry,
@@ -154,6 +155,10 @@ const postRuntimeSelection = auditModelGatewayPostRuntimeSelection(effectiveSnap
 });
 const selectionComparison = compareModelGatewaySelectionAudits(selection, postRuntimeSelection);
 const policyResolution = resolveModelGatewaySelectionPolicy(selectionComparison, { mode: selectionPolicy });
+const runtimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(policyResolution, {
+    source: 'model-gateway-effective-selection',
+    requireRuntimeProof,
+});
 const decisionTrace = buildModelGatewaySelectionDecisionTrace({
     snapshot,
     integrity,
@@ -240,6 +245,7 @@ const summary = {
     },
     selectionComparison,
     policyResolution,
+    runtimeSelectorPlan,
     decisionTrace: {
         requested: writeTrace,
         ...tracePersistence,
@@ -294,6 +300,9 @@ if (json) {
     );
     process.stdout.write(
         `policy: mode=${policyResolution.mode} selected=${policyResolution.summary.selectedCount}/${policyResolution.summary.profileCount} postWinners=${policyResolution.summary.postRuntimeWinnerCount} changed=${policyResolution.summary.changedFromPreRuntimeCount}\n`,
+    );
+    process.stdout.write(
+        `runtime-selector: ready=${runtimeSelectorPlan.ready ? 'yes' : 'no'} selected=${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} blocked=${runtimeSelectorPlan.summary.blockedProfileCount} proofSelected=${runtimeSelectorPlan.summary.runtimeProofSelectedCount}\n`,
     );
     if (writeTrace) {
         process.stdout.write(

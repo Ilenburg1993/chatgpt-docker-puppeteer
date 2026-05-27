@@ -40,12 +40,17 @@ import {
     buildModelGatewayRouteCandidates,
     applyModelGatewayEligibilityToSnapshot,
     applyModelGatewaySelectionTraceRetention,
+    buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewaySelectionDecisionTrace,
+    compareModelGatewaySelectionDecisionTraces,
     compareModelGatewaySelectionAudits,
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     MODEL_GATEWAY_SELECTION_POLICY_MODE,
+    listModelGatewaySelectionDecisionTraceFiles,
     persistModelGatewaySelectionDecisionTrace,
+    readModelGatewaySelectionDecisionTrace,
     resolveModelGatewaySelectionPolicy,
+    selectModelGatewayRuntimeRoute,
     createModelRecord,
     createEnvSecretRegistry,
     auditModelGatewayPostRuntimeSelection,
@@ -718,6 +723,27 @@ describe('model-gateway foundation', () => {
         assert.equal(requireRuntimeProof.summary.unselectedCount, 1);
         assert.equal(requireRuntimeProof.rows[1].source, 'blocked_runtime_proof_missing');
 
+        const runtimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(preferRuntimeProved, {
+            source: 'unit-test-runtime-selector',
+            sessionId: 'unit-session',
+        });
+        assert.equal(runtimeSelectorPlan.schema, 'model-gateway-runtime-selector-plan');
+        assert.equal(runtimeSelectorPlan.ok, true);
+        assert.equal(runtimeSelectorPlan.ready, true);
+        assert.equal(runtimeSelectorPlan.summary.selectedProfileCount, 2);
+        assert.equal(runtimeSelectorPlan.summary.blockedProfileCount, 0);
+        assert.equal(runtimeSelectorPlan.routes[0].decisionEvent.source, 'unit-test-runtime-selector');
+        assert.equal(runtimeSelectorPlan.routes[0].decisionEvent.sessionId, 'unit-session');
+        assert.equal(selectModelGatewayRuntimeRoute(runtimeSelectorPlan, 'repo_agent')?.selectedRouteKey, 'openrouter:openai/gpt-oss-120b');
+
+        const strictRuntimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(requireRuntimeProof, {
+            requireRuntimeProof: true,
+        });
+        assert.equal(strictRuntimeSelectorPlan.ok, false);
+        assert.equal(strictRuntimeSelectorPlan.ready, true);
+        assert.equal(strictRuntimeSelectorPlan.summary.selectedProfileCount, 1);
+        assert.equal(strictRuntimeSelectorPlan.summary.blockedProfileCount, 1);
+
         const trace = buildModelGatewaySelectionDecisionTrace({
             snapshot,
             integrity: { ok: true, redactedIdentityCount: 0 },
@@ -751,8 +777,33 @@ describe('model-gateway foundation', () => {
             assert.equal(persistedPayload.schema, 'model-gateway-selection-decision-trace');
             assert.equal(latestPayload.traceId, 'unit-selection-trace');
 
-            await persistModelGatewaySelectionDecisionTrace({ ...trace, traceId: 'unit-selection-trace-b' }, { directory: traceDir });
+            const secondTrace = {
+                ...trace,
+                traceId: 'unit-selection-trace-b',
+                policy: { mode: MODEL_GATEWAY_SELECTION_POLICY_MODE.REQUIRE_RUNTIME_PROOF },
+                rows: [
+                    {
+                        profileId: 'repo_agent',
+                        source: 'post_runtime_proved',
+                        hasRuntimeProof: true,
+                        selected: { providerId: 'groq', providerModel: 'openai/gpt-oss-120b', selectorKind: 'exact_model' },
+                    },
+                ],
+            };
+            const secondPersistedTrace = await persistModelGatewaySelectionDecisionTrace(secondTrace, { directory: traceDir });
             await persistModelGatewaySelectionDecisionTrace({ ...trace, traceId: 'unit-selection-trace-c' }, { directory: traceDir });
+            const readBackTrace = await readModelGatewaySelectionDecisionTrace(String(secondPersistedTrace.filePath));
+            assert.equal(readBackTrace['traceId'], 'unit-selection-trace-b');
+            const traceFiles = await listModelGatewaySelectionDecisionTraceFiles({ directory: traceDir, limit: 2 });
+            assert.equal(traceFiles.length, 2);
+            const traceDiff = compareModelGatewaySelectionDecisionTraces(trace, secondTrace);
+            assert.equal(traceDiff.schema, 'model-gateway-selection-trace-diff');
+            assert.equal(traceDiff.left.traceId, 'unit-selection-trace');
+            assert.equal(traceDiff.right.traceId, 'unit-selection-trace-b');
+            assert.equal(traceDiff.summary.profileCount, 2);
+            assert.equal(traceDiff.summary.changedProfileCount, 1);
+            assert.equal(traceDiff.summary.removedProfileCount, 1);
+            assert.equal(traceDiff.summary.selectedRouteChangedCount, 2);
             const retentionPreview = await applyModelGatewaySelectionTraceRetention({
                 directory: traceDir,
                 maxFiles: 1,
@@ -1911,12 +1962,14 @@ describe('model-gateway foundation', () => {
             ),
         );
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:selection:effective:trace'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:selection:trace-diff'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:selection:trace-retention'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:plan'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:runtime-health:mirror'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-build'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-effective-selection-trace'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-selection-trace-diff'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-selection-trace-retention'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build-plan'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build-preview'));
