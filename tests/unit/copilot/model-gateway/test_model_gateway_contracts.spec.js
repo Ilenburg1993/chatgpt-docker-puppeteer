@@ -2451,22 +2451,41 @@ describe('model-gateway foundation', () => {
                         rowCount: 1,
                         errors: ['sk-secret-that-must-not-leak'],
                     }),
+                    {
+                        runId: 'run-raw',
+                        providerId: 'openrouter',
+                        sourceId: source.id,
+                        status: 'failed',
+                        errors: ['nested raw sk-raw-secret-that-must-not-leak'],
+                    },
+                ],
+                conflicts: [
+                    {
+                        conflictKey: 'conflict-raw',
+                        projectionKey: 'openrouter:m:default',
+                        fieldPath: 'providerMetadata.diagnostic',
+                        diagnostic: 'provider returned Bearer sk-conflict-secret-that-must-not-leak',
+                    },
                 ],
             });
             const raw = await readFile(filePath, 'utf8');
             const loaded = await store.readSnapshot();
 
             assert.equal(raw.includes('sk-secret-that-must-not-leak'), false);
+            assert.equal(raw.includes('sk-raw-secret-that-must-not-leak'), false);
+            assert.equal(raw.includes('sk-conflict-secret-that-must-not-leak'), false);
             assert.equal(loaded.source, 'unit-test');
             assert.equal(loaded.sources.length, 1);
             assert.equal(loaded.evidences.length, 1);
             assert.equal(loaded.projections.length, 1);
             assert.equal(loaded.projections[0].limits.contextWindowTokens, 131072);
             assert.equal(loaded.rawPayloadRefs.length, 1);
-            assert.equal(loaded.importRuns.length, 1);
+            assert.equal(loaded.importRuns.length, 2);
             assert.equal(loaded.modelEligibilityRuns.length, 1);
             assert.equal(loaded.modelEligibilityDecisions.length, 1);
             assert.equal(JSON.stringify(loaded.modelEligibilityRuns).includes('sk-secret-that-must-not-leak'), false);
+            assert.equal(JSON.stringify(loaded).includes('sk-raw-secret-that-must-not-leak'), false);
+            assert.equal(JSON.stringify(loaded).includes('sk-conflict-secret-that-must-not-leak'), false);
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -2940,8 +2959,13 @@ describe('model-gateway foundation', () => {
                 estimatedCostUsd: 0.01,
             });
 
-            const summary = await store.writeRouteDecisionEvents([event]);
-            await store.writeRouteDecisionEvents([event]);
+            const secretEvent = {
+                ...event,
+                diagnostic: 'provider returned Bearer sk-route-secret-that-must-not-leak',
+            };
+
+            const summary = await store.writeRouteDecisionEvents([secretEvent]);
+            await store.writeRouteDecisionEvents([secretEvent]);
             const loaded = await store.readRouteDecisionEvents({ limit: 5 });
             const rows = /** @type {{ count: number } | undefined} */ (
                 db.prepare('SELECT COUNT(*) AS count FROM copilot_model_gateway_route_decisions').get()
@@ -2953,6 +2977,7 @@ describe('model-gateway foundation', () => {
             assert.equal(loaded[0].decisionId, event.decisionId);
             assert.equal(loaded[0].providerId, 'openrouter');
             assert.equal(JSON.stringify(loaded).includes('sk-'), false);
+            assert.equal(JSON.stringify(loaded).includes('sk-route-secret-that-must-not-leak'), false);
         } finally {
             db.close();
         }
@@ -3578,6 +3603,15 @@ describe('model-gateway foundation', () => {
                         providerModel: 'model-a',
                         lastStatus: 'ok',
                         lastSuccessAt: 1_000,
+                        lastMessage: 'provider returned Bearer sk-runtime-secret-that-must-not-leak',
+                        probes: {
+                            chat: {
+                                status: 'failed',
+                                ok: false,
+                                lastAt: 1_000,
+                                lastMessage: 'probe leaked token sk-probe-secret-that-must-not-leak',
+                            },
+                        },
                     },
                     {
                         key: 'default|missing-provider-model|-',
@@ -3597,13 +3631,30 @@ describe('model-gateway foundation', () => {
                     )
                     .get('runtime-malformed-records')
             );
+            const storedPayloads = /** @type {Array<{ payload_json: string }>} */ (
+                db
+                    .prepare(
+                        `
+                            SELECT payload_json FROM copilot_model_gateway_health_observations
+                            UNION ALL
+                            SELECT payload_json FROM copilot_model_gateway_runtime_probe_results
+                            UNION ALL
+                            SELECT payload_json FROM copilot_model_gateway_runtime_probe_runs
+                        `,
+                    )
+                    .all()
+            );
+            const serializedPayloads = JSON.stringify(storedPayloads);
 
             assert.equal(result.healthObservations, 1);
+            assert.equal(result.probeResults, 1);
             assert.equal(result.skippedRecords, 2);
             assert.equal(diagnostics.runtime.healthObservations, 1);
             assert.equal(runRow?.model_count, 1);
             assert.equal(runRow?.skipped_count, 2);
             assert.equal(JSON.parse(runRow?.payload_json ?? '{}').skippedRecords, 2);
+            assert.equal(serializedPayloads.includes('sk-runtime-secret-that-must-not-leak'), false);
+            assert.equal(serializedPayloads.includes('sk-probe-secret-that-must-not-leak'), false);
         } finally {
             db.close();
         }

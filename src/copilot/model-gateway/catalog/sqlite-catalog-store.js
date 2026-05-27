@@ -1079,7 +1079,7 @@ export class SqliteModelGatewayCatalogStore {
                 0,
                 0,
                 skippedRecords,
-                payloadJson({ source: 'byok-provider-health', records: writableRecords.length, skippedRecords }),
+                operationalPayloadJson({ source: 'byok-provider-health', records: writableRecords.length, skippedRecords }),
             );
             for (const record of writableRecords) {
                 const observed = latestRuntimeAt(record) || observedAtMs;
@@ -1095,7 +1095,7 @@ export class SqliteModelGatewayCatalogStore {
                     runtimeFailureContext(record),
                     observed,
                     null,
-                    payloadJson(record),
+                    operationalPayloadJson(record),
                 );
                 healthObservations += 1;
                 const probes = isRecord(record['probes']) ? record['probes'] : {};
@@ -1116,7 +1116,12 @@ export class SqliteModelGatewayCatalogStore {
                         optionalString(probeValue['status']) ?? 'unknown',
                         dateMs(probeValue['lastAt']) ?? observed,
                         null,
-                        payloadJson({ ...probeValue, providerId: providerId(record), providerModel: providerModel(record), routeProfile: routeProfile(record) }),
+                        operationalPayloadJson({
+                            ...probeValue,
+                            providerId: providerId(record),
+                            providerModel: providerModel(record),
+                            routeProfile: routeProfile(record),
+                        }),
                     );
                     probeResults += 1;
                 }
@@ -1132,7 +1137,12 @@ export class SqliteModelGatewayCatalogStore {
                 .run(
                     probeSuccessCount,
                     probeFailureCount,
-                    payloadJson({ source: 'byok-provider-health', records: writableRecords.length, skippedRecords, probeResults }),
+                    operationalPayloadJson({
+                        source: 'byok-provider-health',
+                        records: writableRecords.length,
+                        skippedRecords,
+                        probeResults,
+                    }),
                     runId,
                 );
         });
@@ -1282,7 +1292,7 @@ export class SqliteModelGatewayCatalogStore {
                     optionalString(event['modelId']),
                     event['selected'] === true ? 1 : 0,
                     dateMs(event['timestamp']) ?? Date.now(),
-                    payloadJson(event),
+                    operationalPayloadJson(event),
                 );
             }
         });

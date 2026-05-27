@@ -3994,6 +3994,63 @@ Resultado:
 
 `ok`
 
+Mudanca 19:
+
+Redaction de payloads operacionais foi fortalecida antes do primeiro build/live.
+
+Problema encontrado:
+
+Alguns caminhos ja eram seguros por contrato porque os construtores de catalogo sanitizavam records antes da persistencia.
+
+Mas a arquitetura nao deve depender apenas de callers disciplinados.
+
+Havia dois pontos de defesa em profundidade a fortalecer:
+
+- `JsonModelGatewayCatalogStore` redigia chaves sensiveis, mas strings soltas em campos nao sensiveis podiam ficar intactas se um caller pulasse os construtores;
+- `SqliteModelGatewayCatalogStore` usava `payloadJson` em runtime health e route decisions, apesar de esses payloads serem operacionais e potencialmente carregarem mensagens/erros de provider.
+
+Nova semantica:
+
+`JsonModelGatewayCatalogStore` agora aplica `redactSecretText` a qualquer string antes de escrever/normalizar snapshot.
+
+Payloads SQLite operacionais agora usam `operationalPayloadJson` em:
+
+- runtime probe runs derivados de health;
+- health observations derivadas de health;
+- runtime probe results derivados de health;
+- route decision events.
+
+Impacto:
+
+Mesmo que uma camada superior injete por engano:
+
+- bearer token em mensagem de erro;
+- API key em diagnostic;
+- token bruto dentro de array de errors;
+- segredo em campo nao chamado `token`/`secret`;
+
+o armazenamento canonico redige antes de serializar.
+
+Isso nao muda os campos relacionais de provider/model/route.
+
+Tambem nao mistura runtime proof com metadados canonicos.
+
+Efeito esperado:
+
+Antes de rodarmos live tests ou build amplo, a base de persistencia passa a tratar segredo como um problema de borda, nao apenas como responsabilidade dos importers.
+
+Validacao focada:
+
+`node --check src/copilot/model-gateway/catalog/json-catalog-store.js`
+
+`node --check src/copilot/model-gateway/catalog/sqlite-catalog-store.js`
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "redacted JSON catalog snapshot|sanitized route decision events|malformed runtime health records|same-millisecond"`
+
+Resultado:
+
+`4 passed`
+
 Validacoes executadas:
 
 `node --check src/copilot/model-gateway/health/provider-health.js`
