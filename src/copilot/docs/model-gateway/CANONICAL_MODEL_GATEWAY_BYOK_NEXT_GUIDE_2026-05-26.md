@@ -3711,6 +3711,39 @@ Teste adicionado:
 
 `derives runtime health status and failure context from generic probe-only records`
 
+Mudanca 13:
+
+Mirror instalado no runtime nao grava rodada vazia.
+
+Antes:
+
+`controller.flush()` sempre escrevia runtime rows quando chamado.
+
+Problema:
+
+Shutdown do terminal poderia gerar uma rodada historica mesmo sem mudanca BYOK pendente.
+
+Depois:
+
+`controller.flush()` retorna o estado atual sem escrita quando:
+
+- mirror esta habilitado
+- nao ha timer pendente
+- nao ha flush em voo
+- `pending=false`
+
+O script canonico de mirror explicito continua usando `mirrorByokProviderHealthToSqlite` diretamente.
+
+Assim:
+
+- comando manual ainda materializa sob demanda
+- mirror instalado evita historico artificial
+- shutdown apenas drena trabalho real
+
+Teste adicionado:
+
+`does not write runtime health mirror rows when no BYOK health change is pending`
+
 Validacoes deste ajuste:
 
 `node --check src/copilot/model-gateway/catalog/sqlite-catalog-store.js`

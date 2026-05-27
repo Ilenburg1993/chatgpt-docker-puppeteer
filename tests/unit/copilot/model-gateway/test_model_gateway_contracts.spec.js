@@ -3657,6 +3657,29 @@ describe('model-gateway foundation', () => {
         }
     });
 
+    it('does not write runtime health mirror rows when no BYOK health change is pending', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            const controller = installByokProviderHealthSqliteMirror({
+                sqliteStore: store,
+                debounceMs: 0,
+                enabled: true,
+            });
+
+            const flushed = await controller.flush();
+            const diagnostics = await store.readStorageDiagnostics();
+            controller.dispose();
+
+            assert.equal(flushed.flushCount, 0);
+            assert.equal(flushed.lastRecords, 0);
+            assert.equal(diagnostics.runtimeRows, 0);
+        } finally {
+            db.close();
+        }
+    });
+
     it('deduplicates BYOK health records by identity and keeps the freshest observed runtime fact', () => {
         const stale = {
             key: 'default|openrouter|openai/gpt-oss-120b',

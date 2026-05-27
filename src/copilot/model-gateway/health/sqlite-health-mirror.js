@@ -132,6 +132,7 @@ export function installByokProviderHealthSqliteMirror(input) {
             clearTimeout(timer);
             timer = null;
         }
+        if (!state.pending && !inFlightPromise) return readState();
         if (inFlightPromise) {
             state.pending = true;
             await inFlightPromise;
