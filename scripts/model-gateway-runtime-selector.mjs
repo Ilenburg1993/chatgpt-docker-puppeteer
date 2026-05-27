@@ -14,6 +14,7 @@ import {
     executeModelGatewayRuntimeSelectorPlanWithFallbacks,
     listByokProviderModelHealth,
     mergeByokProviderHealthRecords,
+    mirrorByokProviderHealthToSqlite,
     resolveModelGatewaySelectionPolicy,
     summarizeModelGatewayRuntimeAccountOverlays,
 } from '../src/copilot/model-gateway/index.js';
@@ -205,6 +206,16 @@ let routeDecisionPersistence = {
     written: 0,
     error: null,
 };
+let runtimeHealthPersistence = {
+    attempted: false,
+    ok: true,
+    records: 0,
+    healthObservations: 0,
+    probeResults: 0,
+    skippedRecords: 0,
+    runId: null,
+    error: null,
+};
 if (execute) {
     if (!context.runtimeSelectorPlan.ready || context.runtimeSelectorPlan.summary.blockedProfileCount > 0) {
         execution = {
@@ -255,6 +266,39 @@ if (execute) {
                 routeDecisionPersistence.error = error instanceof Error ? error.message : String(error);
             }
         }
+        const healthRecordsAfterExecution = listByokProviderModelHealth();
+        runtimeHealthPersistence = {
+            attempted: healthRecordsAfterExecution.length > 0,
+            ok: true,
+            records: healthRecordsAfterExecution.length,
+            healthObservations: 0,
+            probeResults: 0,
+            skippedRecords: 0,
+            runId: null,
+            error: null,
+        };
+        if (healthRecordsAfterExecution.length > 0) {
+            try {
+                const result = await mirrorByokProviderHealthToSqlite({
+                    sqliteStore: new SqliteModelGatewayCatalogStore(),
+                    records: healthRecordsAfterExecution,
+                    observedAt: new Date(),
+                });
+                runtimeHealthPersistence = {
+                    attempted: true,
+                    ok: true,
+                    records: result.records,
+                    healthObservations: result.healthObservations,
+                    probeResults: result.probeResults,
+                    skippedRecords: result.skippedRecords,
+                    runId: result.runId,
+                    error: null,
+                };
+            } catch (error) {
+                runtimeHealthPersistence.ok = false;
+                runtimeHealthPersistence.error = error instanceof Error ? error.message : String(error);
+            }
+        }
     }
 }
 
@@ -268,7 +312,8 @@ const summary = {
         context.runtimeSelectorPlan.ready &&
         context.runtimeSelectorPlan.summary.blockedProfileCount === 0 &&
         (execution?.ok ?? true) &&
-        routeDecisionPersistence.ok,
+        routeDecisionPersistence.ok &&
+        runtimeHealthPersistence.ok,
     runtimeExecuted: execute,
     mode: strict ? 'strict_access_only_with_observed_health' : 'allow_probe_unknown_with_observed_health',
     runtimeSource,
@@ -306,6 +351,7 @@ const summary = {
     runtimeSelectorPlan: context.runtimeSelectorPlan,
     execution,
     routeDecisionPersistence,
+    runtimeHealthPersistence,
     nextCommands: execute
         ? ['npm run model-gateway:runtime-selector', 'npm run model-gateway:live:readiness']
         : [
@@ -342,6 +388,9 @@ if (json) {
         );
         process.stdout.write(
             `route-decisions: attempted=${routeDecisionPersistence.attempted ? 'yes' : 'no'} written=${routeDecisionPersistence.written} error=${routeDecisionPersistence.error ?? '-'}\n`,
+        );
+        process.stdout.write(
+            `runtime-health: attempted=${runtimeHealthPersistence.attempted ? 'yes' : 'no'} records=${runtimeHealthPersistence.records} observations=${runtimeHealthPersistence.healthObservations} probes=${runtimeHealthPersistence.probeResults} skipped=${runtimeHealthPersistence.skippedRecords} run=${runtimeHealthPersistence.runId ?? '-'} error=${runtimeHealthPersistence.error ?? '-'}\n`,
         );
     }
 }

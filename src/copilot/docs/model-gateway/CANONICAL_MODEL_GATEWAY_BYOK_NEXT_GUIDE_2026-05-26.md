@@ -2253,7 +2253,7 @@ Quota/account overlay mais rico.
 - [x] Materializar health observations ja observadas por mirror explicito.
 - [ ] Persistir novos runtime probe runs diretamente no fluxo de probes.
 - [ ] Persistir novos runtime probe results diretamente no fluxo de probes.
-- [ ] Persistir novas health observations diretamente no fluxo de health.
+- [x] Persistir novas health observations diretamente no fluxo de health.
 - [ ] Criar comando de rebuild somente SQLite a partir do JSON.
 - [ ] Criar comando de recover JSON a partir do SQLite quando possivel.
 - [ ] Criar teste de migracao v4 para v5.
@@ -2652,7 +2652,7 @@ Quota/account overlay mais rico.
 - [ ] Rodar live real no-pr com escopo explicito.
 - [ ] Rodar live real full com escopo explicito.
 - [ ] Registrar runtime proof sem promover catalogo.
-- [ ] Registrar health observations em SQLite.
+- [x] Registrar health observations em SQLite.
 - [ ] Registrar artefatos redigidos.
 - [ ] Validar sem Premium Request quando BYOK ativo.
 - [ ] Validar local Ollama ausente dos defaults.
@@ -2734,8 +2734,8 @@ Quota/account overlay mais rico.
 - [ ] Primeiro build commit ok.
 - [ ] Retention ok.
 - [ ] Redaction audit ok.
-- [ ] Runtime persistence implementado.
-- [ ] Runtime health SQLite implementado.
+- [x] Runtime persistence implementado.
+- [x] Runtime health SQLite implementado.
 - [ ] Probes planned gaps priorizados.
 - [ ] Terminal cockpit modularizado ou plano aceito.
 - [ ] Ollama local defaults bloqueados.
@@ -3100,8 +3100,8 @@ Este provider tem reset headers?
 
 ### 13.4 Para Avancar Para Runtime Persistence
 
-- [ ] Runtime probe run schema usado por codigo.
-- [ ] Runtime probe result schema usado por codigo.
+- [x] Runtime probe run schema usado por codigo.
+- [x] Runtime probe result schema usado por codigo.
 - [x] Health observations usadas por codigo.
 - [ ] Retention runtime definida.
 - [ ] Explain runtime por modelo/provider.
@@ -3110,8 +3110,8 @@ Este provider tem reset headers?
 
 ### 13.5 Para Avancar Para Live Tests Exaustivos
 
-- [ ] Runtime persistence pronto.
-- [ ] Health observations pronto.
+- [x] Runtime persistence pronto.
+- [x] Health observations pronto.
 - [ ] Redaction audit verde.
 - [ ] Live plan verde.
 - [ ] Provider/model explicitamente escolhidos.
@@ -6005,7 +6005,11 @@ Ele usa `executeModelGatewayRuntimeSelectorPlanWithFallbacks`.
 
 Quando `--execute` e usado, a CLI tenta persistir os decision events das tentativas no SQLite.
 
+Quando `--execute` e usado, a CLI tambem espelha imediatamente o health BYOK observado para SQLite.
+
 O dry-run continua sem persistir route decisions.
+
+O dry-run continua sem persistir runtime health.
 
 Ele respeita:
 
@@ -6113,6 +6117,7 @@ Esses pontos pertencem a proxima camada.
 - [x] Criar CLI canonica dry-run para o runtime selector.
 - [x] Exigir `--execute` para chamadas reais do runtime selector.
 - [x] Preparar persistencia SQLite de route decisions quando `--execute` for usado.
+- [x] Preparar persistencia SQLite imediata de runtime health quando `--execute` for usado.
 - [x] Integrar package script, Makefile e inventario canonico.
 - [x] Criar snapshot/diff canonico de runtime health.
 - [x] Detectar regressoes `ok -> failed` em runtime health.
