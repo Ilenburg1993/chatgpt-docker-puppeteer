@@ -4608,6 +4608,251 @@ Checklist atualizada por esta mudanca:
 - [x] Adicionar next action explicita para configurar provider local.
 - [ ] Decidir se `local_private` e `local_private_strict` devem ser fundidos no futuro ou se um deles deve permanecer como alias operacional.
 
+Mudanca 25:
+
+Primeira bateria live `llm-b` do model-gateway executada em fases.
+
+Contexto:
+
+Depois do build real do banco de metadados, da paridade SQLite, da redaction audit e da selecao pre-runtime verde, avancamos para os testes live planejados.
+
+A ordem seguiu o plano canonico:
+
+1. controle sem turno de modelo;
+2. fixture BYOK sem provider real;
+3. probes BYOK reais sem turno explicito do operador.
+
+Fase 1:
+
+`npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000`
+
+Artifact:
+
+`artifacts/terminal-live/2026-05-27T11-35-14-936Z/summary.md`
+
+Resultado:
+
+- `Status=PASS`
+- `Exit code=0`
+- `Duration=24354ms`
+- `SSE connected=yes`
+- `SSE errors=0`
+- `no-explicit-turn=true`
+- `usage-visible=true`
+- `activity-visible=true`
+- `sdk-session-command-catalog-visible=true`
+- `sdk-session-events-cockpit-visible=true`
+- `sdk-session-waits-cockpit-visible=true`
+- `metrics-visible=true`
+- `sse-event-ids-monotonic=true`
+- `no-terminal-errors=true`
+- `clean-quit=true`
+
+Observacao:
+
+O terminal estava em standalone.
+
+Mensagem observada:
+
+`MCP tools indisponiveis - tools locais ativas. Inicie src/server para habilitar.`
+
+Isso nao bloqueia o model-gateway.
+
+Mas testes MCP completos exigem server/control-plane ativo.
+
+Fase 2:
+
+`npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`
+
+Artifact:
+
+`artifacts/terminal-live/2026-05-27T11-35-47-772Z/summary.md`
+
+Resultado:
+
+- `Status=PASS`
+- `Exit code=0`
+- `Duration=12366ms`
+- `SSE connected=yes`
+- `SSE errors=0`
+- `byok-status-visible=true`
+- `byok-env-visible=true`
+- `byok-profiles-visible=true`
+- `byok-providers-visible=true`
+- `byok-health-visible=true`
+- `byok-fixture-profile-visible=true`
+- `byok-fixture-profile-activation=true`
+- `byok-fixture-model-list=true`
+- `byok-fixture-remote-discovery=true`
+- `byok-fixture-model-switch=true`
+- `byok-fixture-provider-switch=true`
+- `byok-no-secret-leak=true`
+- `no-terminal-errors=true`
+
+Observacao:
+
+`/byok health` exibiu erros historicos de providers reais.
+
+Isso nao foi erro do teste fixture.
+
+O tracker do terminal permaneceu limpo.
+
+Fase 3:
+
+`npm run terminal:llm-b:live-test -- --byok-real --no-pr --timeout-ms=600000`
+
+Artifact:
+
+`artifacts/terminal-live/2026-05-27T11-36-23-918Z/summary.md`
+
+Resultado:
+
+- `Status=PASS`
+- `Exit code=0`
+- `Duration=138611ms`
+- `SSE connected=yes`
+- `SSE errors=0`
+- `no-explicit-turn=true`
+- `byok-real-dotenv-reload=true`
+- `byok-real-status-ready=true`
+- `byok-real-profile-active=true`
+- `byok-real-model-catalog=true`
+- `byok-real-provider-cockpit=true`
+- `byok-real-sdk-session-cockpit=true`
+- `byok-real-binding-cockpit=true`
+- `byok-real-probe-session-cleanup=true`
+- `byok-real-chat-probe=true`
+- `byok-real-route-decision=true`
+- `byok-real-streaming-probe=true`
+- `byok-real-json-probe=true`
+- `byok-real-vision-probe=true`
+- `byok-real-shortlist-probe=true`
+- `byok-real-chat-probe-ok=true`
+- `byok-real-agent-probe-ok=true`
+- `byok-real-model-filtering=true`
+- `byok-real-recommendation=true`
+- `byok-real-model-switch=true`
+- `byok-real-alt-provider-switch=true`
+- `byok-real-alt-model-switch=true`
+- `byok-real-no-secret-leak=true`
+- `byok-real-usage-not-pr=true`
+- `byok-real-usage-classified=true`
+- `byok-real-operator-health=true`
+- `byok-real-health-command=true`
+
+Resultados runtime especificos observados:
+
+- `kilo-auto/free` chat probe: `ok`, `10481ms`
+- `kilo-auto/free` streaming probe: `ok`, `10899ms`
+- `kilo-auto/free` json probe: `ok`, `3391ms`
+- `kilo-auto/free` agent probe: `ok`, `48982ms`
+- shortlist agent para `openrouter/free` via `kilo-code`: `ok`, `49128ms`
+- vision probe em `kilo-auto/free`: `failed`, HTTP 404 no provider Kilo.
+
+Interpretação:
+
+O runtime confirmou que `vision` nao pode ser tratado como filtro obrigatorio default.
+
+Vision deve permanecer:
+
+- metadado coletado;
+- criterio soft quando o perfil pedir;
+- prova runtime propria quando o fluxo exigir imagem;
+- motivo de degradacao/alternativa quando o provider falhar.
+
+Nao deve excluir modelos bons de texto/tools por default.
+
+O teste tambem confirmou:
+
+- troca viva de modelo dentro do mesmo provider/perfil;
+- eventos `session.model_changed`;
+- preservacao de boundary quando provider/perfil preparado diverge do binding vivo;
+- exercicio de profile alternativo `ollama-cloud`;
+- ausencia de vazamento de 25 valores locais de segredo no output do terminal.
+
+Mirror runtime apos live:
+
+`npm --silent run model-gateway:runtime-health:mirror`
+
+Resultado:
+
+- `ok=true`
+- `runtimeExecuted=false`
+- `providerFetched=false`
+- `catalogMutated=false`
+- `healthObservations=17`
+- `probeResults=6`
+- `skippedRecords=0`
+- `records=17`
+- `sqlite.runtimeRows=168`
+- `sqlite.tableCounts.healthObservations=119`
+- `sqlite.tableCounts.runtimeProbeRuns=7`
+- `sqlite.tableCounts.runtimeProbeResults=42`
+
+Readiness pos-live:
+
+`npm --silent run model-gateway:live:readiness`
+
+Resultado:
+
+- `ok=true`
+- `catalog_integrity=true`
+- `sqlite_parity=true`
+- `redaction_audit=true`
+- `selection_allow_probe=true`
+- `selection_strict_access=true`
+- `selection_effective_observed_health=true`
+- `selection_supply_warnings=true`
+- `runtime_not_promoted=true`
+- `runtime_sqlite_observability=true`
+- `live_runner_present=true`
+- `redaction.catalog.leakCount=0`
+- `redaction.sqlite.leakCount=0`
+- `redaction.sqlite.scannedStringCount=1295797`
+
+Selecao efetiva pos-live:
+
+`npm --silent run model-gateway:selection:effective`
+
+Resultado:
+
+- `ok=true`
+- `runtimeSource=merged`
+- `profileCount=7`
+- `selectedProfileCount=7`
+- `selectedProviders={zai:1,chutes:5,cerebras:1}`
+- `eligibleCount=877`
+- `unknownCount=355`
+- `excludedCount=700`
+- `runtimeAccountOverlaySummary.activeCount=0`
+- `runtimeAccountOverlaySummary.expiredCount=2`
+
+Observacao importante:
+
+Embora os probes reais tenham confirmado Kilo com sucesso, a selecao efetiva canonica ainda escolhe outros providers para varios perfis.
+
+Isso e esperado nesta fase porque:
+
+- runtime proof nao deve contaminar metadados canonicos;
+- runtime health e account state ficam em camada operacional separada;
+- a politica de selecao ainda usa os perfis e o catalogo amplo, nao uma promocao automatica do provider testado manualmente;
+- a etapa futura de selecao pos-runtime deve decidir como combinar runtime proofs recentes com preferencias do operador.
+
+Checklist atualizada por esta mudanca:
+
+- [x] Executar live no-pr control-plane sem modelo.
+- [x] Executar live BYOK fixture sem provider real.
+- [x] Executar probes BYOK reais sem turno explicito do operador.
+- [x] Confirmar chat/streaming/json/agent reais em Kilo.
+- [x] Confirmar shortlist agent real em `openrouter/free` via Kilo.
+- [x] Registrar falha vision como prova especifica de capability, nao falha global.
+- [x] Espelhar runtime health para SQLite apos probes.
+- [x] Confirmar readiness verde pos-live.
+- [x] Confirmar runtime proof nao promove facts para o catalogo canonico.
+- [ ] Criar camada de selecao pos-runtime que combine metadados, account/key state e provas runtime recentes sem misturar as tabelas canonicas.
+- [ ] Melhorar UX de vision: quando provider retorna 404 em attachment, sugerir modelos vision-capable provados ou degradar para texto explicitamente.
+- [ ] Planejar fase live full-turn com modelo real apenas depois de revisar custos/quota e risco de consumo.
+
 Validacoes executadas:
 
 `node --check src/copilot/model-gateway/health/provider-health.js`
