@@ -7793,9 +7793,32 @@ describe('model-gateway foundation', () => {
             softReasons: [],
             reasons: ['secret_configured:OPENAI_API_KEY', 'account_overlay_available'],
             overlayRefs: [overlay.accountOverlayId],
+            actionable: {
+                category: 'blocked',
+                dataNeeded: ['model_visibility'],
+                probeSafe: false,
+                operatorHint: 'resolve_model_visibility',
+            },
             nextActions: ['choose_visible_model_or_refresh_overlay'],
             summary: 'not_visible:account_model_not_visible',
         });
+    });
+
+    it('explains unknown account access as probe-safe only when no hard gate is present', () => {
+        const access = resolveModelGatewayAccountAccess({
+            providerId: 'openrouter',
+            providerModel: 'new/model',
+            accountOverlays: [],
+            secretRegistry: createEnvSecretRegistry({ env: { OPENROUTER_API_KEY: 'sk-or-test' } }),
+        });
+
+        const explanation = explainModelGatewayAccountAccess(access);
+
+        assert.equal(explanation.status, 'missing_overlay');
+        assert.equal(explanation.actionable.category, 'unknown_probe_allowed');
+        assert.deepEqual(explanation.actionable.dataNeeded.sort(), ['account_overlay', 'model_visibility'].sort());
+        assert.equal(explanation.actionable.probeSafe, true);
+        assert.equal(explanation.actionable.operatorHint, 'run_low_cost_access_probe_or_refresh_account_overlay');
     });
 
     it('classifies expired overlays and exhausted account controls before runtime', () => {
@@ -8446,6 +8469,18 @@ describe('model-gateway foundation', () => {
         assert.ok(blocked.hardExclusions.includes('upstream_provider_blocked'));
         assert.ok(blocked.hardExclusions.includes('route_layer_blocked'));
         assert.ok(blocked.hardExclusions.includes('wire_api_blocked'));
+
+        const explanation = explainModelGatewayEligibilityDecision(blocked);
+        assert.equal(explanation.actionable.category, 'blocked');
+        assert.deepEqual(
+            explanation.actionable.dataNeeded.sort(),
+            ['allowed_route_layer_policy', 'allowed_upstream_policy', 'allowed_wire_api_policy'].sort(),
+        );
+        assert.equal(explanation.actionable.operatorHint, 'resolve_allowed_upstream_policy');
+        assert.equal(explanation.actionable.probeSafe, false);
+        assert.ok(explanation.nextActions.includes('choose_allowed_upstream_provider_or_relax_policy'));
+        assert.ok(explanation.nextActions.includes('choose_allowed_route_layer_or_relax_policy'));
+        assert.ok(explanation.nextActions.includes('choose_allowed_wire_api_or_relax_policy'));
     });
 
     it('integrates fatal runtime health classification into pre-runtime eligibility', () => {
@@ -8693,6 +8728,12 @@ describe('model-gateway foundation', () => {
             softPenalties: [],
             reasons: [],
             requiredRuntimeProbes: ['chat'],
+            actionable: {
+                category: 'blocked',
+                dataNeeded: ['secret'],
+                probeSafe: false,
+                operatorHint: 'resolve_secret',
+            },
             nextActions: ['configure_required_secret', 'refresh_account_overlay_or_choose_visible_model'],
             summary: 'excluded:secret_missing:OPENAI_API_KEY',
         });
@@ -8710,6 +8751,12 @@ describe('model-gateway foundation', () => {
             'run_low_cost_access_probe',
             'run_runtime_probes:chat,json',
         ]);
+        assert.deepEqual(explainModelGatewayEligibilityDecision(unknownAllowed).actionable, {
+            category: 'unknown_probe_allowed',
+            dataNeeded: ['account_visibility'],
+            probeSafe: true,
+            operatorHint: 'run_low_cost_access_probe_or_collect_overlay',
+        });
     });
 
     it('evaluates and applies catalog-wide eligibility as a derived snapshot layer', async () => {

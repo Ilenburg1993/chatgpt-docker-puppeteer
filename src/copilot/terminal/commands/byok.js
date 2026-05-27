@@ -3478,6 +3478,9 @@ async function renderByokGatewayEligibility(println, rest, eventBus = null) {
         const color = item.status === 'eligible' ? '\x1b[32m' : item.status === 'unknown' ? '\x1b[33m' : '\x1b[31m';
         println(`    ${color}${item.status}\x1b[0m  \x1b[33m${item.key}\x1b[0m`);
         println(`      \x1b[90m${item.summary} · disposition=${item.disposition}\x1b[0m`);
+        println(
+            `      \x1b[90mhint=${item.actionable?.operatorHint ?? '-'} · data=${item.actionable?.dataNeeded?.slice(0, 4).join(',') || '-'} · probeSafe=${item.actionable?.probeSafe ? 'sim' : 'nao'}\x1b[0m`,
+        );
         if (item.hardExclusions.length > 0) println(`      \x1b[90mhard=${item.hardExclusions.slice(0, 4).join(',')}\x1b[0m`);
         if (item.softPenalties.length > 0) println(`      \x1b[90msoft=${item.softPenalties.slice(0, 4).join(',')}\x1b[0m`);
         if (item.nextActions.length > 0) println(`      \x1b[90mnext=${item.nextActions.slice(0, 4).join(',')}\x1b[0m`);

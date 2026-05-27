@@ -2383,7 +2383,7 @@ Quota/account overlay mais rico.
 - [x] Adicionar upstream provider eligibility para gateways.
 - [x] Adicionar route layer eligibility por task.
 - [x] Adicionar wire API eligibility por adapter.
-- [ ] Adicionar unknown access explain mais acionavel.
+- [x] Adicionar unknown access explain mais acionavel.
 - [ ] Persistir runs de eligibility por build/refresh de modo mais claro.
 - [ ] Adicionar diff de eligibility entre builds.
 - [ ] Adicionar teste de eligibility para provider removal.
@@ -6643,6 +6643,72 @@ Novos campos aceitos em policy:
 Isso evita que uma rota de gateway entre no ranking quando a politica do operador ou tarefa ja exclui o upstream ou a API de fio.
 
 Tambem alinha eligibility com o que o scorer de selecao ja fazia de modo mais tardio.
+
+## 21.45 Mudanca 45 - Unknown Access Explain Acionavel
+
+O explain de account access agora retorna `actionable`.
+
+Campos novos:
+
+- `category`;
+- `dataNeeded`;
+- `probeSafe`;
+- `operatorHint`.
+
+O objetivo e separar:
+
+- bloqueio por hard gate;
+- falta de overlay;
+- falta de visibilidade;
+- probe baixo custo permitido;
+- acao humana ou automatica recomendada.
+
+`account_model_not_visible` agora aponta explicitamente para `model_visibility`.
+
+`account_visibility_unknown` sem hard gate agora aponta para probe baixo custo seguro.
+
+O explain de eligibility tambem retorna `actionable`.
+
+Isto permite que terminal, OpenAI projection e observabilidade usem a mesma leitura.
+
+O terminal `/byok gateway eligibility` agora mostra:
+
+- `hint`;
+- `data`;
+- `probeSafe`.
+
+As gates de upstream provider, route layer e wire API agora possuem next actions especificas.
+
+Exemplos:
+
+- `choose_allowed_upstream_provider_or_relax_policy`;
+- `choose_allowed_route_layer_or_relax_policy`;
+- `choose_allowed_wire_api_or_relax_policy`.
+
+Isto reduz ambiguidade antes do runtime selector real.
+
+Tambem impede que `unknown` seja tratado como erro generico.
+
+## 21.46 Proxima Frente Imediata
+
+A proxima frente de alto retorno e persistir e comparar eligibility por build/refresh.
+
+O objetivo e saber:
+
+- qual politica gerou a decision;
+- qual selector escopou a decision;
+- qual account scope estava ativo;
+- quais modelos mudaram de eligible para excluded;
+- quais modelos mudaram de unknown para eligible;
+- quais mudancas vieram de overlay;
+- quais mudancas vieram de metadado;
+- quais mudancas vieram de policy.
+
+Esta frente deve permanecer pre-runtime.
+
+Ela nao deve chamar provider.
+
+Ela deve preparar o runtime selector real sem misturar camadas.
 
 ## 22. Fim Do Documento Inicial
 

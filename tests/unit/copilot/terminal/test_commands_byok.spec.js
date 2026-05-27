@@ -639,6 +639,12 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             disposition: 'eligible',
             hardExclusions: [],
             softPenalties: [],
+            actionable: {
+                category: 'rankable',
+                dataNeeded: [],
+                probeSafe: false,
+                operatorHint: 'no_extra_action',
+            },
             nextActions: ['candidate_can_be_ranked'],
         })),
         JsonModelGatewayCatalogStore: vi.fn(function JsonModelGatewayCatalogStore() {
