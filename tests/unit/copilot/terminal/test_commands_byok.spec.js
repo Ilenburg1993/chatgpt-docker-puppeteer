@@ -2761,9 +2761,26 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'health clear');
 
-        expect(clearByokProviderModelHealth).toHaveBeenCalledOnce();
+        expect(clearByokProviderModelHealth).toHaveBeenCalledWith({});
         expect(flushByokProviderHealth).toHaveBeenCalledOnce();
         expect(ctx.output()).toContain('BYOK operational health limpo');
+    });
+
+    it('limpa health operacional BYOK por escopo quando solicitado', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'health clear provider:openrouter model:openai/gpt-oss-120b profile:repo_agent');
+
+        expect(clearByokProviderModelHealth).toHaveBeenCalledWith({
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            routeProfile: 'repo_agent',
+        });
+        expect(flushByokProviderHealth).toHaveBeenCalledOnce();
+        expect(ctx.output()).toContain('provider=openrouter');
+        expect(ctx.output()).toContain('model=openai/gpt-oss-120b');
+        expect(ctx.output()).toContain('profile=repo_agent');
     });
 
     it('ativa perfil no processo atual', async () => {

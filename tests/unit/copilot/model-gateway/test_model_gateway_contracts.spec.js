@@ -89,6 +89,7 @@ import {
     redactSecretText,
     byokProviderHealthRecordKey,
     byokProviderHealthRecordLastObservedAt,
+    clearByokProviderModelHealth,
     listByokProviderModelHealth,
     recordByokProviderModelAgentProbeFailure,
     recordByokProviderModelAgentProbeSuccess,
@@ -381,6 +382,30 @@ describe('model-gateway foundation', () => {
             }).reason,
             'chat_health_failed',
         );
+    });
+
+    it('clears runtime health by provider/model/profile scope without dropping unrelated records', () => {
+        recordByokProviderModelCallFailure({
+            routeProfile: 'repo_agent',
+            providerId: 'openrouter',
+            providerModel: 'model-a',
+            message: 'rate limit',
+            errorContext: 'provider.rate_limit',
+            timestamp: 10,
+        });
+        recordByokProviderModelCallSuccess({
+            routeProfile: 'tool_agent',
+            providerId: 'groq',
+            providerModel: 'model-b',
+            timestamp: 20,
+        });
+
+        clearByokProviderModelHealth({ providerId: 'openrouter', providerModel: 'model-a', routeProfile: 'repo_agent' });
+
+        const records = listByokProviderModelHealth();
+        assert.equal(records.length, 1);
+        assert.equal(records[0].providerId, 'groq');
+        assert.equal(records[0].providerModel, 'model-b');
     });
 
     it('routes against explicit merged runtime health records without hydrating global health state', () => {

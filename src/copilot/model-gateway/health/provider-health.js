@@ -856,11 +856,22 @@ export function listByokProviderModelHealth() {
 }
 
 /**
+ * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null }} [input]
  * @returns {void}
  */
-export function clearByokProviderModelHealth() {
+export function clearByokProviderModelHealth(input = {}) {
     hydrateByokProviderHealthFromDisk();
-    _byokProviderHealthByKey.clear();
+    const identity = normalizeHealthIdentity(input);
+    if (!identity.routeProfile && !identity.providerId && !identity.providerModel) {
+        _byokProviderHealthByKey.clear();
+    } else {
+        for (const [key, record] of _byokProviderHealthByKey.entries()) {
+            if (identity.routeProfile && record.routeProfile !== identity.routeProfile) continue;
+            if (identity.providerId && record.providerId !== identity.providerId) continue;
+            if (identity.providerModel && record.providerModel !== identity.providerModel) continue;
+            _byokProviderHealthByKey.delete(key);
+        }
+    }
     scheduleByokProviderHealthFlush();
     notifyByokProviderHealthChange('clear', null);
 }

@@ -1846,7 +1846,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1895,6 +1895,25 @@ function renderByokHealth(println) {
         println(`  \x1b[90m... ${records.length - 30} registro(s) omitidos. Use filtros de /byok models ou /byok providers para cockpit resumido.\x1b[0m`);
     }
     println('');
+}
+
+/**
+ * @param {string[]} tokens
+ * @returns {{ routeProfile?: string; providerId?: string; providerModel?: string }}
+ */
+function parseByokHealthClearScope(tokens) {
+    /** @type {{ routeProfile?: string; providerId?: string; providerModel?: string }} */
+    const scope = {};
+    for (const token of tokens) {
+        const [rawKey, ...rest] = token.split(':');
+        const value = rest.join(':').trim();
+        if (!value) continue;
+        const key = (rawKey ?? '').trim().toLowerCase();
+        if (key === 'provider' || key === 'providerid') scope.providerId = value;
+        if (key === 'model' || key === 'providermodel') scope.providerModel = value;
+        if (key === 'profile' || key === 'routeprofile') scope.routeProfile = value;
+    }
+    return scope;
 }
 
 /**
@@ -3777,9 +3796,15 @@ export async function cmdByok({ println, eventBus = null }, arg) {
 
     if (sub === 'health' || sub === 'chat-health') {
         if ((rest[0] ?? '').toLowerCase() === 'clear') {
-            clearByokProviderModelHealth();
+            const scope = parseByokHealthClearScope(rest.slice(1));
+            clearByokProviderModelHealth(scope);
             await flushByokProviderHealth();
-            println('  \x1b[32mBYOK operational health limpo no processo atual e no store persistente.\x1b[0m\n');
+            const scoped = scope.providerId || scope.providerModel || scope.routeProfile;
+            println(
+                scoped
+                    ? `  \x1b[32mBYOK operational health limpo para provider=${scope.providerId ?? '*'} model=${scope.providerModel ?? '*'} profile=${scope.routeProfile ?? '*'}.\x1b[0m\n`
+                    : '  \x1b[32mBYOK operational health limpo no processo atual e no store persistente.\x1b[0m\n',
+            );
             return;
         }
         renderByokHealth(println);

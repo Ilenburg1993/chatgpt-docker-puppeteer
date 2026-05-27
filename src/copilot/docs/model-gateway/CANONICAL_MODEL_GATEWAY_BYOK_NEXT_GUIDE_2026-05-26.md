@@ -2466,8 +2466,8 @@ Quota/account overlay mais rico.
 - [x] Criar retention de health observations.
 - [x] Criar retention de runtime probe runs/results.
 - [ ] Criar explain de health por provider/modelo.
-- [ ] Criar diff de health antes/depois de live tests.
-- [ ] Criar rota de limpar health por scope.
+- [x] Criar diff de health antes/depois de live tests.
+- [x] Criar rota de limpar health por scope.
 - [ ] Criar teste de resetAt no futuro.
 - [ ] Criar teste de retry-after textual.
 - [ ] Criar teste de quota durante runtime.
@@ -3102,7 +3102,7 @@ Este provider tem reset headers?
 
 - [ ] Runtime probe run schema usado por codigo.
 - [ ] Runtime probe result schema usado por codigo.
-- [ ] Health observations usadas por codigo.
+- [x] Health observations usadas por codigo.
 - [ ] Retention runtime definida.
 - [ ] Explain runtime por modelo/provider.
 - [ ] Selection effective consome runtime persisted quando disponivel.
@@ -5532,7 +5532,7 @@ Persistencia de decision trace deve vir em camada propria, e selecao efetiva rea
 - [x] Persistir decision trace opcional.
 - [ ] Adicionar pesos configuraveis por tipo de prova runtime.
 - [ ] Criar policy de producao para selecao efetiva real.
-- [ ] Ligar policy resolver ao futuro runtime selector.
+- [x] Ligar policy resolver ao futuro runtime selector.
 
 ## 20. Mudanca 32 - Decision Trace Persistente Sem Mutar Catalogo
 
