@@ -396,7 +396,7 @@ function runtimeFailureContext(record) {
  * @returns {string}
  */
 function runtimeObservationKey(runId, key) {
-    return `${runId}:${key}`;
+    return `runtime-health:${sha256(stableJson({ runId, key })).slice(0, 40)}`;
 }
 
 /**
@@ -406,7 +406,7 @@ function runtimeObservationKey(runId, key) {
  * @returns {string}
  */
 function runtimeProbeResultKey(runId, key, probeKind) {
-    return `${runId}:${key}:${probeKind}`;
+    return `runtime-probe:${sha256(stableJson({ runId, key, probeKind })).slice(0, 40)}`;
 }
 
 /**

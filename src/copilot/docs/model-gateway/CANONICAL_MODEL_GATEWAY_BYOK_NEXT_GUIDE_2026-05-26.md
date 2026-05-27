@@ -3620,6 +3620,37 @@ Sem ele, runtime persistence seria apenas um cache substituido a cada mirror.
 
 Com ele, runtime persistence vira camada operacional auditavel.
 
+Mudanca 10:
+
+Runtime persistence agora usa chaves resistentes a colisao.
+
+Antes:
+
+- `runId:healthKey`
+- `runId:healthKey:probeKind`
+
+Problema:
+
+Concatenacao crua pode colidir semanticamente quando `runId` e `healthKey` contem separadores.
+
+Exemplo:
+
+- `runId=a:b`, `healthKey=c`
+- `runId=a`, `healthKey=b:c`
+
+Depois:
+
+- `runtime-health:<sha256(stableJson({ runId, key }))>`
+- `runtime-probe:<sha256(stableJson({ runId, key, probeKind }))>`
+
+Isso mantem IDs curtos, estaveis, redigidos e sem sobrescrita acidental.
+
+Teste adicionado:
+
+`collision-resistant runtime observation keys`
+
+Esse teste preserva duas observacoes que antes poderiam virar uma unica chave bruta.
+
 Validacoes deste ajuste:
 
 `node --check src/copilot/model-gateway/catalog/sqlite-catalog-store.js`
@@ -3629,6 +3660,12 @@ Validacoes deste ajuste:
 Resultado:
 
 `4 passed`
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "collision-resistant runtime observation keys|runtime health mirror runs"`
+
+Resultado:
+
+`2 passed`
 
 `node scripts/model-gateway-sqlite-retention.mjs --json --runtime-probe-run-max-rows=10000 --runtime-probe-result-max-rows=100000 --health-observation-max-rows=100000`
 

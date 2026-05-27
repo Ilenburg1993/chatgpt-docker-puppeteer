@@ -3469,6 +3469,48 @@ describe('model-gateway foundation', () => {
         }
     });
 
+    it('uses collision-resistant runtime observation keys instead of raw concatenation', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            await store.writeRuntimeHealthRecords(
+                [
+                    {
+                        key: 'c',
+                        routeProfile: 'default',
+                        providerId: 'openrouter',
+                        providerModel: 'model-c',
+                        lastStatus: 'ok',
+                        lastSuccessAt: 1_000,
+                    },
+                ],
+                { runId: 'a:b', observedAt: 1_000 },
+            );
+            await store.writeRuntimeHealthRecords(
+                [
+                    {
+                        key: 'b:c',
+                        routeProfile: 'default',
+                        providerId: 'openrouter',
+                        providerModel: 'model-bc',
+                        lastStatus: 'ok',
+                        lastSuccessAt: 2_000,
+                    },
+                ],
+                { runId: 'a', observedAt: 2_000 },
+            );
+
+            const diagnostics = await store.readStorageDiagnostics();
+            const runtimeRecords = await store.listRuntimeHealthRecords();
+
+            assert.equal(diagnostics.runtimeRows, 4);
+            assert.equal(runtimeRecords.length, 2);
+        } finally {
+            db.close();
+        }
+    });
+
     it('installs a storage-neutral runtime health SQLite mirror for new BYOK health facts', async () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');
