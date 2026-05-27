@@ -15,6 +15,7 @@ import { config as loadDotenv } from 'dotenv';
 import {
     buildCatalogRefreshEventBatch,
     buildCatalogRefreshStartedEvent,
+    compareModelGatewaySelectionAudits,
     buildEligibilityEvaluatedEvent,
     buildModelGatewayPreBuildReadinessReport,
     buildModelGatewayRouteCandidates,
@@ -1840,7 +1841,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -2541,17 +2542,21 @@ async function renderByokGatewayCatalogIntegrity(println) {
 
 /**
  * @param {string[]} rest
- * @returns {{ strict: boolean; effective: boolean; profiles: string[] }}
+ * @returns {{ strict: boolean; effective: boolean; requireRuntimeProof: boolean; profiles: string[] }}
  */
 function parseByokGatewaySelectionAuditArgs(rest) {
-    const effective = rest.some((item) => /^(effective|efetiva|observed|health|--effective)$/iu.test(item));
+    const requireRuntimeProof = rest.some((item) =>
+        /^(runtime-proof|proof|proved|provado|require-proof|--runtime-proof|--require-runtime-proof)$/iu.test(item),
+    );
+    const effective =
+        requireRuntimeProof || rest.some((item) => /^(effective|efetiva|observed|health|--effective)$/iu.test(item));
     const strict = effective || rest.some((item) => /^(strict|block|bloquear|--strict)$/iu.test(item));
     const profiles = rest
         .flatMap((item) => {
             const profileArg = item.match(/^--?profiles?[:=](.+)$/iu)?.[1];
             if (profileArg) return profileArg.split(',');
             if (
-                /^(audit|auditoria|selection|selecao|seleção|strict|block|bloquear|--strict|effective|efetiva|observed|health|--effective)$/iu.test(
+                /^(audit|auditoria|selection|selecao|seleção|strict|block|bloquear|--strict|effective|efetiva|observed|health|--effective|runtime-proof|proof|proved|provado|require-proof|--runtime-proof|--require-runtime-proof)$/iu.test(
                     item,
                 )
             ) {
@@ -2561,7 +2566,7 @@ function parseByokGatewaySelectionAuditArgs(rest) {
         })
         .map((item) => item.trim())
         .filter(Boolean);
-    return { strict, effective, profiles };
+    return { strict, effective, requireRuntimeProof, profiles };
 }
 
 /**
@@ -2627,11 +2632,13 @@ async function renderByokGatewaySelectionAudit(println, rest) {
               profiles: args.profiles,
               secretRegistry,
               runtimeHealthRecords: healthRecords,
+              requireRuntimeProof: args.requireRuntimeProof,
           })
         : null;
+    const selectionComparison = postRuntimeSelection ? compareModelGatewaySelectionAudits(selection, postRuntimeSelection) : null;
     println(`\n  \x1b[36mBYOK model-gateway selection audit\x1b[0m`);
     println(
-        `  \x1b[90mstore=${store.filePath} · integrity=${integrity.ok ? 'ok' : 'falha'} · mode=${selection.mode}${args.effective ? '+effective' : ''} · runtime=nao · persisted=nao · profiles=${selection.summary.selectedProfileCount}/${selection.summary.profileCount}\x1b[0m`,
+        `  \x1b[90mstore=${store.filePath} · integrity=${integrity.ok ? 'ok' : 'falha'} · mode=${selection.mode}${args.effective ? '+effective' : ''}${args.requireRuntimeProof ? '+require-proof' : ''} · runtime=nao · persisted=nao · profiles=${selection.summary.selectedProfileCount}/${selection.summary.profileCount}\x1b[0m`,
     );
     println(
         `  \x1b[90mprojections=${selection.snapshotContext['projectionCount']} · routes=${selection.snapshotContext['routeOptionCount']} · overlays=${selection.snapshotContext['accountOverlayCount']} · eligibility=${selection.snapshotContext['eligibilityDecisionCount']} · candidates=${selection.snapshotContext['candidateCount']}\x1b[0m\n`,
@@ -2642,6 +2649,9 @@ async function renderByokGatewaySelectionAudit(println, rest) {
         );
         println(
             `  \x1b[90mpostRuntimeProfiles=${postRuntimeSelection?.summary.selectedProfileCount ?? 0}/${postRuntimeSelection?.summary.profileCount ?? 0} · healthMatches=${postRuntimeSelection?.summary.healthRecordCount ?? 0} · healthProofs=${postRuntimeSelection?.summary.runtimeHealthProofCount ?? 0} · agentProofs=${postRuntimeSelection?.summary.runtimeAgentProbeProofCount ?? 0} · probeProofs=${postRuntimeSelection?.summary.runtimeProbeProofCount ?? 0} · postProviders=${formatCountMap(postRuntimeSelection?.summary.selectedProviders ?? {})}\x1b[0m\n`,
+        );
+        println(
+            `  \x1b[90mcompare changed=${selectionComparison?.summary.changedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0} · postProofSelected=${selectionComparison?.summary.postRuntimeProofSelectedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0}\x1b[0m\n`,
         );
     }
     for (const profile of selection.profiles) {
@@ -2668,6 +2678,16 @@ async function renderByokGatewaySelectionAudit(println, rest) {
             }
         }
         if (supplyLine) println(`      \x1b[90msupply ${supplyLine}\x1b[0m`);
+        const comparisonRow = selectionComparison?.rows.find((row) => row.profileId === profile.profileId);
+        if (comparisonRow?.changed || (args.effective && comparisonRow?.postSelected)) {
+            const postSelected = comparisonRow.postSelected;
+            const postLabel = postSelected
+                ? `${postSelected['providerId']}:${postSelected['providerModel']} · selector=${postSelected['selectorKind']} · score=${postSelected['score'] ?? '-'}`
+                : 'sem selecionado';
+            println(
+                `      \x1b[90mpost-runtime ${comparisonRow.changed ? 'mudou' : 'igual'} -> ${postLabel} · proof=${comparisonRow.postSelectedHasRuntimeProof ? 'sim' : 'nao'}\x1b[0m`,
+            );
+        }
         if (Array.isArray(profile.supplyWarnings) && profile.supplyWarnings.length > 0) {
             println(`      \x1b[33mwarnings=${profile.supplyWarnings.slice(0, 6).join(',')}\x1b[0m`);
         }

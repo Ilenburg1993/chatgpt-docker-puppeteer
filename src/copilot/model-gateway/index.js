@@ -302,6 +302,7 @@ export {
     buildModelGatewayRouteCandidates,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
+    compareModelGatewaySelectionAudits,
     evaluateGatewayModelHealthRoute,
     explainGatewayRouteDecision,
     isGatewayModelAgentProbeHealthFailed,

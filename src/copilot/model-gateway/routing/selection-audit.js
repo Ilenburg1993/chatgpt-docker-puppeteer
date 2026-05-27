@@ -395,3 +395,118 @@ export function auditModelGatewayPostRuntimeSelection(snapshot, options = {}) {
         runtimeMode: 'observed_runtime_health',
     });
 }
+
+/**
+ * @param {Record<string, unknown> | null | undefined} selected
+ * @returns {string | null}
+ */
+function selectedRouteKey(selected) {
+    if (!isRecord(selected)) return null;
+    return [
+        optionalString(selected['providerId']) ?? 'unknown-provider',
+        optionalString(selected['providerModel']) ?? optionalString(selected['id']) ?? 'unknown-model',
+        optionalString(selected['selectorKind']) ?? 'exact_model',
+        optionalString(selected['selectorSyntax']) ?? optionalString(selected['providerModel']) ?? optionalString(selected['id']) ?? 'unknown-model',
+    ].join(':');
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} selected
+ * @returns {boolean}
+ */
+function selectedHasRuntimeProof(selected) {
+    if (!isRecord(selected)) return false;
+    const runtimeHealth = isRecord(selected['runtimeHealth']) ? selected['runtimeHealth'] : {};
+    const verifiedProbes = Array.isArray(runtimeHealth['verifiedProbes']) ? runtimeHealth['verifiedProbes'] : [];
+    return (
+        optionalString(runtimeHealth['lastStatus']) === 'ok' ||
+        optionalString(runtimeHealth['agentProbeStatus']) === 'ok' ||
+        verifiedProbes.length > 0
+    );
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} profiles
+ * @returns {Map<string, Record<string, unknown>>}
+ */
+function profilesById(profiles) {
+    /** @type {Map<string, Record<string, unknown>>} */
+    const byId = new Map();
+    for (const profile of profiles) {
+        const profileId = optionalString(profile['profileId']);
+        if (profileId) byId.set(profileId, profile);
+    }
+    return byId;
+}
+
+/**
+ * Compare a metadata/pre-runtime selection with a post-runtime selection using the same profile set.
+ *
+ * The comparison is deliberately observational: it does not decide that post-runtime should win. It only records what
+ * changed when volatile health proofs were allowed into scoring.
+ *
+ * @param {ReturnType<typeof auditModelGatewayPreRuntimeSelection>} preRuntimeSelection
+ * @param {ReturnType<typeof auditModelGatewayPostRuntimeSelection>} postRuntimeSelection
+ * @returns {{
+ *   schema: 'model-gateway-selection-comparison';
+ *   ok: boolean;
+ *   summary: {
+ *     profileCount: number;
+ *     changedCount: number;
+ *     unchangedCount: number;
+ *     preSelectedCount: number;
+ *     postSelectedCount: number;
+ *     postRuntimeProofSelectedCount: number;
+ *     postRuntimeHealthProofCount: number;
+ *     postRuntimeProbeProofCount: number;
+ *   };
+ *   rows: Array<{
+ *     profileId: string;
+ *     changed: boolean;
+ *     preSelected: Record<string, unknown> | null;
+ *     postSelected: Record<string, unknown> | null;
+ *     preRouteKey: string | null;
+ *     postRouteKey: string | null;
+ *     postSelectedHasRuntimeProof: boolean;
+ *     postDecisionLayers: Record<string, unknown>;
+ *   }>;
+ * }}
+ */
+export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRuntimeSelection) {
+    const preProfiles = Array.isArray(preRuntimeSelection.profiles) ? preRuntimeSelection.profiles.filter(isRecord) : [];
+    const postProfiles = profilesById(Array.isArray(postRuntimeSelection.profiles) ? postRuntimeSelection.profiles.filter(isRecord) : []);
+    const rows = preProfiles.map((preProfile) => {
+        const profileId = optionalString(preProfile['profileId']) ?? 'unknown-profile';
+        const postProfile = postProfiles.get(profileId) ?? {};
+        const preSelected = isRecord(preProfile['selected']) ? preProfile['selected'] : null;
+        const postSelected = isRecord(postProfile['selected']) ? postProfile['selected'] : null;
+        const preRouteKey = selectedRouteKey(preSelected);
+        const postRouteKey = selectedRouteKey(postSelected);
+        return {
+            profileId,
+            changed: preRouteKey !== postRouteKey,
+            preSelected,
+            postSelected,
+            preRouteKey,
+            postRouteKey,
+            postSelectedHasRuntimeProof: selectedHasRuntimeProof(postSelected),
+            postDecisionLayers: isRecord(postProfile['decisionLayers']) ? postProfile['decisionLayers'] : {},
+        };
+    });
+    const changedCount = rows.filter((row) => row.changed).length;
+    return {
+        schema: 'model-gateway-selection-comparison',
+        ok: preRuntimeSelection.ok === true && postRuntimeSelection.ok === true,
+        summary: {
+            profileCount: rows.length,
+            changedCount,
+            unchangedCount: rows.length - changedCount,
+            preSelectedCount: rows.filter((row) => row.preSelected !== null).length,
+            postSelectedCount: rows.filter((row) => row.postSelected !== null).length,
+            postRuntimeProofSelectedCount: rows.filter((row) => row.postSelectedHasRuntimeProof).length,
+            postRuntimeHealthProofCount: postRuntimeSelection.summary.runtimeHealthProofCount,
+            postRuntimeProbeProofCount: postRuntimeSelection.summary.runtimeProbeProofCount,
+        },
+        rows,
+    };
+}

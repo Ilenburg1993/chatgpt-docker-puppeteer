@@ -39,6 +39,7 @@ import {
     buildRouteDecisionTraceAttributes,
     buildModelGatewayRouteCandidates,
     applyModelGatewayEligibilityToSnapshot,
+    compareModelGatewaySelectionAudits,
     createModelRecord,
     createEnvSecretRegistry,
     auditModelGatewayPostRuntimeSelection,
@@ -679,6 +680,12 @@ describe('model-gateway foundation', () => {
             Array.isArray(postRuntimeAudit.profiles[0].selected?.['runtimeHealth']?.['verifiedProbes']) &&
                 postRuntimeAudit.profiles[0].selected?.['runtimeHealth']?.['verifiedProbes'].includes('agent'),
         );
+        const comparison = compareModelGatewaySelectionAudits(audit, postRuntimeAudit);
+        assert.equal(comparison.schema, 'model-gateway-selection-comparison');
+        assert.equal(comparison.summary.profileCount, 2);
+        assert.equal(comparison.summary.changedCount, 1);
+        assert.equal(comparison.summary.postRuntimeProofSelectedCount, 1);
+        assert.equal(comparison.rows[0].postSelectedHasRuntimeProof, true);
 
         const strictAudit = auditModelGatewayPreRuntimeSelection(
             {
@@ -1810,6 +1817,11 @@ describe('model-gateway foundation', () => {
                     entry.command === 'npm run model-gateway:selection:effective -- --profile local_private --fail --fail-on-supply-warning',
             ),
         );
+        assert.ok(
+            packageCommands.some(
+                (entry) => entry.command === 'npm run model-gateway:selection:effective -- --require-runtime-proof',
+            ),
+        );
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:plan'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:runtime-health:mirror'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
@@ -1827,6 +1839,7 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-sqlite-retention'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway commands'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway prebuild'));
+        assert.ok(commands.some((entry) => entry.command === '/byok gateway selection audit runtime-proof'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway selection audit strict local_private_strict'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway health sqlite'));
         assert.ok(commands.every((entry) => MODEL_GATEWAY_CANONICAL_COMMAND_PHASES.includes(entry.phase)));

@@ -6,6 +6,7 @@ import {
     auditModelGatewayCatalogSnapshotIntegrity,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
+    compareModelGatewaySelectionAudits,
     createEnvSecretRegistry,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
@@ -21,7 +22,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-effective-selection.mjs [--json] [--strict] [--runtime-source file|sqlite|merged] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--fail] [--fail-on-supply-warning]
+    process.stdout.write(`Usage: node scripts/model-gateway-effective-selection.mjs [--json] [--strict] [--runtime-source file|sqlite|merged] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--require-runtime-proof] [--fail] [--fail-on-supply-warning]
 
 Build a non-mutating effective selection view from the persisted metadata catalog plus already-observed account/runtime
 health. This does not fetch providers, execute models, run probes or persist eligibility decisions.
@@ -72,6 +73,7 @@ const json = argSet.has('--json');
 const strict = argSet.has('--strict') || !argSet.has('--allow-probe');
 const fail = argSet.has('--fail');
 const failOnSupplyWarning = argSet.has('--fail-on-supply-warning');
+const requireRuntimeProof = argSet.has('--require-runtime-proof') || argSet.has('--runtime-proof');
 const runtimeSource = ['file', 'sqlite', 'merged'].includes(readArg('--runtime-source'))
     ? readArg('--runtime-source')
     : 'merged';
@@ -136,7 +138,9 @@ const postRuntimeSelection = auditModelGatewayPostRuntimeSelection(effectiveSnap
     profiles: readProfiles(),
     secretRegistry,
     runtimeHealthRecords: healthRecords,
+    requireRuntimeProof,
 });
+const selectionComparison = compareModelGatewaySelectionAudits(selection, postRuntimeSelection);
 const dispositions = selectedDispositions(selection);
 const postRuntimeDispositions = selectedDispositions(postRuntimeSelection);
 const supplyWarningCount = selection.profiles.reduce((sum, profile) => sum + profile.supplyWarnings.length, 0);
@@ -187,6 +191,7 @@ const summary = {
         supplyWarningCount: postRuntimeSupplyWarningCount,
         localProviderOptIn: postRuntimeLocalProviderOptIn,
     },
+    selectionComparison,
     nextCommands: [
         'npm run model-gateway:selection:audit -- --strict --fail-on-unselected',
         'npm run model-gateway:live:readiness',
@@ -231,6 +236,14 @@ if (json) {
     process.stdout.write(
         `post-runtime: selected=${postRuntimeSelection.summary.selectedProfileCount}/${postRuntimeSelection.summary.profileCount} health=${postRuntimeSelection.summary.healthRecordCount} healthProofs=${postRuntimeSelection.summary.runtimeHealthProofCount} agentProofs=${postRuntimeSelection.summary.runtimeAgentProbeProofCount} probeProofs=${postRuntimeSelection.summary.runtimeProbeProofCount} providers=${formatCountMap(postRuntimeSelection.summary.selectedProviders)}\n`,
     );
+    process.stdout.write(
+        `comparison: changed=${selectionComparison.summary.changedCount}/${selectionComparison.summary.profileCount} postProofSelected=${selectionComparison.summary.postRuntimeProofSelectedCount}/${selectionComparison.summary.profileCount} requireProof=${requireRuntimeProof ? 'yes' : 'no'}\n`,
+    );
+    for (const row of selectionComparison.rows.filter((item) => item.changed).slice(0, 12)) {
+        const pre = row.preSelected ? `${row.preSelected['providerId']}:${row.preSelected['providerModel']}` : 'none';
+        const post = row.postSelected ? `${row.postSelected['providerId']}:${row.postSelected['providerModel']}` : 'none';
+        process.stdout.write(`  changed ${row.profileId}: ${pre} -> ${post} proof=${row.postSelectedHasRuntimeProof ? 'yes' : 'no'}\n`);
+    }
     if (localProviderOptIn.hasBlocks) {
         process.stdout.write(`\n${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderOptIn.blockedProfileIds })}\n`);
     }

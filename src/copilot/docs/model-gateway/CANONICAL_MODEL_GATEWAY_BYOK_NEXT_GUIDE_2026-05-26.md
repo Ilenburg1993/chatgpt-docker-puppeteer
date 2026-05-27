@@ -5205,8 +5205,109 @@ Checklist atualizada por esta mudanca:
 - [x] Reusar o mesmo `secretRegistry` no fluxo terminal effective.
 - [x] Mostrar contadores de proof no comando humano.
 - [x] Cobrir chamada terminal com teste unitario.
-- [ ] Criar formato de tabela comparando provider selecionado pre-runtime vs pos-runtime por perfil.
-- [ ] Permitir flag terminal para exigir runtime proof em auditoria pos-runtime.
+- [x] Criar formato de tabela comparando provider selecionado pre-runtime vs pos-runtime por perfil.
+- [x] Permitir flag terminal para exigir runtime proof em auditoria pos-runtime.
+
+Mudanca 30:
+
+Foi criado um contrato de comparacao entre selecao pre-runtime e selecao pos-runtime.
+
+Novo helper:
+
+- `compareModelGatewaySelectionAudits(preRuntimeSelection, postRuntimeSelection)`.
+
+Ele retorna:
+
+- `schema=model-gateway-selection-comparison`;
+- resumo com `changedCount`, `unchangedCount`, `preSelectedCount`, `postSelectedCount`;
+- `postRuntimeProofSelectedCount`;
+- `postRuntimeHealthProofCount`;
+- `postRuntimeProbeProofCount`;
+- linhas por perfil com:
+  - `preSelected`;
+  - `postSelected`;
+  - `preRouteKey`;
+  - `postRouteKey`;
+  - `changed`;
+  - `postSelectedHasRuntimeProof`;
+  - `postDecisionLayers`.
+
+Principio:
+
+- comparacao nao decide automaticamente que pos-runtime deve vencer;
+- ela apenas mostra o que muda quando health proof entra na pontuacao;
+- a decisao final ainda depende da policy do operador.
+
+Integracoes:
+
+- `scripts/model-gateway-effective-selection.mjs` inclui `selectionComparison` no JSON;
+- modo texto do script mostra resumo `comparison`;
+- terminal `/byok gateway selection audit effective` mostra `compare changed=...`;
+- terminal mostra por perfil a rota pos-runtime e se ela tem proof;
+- terminal aceita `runtime-proof`, `proof`, `proved`, `--runtime-proof` e `--require-runtime-proof`;
+- comando `runtime-proof` implica `effective` e `strict`;
+- comandos canonicos incluem:
+  - `npm run model-gateway:selection:effective -- --require-runtime-proof`;
+  - `/byok gateway selection audit runtime-proof`.
+
+Resultado observado:
+
+`npm --silent run model-gateway:selection:effective -- --json`
+
+Resumo:
+
+- `ok=true`
+- `comparison.profileCount=7`
+- `comparison.changedCount=5`
+- `comparison.unchangedCount=2`
+- `comparison.preSelectedCount=7`
+- `comparison.postSelectedCount=7`
+- `comparison.postRuntimeProofSelectedCount=5`
+- `comparison.postRuntimeHealthProofCount=14`
+- `comparison.postRuntimeProbeProofCount=7`
+
+Resultado observado com exigencia de proof:
+
+`npm --silent run model-gateway:selection:effective -- --require-runtime-proof`
+
+Resumo:
+
+- `ok=false`
+- `postRuntimeSelection.selectedProfileCount=5/7`
+- `comparison.changedCount=7/7`
+- `comparison.postRuntimeProofSelectedCount=5/7`
+
+Interpretacao:
+
+- exigir proof hoje e util como auditoria/gate, nao como default;
+- ainda ha perfis sem rota provada suficiente;
+- isso confirma que a fase final de runtime selection precisa de policy explicita.
+
+Testes focados executados:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "pre-runtime selection|command inventory"`
+
+Resultado:
+
+- `3 passed`
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js -t "seleção efetiva|prova runtime|seleção pré-runtime"`
+
+Resultado:
+
+- `4 passed`
+
+Checklist atualizada por esta mudanca:
+
+- [x] Criar helper de comparacao de auditorias.
+- [x] Exportar helper nos barrels.
+- [x] Integrar comparison ao script effective.
+- [x] Integrar comparison ao terminal effective.
+- [x] Adicionar flag terminal `runtime-proof`.
+- [x] Adicionar comandos canonicos para runtime proof.
+- [ ] Criar policy final que decide quando pos-runtime vence pre-runtime.
+- [ ] Criar pesos configuraveis para runtime proof por tipo.
+- [ ] Persistir, quando solicitado, um decision trace da comparacao sem mutar catalogo.
 
 ## 19. Fim Do Documento Inicial
 

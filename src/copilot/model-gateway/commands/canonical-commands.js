@@ -220,6 +220,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Fail effective no-runtime selection when the local/private profile has zero local/privacy supply.',
     },
     {
+        id: 'selection.effective.runtime-proof',
+        phase: 'selection',
+        surface: 'package',
+        command: 'npm run model-gateway:selection:effective -- --require-runtime-proof',
+        summary: 'Inspect post-runtime selection while requiring already-observed runtime proof for selected routes.',
+    },
+    {
         id: 'live.readiness',
         phase: 'live-readiness',
         surface: 'package',
@@ -547,6 +554,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok gateway selection audit effective',
         summary: 'Audit effective route selection with observed health, without executing new runtime probes.',
+    },
+    {
+        id: 'terminal.selection-runtime-proof',
+        phase: 'selection',
+        surface: 'terminal',
+        command: '/byok gateway selection audit runtime-proof',
+        summary: 'Compare pre-runtime and post-runtime selection while requiring already-observed runtime proof.',
     },
     {
         id: 'terminal.selection-local-strict',
