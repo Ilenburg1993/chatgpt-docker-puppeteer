@@ -234,9 +234,59 @@ function routePolicy(routeOption) {
  * @param {Record<string, any>} routeOption
  * @returns {Record<string, any>}
  */
+function routeProviderSpecific(routeOption) {
+    return isRecord(routeOption['providerSpecific']) ? routeOption['providerSpecific'] : {};
+}
+
+/**
+ * @param {Record<string, any>} routeOption
+ * @returns {Record<string, any>}
+ */
 function routeTraits(routeOption) {
     const policy = routePolicy(routeOption);
     return isRecord(policy['routeTraits']) ? policy['routeTraits'] : {};
+}
+
+/**
+ * @param {Record<string, any>} routeOption
+ * @param {Record<string, any>} routePolicyRecord
+ * @returns {{ routeLayer: string | null; wireApi: string | null; upstreamProvider: string | null }}
+ */
+function routeEligibilityContext(routeOption, routePolicyRecord) {
+    const providerSpecific = routeProviderSpecific(routeOption);
+    const traits = routeTraits(routeOption);
+    return {
+        routeLayer:
+            optionalString(routePolicyRecord['routeLayer']) ??
+            optionalString(routePolicyRecord['directRouteLayer']) ??
+            optionalString(traits['routeLayer']),
+        wireApi:
+            optionalString(routePolicyRecord['wireApi']) ??
+            optionalString(routePolicyRecord['directWireApi']) ??
+            optionalString(traits['wireApi']),
+        upstreamProvider:
+            optionalString(providerSpecific['upstreamProvider']) ??
+            optionalString(routePolicyRecord['upstreamProvider']) ??
+            optionalString(traits['upstreamProvider']),
+    };
+}
+
+/**
+ * @param {Set<string>} allowSet
+ * @param {string | null} value
+ * @returns {boolean}
+ */
+function allowedByOptionalSet(allowSet, value) {
+    return allowSet.size === 0 || (value !== null && allowSet.has(keyToken(value)));
+}
+
+/**
+ * @param {Set<string>} blockSet
+ * @param {string | null} value
+ * @returns {boolean}
+ */
+function blockedBySet(blockSet, value) {
+    return value !== null && blockSet.has(keyToken(value));
 }
 
 /**
@@ -346,9 +396,32 @@ export function evaluateModelGatewayEligibility(input) {
     const blockProviders = new Set(stringList(policy['blockProviders']));
     const allowModels = new Set(stringList(policy['allowModels']).map(keyToken));
     const blockModels = new Set(stringList(policy['blockModels']).map(keyToken));
+    const allowUpstreamProviders = new Set(stringList(policy['allowUpstreamProviders']).map(keyToken));
+    const blockUpstreamProviders = new Set(stringList(policy['blockUpstreamProviders']).map(keyToken));
+    const allowRouteLayers = new Set(stringList(policy['allowRouteLayers']).map(keyToken));
+    const blockRouteLayers = new Set(stringList(policy['blockRouteLayers']).map(keyToken));
+    const allowWireApis = new Set(stringList(policy['allowWireApis']).map(keyToken));
+    const blockWireApis = new Set(stringList(policy['blockWireApis']).map(keyToken));
+    const routeContext = routeEligibilityContext(routeOption, routePolicyRecord);
 
     if (allowProviders.size > 0 && !allowProviders.has(providerId)) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.PROVIDER_NOT_ALLOWED);
     if (blockProviders.has(providerId)) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.PROVIDER_BLOCKED);
+    if (!allowedByOptionalSet(allowUpstreamProviders, routeContext.upstreamProvider)) {
+        hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.UPSTREAM_PROVIDER_NOT_ALLOWED);
+    }
+    if (blockedBySet(blockUpstreamProviders, routeContext.upstreamProvider)) {
+        hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.UPSTREAM_PROVIDER_BLOCKED);
+    }
+    if (!allowedByOptionalSet(allowRouteLayers, routeContext.routeLayer)) {
+        hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.ROUTE_LAYER_NOT_ALLOWED);
+    }
+    if (blockedBySet(blockRouteLayers, routeContext.routeLayer)) {
+        hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.ROUTE_LAYER_BLOCKED);
+    }
+    if (!allowedByOptionalSet(allowWireApis, routeContext.wireApi)) {
+        hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.WIRE_API_NOT_ALLOWED);
+    }
+    if (blockedBySet(blockWireApis, routeContext.wireApi)) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.WIRE_API_BLOCKED);
     const routeIdentityTokens = [providerModel, selectorSyntax].map(keyToken);
     if (allowModels.size > 0 && routeIdentityTokens.every((token) => !allowModels.has(token))) {
         hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_NOT_ALLOWED);
@@ -447,6 +520,7 @@ export function evaluateModelGatewayEligibility(input) {
             allowRetired: policy['allowRetired'],
             excludeFailedHealth: policy['excludeFailedHealth'],
             policyPreset: policy['policyPreset'],
+            routeContext,
             accountAccess: {
                 status: access.status,
                 canAttempt: access.canAttempt,

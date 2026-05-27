@@ -8393,6 +8393,61 @@ describe('model-gateway foundation', () => {
         assert.equal(decision.policyInputs['unknownAccessPolicy'], 'block');
     });
 
+    it('applies upstream, route layer and wire API gates before runtime ranking', () => {
+        const projection = createCanonicalModelProjection({
+            providerId: 'kilo',
+            providerModel: 'anthropic/claude-sonnet-4.5',
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+        });
+        const route = createModelRouteOption({
+            providerId: 'kilo',
+            providerModel: 'anthropic/claude-sonnet-4.5',
+            selectorKind: 'gateway_policy',
+            selectorSyntax: 'anthropic/claude-sonnet-4.5:fastest',
+            providerSpecific: { upstreamProvider: 'anthropic' },
+            normalizedPolicy: { routeLayer: 'gateway', wireApi: 'openai_chat_completions' },
+        });
+        const overlay = createProviderAccountOverlay({
+            providerId: 'kilo',
+            secretRef: 'KILO_API_KEY',
+            enabledModels: ['anthropic/claude-sonnet-4.5'],
+        });
+
+        const allowed = evaluateModelGatewayEligibility({
+            projection,
+            routeOption: route,
+            accountOverlays: [overlay],
+            secretRegistry: createEnvSecretRegistry({ env: { KILO_API_KEY: 'kilo-test' } }),
+            policy: {
+                allowUpstreamProviders: ['anthropic'],
+                allowRouteLayers: ['gateway'],
+                allowWireApis: ['openai_chat_completions'],
+            },
+        });
+        assert.equal(allowed.include, true);
+        assert.deepEqual(allowed.policyInputs['routeContext'], {
+            routeLayer: 'gateway',
+            wireApi: 'openai_chat_completions',
+            upstreamProvider: 'anthropic',
+        });
+
+        const blocked = evaluateModelGatewayEligibility({
+            projection,
+            routeOption: route,
+            accountOverlays: [overlay],
+            secretRegistry: createEnvSecretRegistry({ env: { KILO_API_KEY: 'kilo-test' } }),
+            policy: {
+                blockUpstreamProviders: ['anthropic'],
+                blockRouteLayers: ['gateway'],
+                blockWireApis: ['openai_chat_completions'],
+            },
+        });
+        assert.equal(blocked.include, false);
+        assert.ok(blocked.hardExclusions.includes('upstream_provider_blocked'));
+        assert.ok(blocked.hardExclusions.includes('route_layer_blocked'));
+        assert.ok(blocked.hardExclusions.includes('wire_api_blocked'));
+    });
+
     it('integrates fatal runtime health classification into pre-runtime eligibility', () => {
         const projection = createCanonicalModelProjection({
             providerId: 'openai',

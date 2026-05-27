@@ -22,6 +22,12 @@ export const MODEL_GATEWAY_ELIGIBILITY_DISPOSITION = Object.freeze({
 export const MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS = Object.freeze({
     PROVIDER_NOT_ALLOWED: 'provider_not_allowed',
     PROVIDER_BLOCKED: 'provider_blocked',
+    UPSTREAM_PROVIDER_NOT_ALLOWED: 'upstream_provider_not_allowed',
+    UPSTREAM_PROVIDER_BLOCKED: 'upstream_provider_blocked',
+    ROUTE_LAYER_NOT_ALLOWED: 'route_layer_not_allowed',
+    ROUTE_LAYER_BLOCKED: 'route_layer_blocked',
+    WIRE_API_NOT_ALLOWED: 'wire_api_not_allowed',
+    WIRE_API_BLOCKED: 'wire_api_blocked',
     MODEL_NOT_ALLOWED: 'model_not_allowed',
     MODEL_BLOCKED: 'model_blocked',
     MODEL_DISABLED: 'model_disabled',

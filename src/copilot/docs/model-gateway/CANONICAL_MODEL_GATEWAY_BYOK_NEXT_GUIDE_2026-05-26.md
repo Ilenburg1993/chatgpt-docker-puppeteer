@@ -2380,9 +2380,9 @@ Quota/account overlay mais rico.
 - [x] Integrar Ollama local installed overlay.
 - [x] Adicionar policy presets formais.
 - [x] Adicionar account-scoped route selector eligibility.
-- [ ] Adicionar upstream provider eligibility para gateways.
-- [ ] Adicionar route layer eligibility por task.
-- [ ] Adicionar wire API eligibility por adapter.
+- [x] Adicionar upstream provider eligibility para gateways.
+- [x] Adicionar route layer eligibility por task.
+- [x] Adicionar wire API eligibility por adapter.
 - [ ] Adicionar unknown access explain mais acionavel.
 - [ ] Persistir runs de eligibility por build/refresh de modo mais claro.
 - [ ] Adicionar diff de eligibility entre builds.
@@ -6607,6 +6607,42 @@ Isto significa:
 - overrides continuam possiveis;
 - runtime selector nao precisa conhecer combinacoes internas de flags;
 - politicas como fresh account, strict account e free/known-cost deixam de ser ad hoc.
+
+## 21.44 Mudanca 44 - Eligibility Para Upstream, Route Layer E Wire API
+
+O evaluator pre-runtime agora entende tres dimensoes de rota antes do ranking:
+
+- upstream provider;
+- route layer;
+- wire API.
+
+Novas hard exclusions:
+
+- `upstream_provider_not_allowed`;
+- `upstream_provider_blocked`;
+- `route_layer_not_allowed`;
+- `route_layer_blocked`;
+- `wire_api_not_allowed`;
+- `wire_api_blocked`.
+
+Novos campos aceitos em policy:
+
+- `allowUpstreamProviders`;
+- `blockUpstreamProviders`;
+- `allowRouteLayers`;
+- `blockRouteLayers`;
+- `allowWireApis`;
+- `blockWireApis`.
+
+`policyInputs.routeContext` registra:
+
+- `routeLayer`;
+- `wireApi`;
+- `upstreamProvider`.
+
+Isso evita que uma rota de gateway entre no ranking quando a politica do operador ou tarefa ja exclui o upstream ou a API de fio.
+
+Tambem alinha eligibility com o que o scorer de selecao ja fazia de modo mais tardio.
 
 ## 22. Fim Do Documento Inicial
 
