@@ -2407,9 +2407,9 @@ Quota/account overlay mais rico.
 - [x] Persistir selection audit quando solicitado.
 - [x] Criar explain diff entre metadata-only e effective.
 - [x] Criar score decomposition mais estavel.
-- [ ] Criar policy para auto selectors.
-- [ ] Criar policy para gateway fallback.
-- [ ] Criar policy para provider direct required.
+- [x] Criar policy para auto selectors.
+- [x] Criar policy para gateway fallback.
+- [x] Criar policy para provider direct required.
 - [ ] Criar policy para privacy strict.
 - [ ] Criar policy para no paid models.
 - [ ] Criar policy para max estimated cost.
@@ -7031,6 +7031,54 @@ Tambem reduz dependencia de interpretar strings soltas no momento de explicar um
 Ainda ha espaco para uma decomposicao com deltas exatos por componente.
 
 Mas a camada atual ja estabiliza categorias e sinais sem reescrever a politica.
+
+## 21.53 Mudanca 53 - Policies Para Selectors, Auto Routes E Direct Provider
+
+O scorer ganhou novas policies pre-runtime.
+
+Novas options:
+
+- `allowSelectorKinds`;
+- `allowAutoSelectors`;
+- `allowGatewayFallbacks`;
+- `requireProviderDirect`.
+
+`allowSelectorKinds` funciona como allow-list explicita de selector kind.
+
+`allowAutoSelectors=false` bloqueia selectors automaticos.
+
+Exemplos de auto selector:
+
+- `auto`;
+- `fastest`;
+- `cheapest`;
+- `best`;
+- `router`;
+- `policy`.
+
+`allowGatewayFallbacks=false` bloqueia fallback de gateway.
+
+`requireProviderDirect=true` exige `routeLayer=direct_provider`.
+
+Novas rejected reasons:
+
+- `selector_kind_not_allowed:<kind>`;
+- `auto_selector_blocked:<kind>`;
+- `gateway_fallback_blocked:<kind>`;
+- `provider_direct_required:<routeLayer>`.
+
+Isso fecha tres lacunas antes do runtime selector real.
+
+Agora o operador pode separar explicitamente:
+
+- rotas diretas;
+- rotas por gateway;
+- rotas automaticas;
+- fallback de gateway.
+
+Essas policies continuam sem executar provider.
+
+Elas operam sobre metadados normalizados e route options.
 
 ## 22. Fim Do Documento Inicial
 

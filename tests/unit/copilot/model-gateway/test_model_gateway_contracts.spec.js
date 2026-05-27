@@ -1819,6 +1819,37 @@ describe('model-gateway foundation', () => {
         assert.equal(blocked.scoreBreakdown.groups.confidence, 1);
     });
 
+    it('applies selector, auto route and gateway fallback policies before runtime', () => {
+        const model = {
+            id: 'kilo:anthropic/claude-sonnet-4.5',
+            providerId: 'kilo',
+            providerModel: 'anthropic/claude-sonnet-4.5',
+            selectorKind: 'gateway_fallback',
+            selectorSyntax: 'anthropic/claude-sonnet-4.5:fastest',
+            normalizedPolicy: {
+                routeLayer: 'gateway_fallback',
+                selectorKind: 'gateway_fallback',
+                selectorSyntax: 'anthropic/claude-sonnet-4.5:fastest',
+                wireApi: 'openai_chat_completions',
+            },
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+        };
+
+        const blocked = scoreGatewayModelCandidate(model, MODEL_GATEWAY_TASK_PROFILES.tool_agent, {
+            allowSelectorKinds: ['exact_model'],
+            allowAutoSelectors: false,
+            allowGatewayFallbacks: false,
+            requireProviderDirect: true,
+        });
+
+        assert.equal(blocked.include, false);
+        assert.ok(blocked.rejectedReasons.includes('selector_kind_not_allowed:gateway_fallback'));
+        assert.ok(blocked.rejectedReasons.includes('auto_selector_blocked:gateway_fallback'));
+        assert.ok(blocked.rejectedReasons.includes('gateway_fallback_blocked:gateway_fallback'));
+        assert.ok(blocked.rejectedReasons.includes('provider_direct_required:gateway_fallback'));
+    });
+
     it('can apply pre-runtime eligibility before scoring runtime candidates', () => {
         const visible = createModelRecord({
             providerId: 'openai',

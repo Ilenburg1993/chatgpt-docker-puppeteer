@@ -146,6 +146,24 @@ function providerAllowedByAllowList(providerId, allowProviders) {
 }
 
 /**
+ * @param {string} selectorKind
+ * @param {string} selectorSyntax
+ * @returns {boolean}
+ */
+function isAutoSelector(selectorKind, selectorSyntax) {
+    return /(?:auto|fastest|cheapest|best|router|policy)/iu.test(selectorKind) || /:(?:auto|fastest|cheapest|best)$/iu.test(selectorSyntax);
+}
+
+/**
+ * @param {string} selectorKind
+ * @param {string} routeLayer
+ * @returns {boolean}
+ */
+function isGatewayFallbackSelector(selectorKind, routeLayer) {
+    return /fallback/iu.test(selectorKind) || routeLayer === 'gateway_fallback';
+}
+
+/**
  * @param {Record<string, any>} profile
  * @param {boolean | undefined} option
  * @returns {boolean}
@@ -293,7 +311,11 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
  *     blockUpstreamProviders?: string[];
  *     preferredUpstreamProviders?: string[];
  *     preferredSelectorKinds?: string[];
+ *     allowSelectorKinds?: string[];
  *     blockSelectorKinds?: string[];
+ *     allowAutoSelectors?: boolean;
+ *     allowGatewayFallbacks?: boolean;
+ *     requireProviderDirect?: boolean;
  *     requiredDataPolicy?: Record<string, unknown>;
  *     preferredDataPolicy?: Record<string, unknown>;
  *     maxPricePerMillion?: number;
@@ -340,6 +362,7 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     const blockUpstreamProviders = stringSet(options.blockUpstreamProviders);
     const preferredUpstreamProviders = stringSet(options.preferredUpstreamProviders);
     const preferredSelectorKinds = stringSet(options.preferredSelectorKinds);
+    const allowSelectorKinds = stringSet(options.allowSelectorKinds);
     const blockSelectorKinds = stringSet(options.blockSelectorKinds);
     const preferredProbeKinds = new Set([...profileProbeKinds(profile), ...stringSet(options.preferredProbeKinds)]);
     const requiredProbeKinds = stringSet(options.requiredProbeKinds);
@@ -372,6 +395,7 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     const wireApi = routePolicyText(model, 'wireApi');
     const upstreamProvider = routeMetadataText(model, 'upstreamProvider');
     const selectorKind = String(model['selectorKind'] ?? routePolicyText(model, 'selectorKind')).trim();
+    const selectorSyntax = String(model['selectorSyntax'] ?? routePolicyText(model, 'selectorSyntax') ?? model['providerModel'] ?? '').trim();
     if (
         isLocalPrivateCandidate(model) &&
         !localProviderSelectionAllowed(profile, options.allowLocalProviders) &&
@@ -388,7 +412,19 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     if (upstreamProvider && blockUpstreamProviders.has(upstreamProvider)) {
         rejectedReasons.push(`upstream_provider_blocked:${upstreamProvider}`);
     }
+    if (selectorKind && allowSelectorKinds.size > 0 && !allowSelectorKinds.has(selectorKind)) {
+        rejectedReasons.push(`selector_kind_not_allowed:${selectorKind}`);
+    }
     if (selectorKind && blockSelectorKinds.has(selectorKind)) rejectedReasons.push(`selector_kind_blocked:${selectorKind}`);
+    if (options.allowAutoSelectors === false && isAutoSelector(selectorKind, selectorSyntax)) {
+        rejectedReasons.push(`auto_selector_blocked:${selectorKind || selectorSyntax}`);
+    }
+    if (options.allowGatewayFallbacks === false && isGatewayFallbackSelector(selectorKind, routeLayer)) {
+        rejectedReasons.push(`gateway_fallback_blocked:${selectorKind || routeLayer}`);
+    }
+    if (options.requireProviderDirect === true && routeLayer && routeLayer !== 'direct_provider') {
+        rejectedReasons.push(`provider_direct_required:${routeLayer}`);
+    }
     if (routeLayer && preferredRouteLayers.has(routeLayer)) {
         score += 20;
         reasons.push(`preferred_route_layer:${routeLayer}`);
