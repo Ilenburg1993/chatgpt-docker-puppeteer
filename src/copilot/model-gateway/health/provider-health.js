@@ -324,6 +324,51 @@ function normalizeRecord(value) {
     return record;
 }
 
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function byokProviderHealthRecordKey(value) {
+    const record = normalizeRecord(value);
+    return record?.key ?? null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number}
+ */
+export function byokProviderHealthRecordLastObservedAt(value) {
+    const record = normalizeRecord(value);
+    if (!record) return 0;
+    const direct = Math.max(
+        record.lastFailureAt ?? 0,
+        record.lastSuccessAt ?? 0,
+        record.lastAgentProbeFailureAt ?? 0,
+        record.lastAgentProbeSuccessAt ?? 0,
+    );
+    return Object.values(record.probes).reduce((max, probe) => Math.max(max, probe.lastAt ?? 0), direct);
+}
+
+/**
+ * @param {...Record<string, unknown>[]} recordSets
+ * @returns {Record<string, unknown>[]}
+ */
+export function mergeByokProviderHealthRecords(...recordSets) {
+    /** @type {Map<string, Record<string, unknown>>} */
+    const byKey = new Map();
+    for (const records of recordSets) {
+        for (const record of records) {
+            const key = byokProviderHealthRecordKey(record);
+            if (!key) continue;
+            const previous = byKey.get(key);
+            if (!previous || byokProviderHealthRecordLastObservedAt(record) >= byokProviderHealthRecordLastObservedAt(previous)) {
+                byKey.set(key, record);
+            }
+        }
+    }
+    return [...byKey.values()];
+}
+
 function pruneByokProviderHealth() {
     if (_byokProviderHealthByKey.size <= MAX_BYOK_PROVIDER_HEALTH_RECORDS) return;
     const entries = [..._byokProviderHealthByKey.values()].sort((a, b) => {

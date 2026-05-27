@@ -66,10 +66,13 @@ import {
     renderModelGatewayLocalProviderOptInGuidance,
     redactSecretRecord,
     redactSecretText,
+    byokProviderHealthRecordKey,
+    byokProviderHealthRecordLastObservedAt,
     recordByokProviderModelAgentProbeSuccess,
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
+    mergeByokProviderHealthRecords,
     listModelGatewayRouteDecisions,
     installByokProviderHealthSqliteMirror,
     mirrorByokProviderHealthToSqlite,
@@ -3394,6 +3397,48 @@ describe('model-gateway foundation', () => {
         } finally {
             db.close();
         }
+    });
+
+    it('deduplicates BYOK health records by identity and keeps the freshest observed runtime fact', () => {
+        const stale = {
+            key: 'default|openrouter|openai/gpt-oss-120b',
+            routeProfile: 'default',
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            lastStatus: 'failed',
+            lastFailureAt: 1_000,
+            failureCount: 1,
+            successCount: 0,
+        };
+        const fresh = {
+            key: 'default|openrouter|openai/gpt-oss-120b',
+            routeProfile: 'default',
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            lastStatus: 'ok',
+            lastSuccessAt: 2_000,
+            failureCount: 1,
+            successCount: 1,
+            probes: {
+                chat: {
+                    kind: 'chat',
+                    status: 'ok',
+                    ok: true,
+                    providerAttempted: true,
+                    count: 1,
+                    successCount: 1,
+                    failureCount: 0,
+                    lastAt: 2_500,
+                },
+            },
+        };
+
+        const records = mergeByokProviderHealthRecords([stale], [fresh]);
+
+        assert.equal(byokProviderHealthRecordKey(fresh), 'default|openrouter|openai/gpt-oss-120b');
+        assert.equal(byokProviderHealthRecordLastObservedAt(fresh), 2_500);
+        assert.equal(records.length, 1);
+        assert.equal(records[0]?.['lastStatus'], 'ok');
     });
 
     it('searches catalog metadata before runtime using routes, overlays and eligibility as ranking hints', () => {

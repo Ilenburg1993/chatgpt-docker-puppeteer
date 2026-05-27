@@ -14,10 +14,12 @@ import {
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
     listByokProviderModelHealth,
+    mergeByokProviderHealthRecords,
     renderModelGatewayLocalProviderOptInGuidance,
     summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewayLocalProviderOptInBlocks,
 } from '../src/copilot/model-gateway/index.js';
+import { setDbLogger } from '../src/copilot/db/sqlite.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LIVE_RUNNER_PATH = path.join(ROOT, 'scripts/copilot/run-terminal-llm-b-live-test.mjs');
@@ -93,6 +95,13 @@ function supplyWarningSummary(audit) {
 const json = argSet.has('--json');
 const fail = argSet.has('--fail');
 const failOnSupplyWarning = argSet.has('--fail-on-supply-warning');
+if (json) {
+    setDbLogger((level, message) => {
+        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
+            process.stderr.write(`[db][${level}] ${message}\n`);
+        }
+    });
+}
 const sourceStore = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
 const sqliteStore = new SqliteModelGatewayCatalogStore({ dbPath: DEFAULT_SQLITE_PATH });
 const sourceSnapshot = await sourceStore.readSnapshot();
@@ -101,7 +110,15 @@ const sqliteDiagnostics = await sqliteStore.readStorageDiagnostics();
 const integrity = auditModelGatewayCatalogSnapshotIntegrity(sourceSnapshot);
 const parity = compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSnapshot);
 const secretRegistry = createEnvSecretRegistry();
-const healthRecords = listByokProviderModelHealth();
+const fileHealthRecords = listByokProviderModelHealth();
+let sqliteHealthRecords = [];
+let sqliteRuntimeError = null;
+try {
+    sqliteHealthRecords = await sqliteStore.listRuntimeHealthRecords();
+} catch (error) {
+    sqliteRuntimeError = error instanceof Error ? error.message : String(error);
+}
+const healthRecords = mergeByokProviderHealthRecords(fileHealthRecords, sqliteHealthRecords);
 const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords);
 const evaluationNow = new Date();
 const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, {
@@ -260,6 +277,9 @@ const summary = {
             supplyWarnings: effectiveStrictSupplyWarnings,
             localProviderOptIn: localProviderOptIn.effectiveStrict,
             healthRecords: healthRecords.length,
+            fileHealthRecords: fileHealthRecords.length,
+            sqliteHealthRecords: sqliteHealthRecords.length,
+            sqliteRuntimeError,
             runtimeAccountOverlays: runtimeAccountOverlays.length,
             runtimeAccountOverlaySummary,
             eligibilityDecisions: effectiveEligibility.decisions.length,

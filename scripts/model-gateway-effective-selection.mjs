@@ -9,6 +9,7 @@ import {
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
     listByokProviderModelHealth,
+    mergeByokProviderHealthRecords,
     renderModelGatewayLocalProviderOptInGuidance,
     summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewayLocalProviderOptInBlocks,
@@ -66,64 +67,6 @@ function formatCountMap(counts) {
         .join(',') || '-';
 }
 
-function healthRecordKey(record) {
-    if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
-    const key = typeof record['key'] === 'string' && record['key'].trim() ? record['key'].trim() : null;
-    const profile =
-        typeof record['routeProfile'] === 'string' && record['routeProfile'].trim()
-            ? record['routeProfile'].trim()
-            : typeof record['profile'] === 'string' && record['profile'].trim()
-              ? record['profile'].trim()
-              : null;
-    const provider =
-        typeof record['providerId'] === 'string' && record['providerId'].trim()
-            ? record['providerId'].trim()
-            : typeof record['provider'] === 'string' && record['provider'].trim()
-              ? record['provider'].trim()
-              : null;
-    const model =
-        typeof record['providerModel'] === 'string' && record['providerModel'].trim()
-            ? record['providerModel'].trim()
-            : typeof record['model'] === 'string' && record['model'].trim()
-              ? record['model'].trim()
-              : null;
-    return key ?? [profile ?? '-', provider ?? '-', model ?? '-'].join('|').toLowerCase();
-}
-
-function healthRecordLastObservedAt(record) {
-    if (!record || typeof record !== 'object' || Array.isArray(record)) return 0;
-    const direct = [
-        record['lastFailureAt'],
-        record['lastSuccessAt'],
-        record['lastAgentProbeFailureAt'],
-        record['lastAgentProbeSuccessAt'],
-    ]
-        .map((value) => (typeof value === 'number' && Number.isFinite(value) ? value : 0))
-        .reduce((max, value) => Math.max(max, value), 0);
-    const probes = record['probes'];
-    if (!probes || typeof probes !== 'object' || Array.isArray(probes)) return direct;
-    return Object.values(probes).reduce((max, probe) => {
-        if (!probe || typeof probe !== 'object' || Array.isArray(probe)) return max;
-        const lastAt = typeof probe['lastAt'] === 'number' && Number.isFinite(probe['lastAt']) ? probe['lastAt'] : 0;
-        return Math.max(max, lastAt);
-    }, direct);
-}
-
-function mergeHealthRecords(...recordSets) {
-    const byKey = new Map();
-    for (const records of recordSets) {
-        for (const record of records) {
-            const key = healthRecordKey(record);
-            if (!key) continue;
-            const previous = byKey.get(key);
-            if (!previous || healthRecordLastObservedAt(record) >= healthRecordLastObservedAt(previous)) {
-                byKey.set(key, record);
-            }
-        }
-    }
-    return [...byKey.values()];
-}
-
 const json = argSet.has('--json');
 const strict = argSet.has('--strict') || !argSet.has('--allow-probe');
 const fail = argSet.has('--fail');
@@ -157,7 +100,7 @@ const healthRecords =
         ? fileHealthRecords
         : runtimeSource === 'sqlite'
           ? sqliteHealthRecords
-          : mergeHealthRecords(fileHealthRecords, sqliteHealthRecords);
+          : mergeByokProviderHealthRecords(fileHealthRecords, sqliteHealthRecords);
 const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords);
 const evaluationNow = new Date();
 const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, {

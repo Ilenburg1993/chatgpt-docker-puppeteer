@@ -11,7 +11,10 @@
 export {
     clearByokProviderModelHealth,
     flushByokProviderHealth,
+    byokProviderHealthRecordKey,
+    byokProviderHealthRecordLastObservedAt,
     listByokProviderModelHealth,
+    mergeByokProviderHealthRecords,
     readByokProviderHealthState,
     readByokProviderModelHealth,
     recordByokProviderModelAgentProbeFailure,

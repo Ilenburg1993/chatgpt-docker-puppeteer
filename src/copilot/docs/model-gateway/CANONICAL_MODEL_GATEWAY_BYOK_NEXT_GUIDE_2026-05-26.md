@@ -3509,6 +3509,31 @@ Ela nao deve transformar health runtime em prova permanente.
 - merge nao-mutante
 - `setDbLogger` em modo JSON para manter stdout parseavel
 
+Mudanca 7:
+
+Merge/dedup de runtime health virou contrato do dominio.
+
+Funcoes expostas:
+
+- `byokProviderHealthRecordKey`
+- `byokProviderHealthRecordLastObservedAt`
+- `mergeByokProviderHealthRecords`
+
+Motivo:
+
+Readiness, selection e futuros explain/cockpit devem usar a mesma semantica.
+
+Nao deve haver merge ad hoc por script.
+
+`model-gateway-live-readiness.mjs` agora tambem usa health `merged`.
+
+O readiness report mostra:
+
+- fileHealthRecords
+- sqliteHealthRecords
+- healthRecords merged
+- sqliteRuntimeError
+
 Proximo passo:
 
 Conectar runtime persisted aos explain/readiness finais com policy clara para cada perfil.
@@ -3548,6 +3573,14 @@ Resultado observado:
 Resultado observado:
 
 `merged:17`
+
+`node scripts/model-gateway-live-readiness.mjs --json`
+
+Resultado observado:
+
+`healthRecords=17`
+
+`sqliteHealthRecords=17`
 
 ## 19. Fim Do Documento Inicial
 
