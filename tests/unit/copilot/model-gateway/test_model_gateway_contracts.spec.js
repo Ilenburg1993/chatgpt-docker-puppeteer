@@ -1679,12 +1679,14 @@ describe('model-gateway foundation', () => {
             ),
         );
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:plan'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:runtime-health:mirror'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-build'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build-plan'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build-preview'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-live-plan'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-runtime-health-mirror'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:refresh:log:sqlite -- --json'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:sqlite:retention -- --json'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:sqlite:retention:apply -- --json'));
@@ -1693,6 +1695,7 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === '/byok gateway commands'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway prebuild'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway selection audit strict local_private_strict'));
+        assert.ok(commands.some((entry) => entry.command === '/byok gateway health sqlite'));
         assert.ok(commands.every((entry) => MODEL_GATEWAY_CANONICAL_COMMAND_PHASES.includes(entry.phase)));
         assert.ok(terminalLines.some((line) => line.includes('/byok gateway catalog refresh')));
     });
