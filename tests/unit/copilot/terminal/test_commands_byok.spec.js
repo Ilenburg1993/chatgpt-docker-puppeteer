@@ -407,6 +407,8 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                 selectedProfileCount: 1,
                 blockedProfileCount: 0,
                 runtimeProofSelectedCount: options.requireRuntimeProof ? 1 : 0,
+                runtimeEnvReadyCount: 1,
+                runtimeEnvBlockedCount: 0,
             },
             routes: [],
         })),
@@ -2479,6 +2481,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('finalSelected=1/1');
         expect(ctx.output()).toContain('runtimeSelector=ready');
         expect(ctx.output()).toContain('blocked=0');
+        expect(ctx.output()).toContain('envReady=1');
+        expect(ctx.output()).toContain('envBlocked=0');
         expect(ctx.output()).toContain('post-runtime mudou -> groq:openai/gpt-oss-120b');
         expect(ctx.output()).toContain('healthProofs=1');
         expect(ctx.output()).toContain('probeProofs=1');

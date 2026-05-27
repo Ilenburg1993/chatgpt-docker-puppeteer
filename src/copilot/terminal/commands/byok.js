@@ -2716,7 +2716,7 @@ async function renderByokGatewaySelectionAudit(println, rest) {
             `  \x1b[90mpolicy=${policyResolution?.mode ?? args.selectionPolicy} · finalSelected=${policyResolution?.summary.selectedCount ?? 0}/${policyResolution?.summary.profileCount ?? 0} · postWinners=${policyResolution?.summary.postRuntimeWinnerCount ?? 0} · finalChanged=${policyResolution?.summary.changedFromPreRuntimeCount ?? 0}\x1b[0m\n`,
         );
         println(
-            `  \x1b[90mruntimeSelector=${runtimeSelectorPlan?.ready ? 'ready' : 'blocked'} · selected=${runtimeSelectorPlan?.summary.selectedProfileCount ?? 0}/${runtimeSelectorPlan?.summary.profileCount ?? 0} · blocked=${runtimeSelectorPlan?.summary.blockedProfileCount ?? 0} · proofSelected=${runtimeSelectorPlan?.summary.runtimeProofSelectedCount ?? 0}\x1b[0m\n`,
+            `  \x1b[90mruntimeSelector=${runtimeSelectorPlan?.ready ? 'ready' : 'blocked'} · selected=${runtimeSelectorPlan?.summary.selectedProfileCount ?? 0}/${runtimeSelectorPlan?.summary.profileCount ?? 0} · blocked=${runtimeSelectorPlan?.summary.blockedProfileCount ?? 0} · envReady=${runtimeSelectorPlan?.summary.runtimeEnvReadyCount ?? 0} · envBlocked=${runtimeSelectorPlan?.summary.runtimeEnvBlockedCount ?? 0} · proofSelected=${runtimeSelectorPlan?.summary.runtimeProofSelectedCount ?? 0}\x1b[0m\n`,
         );
         if (args.writeTrace) {
             println(

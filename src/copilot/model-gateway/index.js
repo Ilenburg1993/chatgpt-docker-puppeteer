@@ -300,6 +300,7 @@ export {
 } from './providers/index.js';
 export {
     applyModelGatewaySelectionTraceRetention,
+    buildModelGatewayRuntimeSelectorProbeEnv,
     buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewaySelectionDecisionTrace,
     buildModelGatewayRouteCandidates,
@@ -309,6 +310,7 @@ export {
     compareModelGatewaySelectionAudits,
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     MODEL_GATEWAY_SELECTION_POLICY_MODE,
+    evaluateModelGatewayRuntimeSelectorRouteEnv,
     evaluateGatewayModelHealthRoute,
     executeModelGatewayRuntimeSelectorPlan,
     executeModelGatewayRuntimeSelectorPlanWithFallbacks,
@@ -331,6 +333,7 @@ export {
     routeModelGatewayCatalogSnapshot,
     persistModelGatewaySelectionDecisionTrace,
     readModelGatewaySelectionDecisionTrace,
+    resolveModelGatewayRuntimeRetryDecision,
     resolveModelGatewaySelectionPolicy,
     resolveModelGatewayTaskProfile,
     selectModelGatewayRuntimeRoute,

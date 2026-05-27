@@ -5821,11 +5821,44 @@ Campos principais:
 - `summary.selectedProfileCount`
 - `summary.blockedProfileCount`
 - `summary.runtimeProofSelectedCount`
+- `summary.runtimeEnvReadyCount`
+- `summary.runtimeEnvBlockedCount`
 - `routes[]`
 
 `selectModelGatewayRuntimeRoute`
 
 Seleciona a rota pronta de um profile especifico.
+
+`buildModelGatewayRuntimeSelectorProbeEnv`
+
+Cria um ambiente BYOK isolado para a rota selecionada.
+
+Essa funcao limpa overrides BYOK herdados do provider atual do terminal e fixa:
+
+- `COPILOT_BYOK_ENABLED=true`;
+- `COPILOT_BYOK_PROVIDER_PRESET=<providerId da rota>`;
+- `COPILOT_BYOK_MODEL=<providerModel da rota>`.
+
+Ela preserva as chaves de provider reais do ambiente, como `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `KILO_API_KEY`, etc.
+
+Isso fecha um gap arquitetural importante: o runtime selector nao pode executar uma rota `openrouter:*` herdando `baseUrl`,
+`providerPreset` ou auth generica de uma configuracao atual `groq`, `kilo` ou outra.
+
+`evaluateModelGatewayRuntimeSelectorRouteEnv`
+
+Avalia, sem expor segredos e sem executar provider, se o env route-aware satisfaz os requisitos do provider selecionado.
+
+Ela retorna:
+
+- `status`;
+- `configuredKeys`;
+- `missingRequiredKeys`;
+- `missingRecommendedKeys`;
+- `providerPreset`;
+- `model`.
+
+Quando `buildModelGatewayRuntimeSelectorPlan` recebe `requireRuntimeEnvReady=true`, rotas cujo env esta `missing` ou
+`partial` sao bloqueadas antes de qualquer live test.
 
 `executeModelGatewayRuntimeSelectorPlan`
 
@@ -5846,9 +5879,21 @@ Ele grava health quando ha tentativa real.
 
 Ele nao executa rotas bloqueadas.
 
-Ele ainda nao implementa retry/fallback multi-rota.
+Ele agora classifica erro lancado pela probe com `classifyByokProviderFailure`.
 
-Essa sera a proxima expansao.
+Ele tambem injeta esse classificador na propria `runConfiguredByokChatProbe`.
+
+Assim, `session.error` e erro lancado seguem a mesma taxonomia.
+
+Quando uma excecao chega sem `providerFailure` normalizado, o executor ainda grava health com:
+
+- `failureKind`;
+- `failureStatusCode`;
+- `retryAfterSeconds`;
+- `resetAt`;
+- `errorContext`.
+
+Isso evita perder sinais de quota, rate-limit, auth e rota invalida durante a primeira execucao real.
 
 `executeModelGatewayRuntimeSelectorPlanWithFallbacks`
 
@@ -5869,18 +5914,41 @@ Cada tentativa usa `executeModelGatewayRuntimeSelectorPlan`, portanto:
 - preserva a semantica de bloqueio;
 - retorna detalhes de cada tentativa.
 
-Ainda nao ha retry temporal da mesma rota.
-
-O retry temporal foi adicionado como opcao explicita:
+O retry temporal da mesma rota existe como opcao explicita:
 
 - `attemptsPerRoute`
 - `retryDelayMs`
+- `maxRetryDelayMs`
 
 O default continua sendo uma tentativa por rota.
 
 Isso evita loops surpresa e deixa os live tests sob controle.
 
-O backoff/rate-limit dinamico ainda precisa ser conectado como policy superior.
+`resolveModelGatewayRuntimeRetryDecision`
+
+Resolve, sem executar provider, o que fazer depois de cada tentativa:
+
+- sucesso: nao retry, nao fallback;
+- rota bloqueada: fallback;
+- `auth`: fallback e sem retry da mesma rota;
+- `credits`: fallback e sem retry da mesma rota;
+- `model-or-route`: fallback e sem retry da mesma rota;
+- `rate-limit`: retry somente se a janela couber no orcamento `maxRetryDelayMs`;
+- `timeout`, `network`, `upstream`, `unknown`: retry da mesma rota quando ainda houver tentativa disponivel.
+
+A decisao preserva:
+
+- `failureKind`;
+- `retryAfterSeconds`;
+- `resetAt`;
+- `waitMs`;
+- `permanent`;
+- `reason`.
+
+O executor com fallback agora usa essa decisao dinamica entre tentativas.
+
+Com isso, quota/auth/modelo inexistente deixam de consumir retries repetidos na mesma rota, enquanto falhas transientes ainda
+podem tentar novamente antes de cair para outro profile.
 
 ### 21.2 Integracao Ao Script Efetivo
 
@@ -5892,7 +5960,7 @@ Agora inclui:
 
 A saida textual mostra:
 
-`runtime-selector: ready=... selected=... blocked=... proofSelected=...`
+`runtime-selector: ready=... selected=... blocked=... envReady=... envBlocked=... proofSelected=...`
 
 Isso permite validar a ponte para runtime real sem executar runtime.
 
@@ -5912,10 +5980,8 @@ Isso e importante porque, durante testes live, poderemos:
 
 Ainda faltam:
 
-- retry runtime real;
-- fallback chain executavel;
-- gravacao de resultado runtime no health store;
-- aplicacao de quota/rate-limit durante a chamada;
+- CLI segura para executar o selector real somente depois dos gates;
+- diff de health antes/depois das tentativas reais;
 - live tests llm-b.
 
 Esses pontos pertencem a proxima camada.
@@ -5935,7 +6001,13 @@ Esses pontos pertencem a proxima camada.
 - [x] Persistir resultado runtime no health store.
 - [x] Criar fallback multi-rota.
 - [x] Criar retry temporal explicito por rota.
-- [ ] Conectar backoff/rate-limit dinamico ao retry.
+- [x] Executar probe com env BYOK isolado por rota selecionada.
+- [x] Avaliar readiness de env por rota sem executar provider.
+- [x] Bloquear plano live quando env route-aware nao esta pronto.
+- [x] Classificar excecao da probe e gravar health no mesmo fluxo.
+- [x] Injetar classificador na probe para normalizar `session.error`.
+- [x] Criar decisao dinamica de retry/fallback por failure kind.
+- [x] Conectar rate-limit/retry-after/resetAt ao retry budget.
 - [ ] Criar live tests llm-b baseados no plano.
 
 ### 21.6 Gate De Live Readiness
@@ -5968,6 +6040,8 @@ Resultado observado sem runtime:
 - `runtime_selector_plan_ready=true`;
 - `7/7 routes selected`;
 - `blocked=0`;
+- `envReady=7`;
+- `envBlocked=0`;
 - `proofSelected=0`;
 - proximo comando ainda e o controle seguro `--no-pr`.
 

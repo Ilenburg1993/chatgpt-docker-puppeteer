@@ -40,6 +40,7 @@ import {
     buildModelGatewayRouteCandidates,
     applyModelGatewayEligibilityToSnapshot,
     applyModelGatewaySelectionTraceRetention,
+    buildModelGatewayRuntimeSelectorProbeEnv,
     buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewaySelectionDecisionTrace,
     compareModelGatewaySelectionDecisionTraces,
@@ -60,10 +61,12 @@ import {
     normalizeModelGatewayAccountLimitState,
     resolveModelGatewayAccountAccess,
     buildModelGatewayOnListModelsHandler,
+    evaluateModelGatewayRuntimeSelectorRouteEnv,
     evaluateGatewayModelHealthRoute,
     executeModelGatewayRuntimeSelectorPlan,
     executeModelGatewayRuntimeSelectorPlanWithFallbacks,
     readGatewayModelHealthFromRecords,
+    resolveModelGatewayRuntimeRetryDecision,
     evaluateModelGatewayProviderEnvRequirements,
     geminiAdapter,
     ollamaAdapter,
@@ -746,27 +749,70 @@ describe('model-gateway foundation', () => {
         assert.equal(strictRuntimeSelectorPlan.summary.selectedProfileCount, 1);
         assert.equal(strictRuntimeSelectorPlan.summary.blockedProfileCount, 1);
 
+        const routeProbeEnv = buildModelGatewayRuntimeSelectorProbeEnv(runtimeSelectorPlan.routes[0].selected, {
+            COPILOT_BYOK_PROFILE: 'current-default-profile',
+            COPILOT_BYOK_PROVIDER_PRESET: 'groq',
+            COPILOT_BYOK_BASE_URL: 'https://wrong.example.test/v1',
+            COPILOT_BYOK_API_KEY: 'wrong-generic-key',
+            OPENROUTER_API_KEY: 'openrouter-key',
+        });
+        assert.equal(routeProbeEnv['COPILOT_BYOK_ENABLED'], 'true');
+        assert.equal(routeProbeEnv['COPILOT_BYOK_PROVIDER_PRESET'], 'openrouter');
+        assert.equal(routeProbeEnv['COPILOT_BYOK_MODEL'], 'openai/gpt-oss-120b');
+        assert.equal(routeProbeEnv['COPILOT_BYOK_BASE_URL'], undefined);
+        assert.equal(routeProbeEnv['COPILOT_BYOK_API_KEY'], undefined);
+        assert.equal(routeProbeEnv['OPENROUTER_API_KEY'], 'openrouter-key');
+        const routeEnvStatus = evaluateModelGatewayRuntimeSelectorRouteEnv(runtimeSelectorPlan.routes[0].selected, {
+            OPENROUTER_API_KEY: 'openrouter-key',
+        });
+        assert.equal(routeEnvStatus.status, 'ready');
+        assert.deepEqual(routeEnvStatus.configuredKeys, ['OPENROUTER_API_KEY']);
+        const routeEnvBlockedPlan = buildModelGatewayRuntimeSelectorPlan(preferRuntimeProved, {
+            requireRuntimeEnvReady: true,
+            env: {},
+        });
+        assert.equal(routeEnvBlockedPlan.summary.runtimeEnvBlockedCount, 2);
+        assert.equal(routeEnvBlockedPlan.summary.blockedProfileCount, 2);
+        assert.equal(routeEnvBlockedPlan.routes[0].reasons.includes('blocked:runtime_env_not_ready'), true);
+        const routeEnvReadyPlan = buildModelGatewayRuntimeSelectorPlan(preferRuntimeProved, {
+            requireRuntimeEnvReady: true,
+            env: { OPENROUTER_API_KEY: 'openrouter-key' },
+        });
+        assert.equal(routeEnvReadyPlan.summary.runtimeEnvReadyCount, 2);
+        assert.equal(routeEnvReadyPlan.summary.blockedProfileCount, 0);
+
         const runtimeExecution = await executeModelGatewayRuntimeSelectorPlan(runtimeSelectorPlan, {
             profileId: 'repo_agent',
+            env: {
+                COPILOT_BYOK_PROVIDER_PRESET: 'groq',
+                COPILOT_BYOK_BASE_URL: 'https://wrong.example.test/v1',
+                OPENROUTER_API_KEY: 'openrouter-key',
+            },
             deps: {
-                runChatProbe: async (options = {}) => ({
-                    ok: true,
-                    status: 'ok',
-                    elapsedMs: 12,
-                    model: String(options.model ?? ''),
-                    profile: 'repo_agent',
-                    preset: 'openrouter',
-                    providerType: 'openai-compatible',
-                    deltaCount: 1,
-                    deltaChars: 13,
-                    finalChars: 13,
-                    finalContent: 'BYOK_PROBE_OK',
-                    observedFinalEvent: true,
-                    sessionId: 'unit-runtime-session',
-                    errors: [],
-                    warnings: [],
-                    providerFailure: null,
-                }),
+                runChatProbe: async (options = {}) => {
+                    assert.equal(options.model, 'openai/gpt-oss-120b');
+                    assert.equal(options.env?.['COPILOT_BYOK_PROVIDER_PRESET'], 'openrouter');
+                    assert.equal(options.env?.['COPILOT_BYOK_BASE_URL'], undefined);
+                    assert.equal(typeof options.deps?.classifyProviderFailure, 'function');
+                    return {
+                        ok: true,
+                        status: 'ok',
+                        elapsedMs: 12,
+                        model: String(options.model ?? ''),
+                        profile: 'repo_agent',
+                        preset: 'openrouter',
+                        providerType: 'openai-compatible',
+                        deltaCount: 1,
+                        deltaChars: 13,
+                        finalChars: 13,
+                        finalContent: 'BYOK_PROBE_OK',
+                        observedFinalEvent: true,
+                        sessionId: 'unit-runtime-session',
+                        errors: [],
+                        warnings: [],
+                        providerFailure: null,
+                    };
+                },
                 recordSuccess: (input) => {
                     assert.equal(input.routeProfile, 'repo_agent');
                     assert.equal(input.providerId, 'openrouter');
@@ -782,6 +828,7 @@ describe('model-gateway foundation', () => {
         assert.equal(runtimeExecution.ok, true);
         assert.equal(runtimeExecution.status, 'ok');
         assert.equal(runtimeExecution.healthRecorded, true);
+        assert.equal(runtimeExecution.providerFailure, null);
 
         const blockedRuntimeExecution = await executeModelGatewayRuntimeSelectorPlan(strictRuntimeSelectorPlan, {
             profileId: 'tool_agent',
@@ -874,6 +921,99 @@ describe('model-gateway foundation', () => {
         assert.equal(retryRuntimeExecution.attemptedCount, 2);
         assert.equal(retryRuntimeExecution.selectedProfileId, 'repo_agent');
         assert.equal(retrySleepCalls, 1);
+        assert.equal(retryRuntimeExecution.retryDecisions[0].retryRoute, true);
+
+        const rateLimitRuntimeExecution = await executeModelGatewayRuntimeSelectorPlan(runtimeSelectorPlan, {
+            profileId: 'repo_agent',
+            deps: {
+                runChatProbe: async () => {
+                    throw Object.assign(new Error('HTTP 429 provider asked to slow down'), {
+                        status: 429,
+                        headers: { 'retry-after': '42' },
+                    });
+                },
+                recordSuccess: () => {
+                    throw new Error('recordSuccess should not be called for thrown runtime execution');
+                },
+                recordFailure: (input) => {
+                    assert.equal(input.routeProfile, 'repo_agent');
+                    assert.equal(input.failureKind, 'rate-limit');
+                    assert.equal(input.retryAfterSeconds, 42);
+                },
+                flushHealth: async () => {},
+            },
+        });
+        assert.equal(rateLimitRuntimeExecution.ok, false);
+        assert.equal(rateLimitRuntimeExecution.providerFailure?.kind, 'rate-limit');
+        assert.equal(rateLimitRuntimeExecution.providerFailure?.retryAfterSeconds, 42);
+        assert.equal(rateLimitRuntimeExecution.healthRecorded, true);
+        const rateLimitDecision = resolveModelGatewayRuntimeRetryDecision(rateLimitRuntimeExecution, {
+            maxRetryDelayMs: 1_000,
+            retryDelayMs: 5,
+        });
+        assert.equal(rateLimitDecision.retryRoute, false);
+        assert.equal(rateLimitDecision.fallbackRoute, true);
+        assert.equal(rateLimitDecision.waitMs, 42_000);
+        assert.equal(rateLimitDecision.reason, 'rate_limit_window_exceeds_runtime_retry_budget');
+
+        let permanentProbeCalls = 0;
+        let permanentRetrySleeps = 0;
+        const permanentRuntimeExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(runtimeSelectorPlan, {
+            profileId: 'repo_agent',
+            fallbackProfileIds: ['tool_agent'],
+            attemptsPerRoute: 3,
+            retryDelayMs: 5,
+            deps: {
+                runChatProbe: async (options = {}) => {
+                    permanentProbeCalls += 1;
+                    return {
+                        ok: permanentProbeCalls === 2,
+                        status: permanentProbeCalls === 2 ? 'ok' : 'failed',
+                        elapsedMs: 10,
+                        model: String(options.model ?? ''),
+                        profile: permanentProbeCalls === 2 ? 'tool_agent' : 'repo_agent',
+                        preset: 'openrouter',
+                        providerType: 'openai-compatible',
+                        deltaCount: permanentProbeCalls === 2 ? 1 : 0,
+                        deltaChars: permanentProbeCalls === 2 ? 13 : 0,
+                        finalChars: permanentProbeCalls === 2 ? 13 : 0,
+                        finalContent: permanentProbeCalls === 2 ? 'BYOK_PROBE_OK' : '',
+                        observedFinalEvent: permanentProbeCalls === 2,
+                        sessionId: `unit-runtime-permanent-${permanentProbeCalls}`,
+                        errors: permanentProbeCalls === 2 ? [] : ['invalid api key'],
+                        warnings: [],
+                        providerFailure:
+                            permanentProbeCalls === 2
+                                ? null
+                                : {
+                                      kind: 'auth',
+                                      statusCode: 401,
+                                      message: 'invalid api key',
+                                      errorContext: 'provider.auth',
+                                      operatorLabel: 'auth',
+                                      operatorAction: 'fix key',
+                                      external: true,
+                                      retryAfterSeconds: null,
+                                      resetAt: null,
+                                      limitHeaders: {},
+                                  },
+                    };
+                },
+                recordSuccess: () => {},
+                recordFailure: () => {},
+                flushHealth: async () => {},
+                sleep: async () => {
+                    permanentRetrySleeps += 1;
+                },
+            },
+        });
+        assert.equal(permanentRuntimeExecution.ok, true);
+        assert.equal(permanentRuntimeExecution.attemptedCount, 2);
+        assert.equal(permanentRuntimeExecution.selectedProfileId, 'tool_agent');
+        assert.equal(permanentRuntimeExecution.retryDecisions[0].permanent, true);
+        assert.equal(permanentRuntimeExecution.retryDecisions[0].retryRoute, false);
+        assert.equal(permanentProbeCalls, 2);
+        assert.equal(permanentRetrySleeps, 0);
 
         const trace = buildModelGatewaySelectionDecisionTrace({
             snapshot,

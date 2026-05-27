@@ -302,7 +302,7 @@ if (json) {
         `policy: mode=${policyResolution.mode} selected=${policyResolution.summary.selectedCount}/${policyResolution.summary.profileCount} postWinners=${policyResolution.summary.postRuntimeWinnerCount} changed=${policyResolution.summary.changedFromPreRuntimeCount}\n`,
     );
     process.stdout.write(
-        `runtime-selector: ready=${runtimeSelectorPlan.ready ? 'yes' : 'no'} selected=${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} blocked=${runtimeSelectorPlan.summary.blockedProfileCount} proofSelected=${runtimeSelectorPlan.summary.runtimeProofSelectedCount}\n`,
+        `runtime-selector: ready=${runtimeSelectorPlan.ready ? 'yes' : 'no'} selected=${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} blocked=${runtimeSelectorPlan.summary.blockedProfileCount} envReady=${runtimeSelectorPlan.summary.runtimeEnvReadyCount} envBlocked=${runtimeSelectorPlan.summary.runtimeEnvBlockedCount} proofSelected=${runtimeSelectorPlan.summary.runtimeProofSelectedCount}\n`,
     );
     if (writeTrace) {
         process.stdout.write(

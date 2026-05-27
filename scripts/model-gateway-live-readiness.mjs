@@ -179,6 +179,8 @@ const runtimeSelectionComparison = compareModelGatewaySelectionAudits(effectiveS
 const runtimeSelectionPolicy = resolveModelGatewaySelectionPolicy(runtimeSelectionComparison, { mode: 'metadata_first' });
 const runtimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(runtimeSelectionPolicy, {
     source: 'model-gateway-live-readiness',
+    requireRuntimeEnvReady: true,
+    env: process.env,
 });
 const runnerExists = await fileExists(LIVE_RUNNER_PATH);
 const strictSelectedDispositions = selectedDispositions(strictAccessSelection);
@@ -245,7 +247,7 @@ const checks = [
     {
         id: 'runtime_selector_plan_ready',
         ok: runtimeSelectorPlan.ready && runtimeSelectorPlan.summary.blockedProfileCount === 0,
-        detail: `${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} routes selected, blocked=${runtimeSelectorPlan.summary.blockedProfileCount}, proofSelected=${runtimeSelectorPlan.summary.runtimeProofSelectedCount}`,
+        detail: `${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} routes selected, blocked=${runtimeSelectorPlan.summary.blockedProfileCount}, envReady=${runtimeSelectorPlan.summary.runtimeEnvReadyCount}, envBlocked=${runtimeSelectorPlan.summary.runtimeEnvBlockedCount}, proofSelected=${runtimeSelectorPlan.summary.runtimeProofSelectedCount}`,
     },
     {
         id: 'selection_supply_warnings',
@@ -368,6 +370,8 @@ const summary = {
             profiles: runtimeSelectorPlan.summary.profileCount,
             blocked: runtimeSelectorPlan.summary.blockedProfileCount,
             runtimeProofSelected: runtimeSelectorPlan.summary.runtimeProofSelectedCount,
+            runtimeEnvReady: runtimeSelectorPlan.summary.runtimeEnvReadyCount,
+            runtimeEnvBlocked: runtimeSelectorPlan.summary.runtimeEnvBlockedCount,
         },
     },
     livePlan: {

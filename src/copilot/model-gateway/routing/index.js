@@ -31,9 +31,12 @@ export {
 } from './task-profiles.js';
 export { routeGatewayModels, routeModelGatewayCatalogSnapshot, scoreGatewayModelCandidate } from './policy-engine.js';
 export {
+    buildModelGatewayRuntimeSelectorProbeEnv,
     buildModelGatewayRuntimeSelectorPlan,
+    evaluateModelGatewayRuntimeSelectorRouteEnv,
     executeModelGatewayRuntimeSelectorPlan,
     executeModelGatewayRuntimeSelectorPlanWithFallbacks,
+    resolveModelGatewayRuntimeRetryDecision,
     selectModelGatewayRuntimeRoute,
 } from './runtime-selector.js';
 export {
