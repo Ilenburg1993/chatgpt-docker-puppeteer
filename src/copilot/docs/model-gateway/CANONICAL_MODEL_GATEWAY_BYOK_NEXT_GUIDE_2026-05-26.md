@@ -3777,6 +3777,73 @@ Isso era insuficiente para decidir se o banco tinha:
 
 `scripts/model-gateway-sqlite-diagnostics.mjs` agora imprime uma linha runtime compacta no modo humano.
 
+Mudanca 15:
+
+Leituras SQLite de runtime agora preservam campos relacionais normalizados.
+
+Antes:
+
+`readRuntimeHealthForModel` e `listRuntimeHealthRecords` retornavam somente `payload_json`.
+
+Problema:
+
+Campos gravados nas colunas relacionais podiam se perder na volta para as camadas superiores:
+
+- `status`
+- `classified_failure`
+- `observed_at_ms`
+- `expires_at_ms`
+
+Depois:
+
+Health records lidos do SQLite incluem:
+
+- `runtimeHealthStatus`
+- `runtimeClassifiedFailure`
+- `runtimeObservedAtMs`
+- `runtimeExpiresAtMs`
+
+Probe records lidos do SQLite incluem:
+
+- `runtimeObservedAtMs`
+- `runtimeExpiresAtMs`
+- provider/model/route normalizados
+- kind/wireApi/status/ok normalizados
+
+`explainModelGatewayCatalogEntry` agora respeita `runtimeHealthStatus`.
+
+Isso impede que uma falha persistida corretamente volte a aparecer como `unknown`.
+
+Mudanca 16:
+
+Runtime account overlays agora entendem campos persistidos do SQLite.
+
+`deriveModelGatewayRuntimeAccountOverlaysFromHealth` agora considera:
+
+- `runtimeClassifiedFailure`
+- `runtimeObservedAtMs`
+- `runtimeHealthStatus`
+- probe-only `lastAt`
+
+Isso conecta:
+
+SQLite runtime persistence -> runtime health records -> account/key overlays -> pre-runtime exclusion.
+
+Sem essa ponte, uma falha probe-only persistida no SQLite poderia aparecer no explain, mas nao bloquear corretamente na selecao efetiva.
+
+Testes adicionados/fortalecidos:
+
+- `derives runtime health status and failure context from generic probe-only records`
+- `derives runtime account overlays from persisted SQLite runtime classification fields`
+
+Validacao:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "generic probe-only records|persisted SQLite runtime classification|volatile account overlays"`
+
+Resultado:
+
+`3 passed`
+
 Validacoes deste ajuste:
 
 `node --check src/copilot/model-gateway/catalog/sqlite-catalog-store.js`

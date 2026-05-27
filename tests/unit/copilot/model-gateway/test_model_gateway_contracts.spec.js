@@ -3566,6 +3566,28 @@ describe('model-gateway foundation', () => {
         const db = new Database(':memory:');
         try {
             const store = new SqliteModelGatewayCatalogStore({ db });
+            const projection = createCanonicalModelProjection({
+                providerId: 'openrouter',
+                providerModel: 'model-streaming',
+                capabilities: { streaming: true },
+            });
+            const snapshot = {
+                sources: [],
+                providerEvidences: [],
+                evidences: [],
+                routeOptions: [],
+                accountOverlays: [],
+                providerProjections: [],
+                projections: [projection],
+                importRuns: [],
+                rawPayloadRefs: [],
+                conflicts: [],
+                modelEligibilityRuns: [],
+                modelEligibilityDecisions: [],
+                schemaVersion: 1,
+                generatedAt: null,
+                source: 'unit-test',
+            };
             await store.writeRuntimeHealthRecords(
                 [
                     {
@@ -3596,11 +3618,21 @@ describe('model-gateway foundation', () => {
                 providerId: 'openrouter',
                 providerModel: 'model-streaming',
             });
+            const explanation = explainModelGatewayCatalogEntry(snapshot, 'model-streaming', {
+                runtimeHealthRecords: runtime.health ? [runtime.health] : [],
+                runtimeProbeResults: runtime.probes,
+            });
 
             assert.equal(runtime.health?.['lastStatus'], undefined);
+            assert.equal(runtime.health?.['runtimeHealthStatus'], 'failed');
+            assert.equal(runtime.health?.['runtimeClassifiedFailure'], 'rate-limit');
+            assert.equal(runtime.health?.['runtimeObservedAtMs'], 5_000);
             assert.equal(runtime.health?.['probes'] && typeof runtime.health['probes'] === 'object', true);
             assert.equal(runtime.probes.length, 1);
             assert.equal(runtime.probes[0]?.['status'], 'failed');
+            assert.equal(runtime.probes[0]?.['runtimeObservedAtMs'], 5_000);
+            assert.equal(explanation.runtimeHealth?.status, 'failed');
+            assert.equal(explanation.nextActions.includes('inspect_or_clear_runtime_health_after_fix'), true);
             const healthRow = /** @type {{ status: string; classified_failure: string; observed_at_ms: number } | undefined} */ (
                 db
                     .prepare(
@@ -7034,6 +7066,37 @@ describe('model-gateway foundation', () => {
         assert.equal(overlays[1].rateLimits.retryAfterSeconds, 15);
         assert.equal(overlays[2].secretRef, 'OLLAMA_CLOUD_API_KEY');
         assert.equal(overlays[2].quota.remainingCreditsUsd, 0);
+    });
+
+    it('derives runtime account overlays from persisted SQLite runtime classification fields', () => {
+        const overlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth([
+            {
+                key: 'default|openrouter|model-streaming',
+                providerId: 'openrouter',
+                providerModel: 'model-streaming',
+                routeProfile: 'default',
+                runtimeHealthStatus: 'failed',
+                runtimeClassifiedFailure: 'rate-limit',
+                runtimeObservedAtMs: Date.parse('2026-05-25T00:10:00.000Z'),
+                probes: {
+                    streaming: {
+                        kind: 'streaming',
+                        status: 'failed',
+                        ok: false,
+                        lastAt: Date.parse('2026-05-25T00:10:00.000Z'),
+                        lastFailureKind: 'rate-limit',
+                    },
+                },
+            },
+        ]);
+
+        assert.equal(overlays.length, 1);
+        assert.equal(overlays[0].providerId, 'openrouter');
+        assert.equal(overlays[0].providerMetadata.failureKind, 'rate-limit');
+        assert.equal(overlays[0].providerMetadata.runtimeHealthStatus, 'failed');
+        assert.equal(overlays[0].providerMetadata.runtimeObservedAtMs, Date.parse('2026-05-25T00:10:00.000Z'));
+        assert.equal(overlays[0].observedAt, '2026-05-25T00:10:00.000Z');
+        assert.equal(overlays[0].expiresAt, '2026-05-25T01:10:00.000Z');
     });
 
     it('summarizes account/key overlays for operator pre-runtime visibility', () => {

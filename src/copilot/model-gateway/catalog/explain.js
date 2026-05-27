@@ -100,6 +100,9 @@ function overlayMentionsProjection(overlay, projection) {
  * @returns {'ok' | 'failed' | 'unknown'}
  */
 function summarizeRuntimeHealthStatus(health) {
+    const runtimeStatus = optionalString(health['runtimeHealthStatus']);
+    if (runtimeStatus === 'failed') return 'failed';
+    if (runtimeStatus === 'ok') return 'ok';
     const lastStatus = optionalString(health['lastStatus']);
     const agentStatus = optionalString(health['agentProbeStatus']);
     if (lastStatus === 'failed' || agentStatus === 'failed') return 'failed';

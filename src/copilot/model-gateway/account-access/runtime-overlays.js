@@ -119,6 +119,7 @@ function failureSignals(health) {
             optionalString(probe['lastMessage']),
         ]);
     return [
+        optionalString(health['runtimeClassifiedFailure']),
         optionalString(health['lastFailureKind']),
         optionalString(health['lastErrorContext']),
         optionalString(health['lastMessage']),
@@ -126,6 +127,23 @@ function failureSignals(health) {
         optionalString(health['lastAgentProbeMessage']),
         ...probeSignals,
     ].filter((item) => item !== null);
+}
+
+/**
+ * @param {Record<string, unknown>} health
+ * @returns {number}
+ */
+function latestObservedMs(health) {
+    const probes = isRecord(health['probes']) ? health['probes'] : {};
+    const probeObserved = Object.values(probes)
+        .filter(isRecord)
+        .reduce((max, probe) => Math.max(max, dateMs(probe['lastAt']) ?? 0), 0);
+    return Math.max(
+        dateMs(health['runtimeObservedAtMs']) ?? 0,
+        dateMs(health['lastFailureAt']) ?? 0,
+        dateMs(health['lastAgentProbeFailureAt']) ?? 0,
+        probeObserved,
+    );
 }
 
 /**
@@ -159,7 +177,7 @@ export function deriveModelGatewayRuntimeAccountOverlayFromHealth(health, option
     if (!providerId) return null;
     const providerModel = optionalString(health['providerModel']) ?? optionalString(health['model']);
     const routeProfile = optionalString(health['routeProfile']) ?? optionalString(health['profile']);
-    const observedMs = dateMs(health['lastFailureAt']) ?? Date.now();
+    const observedMs = latestObservedMs(health) || Date.now();
     const retryAfterSeconds = optionalNumber(health['lastRetryAfterSeconds']);
     const resetAt = resolveResetAt(observedMs, retryAfterSeconds, optionalString(health['lastResetAt']));
     const ttlSeconds = optionalNumber(options.ttlSeconds) ?? DEFAULT_RUNTIME_OVERLAY_TTL_SECONDS;
@@ -196,6 +214,8 @@ export function deriveModelGatewayRuntimeAccountOverlayFromHealth(health, option
             failureStatusCode: optionalNumber(health['lastFailureStatusCode']),
             disabled: failureKind === 'auth',
             observedFromHealthKey: optionalString(health['key']),
+            runtimeObservedAtMs: optionalNumber(health['runtimeObservedAtMs']),
+            runtimeHealthStatus: optionalString(health['runtimeHealthStatus']),
         },
         observedAt: observedMs,
         expiresAt: resolveExpiresAt(observedMs, resetAt, ttlSeconds),

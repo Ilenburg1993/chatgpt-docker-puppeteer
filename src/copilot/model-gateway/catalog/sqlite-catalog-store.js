@@ -462,6 +462,44 @@ function latestProbePerKind(probes) {
 }
 
 /**
+ * @param {{ payload_json: string; status?: string | null; classified_failure?: string | null; observed_at_ms?: number | null; expires_at_ms?: number | null; route_profile?: string | null; provider_id?: string | null; provider_model?: string | null }} row
+ * @returns {Record<string, unknown>}
+ */
+function parseRuntimeHealthRow(row) {
+    const payload = parsePayload(row.payload_json);
+    return {
+        ...payload,
+        providerId: optionalString(payload['providerId']) ?? optionalString(row.provider_id),
+        providerModel: optionalString(payload['providerModel']) ?? optionalString(row.provider_model),
+        routeProfile: optionalString(payload['routeProfile']) ?? optionalString(row.route_profile) ?? DEFAULT_ROUTE_PROFILE,
+        runtimeHealthStatus: optionalString(row.status),
+        runtimeClassifiedFailure: optionalString(row.classified_failure),
+        runtimeObservedAtMs: optionalInteger(row.observed_at_ms),
+        runtimeExpiresAtMs: optionalInteger(row.expires_at_ms),
+    };
+}
+
+/**
+ * @param {{ payload_json: string; probe_kind?: string | null; wire_api?: string | null; ok?: number | null; status?: string | null; observed_at_ms?: number | null; expires_at_ms?: number | null; route_profile?: string | null; provider_id?: string | null; provider_model?: string | null }} row
+ * @returns {Record<string, unknown>}
+ */
+function parseRuntimeProbeRow(row) {
+    const payload = parsePayload(row.payload_json);
+    return {
+        ...payload,
+        providerId: optionalString(payload['providerId']) ?? optionalString(row.provider_id),
+        providerModel: optionalString(payload['providerModel']) ?? optionalString(row.provider_model),
+        routeProfile: optionalString(payload['routeProfile']) ?? optionalString(row.route_profile) ?? DEFAULT_ROUTE_PROFILE,
+        kind: optionalString(payload['kind']) ?? optionalString(row.probe_kind),
+        wireApi: optionalString(payload['wireApi']) ?? optionalString(row.wire_api),
+        ok: typeof payload['ok'] === 'boolean' ? payload['ok'] : row.ok === 1,
+        status: optionalString(payload['status']) ?? optionalString(row.status) ?? 'unknown',
+        runtimeObservedAtMs: optionalInteger(row.observed_at_ms),
+        runtimeExpiresAtMs: optionalInteger(row.expires_at_ms),
+    };
+}
+
+/**
  * @param {Record<string, unknown>} event
  * @returns {string}
  */
@@ -1101,7 +1139,8 @@ export class SqliteModelGatewayCatalogStore {
         const healthRows = this.#db
             .prepare(
                 `
-                    SELECT payload_json
+                    SELECT provider_id, provider_model, route_profile, status, classified_failure,
+                           observed_at_ms, expires_at_ms, payload_json
                     FROM copilot_model_gateway_health_observations
                     WHERE provider_id = ?
                       AND provider_model = ?
@@ -1111,11 +1150,16 @@ export class SqliteModelGatewayCatalogStore {
                 `,
             )
             .all(provider, model, route, route, DEFAULT_ROUTE_PROFILE)
-            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+            .map((row) =>
+                parseRuntimeHealthRow(
+                    /** @type {{ provider_id: string; provider_model: string; route_profile: string; status: string; classified_failure: string | null; observed_at_ms: number; expires_at_ms: number | null; payload_json: string }} */ (row),
+                ),
+            );
         const probes = this.#db
             .prepare(
                 `
-                    SELECT payload_json
+                    SELECT provider_id, provider_model, route_profile, probe_kind, wire_api, ok,
+                           status, observed_at_ms, expires_at_ms, payload_json
                     FROM copilot_model_gateway_runtime_probe_results
                     WHERE provider_id = ?
                       AND provider_model = ?
@@ -1124,7 +1168,11 @@ export class SqliteModelGatewayCatalogStore {
                 `,
             )
             .all(provider, model, route, route, DEFAULT_ROUTE_PROFILE)
-            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+            .map((row) =>
+                parseRuntimeProbeRow(
+                    /** @type {{ provider_id: string; provider_model: string; route_profile: string; probe_kind: string; wire_api: string | null; ok: number; status: string; observed_at_ms: number; expires_at_ms: number | null; payload_json: string }} */ (row),
+                ),
+            );
         return {
             health: healthRows[0] ?? null,
             probes: latestProbePerKind(probes),
@@ -1140,14 +1188,19 @@ export class SqliteModelGatewayCatalogStore {
         return this.#db
             .prepare(
                 `
-                    SELECT payload_json
+                    SELECT provider_id, provider_model, route_profile, status, classified_failure,
+                           observed_at_ms, expires_at_ms, payload_json
                     FROM copilot_model_gateway_health_observations
                     ORDER BY observed_at_ms DESC, observation_key ASC
                     LIMIT ?
                 `,
             )
             .all(limit)
-            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json))
+            .map((row) =>
+                parseRuntimeHealthRow(
+                    /** @type {{ provider_id: string; provider_model: string; route_profile: string; status: string; classified_failure: string | null; observed_at_ms: number; expires_at_ms: number | null; payload_json: string }} */ (row),
+                ),
+            )
             .filter(isRecord);
     }
 
