@@ -1850,6 +1850,46 @@ describe('model-gateway foundation', () => {
         assert.ok(blocked.rejectedReasons.includes('provider_direct_required:gateway_fallback'));
     });
 
+    it('applies privacy strict, no-paid and max estimated cost policies before runtime', () => {
+        const paidTraining = {
+            id: 'openrouter:paid-training',
+            providerId: 'openrouter',
+            providerModel: 'paid-training',
+            capabilities: { streaming: true, tools: true },
+            pricing: { inputUsdPerMillion: 2, outputUsdPerMillion: 3 },
+            dataPolicy: { training: true, retainsPrompts: true },
+        };
+        const privateFree = {
+            id: 'openrouter:private-free',
+            providerId: 'openrouter',
+            providerModel: 'private-free',
+            capabilities: { streaming: true, tools: true, privacy: true },
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+            dataPolicy: { training: false, retainsPrompts: false },
+        };
+
+        const blocked = scoreGatewayModelCandidate(paidTraining, MODEL_GATEWAY_TASK_PROFILES.tool_agent, {
+            privacyStrict: true,
+            noPaidModels: true,
+            maxEstimatedCostPerMillion: 1,
+            requireAgentProbeOk: false,
+        });
+        const allowed = scoreGatewayModelCandidate(privateFree, MODEL_GATEWAY_TASK_PROFILES.tool_agent, {
+            privacyStrict: true,
+            noPaidModels: true,
+            maxEstimatedCostPerMillion: 1,
+            requireAgentProbeOk: false,
+        });
+
+        assert.equal(blocked.include, false);
+        assert.ok(blocked.rejectedReasons.includes('privacy_strict_not_satisfied'));
+        assert.ok(blocked.rejectedReasons.includes('paid_model_blocked:5'));
+        assert.ok(blocked.rejectedReasons.includes('price_above_limit:5>1'));
+        assert.equal(allowed.include, true);
+        assert.ok(allowed.reasons.includes('privacy_strict_satisfied'));
+        assert.ok(allowed.reasons.includes('price_within_preference:0<=1') === false);
+    });
+
     it('can apply pre-runtime eligibility before scoring runtime candidates', () => {
         const visible = createModelRecord({
             providerId: 'openai',

@@ -187,6 +187,18 @@ function dataPolicy(model) {
 }
 
 /**
+ * @param {Record<string, any>} model
+ * @returns {boolean}
+ */
+function privacyStrictSatisfied(model) {
+    const capabilities = isRecord(model['capabilities']) ? model['capabilities'] : {};
+    const policy = dataPolicy(model);
+    const noTraining = policy['training'] === false || policy['trainsOnPrompts'] === false;
+    const noRetention = policy['retainsPrompts'] === false || policy['retention'] === false;
+    return capabilities['privacy'] === true || (noTraining && noRetention);
+}
+
+/**
  * @param {unknown} actual
  * @param {unknown} expected
  * @returns {boolean}
@@ -318,7 +330,10 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
  *     requireProviderDirect?: boolean;
  *     requiredDataPolicy?: Record<string, unknown>;
  *     preferredDataPolicy?: Record<string, unknown>;
+ *     privacyStrict?: boolean;
+ *     noPaidModels?: boolean;
  *     maxPricePerMillion?: number;
+ *     maxEstimatedCostPerMillion?: number;
  *     preferredMaxPricePerMillion?: number;
  *     minimumConfidence?: string;
  *     preferredProbeKinds?: string[];
@@ -442,6 +457,14 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         reasons.push(`preferred_selector_kind:${selectorKind}`);
     }
     score = applyDataPolicyScoring(model, options, score, reasons, rejectedReasons);
+    if (options.privacyStrict === true) {
+        if (privacyStrictSatisfied(model)) {
+            score += 18;
+            reasons.push('privacy_strict_satisfied');
+        } else {
+            rejectedReasons.push('privacy_strict_not_satisfied');
+        }
+    }
 
     for (const capability of profile['requires'] ?? []) {
         if (!hasCapability(model, capability)) rejectedReasons.push(`missing_capability:${capability}`);
@@ -544,9 +567,10 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     }
 
     const price = pricePerMillion(model);
-    const maxPrice = optionNumber(options.maxPricePerMillion);
+    const maxPrice = optionNumber(options.maxPricePerMillion) ?? optionNumber(options.maxEstimatedCostPerMillion);
     const preferredMaxPrice = optionNumber(options.preferredMaxPricePerMillion);
     if (price !== null) {
+        if (options.noPaidModels === true && price > 0) rejectedReasons.push(`paid_model_blocked:${price}`);
         if (maxPrice !== null && price > maxPrice) rejectedReasons.push(`price_above_limit:${price}>${maxPrice}`);
         if (preferredMaxPrice !== null && price <= preferredMaxPrice) {
             score += 20;
@@ -557,6 +581,9 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         reasons.push(`price_per_million:${price}`);
     } else if (maxPrice !== null) {
         reasons.push('price_unknown_for_limit');
+        if (options.noPaidModels === true) rejectedReasons.push('price_unknown_for_no_paid_models');
+    } else if (options.noPaidModels === true) {
+        rejectedReasons.push('price_unknown_for_no_paid_models');
     }
 
     const latency = finiteNumber(options.latencyMsByModelId?.[String(model['id'] ?? '')]);

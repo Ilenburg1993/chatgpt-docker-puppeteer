@@ -2410,9 +2410,9 @@ Quota/account overlay mais rico.
 - [x] Criar policy para auto selectors.
 - [x] Criar policy para gateway fallback.
 - [x] Criar policy para provider direct required.
-- [ ] Criar policy para privacy strict.
-- [ ] Criar policy para no paid models.
-- [ ] Criar policy para max estimated cost.
+- [x] Criar policy para privacy strict.
+- [x] Criar policy para no paid models.
+- [x] Criar policy para max estimated cost.
 - [ ] Criar teste de selecao com provider upstream explicito.
 
 ### Faixa K - Runtime Probes
@@ -7079,6 +7079,58 @@ Agora o operador pode separar explicitamente:
 Essas policies continuam sem executar provider.
 
 Elas operam sobre metadados normalizados e route options.
+
+## 21.54 Mudanca 54 - Policies De Privacidade E Custo
+
+O scorer ganhou policies explicitas de privacidade e custo.
+
+Novas options:
+
+- `privacyStrict`;
+- `noPaidModels`;
+- `maxEstimatedCostPerMillion`.
+
+`privacyStrict=true` exige pelo menos uma das condicoes:
+
+- capability `privacy=true`;
+- data policy com nao treinamento e nao retencao de prompts.
+
+Campos aceitos para nao treinamento:
+
+- `training=false`;
+- `trainsOnPrompts=false`.
+
+Campos aceitos para nao retencao:
+
+- `retainsPrompts=false`;
+- `retention=false`.
+
+`noPaidModels=true` bloqueia modelos com custo conhecido maior que zero.
+
+Se custo estiver desconhecido, tambem bloqueia com:
+
+`price_unknown_for_no_paid_models`
+
+`maxEstimatedCostPerMillion` e alias de policy para `maxPricePerMillion`.
+
+Novas rejected reasons:
+
+- `privacy_strict_not_satisfied`;
+- `paid_model_blocked:<price>`;
+- `price_unknown_for_no_paid_models`;
+- `price_above_limit:<price>><limit>`.
+
+Novo positive signal:
+
+- `privacy_strict_satisfied`.
+
+Estas policies seguem a separacao de camadas:
+
+- usam metadados;
+- nao executam provider;
+- nao dependem de runtime proof.
+
+Elas ajudam perfis sensiveis a custo e privacidade antes de qualquer probe.
 
 ## 22. Fim Do Documento Inicial
 
