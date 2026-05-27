@@ -3561,6 +3561,30 @@ Retencao nao toca metadata projections.
 
 Retencao nao exige rebuild.
 
+`scripts/model-gateway-sqlite-retention.mjs` agora aceita:
+
+- `--runtime-probe-run-max-rows`
+- `--runtime-probe-result-max-rows`
+- `--health-observation-max-rows`
+
+Dry-run validado:
+
+`node scripts/model-gateway-sqlite-retention.mjs --json --runtime-probe-run-max-rows=1 --runtime-probe-result-max-rows=1 --health-observation-max-rows=1`
+
+Resultado observado:
+
+`applied=false`
+
+`beforeRuntime=24`
+
+`afterRuntime=24`
+
+`npm --silent run model-gateway:sqlite:retention -- --json`
+
+Resultado observado:
+
+`healthObservationMaxRows=100000`
+
 Proximo passo:
 
 Conectar runtime persisted aos explain/readiness finais com policy clara para cada perfil.

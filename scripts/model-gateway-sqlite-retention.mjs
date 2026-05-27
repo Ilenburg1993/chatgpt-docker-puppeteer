@@ -30,7 +30,7 @@ if (hasFlag('--json')) {
 if (hasFlag('--help') || hasFlag('-h')) {
     process.stdout.write(`Usage: node scripts/model-gateway-sqlite-retention.mjs [options]
 
-Apply operational SQLite retention for model-gateway account/key history, route decisions and refresh logs.
+Apply operational SQLite retention for model-gateway account/key history, route decisions, refresh logs and runtime health.
 By default this is a dry run. Pass --apply to delete rows beyond the configured limits.
 
 Options:
@@ -38,6 +38,9 @@ Options:
   --account-history-max-rows=<n>       Rows to keep per account history table.
   --route-decision-max-rows=<n>        Route decision rows to keep.
   --refresh-log-max-rows=<n>           Refresh log rows to keep.
+  --runtime-probe-run-max-rows=<n>     Runtime probe run rows to keep.
+  --runtime-probe-result-max-rows=<n>  Runtime probe result rows to keep.
+  --health-observation-max-rows=<n>    Runtime health observation rows to keep.
   --json                               Emit machine-readable JSON.
 
 Examples:
@@ -57,6 +60,18 @@ const policy = {
         DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.routeDecisionMaxRows,
     ),
     refreshLogMaxRows: numberFor('--refresh-log-max-rows', DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows),
+    runtimeProbeRunMaxRows: numberFor(
+        '--runtime-probe-run-max-rows',
+        DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.runtimeProbeRunMaxRows,
+    ),
+    runtimeProbeResultMaxRows: numberFor(
+        '--runtime-probe-result-max-rows',
+        DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.runtimeProbeResultMaxRows,
+    ),
+    healthObservationMaxRows: numberFor(
+        '--health-observation-max-rows',
+        DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.healthObservationMaxRows,
+    ),
 };
 const store = new SqliteModelGatewayCatalogStore();
 const before = await store.readStorageDiagnostics();
@@ -77,13 +92,13 @@ if (hasFlag('--json')) {
     process.stdout.write(`model-gateway SQLite operational retention\n`);
     process.stdout.write(`mode=${hasFlag('--apply') ? 'apply' : 'dry-run'}\n`);
     process.stdout.write(
-        `policy: accountHistoryMaxRowsPerTable=${policy.accountHistoryMaxRowsPerTable} routeDecisionMaxRows=${policy.routeDecisionMaxRows} refreshLogMaxRows=${policy.refreshLogMaxRows}\n`,
+        `policy: accountHistoryMaxRowsPerTable=${policy.accountHistoryMaxRowsPerTable} routeDecisionMaxRows=${policy.routeDecisionMaxRows} refreshLogMaxRows=${policy.refreshLogMaxRows} runtimeProbeRunMaxRows=${policy.runtimeProbeRunMaxRows} runtimeProbeResultMaxRows=${policy.runtimeProbeResultMaxRows} healthObservationMaxRows=${policy.healthObservationMaxRows}\n`,
     );
     process.stdout.write(
-        `before: accountHistory=${before.accountHistoryRows} routeDecisions=${before.routeDecisionRows} refreshLogs=${before.refreshLogRows}\n`,
+        `before: accountHistory=${before.accountHistoryRows} routeDecisions=${before.routeDecisionRows} refreshLogs=${before.refreshLogRows} runtime=${before.runtimeRows}\n`,
     );
     process.stdout.write(
-        `after: accountHistory=${after.accountHistoryRows} routeDecisions=${after.routeDecisionRows} refreshLogs=${after.refreshLogRows}\n`,
+        `after: accountHistory=${after.accountHistoryRows} routeDecisions=${after.routeDecisionRows} refreshLogs=${after.refreshLogRows} runtime=${after.runtimeRows}\n`,
     );
     if (result) process.stdout.write(`deleted=${result.deletedRows}\n`);
 }
