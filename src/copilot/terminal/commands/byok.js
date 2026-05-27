@@ -23,6 +23,7 @@ import {
     buildProbeCompletedEvent,
     auditCatalogImporterSet,
     auditModelGatewayCatalogSnapshotIntegrity,
+    auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
     classifyByokProviderFailure,
     clearByokProviderModelHealth,
@@ -2585,6 +2586,7 @@ async function renderByokGatewaySelectionAudit(println, rest) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const snapshot = await store.readSnapshot();
     const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
+    const secretRegistry = createEnvSecretRegistry();
     const healthRecords = args.effective ? listByokProviderModelHealth() : [];
     const runtimeOverlays = args.effective ? deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords) : [];
     const evaluationNow = new Date();
@@ -2594,7 +2596,7 @@ async function renderByokGatewaySelectionAudit(println, rest) {
     const effectiveEligibility = args.effective
         ? evaluateModelGatewayCatalogEligibility({
               snapshot,
-              secretRegistry: createEnvSecretRegistry(),
+              secretRegistry,
               healthRecords,
               now: () => evaluationNow,
               policy: {
@@ -2617,8 +2619,16 @@ async function renderByokGatewaySelectionAudit(println, rest) {
     const selection = auditModelGatewayPreRuntimeSelection(selectionSnapshot, {
         strict: args.strict,
         profiles: args.profiles,
-        secretRegistry: createEnvSecretRegistry(),
+        secretRegistry,
     });
+    const postRuntimeSelection = args.effective
+        ? auditModelGatewayPostRuntimeSelection(selectionSnapshot, {
+              strict: args.strict,
+              profiles: args.profiles,
+              secretRegistry,
+              runtimeHealthRecords: healthRecords,
+          })
+        : null;
     println(`\n  \x1b[36mBYOK model-gateway selection audit\x1b[0m`);
     println(
         `  \x1b[90mstore=${store.filePath} · integrity=${integrity.ok ? 'ok' : 'falha'} · mode=${selection.mode}${args.effective ? '+effective' : ''} · runtime=nao · persisted=nao · profiles=${selection.summary.selectedProfileCount}/${selection.summary.profileCount}\x1b[0m`,
@@ -2629,6 +2639,9 @@ async function renderByokGatewaySelectionAudit(println, rest) {
     if (args.effective) {
         println(
             `  \x1b[90mobservedHealth=${healthRecords.length} · runtimeOverlays=${runtimeOverlays.length} · active=${runtimeOverlaySummary?.activeCount ?? 0} · expired=${runtimeOverlaySummary?.expiredCount ?? 0} · failures=${formatCountMap(runtimeOverlaySummary?.byFailureKind ?? {})} · providers=${formatCountMap(runtimeOverlaySummary?.byProvider ?? {})} · effectiveEligibility=${effectiveEligibility?.decisions.length ?? 0}\x1b[0m\n`,
+        );
+        println(
+            `  \x1b[90mpostRuntimeProfiles=${postRuntimeSelection?.summary.selectedProfileCount ?? 0}/${postRuntimeSelection?.summary.profileCount ?? 0} · healthMatches=${postRuntimeSelection?.summary.healthRecordCount ?? 0} · healthProofs=${postRuntimeSelection?.summary.runtimeHealthProofCount ?? 0} · agentProofs=${postRuntimeSelection?.summary.runtimeAgentProbeProofCount ?? 0} · probeProofs=${postRuntimeSelection?.summary.runtimeProbeProofCount ?? 0} · postProviders=${formatCountMap(postRuntimeSelection?.summary.selectedProviders ?? {})}\x1b[0m\n`,
         );
     }
     for (const profile of selection.profiles) {

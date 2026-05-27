@@ -5149,6 +5149,65 @@ Checklist atualizada por esta mudanca:
 - [ ] Criar politica para pesos distintos entre chat ok, agent probe e probes de capability especifica.
 - [ ] Criar explain terminal com diff pre-runtime vs pos-runtime.
 
+Mudanca 29:
+
+O terminal passou a exibir a auditoria pos-runtime dentro de `/byok gateway selection audit effective`.
+
+Antes:
+
+- o comando efetivo calculava eligibility com health observado;
+- depois chamava apenas a auditoria pre-runtime sobre o snapshot effective;
+- o operador via `observedHealth` e `runtimeOverlays`, mas nao via como runtime proofs afetariam ranking.
+
+Depois:
+
+- o comando continua mostrando a selecao effective pre-runtime;
+- quando `effective` esta ativo, tambem chama `auditModelGatewayPostRuntimeSelection`;
+- a saida mostra:
+  - `postRuntimeProfiles`;
+  - `healthMatches`;
+  - `healthProofs`;
+  - `agentProofs`;
+  - `probeProofs`;
+  - `postProviders`.
+
+Principio mantido:
+
+- o terminal nao executa probes nessa auditoria;
+- o terminal nao persiste nova eligibility;
+- o terminal nao altera o catalogo canonico;
+- a visualizacao serve para comparar metadata/account state com sinais runtime ja observados.
+
+Teste focado executado:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js -t "seleção efetiva|seleção pré-runtime"`
+
+Resultado:
+
+- `3 passed`
+
+Readiness observado:
+
+`npm --silent run model-gateway:live:readiness`
+
+Resumo:
+
+- `ok=true`
+- `selection_post_runtime_observed_health=true`
+- `healthMatches=49`
+- `healthProofs=14`
+- `agentProofs=7`
+- `probeProofs=7`
+
+Checklist atualizada por esta mudanca:
+
+- [x] Integrar auditoria pos-runtime ao terminal.
+- [x] Reusar o mesmo `secretRegistry` no fluxo terminal effective.
+- [x] Mostrar contadores de proof no comando humano.
+- [x] Cobrir chamada terminal com teste unitario.
+- [ ] Criar formato de tabela comparando provider selecionado pre-runtime vs pos-runtime por perfil.
+- [ ] Permitir flag terminal para exigir runtime proof em auditoria pos-runtime.
+
 ## 19. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
