@@ -1812,6 +1812,11 @@ describe('model-gateway foundation', () => {
         assert.equal(blocked.include, false);
         assert.ok(blocked.rejectedReasons.includes('provider_blocked'));
         assert.ok(blocked.score > 0);
+        assert.equal(blocked.scoreBreakdown.baseScore, 100);
+        assert.equal(blocked.scoreBreakdown.finalScore, blocked.score);
+        assert.equal(blocked.scoreBreakdown.hardGateCount, 1);
+        assert.equal(blocked.scoreBreakdown.rejectedGroups.provider_blocked, 1);
+        assert.equal(blocked.scoreBreakdown.groups.confidence, 1);
     });
 
     it('can apply pre-runtime eligibility before scoring runtime candidates', () => {

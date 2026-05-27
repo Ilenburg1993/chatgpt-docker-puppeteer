@@ -2406,7 +2406,7 @@ Quota/account overlay mais rico.
 - [x] Effective selection com observed health.
 - [x] Persistir selection audit quando solicitado.
 - [x] Criar explain diff entre metadata-only e effective.
-- [ ] Criar score decomposition mais estavel.
+- [x] Criar score decomposition mais estavel.
 - [ ] Criar policy para auto selectors.
 - [ ] Criar policy para gateway fallback.
 - [ ] Criar policy para provider direct required.
@@ -6981,6 +6981,56 @@ Agora a camada consegue distinguir:
 - mesma rota sem prova.
 
 Essa leitura sera usada para policy de auto selectors, gateway fallback e runtime proof.
+
+## 21.52 Mudanca 52 - Score Breakdown Estavel
+
+O scorer agora retorna `scoreBreakdown`.
+
+Campos:
+
+- `baseScore`;
+- `finalScore`;
+- `delta`;
+- `hardGateCount`;
+- `positiveSignals`;
+- `negativeSignals`;
+- `groups`;
+- `rejectedGroups`.
+
+O objetivo e explicar ranking sem alterar ranking.
+
+O score final continua o mesmo.
+
+O breakdown e derivado das reasons e rejected reasons existentes.
+
+Grupos iniciais:
+
+- capability;
+- context;
+- confidence;
+- cost;
+- data policy;
+- eligibility;
+- preference;
+- route policy;
+- runtime health;
+- runtime probe;
+- outros prefixos estaveis.
+
+`selectedSummary()` agora preserva `scoreBreakdown` quando disponivel.
+
+Isso melhora:
+
+- selection audit;
+- decision trace;
+- terminal;
+- futuro runtime selector real.
+
+Tambem reduz dependencia de interpretar strings soltas no momento de explicar uma selecao.
+
+Ainda ha espaco para uma decomposicao com deltas exatos por componente.
+
+Mas a camada atual ja estabiliza categorias e sinais sem reescrever a politica.
 
 ## 22. Fim Do Documento Inicial
 

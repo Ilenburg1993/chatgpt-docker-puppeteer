@@ -228,6 +228,55 @@ function stringSet(value) {
 }
 
 /**
+ * @param {string} reason
+ * @returns {string}
+ */
+function reasonGroup(reason) {
+    const [prefix] = reason.split(':');
+    if (!prefix) return 'unknown';
+    if (prefix.startsWith('preferred')) return 'preference';
+    if (prefix.startsWith('runtime_probe') || prefix.includes('probe')) return 'runtime_probe';
+    if (prefix.includes('health')) return 'runtime_health';
+    if (prefix.includes('price') || prefix.includes('cost')) return 'cost';
+    if (prefix.includes('capability')) return 'capability';
+    if (prefix.includes('context')) return 'context';
+    if (prefix.includes('confidence')) return 'confidence';
+    if (prefix.includes('eligibility')) return 'eligibility';
+    if (prefix.includes('data_policy')) return 'data_policy';
+    if (prefix.includes('route') || prefix.includes('wire') || prefix.includes('upstream') || prefix.includes('selector')) return 'route_policy';
+    return prefix;
+}
+
+/**
+ * @param {string[]} reasons
+ * @param {string[]} rejectedReasons
+ * @param {number} baseScore
+ * @param {number} finalScore
+ * @returns {{ baseScore: number; finalScore: number; delta: number; hardGateCount: number; positiveSignals: string[]; negativeSignals: string[]; groups: Record<string, number>; rejectedGroups: Record<string, number> }}
+ */
+function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
+    /** @type {Record<string, number>} */
+    const groups = {};
+    /** @type {Record<string, number>} */
+    const rejectedGroups = {};
+    for (const reason of reasons) groups[reasonGroup(reason)] = (groups[reasonGroup(reason)] ?? 0) + 1;
+    for (const reason of rejectedReasons) rejectedGroups[reasonGroup(reason)] = (rejectedGroups[reasonGroup(reason)] ?? 0) + 1;
+    const negativeSignals = reasons.filter((reason) =>
+        /(?:missing|failed|unknown_for_limit|price_per_million|latency_ms|penalty|below|too_small)/iu.test(reason),
+    );
+    return {
+        baseScore,
+        finalScore,
+        delta: finalScore - baseScore,
+        hardGateCount: rejectedReasons.length,
+        positiveSignals: reasons.filter((reason) => !negativeSignals.includes(reason)).slice(0, 16),
+        negativeSignals: [...negativeSignals, ...rejectedReasons].slice(0, 16),
+        groups,
+        rejectedGroups,
+    };
+}
+
+/**
  * @param {Record<string, any>} model
  * @param {Record<string, any>} profile
  * @param {{
@@ -272,6 +321,7 @@ function stringSet(value) {
  *     score: number;
  *     reasons: string[];
  *     rejectedReasons: string[];
+ *     scoreBreakdown: ReturnType<typeof buildScoreBreakdown>;
  *     eligibility: Record<string, any> | null;
  *     health: ReturnType<typeof evaluateGatewayModelHealthRoute>['health'];
  * }}
@@ -486,6 +536,7 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         score,
         reasons,
         rejectedReasons,
+        scoreBreakdown: buildScoreBreakdown(reasons, rejectedReasons, 100, score),
         eligibility,
         health: healthDecision.health,
     };
