@@ -380,8 +380,16 @@ describe('model-gateway foundation', () => {
         assert.equal(resolveModelGatewayTaskProfile('repo-agent')?.requireAgentProbeOk, true);
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.requires, ['text', 'streaming']);
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.vision.softRequires, ['vision']);
+        assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.local_private.requires, [
+            'text',
+            'streaming',
+            'local',
+            'privacy',
+            'no_remote_secrets',
+        ]);
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.local_private.supplyWarns, ['local', 'privacy', 'no_remote_secrets']);
         assert.equal(MODEL_GATEWAY_TASK_PROFILES.local_private.localProviderOptIn, true);
+        assert.equal(MODEL_GATEWAY_TASK_PROFILES.local_private.defaultAudit, false);
         assert.equal(MODEL_GATEWAY_TASK_PROFILES.local_private_strict.defaultAudit, false);
         assert.equal(MODEL_GATEWAY_TASK_PROFILES.local_private_strict.localProviderOptIn, true);
         assert.deepEqual(MODEL_GATEWAY_TASK_PROFILES.local_private_strict.requires, [
@@ -599,19 +607,21 @@ describe('model-gateway foundation', () => {
             profiles: ['local_private'],
             secretRegistry: { has: () => true },
         });
-        assert.equal(localPrivateAudit.profiles[0].capabilitySupply.preferred.local, 0);
-        assert.equal(localPrivateAudit.profiles[0].capabilitySupply.preferred.privacy, 0);
-        assert.equal(localPrivateAudit.profiles[0].capabilitySupply.preferred.no_remote_secrets, 0);
-        assert.deepEqual(localPrivateAudit.profiles[0].supplyWarnings, [
-            'preferred_supply_zero:local',
-            'preferred_supply_zero:privacy',
-            'preferred_supply_zero:no_remote_secrets',
-        ]);
+        assert.equal(localPrivateAudit.ok, false);
+        assert.equal(localPrivateAudit.profiles[0].selected, null);
+        assert.equal(localPrivateAudit.profiles[0].capabilitySupply.required.local, 0);
+        assert.equal(localPrivateAudit.profiles[0].capabilitySupply.required.privacy, 0);
+        assert.equal(localPrivateAudit.profiles[0].capabilitySupply.required.no_remote_secrets, 0);
+        assert.ok(localPrivateAudit.profiles[0].supplyWarnings.includes('required_supply_zero:local'));
+        assert.ok(localPrivateAudit.profiles[0].supplyWarnings.includes('required_supply_zero:privacy'));
+        assert.ok(localPrivateAudit.profiles[0].supplyWarnings.includes('required_supply_zero:no_remote_secrets'));
+        assert.ok(localPrivateAudit.profiles[0].topRejectedReasons.includes('missing_capability:local'));
+        assert.ok(localPrivateAudit.profiles[0].nextActions.includes('start_or_configure_explicit_local_provider'));
 
         const defaultProfileAudit = auditModelGatewayPreRuntimeSelection(snapshot, {
             secretRegistry: { has: () => true },
         });
-        assert.equal(defaultProfileAudit.summary.profileCount, 8);
+        assert.equal(defaultProfileAudit.summary.profileCount, 7);
 
         const defaultWithOllamaAudit = auditModelGatewayPreRuntimeSelection(
             {
@@ -661,7 +671,7 @@ describe('model-gateway foundation', () => {
                 secretRegistry: { has: () => true },
             },
         );
-        assert.equal(defaultWithOllamaAudit.summary.profileCount, 8);
+        assert.equal(defaultWithOllamaAudit.summary.profileCount, 7);
         assert.equal(defaultWithOllamaAudit.profiles.some((profile) => profile.selected?.['providerId'] === 'ollama-local'), false);
         assert.ok(defaultWithOllamaAudit.summary.rejectedReasonCounts['local_provider_requires_explicit_request'] > 0);
 

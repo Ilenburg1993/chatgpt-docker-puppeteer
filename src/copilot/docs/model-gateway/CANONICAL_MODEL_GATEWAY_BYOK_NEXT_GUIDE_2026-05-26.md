@@ -4500,7 +4500,113 @@ Checklist atualizada por esta mudanca:
 - [x] Confirmar zero vazamentos em JSON e SQLite.
 - [x] Confirmar zero identidades redigidas no catalogo persistido.
 - [x] Confirmar selecao pre-runtime sem executar runtime.
-- [ ] Investigar selecao `local_private`: ela nao seleciona Ollama por default, mas ainda pode escolher remoto quando nao ha local opt-in; decidir se esse perfil deve exigir opt-in local estrito ou permanecer como preferencia fraca.
+- [x] Investigar selecao `local_private`: ela nao seleciona Ollama por default, mas ainda podia escolher remoto quando nao ha local opt-in.
+
+Mudanca 24:
+
+Perfil `local_private` deixou de cair silenciosamente para remoto.
+
+Descoberta:
+
+A selecao efetiva pos-build ainda incluia `local_private` no conjunto default.
+
+Como o perfil antigo exigia apenas:
+
+- `text`
+- `streaming`
+
+E tratava:
+
+- `local`
+- `privacy`
+- `no_remote_secrets`
+
+como preferencias/supply warnings, o roteador podia selecionar um modelo remoto para um perfil chamado `local_private`.
+
+Isso era semanticamente perigoso.
+
+Decisao arquitetural:
+
+O default do gateway deve selecionar modelos remotos/normais sem Ollama local.
+
+O operador pode pedir local/private explicitamente.
+
+Mas, quando pedir, o perfil local/private deve significar local/private de verdade.
+
+Correcao:
+
+`src/copilot/model-gateway/routing/task-profiles.js`
+
+`local_private` agora:
+
+- tem `defaultAudit=false`;
+- exige `local`;
+- exige `privacy`;
+- exige `no_remote_secrets`;
+- preserva `localProviderOptIn=true`.
+
+Assim:
+
+- o default nao avalia `local_private`;
+- `local_private` explicito nao seleciona remoto por fallback;
+- `local_private` explicito falha antes de runtime se nao houver local elegivel;
+- `local_private_strict` permanece como perfil/alias estrito para comandos canonicos e checks dedicados.
+
+`src/copilot/model-gateway/routing/explain.js`
+
+Quando aparecem:
+
+- `missing_capability:local`
+- `missing_capability:privacy`
+- `missing_capability:no_remote_secrets`
+
+o plano de acao agora inclui:
+
+`start_or_configure_explicit_local_provider`
+
+Validacao focada executada:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "canonical task profiles|pre-runtime selection|Ollama local candidates"`
+
+Resultado:
+
+`4 passed`
+
+Selecao efetiva default pos-mudanca:
+
+`npm --silent run model-gateway:selection:effective`
+
+Resultado observado:
+
+- `ok=true`
+- `profileCount=7`
+- `selectedProfileCount=7`
+- `selectedProviders={zai:1,chutes:5,cerebras:1}`
+- perfis default: `cheap_chat`, `code`, `repo_agent`, `tool_agent`, `json_extraction`, `vision`, `deep_reasoning`
+- `localProviderOptIn.hasBlocks=false`
+
+Selecao efetiva explicita local/private:
+
+`npm --silent run model-gateway:selection:effective -- --profile local_private`
+
+Resultado observado:
+
+- `ok=false`
+- `profileCount=1`
+- `selectedProfileCount=0`
+- `selected=null`
+- `topRejectedReasons` inclui `missing_capability:local`
+- `topRejectedReasons` inclui `missing_capability:privacy`
+- `topRejectedReasons` inclui `missing_capability:no_remote_secrets`
+- `nextActions` inclui `start_or_configure_explicit_local_provider`
+
+Checklist atualizada por esta mudanca:
+
+- [x] Remover `local_private` do conjunto default.
+- [x] Impedir fallback remoto silencioso para perfil local/private.
+- [x] Manter Ollama/local como suporte opt-in, nao default.
+- [x] Adicionar next action explicita para configurar provider local.
+- [ ] Decidir se `local_private` e `local_private_strict` devem ser fundidos no futuro ou se um deles deve permanecer como alias operacional.
 
 Validacoes executadas:
 

@@ -124,6 +124,13 @@ function nextActions(reasons) {
     if (reasons.some((reason) => reason.startsWith('eligibility:secret_missing'))) actions.push('configure_required_secret');
     if (reasons.includes('eligibility:account_model_not_visible')) actions.push('refresh_account_overlay_or_choose_visible_model');
     if (reasons.includes('eligibility:account_access_unknown')) actions.push('collect_account_overlay_before_runtime');
+    if (
+        reasons.includes('missing_capability:local') ||
+        reasons.includes('missing_capability:privacy') ||
+        reasons.includes('missing_capability:no_remote_secrets')
+    ) {
+        actions.push('start_or_configure_explicit_local_provider');
+    }
     if (reasons.some((reason) => reason.startsWith('missing_capability:'))) actions.push('choose_model_with_required_capabilities');
     if (reasons.some((reason) => reason.startsWith('context_too_small:'))) actions.push('choose_larger_context_model_or_compact');
     if (reasons.some((reason) => reason.startsWith('route_layer_blocked:'))) actions.push('relax_route_layer_policy_or_choose_allowed_route');

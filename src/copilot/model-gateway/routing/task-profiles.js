@@ -69,12 +69,13 @@ export const MODEL_GATEWAY_TASK_PROFILES = Object.freeze({
     local_private: Object.freeze({
         id: 'local_private',
         displayName: 'Local/private',
-        requires: Object.freeze(['text', 'streaming']),
+        requires: Object.freeze(['text', 'streaming', 'local', 'privacy', 'no_remote_secrets']),
         prefers: Object.freeze(['local', 'privacy', 'no_remote_secrets']),
         supplyWarns: Object.freeze(['local', 'privacy', 'no_remote_secrets']),
         localProviderOptIn: true,
         minContextWindowTokens: 8_000,
         requireAgentProbeOk: false,
+        defaultAudit: false,
     }),
     local_private_strict: Object.freeze({
         id: 'local_private_strict',
