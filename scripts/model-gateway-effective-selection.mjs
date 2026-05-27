@@ -90,7 +90,7 @@ let sqliteHealthRecords = [];
 let sqliteRuntimeError = null;
 if (runtimeSource === 'sqlite' || runtimeSource === 'merged') {
     try {
-        sqliteHealthRecords = await new SqliteModelGatewayCatalogStore().listRuntimeHealthRecords();
+        sqliteHealthRecords = await new SqliteModelGatewayCatalogStore().listLatestRuntimeHealthRecords();
     } catch (error) {
         sqliteRuntimeError = error instanceof Error ? error.message : String(error);
     }

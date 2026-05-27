@@ -3458,6 +3458,7 @@ describe('model-gateway foundation', () => {
                 providerModel: 'openai/gpt-oss-120b',
             });
             const runtimeRecords = await store.listRuntimeHealthRecords();
+            const latestRuntimeRecords = await store.listLatestRuntimeHealthRecords();
 
             assert.equal(diagnostics.runtimeRows, 6);
             assert.equal(diagnostics.runtime.probeRuns, 2);
@@ -3470,6 +3471,8 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.runtime.probeStatusCounts['ok'], 1);
             assert.equal(diagnostics.runtime.probeStatusCounts['failed'], 1);
             assert.equal(runtimeRecords.length, 2);
+            assert.equal(latestRuntimeRecords.length, 1);
+            assert.equal(latestRuntimeRecords[0]?.['runtimeHealthStatus'], 'ok');
             assert.equal(runtime.health?.['lastStatus'], 'ok');
             assert.equal(runtime.probes.length, 1);
             assert.equal(runtime.probes[0]?.['status'], 'ok');

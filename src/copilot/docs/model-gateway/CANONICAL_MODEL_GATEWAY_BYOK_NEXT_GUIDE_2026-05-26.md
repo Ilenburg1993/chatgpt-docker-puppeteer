@@ -3844,6 +3844,41 @@ Resultado:
 
 `3 passed`
 
+Mudanca 17:
+
+SQLite store agora tem leitura latest-per-route para runtime health.
+
+Novo metodo:
+
+`listLatestRuntimeHealthRecords`
+
+Semantica:
+
+Retorna apenas o health observation mais recente por:
+
+- provider_id
+- provider_model
+- route_profile
+
+Implementacao:
+
+Usa `ROW_NUMBER() OVER (PARTITION BY ...)`.
+
+Motivo:
+
+Selection effective e live readiness nao devem varrer historico bruto quando so precisam do estado runtime efetivo atual.
+
+Historico completo continua disponivel em:
+
+`listRuntimeHealthRecords`
+
+Uso atualizado:
+
+- `scripts/model-gateway-effective-selection.mjs`
+- `scripts/model-gateway-live-readiness.mjs`
+
+Isso prepara o banco para crescer sem tornar as camadas de selecao mais caras do que o necessario.
+
 Validacoes deste ajuste:
 
 `node --check src/copilot/model-gateway/catalog/sqlite-catalog-store.js`

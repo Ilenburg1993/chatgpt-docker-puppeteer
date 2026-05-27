@@ -1205,6 +1205,40 @@ export class SqliteModelGatewayCatalogStore {
     }
 
     /**
+     * @param {{ limit?: number }} [options]
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async listLatestRuntimeHealthRecords(options = {}) {
+        const limit = Math.max(1, optionalInteger(options.limit) ?? 10_000);
+        return this.#db
+            .prepare(
+                `
+                    SELECT provider_id, provider_model, route_profile, status, classified_failure,
+                           observed_at_ms, expires_at_ms, payload_json
+                    FROM (
+                        SELECT provider_id, provider_model, route_profile, status, classified_failure,
+                               observed_at_ms, expires_at_ms, payload_json, observation_key,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY provider_id, provider_model, route_profile
+                                   ORDER BY observed_at_ms DESC, observation_key DESC
+                               ) AS row_number
+                        FROM copilot_model_gateway_health_observations
+                    )
+                    WHERE row_number = 1
+                    ORDER BY observed_at_ms DESC, observation_key ASC
+                    LIMIT ?
+                `,
+            )
+            .all(limit)
+            .map((row) =>
+                parseRuntimeHealthRow(
+                    /** @type {{ provider_id: string; provider_model: string; route_profile: string; status: string; classified_failure: string | null; observed_at_ms: number; expires_at_ms: number | null; payload_json: string }} */ (row),
+                ),
+            )
+            .filter(isRecord);
+    }
+
+    /**
      * @param {Record<string, unknown>[]} events
      * @returns {Promise<{ routeDecisions: number }>}
      */

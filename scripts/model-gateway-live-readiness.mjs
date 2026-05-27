@@ -114,7 +114,7 @@ const fileHealthRecords = listByokProviderModelHealth();
 let sqliteHealthRecords = [];
 let sqliteRuntimeError = null;
 try {
-    sqliteHealthRecords = await sqliteStore.listRuntimeHealthRecords();
+    sqliteHealthRecords = await sqliteStore.listLatestRuntimeHealthRecords();
 } catch (error) {
     sqliteRuntimeError = error instanceof Error ? error.message : String(error);
 }
