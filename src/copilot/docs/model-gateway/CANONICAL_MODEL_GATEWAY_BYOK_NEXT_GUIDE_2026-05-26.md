@@ -5938,6 +5938,48 @@ Esses pontos pertencem a proxima camada.
 - [ ] Conectar backoff/rate-limit dinamico ao retry.
 - [ ] Criar live tests llm-b baseados no plano.
 
+### 21.6 Gate De Live Readiness
+
+O script:
+
+`scripts/model-gateway-live-readiness.mjs`
+
+Agora calcula tambem um `runtimeSelectorPlan`.
+
+Foi adicionado o check:
+
+`runtime_selector_plan_ready`
+
+Esse check exige:
+
+- plano `ready=true`;
+- zero profiles bloqueados;
+- contagem de rotas selecionadas coerente com os profiles.
+
+O script:
+
+`scripts/model-gateway-live-plan.mjs`
+
+Agora inclui esse check como pre-requisito antes de qualquer fase llm-b.
+
+Resultado observado sem runtime:
+
+- readiness `ok=true`;
+- `runtime_selector_plan_ready=true`;
+- `7/7 routes selected`;
+- `blocked=0`;
+- `proofSelected=0`;
+- proximo comando ainda e o controle seguro `--no-pr`.
+
+Isso confirma que ainda nao devemos saltar direto para BYOK real/full turn.
+
+A ordem correta continua:
+
+1. controle terminal sem PR;
+2. fixture BYOK;
+3. BYOK real sem PR;
+4. BYOK real full turn.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
