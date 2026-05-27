@@ -6,6 +6,7 @@
  */
 
 import { normalizeModelGatewayAccountLimitState } from './limits.js';
+import { evaluateModelGatewayAccountOverlayFreshness } from './freshness.js';
 
 /**
  * @param {unknown} value
@@ -29,16 +30,6 @@ function optionalString(value) {
  */
 function arrayLength(value) {
     return Array.isArray(value) ? value.length : 0;
-}
-
-/**
- * @param {unknown} value
- * @returns {number | null}
- */
-function dateMs(value) {
-    if (value === null || value === undefined) return null;
-    const date = value instanceof Date ? value : new Date(/** @type {string | number} */ (value));
-    return Number.isFinite(date.getTime()) ? date.getTime() : null;
 }
 
 /**
@@ -108,6 +99,10 @@ function limitSourceLayer(sourceKind) {
  *     resetAt: string | null;
  *     quotaResetActive: boolean;
  *     quotaResetExpired: boolean;
+ *     freshnessStatus: string;
+ *     freshnessAgeSeconds: number | null;
+ *     freshnessTtlSeconds: number;
+ *     effectiveExpiresAt: string | null;
  *     remainingUsd: number | null;
  *     remainingCreditsUsd: number | null;
  *   }>;
@@ -122,6 +117,7 @@ export function summarizeModelGatewayAccountOverlays(overlays, options = {}) {
         .map((overlay) => {
             const limitOptions = options.now === undefined ? {} : { now: options.now };
             const limits = normalizeModelGatewayAccountLimitState(overlay, limitOptions);
+            const freshness = evaluateModelGatewayAccountOverlayFreshness(overlay, limitOptions);
             return {
                 accountOverlayId: optionalString(overlay['accountOverlayId']) ?? [
                     optionalString(overlay['providerId']) ?? 'unknown-provider',
@@ -143,6 +139,10 @@ export function summarizeModelGatewayAccountOverlays(overlays, options = {}) {
                 resetAt: limits.resetAt,
                 quotaResetActive: limits.quota.resetActive,
                 quotaResetExpired: limits.quota.resetExpired,
+                freshnessStatus: freshness.status,
+                freshnessAgeSeconds: freshness.ageSeconds,
+                freshnessTtlSeconds: freshness.ttlSeconds,
+                effectiveExpiresAt: freshness.effectiveExpiresAt,
                 remainingUsd: limits.spending.remainingUsd,
                 remainingCreditsUsd: limits.quota.remainingCreditsUsd,
             };
@@ -183,6 +183,10 @@ export function summarizeModelGatewayAccountOverlays(overlays, options = {}) {
  *     retryAfterSeconds: number | null;
  *     resetAt: string | null;
  *     expiresAt: string | null;
+ *     freshnessStatus: string;
+ *     freshnessAgeSeconds: number | null;
+ *     freshnessTtlSeconds: number;
+ *     effectiveExpiresAt: string | null;
  *     remainingUsd: number | null;
  *     remainingCreditsUsd: number | null;
  *     failureKind: string | null;
@@ -203,7 +207,6 @@ export function summarizeModelGatewayAccountOverlays(overlays, options = {}) {
  */
 export function explainModelGatewayAccountLimitOverlays(overlays, options = {}) {
     const selector = optionalString(options.selector);
-    const nowMs = dateMs(options.now) ?? Date.now();
     const rows = overlays
         .filter(isRecord)
         .filter((overlay) => matchesSelector(selector, overlay))
@@ -212,8 +215,8 @@ export function explainModelGatewayAccountLimitOverlays(overlays, options = {}) 
             const sourceKind = optionalString(overlay['sourceKind']) ?? 'unknown';
             const providerMetadata = isRecord(overlay['providerMetadata']) ? overlay['providerMetadata'] : {};
             const expiresAt = optionalString(overlay['expiresAt']);
-            const expiresAtMs = dateMs(expiresAt);
-            const overlayExpired = expiresAtMs !== null && expiresAtMs <= nowMs;
+            const freshness = evaluateModelGatewayAccountOverlayFreshness(overlay, options.now === undefined ? {} : { now: options.now });
+            const overlayExpired = freshness.expired;
             const expiredSignal = overlayExpired || limits.quota.resetExpired;
             const activeBlocker = !overlayExpired && !['ok', 'unknown'].includes(limits.status);
             const temporaryBlocker = activeBlocker && ['quota_exhausted', 'rate_limited'].includes(limits.status);
@@ -237,6 +240,10 @@ export function explainModelGatewayAccountLimitOverlays(overlays, options = {}) 
                 retryAfterSeconds: limits.retryAfterSeconds,
                 resetAt: limits.resetAt,
                 expiresAt,
+                freshnessStatus: freshness.status,
+                freshnessAgeSeconds: freshness.ageSeconds,
+                freshnessTtlSeconds: freshness.ttlSeconds,
+                effectiveExpiresAt: freshness.effectiveExpiresAt,
                 remainingUsd: limits.spending.remainingUsd,
                 remainingCreditsUsd: limits.quota.remainingCreditsUsd,
                 failureKind: optionalString(providerMetadata['failureKind']),

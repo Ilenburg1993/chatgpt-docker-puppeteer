@@ -9,6 +9,7 @@
  */
 
 import { normalizeModelGatewayAccountLimitState } from './limits.js';
+import { evaluateModelGatewayAccountOverlayFreshness } from './freshness.js';
 
 export const MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS = Object.freeze({
     VISIBLE: 'visible',
@@ -216,8 +217,7 @@ function resolveConfidence(status, secretConfigured, modelVisible, overlays) {
  * @returns {boolean}
  */
 function overlayExpired(overlay, nowMs) {
-    const expiresAtMs = dateMs(overlay['expiresAt']);
-    return expiresAtMs !== null && expiresAtMs <= nowMs;
+    return evaluateModelGatewayAccountOverlayFreshness(overlay, { now: nowMs }).expired;
 }
 
 /**

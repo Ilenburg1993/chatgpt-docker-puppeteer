@@ -2355,7 +2355,7 @@ Quota/account overlay mais rico.
 - [ ] Integrar `AssistantUsageQuotaSnapshot` somente como overlay SDK-scoped se aplicavel.
 - [x] Documentar diferenca entre quota SDK Copilot e BYOK provider externo.
 - [x] Criar provider quota capability matrix.
-- [ ] Criar account overlay freshness policy por provider.
+- [x] Criar account overlay freshness policy por provider.
 - [ ] Criar reset window strategy por failure kind.
 - [x] Criar comando terminal para explicar quota ativa vs expirada.
 - [ ] Criar retention separada para quota/rate/spending snapshots.
@@ -6413,6 +6413,50 @@ O caso `token gsk-secret-that-must-not-leak rejected` volta a persistir como:
 `token [redacted] rejected`
 
 Esse ajuste e importante antes de build e live tests porque runtime failures podem carregar mensagens de provider com formato de token nao uniforme.
+
+## 21.39 Mudanca 39 - Freshness De Account Overlays
+
+Foi criada uma politica explicita de freshness para account/key overlays.
+
+Arquivo:
+
+`src/copilot/model-gateway/account-access/freshness.js`
+
+Novos helpers:
+
+`resolveModelGatewayAccountOverlayFreshnessPolicy()`
+
+`evaluateModelGatewayAccountOverlayFreshness()`
+
+`summarizeModelGatewayAccountOverlayFreshness()`
+
+A politica e provider/source scoped.
+
+Exemplos iniciais:
+
+- OpenRouter account/key: 900s;
+- Kilo account/gateway: 900s;
+- Cloudflare account/gateway: 900s;
+- Ollama local daemon: 300s;
+- runtime health overlay: 3600s;
+- public api: 86400s.
+
+O resolver de account access agora usa freshness mesmo quando `expiresAt` nao esta presente.
+
+Isso fecha o bug conceitual:
+
+overlay sem `expiresAt` nao pode ficar fresco para sempre.
+
+Quando `requireFreshAccountOverlay=true`, overlays expirados por TTL bloqueiam pre-runtime.
+
+O terminal passou a mostrar `freshness=` em:
+
+- `/byok gateway accounts`;
+- `/byok gateway limits`.
+
+Essa mudanca nao altera catalogo canonico.
+
+Ela altera apenas a leitura account/key scoped antes do runtime.
 
 ## 22. Fim Do Documento Inicial
 

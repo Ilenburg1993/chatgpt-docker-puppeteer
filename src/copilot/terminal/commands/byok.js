@@ -3196,7 +3196,7 @@ async function renderByokGatewayAccounts(println, rest) {
             `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mscope=${row.accountScope} · secretRef=${row.secretRef ?? '-'} · status=${row.limitStatus} · ${retry}\x1b[0m`,
         );
         println(
-            `      \x1b[90msource=${row.sourceId ?? '-'} · kind=${row.sourceKind} · confidence=${row.confidence} · enabled=${row.enabledModelCount} · blocked=${row.blockedModelCount} · ${remaining || 'remaining=-'}\x1b[0m`,
+            `      \x1b[90msource=${row.sourceId ?? '-'} · kind=${row.sourceKind} · confidence=${row.confidence} · freshness=${row.freshnessStatus} · enabled=${row.enabledModelCount} · blocked=${row.blockedModelCount} · ${remaining || 'remaining=-'}\x1b[0m`,
         );
     }
     if (accountSummary.rows.length > args.limit) {
@@ -3248,7 +3248,7 @@ async function renderByokGatewayLimits(println, rest) {
             row.remainingCreditsUsd !== null ? `creditsUsd=${row.remainingCreditsUsd}` : null,
         ].filter(Boolean).join(' · ');
         println(
-            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mscope=${row.accountScope} · status=${row.limitStatus} · state=${state} · ${reset} · expires=${row.expiresAt ?? '-'}\x1b[0m`,
+            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mscope=${row.accountScope} · status=${row.limitStatus} · state=${state} · freshness=${row.freshnessStatus} · ${reset} · expires=${row.expiresAt ?? row.effectiveExpiresAt ?? '-'}\x1b[0m`,
         );
         println(
             `      \x1b[90msource=${row.sourceKind}:${row.sourceId ?? '-'} · layer=${row.sourceLayer} · failure=${row.failureKind ?? '-'} · secretRef=${row.secretRef ?? '-'} · ${money || 'remaining=-'}\x1b[0m`,

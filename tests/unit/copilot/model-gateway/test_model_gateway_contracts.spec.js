@@ -56,10 +56,12 @@ import {
     createEnvSecretRegistry,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
+    evaluateModelGatewayAccountOverlayFreshness,
     explainModelGatewayAccountLimitOverlays,
     explainModelGatewayAccountAccess,
     explainGatewayRouteDecision,
     normalizeModelGatewayAccountLimitState,
+    resolveModelGatewayAccountOverlayFreshnessPolicy,
     resolveModelGatewayAccountAccess,
     buildModelGatewayOnListModelsHandler,
     evaluateModelGatewayRuntimeSelectorRouteEnv,
@@ -219,6 +221,7 @@ import {
     summarizeModelGatewayCatalogSnapshot,
     summarizeCanonicalModelProjectionDiff,
     summarizeModelGatewayRefreshLogText,
+    summarizeModelGatewayAccountOverlayFreshness,
     summarizeModelGatewayAccountOverlays,
     summarizeModelGatewayProviderQuotaCapabilities,
     summarizeModelGatewayLocalProviderOptInBlocks,
@@ -7959,6 +7962,63 @@ describe('model-gateway foundation', () => {
         assert.equal(summary.rows[0].resetAt, '2026-05-25T00:05:00.000Z');
         assert.equal(summary.rows[0].quotaResetActive, false);
         assert.equal(summary.rows[0].quotaResetExpired, false);
+        assert.equal(summary.rows[0].freshnessStatus, 'fresh');
+        assert.equal(summary.rows[0].freshnessTtlSeconds, 900);
+    });
+
+    it('applies account overlay freshness policy without mutating canonical metadata', () => {
+        const overlay = createProviderAccountOverlay({
+            providerId: 'openrouter',
+            secretRef: 'OPENROUTER_API_KEY',
+            enabledModels: ['fresh-model'],
+            sourceKind: 'authenticated_account_api',
+            observedAt: '2026-05-25T00:00:00.000Z',
+        });
+        const policy = resolveModelGatewayAccountOverlayFreshnessPolicy(overlay);
+        assert.equal(policy.ttlSeconds, 900);
+        assert.equal(policy.policySource, 'provider');
+
+        const fresh = evaluateModelGatewayAccountOverlayFreshness(overlay, {
+            now: '2026-05-25T00:05:00.000Z',
+        });
+        assert.equal(fresh.status, 'fresh');
+        assert.equal(fresh.effectiveExpiresAt, '2026-05-25T00:15:00.000Z');
+
+        const stale = evaluateModelGatewayAccountOverlayFreshness(overlay, {
+            now: '2026-05-25T00:13:00.000Z',
+        });
+        assert.equal(stale.status, 'stale');
+
+        const expired = evaluateModelGatewayAccountOverlayFreshness(overlay, {
+            now: '2026-05-25T00:16:00.000Z',
+        });
+        assert.equal(expired.status, 'expired');
+
+        const summary = summarizeModelGatewayAccountOverlayFreshness([overlay], {
+            now: '2026-05-25T00:16:00.000Z',
+        });
+        assert.equal(summary.summary.expired, 1);
+    });
+
+    it('blocks expired account overlays by provider freshness TTL when strict freshness is required', () => {
+        const overlay = createProviderAccountOverlay({
+            providerId: 'openrouter',
+            secretRef: 'OPENROUTER_API_KEY',
+            enabledModels: ['old-model'],
+            sourceKind: 'authenticated_account_api',
+            observedAt: '2026-05-25T00:00:00.000Z',
+        });
+        const access = resolveModelGatewayAccountAccess({
+            providerId: 'openrouter',
+            providerModel: 'old-model',
+            accountOverlays: [overlay],
+            secretRegistry: { has: () => true },
+            requireFreshAccountOverlay: true,
+            now: '2026-05-25T00:16:00.000Z',
+        });
+        assert.equal(access.status, 'expired');
+        assert.equal(access.canAttempt, false);
+        assert.ok(access.hardReasons.includes('account_overlay_expired'));
     });
 
     it('explains active and expired account/key limit overlays before runtime', () => {
