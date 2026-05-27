@@ -3326,6 +3326,7 @@ describe('model-gateway foundation', () => {
                 providerId: 'openrouter',
                 providerModel: 'openai/gpt-oss-120b',
             });
+            const runtimeRecords = await store.listRuntimeHealthRecords();
             const explanation = explainModelGatewayCatalogEntry(snapshot, 'gpt-oss', {
                 runtimeHealthRecords: runtime.health ? [runtime.health] : [],
                 runtimeProbeResults: runtime.probes,
@@ -3334,6 +3335,7 @@ describe('model-gateway foundation', () => {
             assert.equal(mirrored.records, 1);
             assert.equal(mirrored.healthObservations, 1);
             assert.equal(mirrored.probeResults, 2);
+            assert.equal(runtimeRecords.length, 1);
             assert.equal(runtime.health?.['lastStatus'], 'ok');
             assert.equal(runtime.probes.length, 2);
             assert.equal(explanation.runtimeHealth?.status, 'ok');
@@ -3378,6 +3380,7 @@ describe('model-gateway foundation', () => {
                 providerId: 'openrouter',
                 providerModel: 'openai/gpt-oss-120b',
             });
+            const runtimeRecords = await store.listRuntimeHealthRecords();
             controller.dispose();
 
             assert.equal(flushed.enabled, true);
@@ -3385,6 +3388,7 @@ describe('model-gateway foundation', () => {
             assert.equal(flushed.lastRecords, 1);
             assert.equal(flushed.lastHealthObservations, 1);
             assert.equal(flushed.lastProbeResults, 1);
+            assert.equal(runtimeRecords.length, 1);
             assert.equal(runtime.health?.['lastStatus'], 'ok');
             assert.equal(runtime.probes.length, 1);
         } finally {

@@ -3132,8 +3132,8 @@ Este provider tem reset headers?
 
 - [x] Implementar persistencia de runtime health em SQLite por mirror instalado no terminal.
 - [x] Implementar persistencia de probe results em SQLite por mirror instalado no terminal.
-- [ ] Integrar selection effective com runtime persisted quando existir.
-- [ ] Criar testes focados.
+- [x] Integrar selection effective com runtime persisted quando existir.
+- [x] Criar testes focados.
 
 ### 14.3 Terceira Onda
 
@@ -3482,13 +3482,36 @@ O catalogo continua sendo metadata database.
 
 Runtime health continua sendo operational state.
 
-Proximo passo:
+Mudanca 6:
 
-Selection effective deve poder consumir runtime persisted quando disponivel.
+Selection effective agora consome runtime persisted quando disponivel.
 
-Essa integracao deve ser policy-driven.
+O modo default e `merged`.
+
+Fontes suportadas:
+
+- `--runtime-source file`
+- `--runtime-source sqlite`
+- `--runtime-source merged`
+
+`merged` deduplica por key de health e preserva o registro com observacao mais recente.
+
+Essa integracao permanece policy-driven.
 
 Ela nao deve transformar health runtime em prova permanente.
+
+`SqliteModelGatewayCatalogStore` agora expoe `listRuntimeHealthRecords`.
+
+`scripts/model-gateway-effective-selection.mjs` usa:
+
+- ledger JSON de health
+- SQLite persisted runtime health
+- merge nao-mutante
+- `setDbLogger` em modo JSON para manter stdout parseavel
+
+Proximo passo:
+
+Conectar runtime persisted aos explain/readiness finais com policy clara para cada perfil.
 
 Validacoes executadas:
 
@@ -3507,6 +3530,24 @@ Validacoes executadas:
 `npm run model-gateway:typecheck`
 
 `npm run model-gateway:lint`
+
+`node scripts/model-gateway-effective-selection.mjs --json --strict`
+
+Resultado observado:
+
+`runtimeSource=merged`
+
+`fileHealthRecordCount=17`
+
+`sqliteHealthRecordCount=17`
+
+`healthRecordCount=17`
+
+`npm --silent run model-gateway:selection:effective -- --json --strict`
+
+Resultado observado:
+
+`merged:17`
 
 ## 19. Fim Do Documento Inicial
 

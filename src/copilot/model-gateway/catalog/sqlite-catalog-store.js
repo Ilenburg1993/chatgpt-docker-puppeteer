@@ -936,6 +936,26 @@ export class SqliteModelGatewayCatalogStore {
     }
 
     /**
+     * @param {{ limit?: number }} [options]
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async listRuntimeHealthRecords(options = {}) {
+        const limit = Math.max(1, optionalInteger(options.limit) ?? 10_000);
+        return this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_health_observations
+                    ORDER BY observed_at_ms DESC, observation_key ASC
+                    LIMIT ?
+                `,
+            )
+            .all(limit)
+            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json))
+            .filter(isRecord);
+    }
+
+    /**
      * @param {Record<string, unknown>[]} events
      * @returns {Promise<{ routeDecisions: number }>}
      */

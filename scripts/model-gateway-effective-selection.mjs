@@ -2,6 +2,7 @@
 import {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
+    SqliteModelGatewayCatalogStore,
     auditModelGatewayCatalogSnapshotIntegrity,
     auditModelGatewayPreRuntimeSelection,
     createEnvSecretRegistry,
@@ -12,12 +13,13 @@ import {
     summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewayLocalProviderOptInBlocks,
 } from '../src/copilot/model-gateway/index.js';
+import { setDbLogger } from '../src/copilot/db/sqlite.js';
 
 const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-effective-selection.mjs [--json] [--strict] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--fail] [--fail-on-supply-warning]
+    process.stdout.write(`Usage: node scripts/model-gateway-effective-selection.mjs [--json] [--strict] [--runtime-source file|sqlite|merged] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--fail] [--fail-on-supply-warning]
 
 Build a non-mutating effective selection view from the persisted metadata catalog plus already-observed account/runtime
 health. This does not fetch providers, execute models, run probes or persist eligibility decisions.
@@ -64,15 +66,98 @@ function formatCountMap(counts) {
         .join(',') || '-';
 }
 
+function healthRecordKey(record) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+    const key = typeof record['key'] === 'string' && record['key'].trim() ? record['key'].trim() : null;
+    const profile =
+        typeof record['routeProfile'] === 'string' && record['routeProfile'].trim()
+            ? record['routeProfile'].trim()
+            : typeof record['profile'] === 'string' && record['profile'].trim()
+              ? record['profile'].trim()
+              : null;
+    const provider =
+        typeof record['providerId'] === 'string' && record['providerId'].trim()
+            ? record['providerId'].trim()
+            : typeof record['provider'] === 'string' && record['provider'].trim()
+              ? record['provider'].trim()
+              : null;
+    const model =
+        typeof record['providerModel'] === 'string' && record['providerModel'].trim()
+            ? record['providerModel'].trim()
+            : typeof record['model'] === 'string' && record['model'].trim()
+              ? record['model'].trim()
+              : null;
+    return key ?? [profile ?? '-', provider ?? '-', model ?? '-'].join('|').toLowerCase();
+}
+
+function healthRecordLastObservedAt(record) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) return 0;
+    const direct = [
+        record['lastFailureAt'],
+        record['lastSuccessAt'],
+        record['lastAgentProbeFailureAt'],
+        record['lastAgentProbeSuccessAt'],
+    ]
+        .map((value) => (typeof value === 'number' && Number.isFinite(value) ? value : 0))
+        .reduce((max, value) => Math.max(max, value), 0);
+    const probes = record['probes'];
+    if (!probes || typeof probes !== 'object' || Array.isArray(probes)) return direct;
+    return Object.values(probes).reduce((max, probe) => {
+        if (!probe || typeof probe !== 'object' || Array.isArray(probe)) return max;
+        const lastAt = typeof probe['lastAt'] === 'number' && Number.isFinite(probe['lastAt']) ? probe['lastAt'] : 0;
+        return Math.max(max, lastAt);
+    }, direct);
+}
+
+function mergeHealthRecords(...recordSets) {
+    const byKey = new Map();
+    for (const records of recordSets) {
+        for (const record of records) {
+            const key = healthRecordKey(record);
+            if (!key) continue;
+            const previous = byKey.get(key);
+            if (!previous || healthRecordLastObservedAt(record) >= healthRecordLastObservedAt(previous)) {
+                byKey.set(key, record);
+            }
+        }
+    }
+    return [...byKey.values()];
+}
+
 const json = argSet.has('--json');
 const strict = argSet.has('--strict') || !argSet.has('--allow-probe');
 const fail = argSet.has('--fail');
 const failOnSupplyWarning = argSet.has('--fail-on-supply-warning');
+const runtimeSource = ['file', 'sqlite', 'merged'].includes(readArg('--runtime-source'))
+    ? readArg('--runtime-source')
+    : 'merged';
+if (json) {
+    setDbLogger((level, message) => {
+        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
+            process.stderr.write(`[db][${level}] ${message}\n`);
+        }
+    });
+}
 const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
 const snapshot = await store.readSnapshot();
 const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
 const secretRegistry = createEnvSecretRegistry();
-const healthRecords = listByokProviderModelHealth();
+const fileHealthRecords = listByokProviderModelHealth();
+let sqliteHealthRecords = [];
+let sqliteRuntimeError = null;
+if (runtimeSource === 'sqlite' || runtimeSource === 'merged') {
+    try {
+        sqliteHealthRecords = await new SqliteModelGatewayCatalogStore().listRuntimeHealthRecords();
+    } catch (error) {
+        sqliteRuntimeError = error instanceof Error ? error.message : String(error);
+    }
+}
+const healthRecords =
+    runtimeSource === 'file'
+        ? fileHealthRecords
+        : runtimeSource === 'sqlite'
+          ? sqliteHealthRecords
+          : mergeHealthRecords(fileHealthRecords, sqliteHealthRecords);
 const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords);
 const evaluationNow = new Date();
 const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, {
@@ -85,7 +170,7 @@ const evaluated = evaluateModelGatewayCatalogEligibility({
     now: () => evaluationNow,
     policy: {
         unknownAccessPolicy: strict ? 'block' : 'allow_probe',
-        policyProfile: strict ? 'effective-strict-no-runtime' : 'effective-allow-probe-no-runtime',
+        policyProfile: strict ? 'effective-strict-runtime-state' : 'effective-allow-probe-runtime-state',
     },
 });
 const effectiveSnapshot = {
@@ -110,6 +195,7 @@ const summary = {
     ok: integrity.ok && selection.ok && (!failOnSupplyWarning || supplyWarningCount === 0),
     persisted: false,
     runtimeExecuted: false,
+    runtimeSource,
     mode: strict ? 'strict_access_only_with_observed_health' : 'allow_probe_unknown_with_observed_health',
     storePath: store.filePath,
     snapshotId: snapshot.snapshotId,
@@ -119,7 +205,11 @@ const summary = {
         redactedIdentityCount: integrity.redactedIdentityCount,
     },
     observedRuntime: {
+        source: runtimeSource,
+        fileHealthRecordCount: fileHealthRecords.length,
+        sqliteHealthRecordCount: sqliteHealthRecords.length,
         healthRecordCount: healthRecords.length,
+        sqliteRuntimeError,
         runtimeAccountOverlayCount: runtimeAccountOverlays.length,
         runtimeAccountOverlaySummary,
         eligibilityDecisionCount: evaluated.decisions.length,
