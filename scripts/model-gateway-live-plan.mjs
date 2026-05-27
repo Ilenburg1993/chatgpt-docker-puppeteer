@@ -183,6 +183,45 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
             purpose: 'Run the full terminal llm-b scenario with a real assistant turn after all lower-risk phases pass.',
         },
     ];
+    const postPhases = [
+        {
+            id: 'runtime_health_after_live_diff',
+            order: 1,
+            command:
+                'npm run model-gateway:runtime-health:diff -- --baseline artifacts/model-gateway-runtime-health/latest.json --write-snapshot --fail-on-regression',
+            executesModelTurn: false,
+            executesRuntimeProbes: false,
+            consumesProviderQuota: false,
+            purpose: 'Diff runtime health after a live phase against the pre-live baseline and fail on ok-to-failed regressions.',
+        },
+        {
+            id: 'runtime_health_sqlite_mirror',
+            order: 2,
+            command: 'npm run model-gateway:runtime-health:mirror',
+            executesModelTurn: false,
+            executesRuntimeProbes: false,
+            consumesProviderQuota: false,
+            purpose: 'Ensure already-observed BYOK health is materialized into SQLite after live phases.',
+        },
+        {
+            id: 'runtime_selector_after_live',
+            order: 3,
+            command: 'npm run model-gateway:runtime-selector -- --fail',
+            executesModelTurn: false,
+            executesRuntimeProbes: false,
+            consumesProviderQuota: false,
+            purpose: 'Recompute route-aware runtime selector readiness using the newly observed health facts.',
+        },
+        {
+            id: 'live_readiness_after_live',
+            order: 4,
+            command: 'npm run model-gateway:live:readiness -- --fail',
+            executesModelTurn: false,
+            executesRuntimeProbes: false,
+            consumesProviderQuota: false,
+            purpose: 'Verify catalog, SQLite, selection and runtime selector gates still pass after the live phase.',
+        },
+    ];
     return {
         schema: 'model-gateway-live-plan',
         ok: prerequisites.every((item) => item.ok),
@@ -202,6 +241,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         },
         prerequisites,
         phases,
+        postPhases,
         nextCommand: phases[0].command,
     };
 }
@@ -226,6 +266,18 @@ function renderMarkdown(plan) {
         '## Phases',
         '',
         ...plan.phases.flatMap((phase) => [
+            `### ${phase.order}. ${phase.id}`,
+            '',
+            `- command: \`${phase.command}\``,
+            `- executesModelTurn: ${phase.executesModelTurn ? 'true' : 'false'}`,
+            `- executesRuntimeProbes: ${phase.executesRuntimeProbes ? 'true' : 'false'}`,
+            `- consumesProviderQuota: ${phase.consumesProviderQuota ? 'true' : 'false'}`,
+            `- purpose: ${phase.purpose}`,
+            '',
+        ]),
+        '## Post Phases',
+        '',
+        ...plan.postPhases.flatMap((phase) => [
             `### ${phase.order}. ${phase.id}`,
             '',
             `- command: \`${phase.command}\``,

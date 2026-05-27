@@ -2646,7 +2646,7 @@ Quota/account overlay mais rico.
 - [x] BYOK real no-pr passou historicamente.
 - [x] BYOK real completo com Kilo passou historicamente.
 - [x] Live readiness atual ok.
-- [ ] Rodar live plan apos primeira consolidacao deste guia.
+- [x] Rodar live plan apos primeira consolidacao deste guia.
 - [ ] Rodar live no-pr apos runtime persistence estar pronto.
 - [ ] Rodar live fixture apos runtime persistence estar pronto.
 - [ ] Rodar live real no-pr com escopo explicito.
@@ -2712,8 +2712,8 @@ Quota/account overlay mais rico.
 - [ ] Criar sequencia oficial "antes do build".
 - [ ] Criar sequencia oficial "primeiro build".
 - [ ] Criar sequencia oficial "apos build".
-- [ ] Criar sequencia oficial "antes de live".
-- [ ] Criar sequencia oficial "apos live".
+- [x] Criar sequencia oficial "antes de live".
+- [x] Criar sequencia oficial "apos live".
 - [ ] Criar guia de decisao para importer failure.
 - [ ] Criar guia de decisao para quota exhausted.
 - [ ] Criar guia de decisao para local Ollama.
@@ -3113,7 +3113,7 @@ Este provider tem reset headers?
 - [x] Runtime persistence pronto.
 - [x] Health observations pronto.
 - [ ] Redaction audit verde.
-- [ ] Live plan verde.
+- [x] Live plan verde.
 - [ ] Provider/model explicitamente escolhidos.
 - [ ] Ollama local fora dos defaults confirmado.
 - [ ] Quota/active overlay revisado.
@@ -6168,6 +6168,17 @@ A ordem correta agora e:
 4. fixture BYOK;
 5. BYOK real sem PR;
 6. BYOK real full turn.
+
+A ordem pos-live agora e:
+
+1. diff de runtime health contra baseline;
+2. mirror SQLite de runtime health;
+3. runtime selector dry-run com health observado;
+4. live readiness novamente.
+
+O `model-gateway:live:plan` materializa `phases` e `postPhases`.
+
+Nenhuma dessas fases pos-live executa provider.
 
 ## 22. Fim Do Documento Inicial
 
