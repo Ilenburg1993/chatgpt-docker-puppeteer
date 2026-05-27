@@ -221,10 +221,6 @@ function overlayExpired(overlay, nowMs) {
 }
 
 /**
- * @param {Record<string, any>} overlay
- * @returns {boolean}
- */
-/**
  * @param {object} input
  * @param {string} input.providerId
  * @param {string} input.providerModel
@@ -252,6 +248,16 @@ function overlayExpired(overlay, nowMs) {
  *   failureClass: string;
  *   overlays: Record<string, any>[];
  *   overlayRefs: string[];
+ *   resetWindows: Array<{
+ *     status: string;
+ *     class: string;
+ *     source: string;
+ *     resetAt: string | null;
+ *     nextRefreshAfter: string | null;
+ *     retentionExpiresAt: string | null;
+ *     autoUnblocksAt: string | null;
+ *     blocksUntilRefresh: boolean;
+ *   }>;
  *   hardReasons: string[];
  *   softReasons: string[];
  *   reasons: string[];
@@ -289,6 +295,16 @@ export function resolveModelGatewayAccountAccess(input) {
     }
 
     const limitStates = overlays.map((overlay) => normalizeModelGatewayAccountLimitState(overlay, { now: nowMs }));
+    const resetWindows = limitStates.map((state) => ({
+        status: state.resetWindow.status,
+        class: state.resetWindow.class,
+        source: state.resetWindow.source,
+        resetAt: state.resetWindow.resetAt,
+        nextRefreshAfter: state.resetWindow.nextRefreshAfter,
+        retentionExpiresAt: state.resetWindow.retentionExpiresAt,
+        autoUnblocksAt: state.resetWindow.autoUnblocksAt,
+        blocksUntilRefresh: state.resetWindow.blocksUntilRefresh,
+    }));
     if (limitStates.some((state) => state.keyDisabled)) hardReasons.push('account_key_disabled');
     if (limitStates.some((state) => state.spendingExhausted)) hardReasons.push('account_spending_exhausted');
     if (limitStates.some((state) => state.quotaExhausted)) hardReasons.push('account_quota_exhausted');
@@ -329,6 +345,7 @@ export function resolveModelGatewayAccountAccess(input) {
         failureClass: classifyFailure(status, uniqueHard, uniqueSoft),
         overlays,
         overlayRefs: overlays.map((overlay) => optionalString(overlay['accountOverlayId'])).filter((id) => id !== null),
+        resetWindows,
         hardReasons: uniqueHard,
         softReasons: uniqueSoft,
         reasons: [...new Set(reasons)],

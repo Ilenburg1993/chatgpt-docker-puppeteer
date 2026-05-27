@@ -456,6 +456,7 @@ export function evaluateModelGatewayEligibility(input) {
                 modelVisible: access.modelVisible,
                 accessConfidence: access.accessConfidence,
                 failureClass: access.failureClass,
+                resetWindows: access.resetWindows,
             },
             budget: {
                 ...budgetPolicyInputs(policy),

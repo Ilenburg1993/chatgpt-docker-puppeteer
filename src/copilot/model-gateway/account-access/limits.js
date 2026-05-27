@@ -8,6 +8,8 @@
  * @module copilot/model-gateway/account-access/limits
  */
 
+import { resolveModelGatewayAccountResetWindow } from './reset-windows.js';
+
 export const MODEL_GATEWAY_ACCOUNT_LIMIT_STATUS = Object.freeze({
     OK: 'ok',
     UNKNOWN: 'unknown',
@@ -180,6 +182,7 @@ function quotaResetWindow(quotaState, nowMs) {
  *   spending: { limitUsd: number | null; usageUsd: number | null; remainingUsd: number | null; unlimited: boolean };
  *   quota: { remainingCreditsUsd: number | null; dailyRequests: number | null; dailyTokens: number | null; resetAt: string | null; resetActive: boolean; resetExpired: boolean };
  *   rateLimit: ReturnType<typeof normalizeRateLimitState>;
+ *   resetWindow: ReturnType<typeof resolveModelGatewayAccountResetWindow>;
  * }}
  */
 export function normalizeModelGatewayAccountLimitState(overlay, options = {}) {
@@ -221,6 +224,14 @@ export function normalizeModelGatewayAccountLimitState(overlay, options = {}) {
             : rateLimit.limited
               ? MODEL_GATEWAY_ACCOUNT_LIMIT_STATUS.RATE_LIMITED
               : MODEL_GATEWAY_ACCOUNT_LIMIT_STATUS.OK;
+    const resetWindow = resolveModelGatewayAccountResetWindow({
+        status,
+        failureKind: optionalString(providerMetadata['failureKind']),
+        retryAfterSeconds: rateLimit.retryAfterSeconds,
+        resetAt: rateLimit.resetAt ?? quotaState.resetAt,
+        observedAt: overlay['observedAt'],
+        expiresAt: overlay['expiresAt'],
+    }, { now: nowMs });
     return {
         status,
         keyDisabled,
@@ -232,5 +243,6 @@ export function normalizeModelGatewayAccountLimitState(overlay, options = {}) {
         spending,
         quota: { ...quotaState, ...quotaWindow },
         rateLimit,
+        resetWindow,
     };
 }

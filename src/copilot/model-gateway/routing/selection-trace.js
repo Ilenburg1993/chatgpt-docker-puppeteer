@@ -59,6 +59,7 @@ function summarizeSelectedRoute(route) {
     const record = optionalRecord(route);
     if (!record) return null;
     const runtimeHealth = optionalRecord(record['runtimeHealth']);
+    const accountAccess = optionalRecord(record['accountAccess']);
     return {
         providerId: optionalString(record['providerId']),
         providerModel: optionalString(record['providerModel']),
@@ -69,6 +70,14 @@ function summarizeSelectedRoute(route) {
         accountScope: optionalString(record['accountScope']) ?? 'default',
         policyProfile: optionalString(record['policyProfile']),
         taskProfile: optionalString(record['taskProfile']),
+        accountAccess: accountAccess
+            ? {
+                  status: optionalString(accountAccess['status']),
+                  failureClass: optionalString(accountAccess['failureClass']),
+                  accessConfidence: optionalString(accountAccess['accessConfidence']),
+                  resetWindows: Array.isArray(accountAccess['resetWindows']) ? accountAccess['resetWindows'].filter(optionalRecord).slice(0, 4) : [],
+              }
+            : null,
         hasRuntimeProof: record['hasRuntimeProof'] === true,
         runtimeHealth: runtimeHealth
             ? {

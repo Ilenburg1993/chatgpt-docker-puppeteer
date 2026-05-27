@@ -3248,10 +3248,10 @@ async function renderByokGatewayLimits(println, rest) {
             row.remainingCreditsUsd !== null ? `creditsUsd=${row.remainingCreditsUsd}` : null,
         ].filter(Boolean).join(' · ');
         println(
-            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mscope=${row.accountScope} · status=${row.limitStatus} · state=${state} · freshness=${row.freshnessStatus} · ${reset} · expires=${row.expiresAt ?? row.effectiveExpiresAt ?? '-'}\x1b[0m`,
+            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mscope=${row.accountScope} · status=${row.limitStatus} · state=${state} · freshness=${row.freshnessStatus} · resetWindow=${row.resetWindowClass} · ${reset} · expires=${row.expiresAt ?? row.effectiveExpiresAt ?? '-'}\x1b[0m`,
         );
         println(
-            `      \x1b[90msource=${row.sourceKind}:${row.sourceId ?? '-'} · layer=${row.sourceLayer} · failure=${row.failureKind ?? '-'} · secretRef=${row.secretRef ?? '-'} · ${money || 'remaining=-'}\x1b[0m`,
+            `      \x1b[90msource=${row.sourceKind}:${row.sourceId ?? '-'} · layer=${row.sourceLayer} · failure=${row.failureKind ?? '-'} · secretRef=${row.secretRef ?? '-'} · refresh=${row.nextRefreshAfter ?? '-'} · ${money || 'remaining=-'}\x1b[0m`,
         );
         println(`      \x1b[90mnext=${row.nextAction}\x1b[0m`);
     }

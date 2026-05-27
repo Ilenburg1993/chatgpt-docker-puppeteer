@@ -16,6 +16,7 @@ import {
 } from '../health/provider-health.js';
 import { classifyByokProviderFailure } from '../health/provider-failure.js';
 import { evaluateModelGatewayProviderEnvRequirements } from '../secrets/requirements.js';
+import { resolveModelGatewayAccountResetWindow } from '../account-access/reset-windows.js';
 
 const DEFAULT_MAX_RUNTIME_RETRY_DELAY_MS = 30_000;
 
@@ -198,6 +199,7 @@ function runtimeRoute(route) {
         accountScope: optionalString(route['accountScope']) ?? 'default',
         policyProfile: optionalString(route['policyProfile']),
         taskProfile: optionalString(route['taskProfile']),
+        accountAccess: optionalRecord(route['accountAccess']),
         hasRuntimeProof: route['hasRuntimeProof'] === true,
         runtimeHealth: optionalRecord(route['runtimeHealth']),
     };
@@ -531,6 +533,7 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
  *   failureKind: string | null;
  *   retryAfterSeconds: number | null;
  *   resetAt: string | null;
+ *   resetWindow: ReturnType<typeof resolveModelGatewayAccountResetWindow> | null;
  * }}
  */
 export function resolveModelGatewayRuntimeRetryDecision(execution, options = {}) {
@@ -545,6 +548,7 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
             failureKind: null,
             retryAfterSeconds: null,
             resetAt: null,
+            resetWindow: null,
         };
     }
     const providerFailure = optionalRecord(execution.providerFailure) ?? optionalRecord(execution.probe?.providerFailure);
@@ -552,6 +556,12 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
     const retryAfterSeconds = optionalNumber(providerFailure?.['retryAfterSeconds']);
     const resetAt = optionalString(providerFailure?.['resetAt']);
     const nowMs = dateMs(options.now) ?? Date.now();
+    const resetWindow = resolveModelGatewayAccountResetWindow({
+        failureKind,
+        retryAfterSeconds,
+        resetAt,
+        observedAt: options.now ?? nowMs,
+    }, { now: nowMs });
     const fallbackDelayMs = positiveInteger(options.retryDelayMs) ?? 0;
     const maxRetryDelayMs = positiveInteger(options.maxRetryDelayMs) ?? DEFAULT_MAX_RUNTIME_RETRY_DELAY_MS;
     if (execution.status === 'blocked') {
@@ -565,6 +575,7 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
             failureKind,
             retryAfterSeconds,
             resetAt,
+            resetWindow,
         };
     }
     if (failureKind === 'auth' || failureKind === 'credits' || failureKind === 'model-or-route') {
@@ -578,6 +589,7 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
             failureKind,
             retryAfterSeconds,
             resetAt,
+            resetWindow,
         };
     }
     const waitMs = resolveRuntimeRetryDelayMs(retryAfterSeconds, resetAt, nowMs, fallbackDelayMs);
@@ -592,6 +604,7 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
             failureKind,
             retryAfterSeconds,
             resetAt,
+            resetWindow,
         };
     }
     return {
@@ -604,6 +617,7 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
         failureKind,
         retryAfterSeconds,
         resetAt,
+        resetWindow,
     };
 }
 

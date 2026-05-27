@@ -2356,7 +2356,7 @@ Quota/account overlay mais rico.
 - [x] Documentar diferenca entre quota SDK Copilot e BYOK provider externo.
 - [x] Criar provider quota capability matrix.
 - [x] Criar account overlay freshness policy por provider.
-- [ ] Criar reset window strategy por failure kind.
+- [x] Criar reset window strategy por failure kind.
 - [x] Criar comando terminal para explicar quota ativa vs expirada.
 - [ ] Criar retention separada para quota/rate/spending snapshots.
 - [x] Criar teste de quota que expira e deixa de bloquear.
@@ -6457,6 +6457,54 @@ O terminal passou a mostrar `freshness=` em:
 Essa mudanca nao altera catalogo canonico.
 
 Ela altera apenas a leitura account/key scoped antes do runtime.
+
+## 21.40 Mudanca 40 - Reset Window Strategy Para Account/Key
+
+Foi criada uma camada formal para separar:
+
+- janela conhecida de reset;
+- retry-after;
+- refresh recomendado;
+- retencao de evidencia;
+- bloqueio duravel que depende de acao do operador.
+
+Arquivo:
+
+`src/copilot/model-gateway/account-access/reset-windows.js`
+
+Novos helpers:
+
+`resolveModelGatewayAccountResetWindow()`
+
+`summarizeModelGatewayAccountResetWindows()`
+
+A normalizacao de limites agora retorna `resetWindow`.
+
+Isso evita confundir `resetAt` com:
+
+- quota diaria/mensal que ja resetou;
+- rate-limit com retry-after;
+- spending exhausted sem reset conhecido;
+- key disabled/auth que nao deve auto-desbloquear;
+- runtime overlay que deve expirar ou ser atualizado sem tocar no catalogo canonico.
+
+Campos novos aparecem em summaries e terminal:
+
+- `resetWindowClass`;
+- `resetWindowSource`;
+- `nextRefreshAfter`;
+- `retentionExpiresAt`;
+- `autoUnblocksAt`;
+- `blocksUntilRefresh`.
+
+`/byok gateway limits` agora mostra `resetWindow=` e `refresh=`.
+
+Essa camada prepara o selector runtime para distinguir:
+
+- candidatos bloqueados temporariamente ate uma janela conhecida;
+- candidatos que precisam de refresh de account overlay;
+- candidatos bloqueados ate troca de key/plano/limite;
+- candidatos que podem voltar ao pool sem probe runtime imediata quando a janela expira.
 
 ## 22. Fim Do Documento Inicial
 

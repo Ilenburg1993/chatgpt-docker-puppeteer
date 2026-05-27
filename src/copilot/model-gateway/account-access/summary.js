@@ -103,6 +103,12 @@ function limitSourceLayer(sourceKind) {
  *     freshnessAgeSeconds: number | null;
  *     freshnessTtlSeconds: number;
  *     effectiveExpiresAt: string | null;
+ *     resetWindowClass: string;
+ *     resetWindowSource: string;
+ *     nextRefreshAfter: string | null;
+ *     retentionExpiresAt: string | null;
+ *     autoUnblocksAt: string | null;
+ *     blocksUntilRefresh: boolean;
  *     remainingUsd: number | null;
  *     remainingCreditsUsd: number | null;
  *   }>;
@@ -143,6 +149,12 @@ export function summarizeModelGatewayAccountOverlays(overlays, options = {}) {
                 freshnessAgeSeconds: freshness.ageSeconds,
                 freshnessTtlSeconds: freshness.ttlSeconds,
                 effectiveExpiresAt: freshness.effectiveExpiresAt,
+                resetWindowClass: limits.resetWindow.class,
+                resetWindowSource: limits.resetWindow.source,
+                nextRefreshAfter: limits.resetWindow.nextRefreshAfter,
+                retentionExpiresAt: limits.resetWindow.retentionExpiresAt,
+                autoUnblocksAt: limits.resetWindow.autoUnblocksAt,
+                blocksUntilRefresh: limits.resetWindow.blocksUntilRefresh,
                 remainingUsd: limits.spending.remainingUsd,
                 remainingCreditsUsd: limits.quota.remainingCreditsUsd,
             };
@@ -187,6 +199,12 @@ export function summarizeModelGatewayAccountOverlays(overlays, options = {}) {
  *     freshnessAgeSeconds: number | null;
  *     freshnessTtlSeconds: number;
  *     effectiveExpiresAt: string | null;
+ *     resetWindowClass: string;
+ *     resetWindowSource: string;
+ *     nextRefreshAfter: string | null;
+ *     retentionExpiresAt: string | null;
+ *     autoUnblocksAt: string | null;
+ *     blocksUntilRefresh: boolean;
  *     remainingUsd: number | null;
  *     remainingCreditsUsd: number | null;
  *     failureKind: string | null;
@@ -244,6 +262,12 @@ export function explainModelGatewayAccountLimitOverlays(overlays, options = {}) 
                 freshnessAgeSeconds: freshness.ageSeconds,
                 freshnessTtlSeconds: freshness.ttlSeconds,
                 effectiveExpiresAt: freshness.effectiveExpiresAt,
+                resetWindowClass: limits.resetWindow.class,
+                resetWindowSource: limits.resetWindow.source,
+                nextRefreshAfter: limits.resetWindow.nextRefreshAfter,
+                retentionExpiresAt: limits.resetWindow.retentionExpiresAt,
+                autoUnblocksAt: limits.resetWindow.autoUnblocksAt,
+                blocksUntilRefresh: limits.resetWindow.blocksUntilRefresh,
                 remainingUsd: limits.spending.remainingUsd,
                 remainingCreditsUsd: limits.quota.remainingCreditsUsd,
                 failureKind: optionalString(providerMetadata['failureKind']),

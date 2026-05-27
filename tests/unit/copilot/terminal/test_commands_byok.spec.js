@@ -72,6 +72,12 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                     freshnessAgeSeconds: 60,
                     freshnessTtlSeconds: 900,
                     effectiveExpiresAt: '2026-05-25T00:15:00.000Z',
+                    resetWindowClass: 'temporary',
+                    resetWindowSource: 'explicit_reset_at',
+                    nextRefreshAfter: '2026-05-25T00:01:00.000Z',
+                    retentionExpiresAt: '2026-05-25T01:00:00.000Z',
+                    autoUnblocksAt: '2026-05-25T00:01:00.000Z',
+                    blocksUntilRefresh: false,
                     remainingUsd: 12,
                     remainingCreditsUsd: 12,
                 },
@@ -106,6 +112,12 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                     freshnessAgeSeconds: 60,
                     freshnessTtlSeconds: 900,
                     effectiveExpiresAt: '2026-05-25T00:15:00.000Z',
+                    resetWindowClass: 'temporary',
+                    resetWindowSource: 'explicit_reset_at',
+                    nextRefreshAfter: '2026-05-25T00:01:00.000Z',
+                    retentionExpiresAt: '2026-05-25T01:00:00.000Z',
+                    autoUnblocksAt: '2026-05-25T00:01:00.000Z',
+                    blocksUntilRefresh: false,
                     remainingUsd: 12,
                     remainingCreditsUsd: 12,
                     failureKind: null,
@@ -131,6 +143,12 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                     freshnessAgeSeconds: 3600,
                     freshnessTtlSeconds: 3600,
                     effectiveExpiresAt: '2026-05-25T00:02:00.000Z',
+                    resetWindowClass: 'not_blocking',
+                    resetWindowSource: 'none',
+                    nextRefreshAfter: '2026-05-25T00:02:00.000Z',
+                    retentionExpiresAt: '2026-05-25T00:02:00.000Z',
+                    autoUnblocksAt: null,
+                    blocksUntilRefresh: false,
                     remainingUsd: null,
                     remainingCreditsUsd: null,
                     failureKind: 'rate-limit',
@@ -2443,6 +2461,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('active=1');
         expect(ctx.output()).toContain('expired=1');
         expect(ctx.output()).toContain('state=active');
+        expect(ctx.output()).toContain('resetWindow=temporary');
+        expect(ctx.output()).toContain('refresh=2026-05-25T00:01:00.000Z');
         expect(ctx.output()).toContain('next=wait_for_rate_limit_reset_or_choose_another_route');
         expect(ctx.output()).toContain('AssistantUsageQuotaSnapshot é quota SDK/Copilot');
     });

@@ -62,6 +62,7 @@ import {
     explainGatewayRouteDecision,
     normalizeModelGatewayAccountLimitState,
     resolveModelGatewayAccountOverlayFreshnessPolicy,
+    resolveModelGatewayAccountResetWindow,
     resolveModelGatewayAccountAccess,
     buildModelGatewayOnListModelsHandler,
     evaluateModelGatewayRuntimeSelectorRouteEnv,
@@ -223,6 +224,7 @@ import {
     summarizeModelGatewayRefreshLogText,
     summarizeModelGatewayAccountOverlayFreshness,
     summarizeModelGatewayAccountOverlays,
+    summarizeModelGatewayAccountResetWindows,
     summarizeModelGatewayProviderQuotaCapabilities,
     summarizeModelGatewayLocalProviderOptInBlocks,
     summarizeModelGatewaySdkQuotaSnapshots,
@@ -994,6 +996,9 @@ describe('model-gateway foundation', () => {
         assert.equal(rateLimitDecision.fallbackRoute, true);
         assert.equal(rateLimitDecision.waitMs, 42_000);
         assert.equal(rateLimitDecision.reason, 'rate_limit_window_exceeds_runtime_retry_budget');
+        assert.equal(rateLimitDecision.resetWindow?.class, 'temporary');
+        assert.equal(rateLimitDecision.resetWindow?.source, 'retry_after');
+        assert.equal(rateLimitDecision.resetWindow?.retryAfterSeconds, 42);
 
         let permanentProbeCalls = 0;
         let permanentRetrySleeps = 0;
@@ -7727,12 +7732,17 @@ describe('model-gateway foundation', () => {
         assert.equal(active.status, 'rate_limited');
         assert.equal(active.rateLimited, true);
         assert.equal(active.resetAt, '2026-05-25T00:05:00.000Z');
+        assert.equal(active.resetWindow.class, 'temporary');
+        assert.equal(active.resetWindow.source, 'explicit_reset_at');
+        assert.equal(active.resetWindow.autoUnblocksAt, '2026-05-25T00:05:00.000Z');
+        assert.equal(active.resetWindow.blocksUntilRefresh, false);
 
         const expired = normalizeModelGatewayAccountLimitState(activeLimitedOverlay, {
             now: '2026-05-25T00:06:00.000Z',
         });
         assert.equal(expired.status, 'ok');
         assert.equal(expired.rateLimited, false);
+        assert.equal(expired.resetWindow.class, 'not_blocking');
 
         const exhaustedDailyQuota = createProviderAccountOverlay({
             providerId: 'gemini',
@@ -7746,6 +7756,8 @@ describe('model-gateway foundation', () => {
         assert.equal(activeQuota.status, 'quota_exhausted');
         assert.equal(activeQuota.quotaExhausted, true);
         assert.equal(activeQuota.quota.resetActive, true);
+        assert.equal(activeQuota.resetWindow.class, 'temporary');
+        assert.equal(activeQuota.resetWindow.autoUnblocksAt, '2026-05-25T00:05:00.000Z');
 
         const resetQuota = normalizeModelGatewayAccountLimitState(exhaustedDailyQuota, {
             now: '2026-05-25T00:06:00.000Z',
@@ -7753,6 +7765,50 @@ describe('model-gateway foundation', () => {
         assert.equal(resetQuota.status, 'ok');
         assert.equal(resetQuota.quotaExhausted, false);
         assert.equal(resetQuota.quota.resetExpired, true);
+    });
+
+    it('separates reset-window strategy from canonical model metadata', () => {
+        const rateLimitWindow = resolveModelGatewayAccountResetWindow({
+            status: 'rate_limited',
+            retryAfterSeconds: 120,
+            observedAt: '2026-05-25T00:00:00.000Z',
+        }, {
+            now: '2026-05-25T00:00:00.000Z',
+        });
+        assert.equal(rateLimitWindow.class, 'temporary');
+        assert.equal(rateLimitWindow.source, 'retry_after');
+        assert.equal(rateLimitWindow.autoUnblocksAt, '2026-05-25T00:02:00.000Z');
+
+        const unknownQuotaWindow = resolveModelGatewayAccountResetWindow({
+            status: 'quota_exhausted',
+            observedAt: '2026-05-25T00:00:00.000Z',
+        }, {
+            now: '2026-05-25T00:01:00.000Z',
+        });
+        assert.equal(unknownQuotaWindow.class, 'unknown');
+        assert.equal(unknownQuotaWindow.blocksUntilRefresh, true);
+        assert.equal(unknownQuotaWindow.nextRefreshAfter, '2026-05-25T00:15:00.000Z');
+        assert.equal(unknownQuotaWindow.retentionExpiresAt, '2026-05-26T00:00:00.000Z');
+
+        const summary = summarizeModelGatewayAccountResetWindows([
+            {
+                accountOverlayId: 'openrouter:default:key',
+                providerId: 'openrouter',
+                status: 'rate_limited',
+                retryAfterSeconds: 120,
+                observedAt: '2026-05-25T00:00:00.000Z',
+            },
+            {
+                accountOverlayId: 'groq:default:key',
+                providerId: 'groq',
+                status: 'key_disabled',
+                observedAt: '2026-05-25T00:00:00.000Z',
+            },
+        ], {
+            now: '2026-05-25T00:00:00.000Z',
+        });
+        assert.equal(summary.summary.temporary, 1);
+        assert.equal(summary.summary.durable, 1);
     });
 
     it('blocks disabled keys and active account rate-limit windows before runtime', () => {
@@ -7964,6 +8020,9 @@ describe('model-gateway foundation', () => {
         assert.equal(summary.rows[0].quotaResetExpired, false);
         assert.equal(summary.rows[0].freshnessStatus, 'fresh');
         assert.equal(summary.rows[0].freshnessTtlSeconds, 900);
+        assert.equal(summary.rows[0].resetWindowClass, 'temporary');
+        assert.equal(summary.rows[0].resetWindowSource, 'explicit_reset_at');
+        assert.equal(summary.rows[0].autoUnblocksAt, '2026-05-25T00:05:00.000Z');
     });
 
     it('applies account overlay freshness policy without mutating canonical metadata', () => {
@@ -8053,6 +8112,8 @@ describe('model-gateway foundation', () => {
         assert.equal(explanation.rows[0].limitStatus, 'rate_limited');
         assert.equal(explanation.rows[0].activeBlocker, true);
         assert.equal(explanation.rows[0].nextAction, 'wait_for_rate_limit_reset_or_choose_another_route');
+        assert.equal(explanation.rows[0].resetWindowClass, 'temporary');
+        assert.equal(explanation.rows[0].nextRefreshAfter, '2026-05-25T00:05:00.000Z');
         assert.equal(explanation.rows[1].providerId, 'groq');
         assert.equal(explanation.rows[1].expiredSignal, true);
         assert.equal(explanation.rows[1].nextAction, 'refresh_overlay_or_retry_pre_runtime_selection');
@@ -8138,6 +8199,7 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(decision.overlayRefs, [overlay.accountOverlayId]);
         assert.equal(decision.policyInputs['accountAccess']['accessConfidence'], 'high');
         assert.equal(decision.policyInputs['accountAccess']['failureClass'], 'secret_configuration');
+        assert.equal(Array.isArray(decision.policyInputs['accountAccess']['resetWindows']), true);
         assert.equal(JSON.stringify(decision).includes('OPENAI_API_KEY'), true);
     });
 

@@ -59,6 +59,8 @@ function selectedSummary(selected) {
     if (!selected) return null;
     const model = isRecord(selected['model']) ? selected['model'] : {};
     const eligibility = isRecord(selected['eligibility']) ? selected['eligibility'] : {};
+    const policyInputs = isRecord(eligibility['policyInputs']) ? eligibility['policyInputs'] : {};
+    const accountAccess = isRecord(policyInputs['accountAccess']) ? policyInputs['accountAccess'] : {};
     const health = isRecord(selected['health']) ? selected['health'] : {};
     const probes = isRecord(health['probes']) ? health['probes'] : {};
     const verifiedProbes = Object.entries(probes)
@@ -77,6 +79,12 @@ function selectedSummary(selected) {
         accountScope: optionalString(eligibility['accountScope']) ?? 'default',
         policyProfile: optionalString(eligibility['policyProfile']),
         taskProfile: optionalString(eligibility['taskProfile']),
+        accountAccess: {
+            status: optionalString(accountAccess['status']),
+            failureClass: optionalString(accountAccess['failureClass']),
+            accessConfidence: optionalString(accountAccess['accessConfidence']),
+            resetWindows: Array.isArray(accountAccess['resetWindows']) ? accountAccess['resetWindows'].filter(isRecord).slice(0, 4) : [],
+        },
         runtimeHealth: isRecord(selected['health'])
             ? {
                   lastStatus: optionalString(health['lastStatus']),
