@@ -12,6 +12,12 @@ import { explainGatewayRouteDecision } from './explain.js';
 import { routeModelGatewayCatalogSnapshot } from './policy-engine.js';
 import { listModelGatewayTaskProfiles, resolveModelGatewayTaskProfile } from './task-profiles.js';
 
+export const MODEL_GATEWAY_SELECTION_POLICY_MODE = Object.freeze({
+    METADATA_FIRST: 'metadata_first',
+    PREFER_RUNTIME_PROVED: 'prefer_runtime_proved',
+    REQUIRE_RUNTIME_PROOF: 'require_runtime_proof',
+});
+
 /**
  * @param {unknown} value
  * @returns {string | null}
@@ -506,6 +512,99 @@ export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRunt
             postRuntimeProofSelectedCount: rows.filter((row) => row.postSelectedHasRuntimeProof).length,
             postRuntimeHealthProofCount: postRuntimeSelection.summary.runtimeHealthProofCount,
             postRuntimeProbeProofCount: postRuntimeSelection.summary.runtimeProbeProofCount,
+        },
+        rows,
+    };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {'metadata_first' | 'prefer_runtime_proved' | 'require_runtime_proof'}
+ */
+function normalizeSelectionPolicyMode(value) {
+    const normalized = optionalString(value)?.replaceAll('-', '_');
+    if (normalized === MODEL_GATEWAY_SELECTION_POLICY_MODE.PREFER_RUNTIME_PROVED) return normalized;
+    if (normalized === MODEL_GATEWAY_SELECTION_POLICY_MODE.REQUIRE_RUNTIME_PROOF) return normalized;
+    return MODEL_GATEWAY_SELECTION_POLICY_MODE.METADATA_FIRST;
+}
+
+/**
+ * Resolve a final, non-mutating route choice from a pre/post-runtime comparison under an explicit operator policy.
+ *
+ * This function does not run providers and does not decide the default product behavior by itself. It records what a
+ * caller asked for: keep metadata-first choices, prefer proved runtime choices, or require runtime proof.
+ *
+ * @param {ReturnType<typeof compareModelGatewaySelectionAudits>} comparison
+ * @param {{ mode?: 'metadata_first' | 'prefer_runtime_proved' | 'require_runtime_proof' | string }} [options]
+ * @returns {{
+ *   schema: 'model-gateway-selection-policy-resolution';
+ *   ok: boolean;
+ *   mode: 'metadata_first' | 'prefer_runtime_proved' | 'require_runtime_proof';
+ *   summary: {
+ *     profileCount: number;
+ *     selectedCount: number;
+ *     unselectedCount: number;
+ *     metadataWinnerCount: number;
+ *     postRuntimeWinnerCount: number;
+ *     runtimeProofSelectedCount: number;
+ *     changedFromPreRuntimeCount: number;
+ *   };
+ *   rows: Array<{
+ *     profileId: string;
+ *     selected: Record<string, unknown> | null;
+ *     source: 'pre_runtime_metadata' | 'post_runtime_proved' | 'post_runtime_fallback' | 'blocked_runtime_proof_missing';
+ *     changedFromPreRuntime: boolean;
+ *     hasRuntimeProof: boolean;
+ *     preSelected: Record<string, unknown> | null;
+ *     postSelected: Record<string, unknown> | null;
+ *   }>;
+ * }}
+ */
+export function resolveModelGatewaySelectionPolicy(comparison, options = {}) {
+    const mode = normalizeSelectionPolicyMode(options.mode);
+    const rows = comparison.rows.map((row) => {
+        let selected = row.preSelected;
+        /** @type {'pre_runtime_metadata' | 'post_runtime_proved' | 'post_runtime_fallback' | 'blocked_runtime_proof_missing'} */
+        let source = 'pre_runtime_metadata';
+        if (mode === MODEL_GATEWAY_SELECTION_POLICY_MODE.REQUIRE_RUNTIME_PROOF) {
+            selected = row.postSelectedHasRuntimeProof ? row.postSelected : null;
+            source = row.postSelectedHasRuntimeProof ? 'post_runtime_proved' : 'blocked_runtime_proof_missing';
+        } else if (mode === MODEL_GATEWAY_SELECTION_POLICY_MODE.PREFER_RUNTIME_PROVED) {
+            if (row.postSelectedHasRuntimeProof) {
+                selected = row.postSelected;
+                source = 'post_runtime_proved';
+            } else if (!selected && row.postSelected) {
+                selected = row.postSelected;
+                source = 'post_runtime_fallback';
+            }
+        } else if (!selected && row.postSelected) {
+            selected = row.postSelected;
+            source = 'post_runtime_fallback';
+        }
+        return {
+            profileId: row.profileId,
+            selected,
+            source,
+            changedFromPreRuntime: selectedRouteKey(selected) !== row.preRouteKey,
+            hasRuntimeProof: selectedHasRuntimeProof(selected),
+            preSelected: row.preSelected,
+            postSelected: row.postSelected,
+        };
+    });
+    return {
+        schema: 'model-gateway-selection-policy-resolution',
+        ok: rows.every((row) => row.selected !== null),
+        mode,
+        summary: {
+            profileCount: rows.length,
+            selectedCount: rows.filter((row) => row.selected !== null).length,
+            unselectedCount: rows.filter((row) => row.selected === null).length,
+            metadataWinnerCount: rows.filter((row) => row.source === 'pre_runtime_metadata').length,
+            postRuntimeWinnerCount: rows.filter(
+                (row) => row.source === 'post_runtime_proved' || row.source === 'post_runtime_fallback',
+            ).length,
+            runtimeProofSelectedCount: rows.filter((row) => row.hasRuntimeProof).length,
+            changedFromPreRuntimeCount: rows.filter((row) => row.changedFromPreRuntime).length,
         },
         rows,
     };

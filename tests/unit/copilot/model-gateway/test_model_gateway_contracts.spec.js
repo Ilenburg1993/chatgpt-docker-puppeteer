@@ -40,6 +40,8 @@ import {
     buildModelGatewayRouteCandidates,
     applyModelGatewayEligibilityToSnapshot,
     compareModelGatewaySelectionAudits,
+    MODEL_GATEWAY_SELECTION_POLICY_MODE,
+    resolveModelGatewaySelectionPolicy,
     createModelRecord,
     createEnvSecretRegistry,
     auditModelGatewayPostRuntimeSelection,
@@ -686,6 +688,31 @@ describe('model-gateway foundation', () => {
         assert.equal(comparison.summary.changedCount, 1);
         assert.equal(comparison.summary.postRuntimeProofSelectedCount, 1);
         assert.equal(comparison.rows[0].postSelectedHasRuntimeProof, true);
+
+        const metadataFirst = resolveModelGatewaySelectionPolicy(comparison);
+        assert.equal(metadataFirst.schema, 'model-gateway-selection-policy-resolution');
+        assert.equal(metadataFirst.mode, MODEL_GATEWAY_SELECTION_POLICY_MODE.METADATA_FIRST);
+        assert.equal(metadataFirst.ok, true);
+        assert.equal(metadataFirst.summary.selectedCount, 2);
+        assert.equal(metadataFirst.summary.metadataWinnerCount, 2);
+        assert.equal(metadataFirst.summary.postRuntimeWinnerCount, 0);
+
+        const preferRuntimeProved = resolveModelGatewaySelectionPolicy(comparison, {
+            mode: MODEL_GATEWAY_SELECTION_POLICY_MODE.PREFER_RUNTIME_PROVED,
+        });
+        assert.equal(preferRuntimeProved.ok, true);
+        assert.equal(preferRuntimeProved.summary.selectedCount, 2);
+        assert.equal(preferRuntimeProved.summary.postRuntimeWinnerCount, 1);
+        assert.equal(preferRuntimeProved.summary.changedFromPreRuntimeCount, 0);
+        assert.equal(preferRuntimeProved.rows[0].source, 'post_runtime_proved');
+
+        const requireRuntimeProof = resolveModelGatewaySelectionPolicy(comparison, {
+            mode: MODEL_GATEWAY_SELECTION_POLICY_MODE.REQUIRE_RUNTIME_PROOF,
+        });
+        assert.equal(requireRuntimeProof.ok, false);
+        assert.equal(requireRuntimeProof.summary.selectedCount, 1);
+        assert.equal(requireRuntimeProof.summary.unselectedCount, 1);
+        assert.equal(requireRuntimeProof.rows[1].source, 'blocked_runtime_proof_missing');
 
         const strictAudit = auditModelGatewayPreRuntimeSelection(
             {

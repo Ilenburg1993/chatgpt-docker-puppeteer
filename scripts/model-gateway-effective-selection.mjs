@@ -13,6 +13,7 @@ import {
     listByokProviderModelHealth,
     mergeByokProviderHealthRecords,
     renderModelGatewayLocalProviderOptInGuidance,
+    resolveModelGatewaySelectionPolicy,
     summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewayLocalProviderOptInBlocks,
 } from '../src/copilot/model-gateway/index.js';
@@ -22,7 +23,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-effective-selection.mjs [--json] [--strict] [--runtime-source file|sqlite|merged] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--require-runtime-proof] [--fail] [--fail-on-supply-warning]
+    process.stdout.write(`Usage: node scripts/model-gateway-effective-selection.mjs [--json] [--strict] [--runtime-source file|sqlite|merged] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--require-runtime-proof] [--fail] [--fail-on-supply-warning]
 
 Build a non-mutating effective selection view from the persisted metadata catalog plus already-observed account/runtime
 health. This does not fetch providers, execute models, run probes or persist eligibility decisions.
@@ -74,6 +75,7 @@ const strict = argSet.has('--strict') || !argSet.has('--allow-probe');
 const fail = argSet.has('--fail');
 const failOnSupplyWarning = argSet.has('--fail-on-supply-warning');
 const requireRuntimeProof = argSet.has('--require-runtime-proof') || argSet.has('--runtime-proof');
+const selectionPolicy = requireRuntimeProof ? 'require_runtime_proof' : readArg('--selection-policy', 'metadata_first');
 const runtimeSource = ['file', 'sqlite', 'merged'].includes(readArg('--runtime-source'))
     ? readArg('--runtime-source')
     : 'merged';
@@ -141,6 +143,7 @@ const postRuntimeSelection = auditModelGatewayPostRuntimeSelection(effectiveSnap
     requireRuntimeProof,
 });
 const selectionComparison = compareModelGatewaySelectionAudits(selection, postRuntimeSelection);
+const policyResolution = resolveModelGatewaySelectionPolicy(selectionComparison, { mode: selectionPolicy });
 const dispositions = selectedDispositions(selection);
 const postRuntimeDispositions = selectedDispositions(postRuntimeSelection);
 const supplyWarningCount = selection.profiles.reduce((sum, profile) => sum + profile.supplyWarnings.length, 0);
@@ -156,6 +159,7 @@ const summary = {
         integrity.ok &&
         selection.ok &&
         postRuntimeSelection.ok &&
+        policyResolution.ok &&
         (!failOnSupplyWarning || (supplyWarningCount === 0 && postRuntimeSupplyWarningCount === 0)),
     persisted: false,
     runtimeExecuted: false,
@@ -192,6 +196,7 @@ const summary = {
         localProviderOptIn: postRuntimeLocalProviderOptIn,
     },
     selectionComparison,
+    policyResolution,
     nextCommands: [
         'npm run model-gateway:selection:audit -- --strict --fail-on-unselected',
         'npm run model-gateway:live:readiness',
@@ -238,6 +243,9 @@ if (json) {
     );
     process.stdout.write(
         `comparison: changed=${selectionComparison.summary.changedCount}/${selectionComparison.summary.profileCount} postProofSelected=${selectionComparison.summary.postRuntimeProofSelectedCount}/${selectionComparison.summary.profileCount} requireProof=${requireRuntimeProof ? 'yes' : 'no'}\n`,
+    );
+    process.stdout.write(
+        `policy: mode=${policyResolution.mode} selected=${policyResolution.summary.selectedCount}/${policyResolution.summary.profileCount} postWinners=${policyResolution.summary.postRuntimeWinnerCount} changed=${policyResolution.summary.changedFromPreRuntimeCount}\n`,
     );
     for (const row of selectionComparison.rows.filter((item) => item.changed).slice(0, 12)) {
         const pre = row.preSelected ? `${row.preSelected['providerId']}:${row.preSelected['providerModel']}` : 'none';

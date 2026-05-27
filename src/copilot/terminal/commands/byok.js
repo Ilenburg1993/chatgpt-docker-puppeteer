@@ -64,6 +64,7 @@ import {
     resolveProviderEndpointInventory,
     renderModelGatewayLocalProviderOptInGuidance,
     renderModelGatewayCanonicalCommandLines,
+    resolveModelGatewaySelectionPolicy,
     routeGatewayModels,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
@@ -2542,18 +2543,23 @@ async function renderByokGatewayCatalogIntegrity(println) {
 
 /**
  * @param {string[]} rest
- * @returns {{ strict: boolean; effective: boolean; requireRuntimeProof: boolean; profiles: string[] }}
+ * @returns {{ strict: boolean; effective: boolean; requireRuntimeProof: boolean; selectionPolicy: string; profiles: string[] }}
  */
 function parseByokGatewaySelectionAuditArgs(rest) {
     const requireRuntimeProof = rest.some((item) =>
         /^(runtime-proof|proof|proved|provado|require-proof|--runtime-proof|--require-runtime-proof)$/iu.test(item),
     );
+    const selectionPolicy =
+        rest
+            .map((item) => item.match(/^--?selection-policy[:=](.+)$/iu)?.[1] ?? item.match(/^policy[:=](.+)$/iu)?.[1] ?? null)
+            .find((item) => item !== null) ?? (requireRuntimeProof ? 'require_runtime_proof' : 'metadata_first');
     const effective =
         requireRuntimeProof || rest.some((item) => /^(effective|efetiva|observed|health|--effective)$/iu.test(item));
     const strict = effective || rest.some((item) => /^(strict|block|bloquear|--strict)$/iu.test(item));
     const profiles = rest
         .flatMap((item) => {
             const profileArg = item.match(/^--?profiles?[:=](.+)$/iu)?.[1];
+            if (/^--?selection-policy[:=]/iu.test(item) || /^policy[:=]/iu.test(item)) return [];
             if (profileArg) return profileArg.split(',');
             if (
                 /^(audit|auditoria|selection|selecao|seleção|strict|block|bloquear|--strict|effective|efetiva|observed|health|--effective|runtime-proof|proof|proved|provado|require-proof|--runtime-proof|--require-runtime-proof)$/iu.test(
@@ -2566,7 +2572,7 @@ function parseByokGatewaySelectionAuditArgs(rest) {
         })
         .map((item) => item.trim())
         .filter(Boolean);
-    return { strict, effective, requireRuntimeProof, profiles };
+    return { strict, effective, requireRuntimeProof, selectionPolicy, profiles };
 }
 
 /**
@@ -2636,6 +2642,9 @@ async function renderByokGatewaySelectionAudit(println, rest) {
           })
         : null;
     const selectionComparison = postRuntimeSelection ? compareModelGatewaySelectionAudits(selection, postRuntimeSelection) : null;
+    const policyResolution = selectionComparison
+        ? resolveModelGatewaySelectionPolicy(selectionComparison, { mode: args.selectionPolicy })
+        : null;
     println(`\n  \x1b[36mBYOK model-gateway selection audit\x1b[0m`);
     println(
         `  \x1b[90mstore=${store.filePath} · integrity=${integrity.ok ? 'ok' : 'falha'} · mode=${selection.mode}${args.effective ? '+effective' : ''}${args.requireRuntimeProof ? '+require-proof' : ''} · runtime=nao · persisted=nao · profiles=${selection.summary.selectedProfileCount}/${selection.summary.profileCount}\x1b[0m`,
@@ -2652,6 +2661,9 @@ async function renderByokGatewaySelectionAudit(println, rest) {
         );
         println(
             `  \x1b[90mcompare changed=${selectionComparison?.summary.changedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0} · postProofSelected=${selectionComparison?.summary.postRuntimeProofSelectedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0}\x1b[0m\n`,
+        );
+        println(
+            `  \x1b[90mpolicy=${policyResolution?.mode ?? args.selectionPolicy} · finalSelected=${policyResolution?.summary.selectedCount ?? 0}/${policyResolution?.summary.profileCount ?? 0} · postWinners=${policyResolution?.summary.postRuntimeWinnerCount ?? 0} · finalChanged=${policyResolution?.summary.changedFromPreRuntimeCount ?? 0}\x1b[0m\n`,
         );
     }
     for (const profile of selection.profiles) {

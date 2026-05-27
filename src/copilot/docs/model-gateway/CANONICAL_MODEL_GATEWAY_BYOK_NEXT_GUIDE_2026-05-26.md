@@ -5305,11 +5305,236 @@ Checklist atualizada por esta mudanca:
 - [x] Integrar comparison ao terminal effective.
 - [x] Adicionar flag terminal `runtime-proof`.
 - [x] Adicionar comandos canonicos para runtime proof.
-- [ ] Criar policy final que decide quando pos-runtime vence pre-runtime.
+- [x] Criar policy final que decide quando pos-runtime vence pre-runtime.
 - [ ] Criar pesos configuraveis para runtime proof por tipo.
 - [ ] Persistir, quando solicitado, um decision trace da comparacao sem mutar catalogo.
 
-## 19. Fim Do Documento Inicial
+## 19. Mudanca 31 - Policy Resolver Explicito Para Selecao Final
+
+Depois da comparacao entre pre-runtime e pos-runtime, faltava uma camada clara que respondesse uma pergunta simples:
+
+qual rota final o operador quer considerar vencedora neste momento?
+
+Essa pergunta nao deveria ficar implicita em flags soltas.
+
+Tambem nao deveria mutar o catalogo canonico.
+
+Tambem nao deveria apagar a diferenca entre:
+
+- escolha por metadados;
+- escolha por metadados com saude observada;
+- escolha por prova runtime;
+- bloqueio por ausencia de prova runtime.
+
+Foi criada a funcao canonica:
+
+`resolveModelGatewaySelectionPolicy`
+
+Ela vive em:
+
+`src/copilot/model-gateway/routing/selection-audit.js`
+
+E e exportada pelos barrels:
+
+- `src/copilot/model-gateway/routing/index.js`
+- `src/copilot/model-gateway/index.js`
+
+O enum canonico adicionado foi:
+
+`MODEL_GATEWAY_SELECTION_POLICY_MODE`
+
+Modos iniciais:
+
+- `metadata_first`
+- `prefer_runtime_proved`
+- `require_runtime_proof`
+
+### 19.1 Semantica Do Modo `metadata_first`
+
+Esse e o default conservador.
+
+Ele preserva a decisao da auditoria pre-runtime.
+
+Ele so usa pos-runtime como fallback quando a auditoria pre-runtime nao selecionou nada e existe uma selecao pos-runtime disponivel.
+
+Ele e o modo correto para:
+
+- auditoria normal;
+- operador que quer ver a situacao efetiva sem alterar criterios;
+- preparar runtime futuro sem tornar prova runtime obrigatoria;
+- evitar que dados volateis de saude substituam metadados canonicos por acidente.
+
+### 19.2 Semantica Do Modo `prefer_runtime_proved`
+
+Esse modo promove a rota pos-runtime quando ela tem prova runtime.
+
+Ele preserva pre-runtime quando o pos-runtime nao tem prova.
+
+Ele tambem pode usar pos-runtime como fallback quando nao ha pre-runtime selecionado.
+
+Esse modo e adequado para:
+
+- dry-run de selecao mais operacional;
+- avaliar o impacto de preferir modelos ja provados;
+- preparar uma futura selecao efetiva sem exigir cobertura total.
+
+### 19.3 Semantica Do Modo `require_runtime_proof`
+
+Esse modo seleciona apenas rotas com prova runtime.
+
+Perfis sem prova runtime ficam bloqueados com source:
+
+`blocked_runtime_proof_missing`
+
+Esse modo e propositalmente rigoroso.
+
+Ele nao deve ser default global.
+
+Ele e adequado para:
+
+- gates;
+- auditoria antes de live test;
+- validar cobertura operacional;
+- descobrir lacunas antes de delegar selecao para runtime real.
+
+### 19.4 Saida Do Resolver
+
+O schema retornado e:
+
+`model-gateway-selection-policy-resolution`
+
+Campos principais:
+
+- `ok`
+- `mode`
+- `summary.profileCount`
+- `summary.selectedCount`
+- `summary.unselectedCount`
+- `summary.metadataWinnerCount`
+- `summary.postRuntimeWinnerCount`
+- `summary.runtimeProofSelectedCount`
+- `summary.changedFromPreRuntimeCount`
+- `rows[]`
+
+Cada linha registra:
+
+- `profileId`
+- `selected`
+- `source`
+- `changedFromPreRuntime`
+- `hasRuntimeProof`
+- `preSelected`
+- `postSelected`
+
+Sources possiveis:
+
+- `pre_runtime_metadata`
+- `post_runtime_proved`
+- `post_runtime_fallback`
+- `blocked_runtime_proof_missing`
+
+### 19.5 Integracao No Script Efetivo
+
+O script:
+
+`scripts/model-gateway-effective-selection.mjs`
+
+Agora aceita:
+
+`--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof`
+
+A flag:
+
+`--require-runtime-proof`
+
+Continua existindo e implica:
+
+`selectionPolicy=require_runtime_proof`
+
+A saida JSON agora inclui:
+
+`policyResolution`
+
+A saida textual agora inclui uma linha:
+
+`policy: mode=... selected=... postWinners=... changed=...`
+
+Isso torna o script util para humanos e LLMs sem exigir que cada consumidor reimplemente a semantica.
+
+### 19.6 Integracao No Terminal
+
+O comando:
+
+`/byok gateway selection audit effective`
+
+Agora mostra:
+
+- policy ativa;
+- finalSelected;
+- postWinners;
+- finalChanged.
+
+O comando:
+
+`/byok gateway selection audit runtime-proof`
+
+Continua sendo o atalho rigoroso.
+
+Tambem foi adicionado parser para:
+
+- `policy:metadata_first`
+- `policy:prefer_runtime_proved`
+- `policy:require_runtime_proof`
+- `--selection-policy=metadata_first`
+- `--selection-policy=prefer_runtime_proved`
+- `--selection-policy=require_runtime_proof`
+
+### 19.7 Contratos Cobertos
+
+Foram adicionadas verificacoes para:
+
+- resolver exportado;
+- modo default `metadata_first`;
+- modo `prefer_runtime_proved`;
+- modo `require_runtime_proof`;
+- bloqueio de perfil sem prova;
+- terminal chamando o resolver;
+- terminal usando `metadata_first` por default;
+- terminal usando `require_runtime_proof` no atalho runtime-proof.
+
+### 19.8 Limites Ainda Intencionais
+
+A policy final ainda e nao-mutante.
+
+Ela nao persiste decisao.
+
+Ela nao altera catalogo.
+
+Ela nao executa runtime.
+
+Ela nao transforma saude volatil em metadado canonico.
+
+Isso e correto nesta fase.
+
+Persistencia de decision trace e selecao efetiva real devem vir depois, em camada propria.
+
+### 19.9 Checklist Da Mudanca 31
+
+- [x] Criar enum canonico de modos de selection policy.
+- [x] Criar resolver nao-mutante de policy final.
+- [x] Separar source pre-runtime, pos-runtime provado, fallback e bloqueio.
+- [x] Exportar helper pelos barrels.
+- [x] Integrar `--selection-policy` ao script efetivo.
+- [x] Integrar `policy:<modo>` ao terminal.
+- [x] Integrar `runtime-proof` ao resolver rigoroso.
+- [x] Cobrir contratos de model-gateway.
+- [x] Cobrir contratos de terminal.
+- [ ] Persistir decision trace opcional.
+- [ ] Adicionar pesos configuraveis por tipo de prova runtime.
+- [ ] Criar policy de producao para selecao efetiva real.
+- [ ] Ligar policy resolver ao futuro runtime selector.
+
+## 20. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
 
