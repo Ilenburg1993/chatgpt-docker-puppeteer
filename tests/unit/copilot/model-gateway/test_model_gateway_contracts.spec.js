@@ -56,6 +56,7 @@ import {
     createEnvSecretRegistry,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
+    explainModelGatewayAccountLimitOverlays,
     explainModelGatewayAccountAccess,
     explainGatewayRouteDecision,
     normalizeModelGatewayAccountLimitState,
@@ -63,6 +64,7 @@ import {
     buildModelGatewayOnListModelsHandler,
     evaluateModelGatewayRuntimeSelectorRouteEnv,
     evaluateGatewayModelHealthRoute,
+    listModelGatewayProviderQuotaCapabilities,
     executeModelGatewayRuntimeSelectorPlan,
     executeModelGatewayRuntimeSelectorPlanWithFallbacks,
     readGatewayModelHealthFromRecords,
@@ -218,6 +220,7 @@ import {
     summarizeCanonicalModelProjectionDiff,
     summarizeModelGatewayRefreshLogText,
     summarizeModelGatewayAccountOverlays,
+    summarizeModelGatewayProviderQuotaCapabilities,
     summarizeModelGatewayLocalProviderOptInBlocks,
     summarizeModelGatewaySdkQuotaSnapshots,
     summarizeModelGatewayMetadataCoverage,
@@ -686,6 +689,8 @@ describe('model-gateway foundation', () => {
         assert.equal(audit.summary.selectedProviders.openrouter, 2);
         assert.equal(audit.summary.selectedSelectorKinds.provider_explicit, 2);
         assert.equal(audit.profiles[0].selected?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
+        assert.equal(audit.profiles[0].selected?.['accountScope'], 'default');
+        assert.equal(audit.profiles[0].selected?.['taskProfile'], 'repo_agent');
         assert.equal(audit.profiles[0].decisionLayers['runtimeProbeProofCount'], 0);
         assert.deepEqual(audit.profiles[0].capabilitySupply.required, { text: 1, streaming: 1, tools: 1 });
         assert.equal(audit.profiles[0].capabilitySupply.preferred.reasoningEffort, 1);
@@ -764,6 +769,8 @@ describe('model-gateway foundation', () => {
         assert.equal(runtimeSelectorPlan.summary.blockedProfileCount, 0);
         assert.equal(runtimeSelectorPlan.routes[0].decisionEvent.source, 'unit-test-runtime-selector');
         assert.equal(runtimeSelectorPlan.routes[0].decisionEvent.sessionId, 'unit-session');
+        assert.equal(runtimeSelectorPlan.routes[0].selected?.['accountScope'], 'default');
+        assert.equal(runtimeSelectorPlan.routes[0].selected?.['taskProfile'], 'repo_agent');
         assert.equal(selectModelGatewayRuntimeRoute(runtimeSelectorPlan, 'repo_agent')?.selectedRouteKey, 'openrouter:openai/gpt-oss-120b');
 
         const strictRuntimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(requireRuntimeProof, {
@@ -1065,6 +1072,8 @@ describe('model-gateway foundation', () => {
         assert.equal(trace['policy']?.['mode'], MODEL_GATEWAY_SELECTION_POLICY_MODE.PREFER_RUNTIME_PROVED);
         assert.equal(Array.isArray(trace['rows']), true);
         assert.equal(trace['rows']?.[0]?.['selected']?.['providerId'], 'openrouter');
+        assert.equal(trace['rows']?.[0]?.['selected']?.['accountScope'], 'default');
+        assert.equal(trace['rows']?.[0]?.['selected']?.['taskProfile'], 'repo_agent');
 
         const traceDir = await mkdtemp(join(tmpdir(), 'model-gateway-selection-trace-'));
         try {
@@ -1825,6 +1834,42 @@ describe('model-gateway foundation', () => {
             ['gpt-hidden'],
         );
         assert.ok(decision.rejected[0].rejectedReasons.includes('eligibility:account_model_not_visible'));
+    });
+
+    it('does not reuse precomputed eligibility decisions across account scopes', () => {
+        const model = createModelRecord({
+            providerId: 'openrouter',
+            providerModel: 'scope-model',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+            pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 4 },
+        });
+        const defaultExcluded = createModelEligibilityDecision({
+            providerId: 'openrouter',
+            providerModel: 'scope-model',
+            accountScope: 'default',
+            taskProfile: 'tool_agent',
+            include: false,
+            hardExclusions: ['account_model_not_visible'],
+        });
+        const orgEligible = createModelEligibilityDecision({
+            providerId: 'openrouter',
+            providerModel: 'scope-model',
+            accountScope: 'org-alpha',
+            taskProfile: 'tool_agent',
+            include: true,
+            reasons: ['account_model_visible'],
+        });
+
+        const decision = routeGatewayModels([model], 'tool_agent', {
+            eligibilityDecisions: [defaultExcluded, orgEligible],
+            eligibilityPolicy: { accountScope: 'org-alpha' },
+            requireKnownEligibility: true,
+            requireAgentProbeOk: false,
+        });
+
+        assert.equal(decision.selected?.model['providerModel'], 'scope-model');
+        assert.equal(decision.selected?.eligibility?.['accountScope'], 'org-alpha');
     });
 
     it('uses the concrete env secret registry in pre-runtime route admission', () => {
@@ -7914,6 +7959,57 @@ describe('model-gateway foundation', () => {
         assert.equal(summary.rows[0].resetAt, '2026-05-25T00:05:00.000Z');
         assert.equal(summary.rows[0].quotaResetActive, false);
         assert.equal(summary.rows[0].quotaResetExpired, false);
+    });
+
+    it('explains active and expired account/key limit overlays before runtime', () => {
+        const explanation = explainModelGatewayAccountLimitOverlays([
+            createProviderAccountOverlay({
+                providerId: 'openrouter',
+                accountScope: 'default',
+                secretRef: 'OPENROUTER_API_KEY',
+                sourceKind: 'authenticated_account_api',
+                rateLimits: { remainingRequests: 0, resetAt: '2026-05-25T00:05:00.000Z' },
+            }),
+            createProviderAccountOverlay({
+                providerId: 'groq',
+                accountScope: 'default',
+                secretRef: 'GROQ_API_KEY',
+                sourceKind: 'runtime_health',
+                quota: { dailyRequests: 0, resetAt: '2026-05-25T00:01:00.000Z' },
+                expiresAt: '2026-05-25T00:02:00.000Z',
+                providerMetadata: { failureKind: 'credits' },
+            }),
+        ], {
+            now: '2026-05-25T00:03:00.000Z',
+        });
+
+        assert.equal(explanation.summary.total, 2);
+        assert.equal(explanation.summary.activeBlockers, 1);
+        assert.equal(explanation.summary.expiredSignals, 1);
+        assert.equal(explanation.summary.temporaryBlockers, 1);
+        assert.equal(explanation.summary.bySourceLayer.account, 1);
+        assert.equal(explanation.summary.bySourceLayer.runtime, 1);
+        assert.equal(explanation.rows[0].providerId, 'openrouter');
+        assert.equal(explanation.rows[0].limitStatus, 'rate_limited');
+        assert.equal(explanation.rows[0].activeBlocker, true);
+        assert.equal(explanation.rows[0].nextAction, 'wait_for_rate_limit_reset_or_choose_another_route');
+        assert.equal(explanation.rows[1].providerId, 'groq');
+        assert.equal(explanation.rows[1].expiredSignal, true);
+        assert.equal(explanation.rows[1].nextAction, 'refresh_overlay_or_retry_pre_runtime_selection');
+    });
+
+    it('summarizes provider quota capability surfaces without treating SDK quota as BYOK truth', () => {
+        const openRouterRows = listModelGatewayProviderQuotaCapabilities({ selector: 'openrouter' });
+        assert.equal(openRouterRows.length, 1);
+        assert.equal(openRouterRows[0].quotaSnapshot, 'key_credit_balance');
+        assert.equal(openRouterRows[0].sdkQuotaAppliesToByok, false);
+
+        const matrix = summarizeModelGatewayProviderQuotaCapabilities();
+        assert.equal(matrix.summary.total >= 10, true);
+        assert.equal(matrix.summary.sdkQuotaByokTruthCount, 0);
+        assert.equal(matrix.summary.quotaSnapshotCount >= 2, true);
+        assert.equal(matrix.summary.runtimeFailureOverlayCount > 0, true);
+        assert.equal(matrix.summary.byQuotaSnapshot['sdk_entitlement_separate'], 1);
     });
 
     it('normalizes SDK AssistantUsage quota as host entitlement, not BYOK provider quota', () => {

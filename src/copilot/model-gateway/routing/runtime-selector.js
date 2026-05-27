@@ -195,6 +195,9 @@ function runtimeRoute(route) {
         selectorKind: optionalString(route['selectorKind']),
         score: optionalNumber(route['score']),
         eligibilityDisposition: optionalString(route['eligibilityDisposition']),
+        accountScope: optionalString(route['accountScope']) ?? 'default',
+        policyProfile: optionalString(route['policyProfile']),
+        taskProfile: optionalString(route['taskProfile']),
         hasRuntimeProof: route['hasRuntimeProof'] === true,
         runtimeHealth: optionalRecord(route['runtimeHealth']),
     };

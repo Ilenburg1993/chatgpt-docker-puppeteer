@@ -33,7 +33,7 @@ const CATALOG_SOURCE_DEFAULTS = Object.freeze({
     trustTier: 'unknown',
 });
 const CATALOG_IDENTITY_SECRET_RE =
-    /\b(?:sk-(?:or-v1-)?|gsk_|hf_|csk-|nvapi-|cpk_|cfat_|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}\b/gu;
+    /\b(?:sk-(?:or-v1-)?|gsk[-_]|hf[-_]|csk-|nvapi-|cpk[-_]|cfat[-_]|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}\b/gu;
 
 /**
  * @param {unknown} value

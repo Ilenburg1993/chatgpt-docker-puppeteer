@@ -581,23 +581,65 @@ function findRouteOptionForModel(model, routes) {
 
 /**
  * @param {Record<string, any>} model
+ * @param {Record<string, any>} profile
  * @param {Record<string, any>[]} decisions
+ * @param {Parameters<typeof scoreGatewayModelCandidate>[2]} options
  * @returns {Record<string, any> | null}
  */
-function findEligibilityDecisionForModel(model, decisions) {
+function findEligibilityDecisionForModel(model, profile, decisions, options = {}) {
     const key = modelEligibilityKey(model);
     return (
-        decisions.find(
-            (decision) =>
-                [
-                    String(decision['providerId'] ?? 'unknown-provider'),
-                    String(decision['providerModel'] ?? 'unknown-model'),
-                    String(decision['routeProfile'] ?? 'default'),
-                    String(decision['selectorKind'] ?? 'exact_model'),
-                    String(decision['selectorSyntax'] ?? decision['providerModel'] ?? 'unknown-model'),
-                ].join(':') === key,
-        ) ?? null
+        decisions.find((decision) => eligibilityDecisionMatchesRoute(decision, key) && eligibilityDecisionMatchesSelectionScope(decision, profile, options)) ??
+        null
     );
+}
+
+/**
+ * @param {Record<string, any>} decision
+ * @param {string} key
+ * @returns {boolean}
+ */
+function eligibilityDecisionMatchesRoute(decision, key) {
+    return (
+        [
+            String(decision['providerId'] ?? 'unknown-provider'),
+            String(decision['providerModel'] ?? 'unknown-model'),
+            String(decision['routeProfile'] ?? 'default'),
+            String(decision['selectorKind'] ?? 'exact_model'),
+            String(decision['selectorSyntax'] ?? decision['providerModel'] ?? 'unknown-model'),
+        ].join(':') === key
+    );
+}
+
+/**
+ * @param {Record<string, any>} decision
+ * @param {Record<string, any>} profile
+ * @param {Parameters<typeof scoreGatewayModelCandidate>[2]} options
+ * @returns {boolean}
+ */
+function eligibilityDecisionMatchesSelectionScope(decision, profile, options = {}) {
+    const policy = isRecord(options.eligibilityPolicy) ? options.eligibilityPolicy : {};
+    const desiredAccountScope = String(policy['accountScope'] ?? 'default');
+    const decisionAccountScope = String(decision['accountScope'] ?? 'default');
+    if (decisionAccountScope !== desiredAccountScope) return false;
+
+    const desiredPolicyProfile = typeof policy['policyProfile'] === 'string' && policy['policyProfile'] ? policy['policyProfile'] : null;
+    const decisionPolicyProfile =
+        typeof decision['policyProfile'] === 'string' && decision['policyProfile'] ? decision['policyProfile'] : null;
+    if (desiredPolicyProfile && decisionPolicyProfile && decisionPolicyProfile !== 'default' && decisionPolicyProfile !== desiredPolicyProfile) {
+        return false;
+    }
+
+    const desiredTaskProfile =
+        (typeof policy['taskProfile'] === 'string' && policy['taskProfile']) ||
+        (typeof profile['id'] === 'string' && profile['id']) ||
+        null;
+    const decisionTaskProfile = typeof decision['taskProfile'] === 'string' && decision['taskProfile'] ? decision['taskProfile'] : null;
+    if (desiredTaskProfile && decisionTaskProfile && decisionTaskProfile !== 'default' && decisionTaskProfile !== desiredTaskProfile) {
+        return false;
+    }
+
+    return true;
 }
 
 /**
@@ -609,7 +651,9 @@ function findEligibilityDecisionForModel(model, decisions) {
 function resolveCandidateEligibility(model, profile, options = {}) {
     const precomputed = findEligibilityDecisionForModel(
         model,
+        profile,
         Array.isArray(options.eligibilityDecisions) ? options.eligibilityDecisions : [],
+        options,
     );
     if (precomputed) return precomputed;
     if (options.evaluateEligibility !== true) return null;

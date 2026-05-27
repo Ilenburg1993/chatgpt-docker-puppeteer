@@ -15,9 +15,9 @@ const AUDIT_JWT_TOKEN_RE = /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z
 const AUDIT_SECRET_ASSIGNMENT_RE =
     /((?:api[_-]?key|authorization|bearer[_-]?token|access[_-]?token|token|secret|password)\s*[:=]\s*["']?)([^"',\s;]{8,})/giu;
 const AUDIT_PROVIDER_SECRET_RE =
-    /\b(?:sk-(?:or-v1-)?|gsk_|hf_|csk-|nvapi-|cpk_|cfat_|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}\b/gu;
+    /\b(?:sk-(?:or-v1-)?|gsk[-_]|hf[-_]|csk-|nvapi-|cpk[-_]|cfat[-_]|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}\b/gu;
 const AUDIT_PROVIDER_SECRET_EXACT_RE =
-    /^(?:sk-(?:or-v1-)?|gsk_|hf_|csk-|nvapi-|cpk_|cfat_|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}$/u;
+    /^(?:sk-(?:or-v1-)?|gsk[-_]|hf[-_]|csk-|nvapi-|cpk[-_]|cfat[-_]|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}$/u;
 
 /**
  * @param {unknown} value

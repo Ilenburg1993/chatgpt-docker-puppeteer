@@ -40,7 +40,7 @@ const CATALOG_ARRAY_FIELDS = Object.freeze([
 const CATALOG_STRING_BEARER_RE = /\bBearer\s+[A-Za-z0-9._~+/=-]{12,}\b/giu;
 const CATALOG_STRING_JWT_RE = /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b/gu;
 const CATALOG_STRING_PROVIDER_SECRET_RE =
-    /\b(?:sk-(?:or-v1-)?|gsk_|hf_|csk-|nvapi-|cpk_|cfat_|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}\b/gu;
+    /\b(?:sk-(?:or-v1-)?|gsk[-_]|hf[-_]|csk-|nvapi-|cpk[-_]|cfat[-_]|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}\b/gu;
 
 /**
  * @param {unknown} value

@@ -38,6 +38,7 @@ import {
     applyModelGatewayEligibilityToSnapshot,
     evaluateModelGatewayCatalogEligibility,
     evaluateModelGatewayProviderEnvRequirements,
+    explainModelGatewayAccountLimitOverlays,
     explainModelGatewayCatalogEntry,
     explainModelGatewayProviderEntry,
     explainModelGatewayEligibilityDecision,
@@ -79,6 +80,7 @@ import {
     SqliteModelGatewayCatalogStore,
     summarizeModelGatewayAccountOverlays,
     summarizeModelGatewayLocalProviderOptInBlocks,
+    summarizeModelGatewayProviderQuotaCapabilities,
     summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewayRefreshLogText,
     summarizeModelGatewayProviderEnvRequirements,
@@ -1846,7 +1848,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -3204,6 +3206,96 @@ async function renderByokGatewayAccounts(println, rest) {
 }
 
 /**
+ * @param {Record<string, number>} counts
+ * @returns {string}
+ */
+function renderGatewayCountMap(counts) {
+    return Object.entries(counts)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, count]) => `${key}:${count}`)
+        .join(',') || '-';
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayLimits(println, rest) {
+    const args = parseGatewayCatalogListArgs(rest);
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const snapshot = await store.readSnapshot();
+    const catalogOverlays = Array.isArray(snapshot.accountOverlays) ? snapshot.accountOverlays : [];
+    const runtimeOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(listByokProviderModelHealth());
+    const runtimeSummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeOverlays);
+    const explanation = explainModelGatewayAccountLimitOverlays([...catalogOverlays, ...runtimeOverlays], { selector: args.selector });
+    println(`\n  \x1b[36mBYOK model-gateway account limits\x1b[0m`);
+    println(
+        `  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · overlays=${explanation.summary.matched}/${explanation.summary.total} · active=${explanation.summary.activeBlockers} · expired=${explanation.summary.expiredSignals} · temporary=${explanation.summary.temporaryBlockers} · runtime=${runtimeSummary.activeCount}/${runtimeSummary.total}\x1b[0m`,
+    );
+    println(
+        `  \x1b[90mstatus=${renderGatewayCountMap(explanation.summary.byStatus)} · sourceLayer=${renderGatewayCountMap(explanation.summary.bySourceLayer)}\x1b[0m\n`,
+    );
+    if (explanation.rows.length === 0) {
+        println('    \x1b[33mNenhum limite account/key encontrado para o filtro informado.\x1b[0m\n');
+        return;
+    }
+    for (const row of explanation.rows.slice(0, args.limit)) {
+        const state = row.activeBlocker ? 'active' : row.expiredSignal ? 'expired' : 'clear';
+        const reset = row.resetAt ? `reset=${row.resetAt}` : row.retryAfterSeconds ? `retry=${row.retryAfterSeconds}s` : 'reset=-';
+        const money = [
+            row.remainingUsd !== null ? `remainingUsd=${row.remainingUsd}` : null,
+            row.remainingCreditsUsd !== null ? `creditsUsd=${row.remainingCreditsUsd}` : null,
+        ].filter(Boolean).join(' · ');
+        println(
+            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mscope=${row.accountScope} · status=${row.limitStatus} · state=${state} · ${reset} · expires=${row.expiresAt ?? '-'}\x1b[0m`,
+        );
+        println(
+            `      \x1b[90msource=${row.sourceKind}:${row.sourceId ?? '-'} · layer=${row.sourceLayer} · failure=${row.failureKind ?? '-'} · secretRef=${row.secretRef ?? '-'} · ${money || 'remaining=-'}\x1b[0m`,
+        );
+        println(`      \x1b[90mnext=${row.nextAction}\x1b[0m`);
+    }
+    if (explanation.rows.length > args.limit) {
+        println(`\n  \x1b[90mexibindo ${args.limit}/${explanation.rows.length}; use filtro ou limite numerico.\x1b[0m`);
+    }
+    println(
+        '  \x1b[90mLimites provider/account podem bloquear pré-runtime; AssistantUsageQuotaSnapshot é quota SDK/Copilot e não substitui overlay BYOK externo.\x1b[0m\n',
+    );
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {void}
+ */
+function renderByokGatewayQuotaMatrix(println, rest) {
+    const args = parseGatewayCatalogListArgs(rest);
+    const matrix = summarizeModelGatewayProviderQuotaCapabilities({ selector: args.selector });
+    println(`\n  \x1b[36mBYOK model-gateway provider quota matrix\x1b[0m`);
+    println(
+        `  \x1b[90mselector=${args.selector ?? '-'} · providers=${matrix.summary.providerCount}/${matrix.summary.total} · accountVisibility=${matrix.summary.accountVisibilityCount} · quotaSnapshots=${matrix.summary.quotaSnapshotCount} · runtimeOverlay=${matrix.summary.runtimeFailureOverlayCount} · sdkQuotaByokTruth=${matrix.summary.sdkQuotaByokTruthCount}\x1b[0m`,
+    );
+    println(`  \x1b[90mquota=${renderGatewayCountMap(matrix.summary.byQuotaSnapshot)}\x1b[0m\n`);
+    if (matrix.rows.length === 0) {
+        println('    \x1b[33mNenhum provider encontrado para o filtro informado.\x1b[0m\n');
+        return;
+    }
+    for (const row of matrix.rows.slice(0, args.limit)) {
+        println(
+            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mvisibility=${row.accountVisibility} · quota=${row.quotaSnapshot} · spending=${row.spendingLimit} · rate=${row.rateLimit}\x1b[0m`,
+        );
+        println(
+            `      \x1b[90mruntimeOverlay=${row.runtimeFailureOverlay ? 'sim' : 'nao'} · sdkQuotaByokTruth=${row.sdkQuotaAppliesToByok ? 'sim' : 'nao'} · env=${row.requiredEnv.join(',') || '-'}\x1b[0m`,
+        );
+        println(`      \x1b[90mendpoints=${row.endpoints.slice(0, 4).join(',') || '-'}\x1b[0m`);
+    }
+    if (matrix.rows.length > args.limit) {
+        println(`\n  \x1b[90mexibindo ${args.limit}/${matrix.rows.length}; use filtro ou limite numerico.\x1b[0m`);
+    }
+    println('  \x1b[90mA matriz descreve fontes pre-runtime possiveis; ela nao prova acesso runtime nem altera catalogo.\x1b[0m\n');
+}
+
+/**
  * @param {(text: string) => void} println
  * @returns {Promise<void>}
  */
@@ -3915,6 +4007,14 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         }
         if (/^(routes|route|rotas)$/iu.test(rest[0] ?? '')) {
             await renderByokGatewayRoutes(println, rest.slice(1));
+            return;
+        }
+        if (/^(quota-matrix|quota-capabilities|limits-matrix|matrix-limits|matriz-quotas)$/iu.test(rest[0] ?? '')) {
+            renderByokGatewayQuotaMatrix(println, rest.slice(1));
+            return;
+        }
+        if (/^(limits|limit|limites|quota|quotas|rate-limits|account-limits)$/iu.test(rest[0] ?? '')) {
+            await renderByokGatewayLimits(println, rest.slice(1));
             return;
         }
         if (/^(accounts|account|contas|keys|key|account-keys|account-limits)$/iu.test(rest[0] ?? '')) {

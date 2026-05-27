@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeSelectorPlan, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeSelectorPlan, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayAccountLimitOverlays, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayProviderQuotaCapabilities, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -80,6 +80,63 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                 statusCounts: { rate_limited: 1 },
             },
         })),
+        explainModelGatewayAccountLimitOverlays: vi.fn(() => ({
+            rows: [
+                {
+                    accountOverlayId: 'openrouter:default:OPENROUTER_API_KEY',
+                    providerId: 'openrouter',
+                    accountScope: 'default',
+                    secretRef: 'OPENROUTER_API_KEY',
+                    sourceId: 'openrouter-key-account',
+                    sourceKind: 'authenticated_account_api',
+                    sourceLayer: 'account',
+                    confidence: 'authenticated_catalog',
+                    limitStatus: 'rate_limited',
+                    activeBlocker: true,
+                    expiredSignal: false,
+                    temporaryBlocker: true,
+                    retryAfterSeconds: 60,
+                    resetAt: '2026-05-25T00:01:00.000Z',
+                    expiresAt: null,
+                    remainingUsd: 12,
+                    remainingCreditsUsd: 12,
+                    failureKind: null,
+                    nextAction: 'wait_for_rate_limit_reset_or_choose_another_route',
+                },
+                {
+                    accountOverlayId: 'runtime-health:groq:default:limited-model:rate-limit',
+                    providerId: 'groq',
+                    accountScope: 'default',
+                    secretRef: 'GROQ_API_KEY',
+                    sourceId: 'runtime-health-rate-limit',
+                    sourceKind: 'runtime_health',
+                    sourceLayer: 'runtime',
+                    confidence: 'probe_failed',
+                    limitStatus: 'ok',
+                    activeBlocker: false,
+                    expiredSignal: true,
+                    temporaryBlocker: false,
+                    retryAfterSeconds: null,
+                    resetAt: '2026-05-25T00:01:00.000Z',
+                    expiresAt: '2026-05-25T00:02:00.000Z',
+                    remainingUsd: null,
+                    remainingCreditsUsd: null,
+                    failureKind: 'rate-limit',
+                    nextAction: 'refresh_overlay_or_retry_pre_runtime_selection',
+                },
+            ],
+            summary: {
+                total: 2,
+                matched: 2,
+                providers: 2,
+                activeBlockers: 1,
+                expiredSignals: 1,
+                temporaryBlockers: 1,
+                byStatus: { rate_limited: 1, ok: 1 },
+                bySourceKind: { authenticated_account_api: 1, runtime_health: 1 },
+                bySourceLayer: { account: 1, runtime: 1 },
+            },
+        })),
         summarizeModelGatewayRuntimeAccountOverlays: vi.fn(() => ({
             total: 1,
             activeCount: 1,
@@ -87,6 +144,31 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             byProvider: { groq: 1 },
             byFailureKind: { 'rate-limit': 1 },
             items: [],
+        })),
+        summarizeModelGatewayProviderQuotaCapabilities: vi.fn(() => ({
+            rows: [
+                {
+                    providerId: 'openrouter',
+                    accountVisibility: 'key_account_and_public_models',
+                    quotaSnapshot: 'key_credit_balance',
+                    spendingLimit: 'key_credit_balance',
+                    rateLimit: 'headers_or_runtime_failure',
+                    runtimeFailureOverlay: true,
+                    sdkQuotaAppliesToByok: false,
+                    requiredEnv: ['OPENROUTER_API_KEY'],
+                    endpoints: ['/api/v1/models', '/api/v1/key'],
+                },
+            ],
+            summary: {
+                total: 15,
+                matched: 1,
+                providerCount: 1,
+                accountVisibilityCount: 1,
+                quotaSnapshotCount: 1,
+                runtimeFailureOverlayCount: 1,
+                sdkQuotaByokTruthCount: 0,
+                byQuotaSnapshot: { key_credit_balance: 1 },
+            },
         })),
         MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON: 'local_provider_requires_explicit_request',
         summarizeModelGatewayLocalProviderOptInBlocks: vi.fn((selection) => {
@@ -895,6 +977,7 @@ vi.mock('#copilot/model-gateway', () => ({
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
     evaluateModelGatewayProviderEnvRequirements,
+    explainModelGatewayAccountLimitOverlays,
     explainModelGatewayCatalogEntry,
     explainModelGatewayProviderEntry,
     explainModelGatewayEligibilityDecision,
@@ -936,6 +1019,7 @@ vi.mock('#copilot/model-gateway', () => ({
     planModelGatewayProbeBackoff,
     summarizeModelGatewayAccountOverlays,
     summarizeModelGatewayLocalProviderOptInBlocks,
+    summarizeModelGatewayProviderQuotaCapabilities,
     summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewayProviderEnvRequirements,
     summarizeModelGatewayRefreshLogText,
@@ -2327,6 +2411,44 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('secretRef=OPENROUTER_API_KEY');
         expect(ctx.output()).toContain('reset=2026-05-25T00:01:00.000Z');
         expect(ctx.output()).toContain('runtime health continua em /byok health');
+    });
+
+    it('explica limites account/key ativos e expirados antes do runtime', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway limits openrouter');
+
+        expect(deriveModelGatewayRuntimeAccountOverlaysFromHealth).toHaveBeenCalledWith(expect.any(Array));
+        expect(summarizeModelGatewayRuntimeAccountOverlays).toHaveBeenCalledWith(
+            expect.arrayContaining([expect.objectContaining({ sourceKind: 'runtime_health' })]),
+        );
+        expect(explainModelGatewayAccountLimitOverlays).toHaveBeenCalledWith(
+            expect.arrayContaining([expect.objectContaining({ sourceKind: 'runtime_health' })]),
+            expect.objectContaining({ selector: 'openrouter' }),
+        );
+        expect(ctx.output()).toContain('BYOK model-gateway account limits');
+        expect(ctx.output()).toContain('active=1');
+        expect(ctx.output()).toContain('expired=1');
+        expect(ctx.output()).toContain('state=active');
+        expect(ctx.output()).toContain('next=wait_for_rate_limit_reset_or_choose_another_route');
+        expect(ctx.output()).toContain('AssistantUsageQuotaSnapshot é quota SDK/Copilot');
+    });
+
+    it('mostra matriz de capacidades de quota por provider sem executar runtime', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway quota-matrix openrouter');
+
+        expect(summarizeModelGatewayProviderQuotaCapabilities).toHaveBeenCalledWith(
+            expect.objectContaining({ selector: 'openrouter' }),
+        );
+        expect(ctx.output()).toContain('BYOK model-gateway provider quota matrix');
+        expect(ctx.output()).toContain('quota=key_credit_balance');
+        expect(ctx.output()).toContain('sdkQuotaByokTruth=0');
+        expect(ctx.output()).toContain('OPENROUTER_API_KEY');
+        expect(ctx.output()).toContain('/api/v1/key');
     });
 
     it('mostra comandos canônicos do model-gateway para package, make e terminal', async () => {

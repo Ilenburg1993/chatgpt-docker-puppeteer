@@ -2353,14 +2353,14 @@ Quota/account overlay mais rico.
 - [x] Tratar key disabled.
 - [x] Derivar overlays volateis de health runtime.
 - [ ] Integrar `AssistantUsageQuotaSnapshot` somente como overlay SDK-scoped se aplicavel.
-- [ ] Documentar diferenca entre quota SDK Copilot e BYOK provider externo.
-- [ ] Criar provider quota capability matrix.
+- [x] Documentar diferenca entre quota SDK Copilot e BYOK provider externo.
+- [x] Criar provider quota capability matrix.
 - [ ] Criar account overlay freshness policy por provider.
 - [ ] Criar reset window strategy por failure kind.
-- [ ] Criar comando terminal para explicar quota ativa vs expirada.
+- [x] Criar comando terminal para explicar quota ativa vs expirada.
 - [ ] Criar retention separada para quota/rate/spending snapshots.
-- [ ] Criar teste de quota que expira e deixa de bloquear.
-- [ ] Criar teste de key trocada que nao contamina overlay antigo.
+- [x] Criar teste de quota que expira e deixa de bloquear.
+- [x] Criar teste de key trocada que nao contamina overlay antigo.
 - [ ] Criar teste de provider plan sem acesso ao modelo.
 
 ### Faixa I - Elegibilidade Pre-Runtime
@@ -2966,6 +2966,42 @@ Provider docs mudam menos frequentemente.
 Runtime health muda muito frequentemente.
 
 Por isso as camadas devem continuar separadas.
+
+### 10.5 Limites Ativos Versus Expirados
+
+Account/key limit e um overlay dinamico, nao um fato canonico do modelo.
+
+Um bloqueio ativo pode impedir entrada no runtime antes de gastar quota.
+
+Um bloqueio expirado deve aparecer para auditoria, mas nao deve continuar bloqueando por si so.
+
+`quota_exhausted` e `rate_limited` sao bloqueios temporarios quando a janela ainda esta ativa.
+
+`key_disabled` e `spending_exhausted` tendem a ser bloqueios de conta/key ate intervencao do operador.
+
+Runtime health pode gerar overlay volatil, mas esse overlay continua sendo account/runtime scoped.
+
+Runtime health nao reescreve catalogo canonico.
+
+`/byok gateway limits` mostra active, expired e temporary antes de qualquer chamada de modelo.
+
+`/byok gateway limits` combina overlays persistidos do catalogo com overlays derivados de runtime health ja observado.
+
+`/byok gateway limits` tambem explicita `nextAction` para cada bloqueio.
+
+`/byok gateway accounts` continua sendo a visao resumida de account/key.
+
+`/byok gateway limits` e a visao operacional para decidir se uma rota deve nem entrar em runtime.
+
+`AssistantUsageQuotaSnapshot` deve permanecer SDK/Copilot scoped.
+
+`AssistantUsageQuotaSnapshot` pode bloquear ou alertar rotas nativas do SDK.
+
+`AssistantUsageQuotaSnapshot` nao deve ser usado como verdade de quota de OpenRouter, Kilo, Groq, Gemini ou outro provider BYOK externo.
+
+Se um dia for integrado ao gateway, deve entrar como overlay separado com `scope=copilot_sdk_entitlement`.
+
+Essa separacao evita paralelismo falso entre quota do host e quota do provider externo.
 
 ## 11. Hipoteses A Confirmar
 
@@ -6179,6 +6215,204 @@ A ordem pos-live agora e:
 O `model-gateway:live:plan` materializa `phases` e `postPhases`.
 
 Nenhuma dessas fases pos-live executa provider.
+
+## 21.34 Mudanca 34 - Account Limits Explicaveis Antes Do Runtime
+
+Foi criada uma camada pura para explicar limites account/key.
+
+Arquivo:
+
+`src/copilot/model-gateway/account-access/summary.js`
+
+Novo helper:
+
+`explainModelGatewayAccountLimitOverlays()`
+
+Ele recebe overlays de catalogo/account e overlays derivados de runtime health.
+
+Ele nao chama provider.
+
+Ele nao altera catalogo canonico.
+
+Ele classifica:
+
+- `activeBlocker`;
+- `expiredSignal`;
+- `temporaryBlocker`;
+- `sourceLayer`;
+- `limitStatus`;
+- `nextAction`.
+
+O objetivo e permitir exclusao pre-runtime antes de gastar quota real.
+
+O terminal ganhou:
+
+`/byok gateway limits [filtro] [n]`
+
+Essa visao mostra:
+
+- bloqueios ativos;
+- sinais expirados;
+- bloqueios temporarios;
+- origem account/catalog/runtime;
+- reset/retry/expires;
+- acao recomendada.
+
+Tambem foi adicionada ao inventario canonico:
+
+`/byok gateway limits`
+
+Essa mudanca consolida a regra:
+
+quota e rate limit de provider externo sao account/key state.
+
+`AssistantUsageQuotaSnapshot` e quota SDK/Copilot host-scoped.
+
+Essas duas coisas nao podem ser misturadas como se fossem a mesma fonte.
+
+Validadores focados adicionados:
+
+- contrato puro de limite ativo/expirado;
+- terminal `/byok gateway limits`.
+
+## 21.35 Mudanca 35 - Elegibilidade Precomputada Account-Scoped
+
+Foi corrigido um risco de contaminacao entre contas/scopes.
+
+Arquivo:
+
+`src/copilot/model-gateway/routing/policy-engine.js`
+
+Antes, a selecao reaproveitava decisoes de elegibilidade precomputadas por:
+
+- provider;
+- model;
+- route;
+- selector.
+
+Isso era insuficiente para um sistema BYOK universal.
+
+Uma decisao de `accountScope=default` nao pode excluir uma rota de `accountScope=org-alpha`.
+
+Uma decisao de uma policy/task tambem nao deve ser reaplicada cegamente quando a selecao pediu outro scope.
+
+Agora `findEligibilityDecisionForModel()` tambem valida:
+
+- `accountScope`;
+- `policyProfile` quando explicitado;
+- `taskProfile` quando disponivel.
+
+Decisoes legadas sem policy/task explicita continuam aproveitaveis quando o scope bate.
+
+`policyProfile=default` e `taskProfile=default` funcionam como decisoes gerais.
+
+Foi adicionado teste para garantir que uma decisao excluida de um scope nao bloqueia outro scope elegivel.
+
+Essa correcao fortalece a camada pre-runtime antes do runtime selector real.
+
+Ela tambem reduz risco ao trocar key, account, organization ou profile sem rebuild global.
+
+## 21.36 Mudanca 36 - Matriz De Quota Por Provider
+
+Foi criada uma matriz canonica leve de capacidade quota/account por provider.
+
+Arquivo:
+
+`src/copilot/model-gateway/account-access/provider-quota-capabilities.js`
+
+Novos helpers:
+
+`listModelGatewayProviderQuotaCapabilities()`
+
+`summarizeModelGatewayProviderQuotaCapabilities()`
+
+A matriz descreve o que pode ser conhecido antes do runtime.
+
+Ela separa:
+
+- account visibility;
+- quota snapshot;
+- spending limit;
+- rate limit;
+- runtime failure overlay;
+- env keys necessarias;
+- endpoints relevantes.
+
+A matriz tambem registra explicitamente:
+
+`sdkQuotaAppliesToByok=false`
+
+para todos os providers externos atuais.
+
+Isso documenta a decisao arquitetural:
+
+quota SDK/Copilot nao e verdade BYOK provider externa.
+
+O terminal ganhou:
+
+`/byok gateway quota-matrix [filtro] [n]`
+
+Esse comando nao chama provider.
+
+Esse comando ajuda o operador e a LLM a entender quando uma exclusao pre-runtime pode ser objetiva e quando so runtime failure pode produzir overlay.
+
+O inventario canonico de comandos tambem foi atualizado.
+
+## 21.37 Mudanca 37 - Trace De Selecao Com Scope De Conta
+
+Foi reforcada a auditabilidade do caminho ate o runtime selector.
+
+Arquivos:
+
+`src/copilot/model-gateway/routing/selection-audit.js`
+
+`src/copilot/model-gateway/routing/selection-trace.js`
+
+`src/copilot/model-gateway/routing/runtime-selector.js`
+
+O resumo da rota selecionada agora carrega:
+
+- `accountScope`;
+- `policyProfile`;
+- `taskProfile`.
+
+O trace persistido tambem preserva esses campos.
+
+O runtime selector preserva esses campos quando transforma o trace/policy em rota executavel.
+
+Isso nao muda a selecao.
+
+Isso muda a auditabilidade.
+
+Agora, ao trocar key, account, organization, workspace ou policy, o operador consegue ver qual scope gerou a decisao.
+
+Essa informacao sera importante antes dos live tests com llm-b.
+
+## 21.38 Mudanca 38 - Redaction De Secrets Provider Com Hifen
+
+A suite completa de contratos encontrou um vazamento de fixture em snapshot JSON.
+
+O problema nao era a arquitetura de store.
+
+O problema era a regex de redaction do model-gateway.
+
+Ela cobria variantes como `gsk_`, mas nao cobria `gsk-`.
+
+Arquivos corrigidos:
+
+`src/copilot/model-gateway/secrets/redaction-audit.js`
+
+`src/copilot/model-gateway/catalog/contracts.js`
+
+`src/copilot/model-gateway/catalog/json-catalog-store.js`
+
+As regexes agora reconhecem variantes `-` e `_` para familias relevantes.
+
+O caso `token gsk-secret-that-must-not-leak rejected` volta a persistir como:
+
+`token [redacted] rejected`
+
+Esse ajuste e importante antes de build e live tests porque runtime failures podem carregar mensagens de provider com formato de token nao uniforme.
 
 ## 22. Fim Do Documento Inicial
 

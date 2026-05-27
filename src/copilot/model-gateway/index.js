@@ -11,15 +11,18 @@
 export {
     deriveModelGatewayRuntimeAccountOverlayFromHealth,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
+    explainModelGatewayAccountLimitOverlays,
     explainModelGatewayAccountAccess,
     MODEL_GATEWAY_ACCOUNT_ACCESS_CONFIDENCE,
     MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS,
     MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS,
     MODEL_GATEWAY_ACCOUNT_LIMIT_STATUS,
     MODEL_GATEWAY_SDK_QUOTA_STATUS,
+    listModelGatewayProviderQuotaCapabilities,
     normalizeModelGatewayAccountLimitState,
     resolveModelGatewayAccountAccess,
     summarizeModelGatewayAccountOverlays,
+    summarizeModelGatewayProviderQuotaCapabilities,
     summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewaySdkQuotaSnapshots,
 } from './account-access/index.js';

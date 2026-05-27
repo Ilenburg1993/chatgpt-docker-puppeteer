@@ -74,6 +74,9 @@ function selectedSummary(selected) {
         selectorSyntax: optionalString(model['selectorSyntax']) ?? optionalString(model['providerModel']) ?? optionalString(model['id']),
         score: typeof selected['score'] === 'number' && Number.isFinite(selected['score']) ? selected['score'] : null,
         eligibilityDisposition: optionalString(eligibility['disposition']),
+        accountScope: optionalString(eligibility['accountScope']) ?? 'default',
+        policyProfile: optionalString(eligibility['policyProfile']),
+        taskProfile: optionalString(eligibility['taskProfile']),
         runtimeHealth: isRecord(selected['health'])
             ? {
                   lastStatus: optionalString(health['lastStatus']),

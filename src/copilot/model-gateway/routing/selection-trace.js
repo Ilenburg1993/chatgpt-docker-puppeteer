@@ -66,6 +66,9 @@ function summarizeSelectedRoute(route) {
         selectorKind: optionalString(record['selectorKind']),
         score: optionalNumber(record['score']),
         eligibilityDisposition: optionalString(record['eligibilityDisposition']),
+        accountScope: optionalString(record['accountScope']) ?? 'default',
+        policyProfile: optionalString(record['policyProfile']),
+        taskProfile: optionalString(record['taskProfile']),
         hasRuntimeProof: record['hasRuntimeProof'] === true,
         runtimeHealth: runtimeHealth
             ? {

@@ -614,6 +614,20 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Inspect account/key limit status from overlays before runtime.',
     },
     {
+        id: 'terminal.limits',
+        phase: 'pre-runtime',
+        surface: 'terminal',
+        command: '/byok gateway limits',
+        summary: 'Explain active versus expired account/key limit blockers before spending runtime quota.',
+    },
+    {
+        id: 'terminal.quota-matrix',
+        phase: 'pre-runtime',
+        surface: 'terminal',
+        command: '/byok gateway quota-matrix',
+        summary: 'Inspect provider quota/account capability surfaces before deciding what can be known pre-runtime.',
+    },
+    {
         id: 'terminal.eligibility',
         phase: 'pre-runtime',
         surface: 'terminal',
