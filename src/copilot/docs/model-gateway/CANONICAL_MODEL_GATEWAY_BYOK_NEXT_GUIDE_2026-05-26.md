@@ -2413,7 +2413,7 @@ Quota/account overlay mais rico.
 - [x] Criar policy para privacy strict.
 - [x] Criar policy para no paid models.
 - [x] Criar policy para max estimated cost.
-- [ ] Criar teste de selecao com provider upstream explicito.
+- [x] Criar teste de selecao com provider upstream explicito.
 
 ### Faixa K - Runtime Probes
 
@@ -7131,6 +7131,35 @@ Estas policies seguem a separacao de camadas:
 - nao dependem de runtime proof.
 
 Elas ajudam perfis sensiveis a custo e privacidade antes de qualquer probe.
+
+## 21.55 Mudanca 55 - Teste De Upstream Provider Explicito Na Selecao
+
+Foi adicionado teste de selecao com upstream provider explicito.
+
+O teste usa rotas de gateway com:
+
+- `providerSpecific.upstreamProvider=anthropic`;
+- `providerSpecific.upstreamProvider=openai`.
+
+Cobre:
+
+- `allowUpstreamProviders`;
+- `preferredUpstreamProviders`;
+- `blockUpstreamProviders`.
+
+O resultado esperado:
+
+- upstream preferido vence quando permitido;
+- upstream bloqueado sai do ranking;
+- rota alternativa permitida continua selecionavel.
+
+Isto fecha a ultima lacuna imediata da Faixa J.
+
+O comportamento continua pre-runtime.
+
+Nenhum provider e chamado.
+
+O teste protege gateways como Kilo, OpenRouter, HuggingFace Router e Cloudflare AI Gateway.
 
 ## 22. Fim Do Documento Inicial
 

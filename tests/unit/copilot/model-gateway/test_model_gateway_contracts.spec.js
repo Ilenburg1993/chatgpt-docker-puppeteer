@@ -1850,6 +1850,44 @@ describe('model-gateway foundation', () => {
         assert.ok(blocked.rejectedReasons.includes('provider_direct_required:gateway_fallback'));
     });
 
+    it('selects gateway routes by explicit upstream provider policy before runtime', () => {
+        const anthropicRoute = {
+            id: 'kilo:anthropic/claude-sonnet-4.5',
+            providerId: 'kilo',
+            providerModel: 'anthropic/claude-sonnet-4.5',
+            selectorKind: 'gateway_policy',
+            selectorSyntax: 'anthropic/claude-sonnet-4.5:fastest',
+            providerSpecific: { upstreamProvider: 'anthropic' },
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 200_000 },
+        };
+        const openaiRoute = {
+            id: 'kilo:openai/gpt-oss-120b',
+            providerId: 'kilo',
+            providerModel: 'openai/gpt-oss-120b',
+            selectorKind: 'gateway_policy',
+            selectorSyntax: 'openai/gpt-oss-120b:fastest',
+            providerSpecific: { upstreamProvider: 'openai' },
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+        };
+
+        const preferred = routeGatewayModels([openaiRoute, anthropicRoute], 'tool_agent', {
+            requireAgentProbeOk: false,
+            allowUpstreamProviders: ['anthropic', 'openai'],
+            preferredUpstreamProviders: ['anthropic'],
+        });
+        const blocked = routeGatewayModels([openaiRoute, anthropicRoute], 'tool_agent', {
+            requireAgentProbeOk: false,
+            blockUpstreamProviders: ['anthropic'],
+        });
+
+        assert.equal(preferred.selected?.model['providerModel'], 'anthropic/claude-sonnet-4.5');
+        assert.ok(preferred.selected?.reasons.includes('preferred_upstream_provider:anthropic'));
+        assert.equal(blocked.selected?.model['providerModel'], 'openai/gpt-oss-120b');
+        assert.ok(blocked.rejected.some((candidate) => candidate.rejectedReasons.includes('upstream_provider_blocked:anthropic')));
+    });
+
     it('applies privacy strict, no-paid and max estimated cost policies before runtime', () => {
         const paidTraining = {
             id: 'openrouter:paid-training',
