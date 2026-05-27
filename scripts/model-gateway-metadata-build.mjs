@@ -7,6 +7,7 @@ import {
     createDefaultModelGatewayCatalogImporters,
     createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
+    DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION,
     JsonModelGatewayCatalogStore,
     auditModelGatewayCatalogSnapshotIntegrity,
     auditModelGatewayValueRedaction,
@@ -72,7 +73,12 @@ Options:
                                 Treat configured account/key importer failures as build-blocking.
   --fail-on-local-importer-failures
                                 Treat configured local daemon failures as build-blocking.
-  --account-history-max-rows=<n> SQLite account/key history rows to keep per table.
+  --account-history-max-rows=<n> SQLite legacy fallback rows to keep per account history table.
+  --account-quota-max-rows=<n>   SQLite account quota snapshot rows to keep.
+  --account-rate-limit-max-rows=<n>
+                                SQLite account rate-limit snapshot rows to keep.
+  --account-spending-max-rows=<n>
+                                SQLite account spending snapshot rows to keep.
   --route-decision-max-rows=<n> SQLite route decision rows to keep.
   --refresh-log-max-rows=<n>    SQLite refresh log rows to keep.
   --log=<path>                  Write full JSONL progress log to a custom path.
@@ -239,9 +245,29 @@ if (result.writePolicy.committed) {
     }
     if (!hasFlag('--skip-retention')) {
         sqliteRetention = await sqliteStore.applyOperationalRetention({
-            accountHistoryMaxRowsPerTable: numberFor('--account-history-max-rows', 10_000),
-            routeDecisionMaxRows: numberFor('--route-decision-max-rows', 50_000),
-            refreshLogMaxRows: numberFor('--refresh-log-max-rows', 200_000),
+            ...(valuesFor('--account-history-max-rows').length > 0
+                ? { accountHistoryMaxRowsPerTable: numberFor('--account-history-max-rows', 10_000) }
+                : {}),
+            accountQuotaSnapshotMaxRows: numberFor(
+                '--account-quota-max-rows',
+                DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountQuotaSnapshotMaxRows,
+            ),
+            accountRateLimitSnapshotMaxRows: numberFor(
+                '--account-rate-limit-max-rows',
+                DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountRateLimitSnapshotMaxRows,
+            ),
+            accountSpendingSnapshotMaxRows: numberFor(
+                '--account-spending-max-rows',
+                DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountSpendingSnapshotMaxRows,
+            ),
+            routeDecisionMaxRows: numberFor(
+                '--route-decision-max-rows',
+                DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.routeDecisionMaxRows,
+            ),
+            refreshLogMaxRows: numberFor(
+                '--refresh-log-max-rows',
+                DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows,
+            ),
         });
     }
     sqliteDiagnostics = await sqliteStore.readStorageDiagnostics();

@@ -35,7 +35,10 @@ By default this is a dry run. Pass --apply to delete rows beyond the configured 
 
 Options:
   --apply                              Mutate SQLite by deleting rows beyond retention limits.
-  --account-history-max-rows=<n>       Rows to keep per account history table.
+  --account-history-max-rows=<n>       Legacy fallback rows to keep per account history table.
+  --account-quota-max-rows=<n>         Account quota snapshot rows to keep.
+  --account-rate-limit-max-rows=<n>    Account rate-limit snapshot rows to keep.
+  --account-spending-max-rows=<n>      Account spending snapshot rows to keep.
   --route-decision-max-rows=<n>        Route decision rows to keep.
   --refresh-log-max-rows=<n>           Refresh log rows to keep.
   --runtime-probe-run-max-rows=<n>     Runtime probe run rows to keep.
@@ -51,9 +54,25 @@ Examples:
 }
 
 const policy = {
-    accountHistoryMaxRowsPerTable: numberFor(
-        '--account-history-max-rows',
-        DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountHistoryMaxRowsPerTable,
+    ...(valueFor('--account-history-max-rows') === null
+        ? {}
+        : {
+              accountHistoryMaxRowsPerTable: numberFor(
+                  '--account-history-max-rows',
+                  DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountHistoryMaxRowsPerTable,
+              ),
+          }),
+    accountQuotaSnapshotMaxRows: numberFor(
+        '--account-quota-max-rows',
+        DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountQuotaSnapshotMaxRows,
+    ),
+    accountRateLimitSnapshotMaxRows: numberFor(
+        '--account-rate-limit-max-rows',
+        DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountRateLimitSnapshotMaxRows,
+    ),
+    accountSpendingSnapshotMaxRows: numberFor(
+        '--account-spending-max-rows',
+        DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountSpendingSnapshotMaxRows,
     ),
     routeDecisionMaxRows: numberFor(
         '--route-decision-max-rows',
@@ -92,7 +111,7 @@ if (hasFlag('--json')) {
     process.stdout.write(`model-gateway SQLite operational retention\n`);
     process.stdout.write(`mode=${hasFlag('--apply') ? 'apply' : 'dry-run'}\n`);
     process.stdout.write(
-        `policy: accountHistoryMaxRowsPerTable=${policy.accountHistoryMaxRowsPerTable} routeDecisionMaxRows=${policy.routeDecisionMaxRows} refreshLogMaxRows=${policy.refreshLogMaxRows} runtimeProbeRunMaxRows=${policy.runtimeProbeRunMaxRows} runtimeProbeResultMaxRows=${policy.runtimeProbeResultMaxRows} healthObservationMaxRows=${policy.healthObservationMaxRows}\n`,
+        `policy: quota=${policy.accountQuotaSnapshotMaxRows} rateLimit=${policy.accountRateLimitSnapshotMaxRows} spending=${policy.accountSpendingSnapshotMaxRows} routeDecisionMaxRows=${policy.routeDecisionMaxRows} refreshLogMaxRows=${policy.refreshLogMaxRows} runtimeProbeRunMaxRows=${policy.runtimeProbeRunMaxRows} runtimeProbeResultMaxRows=${policy.runtimeProbeResultMaxRows} healthObservationMaxRows=${policy.healthObservationMaxRows}\n`,
     );
     process.stdout.write(
         `before: accountHistory=${before.accountHistoryRows} routeDecisions=${before.routeDecisionRows} refreshLogs=${before.refreshLogRows} runtime=${before.runtimeRows}\n`,

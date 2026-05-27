@@ -2358,7 +2358,7 @@ Quota/account overlay mais rico.
 - [x] Criar account overlay freshness policy por provider.
 - [x] Criar reset window strategy por failure kind.
 - [x] Criar comando terminal para explicar quota ativa vs expirada.
-- [ ] Criar retention separada para quota/rate/spending snapshots.
+- [x] Criar retention separada para quota/rate/spending snapshots.
 - [x] Criar teste de quota que expira e deixa de bloquear.
 - [x] Criar teste de key trocada que nao contamina overlay antigo.
 - [ ] Criar teste de provider plan sem acesso ao modelo.
@@ -6505,6 +6505,44 @@ Essa camada prepara o selector runtime para distinguir:
 - candidatos que precisam de refresh de account overlay;
 - candidatos bloqueados ate troca de key/plano/limite;
 - candidatos que podem voltar ao pool sem probe runtime imediata quando a janela expira.
+
+## 21.41 Mudanca 41 - Retention Separada Para Quota, Rate-Limit E Spending
+
+A retention operacional SQLite deixou de tratar toda historia account/key como um unico limite.
+
+Agora existem knobs separados:
+
+- `accountQuotaSnapshotMaxRows`;
+- `accountRateLimitSnapshotMaxRows`;
+- `accountSpendingSnapshotMaxRows`.
+
+O antigo `accountHistoryMaxRowsPerTable` continua funcionando como fallback legado quando informado.
+
+Defaults canonicos:
+
+- quota snapshots: 20000;
+- rate-limit snapshots: 50000;
+- spending snapshots: 20000.
+
+Scripts atualizados:
+
+- `scripts/model-gateway-sqlite-retention.mjs`;
+- `scripts/model-gateway-metadata-build.mjs`.
+
+Flags novas:
+
+- `--account-quota-max-rows=<n>`;
+- `--account-rate-limit-max-rows=<n>`;
+- `--account-spending-max-rows=<n>`.
+
+Isso e importante porque rate-limit pode gerar muitas amostras curtas, enquanto spending/quota tendem a mudar em outra cadencia.
+
+Tambem preserva o caminho para:
+
+- trocar key sem rebuild full;
+- manter historico suficiente para explicar bloqueios;
+- podar sinais volateis sem apagar catalogo canonico;
+- aplicar retention em SQLite sem tocar JSON canonical.
 
 ## 22. Fim Do Documento Inicial
 

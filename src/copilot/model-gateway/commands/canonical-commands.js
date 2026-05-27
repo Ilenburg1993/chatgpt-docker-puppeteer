@@ -133,14 +133,14 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'package',
         command: 'npm run model-gateway:sqlite:retention -- --json',
         summary:
-            'Preview SQLite operational retention for account/key history, route decisions, refresh logs and runtime health.',
+            'Preview SQLite operational retention for separate quota/rate/spending account history, route decisions, refresh logs and runtime health.',
     },
     {
         id: 'sqlite.retention-apply',
         phase: 'metadata',
         surface: 'package',
         command: 'npm run model-gateway:sqlite:retention:apply -- --json',
-        summary: 'Apply SQLite operational retention for account/key, route, refresh and runtime health tables.',
+        summary: 'Apply SQLite operational retention for account/key quota, rate-limit, spending, route, refresh and runtime health tables.',
     },
     {
         id: 'prebuild.all',

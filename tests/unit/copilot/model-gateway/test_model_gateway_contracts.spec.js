@@ -3875,6 +3875,78 @@ describe('model-gateway foundation', () => {
         }
     });
 
+    it('applies separate SQLite retention limits for quota, rate-limit and spending snapshots', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            await store.writeSnapshot({
+                source: 'separate-account-retention',
+                projections: [createCanonicalModelProjection({ providerId: 'openrouter', providerModel: 'model-a' })],
+            });
+            for (const [table, hasReset] of [
+                ['copilot_model_gateway_account_quota_snapshots', false],
+                ['copilot_model_gateway_account_rate_limit_snapshots', true],
+                ['copilot_model_gateway_account_spending_snapshots', false],
+            ]) {
+                const statement = db.prepare(
+                    hasReset
+                        ? `
+                            INSERT INTO ${table}
+                                (snapshot_key, account_overlay_id, provider_id, account_scope, secret_ref, status,
+                                 reset_at_ms, observed_at_ms, expires_at_ms, payload_json)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        `
+                        : `
+                            INSERT INTO ${table}
+                                (snapshot_key, account_overlay_id, provider_id, account_scope, secret_ref, status,
+                                 observed_at_ms, expires_at_ms, payload_json)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        `,
+                );
+                for (const observedAt of [1, 2, 3, 4]) {
+                    const args = [`${table}:${observedAt}`, 'overlay', 'openrouter', 'default', 'OPENROUTER_API_KEY', 'ok'];
+                    if (hasReset) args.push(null);
+                    args.push(observedAt, null, '{}');
+                    statement.run(...args);
+                }
+            }
+
+            const result = await store.applyOperationalRetention({
+                accountQuotaSnapshotMaxRows: 1,
+                accountRateLimitSnapshotMaxRows: 2,
+                accountSpendingSnapshotMaxRows: 3,
+                routeDecisionMaxRows: 0,
+                refreshLogMaxRows: 0,
+                runtimeProbeRunMaxRows: 0,
+                runtimeProbeResultMaxRows: 0,
+                healthObservationMaxRows: 0,
+            });
+            const quotaCount = /** @type {{ count: number }} */ (
+                db.prepare('SELECT COUNT(*) AS count FROM copilot_model_gateway_account_quota_snapshots').get()
+            );
+            const rateLimitCount = /** @type {{ count: number }} */ (
+                db.prepare('SELECT COUNT(*) AS count FROM copilot_model_gateway_account_rate_limit_snapshots').get()
+            );
+            const spendingCount = /** @type {{ count: number }} */ (
+                db.prepare('SELECT COUNT(*) AS count FROM copilot_model_gateway_account_spending_snapshots').get()
+            );
+            const counts = {
+                quota: quotaCount.count,
+                rateLimit: rateLimitCount.count,
+                spending: spendingCount.count,
+            };
+
+            assert.equal(result.tables['copilot_model_gateway_account_quota_snapshots'].maxRows, 1);
+            assert.equal(result.tables['copilot_model_gateway_account_rate_limit_snapshots'].maxRows, 2);
+            assert.equal(result.tables['copilot_model_gateway_account_spending_snapshots'].maxRows, 3);
+            assert.deepEqual(counts, { quota: 1, rateLimit: 2, spending: 3 });
+            assert.equal(result.deletedRows, 6);
+        } finally {
+            db.close();
+        }
+    });
+
     it('mirrors the debug JSON catalog snapshot into SQLite without changing the source snapshot', async () => {
         const { default: Database } = await import('better-sqlite3');
         const dir = await mkdtemp(join(tmpdir(), 'copilot-model-sqlite-mirror-'));

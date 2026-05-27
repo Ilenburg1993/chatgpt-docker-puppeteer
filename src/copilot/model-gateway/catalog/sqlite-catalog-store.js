@@ -35,6 +35,9 @@ let _runtimeHealthRunSequence = 0;
 
 export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze({
     accountHistoryMaxRowsPerTable: 10_000,
+    accountQuotaSnapshotMaxRows: 20_000,
+    accountRateLimitSnapshotMaxRows: 50_000,
+    accountSpendingSnapshotMaxRows: 20_000,
     routeDecisionMaxRows: 50_000,
     refreshLogMaxRows: 200_000,
     runtimeProbeRunMaxRows: 10_000,
@@ -994,6 +997,9 @@ export class SqliteModelGatewayCatalogStore {
     /**
      * @param {{
      *     accountHistoryMaxRowsPerTable?: number;
+     *     accountQuotaSnapshotMaxRows?: number;
+     *     accountRateLimitSnapshotMaxRows?: number;
+     *     accountSpendingSnapshotMaxRows?: number;
      *     routeDecisionMaxRows?: number;
      *     refreshLogMaxRows?: number;
      *     runtimeProbeRunMaxRows?: number;
@@ -1010,6 +1016,20 @@ export class SqliteModelGatewayCatalogStore {
         const accountHistoryMaxRowsPerTable = retentionLimit(
             policy.accountHistoryMaxRowsPerTable,
             DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountHistoryMaxRowsPerTable,
+        );
+        const accountHistoryFallback =
+            policy.accountHistoryMaxRowsPerTable === undefined ? null : accountHistoryMaxRowsPerTable;
+        const accountQuotaSnapshotMaxRows = retentionLimit(
+            policy.accountQuotaSnapshotMaxRows,
+            accountHistoryFallback ?? DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountQuotaSnapshotMaxRows,
+        );
+        const accountRateLimitSnapshotMaxRows = retentionLimit(
+            policy.accountRateLimitSnapshotMaxRows,
+            accountHistoryFallback ?? DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountRateLimitSnapshotMaxRows,
+        );
+        const accountSpendingSnapshotMaxRows = retentionLimit(
+            policy.accountSpendingSnapshotMaxRows,
+            accountHistoryFallback ?? DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountSpendingSnapshotMaxRows,
         );
         const routeDecisionMaxRows = retentionLimit(
             policy.routeDecisionMaxRows,
@@ -1034,18 +1054,19 @@ export class SqliteModelGatewayCatalogStore {
         /** @type {Record<string, { deletedRows: number; maxRows: number }>} */
         const tables = {};
         const tx = this.#db.transaction(() => {
-            for (const table of [
-                'copilot_model_gateway_account_quota_snapshots',
-                'copilot_model_gateway_account_rate_limit_snapshots',
-                'copilot_model_gateway_account_spending_snapshots',
-            ]) {
+            const accountRetentionTables = /** @type {Array<[string, number]>} */ ([
+                ['copilot_model_gateway_account_quota_snapshots', accountQuotaSnapshotMaxRows],
+                ['copilot_model_gateway_account_rate_limit_snapshots', accountRateLimitSnapshotMaxRows],
+                ['copilot_model_gateway_account_spending_snapshots', accountSpendingSnapshotMaxRows],
+            ]);
+            for (const [table, maxRows] of accountRetentionTables) {
                 const deletedRows = deleteRowsKeepingLatest(this.#db, {
                     table,
                     keyColumn: 'snapshot_key',
                     orderColumn: 'observed_at_ms',
-                    maxRows: accountHistoryMaxRowsPerTable,
+                    maxRows,
                 });
-                tables[table] = { deletedRows, maxRows: accountHistoryMaxRowsPerTable };
+                tables[table] = { deletedRows, maxRows };
             }
             tables['copilot_model_gateway_route_decisions'] = {
                 deletedRows: deleteRowsKeepingLatest(this.#db, {
