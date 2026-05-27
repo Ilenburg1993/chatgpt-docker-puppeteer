@@ -86,6 +86,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
     const localPrivateStrictSelection = localPrivateStrict ? runLocalPrivateStrictSelection() : null;
     const liveRunner = readinessCheck(readiness, 'live_runner_present');
     const effective = readinessCheck(readiness, 'selection_effective_observed_health');
+    const runtimeSelector = readinessCheck(readiness, 'runtime_selector_plan_ready');
     const runtimeNotPromoted = readinessCheck(readiness, 'runtime_not_promoted');
     const prerequisites = [
         {
@@ -102,6 +103,11 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
             id: 'runtime_not_promoted',
             ok: runtimeNotPromoted?.ok === true,
             detail: runtimeNotPromoted?.detail ?? 'runtime proof status is unavailable',
+        },
+        {
+            id: 'runtime_selector_plan_ready',
+            ok: runtimeSelector?.ok === true,
+            detail: runtimeSelector?.detail ?? 'runtime selector plan is unavailable',
         },
         {
             id: 'live_runner_present',

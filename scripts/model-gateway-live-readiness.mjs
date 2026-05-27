@@ -11,14 +11,17 @@ import {
     auditModelGatewayValueRedaction,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
+    buildModelGatewayRuntimeSelectorPlan,
     collectModelGatewaySecretAuditEnvValues,
     compareModelGatewayCatalogSnapshotParity,
+    compareModelGatewaySelectionAudits,
     createEnvSecretRegistry,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
     listByokProviderModelHealth,
     mergeByokProviderHealthRecords,
     renderModelGatewayLocalProviderOptInGuidance,
+    resolveModelGatewaySelectionPolicy,
     summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewayLocalProviderOptInBlocks,
 } from '../src/copilot/model-gateway/index.js';
@@ -172,6 +175,11 @@ const postRuntimeEffectiveSelection = auditModelGatewayPostRuntimeSelection(effe
     secretRegistry,
     runtimeHealthRecords: healthRecords,
 });
+const runtimeSelectionComparison = compareModelGatewaySelectionAudits(effectiveStrictSelection, postRuntimeEffectiveSelection);
+const runtimeSelectionPolicy = resolveModelGatewaySelectionPolicy(runtimeSelectionComparison, { mode: 'metadata_first' });
+const runtimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(runtimeSelectionPolicy, {
+    source: 'model-gateway-live-readiness',
+});
 const runnerExists = await fileExists(LIVE_RUNNER_PATH);
 const strictSelectedDispositions = selectedDispositions(strictAccessSelection);
 const effectiveSelectedDispositions = selectedDispositions(effectiveStrictSelection);
@@ -233,6 +241,11 @@ const checks = [
         id: 'selection_post_runtime_observed_health',
         ok: postRuntimeEffectiveSelection.ok && postRuntimeOnlyKnownAccess,
         detail: `${postRuntimeEffectiveSelection.summary.selectedProfileCount}/${postRuntimeEffectiveSelection.summary.profileCount} profiles selected, healthMatches=${postRuntimeEffectiveSelection.summary.healthRecordCount}, healthProofs=${postRuntimeEffectiveSelection.summary.runtimeHealthProofCount}, agentProofs=${postRuntimeEffectiveSelection.summary.runtimeAgentProbeProofCount}, probeProofs=${postRuntimeEffectiveSelection.summary.runtimeProbeProofCount}, dispositions=${postRuntimeSelectedDispositions.join(',') || 'none'}`,
+    },
+    {
+        id: 'runtime_selector_plan_ready',
+        ok: runtimeSelectorPlan.ready && runtimeSelectorPlan.summary.blockedProfileCount === 0,
+        detail: `${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} routes selected, blocked=${runtimeSelectorPlan.summary.blockedProfileCount}, proofSelected=${runtimeSelectorPlan.summary.runtimeProofSelectedCount}`,
     },
     {
         id: 'selection_supply_warnings',
@@ -346,6 +359,15 @@ const summary = {
             runtimeAgentProofs: postRuntimeEffectiveSelection.summary.runtimeAgentProbeProofCount,
             runtimeProbeProofs: postRuntimeEffectiveSelection.summary.runtimeProbeProofCount,
             healthRecords: healthRecords.length,
+        },
+        runtimeSelectorPlan: {
+            ok: runtimeSelectorPlan.ok,
+            ready: runtimeSelectorPlan.ready,
+            mode: runtimeSelectorPlan.mode,
+            selected: runtimeSelectorPlan.summary.selectedProfileCount,
+            profiles: runtimeSelectorPlan.summary.profileCount,
+            blocked: runtimeSelectorPlan.summary.blockedProfileCount,
+            runtimeProofSelected: runtimeSelectorPlan.summary.runtimeProofSelectedCount,
         },
     },
     livePlan: {
