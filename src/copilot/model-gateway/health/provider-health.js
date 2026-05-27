@@ -70,8 +70,18 @@ const DEFAULT_BYOK_PROVIDER_HEALTH_PATH = join(process.cwd(), 'data', 'copilot-t
  * @property {string | null} lastResetAt
  */
 
+/**
+ * @typedef {object} ByokProviderHealthChangeEvent
+ * @property {'call_failure' | 'call_success' | 'agent_probe_failure' | 'agent_probe_success' | 'probe_result' | 'clear'} reason
+ * @property {number} observedAt
+ * @property {string | null} key
+ * @property {ByokProviderHealthRecord | null} record
+ */
+
 /** @type {Map<string, ByokProviderHealthRecord>} */
 const _byokProviderHealthByKey = new Map();
+/** @type {Set<(event: ByokProviderHealthChangeEvent) => void | Promise<void>>} */
+const _byokProviderHealthChangeListeners = new Set();
 let _byokProviderHealthHydrated = false;
 let _byokProviderHealthFlushScheduled = false;
 let _byokProviderHealthFlushInFlight = false;
@@ -327,6 +337,31 @@ function pruneByokProviderHealth() {
     }
 }
 
+/**
+ * @param {ByokProviderHealthChangeEvent['reason']} reason
+ * @param {ByokProviderHealthRecord | null} record
+ * @returns {void}
+ */
+function notifyByokProviderHealthChange(reason, record) {
+    if (_byokProviderHealthChangeListeners.size === 0) return;
+    const event = {
+        reason,
+        observedAt: Date.now(),
+        key: record?.key ?? null,
+        record,
+    };
+    for (const listener of _byokProviderHealthChangeListeners) {
+        try {
+            const result = listener(event);
+            if (result && typeof result === 'object' && typeof result.catch === 'function') {
+                result.catch(() => {});
+            }
+        } catch {
+            // Health updates must never fail because an observer failed.
+        }
+    }
+}
+
 function hydrateByokProviderHealthFromDisk() {
     if (_byokProviderHealthHydrated) return;
     _byokProviderHealthHydrated = true;
@@ -413,6 +448,22 @@ export async function flushByokProviderHealth() {
 }
 
 /**
+ * Subscribe to in-process BYOK provider health changes.
+ *
+ * The provider-health ledger remains storage-neutral. Observers may mirror the latest runtime facts into SQLite,
+ * telemetry, or operator UIs, but runtime callers do not depend on those sinks.
+ *
+ * @param {(event: ByokProviderHealthChangeEvent) => void | Promise<void>} listener
+ * @returns {() => void}
+ */
+export function subscribeByokProviderHealthChanges(listener) {
+    _byokProviderHealthChangeListeners.add(listener);
+    return () => {
+        _byokProviderHealthChangeListeners.delete(listener);
+    };
+}
+
+/**
  * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; message?: string | null; errorContext?: string | null; failureKind?: string | null; failureStatusCode?: number | null; retryAfterSeconds?: number | null; resetAt?: string | number | Date | null; timestamp?: number }} input
  * @returns {void}
  */
@@ -449,6 +500,7 @@ export function recordByokProviderModelCallFailure(input) {
     });
     pruneByokProviderHealth();
     scheduleByokProviderHealthFlush();
+    notifyByokProviderHealthChange('call_failure', _byokProviderHealthByKey.get(key) ?? null);
 }
 
 /**
@@ -488,6 +540,7 @@ export function recordByokProviderModelCallSuccess(input) {
     });
     pruneByokProviderHealth();
     scheduleByokProviderHealthFlush();
+    notifyByokProviderHealthChange('call_success', _byokProviderHealthByKey.get(key) ?? null);
 }
 
 /**
@@ -528,6 +581,7 @@ export function recordByokProviderModelAgentProbeFailure(input) {
     });
     pruneByokProviderHealth();
     scheduleByokProviderHealthFlush();
+    notifyByokProviderHealthChange('agent_probe_failure', _byokProviderHealthByKey.get(key) ?? null);
 }
 
 /**
@@ -567,6 +621,7 @@ export function recordByokProviderModelAgentProbeSuccess(input) {
     });
     pruneByokProviderHealth();
     scheduleByokProviderHealthFlush();
+    notifyByokProviderHealthChange('agent_probe_success', _byokProviderHealthByKey.get(key) ?? null);
 }
 
 /**
@@ -633,6 +688,7 @@ export function recordByokProviderModelProbeResult(input) {
     });
     pruneByokProviderHealth();
     scheduleByokProviderHealthFlush();
+    notifyByokProviderHealthChange('probe_result', _byokProviderHealthByKey.get(key) ?? null);
 }
 
 /**
@@ -673,10 +729,11 @@ export function clearByokProviderModelHealth() {
     hydrateByokProviderHealthFromDisk();
     _byokProviderHealthByKey.clear();
     scheduleByokProviderHealthFlush();
+    notifyByokProviderHealthChange('clear', null);
 }
 
 /**
- * @returns {{ enabled: boolean; path: string | null; loaded: boolean; records: number; persistedRecords: number; flushScheduled: boolean; flushInFlight: boolean; dirty: boolean; error: string | null }}
+ * @returns {{ enabled: boolean; path: string | null; loaded: boolean; records: number; persistedRecords: number; flushScheduled: boolean; flushInFlight: boolean; dirty: boolean; error: string | null; changeListenerCount: number }}
  */
 export function readByokProviderHealthState() {
     hydrateByokProviderHealthFromDisk();
@@ -690,6 +747,7 @@ export function readByokProviderHealthState() {
         flushInFlight: _byokProviderHealthFlushInFlight,
         dirty: _byokProviderHealthDirty,
         error: _byokProviderHealthLastError,
+        changeListenerCount: _byokProviderHealthChangeListeners.size,
     };
 }
 
@@ -698,6 +756,7 @@ export function readByokProviderHealthState() {
  */
 export function resetByokProviderHealthForTests() {
     _byokProviderHealthByKey.clear();
+    _byokProviderHealthChangeListeners.clear();
     _byokProviderHealthHydrated = false;
     _byokProviderHealthFlushScheduled = false;
     _byokProviderHealthFlushInFlight = false;

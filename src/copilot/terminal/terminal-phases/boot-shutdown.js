@@ -17,6 +17,7 @@ import { rollbackTerminalPinnedContextPhase } from './boot-pinned.js';
  *     rollbackRuntimeListenersPhase: () => Promise<void>;
  *     rollbackPinnedContextPhaseFn?: typeof rollbackTerminalPinnedContextPhase;
  *     flushTerminalSseEventArchiveFn?: typeof flushTerminalSseEventArchive;
+ *     flushModelGatewayRuntimeHealthMirrorFn?: () => Promise<unknown>;
  *     registerShutdownHandlerFn?: typeof registerShutdownHandler;
  *     logFn?: (level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL', message: string) => void;
  * }} deps
@@ -26,8 +27,19 @@ export function registerTerminalShutdownHandlers(ctx, deps) {
     const rollbackRuntimeListenersPhase = deps.rollbackRuntimeListenersPhase;
     const rollbackPinnedContextPhaseFn = deps.rollbackPinnedContextPhaseFn ?? rollbackTerminalPinnedContextPhase;
     const flushTerminalSseEventArchiveFn = deps.flushTerminalSseEventArchiveFn ?? flushTerminalSseEventArchive;
+    const flushModelGatewayRuntimeHealthMirrorFn = deps.flushModelGatewayRuntimeHealthMirrorFn;
     const registerShutdownHandlerFn = deps.registerShutdownHandlerFn ?? registerShutdownHandler;
     const logFn = deps.logFn ?? log;
+
+    registerShutdownHandlerFn(
+        'terminal.modelGatewayRuntimeHealthMirror',
+        async () => {
+            await flushModelGatewayRuntimeHealthMirrorFn?.();
+            logFn('INFO', '[TerminalServer] Model gateway runtime health SQLite mirror drenado via shutdown handler.');
+        },
+        SHUTDOWN_PRIORITY.RUNTIME_STATE_DRAIN,
+        { timeoutMs: 10_000 },
+    );
 
     registerShutdownHandlerFn(
         'terminal.reflectionTimer',

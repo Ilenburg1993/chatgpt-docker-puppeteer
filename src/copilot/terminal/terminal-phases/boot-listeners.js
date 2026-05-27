@@ -11,6 +11,7 @@
  */
 
 import { getMcpStatus } from '#copilot/bridges';
+import { installByokProviderHealthSqliteMirror, SqliteModelGatewayCatalogStore } from '#copilot/model-gateway';
 import { log } from '#copilot/observability';
 import { cancel as cancelTimer, registerTimer } from '../../core/timer-registry.js';
 import { getHubSessionId } from '../../presentation/state/index.js';
@@ -28,6 +29,61 @@ let _sighupHandlerRegistered = false;
 
 /** @type {(() => void) | null} */
 let _sighupHandler = null;
+
+/** @type {ReturnType<typeof installByokProviderHealthSqliteMirror> | null} */
+let _modelGatewayRuntimeHealthMirror = null;
+
+/**
+ * @param {unknown} value
+ * @returns {number | undefined}
+ */
+function optionalNonNegativeInteger(value) {
+    const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN;
+    return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : undefined;
+}
+
+/**
+ * @returns {boolean}
+ */
+function shouldEnableModelGatewayRuntimeHealthMirror() {
+    if (process.env['MODEL_GATEWAY_RUNTIME_HEALTH_SQLITE_MIRROR_DISABLED'] === 'true') return false;
+    if (
+        process.env['VITEST'] === 'true' &&
+        process.env['MODEL_GATEWAY_RUNTIME_HEALTH_SQLITE_MIRROR_ENABLED'] !== 'true'
+    ) {
+        return false;
+    }
+    return true;
+}
+
+/**
+ * @returns {ReturnType<typeof installByokProviderHealthSqliteMirror> | null}
+ */
+function ensureModelGatewayRuntimeHealthMirror() {
+    if (_modelGatewayRuntimeHealthMirror) return _modelGatewayRuntimeHealthMirror;
+    const enabled = shouldEnableModelGatewayRuntimeHealthMirror();
+    _modelGatewayRuntimeHealthMirror = installByokProviderHealthSqliteMirror({
+        sqliteStore: enabled
+            ? new SqliteModelGatewayCatalogStore()
+            : {
+                  writeRuntimeHealthRecords: async () => ({
+                      runId: 'model-gateway:runtime-health:disabled',
+                      healthObservations: 0,
+                      probeResults: 0,
+                  }),
+              },
+        debounceMs: optionalNonNegativeInteger(process.env['MODEL_GATEWAY_RUNTIME_HEALTH_SQLITE_MIRROR_DEBOUNCE_MS']),
+        enabled,
+        onError: (error) => {
+            const message = error instanceof Error ? error.message : String(error);
+            log('WARN', `[model-gateway] runtime health SQLite mirror falhou: ${message}`);
+        },
+    });
+    if (_modelGatewayRuntimeHealthMirror.enabled) {
+        log('INFO', '[model-gateway] runtime health SQLite mirror ativo para health BYOK.');
+    }
+    return _modelGatewayRuntimeHealthMirror;
+}
 
 /**
  * SIGHUP é o sinal esperado no terminal POSIX quando o painel é reaberto/fechado.
@@ -70,6 +126,8 @@ export async function rollbackTerminalRuntimeListenersPhase(ctx) {
         _sighupHandler = null;
         _sighupHandlerRegistered = false;
     }
+    _modelGatewayRuntimeHealthMirror?.dispose();
+    _modelGatewayRuntimeHealthMirror = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +146,7 @@ export async function runTerminalRuntimeListenersPhase(ctx) {
     registerAgentEventListeners(() =>
         printStandaloneBanner({ serverUrl: ctx.bootConfig.server.url, bootPreflight: ctx.bootPreflight }),
     );
+    const modelGatewayRuntimeHealthMirror = ensureModelGatewayRuntimeHealthMirror();
     startReflectionLoop();
 
     ctx.terminalActivityChangedHandler = (activity) => {
@@ -103,6 +162,7 @@ export async function runTerminalRuntimeListenersPhase(ctx) {
     registerTerminalShutdownHandlers(ctx, {
         rollbackRuntimeListenersPhase: () => rollbackTerminalRuntimeListenersPhase(ctx),
         rollbackPinnedContextPhaseFn: rollbackTerminalPinnedContextPhase,
+        flushModelGatewayRuntimeHealthMirrorFn: () => modelGatewayRuntimeHealthMirror?.flush() ?? Promise.resolve(null),
     });
 
     if (copilotServer.io && isTerminalHubReady()) {

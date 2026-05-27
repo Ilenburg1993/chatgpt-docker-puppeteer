@@ -71,6 +71,7 @@ import {
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
     listModelGatewayRouteDecisions,
+    installByokProviderHealthSqliteMirror,
     mirrorByokProviderHealthToSqlite,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     recordModelGatewayRouteDecision,
@@ -3338,6 +3339,54 @@ describe('model-gateway foundation', () => {
             assert.equal(explanation.runtimeHealth?.status, 'ok');
             assert.equal(explanation.runtimeProbes.length, 2);
             assert.equal(explanation.nextActions.includes('run_runtime_probes_for_current_route'), false);
+        } finally {
+            db.close();
+        }
+    });
+
+    it('installs a storage-neutral runtime health SQLite mirror for new BYOK health facts', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            const controller = installByokProviderHealthSqliteMirror({
+                sqliteStore: store,
+                debounceMs: 0,
+                enabled: true,
+            });
+
+            recordByokProviderModelCallSuccess({
+                routeProfile: 'default',
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                successContext: 'unit-test',
+                timestamp: 10_000,
+            });
+            recordByokProviderModelProbeResult({
+                routeProfile: 'default',
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                probeKind: 'chat',
+                status: 'ok',
+                ok: true,
+                providerAttempted: true,
+                timestamp: 10_000,
+            });
+
+            const flushed = await controller.flush();
+            const runtime = await store.readRuntimeHealthForModel({
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+            });
+            controller.dispose();
+
+            assert.equal(flushed.enabled, true);
+            assert.equal(flushed.flushCount, 1);
+            assert.equal(flushed.lastRecords, 1);
+            assert.equal(flushed.lastHealthObservations, 1);
+            assert.equal(flushed.lastProbeResults, 1);
+            assert.equal(runtime.health?.['lastStatus'], 'ok');
+            assert.equal(runtime.probes.length, 1);
         } finally {
             db.close();
         }

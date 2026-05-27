@@ -20,6 +20,7 @@ export {
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
     resetByokProviderHealthForTests,
+    subscribeByokProviderHealthChanges,
 } from './provider-health.js';
 export { classifyByokProviderFailure } from './provider-failure.js';
-export { mirrorByokProviderHealthToSqlite } from './sqlite-health-mirror.js';
+export { installByokProviderHealthSqliteMirror, mirrorByokProviderHealthToSqlite } from './sqlite-health-mirror.js';

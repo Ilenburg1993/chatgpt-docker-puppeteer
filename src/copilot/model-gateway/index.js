@@ -327,6 +327,7 @@ export {
     classifyByokProviderFailure,
     clearByokProviderModelHealth,
     flushByokProviderHealth,
+    installByokProviderHealthSqliteMirror,
     listByokProviderModelHealth,
     mirrorByokProviderHealthToSqlite,
     readByokProviderHealthState,
@@ -337,6 +338,7 @@ export {
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
     resetByokProviderHealthForTests,
+    subscribeByokProviderHealthChanges,
 } from './health/index.js';
 export {
     BYOK_AGENT_PROBE_ANSWER,

@@ -2460,6 +2460,9 @@ Quota/account overlay mais rico.
 - [x] Diferenciar upstream.
 - [x] Expirar rate-limit fatal apos janela.
 - [x] Persistir health observations no SQLite via mirror explicito de health ja observado.
+- [x] Criar subscription storage-neutral para mudancas de health BYOK.
+- [x] Criar instalador debounced de mirror SQLite para health BYOK.
+- [x] Instalar mirror SQLite no boot do terminal com drain em shutdown.
 - [ ] Criar retention de health observations.
 - [ ] Criar explain de health por provider/modelo.
 - [ ] Criar diff de health antes/depois de live tests.
@@ -2590,8 +2593,8 @@ Quota/account overlay mais rico.
 - [x] Metricas de coverage.
 - [x] Metricas de provider freshness.
 - [x] Metricas de exclusion reason.
-- [ ] Eventos de runtime probe persistidos.
-- [x] Eventos de health observation podem ser materializados no SQLite por mirror explicito.
+- [x] Eventos de runtime probe podem ser materializados no SQLite por mirror explicito ou mirror instalado.
+- [x] Eventos de health observation podem ser materializados no SQLite por mirror explicito ou mirror instalado.
 - [ ] Eventos de account quota refresh.
 - [ ] Eventos de build metadata progress em UI terminal.
 - [ ] Eventos de SQLite retention.
@@ -3127,8 +3130,8 @@ Este provider tem reset headers?
 
 ### 14.2 Segunda Onda
 
-- [ ] Implementar persistencia de runtime health em SQLite.
-- [ ] Implementar persistencia de probe results em SQLite.
+- [x] Implementar persistencia de runtime health em SQLite por mirror instalado no terminal.
+- [x] Implementar persistencia de probe results em SQLite por mirror instalado no terminal.
 - [ ] Integrar selection effective com runtime persisted quando existir.
 - [ ] Criar testes focados.
 
@@ -3346,6 +3349,164 @@ Itens pendentes devem permanecer pendentes mesmo se parcialmente iniciados.
 `make model-gateway-live-plan`
 
 `make model-gateway-runtime-health-mirror`
+
+## 18.2 Atualizacao Runtime Health Mirror Instalado
+
+Data: 2026-05-27.
+
+Objetivo:
+
+Materializar health BYOK no SQLite durante a vida normal do terminal.
+
+Principio arquitetural:
+
+Runtime registra fatos.
+
+Provider-health continua storage-neutral.
+
+SQLite mirror observa mudancas.
+
+Terminal instala o mirror.
+
+Shutdown drena o mirror antes do fechamento do banco.
+
+Arquivos alterados:
+
+`src/copilot/model-gateway/health/provider-health.js`
+
+`src/copilot/model-gateway/health/sqlite-health-mirror.js`
+
+`src/copilot/model-gateway/health/index.js`
+
+`src/copilot/model-gateway/index.js`
+
+`src/copilot/terminal/terminal-phases/boot-listeners.js`
+
+`src/copilot/terminal/terminal-phases/boot-shutdown.js`
+
+`tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+
+Mudanca 1:
+
+`provider-health.js` agora expoe `subscribeByokProviderHealthChanges`.
+
+Essa funcao permite observar:
+
+- `call_failure`
+- `call_success`
+- `agent_probe_failure`
+- `agent_probe_success`
+- `probe_result`
+- `clear`
+
+O observer recebe evento com:
+
+- reason
+- observedAt
+- key
+- record
+
+Mudanca 2:
+
+`provider-health.js` nao importa SQLite.
+
+Isso evita dependencia circular.
+
+Isso preserva a fronteira do dominio.
+
+Isso permite outros sinks futuros:
+
+- telemetry
+- SSE
+- terminal UI
+- dashboards
+- account overlays
+
+Mudanca 3:
+
+`sqlite-health-mirror.js` agora expoe `installByokProviderHealthSqliteMirror`.
+
+O installer:
+
+- assina mudancas de health
+- aplica debounce
+- espelha todos os health records atuais para SQLite
+- registra state operacional
+- nao executa provider
+- nao chama modelo
+- nao altera catalogo canonico
+
+Mudanca 4:
+
+O terminal instala esse mirror em `runTerminalRuntimeListenersPhase`.
+
+O mirror e opt-out por env:
+
+`MODEL_GATEWAY_RUNTIME_HEALTH_SQLITE_MIRROR_DISABLED=true`
+
+O debounce e configuravel por env:
+
+`MODEL_GATEWAY_RUNTIME_HEALTH_SQLITE_MIRROR_DEBOUNCE_MS`
+
+Em testes Vitest o mirror fica desligado por default.
+
+Para habilitar em teste explicito:
+
+`MODEL_GATEWAY_RUNTIME_HEALTH_SQLITE_MIRROR_ENABLED=true`
+
+Mudanca 5:
+
+`registerTerminalShutdownHandlers` agora aceita `flushModelGatewayRuntimeHealthMirrorFn`.
+
+Esse handler usa prioridade `RUNTIME_STATE_DRAIN`.
+
+Motivo:
+
+O mirror deve drenar antes de `copilot-db.close`.
+
+O banco fecha em prioridade `DATABASE`.
+
+Como prioridades menores rodam primeiro, `RUNTIME_STATE_DRAIN` preserva a ordem correta.
+
+Estado depois desta atualizacao:
+
+Health runtime tem tres caminhos coerentes:
+
+1. ledger JSON historico do terminal
+2. mirror explicito por comando canonico
+3. mirror instalado no runtime do terminal
+
+Nenhum desses caminhos promove runtime facts ao catalogo canonico.
+
+O catalogo continua sendo metadata database.
+
+Runtime health continua sendo operational state.
+
+Proximo passo:
+
+Selection effective deve poder consumir runtime persisted quando disponivel.
+
+Essa integracao deve ser policy-driven.
+
+Ela nao deve transformar health runtime em prova permanente.
+
+Validacoes executadas:
+
+`node --check src/copilot/model-gateway/health/provider-health.js`
+
+`node --check src/copilot/model-gateway/health/sqlite-health-mirror.js`
+
+`node --check src/copilot/terminal/terminal-phases/boot-listeners.js`
+
+`node --check src/copilot/terminal/terminal-phases/boot-shutdown.js`
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "runtime health SQLite mirror"`
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_boot_shutdown.spec.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "runtime health SQLite mirror|shutdown"`
+
+`npm run model-gateway:typecheck`
+
+`npm run model-gateway:lint`
 
 ## 19. Fim Do Documento Inicial
 
