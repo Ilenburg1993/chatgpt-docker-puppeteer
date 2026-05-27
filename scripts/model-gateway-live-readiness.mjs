@@ -273,6 +273,7 @@ const checks = [
 const commands = [
     'npm run model-gateway:selection:effective -- --strict --fail',
     'npm run model-gateway:runtime-selector -- --fail',
+    'npm run model-gateway:runtime-health:diff -- --write-snapshot',
     'npm run model-gateway:runtime-health:mirror',
     'npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000',
     'npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',

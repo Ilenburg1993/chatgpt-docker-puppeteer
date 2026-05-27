@@ -6013,7 +6013,54 @@ O script bloqueia execucao quando o plano nao esta pronto.
 
 Assim, a entrada futura para runtime real existe, mas continua segura ate decidirmos iniciar live tests.
 
-### 21.4 Relacao Com Traces
+### 21.4 Snapshot E Diff De Runtime Health
+
+Foi criada a CLI:
+
+`scripts/model-gateway-runtime-health-diff.mjs`
+
+Comandos canonicos:
+
+- `npm run model-gateway:runtime-health:diff`
+- `make model-gateway-runtime-health-diff`
+
+Ela le health ja observado em:
+
+- ledger JSON de BYOK provider health;
+- mirror SQLite de runtime health.
+
+Ela nao executa provider.
+
+Ela nao roda probe.
+
+Ela nao consome quota.
+
+Ela pode gravar snapshot:
+
+`npm run model-gateway:runtime-health:diff -- --write-snapshot`
+
+Ela pode comparar com baseline:
+
+`npm run model-gateway:runtime-health:diff -- --baseline artifacts/model-gateway-runtime-health/latest.json`
+
+Ela reporta:
+
+- registros adicionados;
+- registros removidos;
+- campos alterados;
+- regressoes `ok -> failed`;
+- status por provider;
+- status por failure kind.
+
+Isso prepara a disciplina de live tests:
+
+1. gravar snapshot antes;
+2. executar fase controlada;
+3. gravar snapshot depois;
+4. comparar baseline;
+5. entender exatamente quais providers/modelos mudaram.
+
+### 21.5 Relacao Com Traces
 
 O runtime selector aceita tanto a policy resolution quanto o decision trace.
 
@@ -6025,16 +6072,16 @@ Isso e importante porque, durante testes live, poderemos:
 - auditar o evento de decisao;
 - so entao executar provider.
 
-### 21.5 Limites Intencionais
+### 21.6 Limites Intencionais
 
 Ainda faltam:
 
-- diff de health antes/depois das tentativas reais;
+- rotina operacional completa de baseline antes/depois dos live tests;
 - live tests llm-b.
 
 Esses pontos pertencem a proxima camada.
 
-### 21.6 Checklist Da Mudanca 33
+### 21.7 Checklist Da Mudanca 33
 
 - [x] Criar contrato nao-executor do runtime selector.
 - [x] Aceitar policy resolution como entrada.
@@ -6059,9 +6106,11 @@ Esses pontos pertencem a proxima camada.
 - [x] Criar CLI canonica dry-run para o runtime selector.
 - [x] Exigir `--execute` para chamadas reais do runtime selector.
 - [x] Integrar package script, Makefile e inventario canonico.
+- [x] Criar snapshot/diff canonico de runtime health.
+- [x] Detectar regressoes `ok -> failed` em runtime health.
 - [ ] Criar live tests llm-b baseados no plano.
 
-### 21.7 Gate De Live Readiness
+### 21.8 Gate De Live Readiness
 
 O script:
 

@@ -439,6 +439,7 @@
     "model-gateway:refresh:log:sqlite": "node scripts/model-gateway-refresh-log.mjs --sqlite",
     "model-gateway:refresh:plan": "node scripts/model-gateway-refresh.mjs --plan --json",
     "model-gateway:refresh:preview": "node scripts/model-gateway-refresh.mjs --preview",
+    "model-gateway:runtime-health:diff": "node scripts/model-gateway-runtime-health-diff.mjs --json",
     "model-gateway:runtime-health:mirror": "node scripts/model-gateway-runtime-health-mirror.mjs --json",
     "model-gateway:sqlite:diagnostics": "node scripts/model-gateway-sqlite-diagnostics.mjs --json",
     "model-gateway:sqlite:retention": "node scripts/model-gateway-sqlite-retention.mjs",

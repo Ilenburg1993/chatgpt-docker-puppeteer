@@ -256,6 +256,14 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
             'Build the final route-aware runtime selector plan without provider calls; execution requires an explicit --execute flag.',
     },
     {
+        id: 'runtime-health.diff',
+        phase: 'live-readiness',
+        surface: 'package',
+        command: 'npm run model-gateway:runtime-health:diff',
+        summary:
+            'Snapshot and diff already-observed runtime health before or after live tests without provider calls.',
+    },
+    {
         id: 'live.readiness',
         phase: 'live-readiness',
         surface: 'package',
@@ -443,6 +451,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-runtime-selector',
         summary: 'Makefile alias for the dry-run runtime selector plan.',
+    },
+    {
+        id: 'make.runtime-health-diff',
+        phase: 'live-readiness',
+        surface: 'make',
+        command: 'make model-gateway-runtime-health-diff',
+        summary: 'Makefile alias for runtime health snapshot/diff.',
     },
     {
         id: 'make.live-readiness',
