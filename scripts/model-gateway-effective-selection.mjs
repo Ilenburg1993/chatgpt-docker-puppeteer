@@ -229,7 +229,7 @@ if (json) {
         }
     }
     process.stdout.write(
-        `post-runtime: selected=${postRuntimeSelection.summary.selectedProfileCount}/${postRuntimeSelection.summary.profileCount} health=${postRuntimeSelection.summary.healthRecordCount} probeProofs=${postRuntimeSelection.summary.runtimeProbeProofCount} providers=${formatCountMap(postRuntimeSelection.summary.selectedProviders)}\n`,
+        `post-runtime: selected=${postRuntimeSelection.summary.selectedProfileCount}/${postRuntimeSelection.summary.profileCount} health=${postRuntimeSelection.summary.healthRecordCount} healthProofs=${postRuntimeSelection.summary.runtimeHealthProofCount} agentProofs=${postRuntimeSelection.summary.runtimeAgentProbeProofCount} probeProofs=${postRuntimeSelection.summary.runtimeProbeProofCount} providers=${formatCountMap(postRuntimeSelection.summary.selectedProviders)}\n`,
     );
     if (localProviderOptIn.hasBlocks) {
         process.stdout.write(`\n${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderOptIn.blockedProfileIds })}\n`);

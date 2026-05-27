@@ -232,7 +232,7 @@ const checks = [
     {
         id: 'selection_post_runtime_observed_health',
         ok: postRuntimeEffectiveSelection.ok && postRuntimeOnlyKnownAccess,
-        detail: `${postRuntimeEffectiveSelection.summary.selectedProfileCount}/${postRuntimeEffectiveSelection.summary.profileCount} profiles selected, healthMatches=${postRuntimeEffectiveSelection.summary.healthRecordCount}, probeProofs=${postRuntimeEffectiveSelection.summary.runtimeProbeProofCount}, dispositions=${postRuntimeSelectedDispositions.join(',') || 'none'}`,
+        detail: `${postRuntimeEffectiveSelection.summary.selectedProfileCount}/${postRuntimeEffectiveSelection.summary.profileCount} profiles selected, healthMatches=${postRuntimeEffectiveSelection.summary.healthRecordCount}, healthProofs=${postRuntimeEffectiveSelection.summary.runtimeHealthProofCount}, agentProofs=${postRuntimeEffectiveSelection.summary.runtimeAgentProbeProofCount}, probeProofs=${postRuntimeEffectiveSelection.summary.runtimeProbeProofCount}, dispositions=${postRuntimeSelectedDispositions.join(',') || 'none'}`,
     },
     {
         id: 'selection_supply_warnings',
@@ -342,6 +342,8 @@ const summary = {
             supplyWarnings: postRuntimeEffectiveSupplyWarnings,
             localProviderOptIn: localProviderOptIn.postRuntimeEffective,
             healthRecordMatches: postRuntimeEffectiveSelection.summary.healthRecordCount,
+            runtimeHealthProofs: postRuntimeEffectiveSelection.summary.runtimeHealthProofCount,
+            runtimeAgentProofs: postRuntimeEffectiveSelection.summary.runtimeAgentProbeProofCount,
             runtimeProbeProofs: postRuntimeEffectiveSelection.summary.runtimeProbeProofCount,
             healthRecords: healthRecords.length,
         },

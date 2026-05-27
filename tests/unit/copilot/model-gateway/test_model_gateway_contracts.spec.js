@@ -73,6 +73,7 @@ import {
     byokProviderHealthRecordKey,
     byokProviderHealthRecordLastObservedAt,
     listByokProviderModelHealth,
+    recordByokProviderModelAgentProbeFailure,
     recordByokProviderModelAgentProbeSuccess,
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
@@ -412,6 +413,33 @@ describe('model-gateway foundation', () => {
         assert.equal(listByokProviderModelHealth().length, 0);
     });
 
+    it('mirrors dedicated agent probe health into the generic probe ledger', () => {
+        recordByokProviderModelAgentProbeFailure({
+            routeProfile: 'repo_agent',
+            providerId: 'openrouter',
+            providerModel: 'agent-model',
+            message: 'tool call failed',
+            errorContext: 'probe.agent',
+            timestamp: 10,
+        });
+        recordByokProviderModelAgentProbeSuccess({
+            routeProfile: 'repo_agent',
+            providerId: 'openrouter',
+            providerModel: 'agent-model',
+            timestamp: 20,
+        });
+
+        const health = listByokProviderModelHealth()[0];
+        assert.equal(health.agentProbeStatus, 'ok');
+        assert.equal(health.agentProbeFailureCount, 1);
+        assert.equal(health.agentProbeSuccessCount, 1);
+        assert.equal(health.probes.agent.status, 'ok');
+        assert.equal(health.probes.agent.ok, true);
+        assert.equal(health.probes.agent.count, 2);
+        assert.equal(health.probes.agent.failureCount, 1);
+        assert.equal(health.probes.agent.successCount, 1);
+    });
+
     it('defines canonical task profiles before provider-specific scoring', () => {
         assert.deepEqual(
             listModelGatewayTaskProfiles().map((profile) => profile.id),
@@ -642,7 +670,10 @@ describe('model-gateway foundation', () => {
         assert.equal(postRuntimeAudit.runtimeMode, 'observed_runtime_health');
         assert.equal(postRuntimeAudit.summary.selectedProfileCount, 1);
         assert.equal(postRuntimeAudit.summary.healthRecordCount, 1);
+        assert.equal(postRuntimeAudit.summary.runtimeChatOkCount, 1);
+        assert.equal(postRuntimeAudit.summary.runtimeAgentProbeProofCount, 1);
         assert.equal(postRuntimeAudit.summary.runtimeProbeProofCount, 1);
+        assert.equal(postRuntimeAudit.summary.runtimeHealthProofCount, 1);
         assert.equal(postRuntimeAudit.profiles[0].selected?.['runtimeHealth']?.['agentProbeStatus'], 'ok');
         assert.ok(
             Array.isArray(postRuntimeAudit.profiles[0].selected?.['runtimeHealth']?.['verifiedProbes']) &&
@@ -1103,6 +1134,9 @@ describe('model-gateway foundation', () => {
         assert.equal(explanation.rejectedSummaries[0]?.['id'], 'openrouter:weak-chat');
         assert.deepEqual(explanation.rejectedSummaries[0]?.['probes'], {
             status: null,
+            agentProbeStatus: null,
+            chatOk: false,
+            agentProbeVerified: false,
             verifiedProbes: [],
             failedProbes: [],
         });
@@ -1110,7 +1144,10 @@ describe('model-gateway foundation', () => {
             catalogCandidateCount: 1,
             eligibilityEvaluatedCount: 0,
             healthRecordCount: 0,
+            runtimeChatOkCount: 0,
+            runtimeAgentProbeProofCount: 0,
             runtimeProbeProofCount: 0,
+            runtimeHealthProofCount: 0,
         });
     });
 

@@ -260,6 +260,35 @@ function normalizeProbeRecords(value) {
 }
 
 /**
+ * @param {ByokProviderProbeHealthRecord | null | undefined} previousProbe
+ * @param {{ kind: string; status: string; ok: boolean; providerAttempted?: boolean; message?: string | null | undefined; errorContext?: string | null | undefined; failureKind?: string | null | undefined; failureStatusCode?: number | null | undefined; retryAfterSeconds?: number | null | undefined; resetAt?: string | number | Date | null | undefined }} input
+ * @param {number} now
+ * @returns {ByokProviderProbeHealthRecord}
+ */
+function createUpdatedProbeRecord(previousProbe, input, now) {
+    return {
+        kind: input.kind,
+        status: input.status,
+        ok: input.ok,
+        providerAttempted: input.providerAttempted !== false,
+        count: (previousProbe?.count ?? 0) + 1,
+        successCount: (previousProbe?.successCount ?? 0) + (input.ok ? 1 : 0),
+        failureCount: (previousProbe?.failureCount ?? 0) + (input.ok ? 0 : 1),
+        lastAt: now,
+        lastMessage: sanitizeHealthText(input.message) ?? previousProbe?.lastMessage ?? null,
+        lastErrorContext: sanitizeHealthText(input.errorContext) ?? previousProbe?.lastErrorContext ?? null,
+        lastFailureKind: input.ok ? null : sanitizeHealthText(input.failureKind) ?? previousProbe?.lastFailureKind ?? null,
+        lastFailureStatusCode: input.ok
+            ? null
+            : normalizeOptionalNumber(input.failureStatusCode) ?? previousProbe?.lastFailureStatusCode ?? null,
+        lastRetryAfterSeconds: input.ok
+            ? null
+            : normalizeOptionalNumber(input.retryAfterSeconds) ?? previousProbe?.lastRetryAfterSeconds ?? null,
+        lastResetAt: input.ok ? null : normalizeIsoTimestamp(input.resetAt) ?? previousProbe?.lastResetAt ?? null,
+    };
+}
+
+/**
  * @param {unknown} value
  * @returns {ByokProviderHealthRecord | null}
  */
@@ -275,7 +304,38 @@ function normalizeRecord(value) {
     });
     const lastStatus = normalizeStatus(value['lastStatus']);
     const agentProbeStatus = normalizeStatus(value['agentProbeStatus']);
+    const lastAgentProbeFailureAt = normalizeTimestamp(value['lastAgentProbeFailureAt']);
+    const lastAgentProbeSuccessAt = normalizeTimestamp(value['lastAgentProbeSuccessAt']);
+    const normalizedAgentProbeFailureCount = normalizeCount(value['agentProbeFailureCount']);
+    const normalizedAgentProbeSuccessCount = normalizeCount(value['agentProbeSuccessCount']);
+    const agentProbeFailureCount =
+        normalizedAgentProbeFailureCount === 0 && lastAgentProbeFailureAt ? 1 : normalizedAgentProbeFailureCount;
+    const agentProbeSuccessCount =
+        normalizedAgentProbeSuccessCount === 0 && lastAgentProbeSuccessAt ? 1 : normalizedAgentProbeSuccessCount;
     const probes = normalizeProbeRecords(value['probes']);
+    if (agentProbeStatus && !probes['agent']) {
+        probes['agent'] = {
+            kind: 'agent',
+            status: agentProbeStatus,
+            ok: agentProbeStatus === 'ok',
+            providerAttempted: true,
+            count: Math.max(1, agentProbeFailureCount + agentProbeSuccessCount),
+            successCount: agentProbeSuccessCount,
+            failureCount: agentProbeFailureCount,
+            lastAt:
+                agentProbeStatus === 'ok'
+                    ? lastAgentProbeSuccessAt ?? lastAgentProbeFailureAt
+                    : lastAgentProbeFailureAt ?? lastAgentProbeSuccessAt,
+            lastMessage: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastAgentProbeMessage'])),
+            lastErrorContext: sanitizeHealthText(
+                /** @type {string | null | undefined} */ (value['lastAgentProbeErrorContext']),
+            ),
+            lastFailureKind: agentProbeStatus === 'ok' ? null : 'agent_probe_failed',
+            lastFailureStatusCode: null,
+            lastRetryAfterSeconds: null,
+            lastResetAt: null,
+        };
+    }
     if (
         (!lastStatus && !agentProbeStatus && Object.keys(probes).length === 0) ||
         (!identity.routeProfile && !identity.providerId && !identity.providerModel)
@@ -305,10 +365,10 @@ function normalizeRecord(value) {
             /** @type {string | null | undefined} */ (value['lastSuccessContext']),
         ),
         agentProbeStatus,
-        agentProbeFailureCount: normalizeCount(value['agentProbeFailureCount']),
-        agentProbeSuccessCount: normalizeCount(value['agentProbeSuccessCount']),
-        lastAgentProbeFailureAt: normalizeTimestamp(value['lastAgentProbeFailureAt']),
-        lastAgentProbeSuccessAt: normalizeTimestamp(value['lastAgentProbeSuccessAt']),
+        agentProbeFailureCount,
+        agentProbeSuccessCount,
+        lastAgentProbeFailureAt,
+        lastAgentProbeSuccessAt,
         lastAgentProbeMessage: sanitizeHealthText(
             /** @type {string | null | undefined} */ (value['lastAgentProbeMessage']),
         ),
@@ -358,11 +418,15 @@ export function mergeByokProviderHealthRecords(...recordSets) {
     const byKey = new Map();
     for (const records of recordSets) {
         for (const record of records) {
-            const key = byokProviderHealthRecordKey(record);
-            if (!key) continue;
+            const normalized = normalizeRecord(record);
+            const key = normalized?.key ?? null;
+            if (!key || !normalized) continue;
             const previous = byKey.get(key);
-            if (!previous || byokProviderHealthRecordLastObservedAt(record) >= byokProviderHealthRecordLastObservedAt(previous)) {
-                byKey.set(key, record);
+            if (
+                !previous ||
+                byokProviderHealthRecordLastObservedAt(normalized) >= byokProviderHealthRecordLastObservedAt(previous)
+            ) {
+                byKey.set(key, normalized);
             }
         }
     }
@@ -599,6 +663,19 @@ export function recordByokProviderModelAgentProbeFailure(input) {
     const key = healthKey(identity);
     const now = typeof input.timestamp === 'number' && Number.isFinite(input.timestamp) ? input.timestamp : Date.now();
     const previous = _byokProviderHealthByKey.get(key);
+    const agentProbe = createUpdatedProbeRecord(
+        previous?.probes?.['agent'],
+        {
+            kind: 'agent',
+            status: 'failed',
+            ok: false,
+            providerAttempted: true,
+            message: input.message,
+            errorContext: input.errorContext,
+            failureKind: 'agent_probe_failed',
+        },
+        now,
+    );
     _byokProviderHealthByKey.set(key, {
         key,
         ...identity,
@@ -622,7 +699,10 @@ export function recordByokProviderModelAgentProbeFailure(input) {
         lastAgentProbeMessage: sanitizeHealthText(input.message) ?? previous?.lastAgentProbeMessage ?? null,
         lastAgentProbeErrorContext:
             sanitizeHealthText(input.errorContext) ?? previous?.lastAgentProbeErrorContext ?? null,
-        probes: previous?.probes ?? {},
+        probes: {
+            ...(previous?.probes ?? {}),
+            agent: agentProbe,
+        },
     });
     pruneByokProviderHealth();
     scheduleByokProviderHealthFlush();
@@ -640,6 +720,16 @@ export function recordByokProviderModelAgentProbeSuccess(input) {
     const key = healthKey(identity);
     const now = typeof input.timestamp === 'number' && Number.isFinite(input.timestamp) ? input.timestamp : Date.now();
     const previous = _byokProviderHealthByKey.get(key);
+    const agentProbe = createUpdatedProbeRecord(
+        previous?.probes?.['agent'],
+        {
+            kind: 'agent',
+            status: 'ok',
+            ok: true,
+            providerAttempted: true,
+        },
+        now,
+    );
     _byokProviderHealthByKey.set(key, {
         key,
         ...identity,
@@ -662,7 +752,10 @@ export function recordByokProviderModelAgentProbeSuccess(input) {
         lastAgentProbeSuccessAt: now,
         lastAgentProbeMessage: null,
         lastAgentProbeErrorContext: null,
-        probes: previous?.probes ?? {},
+        probes: {
+            ...(previous?.probes ?? {}),
+            agent: agentProbe,
+        },
     });
     pruneByokProviderHealth();
     scheduleByokProviderHealthFlush();
@@ -682,28 +775,23 @@ export function recordByokProviderModelProbeResult(input) {
     const key = healthKey(identity);
     const now = typeof input.timestamp === 'number' && Number.isFinite(input.timestamp) ? input.timestamp : Date.now();
     const previous = _byokProviderHealthByKey.get(key);
-    const previousProbe = previous?.probes?.[probeKind] ?? null;
     const ok = input.ok === true;
-    const probe = {
-        kind: probeKind,
-        status,
-        ok,
-        providerAttempted: input.providerAttempted !== false,
-        count: (previousProbe?.count ?? 0) + 1,
-        successCount: (previousProbe?.successCount ?? 0) + (ok ? 1 : 0),
-        failureCount: (previousProbe?.failureCount ?? 0) + (ok ? 0 : 1),
-        lastAt: now,
-        lastMessage: sanitizeHealthText(input.message) ?? previousProbe?.lastMessage ?? null,
-        lastErrorContext: sanitizeHealthText(input.errorContext) ?? previousProbe?.lastErrorContext ?? null,
-        lastFailureKind: ok ? null : sanitizeHealthText(input.failureKind) ?? previousProbe?.lastFailureKind ?? null,
-        lastFailureStatusCode: ok
-            ? null
-            : normalizeOptionalNumber(input.failureStatusCode) ?? previousProbe?.lastFailureStatusCode ?? null,
-        lastRetryAfterSeconds: ok
-            ? null
-            : normalizeOptionalNumber(input.retryAfterSeconds) ?? previousProbe?.lastRetryAfterSeconds ?? null,
-        lastResetAt: ok ? null : normalizeIsoTimestamp(input.resetAt) ?? previousProbe?.lastResetAt ?? null,
-    };
+    const probe = createUpdatedProbeRecord(
+        previous?.probes?.[probeKind],
+        {
+            kind: probeKind,
+            status,
+            ok,
+            providerAttempted: input.providerAttempted !== false,
+            message: input.message,
+            errorContext: input.errorContext,
+            failureKind: input.failureKind,
+            failureStatusCode: input.failureStatusCode,
+            retryAfterSeconds: input.retryAfterSeconds,
+            resetAt: input.resetAt,
+        },
+        now,
+    );
     _byokProviderHealthByKey.set(key, {
         key,
         ...identity,

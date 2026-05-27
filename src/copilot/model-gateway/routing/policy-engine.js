@@ -437,7 +437,7 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
             score += 20;
             reasons.push('preferred:large_context');
         }
-        if (preference === 'runtime_proved' && healthDecision.health && isGatewayModelAgentProbeVerified(healthDecision.health)) {
+        if (preference === 'runtime_proved' && hasRuntimeProof(healthDecision.health)) {
             score += 20;
             reasons.push('preferred:runtime_proved');
         }

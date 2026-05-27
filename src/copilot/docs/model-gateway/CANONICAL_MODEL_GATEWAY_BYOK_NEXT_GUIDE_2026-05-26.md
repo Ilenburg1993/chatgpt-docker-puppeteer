@@ -5022,6 +5022,133 @@ Checklist atualizada por esta mudanca:
 - [ ] Criar decisao final de runtime selection com politica explicita do operador.
 - [ ] Expor no terminal um explain comparando pre-runtime vs pos-runtime.
 
+Mudanca 27:
+
+Foi refinada a explicabilidade de provas runtime.
+
+Problema observado:
+
+- a selecao pos-runtime tinha `healthRecordCount>0`;
+- algumas rotas recebiam `agent_probe_verified`;
+- mesmo assim o resumo mostrava apenas `runtimeProbeProofCount=0`;
+- isso era tecnicamente correto para probes tipados em `probes`, mas insuficiente como explicacao operacional.
+
+Correcao:
+
+`explainGatewayRouteDecision` agora separa:
+
+- `runtimeChatOkCount`;
+- `runtimeAgentProbeProofCount`;
+- `runtimeProbeProofCount`;
+- `runtimeHealthProofCount`.
+
+Semantica:
+
+- `runtimeChatOkCount`: candidatos com chat/call health `ok`;
+- `runtimeAgentProbeProofCount`: candidatos com agent probe dedicado `ok`;
+- `runtimeProbeProofCount`: candidatos com probes tipados verificados, como `json`, `streaming`, `vision` ou `agent` quando registrados em `probes`;
+- `runtimeHealthProofCount`: uniao logica de chat ok, agent probe ok e probes tipados verificados.
+
+Tambem foi ajustado o scoring de `runtime_proved`.
+
+Antes:
+
+- `runtime_proved` favorecia apenas `agent_probe_verified`.
+
+Agora:
+
+- `runtime_proved` favorece qualquer prova runtime real reconhecida por `hasRuntimeProof`;
+- isso inclui chat ok, agent probe ok e probes tipados;
+- capabilities especificas continuam com pesos proprios, como `preferred_probe_verified:json`.
+
+Resultado observado:
+
+`npm --silent run model-gateway:selection:effective -- --json`
+
+Resumo pos-runtime:
+
+- `ok=true`
+- `healthRecordCount=49`
+- `runtimeHealthProofCount=14`
+- `runtimeChatOkCount=14`
+- `runtimeAgentProbeProofCount=7`
+- `runtimeProbeProofCount=7`
+- `selectedProviders={nvidia-nim:5,chutes:1,cerebras:1}`
+
+Interpretacao:
+
+- ha provas runtime gerais suficientes para alterar ranking;
+- o agent probe dedicado agora tambem aparece como probe tipado `agent`;
+- ainda e necessario evoluir probes especificos como `json`, `streaming` e `vision` por capability.
+
+Testes focados executados:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "pre-runtime selection|explain|runtime probe proofs|explicit merged runtime health"`
+
+Resultado:
+
+- `11 passed`
+
+Checklist atualizada por esta mudanca:
+
+- [x] Separar chat ok, agent proof, probe proof e proof total.
+- [x] Atualizar `runtime_proved` para usar qualquer prova runtime real.
+- [x] Atualizar readiness/effective selection para mostrar health proofs e agent proofs.
+- [x] Atualizar testes de explain e post-runtime audit.
+- [ ] Criar normalizador de probes tipados por capability independente do runtime profile operacional.
+- [x] Registrar, quando possivel, probe kind `agent` tambem em `probes` ao lado de `agentProbeStatus`.
+- [ ] Expor no terminal ranking pos-runtime com explicacao dos contadores.
+
+Mudanca 28:
+
+Foi normalizada a relacao entre `agentProbeStatus` e o mapa generico `probes`.
+
+Antes:
+
+- o campo dedicado `agentProbeStatus` registrava sucesso/falha do probe agent;
+- o mapa `probes.agent` podia nao existir;
+- isso fazia `runtimeAgentProbeProofCount>0`, mas `runtimeProbeProofCount=0`;
+- a explicacao ficava tecnicamente possivel, mas menos coerente para uma camada universal de probes por capability.
+
+Depois:
+
+- `recordByokProviderModelAgentProbeSuccess` grava tambem `probes.agent`;
+- `recordByokProviderModelAgentProbeFailure` grava tambem `probes.agent`;
+- registros legados carregados por `mergeByokProviderHealthRecords` sao normalizados;
+- registros com `agentProbeStatus` mas sem `probes.agent` passam a sintetizar `probes.agent` durante normalizacao;
+- o campo dedicado continua existindo por compatibilidade e leitura rapida.
+
+Resultado observado:
+
+`npm --silent run model-gateway:selection:effective -- --json`
+
+Resumo pos-runtime:
+
+- `ok=true`
+- `healthRecordCount=49`
+- `runtimeHealthProofCount=14`
+- `runtimeChatOkCount=14`
+- `runtimeAgentProbeProofCount=7`
+- `runtimeProbeProofCount=7`
+- `selectedProviders={nvidia-nim:5,chutes:1,cerebras:1}`
+
+Testes focados executados:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "agent probe health|runtime health|pre-runtime selection|merge"`
+
+Resultado:
+
+- `18 passed`
+
+Checklist atualizada por esta mudanca:
+
+- [x] Escrever `probes.agent` em agent probe success.
+- [x] Escrever `probes.agent` em agent probe failure.
+- [x] Normalizar health records legados durante merge.
+- [x] Fazer selection effective enxergar agent probe tambem como probe tipado.
+- [ ] Criar politica para pesos distintos entre chat ok, agent probe e probes de capability especifica.
+- [ ] Criar explain terminal com diff pre-runtime vs pos-runtime.
+
 ## 19. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

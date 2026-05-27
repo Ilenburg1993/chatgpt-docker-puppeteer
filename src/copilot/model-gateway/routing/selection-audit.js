@@ -240,7 +240,10 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
  *     candidateCount: number;
  *     rejectedCount: number;
  *     healthRecordCount: number;
+ *     runtimeChatOkCount: number;
+ *     runtimeAgentProbeProofCount: number;
  *     runtimeProbeProofCount: number;
+ *     runtimeHealthProofCount: number;
  *     selectedProviders: Record<string, number>;
  *     selectedSelectorKinds: Record<string, number>;
  *     rejectedReasonCounts: Record<string, number>;
@@ -338,8 +341,20 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
                 const value = profile.decisionLayers['healthRecordCount'];
                 return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
             }, 0),
+            runtimeChatOkCount: profileAudits.reduce((sum, profile) => {
+                const value = profile.decisionLayers['runtimeChatOkCount'];
+                return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+            }, 0),
+            runtimeAgentProbeProofCount: profileAudits.reduce((sum, profile) => {
+                const value = profile.decisionLayers['runtimeAgentProbeProofCount'];
+                return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+            }, 0),
             runtimeProbeProofCount: profileAudits.reduce((sum, profile) => {
                 const value = profile.decisionLayers['runtimeProbeProofCount'];
+                return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+            }, 0),
+            runtimeHealthProofCount: profileAudits.reduce((sum, profile) => {
+                const value = profile.decisionLayers['runtimeHealthProofCount'];
                 return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
             }, 0),
             selectedProviders: countBy(selectedRows, 'providerId'),

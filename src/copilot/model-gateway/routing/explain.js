@@ -46,7 +46,14 @@ function reasonCounts(reasons) {
 
 /**
  * @param {Record<string, any> | null} health
- * @returns {{ status: string | null; verifiedProbes: string[]; failedProbes: string[] }}
+ * @returns {{
+ *   status: string | null;
+ *   agentProbeStatus: string | null;
+ *   chatOk: boolean;
+ *   agentProbeVerified: boolean;
+ *   verifiedProbes: string[];
+ *   failedProbes: string[];
+ * }}
  */
 function probeSummary(health) {
     const probes = isRecord(health?.['probes']) ? health['probes'] : {};
@@ -57,8 +64,13 @@ function probeSummary(health) {
         if (probe['status'] === 'ok') verifiedProbes.push(kind);
         if (probe['status'] === 'failed') failedProbes.push(kind);
     }
+    const status = optionalString(health?.['lastStatus']) ?? null;
+    const agentProbeStatus = optionalString(health?.['agentProbeStatus']) ?? null;
     return {
-        status: optionalString(health?.['lastStatus']) ?? null,
+        status,
+        agentProbeStatus,
+        chatOk: status === 'ok',
+        agentProbeVerified: agentProbeStatus === 'ok',
         verifiedProbes: verifiedProbes.sort(),
         failedProbes: failedProbes.sort(),
     };
@@ -105,12 +117,24 @@ function candidateSummary(candidate) {
  */
 function decisionLayers(candidates) {
     const summaries = candidates.map(candidateSummary);
+    const probeSummaries = summaries.map((summary) => (isRecord(summary['probes']) ? summary['probes'] : {}));
+    const chatOkCount = probeSummaries.filter((probes) => probes['chatOk'] === true).length;
+    const agentProbeProofCount = probeSummaries.filter((probes) => probes['agentProbeVerified'] === true).length;
+    const runtimeProbeProofCount = probeSummaries.filter(
+        (probes) => Array.isArray(probes['verifiedProbes']) && probes['verifiedProbes'].length > 0,
+    ).length;
     return {
         catalogCandidateCount: summaries.length,
         eligibilityEvaluatedCount: summaries.filter((summary) => summary['eligibility'] !== null).length,
-        healthRecordCount: summaries.filter((summary) => isRecord(summary['probes']) && summary['probes']['status'] !== null).length,
-        runtimeProbeProofCount: summaries.filter(
-            (summary) => isRecord(summary['probes']) && Array.isArray(summary['probes']['verifiedProbes']) && summary['probes']['verifiedProbes'].length > 0,
+        healthRecordCount: probeSummaries.filter((probes) => probes['status'] !== null).length,
+        runtimeChatOkCount: chatOkCount,
+        runtimeAgentProbeProofCount: agentProbeProofCount,
+        runtimeProbeProofCount,
+        runtimeHealthProofCount: probeSummaries.filter(
+            (probes) =>
+                probes['chatOk'] === true ||
+                probes['agentProbeVerified'] === true ||
+                (Array.isArray(probes['verifiedProbes']) && probes['verifiedProbes'].length > 0),
         ).length,
     };
 }
