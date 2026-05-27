@@ -3403,6 +3403,72 @@ describe('model-gateway foundation', () => {
         }
     });
 
+    it('appends runtime health mirror runs and reads the latest health/probe facts per model', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            const staleRecord = {
+                key: 'default|openrouter|openai/gpt-oss-120b',
+                routeProfile: 'default',
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                lastStatus: 'failed',
+                lastFailureAt: 1_000,
+                failureCount: 1,
+                successCount: 0,
+                probes: {
+                    chat: {
+                        kind: 'chat',
+                        status: 'failed',
+                        ok: false,
+                        providerAttempted: true,
+                        count: 1,
+                        successCount: 0,
+                        failureCount: 1,
+                        lastAt: 1_000,
+                    },
+                },
+            };
+            const freshRecord = {
+                ...staleRecord,
+                lastStatus: 'ok',
+                lastSuccessAt: 2_000,
+                successCount: 1,
+                probes: {
+                    chat: {
+                        kind: 'chat',
+                        status: 'ok',
+                        ok: true,
+                        providerAttempted: true,
+                        count: 2,
+                        successCount: 1,
+                        failureCount: 1,
+                        lastAt: 2_000,
+                    },
+                },
+            };
+
+            await store.writeRuntimeHealthRecords([staleRecord], { runId: 'runtime-run-1', observedAt: 1_000 });
+            await store.writeRuntimeHealthRecords([freshRecord], { runId: 'runtime-run-2', observedAt: 2_000 });
+
+            const diagnostics = await store.readStorageDiagnostics();
+            const runtime = await store.readRuntimeHealthForModel({
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+            });
+            const runtimeRecords = await store.listRuntimeHealthRecords();
+
+            assert.equal(diagnostics.runtimeRows, 6);
+            assert.equal(runtimeRecords.length, 2);
+            assert.equal(runtime.health?.['lastStatus'], 'ok');
+            assert.equal(runtime.probes.length, 1);
+            assert.equal(runtime.probes[0]?.['status'], 'ok');
+        } finally {
+            db.close();
+        }
+    });
+
     it('installs a storage-neutral runtime health SQLite mirror for new BYOK health facts', async () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');

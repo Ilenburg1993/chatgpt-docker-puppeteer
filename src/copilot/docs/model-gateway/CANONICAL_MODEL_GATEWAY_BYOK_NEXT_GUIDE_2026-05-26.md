@@ -3585,6 +3585,61 @@ Resultado observado:
 
 `healthObservationMaxRows=100000`
 
+Mudanca 9:
+
+Runtime health writer deixou de ser truncate-and-replace.
+
+Antes:
+
+`writeRuntimeHealthRecords` apagava:
+
+- runtime probe results
+- runtime probe runs
+- health observations
+
+Depois:
+
+`writeRuntimeHealthRecords` faz escrita historica/upsert por `runId`.
+
+Chaves novas:
+
+- health observation: `runId:healthKey`
+- probe result: `runId:healthKey:probeKind`
+
+Consequencias:
+
+- rodadas live sucessivas preservam historico
+- retention runtime passa a ter utilidade real
+- diagnostics conseguem mostrar crescimento operacional
+- leitura por modelo continua retornando fato mais recente
+- leitura por modelo deduplica probe por kind
+
+Esse ajuste e fundacional.
+
+Sem ele, runtime persistence seria apenas um cache substituido a cada mirror.
+
+Com ele, runtime persistence vira camada operacional auditavel.
+
+Validacoes deste ajuste:
+
+`node --check src/copilot/model-gateway/catalog/sqlite-catalog-store.js`
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "runtime health mirror runs|runtime health/probe facts|storage-neutral runtime health SQLite mirror|operational retention"`
+
+Resultado:
+
+`4 passed`
+
+`node scripts/model-gateway-sqlite-retention.mjs --json --runtime-probe-run-max-rows=10000 --runtime-probe-result-max-rows=100000 --health-observation-max-rows=100000`
+
+Resultado observado:
+
+`applied=false`
+
+`beforeRuntime=24`
+
+`afterRuntime=24`
+
 Proximo passo:
 
 Conectar runtime persisted aos explain/readiness finais com policy clara para cada perfil.

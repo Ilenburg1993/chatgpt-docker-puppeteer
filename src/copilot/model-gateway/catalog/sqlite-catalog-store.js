@@ -391,6 +391,40 @@ function runtimeFailureContext(record) {
 }
 
 /**
+ * @param {string} runId
+ * @param {string} key
+ * @returns {string}
+ */
+function runtimeObservationKey(runId, key) {
+    return `${runId}:${key}`;
+}
+
+/**
+ * @param {string} runId
+ * @param {string} key
+ * @param {string} probeKind
+ * @returns {string}
+ */
+function runtimeProbeResultKey(runId, key, probeKind) {
+    return `${runId}:${key}:${probeKind}`;
+}
+
+/**
+ * @param {Record<string, unknown>[]} probes
+ * @returns {Record<string, unknown>[]}
+ */
+function latestProbePerKind(probes) {
+    /** @type {Map<string, Record<string, unknown>>} */
+    const byKind = new Map();
+    for (const probe of probes) {
+        const kind = optionalString(probe['kind']) ?? optionalString(probe['probeKind']);
+        if (!kind || byKind.has(kind)) continue;
+        byKind.set(kind, probe);
+    }
+    return [...byKind.values()];
+}
+
+/**
  * @param {Record<string, unknown>} event
  * @returns {string}
  */
@@ -843,26 +877,56 @@ export class SqliteModelGatewayCatalogStore {
         let healthObservations = 0;
         let probeResults = 0;
         const tx = this.#db.transaction(() => {
-            this.#db.prepare('DELETE FROM copilot_model_gateway_runtime_probe_results').run();
-            this.#db.prepare('DELETE FROM copilot_model_gateway_runtime_probe_runs').run();
-            this.#db.prepare('DELETE FROM copilot_model_gateway_health_observations').run();
             const insertRun = this.#db.prepare(`
                 INSERT INTO copilot_model_gateway_runtime_probe_runs
                     (run_id, probe_profile, account_scope, status, started_at_ms, completed_at_ms,
                      model_count, success_count, failure_count, skipped_count, payload_json)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(run_id) DO UPDATE SET
+                    probe_profile = excluded.probe_profile,
+                    account_scope = excluded.account_scope,
+                    status = excluded.status,
+                    started_at_ms = excluded.started_at_ms,
+                    completed_at_ms = excluded.completed_at_ms,
+                    model_count = excluded.model_count,
+                    success_count = excluded.success_count,
+                    failure_count = excluded.failure_count,
+                    skipped_count = excluded.skipped_count,
+                    payload_json = excluded.payload_json
             `);
             const insertHealth = this.#db.prepare(`
                 INSERT INTO copilot_model_gateway_health_observations
                     (observation_key, provider_id, provider_model, route_profile, health_scope, status,
                      classified_failure, observed_at_ms, expires_at_ms, payload_json)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(observation_key) DO UPDATE SET
+                    provider_id = excluded.provider_id,
+                    provider_model = excluded.provider_model,
+                    route_profile = excluded.route_profile,
+                    health_scope = excluded.health_scope,
+                    status = excluded.status,
+                    classified_failure = excluded.classified_failure,
+                    observed_at_ms = excluded.observed_at_ms,
+                    expires_at_ms = excluded.expires_at_ms,
+                    payload_json = excluded.payload_json
             `);
             const insertProbe = this.#db.prepare(`
                 INSERT INTO copilot_model_gateway_runtime_probe_results
                     (result_key, run_id, provider_id, provider_model, route_profile, probe_kind, wire_api,
                      ok, status, observed_at_ms, expires_at_ms, payload_json)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(result_key) DO UPDATE SET
+                    run_id = excluded.run_id,
+                    provider_id = excluded.provider_id,
+                    provider_model = excluded.provider_model,
+                    route_profile = excluded.route_profile,
+                    probe_kind = excluded.probe_kind,
+                    wire_api = excluded.wire_api,
+                    ok = excluded.ok,
+                    status = excluded.status,
+                    observed_at_ms = excluded.observed_at_ms,
+                    expires_at_ms = excluded.expires_at_ms,
+                    payload_json = excluded.payload_json
             `);
             let probeSuccessCount = 0;
             let probeFailureCount = 0;
@@ -884,7 +948,7 @@ export class SqliteModelGatewayCatalogStore {
                 const status = runtimeHealthStatus(record);
                 const healthKey = optionalString(record['key']) ?? `${routeProfile(record)}|${providerId(record)}|${providerModel(record)}`;
                 insertHealth.run(
-                    healthKey,
+                    runtimeObservationKey(runId, healthKey),
                     providerId(record),
                     providerModel(record),
                     routeProfile(record),
@@ -903,7 +967,7 @@ export class SqliteModelGatewayCatalogStore {
                     if (ok) probeSuccessCount += 1;
                     else probeFailureCount += 1;
                     insertProbe.run(
-                        `${healthKey}:${probeKind}`,
+                        runtimeProbeResultKey(runId, healthKey, probeKind),
                         runId,
                         providerId(record),
                         providerModel(record),
@@ -976,7 +1040,7 @@ export class SqliteModelGatewayCatalogStore {
             .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
         return {
             health: healthRows[0] ?? null,
-            probes,
+            probes: latestProbePerKind(probes),
         };
     }
 
