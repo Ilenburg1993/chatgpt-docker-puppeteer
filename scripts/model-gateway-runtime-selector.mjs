@@ -199,6 +199,12 @@ const context = await buildRuntimeSelectorContext({
 });
 
 let execution = null;
+let routeDecisionPersistence = {
+    attempted: false,
+    ok: true,
+    written: 0,
+    error: null,
+};
 if (execute) {
     if (!context.runtimeSelectorPlan.ready || context.runtimeSelectorPlan.summary.blockedProfileCount > 0) {
         execution = {
@@ -226,6 +232,29 @@ if (execute) {
             timeoutMs: readInteger('--timeout-ms', 45_000),
             env: process.env,
         });
+        const decisionEvents = [
+            ...new Map(
+                execution.attempts
+                    .map((attempt) => attempt.route?.decisionEvent ?? null)
+                    .filter((event) => event !== null)
+                    .map((event) => [event.decisionId, event]),
+            ).values(),
+        ];
+        routeDecisionPersistence = {
+            attempted: decisionEvents.length > 0,
+            ok: true,
+            written: 0,
+            error: null,
+        };
+        if (decisionEvents.length > 0) {
+            try {
+                await new SqliteModelGatewayCatalogStore().writeRouteDecisionEvents(decisionEvents);
+                routeDecisionPersistence.written = decisionEvents.length;
+            } catch (error) {
+                routeDecisionPersistence.ok = false;
+                routeDecisionPersistence.error = error instanceof Error ? error.message : String(error);
+            }
+        }
     }
 }
 
@@ -238,7 +267,8 @@ const summary = {
         context.policyResolution.ok &&
         context.runtimeSelectorPlan.ready &&
         context.runtimeSelectorPlan.summary.blockedProfileCount === 0 &&
-        (execution?.ok ?? true),
+        (execution?.ok ?? true) &&
+        routeDecisionPersistence.ok,
     runtimeExecuted: execute,
     mode: strict ? 'strict_access_only_with_observed_health' : 'allow_probe_unknown_with_observed_health',
     runtimeSource,
@@ -275,6 +305,7 @@ const summary = {
     policyResolution: context.policyResolution,
     runtimeSelectorPlan: context.runtimeSelectorPlan,
     execution,
+    routeDecisionPersistence,
     nextCommands: execute
         ? ['npm run model-gateway:runtime-selector', 'npm run model-gateway:live:readiness']
         : [
@@ -308,6 +339,9 @@ if (json) {
     if (execution) {
         process.stdout.write(
             `execution: ok=${execution.ok ? 'yes' : 'no'} status=${execution.status} attempted=${execution.attemptedCount} selected=${execution.selectedProfileId ?? '-'} error=${execution.error ?? '-'}\n`,
+        );
+        process.stdout.write(
+            `route-decisions: attempted=${routeDecisionPersistence.attempted ? 'yes' : 'no'} written=${routeDecisionPersistence.written} error=${routeDecisionPersistence.error ?? '-'}\n`,
         );
     }
 }

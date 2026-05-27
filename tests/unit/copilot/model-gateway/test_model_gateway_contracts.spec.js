@@ -821,6 +821,10 @@ describe('model-gateway foundation', () => {
                 recordFailure: () => {
                     throw new Error('recordFailure should not be called for ok runtime execution');
                 },
+                recordRouteDecision: (event) => {
+                    assert.equal(event.source, 'unit-test-runtime-selector');
+                    return event;
+                },
                 flushHealth: async () => {},
             },
         });

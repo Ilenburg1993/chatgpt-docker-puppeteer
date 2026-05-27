@@ -7,6 +7,7 @@
  */
 
 import { buildRouteDecisionEvent } from '../observability/events.js';
+import { recordModelGatewayRouteDecision } from '../observability/route-decision-ledger.js';
 import { runConfiguredByokChatProbe } from '../probes/chat-probe.js';
 import {
     flushByokProviderHealth,
@@ -390,6 +391,7 @@ export function selectModelGatewayRuntimeRoute(plan, profileId) {
  *     recordFailure?: typeof recordByokProviderModelCallFailure;
  *     flushHealth?: typeof flushByokProviderHealth;
  *     classifyProviderFailure?: typeof classifyByokProviderFailure;
+ *     recordRouteDecision?: typeof recordModelGatewayRouteDecision;
  *   };
  * }} [options]
  * @returns {Promise<{
@@ -429,6 +431,7 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
     const recordFailure = options.deps?.recordFailure ?? recordByokProviderModelCallFailure;
     const flushHealth = options.deps?.flushHealth ?? flushByokProviderHealth;
     const classifyProviderFailure = options.deps?.classifyProviderFailure ?? classifyByokProviderFailure;
+    const recordRouteDecision = options.deps?.recordRouteDecision ?? recordModelGatewayRouteDecision;
     const recordHealth = options.recordHealth !== false;
     const providerModel = optionalString(selected['providerModel']);
     const probeEnv = buildModelGatewayRuntimeSelectorProbeEnv(selected, options.env);
@@ -438,6 +441,11 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
         providerModel,
     };
     try {
+        try {
+            recordRouteDecision(route.decisionEvent);
+        } catch {
+            // Runtime execution must not fail because an optional observer failed.
+        }
         const probe = await runChatProbe({
             env: probeEnv,
             ...(providerModel ? { model: providerModel } : {}),

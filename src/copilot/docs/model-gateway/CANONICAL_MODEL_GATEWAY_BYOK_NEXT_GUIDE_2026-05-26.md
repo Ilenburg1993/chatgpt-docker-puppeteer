@@ -5877,6 +5877,8 @@ O executor e injetavel para testes.
 
 Ele grava health quando ha tentativa real.
 
+Ele registra o `decisionEvent` sanitizado no route decision ledger antes da tentativa.
+
 Ele nao executa rotas bloqueadas.
 
 Ele agora classifica erro lancado pela probe com `classifyByokProviderFailure`.
@@ -6001,6 +6003,10 @@ Esse modo ficou deliberadamente atras do plano, dos gates e dos live tests contr
 
 Ele usa `executeModelGatewayRuntimeSelectorPlanWithFallbacks`.
 
+Quando `--execute` e usado, a CLI tenta persistir os decision events das tentativas no SQLite.
+
+O dry-run continua sem persistir route decisions.
+
 Ele respeita:
 
 - `--attempts-per-route`;
@@ -6101,10 +6107,12 @@ Esses pontos pertencem a proxima camada.
 - [x] Bloquear plano live quando env route-aware nao esta pronto.
 - [x] Classificar excecao da probe e gravar health no mesmo fluxo.
 - [x] Injetar classificador na probe para normalizar `session.error`.
+- [x] Registrar decision event sanitizado no ledger durante execucao runtime.
 - [x] Criar decisao dinamica de retry/fallback por failure kind.
 - [x] Conectar rate-limit/retry-after/resetAt ao retry budget.
 - [x] Criar CLI canonica dry-run para o runtime selector.
 - [x] Exigir `--execute` para chamadas reais do runtime selector.
+- [x] Preparar persistencia SQLite de route decisions quando `--execute` for usado.
 - [x] Integrar package script, Makefile e inventario canonico.
 - [x] Criar snapshot/diff canonico de runtime health.
 - [x] Detectar regressoes `ok -> failed` em runtime health.
