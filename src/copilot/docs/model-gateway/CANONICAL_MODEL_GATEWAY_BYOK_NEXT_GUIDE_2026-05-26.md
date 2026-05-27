@@ -2386,7 +2386,7 @@ Quota/account overlay mais rico.
 - [x] Adicionar unknown access explain mais acionavel.
 - [x] Persistir runs de eligibility por build/refresh de modo mais claro.
 - [x] Adicionar diff de eligibility entre builds.
-- [ ] Adicionar teste de eligibility para provider removal.
+- [x] Adicionar teste de eligibility para provider removal.
 
 ### Faixa J - Selecao Por Metadados
 
@@ -6846,6 +6846,49 @@ Ela nao executa inference.
 Ela nao muda catalogo canonico.
 
 Ela aumenta a auditabilidade antes do primeiro runtime selector real.
+
+## 21.49 Mudanca 49 - Pruning De Eligibility Para Provider Removal
+
+Foi corrigida a aplicacao da camada derivada de eligibility ao snapshot.
+
+Antes, decisions antigas podiam sobreviver quando um provider/model sumia do catalogo.
+
+Isso era perigoso porque:
+
+- o catalogo canonico ja nao teria mais o modelo;
+- a eligibility antiga ainda poderia aparecer em buscas;
+- selection pre-runtime poderia interpretar decision stale;
+- terminal poderia sugerir estado que nao existe mais.
+
+`applyModelGatewayEligibilityToSnapshot()` agora calcula as chaves atuais de catalogo.
+
+As chaves consideram:
+
+- provider;
+- provider model;
+- route profile.
+
+As chaves atuais sao derivadas de:
+
+- `projections`;
+- `routeOptions`.
+
+Antes de fazer upsert das novas decisions, a funcao remove decisions antigas cujo modelo/rota nao existe mais.
+
+O historico permanece em `modelEligibilityRuns`.
+
+O estado corrente fica em `modelEligibilityDecisions`.
+
+Isto preserva a separacao:
+
+- runs sao historico operacional;
+- decisions sao camada derivada corrente.
+
+Foi adicionado teste explicito de provider/model removal.
+
+Esse comportamento e essencial para refresh incremental seguro.
+
+Tambem evita corrupcao logica quando providers forem removidos, renomeados ou deixarem de listar modelos.
 
 ## 22. Fim Do Documento Inicial
 

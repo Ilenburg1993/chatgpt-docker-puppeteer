@@ -44,15 +44,23 @@ function projectionRouteKey(projection) {
 }
 
 /**
+ * @param {Record<string, any>} record
+ * @returns {string}
+ */
+function catalogModelRouteKey(record) {
+    return [
+        optionalString(record['providerId']) ?? 'unknown-provider',
+        optionalString(record['providerModel']) ?? 'unknown-model',
+        optionalString(record['routeProfile']) ?? 'default',
+    ].join(':');
+}
+
+/**
  * @param {Record<string, any>} route
  * @returns {string}
  */
 function routeOptionKey(route) {
-    return [
-        optionalString(route['providerId']) ?? 'unknown-provider',
-        optionalString(route['providerModel']) ?? 'unknown-model',
-        optionalString(route['routeProfile']) ?? 'default',
-    ].join(':');
+    return catalogModelRouteKey(route);
 }
 
 /**
@@ -111,6 +119,16 @@ function routeOptionsByProjectionKey(routeOptions) {
         map.set(key, existing);
     }
     return map;
+}
+
+/**
+ * @param {Record<string, any>} snapshot
+ * @returns {Set<string>}
+ */
+function currentCatalogRouteKeys(snapshot) {
+    const projections = Array.isArray(snapshot['projections']) ? snapshot['projections'].filter(isRecord) : [];
+    const routeOptions = Array.isArray(snapshot['routeOptions']) ? snapshot['routeOptions'].filter(isRecord) : [];
+    return new Set([...projections, ...routeOptions].map(catalogModelRouteKey));
 }
 
 /**
@@ -210,11 +228,16 @@ export function evaluateModelGatewayCatalogEligibility(input) {
  * @returns {Record<string, any>}
  */
 export function applyModelGatewayEligibilityToSnapshot(snapshot, decisions, run) {
+    const currentKeys = currentCatalogRouteKeys(snapshot);
+    const previousDecisions = Array.isArray(snapshot['modelEligibilityDecisions'])
+        ? snapshot['modelEligibilityDecisions'].filter(isRecord)
+        : [];
+    const retainedDecisions = previousDecisions.filter((decision) => currentKeys.has(catalogModelRouteKey(decision)));
     return {
         ...snapshot,
         source: 'eligibility-refresh',
         modelEligibilityDecisions: upsertMany(
-            Array.isArray(snapshot['modelEligibilityDecisions']) ? snapshot['modelEligibilityDecisions'].filter(isRecord) : [],
+            retainedDecisions,
             decisions,
             modelEligibilityDecisionKey,
         ),

@@ -8863,6 +8863,50 @@ describe('model-gateway foundation', () => {
         assert.equal(nextSnapshot.modelEligibilityDecisions.length, 2);
     });
 
+    it('prunes stale eligibility decisions when provider models disappear from the catalog', () => {
+        const current = createCanonicalModelProjection({
+            providerId: 'openrouter',
+            providerModel: 'current/model',
+            pricing: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 },
+        });
+        const staleDecision = createModelEligibilityDecision({
+            providerId: 'openrouter',
+            providerModel: 'removed/model',
+            include: true,
+            policyProfile: 'strict-account',
+        });
+        const previousDecision = createModelEligibilityDecision({
+            providerId: 'openrouter',
+            providerModel: 'current/model',
+            include: false,
+            hardExclusions: ['account_model_not_visible'],
+            policyProfile: 'strict-account',
+        });
+        const nextDecision = createModelEligibilityDecision({
+            providerId: 'openrouter',
+            providerModel: 'current/model',
+            include: true,
+            policyProfile: 'strict-account',
+        });
+
+        const nextSnapshot = applyModelGatewayEligibilityToSnapshot(
+            {
+                projections: [current],
+                routeOptions: [],
+                modelEligibilityDecisions: [staleDecision, previousDecision],
+                modelEligibilityRuns: [],
+            },
+            [nextDecision],
+            createModelEligibilityRun({ runId: 'eligibility-provider-removal' }),
+        );
+
+        assert.deepEqual(
+            nextSnapshot.modelEligibilityDecisions.map((decision) => decision['providerModel']),
+            ['current/model'],
+        );
+        assert.equal(nextSnapshot.modelEligibilityDecisions[0]?.['include'], true);
+    });
+
     it('evaluates catalog eligibility per route option instead of reusing one model-level decision', () => {
         const projection = createCanonicalModelProjection({
             providerId: 'cloudflare-workers-ai',
