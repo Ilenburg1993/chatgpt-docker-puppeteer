@@ -39,8 +39,11 @@ import {
     buildRouteDecisionTraceAttributes,
     buildModelGatewayRouteCandidates,
     applyModelGatewayEligibilityToSnapshot,
+    buildModelGatewaySelectionDecisionTrace,
     compareModelGatewaySelectionAudits,
+    DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     MODEL_GATEWAY_SELECTION_POLICY_MODE,
+    persistModelGatewaySelectionDecisionTrace,
     resolveModelGatewaySelectionPolicy,
     createModelRecord,
     createEnvSecretRegistry,
@@ -605,7 +608,7 @@ describe('model-gateway foundation', () => {
         });
     });
 
-    it('audits pre-runtime selection across task profiles without requiring runtime probes', () => {
+    it('audits pre-runtime selection across task profiles without requiring runtime probes', async () => {
         const snapshot = {
             projections: [
                 createCanonicalModelProjection({
@@ -713,6 +716,42 @@ describe('model-gateway foundation', () => {
         assert.equal(requireRuntimeProof.summary.selectedCount, 1);
         assert.equal(requireRuntimeProof.summary.unselectedCount, 1);
         assert.equal(requireRuntimeProof.rows[1].source, 'blocked_runtime_proof_missing');
+
+        const trace = buildModelGatewaySelectionDecisionTrace({
+            snapshot,
+            integrity: { ok: true, redactedIdentityCount: 0 },
+            selection: audit,
+            postRuntimeSelection: postRuntimeAudit,
+            selectionComparison: comparison,
+            policyResolution: preferRuntimeProved,
+            runtimeSource: 'unit',
+            runtimeHealthRecordCount: 1,
+            runtimeAccountOverlaySummary: { activeCount: 0, expiredCount: 0 },
+            traceId: 'unit-selection-trace',
+            generatedAt: '2026-05-27T12:00:00.000Z',
+            source: 'unit-test',
+        });
+        assert.equal(trace['schema'], 'model-gateway-selection-decision-trace');
+        assert.equal(trace['traceId'], 'unit-selection-trace');
+        assert.equal(trace['source'], 'unit-test');
+        assert.equal(trace['runtime']?.['source'], 'unit');
+        assert.equal(trace['policy']?.['mode'], MODEL_GATEWAY_SELECTION_POLICY_MODE.PREFER_RUNTIME_PROVED);
+        assert.equal(Array.isArray(trace['rows']), true);
+        assert.equal(trace['rows']?.[0]?.['selected']?.['providerId'], 'openrouter');
+
+        const traceDir = await mkdtemp(join(tmpdir(), 'model-gateway-selection-trace-'));
+        try {
+            const persistedTrace = await persistModelGatewaySelectionDecisionTrace(trace, { directory: traceDir });
+            assert.equal(DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, 'data/copilot/model-gateway/selection-traces');
+            assert.equal(persistedTrace.ok, true);
+            assert.equal(persistedTrace.written, true);
+            const persistedPayload = JSON.parse(await readFile(String(persistedTrace.filePath), 'utf8'));
+            const latestPayload = JSON.parse(await readFile(String(persistedTrace.latestPath), 'utf8'));
+            assert.equal(persistedPayload.schema, 'model-gateway-selection-decision-trace');
+            assert.equal(latestPayload.traceId, 'unit-selection-trace');
+        } finally {
+            await rm(traceDir, { recursive: true, force: true });
+        }
 
         const strictAudit = auditModelGatewayPreRuntimeSelection(
             {
@@ -1849,10 +1888,12 @@ describe('model-gateway foundation', () => {
                 (entry) => entry.command === 'npm run model-gateway:selection:effective -- --require-runtime-proof',
             ),
         );
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:selection:effective:trace'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:plan'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:runtime-health:mirror'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-build'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-effective-selection-trace'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build-plan'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build-preview'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-metadata-build'));

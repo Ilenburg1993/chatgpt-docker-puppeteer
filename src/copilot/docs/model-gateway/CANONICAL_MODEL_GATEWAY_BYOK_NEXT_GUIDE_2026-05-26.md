@@ -5516,7 +5516,7 @@ Ela nao transforma saude volatil em metadado canonico.
 
 Isso e correto nesta fase.
 
-Persistencia de decision trace e selecao efetiva real devem vir depois, em camada propria.
+Persistencia de decision trace deve vir em camada propria, e selecao efetiva real deve continuar separada dela.
 
 ### 19.9 Checklist Da Mudanca 31
 
@@ -5529,12 +5529,194 @@ Persistencia de decision trace e selecao efetiva real devem vir depois, em camad
 - [x] Integrar `runtime-proof` ao resolver rigoroso.
 - [x] Cobrir contratos de model-gateway.
 - [x] Cobrir contratos de terminal.
-- [ ] Persistir decision trace opcional.
+- [x] Persistir decision trace opcional.
 - [ ] Adicionar pesos configuraveis por tipo de prova runtime.
 - [ ] Criar policy de producao para selecao efetiva real.
 - [ ] Ligar policy resolver ao futuro runtime selector.
 
-## 20. Fim Do Documento Inicial
+## 20. Mudanca 32 - Decision Trace Persistente Sem Mutar Catalogo
+
+Apos a policy final, a proxima lacuna era rastreabilidade.
+
+Precisamos saber por que uma rota foi considerada vencedora.
+
+Tambem precisamos guardar essa decisao sem alterar:
+
+- catalogo canonico;
+- fatos de metadados;
+- fatos de account/key;
+- fatos runtime;
+- historico de probes.
+
+Foi criada uma camada nova e separada:
+
+`src/copilot/model-gateway/routing/selection-trace.js`
+
+Ela cria e persiste um envelope de auditoria nao-mutante.
+
+### 20.1 API Canonica Adicionada
+
+Foram adicionadas as exports:
+
+- `DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR`
+- `buildModelGatewaySelectionDecisionTrace`
+- `persistModelGatewaySelectionDecisionTrace`
+
+O diretorio default e:
+
+`data/copilot/model-gateway/selection-traces`
+
+O schema do trace e:
+
+`model-gateway-selection-decision-trace`
+
+O schema do resultado de persistencia e:
+
+`model-gateway-selection-decision-trace-persistence`
+
+### 20.2 Conteudo Do Trace
+
+O trace guarda:
+
+- `traceId`
+- `generatedAt`
+- `source`
+- resumo do snapshot;
+- resumo da integridade;
+- resumo runtime;
+- resumo da auditoria pre-runtime;
+- resumo da auditoria post-runtime;
+- resumo da comparacao;
+- resumo da policy final;
+- linhas por profile.
+
+Cada linha inclui:
+
+- `profileId`
+- `source`
+- `changedFromPreRuntime`
+- `hasRuntimeProof`
+- `selected`
+- `preSelected`
+- `postSelected`
+
+As rotas sao resumidas.
+
+O trace nao inclui segredos.
+
+O trace nao inclui payloads brutos de providers.
+
+O trace nao promove runtime para metadado canonico.
+
+### 20.3 Persistencia Atomica
+
+A persistencia usa escrita atomica:
+
+- cria diretorio;
+- escreve arquivo temporario;
+- faz rename para o arquivo final;
+- opcionalmente atualiza `latest.json` tambem por arquivo temporario e rename.
+
+Isso reduz risco de corrupcao em interrupcao de processo.
+
+O arquivo principal usa o `traceId` normalizado.
+
+`latest.json` e apenas ponteiro operacional.
+
+Nao deve ser tratado como fonte canonica historica.
+
+### 20.4 Integracao No Script Efetivo
+
+O script:
+
+`scripts/model-gateway-effective-selection.mjs`
+
+Agora aceita:
+
+`--write-trace`
+
+Alias:
+
+`--persist-trace`
+
+Tambem aceita:
+
+- `--trace-dir <path>`
+- `--trace-id <id>`
+
+O package script canonico novo e:
+
+`npm run model-gateway:selection:effective:trace`
+
+O Makefile alias novo e:
+
+`make model-gateway-effective-selection-trace`
+
+O inventario canonico tambem registra esses comandos.
+
+### 20.5 Integracao No Terminal
+
+O cockpit BYOK tambem passou a usar a mesma API.
+
+O comando:
+
+`/byok gateway selection audit effective write-trace`
+
+Grava um trace da decisao efetiva sem mutar catalogo.
+
+Tambem pode receber:
+
+- `trace-id:<id>`
+- `--trace-id=<id>`
+- `--trace-dir=<path>`
+
+`write-trace` implica modo efetivo, pois o trace precisa da comparacao pre-runtime/post-runtime e da policy final.
+
+O output mostra:
+
+- `tracePersisted`
+- caminho do arquivo gravado;
+- caminho de `latest`;
+- erro, quando houver.
+
+Isso deixa humanos e LLMs com um caminho unico para auditar a decisao final dentro do terminal.
+
+### 20.6 Papel Arquitetural
+
+Essa camada nao decide modelos sozinha.
+
+Ela nao altera estado canonico.
+
+Ela nao executa probes.
+
+Ela nao abre runtime.
+
+Ela apenas congela uma decisao para auditoria.
+
+Essa separacao e essencial para as proximas fases:
+
+- comparar policies;
+- explicar selecao final;
+- preparar runtime selector;
+- depurar divergencias entre pre-runtime e post-runtime;
+- alimentar live tests com contexto auditavel.
+
+### 20.7 Checklist Da Mudanca 32
+
+- [x] Criar builder de decision trace.
+- [x] Criar persistencia atomica de trace.
+- [x] Exportar helpers pelos barrels.
+- [x] Integrar `--write-trace` ao script efetivo.
+- [x] Integrar package script canonico.
+- [x] Integrar Makefile alias canonico.
+- [x] Integrar inventario canonico.
+- [x] Cobrir persistencia em teste unitario.
+- [x] Adicionar comando terminal para gravar trace sob demanda.
+- [ ] Adicionar retention policy para traces.
+- [ ] Adicionar diff entre traces.
+- [ ] Conectar traces ao runtime selector real.
+
+## 21. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
 

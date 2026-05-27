@@ -227,6 +227,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Inspect post-runtime selection while requiring already-observed runtime proof for selected routes.',
     },
     {
+        id: 'selection.effective.trace',
+        phase: 'selection',
+        surface: 'package',
+        command: 'npm run model-gateway:selection:effective:trace',
+        summary: 'Persist a non-mutating selection decision trace for audit and future runtime handoff.',
+    },
+    {
         id: 'live.readiness',
         phase: 'live-readiness',
         surface: 'package',
@@ -386,6 +393,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-effective-selection',
         summary: 'Makefile alias for effective no-runtime selection.',
+    },
+    {
+        id: 'make.effective-selection-trace',
+        phase: 'selection',
+        surface: 'make',
+        command: 'make model-gateway-effective-selection-trace',
+        summary: 'Makefile alias for effective no-runtime selection with a persisted decision trace.',
     },
     {
         id: 'make.live-readiness',

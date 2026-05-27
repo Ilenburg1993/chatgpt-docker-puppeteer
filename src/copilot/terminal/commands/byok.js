@@ -15,6 +15,7 @@ import { config as loadDotenv } from 'dotenv';
 import {
     buildCatalogRefreshEventBatch,
     buildCatalogRefreshStartedEvent,
+    buildModelGatewaySelectionDecisionTrace,
     compareModelGatewaySelectionAudits,
     buildEligibilityEvaluatedEvent,
     buildModelGatewayPreBuildReadinessReport,
@@ -31,6 +32,7 @@ import {
     createDefaultModelGatewayCatalogImporters,
     createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
+    DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     applyModelGatewayEligibilityToSnapshot,
     evaluateModelGatewayCatalogEligibility,
@@ -59,6 +61,7 @@ import {
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
     recordModelGatewayRouteDecision,
+    persistModelGatewaySelectionDecisionTrace,
     refreshModelGatewayCatalog,
     resolveProviderGatewayTraits,
     resolveProviderEndpointInventory,
@@ -1842,7 +1845,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict] [filtro] [n] | /byok health [clear] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -2543,26 +2546,47 @@ async function renderByokGatewayCatalogIntegrity(println) {
 
 /**
  * @param {string[]} rest
- * @returns {{ strict: boolean; effective: boolean; requireRuntimeProof: boolean; selectionPolicy: string; profiles: string[] }}
+ * @returns {{ strict: boolean; effective: boolean; requireRuntimeProof: boolean; writeTrace: boolean; traceDir: string; traceId: string; selectionPolicy: string; profiles: string[] }}
  */
 function parseByokGatewaySelectionAuditArgs(rest) {
     const requireRuntimeProof = rest.some((item) =>
         /^(runtime-proof|proof|proved|provado|require-proof|--runtime-proof|--require-runtime-proof)$/iu.test(item),
     );
+    const writeTrace = rest.some((item) =>
+        /^(trace|write-trace|persist-trace|decision-trace|--write-trace|--persist-trace)$/iu.test(item),
+    );
+    const traceDir =
+        rest
+            .map((item) => item.match(/^--?trace-dir[:=](.+)$/iu)?.[1] ?? null)
+            .find((item) => item !== null) ?? DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR;
+    const traceId =
+        rest
+            .map((item) => item.match(/^--?trace-id[:=](.+)$/iu)?.[1] ?? item.match(/^trace-id[:=](.+)$/iu)?.[1] ?? null)
+            .find((item) => item !== null) ?? '';
     const selectionPolicy =
         rest
             .map((item) => item.match(/^--?selection-policy[:=](.+)$/iu)?.[1] ?? item.match(/^policy[:=](.+)$/iu)?.[1] ?? null)
             .find((item) => item !== null) ?? (requireRuntimeProof ? 'require_runtime_proof' : 'metadata_first');
     const effective =
-        requireRuntimeProof || rest.some((item) => /^(effective|efetiva|observed|health|--effective)$/iu.test(item));
+        requireRuntimeProof ||
+        writeTrace ||
+        rest.some((item) => /^(effective|efetiva|observed|health|--effective)$/iu.test(item));
     const strict = effective || rest.some((item) => /^(strict|block|bloquear|--strict)$/iu.test(item));
     const profiles = rest
         .flatMap((item) => {
             const profileArg = item.match(/^--?profiles?[:=](.+)$/iu)?.[1];
-            if (/^--?selection-policy[:=]/iu.test(item) || /^policy[:=]/iu.test(item)) return [];
+            if (
+                /^--?selection-policy[:=]/iu.test(item) ||
+                /^policy[:=]/iu.test(item) ||
+                /^--?trace-dir[:=]/iu.test(item) ||
+                /^--?trace-id[:=]/iu.test(item) ||
+                /^trace-id[:=]/iu.test(item)
+            ) {
+                return [];
+            }
             if (profileArg) return profileArg.split(',');
             if (
-                /^(audit|auditoria|selection|selecao|seleção|strict|block|bloquear|--strict|effective|efetiva|observed|health|--effective|runtime-proof|proof|proved|provado|require-proof|--runtime-proof|--require-runtime-proof)$/iu.test(
+                /^(audit|auditoria|selection|selecao|seleção|strict|block|bloquear|--strict|effective|efetiva|observed|health|--effective|runtime-proof|proof|proved|provado|require-proof|--runtime-proof|--require-runtime-proof|trace|write-trace|persist-trace|decision-trace|--write-trace|--persist-trace)$/iu.test(
                     item,
                 )
             ) {
@@ -2572,7 +2596,7 @@ function parseByokGatewaySelectionAuditArgs(rest) {
         })
         .map((item) => item.trim())
         .filter(Boolean);
-    return { strict, effective, requireRuntimeProof, selectionPolicy, profiles };
+    return { strict, effective, requireRuntimeProof, writeTrace, traceDir, traceId, selectionPolicy, profiles };
 }
 
 /**
@@ -2645,6 +2669,25 @@ async function renderByokGatewaySelectionAudit(println, rest) {
     const policyResolution = selectionComparison
         ? resolveModelGatewaySelectionPolicy(selectionComparison, { mode: args.selectionPolicy })
         : null;
+    const tracePersistence =
+        args.writeTrace && postRuntimeSelection && selectionComparison && policyResolution
+            ? await persistModelGatewaySelectionDecisionTrace(
+                  buildModelGatewaySelectionDecisionTrace({
+                      snapshot,
+                      integrity,
+                      selection,
+                      postRuntimeSelection,
+                      selectionComparison,
+                      policyResolution,
+                      runtimeSource: 'terminal-file',
+                      runtimeHealthRecordCount: healthRecords.length,
+                      runtimeAccountOverlaySummary: runtimeOverlaySummary ?? {},
+                      ...(args.traceId ? { traceId: args.traceId } : {}),
+                      source: 'terminal-byok-selection-audit',
+                  }),
+                  { directory: args.traceDir },
+              )
+            : null;
     println(`\n  \x1b[36mBYOK model-gateway selection audit\x1b[0m`);
     println(
         `  \x1b[90mstore=${store.filePath} · integrity=${integrity.ok ? 'ok' : 'falha'} · mode=${selection.mode}${args.effective ? '+effective' : ''}${args.requireRuntimeProof ? '+require-proof' : ''} · runtime=nao · persisted=nao · profiles=${selection.summary.selectedProfileCount}/${selection.summary.profileCount}\x1b[0m`,
@@ -2665,6 +2708,11 @@ async function renderByokGatewaySelectionAudit(println, rest) {
         println(
             `  \x1b[90mpolicy=${policyResolution?.mode ?? args.selectionPolicy} · finalSelected=${policyResolution?.summary.selectedCount ?? 0}/${policyResolution?.summary.profileCount ?? 0} · postWinners=${policyResolution?.summary.postRuntimeWinnerCount ?? 0} · finalChanged=${policyResolution?.summary.changedFromPreRuntimeCount ?? 0}\x1b[0m\n`,
         );
+        if (args.writeTrace) {
+            println(
+                `  \x1b[90mtracePersisted=${tracePersistence?.written ? 'sim' : 'nao'} · trace=${tracePersistence?.filePath ?? '-'} · latest=${tracePersistence?.latestPath ?? '-'} · error=${tracePersistence?.error ?? '-'}\x1b[0m\n`,
+            );
+        }
     }
     for (const profile of selection.profiles) {
         const selected = profile.selected;
