@@ -3070,6 +3070,12 @@ describe('terminal /byok command', () => {
                 lastSuccessAt: Date.now(),
                 lastMessage: null,
                 lastErrorContext: null,
+                probes: {
+                    streaming: { kind: 'streaming', status: 'ok', ok: true, providerAttempted: true, count: 2 },
+                    vision: { kind: 'vision', status: 'failed', ok: false, providerAttempted: true, count: 1 },
+                    live_ask_user: { kind: 'live_ask_user', status: 'ok', ok: true, providerAttempted: true, count: 1 },
+                    live_tool_protocol: { kind: 'live_tool_protocol', status: 'ok', ok: true, providerAttempted: true, count: 1 },
+                },
             },
         ]);
         mockProjection();
@@ -3081,6 +3087,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('byok-provider-health.json');
         expect(ctx.output()).toContain('providerId=kilo-code');
         expect(ctx.output()).toContain('chat=ok');
+        expect(ctx.output()).toContain('capabilities=streaming=okx2 vision=failed');
+        expect(ctx.output()).toContain('protocol=live_ask_user=ok live_tool_protocol=ok');
     });
 
     it('filtra health operacional BYOK por provider/model/profile', async () => {

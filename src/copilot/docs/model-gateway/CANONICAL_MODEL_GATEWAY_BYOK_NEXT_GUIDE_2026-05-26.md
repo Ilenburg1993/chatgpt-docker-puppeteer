@@ -9675,6 +9675,42 @@ Efeito esperado:
 - a etapa pre-runtime continua sem mutar o catalogo canonico;
 - endpoints incompletos deixam de esconder modelos ativos ja provados por runtime.
 
+## Mudanca 97 - Health Cockpit Separa Capability Probes De Protocolo Live
+
+O live real tambem mostrou que a linha de health estava informativa, mas pouco semantica:
+
+- `vision=failed` aparecia junto de `agent`, `chat`, `json`, `streaming` e probes live;
+- isso podia sugerir que uma falha multimodal degradava chat;
+- o codigo de gravacao ja evita degradar chat para probes que nao sao `chat` nem `agent`;
+- faltava tornar essa separacao obvia no cockpit.
+
+Alteracoes aplicadas:
+
+- `/byok health` agora separa probes em grupos:
+  - `capabilities=streaming=... json=... vision=...`;
+  - `protocol=live_ask_user=... live_tool_protocol=...`;
+  - `probes=...` para demais provas;
+- probes de capability nao ficam misturadas com `chatHealth` ou `agentHealth`;
+- `recordByokProbeHealth` passou a chamar `flushByokProviderHealth()` tambem para probes nao-chat/nao-agent;
+- isso torna `vision`, `json` e `streaming` persistidos antes do comando retornar, sem transformar falha de capability em
+  falha de chat.
+
+Teste adicionado/fortalecido:
+
+- o teste de `/byok health` agora valida:
+  - `capabilities=streaming=okx2 vision=failed`;
+  - `protocol=live_ask_user=ok live_tool_protocol=ok`.
+
+Efeito esperado:
+
+- o operador diferencia claramente:
+  - saude textual/conversacional (`chat=`);
+  - saude agentica (`agent=`);
+  - capacidades opcionais (`capabilities=`);
+  - protocolo live do terminal (`protocol=`);
+- o runtime selector pode continuar usando `live_tool_protocol` e `live_ask_user` como provas fortes sem depender de
+  sucesso multimodal.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

@@ -1376,16 +1376,31 @@ function renderByokAgentProbeHealthTag(health) {
 }
 
 /**
- * @param {ReturnType<typeof readByokProviderModelHealth>} health
+ * @param {{ kind?: string; status?: string; providerAttempted?: boolean; count?: number }} probe
  * @returns {string}
  */
-function renderByokProbeHealthSummary(health) {
+function renderByokProbeHealthItem(probe) {
+    return `${probe.kind}=${probe.status}${probe.providerAttempted ? '' : ':local'}${probe.count && probe.count > 1 ? `x${probe.count}` : ''}`;
+}
+
+/**
+ * @param {ReturnType<typeof readByokProviderModelHealth>} health
+ * @returns {string[]}
+ */
+function renderByokProbeHealthSummaries(health) {
     const probes = health?.probes && typeof health.probes === 'object' ? Object.values(health.probes) : [];
-    if (probes.length === 0) return 'probes=?';
-    return probes
-        .sort((a, b) => String(a.kind).localeCompare(String(b.kind)))
-        .map((probe) => `${probe.kind}=${probe.status}${probe.providerAttempted ? '' : ':local'}${probe.count > 1 ? `x${probe.count}` : ''}`)
-        .join(' ');
+    if (probes.length === 0) return ['probes=?'];
+    const sorted = probes.sort((a, b) => String(a.kind).localeCompare(String(b.kind)));
+    const capabilityKinds = new Set(['streaming', 'json', 'vision']);
+    const protocolKinds = new Set(['live_ask_user', 'live_tool_protocol']);
+    const capabilities = sorted.filter((probe) => capabilityKinds.has(String(probe.kind)));
+    const protocol = sorted.filter((probe) => protocolKinds.has(String(probe.kind)));
+    const other = sorted.filter((probe) => !capabilityKinds.has(String(probe.kind)) && !protocolKinds.has(String(probe.kind)));
+    return [
+        capabilities.length > 0 ? `capabilities=${capabilities.map(renderByokProbeHealthItem).join(' ')}` : null,
+        protocol.length > 0 ? `protocol=${protocol.map(renderByokProbeHealthItem).join(' ')}` : null,
+        other.length > 0 ? `probes=${other.map(renderByokProbeHealthItem).join(' ')}` : null,
+    ].filter((item) => item !== null);
 }
 
 /**
@@ -1981,7 +1996,7 @@ function renderByokHealth(println, scope = {}) {
             record.providerModel ? `providerModel=${record.providerModel}` : null,
             label,
             renderByokAgentProbeHealthTag(record),
-            renderByokProbeHealthSummary(record),
+            ...renderByokProbeHealthSummaries(record),
         ].filter(Boolean);
         println(`    \x1b[33m${record.key}\x1b[0m`);
         println(`      \x1b[90m${parts.join(' · ')}\x1b[0m`);
@@ -3823,7 +3838,10 @@ async function recordByokProbeHealth(mode, probe) {
         retryAfterSeconds: probe.providerFailure?.retryAfterSeconds ?? null,
         resetAt: probe.providerFailure?.resetAt ?? null,
     });
-    if (mode !== 'chat' && mode !== 'agent') return providerAttempted;
+    if (mode !== 'chat' && mode !== 'agent') {
+        await flushByokProviderHealth();
+        return providerAttempted;
+    }
     if (mode === 'agent' && probe.ok) {
         recordByokProviderModelAgentProbeSuccess(healthIdentity);
     } else if (mode === 'agent' && providerAttempted) {
