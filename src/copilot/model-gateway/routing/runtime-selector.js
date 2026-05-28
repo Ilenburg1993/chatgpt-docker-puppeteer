@@ -192,6 +192,16 @@ function routeKey(route) {
 }
 
 /**
+ * @param {Record<string, unknown> | null} route
+ * @param {boolean} hasRuntimeProof
+ * @returns {Record<string, unknown> | null}
+ */
+function routeWithRuntimeProofFlag(route, hasRuntimeProof) {
+    if (!route) return null;
+    return { ...route, hasRuntimeProof };
+}
+
+/**
  * @param {Record<string, unknown> | null | undefined} route
  * @returns {string | null}
  */
@@ -752,13 +762,14 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
         const blocked = !selected;
         /** @type {'selected' | 'blocked'} */
         const status = blocked ? 'blocked' : 'selected';
+        const selectedWithProofFlag = routeWithRuntimeProofFlag(selected, hasRuntimeProof);
         if (!blocked) {
-            const key = routeKey(selected);
+            const key = routeKey(selectedWithProofFlag);
             if (key) selectedRouteKeysForPlan.add(key);
-            const providerId = optionalString(selected?.['providerId']);
+            const providerId = optionalString(selectedWithProofFlag?.['providerId']);
             if (providerId) selectedProviderIdsForPlan.add(providerId);
         }
-        const reasons = selectionReasons(selectedForReasons, row);
+        const reasons = selectionReasons(routeWithRuntimeProofFlag(selectedForReasons, hasRuntimeProof), row);
         if (chosen?.label && chosen.label !== 'selected') reasons.push(`runtime_selector_fallback:${chosen.label}`);
         if (blocked && !selected) reasons.push('blocked:no_selected_route');
         if (blocked && accountAccessBlocked) reasons.push('blocked:account_access_denies_attempt');
@@ -779,16 +790,18 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             .filter((candidate) => candidate !== chosen && candidate['blocked'] !== true && optionalRecord(candidate['selected']))
             .map((candidate) => {
                 const candidateSelected = optionalRecord(candidate['selected']);
+                const candidateHasRuntimeProof = candidate['hasRuntimeProof'] === true;
+                const candidateSelectedWithProofFlag = routeWithRuntimeProofFlag(candidateSelected, candidateHasRuntimeProof);
                 const label = optionalString(candidate['label']);
-                const candidateReasons = selectionReasons(candidateSelected, row);
+                const candidateReasons = selectionReasons(candidateSelectedWithProofFlag, row);
                 if (label && label !== 'selected') candidateReasons.push(`runtime_selector_fallback:${label}`);
                 return {
                     profileId,
                     status: 'selected',
                     source: String(normalizedRow['source']),
-                    selected: candidateSelected,
-                    selectedRouteKey: routeKey(candidateSelected),
-                    hasRuntimeProof: candidate['hasRuntimeProof'] === true,
+                    selected: candidateSelectedWithProofFlag,
+                    selectedRouteKey: routeKey(candidateSelectedWithProofFlag),
+                    hasRuntimeProof: candidateHasRuntimeProof,
                     runtimeEnv: optionalRecord(candidate['runtimeEnv']),
                     runtimeHealth: optionalRecord(candidate['runtimeHealth']),
                     providerCooldown: optionalRecord(candidate['providerCooldown']),
@@ -796,7 +809,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                     candidateAlternatives: [],
                     reasons: candidateReasons,
                     nextActions: ['attempt_selected_route', 'record_runtime_result'],
-                    decisionEvent: buildSelectorDecisionEvent(candidateSelected, normalizedRow, {
+                    decisionEvent: buildSelectorDecisionEvent(candidateSelectedWithProofFlag, normalizedRow, {
                         mode,
                         ...(options.source ? { source: options.source } : {}),
                         ...(options.sessionId !== undefined ? { sessionId: options.sessionId } : {}),
@@ -807,8 +820,8 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             profileId,
             status,
             source: String(normalizedRow['source']),
-            selected: blocked ? null : selected,
-            selectedRouteKey: blocked ? null : routeKey(selected),
+            selected: blocked ? null : selectedWithProofFlag,
+            selectedRouteKey: blocked ? null : routeKey(selectedWithProofFlag),
             hasRuntimeProof,
             runtimeEnv,
             runtimeHealth,
@@ -828,7 +841,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                       'relax_selection_policy_or_choose_fallback',
                   ]
                 : ['attempt_selected_route', 'record_runtime_result'],
-            decisionEvent: buildSelectorDecisionEvent(blocked ? null : selected, normalizedRow, {
+            decisionEvent: buildSelectorDecisionEvent(blocked ? null : selectedWithProofFlag, normalizedRow, {
                 mode,
                 ...(options.source ? { source: options.source } : {}),
                 ...(options.sessionId !== undefined ? { sessionId: options.sessionId } : {}),

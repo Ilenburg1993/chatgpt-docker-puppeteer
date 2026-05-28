@@ -1226,11 +1226,13 @@ describe('model-gateway foundation', () => {
                 {
                     profileId: 'repo_agent',
                     source: 'post_runtime_proved',
+                    hasRuntimeProof: true,
                     selected: {
                         providerId: 'zai',
                         providerModel: 'glm-4.5-flash',
                         selectorKind: 'exact_model',
                         selectorSyntax: 'glm-4.5-flash',
+                        hasRuntimeProof: true,
                         accountAccess: { canAttempt: true },
                     },
                     candidateAlternates: [
@@ -1239,6 +1241,7 @@ describe('model-gateway foundation', () => {
                             providerModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
                             selectorKind: 'exact_model',
                             selectorSyntax: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                            hasRuntimeProof: true,
                             accountAccess: { canAttempt: true },
                         },
                     ],
@@ -1246,11 +1249,13 @@ describe('model-gateway foundation', () => {
                 {
                     profileId: 'code',
                     source: 'post_runtime_proved',
+                    hasRuntimeProof: true,
                     selected: {
                         providerId: 'zai',
                         providerModel: 'glm-4.5-flash',
                         selectorKind: 'exact_model',
                         selectorSyntax: 'glm-4.5-flash',
+                        hasRuntimeProof: true,
                         accountAccess: { canAttempt: true },
                     },
                     candidateAlternates: [
@@ -1259,6 +1264,7 @@ describe('model-gateway foundation', () => {
                             providerModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
                             selectorKind: 'exact_model',
                             selectorSyntax: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                            hasRuntimeProof: true,
                             accountAccess: { canAttempt: true },
                         },
                     ],
@@ -1268,9 +1274,14 @@ describe('model-gateway foundation', () => {
         const maximumQualityPlan = buildModelGatewayRuntimeSelectorPlan(sharedBestPolicy);
         assert.equal(maximumQualityPlan.routes[0].selected?.['providerId'], 'zai');
         assert.equal(maximumQualityPlan.routes[1].selected?.['providerId'], 'zai');
+        assert.equal(maximumQualityPlan.routes[0].hasRuntimeProof, true);
+        assert.equal(maximumQualityPlan.routes[0].selected?.['hasRuntimeProof'], true);
+        assert.equal(maximumQualityPlan.routes[1].selected?.['hasRuntimeProof'], true);
         const diversifiedPlan = buildModelGatewayRuntimeSelectorPlan(sharedBestPolicy, { preferProviderDiversity: true });
         assert.equal(diversifiedPlan.routes[0].selected?.['providerId'], 'zai');
         assert.equal(diversifiedPlan.routes[1].selected?.['providerId'], 'groq');
+        assert.equal(diversifiedPlan.routes[1].selected?.['hasRuntimeProof'], true);
+        assert.equal(diversifiedPlan.routes[1].candidateAlternatives[0]?.['selected']?.['hasRuntimeProof'], true);
         assert.ok(diversifiedPlan.routes[1].reasons.includes('runtime_selector_fallback:alternate1'));
 
         const providerCooldownNow = Date.now();

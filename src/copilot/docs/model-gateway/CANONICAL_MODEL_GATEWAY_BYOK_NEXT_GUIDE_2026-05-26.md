@@ -10143,6 +10143,39 @@ Teste adicionado:
 - `preferProviderDiversity=true` seleciona alternativa para o segundo perfil;
 - a reason `runtime_selector_fallback:alternate1` documenta a decisao.
 
+## Mudanca 105 - Contrato de runtime proof consistente no selected
+
+Status: concluido.
+
+Contexto:
+
+- o runtime selector calculava `route.hasRuntimeProof=true` corretamente;
+- porem `route.selected.hasRuntimeProof` podia sair ausente quando a prova vinha da linha de policy;
+- isso criava dois caminhos de leitura para a mesma verdade operacional;
+- scripts, terminal e executores tendem a consumir `route.selected`, porque e esse objeto que vira env/probe/execucao.
+
+Regra aplicada:
+
+- quando a rota escolhida tem prova de runtime, o objeto `selected` serializado tambem recebe `hasRuntimeProof=true`;
+- quando uma alternativa candidata tem prova de runtime, sua entrada em `candidateAlternatives[].selected` tambem recebe a flag;
+- `selectedRouteKey`, `decisionEvent` e reasons passam a usar o mesmo objeto normalizado;
+- a rota bloqueada continua com `selected=null`, sem inventar prova.
+
+Motivo arquitetural:
+
+- runtime proof e estado volatil de decisao, nao metadado canonico;
+- dentro do plano runtime, entretanto, a informacao precisa ser autoconsistente;
+- consumidores nao devem precisar reconciliar `route.hasRuntimeProof`, `row.hasRuntimeProof` e `selected.hasRuntimeProof`;
+- isso prepara o seletor real para executar sem criar heuristicas duplicadas no terminal.
+
+Teste adicionado:
+
+- policy com duas profiles e mesmo melhor provider/model comprovado;
+- default mantem a rota de maior qualidade para ambas;
+- `selected.hasRuntimeProof` aparece nas duas rotas;
+- com `preferProviderDiversity=true`, a alternativa tambem preserva `selected.hasRuntimeProof`;
+- a reason de fallback continua documentando a diversificacao opcional.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
