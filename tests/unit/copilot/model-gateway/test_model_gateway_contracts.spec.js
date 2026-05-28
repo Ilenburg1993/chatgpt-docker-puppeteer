@@ -2303,6 +2303,48 @@ describe('model-gateway foundation', () => {
         assert.equal(ledger[0].decisionId, event.decisionId);
     });
 
+    it('keeps route decision ids unique for pre-decision and runtime outcome in the same millisecond', () => {
+        const route = routeGatewayModels(
+            [
+                createModelRecord({
+                    providerId: 'openrouter',
+                    providerModel: 'openai/gpt-oss-120b',
+                    capabilities: { tools: true, streaming: true },
+                    limits: { contextWindowTokens: 131072 },
+                }),
+            ],
+            'repo_agent',
+            { requireAgentProbeOk: false },
+        );
+        const originalNow = Date.now;
+        Date.now = () => 1_779_930_000_000;
+        try {
+            const preDecision = buildRouteDecisionEvent({
+                taskProfile: 'repo_agent',
+                routeProfile: 'default',
+                mode: 'metadata_first',
+                source: 'unit-test-runtime-selector',
+                route,
+            });
+            const runtimeOutcome = buildRouteDecisionEvent({
+                taskProfile: 'repo_agent',
+                routeProfile: 'default',
+                mode: 'metadata_first:runtime_result',
+                source: 'unit-test-runtime-selector:runtime-result',
+                route,
+                failure: 'runtime_probe_failed:empty',
+            });
+
+            assert.notEqual(preDecision.decisionId, runtimeOutcome.decisionId);
+            assert.equal(preDecision.timestamp, runtimeOutcome.timestamp);
+            assert.equal(preDecision.decisionId.includes('unit-test-runtime-selector'), true);
+            assert.equal(runtimeOutcome.decisionId.includes('runtime-result'), true);
+            assert.equal(runtimeOutcome.decisionId.includes('runtime_probe_failed:empty'), true);
+        } finally {
+            Date.now = originalNow;
+        }
+    });
+
     it('projects catalog refresh diff kinds into stable observability event and metrics', () => {
         const event = buildCatalogRefreshCompletedEvent({
             source: 'unit-test',

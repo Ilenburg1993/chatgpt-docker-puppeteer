@@ -7747,6 +7747,41 @@ Resultado:
 
 `passed`
 
+Mudanca 65:
+
+IDs de route decision sem colisao para pre-decision e outcome runtime.
+
+Problema identificado:
+
+- `copilot_model_gateway_route_decisions` usa `decision_id` como chave primaria;
+- o `decisionId` anterior usava timestamp, task profile e model id;
+- apos a Mudanca 63, uma mesma rota pode gerar pre-decision e runtime outcome em sequencia;
+- se ambos cairem no mesmo milissegundo, o SQLite poderia sobrescrever o primeiro evento pelo segundo.
+
+Correcoes aplicadas:
+
+- `buildRouteDecisionEvent` agora inclui uma sequencia monotônica em processo;
+- o id tambem inclui `source`;
+- o id tambem inclui `mode`;
+- o id tambem inclui `failure` ou `ok`;
+- eventos de pre-decision e outcome no mesmo milissegundo passam a ter ids distintos;
+- a mudanca preserva redacao/sanitizacao;
+- a mudanca evita colisao sem depender de payload ou segredo.
+
+Validacoes focadas:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "route decision"`
+
+Resultado:
+
+`4 passed`
+
+`npm run model-gateway:typecheck`
+
+Resultado:
+
+`passed`
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

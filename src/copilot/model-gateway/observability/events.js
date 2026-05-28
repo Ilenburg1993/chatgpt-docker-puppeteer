@@ -22,6 +22,8 @@ import {
 } from '#copilot/events';
 import { summarizeCanonicalModelProjectionDiff } from '../catalog/import-runs.js';
 
+let routeDecisionSequence = 0;
+
 export {
     MODEL_GATEWAY_CATALOG_CONFLICT_DETECTED,
     MODEL_GATEWAY_CATALOG_IMPORT_COMPLETED,
@@ -209,6 +211,29 @@ function summarizeSelectedRouteCandidate(selected) {
 }
 
 /**
+ * @param {number} timestamp
+ * @param {string} taskProfile
+ * @param {string} modelId
+ * @param {{ mode?: string | null; source?: string | null; failure?: string | null }} input
+ * @returns {string}
+ */
+function buildRouteDecisionId(timestamp, taskProfile, modelId, input) {
+    routeDecisionSequence = (routeDecisionSequence + 1) % 1_000_000;
+    return [
+        'route',
+        timestamp,
+        routeDecisionSequence,
+        taskProfile,
+        optionalString(input.source) ?? 'model-gateway',
+        optionalString(input.mode) ?? 'unknown',
+        modelId,
+        optionalString(input.failure) ?? 'ok',
+    ]
+        .join('-')
+        .replace(/[^a-zA-Z0-9._:-]+/gu, '-');
+}
+
+/**
  * @param {{
  *     taskProfile: string;
  *     routeProfile?: string | null;
@@ -257,14 +282,17 @@ export function buildRouteDecisionEvent(input) {
     const taskProfile = optionalString(input.taskProfile) ?? 'unknown';
     const routeProfile = optionalString(input.routeProfile);
     const modelId = selected.modelId ?? 'none';
+    const mode = optionalString(input.mode) ?? 'unknown';
+    const source = optionalString(input.source) ?? 'model-gateway';
+    const failure = optionalString(input.failure);
     const event = {
         type: MODEL_GATEWAY_ROUTE_DECISION,
         timestamp,
-        decisionId: `route-${timestamp}-${taskProfile}-${modelId}`.replace(/[^a-zA-Z0-9._:-]+/gu, '-'),
+        decisionId: buildRouteDecisionId(timestamp, taskProfile, modelId, { mode, source, failure }),
         taskProfile,
         routeProfile,
-        mode: optionalString(input.mode) ?? 'unknown',
-        source: optionalString(input.source) ?? 'model-gateway',
+        mode,
+        source,
         sessionId: optionalString(input.sessionId),
         selected: selected.modelId !== null,
         gatewayModelId: selected.gatewayModelId,
@@ -278,7 +306,7 @@ export function buildRouteDecisionEvent(input) {
         estimatedInputTokens: finiteNumber(input.estimatedInputTokens),
         estimatedOutputTokens: finiteNumber(input.estimatedOutputTokens),
         estimatedCostUsd: finiteNumber(input.estimatedCostUsd),
-        failure: optionalString(input.failure),
+        failure,
     };
     return {
         ...event,
