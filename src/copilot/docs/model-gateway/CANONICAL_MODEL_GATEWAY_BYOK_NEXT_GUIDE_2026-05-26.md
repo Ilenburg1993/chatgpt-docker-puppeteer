@@ -8647,10 +8647,51 @@ Impacto:
 
 Lacunas ainda abertas apos Mudanca 82:
 
-- `/byok reload` ainda mostra brevemente o perfil legado do `.env.local` antes da reaplicacao da rota runtime-selector;
 - `repo_agent` ainda tenta uma rota primaria sem prova antes de fallback comprovado quando a politica permite;
 - full-turn real deve ser executado so depois de validar esses pontos ou aceitar conscientemente o risco operacional;
 - resultados de vision devem alimentar refinamento de capability runtime, sem virar exclusao automatica.
+
+Mudanca 83:
+
+Runner live reaplica provider runtime imediatamente apos `/byok reload`.
+
+Problema identificado:
+
+- o roteiro live real carregava `.env.local`;
+- em seguida, antes de reaplicar a rota runtime-selector, ainda imprimia paineis como `/byok env`, `/byok providers`, `/byok health` e `/byok profiles`;
+- nesse intervalo, o operador via o perfil legado do arquivo local;
+- depois a rota correta era reaplicada, mas o cockpit inicial ficava ruidoso e podia confundir analise automatica.
+
+Correcao aplicada:
+
+- `buildByokRealPreflightCommands` agora gera:
+  - `/session sdk 8`;
+  - `/byok reload`;
+  - `/byok provider <provider> <model> <baseUrl>`;
+  - somente entao `/byok env`, `/byok providers`, `/byok health`, `/byok profiles`;
+- o caminho sem runtime-selector continua usando `/byok use` e `/byok model`;
+- o comportamento de `--dry-run` permanece sem executar probes runtime reais, portanto pode mostrar a rota dry quando `--byok-real-route-execute` esta desativado por dry-run.
+
+Evidencia:
+
+`npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --no-pr --dry-run --out-dir artifacts/terminal-live/dry-run-runtime-provider-after-reload`
+
+Resultado:
+
+- prompt escrito em `artifacts/terminal-live/dry-run-runtime-provider-after-reload/prompt.txt`;
+- ordem confirmada:
+  - `/byok reload`;
+  - `/byok provider cerebras gpt-oss-120b https://api.cerebras.ai/v1`;
+  - `/byok env`;
+  - `/byok providers`;
+  - `/byok health`;
+- em live executado, o mesmo ponto aplicara a rota final de `execution.final.route`.
+
+Impacto:
+
+- reduzimos ruido de boundary no live;
+- os paineis passam a refletir a rota preparada antes de serem exibidos;
+- o caminho para full-turn fica mais legivel e menos sujeito a falso diagnostico.
 
 ## 22. Fim Do Documento Inicial
 

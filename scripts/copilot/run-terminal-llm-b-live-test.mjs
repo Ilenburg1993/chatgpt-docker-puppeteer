@@ -477,7 +477,7 @@ function buildRuntimeSelectorProviderCommand(runtimeRoute) {
 }
 
 function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, provider, altProvider, runtimeRoute }) {
-    const commands = ['/session sdk 8', '/byok reload', '/byok env', '/byok providers', '/byok health', '/byok profiles'];
+    const commands = ['/session sdk 8', '/byok reload'];
     const runtimeProviderCommand = buildRuntimeSelectorProviderCommand(runtimeRoute);
     if (runtimeProviderCommand) {
         commands.push(runtimeProviderCommand);
@@ -485,6 +485,7 @@ function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, 
         if (profile) commands.push(`/byok use ${profile}`);
         if (model) commands.push(`/byok model ${model}`);
     }
+    commands.push('/byok env', '/byok providers', '/byok health', '/byok profiles');
     commands.push(
         '/byok',
         buildByokRouteCommand(provider, runtimeRoute?.routeProfile ?? 'repo_agent'),
