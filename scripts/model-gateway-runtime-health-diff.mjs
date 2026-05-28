@@ -62,14 +62,25 @@ async function readCurrentHealth() {
     return { records, fileRecords: fileRecords.length, sqliteRecords: sqliteRecords.length, sqliteRuntimeError };
 }
 
-async function writeSnapshot(snapshot, outDir) {
-    const stamp = nowStamp();
+async function writeJsonPayload(payload, filePath, latestPath) {
+    const serialized = `${JSON.stringify(payload, null, 2)}\n`;
+    await writeFile(filePath, serialized, 'utf8');
+    await writeFile(latestPath, serialized, 'utf8');
+}
+
+async function writeSnapshot(snapshot, outDir, stamp) {
     await mkdir(outDir, { recursive: true });
     const filePath = path.join(outDir, `${stamp}.json`);
     const latestPath = path.join(outDir, 'latest.json');
-    const payload = `${JSON.stringify(snapshot, null, 2)}\n`;
-    await writeFile(filePath, payload, 'utf8');
-    await writeFile(latestPath, payload, 'utf8');
+    await writeJsonPayload(snapshot, filePath, latestPath);
+    return { filePath, latestPath };
+}
+
+async function writeDiffReport(report, outDir, stamp) {
+    await mkdir(outDir, { recursive: true });
+    const filePath = path.join(outDir, `${stamp}-diff.json`);
+    const latestPath = path.join(outDir, 'latest-diff.json');
+    await writeJsonPayload(report, filePath, latestPath);
     return { filePath, latestPath };
 }
 
@@ -113,7 +124,14 @@ const diff = baseline
           recovered: [],
           summary: { added: 0, removed: 0, changed: 0, regressions: 0, newFailures: 0, becameFailed: 0, recovered: 0 },
       };
-const persistence = write ? await writeSnapshot(snapshot, outDir) : { filePath: null, latestPath: null };
+const stamp = nowStamp();
+const persistence = write ? await writeSnapshot(snapshot, outDir, stamp) : { filePath: null, latestPath: null };
+const reportPersistence = write
+    ? {
+          filePath: path.join(outDir, `${stamp}-diff.json`),
+          latestPath: path.join(outDir, 'latest-diff.json'),
+      }
+    : { filePath: null, latestPath: null };
 const summary = {
     schema: 'model-gateway-runtime-health-diff',
     ok: !failOnRegression || diff.summary.regressions === 0,
@@ -123,9 +141,13 @@ const summary = {
     snapshotWritten: write,
     snapshotPath: persistence.filePath,
     latestPath: persistence.latestPath,
+    reportWritten: write,
+    reportPath: reportPersistence.filePath,
+    latestReportPath: reportPersistence.latestPath,
     current: snapshot,
     diff,
 };
+if (write) await writeDiffReport(summary, outDir, stamp);
 
 if (json) {
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
@@ -139,7 +161,10 @@ if (json) {
     process.stdout.write(
         `diff: added=${diff.summary.added} removed=${diff.summary.removed} changed=${diff.summary.changed} regressions=${diff.summary.regressions} newFailures=${diff.summary.newFailures} becameFailed=${diff.summary.becameFailed} recovered=${diff.summary.recovered}\n`,
     );
-    if (write) process.stdout.write(`snapshot: ${persistence.filePath} latest=${persistence.latestPath}\n`);
+    if (write) {
+        process.stdout.write(`snapshot: ${persistence.filePath} latest=${persistence.latestPath}\n`);
+        process.stdout.write(`diff-report: ${reportPersistence.filePath} latest=${reportPersistence.latestPath}\n`);
+    }
 }
 
 if (failOnRegression && diff.summary.regressions > 0) process.exit(1);

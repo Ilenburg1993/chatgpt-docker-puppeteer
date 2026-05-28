@@ -11293,6 +11293,85 @@ Consequencias para proximas fases:
 - tambem e importante decidir quando `tool_agent` deve exigir probes live proprios em vez de aceitar health
   profileless de agent, porque hoje isso e aceitavel para fallback, mas ainda nao e tao forte quanto `repo_agent`.
 
+## 21.129. Mudanca 129 - Diff pos-live persiste relatorio comparativo
+
+Data: 2026-05-28.
+
+Problema identificado:
+
+- `model-gateway:runtime-health:diff --write-snapshot` imprimia o relatorio comparativo no stdout;
+- porem `latest.json` era apenas o snapshot bruto de health;
+- ao voltar ao artefato depois, a informacao de diff se perdia:
+  - `regressions`;
+  - `newFailures`;
+  - `becameFailed`;
+  - `recovered`;
+  - baseline usado;
+  - caminho do snapshot;
+  - resumo comparativo.
+
+Correcao:
+
+- `scripts/model-gateway-runtime-health-diff.mjs` agora persiste dois artefatos quando `--write-snapshot` e usado:
+  - snapshot bruto:
+    - `<stamp>.json`;
+    - `latest.json`;
+  - relatorio comparativo:
+    - `<stamp>-diff.json`;
+    - `latest-diff.json`;
+- o JSON do relatorio inclui:
+  - `schema=model-gateway-runtime-health-diff`;
+  - `baselinePath`;
+  - `snapshotPath`;
+  - `latestPath`;
+  - `reportPath`;
+  - `latestReportPath`;
+  - `current`;
+  - `diff`.
+
+Evidencia:
+
+- comando:
+  `npm --silent run model-gateway:runtime-health:diff -- --baseline artifacts/model-gateway-runtime-health-baselines/2026-05-28T22-20-36Z/latest.json --write-snapshot --out-dir artifacts/model-gateway-runtime-health-post-live/2026-05-28T22-45-full-turn --fail-on-regression`;
+- resultado:
+  - `ok=true`;
+  - `regressions=0`;
+  - `becameFailed=0`;
+  - `recovered=0`;
+  - `added=6`;
+  - `changed=61`;
+  - `newFailures=5`;
+  - snapshot:
+    `artifacts/model-gateway-runtime-health-post-live/2026-05-28T22-45-full-turn/latest.json`;
+  - relatorio:
+    `artifacts/model-gateway-runtime-health-post-live/2026-05-28T22-45-full-turn/latest-diff.json`.
+
+Leitura dos `newFailures`:
+
+- eles nao sao regressao do full-turn positivo;
+- representam registros novos em relacao ao baseline antigo, criados por exploracoes posteriores:
+  - `kilo-code|kilo-code|nvidia/nemotron-3-super-120b-a12b:free`;
+  - `-|kilo-code|openrouter/free`;
+  - `default|kilo-code|openrouter/free`;
+  - `-|openai|glm-4.5-flash`;
+  - `default|openai|glm-4.5-flash`;
+- o caso `-|kilo-code|openrouter/free` mostra `lastStatus=ok` mas `agentProbeStatus=failed`, portanto aparece como
+  falha operacional por superficie agent, nao como falha de chat;
+- isso reforca a necessidade futura de tornar o diff mais didatico por superficie:
+  - chat;
+  - agent;
+  - live_turn;
+  - live_tool_protocol;
+  - live_ask_user;
+  - provider/account/credits.
+
+Impacto:
+
+- o operador e a LLM agora conseguem auditar regressao pos-live sem depender do scroll do terminal;
+- `latest.json` permanece adequado para baseline bruto;
+- `latest-diff.json` passa a ser o ponto certo para auditorias comparativas;
+- isso fecha uma lacuna da preparacao para rodadas longas de lives e probes sem perder diagnostico entre turnos.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
