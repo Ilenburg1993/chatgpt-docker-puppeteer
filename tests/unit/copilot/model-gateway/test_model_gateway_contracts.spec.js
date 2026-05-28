@@ -726,6 +726,45 @@ describe('model-gateway foundation', () => {
         assert.equal(readGatewayModelHealthFromIndex(model, runtimeHealthIndex, { routeProfile: 'code' })?.routeProfile, 'code');
     });
 
+    it('does not reuse route-specific agent proof as a profileless or mismatched route fallback', () => {
+        const model = createModelRecord({
+            providerId: 'kilo-code',
+            providerModel: 'openrouter/free',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 200_000 },
+        });
+        const runtimeHealthRecords = [
+            {
+                routeProfile: 'kilo',
+                providerId: 'kilo-code',
+                providerModel: 'openrouter/free',
+                lastStatus: 'ok',
+                lastSuccessAt: 100,
+                agentProbeStatus: 'ok',
+                lastAgentProbeSuccessAt: 100,
+                probes: { agent: { status: 'ok', ok: true, providerAttempted: true, lastAt: 100 } },
+            },
+        ];
+        const runtimeHealthIndex = createGatewayRuntimeHealthIndex(runtimeHealthRecords);
+
+        assert.equal(
+            readGatewayModelHealthFromIndex(model, runtimeHealthIndex, {
+                routeProfile: null,
+                allowRouteProfileFallback: false,
+            }),
+            null,
+        );
+        assert.equal(
+            evaluateGatewayModelHealthRoute(model, {
+                routeProfile: 'repo_agent',
+                runtimeHealthIndex,
+                requireAgentProbeOk: true,
+            }).reason,
+            'agent_probe_missing',
+        );
+        assert.equal(readGatewayModelHealthFromIndex(model, runtimeHealthIndex)?.routeProfile, 'kilo');
+    });
+
     it('allows newer global agent proof to satisfy a route after temporary profile health cooled down', () => {
         const model = createModelRecord({
             providerId: 'zai',
@@ -1248,6 +1287,35 @@ describe('model-gateway foundation', () => {
         assert.equal(liveProtocolBlockedPlan.routes[0].selected, null);
         assert.ok(liveProtocolBlockedPlan.routes[0].reasons.includes('blocked:runtime_probe_failed:live_ask_user'));
         assert.ok(liveProtocolBlockedPlan.routes[0].nextActions.includes('choose_route_without_failed_runtime_health'));
+        const liveTurnFailureAt = Date.now() - 1000;
+        const liveTurnBlockedPlan = buildModelGatewayRuntimeSelectorPlan(preferRuntimeProved, {
+            runtimeHealthRecords: [
+                {
+                    routeProfile: null,
+                    providerId: 'openrouter',
+                    providerModel: 'openai/gpt-oss-120b',
+                    lastStatus: 'failed',
+                    lastFailureKind: 'unknown',
+                    lastFailureAt: liveTurnFailureAt,
+                    lastSuccessAt: 120,
+                    probes: {
+                        live_turn: {
+                            kind: 'live_turn',
+                            status: 'failed',
+                            ok: false,
+                            providerAttempted: true,
+                            lastAt: liveTurnFailureAt,
+                        },
+                    },
+                },
+            ],
+            blockFailedProbeKinds: ['live_turn'],
+            temporaryFailureCooldownMs: 60_000,
+        });
+        assert.equal(liveTurnBlockedPlan.ok, false);
+        assert.equal(liveTurnBlockedPlan.summary.runtimeProbeBlockedCount, 2);
+        assert.ok(liveTurnBlockedPlan.routes[0].reasons.includes('blocked:runtime_health:chat_health_failed'));
+        assert.ok(liveTurnBlockedPlan.routes[0].reasons.includes('blocked:runtime_probe_failed:live_turn'));
 
         const sharedBestPolicy = {
             schema: 'model-gateway-selection-policy-resolution',

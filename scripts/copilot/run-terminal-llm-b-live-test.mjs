@@ -26,6 +26,8 @@ const TURN_SETTLED_AFTER_ASK_RE =
     /(?:Resposta concluída|Turno concluído; aguardando próxima mensagem|Turno do assistente concluído)/iu;
 const REPL_PROMPT_TAIL_RE = /(?:^|\n)voc[eê]\[[^\n]*?›\s*$/iu;
 const LIVE_PROTOCOL_PROBE_KINDS = Object.freeze(['live_tool_protocol', 'live_ask_user']);
+const LIVE_TURN_PROBE_KIND = 'live_turn';
+const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([...LIVE_PROTOCOL_PROBE_KINDS, LIVE_TURN_PROBE_KIND]);
 
 if (hasFlag('--help') || hasFlag('-h')) {
     console.log(`Usage: node scripts/copilot/run-terminal-llm-b-live-test.mjs [options]
@@ -343,7 +345,7 @@ function runRuntimeSelectorLiveRoute({
     const normalizedSelectionPolicy = optionalRuntimeSelectorString(selectionPolicy).replaceAll('-', '_');
     if (normalizedSelectionPolicy) args.push(`--selection-policy=${normalizedSelectionPolicy}`);
     args.push(`--preferred-probes=${LIVE_PROTOCOL_PROBE_KINDS.join(',')}`);
-    args.push(`--block-failed-probes=${LIVE_PROTOCOL_PROBE_KINDS.join(',')}`);
+    args.push(`--block-failed-probes=${LIVE_BLOCKING_PROBE_KINDS.join(',')}`);
     if (execute) {
         args.push(
             '--execute',
@@ -637,6 +639,74 @@ function byokLiveMaterializationState(plain, criteria = []) {
 
 async function recordByokLiveProtocolHealth({ realByok, blocker, criteria, plain, startedAt, durationMs, noPr, byokControlProbe }) {
     if (!realByok || noPr || byokControlProbe) return { attempted: false, recorded: false, reason: 'not_full_byok_live_turn' };
+    const identity = byokLiveRouteIdentity(realByok);
+    if (!identity.providerId || !identity.providerModel) {
+        return { attempted: true, recorded: false, reason: 'missing_route_identity', identity };
+    }
+    const timestamp = Date.parse(startedAt) + Math.max(0, Number.isFinite(durationMs) ? durationMs : 0);
+    if (blocker?.id === 'byok-provider-turn-failed') {
+        try {
+            const {
+                classifyByokProviderFailure,
+                flushByokProviderHealth,
+                recordByokProviderModelCallFailure,
+                recordByokProviderModelProbeResult,
+            } = await import('../../src/copilot/model-gateway/index.js');
+            const providerFailure = classifyByokProviderFailure(
+                new Error(`${blocker.detail ?? 'BYOK provider turn failed'}\n${plain.slice(-2000)}`),
+            );
+            recordByokProviderModelCallFailure({
+                ...identity,
+                message: providerFailure.message,
+                errorContext: 'terminal_live_provider_turn',
+                failureKind: providerFailure.kind,
+                failureStatusCode: providerFailure.statusCode,
+                retryAfterSeconds: providerFailure.retryAfterSeconds,
+                resetAt: providerFailure.resetAt,
+                timestamp,
+            });
+            recordByokProviderModelProbeResult({
+                ...identity,
+                probeKind: LIVE_TURN_PROBE_KIND,
+                status: 'failed',
+                ok: false,
+                providerAttempted: true,
+                message: providerFailure.operatorLabel,
+                errorContext: 'terminal_live_provider_turn',
+                failureKind: providerFailure.kind,
+                failureStatusCode: providerFailure.statusCode,
+                retryAfterSeconds: providerFailure.retryAfterSeconds,
+                resetAt: providerFailure.resetAt,
+                timestamp,
+            });
+            await flushByokProviderHealth();
+            return {
+                attempted: true,
+                recorded: true,
+                identity,
+                providerFailure: {
+                    kind: providerFailure.kind,
+                    statusCode: providerFailure.statusCode,
+                    errorContext: providerFailure.errorContext,
+                },
+                probes: [
+                    {
+                        probeKind: LIVE_TURN_PROBE_KIND,
+                        status: 'failed',
+                        ok: false,
+                        errorContext: 'terminal_live_provider_turn',
+                    },
+                ],
+            };
+        } catch (error) {
+            return {
+                attempted: true,
+                recorded: false,
+                identity,
+                reason: error instanceof Error ? error.message : String(error),
+            };
+        }
+    }
     if (blocker && blocker.id !== 'byok-live-tool-protocol-missed') {
         return {
             attempted: false,
@@ -644,14 +714,19 @@ async function recordByokLiveProtocolHealth({ realByok, blocker, criteria, plain
             reason: `live_turn_not_attempted:${blocker.id}`,
         };
     }
-    const identity = byokLiveRouteIdentity(realByok);
-    if (!identity.providerId || !identity.providerModel) {
-        return { attempted: true, recorded: false, reason: 'missing_route_identity', identity };
-    }
     const materialized = byokLiveMaterializationState(plain, criteria);
     const blockedByProtocol = blocker?.id === 'byok-live-tool-protocol-missed';
-    const timestamp = Date.parse(startedAt) + Math.max(0, Number.isFinite(durationMs) ? durationMs : 0);
     const probeInputs = [
+        {
+            probeKind: LIVE_TURN_PROBE_KIND,
+            ok: !blockedByProtocol && materialized.toolProtocolOk && materialized.askUserOk,
+            status: !blockedByProtocol && materialized.toolProtocolOk && materialized.askUserOk ? 'ok' : 'failed',
+            message:
+                !blockedByProtocol && materialized.toolProtocolOk && materialized.askUserOk
+                    ? 'terminal live turn completed canonical SDK tool and ask_user handshake'
+                    : blocker?.detail ?? 'terminal live turn did not complete the canonical SDK tool and ask_user handshake',
+            errorContext: blockedByProtocol ? 'terminal_live_turn_protocol' : 'terminal_live_turn_validation',
+        },
         {
             probeKind: 'live_tool_protocol',
             ok: !blockedByProtocol && materialized.toolProtocolOk,

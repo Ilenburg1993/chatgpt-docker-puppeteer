@@ -34,6 +34,13 @@ loadModelGatewayDotenv();
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LIVE_RUNNER_PATH = path.join(ROOT, 'scripts/copilot/run-terminal-llm-b-live-test.mjs');
 const DEFAULT_SQLITE_PATH = path.join(ROOT, 'data/copilot.sqlite');
+const TERMINAL_LIVE_ROUTE_PROFILES = Object.freeze(['repo_agent', 'code', 'tool_agent']);
+const TERMINAL_LIVE_PREFERRED_PROBE_KINDS = Object.freeze(['live_tool_protocol', 'live_ask_user']);
+const TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS = Object.freeze([
+    ...TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
+    'live_turn',
+]);
+const TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS = 900_000;
 const args = process.argv.slice(2);
 const argSet = new Set(args);
 
@@ -199,6 +206,36 @@ const runtimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(runtimeSelectio
     requireRuntimeEnvReady: true,
     env: process.env,
 });
+const terminalLiveBaseSelection = auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
+    strict: true,
+    secretRegistry,
+    profiles: TERMINAL_LIVE_ROUTE_PROFILES,
+});
+const terminalLivePostRuntimeSelection = auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
+    strict: true,
+    secretRegistry,
+    profiles: TERMINAL_LIVE_ROUTE_PROFILES,
+    runtimeHealthRecords: healthRecords,
+    preferredProbeKinds: TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
+    blockFailedProbeKinds: TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS,
+    temporaryFailureCooldownMs: TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS,
+});
+const terminalLiveRuntimeSelectionComparison = compareModelGatewaySelectionAudits(
+    terminalLiveBaseSelection,
+    terminalLivePostRuntimeSelection,
+);
+const terminalLiveRuntimeSelectionPolicy = resolveModelGatewaySelectionPolicy(terminalLiveRuntimeSelectionComparison, {
+    mode: 'prefer_runtime_proved',
+});
+const terminalLiveRuntimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(terminalLiveRuntimeSelectionPolicy, {
+    source: 'model-gateway-live-readiness:terminal-live',
+    requireRuntimeEnvReady: true,
+    env: process.env,
+    runtimeHealthRecords: healthRecords,
+    preferredProbeKinds: TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
+    blockFailedProbeKinds: TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS,
+    temporaryFailureCooldownMs: TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS,
+});
 const runnerExists = await fileExists(LIVE_RUNNER_PATH);
 const strictSelectedDispositions = selectedDispositions(strictAccessSelection);
 const effectiveSelectedDispositions = selectedDispositions(effectiveStrictSelection);
@@ -267,6 +304,14 @@ const checks = [
         detail: `${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} routes selected, blocked=${runtimeSelectorPlan.summary.blockedProfileCount}, accessBlocked=${runtimeSelectorPlan.summary.accountAccessBlockedCount ?? 0}, envReady=${runtimeSelectorPlan.summary.runtimeEnvReadyCount}, envBlocked=${runtimeSelectorPlan.summary.runtimeEnvBlockedCount}, proofSelected=${runtimeSelectorPlan.summary.runtimeProofSelectedCount}`,
     },
     {
+        id: 'terminal_live_runtime_selector_plan_ready',
+        ok:
+            terminalLiveRuntimeSelectorPlan.ready &&
+            terminalLiveRuntimeSelectorPlan.summary.selectedProfileCount === TERMINAL_LIVE_ROUTE_PROFILES.length &&
+            terminalLiveRuntimeSelectorPlan.summary.blockedProfileCount === 0,
+        detail: `${terminalLiveRuntimeSelectorPlan.summary.selectedProfileCount}/${terminalLiveRuntimeSelectorPlan.summary.profileCount} terminal routes selected, blocked=${terminalLiveRuntimeSelectorPlan.summary.blockedProfileCount}, accessBlocked=${terminalLiveRuntimeSelectorPlan.summary.accountAccessBlockedCount ?? 0}, envReady=${terminalLiveRuntimeSelectorPlan.summary.runtimeEnvReadyCount}, envBlocked=${terminalLiveRuntimeSelectorPlan.summary.runtimeEnvBlockedCount}, proofSelected=${terminalLiveRuntimeSelectorPlan.summary.runtimeProofSelectedCount}, probeBlocked=${terminalLiveRuntimeSelectorPlan.summary.runtimeProbeBlockedCount}`,
+    },
+    {
         id: 'selection_supply_warnings',
         ok: !failOnSupplyWarning || (effectiveStrictSupplyWarnings.total === 0 && postRuntimeEffectiveSupplyWarnings.total === 0),
         detail: `allow=${allowProbeSupplyWarnings.total}, strict=${strictAccessSupplyWarnings.total}, effective=${effectiveStrictSupplyWarnings.total}, postRuntime=${postRuntimeEffectiveSupplyWarnings.total}`,
@@ -299,8 +344,8 @@ const commands = [
     'npm run model-gateway:runtime-health:mirror',
     'npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000',
     'npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
-    'npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=1 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000',
-    'npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=1 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --timeout-ms=900000',
+    `npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000`,
+    `npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --timeout-ms=900000`,
 ];
 const summary = {
     schema: 'model-gateway-live-readiness',
@@ -400,6 +445,32 @@ const summary = {
             runtimeProofSelected: runtimeSelectorPlan.summary.runtimeProofSelectedCount,
             runtimeEnvReady: runtimeSelectorPlan.summary.runtimeEnvReadyCount,
             runtimeEnvBlocked: runtimeSelectorPlan.summary.runtimeEnvBlockedCount,
+        },
+        terminalLiveRuntimeSelectorPlan: {
+            ok: terminalLiveRuntimeSelectorPlan.ok,
+            ready: terminalLiveRuntimeSelectorPlan.ready,
+            mode: terminalLiveRuntimeSelectorPlan.mode,
+            profiles: TERMINAL_LIVE_ROUTE_PROFILES,
+            preferredProbeKinds: TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
+            blockFailedProbeKinds: TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS,
+            temporaryFailureCooldownMs: TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS,
+            selected: terminalLiveRuntimeSelectorPlan.summary.selectedProfileCount,
+            blocked: terminalLiveRuntimeSelectorPlan.summary.blockedProfileCount,
+            accountAccessBlocked: terminalLiveRuntimeSelectorPlan.summary.accountAccessBlockedCount ?? 0,
+            runtimeProofSelected: terminalLiveRuntimeSelectorPlan.summary.runtimeProofSelectedCount,
+            runtimeEnvReady: terminalLiveRuntimeSelectorPlan.summary.runtimeEnvReadyCount,
+            runtimeEnvBlocked: terminalLiveRuntimeSelectorPlan.summary.runtimeEnvBlockedCount,
+            runtimeHealthBlocked: terminalLiveRuntimeSelectorPlan.summary.runtimeHealthBlockedCount,
+            runtimeProbeBlocked: terminalLiveRuntimeSelectorPlan.summary.runtimeProbeBlockedCount,
+            selectedRoutes: terminalLiveRuntimeSelectorPlan.routes.map((route) => ({
+                profileId: route.profileId,
+                status: route.status,
+                providerId: optionalString(route.selected?.['providerId']),
+                providerModel: optionalString(route.selected?.['providerModel']),
+                routeProfile: optionalString(route.selected?.['routeProfile']),
+                hasRuntimeProof: route.hasRuntimeProof,
+                reasons: route.reasons,
+            })),
         },
     },
     livePlan: {

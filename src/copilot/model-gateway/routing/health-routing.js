@@ -429,10 +429,16 @@ function canUseGlobalAgentProbeFallback(primary, fallback) {
  */
 function readGatewayModelGlobalRuntimeHealth(model, options) {
     if (isGatewayRuntimeHealthIndex(options.runtimeHealthIndex)) {
-        return readGatewayModelHealthFromIndex(model, options.runtimeHealthIndex, { routeProfile: null });
+        return readGatewayModelHealthFromIndex(model, options.runtimeHealthIndex, {
+            routeProfile: null,
+            allowRouteProfileFallback: false,
+        });
     }
     if (Array.isArray(options.runtimeHealthRecords)) {
-        return readGatewayModelHealthFromRecords(model, options.runtimeHealthRecords, { routeProfile: null });
+        return readGatewayModelHealthFromRecords(model, options.runtimeHealthRecords, {
+            routeProfile: null,
+            allowRouteProfileFallback: false,
+        });
     }
     return readGatewayModelHealth(model, { routeProfile: null });
 }
@@ -468,7 +474,7 @@ export function readGatewayModelHealth(model, options = {}) {
  *
  * @param {Record<string, any>} model
  * @param {Record<string, any>[]} records
- * @param {{ routeProfile?: string | null }} [options]
+ * @param {{ routeProfile?: string | null; allowRouteProfileFallback?: boolean }} [options]
  * @returns {ReturnType<typeof readGatewayModelHealth>}
  */
 export function readGatewayModelHealthFromRecords(model, records, options = {}) {
@@ -478,7 +484,7 @@ export function readGatewayModelHealthFromRecords(model, records, options = {}) 
 /**
  * @param {Record<string, any>} model
  * @param {ReturnType<typeof createGatewayRuntimeHealthIndex>} index
- * @param {{ routeProfile?: string | null }} [options]
+ * @param {{ routeProfile?: string | null; allowRouteProfileFallback?: boolean }} [options]
  * @returns {ReturnType<typeof readGatewayModelHealth>}
  */
 export function readGatewayModelHealthFromIndex(model, index, options = {}) {
@@ -486,14 +492,21 @@ export function readGatewayModelHealthFromIndex(model, index, options = {}) {
     const providerModel = optionalString(model['providerModel']) ?? optionalString(model['id']);
     if (!providerId || !providerModel) return null;
     const routeProfile = optionalString(options.routeProfile);
+    const allowRouteProfileFallback = options.allowRouteProfileFallback !== false;
     const modelKey = healthIndexProviderModelKey(providerId, providerModel);
     const exact = routeProfile ? index.exact.get(healthIndexExactKey(providerId, providerModel, routeProfile)) : null;
     if (exact) return /** @type {ReturnType<typeof readGatewayModelHealth>} */ (exact);
     const global = index.global.get(modelKey);
     if (global) return /** @type {ReturnType<typeof readGatewayModelHealth>} */ (global);
     const identity = { routeProfile, providerId, providerModel };
-    const match = index.records.find((record) => healthRecordMatches(record, identity));
+    const match = index.records.find((record) => {
+        if (allowRouteProfileFallback) return healthRecordMatches(record, identity);
+        const recordIdentity = healthIdentity(record);
+        if (recordIdentity.providerId !== providerId || recordIdentity.providerModel !== providerModel) return false;
+        return routeProfile ? recordIdentity.routeProfile === routeProfile || recordIdentity.routeProfile === null : recordIdentity.routeProfile === null;
+    });
     if (match) return /** @type {ReturnType<typeof readGatewayModelHealth>} */ (match);
+    if (!allowRouteProfileFallback) return null;
     const providerModelMatch = index.providerModel.get(modelKey);
     return providerModelMatch ? /** @type {ReturnType<typeof readGatewayModelHealth>} */ (providerModelMatch) : null;
 }
@@ -568,14 +581,18 @@ export function evaluateGatewayProviderHealthCooldown(model, recordsOrIndex, opt
 
 /**
  * @param {Record<string, any>} model
- * @param {{ routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; now?: string | number | Date; temporaryFailureCooldownMs?: number }} [options]
+ * @param {{ routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; now?: string | number | Date; temporaryFailureCooldownMs?: number; allowRouteProfileFallback?: boolean }} [options]
  * @returns {{ include: boolean; reason: string; health: ReturnType<typeof readGatewayModelHealth> }}
  */
 export function evaluateGatewayModelHealthRoute(model, options = {}) {
+    const routeScopedOptions = {
+        ...options,
+        allowRouteProfileFallback: options.allowRouteProfileFallback === true,
+    };
     let health = isGatewayRuntimeHealthIndex(options.runtimeHealthIndex)
-        ? readGatewayModelHealthFromIndex(model, options.runtimeHealthIndex, options)
+        ? readGatewayModelHealthFromIndex(model, options.runtimeHealthIndex, routeScopedOptions)
         : Array.isArray(options.runtimeHealthRecords)
-          ? readGatewayModelHealthFromRecords(model, options.runtimeHealthRecords, options)
+          ? readGatewayModelHealthFromRecords(model, options.runtimeHealthRecords, routeScopedOptions)
           : readGatewayModelHealth(model, options);
     if (!health) {
         return {

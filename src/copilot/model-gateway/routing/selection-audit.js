@@ -379,6 +379,7 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
     const profileIds = resolveProfileIds(options);
     const runtimeRouteProfile = optionalString(options.runtimeRouteProfile);
     const profileAudits = profileIds.map((profileId) => {
+        const effectiveRouteProfile = runtimeRouteProfile ?? (auditOptions.ignoreRuntimeHealth ? null : profileId);
         /** @type {Parameters<typeof routeModelGatewayCatalogSnapshot>[2]} */
         const routeOptions = {
             evaluateEligibility: true,
@@ -393,7 +394,7 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
                 taskProfile: profileId,
             },
         };
-        if (runtimeRouteProfile) routeOptions.routeProfile = runtimeRouteProfile;
+        if (effectiveRouteProfile) routeOptions.routeProfile = effectiveRouteProfile;
         if (options.includeProjectionOnly !== undefined) routeOptions.includeProjectionOnly = options.includeProjectionOnly;
         if (options.secretRegistry !== undefined) routeOptions.secretRegistry = options.secretRegistry;
         if (options.runtimeProofWeights !== undefined) routeOptions.runtimeProofWeights = options.runtimeProofWeights;

@@ -11094,6 +11094,205 @@ Conclusao operacional:
 - o proximo passo natural e rodar o full turn com o mesmo selector e, se houver falha de protocolo, registrar
   `live_tool_protocol` e `live_ask_user` como prova/falha especifica, sem contaminar metadados canonicos.
 
+## 21.127. Mudanca 127 - Full-turn negativo alimenta `live_turn` e health por perfil
+
+Data: 2026-05-28.
+
+Contexto:
+
+- o full-turn BYOK real em `artifacts/terminal-live/2026-05-28T22-33-02-008Z/summary.md` foi bloqueado por
+  `byok-provider-turn-failed`;
+- o terminal conteve corretamente a falha:
+  - sem fallback para Copilot auto;
+  - sem Premium Request;
+  - sem vazamento de segredo;
+  - com cockpit e health visiveis ao operador;
+- porem o harness live nao gravava essa falha como dado operacional reutilizavel pelo seletor;
+- resultado: o seletor podia voltar a preferir uma rota com `agent/chat/json/streaming` descartaveis positivos, mesmo
+  depois de um turno vivo longo falhar no provider.
+
+Correcao aplicada:
+
+- `run-terminal-llm-b-live-test.mjs` passou a distinguir tres classes:
+  - `live_tool_protocol`: materializacao real das tools no transcript vivo;
+  - `live_ask_user`: materializacao real de pergunta, resposta humana e final pos-ask;
+  - `live_turn`: o turno canonico completo, incluindo sucesso/falha do provider durante o turno vivo;
+- quando o blocker e `byok-provider-turn-failed`, o harness agora grava:
+  - `recordByokProviderModelCallFailure`;
+  - `recordByokProviderModelProbeResult` com `probeKind=live_turn`;
+  - `failureKind` classificado por `classifyByokProviderFailure`;
+  - `errorContext=terminal_live_provider_turn`;
+- quando o full-turn passa, o harness grava tambem `live_turn=ok`, alem de `live_tool_protocol=ok` e
+  `live_ask_user=ok`;
+- blockers de preflight continuam sem gerar falso `live_ask_user=failed`.
+
+Correcao de selecao:
+
+- o handoff live agora chama o runtime selector com:
+  - `--preferred-probes=live_tool_protocol,live_ask_user`;
+  - `--block-failed-probes=live_tool_protocol,live_ask_user,live_turn`;
+- isso permite bloquear falhas de turno real sem transformar o catalogo canonico em log operacional.
+
+Bug estrutural descoberto no no-PR seguinte:
+
+- a rota `kilo-code/openrouter/free` foi promovida usando uma prova `agent=ok` gravada para `routeProfile=kilo`;
+- em seguida, o agent probe descartavel para o uso vivo falhou por timeout;
+- raiz: a leitura de health permitia fallback de qualquer `routeProfile` do mesmo provider/model quando faltava health
+  exato ou profileless.
+
+Correcao de escopo:
+
+- `readGatewayModelHealthFromIndex` e `readGatewayModelHealthFromRecords` agora aceitam
+  `allowRouteProfileFallback`;
+- `evaluateGatewayModelHealthRoute` usa `allowRouteProfileFallback=false` por padrao;
+- uma rota agora pode consumir:
+  - health exato do mesmo `routeProfile`;
+  - health profileless/global;
+  - nunca health de outro `routeProfile` como prova automatica;
+- leituras permissivas para cockpit ainda podem mostrar health recente de outro perfil quando chamadas diretamente sem
+  o modo estrito.
+
+Evidencias:
+
+- teste unitario escopado:
+  - `npm --silent exec vitest -- tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "profileless runtime health|does not reuse route-specific|audits pre-runtime selection"`;
+  - resultado: `4 passed | 209 skipped`;
+- lint escopado:
+  - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/model-gateway/routing/health-routing.js src/copilot/model-gateway/routing/selection-audit.js scripts/copilot/run-terminal-llm-b-live-test.mjs tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`;
+  - resultado: ok;
+- no-PR BYOK real depois da primeira correcao:
+  - artefato: `artifacts/terminal-live/2026-05-28T22-38-52-530Z/summary.md`;
+  - resultado: falhou em `byok-real-agent-probe-ok`;
+  - valor da falha: revelou a mistura indevida de prova `routeProfile=kilo` com `repo_agent`.
+
+Estado atual:
+
+- `live_turn` agora existe como camada operacional separada;
+- falhas de provider no turno vivo deixam rastro consumivel pelo seletor;
+- provas de agente ficam amarradas ao perfil correto;
+- o proximo full-turn deve ser rodado somente apos novo no-PR confirmar que a rota promovida tem agent proof no perfil
+  alvo ou health profileless real.
+
+## 21.128. Mudanca 128 - Primeiro full-turn BYOK real positivo e readiness terminal-live
+
+Data: 2026-05-28.
+
+Contexto:
+
+- depois de corrigir a persistencia de `live_turn` e o vazamento de health entre `routeProfile`s, foi executado novo
+  no-PR BYOK real com runtime selector;
+- o no-PR positivo confirmou que a rota promovida ja nao vinha de prova agent de outro perfil:
+  - artefato: `artifacts/terminal-live/2026-05-28T22-43-48-235Z/summary.md`;
+  - resultado: `PASS`;
+  - warning esperado: `byok-real-vision-probe`;
+  - rota: `zai/glm-4.5-flash`;
+- em seguida foi executado o full-turn BYOK real com `llm-b`, tool real, leitura real, ask_user real, resposta humana,
+  continuacao pos-ask, `/usage`, `/activity`, `/tools diag`, `/events`, `/byok health` e export.
+
+Evidencia principal:
+
+- artefato: `artifacts/terminal-live/2026-05-28T22-45-07-214Z/summary.md`;
+- status: `PASS`;
+- hard failures: nenhum;
+- warning: apenas `byok-real-vision-probe`, nao bloqueante;
+- rota selecionada:
+  - `routeProfile=repo_agent`;
+  - `providerId=zai`;
+  - `providerModel=glm-4.5-flash`;
+  - `sdkWireApi=completions`;
+  - `hasRuntimeProof=true`;
+- `liveHealthRecord` gravado:
+  - `repo_agent|zai|glm-4.5-flash`;
+  - `live_turn=ok`;
+  - `live_tool_protocol=ok`;
+  - `live_ask_user=ok`.
+
+O que o full-turn provou:
+
+- o runtime selector consegue selecionar rota BYOK real e entregar a rota ao terminal;
+- o terminal consegue bindar a rota `zai/glm-4.5-flash` sem cair para Copilot auto;
+- o modelo executou `report_intent` real;
+- o modelo executou `read_file_content` real;
+- o transcript vivo exibiu os marcadores `DELTA-CANONICAL-*`;
+- o `ask_user` apareceu como pergunta persistente do SDK, e nao como eco textual do assistant;
+- a resposta humana `SIM` foi registrada;
+- a continuacao pos-ask gerou `POST-ASK-CANONICAL-FINAL`;
+- `/usage` classificou BYOK sem Premium Request;
+- `/activity`, `/tools diag`, `/events` e `/byok health` expuseram diagnostico operacional suficiente;
+- o export foi criado e preservou transcript, envelope e diagnosticos.
+
+Correcao adicional aplicada depois do live:
+
+- `scripts/model-gateway-live-readiness.mjs` ganhou um gate especifico:
+  - `terminal_live_runtime_selector_plan_ready`;
+- esse gate simula o contrato real do terminal live sem executar provider:
+  - perfis: `repo_agent`, `code`, `tool_agent`;
+  - politica: `prefer_runtime_proved`;
+  - probes preferidos: `live_tool_protocol`, `live_ask_user`;
+  - probes bloqueantes quando falham: `live_tool_protocol`, `live_ask_user`, `live_turn`;
+  - cooldown temporario: `900000ms`;
+- o readiness agora diferencia:
+  - gate geral metadata-first;
+  - gate especifico do terminal live;
+- o bloco JSON `selection.terminalLiveRuntimeSelectorPlan` mostra:
+  - perfis avaliados;
+  - probes preferidos;
+  - probes bloqueantes;
+  - rotas selecionadas;
+  - `runtimeProbeBlocked`;
+  - `runtimeProofSelected`;
+  - razoes da decisao.
+
+Motivo arquitetural:
+
+- antes, o readiness podia ficar verde mesmo sem provar que o modo exato usado pelo live test estava coerente;
+- agora, uma regressao como:
+  - `live_turn=failed` recente;
+  - `live_tool_protocol=failed`;
+  - `live_ask_user=failed`;
+  - mistura indevida de prova entre `routeProfile`s;
+  - env ausente para a rota terminal;
+  deve aparecer antes de abrir uma sessao viva com `llm-b`.
+
+Evidencia pos-live:
+
+- mirror operacional:
+  - comando: `npm --silent run model-gateway:runtime-health:mirror`;
+  - resultado: `ok=true`;
+  - `records=77`;
+  - `flushed=true`;
+  - SQLite:
+    - `runtimeRows=19953`;
+    - `healthObservations=10733`;
+    - `runtimeProbeRuns=254`;
+    - `runtimeProbeResults=8966`;
+- readiness:
+  - comando: `npm --silent run model-gateway:live:readiness -- --json`;
+  - resultado: `ok=true`;
+  - `terminal_live_runtime_selector_plan_ready=true`;
+  - detalhe: `3/3 terminal routes selected, blocked=0, accessBlocked=0, envReady=3, envBlocked=0, proofSelected=3, probeBlocked=0`;
+- runtime selector terminal-live direto:
+  - comando:
+    `node scripts/model-gateway-runtime-selector.mjs --json --allow-probe --profile=repo_agent --fallback-profiles=code,tool_agent --selection-policy=prefer_runtime_proved --preferred-probes=live_tool_protocol,live_ask_user --block-failed-probes=live_tool_protocol,live_ask_user,live_turn --temporary-failure-cooldown-ms=900000`;
+  - resultado:
+    - `repo_agent` selecionou `zai/glm-4.5-flash`;
+    - `selection_source=post_runtime_proved`;
+    - `runtimeHealth.health.routeProfile=repo_agent`;
+    - probes positivos: `chat`, `streaming`, `json`, `agent`, `live_turn`, `live_tool_protocol`, `live_ask_user`;
+    - `vision=failed` permaneceu nao bloqueante.
+
+Consequencias para proximas fases:
+
+- o primeiro full-turn BYOK real positivo passa a ser baseline de comportamento vivo;
+- falhas futuras de turno vivo devem ser comparadas contra esse baseline, nao tratadas como incerteza inicial;
+- o readiness canônico deve ser executado antes de novos lives amplos;
+- o proximo avanço de maior retorno e reduzir a diferenca entre:
+  - probes descartaveis `chat/json/streaming/agent`;
+  - provas full-turn `live_turn/live_tool_protocol/live_ask_user`;
+  - selecao final por perfil;
+- tambem e importante decidir quando `tool_agent` deve exigir probes live proprios em vez de aceitar health
+  profileless de agent, porque hoje isso e aceitavel para fallback, mas ainda nao e tao forte quanto `repo_agent`.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
