@@ -9795,7 +9795,7 @@ Evidencia seca:
   - `tool_agent=selected zai/glm-4.5-flash`;
   - `dryRunOkCanSucceedWithSelectedFallbackProfile=true`.
 
-Lacuna observada:
+Lacuna observada antes da proxima mudanca:
 
 - o comando seco ainda pode levar dezenas de segundos;
 - antes de considerar a fase de runtime selector "acabada", auditar custo de:
@@ -9803,6 +9803,80 @@ Lacuna observada:
   - merge file+SQLite de health;
   - auditorias pre/post-runtime;
   - serializacao de planos com alternativas amplas.
+
+## Mudanca 99 - Indice de runtime health para roteamento e selector
+
+Status: concluido.
+
+Objetivo:
+
+- remover o custo quadratico observado na auditoria post-runtime;
+- preservar a separacao entre metadados canonicos e fatos volateis de runtime;
+- manter compatibilidade com todos os callers que ainda passam apenas `runtimeHealthRecords`;
+- criar uma base estrutural para futuras fases de selector runtime sem duplicar regras de health.
+
+Diagnostico:
+
+- o dry-run do selector com `code + prefer_runtime_proved` estava funcional, mas lento;
+- a instrumentacao mostrou `selection.post_runtime_audit` em aproximadamente 12,8s;
+- a causa principal era repeticao de:
+  - ordenacao de todos os registros de health;
+  - filtros por provider/model/profile;
+  - filtros por provider para cooldown;
+  - execucao dessas operacoes para cada candidato do catalogo.
+
+Arquitetura aplicada:
+
+- `createGatewayRuntimeHealthIndex(records)` cria um indice por execucao de roteamento;
+- o indice contem:
+  - `records`: lista ja ordenada por observacao mais recente;
+  - `exact`: chave provider/model/profile;
+  - `global`: chave provider/model sem profile;
+  - `providerModel`: fallback por provider/model;
+  - `provider`: lista por provider para cooldown;
+- `readGatewayModelHealthFromRecords` permanece como API de compatibilidade;
+- `readGatewayModelHealthFromIndex` e o caminho rapido para callers que ja tem o indice;
+- `evaluateGatewayModelHealthRoute` aceita `runtimeHealthIndex`;
+- `evaluateGatewayProviderHealthCooldown` aceita records brutos ou indice;
+- `routeGatewayModels` cria o indice uma vez por chamada quando recebe records brutos;
+- `auditModelGatewayPostRuntimeSelection` consegue receber o indice e repassa ao policy engine;
+- `buildModelGatewayRuntimeSelectorPlan` reusa o mesmo indice para health/cooldown das rotas selecionadas;
+- `model-gateway-runtime-selector.mjs` constroi o indice uma vez e expoe timings.
+
+Evidencia:
+
+- teste focado:
+  - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "runtime health|terminal live protocol|provider health cooldown|indexed runtime health"`;
+  - resultado: 18 testes passaram.
+- typecheck:
+  - `npm run model-gateway:typecheck`;
+  - resultado: passou.
+- check sintatico:
+  - `node --check scripts/model-gateway-runtime-selector.mjs`;
+  - resultado: passou.
+- selector seco:
+  - comando com `--profile=code`, `prefer_runtime_proved`, provas live preferidas e cooldown temporario de 1ms;
+  - resultado: `ok=true`;
+  - `health.build_runtime_index` ficou em poucos ms;
+  - `selection.post_runtime_audit` caiu de aproximadamente 12,8s para cerca de 1,7-2,1s no mesmo ambiente.
+
+Consequencias:
+
+- o runtime selector deixa de pagar o custo de varrer health bruto para cada candidato;
+- a auditoria post-runtime fica viavel para uso frequente antes dos testes live;
+- a mesma estrutura pode ser reutilizada depois por cockpit, explain, dry-runs por profile e execucao com fallbacks;
+- a separacao conceitual continua intacta:
+  - catalogo canonico: metadados estaveis;
+  - health index: vista volatil, derivada e descartavel;
+  - eligibility overlays: decisoes temporais de account/key;
+  - runtime probes: camada posterior e explicita.
+
+Proximas lacunas:
+
+- reduzir tambem o custo de `selection.pre_runtime_audit`, que agora fica proximo de 1,7-2,0s;
+- investigar se `buildModelGatewayRouteCandidates` pode ser compartilhado entre perfis na auditoria;
+- evitar recomputar eligibility matching por candidato quando o snapshot ja trouxe decisions efetivas;
+- manter o selector com timings sempre disponiveis para diagnostico operacional.
 
 ## 22. Fim Do Documento Inicial
 

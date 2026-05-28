@@ -305,6 +305,7 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
  *   secretRegistry?: { has(ref: string): boolean };
  *   eligibilityPolicy?: Record<string, any>;
  *   runtimeHealthRecords?: Record<string, any>[];
+ *   runtimeHealthIndex?: Record<string, any>;
  *   runtimeRouteProfile?: string | null;
  *   requireRuntimeProof?: boolean;
  *   temporaryFailureCooldownMs?: number;
@@ -390,6 +391,12 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
         if (options.includeProjectionOnly !== undefined) routeOptions.includeProjectionOnly = options.includeProjectionOnly;
         if (options.secretRegistry !== undefined) routeOptions.secretRegistry = options.secretRegistry;
         if (Array.isArray(options.runtimeHealthRecords)) routeOptions.runtimeHealthRecords = options.runtimeHealthRecords;
+        if (options.runtimeHealthIndex !== undefined) {
+            routeOptions.runtimeHealthIndex =
+                /** @type {NonNullable<NonNullable<Parameters<typeof routeModelGatewayCatalogSnapshot>[2]>['runtimeHealthIndex']>} */ (
+                    options.runtimeHealthIndex
+                );
+        }
         if (typeof options.temporaryFailureCooldownMs === 'number') {
             routeOptions.temporaryFailureCooldownMs = options.temporaryFailureCooldownMs;
         }

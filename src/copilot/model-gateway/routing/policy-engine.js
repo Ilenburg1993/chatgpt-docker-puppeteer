@@ -10,6 +10,7 @@
 
 import {
     MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS,
+    createGatewayRuntimeHealthIndex,
     evaluateGatewayProviderHealthCooldown,
     evaluateGatewayModelHealthRoute,
     isGatewayModelAgentProbeVerified,
@@ -460,6 +461,7 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
  *     requireKnownEligibility?: boolean;
  *     ignoreRuntimeHealth?: boolean;
  *     runtimeHealthRecords?: Record<string, any>[];
+ *     runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>;
  *     now?: string | number | Date;
  *     temporaryFailureCooldownMs?: number;
  *     providerCooldownWindowMs?: number;
@@ -627,16 +629,19 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
                   routeProfile: options.routeProfile ?? null,
                   ...(options.excludeFailed !== undefined ? { excludeFailed: options.excludeFailed } : {}),
                   ...(Array.isArray(options.runtimeHealthRecords) ? { runtimeHealthRecords: options.runtimeHealthRecords } : {}),
+                  ...(options.runtimeHealthIndex ? { runtimeHealthIndex: options.runtimeHealthIndex } : {}),
                   ...(options.now !== undefined ? { now: options.now } : {}),
                   ...(typeof options.temporaryFailureCooldownMs === 'number'
                       ? { temporaryFailureCooldownMs: options.temporaryFailureCooldownMs }
                       : {}),
                   requireAgentProbeOk: options.requireAgentProbeOk ?? profile['requireAgentProbeOk'] === true,
               });
+    const runtimeHealthSource =
+        options.runtimeHealthIndex ?? (Array.isArray(options.runtimeHealthRecords) ? options.runtimeHealthRecords : null);
     const providerCooldownDecision =
-        options.ignoreRuntimeHealth === true || !Array.isArray(options.runtimeHealthRecords)
+        options.ignoreRuntimeHealth === true || !runtimeHealthSource
             ? null
-            : evaluateGatewayProviderHealthCooldown(model, options.runtimeHealthRecords, {
+            : evaluateGatewayProviderHealthCooldown(model, runtimeHealthSource, {
                   ...(typeof options.providerCooldownWindowMs === 'number' ? { windowMs: options.providerCooldownWindowMs } : {}),
                   ...(typeof options.providerCooldownMinFailedModels === 'number'
                       ? { minFailedModels: options.providerCooldownMinFailedModels }
@@ -979,7 +984,14 @@ export function routeGatewayModels(models, profileInput, options = {}) {
               : null;
     if (!profile) throw new Error(`[model-gateway/policy] perfil de tarefa desconhecido: ${String(profileInput)}`);
 
-    const scored = models.map((model) => scoreGatewayModelCandidate(model, profile, options));
+    const scoringOptions =
+        options.ignoreRuntimeHealth !== true && Array.isArray(options.runtimeHealthRecords) && !options.runtimeHealthIndex
+            ? {
+                  ...options,
+                  runtimeHealthIndex: createGatewayRuntimeHealthIndex(options.runtimeHealthRecords),
+              }
+            : options;
+    const scored = models.map((model) => scoreGatewayModelCandidate(model, profile, scoringOptions));
     const candidates = scored
         .filter((candidate) => candidate.include)
         .sort((a, b) => b.score - a.score || String(a.model['id']).localeCompare(String(b.model['id'])));

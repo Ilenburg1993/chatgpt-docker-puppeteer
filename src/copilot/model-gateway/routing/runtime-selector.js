@@ -19,6 +19,7 @@ import { classifyByokProviderFailure } from '../health/provider-failure.js';
 import { evaluateModelGatewayProviderEnvRequirements } from '../secrets/requirements.js';
 import { resolveModelGatewayAccountResetWindow } from '../account-access/reset-windows.js';
 import {
+    createGatewayRuntimeHealthIndex,
     evaluateGatewayModelHealthRoute,
     evaluateGatewayProviderHealthCooldown,
     isGatewayModelProbeFailed,
@@ -597,7 +598,7 @@ function runtimeSelectorPlanForRouteAttempt(plan, route) {
 
 /**
  * @param {Record<string, unknown>} selectionPolicyOrTrace
- * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; blockFailedProbeKinds?: string[]; temporaryFailureCooldownMs?: number; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
+ * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; blockFailedProbeKinds?: string[]; temporaryFailureCooldownMs?: number; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
  * @returns {{
  *   schema: 'model-gateway-runtime-selector-plan';
  *   ok: boolean;
@@ -642,6 +643,9 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
     const { mode, rows, sourceSchema, traceId } = readRowsFromInput(input);
     const requireRuntimeProof = options.requireRuntimeProof === true || mode === 'require_runtime_proof';
     const requireRuntimeEnvReady = options.requireRuntimeEnvReady === true;
+    const runtimeHealthSource =
+        options.runtimeHealthIndex ??
+        (Array.isArray(options.runtimeHealthRecords) ? createGatewayRuntimeHealthIndex(options.runtimeHealthRecords) : null);
     const selectedRouteKeysForPlan = new Set();
     const selectedProviderIdsForPlan = new Set();
     const routes = rows.map((row) => {
@@ -651,10 +655,10 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             const hasRuntimeProof = row['hasRuntimeProof'] === true || selected?.['hasRuntimeProof'] === true;
             const runtimeEnv = selected ? evaluateModelGatewayRuntimeSelectorRouteEnv(selected, options.env) : null;
             const runtimeHealth =
-                selected && Array.isArray(options.runtimeHealthRecords)
+                selected && runtimeHealthSource
                     ? evaluateGatewayModelHealthRoute(selected, {
                           routeProfile: profileId,
-                          runtimeHealthRecords: options.runtimeHealthRecords,
+                          runtimeHealthIndex: runtimeHealthSource,
                           ...(typeof options.temporaryFailureCooldownMs === 'number'
                               ? { temporaryFailureCooldownMs: options.temporaryFailureCooldownMs }
                               : {}),
@@ -662,8 +666,8 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                       })
                     : null;
             const providerCooldown =
-                selected && Array.isArray(options.runtimeHealthRecords)
-                    ? evaluateGatewayProviderHealthCooldown(selected, options.runtimeHealthRecords, {
+                selected && runtimeHealthSource
+                    ? evaluateGatewayProviderHealthCooldown(selected, runtimeHealthSource, {
                           ...(typeof options.providerCooldownWindowMs === 'number'
                               ? { windowMs: options.providerCooldownWindowMs }
                               : {}),

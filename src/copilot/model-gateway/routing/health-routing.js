@@ -256,6 +256,92 @@ function latestHealthRecordsFirst(records) {
 }
 
 /**
+ * @param {string | null} providerId
+ * @param {string | null} providerModel
+ * @param {string | null} routeProfile
+ * @returns {string}
+ */
+function healthIndexExactKey(providerId, providerModel, routeProfile) {
+    return `${providerId ?? ''}\u001f${providerModel ?? ''}\u001f${routeProfile ?? ''}`;
+}
+
+/**
+ * @param {string | null} providerId
+ * @param {string | null} providerModel
+ * @returns {string}
+ */
+function healthIndexProviderModelKey(providerId, providerModel) {
+    return `${providerId ?? ''}\u001f${providerModel ?? ''}`;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is ReturnType<typeof createGatewayRuntimeHealthIndex>}
+ */
+function isGatewayRuntimeHealthIndex(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const candidate = /** @type {Record<string, unknown>} */ (value);
+    return (
+        candidate['schema'] === 'model-gateway-runtime-health-index' &&
+        Array.isArray(candidate['records']) &&
+        candidate['exact'] instanceof Map &&
+        candidate['global'] instanceof Map &&
+        candidate['providerModel'] instanceof Map &&
+        candidate['provider'] instanceof Map
+    );
+}
+
+/**
+ * Build a per-routing-call index over volatile runtime health. The index intentionally stores only pointers to the
+ * provided records; it does not promote runtime facts into canonical metadata and it does not mutate the health store.
+ *
+ * @param {Record<string, any>[]} records
+ * @returns {{
+ *   schema: 'model-gateway-runtime-health-index';
+ *   records: Record<string, any>[];
+ *   exact: Map<string, Record<string, any>>;
+ *   global: Map<string, Record<string, any>>;
+ *   providerModel: Map<string, Record<string, any>>;
+ *   provider: Map<string, Record<string, any>[]>;
+ * }}
+ */
+export function createGatewayRuntimeHealthIndex(records) {
+    const latest = latestHealthRecordsFirst(Array.isArray(records) ? records : []);
+    const exact = new Map();
+    const global = new Map();
+    const providerModel = new Map();
+    const provider = new Map();
+
+    for (const record of latest) {
+        const identity = healthIdentity(record);
+        if (identity.providerId) {
+            const providerRecords = provider.get(identity.providerId) ?? [];
+            providerRecords.push(record);
+            provider.set(identity.providerId, providerRecords);
+        }
+        if (!identity.providerId || !identity.providerModel) continue;
+
+        const modelKey = healthIndexProviderModelKey(identity.providerId, identity.providerModel);
+        if (!providerModel.has(modelKey)) providerModel.set(modelKey, record);
+        if (identity.routeProfile) {
+            const exactKey = healthIndexExactKey(identity.providerId, identity.providerModel, identity.routeProfile);
+            if (!exact.has(exactKey)) exact.set(exactKey, record);
+        } else if (!global.has(modelKey)) {
+            global.set(modelKey, record);
+        }
+    }
+
+    return {
+        schema: 'model-gateway-runtime-health-index',
+        records: latest,
+        exact,
+        global,
+        providerModel,
+        provider,
+    };
+}
+
+/**
  * @param {{ probes?: Record<string, { ok?: boolean; providerAttempted?: boolean }> } | null} health
  * @param {string} kind
  * @returns {{ ok?: boolean; providerAttempted?: boolean } | null}
@@ -333,37 +419,29 @@ export function readGatewayModelHealth(model, options = {}) {
  * @returns {ReturnType<typeof readGatewayModelHealth>}
  */
 export function readGatewayModelHealthFromRecords(model, records, options = {}) {
+    return readGatewayModelHealthFromIndex(model, createGatewayRuntimeHealthIndex(records), options);
+}
+
+/**
+ * @param {Record<string, any>} model
+ * @param {ReturnType<typeof createGatewayRuntimeHealthIndex>} index
+ * @param {{ routeProfile?: string | null }} [options]
+ * @returns {ReturnType<typeof readGatewayModelHealth>}
+ */
+export function readGatewayModelHealthFromIndex(model, index, options = {}) {
     const providerId = optionalString(model['providerId']);
     const providerModel = optionalString(model['providerModel']) ?? optionalString(model['id']);
     if (!providerId || !providerModel) return null;
     const routeProfile = optionalString(options.routeProfile);
-    const identity = { routeProfile, providerId, providerModel };
-    const latest = latestHealthRecordsFirst(records);
-    const exact = routeProfile
-        ? latest.find((record) => {
-              const recordIdentity = healthIdentity(record);
-              return (
-                  recordIdentity.providerId === providerId &&
-                  recordIdentity.providerModel === providerModel &&
-                  recordIdentity.routeProfile === routeProfile
-              );
-          })
-        : null;
+    const modelKey = healthIndexProviderModelKey(providerId, providerModel);
+    const exact = routeProfile ? index.exact.get(healthIndexExactKey(providerId, providerModel, routeProfile)) : null;
     if (exact) return /** @type {ReturnType<typeof readGatewayModelHealth>} */ (exact);
-    const global = routeProfile
-        ? latest.find((record) => {
-              const recordIdentity = healthIdentity(record);
-              return (
-                  recordIdentity.providerId === providerId &&
-                  recordIdentity.providerModel === providerModel &&
-                  !recordIdentity.routeProfile
-              );
-          })
-        : null;
+    const global = routeProfile ? index.global.get(modelKey) : null;
     if (global) return /** @type {ReturnType<typeof readGatewayModelHealth>} */ (global);
-    const match = latest.find((record) => healthRecordMatches(record, identity));
+    const identity = { routeProfile, providerId, providerModel };
+    const match = index.records.find((record) => healthRecordMatches(record, identity));
     if (match) return /** @type {ReturnType<typeof readGatewayModelHealth>} */ (match);
-    const providerModelMatch = latest.find((record) => healthRecordMatchesProviderModel(record, { providerId, providerModel }));
+    const providerModelMatch = index.providerModel.get(modelKey);
     return providerModelMatch ? /** @type {ReturnType<typeof readGatewayModelHealth>} */ (providerModelMatch) : null;
 }
 
@@ -372,7 +450,7 @@ export function readGatewayModelHealthFromRecords(model, records, options = {}) 
  * instability, not a bad single model. Keep that volatile and time-bounded so canonical metadata stays clean.
  *
  * @param {Record<string, any>} model
- * @param {Record<string, any>[]} records
+ * @param {Record<string, any>[] | ReturnType<typeof createGatewayRuntimeHealthIndex>} recordsOrIndex
  * @param {{ now?: string | number | Date; windowMs?: number; minFailedModels?: number; failureKinds?: string[] }} [options]
  * @returns {{
  *   include: boolean;
@@ -386,7 +464,7 @@ export function readGatewayModelHealthFromRecords(model, records, options = {}) 
  *   failedModels: string[];
  * }}
  */
-export function evaluateGatewayProviderHealthCooldown(model, records, options = {}) {
+export function evaluateGatewayProviderHealthCooldown(model, recordsOrIndex, options = {}) {
     const providerId = optionalString(model['providerId']) ?? optionalString(model['provider']);
     if (!providerId) {
         return {
@@ -405,7 +483,10 @@ export function evaluateGatewayProviderHealthCooldown(model, records, options = 
     const windowMs = optionalNumber(options.windowMs) ?? DEFAULT_PROVIDER_COOLDOWN_WINDOW_MS;
     const minFailedModels = Math.max(1, Math.floor(optionalNumber(options.minFailedModels) ?? DEFAULT_PROVIDER_COOLDOWN_MIN_FAILED_MODELS));
     const failureKinds = normalizedFailureKindSet(options.failureKinds, MODEL_GATEWAY_PROVIDER_COOLDOWN_FAILURE_KINDS);
-    const providerRecords = latestHealthRecordsFirst(records).filter((record) => healthIdentity(record).providerId === providerId);
+    const index = isGatewayRuntimeHealthIndex(recordsOrIndex)
+        ? recordsOrIndex
+        : createGatewayRuntimeHealthIndex(/** @type {Record<string, any>[]} */ (recordsOrIndex));
+    const providerRecords = index.provider.get(providerId) ?? [];
     const latestSuccessAt = providerRecords.reduce((max, record) => Math.max(max, latestProviderSuccessAt(record)), 0);
     const since = nowMs - Math.max(0, windowMs);
     const failures = providerRecords
@@ -434,11 +515,13 @@ export function evaluateGatewayProviderHealthCooldown(model, records, options = 
 
 /**
  * @param {Record<string, any>} model
- * @param {{ routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean; runtimeHealthRecords?: Record<string, any>[]; now?: string | number | Date; temporaryFailureCooldownMs?: number }} [options]
+ * @param {{ routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; now?: string | number | Date; temporaryFailureCooldownMs?: number }} [options]
  * @returns {{ include: boolean; reason: string; health: ReturnType<typeof readGatewayModelHealth> }}
  */
 export function evaluateGatewayModelHealthRoute(model, options = {}) {
-    const health = Array.isArray(options.runtimeHealthRecords)
+    const health = isGatewayRuntimeHealthIndex(options.runtimeHealthIndex)
+        ? readGatewayModelHealthFromIndex(model, options.runtimeHealthIndex, options)
+        : Array.isArray(options.runtimeHealthRecords)
         ? readGatewayModelHealthFromRecords(model, options.runtimeHealthRecords, options)
         : readGatewayModelHealth(model, options);
     if (!health) {

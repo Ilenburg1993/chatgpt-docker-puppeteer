@@ -7,6 +7,7 @@ import {
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
     buildModelGatewayRuntimeSelectorPlan,
+    createGatewayRuntimeHealthIndex,
     compareModelGatewaySelectionAudits,
     createModelGatewayRouteDecisionCapture,
     createEnvSecretRegistry,
@@ -110,6 +111,24 @@ function formatCountMap(counts) {
         .join(',') || '-';
 }
 
+async function measured(timings, name, callback) {
+    const started = Date.now();
+    try {
+        return await callback();
+    } finally {
+        timings.push({ name, durationMs: Date.now() - started });
+    }
+}
+
+function measuredSync(timings, name, callback) {
+    const started = Date.now();
+    try {
+        return callback();
+    } finally {
+        timings.push({ name, durationMs: Date.now() - started });
+    }
+}
+
 async function buildRuntimeSelectorContext({
     strict,
     requireRuntimeProof,
@@ -120,45 +139,60 @@ async function buildRuntimeSelectorContext({
     blockFailedProbeKinds = [],
     temporaryFailureCooldownMs = null,
 }) {
+    const timings = [];
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
-    const snapshot = await store.readSnapshot();
-    const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
-    const secretRegistry = createEnvSecretRegistry();
-    const fileHealthRecords = listByokProviderModelHealth();
+    const snapshot = await measured(timings, 'catalog.read_json_snapshot', () => store.readSnapshot());
+    const integrity = measuredSync(timings, 'catalog.integrity_audit', () => auditModelGatewayCatalogSnapshotIntegrity(snapshot));
+    const secretRegistry = measuredSync(timings, 'env.secret_registry', () => createEnvSecretRegistry());
+    const fileHealthRecords = measuredSync(timings, 'health.read_file_store', () => listByokProviderModelHealth());
     let sqliteHealthRecords = [];
     let sqliteRuntimeError = null;
     if (runtimeSource === 'sqlite' || runtimeSource === 'merged') {
         try {
-            sqliteHealthRecords = await new SqliteModelGatewayCatalogStore().listLatestRuntimeHealthRecords();
+            sqliteHealthRecords = await measured(timings, 'health.read_sqlite_store', () =>
+                new SqliteModelGatewayCatalogStore().listLatestRuntimeHealthRecords(),
+            );
         } catch (error) {
             sqliteRuntimeError = error instanceof Error ? error.message : String(error);
         }
     }
-    const healthRecords =
+    const healthRecords = measuredSync(timings, 'health.merge_runtime_sources', () =>
         runtimeSource === 'file'
             ? fileHealthRecords
             : runtimeSource === 'sqlite'
               ? sqliteHealthRecords
-              : mergeByokProviderHealthRecords(fileHealthRecords, sqliteHealthRecords);
-    const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords, {
-        accountWideFailureKinds: ['auth', 'credits', 'rate-limit'],
-    });
+              : mergeByokProviderHealthRecords(fileHealthRecords, sqliteHealthRecords),
+    );
+    const runtimeAccountOverlays = measuredSync(timings, 'account.runtime_overlays_from_health', () =>
+        deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords, {
+            accountWideFailureKinds: ['auth', 'credits', 'rate-limit'],
+        }),
+    );
     const evaluationNow = new Date();
-    const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, {
-        now: evaluationNow,
-    });
-    const evaluated = evaluateModelGatewayCatalogEligibility({
-        snapshot,
-        secretRegistry,
-        healthRecords,
-        now: () => evaluationNow,
-        policy: {
-            unknownAccessPolicy: strict ? 'block' : 'allow_probe',
-            policyProfile: strict ? 'runtime-selector-strict' : 'runtime-selector-allow-probe',
-            runtimeAccountWideFailureKinds: ['auth', 'credits', 'rate-limit'],
-        },
-    });
-    const runtimeOverlayDecisions = filterModelGatewayRuntimeEligibilityOverlayDecisions(evaluated.decisions);
+    const runtimeAccountOverlaySummary = measuredSync(timings, 'account.runtime_overlay_summary', () =>
+        summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, {
+            now: evaluationNow,
+        }),
+    );
+    const evaluated = measuredSync(timings, 'eligibility.evaluate_effective', () =>
+        evaluateModelGatewayCatalogEligibility({
+            snapshot,
+            secretRegistry,
+            healthRecords,
+            now: () => evaluationNow,
+            policy: {
+                unknownAccessPolicy: strict ? 'block' : 'allow_probe',
+                policyProfile: strict ? 'runtime-selector-strict' : 'runtime-selector-allow-probe',
+                runtimeAccountWideFailureKinds: ['auth', 'credits', 'rate-limit'],
+            },
+        }),
+    );
+    const runtimeOverlayDecisions = measuredSync(timings, 'eligibility.filter_runtime_overlays', () =>
+        filterModelGatewayRuntimeEligibilityOverlayDecisions(evaluated.decisions),
+    );
+    const runtimeHealthIndex = measuredSync(timings, 'health.build_runtime_index', () =>
+        createGatewayRuntimeHealthIndex(healthRecords),
+    );
     const effectiveSnapshot = {
         ...snapshot,
         source: 'runtime-selector-effective-preview',
@@ -172,35 +206,47 @@ async function buildRuntimeSelectorContext({
         ],
     };
     const profileIds = readProfiles();
-    const selection = auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
-        strict,
-        profiles: profileIds,
-        secretRegistry,
-        ...(preferredProbeKinds.length > 0 ? { preferredProbeKinds } : {}),
-        ...(blockFailedProbeKinds.length > 0 ? { blockFailedProbeKinds } : {}),
-        ...(temporaryFailureCooldownMs !== null ? { temporaryFailureCooldownMs } : {}),
-    });
-    const postRuntimeSelection = auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
-        strict,
-        profiles: profileIds,
-        secretRegistry,
-        runtimeHealthRecords: healthRecords,
-        requireRuntimeProof,
-        ...(preferredProbeKinds.length > 0 ? { preferredProbeKinds } : {}),
-        ...(blockFailedProbeKinds.length > 0 ? { blockFailedProbeKinds } : {}),
-        ...(temporaryFailureCooldownMs !== null ? { temporaryFailureCooldownMs } : {}),
-    });
-    const comparison = compareModelGatewaySelectionAudits(selection, postRuntimeSelection);
-    const policyResolution = resolveModelGatewaySelectionPolicy(comparison, { mode: selectionPolicy });
-    const runtimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(policyResolution, {
-        source: 'model-gateway-runtime-selector',
-        requireRuntimeProof,
-        requireRuntimeEnvReady,
-        env: process.env,
-        runtimeHealthRecords: healthRecords,
-        ...(blockFailedProbeKinds.length > 0 ? { blockFailedProbeKinds } : {}),
-        ...(temporaryFailureCooldownMs !== null ? { temporaryFailureCooldownMs } : {}),
-    });
+    const selection = measuredSync(timings, 'selection.pre_runtime_audit', () =>
+        auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
+            strict,
+            profiles: profileIds,
+            secretRegistry,
+            ...(preferredProbeKinds.length > 0 ? { preferredProbeKinds } : {}),
+            ...(blockFailedProbeKinds.length > 0 ? { blockFailedProbeKinds } : {}),
+            ...(temporaryFailureCooldownMs !== null ? { temporaryFailureCooldownMs } : {}),
+        }),
+    );
+    const postRuntimeSelection = measuredSync(timings, 'selection.post_runtime_audit', () =>
+        auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
+            strict,
+            profiles: profileIds,
+            secretRegistry,
+            runtimeHealthRecords: healthRecords,
+            runtimeHealthIndex,
+            requireRuntimeProof,
+            ...(preferredProbeKinds.length > 0 ? { preferredProbeKinds } : {}),
+            ...(blockFailedProbeKinds.length > 0 ? { blockFailedProbeKinds } : {}),
+            ...(temporaryFailureCooldownMs !== null ? { temporaryFailureCooldownMs } : {}),
+        }),
+    );
+    const comparison = measuredSync(timings, 'selection.compare_audits', () =>
+        compareModelGatewaySelectionAudits(selection, postRuntimeSelection),
+    );
+    const policyResolution = measuredSync(timings, 'selection.resolve_policy', () =>
+        resolveModelGatewaySelectionPolicy(comparison, { mode: selectionPolicy }),
+    );
+    const runtimeSelectorPlan = measuredSync(timings, 'selector.build_plan', () =>
+        buildModelGatewayRuntimeSelectorPlan(policyResolution, {
+            source: 'model-gateway-runtime-selector',
+            requireRuntimeProof,
+            requireRuntimeEnvReady,
+            env: process.env,
+            runtimeHealthRecords: healthRecords,
+            runtimeHealthIndex,
+            ...(blockFailedProbeKinds.length > 0 ? { blockFailedProbeKinds } : {}),
+            ...(temporaryFailureCooldownMs !== null ? { temporaryFailureCooldownMs } : {}),
+        }),
+    );
     return {
         storePath: store.filePath,
         snapshot,
@@ -217,6 +263,7 @@ async function buildRuntimeSelectorContext({
         runtimeOverlayDecisionCount: runtimeOverlayDecisions.length,
         selectedDispositions: selectedDispositions(selection),
         postRuntimeDispositions: selectedDispositions(postRuntimeSelection),
+        timings,
     };
 }
 
@@ -412,6 +459,7 @@ const summary = {
         eligibilityDecisionCount: context.eligibility.decisions.length,
         runtimeOverlayDecisionCount: context.runtimeOverlayDecisionCount,
     },
+    timings: context.timings,
     selection: {
         selected: context.selection.summary.selectedProfileCount,
         profiles: context.selection.summary.profileCount,
@@ -451,6 +499,9 @@ if (json) {
     );
     process.stdout.write(
         `post-runtime: selected=${summary.postRuntimeSelection.selected}/${summary.postRuntimeSelection.profiles} healthProofs=${summary.postRuntimeSelection.healthProofs} probeProofs=${summary.postRuntimeSelection.probeProofs}\n`,
+    );
+    process.stdout.write(
+        `timings: ${context.timings.map((item) => `${item.name}=${item.durationMs}ms`).join(' · ') || '-'}\n`,
     );
     process.stdout.write(
         `plan: ready=${context.runtimeSelectorPlan.ready ? 'yes' : 'no'} selected=${context.runtimeSelectorPlan.summary.selectedProfileCount}/${context.runtimeSelectorPlan.summary.profileCount} blocked=${context.runtimeSelectorPlan.summary.blockedProfileCount} envReady=${context.runtimeSelectorPlan.summary.runtimeEnvReadyCount} envBlocked=${context.runtimeSelectorPlan.summary.runtimeEnvBlockedCount} proofSelected=${context.runtimeSelectorPlan.summary.runtimeProofSelectedCount}\n`,

@@ -44,6 +44,7 @@ import {
     buildModelGatewayRuntimeSelectorProbeEnv,
     buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewaySelectionDecisionTrace,
+    createGatewayRuntimeHealthIndex,
     compareModelGatewaySelectionDecisionTraces,
     compareModelGatewaySelectionAudits,
     explainModelGatewaySelectionComparison,
@@ -525,6 +526,75 @@ describe('model-gateway foundation', () => {
         assert.ok(route.selected?.reasons.includes('agent_probe_verified'));
         assert.ok(route.rejected.some((candidate) => candidate.rejectedReasons.includes('chat_health_failed')));
         assert.equal(listByokProviderModelHealth().length, 0);
+    });
+
+    it('routes against an indexed runtime health view with the same profile/global precedence', () => {
+        const staleProfileFailure = createModelRecord({
+            providerId: 'zai',
+            providerModel: 'glm-4.5-flash',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+        });
+        const liveProtocolOk = createModelRecord({
+            providerId: 'openrouter',
+            providerModel: 'qwen/qwen3-coder:free',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+        });
+        const runtimeHealthRecords = [
+            {
+                routeProfile: null,
+                providerId: 'zai',
+                providerModel: 'glm-4.5-flash',
+                lastStatus: 'ok',
+                lastSuccessAt: 150,
+                probes: {
+                    live_tool_protocol: { status: 'ok', ok: true, providerAttempted: true, lastAt: 150 },
+                },
+            },
+            {
+                routeProfile: 'code',
+                providerId: 'zai',
+                providerModel: 'glm-4.5-flash',
+                lastStatus: 'failed',
+                lastFailureAt: 200,
+                lastSuccessAt: 100,
+                lastFailureKind: 'model-or-route',
+                probes: {},
+            },
+            {
+                routeProfile: 'code',
+                providerId: 'openrouter',
+                providerModel: 'qwen/qwen3-coder:free',
+                lastStatus: 'ok',
+                lastSuccessAt: 250,
+                probes: {
+                    live_tool_protocol: { status: 'ok', ok: true, providerAttempted: true, lastAt: 250 },
+                    live_ask_user: { status: 'ok', ok: true, providerAttempted: true, lastAt: 251 },
+                },
+            },
+        ];
+        const runtimeHealthIndex = createGatewayRuntimeHealthIndex(runtimeHealthRecords);
+
+        const indexedRoute = routeGatewayModels([staleProfileFailure, liveProtocolOk], 'code', {
+            routeProfile: 'code',
+            runtimeHealthIndex,
+            preferredProbeKinds: ['live_tool_protocol', 'live_ask_user'],
+            blockFailedProbeKinds: ['live_tool_protocol', 'live_ask_user'],
+        });
+        const rawRoute = routeGatewayModels([staleProfileFailure, liveProtocolOk], 'code', {
+            routeProfile: 'code',
+            runtimeHealthRecords,
+            preferredProbeKinds: ['live_tool_protocol', 'live_ask_user'],
+            blockFailedProbeKinds: ['live_tool_protocol', 'live_ask_user'],
+        });
+
+        assert.equal(indexedRoute.selected?.model['id'], 'openrouter:qwen/qwen3-coder:free');
+        assert.equal(rawRoute.selected?.model['id'], indexedRoute.selected?.model['id']);
+        assert.equal(
+            evaluateGatewayModelHealthRoute(staleProfileFailure, { routeProfile: 'code', runtimeHealthIndex }).reason,
+            'chat_health_failed',
+        );
     });
 
     it('scopes agent probe failures to agentic profiles instead of blocking plain chat/code', () => {

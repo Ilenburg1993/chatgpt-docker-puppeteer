@@ -10,6 +10,7 @@ export { explainGatewayRouteDecision } from './explain.js';
 export {
     MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS,
     MODEL_GATEWAY_PROVIDER_COOLDOWN_FAILURE_KINDS,
+    createGatewayRuntimeHealthIndex,
     evaluateGatewayModelHealthRoute,
     evaluateGatewayProviderHealthCooldown,
     isGatewayModelAgentProbeHealthFailed,
@@ -19,6 +20,7 @@ export {
     isGatewayModelProbeVerified,
     listGatewayModelVerifiedProbeKinds,
     readGatewayModelHealth,
+    readGatewayModelHealthFromIndex,
     readGatewayModelHealthFromRecords,
     readGatewayModelProbeHealth,
 } from './health-routing.js';
