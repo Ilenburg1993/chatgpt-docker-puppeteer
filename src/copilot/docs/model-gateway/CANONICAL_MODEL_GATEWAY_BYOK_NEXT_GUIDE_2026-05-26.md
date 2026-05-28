@@ -10623,6 +10623,42 @@ Validacao esperada:
 - o mesmo teste prova que pesos neutralizados devolvem a escolha metadata-first;
 - a confidence do catalogo permanece `catalog`, sem promover runtime fact para metadado canonico.
 
+## Mudanca 118 - CLI de selecao aceita pesos de runtime proof
+
+Status: concluido.
+
+Contexto:
+
+- pesos configuraveis existiam na API;
+- sem CLI, humanos e LLMs ainda precisariam editar codigo para experimentar politicas;
+- `effective-selection` e `runtime-selector` sao os dois pontos canonicos de decisao sem runtime novo.
+
+Regra aplicada:
+
+- `scripts/model-gateway-effective-selection.mjs` aceita `--runtime-proof-weights key=value,...`;
+- `scripts/model-gateway-runtime-selector.mjs` aceita o mesmo formato;
+- os pesos sao repassados para pre-runtime/post-runtime audit pelo mesmo objeto de options;
+- o resumo JSON inclui `runtimeProofWeights` para auditoria;
+- dry-run continua nao executando provider.
+
+Exemplo:
+
+- `--runtime-proof-weights genericProbeVerified=0,preferredProbeVerified=0,runtimeProvedPreference=0`;
+- esse exemplo neutraliza o bonus de prova runtime generica e permite comparar com metadata-first.
+
+Motivo arquitetural:
+
+- policy tuning deve acontecer acima do motor de scoring;
+- o runtime selector real precisa poder variar pesos sem alterar metadados;
+- o operador pode testar uma politica em dry-run antes de permitir `--execute`;
+- isso prepara futuras politicas por perfil sem criar caminhos paralelos.
+
+Validacao esperada:
+
+- `node --check` dos dois scripts deve passar;
+- dry-run JSON deve ecoar `runtimeProofWeights`;
+- typecheck/lint do dominio continuam verdes.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

@@ -31,7 +31,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-effective-selection.mjs [--json] [--strict] [--runtime-source file|sqlite|merged] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--require-runtime-proof] [--write-trace] [--trace-dir <path>] [--prune-traces] [--trace-retention-apply] [--trace-retention-max <n>] [--fail] [--fail-on-supply-warning]
+    process.stdout.write(`Usage: node scripts/model-gateway-effective-selection.mjs [--json] [--strict] [--runtime-source file|sqlite|merged] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--require-runtime-proof] [--runtime-proof-weights key=value,...] [--write-trace] [--trace-dir <path>] [--prune-traces] [--trace-retention-apply] [--trace-retention-max <n>] [--fail] [--fail-on-supply-warning]
 
 Build a non-mutating effective selection view from the persisted metadata catalog plus already-observed account/runtime
 health. This does not fetch providers, execute models, run probes or persist eligibility decisions.
@@ -56,6 +56,19 @@ function readProfiles() {
     if (profile) profiles.push(profile);
     if (profileList) profiles.push(...profileList.split(','));
     return profiles.map((item) => item.trim()).filter(Boolean);
+}
+
+function readRuntimeProofWeights() {
+    const raw = readArg('--runtime-proof-weights');
+    if (!raw.trim()) return null;
+    const weights = {};
+    for (const item of raw.split(',')) {
+        const [key, value] = item.split(/[=:]/u, 2).map((part) => part.trim());
+        if (!key || !value) continue;
+        const number = Number(value);
+        if (Number.isFinite(number)) weights[key] = number;
+    }
+    return Object.keys(weights).length > 0 ? weights : null;
 }
 
 function selectedDispositions(selection) {
@@ -90,6 +103,7 @@ const traceId = readArg('--trace-id');
 const pruneTraces = argSet.has('--prune-traces') || argSet.has('--trace-retention-preview') || argSet.has('--trace-retention-apply');
 const traceRetentionApply = argSet.has('--trace-retention-apply');
 const traceRetentionMax = Number.parseInt(readArg('--trace-retention-max', '100'), 10);
+const runtimeProofWeights = readRuntimeProofWeights();
 const runtimeSource = ['file', 'sqlite', 'merged'].includes(readArg('--runtime-source'))
     ? readArg('--runtime-source')
     : 'merged';
@@ -148,6 +162,7 @@ const selection = auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
     strict,
     profiles: readProfiles(),
     secretRegistry,
+    ...(runtimeProofWeights ? { runtimeProofWeights } : {}),
 });
 const postRuntimeSelection = auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
     strict,
@@ -155,6 +170,7 @@ const postRuntimeSelection = auditModelGatewayPostRuntimeSelection(effectiveSnap
     secretRegistry,
     runtimeHealthRecords: healthRecords,
     requireRuntimeProof,
+    ...(runtimeProofWeights ? { runtimeProofWeights } : {}),
 });
 const selectionComparison = compareModelGatewaySelectionAudits(selection, postRuntimeSelection);
 const policyResolution = resolveModelGatewaySelectionPolicy(selectionComparison, { mode: selectionPolicy });
@@ -215,6 +231,7 @@ const summary = {
     persisted: false,
     runtimeExecuted: false,
     runtimeSource,
+    runtimeProofWeights,
     mode: strict ? 'strict_access_only_with_observed_health' : 'allow_probe_unknown_with_observed_health',
     storePath: store.filePath,
     snapshotId: snapshot.snapshotId,
