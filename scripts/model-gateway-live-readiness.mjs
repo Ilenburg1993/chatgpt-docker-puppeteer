@@ -138,6 +138,15 @@ try {
     sqliteRuntimeError = error instanceof Error ? error.message : String(error);
 }
 const healthRecords = mergeByokProviderHealthRecords(fileHealthRecords, sqliteHealthRecords);
+const sqliteProbeOnlyRecords = sqliteHealthRecords.filter((record) => record?.['runtimeHealthStatus'] === 'probe-only');
+const sqliteRuntimeProbeProofRecords = sqliteHealthRecords.filter(
+    (record) =>
+        record &&
+        typeof record === 'object' &&
+        record['probes'] &&
+        typeof record['probes'] === 'object' &&
+        Object.values(record['probes']).some((probe) => probe && typeof probe === 'object' && probe['ok'] === true),
+);
 const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords);
 const evaluationNow = new Date();
 const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, {
@@ -273,6 +282,11 @@ const checks = [
         detail: `runtimeRows=${sqliteDiagnostics.runtimeRows}, healthObservations=${sqliteDiagnostics.tableCounts.copilot_model_gateway_health_observations}, probeResults=${sqliteDiagnostics.tableCounts.copilot_model_gateway_runtime_probe_results}`,
     },
     {
+        id: 'runtime_sqlite_probe_source',
+        ok: true,
+        detail: `sqliteHealthRecords=${sqliteHealthRecords.length}, probeOnly=${sqliteProbeOnlyRecords.length}, probeProofRecords=${sqliteRuntimeProbeProofRecords.length}`,
+    },
+    {
         id: 'live_runner_present',
         ok: runnerExists,
         detail: path.relative(ROOT, LIVE_RUNNER_PATH),
@@ -308,6 +322,8 @@ const summary = {
         healthObservations: sqliteDiagnostics.tableCounts.copilot_model_gateway_health_observations,
         runtimeProbeRuns: sqliteDiagnostics.tableCounts.copilot_model_gateway_runtime_probe_runs,
         runtimeProbeResults: sqliteDiagnostics.tableCounts.copilot_model_gateway_runtime_probe_results,
+        runtimeProbeOnlyRecords: sqliteProbeOnlyRecords.length,
+        runtimeProbeProofRecords: sqliteRuntimeProbeProofRecords.length,
     },
     redaction: {
         ok: catalogRedaction.ok && sqliteRedaction.ok,

@@ -353,6 +353,7 @@ function runRuntimeSelectorLiveRoute({
         optionalRuntimeSelectorString(summary?.execution?.error) ||
         optionalRuntimeSelectorString(summary?.execution?.final?.error) ||
         optionalRuntimeSelectorString(summary?.routeDecisionPersistence?.error) ||
+        optionalRuntimeSelectorString(summary?.runtimeProbePersistence?.error) ||
         optionalRuntimeSelectorString(summary?.runtimeHealthPersistence?.error) ||
         optionalRuntimeSelectorString(summary?.runtimeSelectorPlan?.routes?.find?.((route) => route?.status === 'blocked')?.reasons?.join(', '));
     return {
@@ -536,6 +537,38 @@ function buildRealByokRuntime({
                           skippedAttemptCount: runtimeSelector.summary.execution.skippedAttemptCount ?? 0,
                           selectedProfileId: runtimeSelector.summary.execution.selectedProfileId,
                           error: runtimeSelector.summary.execution.error,
+                      }
+                    : null,
+                routeDecisionPersistence: runtimeSelector.summary?.routeDecisionPersistence
+                    ? {
+                          attempted: runtimeSelector.summary.routeDecisionPersistence.attempted === true,
+                          ok: runtimeSelector.summary.routeDecisionPersistence.ok === true,
+                          written: Number(runtimeSelector.summary.routeDecisionPersistence.written ?? 0),
+                          error: runtimeSelector.summary.routeDecisionPersistence.error ?? null,
+                      }
+                    : null,
+                runtimeProbePersistence: runtimeSelector.summary?.runtimeProbePersistence
+                    ? {
+                          attempted: runtimeSelector.summary.runtimeProbePersistence.attempted === true,
+                          ok: runtimeSelector.summary.runtimeProbePersistence.ok === true,
+                          runId: runtimeSelector.summary.runtimeProbePersistence.runId ?? null,
+                          probeResults: Number(runtimeSelector.summary.runtimeProbePersistence.probeResults ?? 0),
+                          skippedResults: Number(runtimeSelector.summary.runtimeProbePersistence.skippedResults ?? 0),
+                          successCount: Number(runtimeSelector.summary.runtimeProbePersistence.successCount ?? 0),
+                          failureCount: Number(runtimeSelector.summary.runtimeProbePersistence.failureCount ?? 0),
+                          error: runtimeSelector.summary.runtimeProbePersistence.error ?? null,
+                      }
+                    : null,
+                runtimeHealthPersistence: runtimeSelector.summary?.runtimeHealthPersistence
+                    ? {
+                          attempted: runtimeSelector.summary.runtimeHealthPersistence.attempted === true,
+                          ok: runtimeSelector.summary.runtimeHealthPersistence.ok === true,
+                          runId: runtimeSelector.summary.runtimeHealthPersistence.runId ?? null,
+                          records: Number(runtimeSelector.summary.runtimeHealthPersistence.records ?? 0),
+                          healthObservations: Number(runtimeSelector.summary.runtimeHealthPersistence.healthObservations ?? 0),
+                          probeResults: Number(runtimeSelector.summary.runtimeHealthPersistence.probeResults ?? 0),
+                          skippedRecords: Number(runtimeSelector.summary.runtimeHealthPersistence.skippedRecords ?? 0),
+                          error: runtimeSelector.summary.runtimeHealthPersistence.error ?? null,
                       }
                     : null,
                 error: runtimeSelector.error ? runtimeSelector.error.slice(0, 800) : null,

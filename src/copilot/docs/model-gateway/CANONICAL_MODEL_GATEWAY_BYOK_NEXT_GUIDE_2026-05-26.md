@@ -10544,6 +10544,42 @@ Validacao esperada:
 - o registro contem `probes.chat.ok=true`;
 - a tabela `health_observations` permanece vazia nesse caso.
 
+## Mudanca 116 - Readiness e artefato live expõem a trilha direta de probes
+
+Status: concluido.
+
+Contexto:
+
+- o runtime selector passou a gravar `runtimeProbePersistence`;
+- a prontidao live ainda mostrava apenas contagens brutas de tabelas runtime;
+- o artefato redigido do live llm-b mostrava execucao do selector, mas nao separava:
+  - persistencia de route decisions;
+  - persistencia direta de runtime probes;
+  - persistencia/espelho de runtime health.
+
+Regra aplicada:
+
+- `run-terminal-llm-b-live-test.mjs` inclui no JSON redigido:
+  - `routeDecisionPersistence`;
+  - `runtimeProbePersistence`;
+  - `runtimeHealthPersistence`;
+- erros de `runtimeProbePersistence` passam a bloquear a rota real como erro explicito;
+- `model-gateway-live-readiness.mjs` informa quantos registros SQLite vieram apenas de probe direto;
+- readiness tambem informa quantos registros possuem prova positiva em `probes.*`.
+
+Motivo arquitetural:
+
+- a LLM e o operador precisam distinguir escolha, execucao e health derivado;
+- um live pode estar correto no provider, mas falhar ao persistir prova direta;
+- um live pode persistir probe direto mesmo antes de o espelho de health rodar;
+- essa separacao melhora auditoria pre-live e pos-live sem expor segredos.
+
+Validacao esperada:
+
+- `npm run model-gateway:live:readiness -- --json` deve conter `runtimeProbeOnlyRecords`;
+- `byok.real.redacted.json` deve conter `runtimeSelector.runtimeProbePersistence` em lives BYOK reais;
+- falhas de persistencia direta devem aparecer como erro do runtime selector.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
