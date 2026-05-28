@@ -32,6 +32,14 @@ function nowStamp() {
     return new Date().toISOString().replace(/[:.]/gu, '-');
 }
 
+/**
+ * @param {string} stamp
+ * @returns {string}
+ */
+function planRunId(stamp) {
+    return stamp.replace(/[^a-zA-Z0-9._:-]+/gu, '-');
+}
+
 function runReadiness() {
     const result = spawnSync(process.execPath, [path.join(ROOT, 'scripts/model-gateway-live-readiness.mjs'), '--json'], {
         cwd: ROOT,
@@ -82,6 +90,11 @@ function countMapText(counts) {
 }
 
 function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict = false } = {}) {
+    const generatedAt = new Date().toISOString();
+    const runId = planRunId(generatedAt.replace(/[:.]/gu, '-'));
+    const baselineOutDir = `artifacts/model-gateway-runtime-health-baselines/${runId}`;
+    const baselinePath = `${baselineOutDir}/latest.json`;
+    const postLiveOutDir = `artifacts/model-gateway-runtime-health-post-live/${runId}`;
     const overlaySummary = effectiveOverlaySummary(readiness);
     const localPrivateStrictSelection = localPrivateStrict ? runLocalPrivateStrictSelection() : null;
     const liveRunner = readinessCheck(readiness, 'live_runner_present');
@@ -140,11 +153,11 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         {
             id: 'runtime_health_baseline',
             order: 2,
-            command: 'npm run model-gateway:runtime-health:diff -- --write-snapshot',
+            command: `npm run model-gateway:runtime-health:diff -- --write-snapshot --out-dir ${baselineOutDir}`,
             executesModelTurn: false,
             executesRuntimeProbes: false,
             consumesProviderQuota: false,
-            purpose: 'Persist a baseline of already-observed runtime health so later live phases can be diffed.',
+            purpose: 'Persist a fixed baseline of already-observed runtime health so every later live phase can be diffed against the same pre-live file.',
         },
         {
             id: 'control_no_pr',
@@ -188,11 +201,11 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
             id: 'runtime_health_after_live_diff',
             order: 1,
             command:
-                'npm run model-gateway:runtime-health:diff -- --baseline artifacts/model-gateway-runtime-health/latest.json --write-snapshot --fail-on-regression',
+                `npm run model-gateway:runtime-health:diff -- --baseline ${baselinePath} --write-snapshot --out-dir ${postLiveOutDir} --fail-on-regression`,
             executesModelTurn: false,
             executesRuntimeProbes: false,
             consumesProviderQuota: false,
-            purpose: 'Diff runtime health after a live phase against the pre-live baseline and fail on ok-to-failed regressions.',
+            purpose: 'Diff runtime health after any live phase against the fixed pre-live baseline and fail on ok-to-failed regressions.',
         },
         {
             id: 'runtime_health_sqlite_mirror',
@@ -225,8 +238,14 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
     return {
         schema: 'model-gateway-live-plan',
         ok: prerequisites.every((item) => item.ok),
-        generatedAt: new Date().toISOString(),
+        generatedAt,
+        runId,
         runtimeExecuted: false,
+        healthBaseline: {
+            outDir: baselineOutDir,
+            latestPath: baselinePath,
+            postLiveOutDir,
+        },
         readiness: {
             ok: readiness.ok === true,
             snapshotId: readiness.snapshotId ?? null,
@@ -252,8 +271,11 @@ function renderMarkdown(plan) {
         '',
         `- ok: ${plan.ok ? 'true' : 'false'}`,
         `- generatedAt: ${plan.generatedAt}`,
+        `- runId: ${plan.runId}`,
         `- runtimeExecuted: ${plan.runtimeExecuted ? 'true' : 'false'}`,
         `- snapshotId: ${plan.readiness.snapshotId ?? '-'}`,
+        `- healthBaseline: ${plan.healthBaseline.latestPath}`,
+        `- postLiveHealthDir: ${plan.healthBaseline.postLiveOutDir}`,
         `- overlays: total=${plan.overlaySummary.total} active=${plan.overlaySummary.activeCount} expired=${plan.overlaySummary.expiredCount}`,
         `- providers: ${countMapText(plan.overlaySummary.byProvider)}`,
         `- failures: ${countMapText(plan.overlaySummary.byFailureKind)}`,

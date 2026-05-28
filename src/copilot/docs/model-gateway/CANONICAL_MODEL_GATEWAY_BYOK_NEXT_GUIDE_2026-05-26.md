@@ -7782,6 +7782,43 @@ Resultado:
 
 `passed`
 
+Mudanca 66:
+
+Baseline fixo por execucao no plano de live tests.
+
+Problema identificado:
+
+- o plano live gerava a fase `runtime_health_baseline` com `model-gateway:runtime-health:diff -- --write-snapshot`;
+- a fase pos-live sugeria `--baseline artifacts/model-gateway-runtime-health/latest.json`;
+- depois de uma primeira diff pos-live, `latest.json` pode deixar de representar o baseline pre-live;
+- em sequencias longas, isso cria comparacoes contra a fase anterior, nao contra o inicio do plano.
+
+Correcoes aplicadas:
+
+- `model-gateway:live:plan` agora cria `runId`;
+- baseline fica em `artifacts/model-gateway-runtime-health-baselines/<runId>/latest.json`;
+- snapshots pos-live ficam em `artifacts/model-gateway-runtime-health-post-live/<runId>`;
+- todas as pos-fases usam o baseline fixo do run;
+- Markdown do plano mostra `runId`, `healthBaseline` e `postLiveHealthDir`;
+- a fase baseline explica que o arquivo e fixo para todas as fases posteriores.
+
+Validacao focada:
+
+`npm run model-gateway:live:plan -- --no-write --json`
+
+Resultado observado:
+
+- `ok=true`;
+- baseline command usa `--out-dir artifacts/model-gateway-runtime-health-baselines/<runId>`;
+- post-live command usa `--baseline artifacts/model-gateway-runtime-health-baselines/<runId>/latest.json`;
+- post-live command nao usa `artifacts/model-gateway-runtime-health/latest.json`.
+
+`npm run model-gateway:typecheck`
+
+Resultado:
+
+`passed`
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
