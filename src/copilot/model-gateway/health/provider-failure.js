@@ -277,6 +277,18 @@ function textLooksLikeNetworkFailure(message, code) {
 }
 
 /**
+ * @param {string} message
+ * @returns {boolean}
+ */
+function textLooksLikeWireSchemaFailure(message) {
+    return (
+        /property ['"]?parsed['"]? is unsupported/iu.test(message) ||
+        /messages\.\d+.*(?:property|field).*(?:unsupported|not supported)/iu.test(message) ||
+        /unsupported (?:parameter|field).*messages/iu.test(message)
+    );
+}
+
+/**
  * @param {ByokProviderFailureKind} kind
  * @param {number | null} statusCode
  * @param {string} message
@@ -413,6 +425,9 @@ export function classifyByokProviderFailure(error) {
         return buildFailure('auth', statusCode, message, limitHints);
     }
     if (statusCode === 404) {
+        return buildFailure('model-or-route', statusCode, message, limitHints);
+    }
+    if (statusCode === 400 && textLooksLikeWireSchemaFailure(message)) {
         return buildFailure('model-or-route', statusCode, message, limitHints);
     }
     if (textLooksLikeTimeoutFailure(message)) {

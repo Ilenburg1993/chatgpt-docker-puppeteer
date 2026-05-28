@@ -435,7 +435,7 @@ if (json) {
         const runtimeEnv = route.runtimeEnv;
         const selected = route.selected ?? {};
         process.stdout.write(
-            `  ${route.profileId}: ${route.status} route=${route.selectedRouteKey ?? '-'} selector=${selected['selectorKind'] ?? '-'}:${selected['selectorSyntax'] ?? '-'} layer=${selected['routeLayer'] ?? '-'} wire=${selected['wireApi'] ?? '-'} upstream=${selected['upstreamProvider'] ?? '-'} env=${runtimeEnv?.status ?? '-'} missing=${runtimeEnv?.missingRequiredKeys.join(',') || '-'} reasons=${route.reasons.slice(0, 4).join(',') || '-'}\n`,
+            `  ${route.profileId}: ${route.status} route=${route.selectedRouteKey ?? '-'} selector=${selected['selectorKind'] ?? '-'}:${selected['selectorSyntax'] ?? '-'} layer=${selected['routeLayer'] ?? '-'} wire=${selected['wireApi'] ?? '-'} upstream=${selected['upstreamProvider'] ?? '-'} env=${runtimeEnv?.status ?? '-'} missing=${runtimeEnv?.missingRequiredKeys.join(',') || '-'} alternatives=${route.alternativeSummary?.usableCount ?? 0}/${route.alternativeSummary?.evaluatedCount ?? 0} reasons=${route.reasons.slice(0, 4).join(',') || '-'}\n`,
         );
     }
     if (execution) {

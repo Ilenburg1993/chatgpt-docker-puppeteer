@@ -41,6 +41,7 @@ Common options:
   --byok-real-route-profile=<profile>
   --byok-real-route-fallback-profiles=<a,b>
   --byok-real-route-execute
+  --byok-real-route-allow-probe
   --byok-real-route-selection-policy=<metadata_first|prefer_runtime_proved|require_runtime_proof>
   --byok-real-route-timeout-ms=<ms>
   --timeout-ms=<ms>
@@ -268,6 +269,7 @@ function runRuntimeSelectorLiveRoute({
     profileId,
     fallbackProfiles = [],
     execute = false,
+    allowProbe = false,
     timeoutMs = 45_000,
     selectionPolicy = '',
 } = {}) {
@@ -278,6 +280,7 @@ function runRuntimeSelectorLiveRoute({
             ok: true,
             status: null,
             executed: false,
+            allowProbe,
             profileId: '',
             fallbackProfiles: [],
             summary: null,
@@ -291,6 +294,7 @@ function runRuntimeSelectorLiveRoute({
         '--fail',
         `--profile=${requestedProfile}`,
     ];
+    if (allowProbe) args.push('--allow-probe');
     const normalizedFallbacks = runtimeSelectorFallbackProfiles(fallbackProfiles.join(','));
     if (normalizedFallbacks.length > 0) args.push(`--fallback-profiles=${normalizedFallbacks.join(',')}`);
     const normalizedSelectionPolicy = optionalRuntimeSelectorString(selectionPolicy).replaceAll('-', '_');
@@ -322,6 +326,7 @@ function runRuntimeSelectorLiveRoute({
         ok: routeUsable,
         status: result.status,
         executed: execute,
+        allowProbe,
         profileId: requestedProfile,
         fallbackProfiles: normalizedFallbacks,
         summary,
@@ -407,6 +412,7 @@ function buildRealByokRuntime({
     runtimeSelectorProfile,
     runtimeSelectorFallbackProfiles: fallbackProfiles = [],
     runtimeSelectorExecute = false,
+    runtimeSelectorAllowProbe = false,
     runtimeSelectorTimeoutMs = 45_000,
     runtimeSelectorSelectionPolicy = '',
 }) {
@@ -416,6 +422,7 @@ function buildRealByokRuntime({
         profileId: runtimeSelectorProfile,
         fallbackProfiles,
         execute: runtimeSelectorExecute,
+        allowProbe: runtimeSelectorAllowProbe,
         timeoutMs: runtimeSelectorTimeoutMs,
         selectionPolicy: runtimeSelectorSelectionPolicy,
     });
@@ -463,6 +470,7 @@ function buildRealByokRuntime({
                 ok: runtimeSelector.ok,
                 status: runtimeSelector.status,
                 executed: runtimeSelector.executed,
+                allowProbe: runtimeSelector.allowProbe,
                 profileId: runtimeSelector.profileId || null,
                 fallbackProfiles: runtimeSelector.fallbackProfiles,
                 selectionPolicy: runtimeSelector.summary?.selectionPolicy ?? null,
@@ -2350,6 +2358,7 @@ async function main() {
         readArg('--byok-real-route-fallback-profiles', ''),
     );
     const byokRealRuntimeSelectorExecute = hasFlag('--byok-real-route-execute') && !dryRun;
+    const byokRealRuntimeSelectorAllowProbe = hasFlag('--byok-real-route-allow-probe');
     const byokRealRuntimeSelectorTimeoutMs = Number(readArg('--byok-real-route-timeout-ms', '45000'));
     const byokRealRuntimeSelectorSelectionPolicy = readArg('--byok-real-route-selection-policy', '');
     const collectSse = !hasFlag('--no-sse');
@@ -2383,6 +2392,7 @@ async function main() {
               runtimeSelectorProfile: byokRealRuntimeSelectorProfile,
               runtimeSelectorFallbackProfiles: byokRealRuntimeSelectorFallbackProfiles,
               runtimeSelectorExecute: byokRealRuntimeSelectorExecute,
+              runtimeSelectorAllowProbe: byokRealRuntimeSelectorAllowProbe,
               runtimeSelectorTimeoutMs: Number.isFinite(byokRealRuntimeSelectorTimeoutMs)
                   ? byokRealRuntimeSelectorTimeoutMs
                   : 45_000,

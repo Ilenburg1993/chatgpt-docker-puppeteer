@@ -9350,6 +9350,8 @@ Implementacao:
 - `compareModelGatewaySelectionAudits` carrega alternativas pre-runtime e post-runtime;
 - `resolveModelGatewaySelectionPolicy` entrega essas alternativas ao runtime selector;
 - `buildModelGatewayRuntimeSelectorPlan` avalia `selected`, `postSelected`, `preSelected` e alternativas rankeadas;
+- o plano agora expõe `alternativeSummary` por rota, com contagens de alternativas avaliadas, usáveis e bloqueadas;
+- o summary do plano expõe `alternativeEvaluatedCount` e `alternativeUsableCount`;
 - o plano prefere o primeiro candidato nao bloqueado por:
   - account access;
   - env runtime;
@@ -9362,6 +9364,8 @@ Implementacao:
   - health exato do perfil;
   - health global sem perfil;
   - health cross-profile do mesmo provider/model.
+- o harness live ganhou `--byok-real-route-allow-probe`, para testes explicitos em modo max-autonomy quando strict
+  nao encontra rotas env-ready conhecidas.
 
 Efeito esperado:
 
@@ -9379,11 +9383,21 @@ Evidencia local apos Mudanca 92:
 - as tres falharam por timeout e foram persistidas em runtime health;
 - o dry-run seguinte passou a bloquear todas as rotas env-ready conhecidas por `chat_health_failed`;
 - nenhum full live com llm-b deve iniciar enquanto o selector nao produzir rota executavel.
+- apos `--byok-real-route-allow-probe`, o selector conseguiu provar chat basico em:
+  - `groq/meta-llama/llama-4-scout-17b-16e-instruct`;
+  - `mistral/devstral-small-2507`.
+- evidencias live:
+  - `artifacts/terminal-live/2026-05-28T16-25-20-738Z/summary.md`;
+  - `artifacts/terminal-live/2026-05-28T16-30-42-416Z/summary.md`.
+- ambos os lives foram bloqueados antes do turno final por preflight agent:
+  - Groq: `property parsed is unsupported` em mensagem assistant do wire OpenAI-compatible;
+  - Mistral: `429` durante agent probe.
+- `property parsed is unsupported` passa a ser classificado como `model-or-route`, pois representa incompatibilidade de
+  schema/wire da rota com o provider OpenAI-compatible, nao erro desconhecido.
 
 Lacunas restantes apos Mudanca 92:
 
 - melhorar a explicabilidade quando todas as alternativas sao bloqueadas;
-- expor contagem de alternativas avaliadas e principais motivos de bloqueio por perfil;
 - separar claramente `sem rota executavel agora` de `catalogo sem modelos`;
 - investigar se devemos ter TTL model-scoped para `timeout` sem sucesso posterior;
 - ampliar fornecedores env-ready antes de tentar novo full live.

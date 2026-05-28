@@ -24,6 +24,16 @@ describe('model-gateway BYOK provider failure taxonomy', () => {
         );
         expect(classifyByokProviderFailure('HTTP status code 404').kind).toBe('model-or-route');
         expect(
+            classifyByokProviderFailure(
+                Object.assign(
+                    new Error(
+                        "400 'messages.2' : for 'role:assistant' the following must be satisfied[('messages.2' : property 'parsed' is unsupported)]",
+                    ),
+                    { status: 400 },
+                ),
+            ).kind,
+        ).toBe('model-or-route');
+        expect(
             classifyByokProviderFailure(Object.assign(new Error('fetch failed'), { code: 'ECONNRESET' })).kind,
         ).toBe('network');
     });

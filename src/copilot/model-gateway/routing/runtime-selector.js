@@ -436,6 +436,74 @@ function buildSelectorDecisionEvent(selected, row, options) {
 }
 
 /**
+ * @param {Record<string, unknown>} candidate
+ * @returns {string[]}
+ */
+function candidateBlockReasons(candidate) {
+    const reasons = [];
+    if (!candidate['selected']) reasons.push('no_selected_route');
+    if (candidate['accountAccessBlocked'] === true) reasons.push('account_access_denies_attempt');
+    if (candidate['runtimeProofBlocked'] === true) reasons.push('runtime_proof_required');
+    if (candidate['runtimeEnvBlocked'] === true) reasons.push('runtime_env_not_ready');
+    const runtimeHealth = optionalRecord(candidate['runtimeHealth']);
+    if (candidate['runtimeHealthBlocked'] === true) reasons.push(`runtime_health:${optionalString(runtimeHealth?.['reason']) ?? 'failed'}`);
+    const providerCooldown = optionalRecord(candidate['providerCooldown']);
+    if (candidate['providerCooldownBlocked'] === true) {
+        const failureKinds = Array.isArray(providerCooldown?.['failureKinds'])
+            ? providerCooldown['failureKinds'].map(optionalString).filter((item) => item !== null)
+            : [];
+        reasons.push(`provider_health_cooldown:${failureKinds.join('+') || 'temporary'}`);
+    }
+    const failedProbeKinds = Array.isArray(candidate['failedProbeKinds'])
+        ? candidate['failedProbeKinds'].map(optionalString).filter((item) => item !== null)
+        : [];
+    for (const kind of failedProbeKinds) reasons.push(`runtime_probe_failed:${kind}`);
+    return reasons;
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} candidateEvaluations
+ * @returns {{
+ *   evaluatedCount: number;
+ *   usableCount: number;
+ *   blockedCount: number;
+ *   providerCount: number;
+ *   rejectionReasonCounts: Record<string, number>;
+ *   topBlockedRoutes: Array<{ label: string; providerId: string | null; providerModel: string | null; reasons: string[] }>;
+ * }}
+ */
+function summarizeRuntimeSelectorAlternatives(candidateEvaluations) {
+    /** @type {Record<string, number>} */
+    const rejectionReasonCounts = {};
+    const providerIds = new Set();
+    const topBlockedRoutes = [];
+    for (const candidate of candidateEvaluations) {
+        const selected = optionalRecord(candidate['selected']);
+        const providerId = optionalString(selected?.['providerId']);
+        if (providerId) providerIds.add(providerId);
+        if (candidate['blocked'] !== true) continue;
+        const reasons = candidateBlockReasons(candidate);
+        for (const reason of reasons) rejectionReasonCounts[reason] = (rejectionReasonCounts[reason] ?? 0) + 1;
+        if (topBlockedRoutes.length < 8) {
+            topBlockedRoutes.push({
+                label: optionalString(candidate['label']) ?? 'candidate',
+                providerId,
+                providerModel: optionalString(selected?.['providerModel']),
+                reasons,
+            });
+        }
+    }
+    return {
+        evaluatedCount: candidateEvaluations.length,
+        usableCount: candidateEvaluations.filter((candidate) => candidate['blocked'] !== true).length,
+        blockedCount: candidateEvaluations.filter((candidate) => candidate['blocked'] === true).length,
+        providerCount: providerIds.size,
+        rejectionReasonCounts,
+        topBlockedRoutes,
+    };
+}
+
+/**
  * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]} route
  * @param {{ ok: boolean; failure: string | null }} outcome
  * @returns {ReturnType<typeof buildRouteDecisionEvent>}
@@ -515,6 +583,8 @@ function sumRouteDecisionRecordedCount(attempts) {
  *     runtimeHealthBlockedCount: number;
  *     runtimeProbeBlockedCount: number;
  *     providerCooldownBlockedCount: number;
+ *     alternativeEvaluatedCount: number;
+ *     alternativeUsableCount: number;
  *   };
  *   routes: Array<{
  *     profileId: string;
@@ -526,6 +596,7 @@ function sumRouteDecisionRecordedCount(attempts) {
  *     runtimeEnv: ReturnType<typeof evaluateModelGatewayRuntimeSelectorRouteEnv> | null;
  *     runtimeHealth: ReturnType<typeof evaluateGatewayModelHealthRoute> | null;
  *     providerCooldown: ReturnType<typeof evaluateGatewayProviderHealthCooldown> | null;
+ *     alternativeSummary: ReturnType<typeof summarizeRuntimeSelectorAlternatives>;
  *     reasons: string[];
  *     nextActions: string[];
  *     decisionEvent: ReturnType<typeof buildRouteDecisionEvent>;
@@ -588,6 +659,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                 providerCooldownBlocked,
                 failedProbeKinds,
                 runtimeProbeBlocked,
+                runtimeProofBlocked: requireRuntimeProof && !hasRuntimeProof,
                 blocked:
                     !selected ||
                     accountAccessBlocked ||
@@ -616,6 +688,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                   usableCandidates.find((candidate) => !selectedRouteKeysForPlan.has(routeKey(candidate.selected))) ??
                   (primary && !primary.blocked ? primary : (usableCandidates[0] ?? primary)));
         const selected = chosen?.blocked ? null : (chosen?.selected ?? null);
+        const alternativeSummary = summarizeRuntimeSelectorAlternatives(candidateEvaluations);
         const selectedForReasons = chosen?.selected ?? runtimeRoute(selectedFromPolicyRow(row));
         const hasRuntimeProof = chosen?.hasRuntimeProof === true;
         const runtimeEnv = chosen?.runtimeEnv ?? null;
@@ -663,6 +736,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             runtimeEnv,
             runtimeHealth,
             providerCooldown,
+            alternativeSummary,
             reasons,
             nextActions: blocked
                 ? [
@@ -707,6 +781,8 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             providerCooldownBlockedCount: routes.filter((route) =>
                 route.reasons.some((reason) => reason.startsWith('blocked:provider_health_cooldown:')),
             ).length,
+            alternativeEvaluatedCount: routes.reduce((sum, route) => sum + route.alternativeSummary.evaluatedCount, 0),
+            alternativeUsableCount: routes.reduce((sum, route) => sum + route.alternativeSummary.usableCount, 0),
         },
         routes,
     };
