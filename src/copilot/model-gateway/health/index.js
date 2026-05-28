@@ -26,4 +26,9 @@ export {
     subscribeByokProviderHealthChanges,
 } from './provider-health.js';
 export { classifyByokProviderFailure } from './provider-failure.js';
+export {
+    comparableModelGatewayRuntimeHealthRecord,
+    diffModelGatewayRuntimeHealthSnapshots,
+    summarizeModelGatewayRuntimeHealthRecords,
+} from './runtime-health-diff.js';
 export { installByokProviderHealthSqliteMirror, mirrorByokProviderHealthToSqlite } from './sqlite-health-mirror.js';

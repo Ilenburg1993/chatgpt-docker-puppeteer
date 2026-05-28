@@ -7,6 +7,8 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+    comparableModelGatewayRuntimeHealthRecord,
+    diffModelGatewayRuntimeHealthSnapshots,
     flushByokProviderHealth,
     readByokProviderHealthState,
     readByokProviderModelHealth,
@@ -16,7 +18,8 @@ import {
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
     resetByokProviderHealthForTests,
-} from '../../../../src/copilot/model-gateway/health/provider-health.js';
+    summarizeModelGatewayRuntimeHealthRecords,
+} from '../../../../src/copilot/model-gateway/health/index.js';
 
 /** @type {string[]} */
 const cleanupDirs = [];
@@ -249,5 +252,80 @@ describe('BYOK provider chat health state', () => {
                 successCount: 1,
             }),
         );
+    });
+
+    it('classifica diff de runtime health separando regressão, falha nova e recuperação', () => {
+        const before = [
+            comparableModelGatewayRuntimeHealthRecord({
+                routeProfile: 'kilo',
+                providerId: 'kilo-code',
+                providerModel: 'stable',
+                lastStatus: 'ok',
+                lastSuccessAt: 1_000,
+            }),
+            comparableModelGatewayRuntimeHealthRecord({
+                routeProfile: 'kilo',
+                providerId: 'kilo-code',
+                providerModel: 'recovering',
+                agentProbeStatus: 'failed',
+                lastAgentProbeFailureAt: 1_000,
+            }),
+            comparableModelGatewayRuntimeHealthRecord({
+                routeProfile: 'openrouter-free',
+                providerId: 'openrouter',
+                providerModel: 'unknown-before',
+            }),
+        ];
+        const after = [
+            comparableModelGatewayRuntimeHealthRecord({
+                routeProfile: 'kilo',
+                providerId: 'kilo-code',
+                providerModel: 'stable',
+                lastStatus: 'failed',
+                lastSuccessAt: 1_000,
+                lastFailureAt: 2_000,
+                lastFailureKind: 'model_call',
+            }),
+            comparableModelGatewayRuntimeHealthRecord({
+                routeProfile: 'kilo',
+                providerId: 'kilo-code',
+                providerModel: 'recovering',
+                agentProbeStatus: 'ok',
+                lastAgentProbeFailureAt: 1_000,
+                lastAgentProbeSuccessAt: 3_000,
+            }),
+            comparableModelGatewayRuntimeHealthRecord({
+                routeProfile: 'openrouter-free',
+                providerId: 'openrouter',
+                providerModel: 'unknown-before',
+                agentProbeStatus: 'failed',
+                lastAgentProbeFailureAt: 2_000,
+            }),
+            comparableModelGatewayRuntimeHealthRecord({
+                routeProfile: 'kilo',
+                providerId: 'kilo-code',
+                providerModel: 'new-empty-agent',
+                agentProbeStatus: 'failed',
+                lastAgentProbeFailureAt: 4_000,
+            }),
+        ];
+
+        const diff = diffModelGatewayRuntimeHealthSnapshots(before, after);
+        const summary = summarizeModelGatewayRuntimeHealthRecords(after);
+
+        expect(diff.summary).toEqual({
+            added: 1,
+            removed: 0,
+            changed: 3,
+            regressions: 1,
+            newFailures: 1,
+            becameFailed: 2,
+            recovered: 1,
+        });
+        expect(diff.regressions[0]?.key).toBe('kilo|kilo-code|stable');
+        expect(diff.newFailures[0]?.key).toBe('kilo|kilo-code|new-empty-agent');
+        expect(diff.recovered[0]?.key).toBe('kilo|kilo-code|recovering');
+        expect(summary.byStatus.failed).toBe(3);
+        expect(summary.byStatus.ok).toBe(1);
     });
 });

@@ -5,10 +5,11 @@ import { fileURLToPath } from 'node:url';
 
 import {
     SqliteModelGatewayCatalogStore,
-    byokProviderHealthRecordKey,
-    byokProviderHealthRecordLastObservedAt,
+    comparableModelGatewayRuntimeHealthRecord,
+    diffModelGatewayRuntimeHealthSnapshots,
     listByokProviderModelHealth,
     mergeByokProviderHealthRecords,
+    summarizeModelGatewayRuntimeHealthRecords,
 } from '../src/copilot/model-gateway/index.js';
 import { setDbLogger } from '../src/copilot/db/sqlite.js';
 
@@ -40,97 +41,10 @@ function nowStamp() {
     return new Date().toISOString().replace(/[:.]/gu, '-');
 }
 
-function optionalString(value) {
-    return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-function statusOf(record) {
-    return optionalString(record['lastStatus']) ?? optionalString(record['agentProbeStatus']) ?? 'unknown';
-}
-
-function failureKindOf(record) {
-    return optionalString(record['lastFailureKind']) ?? optionalString(record['lastErrorContext']) ?? null;
-}
-
-function comparableRecord(record) {
-    return {
-        key: byokProviderHealthRecordKey(record) ?? optionalString(record['key']) ?? 'unknown',
-        routeProfile: optionalString(record['routeProfile']) ?? optionalString(record['profile']),
-        providerId: optionalString(record['providerId']) ?? optionalString(record['provider']),
-        providerModel: optionalString(record['providerModel']) ?? optionalString(record['model']),
-        lastStatus: optionalString(record['lastStatus']),
-        failureKind: failureKindOf(record),
-        lastFailureStatusCode: typeof record['lastFailureStatusCode'] === 'number' ? record['lastFailureStatusCode'] : null,
-        lastRetryAfterSeconds: typeof record['lastRetryAfterSeconds'] === 'number' ? record['lastRetryAfterSeconds'] : null,
-        lastResetAt: optionalString(record['lastResetAt']),
-        agentProbeStatus: optionalString(record['agentProbeStatus']),
-        observedAt: byokProviderHealthRecordLastObservedAt(record),
-        status: statusOf(record),
-    };
-}
-
-function summarize(records) {
-    const byProvider = {};
-    const byStatus = {};
-    const byFailureKind = {};
-    for (const record of records) {
-        const providerId = record.providerId ?? 'unknown';
-        const status = record.status ?? 'unknown';
-        const failureKind = record.failureKind ?? 'none';
-        byProvider[providerId] = (byProvider[providerId] ?? 0) + 1;
-        byStatus[status] = (byStatus[status] ?? 0) + 1;
-        byFailureKind[failureKind] = (byFailureKind[failureKind] ?? 0) + 1;
-    }
-    return {
-        total: records.length,
-        byProvider,
-        byStatus,
-        byFailureKind,
-    };
-}
-
-function mapByKey(records) {
-    return new Map(records.map((record) => [record.key, record]));
-}
-
-function diffSnapshots(beforeRecords, afterRecords) {
-    const before = mapByKey(beforeRecords);
-    const after = mapByKey(afterRecords);
-    const added = [];
-    const removed = [];
-    const changed = [];
-    for (const [key, record] of after) {
-        const previous = before.get(key);
-        if (!previous) {
-            added.push(record);
-            continue;
-        }
-        const fields = ['status', 'failureKind', 'lastFailureStatusCode', 'lastRetryAfterSeconds', 'lastResetAt', 'agentProbeStatus'];
-        const changedFields = fields.filter((field) => previous[field] !== record[field]);
-        if (changedFields.length > 0) changed.push({ key, before: previous, after: record, changedFields });
-    }
-    for (const [key, record] of before) {
-        if (!after.has(key)) removed.push(record);
-    }
-    const regressions = changed.filter((item) => item.before.status === 'ok' && item.after.status === 'failed');
-    return {
-        added,
-        removed,
-        changed,
-        regressions,
-        summary: {
-            added: added.length,
-            removed: removed.length,
-            changed: changed.length,
-            regressions: regressions.length,
-        },
-    };
-}
-
 async function readBaseline(filePath) {
     if (!filePath) return null;
     const parsed = JSON.parse(await readFile(filePath, 'utf8'));
-    return Array.isArray(parsed.records) ? parsed.records.map(comparableRecord) : [];
+    return Array.isArray(parsed.records) ? parsed.records.map(comparableModelGatewayRuntimeHealthRecord) : [];
 }
 
 async function readCurrentHealth() {
@@ -143,7 +57,7 @@ async function readCurrentHealth() {
         sqliteRuntimeError = error instanceof Error ? error.message : String(error);
     }
     const records = mergeByokProviderHealthRecords(fileRecords, sqliteRecords)
-        .map(comparableRecord)
+        .map(comparableModelGatewayRuntimeHealthRecord)
         .sort((left, right) => right.observedAt - left.observedAt || left.key.localeCompare(right.key));
     return { records, fileRecords: fileRecords.length, sqliteRecords: sqliteRecords.length, sqliteRuntimeError };
 }
@@ -184,12 +98,21 @@ const snapshot = {
         sqliteRecords: current.sqliteRecords,
         sqliteRuntimeError: current.sqliteRuntimeError,
     },
-    summary: summarize(current.records),
+    summary: summarizeModelGatewayRuntimeHealthRecords(current.records),
     records: current.records,
 };
 const diff = baseline
-    ? diffSnapshots(baseline, current.records)
-    : { added: [], removed: [], changed: [], regressions: [], summary: { added: 0, removed: 0, changed: 0, regressions: 0 } };
+    ? diffModelGatewayRuntimeHealthSnapshots(baseline, current.records)
+    : {
+          added: [],
+          removed: [],
+          changed: [],
+          regressions: [],
+          newFailures: [],
+          becameFailed: [],
+          recovered: [],
+          summary: { added: 0, removed: 0, changed: 0, regressions: 0, newFailures: 0, becameFailed: 0, recovered: 0 },
+      };
 const persistence = write ? await writeSnapshot(snapshot, outDir) : { filePath: null, latestPath: null };
 const summary = {
     schema: 'model-gateway-runtime-health-diff',
@@ -214,7 +137,7 @@ if (json) {
         `source: file=${current.fileRecords} sqlite=${current.sqliteRecords} sqliteError=${current.sqliteRuntimeError ?? '-'}\n`,
     );
     process.stdout.write(
-        `diff: added=${diff.summary.added} removed=${diff.summary.removed} changed=${diff.summary.changed} regressions=${diff.summary.regressions}\n`,
+        `diff: added=${diff.summary.added} removed=${diff.summary.removed} changed=${diff.summary.changed} regressions=${diff.summary.regressions} newFailures=${diff.summary.newFailures} becameFailed=${diff.summary.becameFailed} recovered=${diff.summary.recovered}\n`,
     );
     if (write) process.stdout.write(`snapshot: ${persistence.filePath} latest=${persistence.latestPath}\n`);
 }

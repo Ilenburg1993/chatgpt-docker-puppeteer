@@ -367,6 +367,8 @@ export {
 export {
     classifyByokProviderFailure,
     clearByokProviderModelHealth,
+    comparableModelGatewayRuntimeHealthRecord,
+    diffModelGatewayRuntimeHealthSnapshots,
     flushByokProviderHealth,
     byokProviderHealthRecordKey,
     byokProviderHealthRecordLastObservedAt,
@@ -382,6 +384,7 @@ export {
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
     resetByokProviderHealthForTests,
+    summarizeModelGatewayRuntimeHealthRecords,
     subscribeByokProviderHealthChanges,
 } from './health/index.js';
 export {

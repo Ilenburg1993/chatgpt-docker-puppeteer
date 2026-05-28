@@ -7477,6 +7477,134 @@ Proxima etapa:
 - apenas depois rodar probes BYOK reais;
 - apos cada fase real, diffar health, espelhar SQLite e recomputar selector/readiness.
 
+Mudanca 61:
+
+Execucao dos primeiros live tests completos com `llm-b` e melhoria do diff de runtime health.
+
+Sequencia executada:
+
+- baseline de runtime health sem chamadas a provider;
+- controle terminal sem PR;
+- fixture BYOK sem provider real;
+- probes BYOK reais sem PR;
+- turno BYOK real completo com tools, streaming, `ask_user`, troca de modelo e troca de provider alternativo.
+
+Comandos executados:
+
+`npm run model-gateway:runtime-health:diff -- --write-snapshot`
+
+`npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000`
+
+`npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`
+
+`npm run terminal:llm-b:live-test -- --byok-real --no-pr --timeout-ms=600000`
+
+`npm run terminal:llm-b:live-test -- --byok-real --timeout-ms=900000`
+
+Artefatos principais:
+
+`artifacts/terminal-live/2026-05-28T00-59-32-668Z/summary.md`
+
+`artifacts/terminal-live/2026-05-28T01-00-19-895Z/summary.md`
+
+`artifacts/terminal-live/2026-05-28T01-01-23-674Z/summary.md`
+
+`artifacts/terminal-live/2026-05-28T01-04-07-536Z/summary.md`
+
+Resultado observado:
+
+- controle terminal: `PASS`;
+- fixture BYOK: `PASS`;
+- BYOK real sem PR: `PASS`;
+- BYOK real com turno completo: `PASS`;
+- SSE conectado e monotônico;
+- `ask_user` renderizado por uma unica fonte;
+- tools dinamicas exercitadas;
+- export Markdown gerado;
+- segredos locais nao vazaram no output;
+- telemetria BYOK nao foi renderizada como Premium Request;
+- `kilo-auto/free` executou chat, streaming, JSON, agent probe e turno real;
+- `kilo-auto/free` registrou falha de vision probe, e o terminal passou a refletir `no-vision` via cache/health;
+- `moonshotai/kimi-k2.6:free` teve sucesso em uma fase e depois `agent probe empty` em shortlist posterior;
+- apos o `empty`, `/byok recommend ... safe` nao promoveu `moonshotai/kimi-k2.6:free`, porque `safe` exige `agentProbeStatus=ok`.
+
+Estado pos-live:
+
+- runtime selector: `ok=true`;
+- runtime selector readiness: `7/7`;
+- access blocked: `0`;
+- env ready: `7/7`;
+- readiness: `ok=true`;
+- SQLite parity: `ok=true`;
+- redaction audit: `ok=true`;
+- runtime health mirror: `ok=true`;
+- health observations espelhadas: `18`;
+- probe results espelhados: `17`;
+- SQLite runtime rows: `842`.
+
+Lacuna identificada no pos-live:
+
+O diff de runtime health tratava o `moonshotai/kimi-k2.6:free` como registro adicionado e falho, mas nao possuia contador proprio para:
+
+- falha nova;
+- rota que passou de desconhecida para falha;
+- rota recuperada.
+
+Isso confundia a leitura operacional.
+
+Nao e correto transformar toda falha nova em regressao fatal, pois live tests tambem descobrem candidatos ruins.
+
+Mas tambem nao e correto esconder essa informacao dentro de `added`.
+
+Correcoes aplicadas:
+
+- criado modulo canonico `src/copilot/model-gateway/health/runtime-health-diff.js`;
+- o script `model-gateway:runtime-health:diff` passou a usar o modulo do gateway, nao logica privada solta;
+- o diff agora expõe `newFailures`;
+- o diff agora expõe `becameFailed`;
+- o diff agora expõe `recovered`;
+- o resumo humano imprime esses contadores;
+- a chave comparavel agora cai para identidade `routeProfile|providerId|providerModel` quando o registro ainda nao tem chave persistida;
+- o barrel `health/index.js` exporta os helpers;
+- o barrel principal `model-gateway/index.js` exporta os helpers;
+- contrato unitario cobre regressao, falha nova e recuperacao.
+
+Evidencia apos a correcao:
+
+`model-gateway:runtime-health:diff` contra o baseline pre-live reportou:
+
+- `added=1`;
+- `changed=10`;
+- `regressions=0`;
+- `newFailures=1`;
+- `becameFailed=0`;
+- `recovered=0`.
+
+O `newFailures=1` corresponde a:
+
+`kilo|kilo-code|moonshotai/kimi-k2.6:free`
+
+Interpretacao:
+
+- nao houve regressao de rota antes saudavel;
+- houve descoberta de candidato que falhou no agent probe;
+- a camada `safe` ja remove esse candidato de recomendacao operacional;
+- o proximo ciclo pode investigar se `empty` deve gerar backoff temporal mais forte, sem contaminar metadados canonicos.
+
+Validacoes focadas:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_provider_health.spec.js`
+
+Resultado:
+
+`6 passed`
+
+`npm run model-gateway:typecheck`
+
+Resultado:
+
+`passed`
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
