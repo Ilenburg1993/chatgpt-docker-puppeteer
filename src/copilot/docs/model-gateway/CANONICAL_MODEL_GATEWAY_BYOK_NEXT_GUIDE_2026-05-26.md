@@ -11487,6 +11487,48 @@ Impacto:
 - futuras execucoes guiadas pelo plano nao vao ignorar falhas recentes de `live_turn`;
 - o operador tem caminho claro para achar snapshot bruto e diff comparativo pos-live.
 
+## 21.132. Mudanca 132 - Inventario canonico de comandos alinhado ao live plan
+
+Data: 2026-05-28.
+
+Problema:
+
+- `npm run model-gateway:commands -- --phase=live-readiness` ainda mostrava os comandos BYOK reais antigos com
+  `--byok-real-route-temporary-failure-cooldown-ms=1`;
+- isso contradizia:
+  - `run-terminal-llm-b-live-test.mjs`;
+  - `model-gateway-live-readiness.mjs`;
+  - `model-gateway-live-plan.mjs`;
+- o cockpit de comandos e a fonte que operador humano e LLM tendem a copiar, entao essa divergencia poderia reabrir
+  rotas com `live_turn` falho recente.
+
+Correcao:
+
+- `MODEL_GATEWAY_CANONICAL_COMMANDS` agora anuncia cooldown `900000` para:
+  - `live.terminal.byok-real-no-pr`;
+  - `live.terminal.byok-real-full`;
+- o resumo de `runtime-health.diff` informa que `--write-snapshot` grava:
+  - `latest.json`;
+  - `latest-diff.json`.
+
+Evidencia:
+
+- comando:
+  `npm --silent run model-gateway:commands -- --phase=live-readiness`;
+- resultado:
+  - comandos BYOK reais exibem `--byok-real-route-temporary-failure-cooldown-ms=900000`;
+  - `runtime-health.diff` informa `latest-diff.json`;
+- teste:
+  `npm --silent exec vitest -- tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "command inventory"`;
+- resultado:
+  - `1 passed`;
+  - `212 skipped`.
+
+Impacto:
+
+- package, Makefile, live plan, readiness, terminal runner e cockpit de comandos voltam a concordar;
+- o caminho operacional canônico nao induz mais cooldown curto por acidente.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
