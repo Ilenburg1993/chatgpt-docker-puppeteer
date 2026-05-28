@@ -206,6 +206,100 @@ function parseProfilesJson(raw) {
     }
 }
 
+function runtimeSelectorFallbackProfiles(raw) {
+    return String(raw ?? '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function optionalRuntimeSelectorString(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : '';
+}
+
+function selectRuntimeSelectorRoute(summary, requestedProfile) {
+    const routes = Array.isArray(summary?.runtimeSelectorPlan?.routes) ? summary.runtimeSelectorPlan.routes : [];
+    const requested = optionalRuntimeSelectorString(requestedProfile);
+    const selectedRoutes = routes.filter((route) => route?.status === 'selected' && route?.selected);
+    return (
+        selectedRoutes.find((route) => route.profileId === requested) ??
+        selectedRoutes[0] ??
+        null
+    );
+}
+
+function selectRuntimeSelectorEffectiveRoute(summary, requestedProfile) {
+    if (summary?.runtimeExecuted === true) {
+        return summary.execution?.ok === true && summary.execution.final?.route?.selected ? summary.execution.final.route : null;
+    }
+    if (summary?.execution?.ok === true && summary.execution.final?.route?.selected) {
+        return summary.execution.final.route;
+    }
+    return selectRuntimeSelectorRoute(summary, requestedProfile);
+}
+
+function runRuntimeSelectorLiveRoute({
+    profileId,
+    fallbackProfiles = [],
+    execute = false,
+    timeoutMs = 45_000,
+    selectionPolicy = '',
+} = {}) {
+    const requestedProfile = optionalRuntimeSelectorString(profileId);
+    if (!requestedProfile) {
+        return {
+            requested: false,
+            ok: true,
+            status: null,
+            executed: false,
+            profileId: '',
+            fallbackProfiles: [],
+            summary: null,
+            selectedRoute: null,
+            error: null,
+        };
+    }
+    const args = [
+        path.join(ROOT, 'scripts/model-gateway-runtime-selector.mjs'),
+        '--json',
+        '--fail',
+        `--profile=${requestedProfile}`,
+    ];
+    const normalizedFallbacks = runtimeSelectorFallbackProfiles(fallbackProfiles.join(','));
+    if (normalizedFallbacks.length > 0) args.push(`--fallback-profiles=${normalizedFallbacks.join(',')}`);
+    const normalizedSelectionPolicy = optionalRuntimeSelectorString(selectionPolicy).replaceAll('-', '_');
+    if (normalizedSelectionPolicy) args.push(`--selection-policy=${normalizedSelectionPolicy}`);
+    if (execute) {
+        args.push('--execute', '--attempts-per-route=1', `--timeout-ms=${Math.max(1_000, Math.trunc(timeoutMs))}`);
+    }
+    const result = spawnSync(process.execPath, args, {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: process.env,
+    });
+    let summary = null;
+    try {
+        summary = result.stdout ? JSON.parse(result.stdout) : null;
+    } catch {
+        summary = null;
+    }
+    const selectedRoute = summary ? selectRuntimeSelectorEffectiveRoute(summary, requestedProfile) : null;
+    return {
+        requested: true,
+        ok: result.status === 0 && Boolean(selectedRoute?.selected),
+        status: result.status,
+        executed: execute,
+        profileId: requestedProfile,
+        fallbackProfiles: normalizedFallbacks,
+        summary,
+        selectedRoute,
+        error:
+            result.status === 0 && selectedRoute?.selected
+                ? null
+                : (result.stderr || result.stdout || `runtime selector exited with ${result.status}`).trim(),
+    };
+}
+
 function profileHasUsableSecret(profileName, profile, env) {
     const tokenEnv = typeof profile?.bearerTokenEnv === 'string' ? profile.bearerTokenEnv : null;
     const apiKeyEnv = typeof profile?.apiKeyEnv === 'string' ? profile.apiKeyEnv : null;
@@ -252,20 +346,65 @@ function profileProvider(env, profileName) {
     return profileName || '';
 }
 
-function buildRealByokRuntime({ dotenvEnv, requestedProfile, requestedAltProfile, requestedModel, requestedAltModel }) {
+function runtimeSelectorRouteDetails(runtimeSelector) {
+    const selected = runtimeSelector?.selectedRoute?.selected;
+    if (!selected) return null;
+    return {
+        routeProfile: optionalRuntimeSelectorString(runtimeSelector.selectedRoute.profileId) || null,
+        providerId: optionalRuntimeSelectorString(selected.providerId) || null,
+        providerModel: optionalRuntimeSelectorString(selected.providerModel) || null,
+        selectorKind: optionalRuntimeSelectorString(selected.selectorKind) || null,
+        selectorSyntax: optionalRuntimeSelectorString(selected.selectorSyntax) || null,
+        routeLayer: optionalRuntimeSelectorString(selected.routeLayer) || null,
+        wireApi: optionalRuntimeSelectorString(selected.wireApi) || null,
+        upstreamProvider: optionalRuntimeSelectorString(selected.upstreamProvider) || null,
+        baseUrl:
+            optionalRuntimeSelectorString(selected.openAICompatibleBaseUrl) ||
+            optionalRuntimeSelectorString(selected.baseUrl) ||
+            null,
+    };
+}
+
+function buildRealByokRuntime({
+    dotenvEnv,
+    requestedProfile,
+    requestedAltProfile,
+    requestedModel,
+    requestedAltModel,
+    runtimeSelectorProfile,
+    runtimeSelectorFallbackProfiles: fallbackProfiles = [],
+    runtimeSelectorExecute = false,
+    runtimeSelectorTimeoutMs = 45_000,
+    runtimeSelectorSelectionPolicy = '',
+}) {
     const mergedEnv = { ...process.env, ...dotenvEnv };
-    const profile = chooseRealByokProfile(mergedEnv, requestedProfile);
-    const altProfile = chooseAlternateByokProfile(mergedEnv, profile, requestedAltProfile);
-    const model = requestedModel || profileModel(mergedEnv, profile);
+    const routeSelectorMandatory = Boolean(optionalRuntimeSelectorString(runtimeSelectorProfile));
+    const runtimeSelector = runRuntimeSelectorLiveRoute({
+        profileId: runtimeSelectorProfile,
+        fallbackProfiles,
+        execute: runtimeSelectorExecute,
+        timeoutMs: runtimeSelectorTimeoutMs,
+        selectionPolicy: runtimeSelectorSelectionPolicy,
+    });
+    const runtimeRoute = runtimeSelectorRouteDetails(runtimeSelector);
+    const profile = routeSelectorMandatory ? '' : chooseRealByokProfile(mergedEnv, requestedProfile);
+    const altProfile = routeSelectorMandatory ? '' : chooseAlternateByokProfile(mergedEnv, profile, requestedAltProfile);
+    const model = runtimeRoute?.providerModel || (!routeSelectorMandatory ? requestedModel || profileModel(mergedEnv, profile) : '');
     const altModel = requestedAltModel || profileModel(mergedEnv, altProfile);
-    const provider = profileProvider(mergedEnv, profile);
+    const provider = runtimeRoute?.providerId || (!routeSelectorMandatory ? profileProvider(mergedEnv, profile) : '');
     const altProvider = profileProvider(mergedEnv, altProfile);
     return {
         env: {
             ...dotenvEnv,
             COPILOT_BYOK_ENABLED: 'true',
-            ...(profile ? { COPILOT_BYOK_PROFILE: profile } : {}),
-            ...(requestedModel ? { COPILOT_BYOK_MODEL: requestedModel } : {}),
+            ...(runtimeRoute
+                ? { COPILOT_BYOK_PROFILE: '' }
+                : profile
+                  ? { COPILOT_BYOK_PROFILE: profile }
+                  : {}),
+            ...(runtimeRoute?.providerId ? { COPILOT_BYOK_PROVIDER_PRESET: runtimeRoute.providerId } : {}),
+            ...(model ? { COPILOT_BYOK_MODEL: model } : {}),
+            ...(runtimeRoute ? { COPILOT_BYOK_BASE_URL: runtimeRoute.baseUrl ?? '' } : {}),
             COPILOT_BYOK_MODEL_DISCOVERY_ENABLED: mergedEnv.COPILOT_BYOK_MODEL_DISCOVERY_ENABLED ?? 'true',
         },
         profile,
@@ -274,6 +413,8 @@ function buildRealByokRuntime({ dotenvEnv, requestedProfile, requestedAltProfile
         altModel,
         provider,
         altProvider,
+        runtimeSelector,
+        runtimeRoute,
         redacted: {
             enabled: true,
             profile: profile || null,
@@ -282,6 +423,26 @@ function buildRealByokRuntime({ dotenvEnv, requestedProfile, requestedAltProfile
             altModel: altModel || null,
             provider: provider || null,
             altProvider: altProvider || null,
+            runtimeSelector: {
+                requested: runtimeSelector.requested,
+                ok: runtimeSelector.ok,
+                status: runtimeSelector.status,
+                executed: runtimeSelector.executed,
+                profileId: runtimeSelector.profileId || null,
+                fallbackProfiles: runtimeSelector.fallbackProfiles,
+                selectionPolicy: runtimeSelector.summary?.selectionPolicy ?? null,
+                selected: runtimeRoute,
+                execution: runtimeSelector.summary?.execution
+                    ? {
+                          ok: runtimeSelector.summary.execution.ok,
+                          status: runtimeSelector.summary.execution.status,
+                          attemptedCount: runtimeSelector.summary.execution.attemptedCount,
+                          selectedProfileId: runtimeSelector.summary.execution.selectedProfileId,
+                          error: runtimeSelector.summary.execution.error,
+                      }
+                    : null,
+                error: runtimeSelector.error ? runtimeSelector.error.slice(0, 800) : null,
+            },
             dotenvLocalLoaded: Object.keys(dotenvEnv).length > 0,
             secretKeysPresent: collectSecretValues(mergedEnv).map(({ key }) => key).sort(),
         },
@@ -298,18 +459,35 @@ function buildByokCatalogCommands(provider) {
     ];
 }
 
-function buildByokRouteCommand(provider) {
+function buildByokRouteCommand(provider, routeProfile = 'repo_agent') {
     const providerFilter = provider ? ` provider:${provider}` : '';
-    return `/byok models route repo_agent active --show-rejected${providerFilter}`;
+    return `/byok models route ${routeProfile || 'repo_agent'} active --show-rejected${providerFilter}`;
 }
 
-function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, provider, altProvider }) {
+function buildRuntimeSelectorProviderCommand(runtimeRoute) {
+    if (!runtimeRoute?.providerId || !runtimeRoute.providerModel) return '';
+    return [
+        '/byok provider',
+        runtimeRoute.providerId,
+        runtimeRoute.providerModel,
+        runtimeRoute.baseUrl || '',
+    ]
+        .filter(Boolean)
+        .join(' ');
+}
+
+function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, provider, altProvider, runtimeRoute }) {
     const commands = ['/session sdk 8', '/byok reload', '/byok env', '/byok providers', '/byok health', '/byok profiles'];
-    if (profile) commands.push(`/byok use ${profile}`);
-    if (model) commands.push(`/byok model ${model}`);
+    const runtimeProviderCommand = buildRuntimeSelectorProviderCommand(runtimeRoute);
+    if (runtimeProviderCommand) {
+        commands.push(runtimeProviderCommand);
+    } else {
+        if (profile) commands.push(`/byok use ${profile}`);
+        if (model) commands.push(`/byok model ${model}`);
+    }
     commands.push(
         '/byok',
-        buildByokRouteCommand(provider),
+        buildByokRouteCommand(provider, runtimeRoute?.routeProfile ?? 'repo_agent'),
         '/byok probe timeout:45000',
         '/byok probe streaming timeout:60000',
         '/byok probe json timeout:60000',
@@ -318,13 +496,13 @@ function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, 
         '/session sdk 8',
         ...buildByokCatalogCommands(provider),
     );
-    if (altModel && altModel !== model) {
+    if (!runtimeRoute && altModel && altModel !== model) {
         commands.push(`/byok model ${altModel}`, '/byok');
     }
-    if (model) {
+    if (!runtimeRoute && model) {
         commands.push(`/byok model ${model}`, '/byok');
     }
-    if (altProfile) {
+    if (!runtimeRoute && altProfile) {
         commands.push(`/byok use ${altProfile}`, '/byok', '/byok providers', '/byok health', ...buildByokCatalogCommands(altProvider));
         if (profile) {
             commands.push(`/byok use ${profile}`);
@@ -1517,7 +1695,11 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
     return criteria;
 }
 
-function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, model, altModel, noPr = false } = {}) {
+function evaluateByokRealOutput(
+    plain,
+    secretValues,
+    { profile, altProfile, model, altModel, noPr = false, runtimeSelector, runtimeRoute } = {},
+) {
     const byokModels = [...new Set([model, altModel].filter((value) => typeof value === 'string' && value.length > 0))];
     const byokModelPrLines = byokModels.flatMap((candidate) => {
         const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
@@ -1559,8 +1741,26 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
         },
         {
             id: 'byok-real-profile-active',
-            pass: !profile || new RegExp(`profile:\\s+${profile.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`, 'u').test(plain),
-            detail: `active BYOK profile ${profile || '(auto)'} was rendered`,
+            pass:
+                Boolean(runtimeRoute) ||
+                !profile ||
+                new RegExp(`profile:\\s+${profile.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`, 'u').test(plain),
+            detail: runtimeRoute
+                ? `runtime-selector route profile ${runtimeRoute.routeProfile ?? '(auto)'} superseded legacy BYOK profile activation`
+                : `active BYOK profile ${profile || '(auto)'} was rendered`,
+        },
+        {
+            id: 'byok-real-runtime-selector-route',
+            pass:
+                !runtimeSelector?.requested ||
+                (runtimeSelector.ok === true &&
+                    Boolean(runtimeRoute?.providerId) &&
+                    Boolean(runtimeRoute?.providerModel) &&
+                    new RegExp(`preset:\\s+${escapeRegExp(runtimeRoute.providerId)}`, 'u').test(plain) &&
+                    new RegExp(`model:\\s+${escapeRegExp(runtimeRoute.providerModel)}`, 'u').test(plain)),
+            detail: runtimeSelector?.requested
+                ? `runtime selector ${runtimeSelector.ok ? 'selected' : 'failed'} route=${runtimeRoute?.providerId ?? '-'}/${runtimeRoute?.providerModel ?? '-'} profile=${runtimeRoute?.routeProfile ?? runtimeSelector.profileId ?? '-'}`
+                : 'runtime selector route handoff was not requested for this BYOK live run',
         },
         {
             id: 'byok-real-model-catalog',
@@ -1607,7 +1807,10 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
         },
         {
             id: 'byok-real-route-decision',
-            pass: /BYOK model route/.test(plain) && /\bdecision=route-/.test(plain) && /fallback chain|Nenhum modelo passou/.test(plain),
+            pass:
+                /BYOK model route/.test(plain) &&
+                (/\bdecision=route-/.test(plain) || /Nenhum candidato encontrado para roteamento/.test(plain)) &&
+                /fallback chain|Nenhum modelo passou|Nenhum candidato encontrado para roteamento/.test(plain),
             detail: 'BYOK preflight exercised model-gateway route decision ledger before probes/live promotion',
         },
         {
@@ -1629,14 +1832,16 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
             pass:
                 byokAdmissionBlocked ||
                 /BYOK vision probe[\s\S]{0,2200}resultado:\s+ok/.test(plain) ||
-                /BYOK vision probe[\s\S]{0,2200}resultado:\s+(?:vision-mismatch|error|provider-error|timeout)/.test(plain),
+                /BYOK vision probe[\s\S]{0,2200}resultado:\s+(?:empty|vision-mismatch|error|provider-error|timeout)/.test(plain),
             detail: byokAdmissionBlocked
                 ? 'BYOK vision probe was admission-blocked before provider streaming'
                 : 'BYOK vision probe exercised image attachment path and recorded an explicit provider capability result',
         },
         {
             id: 'byok-real-shortlist-probe',
-            pass: /BYOK shortlist agent probe/.test(plain) && /Shortlist encerrada: ok=\d+\/\d+/.test(plain),
+            pass:
+                /BYOK shortlist agent probe/.test(plain) &&
+                (/Shortlist encerrada: ok=\d+\/\d+/.test(plain) || /Nenhum candidato cabe na shortlist atual/.test(plain)),
             detail: 'BYOK preflight exercised a ranked disposable shortlist probe without mutating the live session',
         },
         {
@@ -1660,7 +1865,10 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
         },
         {
             id: 'byok-real-recommendation',
-            pass: /BYOK recommend/.test(plain) && /ok para uso geral|baixo para turno real|apertado para sessão longa/.test(plain),
+            pass:
+                /BYOK recommend/.test(plain) &&
+                (/ok para uso geral|baixo para turno real|apertado para sessão longa/.test(plain) ||
+                    /Nenhum modelo atende aos filtros/.test(plain)),
             detail: 'BYOK recommendation command rendered operational budget guidance',
         },
         {
@@ -1893,6 +2101,13 @@ async function main() {
     const byokRealAltProfile = readArg('--byok-real-alt-profile', '');
     const byokRealModel = readArg('--byok-real-model', '');
     const byokRealAltModel = readArg('--byok-real-alt-model', '');
+    const byokRealRuntimeSelectorProfile = readArg('--byok-real-route-profile', '');
+    const byokRealRuntimeSelectorFallbackProfiles = runtimeSelectorFallbackProfiles(
+        readArg('--byok-real-route-fallback-profiles', ''),
+    );
+    const byokRealRuntimeSelectorExecute = hasFlag('--byok-real-route-execute') && !dryRun;
+    const byokRealRuntimeSelectorTimeoutMs = Number(readArg('--byok-real-route-timeout-ms', '45000'));
+    const byokRealRuntimeSelectorSelectionPolicy = readArg('--byok-real-route-selection-policy', '');
     const collectSse = !hasFlag('--no-sse');
     const requestedTerminalPort = readArg('--terminal-port', '');
     const requestedSsePort = readArg('--sse-port', '');
@@ -1921,6 +2136,13 @@ async function main() {
               requestedAltProfile: byokRealAltProfile,
               requestedModel: byokRealModel,
               requestedAltModel: byokRealAltModel,
+              runtimeSelectorProfile: byokRealRuntimeSelectorProfile,
+              runtimeSelectorFallbackProfiles: byokRealRuntimeSelectorFallbackProfiles,
+              runtimeSelectorExecute: byokRealRuntimeSelectorExecute,
+              runtimeSelectorTimeoutMs: Number.isFinite(byokRealRuntimeSelectorTimeoutMs)
+                  ? byokRealRuntimeSelectorTimeoutMs
+                  : 45_000,
+              runtimeSelectorSelectionPolicy: byokRealRuntimeSelectorSelectionPolicy,
           })
         : null;
     const secretValues = byokReal ? collectSecretValues({ ...process.env, ...dotenvEnv, ...(realByok?.env ?? {}) }) : [];

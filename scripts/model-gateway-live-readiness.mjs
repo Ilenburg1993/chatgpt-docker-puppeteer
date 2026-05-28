@@ -285,8 +285,8 @@ const commands = [
     'npm run model-gateway:runtime-health:mirror',
     'npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000',
     'npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
-    'npm run terminal:llm-b:live-test -- --byok-real --no-pr --timeout-ms=600000',
-    'npm run terminal:llm-b:live-test -- --byok-real --timeout-ms=900000',
+    'npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --no-pr --timeout-ms=600000',
+    'npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --timeout-ms=900000',
 ];
 const summary = {
     schema: 'model-gateway-live-readiness',

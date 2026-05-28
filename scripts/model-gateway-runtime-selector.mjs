@@ -21,6 +21,7 @@ import {
     summarizeModelGatewayRuntimeAccountOverlays,
 } from '../src/copilot/model-gateway/index.js';
 import { setDbLogger } from '../src/copilot/db/sqlite.js';
+import { shutdownClient } from '../src/copilot/sdk/session/index.js';
 import { loadModelGatewayDotenv } from './model-gateway-env.mjs';
 
 loadModelGatewayDotenv();
@@ -405,6 +406,10 @@ if (json) {
             `runtime-health: attempted=${runtimeHealthPersistence.attempted ? 'yes' : 'no'} records=${runtimeHealthPersistence.records} observations=${runtimeHealthPersistence.healthObservations} probes=${runtimeHealthPersistence.probeResults} skipped=${runtimeHealthPersistence.skippedRecords} run=${runtimeHealthPersistence.runId ?? '-'} error=${runtimeHealthPersistence.error ?? '-'}\n`,
         );
     }
+}
+
+if (execute) {
+    await shutdownClient({ force: true });
 }
 
 if (fail && !summary.ok) process.exit(1);

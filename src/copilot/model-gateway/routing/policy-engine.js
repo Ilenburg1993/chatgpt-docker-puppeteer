@@ -19,6 +19,7 @@ import { buildModelGatewayRouteCandidates } from './candidate-builder.js';
 import { MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON } from './local-provider-opt-in.js';
 import { resolveModelGatewayTaskProfile } from './task-profiles.js';
 import { evaluateModelGatewayEligibility } from '../eligibility/index.js';
+import { isModelGatewayRuntimeEligibilityOverlayDecision } from '../eligibility/runtime-overlay-decisions.js';
 
 const CONFIDENCE_SCORE = Object.freeze({
     unknown: 0,
@@ -509,15 +510,15 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     if (!healthDecision.include) rejectedReasons.push(healthDecision.reason);
     if (healthDecision.health) {
         if (healthDecision.health.lastStatus === 'ok') {
-            score += 25;
+            score += 140;
             reasons.push('chat_health_ok');
         }
         if (isGatewayModelAgentProbeVerified(healthDecision.health)) {
-            score += 80;
+            score += 140;
             reasons.push('agent_probe_verified');
         }
         for (const kind of listGatewayModelVerifiedProbeKinds(healthDecision.health)) {
-            score += 10;
+            score += 35;
             reasons.push(`runtime_probe_verified:${kind}`);
         }
         for (const kind of preferredProbeKinds) {
@@ -705,8 +706,15 @@ function findRouteOptionForModel(model, routes) {
  */
 function findEligibilityDecisionForModel(model, profile, decisions, options = {}) {
     const key = modelEligibilityKey(model);
+    const scopedDecisions = decisions.filter((decision) => eligibilityDecisionMatchesSelectionScope(decision, profile, options));
     return (
-        decisions.find((decision) => eligibilityDecisionMatchesRoute(decision, key) && eligibilityDecisionMatchesSelectionScope(decision, profile, options)) ??
+        scopedDecisions.find((decision) => eligibilityDecisionMatchesRoute(decision, key) && isModelGatewayRuntimeEligibilityOverlayDecision(decision)) ??
+        scopedDecisions.find(
+            (decision) =>
+                eligibilityDecisionMatchesProviderModel(model, decision) &&
+                isModelGatewayRuntimeEligibilityOverlayDecision(decision),
+        ) ??
+        scopedDecisions.find((decision) => eligibilityDecisionMatchesRoute(decision, key)) ??
         null
     );
 }
@@ -726,6 +734,23 @@ function eligibilityDecisionMatchesRoute(decision, key) {
             String(decision['selectorSyntax'] ?? decision['providerModel'] ?? 'unknown-model'),
         ].join(':') === key
     );
+}
+
+/**
+ * Runtime/account overlays are sometimes generated at provider-model scope before a route-specific selector candidate
+ * is rebuilt. A concrete runtime blocker for the same provider/model/account must override older eligible decisions so
+ * the selector does not keep retrying a route that has already reported exhausted credits, disabled keys or rate caps.
+ *
+ * @param {Record<string, any>} model
+ * @param {Record<string, any>} decision
+ * @returns {boolean}
+ */
+function eligibilityDecisionMatchesProviderModel(model, decision) {
+    const modelProviderId = String(model['providerId'] ?? '').trim();
+    const decisionProviderId = String(decision['providerId'] ?? '').trim();
+    const modelProviderModel = String(model['providerModel'] ?? model['id'] ?? '').trim();
+    const decisionProviderModel = String(decision['providerModel'] ?? '').trim();
+    return Boolean(modelProviderId && modelProviderModel && modelProviderId === decisionProviderId && modelProviderModel === decisionProviderModel);
 }
 
 /**

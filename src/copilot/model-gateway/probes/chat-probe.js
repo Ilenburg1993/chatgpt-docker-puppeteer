@@ -10,6 +10,7 @@
 
 import {
     createPermissionHandler,
+    abortSession,
     onSessionEvents,
     readConfiguredByokState,
     resolveConfiguredByokSessionOverrides,
@@ -223,7 +224,17 @@ export async function runConfiguredByokChatProbe(options = {}) {
                         prompt,
                         ...(options.attachments ? { attachments: options.attachments } : {}),
                     };
-                    const reply = await sendAndWait(session, payload, timeoutMs);
+                    let reply;
+                    try {
+                        reply = await sendAndWait(session, payload, timeoutMs);
+                    } catch (error) {
+                        try {
+                            await abortSession(session);
+                        } catch {
+                            // Best-effort abort: the original provider/SDK failure remains the probe result.
+                        }
+                        throw error;
+                    }
                     const content = typeof reply?.data?.content === 'string' ? reply.data.content : '';
                     if (content) finalContent = content;
                 } finally {

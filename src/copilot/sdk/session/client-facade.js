@@ -14,6 +14,7 @@
 
 import { forceStopClient, getClient, getClientState, stopClient } from './client.js';
 import { createSession, deleteSession, disconnectSession, resumeOrCreate } from './lifecycle.js';
+import { logSwallowed } from '#copilot/core/error-handlers';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -102,6 +103,37 @@ export async function withSession(opts, fn) {
 }
 
 /**
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {number} timeoutMs
+ * @param {string} label
+ * @returns {Promise<T>}
+ */
+function withCleanupTimeout(promise, timeoutMs, label) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => {
+            const timeout = setTimeout(() => reject(new Error(`[sdk/client-facade] ${label} excedeu ${timeoutMs}ms`)), timeoutMs);
+            timeout.unref?.();
+        }),
+    ]);
+}
+
+/**
+ * @param {unknown} error
+ * @param {string} context
+ * @returns {Promise<void>}
+ */
+async function forceStopAfterEphemeralCleanupFailure(error, context) {
+    logSwallowed(error, context);
+    try {
+        await forceStopClient();
+    } catch (forceStopError) {
+        logSwallowed(forceStopError, `${context}.forceStopClient`);
+    }
+}
+
+/**
  * Cria uma sessão de sonda e remove também o estado persistido ao terminar.
  *
  * `disconnect()` sozinho só solta o handle em memória; probes de catálogo/modelo não devem deixar sessões temporárias
@@ -125,12 +157,18 @@ export async function withEphemeralSession(opts, fn) {
         const asyncDispose = disposable[Symbol.asyncDispose];
         try {
             if (typeof asyncDispose === 'function') {
-                await asyncDispose.call(result.session);
+                await withCleanupTimeout(asyncDispose.call(result.session), 10_000, 'asyncDispose ephemeral session');
             } else {
-                await disconnectSession(result.session);
+                await withCleanupTimeout(disconnectSession(result.session), 10_000, 'disconnect ephemeral session');
             }
+        } catch (error) {
+            await forceStopAfterEphemeralCleanupFailure(error, 'sdk.client-facade.withEphemeralSession.cleanup');
         } finally {
-            await deleteSession(client, result.sessionId);
+            try {
+                await withCleanupTimeout(deleteSession(client, result.sessionId), 10_000, 'delete ephemeral session');
+            } catch (error) {
+                await forceStopAfterEphemeralCleanupFailure(error, 'sdk.client-facade.withEphemeralSession.delete');
+            }
         }
     }
 }

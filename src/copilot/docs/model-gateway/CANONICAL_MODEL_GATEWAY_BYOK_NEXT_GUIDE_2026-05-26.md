@@ -2637,7 +2637,7 @@ Quota/account overlay mais rico.
 - [ ] Criar suite especifica de redaction SQLite.
 - [ ] Criar suite especifica de local provider defaults.
 - [ ] Criar suite especifica de SDK quota overlay.
-- [ ] Criar comando de testes live plan sem runtime.
+- [x] Criar comando de testes live plan sem runtime.
 
 ### Faixa U - Live Tests
 
@@ -2647,8 +2647,8 @@ Quota/account overlay mais rico.
 - [x] BYOK real completo com Kilo passou historicamente.
 - [x] Live readiness atual ok.
 - [x] Rodar live plan apos primeira consolidacao deste guia.
-- [ ] Rodar live no-pr apos runtime persistence estar pronto.
-- [ ] Rodar live fixture apos runtime persistence estar pronto.
+- [x] Rodar live no-pr apos runtime persistence estar pronto.
+- [x] Rodar live fixture apos runtime persistence estar pronto.
 - [ ] Rodar live real no-pr com escopo explicito.
 - [ ] Rodar live real full com escopo explicito.
 - [ ] Registrar runtime proof sem promover catalogo.
@@ -8202,6 +8202,376 @@ Resultado:
 Resultado:
 
 `198 passed`
+
+Mudanca 73:
+
+Live control no-pr foi reexecutado apos runtime persistence.
+
+Evidencia:
+
+`npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000`
+
+Resultado:
+
+- `Status: PASS`;
+- `Exit code: 0`;
+- artefato: `artifacts/terminal-live/2026-05-28T13-08-08-672Z/summary.md`;
+- terminal pronto em TTY interativo;
+- nenhum turno LLM explicito aberto;
+- `/usage now`, `/activity`, `/session sdk commands`, `/session sdk events`, `/session sdk waits`, `/metrics`, `/events` e `/errors` renderizaram corretamente;
+- SSE conectado com ids monotonicos;
+- nenhum erro rastreado pelo terminal.
+
+Impacto:
+
+- a camada terminal/SDK/SSE esta apta para a proxima fase live controlada;
+- a fase ainda nao consome BYOK provider quota;
+- o proximo degrau deve continuar sendo fixture BYOK antes de real provider.
+
+Mudanca 74:
+
+Runner live real passa a aplicar a rota do runtime selector.
+
+Problema identificado:
+
+- `model-gateway:runtime-selector` ja escolhia rotas por perfil de tarefa;
+- o runner `terminal:llm-b:live-test -- --byok-real` ainda podia iniciar usando um perfil BYOK legado do `.env.local`;
+- isso permitia testar um provider/modelo diferente daquele que a selecao canonica havia escolhido;
+- em live real, esse desalinhamento poderia produzir falsos positivos, consumo de quota no provider errado, ou falhas que nao pertenciam a rota selecionada.
+
+Correcoes aplicadas:
+
+- adicionado `--byok-real-route-profile=<perfil>` ao runner live;
+- adicionado `--byok-real-route-fallback-profiles=<a,b>` ao runner live;
+- o runner chama `scripts/model-gateway-runtime-selector.mjs --json --fail`;
+- a rota selecionada e aplicada no ambiente inicial do terminal;
+- a rota selecionada tambem e aplicada explicitamente por `/byok provider <provider> <model> [baseUrl]`;
+- quando o modo runtime-selector esta ativo, o runner nao troca para alt profiles depois da rota canonica;
+- o plano live e o readiness passaram a recomendar:
+  - `--byok-real-route-profile=repo_agent`;
+  - `--byok-real-route-fallback-profiles=code,tool_agent`;
+- o inventario canonico de comandos agora lista os comandos live control, fixture e real;
+- o criterio `byok-real-runtime-selector-route` valida que o terminal renderizou o provider/modelo selecionado;
+- corrigido detalhe de reason em `buildModelGatewayRuntimeSelectorPlan`: `blocked:runtime_proof_required` so aparece quando a prova realmente esta ausente.
+
+Evidencia sem runtime:
+
+`npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --no-pr --dry-run --out-dir artifacts/terminal-live/dry-run-runtime-selector-handoff`
+
+Resultado:
+
+- prompt gerado sem abrir terminal real;
+- primeira rota aplicada:
+  - provider `chutes`;
+  - model `Qwen/Qwen3-235B-A22B-Thinking-2507`;
+  - base URL `https://llm.chutes.ai/v1`;
+- o roteiro permaneceu na rota escolhida e nao retornou para perfil BYOK legado.
+
+Impacto:
+
+- live BYOK real fica alinhado com o runtime selector;
+- o operador testa exatamente a rota escolhida por metadados + overlays + env readiness;
+- reduzimos risco de gastar quota em provider incorreto;
+- a fase full-turn fica bloqueada conceitualmente ate fixture e no-pr real passarem.
+
+Mudanca 75:
+
+Fixture BYOK no-pr passou apos o handoff runtime-selector.
+
+Evidencia:
+
+`npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`
+
+Resultado:
+
+- `Status: PASS`;
+- `Exit code: 0`;
+- artefato: `artifacts/terminal-live/2026-05-28T13-17-47-703Z/summary.md`;
+- 31 criterios aprovados;
+- fixture profile apareceu com metadata redigida;
+- `/byok use codex-fixture` ativou o modelo fixture;
+- descoberta remota fixture via `/v1/models` funcionou;
+- `/byok model` e `/byok provider` funcionaram no processo atual;
+- token fake `codex-fixture-token-never-print` nao apareceu no output;
+- SSE conectado e sem erros;
+- terminal error tracker permaneceu limpo.
+
+Baseline associado:
+
+`npm run model-gateway:runtime-health:diff -- --write-snapshot --out-dir artifacts/model-gateway-runtime-health-baselines/2026-05-28T13-18-runtime-selector-handoff`
+
+Resultado:
+
+- snapshot escrito em `artifacts/model-gateway-runtime-health-baselines/2026-05-28T13-18-runtime-selector-handoff/latest.json`;
+- `diff.summary.regressions=0`;
+- `diff.summary.newFailures=0`;
+- estado observado antes do live real preservado para comparacao posterior.
+
+Impacto:
+
+- o controle BYOK local esta pronto;
+- o proximo passo pode ser BYOK real no-pr, ainda sem turno LLM explicito;
+- antes de full-turn real, comparar health contra baseline e garantir readiness ok.
+
+Mudanca 76:
+
+Live BYOK real expôs overlay de conta/runtime que precisava prevalecer sobre decisao antiga.
+
+Evidencia inicial:
+
+`npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --no-pr --timeout-ms=600000`
+
+Resultado:
+
+- `Status: FAIL`;
+- artefato: `artifacts/terminal-live/2026-05-28T13-19-11-953Z/summary.md`;
+- rota aplicada:
+  - provider `chutes`;
+  - model `Qwen/Qwen3-235B-A22B-Thinking-2507`;
+- provider retornou falha real de creditos:
+  - HTTP `402`;
+  - `failureKind=credits`;
+  - mensagem operacional indicando creditos insuficientes.
+
+Snapshot associado:
+
+`artifacts/model-gateway-runtime-health-post-live/2026-05-28T13-19-real-no-pr/latest.json`
+
+Problema estrutural:
+
+- a falha de creditos foi corretamente observada como runtime/account state;
+- porem o seletor ainda podia reutilizar uma decisao elegivel antiga, mais especifica por rota;
+- isso fazia a rota concreta continuar selecionavel mesmo depois de uma falha de conta forte;
+- o problema nao era do terminal;
+- o problema era da prioridade entre decisoes de eligibility no policy engine.
+
+Correcoes aplicadas:
+
+- `findEligibilityDecisionForModel` agora prioriza runtime eligibility overlay blockers;
+- um blocker de runtime/account com mesmo provider/model prevalece sobre decisoes elegiveis antigas;
+- decisoes continuam respeitando escopo de conta/perfil;
+- foi criado teste cobrindo o caso:
+  - decisao antiga elegivel;
+  - decisao runtime posterior com `account_spending_exhausted`;
+  - resultado final rejeitado, sem selecionar a rota.
+
+Impacto:
+
+- falhas dinamicas de conta, quota, creditos e access passam a bloquear retries obvios;
+- metadado canonico permanece separado de runtime/account state;
+- o pre-runtime evita gastar chamadas repetidas em rotas que acabaram de provar indisponibilidade de conta;
+- esta regra e essencial antes de full-turn real.
+
+Mudanca 77:
+
+Runtime selector live agora pode executar a rota antes de entrega-la ao terminal.
+
+Problema identificado:
+
+- o handoff anterior aplicava a rota selecionada por metadados/eligibility;
+- isso ainda podia entregar ao terminal uma rota sem prova runtime recente;
+- em caso de falha na execucao do seletor, o runner podia cair de volta para uma rota dry;
+- esse fallback silencioso misturava camadas e podia consumir provider errado.
+
+Correcoes aplicadas:
+
+- `terminal:llm-b:live-test` recebeu:
+  - `--byok-real-route-execute`;
+  - `--byok-real-route-timeout-ms=<ms>`;
+  - `--byok-real-route-selection-policy=<policy>`;
+- quando `--byok-real-route-execute` esta ativo:
+  - o runner chama `model-gateway:runtime-selector --execute`;
+  - a rota efetiva vem de `execution.final.route`;
+  - se a execucao falhar, nao ha fallback para a rota dry;
+  - o terminal nao inicia com perfil BYOK legado se a rota runtime for obrigatoria;
+- o resumo redigido do live inclui:
+  - `runtimeSelector.executed`;
+  - `runtimeSelector.selectionPolicy`;
+  - `runtimeSelector.execution.status`;
+  - `runtimeSelector.execution.attemptedCount`;
+  - `runtimeSelector.execution.selectedProfileId`.
+
+Comandos canonicos atualizados:
+
+`npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --no-pr --timeout-ms=600000`
+
+`npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --timeout-ms=900000`
+
+Impacto:
+
+- o terminal live passa a testar a rota realmente promovida pelo runtime selector;
+- a fase no-pr real fica mais forte porque inclui prova runtime curta antes do boot;
+- evitamos falso positivo por perfil legado em `.env.local`;
+- full-turn real deve usar exatamente o mesmo handoff.
+
+Mudanca 78:
+
+Fallback runtime selector nao repete a mesma rota por perfis diferentes.
+
+Problema identificado:
+
+- o plano pode selecionar a mesma rota concreta em mais de um perfil;
+- quando a primeira tentativa falhava, o fallback podia tentar o mesmo provider/model de novo por outro perfil;
+- isso consumia tempo/quota e nao acrescentava informacao nova.
+
+Correcoes aplicadas:
+
+- `executeModelGatewayRuntimeSelectorPlanWithFallbacks` agora deduplica tentativas por rota concreta;
+- a chave usa `selectedRouteKey` ou `providerId:providerModel`;
+- perfis distintos continuam elegiveis quando apontam para modelos concretos diferentes;
+- teste novo valida:
+  - rota duplicada falha uma vez;
+  - fallback distinto continua sendo executado;
+  - erro permanente ainda respeita classificacao de retry.
+
+Impacto:
+
+- menos chamadas repetidas;
+- fallback passa a representar alternativas reais;
+- logs de tentativa ficam mais limpos;
+- selecao runtime fica pronta para mais provedores e mais perfis sem multiplicar retries redundantes.
+
+Mudanca 79:
+
+Shutdown e cleanup de probes SDK foram fortificados.
+
+Problemas identificados:
+
+- `model-gateway:runtime-selector --execute` podia produzir JSON completo e ainda assim manter processo vivo;
+- uma sessao efemera com provider timeout podia demorar para limpar;
+- falha em `sendAndWait` nao abortava explicitamente a sessao antes do cleanup.
+
+Correcoes aplicadas:
+
+- `scripts/model-gateway-runtime-selector.mjs` chama `shutdownClient({ force: true })` depois de execucao runtime;
+- `withEphemeralSession` passou a ter timeout de cleanup para:
+  - `asyncDispose`;
+  - `disconnectSession`;
+  - `deleteSession`;
+- se cleanup efemero falhar, a camada chama `forceStopClient` como containment;
+- `runConfiguredByokChatProbe` tenta `abortSession(session)` quando `sendAndWait` falha.
+
+Impacto:
+
+- comandos de selector executado encerram de modo deterministico;
+- timeouts de provider nao seguram o processo indefinidamente;
+- probes descartaveis ficam mais seguros para uso em loops de fallback;
+- essa base e necessaria antes de testes live longos e matrizes maiores.
+
+Mudanca 80:
+
+Sinais runtime comprovados agora pesam mais na selecao `prefer_runtime_proved`.
+
+Problema identificado:
+
+- apos a rota NVIDIA passar runtime, a pontuacao de metadados ainda podia dominar;
+- rotas com score estatico maior, mas sem prova recente, continuavam competindo forte demais;
+- isso contrariava a finalidade da camada observada: depois do runtime, prova real deve pesar bastante.
+
+Correcoes aplicadas:
+
+- `chat_health_ok` passou a somar `140`;
+- `agent_probe_verified` passou a somar `140`;
+- cada probe verificado passou a somar `35`;
+- a mudanca preserva filtros, hard exclusions, env readiness e account overlays;
+- a politica continua distinguindo metadata/pre-runtime de runtime proof.
+
+Evidencia:
+
+`npm run model-gateway:runtime-selector -- --profile=repo_agent --fallback-profiles=code,tool_agent --selection-policy=prefer_runtime_proved --json`
+
+Resultado observado:
+
+- `repo_agent` continuou com rota pre-runtime quando nao havia prova melhor no proprio perfil;
+- `code` passou a promover `nvidia-nim/openai/gpt-oss-120b` com `routeStage=post_runtime_proved`;
+- rotas bloqueadas por creditos/timeout nao foram promovidas.
+
+Impacto:
+
+- provedores que realmente responderam ganham prioridade na fase runtime;
+- a camada de metadados continua sendo a primeira selecao;
+- a camada runtime passa a cumprir seu papel de refinamento observado;
+- isto prepara a selecao efetiva antes de full-turn real.
+
+Mudanca 81:
+
+Live BYOK real no-pr passou com rota executada pelo runtime selector.
+
+Comando:
+
+`npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --no-pr --timeout-ms=600000`
+
+Resultado:
+
+- `Status: PASS`;
+- `Exit code: 0`;
+- duracao aproximada `60438ms`;
+- artefato: `artifacts/terminal-live/2026-05-28T13-58-30-298Z/summary.md`;
+- runtime selector:
+  - `executed=true`;
+  - `attemptedCount=2`;
+  - profile inicial `repo_agent`;
+  - fallback selecionado `code`;
+  - provider `nvidia-nim`;
+  - model `openai/gpt-oss-120b`;
+  - base URL `https://integrate.api.nvidia.com/v1`;
+- terminal live:
+  - binding BYOK alinhado com provider/model selecionado;
+  - `/usage now` renderizou BYOK sem Premium Request;
+  - `/session sdk` mostrou selecao preparada e provider vivo alinhados;
+  - chat probe passou;
+  - streaming probe passou;
+  - JSON probe passou;
+  - vision probe passou com fixture PNG;
+  - agent probe passou com tools e `ask_user`;
+  - `/errors 10` reportou `0` erros;
+  - `/quit` encerrou limpo.
+
+Ajustes de criterio do runner:
+
+- `byok-real-route-decision` aceita o caminho diagnostico sem candidatos quando o endpoint ativo nao retorna catalogo roteavel;
+- `byok-real-shortlist-probe` aceita shortlist vazia como diagnostico operacional valido;
+- `byok-real-recommendation` aceita recomendacao vazia quando filtros excluem todos os candidatos;
+- `byok-real-vision-probe` aceita resultado explicito `empty` como capacidade observada, sem transformar vision em hard exclusion automatica.
+
+Snapshot pos-live:
+
+`npm --silent run model-gateway:runtime-health:mirror`
+
+Resultado:
+
+- `ok=true`;
+- `healthObservations=25`;
+- `probeResults=28`;
+- `sqlite.runtimeRows=2103`;
+- `sqlite.tableCounts.healthObservations=1062`;
+- `sqlite.tableCounts.runtimeProbeRuns=52`;
+- `sqlite.tableCounts.runtimeProbeResults=989`.
+
+`npm --silent run model-gateway:runtime-health:diff -- --write-snapshot --out-dir artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-00-real-selector-nvidia-pass`
+
+Resultado:
+
+- snapshot escrito em `artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-00-real-selector-nvidia-pass/latest.json`;
+- `diff.summary.regressions=0`;
+- `diff.summary.newFailures=0`;
+- `diff.summary.becameFailed=0`;
+- `diff.summary.recovered=0`.
+
+Impacto:
+
+- a cadeia `metadata -> eligibility -> runtime selector execute -> terminal BYOK live no-pr` esta comprovada em provider real;
+- a rota ruim por creditos foi aprendida como estado runtime/account;
+- a rota alternativa comprovada foi promovida;
+- a fase seguinte pode avançar para full-turn real apenas depois de novo readiness e validadores.
+
+Lacunas ainda abertas apos Mudanca 81:
+
+- `/byok models route ... provider:nvidia-nim` ainda pode reportar zero candidatos porque o endpoint ativo e o catalogo canonico nao estao totalmente unificados na renderizacao do cockpit;
+- `/byok reload` ainda mostra brevemente o perfil legado do `.env.local` antes da reaplicacao da rota runtime-selector;
+- `repo_agent` ainda tenta uma rota primaria sem prova antes de fallback comprovado quando a politica permite;
+- full-turn real deve ser executado so depois de validar esses pontos ou aceitar conscientemente o risco operacional;
+- resultados de vision devem alimentar refinamento de capability runtime, sem virar exclusao automatica.
 
 ## 22. Fim Do Documento Inicial
 

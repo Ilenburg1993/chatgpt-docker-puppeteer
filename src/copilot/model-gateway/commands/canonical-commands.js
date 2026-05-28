@@ -285,6 +285,38 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Materialize the live-test plan with an opt-in hard local/private prerequisite.',
     },
     {
+        id: 'live.terminal.control-no-pr',
+        phase: 'live-readiness',
+        surface: 'package',
+        command: 'npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000',
+        summary: 'Run the terminal LLM-B control live test without opening a model turn or consuming provider quota.',
+    },
+    {
+        id: 'live.terminal.byok-fixture',
+        phase: 'live-readiness',
+        surface: 'package',
+        command: 'npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
+        summary: 'Run the BYOK control-plane live test against a local OpenAI-compatible fixture.',
+    },
+    {
+        id: 'live.terminal.byok-real-no-pr',
+        phase: 'live-readiness',
+        surface: 'package',
+        command:
+            'npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --no-pr --timeout-ms=600000',
+        summary:
+            'Run real BYOK preflight probes only after the runtime selector chooses the route profile to apply.',
+    },
+    {
+        id: 'live.terminal.byok-real-full',
+        phase: 'live-readiness',
+        surface: 'package',
+        command:
+            'npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --timeout-ms=900000',
+        summary:
+            'Run the full real BYOK terminal scenario with the same runtime-selector route handoff used by preflight.',
+    },
+    {
         id: 'make.commands',
         phase: 'orientation',
         surface: 'make',

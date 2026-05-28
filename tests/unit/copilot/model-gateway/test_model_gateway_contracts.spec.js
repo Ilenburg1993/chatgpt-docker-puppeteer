@@ -888,6 +888,25 @@ describe('model-gateway foundation', () => {
         assert.equal(routeEnvBlockedPlan.summary.runtimeEnvBlockedCount, 2);
         assert.equal(routeEnvBlockedPlan.summary.blockedProfileCount, 2);
         assert.equal(routeEnvBlockedPlan.routes[0].reasons.includes('blocked:runtime_env_not_ready'), true);
+        const provedButEnvBlockedPolicy = {
+            ...preferRuntimeProved,
+            rows: [preferRuntimeProved.rows[0]].map((row) => ({
+                ...row,
+                hasRuntimeProof: true,
+                selected: {
+                    ...row.selected,
+                    hasRuntimeProof: true,
+                },
+            })),
+        };
+        const provedButEnvBlockedPlan = buildModelGatewayRuntimeSelectorPlan(provedButEnvBlockedPolicy, {
+            requireRuntimeProof: true,
+            requireRuntimeEnvReady: true,
+            env: {},
+        });
+        assert.equal(provedButEnvBlockedPlan.summary.blockedProfileCount, 1);
+        assert.equal(provedButEnvBlockedPlan.routes[0].reasons.includes('blocked:runtime_env_not_ready'), true);
+        assert.equal(provedButEnvBlockedPlan.routes[0].reasons.includes('blocked:runtime_proof_required'), false);
         const routeEnvReadyPlan = buildModelGatewayRuntimeSelectorPlan(preferRuntimeProved, {
             requireRuntimeEnvReady: true,
             env: { OPENROUTER_API_KEY: 'openrouter-key' },
@@ -998,8 +1017,55 @@ describe('model-gateway foundation', () => {
         assert.equal(blockedRuntimeExecution.status, 'blocked');
         assert.equal(blockedRuntimeExecution.error, 'runtime_selector_route_unavailable');
 
+        const duplicateFallbackExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(runtimeSelectorPlan, {
+            profileId: 'repo_agent',
+            fallbackProfileIds: ['tool_agent'],
+            deps: {
+                runChatProbe: async () => ({
+                    ok: false,
+                    status: 'failed',
+                    elapsedMs: 10,
+                    model: '',
+                    profile: 'repo_agent',
+                    preset: 'openrouter',
+                    providerType: 'openai-compatible',
+                    deltaCount: 0,
+                    deltaChars: 0,
+                    finalChars: 0,
+                    finalContent: '',
+                    observedFinalEvent: false,
+                    sessionId: 'unit-runtime-duplicate',
+                    errors: ['duplicate route failed'],
+                    warnings: [],
+                    providerFailure: null,
+                }),
+                recordSuccess: () => {},
+                recordFailure: () => {},
+                flushHealth: async () => {},
+            },
+        });
+        assert.equal(duplicateFallbackExecution.ok, false);
+        assert.equal(duplicateFallbackExecution.attemptedCount, 1);
+        assert.equal(duplicateFallbackExecution.attempts[0].profileId, 'repo_agent');
+
+        const distinctFallbackPlan = {
+            ...runtimeSelectorPlan,
+            routes: runtimeSelectorPlan.routes.map((route) =>
+                route.profileId === 'tool_agent'
+                    ? {
+                          ...route,
+                          selectedRouteKey: 'openrouter:openai/gpt-oss-20b-tool',
+                          selected: {
+                              ...route.selected,
+                              id: 'openrouter:openai/gpt-oss-20b-tool',
+                              providerModel: 'openai/gpt-oss-20b-tool',
+                          },
+                      }
+                    : route,
+            ),
+        };
         let fallbackProbeCalls = 0;
-        const fallbackRuntimeExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(runtimeSelectorPlan, {
+        const fallbackRuntimeExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(distinctFallbackPlan, {
             profileId: 'repo_agent',
             fallbackProfileIds: ['tool_agent'],
             deps: {
@@ -1129,7 +1195,7 @@ describe('model-gateway foundation', () => {
 
         let permanentProbeCalls = 0;
         let permanentRetrySleeps = 0;
-        const permanentRuntimeExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(runtimeSelectorPlan, {
+        const permanentRuntimeExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(distinctFallbackPlan, {
             profileId: 'repo_agent',
             fallbackProfileIds: ['tool_agent'],
             attemptsPerRoute: 3,
@@ -2107,6 +2173,51 @@ describe('model-gateway foundation', () => {
         assert.ok(decision.rejected[0].rejectedReasons.includes('eligibility:account_model_not_visible'));
     });
 
+    it('lets concrete runtime account blockers override older route eligibility decisions', () => {
+        const model = {
+            ...createModelRecord({
+                providerId: 'chutes',
+                providerModel: 'Qwen/Qwen3-235B-A22B-Thinking-2507',
+                capabilities: { streaming: true, tools: true },
+                limits: { contextWindowTokens: 262_144 },
+                pricing: { inputUsdPerMillion: 0.14, outputUsdPerMillion: 0.57 },
+            }),
+            routeProfile: 'repo_agent',
+            selectorKind: 'exact_model',
+            selectorSyntax: 'Qwen/Qwen3-235B-A22B-Thinking-2507',
+        };
+        const staleEligible = createModelEligibilityDecision({
+            providerId: 'chutes',
+            providerModel: 'Qwen/Qwen3-235B-A22B-Thinking-2507',
+            routeProfile: 'repo_agent',
+            selectorKind: 'exact_model',
+            selectorSyntax: 'Qwen/Qwen3-235B-A22B-Thinking-2507',
+            include: true,
+            policyProfile: 'build-default',
+            taskProfile: 'repo_agent',
+        });
+        const runtimeBlocked = createModelEligibilityDecision({
+            providerId: 'chutes',
+            providerModel: 'Qwen/Qwen3-235B-A22B-Thinking-2507',
+            selectorKind: 'exact_model',
+            selectorSyntax: 'Qwen/Qwen3-235B-A22B-Thinking-2507',
+            include: false,
+            hardExclusions: ['account_spending_exhausted'],
+            policyProfile: 'runtime-selector-strict',
+            taskProfile: 'default',
+        });
+
+        const decision = routeGatewayModels([model], 'repo_agent', {
+            eligibilityDecisions: [staleEligible, runtimeBlocked],
+            requireKnownEligibility: true,
+            requireAgentProbeOk: false,
+        });
+
+        assert.equal(decision.selected, null);
+        assert.equal(decision.rejected.length, 1);
+        assert.ok(decision.rejected[0].rejectedReasons.includes('eligibility:account_spending_exhausted'));
+    });
+
     it('does not reuse precomputed eligibility decisions across account scopes', () => {
         const model = createModelRecord({
             providerId: 'openrouter',
@@ -2678,6 +2789,14 @@ describe('model-gateway foundation', () => {
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:selection:trace-diff'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:selection:trace-retention'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:plan'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000'));
+        assert.ok(
+            packageCommands.some(
+                (entry) =>
+                    entry.command ===
+                    'npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --no-pr --timeout-ms=600000',
+            ),
+        );
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:runtime-health:mirror'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-build'));

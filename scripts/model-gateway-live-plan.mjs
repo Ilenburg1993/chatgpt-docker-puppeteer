@@ -180,20 +180,24 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         {
             id: 'byok_real_no_pr_probes',
             order: 5,
-            command: 'npm run terminal:llm-b:live-test -- --byok-real --no-pr --timeout-ms=600000',
+            command:
+                'npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --no-pr --timeout-ms=600000',
             executesModelTurn: false,
             executesRuntimeProbes: true,
             consumesProviderQuota: true,
-            purpose: 'Run real BYOK probe commands only after readiness and fixture phases pass.',
+            purpose:
+                'Run real BYOK probe commands only after readiness and fixture phases pass, applying the route chosen by the model-gateway runtime selector.',
         },
         {
             id: 'byok_real_full_turn',
             order: 6,
-            command: 'npm run terminal:llm-b:live-test -- --byok-real --timeout-ms=900000',
+            command:
+                'npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --timeout-ms=900000',
             executesModelTurn: true,
             executesRuntimeProbes: true,
             consumesProviderQuota: true,
-            purpose: 'Run the full terminal llm-b scenario with a real assistant turn after all lower-risk phases pass.',
+            purpose:
+                'Run the full terminal llm-b scenario with a real assistant turn after all lower-risk phases pass, preserving the same runtime-selector route handoff.',
         },
     ];
     const postPhases = [

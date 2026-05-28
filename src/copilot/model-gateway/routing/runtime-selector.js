@@ -186,6 +186,15 @@ function routeKey(route) {
 }
 
 /**
+ * @param {Record<string, unknown> | null | undefined} route
+ * @returns {string | null}
+ */
+function runtimeSelectorAttemptKey(route) {
+    const selected = optionalRecord(route?.['selected']);
+    return optionalString(route?.['selectedRouteKey']) ?? routeKey(selected);
+}
+
+/**
  * Build an isolated BYOK env for the selected runtime route.
  *
  * The configured terminal BYOK provider is often just the operator's current default. Runtime selection needs to test
@@ -475,7 +484,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
         const reasons = selectionReasons(selected, row);
         if (blocked && !selected) reasons.push('blocked:no_selected_route');
         if (blocked && accountAccessBlocked) reasons.push('blocked:account_access_denies_attempt');
-        if (blocked && selected && requireRuntimeProof) reasons.push('blocked:runtime_proof_required');
+        if (blocked && selected && requireRuntimeProof && !hasRuntimeProof) reasons.push('blocked:runtime_proof_required');
         if (blocked && selected && runtimeEnvBlocked) reasons.push('blocked:runtime_env_not_ready');
         const normalizedRow = {
             ...row,
@@ -854,7 +863,16 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
             ? Math.round(options.retryDelayMs)
             : 0;
     const wait = options.deps?.sleep ?? sleepMs;
-    const attemptProfileIds = uniqueProfileIds.slice(0, maxAttempts);
+    const routeByProfileId = new Map(selectedRoutes.map((route) => [route.profileId, route]));
+    const attemptedRouteKeys = new Set();
+    const attemptProfileIds = [];
+    for (const profileId of uniqueProfileIds) {
+        const key = runtimeSelectorAttemptKey(routeByProfileId.get(profileId));
+        if (key && attemptedRouteKeys.has(key)) continue;
+        if (key) attemptedRouteKeys.add(key);
+        attemptProfileIds.push(profileId);
+        if (attemptProfileIds.length >= maxAttempts) break;
+    }
     /** @type {Array<Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>>} */
     const attempts = [];
     /** @type {Array<ReturnType<typeof resolveModelGatewayRuntimeRetryDecision>>} */
