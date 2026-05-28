@@ -11678,6 +11678,43 @@ Impacto:
 - fallback profileless permanece um caminho de continuidade;
 - quando existir prova exata para `tool_agent`, ela tendera a superar fallback global sem necessidade de regra especial.
 
+## 21.136. Mudanca 136 - Runtime selector preserva explicabilidade do policy engine
+
+Data: 2026-05-28.
+
+Problema:
+
+- o policy engine ja produzia `reasons`, `rejectedReasons` e `scoreBreakdown`;
+- o selection audit tambem preservava esses sinais;
+- mas, ao montar a rota executavel, `runtimeRoute()` reduzia `selected` a campos operacionais;
+- isso fazia o JSON do runtime selector mostrar a rota final sem as razoes de score que explicavam a escolha.
+
+Correcao:
+
+- `runtimeRoute()` agora preserva:
+  - `selected.reasons`;
+  - `selected.rejectedReasons`;
+  - `selected.scoreBreakdown`;
+- a preservacao e limitada e sanitizada por lista de strings;
+- nenhum comportamento de ranking, fallback, health ou execucao foi alterado.
+
+Evidencia:
+
+- `node --check src/copilot/model-gateway/routing/runtime-selector.js`;
+- `npx eslint src/copilot/model-gateway/routing/runtime-selector.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`;
+- `npx vitest run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "selection audit comparison and policy resolution feed the runtime selector|exact route-profile runtime proof"`;
+- dry-run canonico do runtime selector mostrou:
+  - `selectedRouteKey=zai:glm-4.5-flash`;
+  - `selected.reasons` com `runtime_health_exact_route_profile`;
+  - `selected.reasons` com `preferred_probe_verified:live_tool_protocol`;
+  - `selected.scoreBreakdown.finalScore=1450`.
+
+Impacto:
+
+- humanos e LLMs passam a auditar a decisao final sem reabrir artefatos intermediarios;
+- a ponte `policy engine -> selection audit -> runtime selector -> live plan` preserva explicabilidade;
+- futuras regressions de ranking ficam mais faceis de diagnosticar.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

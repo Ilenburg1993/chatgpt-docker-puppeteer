@@ -71,6 +71,14 @@ function optionalString(value) {
 
 /**
  * @param {unknown} value
+ * @returns {string[]}
+ */
+function stringList(value) {
+    return Array.isArray(value) ? value.map(optionalString).filter((item) => item !== null) : [];
+}
+
+/**
+ * @param {unknown} value
  * @returns {number | null}
  */
 function optionalNumber(value) {
@@ -370,6 +378,9 @@ function runtimeRoute(route) {
         runtimeObservedOnly: route['runtimeObservedOnly'] === true || runtimeEvidence?.['source'] === 'runtime_health',
         runtimeEvidence,
         score: optionalNumber(route['score']),
+        scoreBreakdown: optionalRecord(route['scoreBreakdown']),
+        reasons: stringList(route['reasons']).slice(0, 24),
+        rejectedReasons: stringList(route['rejectedReasons']).slice(0, 24),
         eligibilityDisposition: optionalString(route['eligibilityDisposition']),
         accountScope: optionalString(route['accountScope']) ?? 'default',
         policyProfile: optionalString(route['policyProfile']),

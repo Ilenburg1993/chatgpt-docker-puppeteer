@@ -1233,6 +1233,12 @@ describe('model-gateway foundation', () => {
         assert.equal(runtimeSelectorPlan.routes[0].selected?.['routeLayer'], 'openai_compatible_aggregator');
         assert.equal(runtimeSelectorPlan.routes[0].selected?.['wireApi'], 'openai_chat_completions');
         assert.equal(runtimeSelectorPlan.routes[0].selected?.['upstreamProvider'], 'groq');
+        assert.equal(
+            Array.isArray(runtimeSelectorPlan.routes[0].selected?.['reasons']) &&
+                runtimeSelectorPlan.routes[0].selected?.['reasons'].includes('preferred_upstream_provider:groq'),
+            true,
+        );
+        assert.equal(runtimeSelectorPlan.routes[0].selected?.['scoreBreakdown']?.['finalScore'], runtimeSelectorPlan.routes[0].selected?.['score']);
         assert.equal(selectModelGatewayRuntimeRoute(runtimeSelectorPlan, 'repo_agent')?.selectedRouteKey, 'openrouter:openai/gpt-oss-120b');
 
         const strictRuntimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(requireRuntimeProof, {
