@@ -41,6 +41,11 @@ const CONFIDENCE_RANK = Object.freeze({
     probe_failed: -1,
 });
 
+const PREFERRED_PROBE_VERIFIED_SCORE = 240;
+const PREFERRED_LIVE_PROTOCOL_PROBE_VERIFIED_SCORE = 420;
+const PREFERRED_PROBE_FAILED_PENALTY = 120;
+const PREFERRED_LIVE_PROTOCOL_PROBE_FAILED_PENALTY = 260;
+
 const NON_CONVERSATIONAL_CAPABILITY_KINDS = Object.freeze({
     embedding: 'embedding',
     embeddings: 'embedding',
@@ -659,10 +664,14 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         }
         for (const kind of preferredProbeKinds) {
             if (isGatewayModelProbeVerified(healthDecision.health, kind)) {
-                score += 35;
+                score += MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS.includes(kind)
+                    ? PREFERRED_LIVE_PROTOCOL_PROBE_VERIFIED_SCORE
+                    : PREFERRED_PROBE_VERIFIED_SCORE;
                 reasons.push(`preferred_probe_verified:${kind}`);
             } else if (isGatewayModelProbeFailed(healthDecision.health, kind)) {
-                score -= 30;
+                score -= MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS.includes(kind)
+                    ? PREFERRED_LIVE_PROTOCOL_PROBE_FAILED_PENALTY
+                    : PREFERRED_PROBE_FAILED_PENALTY;
                 reasons.push(`preferred_probe_failed:${kind}`);
             }
         }

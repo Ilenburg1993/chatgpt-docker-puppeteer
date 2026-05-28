@@ -2383,6 +2383,58 @@ describe('model-gateway foundation', () => {
         assert.ok(decision.rejected.some((candidate) => candidate.rejectedReasons.includes('runtime_probe_failed:live_ask_user')));
     });
 
+    it('prioritizes terminal live protocol proofs over generic runtime chat proofs when requested', () => {
+        const genericRuntime = createModelRecord({
+            providerId: 'groq',
+            providerModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
+            capabilities: { streaming: true, tools: true, reasoningEffort: true },
+            limits: { contextWindowTokens: 256_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        const liveProtocolRuntime = createModelRecord({
+            providerId: 'zai',
+            providerModel: 'glm-4.5-flash',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+
+        for (const probeKind of ['chat', 'streaming', 'json']) {
+            recordByokProviderModelProbeResult({
+                routeProfile: 'code',
+                providerId: 'groq',
+                providerModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                probeKind,
+                status: 'ok',
+                ok: true,
+                providerAttempted: true,
+                timestamp: 80,
+            });
+        }
+        for (const probeKind of ['live_tool_protocol', 'live_ask_user']) {
+            recordByokProviderModelProbeResult({
+                routeProfile: 'code',
+                providerId: 'zai',
+                providerModel: 'glm-4.5-flash',
+                probeKind,
+                status: 'ok',
+                ok: true,
+                providerAttempted: true,
+                timestamp: 100,
+            });
+        }
+
+        const decision = routeGatewayModels([genericRuntime, liveProtocolRuntime], 'code', {
+            routeProfile: 'code',
+            preferredProbeKinds: ['live_tool_protocol', 'live_ask_user'],
+            blockFailedProbeKinds: ['live_tool_protocol', 'live_ask_user'],
+        });
+
+        assert.equal(decision.selected?.model['id'], 'zai:glm-4.5-flash');
+        assert.ok(decision.selected?.reasons.includes('preferred_probe_verified:live_tool_protocol'));
+        assert.ok(decision.selected?.reasons.includes('preferred_probe_verified:live_ask_user'));
+    });
+
     it('can require explicit probe proofs as a pre-runtime route policy', () => {
         const unproved = createModelRecord({
             providerId: 'openrouter',

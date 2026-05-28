@@ -9711,6 +9711,52 @@ Efeito esperado:
 - o runtime selector pode continuar usando `live_tool_protocol` e `live_ask_user` como provas fortes sem depender de
   sucesso multimodal.
 
+## Mudanca 98 - Provas Live Preferidas Dominam Provas Genericas De Chat
+
+Depois que o live full gravou `live_tool_protocol=ok` e `live_ask_user=ok`, o selector seco ainda preferia uma rota com
+provas genericas de chat/JSON/streaming, mas sem prova do protocolo live do terminal.
+
+Achado:
+
+- comando seco com `preferred-probes=live_tool_protocol,live_ask_user`;
+- antes da correcao, `code` podia selecionar `groq/meta-llama/llama-4-scout-17b-16e-instruct`;
+- essa rota tinha chat/JSON/streaming provados, mas agent/vision falhados e nenhum `live_*`;
+- `zai/glm-4.5-flash` tinha exatamente as provas live geradas pelo full live;
+- mesmo assim, as provas preferidas tinham peso pequeno demais.
+
+Decisao arquitetural:
+
+- probes preferidos nao sao meros detalhes de ranking;
+- quando o caller declara `preferredProbeKinds`, esse e o sinal da camada superior sobre qual evidencia importa;
+- `live_tool_protocol` e `live_ask_user` sao provas mais fortes para o terminal do que uma resposta de chat isolada;
+- isso deve valer sem tornar esses probes hard requirements, pois a politica ainda pode usar fallback se nao houver prova.
+
+Alteracoes aplicadas:
+
+- `policy-engine` passou a dar peso forte para probes preferidos;
+- probes de protocolo live recebem peso ainda maior que probes comuns;
+- falhas em probes preferidos tambem recebem penalidade maior, especialmente `live_*`;
+- teste novo garante que live protocol proof vence generic runtime chat proof quando solicitado.
+
+Evidencia seca apos a correcao:
+
+- `node scripts/model-gateway-runtime-selector.mjs --json --allow-probe --profile=code --selection-policy=prefer_runtime_proved --preferred-probes=live_tool_protocol,live_ask_user --block-failed-probes=live_tool_protocol,live_ask_user --temporary-failure-cooldown-ms=1`;
+- resultado:
+  - `selected.providerId=zai`;
+  - `selected.providerModel=glm-4.5-flash`;
+  - `score=1250`;
+  - `runtimeHealth.verifiedProbes=[live_ask_user, live_tool_protocol]`;
+  - `liveToolProtocolStatus=ok`;
+  - `liveAskUserStatus=ok`;
+  - `groq/meta-llama/llama-4-scout-17b-16e-instruct` virou alternativa, nao selecionado.
+
+Efeito esperado:
+
+- lives futuros reusam primeiro modelos que ja materializaram o protocolo real do terminal;
+- modelos que apenas responderam chat continuam aproveitaveis como fallback;
+- a selecao fica coerente com a fase superior do roadmap: runtime selector real precisa escolher pela prova que mais
+  corresponde ao fluxo que sera executado.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
