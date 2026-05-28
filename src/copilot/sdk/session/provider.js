@@ -153,6 +153,9 @@ export const BYOK_ENV_KEYS = Object.freeze([
     'KILO_BASE_URL',
     'KILO_MODEL',
     'KILO_DEFAULT_MODEL',
+    'OPENCODE_API_KEY',
+    'OPENCODE_MODEL',
+    'OPENCODE_DEFAULT_MODEL',
 ]);
 
 /** @type {Map<string, { expiresAt: number; models: import('../types.js').ModelInfo[] }>} */
@@ -196,6 +199,7 @@ export const BYOK_SECRET_ENV_KEYS = Object.freeze([
     'OLLAMA_CLOUD_API_KEY',
     'KILO_API_KEY',
     'KILO_CODE_API_KEY',
+    'OPENCODE_API_KEY',
 ]);
 
 /**

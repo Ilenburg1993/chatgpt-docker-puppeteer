@@ -22,6 +22,8 @@ vi.mock('@github/copilot-sdk', () => {
 // ─── Imports ───────────────────────────────────────────────────────────────
 
 import {
+    BYOK_ENV_KEYS,
+    BYOK_SECRET_ENV_KEYS,
     anthropicProvider,
     azureProvider,
     buildConfiguredByokModelListHandler,
@@ -37,6 +39,15 @@ import {
     resolveConfiguredByokSessionOverrides,
     validateProviderConfig,
 } from '#copilot/sdk/session';
+
+describe('BYOK env key registry', () => {
+    it('exposes OpenCode keys in the canonical operator env surface', () => {
+        expect(BYOK_ENV_KEYS).toContain('OPENCODE_API_KEY');
+        expect(BYOK_ENV_KEYS).toContain('OPENCODE_MODEL');
+        expect(BYOK_ENV_KEYS).toContain('OPENCODE_DEFAULT_MODEL');
+        expect(BYOK_SECRET_ENV_KEYS).toContain('OPENCODE_API_KEY');
+    });
+});
 
 // ═════════════════════════════════════════════════════════════════════════════
 // F67 — openaiProvider

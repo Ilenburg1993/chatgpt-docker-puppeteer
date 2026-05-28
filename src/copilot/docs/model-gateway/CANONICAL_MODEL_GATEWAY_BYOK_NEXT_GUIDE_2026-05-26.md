@@ -9949,6 +9949,89 @@ Regra preservada:
 - nenhuma decision derivada de health entra nos metadados canonicos;
 - fallback live so ocorre depois da selecao seca e explicita.
 
+## Mudanca 101 - Live llm-b pos-otimizacao e lacuna OpenCode no env canonico
+
+Status: concluido.
+
+Objetivo:
+
+- confirmar em terminal real que as otimizacoes de routing nao alteraram comportamento;
+- provar novamente a cadeia `repo_agent -> code -> tool_agent`;
+- registrar a evidencia live antes de novas mudancas estruturais;
+- corrigir a lacuna observada no cockpit `/byok env` para OpenCode.
+
+Evidencia live:
+
+- artefato:
+  - `artifacts/terminal-live/2026-05-28T17-54-54-795Z/summary.md`;
+- resultado:
+  - `Status: PASS`;
+  - exit code `0`;
+  - duracao aproximada: 192s;
+  - SSE conectado;
+  - 445 eventos;
+  - 0 erros SSE;
+  - export Markdown criado.
+
+Rota comprovada:
+
+- profile solicitado: `repo_agent`;
+- fallbacks: `code`, `tool_agent`;
+- rota final selecionada: `code`;
+- provider/model: `zai/glm-4.5-flash`;
+- provas:
+  - chat probe ok;
+  - streaming probe ok;
+  - json probe ok;
+  - agent probe ok;
+  - live tool protocol ok;
+  - live ask_user ok.
+
+Observacao multimodal:
+
+- vision probe continuou como warning nao-bloqueante;
+- falha HTTP 400 foi registrada como resultado explicito de capacidade;
+- chat/agent nao foram degradados por isso;
+- isso preserva a regra decidida anteriormente: vision nao e criterio excludente automatico.
+
+Fluxo terminal comprovado:
+
+- `report_intent` real apareceu como tool;
+- `read_file_content` real leu `package.json`;
+- deltas publicos foram emitidos;
+- `ask_user` real abriu pergunta persistente;
+- resposta humana `SIM` foi registrada;
+- mensagem pos-ask final apareceu apenas apos a resposta;
+- `/activity`, `/tools diag`, `/events`, `/events --raw`, `/usage now`, `/byok health` e export funcionaram.
+
+Gap detectado:
+
+- o cockpit `/byok env` listava Kilo e demais providers, mas ainda nao mostrava:
+  - `OPENCODE_API_KEY`;
+  - `OPENCODE_MODEL`;
+  - `OPENCODE_DEFAULT_MODEL`;
+- isso era incoerente com o restante da arquitetura, pois OpenCode ja estava presente em:
+  - secret registry;
+  - requirements;
+  - provider specs;
+  - endpoint inventory;
+  - account/quota capabilities;
+  - runtime overlays;
+  - importers autenticados e docs;
+  - SDK provider preset.
+
+Correcao aplicada:
+
+- `BYOK_ENV_KEYS` passou a expor `OPENCODE_API_KEY`, `OPENCODE_MODEL` e `OPENCODE_DEFAULT_MODEL`;
+- `BYOK_SECRET_ENV_KEYS` passou a tratar `OPENCODE_API_KEY` como segredo canonico;
+- teste unitario garante que a superficie canonica do operador inclui OpenCode.
+
+Consequencia:
+
+- `/byok env` passa a refletir o provider OpenCode no mesmo padrao dos demais;
+- a verificacao de vazamento de segredo passa a cobrir a chave OpenCode;
+- a arquitetura fica alinhada da importacao ao terminal.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
