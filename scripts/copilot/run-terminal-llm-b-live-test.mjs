@@ -422,12 +422,23 @@ function profileProvider(env, profileName) {
 function runtimeSelectorRouteDetails(runtimeSelector) {
     const selected = runtimeSelector?.selectedRoute?.selected;
     if (!selected) return null;
+    const runtimeHealth = selected.runtimeHealth && typeof selected.runtimeHealth === 'object' ? selected.runtimeHealth : {};
     return {
         routeProfile: optionalRuntimeSelectorString(runtimeSelector.selectedRoute.profileId) || null,
+        selectedRouteProfile: optionalRuntimeSelectorString(selected.routeProfile) || null,
+        sourceRouteProfile: optionalRuntimeSelectorString(selected.sourceRouteProfile) || null,
+        sourceTaskProfile: optionalRuntimeSelectorString(selected.sourceTaskProfile) || null,
         providerId: optionalRuntimeSelectorString(selected.providerId) || null,
         providerModel: optionalRuntimeSelectorString(selected.providerModel) || null,
         selectorKind: optionalRuntimeSelectorString(selected.selectorKind) || null,
         selectorSyntax: optionalRuntimeSelectorString(selected.selectorSyntax) || null,
+        hasRuntimeProof: selected.hasRuntimeProof === true,
+        verifiedProbes: Array.isArray(runtimeHealth.verifiedProbes)
+            ? runtimeHealth.verifiedProbes.map(optionalRuntimeSelectorString).filter(Boolean)
+            : [],
+        failedProbes: Array.isArray(runtimeHealth.failedProbes)
+            ? runtimeHealth.failedProbes.map(optionalRuntimeSelectorString).filter(Boolean)
+            : [],
         routeLayer: optionalRuntimeSelectorString(selected.routeLayer) || null,
         wireApi: optionalRuntimeSelectorString(selected.wireApi) || null,
         upstreamProvider: optionalRuntimeSelectorString(selected.upstreamProvider) || null,

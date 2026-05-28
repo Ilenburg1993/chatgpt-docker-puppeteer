@@ -10397,6 +10397,41 @@ Teste adicionado:
 - os campos `sourceRouteProfile`/`sourceTaskProfile` preservam `default`;
 - alternativas tambem sao normalizadas.
 
+## Mudanca 112 - Artefato llm-b redigido inclui contexto de runtime proof
+
+Status: concluido.
+
+Contexto:
+
+- o live no-pr mostrou que o resumo redigido precisava de mais contexto para auditoria;
+- `runtimeSelector.selected` trazia provider/model/route, mas nao expunha:
+  - `hasRuntimeProof`;
+  - profile original da rota;
+  - probes verificadas/falhas.
+
+Regra aplicada:
+
+- `run-terminal-llm-b-live-test.mjs` passa a incluir em `byok.real.redacted.json`:
+  - `selectedRouteProfile`;
+  - `sourceRouteProfile`;
+  - `sourceTaskProfile`;
+  - `hasRuntimeProof`;
+  - `verifiedProbes`;
+  - `failedProbes`.
+
+Motivo arquitetural:
+
+- esses campos nao sao segredos;
+- eles explicam por que uma rota foi usada mesmo quando o endpoint remoto atual nao lista o modelo;
+- ajudam a separar metadado remoto, origem da rota, profile efetivo e runtime proof;
+- reduzem necessidade de reabrir JSON bruto do runtime selector durante auditorias live.
+
+Validacao:
+
+- `model-gateway-runtime-selector --execute` confirmou `routeProfile=repo_agent` e `sourceRouteProfile=default`;
+- persistiu 2 route decision events;
+- espelhou 72 health records e 52 probe results para SQLite sem erro.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
