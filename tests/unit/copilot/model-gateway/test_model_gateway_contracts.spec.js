@@ -50,6 +50,7 @@ import {
     compareModelGatewaySelectionAudits,
     explainModelGatewaySelectionComparison,
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
+    DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS,
     MODEL_GATEWAY_SELECTION_POLICY_MODE,
     listModelGatewaySelectionDecisionTraceFiles,
     persistModelGatewaySelectionDecisionTrace,
@@ -2723,6 +2724,54 @@ describe('model-gateway foundation', () => {
         assert.equal(decision.selected?.model['id'], 'kilo:json-runtime');
         assert.ok(decision.selected?.reasons.includes('runtime_probe_verified:json'));
         assert.ok(decision.selected?.reasons.includes('preferred_probe_verified:json'));
+        assert.equal(runtimeProved['verification']?.['confidence'], 'catalog');
+    });
+
+    it('allows runtime proof weights to be tuned without changing probe facts', () => {
+        const metadataFirst = createModelRecord({
+            providerId: 'aaa-metadata',
+            providerModel: 'json-static',
+            capabilities: { streaming: true, structuredOutputs: true, jsonMode: true },
+            limits: { contextWindowTokens: 64_000 },
+            pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 1 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        const runtimeProved = createModelRecord({
+            providerId: 'zzz-runtime',
+            providerModel: 'json-runtime',
+            capabilities: { streaming: true, structuredOutputs: true, jsonMode: true },
+            limits: { contextWindowTokens: 64_000 },
+            pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 1 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+
+        recordByokProviderModelProbeResult({
+            routeProfile: 'json_extraction',
+            providerId: 'zzz-runtime',
+            providerModel: 'json-runtime',
+            probeKind: 'json',
+            status: 'ok',
+            ok: true,
+            providerAttempted: true,
+            timestamp: 76,
+        });
+
+        const defaultWeighted = routeGatewayModels([metadataFirst, runtimeProved], 'json_extraction', {
+            routeProfile: 'json_extraction',
+        });
+        const neutralWeighted = routeGatewayModels([metadataFirst, runtimeProved], 'json_extraction', {
+            routeProfile: 'json_extraction',
+            runtimeProofWeights: {
+                genericProbeVerified: 0,
+                preferredProbeVerified: 0,
+                runtimeProvedPreference: 0,
+            },
+        });
+
+        assert.equal(DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS.preferredProbeVerified, 240);
+        assert.equal(defaultWeighted.selected?.model['id'], 'zzz-runtime:json-runtime');
+        assert.equal(neutralWeighted.selected?.model['id'], 'aaa-metadata:json-static');
+        assert.ok(defaultWeighted.selected?.reasons.includes('runtime_probe_verified:json'));
         assert.equal(runtimeProved['verification']?.['confidence'], 'catalog');
     });
 

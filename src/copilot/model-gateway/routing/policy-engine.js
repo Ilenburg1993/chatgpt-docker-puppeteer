@@ -42,10 +42,30 @@ const CONFIDENCE_RANK = Object.freeze({
     probe_failed: -1,
 });
 
-const PREFERRED_PROBE_VERIFIED_SCORE = 240;
-const PREFERRED_LIVE_PROTOCOL_PROBE_VERIFIED_SCORE = 420;
-const PREFERRED_PROBE_FAILED_PENALTY = 120;
-const PREFERRED_LIVE_PROTOCOL_PROBE_FAILED_PENALTY = 260;
+/**
+ * @typedef {Readonly<{
+ *   chatHealthOk: number;
+ *   agentProbeVerified: number;
+ *   genericProbeVerified: number;
+ *   preferredProbeVerified: number;
+ *   preferredLiveProtocolProbeVerified: number;
+ *   preferredProbeFailedPenalty: number;
+ *   preferredLiveProtocolProbeFailedPenalty: number;
+ *   runtimeProvedPreference: number;
+ * }>} ModelGatewayRuntimeProofWeights
+ */
+
+/** @type {ModelGatewayRuntimeProofWeights} */
+export const DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS = Object.freeze({
+    chatHealthOk: 140,
+    agentProbeVerified: 140,
+    genericProbeVerified: 35,
+    preferredProbeVerified: 240,
+    preferredLiveProtocolProbeVerified: 420,
+    preferredProbeFailedPenalty: 120,
+    preferredLiveProtocolProbeFailedPenalty: 260,
+    runtimeProvedPreference: 20,
+});
 
 const NON_CONVERSATIONAL_CAPABILITY_KINDS = Object.freeze({
     embedding: 'embedding',
@@ -84,6 +104,55 @@ function isRecord(value) {
  */
 function finiteNumber(value) {
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @returns {number}
+ */
+function finiteWeight(value, fallback) {
+    const number = finiteNumber(value);
+    return number === null ? fallback : Math.max(-10_000, Math.min(10_000, Math.round(number)));
+}
+
+/**
+ * @param {unknown} value
+ * @returns {ModelGatewayRuntimeProofWeights}
+ */
+function resolveRuntimeProofWeights(value) {
+    const custom = isRecord(value) ? value : {};
+    return Object.freeze({
+        chatHealthOk: finiteWeight(custom['chatHealthOk'], DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS.chatHealthOk),
+        agentProbeVerified: finiteWeight(
+            custom['agentProbeVerified'],
+            DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS.agentProbeVerified,
+        ),
+        genericProbeVerified: finiteWeight(
+            custom['genericProbeVerified'],
+            DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS.genericProbeVerified,
+        ),
+        preferredProbeVerified: finiteWeight(
+            custom['preferredProbeVerified'],
+            DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS.preferredProbeVerified,
+        ),
+        preferredLiveProtocolProbeVerified: finiteWeight(
+            custom['preferredLiveProtocolProbeVerified'],
+            DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS.preferredLiveProtocolProbeVerified,
+        ),
+        preferredProbeFailedPenalty: finiteWeight(
+            custom['preferredProbeFailedPenalty'],
+            DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS.preferredProbeFailedPenalty,
+        ),
+        preferredLiveProtocolProbeFailedPenalty: finiteWeight(
+            custom['preferredLiveProtocolProbeFailedPenalty'],
+            DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS.preferredLiveProtocolProbeFailedPenalty,
+        ),
+        runtimeProvedPreference: finiteWeight(
+            custom['runtimeProvedPreference'],
+            DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS.runtimeProvedPreference,
+        ),
+    });
 }
 
 /**
@@ -458,6 +527,7 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
  *     allowLocalProviders?: boolean;
  *     excludeLocalProvidersByDefault?: boolean;
  *     requireRuntimeProof?: boolean;
+ *     runtimeProofWeights?: Partial<typeof DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS>;
  *     requireKnownEligibility?: boolean;
  *     ignoreRuntimeHealth?: boolean;
  *     runtimeHealthRecords?: Record<string, any>[];
@@ -656,28 +726,31 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         rejectedReasons.push(`provider_health_cooldown:${providerCooldownDecision.failureKinds.join('+') || 'temporary'}`);
     }
     if (healthDecision.health) {
+        const runtimeProofWeights = resolveRuntimeProofWeights(options.runtimeProofWeights);
         if (healthDecision.health.lastStatus === 'ok') {
-            score += 140;
+            score += runtimeProofWeights.chatHealthOk;
             reasons.push('chat_health_ok');
         }
         if (isGatewayModelAgentProbeVerified(healthDecision.health)) {
-            score += 140;
+            score += runtimeProofWeights.agentProbeVerified;
             reasons.push('agent_probe_verified');
         }
         for (const kind of listGatewayModelVerifiedProbeKinds(healthDecision.health)) {
-            score += 35;
+            score += runtimeProofWeights.genericProbeVerified;
             reasons.push(`runtime_probe_verified:${kind}`);
         }
         for (const kind of preferredProbeKinds) {
             if (isGatewayModelProbeVerified(healthDecision.health, kind)) {
-                score += MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS.includes(kind)
-                    ? PREFERRED_LIVE_PROTOCOL_PROBE_VERIFIED_SCORE
-                    : PREFERRED_PROBE_VERIFIED_SCORE;
+                const weight = MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS.includes(kind)
+                    ? runtimeProofWeights.preferredLiveProtocolProbeVerified
+                    : runtimeProofWeights.preferredProbeVerified;
+                score += weight;
                 reasons.push(`preferred_probe_verified:${kind}`);
             } else if (isGatewayModelProbeFailed(healthDecision.health, kind)) {
-                score -= MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS.includes(kind)
-                    ? PREFERRED_LIVE_PROTOCOL_PROBE_FAILED_PENALTY
-                    : PREFERRED_PROBE_FAILED_PENALTY;
+                const penalty = MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS.includes(kind)
+                    ? runtimeProofWeights.preferredLiveProtocolProbeFailedPenalty
+                    : runtimeProofWeights.preferredProbeFailedPenalty;
+                score -= penalty;
                 reasons.push(`preferred_probe_failed:${kind}`);
             }
         }
@@ -702,7 +775,8 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
             reasons.push('preferred:large_context');
         }
         if (preference === 'runtime_proved' && hasRuntimeProof(healthDecision.health)) {
-            score += 20;
+            const runtimeProofWeights = resolveRuntimeProofWeights(options.runtimeProofWeights);
+            score += runtimeProofWeights.runtimeProvedPreference;
             reasons.push('preferred:runtime_proved');
         }
         if ((preference === 'low_cost' || preference === 'free') && pricePerMillion(model) === 0) {

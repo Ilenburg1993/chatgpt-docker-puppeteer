@@ -34,7 +34,12 @@ export {
     listModelGatewayTaskProfiles,
     resolveModelGatewayTaskProfile,
 } from './task-profiles.js';
-export { routeGatewayModels, routeModelGatewayCatalogSnapshot, scoreGatewayModelCandidate } from './policy-engine.js';
+export {
+    DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS,
+    routeGatewayModels,
+    routeModelGatewayCatalogSnapshot,
+    scoreGatewayModelCandidate,
+} from './policy-engine.js';
 export {
     buildModelGatewayRuntimeSelectorProbeEnv,
     buildModelGatewayRuntimeSelectorProbeRun,

@@ -329,6 +329,7 @@ export {
     compareModelGatewaySelectionDecisionTraces,
     compareModelGatewaySelectionAudits,
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
+    DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS,
     MODEL_GATEWAY_SELECTION_POLICY_MODE,
     createGatewayRuntimeHealthIndex,
     evaluateModelGatewayRuntimeSelectorRouteEnv,

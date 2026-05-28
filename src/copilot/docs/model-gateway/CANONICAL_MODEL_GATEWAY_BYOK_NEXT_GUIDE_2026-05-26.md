@@ -5182,7 +5182,7 @@ Checklist atualizada por esta mudanca:
 - [x] Escrever `probes.agent` em agent probe failure.
 - [x] Normalizar health records legados durante merge.
 - [x] Fazer selection effective enxergar agent probe tambem como probe tipado.
-- [ ] Criar politica para pesos distintos entre chat ok, agent probe e probes de capability especifica.
+- [x] Criar politica para pesos distintos entre chat ok, agent probe e probes de capability especifica.
 - [ ] Criar explain terminal com diff pre-runtime vs pos-runtime.
 
 Mudanca 29:
@@ -5342,7 +5342,7 @@ Checklist atualizada por esta mudanca:
 - [x] Adicionar flag terminal `runtime-proof`.
 - [x] Adicionar comandos canonicos para runtime proof.
 - [x] Criar policy final que decide quando pos-runtime vence pre-runtime.
-- [ ] Criar pesos configuraveis para runtime proof por tipo.
+- [x] Criar pesos configuraveis para runtime proof por tipo.
 - [ ] Persistir, quando solicitado, um decision trace da comparacao sem mutar catalogo.
 
 ## 19. Mudanca 31 - Policy Resolver Explicito Para Selecao Final
@@ -10579,6 +10579,49 @@ Validacao esperada:
 - `npm run model-gateway:live:readiness -- --json` deve conter `runtimeProbeOnlyRecords`;
 - `byok.real.redacted.json` deve conter `runtimeSelector.runtimeProbePersistence` em lives BYOK reais;
 - falhas de persistencia direta devem aparecer como erro do runtime selector.
+
+## Mudanca 117 - Pesos configuraveis para prova runtime por tipo
+
+Status: concluido.
+
+Contexto:
+
+- o score de runtime proof era fixo dentro de `policy-engine.js`;
+- chat ok, agent probe, probe generico, probe preferido e live protocol tinham pesos hardcoded;
+- isso dificultava experimentar politicas de producao sem alterar a camada baixa do seletor;
+- tambem escondia uma decisao importante: nem toda prova runtime vale o mesmo.
+
+Regra aplicada:
+
+- `DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS` foi criado e exportado pelos barrels;
+- `scoreGatewayModelCandidate` aceita `runtimeProofWeights`;
+- `routeGatewayModels`, `routeModelGatewayCatalogSnapshot` e auditorias recebem esses pesos pelo mesmo objeto de options;
+- pesos customizados sao normalizados com limite defensivo;
+- os motivos textuais permanecem estaveis para nao quebrar explain, terminal e testes existentes.
+
+Pesos iniciais:
+
+- `chatHealthOk`: prova basica de chamada de chat;
+- `agentProbeVerified`: prova de agente/tools;
+- `genericProbeVerified`: prova runtime generica por capability;
+- `preferredProbeVerified`: prova preferida pelo perfil;
+- `preferredLiveProtocolProbeVerified`: prova live terminal forte;
+- `preferredProbeFailedPenalty`: penalidade para probe preferido falho;
+- `preferredLiveProtocolProbeFailedPenalty`: penalidade forte para falha live terminal;
+- `runtimeProvedPreference`: bonus do perfil quando ele prefere `runtime_proved`.
+
+Motivo arquitetural:
+
+- a selecao real precisa poder variar politica sem mudar metadado e sem rodar runtime;
+- live protocol deve poder valer mais do que chat simples;
+- capabilities especificas podem ser reforcadas ou neutralizadas por perfil/operador;
+- isso prepara o seletor runtime real para politicas mais maduras.
+
+Validacao esperada:
+
+- teste unitario prova que os pesos default promovem o modelo com probe JSON;
+- o mesmo teste prova que pesos neutralizados devolvem a escolha metadata-first;
+- a confidence do catalogo permanece `catalog`, sem promover runtime fact para metadado canonico.
 
 ## 22. Fim Do Documento Inicial
 
