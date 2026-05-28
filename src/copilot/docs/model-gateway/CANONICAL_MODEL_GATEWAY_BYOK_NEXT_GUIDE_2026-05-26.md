@@ -11529,6 +11529,116 @@ Impacto:
 - package, Makefile, live plan, readiness, terminal runner e cockpit de comandos voltam a concordar;
 - o caminho operacional canônico nao induz mais cooldown curto por acidente.
 
+## 21.133. Mudanca 133 - Readiness expõe matriz de provas live por rota
+
+Data: 2026-05-28.
+
+Problema:
+
+- `terminalLiveRuntimeSelectorPlan` mostrava `runtimeProofSelected=3`;
+- isso era correto em sentido amplo, mas escondia a origem da prova:
+  - health exato do mesmo `routeProfile`;
+  - health profileless/global;
+  - probes live especificos;
+  - probes agent/chat/json/streaming descartaveis;
+- para lives longos, esse resumo era pouco didatico: uma rota fallback podia aparecer como provada sem deixar claro que
+  nao tinha `live_turn` proprio.
+
+Correcao:
+
+- `scripts/model-gateway-live-readiness.mjs` agora enriquece cada item em
+  `selection.terminalLiveRuntimeSelectorPlan.selectedRoutes` com:
+  - `runtimeHealth.include`;
+  - `runtimeHealth.reason`;
+  - `runtimeHealth.healthRouteProfile`;
+  - `runtimeHealth.exactRouteProfileMatch`;
+  - `runtimeHealth.profilelessHealth`;
+  - `runtimeHealth.chatStatus`;
+  - `runtimeHealth.agentProbeStatus`;
+  - `runtimeHealth.probeStatuses`;
+  - `runtimeHealth.preferredProbeProofs`;
+  - `runtimeHealth.blockingProbeFailures`.
+
+Evidencia atual:
+
+- comando:
+  `npm --silent run model-gateway:live:readiness -- --json`;
+- resultado:
+  - `ok=true`;
+  - `repo_agent|zai|glm-4.5-flash`:
+    - `exactRouteProfileMatch=true`;
+    - `live_turn=ok`;
+    - `live_tool_protocol=ok`;
+    - `live_ask_user=ok`;
+    - `agent=ok`;
+    - `vision=failed` nao bloqueante;
+  - `code|zai|glm-4.5-flash`:
+    - `exactRouteProfileMatch=true`;
+    - `live_tool_protocol=ok`;
+    - `live_ask_user=ok`;
+    - sem `live_turn` proprio;
+  - `tool_agent|zai|glm-4.5-flash`:
+    - `profilelessHealth=true`;
+    - `agent=ok`;
+    - sem `live_tool_protocol/live_ask_user` proprios;
+    - sem falhas bloqueantes.
+
+Impacto:
+
+- o readiness continua nao executando provider;
+- o gate nao fica mais opaco;
+- o operador consegue distinguir prova full-turn primaria, prova live parcial e fallback profileless;
+- a proxima decisao arquitetural fica mais clara:
+  - manter `tool_agent` aceitando health profileless como fallback;
+  - ou exigir prova live propria antes de promover `tool_agent` em cenarios futuros.
+
+## 21.134. Mudanca 134 - Live plan preserva a matriz de rotas terminal-live
+
+Data: 2026-05-28.
+
+Problema:
+
+- o readiness passou a expor a matriz rica de provas por rota;
+- mas o artefato `model-gateway-live-plan` ainda carregava apenas checks resumidos;
+- ao escrever `latest.md`, o plano nao preservava:
+  - health exato por perfil;
+  - health profileless;
+  - probes live presentes;
+  - probes preferidos ausentes;
+  - falhas bloqueantes.
+
+Correcao:
+
+- `scripts/model-gateway-live-plan.mjs` agora copia
+  `readiness.selection.terminalLiveRuntimeSelectorPlan` para `plan.readiness.terminalLiveRuntimeSelectorPlan`;
+- o Markdown do plano ganhou secao:
+  - `Terminal Live Route Matrix`;
+- cada rota mostra:
+  - provider/model;
+  - `routeProfile`;
+  - `healthProfile`;
+  - `exact`;
+  - `profileless`;
+  - probes;
+  - preferred probes;
+  - blocking failures.
+
+Evidencia:
+
+- comando:
+  `node scripts/model-gateway-live-plan.mjs --out-dir /tmp/model-gateway-live-plan-check`;
+- trecho de `latest.md`:
+  - `repo_agent`: exact=true, `live_turn=ok`, `live_tool_protocol=ok`, `live_ask_user=ok`;
+  - `code`: exact=true, `live_tool_protocol=ok`, `live_ask_user=ok`;
+  - `tool_agent`: profileless=true, `agent=ok`, preferred live probes missing, blockingFailures=-.
+
+Impacto:
+
+- o plano executavel deixa de ser apenas uma lista de comandos;
+- ele passa a registrar a evidencia operacional que justifica cada rota antes da execucao;
+- isso reduz retrabalho quando um live futuro falhar e precisarmos saber se o fallback tinha prova propria ou apenas
+  prova global.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

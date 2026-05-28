@@ -63,6 +63,14 @@ function optionalString(value) {
 
 /**
  * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
+function optionalRecord(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+}
+
+/**
+ * @param {unknown} value
  * @returns {number}
  */
 function optionalNumber(value) {
@@ -106,6 +114,73 @@ function supplyWarningSummary(audit) {
     return {
         total: Object.values(byProfile).reduce((sum, count) => sum + count, 0),
         byProfile,
+    };
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} probe
+ * @returns {string | null}
+ */
+function runtimeProbeStatus(probe) {
+    const normalizedProbe = optionalRecord(probe);
+    if (!normalizedProbe) return null;
+    return optionalString(normalizedProbe['status']) ?? (normalizedProbe['ok'] === true ? 'ok' : normalizedProbe['ok'] === false ? 'failed' : null);
+}
+
+/**
+ * @param {unknown} probes
+ * @returns {Record<string, string>}
+ */
+function runtimeProbeStatuses(probes) {
+    const normalizedProbes = optionalRecord(probes);
+    if (!normalizedProbes) return {};
+    return Object.fromEntries(
+        Object.entries(normalizedProbes)
+            .map(([kind, probe]) => {
+                const status = runtimeProbeStatus(optionalRecord(probe));
+                return status ? [kind, status] : null;
+            })
+            .filter((entry) => entry !== null)
+            .sort(([left], [right]) => left.localeCompare(right)),
+    );
+}
+
+/**
+ * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]} route
+ * @returns {Record<string, unknown>}
+ */
+function summarizeTerminalLiveRoute(route) {
+    const runtimeHealth = optionalRecord(route.runtimeHealth);
+    const health = optionalRecord(runtimeHealth?.['health']);
+    const probeStatuses = runtimeProbeStatuses(health?.['probes']);
+    const routeProfile = optionalString(route.selected?.['routeProfile']);
+    const healthRouteProfile = optionalString(health?.['routeProfile']);
+    return {
+        profileId: route.profileId,
+        status: route.status,
+        providerId: optionalString(route.selected?.['providerId']),
+        providerModel: optionalString(route.selected?.['providerModel']),
+        routeProfile,
+        hasRuntimeProof: route.hasRuntimeProof,
+        runtimeHealth: runtimeHealth
+            ? {
+                  include: runtimeHealth['include'] === true,
+                  reason: optionalString(runtimeHealth['reason']),
+                  healthRouteProfile,
+                  exactRouteProfileMatch: routeProfile !== null && healthRouteProfile === routeProfile,
+                  profilelessHealth: healthRouteProfile === null,
+                  chatStatus: optionalString(health?.['chatStatus']),
+                  agentProbeStatus: optionalString(health?.['agentProbeStatus']),
+                  probeStatuses,
+                  preferredProbeProofs: Object.fromEntries(
+                      TERMINAL_LIVE_PREFERRED_PROBE_KINDS.map((kind) => [kind, probeStatuses[kind] === 'ok']),
+                  ),
+                  blockingProbeFailures: Object.fromEntries(
+                      TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS.map((kind) => [kind, probeStatuses[kind] === 'failed']),
+                  ),
+              }
+            : null,
+        reasons: route.reasons,
     };
 }
 
@@ -462,15 +537,7 @@ const summary = {
             runtimeEnvBlocked: terminalLiveRuntimeSelectorPlan.summary.runtimeEnvBlockedCount,
             runtimeHealthBlocked: terminalLiveRuntimeSelectorPlan.summary.runtimeHealthBlockedCount,
             runtimeProbeBlocked: terminalLiveRuntimeSelectorPlan.summary.runtimeProbeBlockedCount,
-            selectedRoutes: terminalLiveRuntimeSelectorPlan.routes.map((route) => ({
-                profileId: route.profileId,
-                status: route.status,
-                providerId: optionalString(route.selected?.['providerId']),
-                providerModel: optionalString(route.selected?.['providerModel']),
-                routeProfile: optionalString(route.selected?.['routeProfile']),
-                hasRuntimeProof: route.hasRuntimeProof,
-                reasons: route.reasons,
-            })),
+            selectedRoutes: terminalLiveRuntimeSelectorPlan.routes.map(summarizeTerminalLiveRoute),
         },
     },
     livePlan: {

@@ -90,6 +90,13 @@ function countMapText(counts) {
         .join(',') || '-';
 }
 
+function terminalLiveRouteMatrix(readiness) {
+    const routes =
+        readiness?.terminalLiveRuntimeSelectorPlan?.selectedRoutes ??
+        readiness?.selection?.terminalLiveRuntimeSelectorPlan?.selectedRoutes;
+    return Array.isArray(routes) ? routes : [];
+}
+
 function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict = false } = {}) {
     const generatedAt = new Date().toISOString();
     const runId = planRunId(generatedAt.replace(/[:.]/gu, '-'));
@@ -266,6 +273,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
             snapshotId: readiness.snapshotId ?? null,
             generatedAt: readiness.generatedAt ?? null,
             checks: readiness.checks ?? [],
+            terminalLiveRuntimeSelectorPlan: readiness.selection?.terminalLiveRuntimeSelectorPlan ?? null,
         },
         overlaySummary,
         localPrivateStrict: {
@@ -280,7 +288,28 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
     };
 }
 
+function renderTerminalLiveRoute(route) {
+    const runtimeHealth = route.runtimeHealth ?? {};
+    const probes = Object.entries(runtimeHealth.probeStatuses ?? {})
+        .map(([kind, status]) => `${kind}:${status}`)
+        .join(',') || '-';
+    const preferred = Object.entries(runtimeHealth.preferredProbeProofs ?? {})
+        .map(([kind, ok]) => `${kind}:${ok ? 'ok' : 'missing'}`)
+        .join(',') || '-';
+    const blocking = Object.entries(runtimeHealth.blockingProbeFailures ?? {})
+        .filter(([, failed]) => failed)
+        .map(([kind]) => kind)
+        .join(',') || '-';
+    return [
+        `- ${route.profileId}: ${route.providerId ?? '-'} / ${route.providerModel ?? '-'} · routeProfile=${route.routeProfile ?? '-'} · healthProfile=${runtimeHealth.healthRouteProfile ?? '-'} · exact=${runtimeHealth.exactRouteProfileMatch ? 'true' : 'false'} · profileless=${runtimeHealth.profilelessHealth ? 'true' : 'false'}`,
+        `  - probes: ${probes}`,
+        `  - preferred: ${preferred}`,
+        `  - blockingFailures: ${blocking}`,
+    ];
+}
+
 function renderMarkdown(plan) {
+    const terminalLiveRoutes = terminalLiveRouteMatrix(plan.readiness);
     const lines = [
         '# Model Gateway Live Plan',
         '',
@@ -299,6 +328,10 @@ function renderMarkdown(plan) {
         '## Prerequisites',
         '',
         ...plan.prerequisites.map((item) => `- [${item.ok ? 'x' : ' '}] ${item.id}: ${item.detail}`),
+        '',
+        '## Terminal Live Route Matrix',
+        '',
+        ...(terminalLiveRoutes.length > 0 ? terminalLiveRoutes.flatMap(renderTerminalLiveRoute) : ['- none']),
         '',
         '## Phases',
         '',
