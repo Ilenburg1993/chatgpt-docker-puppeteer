@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/health/sqlite-health-mirror
  */
 
-import { listByokProviderModelHealth, subscribeByokProviderHealthChanges } from './provider-health.js';
+import { flushByokProviderHealth, listByokProviderModelHealth, subscribeByokProviderHealthChanges } from './provider-health.js';
 
 const DEFAULT_HEALTH_SQLITE_MIRROR_DEBOUNCE_MS = 1_000;
 
@@ -45,6 +45,27 @@ export async function mirrorByokProviderHealthToSqlite(input) {
         ...result,
         skippedRecords: result.skippedRecords ?? 0,
         records: records.length,
+    };
+}
+
+/**
+ * Flushes the BYOK health ledger to its durable JSON store and then mirrors the latest redacted facts into SQLite.
+ *
+ * This is intentionally still non-runtime: it does not execute providers or probes. It only makes already-observed
+ * runtime facts durable in both operational stores before readiness/live tooling reads them.
+ *
+ * @param {object} input
+ * @param {{ writeRuntimeHealthRecords(records: Record<string, unknown>[], options?: { runId?: string; observedAt?: string | number | Date }): Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords?: number }> }} input.sqliteStore
+ * @param {Record<string, unknown>[]} [input.records]
+ * @param {string | number | Date} [input.observedAt]
+ * @returns {Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords: number; records: number; flushed: boolean }>}
+ */
+export async function flushAndMirrorByokProviderHealthToSqlite(input) {
+    await flushByokProviderHealth();
+    const result = await mirrorByokProviderHealthToSqlite(input);
+    return {
+        ...result,
+        flushed: true,
     };
 }
 

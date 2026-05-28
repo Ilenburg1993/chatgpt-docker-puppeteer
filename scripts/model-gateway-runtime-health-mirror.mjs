@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { setDbLogger } from '../src/copilot/db/sqlite.js';
-import { SqliteModelGatewayCatalogStore, mirrorByokProviderHealthToSqlite } from '../src/copilot/model-gateway/index.js';
+import { SqliteModelGatewayCatalogStore, flushAndMirrorByokProviderHealthToSqlite } from '../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
 const argSet = new Set(args);
@@ -23,7 +23,7 @@ if (json) {
     });
 }
 const sqliteStore = new SqliteModelGatewayCatalogStore();
-const result = await mirrorByokProviderHealthToSqlite({ sqliteStore });
+const result = await flushAndMirrorByokProviderHealthToSqlite({ sqliteStore });
 const diagnostics = await sqliteStore.readStorageDiagnostics();
 const summary = {
     schema: 'model-gateway-runtime-health-mirror',

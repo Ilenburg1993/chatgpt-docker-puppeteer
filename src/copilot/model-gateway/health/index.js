@@ -31,4 +31,8 @@ export {
     diffModelGatewayRuntimeHealthSnapshots,
     summarizeModelGatewayRuntimeHealthRecords,
 } from './runtime-health-diff.js';
-export { installByokProviderHealthSqliteMirror, mirrorByokProviderHealthToSqlite } from './sqlite-health-mirror.js';
+export {
+    flushAndMirrorByokProviderHealthToSqlite,
+    installByokProviderHealthSqliteMirror,
+    mirrorByokProviderHealthToSqlite,
+} from './sqlite-health-mirror.js';

@@ -13,9 +13,9 @@ import {
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
     executeModelGatewayRuntimeSelectorPlanWithFallbacks,
+    flushAndMirrorByokProviderHealthToSqlite,
     listByokProviderModelHealth,
     mergeByokProviderHealthRecords,
-    mirrorByokProviderHealthToSqlite,
     resolveModelGatewaySelectionPolicy,
     summarizeModelGatewayRuntimeAccountOverlays,
 } from '../src/copilot/model-gateway/index.js';
@@ -283,7 +283,7 @@ if (execute) {
         };
         if (healthRecordsAfterExecution.length > 0) {
             try {
-                const result = await mirrorByokProviderHealthToSqlite({
+                const result = await flushAndMirrorByokProviderHealthToSqlite({
                     sqliteStore: new SqliteModelGatewayCatalogStore(),
                     records: healthRecordsAfterExecution,
                     observedAt: new Date(),

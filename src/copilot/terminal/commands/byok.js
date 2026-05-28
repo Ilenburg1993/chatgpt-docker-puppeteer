@@ -43,6 +43,7 @@ import {
     explainModelGatewayProviderEntry,
     explainModelGatewayEligibilityDecision,
     explainModelGatewaySelectionComparison,
+    flushAndMirrorByokProviderHealthToSqlite,
     flushByokProviderHealth,
     JsonModelGatewayCatalogStore,
     listByokProviderModelHealth,
@@ -51,7 +52,6 @@ import {
     listProviderEndpointInventory,
     listProviderWireProbeMatrix,
     mirrorModelGatewayCatalogSnapshotToSqlite,
-    mirrorByokProviderHealthToSqlite,
     MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
     planModelGatewayCatalogRefresh,
     planModelGatewayProbeBackoff,
@@ -2992,9 +2992,9 @@ async function renderByokGatewayHealthSqliteMirror(println) {
     const sqliteStore = new SqliteModelGatewayCatalogStore();
     println(`\n  \x1b[36mBYOK model-gateway runtime health SQLite mirror\x1b[0m`);
     println('  \x1b[90mfonte=byok-provider-health · destino=copilot.sqlite · runtime facts separados do catálogo\x1b[0m\n');
-    const result = await mirrorByokProviderHealthToSqlite({ sqliteStore });
+    const result = await flushAndMirrorByokProviderHealthToSqlite({ sqliteStore });
     println(
-        `    \x1b[32mhealth runtime espelhado no SQLite\x1b[0m  \x1b[90mrecords=${result.records} · observations=${result.healthObservations} · probes=${result.probeResults} · run=${result.runId}\x1b[0m\n`,
+        `    \x1b[32mhealth runtime espelhado no SQLite\x1b[0m  \x1b[90mflushed=${result.flushed ? 'sim' : 'nao'} · records=${result.records} · observations=${result.healthObservations} · probes=${result.probeResults} · run=${result.runId}\x1b[0m\n`,
     );
 }
 

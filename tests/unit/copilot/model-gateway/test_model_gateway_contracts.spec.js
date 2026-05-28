@@ -100,6 +100,7 @@ import {
     byokProviderHealthRecordLastObservedAt,
     clearByokProviderModelHealth,
     listByokProviderModelHealth,
+    flushAndMirrorByokProviderHealthToSqlite,
     recordByokProviderModelAgentProbeFailure,
     recordByokProviderModelAgentProbeSuccess,
     recordByokProviderModelCallFailure,
@@ -4536,6 +4537,56 @@ describe('model-gateway foundation', () => {
             assert.equal(explanation.runtimeHealth?.status, 'ok');
             assert.equal(explanation.runtimeProbes.length, 2);
             assert.equal(explanation.nextActions.includes('run_runtime_probes_for_current_route'), false);
+        } finally {
+            db.close();
+        }
+    });
+
+    it('flushes BYOK health before mirroring runtime facts into SQLite on demand', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            recordByokProviderModelCallFailure({
+                routeProfile: 'repo_agent',
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                message: 'HTTP 429 retry later',
+                errorContext: 'unit-runtime',
+                failureKind: 'rate-limit',
+                failureStatusCode: 429,
+                retryAfterSeconds: 30,
+                timestamp: 7_000,
+            });
+            recordByokProviderModelProbeResult({
+                routeProfile: 'repo_agent',
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                probeKind: 'chat',
+                status: 'failed',
+                ok: false,
+                providerAttempted: true,
+                failureKind: 'rate-limit',
+                failureStatusCode: 429,
+                retryAfterSeconds: 30,
+                timestamp: 7_000,
+            });
+
+            const mirrored = await flushAndMirrorByokProviderHealthToSqlite({
+                sqliteStore: store,
+                observedAt: 7_500,
+            });
+            const runtime = await store.readRuntimeHealthForModel({
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+            });
+
+            assert.equal(mirrored.flushed, true);
+            assert.equal(mirrored.records, 1);
+            assert.equal(mirrored.healthObservations, 1);
+            assert.equal(mirrored.probeResults, 1);
+            assert.equal(runtime.health?.['lastFailureKind'], 'rate-limit');
+            assert.equal(runtime.probes[0]?.['lastFailureKind'], 'rate-limit');
         } finally {
             db.close();
         }

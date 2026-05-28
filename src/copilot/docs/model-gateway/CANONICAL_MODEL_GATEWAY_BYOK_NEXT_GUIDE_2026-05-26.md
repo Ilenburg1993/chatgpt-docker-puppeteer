@@ -7980,6 +7980,84 @@ Resultado:
 
 `2 passed`
 
+Mudanca 70:
+
+Flush deterministico de runtime health antes do mirror SQLite.
+
+Problema identificado:
+
+- scripts e terminal espelhavam health BYOK para SQLite lendo o estado em memoria/arquivo;
+- o caminho correto para live tests exige garantir que o ledger JSON foi flushado antes da leitura operacional;
+- sem uma primitiva unica, cada consumidor precisava lembrar a sequencia `flush -> mirror`;
+- isso aumentava risco de divergencia entre artefato JSON, SQLite e readiness apos uma fase live.
+
+Correcoes aplicadas:
+
+- criada `flushAndMirrorByokProviderHealthToSqlite`;
+- a funcao chama `flushByokProviderHealth()` e depois `mirrorByokProviderHealthToSqlite()`;
+- o retorno inclui `flushed=true`;
+- `model-gateway-runtime-health-mirror.mjs` passou a usar a nova primitiva;
+- `model-gateway-runtime-selector.mjs -- --execute` passou a usar a nova primitiva depois da tentativa runtime;
+- `/byok gateway health sqlite` passou a usar a nova primitiva e exibir `flushed=sim`;
+- os exports seguem os barrels de `health/index.js` e `model-gateway/index.js`;
+- mocks de terminal foram atualizados para o novo contrato.
+
+Separacao preservada:
+
+- a funcao nao executa provider;
+- a funcao nao roda probe;
+- a funcao nao altera catalogo canonico;
+- a funcao apenas materializa fatos runtime ja observados em stores operacionais.
+
+Validacoes focadas:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "flushes BYOK health before mirroring"`
+
+Resultado:
+
+`1 passed`
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js -t "health sqlite|comandos canônicos|runtime health"`
+
+Resultado:
+
+`2 passed`
+
+`npm run model-gateway:typecheck`
+
+Resultado:
+
+`passed`
+
+`npm run model-gateway:lint`
+
+Resultado:
+
+`passed`
+
+`npm run model-gateway:runtime-health:mirror -- --json`
+
+Resultado:
+
+- `ok=true`;
+- `flushed=true`;
+- `records=18`;
+- `observations=18`;
+- `probes=17`;
+- `runtimeRows=878`.
+
+`npm run model-gateway:test:contracts`
+
+Resultado:
+
+`196 passed`
+
+`npm run model-gateway:test:terminal`
+
+Resultado:
+
+`80 passed`
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

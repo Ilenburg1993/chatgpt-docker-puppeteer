@@ -369,6 +369,7 @@ export {
     clearByokProviderModelHealth,
     comparableModelGatewayRuntimeHealthRecord,
     diffModelGatewayRuntimeHealthSnapshots,
+    flushAndMirrorByokProviderHealthToSqlite,
     flushByokProviderHealth,
     byokProviderHealthRecordKey,
     byokProviderHealthRecordLastObservedAt,
