@@ -1121,6 +1121,7 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
  *   profileId?: string;
  *   fallbackProfileIds?: string[];
  *   maxAttempts?: number;
+ *   maxAttemptsPerProvider?: number;
  *   attemptsPerRoute?: number;
  *   retryDelayMs?: number;
  *   maxRetryDelayMs?: number;
@@ -1196,12 +1197,23 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
         typeof options.maxAttempts === 'number' && Number.isFinite(options.maxAttempts) && options.maxAttempts > 0
             ? Math.floor(options.maxAttempts)
             : routeAttempts.length;
+    const maxAttemptsPerProvider =
+        typeof options.maxAttemptsPerProvider === 'number' &&
+        Number.isFinite(options.maxAttemptsPerProvider) &&
+        options.maxAttemptsPerProvider > 0
+            ? Math.floor(options.maxAttemptsPerProvider)
+            : 4;
+    const providerAttemptCounts = new Map();
     /** @type {Array<Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>>} */
     const attempts = [];
     /** @type {Array<ReturnType<typeof resolveModelGatewayRuntimeRetryDecision>>} */
     const retryDecisions = [];
     for (const { profileId, route } of routeAttempts.slice(0, maxAttempts)) {
+        const providerId = optionalString(route.selected?.['providerId']) ?? 'unknown-provider';
+        if ((providerAttemptCounts.get(providerId) ?? 0) >= maxAttemptsPerProvider) continue;
         for (let routeAttempt = 0; routeAttempt < attemptsPerRoute; routeAttempt += 1) {
+            if ((providerAttemptCounts.get(providerId) ?? 0) >= maxAttemptsPerProvider) break;
+            providerAttemptCounts.set(providerId, (providerAttemptCounts.get(providerId) ?? 0) + 1);
             const attempt = await executeModelGatewayRuntimeSelectorPlan(runtimeSelectorPlanForRouteAttempt(plan, route), {
                 profileId,
                 ...(typeof options.timeoutMs === 'number' ? { timeoutMs: options.timeoutMs } : {}),

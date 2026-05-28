@@ -31,7 +31,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-runtime-selector.mjs [--json] [--execute] [--fail] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--require-runtime-proof] [--allow-probe] [--allow-env-missing] [--preferred-probes a,b] [--block-failed-probes a,b] [--max-attempts N] [--attempts-per-route N] [--retry-delay-ms N] [--max-retry-delay-ms N] [--timeout-ms N]
+    process.stdout.write(`Usage: node scripts/model-gateway-runtime-selector.mjs [--json] [--execute] [--fail] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--require-runtime-proof] [--allow-probe] [--allow-env-missing] [--preferred-probes a,b] [--block-failed-probes a,b] [--max-attempts N] [--max-attempts-per-provider N] [--attempts-per-route N] [--retry-delay-ms N] [--max-retry-delay-ms N] [--timeout-ms N]
 
 Build the final model-gateway runtime selector plan. By default this is dry-run only: it reads metadata plus already
 observed health, validates route-aware BYOK env readiness, and does not execute providers. Provider calls require the
@@ -284,10 +284,12 @@ if (execute) {
     } else {
         const runtimeRouteDecisionCapture = createModelGatewayRouteDecisionCapture();
         const maxAttempts = readInteger('--max-attempts', 0);
+        const maxAttemptsPerProvider = readInteger('--max-attempts-per-provider', 4);
         execution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(context.runtimeSelectorPlan, {
             profileId: requestedExecutionProfile || undefined,
             fallbackProfileIds: fallbackExecutionProfiles,
             ...(maxAttempts > 0 ? { maxAttempts } : {}),
+            maxAttemptsPerProvider,
             attemptsPerRoute: readInteger('--attempts-per-route', 1),
             retryDelayMs: readInteger('--retry-delay-ms', 0),
             maxRetryDelayMs: readInteger('--max-retry-delay-ms', 30_000),

@@ -9536,6 +9536,15 @@ Achado adicional:
 - `artifacts/terminal-live/2026-05-28T17-01-04-508Z/summary.md` mostrou bloqueio real posterior: depois de novos
   timeouts/404 em NIM, o plano ficou sem rota executavel;
 - isso reforca a necessidade de uma camada de catalog stale/provider-cooldown mais seletiva antes de novos lives amplos.
+- o executor recebeu tambem limite por provider:
+  - `--max-attempts-per-provider`;
+  - `--byok-real-route-max-attempts-per-provider`;
+  - default `4`.
+- objetivo: permitir descoberta dentro de um provider, mas impedir que um catalogo stale monopolize todo o budget de live.
+- a lista de alternativas preservada pela auditoria subiu de 24 para 96 itens por perfil, porque provedores sem env ou
+  com health bloqueado podem ocupar os primeiros slots e esconder rotas realmente tentaveis;
+- o harness aumentou o `maxBuffer` do selector para 16 MiB, pois planos com alternativas amplas podem ultrapassar o
+  tamanho padrao de stdout do `spawnSync`.
 
 ## 22. Fim Do Documento Inicial
 

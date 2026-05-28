@@ -44,6 +44,7 @@ Common options:
   --byok-real-route-allow-probe
   --byok-real-route-selection-policy=<metadata_first|prefer_runtime_proved|require_runtime_proof>
   --byok-real-route-max-attempts=<n>
+  --byok-real-route-max-attempts-per-provider=<n>
   --byok-real-route-timeout-ms=<ms>
   --timeout-ms=<ms>
   --transport=<pty|stdio>
@@ -289,6 +290,7 @@ function runRuntimeSelectorLiveRoute({
     execute = false,
     allowProbe = false,
     maxAttempts = 8,
+    maxAttemptsPerProvider = 4,
     timeoutMs = 45_000,
     selectionPolicy = '',
 } = {}) {
@@ -325,6 +327,7 @@ function runRuntimeSelectorLiveRoute({
             '--execute',
             '--attempts-per-route=1',
             `--max-attempts=${Math.max(1, Math.trunc(maxAttempts))}`,
+            `--max-attempts-per-provider=${Math.max(1, Math.trunc(maxAttemptsPerProvider))}`,
             `--timeout-ms=${Math.max(1_000, Math.trunc(timeoutMs))}`,
         );
     }
@@ -332,6 +335,7 @@ function runRuntimeSelectorLiveRoute({
         cwd: ROOT,
         encoding: 'utf8',
         env: process.env,
+        maxBuffer: 16 * 1024 * 1024,
     });
     const summary = parseRuntimeSelectorJsonOutput(result.stdout);
     const selectedRoute = summary ? selectRuntimeSelectorEffectiveRoute(summary, requestedProfile) : null;
@@ -433,6 +437,7 @@ function buildRealByokRuntime({
     runtimeSelectorExecute = false,
     runtimeSelectorAllowProbe = false,
     runtimeSelectorMaxAttempts = 8,
+    runtimeSelectorMaxAttemptsPerProvider = 4,
     runtimeSelectorTimeoutMs = 45_000,
     runtimeSelectorSelectionPolicy = '',
 }) {
@@ -444,6 +449,7 @@ function buildRealByokRuntime({
         execute: runtimeSelectorExecute,
         allowProbe: runtimeSelectorAllowProbe,
         maxAttempts: runtimeSelectorMaxAttempts,
+        maxAttemptsPerProvider: runtimeSelectorMaxAttemptsPerProvider,
         timeoutMs: runtimeSelectorTimeoutMs,
         selectionPolicy: runtimeSelectorSelectionPolicy,
     });
@@ -2381,6 +2387,9 @@ async function main() {
     const byokRealRuntimeSelectorExecute = hasFlag('--byok-real-route-execute') && !dryRun;
     const byokRealRuntimeSelectorAllowProbe = hasFlag('--byok-real-route-allow-probe');
     const byokRealRuntimeSelectorMaxAttempts = Number(readArg('--byok-real-route-max-attempts', '8'));
+    const byokRealRuntimeSelectorMaxAttemptsPerProvider = Number(
+        readArg('--byok-real-route-max-attempts-per-provider', '4'),
+    );
     const byokRealRuntimeSelectorTimeoutMs = Number(readArg('--byok-real-route-timeout-ms', '45000'));
     const byokRealRuntimeSelectorSelectionPolicy = readArg('--byok-real-route-selection-policy', '');
     const collectSse = !hasFlag('--no-sse');
@@ -2418,6 +2427,9 @@ async function main() {
               runtimeSelectorMaxAttempts: Number.isFinite(byokRealRuntimeSelectorMaxAttempts)
                   ? byokRealRuntimeSelectorMaxAttempts
                   : 8,
+              runtimeSelectorMaxAttemptsPerProvider: Number.isFinite(byokRealRuntimeSelectorMaxAttemptsPerProvider)
+                  ? byokRealRuntimeSelectorMaxAttemptsPerProvider
+                  : 4,
               runtimeSelectorTimeoutMs: Number.isFinite(byokRealRuntimeSelectorTimeoutMs)
                   ? byokRealRuntimeSelectorTimeoutMs
                   : 45_000,

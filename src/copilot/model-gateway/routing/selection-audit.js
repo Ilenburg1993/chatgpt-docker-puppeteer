@@ -164,7 +164,7 @@ function selectedSummary(selected) {
  * @param {number} limit
  * @returns {Record<string, unknown>[]}
  */
-function candidateSummaries(candidates, limit = 24) {
+function candidateSummaries(candidates, limit = 96) {
     return candidates.map(selectedSummary).filter(isRecord).slice(0, Math.max(0, Math.floor(limit)));
 }
 
