@@ -7923,6 +7923,63 @@ Resultado:
 - `runtimeExecuted=false`;
 - `routeDecisionPersistence.attempted=false`.
 
+Mudanca 69:
+
+Fallback profiles entram no planejamento da CLI antes da execucao.
+
+Problema identificado:
+
+- o executor aceita `--fallback-profiles`;
+- o comando canonico filtrava o planejamento inicial apenas por `--profile` e `--profiles`;
+- quando o operador passava `--execute --profile repo_agent --fallback-profiles tool_agent`, a rota `tool_agent` podia ser removida antes de chegar ao executor;
+- isso tornava a fallback chain declarada na CLI ilusoria em cenarios filtrados.
+
+Correcoes aplicadas:
+
+- `readProfiles()` agora inclui `--fallback-profiles`;
+- perfis sao normalizados, aparados e deduplicados antes da auditoria de selecao;
+- o executor continua recebendo `fallbackProfileIds` separadamente para preservar a ordem de tentativa;
+- o dry-run passa a mostrar todos os perfis que poderao participar da execucao real.
+- o shape de execucao bloqueada no script agora inclui `routeDecisionRecordedCount=0`.
+
+Validacoes focadas:
+
+`npm run model-gateway:runtime-selector -- --allow-env-missing --profile repo_agent --fallback-profiles tool_agent --json`
+
+Resultado:
+
+- `ok=true`;
+- `profiles=["repo_agent","tool_agent"]`;
+- `selected=2`;
+- `blocked=0`.
+
+`npm run model-gateway:runtime-selector -- --fail --json`
+
+Resultado:
+
+- `ok=true`;
+- `runtimeExecuted=false`;
+- `selected=7`;
+- `blocked=0`.
+
+`npm run model-gateway:typecheck`
+
+Resultado:
+
+`passed`
+
+`npm run model-gateway:lint`
+
+Resultado:
+
+`passed`
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "captures and deduplicates route decision streams|audits pre-runtime selection"`
+
+Resultado:
+
+`2 passed`
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

@@ -51,9 +51,11 @@ function readProfiles() {
     const values = [];
     const profile = readArg('--profile');
     const profiles = readArg('--profiles');
+    const fallbackProfiles = readArg('--fallback-profiles');
     if (profile) values.push(profile);
     if (profiles) values.push(...profiles.split(','));
-    return values.map((item) => item.trim()).filter(Boolean);
+    if (fallbackProfiles) values.push(...fallbackProfiles.split(','));
+    return [...new Set(values.map((item) => item.trim()).filter(Boolean))];
 }
 
 function readInteger(name, fallback) {
@@ -230,6 +232,7 @@ if (execute) {
             selectedProfileId: null,
             attempts: [],
             retryDecisions: [],
+            routeDecisionRecordedCount: 0,
             final: null,
             error: 'runtime_selector_plan_not_ready',
         };
