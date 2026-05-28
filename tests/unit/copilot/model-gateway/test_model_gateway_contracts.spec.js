@@ -2772,6 +2772,24 @@ describe('model-gateway foundation', () => {
         assert.ok(route.selected?.reasons.includes('preferred:runtime_proved'));
         assert.equal(explanation.selectedSummary?.['runtimeObservedOnly'], true);
         assert.deepEqual(explanation.selectedSummary?.['runtimeEvidence']?.['verifiedProbes'], ['agent', 'chat']);
+
+        const eligibleRoute = routeModelGatewayCatalogSnapshot(
+            {
+                projections: [],
+                routeOptions: [],
+                accountOverlays: [],
+            },
+            'repo_agent',
+            {
+                routeProfile: 'repo_agent',
+                runtimeHealthRecords,
+                requireRuntimeProof: true,
+                evaluateEligibility: true,
+                secretRegistry: { has: (ref) => ref === 'Z_AI_KEY' },
+            },
+        );
+        assert.equal(eligibleRoute.selected?.eligibility?.['policyInputs']?.['accountAccess']?.['secretConfigured'], true);
+        assert.equal(eligibleRoute.selected?.eligibility?.['secretRef'], 'Z_AI_KEY');
     });
 
     it('allows runtime proof weights to be tuned without changing probe facts', () => {

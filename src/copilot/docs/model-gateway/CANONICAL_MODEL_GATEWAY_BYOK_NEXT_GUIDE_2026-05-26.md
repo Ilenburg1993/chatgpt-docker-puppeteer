@@ -10829,6 +10829,41 @@ Validacao executada:
 - dry-run:
   `npm run model-gateway:runtime-selector -- --json --allow-probe --allow-env-missing --profile=repo_agent --selection-policy=prefer_runtime_proved`.
 
+## Mudanca 122 - Runtime-only candidates recebem secretRef canonico quando possivel
+
+Status: concluido.
+
+Motivo:
+
+- o runtime selector ja conseguia declarar env `ready`, mas a elegibilidade do candidato efemero ainda podia mostrar
+  `secretConfigured=null`;
+- isso deixava a camada account/key menos didatica, especialmente quando nao havia account overlay persistido para o
+  modelo provado;
+- a selecao precisa diferenciar falta de overlay/account visibility de falta real de chave.
+
+Implementacao:
+
+- candidatos runtime-only consultam `MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS`;
+- o primeiro secret ref configurado no `secretRegistry` e escolhido;
+- se nenhum estiver configurado, o primeiro secret ref obrigatorio do provider fica associado ao candidato;
+- `normalizedPolicy.secretRef` passa a alimentar a elegibilidade sem expor segredo;
+- aliases `kilo-code`/`kilo-gateway` tambem sao considerados nessa resolucao.
+
+Resultado observado:
+
+- dry-run `repo_agent` com `prefer_runtime_proved` selecionou `kilo-code/kilo-auto/free`;
+- `accountAccess.secretConfigured=true`;
+- `accountAccess.status=missing_overlay`, deixando claro que a chave existe, mas a visibilidade por account overlay ainda
+  nao esta materializada;
+- env do runtime selector permaneceu `ready`.
+
+Validacao executada:
+
+- `npm run model-gateway:typecheck`;
+- `npm run lint:copilot`;
+- focused vitest `runtime-only proved routes`;
+- dry-run JSON do runtime selector com resumo de `secretConfigured` e env readiness.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

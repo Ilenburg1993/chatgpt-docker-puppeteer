@@ -24,6 +24,7 @@ import { resolveModelGatewayTaskProfile } from './task-profiles.js';
 import { evaluateModelGatewayEligibility } from '../eligibility/index.js';
 import { isModelGatewayRuntimeEligibilityOverlayDecision } from '../eligibility/runtime-overlay-decisions.js';
 import { resolveProviderEndpointInventory } from '../providers/endpoints/index.js';
+import { MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS } from '../secrets/requirements.js';
 
 const CONFIDENCE_SCORE = Object.freeze({
     unknown: 0,
@@ -1024,6 +1025,34 @@ function runtimeOnlyRouteDefaults(providerId) {
 }
 
 /**
+ * @param {string} providerId
+ * @returns {readonly { id: string; kind: string; keys: readonly string[]; required: boolean }[]}
+ */
+function runtimeOnlyProviderSecretGroups(providerId) {
+    const normalized = providerId.trim().toLowerCase();
+    const entry = MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS.find((item) => {
+        const candidate = /** @type {{ providerAliases?: unknown }} */ (item);
+        const aliases = Array.isArray(candidate.providerAliases) ? candidate.providerAliases : [];
+        return item.providerId === normalized || aliases.includes(normalized);
+    });
+    return entry?.groups.filter((group) => group.kind === 'secret') ?? [];
+}
+
+/**
+ * @param {string} providerId
+ * @param {{ has(ref: string): boolean } | undefined} secretRegistry
+ * @returns {string | null}
+ */
+function runtimeOnlySecretRef(providerId, secretRegistry) {
+    const groups = runtimeOnlyProviderSecretGroups(providerId);
+    for (const group of groups) {
+        const configured = group.keys.find((key) => secretRegistry?.has(key) === true);
+        if (configured) return configured;
+    }
+    return groups.find((group) => group.required)?.keys[0] ?? groups[0]?.keys[0] ?? null;
+}
+
+/**
  * Runtime health can prove a route before a provider catalog exposes the model. These ephemeral candidates let the
  * selector use that proof without writing operational observations into canonical metadata.
  *
@@ -1065,6 +1094,7 @@ function buildRuntimeOnlyRouteCandidates(baseCandidates, options = {}) {
         if (!routeDefaults.knownProvider) continue;
         const routeProfile = runtimeHealthRouteProfile(health) ?? 'default';
         const capabilities = runtimeOnlyCapabilities(health);
+        const secretRef = runtimeOnlySecretRef(providerId, options.secretRegistry);
         const routeCandidateId = `${providerId}:${providerModel}:${routeProfile}:runtime_health:${providerModel}`;
         runtimeCandidates.push({
             schemaVersion: 1,
@@ -1099,6 +1129,7 @@ function buildRuntimeOnlyRouteCandidates(baseCandidates, options = {}) {
             normalizedPolicy: {
                 routeLayer: routeDefaults.routeLayer,
                 wireApi: routeDefaults.wireApi,
+                secretRef,
                 openAICompatibleBaseUrl: routeDefaults.openAICompatibleBaseUrl,
                 baseUrl: routeDefaults.openAICompatibleBaseUrl,
                 endpoint: routeDefaults.endpoint,
