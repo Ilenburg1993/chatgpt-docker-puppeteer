@@ -10068,6 +10068,49 @@ Teste adicionado:
 - leitura com `routeProfile=code` continua retornando o registro de `code`;
 - `evaluateGatewayModelHealthRoute(... requireAgentProbeOk=true)` permite a rota global.
 
+## Mudanca 103 - Fallback global de agent proof apos cooldown temporario
+
+Status: concluido.
+
+Contexto:
+
+- a live provou `zai/glm-4.5-flash` com agent probe global ok;
+- ao mesmo tempo, havia registro antigo route-scoped de `repo_agent` com timeout;
+- como o timeout era temporario e o cooldown ja tinha expirado, o chat nao deveria ficar bloqueado para sempre;
+- porem a rota ainda era rejeitada por `agent_probe_not_verified`, pois o registro exact `repo_agent` nao continha agent probe.
+
+Regra aplicada:
+
+- se uma rota especifica exige agent probe;
+- e o registro route-scoped nao tem prova agentica ativa;
+- e a falha de chat daquela rota nao esta ativa;
+- e existe health global/profileless do mesmo provider/model com `agent=ok`;
+- entao a avaliacao pode preencher apenas os campos de agent probe a partir do health global.
+
+Limites da regra:
+
+- nao mascara `chat_health_failed` ativo;
+- nao mascara falha duravel `model-or-route`;
+- nao troca provider/model;
+- nao promove runtime fact para metadado canonico;
+- nao transforma prova global em decisao persistente de catalogo;
+- apenas compoe a vista volatil de health para aquela decisao.
+
+Motivo arquitetural:
+
+- agent probe global prova que o provider/model sabe chamar tools e `ask_user`;
+- route profile prova/nega adequacao operacional daquele perfil;
+- uma falha temporaria antiga nao deve impedir nova tentativa quando ha prova global mais recente;
+- o seletor ainda pode usar fallback profiles, mas nao deve bloquear uma rota recuperavel por falta de duplicacao exact da mesma prova.
+
+Teste adicionado:
+
+- health `repo_agent` antigo com timeout;
+- health global posterior com `agent=ok`;
+- `temporaryFailureCooldownMs=1`;
+- avaliacao com `requireAgentProbeOk=true`;
+- resultado esperado: `health_allowed`, preservando `routeProfile=repo_agent` e copiando apenas a prova agentica global.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

@@ -715,6 +715,52 @@ describe('model-gateway foundation', () => {
         assert.equal(readGatewayModelHealthFromIndex(model, runtimeHealthIndex, { routeProfile: 'code' })?.routeProfile, 'code');
     });
 
+    it('allows newer global agent proof to satisfy a route after temporary profile health cooled down', () => {
+        const model = createModelRecord({
+            providerId: 'zai',
+            providerModel: 'glm-4.5-flash',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+        });
+        const runtimeHealthRecords = [
+            {
+                routeProfile: 'repo_agent',
+                providerId: 'zai',
+                providerModel: 'glm-4.5-flash',
+                lastStatus: 'failed',
+                lastFailureAt: 1_000,
+                lastSuccessAt: null,
+                lastFailureKind: 'timeout',
+                agentProbeStatus: null,
+                probes: {},
+            },
+            {
+                routeProfile: null,
+                providerId: 'zai',
+                providerModel: 'glm-4.5-flash',
+                lastStatus: 'ok',
+                lastSuccessAt: 2_000,
+                agentProbeStatus: 'ok',
+                lastAgentProbeSuccessAt: 2_100,
+                probes: { agent: { status: 'ok', ok: true, providerAttempted: true, lastAt: 2_100 } },
+            },
+        ];
+
+        const decision = evaluateGatewayModelHealthRoute(model, {
+            routeProfile: 'repo_agent',
+            runtimeHealthIndex: createGatewayRuntimeHealthIndex(runtimeHealthRecords),
+            requireAgentProbeOk: true,
+            now: 10_000,
+            temporaryFailureCooldownMs: 1,
+        });
+
+        assert.equal(decision.include, true);
+        assert.equal(decision.reason, 'health_allowed');
+        assert.equal(decision.health?.routeProfile, 'repo_agent');
+        assert.equal(decision.health?.agentProbeStatus, 'ok');
+        assert.equal(decision.health?.probes?.agent?.ok, true);
+    });
+
     it('expires temporary chat health failures without forgetting durable model-route blockers', () => {
         const model = createModelRecord({
             providerId: 'nvidia-nim',

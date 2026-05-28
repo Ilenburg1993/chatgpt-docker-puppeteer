@@ -385,6 +385,56 @@ export function listGatewayModelVerifiedProbeKinds(health) {
 }
 
 /**
+ * @param {ReturnType<typeof readGatewayModelHealth>} primary
+ * @param {ReturnType<typeof readGatewayModelHealth>} fallback
+ * @returns {ReturnType<typeof readGatewayModelHealth>}
+ */
+function mergeGatewayModelAgentProbeFallback(primary, fallback) {
+    if (!primary || !fallback) return primary;
+    return /** @type {ReturnType<typeof readGatewayModelHealth>} */ ({
+        ...primary,
+        agentProbeStatus: fallback.agentProbeStatus,
+        agentProbeSuccessCount: fallback.agentProbeSuccessCount,
+        lastAgentProbeSuccessAt: fallback.lastAgentProbeSuccessAt,
+        lastAgentProbeMessage: fallback.lastAgentProbeMessage,
+        lastAgentProbeErrorContext: fallback.lastAgentProbeErrorContext,
+        probes: {
+            ...(fallback.probes ?? {}),
+            ...(primary.probes ?? {}),
+            ...(fallback.probes?.['agent'] ? { agent: fallback.probes['agent'] } : {}),
+        },
+    });
+}
+
+/**
+ * @param {ReturnType<typeof readGatewayModelHealth>} primary
+ * @param {ReturnType<typeof readGatewayModelHealth>} fallback
+ * @returns {boolean}
+ */
+function canUseGlobalAgentProbeFallback(primary, fallback) {
+    if (!primary || !fallback || primary === fallback) return false;
+    if (!isGatewayModelAgentProbeVerified(fallback)) return false;
+    if (isGatewayModelAgentProbeVerified(primary)) return false;
+    if (!isGatewayModelAgentProbeHealthFailed(primary)) return true;
+    return (fallback.lastAgentProbeSuccessAt ?? 0) >= (primary.lastAgentProbeFailureAt ?? 0);
+}
+
+/**
+ * @param {Record<string, any>} model
+ * @param {{ runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex> }} options
+ * @returns {ReturnType<typeof readGatewayModelHealth>}
+ */
+function readGatewayModelGlobalRuntimeHealth(model, options) {
+    if (isGatewayRuntimeHealthIndex(options.runtimeHealthIndex)) {
+        return readGatewayModelHealthFromIndex(model, options.runtimeHealthIndex, { routeProfile: null });
+    }
+    if (Array.isArray(options.runtimeHealthRecords)) {
+        return readGatewayModelHealthFromRecords(model, options.runtimeHealthRecords, { routeProfile: null });
+    }
+    return readGatewayModelHealth(model, { routeProfile: null });
+}
+
+/**
  * @param {Record<string, any>} model
  * @param {{ routeProfile?: string | null }} [options]
  * @returns {ReturnType<typeof readByokProviderModelHealth>}
@@ -519,11 +569,11 @@ export function evaluateGatewayProviderHealthCooldown(model, recordsOrIndex, opt
  * @returns {{ include: boolean; reason: string; health: ReturnType<typeof readGatewayModelHealth> }}
  */
 export function evaluateGatewayModelHealthRoute(model, options = {}) {
-    const health = isGatewayRuntimeHealthIndex(options.runtimeHealthIndex)
+    let health = isGatewayRuntimeHealthIndex(options.runtimeHealthIndex)
         ? readGatewayModelHealthFromIndex(model, options.runtimeHealthIndex, options)
         : Array.isArray(options.runtimeHealthRecords)
-        ? readGatewayModelHealthFromRecords(model, options.runtimeHealthRecords, options)
-        : readGatewayModelHealth(model, options);
+          ? readGatewayModelHealthFromRecords(model, options.runtimeHealthRecords, options)
+          : readGatewayModelHealth(model, options);
     if (!health) {
         return {
             include: options.requireAgentProbeOk === true ? false : true,
@@ -531,14 +581,22 @@ export function evaluateGatewayModelHealthRoute(model, options = {}) {
             health,
         };
     }
-    if (options.excludeFailed !== false && isGatewayModelChatHealthActivelyFailed(health, options)) {
-        return { include: false, reason: 'chat_health_failed', health };
+    const routeHealth = /** @type {NonNullable<typeof health>} */ (health);
+    if (options.excludeFailed !== false && isGatewayModelChatHealthActivelyFailed(routeHealth, options)) {
+        return { include: false, reason: 'chat_health_failed', health: routeHealth };
     }
-    if (options.excludeFailed !== false && options.requireAgentProbeOk === true && isGatewayModelAgentProbeHealthFailed(health)) {
-        return { include: false, reason: 'agent_probe_failed', health };
+    if (options.requireAgentProbeOk === true && optionalString(options.routeProfile)) {
+        const fallback = readGatewayModelGlobalRuntimeHealth(model, options);
+        if (canUseGlobalAgentProbeFallback(routeHealth, fallback)) {
+            health = mergeGatewayModelAgentProbeFallback(routeHealth, fallback);
+        }
     }
-    if (options.requireAgentProbeOk === true && !isGatewayModelAgentProbeVerified(health)) {
-        return { include: false, reason: 'agent_probe_not_verified', health };
+    const effectiveHealth = /** @type {NonNullable<typeof health>} */ (health);
+    if (options.excludeFailed !== false && options.requireAgentProbeOk === true && isGatewayModelAgentProbeHealthFailed(effectiveHealth)) {
+        return { include: false, reason: 'agent_probe_failed', health: effectiveHealth };
     }
-    return { include: true, reason: 'health_allowed', health };
+    if (options.requireAgentProbeOk === true && !isGatewayModelAgentProbeVerified(effectiveHealth)) {
+        return { include: false, reason: 'agent_probe_not_verified', health: effectiveHealth };
+    }
+    return { include: true, reason: 'health_allowed', health: effectiveHealth };
 }
