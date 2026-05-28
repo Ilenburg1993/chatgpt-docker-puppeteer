@@ -865,6 +865,7 @@ describe('model-gateway foundation', () => {
         assert.equal(accountBlockedPlan.routes[0].reasons.includes('blocked:account_access_denies_attempt'), true);
         assert.equal(accountBlockedPlan.routes[0].nextActions.includes('refresh_account_overlay_or_choose_accessible_model'), true);
 
+        const runtimeRouteDecisionEvents = [];
         const runtimeExecution = await executeModelGatewayRuntimeSelectorPlan(runtimeSelectorPlan, {
             profileId: 'repo_agent',
             env: {
@@ -907,7 +908,8 @@ describe('model-gateway foundation', () => {
                     throw new Error('recordFailure should not be called for ok runtime execution');
                 },
                 recordRouteDecision: (event) => {
-                    assert.equal(event.source, 'unit-test-runtime-selector');
+                    runtimeRouteDecisionEvents.push(event);
+                    assert.equal(event.source.startsWith('unit-test-runtime-selector'), true);
                     return event;
                 },
                 flushHealth: async () => {},
@@ -918,6 +920,14 @@ describe('model-gateway foundation', () => {
         assert.equal(runtimeExecution.status, 'ok');
         assert.equal(runtimeExecution.healthRecorded, true);
         assert.equal(runtimeExecution.providerFailure, null);
+        assert.equal(runtimeExecution.routeDecisionRecordedCount, 2);
+        assert.deepEqual(
+            runtimeRouteDecisionEvents.map((event) => [event.source, event.failure]),
+            [
+                ['unit-test-runtime-selector', null],
+                ['unit-test-runtime-selector:runtime-result', null],
+            ],
+        );
 
         const blockedRuntimeExecution = await executeModelGatewayRuntimeSelectorPlan(strictRuntimeSelectorPlan, {
             profileId: 'tool_agent',
@@ -1012,6 +1022,7 @@ describe('model-gateway foundation', () => {
         assert.equal(retrySleepCalls, 1);
         assert.equal(retryRuntimeExecution.retryDecisions[0].retryRoute, true);
 
+        const rateLimitRouteDecisionEvents = [];
         const rateLimitRuntimeExecution = await executeModelGatewayRuntimeSelectorPlan(runtimeSelectorPlan, {
             profileId: 'repo_agent',
             deps: {
@@ -1029,6 +1040,10 @@ describe('model-gateway foundation', () => {
                     assert.equal(input.failureKind, 'rate-limit');
                     assert.equal(input.retryAfterSeconds, 42);
                 },
+                recordRouteDecision: (event) => {
+                    rateLimitRouteDecisionEvents.push(event);
+                    return event;
+                },
                 flushHealth: async () => {},
             },
         });
@@ -1036,6 +1051,11 @@ describe('model-gateway foundation', () => {
         assert.equal(rateLimitRuntimeExecution.providerFailure?.kind, 'rate-limit');
         assert.equal(rateLimitRuntimeExecution.providerFailure?.retryAfterSeconds, 42);
         assert.equal(rateLimitRuntimeExecution.healthRecorded, true);
+        assert.equal(rateLimitRuntimeExecution.routeDecisionRecordedCount, 2);
+        assert.deepEqual(rateLimitRouteDecisionEvents.map((event) => event.failure), [
+            null,
+            'runtime_provider_failure:rate-limit',
+        ]);
         const rateLimitDecision = resolveModelGatewayRuntimeRetryDecision(rateLimitRuntimeExecution, {
             maxRetryDelayMs: 1_000,
             retryDelayMs: 5,

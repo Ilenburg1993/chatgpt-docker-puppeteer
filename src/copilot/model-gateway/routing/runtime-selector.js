@@ -365,6 +365,57 @@ function buildSelectorDecisionEvent(selected, row, options) {
 }
 
 /**
+ * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]} route
+ * @param {{ ok: boolean; failure: string | null }} outcome
+ * @returns {ReturnType<typeof buildRouteDecisionEvent>}
+ */
+function buildRuntimeOutcomeDecisionEvent(route, outcome) {
+    const selected = route.selected;
+    const routeKeyValue = route.selectedRouteKey ?? routeKey(selected);
+    return buildRouteDecisionEvent({
+        taskProfile: route.profileId,
+        routeProfile: optionalString(selected?.['routeProfile']) ?? route.profileId,
+        mode: `${route.decisionEvent.mode}:runtime_result`,
+        source: `${route.decisionEvent.source}:runtime-result`,
+        sessionId: route.decisionEvent.sessionId,
+        route: {
+            selected: selected
+                ? {
+                      score: optionalNumber(selected['score']),
+                      reasons: [
+                          ...route.reasons,
+                          outcome.ok ? 'runtime_outcome:ok' : 'runtime_outcome:failed',
+                      ],
+                      model: {
+                          id: selected['id'],
+                          providerId: selected['providerId'],
+                          providerModel: selected['providerModel'],
+                      },
+                  }
+                : null,
+            candidates: selected ? [selected] : [],
+            rejected: outcome.ok ? [] : [{ reason: outcome.failure ?? 'runtime_selector_failed' }],
+            fallbackChain: routeKeyValue ? [String(routeKeyValue)] : [],
+        },
+        failure: outcome.failure,
+    });
+}
+
+/**
+ * @param {typeof recordModelGatewayRouteDecision} recordRouteDecision
+ * @param {ReturnType<typeof buildRouteDecisionEvent>} event
+ * @returns {boolean}
+ */
+function tryRecordRouteDecision(recordRouteDecision, event) {
+    try {
+        recordRouteDecision(event);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * @param {Record<string, unknown>} selectionPolicyOrTrace
  * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; env?: Record<string, string | undefined> }} [options]
  * @returns {{
@@ -502,6 +553,7 @@ export function selectModelGatewayRuntimeRoute(plan, profileId) {
  *   probe: Awaited<ReturnType<typeof runConfiguredByokChatProbe>> | null;
  *   providerFailure: ReturnType<typeof classifyByokProviderFailure> | Awaited<ReturnType<typeof runConfiguredByokChatProbe>>['providerFailure'] | null;
  *   healthRecorded: boolean;
+ *   routeDecisionRecordedCount: number;
  *   error: string | null;
  * }>}
  */
@@ -521,6 +573,7 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
             probe: null,
             providerFailure: null,
             healthRecorded: false,
+            routeDecisionRecordedCount: 0,
             error: 'runtime_selector_route_unavailable',
         };
     }
@@ -532,6 +585,7 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
     const classifyProviderFailure = options.deps?.classifyProviderFailure ?? classifyByokProviderFailure;
     const recordRouteDecision = options.deps?.recordRouteDecision ?? recordModelGatewayRouteDecision;
     const recordHealth = options.recordHealth !== false;
+    let routeDecisionRecordedCount = 0;
     const providerModel = optionalString(selected['providerModel']);
     const probeEnv = buildModelGatewayRuntimeSelectorProbeEnv(selected, options.env);
     const identity = {
@@ -540,11 +594,7 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
         providerModel,
     };
     try {
-        try {
-            recordRouteDecision(route.decisionEvent);
-        } catch {
-            // Runtime execution must not fail because an optional observer failed.
-        }
+        if (tryRecordRouteDecision(recordRouteDecision, route.decisionEvent)) routeDecisionRecordedCount += 1;
         const probe = await runChatProbe({
             env: probeEnv,
             ...(providerModel ? { model: providerModel } : {}),
@@ -573,6 +623,10 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
             await flushHealth();
             healthRecorded = true;
         }
+        const failure = probe.ok ? null : `runtime_probe_failed:${probe.status}`;
+        if (tryRecordRouteDecision(recordRouteDecision, buildRuntimeOutcomeDecisionEvent(route, { ok: probe.ok, failure }))) {
+            routeDecisionRecordedCount += 1;
+        }
         return {
             schema: 'model-gateway-runtime-selector-execution-result',
             ok: probe.ok,
@@ -582,6 +636,7 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
             probe,
             providerFailure: probe.providerFailure ?? null,
             healthRecorded,
+            routeDecisionRecordedCount,
             error: probe.ok ? null : (probe.errors[0] ?? probe.status),
         };
     } catch (error) {
@@ -600,6 +655,17 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
             await flushHealth();
             healthRecorded = true;
         }
+        if (
+            tryRecordRouteDecision(
+                recordRouteDecision,
+                buildRuntimeOutcomeDecisionEvent(route, {
+                    ok: false,
+                    failure: `runtime_provider_failure:${providerFailure.kind ?? 'unknown'}`,
+                }),
+            )
+        ) {
+            routeDecisionRecordedCount += 1;
+        }
         return {
             schema: 'model-gateway-runtime-selector-execution-result',
             ok: false,
@@ -609,6 +675,7 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
             probe: null,
             providerFailure,
             healthRecorded,
+            routeDecisionRecordedCount,
             error: providerFailure.message,
         };
     }

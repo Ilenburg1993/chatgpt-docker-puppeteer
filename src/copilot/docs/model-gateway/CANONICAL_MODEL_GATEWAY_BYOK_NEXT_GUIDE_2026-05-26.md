@@ -7658,6 +7658,60 @@ Resultado:
 
 `passed`
 
+Mudanca 63:
+
+Outcome sanitizado do runtime selector no ledger de decisoes.
+
+Problema identificado:
+
+- o runtime selector registrava a decisao antes da tentativa;
+- o ledger sabia qual rota seria tentada;
+- o ledger nao registrava, no mesmo contrato de route decision, o resultado sanitizado da tentativa runtime;
+- isso deixava sucesso, falha de provider e fallback dependentes de health/probe em vez de tambem existirem como decisao operacional auditavel.
+
+Correcoes aplicadas:
+
+- `executeModelGatewayRuntimeSelectorPlan` agora registra a decisao pre-runtime como antes;
+- apos a tentativa, registra tambem um evento de outcome;
+- outcome bem-sucedido registra `runtime_outcome:ok`;
+- outcome falho por probe registra `runtime_probe_failed:<status>`;
+- outcome falho por excecao/provider registra `runtime_provider_failure:<kind>`;
+- eventos de outcome usam `source=<source-original>:runtime-result`;
+- eventos de outcome usam `mode=<mode-original>:runtime_result`;
+- nao armazenam prompt;
+- nao armazenam headers;
+- nao armazenam payload de provider;
+- nao armazenam segredo;
+- a execucao retorna `routeDecisionRecordedCount`;
+- falha de observador continua nao quebrando runtime.
+
+Exemplo observado em teste:
+
+- pre-decision: `source=unit-test-runtime-selector`, `failure=null`;
+- runtime outcome ok: `source=unit-test-runtime-selector:runtime-result`, `failure=null`;
+- runtime outcome rate-limit: `failure=runtime_provider_failure:rate-limit`.
+
+Valor arquitetural:
+
+- route ledger passa a responder "o que escolhemos" e "o que aconteceu";
+- runtime health continua sendo a fonte de fatos de saude;
+- route decision ledger continua sendo a trilha de decisoes sanitizadas;
+- fallback pode ser auditado por sequencia de outcomes sem ler provider payload.
+
+Validacoes focadas:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "audits pre-runtime selection"`
+
+Resultado:
+
+`1 passed`
+
+`npm run model-gateway:typecheck`
+
+Resultado:
+
+`passed`
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
