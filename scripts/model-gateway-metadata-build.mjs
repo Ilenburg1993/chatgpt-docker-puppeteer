@@ -366,8 +366,15 @@ if (json) {
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 } else {
     process.stdout.write(
-        `\nmodel-gateway metadata build complete: committed=${summary.committed ? 'yes' : 'no'} parity=${summary.sqlite?.parity.ok ?? '-'} projections=${summary.projections} openai=${summary.openai} overlays=${summary.overlays}\n`,
+        `\nmodel-gateway metadata build complete: committed=${summary.committed ? 'yes' : 'no'} ok=${summary.ok ? 'yes' : 'no'} parity=${summary.sqlite?.parity.ok ?? '-'} projections=${summary.projections} openai=${summary.openai} overlays=${summary.overlays} importerFailures=${summary.importerFailures.length}\n`,
     );
+    for (const failure of summary.importerFailures) {
+        const label = failure.buildBlocking ? 'blocking' : 'non-blocking';
+        const errors = failure.errors.length > 0 ? failure.errors.join('; ') : failure.operatorLabel;
+        process.stdout.write(
+            `  importer failure (${label}) ${failure.importerId ?? '-'} provider=${failure.providerId ?? '-'} disposition=${failure.disposition} kind=${failure.failureKind}: ${errors}\n`,
+        );
+    }
     process.stdout.write(`full log: ${summary.logPath}\n`);
 }
 

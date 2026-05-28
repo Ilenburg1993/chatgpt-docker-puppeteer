@@ -250,7 +250,7 @@ const checks = [
     {
         id: 'runtime_selector_plan_ready',
         ok: runtimeSelectorPlan.ready && runtimeSelectorPlan.summary.blockedProfileCount === 0,
-        detail: `${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} routes selected, blocked=${runtimeSelectorPlan.summary.blockedProfileCount}, envReady=${runtimeSelectorPlan.summary.runtimeEnvReadyCount}, envBlocked=${runtimeSelectorPlan.summary.runtimeEnvBlockedCount}, proofSelected=${runtimeSelectorPlan.summary.runtimeProofSelectedCount}`,
+        detail: `${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} routes selected, blocked=${runtimeSelectorPlan.summary.blockedProfileCount}, accessBlocked=${runtimeSelectorPlan.summary.accountAccessBlockedCount ?? 0}, envReady=${runtimeSelectorPlan.summary.runtimeEnvReadyCount}, envBlocked=${runtimeSelectorPlan.summary.runtimeEnvBlockedCount}, proofSelected=${runtimeSelectorPlan.summary.runtimeProofSelectedCount}`,
     },
     {
         id: 'selection_supply_warnings',
@@ -374,6 +374,7 @@ const summary = {
             selected: runtimeSelectorPlan.summary.selectedProfileCount,
             profiles: runtimeSelectorPlan.summary.profileCount,
             blocked: runtimeSelectorPlan.summary.blockedProfileCount,
+            accountAccessBlocked: runtimeSelectorPlan.summary.accountAccessBlockedCount ?? 0,
             runtimeProofSelected: runtimeSelectorPlan.summary.runtimeProofSelectedCount,
             runtimeEnvReady: runtimeSelectorPlan.summary.runtimeEnvReadyCount,
             runtimeEnvBlocked: runtimeSelectorPlan.summary.runtimeEnvBlockedCount,

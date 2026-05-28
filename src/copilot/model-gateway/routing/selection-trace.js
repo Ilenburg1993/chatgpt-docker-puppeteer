@@ -99,9 +99,18 @@ function summarizeSelectedRoute(route) {
         accountAccess: accountAccess
             ? {
                   status: optionalString(accountAccess['status']),
+                  canAttempt: accountAccess['canAttempt'] === true,
+                  secretConfigured: typeof accountAccess['secretConfigured'] === 'boolean' ? accountAccess['secretConfigured'] : null,
+                  modelVisible: accountAccess['modelVisible'] === true,
                   failureClass: optionalString(accountAccess['failureClass']),
                   accessConfidence: optionalString(accountAccess['accessConfidence']),
                   resetWindows: Array.isArray(accountAccess['resetWindows']) ? accountAccess['resetWindows'].filter(optionalRecord).slice(0, 4) : [],
+                  hardReasons: Array.isArray(accountAccess['hardReasons'])
+                      ? accountAccess['hardReasons'].map(optionalString).filter((item) => item !== null).slice(0, 8)
+                      : [],
+                  softReasons: Array.isArray(accountAccess['softReasons'])
+                      ? accountAccess['softReasons'].map(optionalString).filter((item) => item !== null).slice(0, 8)
+                      : [],
               }
             : null,
         hasRuntimeProof: record['hasRuntimeProof'] === true,

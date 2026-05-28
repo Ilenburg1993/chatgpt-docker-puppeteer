@@ -7385,6 +7385,98 @@ Isso reforca a regra:
 
 live test so depois de readiness strict com rotas selecionadas.
 
+Mudanca 60:
+
+Consolidacao final da ponte pre-runtime -> runtime selector antes dos testes live.
+
+Problema identificado:
+
+- o build real de metadados podia terminar com importer de conta falhando sem deixar isso visivel no resumo humano;
+- o importer `gemini-models` registrou falha nao bloqueante por chave expirada;
+- o runtime selector carregava status de conta `expired` em algumas rotas sem mostrar `canAttempt`;
+- o plano live precisava deixar claro que nenhuma rota selecionada estava bloqueada por conta/key.
+
+Correcoes aplicadas:
+
+- `selection-audit` agora preserva `accountAccess.canAttempt`;
+- `selection-audit` agora preserva `secretConfigured`, `modelVisible`, `hardReasons` e `softReasons`;
+- `selection-trace` preserva os mesmos campos;
+- `runtime-selector` bloqueia qualquer rota selecionada cujo `accountAccess.canAttempt === false`;
+- `runtime-selector` inclui `accountAccessBlockedCount`;
+- `live-readiness` mostra `accessBlocked=0` no gate do runtime selector;
+- `model-gateway:metadata:build` imprime falhas de importer no resumo humano, mesmo quando nao bloqueiam o build.
+
+Estado observado depois do build remoto sem Ollama local:
+
+- catalog integrity: `ok=true`;
+- SQLite parity: `ok=true`;
+- redaction audit: `ok=true`;
+- runtime selector readiness: `7/7`;
+- env ready: `7/7`;
+- access blocked: `0`;
+- runtime proofs promovidos antes do live: `0`;
+- overlays ativos: `0`;
+- overlays expirados: `2`;
+- live plan: `ok=true`.
+
+Falha de importer observada:
+
+- `gemini-models`;
+- causa: `API key expired`;
+- classificacao: falha de conta/key, nao de metadado publico;
+- efeito: nao bloqueia o build quando ha fontes publicas/doc suficientes e a selecao default nao depende de Gemini;
+- acao futura: trocar ou renovar `GEMINI_API_KEY`, depois rodar refresh seletivo do provider.
+
+Validacoes focadas:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "audits pre-runtime selection"`
+
+Resultado:
+
+`1 passed`
+
+Validacoes proporcionais apos a consolidacao:
+
+`npm run model-gateway:test:contracts`
+
+Resultado:
+
+`193 passed`
+
+`npm run model-gateway:typecheck`
+
+Resultado:
+
+`passed`
+
+`npm run model-gateway:lint`
+
+Resultado:
+
+`passed`
+
+Comandos pre-live executados sem runtime:
+
+`npm run model-gateway:runtime-selector -- --fail --allow-env-missing --json`
+
+`npm run model-gateway:live:readiness -- --json`
+
+`npm run model-gateway:live:plan -- --no-write --json`
+
+Resultado:
+
+- runtime selector: `ok=true`;
+- readiness: `ok=true`;
+- live plan: `ok=true`.
+
+Proxima etapa:
+
+- rodar baseline de runtime health;
+- rodar controle `llm-b` sem PR;
+- rodar fixture BYOK sem provider real;
+- apenas depois rodar probes BYOK reais;
+- apos cada fase real, diffar health, espelhar SQLite e recomputar selector/readiness.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

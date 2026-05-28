@@ -285,6 +285,16 @@ function runtimeRoute(route) {
 }
 
 /**
+ * @param {Record<string, unknown> | null} route
+ * @returns {boolean}
+ */
+function routeAccountCanAttempt(route) {
+    if (!route) return false;
+    const accountAccess = optionalRecord(route['accountAccess']);
+    return accountAccess?.['canAttempt'] !== false;
+}
+
+/**
  * @param {Record<string, unknown>} row
  * @returns {Record<string, unknown> | null}
  */
@@ -368,6 +378,7 @@ function buildSelectorDecisionEvent(selected, row, options) {
  *     profileCount: number;
  *     selectedProfileCount: number;
  *     blockedProfileCount: number;
+ *     accountAccessBlockedCount: number;
  *     runtimeProofSelectedCount: number;
  *     runtimeEnvReadyCount: number;
  *     runtimeEnvBlockedCount: number;
@@ -397,11 +408,13 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
         const hasRuntimeProof = row['hasRuntimeProof'] === true || selected?.['hasRuntimeProof'] === true;
         const runtimeEnv = selected ? evaluateModelGatewayRuntimeSelectorRouteEnv(selected, options.env) : null;
         const runtimeEnvBlocked = requireRuntimeEnvReady && runtimeEnv?.status !== 'ready';
-        const blocked = !selected || (requireRuntimeProof && !hasRuntimeProof) || runtimeEnvBlocked;
+        const accountAccessBlocked = selected !== null && !routeAccountCanAttempt(selected);
+        const blocked = !selected || accountAccessBlocked || (requireRuntimeProof && !hasRuntimeProof) || runtimeEnvBlocked;
         /** @type {'selected' | 'blocked'} */
         const status = blocked ? 'blocked' : 'selected';
         const reasons = selectionReasons(selected, row);
         if (blocked && !selected) reasons.push('blocked:no_selected_route');
+        if (blocked && accountAccessBlocked) reasons.push('blocked:account_access_denies_attempt');
         if (blocked && selected && requireRuntimeProof) reasons.push('blocked:runtime_proof_required');
         if (blocked && selected && runtimeEnvBlocked) reasons.push('blocked:runtime_env_not_ready');
         const normalizedRow = {
@@ -421,6 +434,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             reasons,
             nextActions: blocked
                 ? [
+                      ...(accountAccessBlocked ? ['refresh_account_overlay_or_choose_accessible_model'] : []),
                       ...(runtimeEnvBlocked ? ['configure_provider_env_for_selected_route'] : []),
                       'run_runtime_probe_for_profile',
                       'relax_selection_policy_or_choose_fallback',
@@ -444,6 +458,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             profileCount: routes.length,
             selectedProfileCount: routes.filter((route) => route.status === 'selected').length,
             blockedProfileCount: routes.filter((route) => route.status === 'blocked').length,
+            accountAccessBlockedCount: routes.filter((route) => route.reasons.includes('blocked:account_access_denies_attempt')).length,
             runtimeProofSelectedCount: routes.filter((route) => route.status === 'selected' && route.hasRuntimeProof).length,
             runtimeEnvReadyCount: routes.filter((route) => route.runtimeEnv?.status === 'ready').length,
             runtimeEnvBlockedCount: routes.filter((route) => route.runtimeEnv !== null && route.runtimeEnv.status !== 'ready').length,

@@ -700,6 +700,8 @@ describe('model-gateway foundation', () => {
         assert.equal(audit.summary.selectedSelectorKinds.provider_explicit, 2);
         assert.equal(audit.profiles[0].selected?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
         assert.equal(audit.profiles[0].selected?.['accountScope'], 'default');
+        assert.equal(audit.profiles[0].selected?.['accountAccess']?.['canAttempt'], true);
+        assert.deepEqual(audit.profiles[0].selected?.['accountAccess']?.['hardReasons'], []);
         assert.equal(audit.profiles[0].selected?.['taskProfile'], 'repo_agent');
         assert.equal(audit.profiles[0].decisionLayers['runtimeProbeProofCount'], 0);
         assert.deepEqual(audit.profiles[0].capabilitySupply.required, { text: 1, streaming: 1, tools: 1 });
@@ -782,9 +784,11 @@ describe('model-gateway foundation', () => {
         assert.equal(runtimeSelectorPlan.ready, true);
         assert.equal(runtimeSelectorPlan.summary.selectedProfileCount, 2);
         assert.equal(runtimeSelectorPlan.summary.blockedProfileCount, 0);
+        assert.equal(runtimeSelectorPlan.summary.accountAccessBlockedCount, 0);
         assert.equal(runtimeSelectorPlan.routes[0].decisionEvent.source, 'unit-test-runtime-selector');
         assert.equal(runtimeSelectorPlan.routes[0].decisionEvent.sessionId, 'unit-session');
         assert.equal(runtimeSelectorPlan.routes[0].selected?.['accountScope'], 'default');
+        assert.equal(runtimeSelectorPlan.routes[0].selected?.['accountAccess']?.['canAttempt'], true);
         assert.equal(runtimeSelectorPlan.routes[0].selected?.['taskProfile'], 'repo_agent');
         assert.equal(runtimeSelectorPlan.routes[0].selected?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
         assert.equal(runtimeSelectorPlan.routes[0].selected?.['routeLayer'], 'openai_compatible_aggregator');
@@ -833,6 +837,33 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(routeEnvReadyPlan.summary.runtimeEnvReadyCount, 2);
         assert.equal(routeEnvReadyPlan.summary.blockedProfileCount, 0);
+
+        const accountBlockedPolicy = {
+            ...preferRuntimeProved,
+            rows: preferRuntimeProved.rows.map((row, index) =>
+                index === 0
+                    ? {
+                          ...row,
+                          selected: {
+                              ...row.selected,
+                              accountAccess: {
+                                  ...row.selected.accountAccess,
+                                  canAttempt: false,
+                                  status: 'not_visible',
+                                  hardReasons: ['account_model_not_visible'],
+                              },
+                          },
+                      }
+                    : row,
+            ),
+        };
+        const accountBlockedPlan = buildModelGatewayRuntimeSelectorPlan(accountBlockedPolicy);
+        assert.equal(accountBlockedPlan.ok, false);
+        assert.equal(accountBlockedPlan.summary.accountAccessBlockedCount, 1);
+        assert.equal(accountBlockedPlan.summary.blockedProfileCount, 1);
+        assert.equal(accountBlockedPlan.routes[0].selected, null);
+        assert.equal(accountBlockedPlan.routes[0].reasons.includes('blocked:account_access_denies_attempt'), true);
+        assert.equal(accountBlockedPlan.routes[0].nextActions.includes('refresh_account_overlay_or_choose_accessible_model'), true);
 
         const runtimeExecution = await executeModelGatewayRuntimeSelectorPlan(runtimeSelectorPlan, {
             profileId: 'repo_agent',

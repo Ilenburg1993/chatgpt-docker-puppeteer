@@ -130,9 +130,14 @@ function selectedSummary(selected) {
         taskProfile: optionalString(eligibility['taskProfile']),
         accountAccess: {
             status: optionalString(accountAccess['status']),
+            canAttempt: accountAccess['canAttempt'] === true,
+            secretConfigured: typeof accountAccess['secretConfigured'] === 'boolean' ? accountAccess['secretConfigured'] : null,
+            modelVisible: accountAccess['modelVisible'] === true,
             failureClass: optionalString(accountAccess['failureClass']),
             accessConfidence: optionalString(accountAccess['accessConfidence']),
             resetWindows: Array.isArray(accountAccess['resetWindows']) ? accountAccess['resetWindows'].filter(isRecord).slice(0, 4) : [],
+            hardReasons: stringList(accountAccess['hardReasons']).slice(0, 8),
+            softReasons: stringList(accountAccess['softReasons']).slice(0, 8),
         },
         runtimeHealth: isRecord(selected['health'])
             ? {
