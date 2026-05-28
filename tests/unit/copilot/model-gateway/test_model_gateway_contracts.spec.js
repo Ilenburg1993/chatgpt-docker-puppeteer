@@ -811,6 +811,60 @@ describe('model-gateway foundation', () => {
         assert.equal(decision.health?.probes?.agent?.ok, true);
     });
 
+    it('prefers exact route-profile runtime proof over profileless fallback proof when candidates tie', () => {
+        const profilelessProved = createModelRecord({
+            providerId: 'openrouter',
+            providerModel: 'aaa-profileless-agent',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        const exactProved = createModelRecord({
+            providerId: 'zai',
+            providerModel: 'zzz-exact-agent',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        const runtimeHealthRecords = [
+            {
+                routeProfile: null,
+                providerId: 'openrouter',
+                providerModel: 'aaa-profileless-agent',
+                lastStatus: 'ok',
+                lastSuccessAt: 100,
+                agentProbeStatus: 'ok',
+                lastAgentProbeSuccessAt: 100,
+                probes: { agent: { status: 'ok', ok: true, providerAttempted: true, lastAt: 100 } },
+            },
+            {
+                routeProfile: 'repo_agent',
+                providerId: 'zai',
+                providerModel: 'zzz-exact-agent',
+                lastStatus: 'ok',
+                lastSuccessAt: 100,
+                agentProbeStatus: 'ok',
+                lastAgentProbeSuccessAt: 100,
+                probes: { agent: { status: 'ok', ok: true, providerAttempted: true, lastAt: 100 } },
+            },
+        ];
+
+        const decision = routeGatewayModels([profilelessProved, exactProved], 'repo_agent', {
+            routeProfile: 'repo_agent',
+            runtimeHealthRecords,
+        });
+
+        assert.equal(decision.selected?.model['id'], 'zai:zzz-exact-agent');
+        assert.ok(decision.selected?.reasons.includes('runtime_health_exact_route_profile'));
+        assert.ok(
+            decision.candidates.some(
+                (candidate) =>
+                    candidate.model['id'] === 'openrouter:aaa-profileless-agent' &&
+                    candidate.reasons.includes('runtime_health_profileless_fallback'),
+            ),
+        );
+    });
+
     it('expires temporary chat health failures without forgetting durable model-route blockers', () => {
         const model = createModelRecord({
             providerId: 'nvidia-nim',

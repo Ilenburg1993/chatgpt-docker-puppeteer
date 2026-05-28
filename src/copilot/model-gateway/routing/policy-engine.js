@@ -53,6 +53,7 @@ const CONFIDENCE_RANK = Object.freeze({
  *   preferredLiveProtocolProbeVerified: number;
  *   preferredProbeFailedPenalty: number;
  *   preferredLiveProtocolProbeFailedPenalty: number;
+ *   exactRouteProfileProof: number;
  *   runtimeProvedPreference: number;
  * }>} ModelGatewayRuntimeProofWeights
  */
@@ -66,6 +67,7 @@ export const DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS = Object.freeze({
     preferredLiveProtocolProbeVerified: 420,
     preferredProbeFailedPenalty: 120,
     preferredLiveProtocolProbeFailedPenalty: 260,
+    exactRouteProfileProof: 60,
     runtimeProvedPreference: 20,
 });
 
@@ -149,6 +151,10 @@ function resolveRuntimeProofWeights(value) {
         preferredLiveProtocolProbeFailedPenalty: finiteWeight(
             custom['preferredLiveProtocolProbeFailedPenalty'],
             DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS.preferredLiveProtocolProbeFailedPenalty,
+        ),
+        exactRouteProfileProof: finiteWeight(
+            custom['exactRouteProfileProof'],
+            DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS.exactRouteProfileProof,
         ),
         runtimeProvedPreference: finiteWeight(
             custom['runtimeProvedPreference'],
@@ -730,6 +736,14 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     }
     if (healthDecision.health) {
         const runtimeProofWeights = resolveRuntimeProofWeights(options.runtimeProofWeights);
+        const requestedRouteProfile = optionalString(options.routeProfile);
+        const healthRouteProfile = runtimeHealthRouteProfile(healthDecision.health);
+        if (requestedRouteProfile && healthRouteProfile === requestedRouteProfile) {
+            score += runtimeProofWeights.exactRouteProfileProof;
+            reasons.push('runtime_health_exact_route_profile');
+        } else if (requestedRouteProfile && healthRouteProfile === null) {
+            reasons.push('runtime_health_profileless_fallback');
+        }
         if (healthDecision.health.lastStatus === 'ok') {
             score += runtimeProofWeights.chatHealthOk;
             reasons.push('chat_health_ok');

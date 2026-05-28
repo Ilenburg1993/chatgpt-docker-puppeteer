@@ -11639,6 +11639,45 @@ Impacto:
 - isso reduz retrabalho quando um live futuro falhar e precisarmos saber se o fallback tinha prova propria ou apenas
   prova global.
 
+## 21.135. Mudanca 135 - Ranking prefere prova runtime exata por perfil
+
+Data: 2026-05-28.
+
+Problema:
+
+- depois de expor a diferenca entre prova exata e proof profileless, faltava refletir isso no score;
+- duas rotas equivalentes podiam empatar mesmo quando uma tinha runtime health do proprio `routeProfile` e outra apenas
+  health global/profileless;
+- fallback profileless deve continuar valido, mas nao deve ser tao forte quanto prova do perfil solicitado.
+
+Correcao:
+
+- `DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS` ganhou:
+  - `exactRouteProfileProof=60`;
+- `scoreGatewayModelCandidate` agora adiciona:
+  - razao `runtime_health_exact_route_profile` quando `health.routeProfile === options.routeProfile`;
+  - razao `runtime_health_profileless_fallback` quando o perfil foi solicitado mas a prova e profileless;
+- o fallback profileless continua elegivel;
+- a prova exata ganha desempate/pontuacao natural.
+
+Evidencia:
+
+- teste:
+  `npm --silent exec vitest -- tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "exact route-profile runtime proof|profileless runtime health|terminal live protocol"`;
+- resultado:
+  - `5 passed`;
+  - `209 skipped`;
+- readiness:
+  - `ok=true`;
+  - `repo_agent` e `code` continuam com exact=true;
+  - `tool_agent` continua profileless=true, visivel e nao bloqueado.
+
+Impacto:
+
+- o seletor passa a alinhar score com a semantica que o readiness ja expõe;
+- fallback profileless permanece um caminho de continuidade;
+- quando existir prova exata para `tool_agent`, ela tendera a superar fallback global sem necessidade de regra especial.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
