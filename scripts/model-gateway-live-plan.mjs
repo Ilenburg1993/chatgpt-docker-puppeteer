@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_OUT_DIR = path.join(ROOT, 'artifacts/model-gateway-live-plan');
+const TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS = 900_000;
 const args = process.argv.slice(2);
 const argSet = new Set(args);
 
@@ -94,12 +95,15 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
     const runId = planRunId(generatedAt.replace(/[:.]/gu, '-'));
     const baselineOutDir = `artifacts/model-gateway-runtime-health-baselines/${runId}`;
     const baselinePath = `${baselineOutDir}/latest.json`;
+    const baselineDiffPath = `${baselineOutDir}/latest-diff.json`;
     const postLiveOutDir = `artifacts/model-gateway-runtime-health-post-live/${runId}`;
+    const postLiveDiffPath = `${postLiveOutDir}/latest-diff.json`;
     const overlaySummary = effectiveOverlaySummary(readiness);
     const localPrivateStrictSelection = localPrivateStrict ? runLocalPrivateStrictSelection() : null;
     const liveRunner = readinessCheck(readiness, 'live_runner_present');
     const effective = readinessCheck(readiness, 'selection_effective_observed_health');
     const runtimeSelector = readinessCheck(readiness, 'runtime_selector_plan_ready');
+    const terminalLiveRuntimeSelector = readinessCheck(readiness, 'terminal_live_runtime_selector_plan_ready');
     const runtimeNotPromoted = readinessCheck(readiness, 'runtime_not_promoted');
     const prerequisites = [
         {
@@ -121,6 +125,11 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
             id: 'runtime_selector_plan_ready',
             ok: runtimeSelector?.ok === true,
             detail: runtimeSelector?.detail ?? 'runtime selector plan is unavailable',
+        },
+        {
+            id: 'terminal_live_runtime_selector_plan_ready',
+            ok: terminalLiveRuntimeSelector?.ok === true,
+            detail: terminalLiveRuntimeSelector?.detail ?? 'terminal-live runtime selector plan is unavailable',
         },
         {
             id: 'live_runner_present',
@@ -181,7 +190,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
             id: 'byok_real_no_pr_probes',
             order: 5,
             command:
-                'npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=1 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000',
+                `npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000`,
             executesModelTurn: false,
             executesRuntimeProbes: true,
             consumesProviderQuota: true,
@@ -192,7 +201,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
             id: 'byok_real_full_turn',
             order: 6,
             command:
-                'npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=1 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --timeout-ms=900000',
+                `npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --timeout-ms=900000`,
             executesModelTurn: true,
             executesRuntimeProbes: true,
             consumesProviderQuota: true,
@@ -209,7 +218,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
             executesModelTurn: false,
             executesRuntimeProbes: false,
             consumesProviderQuota: false,
-            purpose: 'Diff runtime health after any live phase against the fixed pre-live baseline and fail on ok-to-failed regressions.',
+            purpose: `Diff runtime health after any live phase against the fixed pre-live baseline and fail on ok-to-failed regressions. Comparative report: ${postLiveDiffPath}.`,
         },
         {
             id: 'runtime_health_sqlite_mirror',
@@ -248,7 +257,9 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         healthBaseline: {
             outDir: baselineOutDir,
             latestPath: baselinePath,
+            latestDiffPath: baselineDiffPath,
             postLiveOutDir,
+            postLiveLatestDiffPath: postLiveDiffPath,
         },
         readiness: {
             ok: readiness.ok === true,

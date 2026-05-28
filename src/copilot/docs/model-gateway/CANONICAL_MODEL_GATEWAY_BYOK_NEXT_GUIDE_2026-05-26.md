@@ -11444,6 +11444,49 @@ Impacto:
 - `agent` e probes live passam a aparecer no artefato comparativo;
 - falhas futuras de full-turn ficam rastreaveis como regressao real quando houver baseline `ok`.
 
+## 21.131. Mudanca 131 - Live plan alinhado ao gate terminal-live
+
+Data: 2026-05-28.
+
+Problema:
+
+- `model-gateway-live-readiness.mjs` ja validava o gate especifico `terminal_live_runtime_selector_plan_ready`;
+- o runner live ja usava cooldown temporario `900000ms`;
+- porem `scripts/model-gateway-live-plan.mjs` ainda emitia:
+  - comandos BYOK reais com `--byok-real-route-temporary-failure-cooldown-ms=1`;
+  - prerequisitos sem o gate terminal-live;
+  - pos-live diff sem indicar o novo `latest-diff.json`.
+
+Correcao:
+
+- `model-gateway-live-plan.mjs` passou a:
+  - exigir `terminal_live_runtime_selector_plan_ready`;
+  - usar `900000ms` nos comandos no-PR e full-turn BYOK real;
+  - expor `healthBaseline.latestDiffPath`;
+  - expor `healthBaseline.postLiveLatestDiffPath`;
+  - apontar o relatorio comparativo no `purpose` da fase `runtime_health_after_live_diff`.
+
+Evidencia:
+
+- comando:
+  `npm --silent run model-gateway:live:plan -- --json --no-write`;
+- resultado:
+  - `ok=true`;
+  - prerequisito `terminal_live_runtime_selector_plan_ready=true`;
+  - fase `byok_real_no_pr_probes` com cooldown `900000`;
+  - fase `byok_real_full_turn` com cooldown `900000`;
+  - `postLiveLatestDiffPath=artifacts/model-gateway-runtime-health-post-live/<runId>/latest-diff.json`;
+- validadores:
+  - `node --check scripts/model-gateway-live-plan.mjs`;
+  - `node --max-old-space-size=6144 node_modules/.bin/eslint scripts/model-gateway-live-plan.mjs`;
+  - `git diff --check`.
+
+Impacto:
+
+- o plano canônico agora coincide com o harness e com o readiness;
+- futuras execucoes guiadas pelo plano nao vao ignorar falhas recentes de `live_turn`;
+- o operador tem caminho claro para achar snapshot bruto e diff comparativo pos-live.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
