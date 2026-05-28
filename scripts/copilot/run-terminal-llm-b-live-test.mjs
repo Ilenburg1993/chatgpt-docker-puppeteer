@@ -89,13 +89,15 @@ function escapeRegExp(value) {
 function buildScenarioPrompt() {
     return [
         'Faça um teste integrado canônico do terminal.',
-        'Primeiro chame report_intent com o intent "terminal live canonical deltas tools ask_user usage".',
-        'Depois leia as primeiras 3 linhas de package.json usando read_file_content.',
+        'Use chamadas de ferramenta reais do SDK; texto, Markdown, JSON, pseudo-tool e exemplos de tool_calls não contam.',
+        'Primeiro invoque a ferramenta real report_intent com o intent "terminal live canonical deltas tools ask_user usage".',
+        'Depois invoque a ferramenta real read_file_content para ler as primeiras 3 linhas de package.json.',
         'Em seguida escreva uma resposta pública longa, com frases separadas DELTA-CANONICAL-1 até DELTA-CANONICAL-8, para validar deltas parciais e final.',
-        'Por fim chame ask_user perguntando exatamente "ASK-CANONICAL: responda SIM para fechar o teste".',
+        'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-CANONICAL: responda SIM para fechar o teste".',
         'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-CANONICAL-FINAL: usuário confirmou SIM".',
         'Antes da resposta SIM, não escreva, cite nem antecipe o marcador POST-ASK-CANONICAL-FINAL.',
         'A pergunta ASK-CANONICAL deve ser feita pela tool ask_user real; não a simule como texto, Markdown, JSON ou pseudo-tool no transcript público.',
+        'Nunca escreva um objeto tool_calls, uma chave function/args, nem diga que ações foram executadas sem a tool real aparecer no terminal.',
         'Não use outras tools além de report_intent, read_file_content e ask_user.',
     ].join(' ');
 }
@@ -998,18 +1000,36 @@ function findByokRealPreflightProbeFailure(plain) {
     };
 }
 
+function findByokProbeResultStatus(plain, mode) {
+    const escapedMode = escapeRegExp(mode);
+    const match = String(plain ?? '').match(new RegExp(`BYOK ${escapedMode} probe[\\s\\S]*?resultado:\\s+([\\w-]+)`, 'iu'));
+    return match?.[1]?.toLowerCase() ?? null;
+}
+
 function findByokRealLiveToolProtocolMiss(plain) {
     // The live transcript intentionally preserves assistant Markdown; the
     // public delta marker may therefore arrive as `DELTA-*` or `**DELTA-* **`.
-    if (!/(?:^|\n)\s*│\s+(?:\*{1,2})?DELTA-CANONICAL-8\b/u.test(plain)) return null;
     if (/\[ASK\]\s+ASK-CANONICAL/u.test(plain)) return null;
     const markers = [
+        /(?:^|\n)\s*│\s+"tool_calls"\s*:/mu.test(plain) ? 'tool_calls' : null,
+        /(?:^|\n)\s*│\s+"function"\s*:\s*"report_intent"/mu.test(plain) ? 'function:report_intent' : null,
+        /(?:^|\n)\s*│\s+"function"\s*:\s*"read_file_content"/mu.test(plain) ? 'function:read_file_content' : null,
+        /(?:^|\n)\s*│\s+"function"\s*:\s*"ask_user"/mu.test(plain) ? 'function:ask_user' : null,
         /(?:^|\n)\s*│\s+"tool":\s*"report_intent"/mu.test(plain) ? 'report_intent' : null,
         /(?:^|\n)\s*│\s+"tool":\s*"read_file_content"/mu.test(plain) ? 'read_file_content' : null,
         /(?:^|\n)\s*│\s+"tool":\s*"ask_user"/mu.test(plain) ? 'ask_user' : null,
         /(?:^|\n)\s*│\s+\*\*Pergunta ao usu[aá]rio:\*\*/mu.test(plain) ? 'ask_user_text' : null,
         /(?:^|\n)\s*│\s+"question":\s*"ASK-CANONICAL:/mu.test(plain) ? 'ask_user_question_json' : null,
+        /(?:^|\n)\s*│\s+The requested actions have been executed\b/mu.test(plain) ? 'claimed_execution' : null,
     ].filter(Boolean);
+    if (
+        markers.length > 0 &&
+        !/\[TOOL\].*read_file_content/s.test(plain) &&
+        !/✅ \[DONE\] read_file_content/s.test(plain)
+    ) {
+        return { markers };
+    }
+    if (!/(?:^|\n)\s*│\s+(?:\*{1,2})?DELTA-CANONICAL-8\b/u.test(plain)) return null;
     const hasTextifiedAsk = markers.includes('ask_user') || markers.includes('ask_user_text') || markers.includes('ask_user_question_json');
     return hasTextifiedAsk || markers.length >= 2 ? { markers } : null;
 }
@@ -1729,6 +1749,7 @@ function evaluateByokRealOutput(
     const sessionProbeResidueCounts = extractSdkSessionCockpitProbeResidueCounts(plain);
     const preflightProbeResidueCount = sessionProbeResidueCounts[0];
     const postProbeResidueCount = sessionProbeResidueCounts[1];
+    const byokVisionProbeStatus = findByokProbeResultStatus(plain, 'vision');
     const criteria = [
         {
             id: 'byok-real-dotenv-reload',
@@ -1832,11 +1853,13 @@ function evaluateByokRealOutput(
             id: 'byok-real-vision-probe',
             pass:
                 byokAdmissionBlocked ||
-                /BYOK vision probe[\s\S]{0,2200}resultado:\s+ok/.test(plain) ||
-                /BYOK vision probe[\s\S]{0,2200}resultado:\s+(?:empty|vision-mismatch|error|provider-error|timeout)/.test(plain),
+                byokVisionProbeStatus === 'ok' ||
+                ['empty', 'vision-mismatch', 'error', 'provider-error', 'timeout'].includes(byokVisionProbeStatus ?? ''),
             detail: byokAdmissionBlocked
                 ? 'BYOK vision probe was admission-blocked before provider streaming'
-                : 'BYOK vision probe exercised image attachment path and recorded an explicit provider capability result',
+                : byokVisionProbeStatus === 'ok'
+                  ? 'BYOK vision probe proved image attachment interpretation on the disposable session'
+                  : `BYOK vision probe recorded an explicit non-proving capability result (${byokVisionProbeStatus ?? 'missing'}) without degrading chat admission`,
         },
         {
             id: 'byok-real-shortlist-probe',
@@ -2207,6 +2230,7 @@ async function main() {
     let onPromptSynchronizedCommandsDrained = null;
     let promptSynchronizedCommandOutputOffset = 0;
     let waitingForPromptSynchronizedCommand = false;
+    let pendingByokLiveProtocolDiagnostics = false;
     const command = canUsePty
         ? {
               cmd: 'script',
@@ -2335,6 +2359,14 @@ async function main() {
         ) {
             sendNextPromptSynchronizedCommand();
         }
+        if (
+            pendingByokLiveProtocolDiagnostics &&
+            !postCommandsSent &&
+            hasReturnedToReplPrompt(plain, scenarioPlainOffset)
+        ) {
+            pendingByokLiveProtocolDiagnostics = false;
+            scheduleByokLiveProtocolDiagnostics();
+        }
         if (/Modo headless detectado/.test(plain) && !canUsePty && !readySent) {
             console.warn(
                 '[terminal-live] terminal entrou em modo headless; comandos REPL não serão exercitados neste transporte.',
@@ -2407,7 +2439,7 @@ async function main() {
             !postCommandsSent &&
             findByokRealLiveToolProtocolMiss(scenarioTailPlain)
         ) {
-            scheduleByokLiveProtocolDiagnostics();
+            pendingByokLiveProtocolDiagnostics = true;
         }
         if (
             !postCommandsSent &&

@@ -8830,6 +8830,144 @@ Lacunas ainda abertas apos Mudanca 85:
 - decidir se o resultado `vision=empty` deve virar health observation fraca ou capability override explicito;
 - manter Ollama local fora dos defaults ate opt-in do operador.
 
+Mudanca 86:
+
+Full-turn real chegou ao modelo, mas bloqueou no protocolo vivo de `ask_user`.
+
+Evidencia:
+
+`npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --timeout-ms=900000`
+
+Artefato:
+
+- `artifacts/terminal-live/2026-05-28T14-26-35-109Z/summary.md`.
+
+Resultado:
+
+- status `BLOCKED`;
+- blocker `byok-live-tool-protocol-missed`;
+- rota runtime correta:
+  - provider `nvidia-nim`;
+  - model `openai/gpt-oss-120b`;
+  - profile `code`;
+- `report_intent` materializou como tool real;
+- `read_file_content` materializou como tool real;
+- a resposta publica emitiu `DELTA-CANONICAL-1..8`;
+- `ask_user` nao materializou como tool real;
+- o modelo escreveu JSON textual com `"function": "ask_user"` e `"question": "ASK-CANONICAL..."`;
+- nao houve vazamento de segredo;
+- uso foi classificado como `byok_user_message`, nao Premium Request;
+- SSE conectado, com `431` eventos e `0` erros.
+
+Correcao aplicada no runner:
+
+- o prompt canonico agora deixa explicito que pseudo-tool JSON nao conta;
+- o detector `findByokRealLiveToolProtocolMiss` reconhece:
+  - `tool_calls` textual;
+  - `"function": "report_intent"`;
+  - `"function": "read_file_content"`;
+  - `"function": "ask_user"`;
+  - JSON textual de pergunta;
+  - declaracoes textuais de execucao;
+- o runner passa a bloquear cedo em vez de esperar timeout quando a tool viva foi textificada;
+- diagnostics de protocolo devem aguardar retorno ao prompt para nao intercalar comandos no meio do streaming;
+- o detalhe do probe vision no runner separa prova positiva de resultado explicito nao conclusivo.
+
+Correcao aplicada no terminal:
+
+- `/byok probe vision` nao diz mais que a fixture foi interpretada quando `probe.ok=false`;
+- resultado `empty` passa a ser descrito como sinal multimodal nao conclusivo;
+- chat e agent nao sao degradados por falha multimodal isolada.
+
+Interpretacao arquitetural:
+
+- a rota NVIDIA e boa para chat, streaming, JSON e tools simples em turnos de continuation;
+- o turno vivo ainda expõe uma lacuna especifica no final do fluxo: `ask_user` pode ser textificado;
+- isso nao deve ser promovido como runtime proof completo de automacao;
+- o selector precisa distinguir `agent_probe_ok` de `live_ask_user_ok`;
+- enquanto `live_ask_user_ok` nao existir, esse modelo pode ser bom para chat/codigo, mas nao deve ser preferido para automacao que dependa de ask_user vivo.
+
+Lacunas abertas apos Mudanca 86:
+
+- criar metrica/prova separada para `live_tool_protocol` e `live_ask_user`;
+- evitar que agent probe descartavel seja interpretada como equivalencia plena ao turno vivo;
+- reexecutar full-turn apos sincronizacao de diagnostics;
+- investigar se outro modelo NVIDIA com tool-calling mais forte passa `ask_user` vivo;
+- investigar se o problema e do provider, do SDK boundary, do prompt, ou da ponte terminal de `ask_user`.
+
+Mudanca 87:
+
+Runner live agora bloqueia protocolo textificado sem poluir streaming e sem falsificar vision.
+
+Problema identificado apos Mudanca 86:
+
+- o detector de pseudo-tool estava certo, mas acionava diagnostics enquanto o modelo ainda transmitia;
+- isso podia intercalar `/activity 40` dentro do bloco publico em streaming;
+- o criterio de vision no runner podia atravessar a proxima secao e ler `resultado: ok` do agent probe;
+- o comando `/byok probe vision` tambem narrava `empty` como se a imagem tivesse sido interpretada.
+
+Correcao aplicada:
+
+- `pendingByokLiveProtocolDiagnostics` marca o blocker durante streaming;
+- diagnostics so disparam depois de o prompt REPL voltar;
+- `findByokProbeResultStatus` captura o primeiro status da secao vision;
+- `byok-real-vision-probe` diferencia `ok` de `empty`;
+- `/byok probe vision` imprime resultado multimodal nao conclusivo quando `probe.ok=false`;
+- teste unitario cobre `vision empty`.
+
+Revalidacao live:
+
+`npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --timeout-ms=900000`
+
+Artefato:
+
+- `artifacts/terminal-live/2026-05-28T14-30-43-120Z/summary.md`.
+
+Resultado:
+
+- status `BLOCKED`;
+- blocker unico `byok-live-tool-protocol-missed`;
+- `execution.ok=true`;
+- `execution.attemptedCount=1`;
+- `execution.selectedProfileId=code`;
+- rota `nvidia-nim/openai/gpt-oss-120b`;
+- `report_intent` real passou;
+- `read_file_content` real passou;
+- `ask_user` vivo foi textificado;
+- diagnostics rodaram apos retorno ao prompt;
+- `byok-real-vision-probe` agora reporta `empty` como nao conclusivo;
+- `byok-real-usage-classified` passou com uso BYOK;
+- `byok-real-no-secret-leak` passou.
+
+Saude apos revalidacao:
+
+`npm --silent run model-gateway:runtime-health:mirror && npm --silent run model-gateway:runtime-health:diff -- --write-snapshot --out-dir artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-30-full-turn-live-ask-user-blocked`
+
+Resultado:
+
+- `runtimeRows=4641`;
+- `healthObservations=2237`;
+- `runtimeProbeRuns=99`;
+- `runtimeProbeResults=2305`;
+- `regressions=0`;
+- `newFailures=0`;
+- snapshot: `artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-30-full-turn-live-ask-user-blocked/latest.json`.
+
+Impacto:
+
+- temos uma prova negativa limpa de `live_ask_user` para essa rota;
+- o seletor runtime deve passar a separar provas de probe descartavel e provas de turno vivo;
+- o caminho para futuras lives fica mais curto porque falhas de protocolo nao esperam timeout;
+- vision nao contamina selecao como sucesso multimodal quando o provider retorna vazio.
+
+Lacunas abertas apos Mudanca 87:
+
+- criar armazenamento/overlay para `live_tool_protocol` e `live_ask_user`;
+- alimentar o selector com penalidade para rotas com `live_ask_user=failed`;
+- criar runner para testar modelos alternativos da NVIDIA que declaram tool capability;
+- avaliar se `openai/gpt-oss-20b` ou modelos Qwen/Nemotron passam `ask_user` vivo;
+- registrar `vision=empty` como capability runtime nao conclusiva, separada de erro de chat.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

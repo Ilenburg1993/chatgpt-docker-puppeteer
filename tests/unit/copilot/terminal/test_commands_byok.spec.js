@@ -2311,6 +2311,49 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('Vision probe confirma');
     });
 
+    it('explica probe vision sem prova como resultado multimodal não conclusivo', async () => {
+        mockProjection();
+        runConfiguredByokVisionProbe.mockResolvedValue({
+            ok: false,
+            status: 'empty',
+            elapsedMs: 77,
+            model: 'vision-model',
+            profile: 'kilo',
+            preset: 'kilo-code',
+            providerType: 'openai',
+            deltaCount: 0,
+            deltaChars: 0,
+            finalChars: 0,
+            finalContent: '',
+            observedFinalEvent: false,
+            sessionId: 'tmp-vision-empty',
+            errors: ['Probe concluiu sem delta nem mensagem final.'],
+            warnings: [],
+            visionProved: false,
+            dominantColor: null,
+            attachmentMimeType: 'image/png',
+            attachmentBytes: 69,
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'probe vision profile:kilo model:vision-model timeout:8000');
+
+        expect(recordByokProviderModelProbeResult).toHaveBeenCalledWith(
+            expect.objectContaining({
+                routeProfile: 'kilo',
+                providerId: 'kilo-code',
+                providerModel: 'vision-model',
+                probeKind: 'vision',
+                status: 'empty',
+                ok: false,
+            }),
+        );
+        expect(ctx.output()).toContain('resultado:');
+        expect(ctx.output()).toContain('empty');
+        expect(ctx.output()).toContain('resultado explícito sem prova visual positiva');
+        expect(ctx.output()).not.toContain('Vision probe confirma que o provider aceitou');
+    });
+
     it('lista providers disponíveis com comandos operacionais redigidos', async () => {
         const now = Date.now();
         readConfiguredByokProfilesFromEnv.mockReturnValue({

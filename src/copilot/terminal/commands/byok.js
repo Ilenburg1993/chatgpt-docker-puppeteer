@@ -4304,7 +4304,9 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                   : mode === 'json'
                     ? '  \x1b[90mJSON probe confirma saída estruturada parseável. Use junto com agent probe antes de promover modelo para fluxos automatizados.\x1b[0m\n'
                     : mode === 'vision'
-                      ? '  \x1b[90mVision probe confirma que o provider aceitou attachment de imagem e interpretou a fixture. Use junto com agent/JSON quando o fluxo precisar automação multimodal.\x1b[0m\n'
+                      ? probe.ok
+                          ? '  \x1b[90mVision probe confirma que o provider aceitou attachment de imagem e interpretou a fixture. Use junto com agent/JSON quando o fluxo precisar automação multimodal.\x1b[0m\n'
+                          : '  \x1b[90mVision probe registrou resultado explícito sem prova visual positiva; chat/agent não são degradados por essa capacidade multimodal.\x1b[0m\n'
                     : '  \x1b[90mCatálogo mostra oferta; chat probe confirma conversa canária. Para validar runtime agente, rode /byok probe agent antes do live.\x1b[0m\n',
         );
         return;
