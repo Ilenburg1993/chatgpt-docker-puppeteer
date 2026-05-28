@@ -1218,6 +1218,61 @@ describe('model-gateway foundation', () => {
         assert.ok(liveProtocolBlockedPlan.routes[0].reasons.includes('blocked:runtime_probe_failed:live_ask_user'));
         assert.ok(liveProtocolBlockedPlan.routes[0].nextActions.includes('choose_route_without_failed_runtime_health'));
 
+        const sharedBestPolicy = {
+            schema: 'model-gateway-selection-policy-resolution',
+            ok: true,
+            mode: 'prefer_runtime_proved',
+            rows: [
+                {
+                    profileId: 'repo_agent',
+                    source: 'post_runtime_proved',
+                    selected: {
+                        providerId: 'zai',
+                        providerModel: 'glm-4.5-flash',
+                        selectorKind: 'exact_model',
+                        selectorSyntax: 'glm-4.5-flash',
+                        accountAccess: { canAttempt: true },
+                    },
+                    candidateAlternates: [
+                        {
+                            providerId: 'groq',
+                            providerModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                            selectorKind: 'exact_model',
+                            selectorSyntax: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                            accountAccess: { canAttempt: true },
+                        },
+                    ],
+                },
+                {
+                    profileId: 'code',
+                    source: 'post_runtime_proved',
+                    selected: {
+                        providerId: 'zai',
+                        providerModel: 'glm-4.5-flash',
+                        selectorKind: 'exact_model',
+                        selectorSyntax: 'glm-4.5-flash',
+                        accountAccess: { canAttempt: true },
+                    },
+                    candidateAlternates: [
+                        {
+                            providerId: 'groq',
+                            providerModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                            selectorKind: 'exact_model',
+                            selectorSyntax: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                            accountAccess: { canAttempt: true },
+                        },
+                    ],
+                },
+            ],
+        };
+        const maximumQualityPlan = buildModelGatewayRuntimeSelectorPlan(sharedBestPolicy);
+        assert.equal(maximumQualityPlan.routes[0].selected?.['providerId'], 'zai');
+        assert.equal(maximumQualityPlan.routes[1].selected?.['providerId'], 'zai');
+        const diversifiedPlan = buildModelGatewayRuntimeSelectorPlan(sharedBestPolicy, { preferProviderDiversity: true });
+        assert.equal(diversifiedPlan.routes[0].selected?.['providerId'], 'zai');
+        assert.equal(diversifiedPlan.routes[1].selected?.['providerId'], 'groq');
+        assert.ok(diversifiedPlan.routes[1].reasons.includes('runtime_selector_fallback:alternate1'));
+
         const providerCooldownNow = Date.now();
         const providerCooldownRecords = [
             {

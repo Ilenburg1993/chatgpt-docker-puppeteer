@@ -598,7 +598,7 @@ function runtimeSelectorPlanForRouteAttempt(plan, route) {
 
 /**
  * @param {Record<string, unknown>} selectionPolicyOrTrace
- * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; blockFailedProbeKinds?: string[]; temporaryFailureCooldownMs?: number; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
+ * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; preferProviderDiversity?: boolean; avoidDuplicateRoutes?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; blockFailedProbeKinds?: string[]; temporaryFailureCooldownMs?: number; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
  * @returns {{
  *   schema: 'model-gateway-runtime-selector-plan';
  *   ok: boolean;
@@ -643,6 +643,8 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
     const { mode, rows, sourceSchema, traceId } = readRowsFromInput(input);
     const requireRuntimeProof = options.requireRuntimeProof === true || mode === 'require_runtime_proof';
     const requireRuntimeEnvReady = options.requireRuntimeEnvReady === true;
+    const preferProviderDiversity = options.preferProviderDiversity === true;
+    const avoidDuplicateRoutes = options.avoidDuplicateRoutes === true || preferProviderDiversity;
     const runtimeHealthSource =
         options.runtimeHealthIndex ??
         (Array.isArray(options.runtimeHealthRecords) ? createGatewayRuntimeHealthIndex(options.runtimeHealthRecords) : null);
@@ -713,21 +715,27 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
         });
         const primary = candidateEvaluations[0] ?? null;
         const usableCandidates = candidateEvaluations.filter((candidate) => !candidate.blocked);
-        const primaryProviderId = optionalString(primary?.selected?.['providerId']);
-        const unseenProviderCandidate = usableCandidates.find((candidate) => {
-            const key = routeKey(candidate.selected);
-            const providerId = optionalString(candidate.selected?.['providerId']);
-            return key && !selectedRouteKeysForPlan.has(key) && providerId && !selectedProviderIdsForPlan.has(providerId);
-        });
-        const chosen =
-            primary &&
-            !primary.blocked &&
-            !selectedRouteKeysForPlan.has(routeKey(primary.selected)) &&
-            (!primaryProviderId || !selectedProviderIdsForPlan.has(primaryProviderId))
+        let chosen = primary && !primary.blocked ? primary : (usableCandidates[0] ?? primary);
+        if (avoidDuplicateRoutes) {
+            const primaryProviderId = optionalString(primary?.selected?.['providerId']);
+            const primaryAvailable =
+                primary &&
+                !primary.blocked &&
+                !selectedRouteKeysForPlan.has(routeKey(primary.selected)) &&
+                (!preferProviderDiversity || !primaryProviderId || !selectedProviderIdsForPlan.has(primaryProviderId));
+            const unseenProviderCandidate = preferProviderDiversity
+                ? usableCandidates.find((candidate) => {
+                      const key = routeKey(candidate.selected);
+                      const providerId = optionalString(candidate.selected?.['providerId']);
+                      return key && !selectedRouteKeysForPlan.has(key) && providerId && !selectedProviderIdsForPlan.has(providerId);
+                  })
+                : null;
+            chosen = primaryAvailable
                 ? primary
                 : (unseenProviderCandidate ??
                   usableCandidates.find((candidate) => !selectedRouteKeysForPlan.has(routeKey(candidate.selected))) ??
                   (primary && !primary.blocked ? primary : (usableCandidates[0] ?? primary)));
+        }
         const selected = chosen?.blocked ? null : (chosen?.selected ?? null);
         const alternativeSummary = summarizeRuntimeSelectorAlternatives(candidateEvaluations);
         const selectedForReasons = chosen?.selected ?? runtimeRoute(selectedFromPolicyRow(row));

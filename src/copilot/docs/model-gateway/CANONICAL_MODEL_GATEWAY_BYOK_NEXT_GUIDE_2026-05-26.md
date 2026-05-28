@@ -10111,6 +10111,38 @@ Teste adicionado:
 - avaliacao com `requireAgentProbeOk=true`;
 - resultado esperado: `health_allowed`, preservando `routeProfile=repo_agent` e copiando apenas a prova agentica global.
 
+## Mudanca 104 - Diversidade de provider deixa de ser trava default do runtime selector
+
+Status: concluido.
+
+Contexto:
+
+- no plano multi-profile `repo_agent -> code -> tool_agent`, o selector selecionava `zai/glm-4.5-flash` para
+  `repo_agent`, mas desviava `code` para outro provider mesmo quando `zai/glm-4.5-flash` era a melhor rota isolada;
+- isso ocorria por uma regra interna de diversidade que evitava repetir provider/route no mesmo plano;
+- para o objetivo de maxima autonomia e melhor rota por perfil, essa regra nao deve ser default silencioso.
+
+Nova regra:
+
+- default: cada profile escolhe a melhor rota elegivel, mesmo que outro profile use o mesmo provider/model;
+- opcional: `preferProviderDiversity=true` preserva o comportamento de diversificar provider;
+- opcional: `avoidDuplicateRoutes=true` evita repetir a mesma route key sem exigir provider diferente;
+- CLI: `model-gateway-runtime-selector.mjs --prefer-provider-diversity` ativa a diversificacao.
+
+Motivo:
+
+- qualidade/runtime proof devem vencer por default;
+- diversidade e uma policy operacional, nao uma regra universal;
+- em BYOK pequeno, o operador pode ter apenas um provider realmente comprovado;
+- forcar diversidade pode escolher rota inferior sem necessidade.
+
+Teste adicionado:
+
+- duas linhas de policy com o mesmo melhor provider/model;
+- default seleciona o mesmo provider para ambos os perfis;
+- `preferProviderDiversity=true` seleciona alternativa para o segundo perfil;
+- a reason `runtime_selector_fallback:alternate1` documenta a decisao.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
