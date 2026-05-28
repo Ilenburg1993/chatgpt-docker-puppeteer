@@ -7,6 +7,7 @@ import {
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
     buildModelGatewayRuntimeSelectorPlan,
+    buildModelGatewayRuntimeSelectorProbeRun,
     createGatewayRuntimeHealthIndex,
     compareModelGatewaySelectionAudits,
     createModelGatewayRouteDecisionCapture,
@@ -323,6 +324,16 @@ let runtimeHealthPersistence = {
     runId: null,
     error: null,
 };
+let runtimeProbePersistence = {
+    attempted: false,
+    ok: true,
+    runId: null,
+    probeResults: 0,
+    skippedResults: 0,
+    successCount: 0,
+    failureCount: 0,
+    error: null,
+};
 
 function routeRequestProfiles() {
     return [requestedExecutionProfile, ...fallbackExecutionProfiles].filter(
@@ -386,6 +397,35 @@ if (execute) {
                 routeDecisionPersistence.error = error instanceof Error ? error.message : String(error);
             }
         }
+        const directRuntimeProbeRun = buildModelGatewayRuntimeSelectorProbeRun(execution, { observedAt: new Date() });
+        runtimeProbePersistence = {
+            attempted: directRuntimeProbeRun.results.length > 0 || directRuntimeProbeRun.skippedCount > 0,
+            ok: true,
+            runId: null,
+            probeResults: 0,
+            skippedResults: 0,
+            successCount: 0,
+            failureCount: 0,
+            error: null,
+        };
+        if (runtimeProbePersistence.attempted) {
+            try {
+                const result = await new SqliteModelGatewayCatalogStore().writeRuntimeProbeRun(directRuntimeProbeRun);
+                runtimeProbePersistence = {
+                    attempted: true,
+                    ok: true,
+                    runId: result.runId,
+                    probeResults: result.probeResults,
+                    skippedResults: result.skippedResults,
+                    successCount: result.successCount,
+                    failureCount: result.failureCount,
+                    error: null,
+                };
+            } catch (error) {
+                runtimeProbePersistence.ok = false;
+                runtimeProbePersistence.error = error instanceof Error ? error.message : String(error);
+            }
+        }
         const healthRecordsAfterExecution = listByokProviderModelHealth();
         runtimeHealthPersistence = {
             attempted: healthRecordsAfterExecution.length > 0,
@@ -430,6 +470,7 @@ const commandOk =
     context.runtimeSelectorPlan.ready &&
     (execute ? execution?.ok === true : hasSelectedRequestedOrFallbackRoute(context.runtimeSelectorPlan)) &&
     routeDecisionPersistence.ok &&
+    runtimeProbePersistence.ok &&
     runtimeHealthPersistence.ok;
 
 const summary = {
@@ -483,6 +524,7 @@ const summary = {
     runtimeSelectorPlan: context.runtimeSelectorPlan,
     execution,
     routeDecisionPersistence,
+    runtimeProbePersistence,
     runtimeHealthPersistence,
     nextCommands: execute
         ? ['npm run model-gateway:runtime-selector', 'npm run model-gateway:live:readiness']
@@ -524,6 +566,9 @@ if (json) {
         );
         process.stdout.write(
             `route-decisions: attempted=${routeDecisionPersistence.attempted ? 'yes' : 'no'} written=${routeDecisionPersistence.written} error=${routeDecisionPersistence.error ?? '-'}\n`,
+        );
+        process.stdout.write(
+            `runtime-probes: attempted=${runtimeProbePersistence.attempted ? 'yes' : 'no'} results=${runtimeProbePersistence.probeResults} success=${runtimeProbePersistence.successCount} failed=${runtimeProbePersistence.failureCount} skipped=${runtimeProbePersistence.skippedResults} run=${runtimeProbePersistence.runId ?? '-'} error=${runtimeProbePersistence.error ?? '-'}\n`,
         );
         process.stdout.write(
             `runtime-health: attempted=${runtimeHealthPersistence.attempted ? 'yes' : 'no'} records=${runtimeHealthPersistence.records} observations=${runtimeHealthPersistence.healthObservations} probes=${runtimeHealthPersistence.probeResults} skipped=${runtimeHealthPersistence.skippedRecords} run=${runtimeHealthPersistence.runId ?? '-'} error=${runtimeHealthPersistence.error ?? '-'}\n`,

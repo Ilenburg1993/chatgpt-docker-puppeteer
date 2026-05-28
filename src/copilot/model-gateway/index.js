@@ -320,6 +320,7 @@ export {
 export {
     applyModelGatewaySelectionTraceRetention,
     buildModelGatewayRuntimeSelectorProbeEnv,
+    buildModelGatewayRuntimeSelectorProbeRun,
     buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewaySelectionDecisionTrace,
     buildModelGatewayRouteCandidates,

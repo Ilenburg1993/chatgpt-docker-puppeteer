@@ -609,6 +609,59 @@ function sumFallbackRouteDecisionRecordedCount(attempts, skippedRouteDecisionRec
 }
 
 /**
+ * @param {Record<string, unknown> | null | undefined} selected
+ * @returns {string | null}
+ */
+function runtimeSelectorRouteWireApi(selected) {
+    return routeMetadataString(optionalRecord(selected) ?? null, 'wireApi');
+}
+
+/**
+ * @param {Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>} attempt
+ * @param {number} index
+ * @param {number} observedAtMs
+ * @returns {Record<string, unknown> | null}
+ */
+function runtimeSelectorAttemptProbeResult(attempt, index, observedAtMs) {
+    const route = optionalRecord(attempt.route);
+    const selected = optionalRecord(route?.['selected']);
+    const probe = optionalRecord(attempt.probe);
+    const providerId = optionalString(selected?.['providerId']);
+    const providerModel = optionalString(selected?.['providerModel']);
+    if (!selected || !probe || !providerId || !providerModel) return null;
+    const providerFailure = optionalRecord(attempt.providerFailure) ?? optionalRecord(probe['providerFailure']);
+    const routeProfile = optionalString(route?.['profileId']) ?? optionalString(selected['routeProfile']) ?? 'default';
+    const ok = probe['ok'] === true;
+    return {
+        resultKey: `runtime-selector:${observedAtMs}:${index}:${providerId}:${providerModel}:chat`,
+        providerId,
+        providerModel,
+        routeProfile,
+        probeKind: 'chat',
+        wireApi: runtimeSelectorRouteWireApi(selected),
+        ok,
+        status: optionalString(probe['status']) ?? (ok ? 'ok' : 'unknown'),
+        observedAt: observedAtMs,
+        elapsedMs: optionalNumber(probe['elapsedMs']),
+        sessionId: optionalString(probe['sessionId']),
+        deltaCount: optionalNumber(probe['deltaCount']),
+        deltaChars: optionalNumber(probe['deltaChars']),
+        finalChars: optionalNumber(probe['finalChars']),
+        observedFinalEvent: probe['observedFinalEvent'] === true,
+        error: optionalString(attempt.error),
+        providerFailure: providerFailure
+            ? {
+                  kind: optionalString(providerFailure['kind']),
+                  errorContext: optionalString(providerFailure['errorContext']),
+                  statusCode: optionalNumber(providerFailure['statusCode']),
+                  retryAfterSeconds: optionalNumber(providerFailure['retryAfterSeconds']),
+                  resetAt: optionalString(providerFailure['resetAt']),
+              }
+            : null,
+    };
+}
+
+/**
  * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]} route
  * @returns {Array<ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]>}
  */
@@ -1347,4 +1400,81 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
         final,
         error: final?.error ?? 'runtime_selector_no_available_attempts',
     };
+}
+
+/**
+ * Convert a runtime-selector execution into the neutral SQLite runtime-probe run shape.
+ *
+ * The generated object is intentionally catalog-neutral: it captures proof attempts and probe statuses, but does not
+ * mutate model metadata, account overlays or eligibility decisions.
+ *
+ * @param {Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlanWithFallbacks>> | Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>> | null} execution
+ * @param {{ runId?: string; observedAt?: string | number | Date; accountScope?: string | null; probeProfile?: string | null }} [options]
+ * @returns {{
+ *   schema: 'model-gateway-runtime-selector-probe-run';
+ *   runId?: string;
+ *   probeProfile: string;
+ *   accountScope: string;
+ *   status: string;
+ *   startedAt: number;
+ *   completedAt: number;
+ *   skippedCount: number;
+ *   payload: Record<string, unknown>;
+ *   results: Record<string, unknown>[];
+ * }}
+ */
+export function buildModelGatewayRuntimeSelectorProbeRun(execution, options = {}) {
+    const observedAtMs = dateMs(options.observedAt) ?? Date.now();
+    const executionRecord = optionalRecord(execution);
+    const attempts = Array.isArray(executionRecord?.['attempts'])
+        ? executionRecord['attempts'].map((attempt) => optionalRecord(attempt)).filter((attempt) => attempt !== null)
+        : executionRecord
+          ? [executionRecord]
+          : [];
+    const results = attempts
+        .map((attempt, index) =>
+            runtimeSelectorAttemptProbeResult(
+                /** @type {Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>} */ (attempt),
+                index,
+                observedAtMs,
+            ),
+        )
+        .filter((result) => result !== null);
+    const selectedProfileId = optionalString(executionRecord?.['selectedProfileId']) ?? optionalString(executionRecord?.['profileId']);
+    const status = executionRecord?.['ok'] === true ? 'completed' : attempts.length > 0 ? 'failed' : 'blocked';
+    const skippedCount = Math.max(0, optionalNumber(executionRecord?.['skippedAttemptCount']) ?? 0);
+    /** @type {{
+     *   schema: 'model-gateway-runtime-selector-probe-run';
+     *   runId?: string;
+     *   probeProfile: string;
+     *   accountScope: string;
+     *   status: string;
+     *   startedAt: number;
+     *   completedAt: number;
+     *   skippedCount: number;
+     *   payload: Record<string, unknown>;
+     *   results: Record<string, unknown>[];
+     * }} */
+    const run = {
+        schema: 'model-gateway-runtime-selector-probe-run',
+        probeProfile: optionalString(options.probeProfile) ?? selectedProfileId ?? 'runtime-selector',
+        accountScope: optionalString(options.accountScope) ?? 'default',
+        status,
+        startedAt: observedAtMs,
+        completedAt: observedAtMs,
+        skippedCount,
+        payload: {
+            source: 'model-gateway-runtime-selector',
+            executionStatus: optionalString(executionRecord?.['status']) ?? status,
+            executionOk: executionRecord?.['ok'] === true,
+            attemptedCount: optionalNumber(executionRecord?.['attemptedCount']) ?? attempts.length,
+            skippedAttemptCount: skippedCount,
+            selectedProfileId,
+            resultCount: results.length,
+        },
+        results,
+    };
+    const runId = optionalString(options.runId);
+    if (runId) run.runId = runId;
+    return run;
 }

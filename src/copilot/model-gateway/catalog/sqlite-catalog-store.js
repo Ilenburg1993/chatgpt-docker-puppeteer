@@ -465,6 +465,60 @@ function createRuntimeHealthRunId(observedAtMs) {
 }
 
 /**
+ * @param {number} observedAtMs
+ * @returns {string}
+ */
+function createRuntimeProbeRunId(observedAtMs) {
+    _runtimeHealthRunSequence += 1;
+    return `model-gateway:runtime-probe:${observedAtMs}:${process.pid}:${_runtimeHealthRunSequence}`;
+}
+
+/**
+ * @param {Record<string, unknown>} result
+ * @returns {string | null}
+ */
+function runtimeProbeKind(result) {
+    return optionalString(result['probeKind']) ?? optionalString(result['kind']);
+}
+
+/**
+ * @param {Record<string, unknown>} result
+ * @returns {string | null}
+ */
+function runtimeProbeProviderId(result) {
+    return optionalString(result['providerId']) ?? optionalString(result['provider']);
+}
+
+/**
+ * @param {Record<string, unknown>} result
+ * @returns {string | null}
+ */
+function runtimeProbeProviderModel(result) {
+    return optionalString(result['providerModel']) ?? optionalString(result['model']);
+}
+
+/**
+ * @param {Record<string, unknown>} result
+ * @returns {string}
+ */
+function runtimeProbeRouteProfile(result) {
+    return optionalString(result['routeProfile']) ?? DEFAULT_ROUTE_PROFILE;
+}
+
+/**
+ * @param {Record<string, unknown>} result
+ * @returns {boolean}
+ */
+function isWritableRuntimeProbeResult(result) {
+    return Boolean(
+        runtimeProbeProviderId(result) &&
+            runtimeProbeProviderModel(result) &&
+            runtimeProbeKind(result) &&
+            optionalString(result['status']),
+    );
+}
+
+/**
  * @param {Record<string, unknown>[]} probes
  * @returns {Record<string, unknown>[]}
  */
@@ -1270,6 +1324,151 @@ export class SqliteModelGatewayCatalogStore {
         });
         tx();
         return { runId, healthObservations, probeResults, skippedRecords };
+    }
+
+    /**
+     * Persist a direct runtime probe run without relying on the operational health mirror.
+     *
+     * This is the append-only runtime proof lane for explicit probe executors. It intentionally writes only the
+     * runtime probe tables and leaves catalog projections, account overlays and health observations untouched.
+     *
+     * @param {{
+     *     runId?: string;
+     *     probeProfile?: string | null;
+     *     accountScope?: string | null;
+     *     status?: string | null;
+     *     startedAt?: string | number | Date;
+     *     completedAt?: string | number | Date;
+     *     skippedCount?: number;
+     *     payload?: Record<string, unknown>;
+     *     results?: Record<string, unknown>[];
+     * }} input
+     * @returns {Promise<{ runId: string; probeResults: number; skippedResults: number; successCount: number; failureCount: number }>}
+     */
+    async writeRuntimeProbeRun(input) {
+        const completedAtMs = dateMs(input.completedAt) ?? Date.now();
+        const startedAtMs = dateMs(input.startedAt) ?? completedAtMs;
+        const runId = optionalString(input.runId) ?? createRuntimeProbeRunId(completedAtMs);
+        const allResults = Array.isArray(input.results) ? input.results.filter(isRecord) : [];
+        const writableResults = allResults.filter(isWritableRuntimeProbeResult);
+        const skippedResults =
+            Math.max(0, optionalInteger(input.skippedCount) ?? 0) + (allResults.length - writableResults.length);
+        let successCount = 0;
+        let failureCount = 0;
+        const modelKeys = new Set();
+        const tx = this.#db.transaction(() => {
+            const insertRun = this.#db.prepare(`
+                INSERT INTO copilot_model_gateway_runtime_probe_runs
+                    (run_id, probe_profile, account_scope, status, started_at_ms, completed_at_ms,
+                     model_count, success_count, failure_count, skipped_count, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(run_id) DO UPDATE SET
+                    probe_profile = excluded.probe_profile,
+                    account_scope = excluded.account_scope,
+                    status = excluded.status,
+                    started_at_ms = excluded.started_at_ms,
+                    completed_at_ms = excluded.completed_at_ms,
+                    model_count = excluded.model_count,
+                    success_count = excluded.success_count,
+                    failure_count = excluded.failure_count,
+                    skipped_count = excluded.skipped_count,
+                    payload_json = excluded.payload_json
+            `);
+            const insertProbe = this.#db.prepare(`
+                INSERT INTO copilot_model_gateway_runtime_probe_results
+                    (result_key, run_id, provider_id, provider_model, route_profile, probe_kind, wire_api,
+                     ok, status, observed_at_ms, expires_at_ms, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(result_key) DO UPDATE SET
+                    run_id = excluded.run_id,
+                    provider_id = excluded.provider_id,
+                    provider_model = excluded.provider_model,
+                    route_profile = excluded.route_profile,
+                    probe_kind = excluded.probe_kind,
+                    wire_api = excluded.wire_api,
+                    ok = excluded.ok,
+                    status = excluded.status,
+                    observed_at_ms = excluded.observed_at_ms,
+                    expires_at_ms = excluded.expires_at_ms,
+                    payload_json = excluded.payload_json
+            `);
+            insertRun.run(
+                runId,
+                optionalString(input.probeProfile) ?? DEFAULT_TASK_PROFILE,
+                optionalString(input.accountScope) ?? DEFAULT_ACCOUNT_SCOPE,
+                'running',
+                startedAtMs,
+                completedAtMs,
+                0,
+                0,
+                0,
+                skippedResults,
+                operationalPayloadJson({
+                    ...(isRecord(input.payload) ? input.payload : {}),
+                    source: optionalString(input.payload?.['source']) ?? 'direct-runtime-probe',
+                    resultCount: 0,
+                    skippedResults,
+                }),
+            );
+            writableResults.forEach((result, index) => {
+                const probeKind = runtimeProbeKind(result) ?? 'unknown';
+                const provider = runtimeProbeProviderId(result) ?? 'unknown-provider';
+                const model = runtimeProbeProviderModel(result) ?? 'unknown-model';
+                const route = runtimeProbeRouteProfile(result);
+                const ok = result['ok'] === true;
+                const observedAtMs = dateMs(result['observedAt']) ?? optionalInteger(result['observedAtMs']) ?? completedAtMs;
+                if (ok) successCount += 1;
+                else failureCount += 1;
+                modelKeys.add(`${provider}:${model}:${route}`);
+                insertProbe.run(
+                    optionalString(result['resultKey']) ??
+                        runtimeProbeResultKey(runId, `${route}|${provider}|${model}|${probeKind}|${index}`, probeKind),
+                    runId,
+                    provider,
+                    model,
+                    route,
+                    probeKind,
+                    optionalString(result['wireApi']),
+                    ok ? 1 : 0,
+                    optionalString(result['status']) ?? 'unknown',
+                    observedAtMs,
+                    dateMs(result['expiresAt']) ?? optionalInteger(result['expiresAtMs']),
+                    operationalPayloadJson({
+                        ...result,
+                        providerId: provider,
+                        providerModel: model,
+                        routeProfile: route,
+                        kind: probeKind,
+                    }),
+                );
+            });
+            insertRun.run(
+                runId,
+                optionalString(input.probeProfile) ?? DEFAULT_TASK_PROFILE,
+                optionalString(input.accountScope) ?? DEFAULT_ACCOUNT_SCOPE,
+                optionalString(input.status) ?? (failureCount > 0 ? 'failed' : 'completed'),
+                startedAtMs,
+                completedAtMs,
+                modelKeys.size,
+                successCount,
+                failureCount,
+                skippedResults,
+                operationalPayloadJson({
+                    ...(isRecord(input.payload) ? input.payload : {}),
+                    source: optionalString(input.payload?.['source']) ?? 'direct-runtime-probe',
+                    resultCount: writableResults.length,
+                    skippedResults,
+                }),
+            );
+        });
+        tx();
+        return {
+            runId,
+            probeResults: writableResults.length,
+            skippedResults,
+            successCount,
+            failureCount,
+        };
     }
 
     /**

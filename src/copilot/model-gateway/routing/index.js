@@ -37,6 +37,7 @@ export {
 export { routeGatewayModels, routeModelGatewayCatalogSnapshot, scoreGatewayModelCandidate } from './policy-engine.js';
 export {
     buildModelGatewayRuntimeSelectorProbeEnv,
+    buildModelGatewayRuntimeSelectorProbeRun,
     buildModelGatewayRuntimeSelectorPlan,
     evaluateModelGatewayRuntimeSelectorRouteEnv,
     executeModelGatewayRuntimeSelectorPlan,

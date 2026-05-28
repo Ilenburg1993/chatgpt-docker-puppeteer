@@ -42,6 +42,7 @@ import {
     applyModelGatewayEligibilityToSnapshot,
     applyModelGatewaySelectionTraceRetention,
     buildModelGatewayRuntimeSelectorProbeEnv,
+    buildModelGatewayRuntimeSelectorProbeRun,
     buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewaySelectionDecisionTrace,
     createGatewayRuntimeHealthIndex,
@@ -1447,6 +1448,19 @@ describe('model-gateway foundation', () => {
                 ['unit-test-runtime-selector:runtime-result', null],
             ],
         );
+        const directRuntimeProbeRun = buildModelGatewayRuntimeSelectorProbeRun(runtimeExecution, {
+            observedAt: '2026-05-28T21:00:00.000Z',
+        });
+        assert.equal(directRuntimeProbeRun.schema, 'model-gateway-runtime-selector-probe-run');
+        assert.equal(directRuntimeProbeRun.status, 'completed');
+        assert.equal(directRuntimeProbeRun.probeProfile, 'repo_agent');
+        assert.equal(directRuntimeProbeRun.results.length, 1);
+        assert.equal(directRuntimeProbeRun.results[0].providerId, 'openrouter');
+        assert.equal(directRuntimeProbeRun.results[0].providerModel, 'openai/gpt-oss-120b');
+        assert.equal(directRuntimeProbeRun.results[0].routeProfile, 'repo_agent');
+        assert.equal(directRuntimeProbeRun.results[0].probeKind, 'chat');
+        assert.equal(directRuntimeProbeRun.results[0].ok, true);
+        assert.equal(directRuntimeProbeRun.payload.executionOk, true);
 
         const blockedRuntimeExecution = await executeModelGatewayRuntimeSelectorPlan(strictRuntimeSelectorPlan, {
             profileId: 'tool_agent',
@@ -4985,6 +4999,70 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.runtimeRows, 3);
             assert.equal(diagnostics.routeDecisionRows, 1);
             assert.equal(diagnostics.refreshLogRows, 0);
+        } finally {
+            db.close();
+        }
+    });
+
+    it('persists direct runtime probe runs separately from health observations', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            const result = await store.writeRuntimeProbeRun({
+                runId: 'direct-runtime-probe-run',
+                probeProfile: 'repo_agent',
+                accountScope: 'default',
+                status: 'completed',
+                startedAt: '2026-05-28T21:00:00.000Z',
+                completedAt: '2026-05-28T21:00:01.000Z',
+                results: [
+                    {
+                        providerId: 'openrouter',
+                        providerModel: 'openai/gpt-oss-120b',
+                        routeProfile: 'repo_agent',
+                        probeKind: 'chat',
+                        wireApi: 'openai_chat_completions',
+                        ok: true,
+                        status: 'ok',
+                        observedAt: '2026-05-28T21:00:01.000Z',
+                        sessionId: 'direct-probe-session',
+                        authorization: 'Bearer secret-that-must-not-leak',
+                    },
+                    {
+                        providerId: 'broken',
+                        providerModel: '',
+                        probeKind: 'chat',
+                        status: 'failed',
+                    },
+                ],
+                payload: { source: 'unit-direct-runtime-probe' },
+            });
+            const runRow = /** @type {{ status: string; success_count: number; failure_count: number; skipped_count: number } | undefined} */ (
+                db.prepare(
+                    'SELECT status, success_count, failure_count, skipped_count FROM copilot_model_gateway_runtime_probe_runs WHERE run_id = ?',
+                ).get('direct-runtime-probe-run')
+            );
+            const probeRows = /** @type {Array<{ payload_json: string }>} */ (
+                db.prepare('SELECT payload_json FROM copilot_model_gateway_runtime_probe_results').all()
+            );
+            const healthRows = /** @type {{ count: number } | undefined} */ (
+                db.prepare('SELECT COUNT(*) AS count FROM copilot_model_gateway_health_observations').get()
+            );
+
+            assert.equal(result.runId, 'direct-runtime-probe-run');
+            assert.equal(result.probeResults, 1);
+            assert.equal(result.skippedResults, 1);
+            assert.equal(result.successCount, 1);
+            assert.equal(result.failureCount, 0);
+            assert.equal(runRow?.status, 'completed');
+            assert.equal(runRow?.success_count, 1);
+            assert.equal(runRow?.failure_count, 0);
+            assert.equal(runRow?.skipped_count, 1);
+            assert.equal(probeRows.length, 1);
+            assert.equal(probeRows[0].payload_json.includes('secret-that-must-not-leak'), false);
+            assert.equal(probeRows[0].payload_json.includes('[redacted]'), true);
+            assert.equal(healthRows?.count, 0);
         } finally {
             db.close();
         }

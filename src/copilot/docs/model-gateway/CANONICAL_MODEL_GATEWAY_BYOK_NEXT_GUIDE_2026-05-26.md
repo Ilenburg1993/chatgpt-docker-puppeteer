@@ -2251,8 +2251,8 @@ Quota/account overlay mais rico.
 - [x] Materializar runtime probe runs ja observados por mirror explicito.
 - [x] Materializar runtime probe results ja observados por mirror explicito.
 - [x] Materializar health observations ja observadas por mirror explicito.
-- [ ] Persistir novos runtime probe runs diretamente no fluxo de probes.
-- [ ] Persistir novos runtime probe results diretamente no fluxo de probes.
+- [x] Persistir novos runtime probe runs diretamente no fluxo de probes.
+- [x] Persistir novos runtime probe results diretamente no fluxo de probes.
 - [x] Persistir novas health observations diretamente no fluxo de health.
 - [ ] Criar comando de rebuild somente SQLite a partir do JSON.
 - [ ] Criar comando de recover JSON a partir do SQLite quando possivel.
@@ -2426,8 +2426,8 @@ Quota/account overlay mais rico.
 - [x] Probe backoff planning.
 - [x] Materializar probe run observado no SQLite via mirror explicito de health.
 - [x] Materializar probe results observados no SQLite via mirror explicito de health.
-- [ ] Persistir novos probe runs diretamente a partir do executor de probes.
-- [ ] Persistir novos probe results diretamente a partir do executor de probes.
+- [x] Persistir novos probe runs diretamente a partir do executor de probes.
+- [x] Persistir novos probe results diretamente a partir do executor de probes.
 - [ ] Persistir artefato redigido.
 - [ ] Criar reasoning probe.
 - [ ] Criar forced tool choice probe.
@@ -10464,6 +10464,51 @@ Validacao esperada:
 - `npm run model-gateway:commands` deve listar a forma robusta;
 - `npm run model-gateway:live:readiness` deve sugerir os mesmos comandos;
 - `npm run model-gateway:live:plan` deve materializar as mesmas fases.
+
+## Mudanca 114 - Persistencia direta de runtime probes pelo seletor real
+
+Status: concluido.
+
+Contexto:
+
+- o SQLite ja tinha tabelas separadas para `runtime_probe_runs` e `runtime_probe_results`;
+- o fluxo real do runtime selector persistia route decisions diretamente;
+- o mesmo fluxo ainda dependia do espelho de health para materializar resultados de probe;
+- isso deixava a prova runtime menos explicita do que a arquitetura prometida nas faixas D e K.
+
+Regra aplicada:
+
+- `SqliteModelGatewayCatalogStore.writeRuntimeProbeRun` agora grava um run direto de probes;
+- a API grava apenas tabelas runtime, sem tocar catalogo canonico, account overlays ou eligibility;
+- resultados invalidos sao contados como skipped, nao quebram o run inteiro;
+- payloads passam por redaction operacional antes de entrar no banco;
+- `buildModelGatewayRuntimeSelectorProbeRun` converte execucoes do selector em resultados `chat` tipados;
+- `scripts/model-gateway-runtime-selector.mjs` grava a trilha direta de probes quando `--execute` e usado;
+- o espelho de health continua existindo como camada complementar para health/selection.
+
+Motivo arquitetural:
+
+- prova runtime e metadado canonico devem permanecer separados;
+- o banco precisa saber que uma chamada real foi tentada mesmo se o health ledger for limpo, espelhado depois ou agregado;
+- route decisions explicam por que a rota foi escolhida;
+- probe runs explicam o que foi executado;
+- health observations explicam o estado operacional derivado;
+- essas tres camadas juntas reduzem ambiguidades antes dos testes live amplos.
+
+Garantias:
+
+- um probe direto nao altera `model_projections`;
+- um probe direto nao cria overlay de conta;
+- um probe direto nao altera elegibilidade pre-runtime;
+- um probe direto pode ser lido depois pelo caminho existente de `readRuntimeHealthForModel`;
+- secrets em payloads de probe sao redigidos antes de persistir.
+
+Validacao esperada:
+
+- teste unitario cobre o builder do runtime selector;
+- teste unitario cobre `writeRuntimeProbeRun`;
+- `model-gateway-runtime-selector --execute --json` deve mostrar `runtimeProbePersistence`;
+- `runtimeProbePersistence.ok=false` passa a reprovar o comando, como acontece com route decisions e health.
 
 ## 22. Fim Do Documento Inicial
 
