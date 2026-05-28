@@ -10659,6 +10659,87 @@ Validacao esperada:
 - dry-run JSON deve ecoar `runtimeProofWeights`;
 - typecheck/lint do dominio continuam verdes.
 
+## Mudanca 119 - Live BYOK real no-pr valida selector, probes e persistencia direta
+
+Status: concluido.
+
+Execucao:
+
+- data/hora: 2026-05-28T21:58:23.118Z;
+- comando: live BYOK real `no-pr` com runtime selector `repo_agent` e fallbacks `code,tool_agent`;
+- artefato: `artifacts/terminal-live/2026-05-28T21-58-23-109Z/summary.md`;
+- duracao: 105485ms;
+- exit code: 0;
+- status geral: PASS.
+
+Resultado do runtime selector:
+
+- `commandOk=true`;
+- `executed=true`;
+- `selectionPolicy=prefer_runtime_proved`;
+- rota selecionada: `zai/glm-4.5-flash`;
+- profile pedido: `repo_agent`;
+- `selectedRouteProfile=repo_agent`;
+- `sourceRouteProfile=default`;
+- `sourceTaskProfile=default`;
+- `hasRuntimeProof=true`;
+- probes verificados: `agent`, `chat`, `json`, `streaming`;
+- probe falho conhecido: `vision`;
+- `attemptedCount=1`;
+- `skippedAttemptCount=0`.
+
+Persistencia validada:
+
+- route decisions:
+  - `attempted=true`;
+  - `ok=true`;
+  - `written=2`;
+- runtime probe direto:
+  - `attempted=true`;
+  - `ok=true`;
+  - `runId=model-gateway:runtime-probe:1780005515495:75163:1`;
+  - `probeResults=1`;
+  - `successCount=1`;
+  - `failureCount=0`;
+  - `skippedResults=0`;
+- runtime health mirror:
+  - `attempted=true`;
+  - `ok=true`;
+  - `runId=model-gateway:runtime-health:1780005515508:75163:2`;
+  - `records=72`;
+  - `healthObservations=72`;
+  - `probeResults=52`;
+  - `skippedRecords=0`.
+
+Critérios relevantes:
+
+- BYOK real carregou `.env.local` sem expor segredos;
+- terminal chegou a ready;
+- nenhum turno LLM explicito foi aberto em `--no-pr`;
+- SSE conectou sem erro;
+- `/usage`, `/activity`, `/metrics`, `/events`, `/session sdk`, `/byok`, `/byok providers`, `/byok profiles` renderizaram;
+- chat probe real passou;
+- streaming probe real passou;
+- JSON probe real passou;
+- agent probe real passou com tool calling e ask_user;
+- vision probe falhou de modo esperado como capability/probe, sem degradar chat/agent;
+- 25 valores locais de segredo foram verificados contra vazamento;
+- uso BYOK nao foi renderizado como Premium Request.
+
+Lacunas observadas:
+
+- provider Z.AI listou catalogo remoto sem `glm-4.5-flash`, mas a rota continua utilizavel via env/route provada;
+- filtro `safe` removeu candidatos Z.AI remotos por falta de prova agent positiva ou health ruim;
+- vision segue como diagnostico opcional e precisa UX melhor para sugerir rota vision-capable provada;
+- alguns modelos remotos Z.AI aparecem como custo desconhecido e sem safety suficiente para promocao automatica.
+
+Decisao:
+
+- a trilha selector -> probe direto -> health mirror esta comprovada em live real no-pr;
+- ainda nao rodar live full-turn por default;
+- antes de live full, revisar custo/quota e criterio de promocao de modelos Z.AI remotos;
+- manter `glm-4.5-flash` como rota provada por runtime mesmo ausente do catalogo remoto atual.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
