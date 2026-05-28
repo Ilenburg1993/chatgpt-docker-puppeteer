@@ -25,6 +25,7 @@ const POST_ASK_FINAL_RE = /POST-ASK-CANONICAL-FINAL:\s*usu[aá]rio confirmou SIM
 const TURN_SETTLED_AFTER_ASK_RE =
     /(?:Resposta concluída|Turno concluído; aguardando próxima mensagem|Turno do assistente concluído)/iu;
 const REPL_PROMPT_TAIL_RE = /(?:^|\n)voc[eê]\[[^\n]*?›\s*$/iu;
+const LIVE_PROTOCOL_PROBE_KINDS = Object.freeze(['live_tool_protocol', 'live_ask_user']);
 
 function stripAnsi(value) {
     return String(value ?? '').replace(ANSI_RE, '');
@@ -271,6 +272,8 @@ function runRuntimeSelectorLiveRoute({
     if (normalizedFallbacks.length > 0) args.push(`--fallback-profiles=${normalizedFallbacks.join(',')}`);
     const normalizedSelectionPolicy = optionalRuntimeSelectorString(selectionPolicy).replaceAll('-', '_');
     if (normalizedSelectionPolicy) args.push(`--selection-policy=${normalizedSelectionPolicy}`);
+    args.push(`--preferred-probes=${LIVE_PROTOCOL_PROBE_KINDS.join(',')}`);
+    args.push(`--block-failed-probes=${LIVE_PROTOCOL_PROBE_KINDS.join(',')}`);
     if (execute) {
         args.push('--execute', '--attempts-per-route=1', `--timeout-ms=${Math.max(1_000, Math.trunc(timeoutMs))}`);
     }
@@ -449,6 +452,108 @@ function buildRealByokRuntime({
             secretKeysPresent: collectSecretValues(mergedEnv).map(({ key }) => key).sort(),
         },
     };
+}
+
+function byokLiveRouteIdentity(realByok) {
+    const selected = realByok?.redacted?.runtimeSelector?.selected ?? {};
+    const routeProfile =
+        optionalRuntimeSelectorString(selected.routeProfile) ||
+        optionalRuntimeSelectorString(realByok?.redacted?.runtimeSelector?.profileId) ||
+        optionalRuntimeSelectorString(realByok?.redacted?.profile) ||
+        null;
+    const providerId =
+        optionalRuntimeSelectorString(selected.providerId) || optionalRuntimeSelectorString(realByok?.redacted?.provider) || null;
+    const providerModel =
+        optionalRuntimeSelectorString(selected.providerModel) || optionalRuntimeSelectorString(realByok?.redacted?.model) || null;
+    return { routeProfile, providerId, providerModel };
+}
+
+function byokLiveMaterializationState(plain, criteria = []) {
+    const passed = new Set(criteria.filter((criterion) => criterion?.pass === true).map((criterion) => criterion.id));
+    return {
+        toolProtocolOk:
+            passed.has('tool-start-done') &&
+            /\[TOOL\].*read_file_content/s.test(plain) &&
+            /✅ \[DONE\] read_file_content/s.test(plain),
+        askUserOk:
+            passed.has('ask-user-visible') &&
+            passed.has('ask-user-answer') &&
+            passed.has('post-ask-final-visible') &&
+            /\[ASK\] ASK-CANONICAL: responda SIM para fechar o teste/u.test(plain) &&
+            POST_ASK_FINAL_RE.test(plain),
+    };
+}
+
+async function recordByokLiveProtocolHealth({ realByok, blocker, criteria, plain, startedAt, durationMs, noPr, byokControlProbe }) {
+    if (!realByok || noPr || byokControlProbe) return { attempted: false, recorded: false, reason: 'not_full_byok_live_turn' };
+    if (blocker && blocker.id !== 'byok-live-tool-protocol-missed') {
+        return {
+            attempted: false,
+            recorded: false,
+            reason: `live_turn_not_attempted:${blocker.id}`,
+        };
+    }
+    const identity = byokLiveRouteIdentity(realByok);
+    if (!identity.providerId || !identity.providerModel) {
+        return { attempted: true, recorded: false, reason: 'missing_route_identity', identity };
+    }
+    const materialized = byokLiveMaterializationState(plain, criteria);
+    const blockedByProtocol = blocker?.id === 'byok-live-tool-protocol-missed';
+    const timestamp = Date.parse(startedAt) + Math.max(0, Number.isFinite(durationMs) ? durationMs : 0);
+    const probeInputs = [
+        {
+            probeKind: 'live_tool_protocol',
+            ok: !blockedByProtocol && materialized.toolProtocolOk,
+            status: !blockedByProtocol && materialized.toolProtocolOk ? 'ok' : 'failed',
+            message:
+                !blockedByProtocol && materialized.toolProtocolOk
+                    ? 'terminal live turn materialized required SDK tools'
+                    : blocker?.detail ?? 'terminal live turn did not materialize required SDK tool protocol',
+            errorContext: blockedByProtocol ? 'terminal_live_tool_protocol' : 'terminal_live_tool_protocol_validation',
+        },
+        {
+            probeKind: 'live_ask_user',
+            ok: !blockedByProtocol && materialized.askUserOk,
+            status: !blockedByProtocol && materialized.askUserOk ? 'ok' : 'failed',
+            message:
+                !blockedByProtocol && materialized.askUserOk
+                    ? 'terminal live turn materialized ask_user, answer, and post-ask final'
+                    : blocker?.detail ?? 'terminal live turn did not complete real ask_user handshake',
+            errorContext: blockedByProtocol ? 'terminal_live_ask_user' : 'terminal_live_ask_user_validation',
+        },
+    ];
+    try {
+        const { flushByokProviderHealth, recordByokProviderModelProbeResult } = await import(
+            '../../src/copilot/model-gateway/index.js'
+        );
+        for (const probe of probeInputs) {
+            recordByokProviderModelProbeResult({
+                ...identity,
+                probeKind: probe.probeKind,
+                status: probe.status,
+                ok: probe.ok,
+                providerAttempted: true,
+                message: probe.message,
+                errorContext: probe.errorContext,
+                failureKind: probe.ok ? null : 'tool_protocol',
+                timestamp,
+            });
+        }
+        await flushByokProviderHealth();
+        return {
+            attempted: true,
+            recorded: true,
+            identity,
+            probes: probeInputs.map(({ probeKind, status, ok, errorContext }) => ({ probeKind, status, ok, errorContext })),
+        };
+    } catch (error) {
+        return {
+            attempted: true,
+            recorded: false,
+            identity,
+            reason: error instanceof Error ? error.message : String(error),
+        };
+    }
 }
 
 function buildByokCatalogCommands(provider) {
@@ -850,6 +955,7 @@ function buildReport({
     sseSummary,
     startedAt,
     transport,
+    liveHealthRecord,
 }) {
     const ok = criteria.every((criterion) => criterion.pass);
     const status = blocker ? 'BLOCKED' : ok ? 'PASS' : 'FAIL';
@@ -870,6 +976,7 @@ function buildReport({
         `- Exported Markdown: ${exportPath ?? '-'}`,
         `- SSE raw output: ${sseRawPath}`,
         `- SSE JSONL: ${sseJsonlPath}`,
+        `- BYOK live health record: ${liveHealthRecord?.recorded ? 'recorded' : liveHealthRecord?.attempted ? `not-recorded · ${liveHealthRecord.reason ?? 'unknown'}` : 'n/a'}`,
         '',
         '## SSE',
         '',
@@ -2543,6 +2650,16 @@ async function main() {
         ...(byokReal ? evaluateByokRealOutput(plain, secretValues, { ...(realByok ?? {}), noPr }) : []),
     ];
     const durationMs = Date.now() - Date.parse(startedAt);
+    const liveHealthRecord = await recordByokLiveProtocolHealth({
+        realByok,
+        blocker,
+        criteria,
+        plain,
+        startedAt,
+        durationMs,
+        noPr,
+        byokControlProbe,
+    });
     await writeFile(rawPath, raw, 'utf8');
     await writeFile(plainPath, plain, 'utf8');
     await writeFile(sseRawPath, sseSummary.raw, 'utf8');
@@ -2564,6 +2681,7 @@ async function main() {
                 criteria,
                 sse: sseSummary,
                 byokReal: realByok?.redacted ?? null,
+                liveHealthRecord,
                 export: exportSummary
                     ? {
                           ok: exportSummary.ok,
@@ -2596,6 +2714,7 @@ async function main() {
             sseSummary,
             startedAt,
             transport,
+            liveHealthRecord,
         }),
         'utf8',
     );

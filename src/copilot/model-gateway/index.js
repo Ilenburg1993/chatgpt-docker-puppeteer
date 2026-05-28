@@ -343,6 +343,7 @@ export {
     listGatewayModelVerifiedProbeKinds,
     listModelGatewayTaskProfiles,
     listModelGatewaySelectionDecisionTraceFiles,
+    MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS,
     MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
     MODEL_GATEWAY_TASK_PROFILES,
     readGatewayModelHealth,

@@ -18,6 +18,7 @@ import {
 import { classifyByokProviderFailure } from '../health/provider-failure.js';
 import { evaluateModelGatewayProviderEnvRequirements } from '../secrets/requirements.js';
 import { resolveModelGatewayAccountResetWindow } from '../account-access/reset-windows.js';
+import { evaluateGatewayModelHealthRoute, isGatewayModelProbeFailed } from './health-routing.js';
 
 const DEFAULT_MAX_RUNTIME_RETRY_DELAY_MS = 30_000;
 
@@ -340,6 +341,29 @@ function selectedFromPolicyRow(row) {
 }
 
 /**
+ * @param {Record<string, unknown>} row
+ * @returns {Array<{ label: string; selected: Record<string, unknown> }>}
+ */
+function selectedCandidatesFromPolicyRow(row) {
+    const candidates = [
+        { label: 'selected', selected: optionalRecord(row['selected']) },
+        { label: 'postSelected', selected: optionalRecord(row['postSelected']) },
+        { label: 'preSelected', selected: optionalRecord(row['preSelected']) },
+    ];
+    const seen = new Set();
+    const result = [];
+    for (const candidate of candidates) {
+        if (!candidate.selected) continue;
+        const route = runtimeRoute(candidate.selected);
+        const key = routeKey(route);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        result.push({ label: candidate.label, selected: candidate.selected });
+    }
+    return result;
+}
+
+/**
  * @param {Record<string, unknown>} input
  * @returns {{ mode: string; rows: Record<string, unknown>[]; sourceSchema: string | null; traceId: string | null }}
  */
@@ -462,7 +486,7 @@ function sumRouteDecisionRecordedCount(attempts) {
 
 /**
  * @param {Record<string, unknown>} selectionPolicyOrTrace
- * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; env?: Record<string, string | undefined> }} [options]
+ * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; blockFailedProbeKinds?: string[] }} [options]
  * @returns {{
  *   schema: 'model-gateway-runtime-selector-plan';
  *   ok: boolean;
@@ -478,6 +502,8 @@ function sumRouteDecisionRecordedCount(attempts) {
  *     runtimeProofSelectedCount: number;
  *     runtimeEnvReadyCount: number;
  *     runtimeEnvBlockedCount: number;
+ *     runtimeHealthBlockedCount: number;
+ *     runtimeProbeBlockedCount: number;
  *   };
  *   routes: Array<{
  *     profileId: string;
@@ -487,6 +513,7 @@ function sumRouteDecisionRecordedCount(attempts) {
  *     selectedRouteKey: string | null;
  *     hasRuntimeProof: boolean;
  *     runtimeEnv: ReturnType<typeof evaluateModelGatewayRuntimeSelectorRouteEnv> | null;
+ *     runtimeHealth: ReturnType<typeof evaluateGatewayModelHealthRoute> | null;
  *     reasons: string[];
  *     nextActions: string[];
  *     decisionEvent: ReturnType<typeof buildRouteDecisionEvent>;
@@ -500,19 +527,71 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
     const requireRuntimeEnvReady = options.requireRuntimeEnvReady === true;
     const routes = rows.map((row) => {
         const profileId = optionalString(row['profileId']) ?? 'unknown';
-        const selected = runtimeRoute(selectedFromPolicyRow(row));
-        const hasRuntimeProof = row['hasRuntimeProof'] === true || selected?.['hasRuntimeProof'] === true;
-        const runtimeEnv = selected ? evaluateModelGatewayRuntimeSelectorRouteEnv(selected, options.env) : null;
-        const runtimeEnvBlocked = requireRuntimeEnvReady && runtimeEnv?.status !== 'ready';
-        const accountAccessBlocked = selected !== null && !routeAccountCanAttempt(selected);
-        const blocked = !selected || accountAccessBlocked || (requireRuntimeProof && !hasRuntimeProof) || runtimeEnvBlocked;
+        const candidateEvaluations = selectedCandidatesFromPolicyRow(row).map(({ label, selected: rawSelected }) => {
+            const selected = runtimeRoute(rawSelected);
+            const hasRuntimeProof = row['hasRuntimeProof'] === true || selected?.['hasRuntimeProof'] === true;
+            const runtimeEnv = selected ? evaluateModelGatewayRuntimeSelectorRouteEnv(selected, options.env) : null;
+            const runtimeHealth =
+                selected && Array.isArray(options.runtimeHealthRecords)
+                    ? evaluateGatewayModelHealthRoute(selected, {
+                          routeProfile: profileId,
+                          runtimeHealthRecords: options.runtimeHealthRecords,
+                          requireAgentProbeOk: false,
+                      })
+                    : null;
+            const runtimeEnvBlocked = requireRuntimeEnvReady && runtimeEnv?.status !== 'ready';
+            const accountAccessBlocked = selected !== null && !routeAccountCanAttempt(selected);
+            const runtimeHealthBlocked = runtimeHealth?.include === false;
+            const failedProbeKinds = Array.isArray(options.blockFailedProbeKinds)
+                ? options.blockFailedProbeKinds.filter((kind) => runtimeHealth?.health && isGatewayModelProbeFailed(runtimeHealth.health, kind))
+                : [];
+            const runtimeProbeBlocked = failedProbeKinds.length > 0;
+            return {
+                label,
+                selected,
+                hasRuntimeProof,
+                runtimeEnv,
+                runtimeHealth,
+                runtimeEnvBlocked,
+                accountAccessBlocked,
+                runtimeHealthBlocked,
+                failedProbeKinds,
+                runtimeProbeBlocked,
+                blocked:
+                    !selected ||
+                    accountAccessBlocked ||
+                    (requireRuntimeProof && !hasRuntimeProof) ||
+                    runtimeEnvBlocked ||
+                    runtimeHealthBlocked ||
+                    runtimeProbeBlocked,
+            };
+        });
+        const primary = candidateEvaluations[0] ?? null;
+        const chosen =
+            primary && (primary.runtimeHealthBlocked || primary.runtimeProbeBlocked)
+                ? (candidateEvaluations.find((candidate) => !candidate.blocked) ?? primary)
+                : primary;
+        const selected = chosen?.blocked ? null : (chosen?.selected ?? null);
+        const selectedForReasons = chosen?.selected ?? runtimeRoute(selectedFromPolicyRow(row));
+        const hasRuntimeProof = chosen?.hasRuntimeProof === true;
+        const runtimeEnv = chosen?.runtimeEnv ?? null;
+        const runtimeHealth = chosen?.runtimeHealth ?? null;
+        const runtimeEnvBlocked = chosen?.runtimeEnvBlocked === true;
+        const accountAccessBlocked = chosen?.accountAccessBlocked === true;
+        const runtimeHealthBlocked = chosen?.runtimeHealthBlocked === true;
+        const failedProbeKinds = chosen?.failedProbeKinds ?? [];
+        const runtimeProbeBlocked = chosen?.runtimeProbeBlocked === true;
+        const blocked = !selected;
         /** @type {'selected' | 'blocked'} */
         const status = blocked ? 'blocked' : 'selected';
-        const reasons = selectionReasons(selected, row);
+        const reasons = selectionReasons(selectedForReasons, row);
+        if (chosen?.label && chosen.label !== 'selected') reasons.push(`runtime_selector_fallback:${chosen.label}`);
         if (blocked && !selected) reasons.push('blocked:no_selected_route');
         if (blocked && accountAccessBlocked) reasons.push('blocked:account_access_denies_attempt');
-        if (blocked && selected && requireRuntimeProof && !hasRuntimeProof) reasons.push('blocked:runtime_proof_required');
-        if (blocked && selected && runtimeEnvBlocked) reasons.push('blocked:runtime_env_not_ready');
+        if (blocked && chosen?.selected && requireRuntimeProof && !hasRuntimeProof) reasons.push('blocked:runtime_proof_required');
+        if (blocked && chosen?.selected && runtimeEnvBlocked) reasons.push('blocked:runtime_env_not_ready');
+        if (blocked && chosen?.selected && runtimeHealthBlocked) reasons.push(`blocked:runtime_health:${runtimeHealth?.reason ?? 'failed'}`);
+        for (const kind of failedProbeKinds) reasons.push(`blocked:runtime_probe_failed:${kind}`);
         const normalizedRow = {
             ...row,
             profileId,
@@ -527,11 +606,13 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             selectedRouteKey: blocked ? null : routeKey(selected),
             hasRuntimeProof,
             runtimeEnv,
+            runtimeHealth,
             reasons,
             nextActions: blocked
                 ? [
                       ...(accountAccessBlocked ? ['refresh_account_overlay_or_choose_accessible_model'] : []),
                       ...(runtimeEnvBlocked ? ['configure_provider_env_for_selected_route'] : []),
+                      ...(runtimeHealthBlocked || runtimeProbeBlocked ? ['choose_route_without_failed_runtime_health'] : []),
                       'run_runtime_probe_for_profile',
                       'relax_selection_policy_or_choose_fallback',
                   ]
@@ -558,6 +639,12 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             runtimeProofSelectedCount: routes.filter((route) => route.status === 'selected' && route.hasRuntimeProof).length,
             runtimeEnvReadyCount: routes.filter((route) => route.runtimeEnv?.status === 'ready').length,
             runtimeEnvBlockedCount: routes.filter((route) => route.runtimeEnv !== null && route.runtimeEnv.status !== 'ready').length,
+            runtimeHealthBlockedCount: routes.filter((route) =>
+                route.reasons.some((reason) => reason.startsWith('blocked:runtime_health:')),
+            ).length,
+            runtimeProbeBlockedCount: routes.filter((route) =>
+                route.reasons.some((reason) => reason.startsWith('blocked:runtime_probe_failed:')),
+            ).length,
         },
         routes,
     };

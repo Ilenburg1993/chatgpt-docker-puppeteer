@@ -14,6 +14,8 @@ import {
     readByokProviderModelHealth,
 } from '../health/index.js';
 
+export const MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS = Object.freeze(['live_tool_protocol', 'live_ask_user']);
+
 /**
  * @param {{ lastStatus: 'failed' | 'ok' | null; lastFailureAt: number | null; lastSuccessAt: number | null }} health
  * @returns {boolean}
@@ -81,7 +83,7 @@ function healthRecordMatches(record, identity) {
     const recordIdentity = healthIdentity(record);
     if (recordIdentity.providerId !== identity.providerId) return false;
     if (recordIdentity.providerModel !== identity.providerModel) return false;
-    return !identity.routeProfile || recordIdentity.routeProfile === identity.routeProfile;
+    return !identity.routeProfile || !recordIdentity.routeProfile || recordIdentity.routeProfile === identity.routeProfile;
 }
 
 /**
@@ -148,14 +150,15 @@ export function readGatewayModelHealth(model, options = {}) {
     const routeProfile = typeof options.routeProfile === 'string' && options.routeProfile.trim() ? options.routeProfile : null;
     const exact = readByokProviderModelHealth({ routeProfile, providerId, providerModel });
     if (exact) return exact;
-    return (
-        listByokProviderModelHealth().find(
-            (health) =>
-                health.providerId === providerId &&
-                health.providerModel === providerModel &&
-                (!routeProfile || health.routeProfile === routeProfile),
-        ) ?? null
-    );
+    if (routeProfile) {
+        const global = readByokProviderModelHealth({ routeProfile: null, providerId, providerModel });
+        if (global) return global;
+    }
+    const match =
+        latestHealthRecordsFirst(listByokProviderModelHealth()).find((health) =>
+            healthRecordMatches(health, { routeProfile, providerId, providerModel }),
+        ) ?? null;
+    return match ? /** @type {ReturnType<typeof readGatewayModelHealth>} */ (match) : null;
 }
 
 /**
@@ -176,6 +179,17 @@ export function readGatewayModelHealthFromRecords(model, records, options = {}) 
     const routeProfile = optionalString(options.routeProfile);
     const identity = { routeProfile, providerId, providerModel };
     const latest = latestHealthRecordsFirst(records);
+    const exact = routeProfile
+        ? latest.find((record) => {
+              const recordIdentity = healthIdentity(record);
+              return (
+                  recordIdentity.providerId === providerId &&
+                  recordIdentity.providerModel === providerModel &&
+                  recordIdentity.routeProfile === routeProfile
+              );
+          })
+        : null;
+    if (exact) return /** @type {ReturnType<typeof readGatewayModelHealth>} */ (exact);
     const match = latest.find((record) => healthRecordMatches(record, identity));
     return match ? /** @type {ReturnType<typeof readGatewayModelHealth>} */ (match) : null;
 }

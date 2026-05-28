@@ -8962,11 +8962,209 @@ Impacto:
 
 Lacunas abertas apos Mudanca 87:
 
-- criar armazenamento/overlay para `live_tool_protocol` e `live_ask_user`;
-- alimentar o selector com penalidade para rotas com `live_ask_user=failed`;
 - criar runner para testar modelos alternativos da NVIDIA que declaram tool capability;
 - avaliar se `openai/gpt-oss-20b` ou modelos Qwen/Nemotron passam `ask_user` vivo;
 - registrar `vision=empty` como capability runtime nao conclusiva, separada de erro de chat.
+
+### Mudanca 88 - Probes canonicos de protocolo live e bloqueio pre-runtime
+
+Status: implementado em 2026-05-28.
+
+Objetivo:
+
+- separar definitivamente `agent_probe_ok` de prova de protocolo vivo;
+- impedir que uma rota com `ask_user` textificado continue sendo tentada como se fosse apenas "chat/probe OK";
+- persistir fatos de live full-turn no mesmo health store usado pelo selector e pelo SQLite mirror;
+- manter o banco canonico de metadados imutavel diante de fatos volateis de runtime.
+
+Alteracoes aplicadas:
+
+- `MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS` criado com:
+  - `live_tool_protocol`;
+  - `live_ask_user`.
+- `profileProbeKinds` agora prefere estes probes quando o perfil exige tools ou tool-agent behavior;
+- `explainGatewayRouteDecision` agora expoe:
+  - `liveToolProtocolStatus`;
+  - `liveAskUserStatus`;
+  - `runtimeLiveToolProtocolProofCount`;
+  - `runtimeLiveAskUserProofCount`;
+  - `runtimeLiveProtocolFailureCount`.
+- `auditModelGatewayPostRuntimeSelection` agora preserva:
+  - `failedProbes`;
+  - status live de tool protocol;
+  - status live de ask_user.
+- `scripts/model-gateway-runtime-selector.mjs` ganhou:
+  - `--preferred-probes=a,b`;
+  - `--block-failed-probes=a,b`;
+  - resumo JSON com probes preferidos/bloqueados;
+  - exposicao dos probes live canonicos.
+- `scripts/copilot/run-terminal-llm-b-live-test.mjs` agora:
+  - chama o runtime selector com `--preferred-probes=live_tool_protocol,live_ask_user`;
+  - chama o runtime selector com `--block-failed-probes=live_tool_protocol,live_ask_user`;
+  - registra resultado live full-turn no provider health;
+  - grava dois probes por rota full-turn BYOK real:
+    - `live_tool_protocol`;
+    - `live_ask_user`.
+- o summary JSON/MD do live runner agora informa se o fato live foi gravado no health store.
+
+Semantica nova:
+
+- `agent` continua sendo probe descartavel de capacidade basica de tool/ask_user;
+- `live_tool_protocol` e prova de que o turno terminal real materializou tools SDK;
+- `live_ask_user` e prova de que o turno terminal real materializou pergunta, resposta humana e final pos-resposta;
+- falha de `live_ask_user` nao apaga o modelo do catalogo canonico;
+- falha de `live_ask_user` pode bloquear a rota em uma handoff live posterior;
+- a decisao fica no overlay de health/runtime, nao nos metadados canonicos.
+
+Validacoes executadas:
+
+- `node --check scripts/copilot/run-terminal-llm-b-live-test.mjs`;
+- `node --check scripts/model-gateway-runtime-selector.mjs`;
+- `npm run model-gateway:typecheck`;
+- `npm run model-gateway:lint`;
+- `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/model-gateway/test_model_gateway_provider_health.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`;
+- `git diff --check`;
+- dry-run do runtime selector com:
+  - `--preferred-probes=live_tool_protocol,live_ask_user`;
+  - `--block-failed-probes=live_tool_protocol,live_ask_user`;
+  - `--selection-policy=prefer_runtime_proved`.
+
+Resultado do dry-run:
+
+- `ok=true`;
+- `ready=true`;
+- `selected=3`;
+- `blocked=0`;
+- `preferred=[live_tool_protocol, live_ask_user]`;
+- `block=[live_tool_protocol, live_ask_user]`.
+
+Teste unitario novo:
+
+- cobre rota com `live_ask_user=failed`;
+- confirma que `blockFailedProbeKinds=['live_ask_user']` rejeita a rota antes de outro handoff;
+- confirma que uma alternativa nao marcada pode ser escolhida.
+
+Impacto arquitetural:
+
+- o sistema passa a ter tres niveis claros:
+  - metadados canonicos;
+  - probes/health volateis;
+  - live protocol proof;
+- o runtime selector deixa de depender apenas de "modelo respondeu";
+- uma live bloqueada agora produz memoria operacional reutilizavel;
+- o proximo live test deve gravar a falha atual no health e, depois do mirror, permitir que o selector evite a mesma rota.
+
+Lacunas abertas apos Mudanca 88:
+
+- criar runner para testar modelos alternativos da NVIDIA que declaram tool capability;
+- avaliar se `openai/gpt-oss-20b` ou modelos Qwen/Nemotron passam `ask_user` vivo;
+- registrar `vision=empty` como capability runtime nao conclusiva, separada de erro de chat.
+
+### Mudanca 89 - Selector aprende com live failed e bloqueia quedas ruins
+
+Status: implementado em 2026-05-28.
+
+Problema revelado pela Mudanca 88:
+
+- depois de gravar `live_ask_user=failed`, o selector evitou a rota NVIDIA;
+- porem, a queda inicial podia ir para vencedores de metadados com health ruim ja conhecido;
+- isso acontecia porque:
+  - o plano final do runtime consumia apenas a rota vencedora da policy row;
+  - health global sem `routeProfile` nao servia como fallback para uma rota com `routeProfile`;
+  - o harness live gravava `live_tool_protocol/live_ask_user=failed` tambem quando o bloqueio ocorria em preflight.
+
+Correcoes aplicadas:
+
+- `readGatewayModelHealth` e `readGatewayModelHealthFromRecords` agora usam health profileless como fallback;
+- `buildModelGatewayRuntimeSelectorPlan` recebe `runtimeHealthRecords`;
+- o plano final bloqueia rota com:
+  - `chat_health_failed`;
+  - `agent_probe_failed`;
+  - probe bloqueado por `--block-failed-probes`;
+  - account access negando tentativa;
+  - env runtime ausente quando exigido.
+- o plano final pode usar `postSelected` como fallback quando o primario foi bloqueado por health/probe runtime;
+- o fallback e marcado com `runtime_selector_fallback:postSelected`;
+- o harness live agora grava `live_tool_protocol/live_ask_user` apenas quando:
+  - o full-turn vivo foi realmente tentado; ou
+  - o blocker foi `byok-live-tool-protocol-missed`.
+- blockers de preflight, admission, quota e provider nao gravam falso `live_ask_user=failed`;
+- o registro incorreto de `repo_agent|mistral|devstral-medium-2507` criado durante a transicao foi limpo.
+
+Evidencia live gravada:
+
+Artefato:
+
+- `artifacts/terminal-live/2026-05-28T15-11-12-447Z/summary.md`.
+
+Resultado:
+
+- status `BLOCKED`;
+- blocker `byok-live-tool-protocol-missed`;
+- rota `code|nvidia-nim|openai/gpt-oss-120b`;
+- `live_tool_protocol=failed`;
+- `live_ask_user=failed`;
+- health record gravado no arquivo operacional;
+- mirror SQLite executado em seguida.
+
+Mirror apos live:
+
+- `runtimeRows=5183`;
+- `healthObservations=2487`;
+- `runtimeProbeRuns=109`;
+- `runtimeProbeResults=2587`;
+- snapshot: `artifacts/model-gateway-runtime-health-post-live/2026-05-28T15-11-live-protocol-health-recorded/latest.json`.
+
+Evidencia de selector:
+
+- apos gravar a falha live, NVIDIA deixou de ser selecionado para o handoff;
+- Chutes `moonshotai/Kimi-K2.5-TEE` foi tentado e falhou com `402 credits`;
+- Groq `llama-3.1-8b-instant` foi tentado e falhou com `413/TPM rate-limit`;
+- Zai `glm-4-32b-0414-128k` foi tentado e falhou por timeout;
+- Mistral `devstral-medium-2507` passou chat selector, mas falhou no agent preflight com `429`;
+- o proximo plano selecionou Zai `glm-4.5-flash`.
+
+Evidencia preflight Mistral:
+
+Artefato:
+
+- `artifacts/terminal-live/2026-05-28T15-24-07-146Z/summary.md`.
+
+Resultado:
+
+- status `BLOCKED`;
+- blocker `byok-preflight-probe-failed`;
+- chat/stream/json passaram;
+- vision falhou `HTTP 400` como capability separada;
+- agent preflight falhou com `429`;
+- nenhum turno vivo foi enviado;
+- apos correcao, esse caso nao deve gravar `live_ask_user=failed`.
+
+Validacoes executadas:
+
+- `npm run model-gateway:typecheck`;
+- `npm run model-gateway:lint`;
+- `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/model-gateway/test_model_gateway_provider_health.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`;
+- `node --check scripts/model-gateway-runtime-selector.mjs`;
+- `node --check scripts/copilot/run-terminal-llm-b-live-test.mjs`.
+
+Impacto arquitetural:
+
+- metadados fortes nao bastam para runtime se a account/key falha;
+- health global agora protege rotas especificas do mesmo provider/model;
+- preflight e live protocol proof ficam separados;
+- o selector agora tem memoria operacional para desviar de falhas reais;
+- o proximo trabalho deve consolidar account/provider-level blocking para falhas de cota/credito repetidas.
+
+Lacunas abertas apos Mudanca 89:
+
+- consolidar bloqueio por provider/account quando varios modelos do mesmo provider falham por credito/cota;
+- classificar melhor `429` sem body de Mistral como rate-limit em vez de provider.unknown;
+- impedir que preflight agent failed faca o cockpit narrar texto ambiguo de sucesso;
+- executar probe bounded para Zai `glm-4.5-flash`;
+- se Zai passar, executar full-turn live;
+- se Zai falhar, continuar a cadeia ate uma rota com agent preflight positivo;
+- avaliar modelos NVIDIA alternativos em probes menores sem repetir o live de `openai/gpt-oss-120b`.
 
 ## 22. Fim Do Documento Inicial
 

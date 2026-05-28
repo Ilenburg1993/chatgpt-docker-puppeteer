@@ -9,6 +9,7 @@
  */
 
 import {
+    MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS,
     evaluateGatewayModelHealthRoute,
     isGatewayModelAgentProbeVerified,
     isGatewayModelProbeFailed,
@@ -627,7 +628,9 @@ function profileProbeKinds(profile) {
     const prefers = stringArray(profile['prefers']);
     const kinds = [];
     if (requires.includes('streaming')) kinds.push('streaming');
-    if (requires.includes('tools') || prefers.includes('forcedToolChoice') || prefers.includes('parallelToolCalls')) kinds.push('agent');
+    if (requires.includes('tools') || prefers.includes('forcedToolChoice') || prefers.includes('parallelToolCalls')) {
+        kinds.push('agent', ...MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS);
+    }
     if (prefers.includes('structuredOutputs') || prefers.includes('jsonMode') || prefers.includes('jsonSchema')) kinds.push('json');
     if (softRequires.includes('vision') || prefers.includes('vision')) kinds.push('vision');
     return [...new Set(kinds)];

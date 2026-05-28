@@ -16,6 +16,7 @@ import {
     filterModelGatewayRuntimeEligibilityOverlayDecisions,
     flushAndMirrorByokProviderHealthToSqlite,
     listByokProviderModelHealth,
+    MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS,
     mergeByokProviderHealthRecords,
     resolveModelGatewaySelectionPolicy,
     summarizeModelGatewayRuntimeAccountOverlays,
@@ -30,7 +31,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-runtime-selector.mjs [--json] [--execute] [--fail] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--require-runtime-proof] [--allow-probe] [--allow-env-missing] [--attempts-per-route N] [--retry-delay-ms N] [--max-retry-delay-ms N] [--timeout-ms N]
+    process.stdout.write(`Usage: node scripts/model-gateway-runtime-selector.mjs [--json] [--execute] [--fail] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--require-runtime-proof] [--allow-probe] [--allow-env-missing] [--preferred-probes a,b] [--block-failed-probes a,b] [--attempts-per-route N] [--retry-delay-ms N] [--max-retry-delay-ms N] [--timeout-ms N]
 
 Build the final model-gateway runtime selector plan. By default this is dry-run only: it reads metadata plus already
 observed health, validates route-aware BYOK env readiness, and does not execute providers. Provider calls require the
@@ -67,6 +68,17 @@ function readInteger(name, fallback) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function readStringList(name) {
+    return [
+        ...new Set(
+            readArg(name)
+                .split(',')
+                .map((item) => item.trim())
+                .filter(Boolean),
+        ),
+    ];
+}
+
 function selectedDispositions(selection) {
     return [
         ...new Set(
@@ -98,7 +110,15 @@ function formatCountMap(counts) {
         .join(',') || '-';
 }
 
-async function buildRuntimeSelectorContext({ strict, requireRuntimeProof, requireRuntimeEnvReady, selectionPolicy, runtimeSource }) {
+async function buildRuntimeSelectorContext({
+    strict,
+    requireRuntimeProof,
+    requireRuntimeEnvReady,
+    selectionPolicy,
+    runtimeSource,
+    preferredProbeKinds = [],
+    blockFailedProbeKinds = [],
+}) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const snapshot = await store.readSnapshot();
     const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
@@ -152,6 +172,8 @@ async function buildRuntimeSelectorContext({ strict, requireRuntimeProof, requir
         strict,
         profiles: profileIds,
         secretRegistry,
+        ...(preferredProbeKinds.length > 0 ? { preferredProbeKinds } : {}),
+        ...(blockFailedProbeKinds.length > 0 ? { blockFailedProbeKinds } : {}),
     });
     const postRuntimeSelection = auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
         strict,
@@ -159,6 +181,8 @@ async function buildRuntimeSelectorContext({ strict, requireRuntimeProof, requir
         secretRegistry,
         runtimeHealthRecords: healthRecords,
         requireRuntimeProof,
+        ...(preferredProbeKinds.length > 0 ? { preferredProbeKinds } : {}),
+        ...(blockFailedProbeKinds.length > 0 ? { blockFailedProbeKinds } : {}),
     });
     const comparison = compareModelGatewaySelectionAudits(selection, postRuntimeSelection);
     const policyResolution = resolveModelGatewaySelectionPolicy(comparison, { mode: selectionPolicy });
@@ -167,6 +191,8 @@ async function buildRuntimeSelectorContext({ strict, requireRuntimeProof, requir
         requireRuntimeProof,
         requireRuntimeEnvReady,
         env: process.env,
+        runtimeHealthRecords: healthRecords,
+        ...(blockFailedProbeKinds.length > 0 ? { blockFailedProbeKinds } : {}),
     });
     return {
         storePath: store.filePath,
@@ -195,6 +221,8 @@ const requireRuntimeProof = argSet.has('--require-runtime-proof') || argSet.has(
 const requireRuntimeEnvReady = !argSet.has('--allow-env-missing');
 const runtimeSource = runtimeSourceArg();
 const selectionPolicy = selectionPolicyArg(requireRuntimeProof);
+const preferredProbeKinds = readStringList('--preferred-probes');
+const blockFailedProbeKinds = readStringList('--block-failed-probes');
 
 if (json) {
     setDbLogger((level, message) => {
@@ -210,6 +238,8 @@ const context = await buildRuntimeSelectorContext({
     requireRuntimeEnvReady,
     selectionPolicy,
     runtimeSource,
+    preferredProbeKinds,
+    blockFailedProbeKinds,
 });
 
 let execution = null;
@@ -329,6 +359,9 @@ const summary = {
     mode: strict ? 'strict_access_only_with_observed_health' : 'allow_probe_unknown_with_observed_health',
     runtimeSource,
     selectionPolicy,
+    preferredProbeKinds,
+    blockFailedProbeKinds,
+    liveProtocolProbeKinds: MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS,
     requireRuntimeProof,
     requireRuntimeEnvReady,
     storePath: context.storePath,

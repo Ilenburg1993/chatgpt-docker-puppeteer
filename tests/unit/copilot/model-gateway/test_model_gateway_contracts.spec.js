@@ -525,6 +525,40 @@ describe('model-gateway foundation', () => {
         assert.equal(listByokProviderModelHealth().length, 0);
     });
 
+    it('uses profileless runtime health as fallback evidence for route-scoped selection', () => {
+        const model = createModelRecord({
+            providerId: 'nvidia-nim',
+            providerModel: 'openai/gpt-oss-120b',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        const runtimeHealthRecords = [
+            {
+                routeProfile: null,
+                providerId: 'nvidia-nim',
+                providerModel: 'openai/gpt-oss-120b',
+                lastStatus: 'failed',
+                lastFailureAt: 100,
+                lastSuccessAt: 0,
+                agentProbeStatus: null,
+                probes: {},
+            },
+        ];
+
+        assert.equal(
+            readGatewayModelHealthFromRecords(model, runtimeHealthRecords, { routeProfile: 'code' })?.lastStatus,
+            'failed',
+        );
+        const route = routeGatewayModels([model], 'code', {
+            routeProfile: 'code',
+            runtimeHealthRecords,
+        });
+
+        assert.equal(route.selected, null);
+        assert.ok(route.rejected.some((candidate) => candidate.rejectedReasons.includes('chat_health_failed')));
+    });
+
     it('mirrors dedicated agent probe health into the generic probe ledger', () => {
         recordByokProviderModelAgentProbeFailure({
             routeProfile: 'repo_agent',
@@ -913,6 +947,32 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(routeEnvReadyPlan.summary.runtimeEnvReadyCount, 2);
         assert.equal(routeEnvReadyPlan.summary.blockedProfileCount, 0);
+        const liveProtocolBlockedPlan = buildModelGatewayRuntimeSelectorPlan(preferRuntimeProved, {
+            runtimeHealthRecords: [
+                {
+                    routeProfile: null,
+                    providerId: 'openrouter',
+                    providerModel: 'openai/gpt-oss-120b',
+                    lastStatus: 'ok',
+                    lastSuccessAt: 120,
+                    probes: {
+                        live_ask_user: {
+                            kind: 'live_ask_user',
+                            status: 'failed',
+                            ok: false,
+                            providerAttempted: true,
+                            lastAt: 125,
+                        },
+                    },
+                },
+            ],
+            blockFailedProbeKinds: ['live_ask_user'],
+        });
+        assert.equal(liveProtocolBlockedPlan.ok, false);
+        assert.equal(liveProtocolBlockedPlan.summary.runtimeProbeBlockedCount, 2);
+        assert.equal(liveProtocolBlockedPlan.routes[0].selected, null);
+        assert.ok(liveProtocolBlockedPlan.routes[0].reasons.includes('blocked:runtime_probe_failed:live_ask_user'));
+        assert.ok(liveProtocolBlockedPlan.routes[0].nextActions.includes('choose_route_without_failed_runtime_health'));
 
         const accountBlockedPolicy = {
             ...preferRuntimeProved,
@@ -1876,6 +1936,8 @@ describe('model-gateway foundation', () => {
             agentProbeVerified: false,
             verifiedProbes: [],
             failedProbes: [],
+            liveToolProtocolStatus: null,
+            liveAskUserStatus: null,
         });
         assert.deepEqual(explanation.decisionLayers, {
             catalogCandidateCount: 1,
@@ -1884,6 +1946,9 @@ describe('model-gateway foundation', () => {
             runtimeChatOkCount: 0,
             runtimeAgentProbeProofCount: 0,
             runtimeProbeProofCount: 0,
+            runtimeLiveToolProtocolProofCount: 0,
+            runtimeLiveAskUserProofCount: 0,
+            runtimeLiveProtocolFailureCount: 0,
             runtimeHealthProofCount: 0,
         });
     });
@@ -2022,6 +2087,46 @@ describe('model-gateway foundation', () => {
         assert.ok(decision.selected?.reasons.includes('runtime_probe_verified:json'));
         assert.ok(decision.selected?.reasons.includes('preferred_probe_verified:json'));
         assert.equal(runtimeProved['verification']?.['confidence'], 'catalog');
+    });
+
+    it('can block routes with failed terminal live protocol probes before another runtime handoff', () => {
+        const textifiedTools = createModelRecord({
+            providerId: 'nvidia-nim',
+            providerModel: 'openai/gpt-oss-120b',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        const unprovenAlternative = createModelRecord({
+            providerId: 'openrouter',
+            providerModel: 'qwen/qwen3-coder:free',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+
+        recordByokProviderModelProbeResult({
+            routeProfile: 'code',
+            providerId: 'nvidia-nim',
+            providerModel: 'openai/gpt-oss-120b',
+            probeKind: 'live_ask_user',
+            status: 'failed',
+            ok: false,
+            providerAttempted: true,
+            message: 'terminal live turn textified ask_user',
+            errorContext: 'terminal_live_ask_user',
+            failureKind: 'tool_protocol',
+            timestamp: 85,
+        });
+
+        const decision = routeGatewayModels([textifiedTools, unprovenAlternative], 'code', {
+            routeProfile: 'code',
+            blockFailedProbeKinds: ['live_ask_user'],
+            preferredProbeKinds: ['live_tool_protocol', 'live_ask_user'],
+        });
+
+        assert.equal(decision.selected?.model['id'], 'openrouter:qwen/qwen3-coder:free');
+        assert.ok(decision.rejected.some((candidate) => candidate.rejectedReasons.includes('runtime_probe_failed:live_ask_user')));
     });
 
     it('can require explicit probe proofs as a pre-runtime route policy', () => {

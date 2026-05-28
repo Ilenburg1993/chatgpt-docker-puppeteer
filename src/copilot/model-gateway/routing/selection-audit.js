@@ -100,6 +100,10 @@ function selectedSummary(selected) {
         .filter(([, probe]) => isRecord(probe) && probe['ok'] === true && probe['providerAttempted'] !== false)
         .map(([kind]) => kind)
         .sort();
+    const failedProbes = Object.entries(probes)
+        .filter(([, probe]) => isRecord(probe) && probe['ok'] === false && probe['providerAttempted'] !== false)
+        .map(([kind]) => kind)
+        .sort();
     return {
         id: optionalString(model['id']),
         providerId: optionalString(model['providerId']),
@@ -144,6 +148,11 @@ function selectedSummary(selected) {
                   lastStatus: optionalString(health['lastStatus']),
                   agentProbeStatus: optionalString(health['agentProbeStatus']),
                   verifiedProbes,
+                  failedProbes,
+                  liveToolProtocolStatus: isRecord(probes['live_tool_protocol'])
+                      ? optionalString(probes['live_tool_protocol']['status'])
+                      : null,
+                  liveAskUserStatus: isRecord(probes['live_ask_user']) ? optionalString(probes['live_ask_user']['status']) : null,
               }
             : null,
         reasons: stringList(selected['reasons']).slice(0, 8),
@@ -314,6 +323,9 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
  *     runtimeChatOkCount: number;
  *     runtimeAgentProbeProofCount: number;
  *     runtimeProbeProofCount: number;
+ *     runtimeLiveToolProtocolProofCount: number;
+ *     runtimeLiveAskUserProofCount: number;
+ *     runtimeLiveProtocolFailureCount: number;
  *     runtimeHealthProofCount: number;
  *     selectedProviders: Record<string, number>;
  *     selectedSelectorKinds: Record<string, number>;
@@ -422,6 +434,18 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
             }, 0),
             runtimeProbeProofCount: profileAudits.reduce((sum, profile) => {
                 const value = profile.decisionLayers['runtimeProbeProofCount'];
+                return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+            }, 0),
+            runtimeLiveToolProtocolProofCount: profileAudits.reduce((sum, profile) => {
+                const value = profile.decisionLayers['runtimeLiveToolProtocolProofCount'];
+                return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+            }, 0),
+            runtimeLiveAskUserProofCount: profileAudits.reduce((sum, profile) => {
+                const value = profile.decisionLayers['runtimeLiveAskUserProofCount'];
+                return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+            }, 0),
+            runtimeLiveProtocolFailureCount: profileAudits.reduce((sum, profile) => {
+                const value = profile.decisionLayers['runtimeLiveProtocolFailureCount'];
                 return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
             }, 0),
             runtimeHealthProofCount: profileAudits.reduce((sum, profile) => {

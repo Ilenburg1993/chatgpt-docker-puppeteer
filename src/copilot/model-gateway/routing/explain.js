@@ -53,6 +53,8 @@ function reasonCounts(reasons) {
  *   agentProbeVerified: boolean;
  *   verifiedProbes: string[];
  *   failedProbes: string[];
+ *   liveToolProtocolStatus: string | null;
+ *   liveAskUserStatus: string | null;
  * }}
  */
 function probeSummary(health) {
@@ -73,6 +75,8 @@ function probeSummary(health) {
         agentProbeVerified: agentProbeStatus === 'ok',
         verifiedProbes: verifiedProbes.sort(),
         failedProbes: failedProbes.sort(),
+        liveToolProtocolStatus: isRecord(probes['live_tool_protocol']) ? optionalString(probes['live_tool_protocol']['status']) : null,
+        liveAskUserStatus: isRecord(probes['live_ask_user']) ? optionalString(probes['live_ask_user']['status']) : null,
     };
 }
 
@@ -123,13 +127,28 @@ function decisionLayers(candidates) {
     const runtimeProbeProofCount = probeSummaries.filter(
         (probes) => Array.isArray(probes['verifiedProbes']) && probes['verifiedProbes'].length > 0,
     ).length;
+    const runtimeLiveToolProtocolProofCount = probeSummaries.filter(
+        (probes) => probes['liveToolProtocolStatus'] === 'ok',
+    ).length;
+    const runtimeLiveAskUserProofCount = probeSummaries.filter((probes) => probes['liveAskUserStatus'] === 'ok').length;
+    const runtimeLiveProtocolFailureCount = probeSummaries.filter(
+        (probes) => probes['liveToolProtocolStatus'] === 'failed' || probes['liveAskUserStatus'] === 'failed',
+    ).length;
     return {
         catalogCandidateCount: summaries.length,
         eligibilityEvaluatedCount: summaries.filter((summary) => summary['eligibility'] !== null).length,
-        healthRecordCount: probeSummaries.filter((probes) => probes['status'] !== null).length,
+        healthRecordCount: probeSummaries.filter(
+            (probes) =>
+                probes['status'] !== null ||
+                (Array.isArray(probes['verifiedProbes']) && probes['verifiedProbes'].length > 0) ||
+                (Array.isArray(probes['failedProbes']) && probes['failedProbes'].length > 0),
+        ).length,
         runtimeChatOkCount: chatOkCount,
         runtimeAgentProbeProofCount: agentProbeProofCount,
         runtimeProbeProofCount,
+        runtimeLiveToolProtocolProofCount,
+        runtimeLiveAskUserProofCount,
+        runtimeLiveProtocolFailureCount,
         runtimeHealthProofCount: probeSummaries.filter(
             (probes) =>
                 probes['chatOk'] === true ||
