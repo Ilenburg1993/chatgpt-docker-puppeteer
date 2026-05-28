@@ -705,6 +705,11 @@ export function normalizeRuntimeAgenticCapabilityTaxonomy(input = {}) {
         codeExecution: bool(['codeExecution', 'code_execution']),
         vision: capabilities['vision'] === true || inputModalities.includes('image'),
         audio: capabilities['audio'] === true || inputModalities.includes('audio') || outputModalities.includes('audio'),
+        embeddings: capabilities['embeddings'] === true || capabilities['embedding'] === true || outputModalities.includes('embedding'),
+        rerank: capabilities['rerank'] === true || capabilities['reranker'] === true || outputModalities.includes('rerank'),
+        asr: capabilities['asr'] === true || capabilities['transcription'] === true || outputModalities.includes('asr'),
+        tts: capabilities['tts'] === true || outputModalities.includes('tts'),
+        imageGeneration: capabilities['imageGeneration'] === true || outputModalities.includes('image-generation'),
     };
     const agenticLevel = taxonomy.parallelToolCalls
         ? 'parallel_tools'
@@ -723,6 +728,11 @@ export function normalizeRuntimeAgenticCapabilityTaxonomy(input = {}) {
     if (taxonomy.codeExecution) families.push('code_execution');
     if (taxonomy.vision) families.push('vision');
     if (taxonomy.audio) families.push('audio');
+    if (taxonomy.embeddings) families.push('embedding');
+    if (taxonomy.rerank) families.push('rerank');
+    if (taxonomy.asr) families.push('asr');
+    if (taxonomy.tts) families.push('tts');
+    if (taxonomy.imageGeneration) families.push('image_generation');
     return {
         ...taxonomy,
         agenticLevel,

@@ -9415,6 +9415,128 @@ Proximo passo correto:
 - se falhar em agent/tool protocol, registrar health separado;
 - se passar, registrar `live_tool_protocol=ok` e `live_ask_user=ok`.
 
+## Mudanca 93 - Separacao De Familias Nao Conversacionais Antes Do Runtime
+
+Durante a retomada dos testes live, o seletor caiu para `nvidia-nim:baai/bge-m3` como fallback do perfil `code`.
+
+Isso revelou uma falha de camada baixa:
+
+- o importer autenticado da NVIDIA marcava todos os modelos do endpoint `/v1/models` como `chat=true` e `streaming=true`;
+- modelos BGE, embeddings, rerank, ASR, TTS e image-generation podiam entrar no fluxo de chat por ausencia de taxonomia
+  negativa;
+- o catalogo antigo ainda tinha `modalities.output=["text"]` para `baai/bge-m3`, portanto a politica precisava ter uma defesa
+  independente do rebuild;
+- o problema nao era runtime selector em si, mas classificacao de familia antes do runtime.
+
+Alteracoes estruturais aplicadas:
+
+- `nvidia-nim-models-importer` agora classifica familias:
+  - `chat`;
+  - `embedding`;
+  - `rerank`;
+  - `audio`;
+  - `image-generation`.
+- Para `baai/bge-m3` e similares:
+  - `capabilities.chat=false`;
+  - `capabilities.streaming=false`;
+  - `capabilities.embeddings=true`;
+  - `modalities.output=["embedding"]`;
+  - `normalizedPolicy.wireApi="openai_embeddings"`.
+- A taxonomia normalizada passou a expor familias nao conversacionais:
+  - `embedding`;
+  - `rerank`;
+  - `asr`;
+  - `tts`;
+  - `image_generation`.
+- O policy engine passou a rejeitar modelos nao conversacionais para perfis conversacionais:
+  - `cheap_chat`;
+  - `code`;
+  - `repo_agent`;
+  - `tool_agent`;
+  - `json_extraction`;
+  - `vision`;
+  - `deep_reasoning`.
+- A regra preserva a decisao anterior sobre vision:
+  - vision continua sendo preferencia/soft capability;
+  - modelos vision-text nao sao excluidos automaticamente;
+  - apenas familias de saida nao conversacional sao bloqueadas para chat.
+
+Motivacao arquitetural:
+
+- metadados amplos devem registrar todos os modelos, inclusive embeddings e rerank;
+- selecao pre-runtime deve impedir tentativas obvias de rota errada;
+- runtime probes devem ser reservados para candidatos plausiveis;
+- o banco canonico nao deve apagar modelos nao conversacionais, apenas classifica-los corretamente;
+- perfis futuros de embeddings/rerank devem poder selecionar essas familias explicitamente.
+
+Evidencia local:
+
+- teste unitario novo garante que `baai/bge-m3` e rerank nao entram em `code`;
+- teste unitario da NVIDIA garante metadados corretos para BGE;
+- dry-run do runtime selector deixou de escolher `baai/bge-m3`;
+- novo fallback observado: `nvidia-nim:bigcode/starcoder2-15b` para `code`.
+
+Lacunas restantes:
+
+- criar perfis explicitos para embeddings/rerank quando o gateway passar a expor tarefas nao conversacionais;
+- enriquecer importers de outros provedores com a mesma classificacao negativa;
+- auditar `bigcode/starcoder2-15b` por probe, pois ele pode ser text/code-generation sem tools, mas ainda precisa provar
+  compatibilidade com chat OpenAI-compatible;
+- executar refresh provider-scoped da NVIDIA para substituir o snapshot antigo por metadados corrigidos.
+
+## Mudanca 94 - Executor De Runtime Com Alternativas Reais E Health Por Perfil
+
+O probe posterior a Mudanca 93 revelou um problema de execucao:
+
+- o plano dizia haver dezenas de alternativas utilizaveis;
+- o executor tentava apenas a rota selecionada do perfil;
+- se a primeira rota falhasse com `model-or-route`, a execucao encerrava mesmo havendo alternativas no mesmo perfil;
+- falhas de agent/vision registradas em health profileless tambem podiam bloquear perfis simples de `code`.
+
+Alteracoes aplicadas:
+
+- `buildModelGatewayRuntimeSelectorPlan` agora preserva `candidateAlternatives` usaveis por perfil;
+- `executeModelGatewayRuntimeSelectorPlanWithFallbacks` passa a tentar:
+  - rota selecionada do perfil;
+  - alternativas do mesmo perfil;
+  - perfis fallback;
+  - sem repetir a mesma chave provider/model;
+  - respeitando `attemptsPerRoute`;
+  - respeitando `maxAttempts`.
+- `model-gateway-runtime-selector.mjs` recebeu `--max-attempts`;
+- `run-terminal-llm-b-live-test.mjs` recebeu `--byok-real-route-max-attempts`, default `8`, para lives controlados;
+- `evaluateGatewayModelHealthRoute` passou a bloquear `agent_probe_failed` apenas quando o perfil exige prova agentica;
+- o runtime selector passa `requireAgentProbeOk` para `repo_agent` e `tool_agent`, mas nao para `code`.
+
+Evidencia live/pre-live:
+
+- `model-gateway-runtime-selector --execute --attempts-per-route=1 --timeout-ms=20000` percorreu 7 rotas;
+- falhas registradas:
+  - `zai/glm-4.6`: timeout;
+  - `zai/glm-4.7`: timeout;
+  - `zai/glm-5`: timeout;
+  - `nvidia-nim/bytedance/seed-oss-36b-instruct`: timeout;
+  - `nvidia-nim/databricks/dbrx-instruct`: 404 `model-or-route`;
+  - `nvidia-nim/deepseek-ai/deepseek-coder-6.7b-instruct`: 404 `model-or-route`;
+- sucesso registrado:
+  - `nvidia-nim/deepseek-ai/deepseek-v4-flash`, perfil `code`.
+
+Consequencia:
+
+- o primeiro full live deve usar a rota provada pelo executor, nao a primeira rota metadata-only;
+- `code` pode usar modelos com chat/streaming provado mesmo quando agent probe falhou;
+- `repo_agent` e `tool_agent` continuam exigindo saude agentica;
+- lives ficam bounded por `--byok-real-route-max-attempts` para evitar varrer catalogos enormes sem limite.
+
+Achado adicional:
+
+- `artifacts/terminal-live/2026-05-28T16-59-41-371Z/summary.md` mostrou que ruido de shutdown do SDK podia impedir o
+  harness de parsear JSON do selector;
+- o parser do harness agora extrai o objeto JSON mesmo se houver texto antes/depois;
+- `artifacts/terminal-live/2026-05-28T17-01-04-508Z/summary.md` mostrou bloqueio real posterior: depois de novos
+  timeouts/404 em NIM, o plano ficou sem rota executavel;
+- isso reforca a necessidade de uma camada de catalog stale/provider-cooldown mais seletiva antes de novos lives amplos.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

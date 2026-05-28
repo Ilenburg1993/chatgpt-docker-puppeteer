@@ -19,6 +19,7 @@ import {
     normalizeModelAliases,
     normalizeModelIdentityTraits,
     normalizeModelLifecycle,
+    normalizeModelModalities,
 } from '../normalizers.js';
 
 export const NVIDIA_NIM_BASE_URL = 'https://integrate.api.nvidia.com/v1';
@@ -68,19 +69,75 @@ function parseNvidiaRows(raw) {
 
 /**
  * @param {string} providerModel
+ * @returns {'chat' | 'embedding' | 'rerank' | 'audio' | 'image-generation'}
+ */
+function classifyNvidiaModelRuntimeFamily(providerModel) {
+    const lower = providerModel.toLowerCase();
+    const tokenized = lower.replace(/[^a-z0-9]+/gu, '-');
+    if (/(?:^|-)(?:rerank|reranker)(?:-|$)/u.test(tokenized)) return 'rerank';
+    if (
+        /(?:^|-)(?:embed|embedding|embeddings|bge|e5|gte|nv-embedqa|nvolveqa|snowflake-arctic-embed|jina-embeddings?)(?:-|$)/u.test(
+            tokenized,
+        )
+    ) {
+        return 'embedding';
+    }
+    if (/(?:^|-)(?:whisper|parakeet|asr|stt|transcription|tts|speech)(?:-|$)/u.test(tokenized)) return 'audio';
+    if (/(?:^|-)(?:text-to-image|image-generation|sdxl|flux)(?:-|$)/u.test(tokenized)) return 'image-generation';
+    return 'chat';
+}
+
+/**
+ * @param {string} providerModel
  * @returns {Record<string, boolean>}
  */
 function capabilitiesFromModelId(providerModel) {
     const lower = providerModel.toLowerCase();
+    const runtimeFamily = classifyNvidiaModelRuntimeFamily(providerModel);
     /** @type {Record<string, boolean>} */
-    const capabilities = { chat: true, streaming: true };
-    if (lower.includes('embed')) capabilities['embeddings'] = true;
-    if (lower.includes('rerank')) capabilities['rerank'] = true;
+    const capabilities =
+        runtimeFamily === 'chat'
+            ? { chat: true, streaming: true }
+            : {
+                  chat: false,
+                  streaming: false,
+                  [runtimeFamily === 'embedding' ? 'embeddings' : runtimeFamily === 'image-generation' ? 'imageGeneration' : runtimeFamily]:
+                      true,
+              };
     if (lower.includes('vl') || lower.includes('vision') || lower.includes('llava')) capabilities['vision'] = true;
-    if (lower.includes('gpt-oss') || lower.includes('nemotron') || lower.includes('deepseek') || lower.includes('qwen')) {
+    if (
+        runtimeFamily === 'chat' &&
+        (lower.includes('gpt-oss') || lower.includes('nemotron') || lower.includes('deepseek') || lower.includes('qwen'))
+    ) {
         capabilities['reasoning'] = true;
     }
     return capabilities;
+}
+
+/**
+ * @param {string} providerModel
+ * @returns {{ input: string[]; output: string[] }}
+ */
+function modalitiesFromModelId(providerModel) {
+    const runtimeFamily = classifyNvidiaModelRuntimeFamily(providerModel);
+    if (runtimeFamily === 'embedding') return normalizeModelModalities({ input: ['text'], output: ['embedding'] });
+    if (runtimeFamily === 'rerank') return normalizeModelModalities({ input: ['text'], output: ['rerank'] });
+    if (runtimeFamily === 'audio') return normalizeModelModalities({ input: ['audio'], output: ['text'] });
+    if (runtimeFamily === 'image-generation') return normalizeModelModalities({ input: ['text'], output: ['image'] });
+    return normalizeModelModalities({ input: ['text'], output: ['text'] });
+}
+
+/**
+ * @param {string} providerModel
+ * @returns {string | null}
+ */
+function wireApiFromModelId(providerModel) {
+    const runtimeFamily = classifyNvidiaModelRuntimeFamily(providerModel);
+    if (runtimeFamily === 'embedding') return 'openai_embeddings';
+    if (runtimeFamily === 'rerank') return 'rerank';
+    if (runtimeFamily === 'audio') return 'audio';
+    if (runtimeFamily === 'image-generation') return 'image_generation';
+    return null;
 }
 
 /**
@@ -92,11 +149,14 @@ function modelEvidenceValues(row) {
     const aliases = normalizeModelAliases({ providerModel });
     const lifecycle = normalizeModelLifecycle({ created: finiteNumber(row['created']), providerModel });
     const capabilities = providerModel ? capabilitiesFromModelId(providerModel) : {};
+    const modalities = providerModel ? modalitiesFromModelId(providerModel) : normalizeModelModalities();
     const identityTraits = normalizeModelIdentityTraits({ providerModel });
     const values = [
         { fieldPath: 'displayName', value: providerModel },
         ...Object.entries(aliases).map(([key, value]) => ({ fieldPath: `aliases.${key}`, value })),
         ...Object.entries(lifecycle).map(([key, value]) => ({ fieldPath: `lifecycle.${key}`, value })),
+        { fieldPath: 'modalities.input', value: modalities.input },
+        { fieldPath: 'modalities.output', value: modalities.output },
         ...Object.entries(capabilities).map(([key, value]) => ({ fieldPath: `capabilities.${key}`, value })),
         { fieldPath: 'providerMetadata.ownedBy', value: stringValue(row['owned_by']) ?? 'nvidia' },
         { fieldPath: 'providerMetadata.nvidia.object', value: stringValue(row['object']) },
@@ -168,6 +228,7 @@ export function createNvidiaNimModelsImporter(options = {}) {
             return rows.flatMap((row) => {
                 const providerModel = stringValue(isRecord(row) ? row['id'] : null);
                 if (!providerModel) return [];
+                const wireApi = wireApiFromModelId(providerModel);
                 return [
                     createModelRouteOption({
                         providerId: 'nvidia-nim',
@@ -179,6 +240,7 @@ export function createNvidiaNimModelsImporter(options = {}) {
                         confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG,
                         normalizedPolicy: {
                             routeLayer: 'openai_compatible',
+                            ...(wireApi ? { wireApi } : {}),
                             openAICompatibleBaseUrl: baseUrl,
                             managementEndpoints: [...NVIDIA_NIM_MANAGEMENT_ENDPOINTS],
                             hostedOrSelfHosted: baseUrl === NVIDIA_NIM_BASE_URL ? 'hosted' : 'self_hosted',

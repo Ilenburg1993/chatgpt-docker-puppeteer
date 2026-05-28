@@ -227,6 +227,14 @@ function orderRuntimeSelectorAttemptProfileIds(profileIds, routeByProfileId, pre
 }
 
 /**
+ * @param {string} profileId
+ * @returns {boolean}
+ */
+function runtimeSelectorProfileRequiresAgentProbe(profileId) {
+    return profileId === 'repo_agent' || profileId === 'tool_agent';
+}
+
+/**
  * Build an isolated BYOK env for the selected runtime route.
  *
  * The configured terminal BYOK provider is often just the operator's current default. Runtime selection needs to test
@@ -563,6 +571,31 @@ function sumRouteDecisionRecordedCount(attempts) {
 }
 
 /**
+ * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]} route
+ * @returns {Array<ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]>}
+ */
+function runtimeSelectorRouteAttempts(route) {
+    const alternatives = Array.isArray(route['candidateAlternatives'])
+        ? route['candidateAlternatives'].map((candidate) => optionalRecord(candidate)).filter((candidate) => candidate !== null)
+        : [];
+    return [route, .../** @type {Array<ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]>} */ (alternatives)];
+}
+
+/**
+ * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>} plan
+ * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]} route
+ * @returns {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>}
+ */
+function runtimeSelectorPlanForRouteAttempt(plan, route) {
+    const profileId = optionalString(route['profileId']);
+    const routes = plan.routes.map((candidateRoute) => (candidateRoute.profileId === profileId ? route : candidateRoute));
+    return {
+        ...plan,
+        routes,
+    };
+}
+
+/**
  * @param {Record<string, unknown>} selectionPolicyOrTrace
  * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; blockFailedProbeKinds?: string[]; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
  * @returns {{
@@ -597,6 +630,7 @@ function sumRouteDecisionRecordedCount(attempts) {
  *     runtimeHealth: ReturnType<typeof evaluateGatewayModelHealthRoute> | null;
  *     providerCooldown: ReturnType<typeof evaluateGatewayProviderHealthCooldown> | null;
  *     alternativeSummary: ReturnType<typeof summarizeRuntimeSelectorAlternatives>;
+ *     candidateAlternatives: Array<Record<string, unknown>>;
  *     reasons: string[];
  *     nextActions: string[];
  *     decisionEvent: ReturnType<typeof buildRouteDecisionEvent>;
@@ -621,7 +655,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                     ? evaluateGatewayModelHealthRoute(selected, {
                           routeProfile: profileId,
                           runtimeHealthRecords: options.runtimeHealthRecords,
-                          requireAgentProbeOk: false,
+                          requireAgentProbeOk: runtimeSelectorProfileRequiresAgentProbe(profileId),
                       })
                     : null;
             const providerCooldown =
@@ -726,6 +760,34 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             source: optionalString(row['source']) ?? 'unknown',
             hasRuntimeProof,
         };
+        const candidateAlternatives = candidateEvaluations
+            .filter((candidate) => candidate !== chosen && candidate['blocked'] !== true && optionalRecord(candidate['selected']))
+            .map((candidate) => {
+                const candidateSelected = optionalRecord(candidate['selected']);
+                const label = optionalString(candidate['label']);
+                const candidateReasons = selectionReasons(candidateSelected, row);
+                if (label && label !== 'selected') candidateReasons.push(`runtime_selector_fallback:${label}`);
+                return {
+                    profileId,
+                    status: 'selected',
+                    source: String(normalizedRow['source']),
+                    selected: candidateSelected,
+                    selectedRouteKey: routeKey(candidateSelected),
+                    hasRuntimeProof: candidate['hasRuntimeProof'] === true,
+                    runtimeEnv: optionalRecord(candidate['runtimeEnv']),
+                    runtimeHealth: optionalRecord(candidate['runtimeHealth']),
+                    providerCooldown: optionalRecord(candidate['providerCooldown']),
+                    alternativeSummary,
+                    candidateAlternatives: [],
+                    reasons: candidateReasons,
+                    nextActions: ['attempt_selected_route', 'record_runtime_result'],
+                    decisionEvent: buildSelectorDecisionEvent(candidateSelected, normalizedRow, {
+                        mode,
+                        ...(options.source ? { source: options.source } : {}),
+                        ...(options.sessionId !== undefined ? { sessionId: options.sessionId } : {}),
+                    }),
+                };
+            });
         return {
             profileId,
             status,
@@ -737,6 +799,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             runtimeHealth,
             providerCooldown,
             alternativeSummary,
+            candidateAlternatives,
             reasons,
             nextActions: blocked
                 ? [
@@ -1102,10 +1165,6 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
     const uniqueProfileIds = [...new Set(orderedProfileIds)].filter((profileId) =>
         selectedRoutes.some((route) => route.profileId === profileId),
     );
-    const maxAttempts =
-        typeof options.maxAttempts === 'number' && Number.isFinite(options.maxAttempts) && options.maxAttempts > 0
-            ? Math.floor(options.maxAttempts)
-            : uniqueProfileIds.length;
     const attemptsPerRoute =
         typeof options.attemptsPerRoute === 'number' && Number.isFinite(options.attemptsPerRoute) && options.attemptsPerRoute > 0
             ? Math.floor(options.attemptsPerRoute)
@@ -1122,21 +1181,28 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
         plan.mode === 'prefer_runtime_proved',
     );
     const attemptedRouteKeys = new Set();
-    const attemptProfileIds = [];
+    const routeAttempts = [];
     for (const profileId of orderedRuntimeProfileIds) {
-        const key = runtimeSelectorAttemptKey(routeByProfileId.get(profileId));
-        if (key && attemptedRouteKeys.has(key)) continue;
-        if (key) attemptedRouteKeys.add(key);
-        attemptProfileIds.push(profileId);
-        if (attemptProfileIds.length >= maxAttempts) break;
+        const route = routeByProfileId.get(profileId);
+        if (!route) continue;
+        for (const candidateRoute of runtimeSelectorRouteAttempts(route)) {
+            const key = runtimeSelectorAttemptKey(candidateRoute);
+            if (key && attemptedRouteKeys.has(key)) continue;
+            if (key) attemptedRouteKeys.add(key);
+            routeAttempts.push({ profileId, route: candidateRoute });
+        }
     }
+    const maxAttempts =
+        typeof options.maxAttempts === 'number' && Number.isFinite(options.maxAttempts) && options.maxAttempts > 0
+            ? Math.floor(options.maxAttempts)
+            : routeAttempts.length;
     /** @type {Array<Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>>} */
     const attempts = [];
     /** @type {Array<ReturnType<typeof resolveModelGatewayRuntimeRetryDecision>>} */
     const retryDecisions = [];
-    for (const profileId of attemptProfileIds) {
+    for (const { profileId, route } of routeAttempts.slice(0, maxAttempts)) {
         for (let routeAttempt = 0; routeAttempt < attemptsPerRoute; routeAttempt += 1) {
-            const attempt = await executeModelGatewayRuntimeSelectorPlan(plan, {
+            const attempt = await executeModelGatewayRuntimeSelectorPlan(runtimeSelectorPlanForRouteAttempt(plan, route), {
                 profileId,
                 ...(typeof options.timeoutMs === 'number' ? { timeoutMs: options.timeoutMs } : {}),
                 ...(options.prompt ? { prompt: options.prompt } : {}),

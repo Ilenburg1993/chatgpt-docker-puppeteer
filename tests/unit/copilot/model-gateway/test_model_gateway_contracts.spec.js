@@ -526,6 +526,48 @@ describe('model-gateway foundation', () => {
         assert.equal(listByokProviderModelHealth().length, 0);
     });
 
+    it('scopes agent probe failures to agentic profiles instead of blocking plain chat/code', () => {
+        const model = createModelRecord({
+            providerId: 'mistral',
+            providerModel: 'devstral-small-2507',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        const runtimeHealthRecords = [
+            {
+                routeProfile: null,
+                providerId: 'mistral',
+                providerModel: 'devstral-small-2507',
+                lastStatus: 'ok',
+                lastSuccessAt: 100,
+                lastFailureAt: null,
+                agentProbeStatus: 'failed',
+                lastAgentProbeFailureAt: 120,
+                lastAgentProbeSuccessAt: null,
+                probes: {
+                    chat: { status: 'ok', ok: true, providerAttempted: true, lastAt: 100 },
+                    streaming: { status: 'ok', ok: true, providerAttempted: true, lastAt: 105 },
+                    agent: { status: 'failed', ok: false, providerAttempted: true, lastAt: 120 },
+                },
+            },
+        ];
+
+        const codeRoute = routeGatewayModels([model], 'code', {
+            routeProfile: 'code',
+            runtimeHealthRecords,
+        });
+        const agentRoute = routeGatewayModels([model], 'repo_agent', {
+            routeProfile: 'repo_agent',
+            runtimeHealthRecords,
+        });
+
+        assert.equal(codeRoute.selected?.model['id'], 'mistral:devstral-small-2507');
+        assert.ok(codeRoute.selected?.reasons.includes('runtime_probe_verified:chat'));
+        assert.equal(agentRoute.selected, null);
+        assert.ok(agentRoute.rejected.some((candidate) => candidate.rejectedReasons.includes('agent_probe_failed')));
+    });
+
     it('uses profileless runtime health as fallback evidence for route-scoped selection', () => {
         const model = createModelRecord({
             providerId: 'nvidia-nim',
@@ -1158,6 +1200,79 @@ describe('model-gateway foundation', () => {
         assert.equal(duplicateFallbackExecution.ok, false);
         assert.equal(duplicateFallbackExecution.attemptedCount, 1);
         assert.equal(duplicateFallbackExecution.attempts[0].profileId, 'repo_agent');
+
+        const sameProfileAlternativePlan = {
+            ...runtimeSelectorPlan,
+            routes: runtimeSelectorPlan.routes.map((route) =>
+                route.profileId === 'repo_agent'
+                    ? {
+                          ...route,
+                          candidateAlternatives: [
+                              {
+                                  ...route,
+                                  selectedRouteKey: 'openrouter:openai/gpt-oss-20b-alt',
+                                  selected: {
+                                      ...route.selected,
+                                      id: 'openrouter:openai/gpt-oss-20b-alt',
+                                      providerModel: 'openai/gpt-oss-20b-alt',
+                                  },
+                                  candidateAlternatives: [],
+                              },
+                          ],
+                      }
+                    : route,
+            ),
+        };
+        const sameProfileModels = [];
+        const sameProfileAlternativeExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(sameProfileAlternativePlan, {
+            profileId: 'repo_agent',
+            attemptsPerRoute: 2,
+            deps: {
+                runChatProbe: async (options = {}) => {
+                    sameProfileModels.push(String(options.model ?? ''));
+                    const ok = options.model === 'openai/gpt-oss-20b-alt';
+                    return {
+                        ok,
+                        status: ok ? 'ok' : 'failed',
+                        elapsedMs: 10,
+                        model: String(options.model ?? ''),
+                        profile: 'repo_agent',
+                        preset: 'openrouter',
+                        providerType: 'openai-compatible',
+                        deltaCount: ok ? 1 : 0,
+                        deltaChars: ok ? 13 : 0,
+                        finalChars: ok ? 13 : 0,
+                        finalContent: ok ? 'BYOK_PROBE_OK' : '',
+                        observedFinalEvent: ok,
+                        sessionId: `unit-runtime-same-profile-${sameProfileModels.length}`,
+                        errors: ok ? [] : ['first route 404'],
+                        warnings: [],
+                        providerFailure: ok
+                            ? null
+                            : {
+                                  kind: 'model-or-route',
+                                  statusCode: 404,
+                                  message: 'first route 404',
+                                  errorContext: 'provider.model_or_route',
+                                  operatorLabel: 'route',
+                                  operatorAction: 'try alternative',
+                                  external: true,
+                                  retryAfterSeconds: null,
+                                  resetAt: null,
+                                  limitHeaders: {},
+                              },
+                    };
+                },
+                recordSuccess: () => {},
+                recordFailure: () => {},
+                flushHealth: async () => {},
+            },
+        });
+        assert.equal(sameProfileAlternativeExecution.ok, true);
+        assert.equal(sameProfileAlternativeExecution.attemptedCount, 2);
+        assert.equal(sameProfileAlternativeExecution.selectedProfileId, 'repo_agent');
+        assert.deepEqual(sameProfileModels, ['openai/gpt-oss-120b', 'openai/gpt-oss-20b-alt']);
+        assert.equal(sameProfileAlternativeExecution.retryDecisions[0].retryRoute, false);
 
         const distinctFallbackPlan = {
             ...runtimeSelectorPlan,
@@ -2064,6 +2179,51 @@ describe('model-gateway foundation', () => {
         assert.equal(decision.rejected.length, 0);
         const failed = decision.candidates.find((candidate) => candidate.model['id'] === 'kilo:kilo-auto/free');
         assert.ok(failed?.reasons.includes('preferred_probe_failed:vision'));
+    });
+
+    it('rejects non-conversational model families before chat runtime selection', () => {
+        const embedding = createModelRecord({
+            providerId: 'nvidia-nim',
+            providerModel: 'baai/bge-m3',
+            capabilities: { chat: true, streaming: true },
+            modalities: { input: ['text'], output: ['text'] },
+            limits: { contextWindowTokens: 128_000 },
+            verification: { confidence: 'catalog', sources: ['authenticated_catalog'] },
+        });
+        const rerank = createModelRecord({
+            providerId: 'cloudflare-workers-ai',
+            providerModel: '@cf/baai/bge-reranker-base',
+            capabilities: { rerank: true, streaming: true },
+            modalities: { input: ['text'], output: ['rerank'] },
+            limits: { contextWindowTokens: 128_000 },
+            verification: { confidence: 'catalog', sources: ['authenticated_catalog'] },
+        });
+        const chat = createModelRecord({
+            providerId: 'nvidia-nim',
+            providerModel: 'openai/gpt-oss-120b',
+            capabilities: { chat: true, streaming: true, tools: true },
+            modalities: { input: ['text'], output: ['text'] },
+            limits: { contextWindowTokens: 128_000 },
+            verification: { confidence: 'catalog', sources: ['authenticated_catalog'] },
+        });
+
+        const decision = routeGatewayModels([embedding, rerank, chat], 'code', { requireAgentProbeOk: false });
+
+        assert.equal(decision.selected?.model['providerModel'], 'openai/gpt-oss-120b');
+        assert.ok(
+            decision.rejected.some(
+                (candidate) =>
+                    candidate.model['providerModel'] === 'baai/bge-m3' &&
+                    candidate.rejectedReasons.includes('non_chat_model_family:embedding'),
+            ),
+        );
+        assert.ok(
+            decision.rejected.some(
+                (candidate) =>
+                    candidate.model['providerModel'] === '@cf/baai/bge-reranker-base' &&
+                    candidate.rejectedReasons.includes('non_chat_model_family:rerank'),
+            ),
+        );
     });
 
     it('scores and explains gateway route decisions before runtime probes', () => {
@@ -7843,6 +8003,12 @@ describe('model-gateway foundation', () => {
                                 created: 1770000000,
                                 owned_by: 'nvidia',
                             },
+                            {
+                                id: 'baai/bge-m3',
+                                object: 'model',
+                                created: 735790403,
+                                owned_by: 'baai',
+                            },
                         ],
                     }),
                 });
@@ -7871,6 +8037,10 @@ describe('model-gateway foundation', () => {
         assert.equal(byModel.get('nvidia-nim:nvidia/nemotron-nano-12b-v2-vl:capabilities.vision'), true);
         assert.equal(byModel.get('nvidia-nim:nvidia/nemotron-nano-12b-v2-vl:providerMetadata.modelTraits.family'), 'nemotron');
         assert.equal(byModel.get('nvidia-nim:nvidia/nemotron-nano-12b-v2-vl:providerMetadata.modelTraits.tier'), 'nano');
+        assert.deepEqual(byModel.get('nvidia-nim:baai/bge-m3:modalities.output'), ['embedding']);
+        assert.equal(byModel.get('nvidia-nim:baai/bge-m3:capabilities.chat'), false);
+        assert.equal(byModel.get('nvidia-nim:baai/bge-m3:capabilities.streaming'), false);
+        assert.equal(byModel.get('nvidia-nim:baai/bge-m3:capabilities.embeddings'), true);
         assert.deepEqual(
             byModel.get('nvidia-nim:nvidia/nemotron-nano-12b-v2-vl:providerMetadata.modelTraits.modalityHints'),
             ['vision'],
@@ -7888,7 +8058,9 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(snapshot.accountOverlays[0].enabledModels, [
             'openai/gpt-oss-120b',
             'nvidia/nemotron-nano-12b-v2-vl',
+            'baai/bge-m3',
         ]);
+        assert.equal(snapshot.routeOptions.find((route) => route.providerModel === 'baai/bge-m3')?.normalizedPolicy.wireApi, 'openai_embeddings');
         assert.equal(snapshot.accountOverlays[0].secretRef, 'NVIDIA_KEY');
     });
 

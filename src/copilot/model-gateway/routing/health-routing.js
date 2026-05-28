@@ -416,7 +416,7 @@ export function evaluateGatewayModelHealthRoute(model, options = {}) {
     if (options.excludeFailed !== false && isGatewayModelChatHealthFailed(health)) {
         return { include: false, reason: 'chat_health_failed', health };
     }
-    if (options.excludeFailed !== false && isGatewayModelAgentProbeHealthFailed(health)) {
+    if (options.excludeFailed !== false && options.requireAgentProbeOk === true && isGatewayModelAgentProbeHealthFailed(health)) {
         return { include: false, reason: 'agent_probe_failed', health };
     }
     if (options.requireAgentProbeOk === true && !isGatewayModelAgentProbeVerified(health)) {

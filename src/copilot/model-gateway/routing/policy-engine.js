@@ -41,6 +41,29 @@ const CONFIDENCE_RANK = Object.freeze({
     probe_failed: -1,
 });
 
+const NON_CONVERSATIONAL_CAPABILITY_KINDS = Object.freeze({
+    embedding: 'embedding',
+    embeddings: 'embedding',
+    rerank: 'rerank',
+    reranker: 'rerank',
+    asr: 'asr',
+    stt: 'asr',
+    transcription: 'asr',
+    tts: 'tts',
+    imageGeneration: 'image-generation',
+    image_generation: 'image-generation',
+});
+
+const NON_CONVERSATIONAL_MODALITIES = Object.freeze(['embedding', 'rerank', 'asr', 'tts', 'image-generation']);
+
+const NON_CONVERSATIONAL_WIRE_APIS = Object.freeze({
+    openai_embeddings: 'embedding',
+    embeddings: 'embedding',
+    rerank: 'rerank',
+    audio: 'audio',
+    image_generation: 'image-generation',
+});
+
 /**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
@@ -110,6 +133,90 @@ function routeMetadataText(model, field) {
     const routeProviderSpecific = isRecord(model['routeProviderSpecific']) ? model['routeProviderSpecific'] : {};
     const providerSpecific = isRecord(model['providerSpecific']) ? model['providerSpecific'] : {};
     return String(routing[field] ?? policy[field] ?? routeProviderSpecific[field] ?? providerSpecific[field] ?? '').trim();
+}
+
+/**
+ * @param {Record<string, any>} profile
+ * @returns {boolean}
+ */
+function profileRequiresConversationalRoute(profile) {
+    const requires = stringArray(profile['requires']);
+    const prefers = stringArray(profile['prefers']);
+    const explicitNonConversational = new Set(['embedding', 'embeddings', 'rerank', 'asr', 'tts', 'image-generation']);
+    return (
+        (requires.includes('text') ||
+            requires.includes('streaming') ||
+            requires.includes('tools') ||
+            prefers.includes('forcedToolChoice') ||
+            prefers.includes('parallelToolCalls') ||
+            prefers.includes('structuredOutputs') ||
+            prefers.includes('jsonMode') ||
+            prefers.includes('jsonSchema')) &&
+        !requires.some((capability) => explicitNonConversational.has(capability))
+    );
+}
+
+/**
+ * @param {Record<string, any>} model
+ * @returns {string[]}
+ */
+function collectModelGatewayFamilyHints(model) {
+    const capabilities = isRecord(model['capabilities']) ? model['capabilities'] : {};
+    const modalities = isRecord(model['modalities']) ? model['modalities'] : {};
+    const providerMetadata = isRecord(model['providerMetadata']) ? model['providerMetadata'] : {};
+    const modelTraits = isRecord(providerMetadata['modelTraits']) ? providerMetadata['modelTraits'] : {};
+    const routeTraits = isRecord(model['routeTraits']) ? model['routeTraits'] : {};
+    const routing = isRecord(model['routing']) ? model['routing'] : {};
+    const policy = isRecord(model['normalizedPolicy']) ? model['normalizedPolicy'] : {};
+    const hints = [
+        ...stringArray(modalities['input']),
+        ...stringArray(modalities['output']),
+        ...stringArray(modelTraits['modalityHints']),
+        ...stringArray(routeTraits['modalityHints']),
+        ...stringArray(routing['modalityHints']),
+        ...stringArray(policy['modalityHints']),
+        ...stringArray(modelTraits['capabilityFamilies']),
+        ...stringArray(routeTraits['capabilityFamilies']),
+    ];
+    for (const [capability, kind] of Object.entries(NON_CONVERSATIONAL_CAPABILITY_KINDS)) {
+        if (capabilities[capability] === true || routeTraits[capability] === true) hints.push(kind);
+    }
+    const wireApi = routeMetadataText(model, 'wireApi').toLowerCase().replace(/[-\s]+/gu, '_');
+    if (wireApi && NON_CONVERSATIONAL_WIRE_APIS[/** @type {keyof typeof NON_CONVERSATIONAL_WIRE_APIS} */ (wireApi)]) {
+        hints.push(NON_CONVERSATIONAL_WIRE_APIS[/** @type {keyof typeof NON_CONVERSATIONAL_WIRE_APIS} */ (wireApi)]);
+    }
+    return [...new Set(hints.map((hint) => String(hint).toLowerCase().replace(/[_\s]+/gu, '-')))];
+}
+
+/**
+ * @param {Record<string, any>} model
+ * @returns {string | null}
+ */
+function inferNonConversationalModelFamily(model) {
+    const capabilities = isRecord(model['capabilities']) ? model['capabilities'] : {};
+    const hints = collectModelGatewayFamilyHints(model);
+    const explicitHint = NON_CONVERSATIONAL_MODALITIES.find((kind) => hints.includes(kind));
+    if (explicitHint) return explicitHint;
+    const outputModalities = isRecord(model['modalities']) ? stringArray(model['modalities']['output']) : [];
+    if (outputModalities.length > 0 && !outputModalities.includes('text')) return outputModalities[0] ?? 'non-text-output';
+    const text = [
+        model['providerModel'],
+        model['id'],
+        model['displayName'],
+        model['canonicalSlug'],
+        isRecord(model['aliases']) ? model['aliases']['providerModel'] : null,
+    ]
+        .map((value) => String(value ?? '').toLowerCase())
+        .join(' ')
+        .replace(/[^a-z0-9]+/gu, '-');
+    if (/(?:^|-)(?:embed|embedding|embeddings|bge|e5|gte|nv-embedqa|nvolveqa|snowflake-arctic-embed|jina-embeddings?)(?:-|$)/u.test(text)) {
+        return 'embedding';
+    }
+    if (/(?:^|-)(?:rerank|reranker)(?:-|$)/u.test(text)) return 'rerank';
+    if (/(?:^|-)(?:whisper|parakeet|asr|stt|transcription|tts|speech)(?:-|$)/u.test(text)) return 'audio';
+    if (/(?:^|-)(?:text-to-image|image-generation|sdxl|flux)(?:-|$)/u.test(text)) return 'image-generation';
+    if (capabilities['chat'] === false) return 'chat-disabled';
+    return null;
 }
 
 /**
@@ -474,6 +581,9 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
             rejectedReasons.push('privacy_strict_not_satisfied');
         }
     }
+
+    const nonConversationalFamily = profileRequiresConversationalRoute(profile) ? inferNonConversationalModelFamily(model) : null;
+    if (nonConversationalFamily) rejectedReasons.push(`non_chat_model_family:${nonConversationalFamily}`);
 
     for (const capability of profile['requires'] ?? []) {
         if (!hasCapability(model, capability)) rejectedReasons.push(`missing_capability:${capability}`);
