@@ -10432,6 +10432,39 @@ Validacao:
 - persistiu 2 route decision events;
 - espelhou 72 health records e 52 probe results para SQLite sem erro.
 
+## Mudanca 113 - Comandos canonicos de live BYOK real alinhados ao caminho validado
+
+Status: concluido.
+
+Contexto:
+
+- o inventario canonico ainda apontava para lives BYOK reais com timeout de rota de 15000ms;
+- os comandos nao incluiam:
+  - `--byok-real-route-allow-probe`;
+  - `--byok-real-route-temporary-failure-cooldown-ms=1`;
+  - `--byok-real-route-max-attempts=8`;
+  - `--byok-real-route-max-attempts-per-provider=4`;
+- o live no-pr validado usou timeout de rota de 20000ms e timeout total de 240000ms.
+
+Regra aplicada:
+
+- `src/copilot/model-gateway/commands/canonical-commands.js` foi atualizado;
+- `scripts/model-gateway-live-readiness.mjs` foi atualizado;
+- `scripts/model-gateway-live-plan.mjs` foi atualizado;
+- o teste de inventario canonico agora exige o comando no-pr robusto.
+
+Motivo arquitetural:
+
+- humanos e LLMs devem usar o mesmo comando que passou em live real;
+- comando canonico antigo podia induzir falsos negativos por cooldown/profile/probe incompletos;
+- o caminho full preserva timeout total maior, mas usa o mesmo handoff robusto.
+
+Validacao esperada:
+
+- `npm run model-gateway:commands` deve listar a forma robusta;
+- `npm run model-gateway:live:readiness` deve sugerir os mesmos comandos;
+- `npm run model-gateway:live:plan` deve materializar as mesmas fases.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
