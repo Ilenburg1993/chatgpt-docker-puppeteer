@@ -75,6 +75,7 @@ import {
     listModelGatewayProviderQuotaCapabilities,
     executeModelGatewayRuntimeSelectorPlan,
     executeModelGatewayRuntimeSelectorPlanWithFallbacks,
+    readGatewayModelHealthFromIndex,
     readGatewayModelHealthFromRecords,
     resolveModelGatewayRuntimeRetryDecision,
     evaluateModelGatewayProviderEnvRequirements,
@@ -671,6 +672,47 @@ describe('model-gateway foundation', () => {
 
         assert.equal(route.selected, null);
         assert.ok(route.rejected.some((candidate) => candidate.rejectedReasons.includes('chat_health_failed')));
+    });
+
+    it('prefers profileless runtime health for unscoped health reads even when route-specific records are newer', () => {
+        const model = createModelRecord({
+            providerId: 'zai',
+            providerModel: 'glm-4.5-flash',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+        });
+        const runtimeHealthRecords = [
+            {
+                routeProfile: null,
+                providerId: 'zai',
+                providerModel: 'glm-4.5-flash',
+                lastStatus: 'ok',
+                lastSuccessAt: 100,
+                agentProbeStatus: 'ok',
+                lastAgentProbeSuccessAt: 110,
+                probes: { agent: { status: 'ok', ok: true, providerAttempted: true, lastAt: 110 } },
+            },
+            {
+                routeProfile: 'code',
+                providerId: 'zai',
+                providerModel: 'glm-4.5-flash',
+                lastStatus: 'ok',
+                lastSuccessAt: 200,
+                agentProbeStatus: null,
+                probes: {
+                    live_tool_protocol: { status: 'ok', ok: true, providerAttempted: true, lastAt: 200 },
+                    live_ask_user: { status: 'ok', ok: true, providerAttempted: true, lastAt: 201 },
+                },
+            },
+        ];
+        const runtimeHealthIndex = createGatewayRuntimeHealthIndex(runtimeHealthRecords);
+
+        assert.equal(readGatewayModelHealthFromIndex(model, runtimeHealthIndex)?.routeProfile, null);
+        assert.equal(
+            evaluateGatewayModelHealthRoute(model, { runtimeHealthIndex, requireAgentProbeOk: true }).reason,
+            'health_allowed',
+        );
+        assert.equal(readGatewayModelHealthFromIndex(model, runtimeHealthIndex, { routeProfile: 'code' })?.routeProfile, 'code');
     });
 
     it('expires temporary chat health failures without forgetting durable model-route blockers', () => {

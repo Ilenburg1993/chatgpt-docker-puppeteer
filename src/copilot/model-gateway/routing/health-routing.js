@@ -436,7 +436,7 @@ export function readGatewayModelHealthFromIndex(model, index, options = {}) {
     const modelKey = healthIndexProviderModelKey(providerId, providerModel);
     const exact = routeProfile ? index.exact.get(healthIndexExactKey(providerId, providerModel, routeProfile)) : null;
     if (exact) return /** @type {ReturnType<typeof readGatewayModelHealth>} */ (exact);
-    const global = routeProfile ? index.global.get(modelKey) : null;
+    const global = index.global.get(modelKey);
     if (global) return /** @type {ReturnType<typeof readGatewayModelHealth>} */ (global);
     const identity = { routeProfile, providerId, providerModel };
     const match = index.records.find((record) => healthRecordMatches(record, identity));

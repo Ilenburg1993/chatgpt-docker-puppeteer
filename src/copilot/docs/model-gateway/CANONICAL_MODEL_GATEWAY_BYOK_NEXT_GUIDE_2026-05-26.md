@@ -10032,6 +10032,42 @@ Consequencia:
 - a verificacao de vazamento de segredo passa a cobrir a chave OpenCode;
 - a arquitetura fica alinhada da importacao ao terminal.
 
+## Mudanca 102 - Precedencia correta para health global sem routeProfile
+
+Status: concluido.
+
+Contexto:
+
+- apos a live, o provider/model `zai/glm-4.5-flash` tinha:
+  - health global/profileless com `agent=ok`;
+  - health `code` com protocolo live ok;
+  - health `repo_agent` antigo com timeout ja expirado.
+- uma consulta sem `routeProfile` podia escolher o registro route-scoped mais recente em vez do global;
+- isso era heranca do caminho antigo e ficou mais visivel depois da indexacao.
+
+Regra corrigida:
+
+- quando o caller nao pede `routeProfile`, o health profileless/global deve ser preferido;
+- quando o caller pede `routeProfile`, a ordem continua:
+  - exact route profile;
+  - profileless/global;
+  - fallback provider/model.
+
+Motivo:
+
+- health global representa prova geral do provider/model;
+- health route-scoped representa prova ou falha daquela rota;
+- uma consulta global nao deve ser contaminada por uma rota especifica so porque ela e mais recente;
+- isso evita falsos bloqueios quando a pergunta e "este provider/model funciona genericamente?".
+
+Teste adicionado:
+
+- registro global com `agent=ok`;
+- registro `code` mais recente com protocolo live, mas sem agent probe;
+- leitura sem profile retorna o global;
+- leitura com `routeProfile=code` continua retornando o registro de `code`;
+- `evaluateGatewayModelHealthRoute(... requireAgentProbeOk=true)` permite a rota global.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
