@@ -469,6 +469,7 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
  *     providerCooldownFailureKinds?: string[];
  *     latencyMsByModelId?: Record<string, number>;
  *     eligibilityDecisions?: Record<string, any>[];
+ *     eligibilityDecisionIndex?: ReturnType<typeof createEligibilityDecisionIndex>;
  *     evaluateEligibility?: boolean;
  *     routeOptions?: Record<string, any>[];
  *     accountOverlays?: Record<string, any>[];
@@ -827,6 +828,16 @@ function routeEligibilityKey(route) {
 
 /**
  * @param {Record<string, any>} record
+ * @returns {string | null}
+ */
+function providerModelEligibilityKey(record) {
+    const providerId = String(record['providerId'] ?? '').trim();
+    const providerModel = String(record['providerModel'] ?? record['id'] ?? '').trim();
+    return providerId && providerModel ? `${providerId}:${providerModel}` : null;
+}
+
+/**
+ * @param {Record<string, any>} record
  * @returns {string}
  */
 function modelRouteBaseKey(record) {
@@ -898,11 +909,7 @@ function eligibilityDecisionMatchesRoute(decision, key) {
  * @returns {boolean}
  */
 function eligibilityDecisionMatchesProviderModel(model, decision) {
-    const modelProviderId = String(model['providerId'] ?? '').trim();
-    const decisionProviderId = String(decision['providerId'] ?? '').trim();
-    const modelProviderModel = String(model['providerModel'] ?? model['id'] ?? '').trim();
-    const decisionProviderModel = String(decision['providerModel'] ?? '').trim();
-    return Boolean(modelProviderId && modelProviderModel && modelProviderId === decisionProviderId && modelProviderModel === decisionProviderModel);
+    return providerModelEligibilityKey(model) !== null && providerModelEligibilityKey(model) === providerModelEligibilityKey(decision);
 }
 
 /**
@@ -937,12 +944,83 @@ function eligibilityDecisionMatchesSelectionScope(decision, profile, options = {
 }
 
 /**
+ * @param {Record<string, any>[]} decisions
+ * @param {Record<string, any>} profile
+ * @param {Parameters<typeof scoreGatewayModelCandidate>[2]} options
+ * @returns {{
+ *   schema: 'model-gateway-eligibility-decision-index';
+ *   byRouteRuntimeOverlay: Map<string, Record<string, any>>;
+ *   byProviderModelRuntimeOverlay: Map<string, Record<string, any>>;
+ *   byRoute: Map<string, Record<string, any>>;
+ * }}
+ */
+function createEligibilityDecisionIndex(decisions, profile, options = {}) {
+    const byRouteRuntimeOverlay = new Map();
+    const byProviderModelRuntimeOverlay = new Map();
+    const byRoute = new Map();
+
+    for (const decision of decisions) {
+        if (!isRecord(decision) || !eligibilityDecisionMatchesSelectionScope(decision, profile, options)) continue;
+        const routeKey = routeEligibilityKey(decision);
+        const providerModelKey = providerModelEligibilityKey(decision);
+        const runtimeOverlay = isModelGatewayRuntimeEligibilityOverlayDecision(decision);
+        if (runtimeOverlay && !byRouteRuntimeOverlay.has(routeKey)) byRouteRuntimeOverlay.set(routeKey, decision);
+        if (runtimeOverlay && providerModelKey && !byProviderModelRuntimeOverlay.has(providerModelKey)) {
+            byProviderModelRuntimeOverlay.set(providerModelKey, decision);
+        }
+        if (!byRoute.has(routeKey)) byRoute.set(routeKey, decision);
+    }
+
+    return {
+        schema: 'model-gateway-eligibility-decision-index',
+        byRouteRuntimeOverlay,
+        byProviderModelRuntimeOverlay,
+        byRoute,
+    };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is ReturnType<typeof createEligibilityDecisionIndex>}
+ */
+function isEligibilityDecisionIndex(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const candidate = /** @type {Record<string, unknown>} */ (value);
+    return (
+        candidate['schema'] === 'model-gateway-eligibility-decision-index' &&
+        candidate['byRouteRuntimeOverlay'] instanceof Map &&
+        candidate['byProviderModelRuntimeOverlay'] instanceof Map &&
+        candidate['byRoute'] instanceof Map
+    );
+}
+
+/**
+ * @param {Record<string, any>} model
+ * @param {ReturnType<typeof createEligibilityDecisionIndex>} index
+ * @returns {Record<string, any> | null}
+ */
+function findEligibilityDecisionForModelInIndex(model, index) {
+    const routeKey = modelEligibilityKey(model);
+    const providerModelKey = providerModelEligibilityKey(model);
+    return (
+        index.byRouteRuntimeOverlay.get(routeKey) ??
+        (providerModelKey ? index.byProviderModelRuntimeOverlay.get(providerModelKey) : null) ??
+        index.byRoute.get(routeKey) ??
+        null
+    );
+}
+
+/**
  * @param {Record<string, any>} model
  * @param {Record<string, any>} profile
  * @param {Parameters<typeof scoreGatewayModelCandidate>[2]} options
  * @returns {Record<string, any> | null}
  */
 function resolveCandidateEligibility(model, profile, options = {}) {
+    if (isEligibilityDecisionIndex(options.eligibilityDecisionIndex)) {
+        const indexed = findEligibilityDecisionForModelInIndex(model, options.eligibilityDecisionIndex);
+        if (indexed) return indexed;
+    }
     const precomputed = findEligibilityDecisionForModel(
         model,
         profile,
@@ -984,13 +1062,19 @@ export function routeGatewayModels(models, profileInput, options = {}) {
               : null;
     if (!profile) throw new Error(`[model-gateway/policy] perfil de tarefa desconhecido: ${String(profileInput)}`);
 
-    const scoringOptions =
-        options.ignoreRuntimeHealth !== true && Array.isArray(options.runtimeHealthRecords) && !options.runtimeHealthIndex
-            ? {
-                  ...options,
-                  runtimeHealthIndex: createGatewayRuntimeHealthIndex(options.runtimeHealthRecords),
-              }
-            : options;
+    let scoringOptions = options;
+    if (
+        (options.ignoreRuntimeHealth !== true && Array.isArray(options.runtimeHealthRecords) && !options.runtimeHealthIndex) ||
+        (Array.isArray(options.eligibilityDecisions) && !options.eligibilityDecisionIndex)
+    ) {
+        scoringOptions = { ...options };
+        if (options.ignoreRuntimeHealth !== true && Array.isArray(options.runtimeHealthRecords) && !options.runtimeHealthIndex) {
+            scoringOptions.runtimeHealthIndex = createGatewayRuntimeHealthIndex(options.runtimeHealthRecords);
+        }
+        if (Array.isArray(options.eligibilityDecisions) && !options.eligibilityDecisionIndex) {
+            scoringOptions.eligibilityDecisionIndex = createEligibilityDecisionIndex(options.eligibilityDecisions, profile, options);
+        }
+    }
     const scored = models.map((model) => scoreGatewayModelCandidate(model, profile, scoringOptions));
     const candidates = scored
         .filter((candidate) => candidate.include)

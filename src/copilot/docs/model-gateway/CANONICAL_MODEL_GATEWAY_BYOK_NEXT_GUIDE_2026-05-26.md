@@ -9871,12 +9871,83 @@ Consequencias:
   - eligibility overlays: decisoes temporais de account/key;
   - runtime probes: camada posterior e explicita.
 
-Proximas lacunas:
+Proximas lacunas antes da mudanca seguinte:
 
 - reduzir tambem o custo de `selection.pre_runtime_audit`, que agora fica proximo de 1,7-2,0s;
 - investigar se `buildModelGatewayRouteCandidates` pode ser compartilhado entre perfis na auditoria;
 - evitar recomputar eligibility matching por candidato quando o snapshot ja trouxe decisions efetivas;
 - manter o selector com timings sempre disponiveis para diagnostico operacional.
+
+## Mudanca 100 - Indice de eligibility decisions para auditoria pre-runtime
+
+Status: concluido.
+
+Objetivo:
+
+- remover o segundo gargalo quadratico do selector;
+- fortalecer a camada mais baixa de roteamento antes de ampliar live tests;
+- preservar a precedencia semantica das decisoes:
+  - overlay runtime route-specific;
+  - overlay runtime por provider/model;
+  - decisao canonica route-specific;
+  - avaliacao inline apenas quando nao ha decisao precomputada.
+
+Diagnostico:
+
+- apos a Mudanca 99, `selection.pre_runtime_audit` passou a ser o gargalo principal;
+- medicao isolada no snapshot atual:
+  - `build_candidates`: cerca de 9-10ms;
+  - `route_code_no_eligibility`: cerca de 67ms;
+  - `route_code_eval_eligibility`: cerca de 1,7s;
+  - `pre_audit_code`: cerca de 1,65s;
+- portanto, o custo nao estava em construir candidatos;
+- o custo estava em filtrar e varrer `modelEligibilityDecisions` para cada candidato.
+
+Arquitetura aplicada:
+
+- o policy engine agora cria um indice de decisions por chamada de `routeGatewayModels`;
+- o indice e escopado ao profile e a policy de eligibility;
+- o indice contem:
+  - `byRouteRuntimeOverlay`;
+  - `byProviderModelRuntimeOverlay`;
+  - `byRoute`;
+- `resolveCandidateEligibility` consulta o indice antes de cair para o caminho legado;
+- o caminho legado permanece para callers pequenos, externos ou testes especificos;
+- nenhuma regra nova de inclusao foi criada;
+- a mudanca apenas torna a mesma precedencia consultavel em O(1) medio.
+
+Evidencia:
+
+- medicao isolada apos a mudanca:
+  - `build_candidates=9ms`;
+  - `route_code_eval_eligibility=74ms`;
+  - `pre_audit_code=77ms`.
+- selector seco completo:
+  - `selection.pre_runtime_audit`: cerca de 99ms;
+  - `selection.post_runtime_audit`: cerca de 115ms;
+  - `selector.build_plan`: cerca de 73ms;
+  - `ok=true`.
+- validadores:
+  - `npm run model-gateway:typecheck`: passou;
+  - teste focado com health, live protocol, provider cooldown e eligibility: passou.
+
+Consequencias:
+
+- o selector seco deixa de gastar varios segundos em matching repetitivo;
+- o custo dominante passa a ser leitura/auditoria do catalogo JSON, nao roteamento;
+- o runtime selector fica suficientemente rapido para ser usado como helper operacional frequente;
+- futuras otimizacoes devem mirar:
+  - leitura incremental/provider-scoped do catalogo;
+  - cache controlado do snapshot;
+  - auditoria de integridade incremental;
+  - reducao da serializacao quando o operador pede apenas um profile.
+
+Regra preservada:
+
+- eligibility continua sendo uma camada pre-runtime;
+- runtime health continua sendo uma camada volatil;
+- nenhuma decision derivada de health entra nos metadados canonicos;
+- fallback live so ocorre depois da selecao seca e explicita.
 
 ## 22. Fim Do Documento Inicial
 
