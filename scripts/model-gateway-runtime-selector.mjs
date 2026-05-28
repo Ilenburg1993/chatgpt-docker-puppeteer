@@ -273,6 +273,19 @@ let runtimeHealthPersistence = {
     runId: null,
     error: null,
 };
+
+function routeRequestProfiles() {
+    return [requestedExecutionProfile, ...fallbackExecutionProfiles].filter(
+        (profile) => typeof profile === 'string' && profile.trim(),
+    );
+}
+
+function hasSelectedRequestedOrFallbackRoute(plan) {
+    const profiles = new Set(routeRequestProfiles());
+    if (profiles.size === 0) return plan.summary.blockedProfileCount === 0;
+    return plan.routes.some((route) => profiles.has(route.profileId) && route.status === 'selected' && route.selected);
+}
+
 if (execute) {
     if (!context.runtimeSelectorPlan.ready) {
         execution = {
@@ -363,7 +376,7 @@ const commandOk =
     context.postRuntimeSelection.ok &&
     context.policyResolution.ok &&
     context.runtimeSelectorPlan.ready &&
-    (execute ? execution?.ok === true : context.runtimeSelectorPlan.summary.blockedProfileCount === 0) &&
+    (execute ? execution?.ok === true : hasSelectedRequestedOrFallbackRoute(context.runtimeSelectorPlan)) &&
     routeDecisionPersistence.ok &&
     runtimeHealthPersistence.ok;
 
@@ -375,6 +388,7 @@ const summary = {
         profileId: requestedExecutionProfile,
         fallbackProfileIds: fallbackExecutionProfiles,
         executionOkCanSucceedWithBlockedFallbackProfiles: execute,
+        dryRunOkCanSucceedWithSelectedFallbackProfile: !execute,
     },
     mode: strict ? 'strict_access_only_with_observed_health' : 'allow_probe_unknown_with_observed_health',
     runtimeSource,

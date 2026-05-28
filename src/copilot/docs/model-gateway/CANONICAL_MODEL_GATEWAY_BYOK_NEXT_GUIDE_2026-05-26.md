@@ -9757,6 +9757,53 @@ Efeito esperado:
 - a selecao fica coerente com a fase superior do roadmap: runtime selector real precisa escolher pela prova que mais
   corresponde ao fluxo que sera executado.
 
+## Mudanca 99 - Dry-Run Do Selector Considera Fallback Selecionado Como Cadeia Roteavel
+
+Depois da Mudanca 98, o plano `repo_agent -> code -> tool_agent` ficou semanticamente correto:
+
+- `repo_agent` permanecia bloqueado porque ainda nao havia prova agentica no perfil `repo_agent`;
+- `code` selecionava `zai/glm-4.5-flash` com prova live;
+- `tool_agent` tambem selecionava `zai/glm-4.5-flash`;
+- mas o comando seco ainda retornava `ok=false`, pois exigia zero perfis bloqueados.
+
+Problema:
+
+- quando o operador chama `--profile=repo_agent --fallback-profiles=code,tool_agent`, a unidade de sucesso nao e "todos
+  os perfis estao selected";
+- a unidade de sucesso e "a cadeia solicitada tem pelo menos uma rota selecionada e executavel";
+- isso ja era verdade em `--execute`, mas nao no dry-run.
+
+Alteracoes aplicadas:
+
+- `model-gateway-runtime-selector.mjs` agora calcula os perfis solicitados:
+  - profile primario;
+  - fallback profiles;
+- em dry-run, se houver profile/fallback solicitado, `ok=true` quando qualquer rota dessa cadeia estiver selected;
+- sem profile/fallback explicito, o comportamento antigo permanece: todos os perfis do plano precisam estar selected;
+- `routeRequest` passou a expor `dryRunOkCanSucceedWithSelectedFallbackProfile`.
+
+Evidencia seca:
+
+- comando:
+
+`node scripts/model-gateway-runtime-selector.mjs --json --allow-probe --profile=repo_agent --fallback-profiles=code,tool_agent --selection-policy=prefer_runtime_proved --preferred-probes=live_tool_protocol,live_ask_user --block-failed-probes=live_tool_protocol,live_ask_user --temporary-failure-cooldown-ms=1`
+
+- resultado:
+  - `ok=true`;
+  - `repo_agent=blocked`;
+  - `code=selected zai/glm-4.5-flash`;
+  - `tool_agent=selected zai/glm-4.5-flash`;
+  - `dryRunOkCanSucceedWithSelectedFallbackProfile=true`.
+
+Lacuna observada:
+
+- o comando seco ainda pode levar dezenas de segundos;
+- antes de considerar a fase de runtime selector "acabada", auditar custo de:
+  - leitura do catalogo JSON;
+  - merge file+SQLite de health;
+  - auditorias pre/post-runtime;
+  - serializacao de planos com alternativas amplas.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
