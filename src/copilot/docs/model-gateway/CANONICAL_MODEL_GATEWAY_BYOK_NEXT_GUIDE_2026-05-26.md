@@ -3141,7 +3141,7 @@ Este provider tem reset headers?
 - [x] Health observations usadas por codigo.
 - [ ] Retention runtime definida.
 - [ ] Explain runtime por modelo/provider.
-- [ ] Selection effective consome runtime persisted quando disponivel.
+- [x] Selection effective consome runtime persisted quando disponivel.
 - [ ] Tests de runtime persistence verdes.
 
 ### 13.5 Para Avancar Para Live Tests Exaustivos
@@ -10509,6 +10509,40 @@ Validacao esperada:
 - teste unitario cobre `writeRuntimeProbeRun`;
 - `model-gateway-runtime-selector --execute --json` deve mostrar `runtimeProbePersistence`;
 - `runtimeProbePersistence.ok=false` passa a reprovar o comando, como acontece com route decisions e health.
+
+## Mudanca 115 - SQLite runtime source passa a enxergar probes diretos
+
+Status: concluido.
+
+Contexto:
+
+- a mudanca anterior gravou probes diretamente em `runtime_probe_results`;
+- `listLatestRuntimeHealthRecords()` ainda lia apenas `health_observations`;
+- isso criava uma dependencia indevida do espelho de health para que o selector enxergasse provas runtime persistidas;
+- em execucoes futuras, um run direto de probes poderia existir no banco sem influenciar a selecao pos-runtime.
+
+Regra aplicada:
+
+- `listLatestRuntimeHealthRecords()` agora mescla as ultimas health observations com os ultimos probes por tipo;
+- quando nao ha health observation, o metodo sintetiza um registro runtime `probe-only`;
+- probes diretos continuam separados no banco, mas passam a alimentar a leitura operacional do selector;
+- o merge preserva `probes.<kind>` para contadores de proof tipados;
+- quando o probe e mais recente que a health observation, o status operacional derivado acompanha o probe;
+- quando existe health mais recente, ela continua tendo precedencia para o status geral.
+
+Motivo arquitetural:
+
+- persistir uma prova runtime so e util se a selecao efetiva puder le-la;
+- o catalogo canonico continua imutavel;
+- o SQLite passa a ser fonte runtime completa mesmo quando o health ledger externo foi limpo ou ainda nao espelhado;
+- isso reduz risco de repetir chamadas reais desnecessarias depois de um live ou probe bem-sucedido.
+
+Validacao esperada:
+
+- teste unitario grava um run direto sem health observation;
+- `listLatestRuntimeHealthRecords()` retorna um registro `probe-only`;
+- o registro contem `probes.chat.ok=true`;
+- a tabela `health_observations` permanece vazia nesse caso.
 
 ## 22. Fim Do Documento Inicial
 

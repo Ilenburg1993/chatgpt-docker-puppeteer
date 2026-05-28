@@ -572,6 +572,65 @@ function parseRuntimeProbeRow(row) {
 }
 
 /**
+ * @param {Record<string, unknown>} record
+ * @returns {string | null}
+ */
+function runtimeRecordKey(record) {
+    const provider = optionalString(record['providerId']);
+    const model = optionalString(record['providerModel']);
+    if (!provider || !model) return null;
+    return `${optionalString(record['routeProfile']) ?? DEFAULT_ROUTE_PROFILE}|${provider}|${model}`;
+}
+
+/**
+ * @param {Record<string, unknown>} record
+ * @param {Record<string, unknown>} probe
+ * @returns {Record<string, unknown>}
+ */
+function mergeRuntimeProbeIntoHealthRecord(record, probe) {
+    const kind = optionalString(probe['kind']) ?? optionalString(probe['probeKind']);
+    if (!kind) return record;
+    const observedAt = optionalInteger(probe['runtimeObservedAtMs']) ?? dateMs(probe['lastAt']) ?? Date.now();
+    const probeRecord = {
+        ...probe,
+        kind,
+        lastAt: observedAt,
+        ok: probe['ok'] === true,
+        status: optionalString(probe['status']) ?? 'unknown',
+    };
+    const probes = {
+        ...(isRecord(record['probes']) ? record['probes'] : {}),
+        [kind]: probeRecord,
+    };
+    const healthObservedAt = Math.max(
+        dateMs(record['lastSuccessAt']) ?? 0,
+        dateMs(record['lastFailureAt']) ?? 0,
+        optionalInteger(record['runtimeObservedAtMs']) ?? 0,
+    );
+    const probeIsNewer = observedAt >= healthObservedAt;
+    return {
+        ...record,
+        probes,
+        ...(probeIsNewer && probe['ok'] === true
+            ? {
+                  lastStatus: 'ok',
+                  lastSuccessAt: observedAt,
+                  lastSuccessContext: optionalString(record['lastSuccessContext']) ?? `runtime_probe:${kind}`,
+              }
+            : {}),
+        ...(probeIsNewer && probe['ok'] === false
+            ? {
+                  lastStatus: 'failed',
+                  lastFailureAt: observedAt,
+                  lastMessage: optionalString(probe['message']) ?? optionalString(probe['status']),
+                  lastErrorContext: optionalString(probe['errorContext']) ?? `runtime_probe:${kind}`,
+                  lastFailureKind: optionalString(probe['failureKind']) ?? optionalString(probe['status']),
+              }
+            : {}),
+    };
+}
+
+/**
  * @param {Record<string, unknown>} event
  * @returns {string}
  */
@@ -1554,7 +1613,7 @@ export class SqliteModelGatewayCatalogStore {
      */
     async listLatestRuntimeHealthRecords(options = {}) {
         const limit = Math.max(1, optionalInteger(options.limit) ?? 10_000);
-        return this.#db
+        const healthRecords = this.#db
             .prepare(
                 `
                     SELECT provider_id, provider_model, route_profile, status, classified_failure,
@@ -1580,6 +1639,55 @@ export class SqliteModelGatewayCatalogStore {
                 ),
             )
             .filter(isRecord);
+        const latestProbes = this.#db
+            .prepare(
+                `
+                    SELECT provider_id, provider_model, route_profile, probe_kind, wire_api, ok,
+                           status, observed_at_ms, expires_at_ms, payload_json
+                    FROM (
+                        SELECT provider_id, provider_model, route_profile, probe_kind, wire_api, ok,
+                               status, observed_at_ms, expires_at_ms, payload_json, result_key,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY provider_id, provider_model, route_profile, probe_kind
+                                   ORDER BY observed_at_ms DESC, result_key DESC
+                               ) AS row_number
+                        FROM copilot_model_gateway_runtime_probe_results
+                    )
+                    WHERE row_number = 1
+                    ORDER BY observed_at_ms DESC, result_key ASC
+                    LIMIT ?
+                `,
+            )
+            .all(limit * 8)
+            .map((row) =>
+                parseRuntimeProbeRow(
+                    /** @type {{ provider_id: string; provider_model: string; route_profile: string; probe_kind: string; wire_api: string | null; ok: number; status: string; observed_at_ms: number; expires_at_ms: number | null; payload_json: string }} */ (row),
+                ),
+            )
+            .filter(isRecord);
+        /** @type {Map<string, Record<string, unknown>>} */
+        const byKey = new Map();
+        for (const record of healthRecords) {
+            const key = runtimeRecordKey(record);
+            if (key) byKey.set(key, record);
+        }
+        for (const probe of latestProbes) {
+            const key = runtimeRecordKey(probe);
+            if (!key) continue;
+            const current =
+                byKey.get(key) ??
+                {
+                    key,
+                    providerId: optionalString(probe['providerId']),
+                    providerModel: optionalString(probe['providerModel']),
+                    routeProfile: optionalString(probe['routeProfile']) ?? DEFAULT_ROUTE_PROFILE,
+                    runtimeHealthStatus: 'probe-only',
+                };
+            byKey.set(key, mergeRuntimeProbeIntoHealthRecord(current, probe));
+        }
+        return [...byKey.values()]
+            .sort((left, right) => latestRuntimeAt(right) - latestRuntimeAt(left))
+            .slice(0, limit);
     }
 
     /**

@@ -5049,6 +5049,7 @@ describe('model-gateway foundation', () => {
             const healthRows = /** @type {{ count: number } | undefined} */ (
                 db.prepare('SELECT COUNT(*) AS count FROM copilot_model_gateway_health_observations').get()
             );
+            const latestRuntimeRecords = await store.listLatestRuntimeHealthRecords();
 
             assert.equal(result.runId, 'direct-runtime-probe-run');
             assert.equal(result.probeResults, 1);
@@ -5063,6 +5064,12 @@ describe('model-gateway foundation', () => {
             assert.equal(probeRows[0].payload_json.includes('secret-that-must-not-leak'), false);
             assert.equal(probeRows[0].payload_json.includes('[redacted]'), true);
             assert.equal(healthRows?.count, 0);
+            assert.equal(latestRuntimeRecords.length, 1);
+            assert.equal(latestRuntimeRecords[0]['providerId'], 'openrouter');
+            assert.equal(latestRuntimeRecords[0]['providerModel'], 'openai/gpt-oss-120b');
+            assert.equal(latestRuntimeRecords[0]['lastStatus'], 'ok');
+            assert.equal(latestRuntimeRecords[0]['runtimeHealthStatus'], 'probe-only');
+            assert.equal(latestRuntimeRecords[0]['probes']['chat']['ok'], true);
         } finally {
             db.close();
         }
