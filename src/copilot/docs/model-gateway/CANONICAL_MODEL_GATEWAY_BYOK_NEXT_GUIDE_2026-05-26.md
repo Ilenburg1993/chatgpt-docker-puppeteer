@@ -7712,6 +7712,41 @@ Resultado:
 
 `passed`
 
+Mudanca 64:
+
+Agregacao de outcome auditavel em execucao com fallbacks.
+
+Problema identificado:
+
+- cada tentativa individual do runtime selector agora registra pre-decision e outcome;
+- o executor com fallback retornava `attempts` e `retryDecisions`;
+- mas nao retornava o total agregado de eventos de route decision gravados;
+- isso exigiria somar manualmente cada tentativa para saber se a trilha de auditoria foi emitida.
+
+Correcoes aplicadas:
+
+- `executeModelGatewayRuntimeSelectorPlanWithFallbacks` retorna `routeDecisionRecordedCount`;
+- sucesso com fallback soma todos os eventos gravados nas tentativas anteriores e na tentativa vencedora;
+- falha final tambem soma os eventos gravados;
+- comentario do modulo foi atualizado para refletir a arquitetura atual:
+  - planning continua nao-executante;
+  - helpers de execucao sao pontes runtime explicitas;
+  - outcomes sanitizados nao contaminam metadados canonicos.
+
+Validacoes focadas:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "audits pre-runtime selection"`
+
+Resultado:
+
+`1 passed`
+
+`npm run model-gateway:typecheck`
+
+Resultado:
+
+`passed`
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

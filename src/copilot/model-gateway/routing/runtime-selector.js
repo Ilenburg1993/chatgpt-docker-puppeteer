@@ -1,9 +1,10 @@
 // @ts-check
 /**
- * Final runtime selector planning.
+ * Final runtime selector planning and bounded execution helpers.
  *
  * This layer turns a resolved selection policy or persisted decision trace into the exact route a runtime caller should
- * attempt first. It is deliberately non-executing: provider calls, probes and retries live above this boundary.
+ * attempt first. Planning remains non-executing; the execution helpers below are explicit runtime bridges that record
+ * sanitized health and route-decision outcomes without moving provider payloads into canonical metadata.
  */
 
 import { buildRouteDecisionEvent } from '../observability/events.js';
@@ -416,6 +417,14 @@ function tryRecordRouteDecision(recordRouteDecision, event) {
 }
 
 /**
+ * @param {Array<Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>>} attempts
+ * @returns {number}
+ */
+function sumRouteDecisionRecordedCount(attempts) {
+    return attempts.reduce((total, attempt) => total + (optionalNumber(attempt.routeDecisionRecordedCount) ?? 0), 0);
+}
+
+/**
  * @param {Record<string, unknown>} selectionPolicyOrTrace
  * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; env?: Record<string, string | undefined> }} [options]
  * @returns {{
@@ -812,6 +821,7 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
  *   selectedProfileId: string | null;
  *   attempts: Array<Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>>;
  *   retryDecisions: Array<ReturnType<typeof resolveModelGatewayRuntimeRetryDecision>>;
+ *   routeDecisionRecordedCount: number;
  *   final: Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>> | null;
  *   error: string | null;
  * }>}
@@ -868,6 +878,7 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
                     selectedProfileId: attempt.profileId,
                     attempts,
                     retryDecisions,
+                    routeDecisionRecordedCount: sumRouteDecisionRecordedCount(attempts),
                     final: attempt,
                     error: null,
                 };
@@ -890,6 +901,7 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
         selectedProfileId: null,
         attempts,
         retryDecisions,
+        routeDecisionRecordedCount: sumRouteDecisionRecordedCount(attempts),
         final,
         error: final?.error ?? 'runtime_selector_no_available_attempts',
     };

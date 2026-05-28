@@ -978,6 +978,7 @@ describe('model-gateway foundation', () => {
         assert.equal(fallbackRuntimeExecution.selectedProfileId, 'tool_agent');
         assert.equal(fallbackRuntimeExecution.attempts[0].ok, false);
         assert.equal(fallbackRuntimeExecution.attempts[1].ok, true);
+        assert.equal(fallbackRuntimeExecution.routeDecisionRecordedCount, 4);
 
         let retryProbeCalls = 0;
         let retrySleepCalls = 0;
@@ -1021,6 +1022,7 @@ describe('model-gateway foundation', () => {
         assert.equal(retryRuntimeExecution.selectedProfileId, 'repo_agent');
         assert.equal(retrySleepCalls, 1);
         assert.equal(retryRuntimeExecution.retryDecisions[0].retryRoute, true);
+        assert.equal(retryRuntimeExecution.routeDecisionRecordedCount, 4);
 
         const rateLimitRouteDecisionEvents = [];
         const rateLimitRuntimeExecution = await executeModelGatewayRuntimeSelectorPlan(runtimeSelectorPlan, {
