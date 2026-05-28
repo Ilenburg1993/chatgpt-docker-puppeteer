@@ -582,6 +582,15 @@ function sumRouteDecisionRecordedCount(attempts) {
 }
 
 /**
+ * @param {Array<Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>>} attempts
+ * @param {number} skippedRouteDecisionRecordedCount
+ * @returns {number}
+ */
+function sumFallbackRouteDecisionRecordedCount(attempts, skippedRouteDecisionRecordedCount) {
+    return sumRouteDecisionRecordedCount(attempts) + skippedRouteDecisionRecordedCount;
+}
+
+/**
  * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]} route
  * @returns {Array<ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]>}
  */
@@ -1234,23 +1243,29 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
             ? Math.floor(options.maxAttemptsPerProvider)
             : 4;
     const providerAttemptCounts = new Map();
+    const recordRouteDecision = options.deps?.recordRouteDecision ?? recordModelGatewayRouteDecision;
     /** @type {Array<Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>>} */
     const attempts = [];
     /** @type {Array<ReturnType<typeof resolveModelGatewayRuntimeRetryDecision>>} */
     const retryDecisions = [];
     /** @type {Array<Record<string, unknown>>} */
     const skippedAttempts = [];
+    let skippedRouteDecisionRecordedCount = 0;
     routeLoop: for (const { profileId, route } of routeAttempts) {
         if (attempts.length >= maxAttempts) break;
         const providerId = optionalString(route.selected?.['providerId']) ?? 'unknown-provider';
         if ((providerAttemptCounts.get(providerId) ?? 0) >= maxAttemptsPerProvider) {
+            const failure = 'runtime_selector_skipped:provider_attempt_cap';
             skippedAttempts.push({
                 profileId,
                 selectedRouteKey: runtimeSelectorAttemptKey(route),
                 providerId,
-                reason: 'provider_attempt_cap',
+                reason: failure,
                 maxAttemptsPerProvider,
             });
+            if (tryRecordRouteDecision(recordRouteDecision, buildRuntimeOutcomeDecisionEvent(route, { ok: false, failure }))) {
+                skippedRouteDecisionRecordedCount += 1;
+            }
             continue;
         }
         for (let routeAttempt = 0; routeAttempt < attemptsPerRoute; routeAttempt += 1) {
@@ -1277,7 +1292,10 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
                     retryDecisions,
                     skippedAttemptCount: skippedAttempts.length,
                     skippedAttempts,
-                    routeDecisionRecordedCount: sumRouteDecisionRecordedCount(attempts),
+                    routeDecisionRecordedCount: sumFallbackRouteDecisionRecordedCount(
+                        attempts,
+                        skippedRouteDecisionRecordedCount,
+                    ),
                     final: attempt,
                     error: null,
                 };
@@ -1302,7 +1320,7 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
         retryDecisions,
         skippedAttemptCount: skippedAttempts.length,
         skippedAttempts,
-        routeDecisionRecordedCount: sumRouteDecisionRecordedCount(attempts),
+        routeDecisionRecordedCount: sumFallbackRouteDecisionRecordedCount(attempts, skippedRouteDecisionRecordedCount),
         final,
         error: final?.error ?? 'runtime_selector_no_available_attempts',
     };

@@ -10230,6 +10230,7 @@ Regra aplicada:
   - `maxAttemptsPerProvider`;
 - o CLI canonico imprime `skipped=<n>` na linha de execution;
 - o runner llm-b preserva `skippedAttemptCount` no resumo redigido.
+- skips por cap de provider tambem viram route-decision outcome `runtime_selector_skipped:provider_attempt_cap`.
 
 Motivo arquitetural:
 
@@ -10242,7 +10243,7 @@ Teste adicionado:
 
 - plano com duas rotas OpenRouter e uma Groq;
 - `maxAttemptsPerProvider=1`;
-- a segunda rota OpenRouter e registrada como skip `provider_attempt_cap`;
+- a segunda rota OpenRouter e registrada como skip `runtime_selector_skipped:provider_attempt_cap`;
 - o executor continua ate Groq e passa;
 - `maxAttempts` puro nao gera skip falso.
 

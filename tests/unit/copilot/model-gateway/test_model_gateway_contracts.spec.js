@@ -1576,6 +1576,7 @@ describe('model-gateway foundation', () => {
             ),
         };
         const providerCapModels = [];
+        const providerCapRouteDecisionEvents = [];
         const providerCapAlternativeExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(providerCapAlternativePlan, {
             profileId: 'repo_agent',
             maxAttempts: 2,
@@ -1606,14 +1607,20 @@ describe('model-gateway foundation', () => {
                 },
                 recordSuccess: () => {},
                 recordFailure: () => {},
+                recordRouteDecision: (event) => {
+                    providerCapRouteDecisionEvents.push(event);
+                    return event;
+                },
                 flushHealth: async () => {},
             },
         });
         assert.equal(providerCapAlternativeExecution.ok, true);
         assert.equal(providerCapAlternativeExecution.attemptedCount, 2);
         assert.equal(providerCapAlternativeExecution.skippedAttemptCount, 1);
-        assert.equal(providerCapAlternativeExecution.skippedAttempts[0]?.['reason'], 'provider_attempt_cap');
+        assert.equal(providerCapAlternativeExecution.skippedAttempts[0]?.['reason'], 'runtime_selector_skipped:provider_attempt_cap');
         assert.equal(providerCapAlternativeExecution.skippedAttempts[0]?.['providerId'], 'openrouter');
+        assert.equal(providerCapAlternativeExecution.routeDecisionRecordedCount, 5);
+        assert.ok(providerCapRouteDecisionEvents.some((event) => event.failure === 'runtime_selector_skipped:provider_attempt_cap'));
         assert.deepEqual(providerCapModels, [
             'openai/gpt-oss-120b',
             'meta-llama/llama-4-scout-17b-16e-instruct',
