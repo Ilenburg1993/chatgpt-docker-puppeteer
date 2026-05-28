@@ -10962,6 +10962,138 @@ Observacao operacional:
 - quando usar `jq`, preferir `npm --silent` ou gravar stdout em arquivo temporario;
 - `npm run` normal imprime cabecalho antes do JSON e pode quebrar consumers estritos.
 
+## Mudanca 125 - Handoff llm-b preserva wireApi da rota escolhida
+
+Problema identificado:
+
+- o runtime selector ja montava env isolado com `COPILOT_BYOK_WIRE_API` para probes diretos;
+- o runner live `terminal:llm-b:live-test`, entretanto, ao entregar a rota para o terminal real, repassava provider,
+  model e baseUrl, mas nao repassava o wire API;
+- em seguida o proprio preflight chamava `/byok provider ...`, que limpa seletores efemeros antigos;
+- esse fluxo podia apagar `COPILOT_BYOK_WIRE_API` e deixar a sessao viva cair no wire default do provider/perfil,
+  apesar de a rota ter sido escolhida por metadados/provas de outro wire;
+- isso era especialmente arriscado para rotas OpenAI-compatible que precisam fixar `completions` ou `responses`.
+
+Correcao estrutural:
+
+- `run-terminal-llm-b-live-test.mjs` agora normaliza o wire canonico da rota do gateway para o contrato do SDK:
+  - `openai_chat_completions`, `chat_completions` e `completions` viram `completions`;
+  - `openai_responses` e `responses` viram `responses`;
+- o resumo redigido `byok.real.redacted.json` passa a expor:
+  - `wireApi`;
+  - `sdkWireApi`;
+  - `candidateSource`;
+  - `runtimeObservedOnly`;
+  - `runtimeEvidence`;
+- o env do terminal live passa a receber `COPILOT_BYOK_WIRE_API` quando a rota tem wire compativel;
+- o comando interno de preflight passou a chamar `/byok provider ... wire:<sdkWireApi>` quando aplicavel;
+- `/byok provider` agora aceita o argumento opcional `wire:<completions|responses>`;
+- `/byok provider` rejeita wire invalido antes de alterar o processo;
+- quando wire e omitido, o comando continua limpando herancas antigas, preservando o comportamento seguro anterior.
+
+Evidencia:
+
+- `node --check scripts/copilot/run-terminal-llm-b-live-test.mjs`;
+- `node --check src/copilot/terminal/commands/byok.js`;
+- `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js -t "provider efemero|wireApi invalido"`;
+- dry-run BYOK real com runtime selector e `--no-pr` gerou prompt de preflight sem executar turno real.
+
+Impacto:
+
+- o handoff selector -> terminal agora usa o mesmo contrato de wire dos probes diretos;
+- lives futuros ficam menos sujeitos a divergencia entre rota provada e sessao viva;
+- a auditoria redigida passa a carregar dados suficientes para diagnosticar se a falha veio do provider, do modelo,
+  do baseUrl ou do wire API;
+- isso fortalece a ponte entre runtime selector real e os testes live com `llm-b`.
+
+## Mudanca 126 - Lives pre-full-turn e wire default explicito para OpenAI-compatible
+
+Problema identificado apos a mudanca anterior:
+
+- o dry-run BYOK real ainda podia gerar `/byok provider ...` sem `wire:*` quando a rota era `openai_compatible`, mas o
+  catalogo nao trazia `wireApi` explicito;
+- para `zai/glm-4.5-flash`, isso funcionava por default do SDK, mas deixava uma ambiguidade desnecessaria exatamente
+  na ponte que estamos endurecendo antes do full turn;
+- a regra correta para rotas OpenAI-compatible sem wire explicito e declarar `completions`, pois esse e o default
+  operacional do provider customizado no SDK.
+
+Correcao:
+
+- `buildModelGatewayRuntimeSelectorProbeEnv` agora infere `COPILOT_BYOK_WIRE_API=completions` quando:
+  - a rota tem `routeLayer` contendo `openai_compatible`;
+  - existe `openAICompatibleBaseUrl` ou `baseUrl`;
+  - nao ha `wireApi` canonico mais especifico;
+- `run-terminal-llm-b-live-test.mjs` aplica a mesma inferencia no handoff terminal;
+- o dry-run BYOK real passou a materializar:
+  - `/byok provider zai glm-4.5-flash https://api.z.ai/api/paas/v4 wire:completions`.
+
+Lives executados:
+
+- controle sem PR:
+  - comando: `npm --silent run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000`;
+  - artefato: `artifacts/terminal-live/2026-05-28T22-27-46-399Z/summary.md`;
+  - resultado: `ok=true`, `blocked=false`, `hardFailures=[]`, `warnings=[]`;
+- controle BYOK fixture sem PR:
+  - comando: `npm --silent run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`;
+  - artefato: `artifacts/terminal-live/2026-05-28T22-28-08-609Z/summary.md`;
+  - resultado: `ok=true`, `blocked=false`, `hardFailures=[]`, `warnings=[]`;
+- BYOK real sem PR com runtime selector executando probe descartavel:
+  - comando: `npm --silent run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=1 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000`;
+  - artefato: `artifacts/terminal-live/2026-05-28T22-28-40-833Z/summary.md`;
+  - resultado: `ok=true`, `blocked=false`, `hardFailures=[]`;
+  - warning esperado: `byok-real-vision-probe`, porque `glm-4.5-flash` recusou parametro/capability de vision com
+    HTTP 400 sem degradar chat/agent;
+  - runtime selector:
+    - `requested=true`;
+    - `ok=true`;
+    - `executed=true`;
+    - `commandOk=true`;
+    - `selected.providerId=zai`;
+    - `selected.providerModel=glm-4.5-flash`;
+    - `selected.hasRuntimeProof=true`;
+    - `verifiedProbes=[agent, chat, json, streaming]`;
+    - `failedProbes=[vision]`;
+    - `routeDecisionPersistence.written=2`;
+    - `runtimeProbePersistence.ok=true`;
+    - `runtimeProbePersistence.runId=model-gateway:runtime-probe:1780007330098:92127:1`;
+    - `runtimeHealthPersistence.runId=model-gateway:runtime-health:1780007330105:92127:2`.
+
+Pos-fases:
+
+- diff contra baseline:
+  - baseline: `artifacts/model-gateway-runtime-health-baselines/2026-05-28T22-20-36Z/latest.json`;
+  - resultado: `ok=true`;
+  - `regressions=0`;
+  - `newFailures=0`;
+  - `becameFailed=0`;
+  - `recovered=0`;
+  - `changed=61`, apenas enriquecimentos de `failureKind` em registros ja falhos;
+- mirror SQLite:
+  - `runId=model-gateway:runtime-health:1780007472360:93644:1`;
+  - `records=73`;
+  - `healthObservations=73`;
+  - `probeResults=52`;
+  - `skippedRecords=0`;
+- readiness final:
+  - `ok=true`;
+  - `failed=[]`;
+  - SQLite:
+    - `parityOk=true`;
+    - `runtimeRows=15706`;
+    - `healthObservations=8310`;
+    - `runtimeProbeRuns=218`;
+    - `runtimeProbeResults=7178`;
+    - `runtimeProbeProofRecords=12`.
+
+Conclusao operacional:
+
+- as fases pre-full-turn estao verdes;
+- a rota real atual mais forte continua `zai/glm-4.5-flash`;
+- o full turn ainda deve ser tratado como fase separada porque consome turno real e exercita protocolo live completo;
+- antes dele, manter bloqueio de vision como warning para esta rota e nao como exclusao global;
+- o proximo passo natural e rodar o full turn com o mesmo selector e, se houver falha de protocolo, registrar
+  `live_tool_protocol` e `live_ask_user` como prova/falha especifica, sem contaminar metadados canonicos.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

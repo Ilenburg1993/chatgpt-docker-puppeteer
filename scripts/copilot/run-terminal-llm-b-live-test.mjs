@@ -248,6 +248,24 @@ function optionalRuntimeSelectorString(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : '';
 }
 
+function sdkWireApiForRuntimeRoute(wireApi) {
+    const normalized = optionalRuntimeSelectorString(wireApi)?.replaceAll('-', '_') ?? '';
+    if (normalized === 'openai_chat_completions' || normalized === 'chat_completions' || normalized === 'completions') {
+        return 'completions';
+    }
+    if (normalized === 'openai_responses' || normalized === 'responses') return 'responses';
+    return '';
+}
+
+function runtimeRouteSdkWireApi(selected) {
+    const explicit = sdkWireApiForRuntimeRoute(selected?.wireApi);
+    if (explicit) return explicit;
+    const routeLayer = optionalRuntimeSelectorString(selected?.routeLayer) ?? '';
+    const baseUrl =
+        optionalRuntimeSelectorString(selected?.openAICompatibleBaseUrl) || optionalRuntimeSelectorString(selected?.baseUrl);
+    return baseUrl && routeLayer.includes('openai_compatible') ? 'completions' : '';
+}
+
 function parseRuntimeSelectorJsonOutput(text) {
     const raw = typeof text === 'string' ? text.trim() : '';
     if (!raw) return null;
@@ -442,11 +460,18 @@ function runtimeSelectorRouteDetails(runtimeSelector) {
             : [],
         routeLayer: optionalRuntimeSelectorString(selected.routeLayer) || null,
         wireApi: optionalRuntimeSelectorString(selected.wireApi) || null,
+        sdkWireApi: runtimeRouteSdkWireApi(selected) || null,
         upstreamProvider: optionalRuntimeSelectorString(selected.upstreamProvider) || null,
         baseUrl:
             optionalRuntimeSelectorString(selected.openAICompatibleBaseUrl) ||
             optionalRuntimeSelectorString(selected.baseUrl) ||
             null,
+        candidateSource: optionalRuntimeSelectorString(selected.candidateSource) || null,
+        runtimeObservedOnly: selected.runtimeObservedOnly === true,
+        runtimeEvidence:
+            selected.runtimeEvidence && typeof selected.runtimeEvidence === 'object' && !Array.isArray(selected.runtimeEvidence)
+                ? selected.runtimeEvidence
+                : null,
     };
 }
 
@@ -496,6 +521,7 @@ function buildRealByokRuntime({
                       COPILOT_BYOK_PROVIDER_PRESET: runtimeRoute?.providerId ?? '',
                       COPILOT_BYOK_MODEL: model || '',
                       COPILOT_BYOK_BASE_URL: runtimeRoute?.baseUrl ?? '',
+                      COPILOT_BYOK_WIRE_API: runtimeRoute?.sdkWireApi ?? '',
                   }
                 : profile
                   ? { COPILOT_BYOK_PROFILE: profile }
@@ -703,6 +729,7 @@ function buildRuntimeSelectorProviderCommand(runtimeRoute) {
         runtimeRoute.providerId,
         runtimeRoute.providerModel,
         runtimeRoute.baseUrl || '',
+        runtimeRoute.sdkWireApi ? `wire:${runtimeRoute.sdkWireApi}` : '',
     ]
         .filter(Boolean)
         .join(' ');

@@ -4838,13 +4838,17 @@ describe('terminal /byok command', () => {
         mockProjection();
         const ctx = mockCtx();
 
-        await cmdByok({ println: ctx.println }, 'provider kilo-code anthropic/claude-sonnet-4.5 https://api.kilo.ai/api/gateway');
+        await cmdByok(
+            { println: ctx.println },
+            'provider kilo-code anthropic/claude-sonnet-4.5 https://api.kilo.ai/api/gateway wire:completions',
+        );
 
         expect(process.env['COPILOT_BYOK_ENABLED']).toBe('true');
         expect(process.env['COPILOT_BYOK_PROFILE']).toBeUndefined();
         expect(process.env['COPILOT_BYOK_PROVIDER_PRESET']).toBe('kilo-code');
         expect(process.env['COPILOT_BYOK_MODEL']).toBe('anthropic/claude-sonnet-4.5');
         expect(process.env['COPILOT_BYOK_BASE_URL']).toBe('https://api.kilo.ai/api/gateway');
+        expect(process.env['COPILOT_BYOK_WIRE_API']).toBe('completions');
         expect(ctx.output()).toContain('BYOK status');
     });
 
@@ -4852,6 +4856,7 @@ describe('terminal /byok command', () => {
         process.env['COPILOT_BYOK_PROFILE'] = 'kilo';
         process.env['COPILOT_BYOK_MODEL'] = 'stale-model';
         process.env['COPILOT_BYOK_BASE_URL'] = 'https://stale.example/v1';
+        process.env['COPILOT_BYOK_WIRE_API'] = 'responses';
         mockProjection();
         const ctx = mockCtx();
 
@@ -4862,7 +4867,20 @@ describe('terminal /byok command', () => {
         expect(process.env['COPILOT_BYOK_PROVIDER_PRESET']).toBe('openrouter');
         expect(process.env['COPILOT_BYOK_MODEL']).toBeUndefined();
         expect(process.env['COPILOT_BYOK_BASE_URL']).toBeUndefined();
+        expect(process.env['COPILOT_BYOK_WIRE_API']).toBeUndefined();
         expect(ctx.output()).toContain('BYOK status');
+    });
+
+    it('recusa wireApi invalido ao trocar provider efemero', async () => {
+        process.env['COPILOT_BYOK_PROVIDER_PRESET'] = 'stale-provider';
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'provider openrouter openai/gpt-oss-120b https://openrouter.ai/api/v1 wire:bad');
+
+        expect(process.env['COPILOT_BYOK_PROVIDER_PRESET']).toBe('stale-provider');
+        expect(process.env['COPILOT_BYOK_WIRE_API']).toBeUndefined();
+        expect(ctx.output()).toContain('wireApi inválido');
     });
 
     it('persiste perfil BYOK em .env.local sem gravar segredo novo', async () => {

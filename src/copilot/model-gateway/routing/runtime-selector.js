@@ -137,6 +137,19 @@ function sdkWireApiForRoute(wireApi) {
 }
 
 /**
+ * @param {Record<string, unknown> | null | undefined} selected
+ * @returns {'completions' | 'responses' | null}
+ */
+function routeSdkWireApi(selected) {
+    const explicit = sdkWireApiForRoute(routeMetadataString(selected, 'wireApi'));
+    if (explicit) return explicit;
+    const routeLayer = routeMetadataString(selected, 'routeLayer');
+    const baseUrl = routeMetadataString(selected, 'openAICompatibleBaseUrl') ?? routeMetadataString(selected, 'baseUrl');
+    if (baseUrl && routeLayer && routeLayer.includes('openai_compatible')) return 'completions';
+    return null;
+}
+
+/**
  * @param {number} delayMs
  * @returns {Promise<void>}
  */
@@ -280,7 +293,7 @@ export function buildModelGatewayRuntimeSelectorProbeEnv(selected, baseEnv = pro
     const providerId = optionalString(selected?.['providerId']);
     const providerModel = optionalString(selected?.['providerModel']);
     const baseUrl = routeMetadataString(selected, 'openAICompatibleBaseUrl') ?? routeMetadataString(selected, 'baseUrl');
-    const sdkWireApi = sdkWireApiForRoute(routeMetadataString(selected, 'wireApi'));
+    const sdkWireApi = routeSdkWireApi(selected);
     env['COPILOT_BYOK_ENABLED'] = 'true';
     if (providerId) env['COPILOT_BYOK_PROVIDER_PRESET'] = providerId;
     if (providerModel) env['COPILOT_BYOK_MODEL'] = providerModel;

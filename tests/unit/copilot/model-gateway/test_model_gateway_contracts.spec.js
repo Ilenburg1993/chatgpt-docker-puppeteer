@@ -1165,6 +1165,16 @@ describe('model-gateway foundation', () => {
         assert.equal(routeProbeEnv['COPILOT_BYOK_WIRE_API'], 'completions');
         assert.equal(routeProbeEnv['COPILOT_BYOK_API_KEY'], undefined);
         assert.equal(routeProbeEnv['OPENROUTER_API_KEY'], 'openrouter-key');
+        const defaultOpenAiCompatibleWireEnv = buildModelGatewayRuntimeSelectorProbeEnv(
+            {
+                providerId: 'zai',
+                providerModel: 'glm-4.5-flash',
+                routeLayer: 'openai_compatible',
+                openAICompatibleBaseUrl: 'https://api.z.ai/api/paas/v4',
+            },
+            {},
+        );
+        assert.equal(defaultOpenAiCompatibleWireEnv['COPILOT_BYOK_WIRE_API'], 'completions');
         const routeEnvStatus = evaluateModelGatewayRuntimeSelectorRouteEnv(runtimeSelectorPlan.routes[0].selected, {
             OPENROUTER_API_KEY: 'openrouter-key',
         });
