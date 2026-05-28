@@ -10247,6 +10247,38 @@ Teste adicionado:
 - o executor continua ate Groq e passa;
 - `maxAttempts` puro nao gera skip falso.
 
+## Mudanca 108 - Runner llm-b respeita ok/exit do runtime selector
+
+Status: concluido.
+
+Contexto:
+
+- o runner live extraia a rota selecionada do JSON do runtime selector;
+- porem a decisao "rota usavel" dependia quase so de `selectedRoute`;
+- se o CLI retornasse `summary.ok=false` por falha de persistencia, health mirror ou outro erro operacional, a rota poderia parecer usavel;
+- em live real isso poderia continuar para o terminal mesmo quando o handoff do seletor falhou.
+
+Regra aplicada:
+
+- `run-terminal-llm-b-live-test.mjs` agora exige `result.status===0`;
+- tambem exige `summary.ok !== false`;
+- quando `--byok-real-route-execute` esta ativo, exige `summary.execution.ok===true`;
+- erros de `routeDecisionPersistence` e `runtimeHealthPersistence` entram no erro redigido;
+- o resumo redigido do runner passa a incluir `runtimeSelector.commandOk`.
+
+Motivo arquitetural:
+
+- rota selecionada nao basta para autorizar live;
+- o comando canonico do runtime selector e o gate operacional;
+- falhas de persistencia/health nao devem ser mascaradas por um objeto `selected` valido;
+- isso reduz risco de lives consumirem quota com auditoria quebrada.
+
+Teste/validacao:
+
+- `node --check scripts/copilot/run-terminal-llm-b-live-test.mjs`;
+- validadores escopados do model-gateway continuam verdes;
+- a mudanca e deliberadamente no gate do runner, sem alterar metadado canonico.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

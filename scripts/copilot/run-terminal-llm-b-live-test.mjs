@@ -305,6 +305,7 @@ function runRuntimeSelectorLiveRoute({
             status: null,
             executed: false,
             allowProbe,
+            commandOk: true,
             profileId: '',
             fallbackProfiles: [],
             summary: null,
@@ -345,10 +346,14 @@ function runRuntimeSelectorLiveRoute({
     });
     const summary = parseRuntimeSelectorJsonOutput(result.stdout);
     const selectedRoute = summary ? selectRuntimeSelectorEffectiveRoute(summary, requestedProfile) : null;
-    const routeUsable = Boolean(selectedRoute?.selected) && (!execute || summary?.execution?.ok !== false);
+    const commandSucceeded = result.status === 0 && summary?.ok !== false;
+    const executionSucceeded = !execute || summary?.execution?.ok === true;
+    const routeUsable = Boolean(selectedRoute?.selected) && commandSucceeded && executionSucceeded;
     const summaryError =
         optionalRuntimeSelectorString(summary?.execution?.error) ||
         optionalRuntimeSelectorString(summary?.execution?.final?.error) ||
+        optionalRuntimeSelectorString(summary?.routeDecisionPersistence?.error) ||
+        optionalRuntimeSelectorString(summary?.runtimeHealthPersistence?.error) ||
         optionalRuntimeSelectorString(summary?.runtimeSelectorPlan?.routes?.find?.((route) => route?.status === 'blocked')?.reasons?.join(', '));
     return {
         requested: true,
@@ -356,6 +361,7 @@ function runRuntimeSelectorLiveRoute({
         status: result.status,
         executed: execute,
         allowProbe,
+        commandOk: summary?.ok === true && result.status === 0,
         profileId: requestedProfile,
         fallbackProfiles: normalizedFallbacks,
         summary,
@@ -506,6 +512,7 @@ function buildRealByokRuntime({
                 status: runtimeSelector.status,
                 executed: runtimeSelector.executed,
                 allowProbe: runtimeSelector.allowProbe,
+                commandOk: runtimeSelector.commandOk,
                 profileId: runtimeSelector.profileId || null,
                 fallbackProfiles: runtimeSelector.fallbackProfiles,
                 selectionPolicy: runtimeSelector.summary?.selectionPolicy ?? null,
