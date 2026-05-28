@@ -4678,6 +4678,31 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('secret');
     });
 
+    it('recarrega .env.local em modo statusless para handoff runtime sem imprimir cockpit legado', async () => {
+        loadDotenv.mockReturnValue({ parsed: { KILO_API_KEY: 'secret' } });
+        mockProjection({
+            summary: {
+                enabled: true,
+                ready: true,
+                profile: 'kilo',
+                preset: 'kilo-code',
+                providerType: 'openai',
+                baseUrl: 'https://api.kilo.ai/api/gateway',
+                model: 'kilo-auto/free',
+                auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
+            },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'reload --no-status');
+
+        expect(loadDotenv).toHaveBeenCalledWith({ path: '.env.local', override: true, quiet: true });
+        expect(ctx.output()).toContain('.env.local recarregado');
+        expect(ctx.output()).toContain('Status omitido');
+        expect(ctx.output()).not.toContain('BYOK status');
+        expect(ctx.output()).not.toContain('secret');
+    });
+
     it('troca provider efemero no processo atual', async () => {
         process.env['COPILOT_BYOK_PROFILE'] = 'kilo';
         mockProjection();

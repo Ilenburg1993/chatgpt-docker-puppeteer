@@ -8647,7 +8647,6 @@ Impacto:
 
 Lacunas ainda abertas apos Mudanca 82:
 
-- `repo_agent` ainda tenta uma rota primaria sem prova antes de fallback comprovado quando a politica permite;
 - full-turn real deve ser executado so depois de validar esses pontos ou aceitar conscientemente o risco operacional;
 - resultados de vision devem alimentar refinamento de capability runtime, sem virar exclusao automatica.
 
@@ -8666,32 +8665,170 @@ Correcao aplicada:
 
 - `buildByokRealPreflightCommands` agora gera:
   - `/session sdk 8`;
-  - `/byok reload`;
+  - `/byok reload --no-status`;
   - `/byok provider <provider> <model> <baseUrl>`;
   - somente entao `/byok env`, `/byok providers`, `/byok health`, `/byok profiles`;
 - o caminho sem runtime-selector continua usando `/byok use` e `/byok model`;
 - o comportamento de `--dry-run` permanece sem executar probes runtime reais, portanto pode mostrar a rota dry quando `--byok-real-route-execute` esta desativado por dry-run.
+- `/byok reload --no-status` recarrega `.env.local`, omite o cockpit legado e instrui o operador a aplicar a rota preparada antes de chamar `/byok`.
 
 Evidencia:
 
-`npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --no-pr --dry-run --out-dir artifacts/terminal-live/dry-run-runtime-provider-after-reload`
+`npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --no-pr --dry-run --out-dir artifacts/terminal-live/dry-run-runtime-reload-statusless`
 
 Resultado:
 
-- prompt escrito em `artifacts/terminal-live/dry-run-runtime-provider-after-reload/prompt.txt`;
+- prompt escrito em `artifacts/terminal-live/dry-run-runtime-reload-statusless/prompt.txt`;
 - ordem confirmada:
-  - `/byok reload`;
+  - `/byok reload --no-status`;
   - `/byok provider cerebras gpt-oss-120b https://api.cerebras.ai/v1`;
   - `/byok env`;
   - `/byok providers`;
   - `/byok health`;
 - em live executado, o mesmo ponto aplicara a rota final de `execution.final.route`.
 
+Teste adicional:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js -t "recarrega .env.local"`
+
+Resultado:
+
+- `2 passed`;
+- reload normal continua exibindo status;
+- reload `--no-status` recarrega sem imprimir `BYOK status` nem segredo.
+
 Impacto:
 
 - reduzimos ruido de boundary no live;
 - os paineis passam a refletir a rota preparada antes de serem exibidos;
 - o caminho para full-turn fica mais legivel e menos sujeito a falso diagnostico.
+
+Mudanca 84:
+
+Executor do runtime selector prioriza rotas com prova quando a politica pede `prefer_runtime_proved`.
+
+Problema identificado:
+
+- o plano `prefer_runtime_proved` ja conseguia identificar rotas com prova runtime;
+- porem `executeModelGatewayRuntimeSelectorPlanWithFallbacks` ainda tentava primeiro o perfil solicitado;
+- no caso real, isso significava tentar `repo_agent/cerebras/gpt-oss-120b`, que vinha dando timeout, antes de chegar em `code/nvidia-nim/openai/gpt-oss-120b`, que ja tinha prova;
+- a politica dizia preferir runtime provado, mas a ordem de execucao ainda privilegiava a ordem textual de perfil.
+
+Correcao aplicada:
+
+- o executor agora ordena perfis por prova runtime quando `plan.mode === prefer_runtime_proved`;
+- rotas com `hasRuntimeProof=true` sobem antes das sem prova;
+- a ordem original permanece como desempate;
+- dedupe de rota concreta continua valendo;
+- politicas diferentes de `prefer_runtime_proved` preservam a ordem original.
+
+Teste adicionado:
+
+- plano com `repo_agent` sem prova;
+- fallback `tool_agent` com prova e rota distinta;
+- chamada com `profileId=repo_agent` e `fallbackProfileIds=[tool_agent]`;
+- resultado esperado:
+  - `attemptedCount=1`;
+  - `selectedProfileId=tool_agent`;
+  - modelo tentado `openai/gpt-oss-20b-tool`.
+
+Evidencia real:
+
+`node scripts/model-gateway-runtime-selector.mjs --profile=repo_agent --fallback-profiles=code,tool_agent --selection-policy=prefer_runtime_proved --execute --attempts-per-route=1 --timeout-ms=15000 --json --fail`
+
+Resultado:
+
+- `ok=true`;
+- `execution.ok=true`;
+- `execution.attemptedCount=1`;
+- `execution.selectedProfileId=code`;
+- primeira e unica tentativa:
+  - provider `nvidia-nim`;
+  - model `openai/gpt-oss-120b`;
+  - `error=null`;
+- artefato: `artifacts/model-gateway-runtime-selector/2026-05-28T14-14-prefer-runtime-proved-first.json`.
+
+Impacto:
+
+- evitamos timeout conhecido antes do provider comprovado;
+- reduzimos gasto de quota e latencia no handoff live;
+- full-turn real passa a ter caminho mais direto;
+- o seletor runtime agora expressa melhor a intencao da policy.
+
+Lacunas ainda abertas apos Mudanca 84:
+
+- full-turn real ainda precisa ser executado e auditado;
+- resultados de vision devem alimentar refinamento de capability runtime, sem virar exclusao automatica;
+- o warning de `shutdownClient({ force: true })` no selector executado ainda e ruidoso, embora o encerramento seja deterministico;
+- a rota `repo_agent` sem prova continua disponivel para policy metadata-first, mas nao deve prevalecer em prefer-runtime-proved.
+
+Mudanca 85:
+
+Live no-pr confirmou handoff statusless e prova runtime antes do full-turn.
+
+Problema investigado:
+
+- a correcao anterior precisava ser validada dentro do terminal real;
+- o risco era o cockpit ainda imprimir o perfil legado de `.env.local` antes de aplicar a rota runtime;
+- tambem era necessario confirmar que a ordenacao por runtime proof nao era apenas unidade isolada, mas afetava o runner live.
+
+Evidencia live:
+
+`npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --no-pr --timeout-ms=600000`
+
+Artefato:
+
+- `artifacts/terminal-live/2026-05-28T14-17-53-222Z/summary.md`.
+
+Resultado:
+
+- status geral `PASS`;
+- duracao `43350ms`;
+- `byok-real-runtime-selector-route` passou;
+- `byok-real-profile-active` passou;
+- `byok-real-binding-cockpit` passou;
+- `byok-real-no-secret-leak` passou;
+- `byok-real-chat-probe-ok` passou;
+- `byok-real-agent-probe-ok` passou;
+- `byok-real-health-command` passou;
+- `execution.ok=true`;
+- `execution.attemptedCount=1`;
+- `execution.selectedProfileId=code`;
+- rota final:
+  - provider `nvidia-nim`;
+  - model `openai/gpt-oss-120b`;
+  - base URL `https://integrate.api.nvidia.com/v1`;
+- `/byok reload --no-status` apareceu antes da aplicacao da rota;
+- o primeiro cockpit `BYOK status` apos reload ja apareceu com `preset: nvidia-nim`;
+- nao houve cockpit legado `kilo-code` entre reload e rota ativa.
+
+Saude apos live:
+
+`npm --silent run model-gateway:runtime-health:mirror && npm --silent run model-gateway:runtime-health:diff -- --write-snapshot --out-dir artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-17-statusless-proof-first-no-pr`
+
+Resultado:
+
+- `runtimeRows=3237`;
+- `healthObservations=1587`;
+- `runtimeProbeRuns=73`;
+- `runtimeProbeResults=1577`;
+- `regressions=0`;
+- `newFailures=0`;
+- snapshot: `artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-17-statusless-proof-first-no-pr/latest.json`.
+
+Impacto:
+
+- o caminho no-pr esta pronto para servir de preflight imediato do full-turn;
+- a selecao `prefer_runtime_proved` agora corta timeout conhecido antes de acionar a sessao real;
+- o cockpit terminal mostra a fronteira correta entre estado carregado, rota preparada e provider ativo;
+- a evidencia de runtime continua fora do catalogo canonico.
+
+Lacunas ainda abertas apos Mudanca 85:
+
+- executar full-turn real com a mesma rota comprovada;
+- analisar custo, quota e classificacao de uso do full-turn;
+- decidir se o resultado `vision=empty` deve virar health observation fraca ou capability override explicito;
+- manter Ollama local fora dos defaults ate opt-in do operador.
 
 ## 22. Fim Do Documento Inicial
 

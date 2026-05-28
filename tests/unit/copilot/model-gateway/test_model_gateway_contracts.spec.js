@@ -1064,6 +1064,65 @@ describe('model-gateway foundation', () => {
                     : route,
             ),
         };
+        const provedFallbackFirstPlan = {
+            ...distinctFallbackPlan,
+            mode: 'prefer_runtime_proved',
+            routes: distinctFallbackPlan.routes.map((route) =>
+                route.profileId === 'tool_agent'
+                    ? {
+                          ...route,
+                          hasRuntimeProof: true,
+                          selected: {
+                              ...route.selected,
+                              hasRuntimeProof: true,
+                          },
+                      }
+                    : {
+                          ...route,
+                          hasRuntimeProof: false,
+                          selected: route.selected
+                              ? {
+                                    ...route.selected,
+                                    hasRuntimeProof: false,
+                                }
+                              : route.selected,
+                      },
+            ),
+        };
+        const provedFallbackFirstExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(provedFallbackFirstPlan, {
+            profileId: 'repo_agent',
+            fallbackProfileIds: ['tool_agent'],
+            deps: {
+                runChatProbe: async (options = {}) => {
+                    assert.equal(options.model, 'openai/gpt-oss-20b-tool');
+                    return {
+                        ok: true,
+                        status: 'ok',
+                        elapsedMs: 10,
+                        model: String(options.model ?? ''),
+                        profile: 'tool_agent',
+                        preset: 'openrouter',
+                        providerType: 'openai-compatible',
+                        deltaCount: 1,
+                        deltaChars: 13,
+                        finalChars: 13,
+                        finalContent: 'BYOK_PROBE_OK',
+                        observedFinalEvent: true,
+                        sessionId: 'unit-runtime-proved-fallback',
+                        errors: [],
+                        warnings: [],
+                        providerFailure: null,
+                    };
+                },
+                recordSuccess: () => {},
+                recordFailure: () => {},
+                flushHealth: async () => {},
+            },
+        });
+        assert.equal(provedFallbackFirstExecution.ok, true);
+        assert.equal(provedFallbackFirstExecution.attemptedCount, 1);
+        assert.equal(provedFallbackFirstExecution.selectedProfileId, 'tool_agent');
+
         let fallbackProbeCalls = 0;
         const fallbackRuntimeExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(distinctFallbackPlan, {
             profileId: 'repo_agent',

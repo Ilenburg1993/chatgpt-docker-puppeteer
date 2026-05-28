@@ -195,6 +195,33 @@ function runtimeSelectorAttemptKey(route) {
 }
 
 /**
+ * @param {Record<string, unknown> | null | undefined} route
+ * @returns {boolean}
+ */
+function runtimeSelectorRouteHasProof(route) {
+    const selected = optionalRecord(route?.['selected']);
+    return route?.['hasRuntimeProof'] === true || selected?.['hasRuntimeProof'] === true;
+}
+
+/**
+ * @param {string[]} profileIds
+ * @param {Map<string, Record<string, unknown>>} routeByProfileId
+ * @param {boolean} preferRuntimeProof
+ * @returns {string[]}
+ */
+function orderRuntimeSelectorAttemptProfileIds(profileIds, routeByProfileId, preferRuntimeProof) {
+    if (!preferRuntimeProof) return profileIds;
+    return profileIds
+        .map((profileId, index) => ({
+            profileId,
+            index,
+            hasRuntimeProof: runtimeSelectorRouteHasProof(routeByProfileId.get(profileId)),
+        }))
+        .sort((left, right) => Number(right.hasRuntimeProof) - Number(left.hasRuntimeProof) || left.index - right.index)
+        .map((entry) => entry.profileId);
+}
+
+/**
  * Build an isolated BYOK env for the selected runtime route.
  *
  * The configured terminal BYOK provider is often just the operator's current default. Runtime selection needs to test
@@ -864,9 +891,14 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
             : 0;
     const wait = options.deps?.sleep ?? sleepMs;
     const routeByProfileId = new Map(selectedRoutes.map((route) => [route.profileId, route]));
+    const orderedRuntimeProfileIds = orderRuntimeSelectorAttemptProfileIds(
+        uniqueProfileIds,
+        routeByProfileId,
+        plan.mode === 'prefer_runtime_proved',
+    );
     const attemptedRouteKeys = new Set();
     const attemptProfileIds = [];
-    for (const profileId of uniqueProfileIds) {
+    for (const profileId of orderedRuntimeProfileIds) {
         const key = runtimeSelectorAttemptKey(routeByProfileId.get(profileId));
         if (key && attemptedRouteKeys.has(key)) continue;
         if (key) attemptedRouteKeys.add(key);

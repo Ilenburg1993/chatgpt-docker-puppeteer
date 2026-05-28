@@ -477,7 +477,7 @@ function buildRuntimeSelectorProviderCommand(runtimeRoute) {
 }
 
 function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, provider, altProvider, runtimeRoute }) {
-    const commands = ['/session sdk 8', '/byok reload'];
+    const commands = ['/session sdk 8', runtimeRoute ? '/byok reload --no-status' : '/byok reload'];
     const runtimeProviderCommand = buildRuntimeSelectorProviderCommand(runtimeRoute);
     if (runtimeProviderCommand) {
         commands.push(runtimeProviderCommand);

@@ -4311,6 +4311,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
     }
 
     if (sub === 'reload') {
+        const skipStatus = rest.some((item) => /^(quiet|--quiet|no-status|--no-status|statusless|--statusless)$/iu.test(item));
         clearRuntimeSelectors();
         const result = loadDotenv({ path: '.env.local', override: true, quiet: true });
         if (result.error) {
@@ -4318,6 +4319,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             return;
         }
         println('  \x1b[32m.env.local recarregado no processo atual. Segredos não foram exibidos.\x1b[0m');
+        if (skipStatus) {
+            println('  \x1b[90mStatus omitido por solicitação; aplique a rota preparada e rode /byok para o cockpit final.\x1b[0m\n');
+            return;
+        }
         await renderStatus(readTerminalByokProjection(), println);
         return;
     }
