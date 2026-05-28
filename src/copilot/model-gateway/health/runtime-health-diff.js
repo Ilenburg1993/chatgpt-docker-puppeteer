@@ -19,11 +19,78 @@ function optionalString(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
+function optionalRecord(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+}
+
+/**
+ * @param {Record<string, unknown>} probe
+ * @returns {string}
+ */
+function probeStatusOf(probe) {
+    return optionalString(probe['status']) ?? (probe['ok'] === true ? 'ok' : probe['ok'] === false ? 'failed' : 'unknown');
+}
+
+/**
+ * @param {Record<string, unknown>} record
+ * @returns {Record<string, string>}
+ */
+function probeStatusesOf(record) {
+    const probes = optionalRecord(record['probes']);
+    if (!probes) return {};
+    return Object.fromEntries(
+        Object.entries(probes)
+            .map(([kind, probe]) => {
+                const normalizedProbe = optionalRecord(probe);
+                return normalizedProbe ? [kind, probeStatusOf(normalizedProbe)] : null;
+            })
+            .filter((entry) => entry !== null)
+            .sort(([left], [right]) => left.localeCompare(right)),
+    );
+}
+
+/**
+ * @param {Record<string, string>} probeStatuses
+ * @returns {string}
+ */
+function probeStatusFingerprint(probeStatuses) {
+    return Object.entries(probeStatuses)
+        .map(([kind, status]) => `${kind}:${status}`)
+        .join('|');
+}
+
+/**
+ * @param {Record<string, string>} probeStatuses
+ * @returns {string[]}
+ */
+function failedProbeKinds(probeStatuses) {
+    return Object.entries(probeStatuses)
+        .filter(([, status]) => status === 'failed')
+        .map(([kind]) => kind);
+}
+
+/**
+ * @param {string[]} probeKinds
+ * @returns {string[]}
+ */
+function blockingFailedProbeKinds(probeKinds) {
+    return probeKinds.filter((kind) => kind !== 'vision');
+}
+
+/**
  * @param {Record<string, unknown>} record
  * @returns {string}
  */
 function statusOf(record) {
-    return optionalString(record['lastStatus']) ?? optionalString(record['agentProbeStatus']) ?? 'unknown';
+    const directStatus = optionalString(record['lastStatus']) ?? optionalString(record['agentProbeStatus']);
+    if (directStatus) return directStatus;
+    const probeStatuses = probeStatusesOf(record);
+    if (blockingFailedProbeKinds(failedProbeKinds(probeStatuses)).length > 0) return 'failed';
+    if (Object.values(probeStatuses).some((status) => status === 'ok')) return 'ok';
+    return 'unknown';
 }
 
 /**
@@ -55,6 +122,10 @@ function optionalNumber(value) {
  *   lastRetryAfterSeconds: number | null;
  *   lastResetAt: string | null;
  *   agentProbeStatus: string | null;
+ *   probeStatuses: Record<string, string>;
+ *   probeStatusFingerprint: string;
+ *   failedProbeKinds: string[];
+ *   blockingFailedProbeKinds: string[];
  *   observedAt: number;
  *   status: string;
  * }}
@@ -66,6 +137,8 @@ export function comparableModelGatewayRuntimeHealthRecord(record) {
     const identityKey = [routeProfile, providerId, providerModel].every(Boolean)
         ? [routeProfile, providerId, providerModel].join('|')
         : null;
+    const probeStatuses = probeStatusesOf(record);
+    const failedProbes = failedProbeKinds(probeStatuses);
     return {
         key: byokProviderHealthRecordKey(record) ?? optionalString(record['key']) ?? identityKey ?? 'unknown',
         routeProfile,
@@ -77,6 +150,10 @@ export function comparableModelGatewayRuntimeHealthRecord(record) {
         lastRetryAfterSeconds: optionalNumber(record['lastRetryAfterSeconds']),
         lastResetAt: optionalString(record['lastResetAt']),
         agentProbeStatus: optionalString(record['agentProbeStatus']),
+        probeStatuses,
+        probeStatusFingerprint: probeStatusFingerprint(probeStatuses),
+        failedProbeKinds: failedProbes,
+        blockingFailedProbeKinds: blockingFailedProbeKinds(failedProbes),
         observedAt: byokProviderHealthRecordLastObservedAt(record),
         status: statusOf(record),
     };
@@ -84,7 +161,7 @@ export function comparableModelGatewayRuntimeHealthRecord(record) {
 
 /**
  * @param {ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>[]} records
- * @returns {{ total: number; byProvider: Record<string, number>; byStatus: Record<string, number>; byFailureKind: Record<string, number> }}
+ * @returns {{ total: number; byProvider: Record<string, number>; byStatus: Record<string, number>; byFailureKind: Record<string, number>; byProbeStatus: Record<string, number> }}
  */
 export function summarizeModelGatewayRuntimeHealthRecords(records) {
     /** @type {Record<string, number>} */
@@ -93,6 +170,8 @@ export function summarizeModelGatewayRuntimeHealthRecords(records) {
     const byStatus = {};
     /** @type {Record<string, number>} */
     const byFailureKind = {};
+    /** @type {Record<string, number>} */
+    const byProbeStatus = {};
     for (const record of records) {
         const providerId = record.providerId ?? 'unknown';
         const status = record.status ?? 'unknown';
@@ -100,12 +179,17 @@ export function summarizeModelGatewayRuntimeHealthRecords(records) {
         byProvider[providerId] = (byProvider[providerId] ?? 0) + 1;
         byStatus[status] = (byStatus[status] ?? 0) + 1;
         byFailureKind[failureKind] = (byFailureKind[failureKind] ?? 0) + 1;
+        for (const [probeKind, probeStatus] of Object.entries(record.probeStatuses)) {
+            const key = `${probeKind}:${probeStatus}`;
+            byProbeStatus[key] = (byProbeStatus[key] ?? 0) + 1;
+        }
     }
     return {
         total: records.length,
         byProvider,
         byStatus,
         byFailureKind,
+        byProbeStatus,
     };
 }
 
@@ -122,7 +206,12 @@ function mapByKey(records) {
  * @returns {boolean}
  */
 function failed(record) {
-    return record.status === 'failed' || record.lastStatus === 'failed' || record.agentProbeStatus === 'failed';
+    return (
+        record.status === 'failed' ||
+        record.lastStatus === 'failed' ||
+        record.agentProbeStatus === 'failed' ||
+        record.blockingFailedProbeKinds.length > 0
+    );
 }
 
 /**
@@ -130,7 +219,39 @@ function failed(record) {
  * @returns {boolean}
  */
 function ok(record) {
-    return record.status === 'ok' || record.lastStatus === 'ok' || record.agentProbeStatus === 'ok';
+    return (
+        record.status === 'ok' ||
+        record.lastStatus === 'ok' ||
+        record.agentProbeStatus === 'ok' ||
+        Object.values(record.probeStatuses).some((status) => status === 'ok')
+    );
+}
+
+/**
+ * @param {{ before: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; after: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; changedFields: string[] }} item
+ * @returns {boolean}
+ */
+function hasNonProbeSurfaceRegression(item) {
+    return item.changedFields.some((field) => field !== 'probeStatusFingerprint') && ok(item.before) && failed(item.after);
+}
+
+/**
+ * @param {ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>} before
+ * @param {ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>} after
+ * @returns {boolean}
+ */
+function hasProbeStatusRegression(before, after) {
+    return Object.entries(after.probeStatuses).some(
+        ([probeKind, afterStatus]) => before.probeStatuses[probeKind] === 'ok' && afterStatus === 'failed',
+    );
+}
+
+/**
+ * @param {{ before: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; after: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; changedFields: string[] }} item
+ * @returns {boolean}
+ */
+function hasAnyRegression(item) {
+    return hasNonProbeSurfaceRegression(item) || hasProbeStatusRegression(item.before, item.after);
 }
 
 /**
@@ -160,7 +281,15 @@ export function diffModelGatewayRuntimeHealthSnapshots(beforeRecords, afterRecor
             continue;
         }
         /** @type {Array<keyof ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>>} */
-        const fields = ['status', 'failureKind', 'lastFailureStatusCode', 'lastRetryAfterSeconds', 'lastResetAt', 'agentProbeStatus'];
+        const fields = [
+            'status',
+            'failureKind',
+            'lastFailureStatusCode',
+            'lastRetryAfterSeconds',
+            'lastResetAt',
+            'agentProbeStatus',
+            'probeStatusFingerprint',
+        ];
         const changedFields = fields.filter((field) => previous[field] !== record[field]);
         if (changedFields.length > 0) changed.push({ key, before: previous, after: record, changedFields });
     }
@@ -168,8 +297,8 @@ export function diffModelGatewayRuntimeHealthSnapshots(beforeRecords, afterRecor
         if (!after.has(key)) removed.push(record);
     }
 
-    const regressions = changed.filter((item) => ok(item.before) && failed(item.after));
-    const becameFailed = changed.filter((item) => !failed(item.before) && failed(item.after));
+    const regressions = changed.filter(hasAnyRegression);
+    const becameFailed = changed.filter((item) => !failed(item.before) && failed(item.after) && hasAnyRegression(item));
     const recovered = changed.filter((item) => failed(item.before) && ok(item.after) && !failed(item.after));
     const newFailures = added.filter(failed);
 

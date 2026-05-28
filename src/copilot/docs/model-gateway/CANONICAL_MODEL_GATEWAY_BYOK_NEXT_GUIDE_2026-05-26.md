@@ -11372,6 +11372,78 @@ Impacto:
 - `latest-diff.json` passa a ser o ponto certo para auditorias comparativas;
 - isso fecha uma lacuna da preparacao para rodadas longas de lives e probes sem perder diagnostico entre turnos.
 
+## 21.130. Mudanca 130 - Runtime health diff passa a comparar superficies de probe
+
+Data: 2026-05-28.
+
+Problema:
+
+- depois de introduzir `live_turn`, `live_tool_protocol` e `live_ask_user`, o snapshot comparavel de runtime health
+  ainda ignorava `record.probes`;
+- isso fazia o diff enxergar apenas `lastStatus`, `agentProbeStatus` e campos de falha do provider;
+- uma regressao futura como `live_turn: ok -> failed` poderia ficar escondida dentro do payload bruto;
+- por outro lado, tratar qualquer probe falho como falha global reintroduziria o problema ja decidido:
+  - `vision=failed` nao deve excluir automaticamente uma rota de chat/agent.
+
+Correcao:
+
+- `comparableModelGatewayRuntimeHealthRecord` agora inclui:
+  - `probeStatuses`;
+  - `probeStatusFingerprint`;
+  - `failedProbeKinds`;
+  - `blockingFailedProbeKinds`;
+- `summarizeModelGatewayRuntimeHealthRecords` agora inclui:
+  - `byProbeStatus`;
+- `diffModelGatewayRuntimeHealthSnapshots` agora inclui `probeStatusFingerprint` em `changedFields`;
+- regressao por probe so e considerada quando ha transicao explicita:
+  - `probe: ok -> failed`;
+- probe ausente no baseline e falho no health atual e classificado como descoberta de superficie, nao como regressao;
+- `vision` continua em `failedProbeKinds`, mas nao entra em `blockingFailedProbeKinds`.
+
+Evidencia unit:
+
+- comando:
+  `npm --silent exec vitest -- tests/unit/copilot/model-gateway/test_model_gateway_provider_health.spec.js -t "runtime health|probes live"`;
+- resultado:
+  - `2 passed`;
+  - `5 skipped`;
+- novo caso cobre:
+  - `vision=failed` nao bloqueante;
+  - `live_turn: ok -> failed` como regressao;
+  - `probeStatusFingerprint` em `changedFields`;
+  - `byProbeStatus['live_turn:failed']`.
+
+Evidencia real:
+
+- comando:
+  `npm --silent run model-gateway:runtime-health:diff -- --baseline artifacts/model-gateway-runtime-health-baselines/2026-05-28T22-20-36Z/latest.json --write-snapshot --out-dir artifacts/model-gateway-runtime-health-post-live/2026-05-28T22-45-full-turn --fail-on-regression`;
+- resultado:
+  - `ok=true`;
+  - `regressions=0`;
+  - `newFailures=5`;
+  - `changed=75`;
+  - `byProbeStatus` contem:
+    - `live_turn:ok=1`;
+    - `live_tool_protocol:ok=2`;
+    - `live_ask_user:ok=2`;
+    - `vision:failed=13`;
+    - `agent:failed=20`;
+- registro de maior valor:
+  - `repo_agent|zai|glm-4.5-flash`;
+  - `status=ok`;
+  - `probeStatuses.chat=ok`;
+  - `probeStatuses.live_turn=ok`;
+  - `probeStatuses.live_tool_protocol=ok`;
+  - `probeStatuses.live_ask_user=ok`;
+  - `blockingFailedProbeKinds=[]`.
+
+Impacto:
+
+- o diff agora e adequado para lives longos e comparacao de protocolo;
+- `vision` continua sendo capability especifica, nao gate global;
+- `agent` e probes live passam a aparecer no artefato comparativo;
+- falhas futuras de full-turn ficam rastreaveis como regressao real quando houver baseline `ok`.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

@@ -319,7 +319,7 @@ describe('BYOK provider chat health state', () => {
             changed: 3,
             regressions: 1,
             newFailures: 1,
-            becameFailed: 2,
+            becameFailed: 1,
             recovered: 1,
         });
         expect(diff.regressions[0]?.key).toBe('kilo|kilo-code|stable');
@@ -327,5 +327,51 @@ describe('BYOK provider chat health state', () => {
         expect(diff.recovered[0]?.key).toBe('kilo|kilo-code|recovering');
         expect(summary.byStatus.failed).toBe(3);
         expect(summary.byStatus.ok).toBe(1);
+    });
+
+    it('inclui probes live na comparação sem tratar vision como falha bloqueante', () => {
+        const before = [
+            comparableModelGatewayRuntimeHealthRecord({
+                routeProfile: 'repo_agent',
+                providerId: 'zai',
+                providerModel: 'glm-4.5-flash',
+                probes: {
+                    live_turn: { status: 'ok', ok: true },
+                    live_tool_protocol: { status: 'ok', ok: true },
+                    vision: { status: 'failed', ok: false },
+                },
+            }),
+        ];
+        const after = [
+            comparableModelGatewayRuntimeHealthRecord({
+                routeProfile: 'repo_agent',
+                providerId: 'zai',
+                providerModel: 'glm-4.5-flash',
+                probes: {
+                    live_turn: { status: 'failed', ok: false },
+                    live_tool_protocol: { status: 'ok', ok: true },
+                    vision: { status: 'failed', ok: false },
+                },
+            }),
+        ];
+
+        const diff = diffModelGatewayRuntimeHealthSnapshots(before, after);
+        const summary = summarizeModelGatewayRuntimeHealthRecords(after);
+
+        expect(before[0].failedProbeKinds).toEqual(['vision']);
+        expect(before[0].blockingFailedProbeKinds).toEqual([]);
+        expect(after[0].blockingFailedProbeKinds).toEqual(['live_turn']);
+        expect(diff.summary).toEqual({
+            added: 0,
+            removed: 0,
+            changed: 1,
+            regressions: 1,
+            newFailures: 0,
+            becameFailed: 1,
+            recovered: 0,
+        });
+        expect(diff.changed[0]?.changedFields).toContain('probeStatusFingerprint');
+        expect(summary.byProbeStatus['live_turn:failed']).toBe(1);
+        expect(summary.byProbeStatus['vision:failed']).toBe(1);
     });
 });
