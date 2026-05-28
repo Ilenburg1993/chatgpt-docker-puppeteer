@@ -8058,6 +8058,63 @@ Resultado:
 
 `80 passed`
 
+Mudanca 71:
+
+Reset windows numericas de provider agora distinguem epoch e duracao.
+
+Problema identificado:
+
+- providers usam `x-ratelimit-reset` de formas diferentes;
+- alguns retornam ISO timestamp;
+- alguns retornam Unix epoch em segundos;
+- alguns retornam Unix epoch em milissegundos;
+- outros retornam duracao relativa;
+- o classificador tratava numero de reset como duracao relativa;
+- isso podia transformar `1779930123` em uma janela muitos anos no futuro, em vez de `2026-05-28T01:02:03.000Z`.
+
+Correcoes aplicadas:
+
+- criada interpretacao dedicada para reset headers;
+- numeros `>= 1_000_000_000_000` sao epoch em milissegundos;
+- numeros `>= 1_000_000_000` sao epoch em segundos;
+- numeros menores continuam sendo duracao relativa em segundos;
+- ISO timestamps continuam aceitos;
+- duracoes textuais continuam aceitas;
+- retry-after continua seguindo semantica propria de duracao relativa.
+
+Impacto arquitetural:
+
+- overlays volateis de rate-limit passam a expirar na janela correta;
+- pre-runtime exclusion evita bloquear modelos por decadas devido a parse errado;
+- runtime retry budget recebe `resetAt` mais fiel;
+- live readiness fica menos sujeita a falsos bloqueios de quota/rate-limit.
+
+Validacoes focadas:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "classifies provider quota, auth and reset-window failures"`
+
+Resultado:
+
+`1 passed`
+
+`npm run model-gateway:typecheck`
+
+Resultado:
+
+`passed`
+
+`npm run model-gateway:lint`
+
+Resultado:
+
+`passed`
+
+`npm run model-gateway:test:contracts`
+
+Resultado:
+
+`197 passed`
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

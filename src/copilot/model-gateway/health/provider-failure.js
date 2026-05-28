@@ -124,6 +124,28 @@ function parseDurationSeconds(value) {
 }
 
 /**
+ * Rate-limit reset headers are not standardized across providers: some send ISO timestamps, some send Unix epoch
+ * seconds or milliseconds, and others send a relative duration. Prefer absolute timestamps when the numeric value is
+ * clearly epoch-shaped; otherwise treat small numbers as relative seconds.
+ *
+ * @param {string} value
+ * @returns {string | null}
+ */
+function parseResetHeaderAt(value) {
+    const trimmed = value.trim();
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric) && numeric >= 0) {
+        if (numeric >= 1_000_000_000_000) return new Date(numeric).toISOString();
+        if (numeric >= 1_000_000_000) return new Date(numeric * 1000).toISOString();
+        return new Date(Date.now() + numeric * 1000).toISOString();
+    }
+    const date = new Date(trimmed);
+    if (Number.isFinite(date.getTime())) return date.toISOString();
+    const seconds = parseDurationSeconds(trimmed);
+    return seconds !== null ? new Date(Date.now() + seconds * 1000).toISOString() : null;
+}
+
+/**
  * @param {unknown} headers
  * @param {string} name
  * @returns {string | null}
@@ -195,12 +217,7 @@ function readLimitHints(error, message) {
         .find((value) => value !== null);
     const resetFromHeader =
         resetHeader !== undefined && resetHeader !== null
-            ? (() => {
-                  const date = new Date(resetHeader);
-                  if (Number.isFinite(date.getTime())) return date.toISOString();
-                  const seconds = parseDurationSeconds(resetHeader);
-                  return seconds !== null ? new Date(Date.now() + seconds * 1000).toISOString() : null;
-              })()
+            ? parseResetHeaderAt(resetHeader)
             : null;
     return {
         retryAfterSeconds,

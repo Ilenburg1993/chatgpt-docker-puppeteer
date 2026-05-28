@@ -23,6 +23,7 @@ import {
     MODEL_GATEWAY_TASK_PROFILES,
     buildModelGatewayPreBuildReadinessReport,
     buildModelGatewayPreKCompatibilityReport,
+    classifyByokProviderFailure,
     anthropicAdapter,
     buildEnvByokModelGatewaySnapshot,
     buildModelGatewayOperatorProjection,
@@ -422,6 +423,43 @@ describe('model-gateway foundation', () => {
         assert.equal(records.length, 1);
         assert.equal(records[0].providerId, 'groq');
         assert.equal(records[0].providerModel, 'model-b');
+    });
+
+    it('classifies provider quota, auth and reset-window failures consistently', () => {
+        const originalNow = Date.now;
+        Date.now = () => 1_779_930_000_000;
+        try {
+            const retryText = classifyByokProviderFailure(
+                Object.assign(new Error('Rate limit exceeded, try again in 2 minutes'), { status: 429 }),
+            );
+            const epochReset = classifyByokProviderFailure(
+                Object.assign(new Error('HTTP 429 too many requests'), {
+                    status: 429,
+                    headers: { 'x-ratelimit-reset': '1779930123' },
+                }),
+            );
+            const durationReset = classifyByokProviderFailure(
+                Object.assign(new Error('HTTP 429 too many requests'), {
+                    status: 429,
+                    headers: { 'x-ratelimit-reset': '90' },
+                }),
+            );
+            const credits = classifyByokProviderFailure(Object.assign(new Error('payment required: add credits'), { status: 402 }));
+            const auth = classifyByokProviderFailure(Object.assign(new Error('invalid api key'), { status: 401 }));
+
+            assert.equal(retryText.kind, 'rate-limit');
+            assert.equal(retryText.retryAfterSeconds, 120);
+            assert.equal(retryText.resetAt, '2026-05-28T01:02:00.000Z');
+            assert.equal(epochReset.kind, 'rate-limit');
+            assert.equal(epochReset.resetAt, '2026-05-28T01:02:03.000Z');
+            assert.equal(durationReset.resetAt, '2026-05-28T01:01:30.000Z');
+            assert.equal(credits.kind, 'credits');
+            assert.equal(credits.statusCode, 402);
+            assert.equal(auth.kind, 'auth');
+            assert.equal(auth.statusCode, 401);
+        } finally {
+            Date.now = originalNow;
+        }
     });
 
     it('routes against explicit merged runtime health records without hydrating global health state', () => {
