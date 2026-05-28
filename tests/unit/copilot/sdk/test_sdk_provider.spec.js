@@ -515,6 +515,12 @@ describe('F72 — BYOK env configuration', () => {
                 model: '@cf/meta/llama-3.1-8b-instruct',
                 extraEnv: { CLOUDFLARE_ACCOUNT_ID: 'account-1' },
             },
+            {
+                preset: 'opencode',
+                secretKey: 'OPENCODE_API_KEY',
+                baseUrl: 'https://opencode.ai/zen/v1',
+                model: 'gpt-5.1-codex',
+            },
         ];
 
         for (const item of cases) {

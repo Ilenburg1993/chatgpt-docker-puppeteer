@@ -408,6 +408,18 @@ const BYOK_PROVIDER_PRESETS = Object.freeze({
         supportsVision: true,
         requiresAuth: true,
     },
+    opencode: {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: 'https://opencode.ai/zen/v1',
+        modelEnvKeys: Object.freeze(['OPENCODE_MODEL', 'OPENCODE_DEFAULT_MODEL']),
+        apiKeyEnvKeys: Object.freeze(['OPENCODE_API_KEY']),
+        defaultModel: 'gpt-5.1-codex',
+        staticModels: Object.freeze(['gpt-5.1-codex', 'claude-sonnet-4-5', 'gemini-3.5-flash', 'glm-5.1', 'deepseek-v4-flash-free']),
+        contextWindowTokens: 200_000,
+        supportsReasoning: true,
+        supportsVision: true,
+        requiresAuth: true,
+    },
     zai: {
         providerType: PROVIDER_TYPES.OPENAI,
         baseUrl: 'https://api.z.ai/api/paas/v4',

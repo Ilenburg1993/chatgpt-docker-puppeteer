@@ -23,6 +23,9 @@ import {
     summarizeModelGatewayLocalProviderOptInBlocks,
 } from '../src/copilot/model-gateway/index.js';
 import { setDbLogger } from '../src/copilot/db/sqlite.js';
+import { loadModelGatewayDotenv } from './model-gateway-env.mjs';
+
+loadModelGatewayDotenv();
 
 const args = process.argv.slice(2);
 const argSet = new Set(args);

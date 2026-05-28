@@ -786,6 +786,10 @@ describe('model-gateway foundation', () => {
         assert.equal(runtimeSelectorPlan.routes[0].decisionEvent.sessionId, 'unit-session');
         assert.equal(runtimeSelectorPlan.routes[0].selected?.['accountScope'], 'default');
         assert.equal(runtimeSelectorPlan.routes[0].selected?.['taskProfile'], 'repo_agent');
+        assert.equal(runtimeSelectorPlan.routes[0].selected?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
+        assert.equal(runtimeSelectorPlan.routes[0].selected?.['routeLayer'], 'openai_compatible_aggregator');
+        assert.equal(runtimeSelectorPlan.routes[0].selected?.['wireApi'], 'openai_chat_completions');
+        assert.equal(runtimeSelectorPlan.routes[0].selected?.['upstreamProvider'], 'groq');
         assert.equal(selectModelGatewayRuntimeRoute(runtimeSelectorPlan, 'repo_agent')?.selectedRouteKey, 'openrouter:openai/gpt-oss-120b');
 
         const strictRuntimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(requireRuntimeProof, {
@@ -800,6 +804,7 @@ describe('model-gateway foundation', () => {
             COPILOT_BYOK_PROFILE: 'current-default-profile',
             COPILOT_BYOK_PROVIDER_PRESET: 'groq',
             COPILOT_BYOK_BASE_URL: 'https://wrong.example.test/v1',
+            COPILOT_BYOK_WIRE_API: 'responses',
             COPILOT_BYOK_API_KEY: 'wrong-generic-key',
             OPENROUTER_API_KEY: 'openrouter-key',
         });
@@ -807,6 +812,7 @@ describe('model-gateway foundation', () => {
         assert.equal(routeProbeEnv['COPILOT_BYOK_PROVIDER_PRESET'], 'openrouter');
         assert.equal(routeProbeEnv['COPILOT_BYOK_MODEL'], 'openai/gpt-oss-120b');
         assert.equal(routeProbeEnv['COPILOT_BYOK_BASE_URL'], undefined);
+        assert.equal(routeProbeEnv['COPILOT_BYOK_WIRE_API'], 'completions');
         assert.equal(routeProbeEnv['COPILOT_BYOK_API_KEY'], undefined);
         assert.equal(routeProbeEnv['OPENROUTER_API_KEY'], 'openrouter-key');
         const routeEnvStatus = evaluateModelGatewayRuntimeSelectorRouteEnv(runtimeSelectorPlan.routes[0].selected, {
@@ -840,6 +846,7 @@ describe('model-gateway foundation', () => {
                     assert.equal(options.model, 'openai/gpt-oss-120b');
                     assert.equal(options.env?.['COPILOT_BYOK_PROVIDER_PRESET'], 'openrouter');
                     assert.equal(options.env?.['COPILOT_BYOK_BASE_URL'], undefined);
+                    assert.equal(options.env?.['COPILOT_BYOK_WIRE_API'], 'completions');
                     assert.equal(typeof options.deps?.classifyProviderFailure, 'function');
                     return {
                         ok: true,
@@ -1092,6 +1099,22 @@ describe('model-gateway foundation', () => {
         assert.equal(trace['rows']?.[0]?.['selected']?.['providerId'], 'openrouter');
         assert.equal(trace['rows']?.[0]?.['selected']?.['accountScope'], 'default');
         assert.equal(trace['rows']?.[0]?.['selected']?.['taskProfile'], 'repo_agent');
+        assert.equal(trace['rows']?.[0]?.['selected']?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
+        assert.equal(trace['rows']?.[0]?.['selected']?.['routeLayer'], 'openai_compatible_aggregator');
+        assert.equal(trace['rows']?.[0]?.['selected']?.['wireApi'], 'openai_chat_completions');
+        assert.equal(trace['rows']?.[0]?.['selected']?.['upstreamProvider'], 'groq');
+        const traceRuntimePlan = buildModelGatewayRuntimeSelectorPlan(trace, {
+            source: 'unit-trace-runtime-selector',
+            env: { OPENROUTER_API_KEY: 'openrouter-key' },
+        });
+        assert.equal(traceRuntimePlan.sourceSchema, 'model-gateway-selection-decision-trace');
+        assert.equal(traceRuntimePlan.traceId, 'unit-selection-trace');
+        assert.equal(traceRuntimePlan.routes[0].selected?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
+        assert.equal(traceRuntimePlan.routes[0].selected?.['routeLayer'], 'openai_compatible_aggregator');
+        assert.equal(traceRuntimePlan.routes[0].selected?.['wireApi'], 'openai_chat_completions');
+        const traceProbeEnv = buildModelGatewayRuntimeSelectorProbeEnv(traceRuntimePlan.routes[0].selected, {});
+        assert.equal(traceProbeEnv['COPILOT_BYOK_MODEL'], 'openai/gpt-oss-120b');
+        assert.equal(traceProbeEnv['COPILOT_BYOK_WIRE_API'], 'completions');
 
         const traceDir = await mkdtemp(join(tmpdir(), 'model-gateway-selection-trace-'));
         try {
@@ -5095,6 +5118,13 @@ describe('model-gateway foundation', () => {
                     providerModel: 'model-a',
                     selectorKind: 'exact_model',
                     selectorSyntax: 'model-a',
+                }),
+                createModelRouteOption({
+                    providerId: 'huggingface',
+                    providerModel: 'katanemo/Arch-Router-1.5B',
+                    selectorKind: 'provider_explicit',
+                    selectorSyntax: 'katanemo/Arch-Router-1.5B:hf-inference',
+                    providerSpecific: { huggingFaceProvider: 'hf-inference' },
                 }),
             ],
             projections: [

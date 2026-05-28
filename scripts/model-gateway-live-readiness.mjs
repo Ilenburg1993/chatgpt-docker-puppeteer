@@ -26,6 +26,9 @@ import {
     summarizeModelGatewayLocalProviderOptInBlocks,
 } from '../src/copilot/model-gateway/index.js';
 import { setDbLogger } from '../src/copilot/db/sqlite.js';
+import { loadModelGatewayDotenv } from './model-gateway-env.mjs';
+
+loadModelGatewayDotenv();
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LIVE_RUNNER_PATH = path.join(ROOT, 'scripts/copilot/run-terminal-llm-b-live-test.mjs');

@@ -8,6 +8,9 @@ import {
     renderModelGatewayLocalProviderOptInGuidance,
     summarizeModelGatewayLocalProviderOptInBlocks,
 } from '../src/copilot/model-gateway/index.js';
+import { loadModelGatewayDotenv } from './model-gateway-env.mjs';
+
+loadModelGatewayDotenv();
 
 const args = process.argv.slice(2);
 const argSet = new Set(args);

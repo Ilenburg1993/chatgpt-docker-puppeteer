@@ -44,6 +44,39 @@ function isRecord(value) {
 }
 
 /**
+ * @param {Record<string, unknown>} model
+ * @param {string} field
+ * @returns {string | null}
+ */
+function modelRouteString(model, field) {
+    const routing = isRecord(model['routing']) ? model['routing'] : {};
+    const policy = isRecord(model['normalizedPolicy']) ? model['normalizedPolicy'] : {};
+    const routeProviderSpecific = isRecord(model['routeProviderSpecific']) ? model['routeProviderSpecific'] : {};
+    const providerSpecific = isRecord(model['providerSpecific']) ? model['providerSpecific'] : {};
+    return (
+        optionalString(model[field]) ??
+        optionalString(routing[field]) ??
+        optionalString(policy[field]) ??
+        optionalString(routeProviderSpecific[field]) ??
+        optionalString(providerSpecific[field])
+    );
+}
+
+/**
+ * @param {Record<string, unknown>} model
+ * @param {string} field
+ * @returns {boolean | null}
+ */
+function modelRouteBoolean(model, field) {
+    const routing = isRecord(model['routing']) ? model['routing'] : {};
+    const policy = isRecord(model['normalizedPolicy']) ? model['normalizedPolicy'] : {};
+    const routeProviderSpecific = isRecord(model['routeProviderSpecific']) ? model['routeProviderSpecific'] : {};
+    const providerSpecific = isRecord(model['providerSpecific']) ? model['providerSpecific'] : {};
+    const value = model[field] ?? routing[field] ?? policy[field] ?? routeProviderSpecific[field] ?? providerSpecific[field];
+    return typeof value === 'boolean' ? value : null;
+}
+
+/**
  * @param {Record<string, any>} profile
  * @returns {boolean}
  */
@@ -71,9 +104,24 @@ function selectedSummary(selected) {
         id: optionalString(model['id']),
         providerId: optionalString(model['providerId']),
         providerModel: optionalString(model['providerModel']) ?? optionalString(model['id']),
+        routeCandidateId: optionalString(model['routeCandidateId']),
+        canonicalModelId: optionalString(model['canonicalModelId']),
         routeProfile: optionalString(model['routeProfile']),
+        routeOptionRef: optionalString(model['routeOptionRef']),
+        routeOptionRefs: Array.isArray(model['routeOptionRefs']) ? model['routeOptionRefs'].map(optionalString).filter((item) => item !== null).slice(0, 8) : [],
         selectorKind: optionalString(model['selectorKind']) ?? 'exact_model',
         selectorSyntax: optionalString(model['selectorSyntax']) ?? optionalString(model['providerModel']) ?? optionalString(model['id']),
+        routeLayer: modelRouteString(model, 'routeLayer'),
+        wireApi: modelRouteString(model, 'wireApi'),
+        runtimeKind: modelRouteString(model, 'runtimeKind'),
+        upstreamProvider: modelRouteString(model, 'upstreamProvider'),
+        baseUrl: modelRouteString(model, 'baseUrl'),
+        openAICompatibleBaseUrl: modelRouteString(model, 'openAICompatibleBaseUrl'),
+        endpoint: modelRouteString(model, 'endpoint'),
+        aiSdkPackage: modelRouteString(model, 'aiSdkPackage'),
+        autoSelection: modelRouteBoolean(model, 'autoSelection'),
+        supportsFallback: modelRouteBoolean(model, 'supportsFallback'),
+        localPrivate: modelRouteBoolean(model, 'localPrivate'),
         score: typeof selected['score'] === 'number' && Number.isFinite(selected['score']) ? selected['score'] : null,
         scoreBreakdown: isRecord(selected['scoreBreakdown']) ? selected['scoreBreakdown'] : null,
         eligibilityDisposition: optionalString(eligibility['disposition']),

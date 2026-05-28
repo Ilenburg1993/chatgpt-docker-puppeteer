@@ -7232,6 +7232,159 @@ Ele apenas orienta o operador humano e LLM.
 
 Isto reduz ambiguidade operacional antes dos live tests.
 
+## 21.58 Mudanca 58 - Identidade Operacional Completa No Runtime Selector
+
+Foi corrigido um gap de base no caminho:
+
+`selection audit -> selection trace -> runtime selector plan -> runtime probe env`
+
+Antes, o runtime selector reduzia a rota selecionada a:
+
+- `providerId`;
+- `providerModel`.
+
+Isso era insuficiente para rotas universais.
+
+O problema afetava especialmente:
+
+- gateways;
+- agregadores;
+- selectors automaticos;
+- rotas Cloudflare;
+- rotas OpenAI-compatible com `wireApi` explicito;
+- rotas com `selectorSyntax` diferente de `providerModel`;
+- providers novos com endpoint oficial no catalogo.
+
+Agora a rota selecionada preserva:
+
+- `selectorSyntax`;
+- `routeCandidateId`;
+- `canonicalModelId`;
+- `routeOptionRef`;
+- `routeOptionRefs`;
+- `routeLayer`;
+- `wireApi`;
+- `runtimeKind`;
+- `upstreamProvider`;
+- `baseUrl`;
+- `openAICompatibleBaseUrl`;
+- `endpoint`;
+- `aiSdkPackage`;
+- `autoSelection`;
+- `supportsFallback`;
+- `localPrivate`.
+
+O trace persistido tambem preserva esses campos.
+
+O plano runtime passa a carregar a mesma identidade operacional.
+
+O env de probe runtime agora:
+
+- remove overrides BYOK antigos;
+- mantem secrets provider-scoped;
+- define `COPILOT_BYOK_PROVIDER_PRESET` a partir da rota;
+- define `COPILOT_BYOK_MODEL` com `providerModel`, nao com `selectorSyntax`;
+- projeta `COPILOT_BYOK_BASE_URL` quando a rota trouxer `openAICompatibleBaseUrl` ou `baseUrl`;
+- converte `openai_chat_completions` para `COPILOT_BYOK_WIRE_API=completions`;
+- converte `openai_responses` para `COPILOT_BYOK_WIRE_API=responses`;
+- nao injeta valores de `wireApi` que o SDK ainda nao entende.
+
+Isso fecha uma fronteira importante:
+
+- `selectorSyntax` identifica a rota no catalogo/SDK/listagem;
+- `providerModel` continua sendo o id enviado ao provider quando a chamada runtime e feita;
+- `wireApi` fica preservado como metadado canonico;
+- apenas wire APIs compativeis com o SDK atual viram env runtime.
+
+Tambem foi adicionado preset SDK para:
+
+`opencode`
+
+Com:
+
+- base oficial `https://opencode.ai/zen/v1`;
+- secret `OPENCODE_API_KEY`;
+- modelo default `gpt-5.1-codex`;
+- catalogo estatico minimo para fallback.
+
+Isso alinha importer, secrets, endpoint inventory e runtime BYOK.
+
+Validacoes adicionadas:
+
+- selection audit preserva selector/wire/upstream;
+- trace preserva selector/wire/upstream;
+- runtime plan preserva selector/wire/upstream;
+- runtime probe env nao herda provider/baseUrl/wireApi antigos;
+- runtime probe env usa `providerModel`, nao `selectorSyntax`;
+- preset SDK `opencode` fica pronto com `OPENCODE_API_KEY`.
+
+## 21.59 Mudanca 59 - Readiness Pre-Live Carrega Env E Corrige Falso Positivo HF
+
+Durante o dry-run real do runtime selector foi identificado que:
+
+- o catalogo estava `ok=false`;
+- nenhuma rota strict era selecionada;
+- o live test ainda nao estava pronto.
+
+O erro de integridade tinha causa especifica.
+
+A regex de segredo tratava `hf-inference` como se fosse token HuggingFace.
+
+Isso redigia uma `selectorSyntax` legitima:
+
+`katanemo/Arch-Router-1.5B:hf-inference`
+
+Resultado anterior:
+
+- `selectorSyntax` virava `...:[redacted]`;
+- a auditoria de integridade marcava identidade redigida;
+- o runtime selector dry-run ficava bloqueado antes de qualquer live.
+
+Correcoes aplicadas:
+
+- token HuggingFace agora exige formato `hf_` longo;
+- `hf-inference` permanece como provider/upstream publico;
+- redaction de `json-catalog-store`;
+- redaction de `catalog/contracts`;
+- redaction audit;
+- teste de integridade com `hf-inference`.
+
+Tambem foi criado bootstrap comum:
+
+`scripts/model-gateway-env.mjs`
+
+Ele carrega:
+
+- `.env.local`;
+- `.env`.
+
+Com `override=false`.
+
+Scripts atualizados:
+
+- `model-gateway-effective-selection.mjs`;
+- `model-gateway-runtime-selector.mjs`;
+- `model-gateway-live-readiness.mjs`;
+- `model-gateway-selection-audit.mjs`.
+
+Isso alinha os comandos canônicos ao comportamento do terminal:
+
+- terminal ja carrega `.env.local`;
+- comandos de build/refresh ja carregavam `.env.local`;
+- agora readiness/selection/runtime-selector tambem carregam.
+
+Estado observado apos a correcao:
+
+- integridade do catalogo voltou a `ok=true`;
+- redacted identity count voltou a `0`;
+- runtime selector ainda nao esta pronto para live porque overlays strict de conta estao expirados;
+- portanto a proxima etapa nao e llm-b;
+- a proxima etapa e refresh/build de metadados/account overlays antes de runtime.
+
+Isso reforca a regra:
+
+live test so depois de readiness strict com rotas selecionadas.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

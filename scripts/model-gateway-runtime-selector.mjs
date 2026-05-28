@@ -19,6 +19,9 @@ import {
     summarizeModelGatewayRuntimeAccountOverlays,
 } from '../src/copilot/model-gateway/index.js';
 import { setDbLogger } from '../src/copilot/db/sqlite.js';
+import { loadModelGatewayDotenv } from './model-gateway-env.mjs';
+
+loadModelGatewayDotenv();
 
 const args = process.argv.slice(2);
 const argSet = new Set(args);
@@ -378,8 +381,9 @@ if (json) {
     );
     for (const route of context.runtimeSelectorPlan.routes) {
         const runtimeEnv = route.runtimeEnv;
+        const selected = route.selected ?? {};
         process.stdout.write(
-            `  ${route.profileId}: ${route.status} route=${route.selectedRouteKey ?? '-'} env=${runtimeEnv?.status ?? '-'} missing=${runtimeEnv?.missingRequiredKeys.join(',') || '-'} reasons=${route.reasons.slice(0, 4).join(',') || '-'}\n`,
+            `  ${route.profileId}: ${route.status} route=${route.selectedRouteKey ?? '-'} selector=${selected['selectorKind'] ?? '-'}:${selected['selectorSyntax'] ?? '-'} layer=${selected['routeLayer'] ?? '-'} wire=${selected['wireApi'] ?? '-'} upstream=${selected['upstreamProvider'] ?? '-'} env=${runtimeEnv?.status ?? '-'} missing=${runtimeEnv?.missingRequiredKeys.join(',') || '-'} reasons=${route.reasons.slice(0, 4).join(',') || '-'}\n`,
         );
     }
     if (execution) {

@@ -71,6 +71,65 @@ function optionalNumber(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {boolean | null}
+ */
+function optionalBoolean(value) {
+    return typeof value === 'boolean' ? value : null;
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} selected
+ * @param {string} field
+ * @returns {string | null}
+ */
+function routeMetadataString(selected, field) {
+    const record = optionalRecord(selected);
+    const routing = optionalRecord(record?.['routing']);
+    const policy = optionalRecord(record?.['normalizedPolicy']);
+    const routeProviderSpecific = optionalRecord(record?.['routeProviderSpecific']);
+    const providerSpecific = optionalRecord(record?.['providerSpecific']);
+    return (
+        optionalString(record?.[field]) ??
+        optionalString(routing?.[field]) ??
+        optionalString(policy?.[field]) ??
+        optionalString(routeProviderSpecific?.[field]) ??
+        optionalString(providerSpecific?.[field])
+    );
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} selected
+ * @param {string} field
+ * @returns {boolean | null}
+ */
+function routeMetadataBoolean(selected, field) {
+    const record = optionalRecord(selected);
+    const routing = optionalRecord(record?.['routing']);
+    const policy = optionalRecord(record?.['normalizedPolicy']);
+    const routeProviderSpecific = optionalRecord(record?.['routeProviderSpecific']);
+    const providerSpecific = optionalRecord(record?.['providerSpecific']);
+    return (
+        optionalBoolean(record?.[field]) ??
+        optionalBoolean(routing?.[field]) ??
+        optionalBoolean(policy?.[field]) ??
+        optionalBoolean(routeProviderSpecific?.[field]) ??
+        optionalBoolean(providerSpecific?.[field])
+    );
+}
+
+/**
+ * @param {string | null} wireApi
+ * @returns {'completions' | 'responses' | null}
+ */
+function sdkWireApiForRoute(wireApi) {
+    if (wireApi === 'openai_chat_completions' || wireApi === 'chat_completions') return 'completions';
+    if (wireApi === 'openai_responses' || wireApi === 'responses') return 'responses';
+    if (wireApi === 'completions') return 'completions';
+    return null;
+}
+
+/**
  * @param {number} delayMs
  * @returns {Promise<void>}
  */
@@ -141,9 +200,13 @@ export function buildModelGatewayRuntimeSelectorProbeEnv(selected, baseEnv = pro
     for (const key of RUNTIME_ROUTE_ENV_RESET_KEYS) delete env[key];
     const providerId = optionalString(selected?.['providerId']);
     const providerModel = optionalString(selected?.['providerModel']);
+    const baseUrl = routeMetadataString(selected, 'openAICompatibleBaseUrl') ?? routeMetadataString(selected, 'baseUrl');
+    const sdkWireApi = sdkWireApiForRoute(routeMetadataString(selected, 'wireApi'));
     env['COPILOT_BYOK_ENABLED'] = 'true';
     if (providerId) env['COPILOT_BYOK_PROVIDER_PRESET'] = providerId;
     if (providerModel) env['COPILOT_BYOK_MODEL'] = providerModel;
+    if (baseUrl) env['COPILOT_BYOK_BASE_URL'] = baseUrl;
+    if (sdkWireApi) env['COPILOT_BYOK_WIRE_API'] = sdkWireApi;
     return env;
 }
 
@@ -192,8 +255,24 @@ function runtimeRoute(route) {
         id: `${providerId}:${providerModel}`,
         providerId,
         providerModel,
+        selectorSyntax: optionalString(route['selectorSyntax']) ?? providerModel,
+        routeCandidateId: optionalString(route['routeCandidateId']),
+        canonicalModelId: optionalString(route['canonicalModelId']),
         routeProfile: optionalString(route['routeProfile']),
+        routeOptionRef: optionalString(route['routeOptionRef']),
+        routeOptionRefs: Array.isArray(route['routeOptionRefs']) ? route['routeOptionRefs'].map(optionalString).filter((item) => item !== null).slice(0, 8) : [],
         selectorKind: optionalString(route['selectorKind']),
+        routeLayer: routeMetadataString(route, 'routeLayer'),
+        wireApi: routeMetadataString(route, 'wireApi'),
+        runtimeKind: routeMetadataString(route, 'runtimeKind'),
+        upstreamProvider: routeMetadataString(route, 'upstreamProvider'),
+        baseUrl: routeMetadataString(route, 'baseUrl'),
+        openAICompatibleBaseUrl: routeMetadataString(route, 'openAICompatibleBaseUrl'),
+        endpoint: routeMetadataString(route, 'endpoint'),
+        aiSdkPackage: routeMetadataString(route, 'aiSdkPackage'),
+        autoSelection: routeMetadataBoolean(route, 'autoSelection'),
+        supportsFallback: routeMetadataBoolean(route, 'supportsFallback'),
+        localPrivate: routeMetadataBoolean(route, 'localPrivate'),
         score: optionalNumber(route['score']),
         eligibilityDisposition: optionalString(route['eligibilityDisposition']),
         accountScope: optionalString(route['accountScope']) ?? 'default',

@@ -33,6 +33,16 @@ function optionalNumber(value) {
 }
 
 /**
+ * @param {Record<string, unknown>} record
+ * @param {string} field
+ * @returns {boolean | null}
+ */
+function optionalRouteBoolean(record, field) {
+    const value = record[field];
+    return typeof value === 'boolean' ? value : null;
+}
+
+/**
  * @param {unknown} value
  * @returns {string}
  */
@@ -63,8 +73,24 @@ function summarizeSelectedRoute(route) {
     return {
         providerId: optionalString(record['providerId']),
         providerModel: optionalString(record['providerModel']),
+        selectorSyntax: optionalString(record['selectorSyntax']) ?? optionalString(record['providerModel']),
+        routeCandidateId: optionalString(record['routeCandidateId']),
+        canonicalModelId: optionalString(record['canonicalModelId']),
         routeProfile: optionalString(record['routeProfile']),
+        routeOptionRef: optionalString(record['routeOptionRef']),
+        routeOptionRefs: Array.isArray(record['routeOptionRefs']) ? record['routeOptionRefs'].map(optionalString).filter((item) => item !== null).slice(0, 8) : [],
         selectorKind: optionalString(record['selectorKind']),
+        routeLayer: optionalString(record['routeLayer']),
+        wireApi: optionalString(record['wireApi']),
+        runtimeKind: optionalString(record['runtimeKind']),
+        upstreamProvider: optionalString(record['upstreamProvider']),
+        baseUrl: optionalString(record['baseUrl']),
+        openAICompatibleBaseUrl: optionalString(record['openAICompatibleBaseUrl']),
+        endpoint: optionalString(record['endpoint']),
+        aiSdkPackage: optionalString(record['aiSdkPackage']),
+        autoSelection: optionalRouteBoolean(record, 'autoSelection'),
+        supportsFallback: optionalRouteBoolean(record, 'supportsFallback'),
+        localPrivate: optionalRouteBoolean(record, 'localPrivate'),
         score: optionalNumber(record['score']),
         eligibilityDisposition: optionalString(record['eligibilityDisposition']),
         accountScope: optionalString(record['accountScope']) ?? 'default',
