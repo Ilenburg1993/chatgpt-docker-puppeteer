@@ -13,6 +13,7 @@ import {
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
     executeModelGatewayRuntimeSelectorPlanWithFallbacks,
+    filterModelGatewayRuntimeEligibilityOverlayDecisions,
     flushAndMirrorByokProviderHealthToSqlite,
     listByokProviderModelHealth,
     mergeByokProviderHealthRecords,
@@ -132,10 +133,14 @@ async function buildRuntimeSelectorContext({ strict, requireRuntimeProof, requir
             policyProfile: strict ? 'runtime-selector-strict' : 'runtime-selector-allow-probe',
         },
     });
+    const runtimeOverlayDecisions = filterModelGatewayRuntimeEligibilityOverlayDecisions(evaluated.decisions);
     const effectiveSnapshot = {
         ...snapshot,
         source: 'runtime-selector-effective-preview',
-        modelEligibilityDecisions: evaluated.decisions,
+        modelEligibilityDecisions: [
+            ...(Array.isArray(snapshot.modelEligibilityDecisions) ? snapshot.modelEligibilityDecisions : []),
+            ...runtimeOverlayDecisions,
+        ],
         modelEligibilityRuns: [
             ...(Array.isArray(snapshot.modelEligibilityRuns) ? snapshot.modelEligibilityRuns : []),
             evaluated.run,
@@ -175,6 +180,7 @@ async function buildRuntimeSelectorContext({ strict, requireRuntimeProof, requir
         comparison,
         policyResolution,
         runtimeSelectorPlan,
+        runtimeOverlayDecisionCount: runtimeOverlayDecisions.length,
         selectedDispositions: selectedDispositions(selection),
         postRuntimeDispositions: selectedDispositions(postRuntimeSelection),
     };
@@ -336,6 +342,7 @@ const summary = {
         sqliteRuntimeError: context.sqliteRuntimeError,
         runtimeAccountOverlaySummary: context.runtimeAccountOverlaySummary,
         eligibilityDecisionCount: context.eligibility.decisions.length,
+        runtimeOverlayDecisionCount: context.runtimeOverlayDecisionCount,
     },
     selection: {
         selected: context.selection.summary.selectedProfileCount,

@@ -8115,6 +8115,94 @@ Resultado:
 
 `197 passed`
 
+Mudanca 72:
+
+Effective runtime overlay nao substitui eligibility canonica por unknown blockers.
+
+Problema identificado:
+
+- apos espelhar mais health observado para SQLite, `live-readiness` caiu para `0/7` rotas selecionadas;
+- a causa era a reavaliacao effective com `unknownAccessPolicy=block`;
+- essa reavaliacao gerava milhares de decisions `account_access_unknown`;
+- ao montar o snapshot effective, essas decisions substituiam a eligibility persistida que ja estava apta;
+- o resultado era um falso bloqueio total antes dos live tests, mesmo sem overlays runtime ativos.
+
+Principio arquitetural consolidado:
+
+- health/runtime observado pode sobrepor bloqueadores concretos;
+- ausencia generica de account visibility nao deve apagar eligibility canonica;
+- unknown access precisa continuar sendo tratado na camada de account overlay/refresh, nao como regressao runtime;
+- effective snapshot deve preservar catalog eligibility e adicionar apenas blockers runtime/account concretos.
+
+Correcoes aplicadas:
+
+- criado `filterModelGatewayRuntimeEligibilityOverlayDecisions`;
+- criado `isModelGatewayRuntimeEligibilityOverlayDecision`;
+- o filtro mantem apenas blockers concretos como:
+  - `health_fatal`;
+  - `account_key_disabled`;
+  - `account_spending_exhausted`;
+  - `account_quota_exhausted`;
+  - `account_rate_limited`;
+  - `account_model_blocked`;
+- `account_access_unknown` e `account_overlay_missing` nao sao promovidos para overlay runtime;
+- `model-gateway-runtime-selector.mjs` passou a preservar `snapshot.modelEligibilityDecisions` e anexar apenas overlay decisions concretas;
+- `model-gateway-live-readiness.mjs` passou a usar a mesma regra;
+- a saida JSON informa `runtimeOverlayDecisionCount`/`runtimeOverlayDecisions`.
+
+Impacto:
+
+- mirror SQLite pode crescer sem colapsar o selector;
+- rate-limit/quota/auth concretos continuam bloqueando quando ativos;
+- readiness volta a refletir o que realmente impede runtime;
+- live tests continuam bloqueados apenas por causa concreta, nao por ausencia generica de overlay.
+
+Validacoes focadas:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "runtime eligibility overlays concrete|classifies provider quota"`
+
+Resultado:
+
+`2 passed`
+
+`npm run model-gateway:runtime-selector -- --fail --json`
+
+Resultado:
+
+- `ok=true`;
+- `selected=7`;
+- `blocked=0`;
+- `envReady=7`;
+- `runtimeOverlayDecisionCount=0`.
+
+`npm run model-gateway:live:readiness -- --fail --json`
+
+Resultado:
+
+- `ok=true`;
+- `runtimeSelector.selected=7`;
+- `runtimeSelector.blocked=0`;
+- `runtimeSelector.runtimeEnvReady=7`;
+- `runtimeOverlayDecisions=0`.
+
+`npm run model-gateway:typecheck`
+
+Resultado:
+
+`passed`
+
+`npm run model-gateway:lint`
+
+Resultado:
+
+`passed`
+
+`npm run model-gateway:test:contracts`
+
+Resultado:
+
+`198 passed`
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

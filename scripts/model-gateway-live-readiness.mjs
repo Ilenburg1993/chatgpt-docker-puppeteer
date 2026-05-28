@@ -18,6 +18,7 @@ import {
     createEnvSecretRegistry,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
+    filterModelGatewayRuntimeEligibilityOverlayDecisions,
     listByokProviderModelHealth,
     mergeByokProviderHealthRecords,
     renderModelGatewayLocalProviderOptInGuidance,
@@ -152,10 +153,14 @@ const effectiveEligibility = evaluateModelGatewayCatalogEligibility({
         policyProfile: 'live-readiness-effective-strict',
     },
 });
+const runtimeOverlayDecisions = filterModelGatewayRuntimeEligibilityOverlayDecisions(effectiveEligibility.decisions);
 const effectiveSnapshot = {
     ...sourceSnapshot,
     source: 'live-readiness-effective-preview',
-    modelEligibilityDecisions: effectiveEligibility.decisions,
+    modelEligibilityDecisions: [
+        ...(Array.isArray(sourceSnapshot.modelEligibilityDecisions) ? sourceSnapshot.modelEligibilityDecisions : []),
+        ...runtimeOverlayDecisions,
+    ],
     modelEligibilityRuns: [
         ...(Array.isArray(sourceSnapshot.modelEligibilityRuns) ? sourceSnapshot.modelEligibilityRuns : []),
         effectiveEligibility.run,
@@ -352,6 +357,7 @@ const summary = {
             runtimeAccountOverlays: runtimeAccountOverlays.length,
             runtimeAccountOverlaySummary,
             eligibilityDecisions: effectiveEligibility.decisions.length,
+            runtimeOverlayDecisions: runtimeOverlayDecisions.length,
         },
         postRuntimeEffective: {
             ok: postRuntimeEffectiveSelection.ok,

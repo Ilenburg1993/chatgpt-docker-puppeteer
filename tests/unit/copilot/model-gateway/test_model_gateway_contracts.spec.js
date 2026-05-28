@@ -217,6 +217,7 @@ import {
     recommendCatalogDiffProbes,
     evaluateModelGatewayCatalogEligibility,
     evaluateModelGatewayEligibility,
+    filterModelGatewayRuntimeEligibilityOverlayDecisions,
     listModelGatewayEligibilityPolicyPresets,
     refreshModelGatewayCatalog,
     runCatalogImporters,
@@ -460,6 +461,21 @@ describe('model-gateway foundation', () => {
         } finally {
             Date.now = originalNow;
         }
+    });
+
+    it('keeps runtime eligibility overlays concrete without promoting unknown access blockers', () => {
+        const decisions = [
+            { id: 'unknown', hardExclusions: ['account_access_unknown'] },
+            { id: 'missing-overlay', hardExclusions: ['account_overlay_missing'] },
+            { id: 'fatal-health', hardExclusions: ['health_fatal'] },
+            { id: 'rate-limit', hardExclusions: ['account_rate_limited'] },
+            { id: 'quota', hardExclusions: ['account_quota_exhausted'] },
+        ];
+
+        assert.deepEqual(
+            filterModelGatewayRuntimeEligibilityOverlayDecisions(decisions).map((decision) => decision['id']),
+            ['fatal-health', 'rate-limit', 'quota'],
+        );
     });
 
     it('routes against explicit merged runtime health records without hydrating global health state', () => {

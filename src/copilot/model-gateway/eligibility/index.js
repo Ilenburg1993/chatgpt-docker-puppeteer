@@ -24,6 +24,10 @@ export {
     resolveModelGatewayEligibilityPolicy,
 } from './policy-presets.js';
 export {
+    filterModelGatewayRuntimeEligibilityOverlayDecisions,
+    isModelGatewayRuntimeEligibilityOverlayDecision,
+} from './runtime-overlay-decisions.js';
+export {
     applyModelGatewayEligibilityToSnapshot,
     evaluateModelGatewayCatalogEligibility,
     modelEligibilityDecisionKey,
