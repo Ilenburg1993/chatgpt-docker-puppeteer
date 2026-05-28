@@ -330,6 +330,7 @@ function runtimeRoute(route) {
     const providerId = optionalString(route['providerId']);
     const providerModel = optionalString(route['providerModel']);
     if (!providerId || !providerModel) return null;
+    const runtimeEvidence = optionalRecord(route['runtimeEvidence']);
     return {
         id: `${providerId}:${providerModel}`,
         providerId,
@@ -352,6 +353,9 @@ function runtimeRoute(route) {
         autoSelection: routeMetadataBoolean(route, 'autoSelection'),
         supportsFallback: routeMetadataBoolean(route, 'supportsFallback'),
         localPrivate: routeMetadataBoolean(route, 'localPrivate'),
+        candidateSource: optionalString(route['candidateSource']),
+        runtimeObservedOnly: route['runtimeObservedOnly'] === true || runtimeEvidence?.['source'] === 'runtime_health',
+        runtimeEvidence,
         score: optionalNumber(route['score']),
         eligibilityDisposition: optionalString(route['eligibilityDisposition']),
         accountScope: optionalString(route['accountScope']) ?? 'default',

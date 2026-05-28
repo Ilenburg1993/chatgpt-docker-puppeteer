@@ -1185,6 +1185,9 @@ describe('model-gateway foundation', () => {
                 selected: {
                     ...row.selected,
                     hasRuntimeProof: true,
+                    candidateSource: 'runtime_health',
+                    runtimeObservedOnly: true,
+                    runtimeEvidence: { source: 'runtime_health', verifiedProbes: ['chat'] },
                 },
             })),
         };
@@ -1193,7 +1196,14 @@ describe('model-gateway foundation', () => {
             requireRuntimeEnvReady: true,
             env: {},
         });
+        const provedRuntimeOnlyPlan = buildModelGatewayRuntimeSelectorPlan(provedButEnvBlockedPolicy, {
+            requireRuntimeProof: true,
+            requireRuntimeEnvReady: false,
+            env: {},
+        });
         assert.equal(provedButEnvBlockedPlan.summary.blockedProfileCount, 1);
+        assert.equal(provedRuntimeOnlyPlan.routes[0].selected?.['candidateSource'], 'runtime_health');
+        assert.equal(provedRuntimeOnlyPlan.routes[0].selected?.['runtimeObservedOnly'], true);
         assert.equal(provedButEnvBlockedPlan.routes[0].reasons.includes('blocked:runtime_env_not_ready'), true);
         assert.equal(provedButEnvBlockedPlan.routes[0].reasons.includes('blocked:runtime_proof_required'), false);
         const routeEnvReadyPlan = buildModelGatewayRuntimeSelectorPlan(preferRuntimeProved, {

@@ -10864,6 +10864,35 @@ Validacao executada:
 - focused vitest `runtime-only proved routes`;
 - dry-run JSON do runtime selector com resumo de `secretConfigured` e env readiness.
 
+## Mudanca 123 - Runtime selector preserva origem operacional da rota escolhida
+
+Status: concluido.
+
+Motivo:
+
+- `policyResolution.rows[].selected` ja carregava `candidateSource=runtime_health` e `runtimeObservedOnly=true`;
+- ao montar `runtimeSelectorPlan.routes[].selected`, o resumo de runtime descartava esses campos;
+- isso reduzia a clareza do plano live, principalmente quando a rota escolhida vinha de prova operacional e nao de
+  projecao canonica.
+
+Implementacao:
+
+- `runtimeRoute` agora preserva:
+  - `candidateSource`;
+  - `runtimeObservedOnly`;
+  - `runtimeEvidence`;
+- planos bloqueados por env continuam podendo ocultar `selected`, mas planos selecionaveis mantem a origem operacional;
+- dry-run com `repo_agent,code,tool_agent` confirmou `source=runtime_health` e `runtimeOnly=true` nos tres perfis
+  selecionados.
+
+Validacao executada:
+
+- `node --check src/copilot/model-gateway/routing/runtime-selector.js`;
+- focused vitest `audits pre-runtime selection`;
+- `npm run model-gateway:typecheck`;
+- dry-run JSON do runtime selector com `preferred-probes` e `block-failed-probes`;
+- `npm run model-gateway:live:readiness -- --json` permaneceu `ok=true`.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
