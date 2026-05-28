@@ -26,7 +26,11 @@ export const MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS = Object.freeze([
         providerId: 'openrouter',
         groups: Object.freeze([anySecret('api_key', ['OPENROUTER_API_KEY', 'OPEN_ROUTER_KEY'])]),
     }),
-    Object.freeze({ providerId: 'kilo', groups: Object.freeze([anySecret('api_key', ['KILO_API_KEY', 'KILO_CODE_API_KEY'])]) }),
+    Object.freeze({
+        providerId: 'kilo',
+        providerAliases: Object.freeze(['kilo-code', 'kilo-gateway']),
+        groups: Object.freeze([anySecret('api_key', ['KILO_API_KEY', 'KILO_CODE_API_KEY', 'KILOCODE_API_KEY'])]),
+    }),
     Object.freeze({
         providerId: 'huggingface',
         groups: Object.freeze([anySecret('api_key', ['HF_TOKEN', 'HUGGINGFACE_API_TOKEN', 'HUGGING_FACE_API_KEY', 'HUGGING_FACE_KEY'])]),

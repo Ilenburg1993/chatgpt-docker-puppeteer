@@ -10740,6 +10740,95 @@ Decisao:
 - antes de live full, revisar custo/quota e criterio de promocao de modelos Z.AI remotos;
 - manter `glm-4.5-flash` como rota provada por runtime mesmo ausente do catalogo remoto atual.
 
+## Mudanca 120 - Candidatos operacionais runtime-only sem contaminar catalogo canonico
+
+Status: concluido.
+
+Motivo:
+
+- o teste live comprovou que uma rota pode funcionar em runtime mesmo quando o catalogo canonico ainda nao possui uma
+  projecao suficiente, ou quando a evidencia esta em uma camada operacional;
+- o seletor dependia de `projections` para formar candidatos, portanto provas persistidas em SQLite ficavam sem uso
+  caso o modelo/provedor ainda nao tivesse uma projecao canonica;
+- promover runtime facts para `projections` seria errado, pois runtime e account/key state sao volateis.
+
+Implementacao:
+
+- `routeGatewayModels` agora pode montar candidatos efemeros a partir de `runtimeHealthRecords` ou
+  `runtimeHealthIndex.records`;
+- esses candidatos so existem durante a chamada de selecao;
+- a origem fica marcada como `provenance.candidateSource=runtime_health`;
+- `provenance.canonicalMetadataMutation=false` deixa explicito que nenhuma observacao runtime virou metadado canonico;
+- `runtimeEvidence` inclui status, profile e probes verificados;
+- capacidades minimas sao inferidas apenas da prova operacional:
+  - `chat`/`streaming` por sucesso de chamada/probe;
+  - `tools` por agent/live tool protocol;
+  - `jsonMode`/`structuredOutputs` por probe JSON;
+  - `vision` apenas por probe vision positiva;
+- falha de vision observada vira `unsupportedParameters: ["vision"]`, sem bloquear chat/agent;
+- candidatos runtime-only precisam de provider conhecido na matriz de endpoints para terem caminho executavel;
+- providers locais continuam sujeitos ao opt-in explicito de Ollama/local.
+
+Garantias:
+
+- pre-runtime puro continua sem usar runtime-only, pois `ignoreRuntimeHealth=true`;
+- metadata-first continua podendo manter selecao canonica;
+- `prefer_runtime_proved` e `require_runtime_proof` podem aproveitar runtime-only;
+- `snapshotContext.runtimeOnlyCandidateCount` mostra quantos candidatos efemeros entraram;
+- explain/selection summary exibem `runtimeObservedOnly=true` quando aplicavel;
+- a arquitetura continua separando banco canonico, account/key state e runtime proof.
+
+Validacao executada:
+
+- `node --check src/copilot/model-gateway/routing/policy-engine.js`;
+- `node --check src/copilot/model-gateway/routing/selection-audit.js`;
+- `node --check src/copilot/model-gateway/routing/explain.js`;
+- focused vitest:
+  `runtime-only proved routes`,
+  `task-relevant runtime probe proofs`,
+  `runtime proof weights`,
+  `routes against an indexed runtime health view`.
+
+## Mudanca 121 - Explain e aliases de provider para rotas provadas sem projecao
+
+Status: concluido.
+
+Motivo:
+
+- operadores e LLMs precisam distinguir "nao existe no catalogo canonico" de "existe prova operacional";
+- `kilo-code` e `kilo-gateway` sao presets reais do terminal/SDK, mas a matriz de endpoints consolidava a familia como
+  `kilo`;
+- sem aliases, um candidato runtime-only podia ficar sem base URL/env check coerente.
+
+Implementacao:
+
+- `explainModelGatewayCatalogEntry` agora retorna `operationalFound=true` quando o seletor textual nao encontra
+  projecao, mas encontra runtime health/probes para o provider/model;
+- `nextActions` diferencia:
+  - `runtime_route_proved_but_catalog_projection_missing`;
+  - `refresh_catalog_or_collect_provider_model_metadata`;
+  - `runtime_selector_can_use_operational_candidate`;
+- `resolveProviderEndpointInventory` passa a reconhecer `providerAliases`;
+- endpoint inventory de Kilo inclui `kilo-code` e `kilo-gateway`;
+- env requirements de Kilo tambem aceitam `kilo-code`/`kilo-gateway` e `KILOCODE_API_KEY`;
+- dry-run confirmou candidato runtime-only `kilo-code/kilo-auto/free` com:
+  - `candidateSource=runtime_health`;
+  - `runtimeObservedOnly=true`;
+  - `baseUrl=https://api.kilo.ai/api/gateway`;
+  - `wireApi=chat_completions`;
+  - env `ready`.
+
+Validacao executada:
+
+- `node --check` em endpoint inventory, Kilo endpoints, requirements e policy engine;
+- focused vitest:
+  `runtime-proved routes that are still absent`,
+  `runtime-only proved routes`,
+  `provider env requirements`,
+  `provider endpoint inventory`;
+- dry-run:
+  `npm run model-gateway:runtime-selector -- --json --allow-probe --allow-env-missing --profile=repo_agent --selection-policy=prefer_runtime_proved`.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

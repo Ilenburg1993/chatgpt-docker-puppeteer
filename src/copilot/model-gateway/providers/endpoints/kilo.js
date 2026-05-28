@@ -1,6 +1,7 @@
 // @ts-check
 export const KILO_PROVIDER_ENDPOINTS = Object.freeze({
     providerId: 'kilo',
+    providerAliases: Object.freeze(['kilo-code', 'kilo-gateway']),
     adapterId: 'kilo',
     providerKind: 'gateway',
     baseUrls: Object.freeze(['https://api.kilo.ai/api/gateway']),

@@ -2727,6 +2727,53 @@ describe('model-gateway foundation', () => {
         assert.equal(runtimeProved['verification']?.['confidence'], 'catalog');
     });
 
+    it('admits runtime-only proved routes without mutating canonical metadata', () => {
+        const runtimeHealthRecords = [
+            {
+                routeProfile: 'repo_agent',
+                providerId: 'zai',
+                providerModel: 'glm-runtime-only',
+                lastStatus: 'ok',
+                lastSuccessAt: 120,
+                agentProbeStatus: 'ok',
+                lastAgentProbeSuccessAt: 125,
+                runtimeHealthStatus: 'ok',
+                runtimeObservedAtMs: 125,
+                probes: {
+                    chat: { status: 'ok', ok: true, providerAttempted: true, lastAt: 120, deltaCount: 3 },
+                    agent: { status: 'ok', ok: true, providerAttempted: true, lastAt: 125 },
+                },
+            },
+        ];
+
+        const route = routeModelGatewayCatalogSnapshot(
+            {
+                projections: [],
+                routeOptions: [],
+                accountOverlays: [],
+            },
+            'repo_agent',
+            {
+                routeProfile: 'repo_agent',
+                runtimeHealthRecords,
+                requireRuntimeProof: true,
+            },
+        );
+        const explanation = explainGatewayRouteDecision(route);
+
+        assert.equal(route.snapshotContext.projectionCount, 0);
+        assert.equal(route.snapshotContext.runtimeOnlyCandidateCount, 1);
+        assert.equal(route.selected?.model['providerId'], 'zai');
+        assert.equal(route.selected?.model['providerModel'], 'glm-runtime-only');
+        assert.equal(route.selected?.model['provenance']?.['candidateSource'], 'runtime_health');
+        assert.equal(route.selected?.model['provenance']?.['canonicalMetadataMutation'], false);
+        assert.equal(route.selected?.model['normalizedPolicy']?.['openAICompatibleBaseUrl'], 'https://api.z.ai/api/paas/v4');
+        assert.ok(route.selected?.reasons.includes('agent_probe_verified'));
+        assert.ok(route.selected?.reasons.includes('preferred:runtime_proved'));
+        assert.equal(explanation.selectedSummary?.['runtimeObservedOnly'], true);
+        assert.deepEqual(explanation.selectedSummary?.['runtimeEvidence']?.['verifiedProbes'], ['agent', 'chat']);
+    });
+
     it('allows runtime proof weights to be tuned without changing probe facts', () => {
         const metadataFirst = createModelRecord({
             providerId: 'aaa-metadata',
@@ -5686,6 +5733,57 @@ describe('model-gateway foundation', () => {
         } finally {
             db.close();
         }
+    });
+
+    it('explains runtime-proved routes that are still absent from canonical catalog projections', () => {
+        const explanation = explainModelGatewayCatalogEntry(
+            {
+                sources: [],
+                providerEvidences: [],
+                evidences: [],
+                routeOptions: [],
+                accountOverlays: [],
+                providerProjections: [],
+                projections: [],
+                importRuns: [],
+                rawPayloadRefs: [],
+                conflicts: [],
+                modelEligibilityRuns: [],
+                modelEligibilityDecisions: [],
+                schemaVersion: 1,
+                generatedAt: null,
+                source: 'unit-test',
+            },
+            'zai:glm-runtime-only',
+            {
+                runtimeHealthRecords: [
+                    {
+                        routeProfile: 'repo_agent',
+                        providerId: 'zai',
+                        providerModel: 'glm-runtime-only',
+                        runtimeHealthStatus: 'ok',
+                        lastStatus: 'ok',
+                        lastSuccessAt: 10,
+                    },
+                ],
+                runtimeProbeResults: [
+                    {
+                        providerId: 'zai',
+                        providerModel: 'glm-runtime-only',
+                        probeKind: 'chat',
+                        ok: true,
+                        status: 'ok',
+                    },
+                ],
+            },
+        );
+
+        assert.equal(explanation.found, false);
+        assert.equal(explanation['operationalFound'], true);
+        assert.equal(explanation.runtimeHealth?.status, 'ok');
+        assert.equal(explanation.runtimeProbes.length, 1);
+        assert.ok(explanation.nextActions.includes('runtime_route_proved_but_catalog_projection_missing'));
+        assert.ok(explanation.nextActions.includes('runtime_selector_can_use_operational_candidate'));
     });
 
     it('flushes BYOK health before mirroring runtime facts into SQLite on demand', async () => {
@@ -11691,11 +11789,13 @@ describe('model-gateway foundation', () => {
         }
 
         const kilo = resolveProviderEndpointInventory('kilo');
+        const kiloCode = resolveProviderEndpointInventory('kilo-code');
         const hf = resolveProviderEndpointInventory('huggingface');
         const cloudflare = resolveProviderEndpointInventory('cloudflare-workers-ai');
         const openCode = resolveProviderEndpointInventory('opencode');
 
         assert.equal(kilo?.providerKind, 'gateway');
+        assert.equal(kiloCode?.providerId, 'kilo');
         assert.ok(kilo?.modelCatalogSources.some((source) => source.url.endsWith('/api/gateway/models')));
         assert.ok(hf?.routeSelectors.includes('fastest'));
         assert.ok(hf?.routeSelectors.includes('cheapest'));
@@ -11799,6 +11899,10 @@ describe('model-gateway foundation', () => {
             env: { OLLAMA_HOST: 'http://localhost:11434' },
             providerId: 'ollama',
         });
+        const kiloAliasRows = evaluateModelGatewayProviderEnvRequirements({
+            env: { KILO_CODE_API_KEY: 'kilo-code-secret' },
+            providerId: 'kilo-code',
+        });
         const ollamaLocalRows = evaluateModelGatewayProviderEnvRequirements({
             env: { OLLAMA_HOST: 'http://localhost:11434' },
             providerId: 'ollama-local',
@@ -11811,12 +11915,15 @@ describe('model-gateway foundation', () => {
         const byProvider = new Map(rows.map((row) => [row.providerId, row]));
 
         assert.equal(byProvider.get('kilo')?.status, 'ready');
+        assert.deepEqual(byProvider.get('kilo')?.providerAliases, ['kilo-code', 'kilo-gateway']);
         assert.equal(byProvider.get('cloudflare-workers-ai')?.status, 'ready');
         assert.deepEqual(byProvider.get('cloudflare-workers-ai')?.missingRecommendedKeys, ['CLOUDFLARE_AI_GATEWAY_ID']);
         assert.equal(byProvider.get('ollama-local')?.status, 'ready');
         assert.deepEqual(byProvider.get('ollama-local')?.providerAliases, ['ollama']);
         assert.equal(byProvider.get('ollama-cloud')?.status, 'missing');
         assert.deepEqual(ollamaAliasRows.map((row) => row.providerId), ['ollama-local']);
+        assert.deepEqual(kiloAliasRows.map((row) => row.providerId), ['kilo']);
+        assert.equal(kiloAliasRows[0].status, 'ready');
         assert.deepEqual(ollamaLocalRows.map((row) => row.providerId), ['ollama-local']);
         assert.deepEqual(ollamaCloudRows.map((row) => row.providerId), ['ollama-cloud']);
         assert.deepEqual(ollamaCloudRows[0].missingRequiredKeys, ['OLLAMA_CLOUD_API_KEY']);
@@ -11824,6 +11931,7 @@ describe('model-gateway foundation', () => {
         assert.ok(byProvider.get('opencode')?.missingRequiredKeys.includes('OPENCODE_API_KEY'));
         assert.ok(summary.readyCount >= 3);
         assert.equal(JSON.stringify(rows).includes('kilo-secret'), false);
+        assert.equal(JSON.stringify(kiloAliasRows).includes('kilo-code-secret'), false);
         assert.equal(JSON.stringify(rows).includes('cf-secret'), false);
     });
 

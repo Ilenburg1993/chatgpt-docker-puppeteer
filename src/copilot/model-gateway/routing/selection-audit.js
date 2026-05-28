@@ -96,6 +96,8 @@ function selectedSummary(selected) {
     const accountAccess = isRecord(policyInputs['accountAccess']) ? policyInputs['accountAccess'] : {};
     const health = isRecord(selected['health']) ? selected['health'] : {};
     const probes = isRecord(health['probes']) ? health['probes'] : {};
+    const provenance = isRecord(model['provenance']) ? model['provenance'] : {};
+    const runtimeEvidence = isRecord(model['runtimeEvidence']) ? model['runtimeEvidence'] : {};
     const verifiedProbes = Object.entries(probes)
         .filter(([, probe]) => isRecord(probe) && probe['ok'] === true && probe['providerAttempted'] !== false)
         .map(([kind]) => kind)
@@ -126,6 +128,9 @@ function selectedSummary(selected) {
         autoSelection: modelRouteBoolean(model, 'autoSelection'),
         supportsFallback: modelRouteBoolean(model, 'supportsFallback'),
         localPrivate: modelRouteBoolean(model, 'localPrivate'),
+        candidateSource: optionalString(provenance['candidateSource']) ?? optionalString(provenance['source']),
+        runtimeObservedOnly: provenance['candidateSource'] === 'runtime_health' || runtimeEvidence['source'] === 'runtime_health',
+        runtimeEvidence: Object.keys(runtimeEvidence).length > 0 ? runtimeEvidence : null,
         score: typeof selected['score'] === 'number' && Number.isFinite(selected['score']) ? selected['score'] : null,
         scoreBreakdown: isRecord(selected['scoreBreakdown']) ? selected['scoreBreakdown'] : null,
         eligibilityDisposition: optionalString(eligibility['disposition']),

@@ -23,6 +23,7 @@ import { MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON } from './local-pr
 import { resolveModelGatewayTaskProfile } from './task-profiles.js';
 import { evaluateModelGatewayEligibility } from '../eligibility/index.js';
 import { isModelGatewayRuntimeEligibilityOverlayDecision } from '../eligibility/runtime-overlay-decisions.js';
+import { resolveProviderEndpointInventory } from '../providers/endpoints/index.js';
 
 const CONFIDENCE_SCORE = Object.freeze({
     unknown: 0,
@@ -524,6 +525,7 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
  *     preferredProbeKinds?: string[];
  *     requiredProbeKinds?: string[];
  *     blockFailedProbeKinds?: string[];
+ *     includeRuntimeOnlyCandidates?: boolean;
  *     allowLocalProviders?: boolean;
  *     excludeLocalProvidersByDefault?: boolean;
  *     requireRuntimeProof?: boolean;
@@ -861,6 +863,292 @@ function profileProbeKinds(profile) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {Record<string, any>}
+ */
+function recordMap(value) {
+    return isRecord(value) ? /** @type {Record<string, any>} */ (value) : {};
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function optionalString(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * @param {Record<string, any>} health
+ * @returns {Record<string, any>}
+ */
+function runtimeHealthProbes(health) {
+    return recordMap(health['probes']);
+}
+
+/**
+ * @param {Record<string, any>} health
+ * @param {string} kind
+ * @returns {boolean}
+ */
+function runtimeProbeOk(health, kind) {
+    const probe = recordMap(runtimeHealthProbes(health)[kind]);
+    return probe['ok'] === true && probe['providerAttempted'] !== false;
+}
+
+/**
+ * @param {Record<string, any>} health
+ * @param {string} kind
+ * @returns {boolean}
+ */
+function runtimeProbeAttempted(health, kind) {
+    const probe = recordMap(runtimeHealthProbes(health)[kind]);
+    return probe['providerAttempted'] !== false && (probe['ok'] === true || probe['ok'] === false);
+}
+
+/**
+ * @param {Record<string, any>} health
+ * @returns {boolean}
+ */
+function runtimeHealthHasPositiveProof(health) {
+    if (health['lastStatus'] === 'ok' || health['runtimeHealthStatus'] === 'ok') return true;
+    if (health['agentProbeStatus'] === 'ok') return true;
+    return Object.values(runtimeHealthProbes(health)).some(
+        (probe) => isRecord(probe) && probe['ok'] === true && probe['providerAttempted'] !== false,
+    );
+}
+
+/**
+ * @param {Record<string, any>} health
+ * @returns {number}
+ */
+function runtimeHealthObservedAt(health) {
+    const probes = runtimeHealthProbes(health);
+    const probeAt = Object.values(probes).reduce((max, probe) => {
+        if (!isRecord(probe)) return max;
+        return Math.max(
+            max,
+            finiteNumber(probe['lastAt']) ?? finiteNumber(probe['observedAt']) ?? finiteNumber(probe['runtimeObservedAtMs']) ?? 0,
+        );
+    }, 0);
+    return Math.max(
+        finiteNumber(health['runtimeObservedAtMs']) ?? 0,
+        finiteNumber(health['lastSuccessAt']) ?? 0,
+        finiteNumber(health['lastAgentProbeSuccessAt']) ?? 0,
+        probeAt,
+    );
+}
+
+/**
+ * @param {Record<string, any>} health
+ * @returns {string | null}
+ */
+function runtimeHealthRouteProfile(health) {
+    const profile = optionalString(health['routeProfile']) ?? optionalString(health['profile']);
+    return profile && profile !== 'default' ? profile : null;
+}
+
+/**
+ * @param {Record<string, any>} health
+ * @returns {Record<string, boolean>}
+ */
+function runtimeOnlyCapabilities(health) {
+    const chatOk = runtimeProbeOk(health, 'chat') || health['lastStatus'] === 'ok' || health['runtimeHealthStatus'] === 'ok';
+    const streaming =
+        runtimeProbeOk(health, 'streaming') ||
+        runtimeProbeOk(health, 'live_tool_protocol') ||
+        Object.values(runtimeHealthProbes(health)).some(
+            (probe) =>
+                isRecord(probe) &&
+                probe['ok'] === true &&
+                finiteNumber(probe['deltaCount']) !== null &&
+                Number(probe['deltaCount']) > 0,
+        ) ||
+        chatOk;
+    const tools = runtimeProbeOk(health, 'agent') || runtimeProbeOk(health, 'live_tool_protocol') || health['agentProbeStatus'] === 'ok';
+    const json = runtimeProbeOk(health, 'json');
+    const vision = runtimeProbeOk(health, 'vision');
+    return {
+        text: true,
+        chat: chatOk,
+        streaming,
+        tools,
+        forcedToolChoice: tools,
+        structuredOutputs: json,
+        jsonMode: json,
+        jsonSchema: json,
+        vision,
+    };
+}
+
+/**
+ * @param {Record<string, boolean>} capabilities
+ * @returns {string[]}
+ */
+function runtimeOnlySupportedParameters(capabilities) {
+    return [
+        'stream',
+        ...(capabilities['tools'] ? ['tools', 'tool_choice'] : []),
+        ...(capabilities['jsonMode'] || capabilities['structuredOutputs'] ? ['response_format'] : []),
+    ];
+}
+
+/**
+ * @param {string} providerId
+ * @returns {{ knownProvider: boolean; routeLayer: string; wireApi: string | null; openAICompatibleBaseUrl: string | null; endpoint: string | null; localPrivate: boolean }}
+ */
+function runtimeOnlyRouteDefaults(providerId) {
+    const inventory = resolveProviderEndpointInventory(providerId);
+    const endpoint =
+        inventory?.runtimeEndpoints.find((item) => item.kind === 'openai_chat_completions' || item.kind === 'chat_completions') ??
+        inventory?.runtimeEndpoints.find((item) => item.kind === 'responses') ??
+        inventory?.runtimeEndpoints.find((item) => item.kind.includes('chat')) ??
+        inventory?.runtimeEndpoints[0] ??
+        null;
+    const localPrivate = providerId === 'ollama-local' || providerId === 'ollama' || inventory?.providerKind === 'local_or_cloud_daemon';
+    const endpointKind = endpoint?.kind ?? null;
+    const wireApi =
+        endpointKind === 'openai_chat_completions' || endpointKind === 'chat_completions' || endpointKind === 'chat'
+            ? 'chat_completions'
+            : endpointKind === 'responses'
+              ? 'responses'
+              : endpointKind;
+    return {
+        knownProvider: Boolean(inventory),
+        routeLayer: localPrivate ? 'local_daemon' : 'runtime_observed',
+        wireApi,
+        openAICompatibleBaseUrl: inventory?.baseUrls[0] ?? null,
+        endpoint: endpoint?.path ?? null,
+        localPrivate,
+    };
+}
+
+/**
+ * Runtime health can prove a route before a provider catalog exposes the model. These ephemeral candidates let the
+ * selector use that proof without writing operational observations into canonical metadata.
+ *
+ * @param {Record<string, any>[]} baseCandidates
+ * @param {Parameters<typeof scoreGatewayModelCandidate>[2]} options
+ * @returns {Record<string, any>[]}
+ */
+function buildRuntimeOnlyRouteCandidates(baseCandidates, options = {}) {
+    if (options.ignoreRuntimeHealth === true || options.includeRuntimeOnlyCandidates === false) return [];
+    const records = Array.isArray(options.runtimeHealthRecords)
+        ? options.runtimeHealthRecords
+        : options.runtimeHealthIndex && Array.isArray(options.runtimeHealthIndex.records)
+          ? options.runtimeHealthIndex.records
+          : [];
+    if (records.length === 0) return [];
+    const existingProviderModels = new Set(
+        baseCandidates
+            .map((candidate) => `${optionalString(candidate['providerId']) ?? ''}\u001f${optionalString(candidate['providerModel']) ?? ''}`)
+            .filter((key) => key !== '\u001f'),
+    );
+    /** @type {Map<string, Record<string, any>>} */
+    const newest = new Map();
+    for (const health of records.filter(isRecord)) {
+        const providerId = optionalString(health['providerId']) ?? optionalString(health['provider']);
+        const providerModel = optionalString(health['providerModel']) ?? optionalString(health['model']);
+        if (!providerId || !providerModel || !runtimeHealthHasPositiveProof(health)) continue;
+        if (existingProviderModels.has(`${providerId}\u001f${providerModel}`)) continue;
+        const routeProfile = runtimeHealthRouteProfile(health);
+        const key = `${providerId}\u001f${providerModel}\u001f${routeProfile ?? ''}`;
+        const current = newest.get(key);
+        if (!current || runtimeHealthObservedAt(health) > runtimeHealthObservedAt(current)) newest.set(key, health);
+    }
+    /** @type {Record<string, any>[]} */
+    const runtimeCandidates = [];
+    for (const health of newest.values()) {
+        const providerId = optionalString(health['providerId']) ?? optionalString(health['provider']) ?? 'unknown-provider';
+        const providerModel = optionalString(health['providerModel']) ?? optionalString(health['model']) ?? 'unknown-model';
+        const routeDefaults = runtimeOnlyRouteDefaults(providerId);
+        if (!routeDefaults.knownProvider) continue;
+        const routeProfile = runtimeHealthRouteProfile(health) ?? 'default';
+        const capabilities = runtimeOnlyCapabilities(health);
+        const routeCandidateId = `${providerId}:${providerModel}:${routeProfile}:runtime_health:${providerModel}`;
+        runtimeCandidates.push({
+            schemaVersion: 1,
+            id: routeCandidateId,
+            canonicalModelId: `${providerId}:${providerModel}`,
+            routeCandidateId,
+            providerId,
+            providerModel,
+            routeProfile,
+            displayName: providerModel,
+            enabled: true,
+            modalities: {
+                input: capabilities['vision'] ? ['text', 'image'] : ['text'],
+                output: ['text'],
+            },
+            capabilities,
+            supportedParameters: runtimeOnlySupportedParameters(capabilities),
+            unsupportedParameters: Object.entries({
+                vision: runtimeProbeAttempted(health, 'vision') && !runtimeProbeOk(health, 'vision'),
+            })
+                .filter(([, unsupported]) => unsupported)
+                .map(([parameter]) => parameter),
+            limits: {},
+            pricing: {},
+            verification: {
+                confidence: 'probe_verified',
+                sources: ['runtime_health'],
+                updatedAt: new Date(runtimeHealthObservedAt(health) || Date.now()).toISOString(),
+            },
+            selectorKind: 'runtime_health',
+            selectorSyntax: providerModel,
+            normalizedPolicy: {
+                routeLayer: routeDefaults.routeLayer,
+                wireApi: routeDefaults.wireApi,
+                openAICompatibleBaseUrl: routeDefaults.openAICompatibleBaseUrl,
+                baseUrl: routeDefaults.openAICompatibleBaseUrl,
+                endpoint: routeDefaults.endpoint,
+                routeTraits: {
+                    runtimeObservedOnly: true,
+                    localPrivate: routeDefaults.localPrivate,
+                    routeLayer: routeDefaults.routeLayer,
+                    endpointKind: routeDefaults.wireApi,
+                    openAICompatible: !routeDefaults.localPrivate && Boolean(routeDefaults.openAICompatibleBaseUrl),
+                },
+            },
+            routing: {
+                tier: 'balanced',
+                useCases: [],
+                routeLayer: routeDefaults.routeLayer,
+                wireApi: routeDefaults.wireApi,
+                selectorKind: 'runtime_health',
+                selectorSyntax: providerModel,
+                runtimeObservedOnly: true,
+            },
+            routeTraits: {
+                runtimeObservedOnly: true,
+                localPrivate: routeDefaults.localPrivate,
+            },
+            routeProviderSpecific: {},
+            routeOptionRef: `${providerId}:${providerModel}:${routeProfile}:runtime_health:${providerModel}`,
+            routeOptionRefs: [`${providerId}:${providerModel}:${routeProfile}:runtime_health:${providerModel}`],
+            provenance: {
+                source: 'runtime_health',
+                candidateSource: 'runtime_health',
+                canonicalMetadataMutation: false,
+                observedAtMs: runtimeHealthObservedAt(health),
+            },
+            runtimeEvidence: {
+                source: 'runtime_health',
+                routeProfile,
+                runtimeHealthStatus: optionalString(health['runtimeHealthStatus']),
+                lastStatus: optionalString(health['lastStatus']),
+                agentProbeStatus: optionalString(health['agentProbeStatus']),
+                verifiedProbes: Object.entries(runtimeHealthProbes(health))
+                    .filter(([, probe]) => isRecord(probe) && probe['ok'] === true && probe['providerAttempted'] !== false)
+                    .map(([kind]) => kind)
+                    .sort(),
+            },
+        });
+    }
+    return runtimeCandidates;
+}
+
+/**
  * @param {ReturnType<typeof evaluateGatewayModelHealthRoute>['health']} health
  * @returns {boolean}
  */
@@ -1125,6 +1413,7 @@ function resolveCandidateEligibility(model, profile, options = {}) {
  *     candidates: ReturnType<typeof scoreGatewayModelCandidate>[];
  *     rejected: ReturnType<typeof scoreGatewayModelCandidate>[];
  *     fallbackChain: string[];
+ *     runtimeOnlyCandidateCount: number;
  * }}
  */
 export function routeGatewayModels(models, profileInput, options = {}) {
@@ -1149,7 +1438,8 @@ export function routeGatewayModels(models, profileInput, options = {}) {
             scoringOptions.eligibilityDecisionIndex = createEligibilityDecisionIndex(options.eligibilityDecisions, profile, options);
         }
     }
-    const scored = models.map((model) => scoreGatewayModelCandidate(model, profile, scoringOptions));
+    const runtimeOnlyCandidates = buildRuntimeOnlyRouteCandidates(models, scoringOptions);
+    const scored = [...models, ...runtimeOnlyCandidates].map((model) => scoreGatewayModelCandidate(model, profile, scoringOptions));
     const candidates = scored
         .filter((candidate) => candidate.include)
         .sort((a, b) => b.score - a.score || String(a.model['id']).localeCompare(String(b.model['id'])));
@@ -1160,6 +1450,7 @@ export function routeGatewayModels(models, profileInput, options = {}) {
         candidates,
         rejected,
         fallbackChain: candidates.map((candidate) => String(candidate.model['id'] ?? candidate.model['providerModel'] ?? 'unknown')),
+        runtimeOnlyCandidateCount: runtimeOnlyCandidates.length,
     };
 }
 
@@ -1194,7 +1485,8 @@ export function routeModelGatewayCatalogSnapshot(snapshot, profileInput, options
             routeOptionCount: routeOptions.length,
             accountOverlayCount: accountOverlays.length,
             eligibilityDecisionCount: eligibilityDecisions.length,
-            candidateCount: candidates.length,
+            candidateCount: candidates.length + route.runtimeOnlyCandidateCount,
+            runtimeOnlyCandidateCount: route.runtimeOnlyCandidateCount,
         },
     };
 }

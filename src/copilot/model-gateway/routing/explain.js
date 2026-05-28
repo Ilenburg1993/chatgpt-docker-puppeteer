@@ -89,6 +89,8 @@ function candidateSummary(candidate) {
     const eligibility = isRecord(candidate['eligibility']) ? candidate['eligibility'] : null;
     const health = isRecord(candidate['health']) ? candidate['health'] : null;
     const normalizedPolicy = isRecord(model['normalizedPolicy']) ? model['normalizedPolicy'] : {};
+    const provenance = isRecord(model['provenance']) ? model['provenance'] : {};
+    const runtimeEvidence = isRecord(model['runtimeEvidence']) ? model['runtimeEvidence'] : {};
     return {
         id: candidateId(candidate),
         providerId: optionalString(model['providerId']),
@@ -96,6 +98,9 @@ function candidateSummary(candidate) {
         routeProfile: optionalString(model['routeProfile']),
         routeLayer: optionalString(normalizedPolicy['routeLayer']),
         wireApi: optionalString(normalizedPolicy['wireApi'] ?? normalizedPolicy['directWireApi']),
+        candidateSource: optionalString(provenance['candidateSource']) ?? optionalString(provenance['source']),
+        runtimeObservedOnly: provenance['candidateSource'] === 'runtime_health' || runtimeEvidence['source'] === 'runtime_health',
+        runtimeEvidence: Object.keys(runtimeEvidence).length > 0 ? runtimeEvidence : null,
         score: typeof candidate['score'] === 'number' ? candidate['score'] : null,
         included: candidate['include'] === true,
         rejectedReasons: Array.isArray(candidate['rejectedReasons'])

@@ -143,11 +143,57 @@ function findRuntimeProbes(projection, rows) {
 }
 
 /**
+ * @param {Record<string, unknown>} row
+ * @param {string} selector
+ * @returns {boolean}
+ */
+function runtimeRecordMatchesSelector(row, selector) {
+    const normalized = selector.toLowerCase();
+    const providerId = optionalString(row['providerId']) ?? optionalString(row['provider']);
+    const providerModel = optionalString(row['providerModel']) ?? optionalString(row['model']);
+    if (!providerModel) return false;
+    const tokens = [
+        providerModel,
+        providerId ? `${providerId}:${providerModel}` : null,
+        providerId ? `${providerId}/${providerModel}` : null,
+        optionalString(row['key']),
+    ]
+        .filter((item) => item !== null)
+        .map((item) => String(item).toLowerCase());
+    return tokens.some((token) => token === normalized || token.includes(normalized));
+}
+
+/**
+ * @param {string} selector
+ * @param {Record<string, unknown>[]} rows
+ * @returns {Record<string, unknown> | null}
+ */
+function findRuntimeHealthBySelector(selector, rows) {
+    return rows.find((row) => runtimeRecordMatchesSelector(row, selector)) ?? null;
+}
+
+/**
+ * @param {Record<string, unknown>} health
+ * @param {Record<string, unknown>[]} rows
+ * @returns {Record<string, unknown>[]}
+ */
+function findRuntimeProbesForHealth(health, rows) {
+    const providerId = optionalString(health['providerId']) ?? optionalString(health['provider']);
+    const providerModel = optionalString(health['providerModel']) ?? optionalString(health['model']);
+    return rows.filter(
+        (row) =>
+            (optionalString(row['providerId']) ?? optionalString(row['provider'])) === providerId &&
+            (optionalString(row['providerModel']) ?? optionalString(row['model'])) === providerModel,
+    );
+}
+
+/**
  * @param {ReturnType<typeof import('./json-catalog-store.js').normalizeStoredCatalogSnapshot>} snapshot
  * @param {string} selector
  * @param {{ runtimeHealthRecords?: Record<string, unknown>[]; runtimeProbeResults?: Record<string, unknown>[] }} [options]
  * @returns {{
  *   found: boolean;
+ *   operationalFound?: boolean;
  *   selector: string;
  *   key: string | null;
  *   projection: Record<string, any> | null;
@@ -172,8 +218,17 @@ export function explainModelGatewayCatalogEntry(snapshot, selector, options = {}
     const projection =
         snapshot.projections.find((item) => matchesProjectionSelector(item, normalizedSelector)) ?? null;
     if (!projection) {
+        const runtimeHealthRecord = findRuntimeHealthBySelector(normalizedSelector, options.runtimeHealthRecords ?? []);
+        const runtimeProbes = runtimeHealthRecord ? findRuntimeProbesForHealth(runtimeHealthRecord, options.runtimeProbeResults ?? []) : [];
+        const runtimeHealth = runtimeHealthRecord
+            ? {
+                  status: summarizeRuntimeHealthStatus(runtimeHealthRecord),
+                  record: runtimeHealthRecord,
+              }
+            : null;
         return {
             found: false,
+            operationalFound: runtimeHealthRecord !== null,
             selector: normalizedSelector,
             key: null,
             projection: null,
@@ -182,15 +237,21 @@ export function explainModelGatewayCatalogEntry(snapshot, selector, options = {}
             accountOverlays: [],
             eligibility: null,
             providerProjection: null,
-            runtimeHealth: null,
-            runtimeProbes: [],
+            runtimeHealth,
+            runtimeProbes,
             metadataCoverage: {
                 confidenceFields: 0,
                 provenanceFields: 0,
                 supportedParameters: 0,
                 unsupportedParameters: 0,
             },
-            nextActions: ['refresh_catalog_or_use_more_specific_selector'],
+            nextActions: runtimeHealthRecord
+                ? [
+                      'runtime_route_proved_but_catalog_projection_missing',
+                      'refresh_catalog_or_collect_provider_model_metadata',
+                      'runtime_selector_can_use_operational_candidate',
+                  ]
+                : ['refresh_catalog_or_use_more_specific_selector'],
         };
     }
     const routeOptions = snapshot.routeOptions.filter((route) => sameModelRoute(route, projection));

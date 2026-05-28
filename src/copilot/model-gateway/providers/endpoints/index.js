@@ -48,6 +48,7 @@ export {
 /**
  * @typedef {object} ProviderEndpointInventory
  * @property {string} providerId
+ * @property {readonly string[]} [providerAliases]
  * @property {string} adapterId
  * @property {string} providerKind
  * @property {readonly string[]} baseUrls
@@ -87,7 +88,14 @@ export function listProviderEndpointInventory() {
 export function resolveProviderEndpointInventory(providerId) {
     if (typeof providerId !== 'string') return null;
     const normalized = providerId.trim().toLowerCase();
-    return MODEL_GATEWAY_PROVIDER_ENDPOINT_INVENTORY.find((item) => item.providerId === normalized || item.adapterId === normalized) ?? null;
+    return (
+        MODEL_GATEWAY_PROVIDER_ENDPOINT_INVENTORY.find(
+            (item) =>
+                item.providerId === normalized ||
+                item.adapterId === normalized ||
+                (Array.isArray(item.providerAliases) && item.providerAliases.includes(normalized)),
+        ) ?? null
+    );
 }
 
 export {
