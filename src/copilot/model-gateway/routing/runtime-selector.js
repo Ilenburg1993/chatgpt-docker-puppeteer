@@ -1109,7 +1109,12 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
             resetWindow,
         };
     }
-    if (failureKind === 'auth' || failureKind === 'credits' || failureKind === 'model-or-route') {
+    if (
+        failureKind === 'auth' ||
+        failureKind === 'credits' ||
+        failureKind === 'model-or-route' ||
+        failureKind === 'capability-unsupported'
+    ) {
         return {
             schema: 'model-gateway-runtime-selector-retry-decision',
             retryRoute: false,

@@ -184,6 +184,9 @@ function normalizeFailureKind(value) {
     if (normalized === 'network' || normalized.includes('provider.network')) return 'network';
     if (normalized === 'upstream' || normalized.includes('provider.upstream')) return 'upstream';
     if (normalized === 'model-or-route' || normalized.includes('provider.model_or_route')) return 'model-or-route';
+    if (normalized === 'capability-unsupported' || normalized.includes('provider.capability_unsupported')) {
+        return 'capability-unsupported';
+    }
     if (normalized === 'credits' || normalized.includes('provider.credits')) return 'credits';
     if (normalized === 'rate-limit' || normalized.includes('rate_limit') || normalized.includes('rate-limit')) return 'rate-limit';
     if (normalized === 'auth' || normalized.includes('provider.auth')) return 'auth';

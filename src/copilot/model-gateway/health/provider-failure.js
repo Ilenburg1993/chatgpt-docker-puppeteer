@@ -13,7 +13,7 @@
 import { toError } from '#copilot/core';
 
 /**
- * @typedef {'credits' | 'rate-limit' | 'auth' | 'model-or-route' | 'timeout' | 'network' | 'upstream' | 'unknown'} ByokProviderFailureKind
+ * @typedef {'credits' | 'rate-limit' | 'auth' | 'model-or-route' | 'capability-unsupported' | 'timeout' | 'network' | 'upstream' | 'unknown'} ByokProviderFailureKind
  */
 
 /**
@@ -289,6 +289,21 @@ function textLooksLikeWireSchemaFailure(message) {
 }
 
 /**
+ * @param {string} message
+ * @returns {boolean}
+ */
+function textLooksLikeUnsupportedCapabilityFailure(message) {
+    return (
+        /\binvalid api parameter\b/iu.test(message) ||
+        /\bunsupported (?:parameter|field|capability|modality|attachment|image|vision)\b/iu.test(message) ||
+        /\b(?:image|vision|attachment|tool|tools|function calling|json schema|response format)\b.*\b(?:unsupported|not supported|invalid)\b/iu.test(
+            message,
+        ) ||
+        /\b(?:does not|doesn't|do not|don't) support\b/iu.test(message)
+    );
+}
+
+/**
  * @param {ByokProviderFailureKind} kind
  * @param {number | null} statusCode
  * @param {string} message
@@ -349,6 +364,18 @@ function buildFailure(kind, statusCode, message, limitHints) {
                 operatorLabel: `provider BYOK nao encontrou modelo ou rota configurada${http ? ` (${http})` : ''}`,
                 operatorAction:
                     'confira /byok models refresh, selecione o modelo explicitamente e probe o candidato antes do live',
+                external: true,
+            };
+        case 'capability-unsupported':
+            return {
+                ...base,
+                kind,
+                message,
+                statusCode,
+                errorContext: 'provider.capability_unsupported',
+                operatorLabel: `provider BYOK recusou parametro ou capacidade da chamada${http ? ` (${http})` : ''}`,
+                operatorAction:
+                    'trate como falha da capability/probe, nao como indisponibilidade geral; tente rota sem essa capacidade ou modelo com suporte declarado',
                 external: true,
             };
         case 'timeout':
@@ -428,7 +455,10 @@ export function classifyByokProviderFailure(error) {
         return buildFailure('model-or-route', statusCode, message, limitHints);
     }
     if (statusCode === 400 && textLooksLikeWireSchemaFailure(message)) {
-        return buildFailure('model-or-route', statusCode, message, limitHints);
+        return buildFailure('capability-unsupported', statusCode, message, limitHints);
+    }
+    if (statusCode === 400 && textLooksLikeUnsupportedCapabilityFailure(message)) {
+        return buildFailure('capability-unsupported', statusCode, message, limitHints);
     }
     if (textLooksLikeTimeoutFailure(message)) {
         return buildFailure('timeout', statusCode, message, limitHints);

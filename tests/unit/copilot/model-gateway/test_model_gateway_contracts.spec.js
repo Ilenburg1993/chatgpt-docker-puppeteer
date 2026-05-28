@@ -451,6 +451,12 @@ describe('model-gateway foundation', () => {
             );
             const credits = classifyByokProviderFailure(Object.assign(new Error('payment required: add credits'), { status: 402 }));
             const auth = classifyByokProviderFailure(Object.assign(new Error('invalid api key'), { status: 401 }));
+            const invalidVisionParameter = classifyByokProviderFailure(
+                Object.assign(new Error('400 Invalid API parameter, please check the documentation.'), { status: 400 }),
+            );
+            const unsupportedToolSchema = classifyByokProviderFailure(
+                Object.assign(new Error("400 'messages.2' : property 'parsed' is unsupported"), { status: 400 }),
+            );
 
             assert.equal(retryText.kind, 'rate-limit');
             assert.equal(retryText.retryAfterSeconds, 120);
@@ -462,6 +468,9 @@ describe('model-gateway foundation', () => {
             assert.equal(credits.statusCode, 402);
             assert.equal(auth.kind, 'auth');
             assert.equal(auth.statusCode, 401);
+            assert.equal(invalidVisionParameter.kind, 'capability-unsupported');
+            assert.equal(invalidVisionParameter.errorContext, 'provider.capability_unsupported');
+            assert.equal(unsupportedToolSchema.kind, 'capability-unsupported');
         } finally {
             Date.now = originalNow;
         }

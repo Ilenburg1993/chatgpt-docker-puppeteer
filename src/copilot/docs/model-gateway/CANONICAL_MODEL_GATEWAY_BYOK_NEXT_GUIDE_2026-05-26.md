@@ -10279,6 +10279,89 @@ Teste/validacao:
 - validadores escopados do model-gateway continuam verdes;
 - a mudanca e deliberadamente no gate do runner, sem alterar metadado canonico.
 
+## Mudanca 109 - Live llm-b no-pr confirma gate commandOk do runtime selector
+
+Status: concluido.
+
+Execucao:
+
+`node scripts/copilot/run-terminal-llm-b-live-test.mjs --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-temporary-failure-cooldown-ms=1 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000`
+
+Artefato:
+
+- `artifacts/terminal-live/2026-05-28T21-28-32-274Z/summary.md`;
+- `artifacts/terminal-live/2026-05-28T21-28-32-274Z/byok.real.redacted.json`.
+
+Resultado:
+
+- status geral: PASS;
+- exit code: 0;
+- duracao: 90626ms;
+- runtime selector:
+  - `commandOk=true`;
+  - `execution.ok=true`;
+  - `attemptedCount=1`;
+  - `skippedAttemptCount=0`;
+  - rota `repo_agent -> zai/glm-4.5-flash`;
+- chat probe: ok;
+- streaming probe: ok;
+- JSON probe: ok;
+- agent probe: ok com tool calling e ask_user;
+- vision probe: failed HTTP 400, mas nao degradou admissao de chat/agent;
+- `/byok env` exibiu `OPENCODE_API_KEY`;
+- `/usage now` manteve BYOK fora de Premium Request;
+- secret scan: 25 valores locais checados sem vazamento no output.
+
+Observacoes:
+
+- a falha de vision continua sendo capacidade especifica, nao criterio excludente default;
+- o catalogo remoto Zai nao lista `glm-4.5-flash`, mas a rota configurada tem prova viva e agent probe ok;
+- essa diferenca reforca a separacao entre metadado remoto, overlay de conta, runtime health e runtime proof;
+- safe filtering remove candidatos sem agent proof quando a policy pede seguranca operacional;
+- o gate do runner agora confirmou que `summary.ok`, exit code e `execution.ok` precisam estar coerentes antes do terminal prosseguir.
+
+Proximas lacunas identificadas:
+
+- classificar melhor HTTP 400 de vision como incompatibilidade multimodal especifica, nao `unknown` generico;
+- expor no cockpit quando um modelo comprovado por runtime nao aparece no endpoint remoto atual;
+- manter `glm-4.5-flash` como runtime-proved route sem promove-lo a metadado canonico remoto;
+- continuar fortalecendo health/probe classification antes de lives full com PR.
+
+## Mudanca 110 - Falhas de capability deixam de cair em unknown/model-or-route
+
+Status: concluido.
+
+Contexto:
+
+- no live no-pr, o vision probe de `zai/glm-4.5-flash` falhou com HTTP 400 `Invalid API parameter`;
+- o terminal classificava isso como `provider.unknown`;
+- mensagens de schema/tool como `property parsed is unsupported` tambem podiam ser tratadas como `model-or-route`;
+- isso mistura tres coisas diferentes:
+  - modelo/rota inexistente;
+  - capability/parametro recusado;
+  - falha desconhecida real.
+
+Regra aplicada:
+
+- a taxonomia BYOK ganhou `capability-unsupported`;
+- HTTP 400 com parametro invalido, capability unsupported, attachment/image/vision/tool/schema unsupported passa a essa classe;
+- `errorContext=provider.capability_unsupported`;
+- `resolveModelGatewayRuntimeRetryDecision` trata essa classe como permanente para a rota/chamada;
+- health routing normaliza `provider.capability_unsupported`.
+
+Motivo arquitetural:
+
+- uma falha de vision nao deve degradar chat nem agent;
+- uma falha de tool/schema nao quer dizer que o modelo nao exista;
+- runtime selector precisa saber quando deve cair para alternativa em vez de repetir a mesma rota;
+- o banco continua separando metadado canonico de probe/runtime health.
+
+Teste adicionado:
+
+- HTTP 400 `Invalid API parameter` classifica como `capability-unsupported`;
+- HTTP 400 `property parsed is unsupported` classifica como `capability-unsupported`;
+- quota/auth/rate-limit continuam preservados.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
