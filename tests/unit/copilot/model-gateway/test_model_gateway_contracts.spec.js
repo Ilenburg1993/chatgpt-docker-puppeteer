@@ -92,6 +92,8 @@ import {
     renderModelGatewayLocalProviderOptInGuidance,
     auditModelGatewayValueRedaction,
     collectModelGatewaySecretAuditEnvValues,
+    createModelGatewayRouteDecisionCapture,
+    dedupeModelGatewayRouteDecisionEvents,
     redactSecretRecord,
     redactSecretText,
     byokProviderHealthRecordKey,
@@ -2301,6 +2303,61 @@ describe('model-gateway foundation', () => {
         assert.equal(recorded.decisionId, event.decisionId);
         assert.equal(ledger.length, 1);
         assert.equal(ledger[0].decisionId, event.decisionId);
+    });
+
+    it('captures and deduplicates route decision streams before SQLite persistence', () => {
+        const route = routeGatewayModels(
+            [
+                createModelRecord({
+                    providerId: 'openrouter',
+                    providerModel: 'openai/gpt-oss-120b',
+                    capabilities: { tools: true, streaming: true },
+                    limits: { contextWindowTokens: 131072 },
+                }),
+            ],
+            'repo_agent',
+            { requireAgentProbeOk: false },
+        );
+        const first = buildRouteDecisionEvent({
+            taskProfile: 'repo_agent',
+            routeProfile: 'default',
+            mode: 'metadata_first',
+            source: 'unit-test-runtime-selector',
+            route,
+        });
+        const second = buildRouteDecisionEvent({
+            taskProfile: 'repo_agent',
+            routeProfile: 'default',
+            mode: 'metadata_first:runtime_result',
+            source: 'unit-test-runtime-selector:runtime-result',
+            route,
+            failure: 'runtime_probe_failed:empty',
+        });
+        const duplicateSecond = {
+            ...second,
+            selected: false,
+            failure: 'runtime_probe_failed:updated-empty',
+        };
+        const capture = createModelGatewayRouteDecisionCapture();
+
+        capture.record(first);
+        capture.record(second);
+        capture.record(duplicateSecond);
+        const captured = capture.list();
+        const unique = capture.listUnique();
+        const deduped = dedupeModelGatewayRouteDecisionEvents([first, second, duplicateSecond, null, undefined]);
+
+        assert.equal(capture.count(), 3);
+        assert.equal(captured.length, 3);
+        assert.equal(unique.length, 2);
+        assert.deepEqual(
+            unique.map((event) => event.decisionId),
+            [first.decisionId, second.decisionId],
+        );
+        assert.equal(unique[1].failure, 'runtime_probe_failed:updated-empty');
+        assert.equal(deduped[1].failure, 'runtime_probe_failed:updated-empty');
+        captured[0].fallbackChain.push('mutated');
+        assert.equal(capture.list()[0].fallbackChain.includes('mutated'), false);
     });
 
     it('keeps route decision ids unique for pre-decision and runtime outcome in the same millisecond', () => {

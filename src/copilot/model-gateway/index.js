@@ -439,6 +439,8 @@ export {
     projectProbeCompletedMetrics,
     projectRouteDecisionMetrics,
     projectModelGatewayMetrics,
+    createModelGatewayRouteDecisionCapture,
+    dedupeModelGatewayRouteDecisionEvents,
     listModelGatewayRouteDecisions,
     recordModelGatewayRouteDecision,
     resetModelGatewayRouteDecisionLedgerForTests,

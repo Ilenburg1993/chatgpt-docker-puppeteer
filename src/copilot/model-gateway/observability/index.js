@@ -37,6 +37,8 @@ export {
     projectModelGatewayMetrics,
 } from './events.js';
 export {
+    createModelGatewayRouteDecisionCapture,
+    dedupeModelGatewayRouteDecisionEvents,
     listModelGatewayRouteDecisions,
     recordModelGatewayRouteDecision,
     resetModelGatewayRouteDecisionLedgerForTests,

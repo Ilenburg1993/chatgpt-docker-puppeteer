@@ -8,6 +8,7 @@ import {
     auditModelGatewayPreRuntimeSelection,
     buildModelGatewayRuntimeSelectorPlan,
     compareModelGatewaySelectionAudits,
+    createModelGatewayRouteDecisionCapture,
     createEnvSecretRegistry,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
@@ -237,8 +238,7 @@ if (execute) {
             .split(',')
             .map((item) => item.trim())
             .filter(Boolean);
-        /** @type {Array<ReturnType<import('../src/copilot/model-gateway/index.js').buildRouteDecisionEvent>>} */
-        const runtimeRouteDecisionEvents = [];
+        const runtimeRouteDecisionCapture = createModelGatewayRouteDecisionCapture();
         execution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(context.runtimeSelectorPlan, {
             profileId: readArg('--profile') || undefined,
             fallbackProfileIds: fallbackProfiles,
@@ -248,19 +248,10 @@ if (execute) {
             timeoutMs: readInteger('--timeout-ms', 45_000),
             env: process.env,
             deps: {
-                recordRouteDecision: (event) => {
-                    runtimeRouteDecisionEvents.push(event);
-                    return event;
-                },
+                recordRouteDecision: runtimeRouteDecisionCapture.record,
             },
         });
-        const decisionEvents = [
-            ...new Map(
-                runtimeRouteDecisionEvents
-                    .filter((event) => event !== null)
-                    .map((event) => [event.decisionId, event]),
-            ).values(),
-        ];
+        const decisionEvents = runtimeRouteDecisionCapture.listUnique();
         routeDecisionPersistence = {
             attempted: decisionEvents.length > 0,
             ok: true,

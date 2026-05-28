@@ -7862,6 +7862,67 @@ Resultado:
 
 `passed`
 
+Mudanca 68:
+
+Captura testavel de route decisions do runtime selector.
+
+Problema identificado:
+
+- o comando canonico `model-gateway:runtime-selector -- --execute` tinha logica propria para capturar e deduplicar eventos;
+- isso deixava a persistencia SQLite do outcome menos reutilizavel;
+- tambem dificultava testar o caminho sem chamar provider real.
+
+Correcoes aplicadas:
+
+- criada a primitiva `createModelGatewayRouteDecisionCapture`;
+- criado `dedupeModelGatewayRouteDecisionEvents`;
+- o capturador preserva o formato de `recordModelGatewayRouteDecision`;
+- o capturador retorna listas clonadas para evitar mutacao acidental;
+- a deduplicacao mantem a ordem de primeira ocorrencia e usa o payload mais recente por `decisionId`;
+- o script `model-gateway-runtime-selector.mjs` passou a usar essa primitiva;
+- os exports seguem o modelo de barrels em `observability/index.js` e `model-gateway/index.js`.
+
+Separacao preservada:
+
+- captura em memoria continua separada da escrita SQLite;
+- escrita SQLite continua ocorrendo em lote apos a execucao;
+- payloads de provider e segredos continuam fora dos eventos;
+- provider calls continuam exigindo `--execute`.
+
+Validacoes focadas:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "captures and deduplicates route decision streams"`
+
+Resultado:
+
+`1 passed`
+
+`npm run model-gateway:typecheck`
+
+Resultado:
+
+`passed`
+
+`npm run model-gateway:lint`
+
+Resultado:
+
+`passed`
+
+`npm run model-gateway:test:contracts`
+
+Resultado:
+
+`195 passed`
+
+`npm run model-gateway:runtime-selector -- --fail --json`
+
+Resultado:
+
+- `ok=true`;
+- `runtimeExecuted=false`;
+- `routeDecisionPersistence.attempted=false`.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

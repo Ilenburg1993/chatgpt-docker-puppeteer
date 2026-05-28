@@ -17,8 +17,21 @@ const ROUTE_DECISION_LEDGER = [];
  * @param {ReturnType<import('./events.js').buildRouteDecisionEvent>} event
  * @returns {ReturnType<import('./events.js').buildRouteDecisionEvent>}
  */
+function cloneRouteDecisionEvent(event) {
+    return {
+        ...event,
+        fallbackChain: [...event.fallbackChain],
+        reasons: [...event.reasons],
+        traceAttributes: { ...event.traceAttributes },
+    };
+}
+
+/**
+ * @param {ReturnType<import('./events.js').buildRouteDecisionEvent>} event
+ * @returns {ReturnType<import('./events.js').buildRouteDecisionEvent>}
+ */
 export function recordModelGatewayRouteDecision(event) {
-    const record = Object.freeze({ ...event, fallbackChain: [...event.fallbackChain], reasons: [...event.reasons] });
+    const record = Object.freeze(cloneRouteDecisionEvent(event));
     ROUTE_DECISION_LEDGER.push(record);
     while (ROUTE_DECISION_LEDGER.length > DEFAULT_ROUTE_DECISION_LEDGER_LIMIT) {
         ROUTE_DECISION_LEDGER.shift();
@@ -35,11 +48,56 @@ export function listModelGatewayRouteDecisions(options = {}) {
         typeof options.limit === 'number' && Number.isFinite(options.limit) && options.limit > 0
             ? Math.floor(options.limit)
             : 50;
-    return ROUTE_DECISION_LEDGER.slice(-limit).reverse().map((event) => ({
-        ...event,
-        fallbackChain: [...event.fallbackChain],
-        reasons: [...event.reasons],
-    }));
+    return ROUTE_DECISION_LEDGER.slice(-limit).reverse().map(cloneRouteDecisionEvent);
+}
+
+/**
+ * Deduplicates a route-decision stream by `decisionId` while keeping first-seen ordering and the most recent event
+ * payload for each id. This is useful for scripts that capture pre-decision and runtime outcome events before writing
+ * them to SQLite in one batch.
+ *
+ * @param {Array<ReturnType<import('./events.js').buildRouteDecisionEvent> | null | undefined>} events
+ * @returns {Array<ReturnType<import('./events.js').buildRouteDecisionEvent>>}
+ */
+export function dedupeModelGatewayRouteDecisionEvents(events) {
+    const validEvents = events.filter(
+        /** @returns {event is ReturnType<import('./events.js').buildRouteDecisionEvent>} */
+        (event) => event !== null && event !== undefined && typeof event.decisionId === 'string',
+    );
+    return [
+        ...new Map(
+            validEvents.map((event) => [String(event.decisionId), cloneRouteDecisionEvent(event)]),
+        ).values(),
+    ];
+}
+
+/**
+ * Creates a bounded-to-the-current-operation route-decision recorder. The returned `record` function has the same
+ * shape as `recordModelGatewayRouteDecision`, so it can be injected into runtime selector execution and later flushed
+ * to an operational store.
+ *
+ * @param {{ delegate?: typeof recordModelGatewayRouteDecision }} [options]
+ * @returns {{
+ *   record: typeof recordModelGatewayRouteDecision;
+ *   list: () => Array<ReturnType<import('./events.js').buildRouteDecisionEvent>>;
+ *   listUnique: () => Array<ReturnType<import('./events.js').buildRouteDecisionEvent>>;
+ *   count: () => number;
+ * }}
+ */
+export function createModelGatewayRouteDecisionCapture(options = {}) {
+    /** @type {Array<ReturnType<import('./events.js').buildRouteDecisionEvent>>} */
+    const events = [];
+    const delegate = typeof options.delegate === 'function' ? options.delegate : null;
+    return Object.freeze({
+        record: (event) => {
+            const record = cloneRouteDecisionEvent(event);
+            events.push(record);
+            return delegate ? delegate(record) : record;
+        },
+        list: () => events.map(cloneRouteDecisionEvent),
+        listUnique: () => dedupeModelGatewayRouteDecisionEvents(events),
+        count: () => events.length,
+    });
 }
 
 /**
