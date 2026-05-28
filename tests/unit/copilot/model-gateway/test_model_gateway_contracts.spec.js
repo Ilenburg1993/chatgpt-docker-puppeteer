@@ -3096,7 +3096,7 @@ describe('model-gateway foundation', () => {
         assert.equal(plan.totalEstimatedCostUsd, 0.0028);
     });
 
-    it('defers recommended probes during active account or runtime rate-limit windows', () => {
+    it('defers recommended probes during active account, runtime rate-limit or recent probe-failure windows', () => {
         const recommendations = [
             {
                 key: 'openrouter:priced/model:default',
@@ -3113,6 +3113,14 @@ describe('model-gateway foundation', () => {
                 routeProfile: 'default',
                 probeKinds: ['json'],
                 reasons: ['capabilities_changed'],
+            },
+            {
+                key: 'kilo-code:moonshotai/kimi-k2.6:free:kilo',
+                providerId: 'kilo-code',
+                providerModel: 'moonshotai/kimi-k2.6:free',
+                routeProfile: 'kilo',
+                probeKinds: ['agent'],
+                reasons: ['agentic_capability'],
             },
         ];
         const plan = planModelGatewayProbeBackoff({
@@ -3132,14 +3140,42 @@ describe('model-gateway foundation', () => {
                     lastFailureAt: Date.parse('2026-05-25T00:00:30.000Z'),
                     lastResetAt: '2026-05-25T00:03:00.000Z',
                 },
+                {
+                    providerId: 'kilo-code',
+                    providerModel: 'moonshotai/kimi-k2.6:free',
+                    routeProfile: 'kilo',
+                    agentProbeStatus: 'failed',
+                    lastAgentProbeFailureAt: Date.parse('2026-05-25T00:00:00.000Z'),
+                    lastAgentProbeMessage: 'agent probe empty',
+                    probes: {
+                        agent: {
+                            kind: 'agent',
+                            status: 'empty',
+                            ok: false,
+                            providerAttempted: true,
+                            lastAt: Date.parse('2026-05-25T00:00:00.000Z'),
+                        },
+                    },
+                },
             ],
-            now: '2026-05-25T00:00:00.000Z',
+            now: '2026-05-25T00:01:00.000Z',
+            probeFailureCooldownSeconds: 900,
         });
 
         assert.equal(plan.summary.ready, 0);
-        assert.equal(plan.summary.deferred, 2);
-        assert.deepEqual(plan.deferred.map((item) => item.reason).sort(), ['account_rate_limited', 'runtime_rate_limited']);
+        assert.equal(plan.summary.deferred, 3);
+        assert.deepEqual(plan.deferred.map((item) => item.reason).sort(), [
+            'account_rate_limited',
+            'runtime_probe_failed_recent',
+            'runtime_rate_limited',
+        ]);
         assert.equal(plan.deferred[0].resetAt, '2026-05-25T00:05:00.000Z');
+        assert.deepEqual(
+            plan.deferred
+                .filter((item) => item.reason === 'runtime_probe_failed_recent')
+                .map((item) => [item.probeKind, item.retryAfterSeconds, item.resetAt]),
+            [['agent', 840, '2026-05-25T00:15:00.000Z']],
+        );
     });
 
     it('summarizes metadata coverage by provider before runtime', () => {

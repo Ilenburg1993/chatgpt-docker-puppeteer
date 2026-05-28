@@ -10,6 +10,8 @@
 
 import { normalizeModelGatewayAccountLimitState } from '../account-access/limits.js';
 
+const DEFAULT_RUNTIME_PROBE_FAILURE_COOLDOWN_SECONDS = 15 * 60;
+
 /**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
@@ -107,19 +109,57 @@ function runtimeRateLimitState(health, nowMs) {
 }
 
 /**
+ * @param {Record<string, unknown>} health
+ * @param {string} kind
+ * @param {number} nowMs
+ * @param {number} cooldownSeconds
+ * @returns {{ active: boolean; probeKind: string; retryAfterSeconds: number | null; resetAt: string | null }}
+ */
+function runtimeProbeFailureState(health, kind, nowMs, cooldownSeconds) {
+    const probes = isRecord(health['probes']) ? health['probes'] : {};
+    const probe = isRecord(probes[kind]) ? probes[kind] : null;
+    const failed =
+        probe?.['ok'] === false ||
+        (kind === 'agent' &&
+            optionalString(health['agentProbeStatus']) === 'failed' &&
+            (dateMs(health['lastAgentProbeFailureAt']) ?? 0) >= (dateMs(health['lastAgentProbeSuccessAt']) ?? 0));
+    if (!failed) return { active: false, probeKind: kind, retryAfterSeconds: null, resetAt: null };
+    const resetAt = optionalString(probe?.['lastResetAt']);
+    const resetMs = dateMs(resetAt);
+    if (resetMs !== null) return { active: resetMs > nowMs, probeKind: kind, retryAfterSeconds: null, resetAt };
+    const retryAfterSeconds = finiteNumber(probe?.['lastRetryAfterSeconds']);
+    const observedMs =
+        dateMs(probe?.['lastAt']) ??
+        (kind === 'agent' ? dateMs(health['lastAgentProbeFailureAt']) : null) ??
+        dateMs(health['lastFailureAt']);
+    if (observedMs === null) return { active: true, probeKind: kind, retryAfterSeconds: null, resetAt: null };
+    const waitSeconds = retryAfterSeconds !== null && retryAfterSeconds > 0 ? retryAfterSeconds : cooldownSeconds;
+    const retryMs = observedMs + waitSeconds * 1000;
+    return {
+        active: retryMs > nowMs,
+        probeKind: kind,
+        retryAfterSeconds: Math.max(0, Math.ceil((retryMs - nowMs) / 1000)),
+        resetAt: new Date(retryMs).toISOString(),
+    };
+}
+
+/**
  * @param {object} input
  * @param {Record<string, unknown>[]} [input.recommendations]
  * @param {Record<string, unknown>[]} [input.accountOverlays]
  * @param {Record<string, unknown>[]} [input.healthRecords]
  * @param {string | number | Date} [input.now]
+ * @param {number} [input.probeFailureCooldownSeconds]
  * @returns {{
  *   ready: Array<{ key: string; providerId: string; providerModel: string; routeProfile: string; probeKinds: string[]; reasons: string[] }>;
- *   deferred: Array<{ key: string; providerId: string; providerModel: string; routeProfile: string; reason: string; retryAfterSeconds: number | null; resetAt: string | null }>;
+ *   deferred: Array<{ key: string; providerId: string; providerModel: string; routeProfile: string; reason: string; probeKind?: string; retryAfterSeconds: number | null; resetAt: string | null }>;
  *   summary: { total: number; ready: number; deferred: number; reasonCounts: Record<string, number> };
  * }}
  */
 export function planModelGatewayProbeBackoff(input = {}) {
     const nowMs = dateMs(input.now) ?? Date.now();
+    const probeFailureCooldownSeconds =
+        finiteNumber(input.probeFailureCooldownSeconds) ?? DEFAULT_RUNTIME_PROBE_FAILURE_COOLDOWN_SECONDS;
     const overlays = Array.isArray(input.accountOverlays) ? input.accountOverlays.filter(isRecord) : [];
     const healthRecords = Array.isArray(input.healthRecords) ? input.healthRecords.filter(isRecord) : [];
     const ready = [];
@@ -127,6 +167,9 @@ export function planModelGatewayProbeBackoff(input = {}) {
 
     for (const recommendation of Array.isArray(input.recommendations) ? input.recommendations.filter(isRecord) : []) {
         const identity = recommendationIdentity(recommendation);
+        const probeKinds = Array.isArray(recommendation['probeKinds'])
+            ? recommendation['probeKinds'].map(optionalString).filter((kind) => kind !== null)
+            : [];
         const providerOverlays = overlays.filter((overlay) => overlayMatchesProvider(overlay, identity.providerId));
         const overlayLimit = providerOverlays
             .map((overlay) => normalizeModelGatewayAccountLimitState(overlay, { now: nowMs }))
@@ -153,11 +196,23 @@ export function planModelGatewayProbeBackoff(input = {}) {
             });
             continue;
         }
+        const runtimeProbeCooldown = healthRecords
+            .filter((health) => healthMatchesRecommendation(health, identity))
+            .flatMap((health) => probeKinds.map((kind) => runtimeProbeFailureState(health, kind, nowMs, probeFailureCooldownSeconds)))
+            .find((state) => state.active);
+        if (runtimeProbeCooldown) {
+            deferred.push({
+                ...identity,
+                reason: 'runtime_probe_failed_recent',
+                probeKind: runtimeProbeCooldown.probeKind,
+                retryAfterSeconds: runtimeProbeCooldown.retryAfterSeconds,
+                resetAt: runtimeProbeCooldown.resetAt,
+            });
+            continue;
+        }
         ready.push({
             ...identity,
-            probeKinds: Array.isArray(recommendation['probeKinds'])
-                ? recommendation['probeKinds'].map(optionalString).filter((kind) => kind !== null)
-                : [],
+            probeKinds,
             reasons: Array.isArray(recommendation['reasons']) ? recommendation['reasons'].map(String) : [],
         });
     }

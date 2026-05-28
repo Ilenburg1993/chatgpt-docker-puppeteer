@@ -2170,8 +2170,9 @@ async function renderByokGatewayProbeBackoff(println, rest) {
     }
     for (const item of plan.deferred.slice(0, args.limit)) {
         const retry = item.resetAt ? `reset=${item.resetAt}` : item.retryAfterSeconds ? `retry=${item.retryAfterSeconds}s` : 'reset=-';
+        const probe = item.probeKind ? ` · probe=${item.probeKind}` : '';
         println(
-            `    \x1b[33mDEFER\x1b[0m ${item.key}  \x1b[90mreason=${item.reason} · ${retry} · provider=${item.providerId}\x1b[0m`,
+            `    \x1b[33mDEFER\x1b[0m ${item.key}  \x1b[90mreason=${item.reason}${probe} · ${retry} · provider=${item.providerId}\x1b[0m`,
         );
     }
     for (const item of plan.ready.slice(0, Math.max(0, args.limit - plan.deferred.length))) {

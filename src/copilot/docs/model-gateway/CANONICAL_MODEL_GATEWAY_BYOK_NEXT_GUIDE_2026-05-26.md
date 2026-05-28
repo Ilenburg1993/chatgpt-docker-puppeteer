@@ -7605,6 +7605,59 @@ Resultado:
 
 `passed`
 
+Mudanca 62:
+
+Backoff pre-runtime para falhas recentes de probe que nao sao quota/auth.
+
+Problema identificado apos os lives:
+
+- `moonshotai/kimi-k2.6:free` produziu `agent probe empty`;
+- o diff pos-live agora mostra isso como `newFailures=1`;
+- a camada `safe` ja deixa de recomendar o modelo;
+- porem o `probe backoff planner` so adiava rate-limit de conta ou runtime;
+- uma recomendacao de probe poderia tentar novamente imediatamente o mesmo `agent empty`;
+- isso aumenta ruido, custo e chance de interpretar instabilidade como capacidade real.
+
+Principio arquitetural:
+
+- falha recente de probe nao e metadado canonico;
+- falha recente de probe nao e necessariamente quota;
+- falha recente de probe nao deve bloquear o catalogo para sempre;
+- falha recente de probe deve criar uma janela volatil de reteste.
+
+Correcoes aplicadas:
+
+- `planModelGatewayProbeBackoff` passa a ler `health.probes[kind]`;
+- falha recente de probe gera `runtime_probe_failed_recent`;
+- o motivo inclui `probeKind`;
+- cooldown padrao: `900s`;
+- o cooldown pode ser sobrescrito por `probeFailureCooldownSeconds`;
+- se o probe tiver `lastRetryAfterSeconds` ou `lastResetAt`, esses valores prevalecem;
+- falha de `agentProbeStatus=failed` tambem alimenta o cooldown de `agent`;
+- o terminal `/byok gateway probes backoff` mostra `probe=<kind>` nos itens adiados.
+
+Separacao de responsabilidades:
+
+- account overlays continuam representando quota/auth/rate-limit de conta/key;
+- runtime health continua representando fatos observados;
+- backoff planner apenas decide quando nao insistir em probes recentes;
+- selecao segura continua exigindo evidencia positiva de `agentProbeStatus=ok`;
+- catalogo canonico nao e modificado por falha transient de probe.
+
+Validacoes focadas:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "defers recommended probes"`
+
+Resultado:
+
+`1 passed`
+
+`npm run model-gateway:typecheck`
+
+Resultado:
+
+`passed`
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
