@@ -810,6 +810,7 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
  *     recordFailure?: typeof recordByokProviderModelCallFailure;
  *     flushHealth?: typeof flushByokProviderHealth;
  *     classifyProviderFailure?: typeof classifyByokProviderFailure;
+ *     recordRouteDecision?: typeof recordModelGatewayRouteDecision;
  *     sleep?: typeof sleepMs;
  *   };
  * }} [options]

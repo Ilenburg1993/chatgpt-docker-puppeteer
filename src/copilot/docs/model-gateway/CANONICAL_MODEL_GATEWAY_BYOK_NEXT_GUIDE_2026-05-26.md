@@ -7819,6 +7819,49 @@ Resultado:
 
 `passed`
 
+Mudanca 67:
+
+Persistencia SQLite dos outcomes do runtime selector no comando canonico.
+
+Problema identificado:
+
+- o executor runtime passou a gerar dois eventos por tentativa: pre-decision e outcome;
+- o script `model-gateway:runtime-selector -- --execute` ainda coletava apenas `attempt.route.decisionEvent`;
+- isso persistiria no SQLite apenas a decisao pre-runtime;
+- os outcomes sanitizados ficariam no retorno da execucao, mas nao na camada operacional SQLite.
+
+Correcoes aplicadas:
+
+- o comando `model-gateway-runtime-selector.mjs` agora injeta `recordRouteDecision`;
+- todos os eventos emitidos pelo executor sao capturados em `runtimeRouteDecisionEvents`;
+- a persistencia SQLite usa esse stream completo;
+- pre-decision e runtime outcome passam a ser persistidos juntos;
+- o output humano mostra `routeDecisionEvents=<n>`;
+- o tipo de `executeModelGatewayRuntimeSelectorPlanWithFallbacks` passou a declarar `recordRouteDecision` em `deps`.
+
+Separacao preservada:
+
+- o comando continua dry-run por default;
+- provider calls continuam exigindo `--execute`;
+- payloads de provider continuam fora do ledger;
+- segredos continuam redigidos por `operationalPayloadJson`.
+
+Validacoes focadas:
+
+`npm run model-gateway:runtime-selector -- --fail --json`
+
+Resultado:
+
+- `ok=true`;
+- `runtimeExecuted=false`;
+- `routeDecisionPersistence.attempted=false`.
+
+`npm run model-gateway:typecheck`
+
+Resultado:
+
+`passed`
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

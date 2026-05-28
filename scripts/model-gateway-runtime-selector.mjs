@@ -237,6 +237,8 @@ if (execute) {
             .split(',')
             .map((item) => item.trim())
             .filter(Boolean);
+        /** @type {Array<ReturnType<import('../src/copilot/model-gateway/index.js').buildRouteDecisionEvent>>} */
+        const runtimeRouteDecisionEvents = [];
         execution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(context.runtimeSelectorPlan, {
             profileId: readArg('--profile') || undefined,
             fallbackProfileIds: fallbackProfiles,
@@ -245,11 +247,16 @@ if (execute) {
             maxRetryDelayMs: readInteger('--max-retry-delay-ms', 30_000),
             timeoutMs: readInteger('--timeout-ms', 45_000),
             env: process.env,
+            deps: {
+                recordRouteDecision: (event) => {
+                    runtimeRouteDecisionEvents.push(event);
+                    return event;
+                },
+            },
         });
         const decisionEvents = [
             ...new Map(
-                execution.attempts
-                    .map((attempt) => attempt.route?.decisionEvent ?? null)
+                runtimeRouteDecisionEvents
                     .filter((event) => event !== null)
                     .map((event) => [event.decisionId, event]),
             ).values(),
@@ -388,7 +395,7 @@ if (json) {
     }
     if (execution) {
         process.stdout.write(
-            `execution: ok=${execution.ok ? 'yes' : 'no'} status=${execution.status} attempted=${execution.attemptedCount} selected=${execution.selectedProfileId ?? '-'} error=${execution.error ?? '-'}\n`,
+            `execution: ok=${execution.ok ? 'yes' : 'no'} status=${execution.status} attempted=${execution.attemptedCount} selected=${execution.selectedProfileId ?? '-'} routeDecisionEvents=${execution.routeDecisionRecordedCount ?? 0} error=${execution.error ?? '-'}\n`,
         );
         process.stdout.write(
             `route-decisions: attempted=${routeDecisionPersistence.attempted ? 'yes' : 'no'} written=${routeDecisionPersistence.written} error=${routeDecisionPersistence.error ?? '-'}\n`,
