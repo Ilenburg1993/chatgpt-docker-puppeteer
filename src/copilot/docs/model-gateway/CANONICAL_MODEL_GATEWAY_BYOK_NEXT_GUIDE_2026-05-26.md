@@ -10893,6 +10893,75 @@ Validacao executada:
 - dry-run JSON do runtime selector com `preferred-probes` e `block-failed-probes`;
 - `npm run model-gateway:live:readiness -- --json` permaneceu `ok=true`.
 
+## Mudanca 124 - Execucao real limitada do runtime selector apos runtime-only foundation
+
+Status: concluido.
+
+Motivo:
+
+- depois de admitir candidatos runtime-only e preservar sua origem, era preciso confirmar que o caminho real ainda
+  seleciona uma rota executavel, registra decision/probe/health e mantem SQLite consistente;
+- a execucao deveria ser pequena, sem live terminal full-turn, e com limites claros.
+
+Comando efetivo:
+
+- `npm --silent run model-gateway:runtime-selector -- --json --allow-probe --profile=repo_agent --fallback-profiles=code,tool_agent --selection-policy=prefer_runtime_proved --preferred-probes=agent,live_tool_protocol,live_ask_user --block-failed-probes=live_tool_protocol,live_ask_user --temporary-failure-cooldown-ms=1 --execute --max-attempts=3 --max-attempts-per-provider=2 --attempts-per-route=1 --timeout-ms=25000`
+
+Resultado:
+
+- exit code `0`;
+- `ok=true`;
+- `runtimeExecuted=true`;
+- execution:
+  - `ok=true`;
+  - `status=ok`;
+  - `attemptedCount=1`;
+  - `skippedAttemptCount=0`;
+  - `selectedProfileId=repo_agent`;
+- rota final:
+  - provider `zai`;
+  - model `glm-4.5-flash`;
+  - source `post_runtime_proved`;
+  - `candidateSource=route_option`;
+  - `runtimeObservedOnly=false`;
+  - env `ready`;
+  - account access `visible`;
+  - `secretConfigured=true`;
+  - probes runtime conhecidos: `agent`, `chat`, `json`, `streaming`;
+  - vision falha registrada como capability unsupported;
+- direct runtime probe persistence:
+  - `attempted=true`;
+  - `ok=true`;
+  - `runId=model-gateway:runtime-probe:1780006723828:86754:1`;
+  - `probeResults=1`;
+  - `successCount=1`;
+  - `failureCount=0`;
+- runtime health mirror:
+  - `attempted=true`;
+  - `ok=true`;
+  - `runId=model-gateway:runtime-health:1780006724174:86754:2`;
+  - `records=73`;
+  - `healthObservations=73`;
+  - `probeResults=52`.
+
+Readiness pos-execucao:
+
+- `npm --silent run model-gateway:live:readiness -- --json`;
+- `ok=true`;
+- `checksFailed=[]`;
+- SQLite:
+  - `parityOk=true`;
+  - `runtimeRows=14822`;
+  - `healthObservations=7799`;
+  - `runtimeProbeRuns=210`;
+  - `runtimeProbeResults=6813`;
+  - `runtimeProbeProofRecords=12`.
+
+Observacao operacional:
+
+- quando usar `jq`, preferir `npm --silent` ou gravar stdout em arquivo temporario;
+- `npm run` normal imprime cabecalho antes do JSON e pode quebrar consumers estritos.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
