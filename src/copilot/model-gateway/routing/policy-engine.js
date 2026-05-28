@@ -455,6 +455,8 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
  *     requireKnownEligibility?: boolean;
  *     ignoreRuntimeHealth?: boolean;
  *     runtimeHealthRecords?: Record<string, any>[];
+ *     now?: string | number | Date;
+ *     temporaryFailureCooldownMs?: number;
  *     providerCooldownWindowMs?: number;
  *     providerCooldownMinFailedModels?: number;
  *     providerCooldownFailureKinds?: string[];
@@ -620,6 +622,10 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
                   routeProfile: options.routeProfile ?? null,
                   ...(options.excludeFailed !== undefined ? { excludeFailed: options.excludeFailed } : {}),
                   ...(Array.isArray(options.runtimeHealthRecords) ? { runtimeHealthRecords: options.runtimeHealthRecords } : {}),
+                  ...(options.now !== undefined ? { now: options.now } : {}),
+                  ...(typeof options.temporaryFailureCooldownMs === 'number'
+                      ? { temporaryFailureCooldownMs: options.temporaryFailureCooldownMs }
+                      : {}),
                   requireAgentProbeOk: options.requireAgentProbeOk ?? profile['requireAgentProbeOk'] === true,
               });
     const providerCooldownDecision =

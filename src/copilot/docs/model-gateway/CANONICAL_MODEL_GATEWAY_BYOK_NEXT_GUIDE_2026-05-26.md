@@ -9545,6 +9545,10 @@ Achado adicional:
   com health bloqueado podem ocupar os primeiros slots e esconder rotas realmente tentaveis;
 - o harness aumentou o `maxBuffer` do selector para 16 MiB, pois planos com alternativas amplas podem ultrapassar o
   tamanho padrao de stdout do `spawnSync`.
+- falhas temporarias de chat runtime (`timeout`, `network`, `upstream`, `rate-limit`, `unknown`) passaram a ter cooldown
+  model-scoped default de 15 minutos;
+- falhas duraveis como `model-or-route`, `auth` e `credits` continuam bloqueando ate sucesso posterior, clear explicito
+  ou refresh/overlay adequado.
 
 ## 22. Fim Do Documento Inicial
 

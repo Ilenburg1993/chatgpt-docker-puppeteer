@@ -357,6 +357,7 @@ describe('model-gateway foundation', () => {
         registry.upsertProvider({ id: 'groq', providerType: 'openai' });
         registry.upsertModel({ providerId: 'openrouter', providerModel: 'model-a', capabilities: { tools: true } });
         registry.upsertModel({ providerId: 'groq', providerModel: 'model-b', capabilities: { tools: true } });
+        const now = Date.now();
 
         recordByokProviderModelCallFailure({
             routeProfile: 'agent',
@@ -364,19 +365,19 @@ describe('model-gateway foundation', () => {
             providerModel: 'model-a',
             message: 'rate limit',
             errorContext: 'provider.rate_limit',
-            timestamp: 10,
+            timestamp: now - 10,
         });
         recordByokProviderModelCallSuccess({
             routeProfile: 'agent',
             providerId: 'groq',
             providerModel: 'model-b',
-            timestamp: 20,
+            timestamp: now - 5,
         });
         recordByokProviderModelAgentProbeSuccess({
             routeProfile: 'agent',
             providerId: 'groq',
             providerModel: 'model-b',
-            timestamp: 30,
+            timestamp: now,
         });
 
         assert.deepEqual(
@@ -600,6 +601,48 @@ describe('model-gateway foundation', () => {
 
         assert.equal(route.selected, null);
         assert.ok(route.rejected.some((candidate) => candidate.rejectedReasons.includes('chat_health_failed')));
+    });
+
+    it('expires temporary chat health failures without forgetting durable model-route blockers', () => {
+        const model = createModelRecord({
+            providerId: 'nvidia-nim',
+            providerModel: 'deepseek-ai/deepseek-v4-flash',
+            capabilities: { streaming: true },
+            limits: { contextWindowTokens: 128_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        const temporaryTimeout = {
+            routeProfile: 'code',
+            providerId: 'nvidia-nim',
+            providerModel: 'deepseek-ai/deepseek-v4-flash',
+            lastStatus: 'failed',
+            lastFailureAt: 1_000_000,
+            lastSuccessAt: 500_000,
+            lastFailureKind: 'timeout',
+            probes: {},
+        };
+        const staleTimeoutRoute = routeGatewayModels([model], 'code', {
+            routeProfile: 'code',
+            runtimeHealthRecords: [temporaryTimeout],
+            temporaryFailureCooldownMs: 15 * 60 * 1000,
+        });
+        const activeTimeoutRoute = routeGatewayModels([model], 'code', {
+            routeProfile: 'code',
+            runtimeHealthRecords: [temporaryTimeout],
+            now: 1_060_000,
+            temporaryFailureCooldownMs: 15 * 60 * 1000,
+        });
+        const durableRouteFailure = routeGatewayModels([model], 'code', {
+            routeProfile: 'code',
+            runtimeHealthRecords: [{ ...temporaryTimeout, lastFailureKind: 'model-or-route' }],
+            temporaryFailureCooldownMs: 1,
+        });
+
+        assert.equal(staleTimeoutRoute.selected?.model['id'], 'nvidia-nim:deepseek-ai/deepseek-v4-flash');
+        assert.equal(activeTimeoutRoute.selected, null);
+        assert.ok(activeTimeoutRoute.rejected.some((candidate) => candidate.rejectedReasons.includes('chat_health_failed')));
+        assert.equal(durableRouteFailure.selected, null);
+        assert.ok(durableRouteFailure.rejected.some((candidate) => candidate.rejectedReasons.includes('chat_health_failed')));
     });
 
     it('mirrors dedicated agent probe health into the generic probe ledger', () => {

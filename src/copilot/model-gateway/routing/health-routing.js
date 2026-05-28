@@ -23,6 +23,8 @@ export const MODEL_GATEWAY_PROVIDER_COOLDOWN_FAILURE_KINDS = Object.freeze([
 ]);
 const DEFAULT_PROVIDER_COOLDOWN_WINDOW_MS = 15 * 60 * 1000;
 const DEFAULT_PROVIDER_COOLDOWN_MIN_FAILED_MODELS = 2;
+const DEFAULT_MODEL_TEMPORARY_FAILURE_COOLDOWN_MS = 15 * 60 * 1000;
+const TEMPORARY_MODEL_FAILURE_KINDS = Object.freeze(['timeout', 'network', 'upstream', 'rate-limit', 'unknown']);
 
 /**
  * @param {{ lastStatus: 'failed' | 'ok' | null; lastFailureAt: number | null; lastSuccessAt: number | null }} health
@@ -101,6 +103,16 @@ function optionalNumber(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @returns {number}
+ */
+function positiveNumber(value, fallback) {
+    const number = optionalNumber(value);
+    return number !== null && number > 0 ? number : fallback;
+}
+
+/**
  * @param {Record<string, any>} record
  * @returns {number}
  */
@@ -176,6 +188,29 @@ function normalizeFailureKind(value) {
     if (normalized === 'rate-limit' || normalized.includes('rate_limit') || normalized.includes('rate-limit')) return 'rate-limit';
     if (normalized === 'auth' || normalized.includes('provider.auth')) return 'auth';
     return normalized;
+}
+
+/**
+ * @param {{ lastFailureKind?: string | null; lastErrorContext?: string | null }} health
+ * @returns {string | null}
+ */
+function modelLastFailureKind(health) {
+    return normalizeFailureKind(optionalString(health.lastFailureKind) ?? optionalString(health.lastErrorContext));
+}
+
+/**
+ * @param {{ lastStatus: 'failed' | 'ok' | null; lastFailureAt: number | null; lastSuccessAt: number | null; lastFailureKind?: string | null; lastErrorContext?: string | null }} health
+ * @param {{ now?: string | number | Date; temporaryFailureCooldownMs?: number }} [options]
+ * @returns {boolean}
+ */
+function isGatewayModelChatHealthActivelyFailed(health, options = {}) {
+    if (!isGatewayModelChatHealthFailed(health)) return false;
+    const failureKind = modelLastFailureKind(health);
+    if (!failureKind || !TEMPORARY_MODEL_FAILURE_KINDS.includes(failureKind)) return true;
+    const lastFailureAt = optionalNumber(health.lastFailureAt) ?? 0;
+    const nowMs = dateMs(options.now) ?? Date.now();
+    const cooldownMs = positiveNumber(options.temporaryFailureCooldownMs, DEFAULT_MODEL_TEMPORARY_FAILURE_COOLDOWN_MS);
+    return lastFailureAt + cooldownMs > nowMs;
 }
 
 /**
@@ -399,7 +434,7 @@ export function evaluateGatewayProviderHealthCooldown(model, records, options = 
 
 /**
  * @param {Record<string, any>} model
- * @param {{ routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean; runtimeHealthRecords?: Record<string, any>[] }} [options]
+ * @param {{ routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean; runtimeHealthRecords?: Record<string, any>[]; now?: string | number | Date; temporaryFailureCooldownMs?: number }} [options]
  * @returns {{ include: boolean; reason: string; health: ReturnType<typeof readGatewayModelHealth> }}
  */
 export function evaluateGatewayModelHealthRoute(model, options = {}) {
@@ -413,7 +448,7 @@ export function evaluateGatewayModelHealthRoute(model, options = {}) {
             health,
         };
     }
-    if (options.excludeFailed !== false && isGatewayModelChatHealthFailed(health)) {
+    if (options.excludeFailed !== false && isGatewayModelChatHealthActivelyFailed(health, options)) {
         return { include: false, reason: 'chat_health_failed', health };
     }
     if (options.excludeFailed !== false && options.requireAgentProbeOk === true && isGatewayModelAgentProbeHealthFailed(health)) {
