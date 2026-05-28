@@ -1541,6 +1541,117 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(sameProfileModels, ['openai/gpt-oss-120b', 'openai/gpt-oss-20b-alt']);
         assert.equal(sameProfileAlternativeExecution.retryDecisions[0].retryRoute, false);
 
+        const providerCapAlternativePlan = {
+            ...runtimeSelectorPlan,
+            routes: runtimeSelectorPlan.routes.map((route) =>
+                route.profileId === 'repo_agent'
+                    ? {
+                          ...route,
+                          candidateAlternatives: [
+                              {
+                                  ...route,
+                                  selectedRouteKey: 'openrouter:openai/gpt-oss-20b-alt',
+                                  selected: {
+                                      ...route.selected,
+                                      id: 'openrouter:openai/gpt-oss-20b-alt',
+                                      providerModel: 'openai/gpt-oss-20b-alt',
+                                  },
+                                  candidateAlternatives: [],
+                              },
+                              {
+                                  ...route,
+                                  selectedRouteKey: 'groq:meta-llama/llama-4-scout-17b-16e-instruct',
+                                  selected: {
+                                      ...route.selected,
+                                      id: 'groq:meta-llama/llama-4-scout-17b-16e-instruct',
+                                      providerId: 'groq',
+                                      providerModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                                      selectorSyntax: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                                  },
+                                  candidateAlternatives: [],
+                              },
+                          ],
+                      }
+                    : route,
+            ),
+        };
+        const providerCapModels = [];
+        const providerCapAlternativeExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(providerCapAlternativePlan, {
+            profileId: 'repo_agent',
+            maxAttempts: 2,
+            maxAttemptsPerProvider: 1,
+            deps: {
+                runChatProbe: async (options = {}) => {
+                    const model = String(options.model ?? '');
+                    providerCapModels.push(model);
+                    const ok = model === 'meta-llama/llama-4-scout-17b-16e-instruct';
+                    return {
+                        ok,
+                        status: ok ? 'ok' : 'failed',
+                        elapsedMs: 10,
+                        model,
+                        profile: 'repo_agent',
+                        preset: ok ? 'groq' : 'openrouter',
+                        providerType: 'openai-compatible',
+                        deltaCount: ok ? 1 : 0,
+                        deltaChars: ok ? 13 : 0,
+                        finalChars: ok ? 13 : 0,
+                        finalContent: ok ? 'BYOK_PROBE_OK' : '',
+                        observedFinalEvent: ok,
+                        sessionId: `unit-runtime-provider-cap-${providerCapModels.length}`,
+                        errors: ok ? [] : ['first provider failed'],
+                        warnings: [],
+                        providerFailure: null,
+                    };
+                },
+                recordSuccess: () => {},
+                recordFailure: () => {},
+                flushHealth: async () => {},
+            },
+        });
+        assert.equal(providerCapAlternativeExecution.ok, true);
+        assert.equal(providerCapAlternativeExecution.attemptedCount, 2);
+        assert.deepEqual(providerCapModels, [
+            'openai/gpt-oss-120b',
+            'meta-llama/llama-4-scout-17b-16e-instruct',
+        ]);
+
+        let boundedAttemptCalls = 0;
+        const boundedAttemptExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(runtimeSelectorPlan, {
+            profileId: 'repo_agent',
+            attemptsPerRoute: 3,
+            maxAttempts: 2,
+            deps: {
+                runChatProbe: async (options = {}) => {
+                    boundedAttemptCalls += 1;
+                    return {
+                        ok: false,
+                        status: 'failed',
+                        elapsedMs: 10,
+                        model: String(options.model ?? ''),
+                        profile: 'repo_agent',
+                        preset: 'openrouter',
+                        providerType: 'openai-compatible',
+                        deltaCount: 0,
+                        deltaChars: 0,
+                        finalChars: 0,
+                        finalContent: '',
+                        observedFinalEvent: false,
+                        sessionId: `unit-runtime-bounded-${boundedAttemptCalls}`,
+                        errors: ['bounded failure'],
+                        warnings: [],
+                        providerFailure: null,
+                    };
+                },
+                recordSuccess: () => {},
+                recordFailure: () => {},
+                flushHealth: async () => {},
+            },
+        });
+        assert.equal(boundedAttemptExecution.ok, false);
+        assert.equal(boundedAttemptExecution.attemptedCount, 2);
+        assert.equal(boundedAttemptCalls, 2);
+
         const distinctFallbackPlan = {
             ...runtimeSelectorPlan,
             routes: runtimeSelectorPlan.routes.map((route) =>

@@ -1224,7 +1224,7 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
     const maxAttempts =
         typeof options.maxAttempts === 'number' && Number.isFinite(options.maxAttempts) && options.maxAttempts > 0
             ? Math.floor(options.maxAttempts)
-            : routeAttempts.length;
+            : routeAttempts.length * attemptsPerRoute;
     const maxAttemptsPerProvider =
         typeof options.maxAttemptsPerProvider === 'number' &&
         Number.isFinite(options.maxAttemptsPerProvider) &&
@@ -1236,10 +1236,12 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
     const attempts = [];
     /** @type {Array<ReturnType<typeof resolveModelGatewayRuntimeRetryDecision>>} */
     const retryDecisions = [];
-    for (const { profileId, route } of routeAttempts.slice(0, maxAttempts)) {
+    routeLoop: for (const { profileId, route } of routeAttempts) {
+        if (attempts.length >= maxAttempts) break;
         const providerId = optionalString(route.selected?.['providerId']) ?? 'unknown-provider';
         if ((providerAttemptCounts.get(providerId) ?? 0) >= maxAttemptsPerProvider) continue;
         for (let routeAttempt = 0; routeAttempt < attemptsPerRoute; routeAttempt += 1) {
+            if (attempts.length >= maxAttempts) break routeLoop;
             if ((providerAttemptCounts.get(providerId) ?? 0) >= maxAttemptsPerProvider) break;
             providerAttemptCounts.set(providerId, (providerAttemptCounts.get(providerId) ?? 0) + 1);
             const attempt = await executeModelGatewayRuntimeSelectorPlan(runtimeSelectorPlanForRouteAttempt(plan, route), {

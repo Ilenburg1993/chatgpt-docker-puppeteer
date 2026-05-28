@@ -10176,6 +10176,39 @@ Teste adicionado:
 - com `preferProviderDiversity=true`, a alternativa tambem preserva `selected.hasRuntimeProof`;
 - a reason de fallback continua documentando a diversificacao opcional.
 
+## Mudanca 106 - Max attempts conta tentativas reais no executor runtime
+
+Status: concluido.
+
+Contexto:
+
+- `executeModelGatewayRuntimeSelectorPlanWithFallbacks` recebia `maxAttempts`;
+- o codigo aplicava esse limite como fatia previa de rotas candidatas;
+- depois disso, `maxAttemptsPerProvider` podia pular rotas do mesmo provider;
+- nesse caso, uma alternativa valida de outro provider podia ficar fora da fatia sem nunca ser tentada.
+
+Regra aplicada:
+
+- `maxAttempts` passa a limitar tentativas realmente executadas;
+- `maxAttemptsPerProvider` continua limitando tentativas por provider;
+- candidatos pulados por provider cap nao consomem o limite global;
+- `attemptsPerRoute` tambem passa a respeitar o limite global de tentativas reais.
+- quando `maxAttempts` nao e informado, o default continua permitindo as tentativas por rota configuradas.
+
+Motivo arquitetural:
+
+- o operador configura `maxAttempts` para controlar gasto de quota, tempo e risco;
+- rotas puladas por policy/cap nao gastam quota e nao devem consumir esse orcamento;
+- lives com muitos modelos de um mesmo provider precisam conseguir chegar a alternativa de provider diferente;
+- o runtime selector deve ser bounded sem perder fallback util por contagem prematura.
+
+Teste adicionado:
+
+- plano com rota principal OpenRouter, alternativa OpenRouter e alternativa Groq;
+- `maxAttempts=2` e `maxAttemptsPerProvider=1`;
+- a segunda rota OpenRouter e pulada pelo cap e a tentativa real chega ao Groq;
+- `attemptsPerRoute=3` com `maxAttempts=2` executa somente duas tentativas reais.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
