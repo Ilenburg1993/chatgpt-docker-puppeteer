@@ -245,10 +245,11 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
  *   gatewayId?: string | null;
  *   providerModel?: string | null;
  *   confidence?: string | null;
+ *   providerOwner?: string | null;
  * } | undefined}
  */
 function getByokModelMetadata(model) {
-    return /** @type {{ byok?: { freeTier?: boolean | null; pricing?: { prompt?: number | null; completion?: number | null; request?: number | null }; rateLimits?: { maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }; provider?: string | null; profile?: string | null; source?: string; profileFreeTier?: boolean | null; profileCostSource?: string | null; profileCostDetail?: string | null; inputModalities?: string[]; outputModalities?: string[]; supportsReasoning?: boolean; capabilities?: Record<string, unknown>; gatewayId?: string | null; providerModel?: string | null; confidence?: string | null } }} */ (model).byok;
+    return /** @type {{ byok?: { freeTier?: boolean | null; pricing?: { prompt?: number | null; completion?: number | null; request?: number | null }; rateLimits?: { maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }; provider?: string | null; profile?: string | null; source?: string; profileFreeTier?: boolean | null; profileCostSource?: string | null; profileCostDetail?: string | null; inputModalities?: string[]; outputModalities?: string[]; supportsReasoning?: boolean; capabilities?: Record<string, unknown>; gatewayId?: string | null; providerModel?: string | null; confidence?: string | null; providerOwner?: string | null } }} */ (model).byok;
 }
 
 /**
@@ -1316,12 +1317,17 @@ function renderByokProbeHealthSummary(health) {
 function withByokCatalogSource(model, source) {
     const meta = getByokModelMetadata(model) ?? {};
     const profileCostHint = readByokProfileCostHint(source.profileName);
+    const sourceProvider = source.preset ?? source.providerType ?? source.profileName ?? null;
+    const providerScopedDiscoveryModel = ['remote', 'static'].includes(String(meta.source ?? ''));
+    const shouldUseOperationalProvider = providerScopedDiscoveryModel && sourceProvider && !source.profileName;
+    const provider = shouldUseOperationalProvider ? sourceProvider : meta.provider ?? sourceProvider;
     return /** @type {import('../../presentation/contracts/index.js').RuntimeModelInfo} */ ({
         ...model,
         byok: {
             ...meta,
-            provider: meta.provider ?? source.preset ?? source.providerType ?? source.profileName ?? null,
-            profile: meta.profile ?? source.profileName ?? null,
+            provider,
+            providerOwner: shouldUseOperationalProvider ? meta.provider ?? null : meta.providerOwner ?? null,
+            profile: meta.profile ?? source.profileName ?? source.preset ?? null,
             source: meta.source ?? source.preset ?? source.providerType ?? source.profileName ?? undefined,
             profileFreeTier: meta.profileFreeTier ?? profileCostHint.profileFreeTier,
             profileCostSource: meta.profileCostSource ?? profileCostHint.profileCostSource,

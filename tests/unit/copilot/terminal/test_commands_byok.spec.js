@@ -3514,6 +3514,82 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('local_provider_requires_explicit_request');
     });
 
+    it('roteia modelos descobertos pelo provider ativo usando o preset operacional em vez de owned_by', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'openai/gpt-oss-120b',
+                    name: 'GPT OSS 120B',
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 128000 },
+                    },
+                    byok: {
+                        provider: 'openai',
+                        providerModel: 'openai/gpt-oss-120b',
+                        source: 'remote',
+                        capabilities: { tools: true, streaming: true },
+                    },
+                },
+            ],
+            source: 'remote-cache',
+            endpoint: 'https://integrate.api.nvidia.com/v1/models',
+            fromCache: true,
+            error: null,
+        });
+        routeGatewayModels.mockImplementation((candidates) => ({
+            profile: { id: 'code' },
+            selected: {
+                model: candidates[0],
+                include: true,
+                score: 240,
+                reasons: ['active_provider_preset'],
+                rejectedReasons: [],
+                health: null,
+            },
+            candidates: [
+                {
+                    model: candidates[0],
+                    include: true,
+                    score: 240,
+                    reasons: ['active_provider_preset'],
+                    rejectedReasons: [],
+                    health: null,
+                },
+            ],
+            rejected: [],
+            fallbackChain: ['nvidia-nim:openai/gpt-oss-120b'],
+        }));
+        mockProjection({
+            summary: {
+                enabled: true,
+                ready: true,
+                profile: null,
+                preset: 'nvidia-nim',
+                providerType: 'openai',
+                baseUrl: 'https://integrate.api.nvidia.com/v1',
+                model: 'openai/gpt-oss-120b',
+            },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models route code active --show-rejected provider:nvidia-nim');
+
+        expect(routeGatewayModels).toHaveBeenCalledWith(
+            [
+                expect.objectContaining({
+                    providerId: 'nvidia-nim',
+                    providerModel: 'openai/gpt-oss-120b',
+                }),
+            ],
+            'code',
+            expect.objectContaining({ allowProviders: ['nvidia-nim'] }),
+        );
+        expect(ctx.output()).toContain('selecionado');
+        expect(ctx.output()).toContain('provider=nvidia-nim');
+        expect(ctx.output()).not.toContain('Nenhum candidato encontrado para roteamento');
+    });
+
     it('usa catálogo gateway como fallback para provider explícito sem perfil correspondente', async () => {
         routeGatewayModels.mockImplementation((candidates) => ({
             profile: { id: 'repo_agent' },

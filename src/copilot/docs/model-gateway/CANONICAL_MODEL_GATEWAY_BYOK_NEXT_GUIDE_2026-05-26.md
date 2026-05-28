@@ -8565,9 +8565,88 @@ Impacto:
 - a rota alternativa comprovada foi promovida;
 - a fase seguinte pode avançar para full-turn real apenas depois de novo readiness e validadores.
 
-Lacunas ainda abertas apos Mudanca 81:
+Mudanca 82:
 
-- `/byok models route ... provider:nvidia-nim` ainda pode reportar zero candidatos porque o endpoint ativo e o catalogo canonico nao estao totalmente unificados na renderizacao do cockpit;
+Cockpit `/byok models route ... active provider:<preset>` preserva o provider operacional.
+
+Problema identificado:
+
+- endpoints OpenAI-compatible podem devolver `owned_by` ou `provider` com o dono do modelo;
+- em NVIDIA NIM, o modelo selecionado foi `openai/gpt-oss-120b`, mas a fronteira operacional era `nvidia-nim`;
+- o terminal podia filtrar ou rotear pelo dono `openai` em vez do preset operacional;
+- isso explicava parte dos diagnosticos `Nenhum candidato encontrado para roteamento` em comandos focados no provider ativo.
+
+Correcoes aplicadas:
+
+- `withByokCatalogSource` agora distingue provider operacional de owner do modelo em modelos descobertos por provider ativo;
+- para modelos `remote/static` vindos do provider ativo, `byok.provider` passa a refletir o preset operacional;
+- o owner anterior fica preservado em `byok.providerOwner`;
+- `byok.profile` tambem recebe o preset quando nao ha profile nomeado;
+- `toGatewayRouteCandidate` passa a enxergar o provider operacional correto sem mudar a arquitetura do policy engine.
+
+Teste adicionado:
+
+`npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js -t "roteia modelos descobertos|modelos BYOK como candidatos"`
+
+Resultado:
+
+- `1 passed`;
+- o fixture simula endpoint NVIDIA retornando modelo com owner `openai`;
+- `/byok models route code active --show-rejected provider:nvidia-nim` envia candidato com:
+  - `providerId=nvidia-nim`;
+  - `providerModel=openai/gpt-oss-120b`;
+- o cockpit seleciona o modelo e nao cai no diagnostico de zero candidatos.
+
+Live revalidado:
+
+`npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-timeout-ms=15000 --no-pr --timeout-ms=600000`
+
+Resultado:
+
+- `Status: PASS`;
+- artefato: `artifacts/terminal-live/2026-05-28T14-08-27-863Z/summary.md`;
+- `/byok models route code active --show-rejected provider:nvidia-nim` retornou:
+  - `fonte=provider`;
+  - `endpoint=https://integrate.api.nvidia.com/v1/models`;
+  - `admissao=117/117`;
+  - `rejeitados=0`;
+  - selecionado `openai/gpt-oss-120b`;
+  - `provider=nvidia-nim`;
+  - `score=721`;
+  - fallback chain com 117 candidatos NVIDIA;
+- probes chat, streaming, JSON, vision e agent passaram;
+- `/errors 10` reportou zero erros.
+
+Health pos-live:
+
+`npm --silent run model-gateway:runtime-health:mirror`
+
+Resultado:
+
+- `ok=true`;
+- `healthObservations=25`;
+- `probeResults=28`;
+- `sqlite.runtimeRows=2481`;
+- `sqlite.tableCounts.healthObservations=1237`;
+- `sqlite.tableCounts.runtimeProbeRuns=59`;
+- `sqlite.tableCounts.runtimeProbeResults=1185`.
+
+`npm --silent run model-gateway:runtime-health:diff -- --write-snapshot --out-dir artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-08-real-selector-nvidia-route-cockpit-pass`
+
+Resultado:
+
+- snapshot escrito em `artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-08-real-selector-nvidia-route-cockpit-pass/latest.json`;
+- `diff.summary.regressions=0`;
+- `diff.summary.newFailures=0`;
+
+Impacto:
+
+- o operador passa a ver e testar a fronteira operacional correta;
+- o live runner pode continuar usando `provider:nvidia-nim` sem depender de owner interno do modelo;
+- a rota canonica fica alinhada entre endpoint ativo, cockpit terminal e model-gateway.
+
+Lacunas ainda abertas apos Mudanca 82:
+
 - `/byok reload` ainda mostra brevemente o perfil legado do `.env.local` antes da reaplicacao da rota runtime-selector;
 - `repo_agent` ainda tenta uma rota primaria sem prova antes de fallback comprovado quando a politica permite;
 - full-turn real deve ser executado so depois de validar esses pontos ou aceitar conscientemente o risco operacional;
