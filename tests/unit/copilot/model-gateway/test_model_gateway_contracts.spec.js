@@ -1241,6 +1241,8 @@ describe('model-gateway foundation', () => {
                         providerModel: 'glm-4.5-flash',
                         selectorKind: 'exact_model',
                         selectorSyntax: 'glm-4.5-flash',
+                        routeProfile: 'default',
+                        taskProfile: 'default',
                         hasRuntimeProof: true,
                         accountAccess: { canAttempt: true },
                     },
@@ -1250,6 +1252,8 @@ describe('model-gateway foundation', () => {
                             providerModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
                             selectorKind: 'exact_model',
                             selectorSyntax: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                            routeProfile: 'default',
+                            taskProfile: 'default',
                             hasRuntimeProof: true,
                             accountAccess: { canAttempt: true },
                         },
@@ -1264,6 +1268,8 @@ describe('model-gateway foundation', () => {
                         providerModel: 'glm-4.5-flash',
                         selectorKind: 'exact_model',
                         selectorSyntax: 'glm-4.5-flash',
+                        routeProfile: 'default',
+                        taskProfile: 'default',
                         hasRuntimeProof: true,
                         accountAccess: { canAttempt: true },
                     },
@@ -1273,6 +1279,8 @@ describe('model-gateway foundation', () => {
                             providerModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
                             selectorKind: 'exact_model',
                             selectorSyntax: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                            routeProfile: 'default',
+                            taskProfile: 'default',
                             hasRuntimeProof: true,
                             accountAccess: { canAttempt: true },
                         },
@@ -1285,12 +1293,18 @@ describe('model-gateway foundation', () => {
         assert.equal(maximumQualityPlan.routes[1].selected?.['providerId'], 'zai');
         assert.equal(maximumQualityPlan.routes[0].hasRuntimeProof, true);
         assert.equal(maximumQualityPlan.routes[0].selected?.['hasRuntimeProof'], true);
+        assert.equal(maximumQualityPlan.routes[0].selected?.['routeProfile'], 'repo_agent');
+        assert.equal(maximumQualityPlan.routes[0].selected?.['taskProfile'], 'repo_agent');
+        assert.equal(maximumQualityPlan.routes[0].selected?.['sourceRouteProfile'], 'default');
         assert.equal(maximumQualityPlan.routes[1].selected?.['hasRuntimeProof'], true);
+        assert.equal(maximumQualityPlan.routes[1].selected?.['routeProfile'], 'code');
+        assert.equal(maximumQualityPlan.routes[1].selected?.['sourceTaskProfile'], 'default');
         const diversifiedPlan = buildModelGatewayRuntimeSelectorPlan(sharedBestPolicy, { preferProviderDiversity: true });
         assert.equal(diversifiedPlan.routes[0].selected?.['providerId'], 'zai');
         assert.equal(diversifiedPlan.routes[1].selected?.['providerId'], 'groq');
         assert.equal(diversifiedPlan.routes[1].selected?.['hasRuntimeProof'], true);
         assert.equal(diversifiedPlan.routes[1].candidateAlternatives[0]?.['selected']?.['hasRuntimeProof'], true);
+        assert.equal(diversifiedPlan.routes[1].candidateAlternatives[0]?.['selected']?.['routeProfile'], 'code');
         assert.ok(diversifiedPlan.routes[1].reasons.includes('runtime_selector_fallback:alternate1'));
 
         const providerCooldownNow = Date.now();

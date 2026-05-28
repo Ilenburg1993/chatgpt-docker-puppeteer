@@ -202,6 +202,24 @@ function routeWithRuntimeProofFlag(route, hasRuntimeProof) {
 }
 
 /**
+ * @param {Record<string, unknown> | null} route
+ * @param {string} profileId
+ * @returns {Record<string, unknown> | null}
+ */
+function routeWithRuntimeProfile(route, profileId) {
+    if (!route) return null;
+    const routeProfile = optionalString(route['routeProfile']);
+    const taskProfile = optionalString(route['taskProfile']);
+    return {
+        ...route,
+        routeProfile: profileId,
+        taskProfile: profileId,
+        ...(routeProfile && routeProfile !== profileId ? { sourceRouteProfile: routeProfile } : {}),
+        ...(taskProfile && taskProfile !== profileId ? { sourceTaskProfile: taskProfile } : {}),
+    };
+}
+
+/**
  * @param {Record<string, unknown> | null | undefined} route
  * @returns {string | null}
  */
@@ -755,9 +773,9 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                   usableCandidates.find((candidate) => !selectedRouteKeysForPlan.has(routeKey(candidate.selected))) ??
                   (primary && !primary.blocked ? primary : (usableCandidates[0] ?? primary)));
         }
-        const selected = chosen?.blocked ? null : (chosen?.selected ?? null);
+        const selected = routeWithRuntimeProfile(chosen?.blocked ? null : (chosen?.selected ?? null), profileId);
         const alternativeSummary = summarizeRuntimeSelectorAlternatives(candidateEvaluations);
-        const selectedForReasons = chosen?.selected ?? runtimeRoute(selectedFromPolicyRow(row));
+        const selectedForReasons = routeWithRuntimeProfile(chosen?.selected ?? runtimeRoute(selectedFromPolicyRow(row)), profileId);
         const hasRuntimeProof = chosen?.hasRuntimeProof === true;
         const runtimeEnv = chosen?.runtimeEnv ?? null;
         const runtimeHealth = chosen?.runtimeHealth ?? null;
@@ -798,7 +816,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
         const candidateAlternatives = candidateEvaluations
             .filter((candidate) => candidate !== chosen && candidate['blocked'] !== true && optionalRecord(candidate['selected']))
             .map((candidate) => {
-                const candidateSelected = optionalRecord(candidate['selected']);
+                const candidateSelected = routeWithRuntimeProfile(optionalRecord(candidate['selected']), profileId);
                 const candidateHasRuntimeProof = candidate['hasRuntimeProof'] === true;
                 const candidateSelectedWithProofFlag = routeWithRuntimeProofFlag(candidateSelected, candidateHasRuntimeProof);
                 const label = optionalString(candidate['label']);

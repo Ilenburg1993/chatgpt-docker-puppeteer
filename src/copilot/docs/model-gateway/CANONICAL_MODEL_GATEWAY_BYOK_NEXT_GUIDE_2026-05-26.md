@@ -10362,6 +10362,41 @@ Teste adicionado:
 - HTTP 400 `property parsed is unsupported` classifica como `capability-unsupported`;
 - quota/auth/rate-limit continuam preservados.
 
+## Mudanca 111 - Runtime selector normaliza routeProfile executavel
+
+Status: concluido.
+
+Contexto:
+
+- no dry-run real, a rota escolhida para `repo_agent` podia carregar `selected.routeProfile=default`;
+- o plano em si tinha `profileId=repo_agent`;
+- a execucao gravava health com `route.profileId`, mas decision events podiam olhar para `selected.routeProfile`;
+- isso podia poluir ledger/SQLite com profile incorreto.
+
+Regra aplicada:
+
+- o objeto `selected` serializado pelo runtime selector passa a receber:
+  - `routeProfile=<profileId do plano>`;
+  - `taskProfile=<profileId do plano>`;
+- quando a rota original tinha outro profile, preservamos:
+  - `sourceRouteProfile`;
+  - `sourceTaskProfile`;
+- candidate alternatives recebem a mesma normalizacao.
+
+Motivo arquitetural:
+
+- route option source profile e runtime execution profile sao conceitos diferentes;
+- o executor precisa registrar o profile efetivo da tentativa;
+- a origem ainda e util para diagnostico e nao deve ser apagada;
+- isso prepara SQLite/ledger para consultas por `repo_agent`, `code`, `tool_agent` sem misturar `default`.
+
+Teste adicionado:
+
+- policy com rota `default` selecionada para `repo_agent` e `code`;
+- o plano executavel normaliza `selected.routeProfile` e `selected.taskProfile`;
+- os campos `sourceRouteProfile`/`sourceTaskProfile` preservam `default`;
+- alternativas tambem sao normalizadas.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.
