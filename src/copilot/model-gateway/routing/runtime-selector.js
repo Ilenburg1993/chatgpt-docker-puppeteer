@@ -597,7 +597,7 @@ function runtimeSelectorPlanForRouteAttempt(plan, route) {
 
 /**
  * @param {Record<string, unknown>} selectionPolicyOrTrace
- * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; blockFailedProbeKinds?: string[]; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
+ * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; blockFailedProbeKinds?: string[]; temporaryFailureCooldownMs?: number; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
  * @returns {{
  *   schema: 'model-gateway-runtime-selector-plan';
  *   ok: boolean;
@@ -655,6 +655,9 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                     ? evaluateGatewayModelHealthRoute(selected, {
                           routeProfile: profileId,
                           runtimeHealthRecords: options.runtimeHealthRecords,
+                          ...(typeof options.temporaryFailureCooldownMs === 'number'
+                              ? { temporaryFailureCooldownMs: options.temporaryFailureCooldownMs }
+                              : {}),
                           requireAgentProbeOk: runtimeSelectorProfileRequiresAgentProbe(profileId),
                       })
                     : null;

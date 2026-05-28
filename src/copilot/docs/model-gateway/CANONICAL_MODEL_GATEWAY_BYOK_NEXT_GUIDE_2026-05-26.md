@@ -9549,6 +9549,131 @@ Achado adicional:
   model-scoped default de 15 minutos;
 - falhas duraveis como `model-or-route`, `auth` e `credits` continuam bloqueando ate sucesso posterior, clear explicito
   ou refresh/overlay adequado.
+- `model-gateway-runtime-selector.mjs` recebeu `--temporary-failure-cooldown-ms` para auditorias controladas sem apagar
+  o health store.
+- `run-terminal-llm-b-live-test.mjs` recebeu `--byok-real-route-temporary-failure-cooldown-ms` para propagar esse mesmo
+  controle ao live harness.
+- Evidencia adicional:
+  - com `--temporary-failure-cooldown-ms=1`, a execucao limitada tentou `cerebras/gpt-oss-120b`,
+    `cerebras/zai-glm-4.7`, `zai/glm-4-32b-0414-128k`;
+  - a rota viva encontrada foi `zai/glm-4.5-flash`, perfil `code`.
+
+## Mudanca 95 - Vision Como Diagnostico Opcional No Live Full
+
+O primeiro full live real depois da rota `zai/glm-4.5-flash` provou o fluxo principal, mas falhou no status final porque
+o harness ainda tratava `vision` como criterio obrigatorio.
+
+Artefato:
+
+- `artifacts/terminal-live/2026-05-28T17-16-14-392Z/summary.md`.
+
+Resultado observado:
+
+- runtime selector executou fallback real e promoveu `zai/glm-4.5-flash`;
+- BYOK carregou `.env.local` sem vazar segredos;
+- chat probe passou;
+- streaming probe passou;
+- JSON probe passou;
+- agent probe passou com tools e `ask_user`;
+- o turno publico integrado materializou:
+  - `report_intent`;
+  - `read_file_content`;
+  - deltas canonicos;
+  - `ask_user`;
+  - resposta humana;
+  - final pos-ask;
+- `vision` falhou com erro do provider, mas isso nao degradou chat, tools, JSON, streaming nem ask_user.
+
+Decisao arquitetural:
+
+- `vision` continua sendo capability rica e deve ser registrada;
+- `vision` continua sendo preferencia/soft capability para perfis que nao exigem imagem;
+- `vision` nao pode transformar um live de repo/code/tool protocol em FAIL por default;
+- apenas um teste explicitamente multimodal deve exigir `vision` como hard gate.
+
+Alteracoes aplicadas:
+
+- `run-terminal-llm-b-live-test.mjs` ganhou criterios com severidade:
+  - falha dura permanece bloqueante;
+  - diagnostico opcional aparece como `[!]`;
+  - `summary.json.ok` passa a refletir apenas criterios obrigatorios.
+- `byok-real-vision-probe` virou warning por default:
+  - sucesso segue como `[x]`;
+  - erro/timeout/empty/failed segue visivel como `[!]`;
+  - nao derruba o live full quando o objetivo e validar repo/code runtime.
+- Novo opt-in:
+  - `--byok-real-require-vision-probe`;
+  - quando usado, `vision` volta a ser criterio obrigatorio.
+
+Evidencia apos a correcao:
+
+- `artifacts/terminal-live/2026-05-28T17-23-22-050Z/summary.md`;
+- status `PASS`;
+- `byok-real-vision-probe` apareceu como `[!]`, nao como falha dura;
+- `summary.json.ok=true` e `requiredOk=true`;
+- health registrada para `code|zai|glm-4.5-flash`:
+  - `live_tool_protocol=ok`;
+  - `live_ask_user=ok`;
+- o turno principal materializou tools reais, deltas, `ask_user`, resposta humana e final pos-ask.
+
+Comando recomendado para live full repo/code:
+
+`node scripts/copilot/run-terminal-llm-b-live-test.mjs --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-temporary-failure-cooldown-ms=1 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --timeout-ms=240000`
+
+Comando recomendado para live multimodal estrito:
+
+`node scripts/copilot/run-terminal-llm-b-live-test.mjs --byok-real --byok-real-route-profile=vision --byok-real-route-execute --byok-real-route-allow-probe --byok-real-require-vision-probe --byok-real-route-selection-policy=prefer_runtime_proved --timeout-ms=240000`
+
+Lacunas restantes:
+
+- separar health `vision` de health `chat` no cockpit para evitar leitura ambigua pelo operador;
+- criar runtime live dedicado para perfil `vision`, com prompt e fixture multimodal como objetivo primario;
+- registrar falhas multimodais como capability runtime especifica, sem contaminar selecao textual.
+
+## Mudanca 96 - Active/Current Preserva Modelo Ativo Mesmo Quando O Catalogo Remoto O Omite
+
+O live de `2026-05-28T17-23-22-050Z` tambem revelou um desalinhamento no cockpit:
+
+- o runtime selector promoveu `zai/glm-4.5-flash`;
+- o terminal ficou corretamente bound em `glm-4.5-flash`;
+- probes chat/streaming/JSON/agent passaram nesse modelo;
+- mas `/byok models route code active --show-rejected provider:zai` olhava o endpoint remoto `/models`;
+- o endpoint remoto nao listava `glm-4.5-flash`;
+- a rota de preview escolhia `glm-4.5`, que tinha health de timeout.
+
+Decisao arquitetural:
+
+- `active/current` e uma intencao operacional, nao apenas um filtro de catalogo;
+- quando o operador pede `active/current`, o modelo atualmente preparado/bound deve entrar como candidato;
+- isso deve acontecer mesmo quando o provider remoto omite o modelo ativo;
+- o catalogo canonico nao deve ser alterado por esse fato sozinho;
+- a inclusao e uma projection efemera de terminal para preview/diagnostico.
+
+Alteracoes aplicadas:
+
+- `parseRecommendArgs` passou a registrar `activeOnly`;
+- o label de filtros agora mostra `active`;
+- `discoverByokCatalogForCommand` injeta o modelo ativo como candidato quando `active/current` e usado;
+- se o modelo ja existir nos modelos locais/gateway, ele e reaproveitado;
+- se nao existir, o terminal sintetiza um candidato `active-runtime` com:
+  - provider operacional;
+  - providerModel ativo;
+  - context window do status BYOK;
+  - reasoning/vision declarados no status BYOK;
+  - tools/streaming como capacidades operacionais default para fins de rota/probe;
+  - `confidence=runtime`.
+
+Teste adicionado:
+
+- `mantem o modelo ativo como candidato quando active/current e o endpoint remoto o omite`;
+- cobre exatamente o caso `zai/glm-4.5-flash` ausente do endpoint remoto, mas presente como modelo ativo.
+
+Efeito esperado:
+
+- o cockpit de rota deixa de contradizer a rota viva promovida pelo runtime selector;
+- o operador ve o modelo ativo como candidato de diagnostico;
+- a etapa pre-runtime continua sem mutar o catalogo canonico;
+- endpoints incompletos deixam de esconder modelos ativos ja provados por runtime.
 
 ## 22. Fim Do Documento Inicial
 

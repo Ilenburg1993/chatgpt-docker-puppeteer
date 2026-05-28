@@ -45,7 +45,9 @@ Common options:
   --byok-real-route-selection-policy=<metadata_first|prefer_runtime_proved|require_runtime_proof>
   --byok-real-route-max-attempts=<n>
   --byok-real-route-max-attempts-per-provider=<n>
+  --byok-real-route-temporary-failure-cooldown-ms=<ms>
   --byok-real-route-timeout-ms=<ms>
+  --byok-real-require-vision-probe
   --timeout-ms=<ms>
   --transport=<pty|stdio>
   --out-dir=<path>
@@ -291,6 +293,7 @@ function runRuntimeSelectorLiveRoute({
     allowProbe = false,
     maxAttempts = 8,
     maxAttemptsPerProvider = 4,
+    temporaryFailureCooldownMs = 0,
     timeoutMs = 45_000,
     selectionPolicy = '',
 } = {}) {
@@ -330,6 +333,9 @@ function runRuntimeSelectorLiveRoute({
             `--max-attempts-per-provider=${Math.max(1, Math.trunc(maxAttemptsPerProvider))}`,
             `--timeout-ms=${Math.max(1_000, Math.trunc(timeoutMs))}`,
         );
+    }
+    if (temporaryFailureCooldownMs > 0) {
+        args.push(`--temporary-failure-cooldown-ms=${Math.max(1, Math.trunc(temporaryFailureCooldownMs))}`);
     }
     const result = spawnSync(process.execPath, args, {
         cwd: ROOT,
@@ -438,6 +444,7 @@ function buildRealByokRuntime({
     runtimeSelectorAllowProbe = false,
     runtimeSelectorMaxAttempts = 8,
     runtimeSelectorMaxAttemptsPerProvider = 4,
+    runtimeSelectorTemporaryFailureCooldownMs = 0,
     runtimeSelectorTimeoutMs = 45_000,
     runtimeSelectorSelectionPolicy = '',
 }) {
@@ -450,6 +457,7 @@ function buildRealByokRuntime({
         allowProbe: runtimeSelectorAllowProbe,
         maxAttempts: runtimeSelectorMaxAttempts,
         maxAttemptsPerProvider: runtimeSelectorMaxAttemptsPerProvider,
+        temporaryFailureCooldownMs: runtimeSelectorTemporaryFailureCooldownMs,
         timeoutMs: runtimeSelectorTimeoutMs,
         selectionPolicy: runtimeSelectorSelectionPolicy,
     });
@@ -1006,6 +1014,19 @@ function hasReturnedToReplPrompt(plain, outputOffset) {
     return REPL_PROMPT_TAIL_RE.test(String(plain ?? '').slice(outputOffset));
 }
 
+function isHardCriterionFailure(criterion) {
+    return criterion?.pass !== true && criterion?.severity !== 'warning' && criterion?.required !== false;
+}
+
+function allRequiredCriteriaPassed(criteria) {
+    return criteria.every((criterion) => !isHardCriterionFailure(criterion));
+}
+
+function criterionMarker(criterion) {
+    if (criterion.pass) return '[x]';
+    return isHardCriterionFailure(criterion) ? '[ ]' : '[!]';
+}
+
 function buildReport({
     criteria,
     durationMs,
@@ -1022,7 +1043,7 @@ function buildReport({
     transport,
     liveHealthRecord,
 }) {
-    const ok = criteria.every((criterion) => criterion.pass);
+    const ok = allRequiredCriteriaPassed(criteria);
     const status = blocker ? 'BLOCKED' : ok ? 'PASS' : 'FAIL';
     const lines = [
         '# Terminal LLM-B Live Test',
@@ -1056,7 +1077,7 @@ function buildReport({
         '',
         '## Criteria',
         '',
-        ...criteria.map((criterion) => `- ${criterion.pass ? '[x]' : '[ ]'} ${criterion.id}: ${criterion.detail}`),
+        ...criteria.map((criterion) => `- ${criterionMarker(criterion)} ${criterion.id}: ${criterion.detail}`),
         '',
     ];
     return `${lines.join('\n')}\n`;
@@ -1974,7 +1995,7 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
 function evaluateByokRealOutput(
     plain,
     secretValues,
-    { profile, altProfile, model, altModel, noPr = false, runtimeSelector, runtimeRoute } = {},
+    { profile, altProfile, model, altModel, noPr = false, runtimeSelector, runtimeRoute, requireVisionProbe = false } = {},
 ) {
     const byokModels = [...new Set([model, altModel].filter((value) => typeof value === 'string' && value.length > 0))];
     const byokModelPrLines = byokModels.flatMap((candidate) => {
@@ -2106,10 +2127,9 @@ function evaluateByokRealOutput(
         },
         {
             id: 'byok-real-vision-probe',
-            pass:
-                byokAdmissionBlocked ||
-                byokVisionProbeStatus === 'ok' ||
-                ['empty', 'vision-mismatch', 'error', 'provider-error', 'timeout'].includes(byokVisionProbeStatus ?? ''),
+            pass: byokAdmissionBlocked || byokVisionProbeStatus === 'ok',
+            required: requireVisionProbe,
+            severity: requireVisionProbe ? 'error' : 'warning',
             detail: byokAdmissionBlocked
                 ? 'BYOK vision probe was admission-blocked before provider streaming'
                 : byokVisionProbeStatus === 'ok'
@@ -2390,8 +2410,12 @@ async function main() {
     const byokRealRuntimeSelectorMaxAttemptsPerProvider = Number(
         readArg('--byok-real-route-max-attempts-per-provider', '4'),
     );
+    const byokRealRuntimeSelectorTemporaryFailureCooldownMs = Number(
+        readArg('--byok-real-route-temporary-failure-cooldown-ms', '0'),
+    );
     const byokRealRuntimeSelectorTimeoutMs = Number(readArg('--byok-real-route-timeout-ms', '45000'));
     const byokRealRuntimeSelectorSelectionPolicy = readArg('--byok-real-route-selection-policy', '');
+    const byokRealRequireVisionProbe = hasFlag('--byok-real-require-vision-probe');
     const collectSse = !hasFlag('--no-sse');
     const requestedTerminalPort = readArg('--terminal-port', '');
     const requestedSsePort = readArg('--sse-port', '');
@@ -2430,6 +2454,11 @@ async function main() {
               runtimeSelectorMaxAttemptsPerProvider: Number.isFinite(byokRealRuntimeSelectorMaxAttemptsPerProvider)
                   ? byokRealRuntimeSelectorMaxAttemptsPerProvider
                   : 4,
+              runtimeSelectorTemporaryFailureCooldownMs: Number.isFinite(
+                  byokRealRuntimeSelectorTemporaryFailureCooldownMs,
+              )
+                  ? byokRealRuntimeSelectorTemporaryFailureCooldownMs
+                  : 0,
               runtimeSelectorTimeoutMs: Number.isFinite(byokRealRuntimeSelectorTimeoutMs)
                   ? byokRealRuntimeSelectorTimeoutMs
                   : 45_000,
@@ -2832,7 +2861,13 @@ async function main() {
             : evaluateOutput(plain, sseSummary, exportSummary);
     const criteria = [
         ...baseCriteria,
-        ...(byokReal ? evaluateByokRealOutput(plain, secretValues, { ...(realByok ?? {}), noPr }) : []),
+        ...(byokReal
+            ? evaluateByokRealOutput(plain, secretValues, {
+                  ...(realByok ?? {}),
+                  noPr,
+                  requireVisionProbe: byokRealRequireVisionProbe,
+              })
+            : []),
     ];
     const durationMs = Date.now() - Date.parse(startedAt);
     const liveHealthRecord = await recordByokLiveProtocolHealth({
@@ -2857,7 +2892,8 @@ async function main() {
         jsonPath,
         `${JSON.stringify(
             {
-                ok: criteria.every((c) => c.pass),
+                ok: allRequiredCriteriaPassed(criteria),
+                requiredOk: allRequiredCriteriaPassed(criteria),
                 blocked: Boolean(blocker),
                 blocker,
                 startedAt,
@@ -2906,7 +2942,7 @@ async function main() {
     if (realByok) {
         await writeFile(path.join(outDir, 'byok.real.redacted.json'), `${JSON.stringify(realByok.redacted, null, 2)}\n`, 'utf8');
     }
-    const failed = criteria.filter((criterion) => !criterion.pass);
+    const failed = criteria.filter(isHardCriterionFailure);
     console.log(`[terminal-live] summary: ${path.relative(ROOT, mdPath)}`);
     if (failed.length > 0 || exitCode !== 0) {
         console.error(

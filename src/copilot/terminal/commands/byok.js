@@ -703,11 +703,12 @@ function classifyByokModelBudget(model, runtimeBudget = null) {
 
 /**
  * @param {string[]} rest
- * @returns {{ limit: number; freeOnly: boolean; meteredOnly: boolean; unknownCostOnly: boolean; provider: string | null; vision: boolean; reasoning: boolean; tools: boolean; streaming: boolean; probeVerified: boolean; minContext: number | null; minRequest: number | null; avoidLowLimit: boolean; forceRefresh: boolean; allProviders: boolean; grouped: boolean }}
+ * @returns {{ limit: number; activeOnly: boolean; freeOnly: boolean; meteredOnly: boolean; unknownCostOnly: boolean; provider: string | null; vision: boolean; reasoning: boolean; tools: boolean; streaming: boolean; probeVerified: boolean; minContext: number | null; minRequest: number | null; avoidLowLimit: boolean; forceRefresh: boolean; allProviders: boolean; grouped: boolean }}
  */
 function parseRecommendArgs(rest) {
     const state = {
         limit: DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT,
+        activeOnly: false,
         freeOnly: false,
         meteredOnly: false,
         unknownCostOnly: false,
@@ -729,6 +730,8 @@ function parseRecommendArgs(rest) {
         const numeric = Number.parseInt(item, 10);
         if (Number.isFinite(numeric) && numeric > 0) {
             state.limit = numeric;
+        } else if (['active', 'current', '--active', '--current'].includes(item)) {
+            state.activeOnly = true;
         } else if (['refresh', 'force', '--refresh', '--force'].includes(item)) {
             state.forceRefresh = true;
         } else if (['all-providers', 'providers', '--all-providers'].includes(item)) {
@@ -816,6 +819,7 @@ function renderByokFilterLabel(filters) {
     return [
         filters.allProviders ? 'all-providers' : null,
         filters.grouped ? 'grouped' : null,
+        filters.activeOnly ? 'active' : null,
         filters.provider ? `provider:${filters.provider}` : null,
         filters.freeOnly ? 'free' : null,
         filters.meteredOnly ? 'metered' : null,
@@ -1015,6 +1019,81 @@ function activeProjectionSuggestsLocalProvider(projection) {
     return [summary.profile, summary.preset, summary.providerType, summary.baseUrl]
         .filter(Boolean)
         .some((value) => /\bollama(?:-local)?\b|localhost|127\.0\.0\.1|0\.0\.0\.0/iu.test(String(value)));
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalByokProjection>} projection
+ * @returns {import('../../presentation/contracts/index.js').RuntimeModelInfo | null}
+ */
+function buildActiveByokProjectionModel(projection) {
+    const summary = projection.summary;
+    const activeModel = optionalScalarString(summary.model);
+    if (!activeModel) return null;
+    const provider =
+        optionalScalarString(summary.preset) ??
+        optionalScalarString(summary.providerType) ??
+        optionalScalarString(summary.profile) ??
+        'byok';
+    const existing = [...projection.gatewayModels, ...projection.models].find((model) => {
+        const meta = getByokModelMetadata(model);
+        const providerMatch = [meta?.provider, meta?.profile, meta?.source, asRecord(model)['vendor']]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(provider.toLowerCase()));
+        const modelMatch = model.id === activeModel || optionalScalarString(meta?.providerModel) === activeModel;
+        return providerMatch && modelMatch;
+    });
+    if (existing) {
+        return withByokCatalogSource(existing, {
+            profileName: optionalScalarString(summary.profile),
+            preset: optionalScalarString(summary.preset),
+            providerType: optionalScalarString(summary.providerType),
+        });
+    }
+    const contextWindowTokens = finitePositiveNumber(summary.capabilities?.contextWindowTokens);
+    const vision = Boolean(summary.capabilities?.vision);
+    const reasoningEffort = Boolean(summary.capabilities?.reasoningEffort);
+    return /** @type {import('../../presentation/contracts/index.js').RuntimeModelInfo} */ ({
+        id: activeModel,
+        name: activeModel,
+        displayName: activeModel,
+        vendor: provider,
+        capabilities: {
+            supports: {
+                reasoningEffort,
+                vision,
+                tools: true,
+                streaming: true,
+            },
+            limits: {
+                ...(contextWindowTokens !== null ? { max_context_window_tokens: contextWindowTokens } : {}),
+            },
+        },
+        byok: {
+            provider,
+            profile: optionalScalarString(summary.profile) ?? provider,
+            providerModel: activeModel,
+            source: 'active-runtime',
+            confidence: 'runtime',
+            supportsReasoning: reasoningEffort,
+            inputModalities: vision ? ['text', 'image'] : ['text'],
+            outputModalities: ['text'],
+            capabilities: {
+                tools: true,
+                streaming: true,
+                vision,
+                reasoningEffort,
+            },
+        },
+    });
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalByokProjection>} projection
+ * @returns {import('../../presentation/contracts/index.js').RuntimeModelInfo[]}
+ */
+function activeByokProjectionModelList(projection) {
+    const model = buildActiveByokProjectionModel(projection);
+    return model ? [model] : [];
 }
 
 /**
@@ -1407,6 +1486,16 @@ async function discoverByokCatalogForCommand(projection, filters) {
         const selectedModels = remoteAuthoritative
             ? chooseByokCatalogModels(discovered.models, gatewayModels)
             : chooseByokCatalogModels(gatewayModels, discovered.models);
+        const models = selectedModels.map((model) =>
+            withByokCatalogSource(model, {
+                profileName: projection.summary.profile,
+                preset: projection.summary.preset,
+                providerType: projection.summary.providerType,
+            }),
+        );
+        if (filters.activeOnly) {
+            appendUniqueByokCatalogModels(models, activeByokProjectionModelList(projection));
+        }
         const sourceLabel =
             discovered.source === 'remote'
                 ? 'provider'
@@ -1416,13 +1505,7 @@ async function discoverByokCatalogForCommand(projection, filters) {
                     ? 'model-gateway/static-fallback'
                     : 'model-gateway/static';
         return {
-            models: selectedModels.map((model) =>
-                withByokCatalogSource(model, {
-                    profileName: projection.summary.profile,
-                    preset: projection.summary.preset,
-                    providerType: projection.summary.providerType,
-                }),
-            ),
+            models,
             sourceLabel,
             endpoint: discovered.endpoint,
             errors: discovered.error ? [discovered.error] : [],
@@ -1479,6 +1562,10 @@ async function discoverByokCatalogForCommand(projection, filters) {
             .filter((model) => matchesByokProviderFilter(model, filters.provider));
         const added = appendUniqueByokCatalogModels(models, gatewayFallbackModels);
         if (added > 0) sourceCounts.set('model-gateway-static', (sourceCounts.get('model-gateway-static') ?? 0) + added);
+    }
+    if (filters.activeOnly) {
+        const added = appendUniqueByokCatalogModels(models, activeByokProjectionModelList(projection));
+        if (added > 0) sourceCounts.set('active-runtime', (sourceCounts.get('active-runtime') ?? 0) + added);
     }
     const sourceLabel =
         [...sourceCounts.entries()]

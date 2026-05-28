@@ -307,6 +307,7 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
  *   runtimeHealthRecords?: Record<string, any>[];
  *   runtimeRouteProfile?: string | null;
  *   requireRuntimeProof?: boolean;
+ *   temporaryFailureCooldownMs?: number;
  *   requiredProbeKinds?: string[];
  *   preferredProbeKinds?: string[];
  *   blockFailedProbeKinds?: string[];
@@ -389,6 +390,9 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
         if (options.includeProjectionOnly !== undefined) routeOptions.includeProjectionOnly = options.includeProjectionOnly;
         if (options.secretRegistry !== undefined) routeOptions.secretRegistry = options.secretRegistry;
         if (Array.isArray(options.runtimeHealthRecords)) routeOptions.runtimeHealthRecords = options.runtimeHealthRecords;
+        if (typeof options.temporaryFailureCooldownMs === 'number') {
+            routeOptions.temporaryFailureCooldownMs = options.temporaryFailureCooldownMs;
+        }
         if (typeof options.providerCooldownWindowMs === 'number') {
             routeOptions.providerCooldownWindowMs = options.providerCooldownWindowMs;
         }

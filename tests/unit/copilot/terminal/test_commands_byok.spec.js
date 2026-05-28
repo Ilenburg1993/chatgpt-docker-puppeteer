@@ -3633,6 +3633,85 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('Nenhum candidato encontrado para roteamento');
     });
 
+    it('mantem o modelo ativo como candidato quando active/current e o endpoint remoto o omite', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'glm-4.5',
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 128000 },
+                    },
+                    byok: {
+                        provider: 'zai',
+                        providerModel: 'glm-4.5',
+                        source: 'remote',
+                        capabilities: { tools: true, streaming: true },
+                    },
+                },
+            ],
+            source: 'remote-cache',
+            endpoint: 'https://api.z.ai/api/paas/v4/models',
+            fromCache: true,
+            error: null,
+        });
+        routeGatewayModels.mockImplementation((candidates) => {
+            const selectedModel = candidates.find((candidate) => candidate.providerModel === 'glm-4.5-flash') ?? candidates[0];
+            return {
+                profile: { id: 'code' },
+                selected: {
+                    model: selectedModel,
+                    include: true,
+                    score: 260,
+                    reasons: ['active_runtime_model'],
+                    rejectedReasons: [],
+                    health: null,
+                },
+                candidates: [
+                    {
+                        model: selectedModel,
+                        include: true,
+                        score: 260,
+                        reasons: ['active_runtime_model'],
+                        rejectedReasons: [],
+                        health: null,
+                    },
+                ],
+                rejected: [],
+                fallbackChain: ['zai:glm-4.5-flash', 'zai:glm-4.5'],
+            };
+        });
+        mockProjection({
+            summary: {
+                enabled: true,
+                ready: true,
+                profile: null,
+                preset: 'zai',
+                providerType: 'openai',
+                baseUrl: 'https://api.z.ai/api/paas/v4',
+                model: 'glm-4.5-flash',
+                capabilities: { reasoningEffort: true, vision: true, contextWindowTokens: 128000 },
+            },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models route code active --show-rejected provider:zai');
+
+        expect(routeGatewayModels).toHaveBeenCalledWith(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    providerId: 'zai',
+                    providerModel: 'glm-4.5-flash',
+                    verification: expect.objectContaining({ confidence: 'runtime' }),
+                }),
+            ]),
+            'code',
+            expect.objectContaining({ allowProviders: ['zai'] }),
+        );
+        expect(ctx.output()).toContain('selecionado');
+        expect(ctx.output()).toContain('glm-4.5-flash');
+    });
+
     it('usa catálogo gateway como fallback para provider explícito sem perfil correspondente', async () => {
         routeGatewayModels.mockImplementation((candidates) => ({
             profile: { id: 'repo_agent' },
