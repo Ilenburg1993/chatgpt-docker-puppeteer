@@ -18,7 +18,11 @@ import {
 import { classifyByokProviderFailure } from '../health/provider-failure.js';
 import { evaluateModelGatewayProviderEnvRequirements } from '../secrets/requirements.js';
 import { resolveModelGatewayAccountResetWindow } from '../account-access/reset-windows.js';
-import { evaluateGatewayModelHealthRoute, isGatewayModelProbeFailed } from './health-routing.js';
+import {
+    evaluateGatewayModelHealthRoute,
+    evaluateGatewayProviderHealthCooldown,
+    isGatewayModelProbeFailed,
+} from './health-routing.js';
 
 const DEFAULT_MAX_RUNTIME_RETRY_DELAY_MS = 30_000;
 
@@ -349,6 +353,12 @@ function selectedCandidatesFromPolicyRow(row) {
         { label: 'selected', selected: optionalRecord(row['selected']) },
         { label: 'postSelected', selected: optionalRecord(row['postSelected']) },
         { label: 'preSelected', selected: optionalRecord(row['preSelected']) },
+        ...(Array.isArray(row['candidateAlternates'])
+            ? row['candidateAlternates'].map((selected, index) => ({
+                  label: `alternate${index + 1}`,
+                  selected: optionalRecord(selected),
+              }))
+            : []),
     ];
     const seen = new Set();
     const result = [];
@@ -486,7 +496,7 @@ function sumRouteDecisionRecordedCount(attempts) {
 
 /**
  * @param {Record<string, unknown>} selectionPolicyOrTrace
- * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; blockFailedProbeKinds?: string[] }} [options]
+ * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; blockFailedProbeKinds?: string[]; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
  * @returns {{
  *   schema: 'model-gateway-runtime-selector-plan';
  *   ok: boolean;
@@ -504,6 +514,7 @@ function sumRouteDecisionRecordedCount(attempts) {
  *     runtimeEnvBlockedCount: number;
  *     runtimeHealthBlockedCount: number;
  *     runtimeProbeBlockedCount: number;
+ *     providerCooldownBlockedCount: number;
  *   };
  *   routes: Array<{
  *     profileId: string;
@@ -514,6 +525,7 @@ function sumRouteDecisionRecordedCount(attempts) {
  *     hasRuntimeProof: boolean;
  *     runtimeEnv: ReturnType<typeof evaluateModelGatewayRuntimeSelectorRouteEnv> | null;
  *     runtimeHealth: ReturnType<typeof evaluateGatewayModelHealthRoute> | null;
+ *     providerCooldown: ReturnType<typeof evaluateGatewayProviderHealthCooldown> | null;
  *     reasons: string[];
  *     nextActions: string[];
  *     decisionEvent: ReturnType<typeof buildRouteDecisionEvent>;
@@ -525,6 +537,8 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
     const { mode, rows, sourceSchema, traceId } = readRowsFromInput(input);
     const requireRuntimeProof = options.requireRuntimeProof === true || mode === 'require_runtime_proof';
     const requireRuntimeEnvReady = options.requireRuntimeEnvReady === true;
+    const selectedRouteKeysForPlan = new Set();
+    const selectedProviderIdsForPlan = new Set();
     const routes = rows.map((row) => {
         const profileId = optionalString(row['profileId']) ?? 'unknown';
         const candidateEvaluations = selectedCandidatesFromPolicyRow(row).map(({ label, selected: rawSelected }) => {
@@ -539,9 +553,24 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                           requireAgentProbeOk: false,
                       })
                     : null;
+            const providerCooldown =
+                selected && Array.isArray(options.runtimeHealthRecords)
+                    ? evaluateGatewayProviderHealthCooldown(selected, options.runtimeHealthRecords, {
+                          ...(typeof options.providerCooldownWindowMs === 'number'
+                              ? { windowMs: options.providerCooldownWindowMs }
+                              : {}),
+                          ...(typeof options.providerCooldownMinFailedModels === 'number'
+                              ? { minFailedModels: options.providerCooldownMinFailedModels }
+                              : {}),
+                          ...(Array.isArray(options.providerCooldownFailureKinds)
+                              ? { failureKinds: options.providerCooldownFailureKinds }
+                              : {}),
+                      })
+                    : null;
             const runtimeEnvBlocked = requireRuntimeEnvReady && runtimeEnv?.status !== 'ready';
             const accountAccessBlocked = selected !== null && !routeAccountCanAttempt(selected);
             const runtimeHealthBlocked = runtimeHealth?.include === false;
+            const providerCooldownBlocked = providerCooldown?.include === false;
             const failedProbeKinds = Array.isArray(options.blockFailedProbeKinds)
                 ? options.blockFailedProbeKinds.filter((kind) => runtimeHealth?.health && isGatewayModelProbeFailed(runtimeHealth.health, kind))
                 : [];
@@ -552,9 +581,11 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                 hasRuntimeProof,
                 runtimeEnv,
                 runtimeHealth,
+                providerCooldown,
                 runtimeEnvBlocked,
                 accountAccessBlocked,
                 runtimeHealthBlocked,
+                providerCooldownBlocked,
                 failedProbeKinds,
                 runtimeProbeBlocked,
                 blocked:
@@ -563,27 +594,48 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                     (requireRuntimeProof && !hasRuntimeProof) ||
                     runtimeEnvBlocked ||
                     runtimeHealthBlocked ||
-                    runtimeProbeBlocked,
+                    runtimeProbeBlocked ||
+                    providerCooldownBlocked,
             };
         });
         const primary = candidateEvaluations[0] ?? null;
+        const usableCandidates = candidateEvaluations.filter((candidate) => !candidate.blocked);
+        const primaryProviderId = optionalString(primary?.selected?.['providerId']);
+        const unseenProviderCandidate = usableCandidates.find((candidate) => {
+            const key = routeKey(candidate.selected);
+            const providerId = optionalString(candidate.selected?.['providerId']);
+            return key && !selectedRouteKeysForPlan.has(key) && providerId && !selectedProviderIdsForPlan.has(providerId);
+        });
         const chosen =
-            primary && (primary.runtimeHealthBlocked || primary.runtimeProbeBlocked)
-                ? (candidateEvaluations.find((candidate) => !candidate.blocked) ?? primary)
-                : primary;
+            primary &&
+            !primary.blocked &&
+            !selectedRouteKeysForPlan.has(routeKey(primary.selected)) &&
+            (!primaryProviderId || !selectedProviderIdsForPlan.has(primaryProviderId))
+                ? primary
+                : (unseenProviderCandidate ??
+                  usableCandidates.find((candidate) => !selectedRouteKeysForPlan.has(routeKey(candidate.selected))) ??
+                  (primary && !primary.blocked ? primary : (usableCandidates[0] ?? primary)));
         const selected = chosen?.blocked ? null : (chosen?.selected ?? null);
         const selectedForReasons = chosen?.selected ?? runtimeRoute(selectedFromPolicyRow(row));
         const hasRuntimeProof = chosen?.hasRuntimeProof === true;
         const runtimeEnv = chosen?.runtimeEnv ?? null;
         const runtimeHealth = chosen?.runtimeHealth ?? null;
+        const providerCooldown = chosen?.providerCooldown ?? null;
         const runtimeEnvBlocked = chosen?.runtimeEnvBlocked === true;
         const accountAccessBlocked = chosen?.accountAccessBlocked === true;
         const runtimeHealthBlocked = chosen?.runtimeHealthBlocked === true;
+        const providerCooldownBlocked = chosen?.providerCooldownBlocked === true;
         const failedProbeKinds = chosen?.failedProbeKinds ?? [];
         const runtimeProbeBlocked = chosen?.runtimeProbeBlocked === true;
         const blocked = !selected;
         /** @type {'selected' | 'blocked'} */
         const status = blocked ? 'blocked' : 'selected';
+        if (!blocked) {
+            const key = routeKey(selected);
+            if (key) selectedRouteKeysForPlan.add(key);
+            const providerId = optionalString(selected?.['providerId']);
+            if (providerId) selectedProviderIdsForPlan.add(providerId);
+        }
         const reasons = selectionReasons(selectedForReasons, row);
         if (chosen?.label && chosen.label !== 'selected') reasons.push(`runtime_selector_fallback:${chosen.label}`);
         if (blocked && !selected) reasons.push('blocked:no_selected_route');
@@ -591,6 +643,9 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
         if (blocked && chosen?.selected && requireRuntimeProof && !hasRuntimeProof) reasons.push('blocked:runtime_proof_required');
         if (blocked && chosen?.selected && runtimeEnvBlocked) reasons.push('blocked:runtime_env_not_ready');
         if (blocked && chosen?.selected && runtimeHealthBlocked) reasons.push(`blocked:runtime_health:${runtimeHealth?.reason ?? 'failed'}`);
+        if (blocked && chosen?.selected && providerCooldownBlocked) {
+            reasons.push(`blocked:provider_health_cooldown:${providerCooldown?.failureKinds.join('+') || 'temporary'}`);
+        }
         for (const kind of failedProbeKinds) reasons.push(`blocked:runtime_probe_failed:${kind}`);
         const normalizedRow = {
             ...row,
@@ -607,12 +662,16 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             hasRuntimeProof,
             runtimeEnv,
             runtimeHealth,
+            providerCooldown,
             reasons,
             nextActions: blocked
                 ? [
                       ...(accountAccessBlocked ? ['refresh_account_overlay_or_choose_accessible_model'] : []),
                       ...(runtimeEnvBlocked ? ['configure_provider_env_for_selected_route'] : []),
-                      ...(runtimeHealthBlocked || runtimeProbeBlocked ? ['choose_route_without_failed_runtime_health'] : []),
+                      ...(runtimeHealthBlocked || runtimeProbeBlocked || providerCooldownBlocked
+                          ? ['choose_route_without_failed_runtime_health']
+                          : []),
+                      ...(providerCooldownBlocked ? ['wait_for_provider_cooldown_or_probe_different_provider'] : []),
                       'run_runtime_probe_for_profile',
                       'relax_selection_policy_or_choose_fallback',
                   ]
@@ -644,6 +703,9 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             ).length,
             runtimeProbeBlockedCount: routes.filter((route) =>
                 route.reasons.some((reason) => reason.startsWith('blocked:runtime_probe_failed:')),
+            ).length,
+            providerCooldownBlockedCount: routes.filter((route) =>
+                route.reasons.some((reason) => reason.startsWith('blocked:provider_health_cooldown:')),
             ).length,
         },
         routes,

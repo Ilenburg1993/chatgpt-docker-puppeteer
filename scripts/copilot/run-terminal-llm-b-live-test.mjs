@@ -27,6 +27,29 @@ const TURN_SETTLED_AFTER_ASK_RE =
 const REPL_PROMPT_TAIL_RE = /(?:^|\n)voc[eê]\[[^\n]*?›\s*$/iu;
 const LIVE_PROTOCOL_PROBE_KINDS = Object.freeze(['live_tool_protocol', 'live_ask_user']);
 
+if (hasFlag('--help') || hasFlag('-h')) {
+    console.log(`Usage: node scripts/copilot/run-terminal-llm-b-live-test.mjs [options]
+
+Canonical Terminal LLM-B live harness. It starts a real terminal session unless --dry-run is used.
+
+Common options:
+  --dry-run
+  --no-pr
+  --byok-real
+  --byok-real-profile=<profile>
+  --byok-real-model=<model>
+  --byok-real-route-profile=<profile>
+  --byok-real-route-fallback-profiles=<a,b>
+  --byok-real-route-execute
+  --byok-real-route-selection-policy=<metadata_first|prefer_runtime_proved|require_runtime_proof>
+  --byok-real-route-timeout-ms=<ms>
+  --timeout-ms=<ms>
+  --transport=<pty|stdio>
+  --out-dir=<path>
+`);
+    process.exit(0);
+}
+
 function stripAnsi(value) {
     return String(value ?? '').replace(ANSI_RE, '');
 }
@@ -289,9 +312,14 @@ function runRuntimeSelectorLiveRoute({
         summary = null;
     }
     const selectedRoute = summary ? selectRuntimeSelectorEffectiveRoute(summary, requestedProfile) : null;
+    const routeUsable = Boolean(selectedRoute?.selected) && (!execute || summary?.execution?.ok !== false);
+    const summaryError =
+        optionalRuntimeSelectorString(summary?.execution?.error) ||
+        optionalRuntimeSelectorString(summary?.execution?.final?.error) ||
+        optionalRuntimeSelectorString(summary?.runtimeSelectorPlan?.routes?.find?.((route) => route?.status === 'blocked')?.reasons?.join(', '));
     return {
         requested: true,
-        ok: result.status === 0 && Boolean(selectedRoute?.selected),
+        ok: routeUsable,
         status: result.status,
         executed: execute,
         profileId: requestedProfile,
@@ -299,9 +327,9 @@ function runRuntimeSelectorLiveRoute({
         summary,
         selectedRoute,
         error:
-            result.status === 0 && selectedRoute?.selected
+            routeUsable
                 ? null
-                : (result.stderr || result.stdout || `runtime selector exited with ${result.status}`).trim(),
+                : summaryError || (result.stderr || result.stdout || `runtime selector exited with ${result.status}`).trim(),
     };
 }
 
@@ -402,14 +430,16 @@ function buildRealByokRuntime({
         env: {
             ...dotenvEnv,
             COPILOT_BYOK_ENABLED: 'true',
-            ...(runtimeRoute
-                ? { COPILOT_BYOK_PROFILE: '' }
+            ...(routeSelectorMandatory || runtimeRoute
+                ? {
+                      COPILOT_BYOK_PROFILE: '',
+                      COPILOT_BYOK_PROVIDER_PRESET: runtimeRoute?.providerId ?? '',
+                      COPILOT_BYOK_MODEL: model || '',
+                      COPILOT_BYOK_BASE_URL: runtimeRoute?.baseUrl ?? '',
+                  }
                 : profile
                   ? { COPILOT_BYOK_PROFILE: profile }
                   : {}),
-            ...(runtimeRoute?.providerId ? { COPILOT_BYOK_PROVIDER_PRESET: runtimeRoute.providerId } : {}),
-            ...(model ? { COPILOT_BYOK_MODEL: model } : {}),
-            ...(runtimeRoute ? { COPILOT_BYOK_BASE_URL: runtimeRoute.baseUrl ?? '' } : {}),
             COPILOT_BYOK_MODEL_DISCOVERY_ENABLED: mergedEnv.COPILOT_BYOK_MODEL_DISCOVERY_ENABLED ?? 'true',
         },
         profile,
@@ -995,6 +1025,89 @@ function buildReport({
         '',
     ];
     return `${lines.join('\n')}\n`;
+}
+
+async function writeEarlyBlockedSummary({
+    blocker,
+    startedAt,
+    outDir,
+    rawPath,
+    plainPath,
+    exportPath,
+    sseRawPath,
+    sseJsonlPath,
+    jsonPath,
+    mdPath,
+    transport,
+    realByok,
+}) {
+    const durationMs = Date.now() - Date.parse(startedAt);
+    const raw = `[terminal-live] blocked before terminal start: ${blocker.id} · ${blocker.detail}\n`;
+    const sseSummary = {
+        connected: false,
+        statusCode: null,
+        eventCount: 0,
+        eventsWithId: 0,
+        eventsWithSource: 0,
+        eventsWithTraceId: 0,
+        traceIds: [],
+        errors: ['blocked-before-terminal-start'],
+        events: [],
+        raw: '',
+    };
+    const criteria = [
+        { id: `blocked-by-${blocker.id}`, pass: false, detail: blocker.detail },
+        { id: 'terminal-not-started-after-blocker', pass: true, detail: 'runtime selector blocker prevented default BYOK fallback' },
+    ];
+    const liveHealthRecord = { attempted: false, recorded: false, reason: `live_turn_not_attempted:${blocker.id}` };
+    await writeFile(rawPath, raw, 'utf8');
+    await writeFile(plainPath, raw, 'utf8');
+    await writeFile(sseRawPath, '', 'utf8');
+    await writeFile(sseJsonlPath, '', 'utf8');
+    await writeFile(
+        jsonPath,
+        `${JSON.stringify(
+            {
+                ok: false,
+                blocked: true,
+                blocker,
+                startedAt,
+                durationMs,
+                exitCode: null,
+                criteria,
+                sse: sseSummary,
+                byokReal: realByok?.redacted ?? null,
+                liveHealthRecord,
+                export: null,
+            },
+            null,
+            2,
+        )}\n`,
+        'utf8',
+    );
+    await writeFile(
+        mdPath,
+        buildReport({
+            criteria,
+            durationMs,
+            exitCode: null,
+            blocker,
+            outputPath: path.relative(ROOT, rawPath),
+            plainOutputPath: path.relative(ROOT, plainPath),
+            exportPath: path.relative(ROOT, exportPath),
+            exportSummary: null,
+            sseRawPath: path.relative(ROOT, sseRawPath),
+            sseJsonlPath: path.relative(ROOT, sseJsonlPath),
+            sseSummary,
+            startedAt,
+            transport,
+            liveHealthRecord,
+        }),
+        'utf8',
+    );
+    if (realByok) {
+        await writeFile(path.join(outDir, 'byok.real.redacted.json'), `${JSON.stringify(realByok.redacted, null, 2)}\n`, 'utf8');
+    }
 }
 
 function detectLiveBlocker(plain, runtime = {}) {
@@ -2277,6 +2390,31 @@ async function main() {
           })
         : null;
     const secretValues = byokReal ? collectSecretValues({ ...process.env, ...dotenvEnv, ...(realByok?.env ?? {}) }) : [];
+    if (byokReal && byokRealRuntimeSelectorProfile && !realByok?.runtimeRoute) {
+        const blocker = {
+            id: 'byok-runtime-selector-route-unavailable',
+            detail: realByok?.runtimeSelector?.error || 'runtime selector did not produce an executable route',
+        };
+        await writeEarlyBlockedSummary({
+            blocker,
+            startedAt,
+            outDir,
+            rawPath,
+            plainPath,
+            exportPath,
+            sseRawPath,
+            sseJsonlPath,
+            jsonPath,
+            mdPath,
+            transport: requestedTransport,
+            realByok,
+        });
+        console.log(`[terminal-live] summary: ${path.relative(ROOT, mdPath)}`);
+        console.error(`[terminal-live] BLOCKED: ${blocker.id}`);
+        process.exitCode = 1;
+        await byokFixtureProvider?.close();
+        return;
+    }
 
     if (sessionCycle) {
         const summary = await runSessionCycleLiveTest({

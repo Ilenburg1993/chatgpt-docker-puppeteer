@@ -139,7 +139,9 @@ async function buildRuntimeSelectorContext({
             : runtimeSource === 'sqlite'
               ? sqliteHealthRecords
               : mergeByokProviderHealthRecords(fileHealthRecords, sqliteHealthRecords);
-    const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords);
+    const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords, {
+        accountWideFailureKinds: ['auth', 'credits', 'rate-limit'],
+    });
     const evaluationNow = new Date();
     const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, {
         now: evaluationNow,
@@ -152,6 +154,7 @@ async function buildRuntimeSelectorContext({
         policy: {
             unknownAccessPolicy: strict ? 'block' : 'allow_probe',
             policyProfile: strict ? 'runtime-selector-strict' : 'runtime-selector-allow-probe',
+            runtimeAccountWideFailureKinds: ['auth', 'credits', 'rate-limit'],
         },
     });
     const runtimeOverlayDecisions = filterModelGatewayRuntimeEligibilityOverlayDecisions(evaluated.decisions);
@@ -223,6 +226,11 @@ const runtimeSource = runtimeSourceArg();
 const selectionPolicy = selectionPolicyArg(requireRuntimeProof);
 const preferredProbeKinds = readStringList('--preferred-probes');
 const blockFailedProbeKinds = readStringList('--block-failed-probes');
+const requestedExecutionProfile = readArg('--profile') || null;
+const fallbackExecutionProfiles = readArg('--fallback-profiles')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 
 if (json) {
     setDbLogger((level, message) => {
@@ -260,7 +268,7 @@ let runtimeHealthPersistence = {
     error: null,
 };
 if (execute) {
-    if (!context.runtimeSelectorPlan.ready || context.runtimeSelectorPlan.summary.blockedProfileCount > 0) {
+    if (!context.runtimeSelectorPlan.ready) {
         execution = {
             schema: 'model-gateway-runtime-selector-fallback-execution-result',
             ok: false,
@@ -274,14 +282,10 @@ if (execute) {
             error: 'runtime_selector_plan_not_ready',
         };
     } else {
-        const fallbackProfiles = readArg('--fallback-profiles')
-            .split(',')
-            .map((item) => item.trim())
-            .filter(Boolean);
         const runtimeRouteDecisionCapture = createModelGatewayRouteDecisionCapture();
         execution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(context.runtimeSelectorPlan, {
-            profileId: readArg('--profile') || undefined,
-            fallbackProfileIds: fallbackProfiles,
+            profileId: requestedExecutionProfile || undefined,
+            fallbackProfileIds: fallbackExecutionProfiles,
             attemptsPerRoute: readInteger('--attempts-per-route', 1),
             retryDelayMs: readInteger('--retry-delay-ms', 0),
             maxRetryDelayMs: readInteger('--max-retry-delay-ms', 30_000),
@@ -343,19 +347,25 @@ if (execute) {
     }
 }
 
+const commandOk =
+    context.integrity.ok &&
+    context.selection.ok &&
+    context.postRuntimeSelection.ok &&
+    context.policyResolution.ok &&
+    context.runtimeSelectorPlan.ready &&
+    (execute ? execution?.ok === true : context.runtimeSelectorPlan.summary.blockedProfileCount === 0) &&
+    routeDecisionPersistence.ok &&
+    runtimeHealthPersistence.ok;
+
 const summary = {
     schema: 'model-gateway-runtime-selector-command',
-    ok:
-        context.integrity.ok &&
-        context.selection.ok &&
-        context.postRuntimeSelection.ok &&
-        context.policyResolution.ok &&
-        context.runtimeSelectorPlan.ready &&
-        context.runtimeSelectorPlan.summary.blockedProfileCount === 0 &&
-        (execution?.ok ?? true) &&
-        routeDecisionPersistence.ok &&
-        runtimeHealthPersistence.ok,
+    ok: commandOk,
     runtimeExecuted: execute,
+    routeRequest: {
+        profileId: requestedExecutionProfile,
+        fallbackProfileIds: fallbackExecutionProfiles,
+        executionOkCanSucceedWithBlockedFallbackProfiles: execute,
+    },
     mode: strict ? 'strict_access_only_with_observed_health' : 'allow_probe_unknown_with_observed_health',
     runtimeSource,
     selectionPolicy,

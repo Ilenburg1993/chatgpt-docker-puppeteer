@@ -70,6 +70,7 @@ import {
     buildModelGatewayOnListModelsHandler,
     evaluateModelGatewayRuntimeSelectorRouteEnv,
     evaluateGatewayModelHealthRoute,
+    evaluateGatewayProviderHealthCooldown,
     listModelGatewayProviderQuotaCapabilities,
     executeModelGatewayRuntimeSelectorPlan,
     executeModelGatewayRuntimeSelectorPlanWithFallbacks,
@@ -973,6 +974,56 @@ describe('model-gateway foundation', () => {
         assert.equal(liveProtocolBlockedPlan.routes[0].selected, null);
         assert.ok(liveProtocolBlockedPlan.routes[0].reasons.includes('blocked:runtime_probe_failed:live_ask_user'));
         assert.ok(liveProtocolBlockedPlan.routes[0].nextActions.includes('choose_route_without_failed_runtime_health'));
+
+        const providerCooldownNow = Date.now();
+        const providerCooldownRecords = [
+            {
+                routeProfile: 'repo_agent',
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                lastStatus: 'failed',
+                lastFailureKind: 'timeout',
+                lastFailureAt: providerCooldownNow - 3_000,
+                lastSuccessAt: null,
+            },
+            {
+                routeProfile: 'repo_agent',
+                providerId: 'openrouter',
+                providerModel: 'anthropic/claude-test',
+                lastStatus: 'failed',
+                lastFailureKind: 'timeout',
+                lastFailureAt: providerCooldownNow - 2_000,
+                lastSuccessAt: null,
+            },
+            {
+                routeProfile: 'tool_agent',
+                providerId: 'openrouter',
+                providerModel: 'meta/llama-test',
+                lastStatus: 'failed',
+                lastFailureKind: 'upstream',
+                lastFailureAt: providerCooldownNow - 1_000,
+                lastSuccessAt: null,
+            },
+        ];
+        const providerCooldown = evaluateGatewayProviderHealthCooldown(
+            { providerId: 'openrouter', providerModel: 'openai/gpt-oss-120b' },
+            providerCooldownRecords,
+            { now: providerCooldownNow },
+        );
+        assert.equal(providerCooldown.include, false);
+        assert.equal(providerCooldown.reason, 'provider_health_cooldown');
+        assert.equal(providerCooldown.failedModelCount, 3);
+        assert.deepEqual(providerCooldown.failureKinds, ['timeout', 'upstream']);
+        const providerCooldownPlan = buildModelGatewayRuntimeSelectorPlan(preferRuntimeProved, {
+            runtimeHealthRecords: providerCooldownRecords,
+            providerCooldownWindowMs: 10_000,
+            providerCooldownMinFailedModels: 3,
+        });
+        assert.equal(providerCooldownPlan.ok, false);
+        assert.equal(providerCooldownPlan.summary.providerCooldownBlockedCount, 2);
+        assert.equal(providerCooldownPlan.routes[0].selected, null);
+        assert.ok(providerCooldownPlan.routes[0].reasons.includes('blocked:provider_health_cooldown:timeout+upstream'));
+        assert.ok(providerCooldownPlan.routes[0].nextActions.includes('wait_for_provider_cooldown_or_probe_different_provider'));
 
         const accountBlockedPolicy = {
             ...preferRuntimeProved,
@@ -8840,6 +8891,22 @@ describe('model-gateway foundation', () => {
         assert.equal(overlays[1].rateLimits.retryAfterSeconds, 15);
         assert.equal(overlays[2].secretRef, 'OLLAMA_CLOUD_API_KEY');
         assert.equal(overlays[2].quota.remainingCreditsUsd, 0);
+
+        const accountWide = deriveModelGatewayRuntimeAccountOverlaysFromHealth(
+            [
+                {
+                    providerId: 'chutes',
+                    providerModel: 'model-that-spent-the-key',
+                    lastStatus: 'failed',
+                    lastFailureKind: 'credits',
+                    lastFailureStatusCode: 402,
+                },
+            ],
+            { accountWideFailureKinds: ['credits'] },
+        );
+        assert.equal(accountWide.length, 1);
+        assert.deepEqual(accountWide[0].enabledModels, []);
+        assert.equal(accountWide[0].providerMetadata.accountWide, true);
     });
 
     it('derives runtime account overlays from persisted SQLite runtime classification fields', () => {

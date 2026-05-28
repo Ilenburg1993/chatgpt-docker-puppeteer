@@ -168,6 +168,7 @@ function inferRuntimeFailureKind(health) {
  * @param {string} [options.accountScope]
  * @param {Record<string, string>} [options.secretRefsByProvider]
  * @param {number} [options.ttlSeconds]
+ * @param {string[]} [options.accountWideFailureKinds]
  * @returns {Record<string, unknown> | null}
  */
 export function deriveModelGatewayRuntimeAccountOverlayFromHealth(health, options = {}) {
@@ -185,7 +186,13 @@ export function deriveModelGatewayRuntimeAccountOverlayFromHealth(health, option
         ? /** @type {Record<string, string>} */ (options.secretRefsByProvider)
         : {};
     const secretRef = defaultSecretRef(providerId, secretRefsByProvider);
-    const sourceModelPart = providerModel ? providerModel.replace(/[^a-z0-9_.-]+/giu, '_') : 'provider';
+    const accountWideFailureKinds = new Set(
+        Array.isArray(options.accountWideFailureKinds)
+            ? options.accountWideFailureKinds.map(optionalString).filter((item) => item !== null)
+            : [],
+    );
+    const accountWide = accountWideFailureKinds.has(failureKind);
+    const sourceModelPart = accountWide || !providerModel ? 'provider' : providerModel.replace(/[^a-z0-9_.-]+/giu, '_');
     const sourceId = `runtime-health-${failureKind}`;
     return /** @type {Record<string, unknown>} */ (createProviderAccountOverlay({
         accountOverlayId: `runtime-health:${providerId}:${options.accountScope ?? 'default'}:${sourceModelPart}:${failureKind}`,
@@ -195,7 +202,7 @@ export function deriveModelGatewayRuntimeAccountOverlayFromHealth(health, option
         sourceId,
         sourceKind: 'runtime_health',
         confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.PROBE_FAILED,
-        enabledModels: providerModel ? [providerModel] : [],
+        enabledModels: accountWide || !providerModel ? [] : [providerModel],
         quota: failureKind === 'credits' ? { remainingCreditsUsd: 0, resetAt } : {},
         spendingLimits: failureKind === 'credits' ? { remainingUsd: 0 } : {},
         rateLimits:
@@ -211,6 +218,7 @@ export function deriveModelGatewayRuntimeAccountOverlayFromHealth(health, option
             semantics: 'runtime_failure_account_overlay',
             routeProfile,
             failureKind,
+            accountWide,
             failureStatusCode: optionalNumber(health['lastFailureStatusCode']),
             disabled: failureKind === 'auth',
             observedFromHealthKey: optionalString(health['key']),
@@ -228,6 +236,7 @@ export function deriveModelGatewayRuntimeAccountOverlayFromHealth(health, option
  * @param {string} [options.accountScope]
  * @param {Record<string, string>} [options.secretRefsByProvider]
  * @param {number} [options.ttlSeconds]
+ * @param {string[]} [options.accountWideFailureKinds]
  * @returns {Record<string, unknown>[]}
  */
 export function deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords, options = {}) {

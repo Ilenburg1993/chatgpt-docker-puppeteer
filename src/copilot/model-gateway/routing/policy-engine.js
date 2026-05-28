@@ -10,6 +10,7 @@
 
 import {
     MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS,
+    evaluateGatewayProviderHealthCooldown,
     evaluateGatewayModelHealthRoute,
     isGatewayModelAgentProbeVerified,
     isGatewayModelProbeFailed,
@@ -347,6 +348,9 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
  *     requireKnownEligibility?: boolean;
  *     ignoreRuntimeHealth?: boolean;
  *     runtimeHealthRecords?: Record<string, any>[];
+ *     providerCooldownWindowMs?: number;
+ *     providerCooldownMinFailedModels?: number;
+ *     providerCooldownFailureKinds?: string[];
  *     latencyMsByModelId?: Record<string, number>;
  *     eligibilityDecisions?: Record<string, any>[];
  *     evaluateEligibility?: boolean;
@@ -508,7 +512,22 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
                   ...(Array.isArray(options.runtimeHealthRecords) ? { runtimeHealthRecords: options.runtimeHealthRecords } : {}),
                   requireAgentProbeOk: options.requireAgentProbeOk ?? profile['requireAgentProbeOk'] === true,
               });
+    const providerCooldownDecision =
+        options.ignoreRuntimeHealth === true || !Array.isArray(options.runtimeHealthRecords)
+            ? null
+            : evaluateGatewayProviderHealthCooldown(model, options.runtimeHealthRecords, {
+                  ...(typeof options.providerCooldownWindowMs === 'number' ? { windowMs: options.providerCooldownWindowMs } : {}),
+                  ...(typeof options.providerCooldownMinFailedModels === 'number'
+                      ? { minFailedModels: options.providerCooldownMinFailedModels }
+                      : {}),
+                  ...(Array.isArray(options.providerCooldownFailureKinds)
+                      ? { failureKinds: options.providerCooldownFailureKinds }
+                      : {}),
+              });
     if (!healthDecision.include) rejectedReasons.push(healthDecision.reason);
+    if (providerCooldownDecision?.include === false) {
+        rejectedReasons.push(`provider_health_cooldown:${providerCooldownDecision.failureKinds.join('+') || 'temporary'}`);
+    }
     if (healthDecision.health) {
         if (healthDecision.health.lastStatus === 'ok') {
             score += 140;

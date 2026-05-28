@@ -9166,6 +9166,241 @@ Lacunas abertas apos Mudanca 89:
 - se Zai falhar, continuar a cadeia ate uma rota com agent preflight positivo;
 - avaliar modelos NVIDIA alternativos em probes menores sem repetir o live de `openai/gpt-oss-120b`.
 
+### Mudanca 90 - Cooldown provider-scoped e overlays account-wide
+
+Status: implementado em 2026-05-28.
+
+Problema identificado apos a cadeia de probes live:
+
+- Zai apresentou timeouts sucessivos em modelos diferentes:
+  - `glm-4-32b-0414-128k`;
+  - `glm-4.5-flash`;
+  - `glm-4.6v-flash`;
+  - `glm-4.6v-flashx`.
+- mesmo assim, o runtime selector continuava escolhendo outro modelo Zai ainda sem health proprio;
+- a memoria operacional era forte para `provider/model`, mas fraca para `provider/account`;
+- isso consumia tempo e podia gastar quota ou latencia em tentativas obviamente pouco promissoras.
+
+Regra consolidada:
+
+- metadado canonico continua imutavel;
+- falha runtime de um modelo continua registrada como health de modelo;
+- falhas temporarias repetidas em varios modelos do mesmo provider geram cooldown provider-scoped;
+- credito, auth e rate-limit podem gerar overlay account-wide no runtime selector;
+- nenhum desses estados vira fato permanente do catalogo.
+
+Implementacao:
+
+- `evaluateGatewayProviderHealthCooldown` em `routing/health-routing.js`;
+- `MODEL_GATEWAY_PROVIDER_COOLDOWN_FAILURE_KINDS`;
+- cooldown default:
+  - falhas `timeout`;
+  - falhas `network`;
+  - falhas `upstream`;
+  - falhas `model-or-route` quando aparecem em modelos distintos do mesmo provider, pois isso normalmente indica base URL,
+    catalogo remoto ou acesso da key incompatível com a rota OpenAI-normalizada atual;
+  - janela curta de 15 minutos;
+  - minimo de 2 modelos distintos falhando;
+  - sucesso posterior do provider desfaz o cooldown.
+- `scoreGatewayModelCandidate` rejeita candidatos de provider em cooldown quando recebe `runtimeHealthRecords`;
+- `buildModelGatewayRuntimeSelectorPlan` tambem bloqueia a rota final se a policy ainda trouxer provider em cooldown;
+- o plano expõe `providerCooldownBlockedCount`;
+- a rota bloqueada inclui:
+  - `blocked:provider_health_cooldown:<kinds>`;
+  - `wait_for_provider_cooldown_or_probe_different_provider`.
+
+Overlay account/key:
+
+- `deriveModelGatewayRuntimeAccountOverlaysFromHealth` agora aceita `accountWideFailureKinds`;
+- o runtime selector usa `auth`, `credits` e `rate-limit` como account-wide;
+- isso evita repetir modelos do mesmo provider quando a propria key/conta ja demonstrou bloqueio externo;
+- por default historico, a funcao continua model-scoped quando a opcao nao e informada.
+
+Evidencia que motivou:
+
+- Chutes falhou com `402 credits`;
+- Groq falhou com limite de tokens/rate;
+- Zai falhou repetidamente por timeout;
+- Mistral passou chat selector, mas falhou agent preflight com `429`;
+- NVIDIA falhou live protocol `ask_user`.
+
+Efeito esperado:
+
+- o selector para de trocar apenas o modelo quando o problema observado e do provider/conta;
+- reduzimos tentativas redundantes;
+- preservamos o catalogo de metadados;
+- a selecao pre-runtime continua barata;
+- a etapa runtime continua separada e audivel.
+
+Lacunas restantes apos Mudanca 90:
+
+- classificar melhor `429` sem body de Mistral;
+- calibrar TTL por provider e failure kind;
+- expor cooldown provider-scoped no cockpit `/byok health`;
+- registrar no summary live quando o provider foi pulado por cooldown;
+- continuar a cadeia para achar uma rota com chat e agent preflight positivos antes do full-turn.
+
+### Mudanca 91 - Prova live canônica e hardening do harness
+
+Status: implementado em 2026-05-28.
+
+Durante a investigacao foi feita uma chamada equivocada:
+
+- `node scripts/copilot/run-terminal-llm-b-live-test.mjs --help`;
+- o harness nao tratava `--help`;
+- por isso iniciou um teste live real em vez de imprimir uso.
+
+Correcao:
+
+- o harness agora trata `--help` e `-h`;
+- imprime as flags canonicas;
+- encerra com `exit 0`;
+- nao abre terminal;
+- nao consome runtime;
+- nao envia turno ao provider.
+
+Evidencia do help:
+
+- `node --check scripts/copilot/run-terminal-llm-b-live-test.mjs`;
+- `node scripts/copilot/run-terminal-llm-b-live-test.mjs --help`;
+- saida mostra `--byok-real-route-profile`, `--byok-real-route-fallback-profiles`, `--byok-real-route-execute` e demais flags.
+
+Evidencia live gerada pelo acionamento acidental:
+
+- artefato: `artifacts/terminal-live/2026-05-28T15-45-41-220Z/summary.md`;
+- status: `PASS`;
+- provider ativo: `kilo-code`;
+- modelo ativo: `kilo-auto/free`;
+- binding: BYOK ready;
+- `report_intent` executou como tool real;
+- `read_file_content` executou como tool real;
+- `ask_user` apareceu como interação real do SDK;
+- resposta `SIM` foi registrada como resposta humana;
+- marcador final `POST-ASK-CANONICAL-FINAL: usuário confirmou SIM` apareceu apenas apos resposta;
+- SSE conectado;
+- eventos monotônicos;
+- erros rastreados: `0`;
+- export gerado.
+
+O que essa evidencia cobre:
+
+- terminal live;
+- delta streaming;
+- `assistant.message`;
+- tool telemetry;
+- user input/ask_user real;
+- export;
+- SSE;
+- health terminal.
+
+O que essa evidencia nao cobre:
+
+- handoff via runtime selector;
+- rota `zai/glm-4.7-flash`;
+- full-turn BYOK usando a rota selecionada pelo gateway;
+- agent preflight da rota selecionada pelo gateway;
+- persistencia `live_tool_protocol/live_ask_user` para a rota `zai`.
+
+Falhas descobertas no handoff real:
+
+- o harness exigia `exit 0` do runtime selector mesmo quando havia fallback selecionado;
+- o CLI do selector pode sair com falha global se alguns perfis ficaram bloqueados;
+- isso nao significa que a rota de fallback e inutilizavel;
+- o harness agora considera `selectedRoute` e `execution.ok` para aceitar fallback;
+- se a rota obrigatoria nao existir, o harness neutraliza `COPILOT_BYOK_PROFILE`, `COPILOT_BYOK_PROVIDER_PRESET`, `COPILOT_BYOK_MODEL` e `COPILOT_BYOK_BASE_URL` herdados;
+- assim ele nao cai silenciosamente no provider default do `.env.local`.
+- o harness agora bloqueia antes de iniciar o terminal quando a rota obrigatoria esta indisponivel;
+- o blocker prioriza `summary.execution.error` do runtime selector em vez de uma linha genérica de stderr.
+
+Evidencia apos a correcao:
+
+- `artifacts/terminal-live/2026-05-28T16-00-27-712Z/summary.md`;
+- status `BLOCKED`;
+- blocker `byok-runtime-selector-route-unavailable`;
+- terminal nao iniciou;
+- SSE nao conectou;
+- default Kilo nao foi usado;
+- redacted JSON preservou o erro do runtime selector;
+- a rota obrigatoria ficou sem identidade porque o selector falhou por timeout antes do live.
+
+Evidencia de selector apos Mudanca 90:
+
+- `zai/glm-4.7-flash` passou probe bounded simples;
+- o sucesso posterior do provider limpou o cooldown temporario;
+- o runtime selector passou a promover `zai/glm-4.7-flash` como `post_runtime_proved`;
+- todos os perfis ficaram selecionados no plano apos a prova.
+- em seguida, `repo_agent|zai|glm-4.7-flash` e `repo_agent|zai|glm-4.7-flashx` falharam por timeout;
+- o limiar default foi reduzido de 3 para 2 modelos distintos para evitar insistir no mesmo provider durante handoff live.
+
+### Mudanca 92 - Alternativas reais, diversidade de fallback e health cross-profile
+
+Status: implementado em 2026-05-28.
+
+Problema identificado nos probes de handoff:
+
+- o runtime selector tinha apenas a rota vencedora por perfil;
+- quando `repo_agent`, `code` e `tool_agent` apontavam para o mesmo provider/model, o fallback por perfil nao era fallback real;
+- uma falha `code|cerebras|zai-glm-4.7` nao bloqueava automaticamente `repo_agent|cerebras|zai-glm-4.7`;
+- isso permitia repetir o mesmo provider/model em outro perfil, gastando tempo e quota em uma rota ja provada ruim;
+- rotas `model-or-route` da NVIDIA tambem mostraram que catalogo remoto e acesso real da key podem divergir.
+
+Implementacao:
+
+- `auditModelGatewaySelection` agora preserva `candidateAlternates` por perfil;
+- `compareModelGatewaySelectionAudits` carrega alternativas pre-runtime e post-runtime;
+- `resolveModelGatewaySelectionPolicy` entrega essas alternativas ao runtime selector;
+- `buildModelGatewayRuntimeSelectorPlan` avalia `selected`, `postSelected`, `preSelected` e alternativas rankeadas;
+- o plano prefere o primeiro candidato nao bloqueado por:
+  - account access;
+  - env runtime;
+  - health de chat/agent;
+  - probes live bloqueantes;
+  - cooldown provider-scoped.
+- entre perfis, o plano evita repetir `provider/model`;
+- quando possivel, tambem evita repetir provider, para que `fallback-profiles` representem familias distintas;
+- `readGatewayModelHealthFromRecords` agora prefere:
+  - health exato do perfil;
+  - health global sem perfil;
+  - health cross-profile do mesmo provider/model.
+
+Efeito esperado:
+
+- fallback por perfil vira fallback operacional, nao apenas outra etiqueta para a mesma rota;
+- falha de runtime de um provider/model passa a proteger todos os perfis;
+- live harness recebe uma rota mais honesta ou um bloqueio claro;
+- o catalogo canonico continua limpo, pois tudo ocorre na camada volátil de health/selection.
+
+Evidencia local apos Mudanca 92:
+
+- `model-gateway-runtime-selector --execute` tentou tres rotas distintas no mesmo comando:
+  - `repo_agent|zai|glm-4.5-air`;
+  - `code|cerebras|zai-glm-4.7`;
+  - `tool_agent|zai|glm-4.6v`.
+- as tres falharam por timeout e foram persistidas em runtime health;
+- o dry-run seguinte passou a bloquear todas as rotas env-ready conhecidas por `chat_health_failed`;
+- nenhum full live com llm-b deve iniciar enquanto o selector nao produzir rota executavel.
+
+Lacunas restantes apos Mudanca 92:
+
+- melhorar a explicabilidade quando todas as alternativas sao bloqueadas;
+- expor contagem de alternativas avaliadas e principais motivos de bloqueio por perfil;
+- separar claramente `sem rota executavel agora` de `catalogo sem modelos`;
+- investigar se devemos ter TTL model-scoped para `timeout` sem sucesso posterior;
+- ampliar fornecedores env-ready antes de tentar novo full live.
+
+Proximo passo correto:
+
+- rodar o harness com:
+  - `--byok-real`;
+  - `--byok-real-route-profile=repo_agent`;
+  - `--byok-real-route-fallback-profiles=code,tool_agent`;
+  - `--byok-real-route-execute`;
+  - `--byok-real-route-selection-policy=prefer_runtime_proved`;
+  - `--byok-real-route-timeout-ms=20000`.
+- se passar preflight, executar full-turn;
+- se falhar em agent/tool protocol, registrar health separado;
+- se passar, registrar `live_tool_protocol=ok` e `live_ask_user=ok`.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

@@ -160,6 +160,15 @@ function selectedSummary(selected) {
 }
 
 /**
+ * @param {Array<Record<string, any>>} candidates
+ * @param {number} limit
+ * @returns {Record<string, unknown>[]}
+ */
+function candidateSummaries(candidates, limit = 24) {
+    return candidates.map(selectedSummary).filter(isRecord).slice(0, Math.max(0, Math.floor(limit)));
+}
+
+/**
  * @param {Array<Record<string, unknown>>} rows
  * @param {string} key
  * @returns {Record<string, number>}
@@ -301,6 +310,9 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
  *   requiredProbeKinds?: string[];
  *   preferredProbeKinds?: string[];
  *   blockFailedProbeKinds?: string[];
+ *   providerCooldownWindowMs?: number;
+ *   providerCooldownMinFailedModels?: number;
+ *   providerCooldownFailureKinds?: string[];
  * }} options
  * @param {{
  *   schema: 'model-gateway-pre-runtime-selection-audit' | 'model-gateway-post-runtime-selection-audit';
@@ -334,6 +346,7 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
  *   profiles: Array<{
  *     profileId: string;
  *     selected: Record<string, unknown> | null;
+ *     candidateAlternates: Record<string, unknown>[];
  *     candidateCount: number;
  *     rejectedCount: number;
  *     fallbackChain: string[];
@@ -376,6 +389,15 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
         if (options.includeProjectionOnly !== undefined) routeOptions.includeProjectionOnly = options.includeProjectionOnly;
         if (options.secretRegistry !== undefined) routeOptions.secretRegistry = options.secretRegistry;
         if (Array.isArray(options.runtimeHealthRecords)) routeOptions.runtimeHealthRecords = options.runtimeHealthRecords;
+        if (typeof options.providerCooldownWindowMs === 'number') {
+            routeOptions.providerCooldownWindowMs = options.providerCooldownWindowMs;
+        }
+        if (typeof options.providerCooldownMinFailedModels === 'number') {
+            routeOptions.providerCooldownMinFailedModels = options.providerCooldownMinFailedModels;
+        }
+        if (Array.isArray(options.providerCooldownFailureKinds)) {
+            routeOptions.providerCooldownFailureKinds = stringList(options.providerCooldownFailureKinds);
+        }
         if (Array.isArray(options.requiredProbeKinds)) routeOptions.requiredProbeKinds = stringList(options.requiredProbeKinds);
         if (Array.isArray(options.preferredProbeKinds)) routeOptions.preferredProbeKinds = stringList(options.preferredProbeKinds);
         if (Array.isArray(options.blockFailedProbeKinds)) routeOptions.blockFailedProbeKinds = stringList(options.blockFailedProbeKinds);
@@ -386,6 +408,7 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
         return {
             profileId,
             selected: selectedSummary(route.selected),
+            candidateAlternates: candidateSummaries(route.candidates),
             candidateCount: route.candidates.length,
             rejectedCount: route.rejected.length,
             fallbackChain: route.fallbackChain.slice(0, 12),
@@ -560,6 +583,8 @@ function profilesById(profiles) {
  *     changed: boolean;
  *     preSelected: Record<string, unknown> | null;
  *     postSelected: Record<string, unknown> | null;
+ *     preCandidateAlternates: Record<string, unknown>[];
+ *     postCandidateAlternates: Record<string, unknown>[];
  *     preRouteKey: string | null;
  *     postRouteKey: string | null;
  *     postSelectedHasRuntimeProof: boolean;
@@ -575,6 +600,12 @@ export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRunt
         const postProfile = postProfiles.get(profileId) ?? {};
         const preSelected = isRecord(preProfile['selected']) ? preProfile['selected'] : null;
         const postSelected = isRecord(postProfile['selected']) ? postProfile['selected'] : null;
+        const preCandidateAlternates = Array.isArray(preProfile['candidateAlternates'])
+            ? preProfile['candidateAlternates'].filter(isRecord)
+            : [];
+        const postCandidateAlternates = Array.isArray(postProfile['candidateAlternates'])
+            ? postProfile['candidateAlternates'].filter(isRecord)
+            : [];
         const preRouteKey = selectedRouteKey(preSelected);
         const postRouteKey = selectedRouteKey(postSelected);
         return {
@@ -582,6 +613,8 @@ export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRunt
             changed: preRouteKey !== postRouteKey,
             preSelected,
             postSelected,
+            preCandidateAlternates,
+            postCandidateAlternates,
             preRouteKey,
             postRouteKey,
             postSelectedHasRuntimeProof: selectedHasRuntimeProof(postSelected),
@@ -733,6 +766,7 @@ function normalizeSelectionPolicyMode(value) {
  *     hasRuntimeProof: boolean;
  *     preSelected: Record<string, unknown> | null;
  *     postSelected: Record<string, unknown> | null;
+ *     candidateAlternates: Record<string, unknown>[];
  *   }>;
  * }}
  */
@@ -740,6 +774,12 @@ export function resolveModelGatewaySelectionPolicy(comparison, options = {}) {
     const mode = normalizeSelectionPolicyMode(options.mode);
     const rows = comparison.rows.map((row) => {
         let selected = row.preSelected;
+        const preCandidateAlternates = Array.isArray(row.preCandidateAlternates)
+            ? row.preCandidateAlternates.filter(isRecord)
+            : [];
+        const postCandidateAlternates = Array.isArray(row.postCandidateAlternates)
+            ? row.postCandidateAlternates.filter(isRecord)
+            : [];
         /** @type {'pre_runtime_metadata' | 'post_runtime_proved' | 'post_runtime_fallback' | 'blocked_runtime_proof_missing'} */
         let source = 'pre_runtime_metadata';
         if (mode === MODEL_GATEWAY_SELECTION_POLICY_MODE.REQUIRE_RUNTIME_PROOF) {
@@ -757,6 +797,11 @@ export function resolveModelGatewaySelectionPolicy(comparison, options = {}) {
             selected = row.postSelected;
             source = 'post_runtime_fallback';
         }
+        const candidateAlternates =
+            mode === MODEL_GATEWAY_SELECTION_POLICY_MODE.PREFER_RUNTIME_PROVED ||
+            mode === MODEL_GATEWAY_SELECTION_POLICY_MODE.REQUIRE_RUNTIME_PROOF
+                ? [...postCandidateAlternates, ...preCandidateAlternates]
+                : [...preCandidateAlternates, ...postCandidateAlternates];
         return {
             profileId: row.profileId,
             selected,
@@ -765,6 +810,7 @@ export function resolveModelGatewaySelectionPolicy(comparison, options = {}) {
             hasRuntimeProof: selectedHasRuntimeProof(selected),
             preSelected: row.preSelected,
             postSelected: row.postSelected,
+            candidateAlternates,
         };
     });
     return {

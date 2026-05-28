@@ -9,7 +9,9 @@ export { buildModelGatewayRouteCandidates } from './candidate-builder.js';
 export { explainGatewayRouteDecision } from './explain.js';
 export {
     MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS,
+    MODEL_GATEWAY_PROVIDER_COOLDOWN_FAILURE_KINDS,
     evaluateGatewayModelHealthRoute,
+    evaluateGatewayProviderHealthCooldown,
     isGatewayModelAgentProbeHealthFailed,
     isGatewayModelAgentProbeVerified,
     isGatewayModelChatHealthFailed,

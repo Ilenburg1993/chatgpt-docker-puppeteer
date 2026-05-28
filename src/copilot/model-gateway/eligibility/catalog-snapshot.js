@@ -174,6 +174,9 @@ export function evaluateModelGatewayCatalogEligibility(input) {
     const policy = isRecord(input.policy) ? input.policy : {};
     const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords, {
         accountScope: optionalString(policy['accountScope']) ?? 'default',
+        accountWideFailureKinds: Array.isArray(policy['runtimeAccountWideFailureKinds'])
+            ? policy['runtimeAccountWideFailureKinds'].map(optionalString).filter((item) => item !== null)
+            : [],
     });
     const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, { now: startedAt });
     const accountOverlays = [...snapshotAccountOverlays, ...runtimeAccountOverlays];
