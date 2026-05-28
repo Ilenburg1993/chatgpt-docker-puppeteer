@@ -346,6 +346,8 @@ if (execute) {
             selectedProfileId: null,
             attempts: [],
             retryDecisions: [],
+            skippedAttemptCount: 0,
+            skippedAttempts: [],
             routeDecisionRecordedCount: 0,
             final: null,
             error: 'runtime_selector_plan_not_ready',
@@ -518,7 +520,7 @@ if (json) {
     }
     if (execution) {
         process.stdout.write(
-            `execution: ok=${execution.ok ? 'yes' : 'no'} status=${execution.status} attempted=${execution.attemptedCount} selected=${execution.selectedProfileId ?? '-'} routeDecisionEvents=${execution.routeDecisionRecordedCount ?? 0} error=${execution.error ?? '-'}\n`,
+            `execution: ok=${execution.ok ? 'yes' : 'no'} status=${execution.status} attempted=${execution.attemptedCount} skipped=${execution.skippedAttemptCount ?? 0} selected=${execution.selectedProfileId ?? '-'} routeDecisionEvents=${execution.routeDecisionRecordedCount ?? 0} error=${execution.error ?? '-'}\n`,
         );
         process.stdout.write(
             `route-decisions: attempted=${routeDecisionPersistence.attempted ? 'yes' : 'no'} written=${routeDecisionPersistence.written} error=${routeDecisionPersistence.error ?? '-'}\n`,

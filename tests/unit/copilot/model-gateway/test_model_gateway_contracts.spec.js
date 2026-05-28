@@ -1611,6 +1611,9 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(providerCapAlternativeExecution.ok, true);
         assert.equal(providerCapAlternativeExecution.attemptedCount, 2);
+        assert.equal(providerCapAlternativeExecution.skippedAttemptCount, 1);
+        assert.equal(providerCapAlternativeExecution.skippedAttempts[0]?.['reason'], 'provider_attempt_cap');
+        assert.equal(providerCapAlternativeExecution.skippedAttempts[0]?.['providerId'], 'openrouter');
         assert.deepEqual(providerCapModels, [
             'openai/gpt-oss-120b',
             'meta-llama/llama-4-scout-17b-16e-instruct',
@@ -1650,6 +1653,7 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(boundedAttemptExecution.ok, false);
         assert.equal(boundedAttemptExecution.attemptedCount, 2);
+        assert.equal(boundedAttemptExecution.skippedAttemptCount, 0);
         assert.equal(boundedAttemptCalls, 2);
 
         const distinctFallbackPlan = {

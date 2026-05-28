@@ -10209,6 +10209,43 @@ Teste adicionado:
 - a segunda rota OpenRouter e pulada pelo cap e a tentativa real chega ao Groq;
 - `attemptsPerRoute=3` com `maxAttempts=2` executa somente duas tentativas reais.
 
+## Mudanca 107 - Skips estruturados no executor runtime
+
+Status: concluido.
+
+Contexto:
+
+- depois de corrigir `maxAttempts`, rotas puladas por `maxAttemptsPerProvider` continuavam invisiveis;
+- em live tests, isso dificultava saber se uma rota nao foi tentada por bug, por cap de provider ou por falta de budget;
+- o runner llm-b mostrava `attemptedCount`, mas nao o numero de rotas ignoradas por policy operacional.
+
+Regra aplicada:
+
+- `executeModelGatewayRuntimeSelectorPlanWithFallbacks` agora retorna `skippedAttemptCount`;
+- tambem retorna `skippedAttempts[]` com:
+  - `profileId`;
+  - `selectedRouteKey`;
+  - `providerId`;
+  - `reason`;
+  - `maxAttemptsPerProvider`;
+- o CLI canonico imprime `skipped=<n>` na linha de execution;
+- o runner llm-b preserva `skippedAttemptCount` no resumo redigido.
+
+Motivo arquitetural:
+
+- live tests precisam distinguir "nao havia rota" de "rota pulada por cap";
+- esse dado nao e runtime proof nem metadado canonico;
+- e telemetria operacional da execucao do seletor;
+- evita interpretacao errada de fallback quando ha muitas alternativas do mesmo provider.
+
+Teste adicionado:
+
+- plano com duas rotas OpenRouter e uma Groq;
+- `maxAttemptsPerProvider=1`;
+- a segunda rota OpenRouter e registrada como skip `provider_attempt_cap`;
+- o executor continua ate Groq e passa;
+- `maxAttempts` puro nao gera skip falso.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

@@ -1175,6 +1175,8 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
  *   selectedProfileId: string | null;
  *   attempts: Array<Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>>;
  *   retryDecisions: Array<ReturnType<typeof resolveModelGatewayRuntimeRetryDecision>>;
+ *   skippedAttemptCount: number;
+ *   skippedAttempts: Array<Record<string, unknown>>;
  *   routeDecisionRecordedCount: number;
  *   final: Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>> | null;
  *   error: string | null;
@@ -1236,10 +1238,21 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
     const attempts = [];
     /** @type {Array<ReturnType<typeof resolveModelGatewayRuntimeRetryDecision>>} */
     const retryDecisions = [];
+    /** @type {Array<Record<string, unknown>>} */
+    const skippedAttempts = [];
     routeLoop: for (const { profileId, route } of routeAttempts) {
         if (attempts.length >= maxAttempts) break;
         const providerId = optionalString(route.selected?.['providerId']) ?? 'unknown-provider';
-        if ((providerAttemptCounts.get(providerId) ?? 0) >= maxAttemptsPerProvider) continue;
+        if ((providerAttemptCounts.get(providerId) ?? 0) >= maxAttemptsPerProvider) {
+            skippedAttempts.push({
+                profileId,
+                selectedRouteKey: runtimeSelectorAttemptKey(route),
+                providerId,
+                reason: 'provider_attempt_cap',
+                maxAttemptsPerProvider,
+            });
+            continue;
+        }
         for (let routeAttempt = 0; routeAttempt < attemptsPerRoute; routeAttempt += 1) {
             if (attempts.length >= maxAttempts) break routeLoop;
             if ((providerAttemptCounts.get(providerId) ?? 0) >= maxAttemptsPerProvider) break;
@@ -1262,6 +1275,8 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
                     selectedProfileId: attempt.profileId,
                     attempts,
                     retryDecisions,
+                    skippedAttemptCount: skippedAttempts.length,
+                    skippedAttempts,
                     routeDecisionRecordedCount: sumRouteDecisionRecordedCount(attempts),
                     final: attempt,
                     error: null,
@@ -1285,6 +1300,8 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
         selectedProfileId: null,
         attempts,
         retryDecisions,
+        skippedAttemptCount: skippedAttempts.length,
+        skippedAttempts,
         routeDecisionRecordedCount: sumRouteDecisionRecordedCount(attempts),
         final,
         error: final?.error ?? 'runtime_selector_no_available_attempts',

@@ -515,6 +515,7 @@ function buildRealByokRuntime({
                           ok: runtimeSelector.summary.execution.ok,
                           status: runtimeSelector.summary.execution.status,
                           attemptedCount: runtimeSelector.summary.execution.attemptedCount,
+                          skippedAttemptCount: runtimeSelector.summary.execution.skippedAttemptCount ?? 0,
                           selectedProfileId: runtimeSelector.summary.execution.selectedProfileId,
                           error: runtimeSelector.summary.execution.error,
                       }
