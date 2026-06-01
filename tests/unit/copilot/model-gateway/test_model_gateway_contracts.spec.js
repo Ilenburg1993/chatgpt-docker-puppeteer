@@ -47,6 +47,7 @@ import {
     buildModelGatewayRuntimeSelectorProbeRun,
     buildModelGatewayRuntimeAutomationDecision,
     buildModelGatewayRuntimeSelectorPlan,
+    readModelGatewayRuntimeAutomationPolicy,
     buildModelGatewaySelectionDecisionTrace,
     createGatewayRuntimeHealthIndex,
     compareModelGatewaySelectionDecisionTraces,
@@ -1268,6 +1269,24 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(keepDecision.action, 'keep_current');
         assert.equal(keepDecision.ok, true);
+        const autoPolicy = readModelGatewayRuntimeAutomationPolicy({
+            COPILOT_BYOK_GATEWAY_AUTO: 'true',
+            COPILOT_BYOK_GATEWAY_AUTO_POLICY: 'prefer_runtime_proved',
+            COPILOT_BYOK_GATEWAY_AUTO_PROFILES: 'repo_agent,code',
+            COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LIVE_SET_MODEL: 'yes',
+            COPILOT_BYOK_GATEWAY_AUTO_ALLOW_NEW_SESSION: '1',
+            COPILOT_BYOK_GATEWAY_AUTO_ALLOW_PROVIDER_PROBES: 'false',
+            COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LOCAL_PRIVATE: 'on',
+        });
+        assert.deepEqual(autoPolicy, {
+            enabled: true,
+            policy: 'prefer_runtime_proved',
+            profiles: ['repo_agent', 'code'],
+            allowLiveSetModel: true,
+            allowNewSession: true,
+            allowProviderProbes: false,
+            allowLocalPrivate: true,
+        });
 
         const noLiveSessionDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan,

@@ -18,6 +18,7 @@ import {
     buildModelGatewaySelectionDecisionTrace,
     buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewayRuntimeAutomationDecision,
+    readModelGatewayRuntimeAutomationPolicy,
     compareModelGatewaySelectionAudits,
     buildEligibilityEvaluatedEvent,
     buildModelGatewayPreBuildReadinessReport,
@@ -3331,16 +3332,19 @@ function parseGatewayCatalogListArgs(rest) {
  * @returns {{ profileId: string; allowLiveSetModel: boolean; allowNewSession: boolean; allowLocalPrivate: boolean }}
  */
 function parseByokGatewayAutoArgs(rest) {
+    const policy = readModelGatewayRuntimeAutomationPolicy();
     const profileToken = rest.find((item) => /^(?:profile|perfil|routeProfile|route-profile)[:=]/iu.test(item));
     const profileId =
         optionalScalarString(profileToken?.replace(/^(?:profile|perfil|routeProfile|route-profile)[:=]/iu, '')) ??
+        policy.profiles[0] ??
         optionalScalarString(rest.find((item) => !/^(auto|status|plan|apply|on|off|--|allow-|live-|new-session|local)/iu.test(item))) ??
         'repo_agent';
     return {
         profileId,
-        allowLiveSetModel: rest.some((item) => /^(?:--)?allow-live-set-model|live-set-model|set-model$/iu.test(item)),
-        allowNewSession: rest.some((item) => /^(?:--)?allow-new-session|new-session$/iu.test(item)),
-        allowLocalPrivate: rest.some((item) => /^(?:--)?allow-local-private|local-private|ollama$/iu.test(item)),
+        allowLiveSetModel:
+            policy.allowLiveSetModel || rest.some((item) => /^(?:--)?allow-live-set-model|live-set-model|set-model$/iu.test(item)),
+        allowNewSession: policy.allowNewSession || rest.some((item) => /^(?:--)?allow-new-session|new-session$/iu.test(item)),
+        allowLocalPrivate: policy.allowLocalPrivate || rest.some((item) => /^(?:--)?allow-local-private|local-private|ollama$/iu.test(item)),
     };
 }
 

@@ -8,7 +8,11 @@
  * @module copilot/model-gateway
  */
 
-export { buildModelGatewayRuntimeAutomationDecision } from './automation/index.js';
+export {
+    MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV,
+    buildModelGatewayRuntimeAutomationDecision,
+    readModelGatewayRuntimeAutomationPolicy,
+} from './automation/index.js';
 
 export {
     deriveModelGatewayRuntimeAccountOverlayFromHealth,

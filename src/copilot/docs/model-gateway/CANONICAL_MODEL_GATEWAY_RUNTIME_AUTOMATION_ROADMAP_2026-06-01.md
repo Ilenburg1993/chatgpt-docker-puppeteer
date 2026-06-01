@@ -278,20 +278,20 @@ Precisamos de um cockpit operacional unico:
 
 ## Faixa B - Politica Auto Do Gateway
 
-- [ ] B.1 Definir envs:
-  - [ ] `COPILOT_BYOK_GATEWAY_AUTO`;
-  - [ ] `COPILOT_BYOK_GATEWAY_AUTO_POLICY`;
-  - [ ] `COPILOT_BYOK_GATEWAY_AUTO_PROFILES`;
-  - [ ] `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LIVE_SET_MODEL`;
-  - [ ] `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_NEW_SESSION`;
-  - [ ] `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_PROVIDER_PROBES`.
-- [ ] B.2 Criar parser de policy.
-- [ ] B.3 Defaults:
-  - [ ] auto off;
-  - [ ] probes off;
-  - [ ] live setModel allowed only same provider;
-  - [ ] new session advisory unless explicit.
-- [ ] B.4 Integrar policy ao automation decision.
+- [x] B.1 Definir envs:
+  - [x] `COPILOT_BYOK_GATEWAY_AUTO`;
+  - [x] `COPILOT_BYOK_GATEWAY_AUTO_POLICY`;
+  - [x] `COPILOT_BYOK_GATEWAY_AUTO_PROFILES`;
+  - [x] `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LIVE_SET_MODEL`;
+  - [x] `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_NEW_SESSION`;
+  - [x] `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_PROVIDER_PROBES`.
+- [x] B.2 Criar parser de policy.
+- [x] B.3 Defaults:
+  - [x] auto off;
+  - [x] probes off;
+  - [x] live setModel allowed only same provider;
+  - [x] new session advisory unless explicit.
+- [x] B.4 Integrar policy ao automation decision.
 
 ## Faixa C - Controller Pre/Post Turn
 

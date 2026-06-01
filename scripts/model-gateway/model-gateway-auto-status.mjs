@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 
-import { buildModelGatewayRuntimeAutomationDecision } from '../../src/copilot/model-gateway/index.js';
+import {
+    buildModelGatewayRuntimeAutomationDecision,
+    readModelGatewayRuntimeAutomationPolicy,
+} from '../../src/copilot/model-gateway/index.js';
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from './index.mjs';
 
 const args = process.argv.slice(2);
@@ -75,21 +78,23 @@ function liveBindingFromArgs() {
 }
 
 const selector = readRuntimeSelectorPlan();
+const envPolicy = readModelGatewayRuntimeAutomationPolicy();
 const decision = buildModelGatewayRuntimeAutomationDecision({
     runtimeSelectorPlan: selector.runtimeSelectorPlan,
     profileId: readArg('--profile', 'repo_agent'),
     currentSessionId: optional(readArg('--live-session-id')) ?? (liveBindingFromArgs() ? 'cli-live-session' : null),
     liveByokBinding: liveBindingFromArgs(),
     policy: {
-        allowLiveSetModel: argSet.has('--allow-live-set-model'),
-        allowNewSession: argSet.has('--allow-new-session'),
-        allowLocalPrivate: argSet.has('--allow-local-private'),
+        allowLiveSetModel: envPolicy.allowLiveSetModel || argSet.has('--allow-live-set-model'),
+        allowNewSession: envPolicy.allowNewSession || argSet.has('--allow-new-session'),
+        allowLocalPrivate: envPolicy.allowLocalPrivate || argSet.has('--allow-local-private'),
     },
 });
 
 const summary = {
     schema: 'model-gateway-auto-status',
     ok: decision.ok,
+    policy: envPolicy,
     runtimeSelectorOk: selector.ok === true,
     decision,
 };
