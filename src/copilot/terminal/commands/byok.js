@@ -3351,6 +3351,9 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
     println(`    atual:         \x1b[33m${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}\x1b[0m`);
     println(`    live switch:   \x1b[33m${decision.canApplyLiveModel ? 'sim' : 'nao'}\x1b[0m`);
     println(`    nova sessao:   \x1b[33m${decision.requiresNewSession ? 'sim' : 'nao'}\x1b[0m`);
+    if (decision.blockerClass && decision.blockerClass !== 'none') {
+        println(`    classe:        \x1b[33m${decision.blockerClass}\x1b[0m`);
+    }
     if (decision.nonActionReason) println(`    nao-acao:      \x1b[33m${decision.nonActionReason}\x1b[0m`);
     if (decision.cooldown?.active === true) {
         println(

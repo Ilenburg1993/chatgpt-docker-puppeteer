@@ -157,6 +157,24 @@ function routeCooldown(route) {
 }
 
 /**
+ * @param {string[]} blockers
+ * @returns {'none' | 'quota_hard' | 'rate_limit_resettable' | 'auth_invalid' | 'model_unavailable' | 'local_private_policy' | 'new_session_policy' | 'route_blocked'}
+ */
+function blockerClass(blockers) {
+    const textValue = blockers.join(' ').toLowerCase();
+    if (!textValue) return 'none';
+    if (/local_private/iu.test(textValue)) return 'local_private_policy';
+    if (/new_session/iu.test(textValue)) return 'new_session_policy';
+    if (/rate[_ -]?limit|cooldown|retry/iu.test(textValue)) return 'rate_limit_resettable';
+    if (/quota|credit|balance|spending/iu.test(textValue)) return 'quota_hard';
+    if (/\bauth\b|unauthori[sz]ed|forbidden|key_disabled|invalid[_ -]?key/iu.test(textValue)) return 'auth_invalid';
+    if (/model[_ -]?unavailable|model-or-route|selected_route_missing|route_missing|not[_ -]?found/iu.test(textValue)) {
+        return 'model_unavailable';
+    }
+    return 'route_blocked';
+}
+
+/**
  * @param {Record<string, unknown> | null | undefined} plan
  * @param {string | null | undefined} profileId
  * @returns {Record<string, unknown> | null}
@@ -215,6 +233,7 @@ export function selectModelGatewayRuntimeAutomationRoute(runtimeSelectorPlan, pr
  *   currentBoundary: ReturnType<typeof liveBoundary>;
  *   targetBoundary: ReturnType<typeof targetBoundary>;
  *   cooldown: ReturnType<typeof routeCooldown>;
+ *   blockerClass: ReturnType<typeof blockerClass>;
  *   nonActionReason: string | null;
  *   nextCommands: string[];
  *   operatorSummary: string;
@@ -227,6 +246,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
     const current = liveBoundary(input.liveByokBinding);
     const cooldown = routeCooldown(route);
     const blockers = [...automationRoute.blockers, ...policyBlockers(route, input.policy ?? {})];
+    const currentBlockerClass = blockerClass(blockers);
     const selectedKey = automationRoute.selectedRouteKey;
     const routeProfile = automationRoute.routeProfile;
     if (blockers.length > 0) {
@@ -244,6 +264,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             currentBoundary: current,
             targetBoundary: target,
             cooldown,
+            blockerClass: currentBlockerClass,
             nonActionReason: wait ? 'route_wait_for_reset' : 'route_blocked',
             nextCommands: wait ? ['npm run model-gateway:runtime-health:diff', 'npm run model-gateway:runtime-selector -- --fail'] : ['npm run model-gateway:selection:audit -- --strict'],
             operatorSummary: wait
@@ -267,6 +288,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             currentBoundary: current,
             targetBoundary: target,
             cooldown,
+            blockerClass: 'none',
             nonActionReason: null,
             nextCommands: ['/session sdk next new', target.model ? `/byok model ${target.model}` : '/byok auto apply'],
             operatorSummary: 'Sem sessao viva; a rota selecionada pode ser preparada para o proximo boot.',
@@ -286,6 +308,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             currentBoundary: current,
             targetBoundary: target,
             cooldown,
+            blockerClass: 'none',
             nonActionReason: 'already_aligned',
             nextCommands: ['continue_terminal_turn'],
             operatorSummary: 'Sessao viva ja esta alinhada com a rota selecionada.',
@@ -305,6 +328,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             currentBoundary: current,
             targetBoundary: target,
             cooldown,
+            blockerClass: 'none',
             nonActionReason: null,
             nextCommands: target.model ? [`/byok model ${target.model}`] : ['/byok auto apply'],
             operatorSummary: 'Mesmo provider BYOK; o modelo pode ser aplicado na sessao viva.',
@@ -324,6 +348,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
         currentBoundary: current,
         targetBoundary: target,
         cooldown,
+        blockerClass: requiresNewSession && input.policy?.allowNewSession !== true ? 'new_session_policy' : 'none',
         nonActionReason: requiresNewSession ? 'new_session_policy_required' : 'live_set_model_policy_disabled',
         nextCommands: requiresNewSession
             ? ['/session sdk next new', target.model ? `/byok model ${target.model}` : '/byok auto apply']

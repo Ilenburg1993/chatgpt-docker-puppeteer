@@ -1346,6 +1346,7 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(newSessionDecision.action, 'manual_intervention');
         assert.equal(newSessionDecision.requiresNewSession, true);
+        assert.equal(newSessionDecision.blockerClass, 'new_session_policy');
         assert.equal(newSessionDecision.nonActionReason, 'new_session_policy_required');
         assert.equal(newSessionDecision.blockers.includes('new_session_requires_explicit_policy'), true);
         const newSessionControllerStep = buildModelGatewayRuntimeAutomationControllerStep({
@@ -1376,6 +1377,7 @@ describe('model-gateway foundation', () => {
             policy: { allowLocalPrivate: false },
         });
         assert.equal(localPrivateDecision.ok, false);
+        assert.equal(localPrivateDecision.blockerClass, 'local_private_policy');
         assert.equal(localPrivateDecision.blockers.includes('local_private_requires_explicit_opt_in'), true);
         const failureControllerStep = buildModelGatewayRuntimeAutomationControllerStep({
             phase: 'post_turn',
@@ -1413,6 +1415,7 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(hardQuotaDecision.ok, false);
         assert.equal(hardQuotaDecision.action, 'manual_intervention');
+        assert.equal(hardQuotaDecision.blockerClass, 'quota_hard');
         assert.equal(hardQuotaDecision.blockers.includes('blocked:quota-exhausted'), true);
 
         const rateLimitResetDecision = buildModelGatewayRuntimeAutomationDecision({
@@ -1437,6 +1440,7 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(rateLimitResetDecision.ok, false);
         assert.equal(rateLimitResetDecision.action, 'wait_for_reset');
+        assert.equal(rateLimitResetDecision.blockerClass, 'rate_limit_resettable');
         assert.equal(rateLimitResetDecision.nonActionReason, 'route_wait_for_reset');
         assert.equal(rateLimitResetDecision.cooldown.active, true);
         assert.equal(rateLimitResetDecision.cooldown.resetAt, '2026-06-01T10:00:00.000Z');
