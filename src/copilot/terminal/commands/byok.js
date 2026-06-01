@@ -3352,6 +3352,11 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
     println(`    live switch:   \x1b[33m${decision.canApplyLiveModel ? 'sim' : 'nao'}\x1b[0m`);
     println(`    nova sessao:   \x1b[33m${decision.requiresNewSession ? 'sim' : 'nao'}\x1b[0m`);
     if (decision.nonActionReason) println(`    nao-acao:      \x1b[33m${decision.nonActionReason}\x1b[0m`);
+    if (decision.cooldown?.active === true) {
+        println(
+            `    cooldown:      \x1b[33m${decision.cooldown.reason ?? 'ativo'} · reset=${decision.cooldown.resetAt ?? '-'} · retryAfter=${decision.cooldown.retryAfterSeconds ?? '-'}s\x1b[0m`,
+        );
+    }
     if (decision.blockers.length > 0) println(`    blockers:      \x1b[33m${decision.blockers.join(', ')}\x1b[0m`);
     if (persistence) {
         println(`    persistencia:  \x1b[32m${persistence.automationDecisions} decision(s) gravada(s)\x1b[0m`);

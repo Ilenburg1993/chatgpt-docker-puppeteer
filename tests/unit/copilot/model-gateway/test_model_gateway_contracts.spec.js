@@ -1429,6 +1429,8 @@ describe('model-gateway foundation', () => {
         assert.equal(rateLimitResetDecision.ok, false);
         assert.equal(rateLimitResetDecision.action, 'wait_for_reset');
         assert.equal(rateLimitResetDecision.nonActionReason, 'route_wait_for_reset');
+        assert.equal(rateLimitResetDecision.cooldown.active, true);
+        assert.equal(rateLimitResetDecision.cooldown.resetAt, '2026-06-01T10:00:00.000Z');
         assert.equal(rateLimitResetDecision.nextCommands.includes('npm run model-gateway:runtime-health:diff'), true);
 
         const routeProbeEnv = buildModelGatewayRuntimeSelectorProbeEnv(runtimeSelectorPlan.routes[0].selected, {

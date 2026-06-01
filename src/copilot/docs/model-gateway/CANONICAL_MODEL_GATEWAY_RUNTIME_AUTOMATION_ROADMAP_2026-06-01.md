@@ -350,7 +350,7 @@ Precisamos de um cockpit operacional unico:
 - [x] G.2 Runtime overlays derivados de health existem.
 - [ ] G.3 Tornar account-wide failure kinds configuraveis no controller.
 - [ ] G.4 Diferenciar quota hard, rate-limit resetavel, auth invalid, model unavailable.
-- [ ] G.5 Expor cooldown no comando auto status.
+- [x] G.5 Expor cooldown no comando auto status.
 
 ## Faixa H - Integracao Com SDK Session
 
