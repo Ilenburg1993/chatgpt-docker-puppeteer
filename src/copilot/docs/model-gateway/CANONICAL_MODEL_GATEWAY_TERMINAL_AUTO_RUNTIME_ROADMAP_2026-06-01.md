@@ -9,6 +9,10 @@ O guia anterior continua como historico:
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_NEXT_GUIDE_2026-05-26.md`
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_AUTO_RUNTIME_OPERABILITY_ROADMAP_2026-06-01.md`
 
+Playbook operacional ativo para humano/LLM:
+
+- `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_RUNTIME_PLAYBOOK_2026-06-01.md`
+
 ## 1. Escopo
 
 - O foco primario e `src/copilot/model-gateway/`.
@@ -215,7 +219,7 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] B.7 Policy snapshot por automation decision.
 - [x] B.8 Fonte por campo no JSON do doctor.
 - [x] B.9 Validacao de policy invalida.
-- [ ] B.10 Modo auto full documentado com limites.
+- [x] B.10 Modo auto full documentado com limites.
 
 ### Faixa C - Ledger Operacional
 
@@ -327,22 +331,23 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] K.2 Fixture BYOK.
 - [x] K.3 BYOK real com flags explicitas.
 - [x] K.4 Runtime selector options no runner.
-- [ ] K.5 Scenario pre-turn auto fixture.
-- [ ] K.6 Scenario post-turn fallback fixture.
-- [ ] K.7 Scenario model_changed confirmation fixture.
-- [ ] K.8 Scenario handoff new session fixture.
-- [ ] K.9 Scenario real no-pr.
-- [ ] K.10 Relatorio de chancela.
+- [x] K.5 Auto cockpit no-PR live.
+- [ ] K.6 Scenario pre-turn auto fixture.
+- [ ] K.7 Scenario post-turn fallback fixture.
+- [ ] K.8 Scenario model_changed confirmation fixture.
+- [ ] K.9 Scenario handoff new session fixture.
+- [ ] K.10 Scenario BYOK real no-pr.
+- [ ] K.11 Relatorio de chancela.
 
 ### Faixa L - Chancela Funcional
 
 - [x] L.1 `model-gateway:auto:ready` passa.
 - [x] L.2 `model-gateway:auto:doctor` passa.
-- [ ] L.3 `/byok auto doctor` passa.
+- [x] L.3 `/byok auto doctor` passa.
 - [ ] L.4 Pre-turn fixture passa.
 - [ ] L.5 Post-turn fixture passa.
 - [ ] L.6 Confirmation fixture passa.
-- [ ] L.7 Live no-pr passa.
+- [x] L.7 Live no-pr passa.
 - [ ] L.8 Live real com fallback passa.
 - [ ] L.9 Relatorio final gerado.
 - [ ] L.10 Operador tem comando unico de rotina.
@@ -356,7 +361,7 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 5. [x] Persistir recovery attempts como decisions/effects post-turn.
 6. [x] Correlacionar `session.model_changed` com handoffs.
 7. [ ] Expandir live fixture de auto.
-8. [ ] Rodar live fixture.
+8. [x] Rodar live fixture.
 9. [ ] Corrigir bugs descobertos.
 10. [ ] Rodar live real apenas quando os gates estiverem verdes.
 
@@ -375,3 +380,45 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [ ] Live fixture passa.
 - [ ] Live real passa.
 - [ ] Nao ha vazamento de segredo em logs, docs ou SQLite.
+
+## 9. Evidencia Live Atual
+
+### 9.1 Control no-PR
+
+- [x] Rodado em 2026-06-01.
+- [x] Comando: `npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000`.
+- [x] Artefato: `artifacts/terminal-live/2026-06-01T22-00-26-580Z/summary.md`.
+- [x] Resultado: PASS.
+- [x] Terminal error tracker: 0.
+- [x] Sem turno explicito de modelo.
+- [x] Observacao: `quota.warning` SDK pode aparecer como telemetria lateral, sem equivaler a quota BYOK.
+
+### 9.2 BYOK fixture no-PR
+
+- [x] Rodado em 2026-06-01.
+- [x] Comando: `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`.
+- [x] Artefato: `artifacts/terminal-live/2026-06-01T22-02-19-576Z/summary.md`.
+- [x] Resultado: PASS.
+- [x] Terminal error tracker: 0.
+- [x] Criterios PASS: 31.
+- [x] `/byok use codex-fixture` ativou perfil fixture no processo.
+- [x] `/byok models refresh` descobriu catalogo fixture.
+- [x] `/byok model fixture/model-b` trocou modelo preparado.
+- [x] `/byok provider openai-compatible fixture/model-c <baseUrl>` trocou provider/model/baseUrl preparado.
+- [x] `/byok use sdk` retornou para modo SDK.
+- [x] Bearer token fixture nao vazou.
+
+### 9.3 Auto cockpit no-PR
+
+- [x] Rodado em 2026-06-01.
+- [x] Comando: `npm run model-gateway:live:auto-probe`.
+- [x] Artefato: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`.
+- [x] Resultado: PASS.
+- [x] Terminal error tracker: 0.
+- [x] Sem turno explicito de modelo.
+- [x] `/byok gateway commands` mostrou inventario canonico com 128 comandos.
+- [x] `/byok auto policy` mostrou policy efetiva.
+- [x] `/byok auto status profile:repo_agent` mostrou decision sem aplicar efeito.
+- [x] `/byok auto doctor profile:repo_agent` mostrou policy, decision, ledgers e blockers.
+- [x] `/byok auto explain profile:repo_agent` explicou action/blockers/next commands.
+- [x] `/byok auto history`, `/byok auto handoffs` e `/byok auto confirmations` renderizaram ledger/empty state.

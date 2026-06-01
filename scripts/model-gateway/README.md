@@ -91,6 +91,15 @@ npm run model-gateway:live:readiness
 npm run model-gateway:live:plan
 npm run model-gateway:auto:scenarios
 npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000
+npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000
+npm run model-gateway:live:auto-probe
 ```
 
-Rode testes live reais apenas depois de readiness e plan estarem claros. O caminho real pode consumir quota da key BYOK.
+Rode testes live reais apenas depois de readiness, plan, control no-PR, BYOK fixture no-PR e auto-probe estarem claros.
+O caminho real pode consumir quota da key BYOK.
+
+O playbook operacional ativo vive em:
+
+```text
+src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_RUNTIME_PLAYBOOK_2026-06-01.md
+```

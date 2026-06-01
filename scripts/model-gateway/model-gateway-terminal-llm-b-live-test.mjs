@@ -50,6 +50,7 @@ Common options:
   --byok-real-route-temporary-failure-cooldown-ms=<ms>
   --byok-real-route-timeout-ms=<ms>
   --byok-real-require-vision-probe
+  --auto-probe
   --timeout-ms=<ms>
   --transport=<pty|stdio>
   --out-dir=<path>
@@ -174,6 +175,27 @@ function buildByokProbeCommands({ fixtureBaseUrl = 'http://127.0.0.1:11434/v1' }
         '/usage now',
         '/events 30',
         '/events 30 --raw',
+        '/errors 10',
+        '/quit',
+    ];
+}
+
+function buildAutoProbeCommands({ profile = 'repo_agent' } = {}) {
+    const routeProfile = profile || 'repo_agent';
+    return [
+        '/usage now',
+        '/activity 20',
+        '/byok gateway commands',
+        '/byok auto policy',
+        `/byok auto status profile:${routeProfile}`,
+        `/byok auto doctor profile:${routeProfile}`,
+        `/byok auto explain profile:${routeProfile}`,
+        `/byok gateway auto profile:${routeProfile}`,
+        '/byok auto history 10',
+        '/byok auto handoffs 10',
+        '/byok auto confirmations 10',
+        '/events 40',
+        '/events 80 --raw',
         '/errors 10',
         '/quit',
     ];
@@ -2146,6 +2168,106 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
     return criteria;
 }
 
+function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } = {}) {
+    const archiveRawEvents = extractArchiveRawEvents(plain);
+    const routeProfile = profile || 'repo_agent';
+    return [
+        {
+            id: 'ready',
+            pass: /LLM-B pronta/.test(plain),
+            detail: 'terminal reached ready state',
+        },
+        {
+            id: 'interactive-repl',
+            pass: !/Modo headless detectado/.test(plain),
+            detail: 'terminal ran with an interactive REPL/TTY surface',
+        },
+        {
+            id: 'no-explicit-turn',
+            pass: !/\[intervene→turn\]/.test(plain) && !/Processando mensagem/.test(plain),
+            detail: 'auto probe did not open an explicit LLM turn',
+        },
+        {
+            id: 'gateway-commands-visible',
+            pass: /model-gateway/i.test(plain) && /npm run model-gateway:/.test(plain) && /\/byok auto doctor/.test(plain),
+            detail: '/byok gateway commands rendered canonical package and terminal commands',
+        },
+        {
+            id: 'auto-policy-visible',
+            pass:
+                /BYOK model-gateway auto policy/.test(plain) &&
+                /efetivo:/.test(plain) &&
+                /liveSetModel=/.test(plain) &&
+                /newSession=/.test(plain),
+            detail: '/byok auto policy rendered effective policy and source-independent flags',
+        },
+        {
+            id: 'auto-status-visible',
+            pass:
+                /BYOK model-gateway auto/i.test(plain) &&
+                /runtimeSelector=/.test(plain) &&
+                /action=/.test(plain) &&
+                new RegExp(`profile[:=]${escapeRegExp(routeProfile)}|profile=${escapeRegExp(routeProfile)}`, 'iu').test(plain),
+            detail: '/byok auto status rendered the selected profile decision',
+        },
+        {
+            id: 'auto-doctor-visible',
+            pass:
+                /BYOK model-gateway auto doctor/.test(plain) &&
+                /policy:/.test(plain) &&
+                /decision:/.test(plain) &&
+                /ledgers:/.test(plain),
+            detail: '/byok auto doctor rendered policy, decision and ledger cockpit',
+        },
+        {
+            id: 'auto-explain-visible',
+            pass: /BYOK model-gateway auto explain|automation decision|operatorSummary|resumo:/i.test(plain),
+            detail: '/byok auto explain rendered the automation explanation',
+        },
+        {
+            id: 'auto-gateway-alias-visible',
+            pass: /\/byok gateway auto|BYOK model-gateway auto status|model-gateway auto status/i.test(plain),
+            detail: '/byok gateway auto alias produced an automation decision surface',
+        },
+        {
+            id: 'auto-history-visible',
+            pass: /BYOK model-gateway auto history/.test(plain),
+            detail: '/byok auto history rendered persisted automation decisions or empty state',
+        },
+        {
+            id: 'auto-handoffs-visible',
+            pass: /BYOK model-gateway auto handoffs/.test(plain),
+            detail: '/byok auto handoffs rendered SDK handoff ledger or empty state',
+        },
+        {
+            id: 'auto-confirmations-visible',
+            pass: /BYOK model-gateway auto confirmations/.test(plain),
+            detail: '/byok auto confirmations rendered SDK confirmation ledger or empty state',
+        },
+        {
+            id: 'auto-sse-archive-query-visible',
+            pass: /Eventos SSE/.test(plain) && /arquivo=/.test(plain),
+            detail: '/events rendered the durable public SSE archive tail',
+        },
+        {
+            id: 'auto-sse-archive-raw-visible',
+            pass: archiveRawEvents.length > 0,
+            detail: `/events --raw exposed ${archiveRawEvents.length} archived control event(s)`,
+        },
+        {
+            id: 'no-terminal-errors',
+            pass: /Nenhum erro recente/.test(plain) && !/\bERROR\b/.test(plain),
+            detail: 'terminal error tracker stayed clean',
+        },
+        {
+            id: 'clean-quit',
+            pass: /readline fechado/.test(plain),
+            detail: 'terminal exited through /quit',
+        },
+        ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false, plain }),
+    ];
+}
+
 function evaluateByokRealOutput(
     plain,
     secretValues,
@@ -2548,8 +2670,11 @@ async function main() {
     const sessionCycle = hasFlag('--session-cycle');
     const byokProbe = hasFlag('--byok-probe');
     const byokFixture = hasFlag('--byok-fixture');
+    const autoProbe = hasFlag('--auto-probe');
+    const autoProbeProfile = readArg('--auto-probe-profile', 'repo_agent');
     const byokReal = hasFlag('--byok-real');
     const byokControlProbe = !byokReal && (byokProbe || byokFixture);
+    const autoControlProbe = autoProbe && !byokReal && !byokControlProbe;
     const byokRealProfile = readArg('--byok-real-profile', '');
     const byokRealAltProfile = readArg('--byok-real-alt-profile', '');
     const byokRealModel = readArg('--byok-real-model', '');
@@ -2661,7 +2786,9 @@ async function main() {
     }
 
     if (dryRun) {
-        const prompt = byokControlProbe
+        const prompt = autoControlProbe
+            ? buildAutoProbeCommands({ profile: autoProbeProfile }).join('\n')
+            : byokControlProbe
             ? buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl }).join('\n')
             : byokReal
               ? [
@@ -2852,7 +2979,7 @@ async function main() {
             if (collectSse) {
                 sseCollector = startSseCollector({ port: Number.isFinite(ssePort) ? ssePort : terminalPort });
             }
-            if (byokControlProbe || noPr || byokReal) {
+            if (autoControlProbe || byokControlProbe || noPr || byokReal) {
                 const commands = byokReal
                     ? [
                           '/usage now',
@@ -2860,7 +2987,9 @@ async function main() {
                           ...buildByokRealPreflightCommands(realByok ?? {}),
                           ...(noPr ? buildByokRealNoPrDiagnosticCommands() : []),
                       ]
-                    : byokControlProbe
+                    : autoControlProbe
+                      ? buildAutoProbeCommands({ profile: autoProbeProfile })
+                      : byokControlProbe
                       ? ['/usage now', '/activity 12', ...buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl })]
                       : ['/usage now', '/activity 12', ...buildNoPrProbeCommands()];
                 startPromptSynchronizedCommandSequence(commands, () => {
@@ -2996,7 +3125,7 @@ async function main() {
         raw: '',
         disabled: !collectSse,
     };
-    const blocker = noPr || byokControlProbe
+    const blocker = noPr || byokControlProbe || autoControlProbe
         ? null
         : detectLiveBlocker(plain, {
               timedOut,
@@ -3005,10 +3134,12 @@ async function main() {
               postCommandsSent,
               sseEvents: sseSummary.events,
           });
-    const exportSummary = noPr || byokControlProbe || blocker ? null : await inspectExportedMarkdown(exportPath);
+    const exportSummary = noPr || byokControlProbe || autoControlProbe || blocker ? null : await inspectExportedMarkdown(exportPath);
     const baseCriteria = blocker
         ? evaluateBlockedOutput(plain, sseSummary, blocker)
-        : byokControlProbe
+        : autoControlProbe
+          ? evaluateAutoProbeOutput(plain, sseSummary, { profile: autoProbeProfile })
+          : byokControlProbe
           ? evaluateByokProbeOutput(plain, sseSummary, { fixture: byokFixture })
           : noPr
             ? evaluateNoPrOutput(plain, sseSummary)
@@ -3082,7 +3213,7 @@ async function main() {
             blocker,
             outputPath: path.relative(ROOT, rawPath),
             plainOutputPath: path.relative(ROOT, plainPath),
-            exportPath: noPr || byokProbe ? null : path.relative(ROOT, exportPath),
+            exportPath: noPr || byokProbe || autoProbe ? null : path.relative(ROOT, exportPath),
             exportSummary,
             sseRawPath: path.relative(ROOT, sseRawPath),
             sseJsonlPath: path.relative(ROOT, sseJsonlPath),

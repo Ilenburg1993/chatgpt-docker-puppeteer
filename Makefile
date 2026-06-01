@@ -234,6 +234,7 @@ help:
 	@echo "  $(CYAN)make model-gateway-auto-scenarios$(NC) Cenários canônicos para operador/LLM antes dos live tests"
 	@echo "  $(CYAN)make model-gateway-live-readiness$(NC)   Gate antes dos testes live llm-b"
 	@echo "  $(CYAN)make model-gateway-live-plan$(NC)  Plano auditável antes dos testes live"
+	@echo "  $(CYAN)make model-gateway-live-auto-probe$(NC)  Probe live do cockpit auto sem turno de modelo"
 	@echo "  $(CYAN)make model-gateway-terminal$(NC)  Abrir terminal llm-b para comandos /byok"
 	@echo ""
 	@echo "$(CYAN)$(BOLD)🌐 GitHub/Copilot Network:$(NC)"
@@ -1452,7 +1453,7 @@ rag-rebuild-code-config-strict:
 # MODEL GATEWAY BYOK — COMANDOS CANÔNICOS PRE-BUILD
 # =============================================================================
 
-.PHONY: model-gateway-help model-gateway-commands model-gateway-commands-json model-gateway-lint model-gateway-typecheck model-gateway-test-contracts model-gateway-test-terminal model-gateway-validate model-gateway-prebuild model-gateway-build model-gateway-metadata-build model-gateway-metadata-build-plan model-gateway-metadata-build-preview model-gateway-catalog-integrity model-gateway-redaction-audit model-gateway-selection-audit model-gateway-effective-selection model-gateway-effective-selection-trace model-gateway-selection-trace-diff model-gateway-selection-trace-retention model-gateway-runtime-selector model-gateway-auto-status model-gateway-auto-plan model-gateway-auto-ready model-gateway-auto-doctor model-gateway-auto-explain model-gateway-auto-handoffs model-gateway-auto-confirmations model-gateway-auto-scenarios model-gateway-live-readiness model-gateway-live-llm-b model-gateway-refresh model-gateway-refresh-preview model-gateway-refresh-plan model-gateway-refresh-provider model-gateway-refresh-log model-gateway-refresh-log-sqlite model-gateway-runtime-health-diff model-gateway-runtime-health-mirror model-gateway-sqlite-diagnostics model-gateway-sqlite-retention model-gateway-sqlite-retention-apply model-gateway-terminal
+.PHONY: model-gateway-help model-gateway-commands model-gateway-commands-json model-gateway-lint model-gateway-typecheck model-gateway-test-contracts model-gateway-test-terminal model-gateway-validate model-gateway-prebuild model-gateway-build model-gateway-metadata-build model-gateway-metadata-build-plan model-gateway-metadata-build-preview model-gateway-catalog-integrity model-gateway-redaction-audit model-gateway-selection-audit model-gateway-effective-selection model-gateway-effective-selection-trace model-gateway-selection-trace-diff model-gateway-selection-trace-retention model-gateway-runtime-selector model-gateway-auto-status model-gateway-auto-plan model-gateway-auto-ready model-gateway-auto-doctor model-gateway-auto-explain model-gateway-auto-handoffs model-gateway-auto-confirmations model-gateway-auto-scenarios model-gateway-live-readiness model-gateway-live-auto-probe model-gateway-live-llm-b model-gateway-refresh model-gateway-refresh-preview model-gateway-refresh-plan model-gateway-refresh-provider model-gateway-refresh-log model-gateway-refresh-log-sqlite model-gateway-runtime-health-diff model-gateway-runtime-health-mirror model-gateway-sqlite-diagnostics model-gateway-sqlite-retention model-gateway-sqlite-retention-apply model-gateway-terminal
 
 model-gateway-help: model-gateway-commands
 
@@ -1554,6 +1555,9 @@ model-gateway-live-llm-b:
 
 model-gateway-live-plan:
 	@$(NPM) run model-gateway:live:plan
+
+model-gateway-live-auto-probe:
+	@$(NPM) run model-gateway:live:auto-probe
 
 model-gateway-refresh:
 	@$(NPM) run model-gateway:refresh

@@ -363,6 +363,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Run the BYOK control-plane live test against a local OpenAI-compatible fixture.',
     },
     {
+        id: 'live.terminal.auto-probe',
+        phase: 'live-readiness',
+        surface: 'package',
+        command: 'npm run model-gateway:live:auto-probe',
+        summary: 'Run the terminal auto-mode cockpit probe without opening a model turn or calling providers.',
+    },
+    {
         id: 'live.terminal.byok-real-no-pr',
         phase: 'live-readiness',
         surface: 'package',
@@ -631,6 +638,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-live-plan',
         summary: 'Makefile alias for the no-runtime terminal live-test plan.',
+    },
+    {
+        id: 'make.live-auto-probe',
+        phase: 'live-readiness',
+        surface: 'make',
+        command: 'make model-gateway-live-auto-probe',
+        summary: 'Makefile alias for the terminal auto-mode cockpit probe.',
     },
     {
         id: 'terminal.commands',
