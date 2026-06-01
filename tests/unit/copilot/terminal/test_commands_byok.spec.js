@@ -3024,15 +3024,19 @@ describe('terminal /byok command', () => {
         const handoffsCtx = mockCtx();
         const confirmationsCtx = mockCtx();
         const recoveriesCtx = mockCtx();
+        const fixtureCtx = mockCtx();
 
         await cmdByok({ println: handoffsCtx.println }, 'auto handoffs 5');
         await cmdByok({ println: confirmationsCtx.println }, 'auto confirmations 5');
+        await cmdByok({ println: fixtureCtx.println }, 'auto recovery-fixture profile:repo_agent failure:rate-limit');
         await cmdByok({ println: recoveriesCtx.println }, 'auto recoveries 5');
 
         expect(handoffsCtx.output()).toContain('BYOK model-gateway auto handoffs');
         expect(handoffsCtx.output()).toContain('boot_scheduled');
         expect(confirmationsCtx.output()).toContain('BYOK model-gateway auto confirmations');
         expect(confirmationsCtx.output()).toContain('matched_handoff');
+        expect(fixtureCtx.output()).toContain('BYOK model-gateway auto recovery fixture');
+        expect(fixtureCtx.output()).toContain('providerCall=nao');
         expect(recoveriesCtx.output()).toContain('BYOK model-gateway auto recoveries');
         expect(recoveriesCtx.output()).toContain('rate-limit');
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
@@ -3198,7 +3202,7 @@ describe('terminal /byok command', () => {
             }),
         );
         expect(result.controllerStep?.phase).toBe('post_turn');
-        expect(result.application?.skipped).toEqual(
+        expect(result.application?.applied).toEqual(
             expect.arrayContaining([expect.objectContaining({ kind: 'replan_after_turn_failure' })]),
         );
         expect(result.effectPersistence).toEqual(

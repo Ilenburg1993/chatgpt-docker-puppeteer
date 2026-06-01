@@ -119,6 +119,7 @@ import {
     isSameTerminalByokProviderBoundary,
     parseTerminalByokGatewayAutoArgs,
     persistTerminalByokGatewayAutoEffectApplications,
+    runTerminalByokGatewayPostTurnAutomation,
 } from '../byok/index.js';
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
@@ -3541,6 +3542,65 @@ async function renderByokGatewayAutoRecoveries(println, rest) {
 }
 
 /**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayAutoRecoveryFixture(println, rest) {
+    const args = parseTerminalByokGatewayAutoArgs(
+        rest.filter(
+            (item) =>
+                !/^(?:recovery-fixture|fixture-recovery|fixture|simulate|simular)$/iu.test(item) &&
+                !/^(?:failure|kind|failureKind|failure-kind)[:=]/iu.test(item),
+        ),
+    );
+    const failureKindToken = rest.find((item) => /^(?:failure|kind|failureKind|failure-kind)[:=]/iu.test(item));
+    const failureKind = optionalScalarString(failureKindToken?.replace(/^(?:failure|kind|failureKind|failure-kind)[:=]/iu, '')) ?? 'rate-limit';
+    const fixtureEnv = {
+        ...process.env,
+        COPILOT_BYOK_GATEWAY_AUTO: 'true',
+        COPILOT_BYOK_GATEWAY_AUTO_PROFILES: args.profileId,
+        COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LIVE_SET_MODEL: 'false',
+        COPILOT_BYOK_GATEWAY_AUTO_ALLOW_NEW_SESSION: 'false',
+        COPILOT_BYOK_GATEWAY_AUTO_ALLOW_PROVIDER_PROBES: 'false',
+        COPILOT_BYOK_GATEWAY_AUTO_ACCOUNT_WIDE_FAILURE_KINDS: 'rate-limit,credits,quota',
+    };
+    const result = await runTerminalByokGatewayPostTurnAutomation(
+        {
+            profile: args.profileId,
+            provider: 'fixture-provider',
+            model: 'fixture/model-recovery',
+            failureKind,
+            message: `fixture ${failureKind} failure for model-gateway post-turn recovery`,
+            errorContext: 'terminal.byok.auto_recovery_fixture',
+        },
+        { env: fixtureEnv },
+    );
+    println('\n  \x1b[36mBYOK model-gateway auto recovery fixture\x1b[0m');
+    println(
+        `  \x1b[90mprofile=${args.profileId} · failure=${failureKind} · ran=${result.ran ? 'sim' : 'nao'} · providerCall=nao\x1b[0m`,
+    );
+    if (result.ran !== true || !result.status) {
+        println('    \x1b[33mFixture não executou; verifique policy e snapshot ativo.\x1b[0m\n');
+        return;
+    }
+    const applied = result.application?.applied ?? [];
+    const skipped = result.application?.skipped ?? [];
+    println(
+        `    decision:      \x1b[33maction=${result.status.decision.action} · route=${result.status.decision.selectedRouteKey ?? '-'}\x1b[0m`,
+    );
+    println(
+        `    effects:       \x1b[33mapplied=${applied.length} · skipped=${skipped.length} · persisted=${result.effectPersistence?.automationEffectApplications ?? 0}\x1b[0m`,
+    );
+    println(
+        `    recoveries:    \x1b[33m${result.effectPersistence?.recoveryAttempts ?? 0}\x1b[0m`,
+    );
+    const details = [...applied, ...skipped].map(describeTerminalByokGatewayAutoEffect).slice(0, 5);
+    if (details.length > 0) println(`    detalhe:       \x1b[90m${details.join('; ')}\x1b[0m`);
+    println('  \x1b[90mUse /byok auto recoveries 10 para ler o ledger persistido.\x1b[0m\n');
+}
+
+/**
  * @param {boolean} value
  * @returns {string}
  */
@@ -4576,6 +4636,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayAutoConfirmations(println, rest);
             return;
         }
+        if (rest.some((item) => /^(recovery-fixture|fixture-recovery|simulate-recovery|simular-recovery)$/iu.test(item))) {
+            await renderByokGatewayAutoRecoveryFixture(println, rest);
+            return;
+        }
         if (rest.some((item) => /^(recoveries|recovery|recuperacoes|recuperações|post-turn)$/iu.test(item))) {
             await renderByokGatewayAutoRecoveries(println, rest);
             return;
@@ -4625,6 +4689,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             }
             if (autoRest.some((item) => /^(confirmations|confirmation|confirmacoes|confirmações|model-changed)$/iu.test(item))) {
                 await renderByokGatewayAutoConfirmations(println, autoRest);
+                return;
+            }
+            if (autoRest.some((item) => /^(recovery-fixture|fixture-recovery|simulate-recovery|simular-recovery)$/iu.test(item))) {
+                await renderByokGatewayAutoRecoveryFixture(println, autoRest);
                 return;
             }
             if (autoRest.some((item) => /^(recoveries|recovery|recuperacoes|recuperações|post-turn)$/iu.test(item))) {

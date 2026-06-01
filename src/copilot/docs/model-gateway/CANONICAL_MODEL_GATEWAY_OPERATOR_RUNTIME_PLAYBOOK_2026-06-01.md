@@ -202,6 +202,7 @@ Responsavel pela experiencia viva do operador:
 /byok auto switch profile:repo_agent
 /byok auto handoffs 10
 /byok auto confirmations 10
+/byok auto recovery-fixture profile:repo_agent failure:rate-limit
 /byok auto recoveries 10
 /byok auto off
 ```
@@ -344,6 +345,7 @@ Esse probe abre o terminal real e valida o cockpit de auto-mode:
 - `/byok auto history 10`;
 - `/byok auto handoffs 10`;
 - `/byok auto confirmations 10`;
+- `/byok auto recovery-fixture profile:repo_agent failure:rate-limit`;
 - `/byok auto recoveries 10`;
 - `/events`;
 - `/errors`.
@@ -355,17 +357,19 @@ Evidencia em 2026-06-01:
 - status: PASS;
 - artefato inicial: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`;
 - artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-57-46-528Z/summary.md`;
-- duracao mais recente: 28529ms;
+- artefato com recovery fixture final: `artifacts/terminal-live/2026-06-01T23-09-22-745Z/summary.md`;
+- duracao mais recente: 17611ms;
 - erros rastreados: 0;
-- criterios PASS mais recentes: 26;
-- inventario canonico exibiu 133 comandos apos recovery ledger;
+- criterios PASS mais recentes: 27;
+- inventario canonico exibiu 134 comandos apos recovery fixture;
 - `/byok auto policy` funcionou;
 - `/byok auto status profile:repo_agent` funcionou;
 - `/byok auto doctor profile:repo_agent` funcionou;
 - `/byok auto explain profile:repo_agent` funcionou;
-- ledgers history/handoffs/confirmations/recoveries renderizaram corretamente.
-- ledger de live scenarios gravou `terminal-live:2026-06-01T22-57-46-546Z:auto_probe`;
-- `npm run model-gateway:live:runs` leu 3 runs persistidos e confirmou `criteriaTotal=26` no ultimo.
+- `/byok auto recovery-fixture profile:repo_agent failure:rate-limit` gravou recovery account-wide sem chamada ao provider;
+- ledgers history/handoffs/confirmations/recoveries renderizaram corretamente;
+- ledger de live scenarios gravou `terminal-live:2026-06-01T23-09-22-754Z:auto_probe`;
+- `npm run model-gateway:live:runs` leu 5 runs persistidos e confirmou `criteriaTotal=27` no ultimo.
 
 ### 5.6 BYOK real no-PR
 
@@ -438,6 +442,7 @@ Depois reiniciar a task/sessao conforme a mensagem do terminal quando houver reb
 /byok auto switch profile:repo_agent
 /byok auto handoffs 10
 /byok auto confirmations 10
+/byok auto recovery-fixture profile:repo_agent failure:rate-limit
 /byok auto recoveries 10
 ```
 
@@ -526,6 +531,7 @@ Isso cria overlay temporario com reset/cooldown.
 - [ ] `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000` passa.
 - [x] `npm run model-gateway:live:auto-probe` passa.
 - [x] `npm run model-gateway:live:runs` mostra o ultimo auto-probe persistido.
+- [x] `/byok auto recovery-fixture profile:repo_agent failure:rate-limit` persiste recovery sem provider call.
 - [x] `/byok auto doctor profile:repo_agent` passa no terminal.
 - [ ] `byok-real-no-pr` passa quando o operador permitir gasto de quota BYOK.
 - [ ] `byok-real-full` passa quando o operador permitir turno real.

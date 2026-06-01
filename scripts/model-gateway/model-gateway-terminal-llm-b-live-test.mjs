@@ -194,6 +194,7 @@ function buildAutoProbeCommands({ profile = 'repo_agent' } = {}) {
         '/byok auto history 10',
         '/byok auto handoffs 10',
         '/byok auto confirmations 10',
+        `/byok auto recovery-fixture profile:${routeProfile} failure:rate-limit`,
         '/byok auto recoveries 10',
         '/events 40',
         '/events 80 --raw',
@@ -2319,8 +2320,13 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
             detail: '/byok auto confirmations rendered SDK confirmation ledger or empty state',
         },
         {
+            id: 'auto-recovery-fixture-visible',
+            pass: /BYOK model-gateway auto recovery fixture/.test(plain) && /providerCall=nao/.test(plain),
+            detail: '/byok auto recovery-fixture ran synthetic post-turn recovery without provider call',
+        },
+        {
             id: 'auto-recoveries-visible',
-            pass: /BYOK model-gateway auto recoveries/.test(plain),
+            pass: /BYOK model-gateway auto recoveries/.test(plain) && /rate-limit/.test(plain),
             detail: '/byok auto recoveries rendered post-turn recovery ledger or empty state',
         },
         {

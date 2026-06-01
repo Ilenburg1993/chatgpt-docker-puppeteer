@@ -205,6 +205,10 @@ export async function applyTerminalByokGatewayAutoEffects(controllerStep) {
             skipped.push({ ...effect, skippedReason: 'effect_not_authorized' });
             continue;
         }
+        if (effect['kind'] === 'replan_after_turn_failure') {
+            applied.push({ ...effect, applied: true, terminalMutation: false });
+            continue;
+        }
         if (effect['kind'] === 'set_live_model' && typeof effect['model'] === 'string' && effect['model'].trim()) {
             setTerminalModelProjection(effect['model']);
             applied.push({ ...effect, applied: true });

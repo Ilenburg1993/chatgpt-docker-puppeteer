@@ -77,6 +77,7 @@ Playbook operacional ativo para humano/LLM:
 - [x] `/byok auto handoffs`.
 - [x] `/byok auto confirmations`.
 - [x] `/byok auto recoveries`.
+- [x] `/byok auto recovery-fixture`.
 - [x] Post-turn controller automatico roda quando a policy esta ligada.
 
 ### 2.4 SDK boundary
@@ -421,15 +422,17 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] Comando: `npm run model-gateway:live:auto-probe`.
 - [x] Artefato inicial: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`.
 - [x] Artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-57-46-528Z/summary.md`.
+- [x] Artefato com recovery fixture final: `artifacts/terminal-live/2026-06-01T23-09-22-745Z/summary.md`.
 - [x] Resultado: PASS.
 - [x] Terminal error tracker: 0.
 - [x] Sem turno explicito de modelo.
-- [x] `/byok gateway commands` mostrou inventario canonico com 133 comandos apos incluir recovery ledger.
+- [x] `/byok gateway commands` mostrou inventario canonico com 134 comandos apos incluir recovery fixture.
 - [x] `/byok auto policy` mostrou policy efetiva.
 - [x] `/byok auto status profile:repo_agent` mostrou decision sem aplicar efeito.
 - [x] `/byok auto doctor profile:repo_agent` mostrou policy, decision, ledgers e blockers.
 - [x] `/byok auto explain profile:repo_agent` explicou action/blockers/next commands.
+- [x] `/byok auto recovery-fixture profile:repo_agent failure:rate-limit` persistiu recovery account-wide sem provider call.
 - [x] `/byok auto history`, `/byok auto handoffs`, `/byok auto confirmations` e `/byok auto recoveries` renderizaram ledger/empty state.
-- [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-01T22-57-46-546Z:auto_probe`.
-- [x] `npm run model-gateway:live:runs` leu 3 registros persistidos e o ultimo com `criteriaTotal=26`.
-- [x] `npm run model-gateway:auto:doctor` mostrou `schema=10`, `commands=133`, `recoveries=0` e `liveRuns=3`.
+- [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-01T23-09-22-754Z:auto_probe`.
+- [x] `npm run model-gateway:live:runs` leu 5 registros persistidos e o ultimo com `criteriaTotal=27`.
+- [x] `npm run model-gateway:auto:doctor` mostrou `schema=10`, `commands=134`, `recoveries=2` e `liveRuns=5`.

@@ -773,6 +773,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Read the latest post-turn recovery attempts created after BYOK failures.',
     },
     {
+        id: 'terminal.auto-recovery-fixture',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto recovery-fixture profile:repo_agent failure:rate-limit',
+        summary: 'Persist a synthetic post-turn recovery attempt without calling providers, for operator/live validation.',
+    },
+    {
         id: 'terminal.auto-off',
         phase: 'automation',
         surface: 'terminal',

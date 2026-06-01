@@ -84,11 +84,13 @@ No terminal:
 /byok auto status profile:repo_agent
 /byok auto record profile:repo_agent
 /byok auto apply profile:repo_agent allow-live-set-model
+/byok auto recovery-fixture profile:repo_agent failure:rate-limit
 /byok auto off
 ```
 
 `apply` só executa efeitos que a policy autorizou. Troca live de modelo é limitada à mesma boundary BYOK; troca de
 provider/perfil exige novo boot de sessão SDK.
+`recovery-fixture` simula uma falha post-turn account-wide, grava o ledger de recovery e não chama provider.
 
 ## Live Tests
 

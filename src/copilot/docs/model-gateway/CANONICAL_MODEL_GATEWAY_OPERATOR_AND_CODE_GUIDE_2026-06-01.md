@@ -212,7 +212,7 @@ Regras:
 
 ## 5. Comandos Canonicos
 
-Inventario atual: 133 comandos.
+Inventario atual: 134 comandos.
 
 Distribuicao por fase:
 
@@ -223,7 +223,7 @@ Distribuicao por fase:
 - pre-runtime: 13
 - selection: 17
 - live-readiness: 17
-- automation: 32
+- automation: 33
 
 Comandos de orientacao:
 
@@ -262,6 +262,7 @@ Comandos terminal equivalentes:
 /byok auto history 10
 /byok auto handoffs 10
 /byok auto confirmations 10
+/byok auto recovery-fixture profile:repo_agent failure:rate-limit
 /byok auto recoveries 10
 ```
 
@@ -307,8 +308,9 @@ Variaveis principais:
 5. No terminal, rodar `/byok auto doctor profile:repo_agent`.
 6. Se houver blocker, corrigir a camada apontada.
 7. Se quiser auto, usar `/byok auto on ...`.
-8. Se uma falha BYOK ocorrer, consultar `/byok auto recoveries 10` e `/byok gateway health sqlite`.
-9. Antes de BYOK real, rodar live control e fixture.
+8. Antes de BYOK real, validar recovery sem provider call com `/byok auto recovery-fixture profile:repo_agent failure:rate-limit`.
+9. Se uma falha BYOK ocorrer, consultar `/byok auto recoveries 10` e `/byok gateway health sqlite`.
+10. Antes de BYOK real, rodar live control e fixture.
 
 ## 8. Escada De Testes Live
 
@@ -351,20 +353,20 @@ npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_a
 
 Validado nesta linha:
 
-- `npm run model-gateway:commands:json`: 133 comandos.
-- `npm run model-gateway:auto:recoveries`: PASS, read-only, rows=0.
-- `npm run model-gateway:auto:doctor`: PASS, schema=10, recoveries=0, liveRuns=3.
+- `npm run model-gateway:commands:json`: 134 comandos.
+- `npm run model-gateway:auto:recoveries`: PASS, read-only, rows=2, recovery fixture `rate-limit` aplicada.
+- `npm run model-gateway:auto:doctor`: PASS, schema=10, recoveries=2, liveRuns=5.
 - `npm run model-gateway:auto:scenarios`: PASS, inclui `auto_recoveries`.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`: 215 PASS.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js`: 97 PASS.
 - `npm run model-gateway:live:auto-probe`: PASS.
-- Artefato live: `artifacts/terminal-live/2026-06-01T22-57-46-528Z/summary.md`.
-- `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-01T22-57-46-546Z:auto_probe`, `criteriaTotal=26`, `criteriaFailed=0`.
+- Artefato live: `artifacts/terminal-live/2026-06-01T23-09-22-745Z/summary.md`.
+- `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-01T23-09-22-754Z:auto_probe`, `criteriaTotal=27`, `criteriaFailed=0`.
 - `npm run model-gateway:lint`: PASS.
 
 ## 10. Proximas Lacunas De Alto Retorno
 
-- Criar fixture live de post-turn failure/cooldown/fallback que grave recovery attempts reais.
+- Expandir fixture live de post-turn failure/cooldown/fallback para mais failure kinds e fallback profiles.
 - Criar fixture live de pre-turn apply dentro da mesma boundary.
 - Criar fixture live de `session.model_changed` correlacionada com handoff.
 - Criar cockpit visual preparado/live/confirmed mais explicito.
@@ -386,4 +388,3 @@ Checklist para cada mudanca:
 - [ ] Live probe cobre a UX quando o operador precisa ver o comando no terminal.
 - [ ] Documentos ativos foram atualizados.
 - [ ] Segredos continuam redigidos.
-
