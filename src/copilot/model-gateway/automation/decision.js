@@ -123,6 +123,31 @@ function policyBlockers(route, options) {
 }
 
 /**
+ * @param {string | null} routeProfile
+ * @param {string[]} blockers
+ * @param {boolean} wait
+ * @returns {string[]}
+ */
+function blockedRouteNextCommands(routeProfile, blockers, wait) {
+    if (wait) return ['npm run model-gateway:runtime-health:diff', 'npm run model-gateway:runtime-selector -- --fail'];
+    const profile = routeProfile || 'repo_agent';
+    const needsRuntimeProofPlan = blockers.some((blocker) =>
+        /selected_route_missing|runtime_selector_route_blocked|runtime_health|runtime_probe|runtime_proof|provider_health_cooldown/iu.test(
+            blocker,
+        ),
+    );
+    return [
+        ...(needsRuntimeProofPlan
+            ? [
+                  `npm run model-gateway:auto:proof-plan -- --profile=${profile} --limit=12`,
+                  `/byok auto proof-plan profile:${profile} 12`,
+              ]
+            : []),
+        'npm run model-gateway:selection:audit -- --strict',
+    ];
+}
+
+/**
  * @param {Record<string, unknown> | null | undefined} route
  * @param {Record<string, unknown> | null | undefined} turnFailure
  * @returns {boolean}
@@ -303,7 +328,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             cooldown,
             blockerClass: currentBlockerClass,
             nonActionReason: sameRouteFailure !== null ? 'same_route_failed_this_turn' : wait ? 'route_wait_for_reset' : 'route_blocked',
-            nextCommands: wait ? ['npm run model-gateway:runtime-health:diff', 'npm run model-gateway:runtime-selector -- --fail'] : ['npm run model-gateway:selection:audit -- --strict'],
+            nextCommands: blockedRouteNextCommands(routeProfile, blockers, wait),
             operatorSummary: wait
                 ? 'Rota bloqueada por health/cooldown ou falha recente; aguarde reset ou escolha outra rota.'
                 : sameRouteFailure !== null

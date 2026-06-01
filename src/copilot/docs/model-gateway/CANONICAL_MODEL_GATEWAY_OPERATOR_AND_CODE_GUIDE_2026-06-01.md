@@ -223,7 +223,8 @@ Distribuicao por fase:
 - pre-runtime: 13
 - selection: 17
 - live-readiness: 17
-- automation: 33
+- automation: 35
+- runtime-probes: 1
 
 Comandos de orientacao:
 
@@ -242,6 +243,11 @@ npm run model-gateway:auto:proof-plan
 npm run model-gateway:auto:scenarios
 npm run model-gateway:sqlite:diagnostics
 ```
+
+Quando `auto:ready` ou a decisao de automacao bloquear uma rota por falta de prova runtime, health bloqueada,
+rota ausente ou prova falha, o primeiro proximo passo canonico deve ser `model-gateway:auto:proof-plan` ou
+`/byok auto proof-plan`. Isso preserva a separacao entre selecao por metadados, prova runtime planejada e chamada
+real de provider.
 
 Comandos de ledgers:
 

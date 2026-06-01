@@ -17,6 +17,7 @@ export const MODEL_GATEWAY_CANONICAL_COMMAND_PHASES = Object.freeze([
     'pre-runtime',
     'selection',
     'automation',
+    'runtime-probes',
     'live-readiness',
     'validate',
     'prebuild',

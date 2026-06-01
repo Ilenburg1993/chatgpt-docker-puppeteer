@@ -1270,6 +1270,18 @@ describe('model-gateway foundation', () => {
         assert.equal(strictRuntimeSelectorPlan.ready, true);
         assert.equal(strictRuntimeSelectorPlan.summary.selectedProfileCount, 1);
         assert.equal(strictRuntimeSelectorPlan.summary.blockedProfileCount, 1);
+        const runtimeProofBlockedDecision = buildModelGatewayRuntimeAutomationDecision({
+            runtimeSelectorPlan: strictRuntimeSelectorPlan,
+            profileId: 'tool_agent',
+        });
+        assert.equal(runtimeProofBlockedDecision.ok, false);
+        assert.equal(runtimeProofBlockedDecision.action, 'manual_intervention');
+        assert.equal(runtimeProofBlockedDecision.blockers.includes('blocked:runtime_proof_required'), true);
+        assert.equal(
+            runtimeProofBlockedDecision.nextCommands.includes('npm run model-gateway:auto:proof-plan -- --profile=tool_agent --limit=12'),
+            true,
+        );
+        assert.equal(runtimeProofBlockedDecision.nextCommands.includes('/byok auto proof-plan profile:tool_agent 12'), true);
 
         const keepDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan,

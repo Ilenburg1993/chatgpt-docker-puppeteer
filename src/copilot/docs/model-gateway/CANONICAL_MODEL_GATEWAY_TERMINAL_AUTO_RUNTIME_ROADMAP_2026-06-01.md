@@ -59,6 +59,7 @@ Playbook operacional ativo para humano/LLM:
 - [x] `model-gateway:auto:recoveries`.
 - [x] `model-gateway:auto:proof-plan`.
 - [x] `model-gateway:live:runs`.
+- [x] Inventario canonico registra a fase `runtime-probes`.
 
 ### 2.3 Terminal
 
@@ -70,6 +71,7 @@ Playbook operacional ativo para humano/LLM:
 - [x] `/byok auto off` desliga policy persistente.
 - [x] `/byok auto policy` mostra policy efetiva.
 - [x] `/byok auto proof-plan` lista comandos explicitos de prova runtime por provider/model.
+- [x] Decisao auto bloqueada por prova runtime/health/rota ausente aponta para `auto:proof-plan` antes de qualquer chamada real de provider.
 - [x] Pre-turn auto roda quando policy esta ligada.
 - [x] Pre-turn persiste decision, effect applications e handoffs.
 - [x] `prepare_new_sdk_session` agenda novo boot SDK quando autorizado.

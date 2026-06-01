@@ -188,6 +188,10 @@ npm run model-gateway:live:runs
 Regra: `auto:status`, `auto:ready`, `auto:doctor`, `auto:explain`, `auto:handoffs`, `auto:confirmations`,
 `auto:recoveries`, `auto:proof-plan` e `auto:scenarios` nao devem chamar provider nem mutar terminal.
 
+Regra de bloqueio: quando a decisao auto encontra `runtime_proof_required`, rota bloqueada, health runtime falha
+ou candidato sem selecao, os `nextCommands` devem apontar primeiro para `model-gateway:auto:proof-plan` e para
+`/byok auto proof-plan`, antes de qualquer prova live explicita.
+
 ### 3.6 Terminal
 
 Responsavel pela experiencia viva do operador:
