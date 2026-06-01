@@ -43,6 +43,32 @@ function optionalScalarString(value) {
 }
 
 /**
+ * @param {Record<string, unknown>} effect
+ * @returns {string}
+ */
+export function describeTerminalByokGatewayAutoEffect(effect) {
+    const kind = optionalScalarString(effect['kind']) ?? 'unknown_effect';
+    const model = optionalScalarString(effect['model']);
+    const skippedReason = optionalScalarString(effect['skippedReason']);
+    if (effect['applied'] === true && kind === 'set_live_model') {
+        return model ? `modelo vivo atualizado para ${model}` : 'modelo vivo atualizado';
+    }
+    if (effect['applied'] === true && kind === 'prepare_new_sdk_session') {
+        return model ? `novo boot SDK preparado para ${model}` : 'novo boot SDK preparado';
+    }
+    if (effect['applied'] === true && kind === 'replan_after_turn_failure') {
+        return `replanejamento pos-falha registrado (${optionalScalarString(effect['failureKind']) ?? 'unknown_failure'})`;
+    }
+    if (skippedReason === 'effect_not_authorized') {
+        return `efeito ${kind} aguardando autorizacao da policy`;
+    }
+    if (skippedReason) {
+        return `efeito ${kind} nao aplicado (${skippedReason})`;
+    }
+    return `efeito ${kind}`;
+}
+
+/**
  * @param {string[]} rest
  * @param {{ env?: NodeJS.ProcessEnv; policy?: ReturnType<typeof readModelGatewayRuntimeAutomationPolicy> }} [options]
  * @returns {{ profileId: string; allowLiveSetModel: boolean; allowNewSession: boolean; allowLocalPrivate: boolean }}

@@ -79,7 +79,7 @@ O guia anterior continua como historico:
 - [x] `session.model_changed` tenta correlacionar com handoff pendente.
 - [x] Confirmation do modelo vivo e persistida.
 - [x] Mismatch inicial e persistido como status operacional.
-- [ ] Falta mostrar linha curta "auto trocou" ou "auto preparou novo boot".
+- [x] Terminal mostra linha curta para modelo vivo atualizado, boot SDK preparado e detalhe pos-falha.
 
 ### 2.5 Falhas, quotas e recovery
 
@@ -238,8 +238,8 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] D.4 Effects executor.
 - [x] D.5 Persistence.
 - [x] D.6 Activity log curto.
-- [ ] D.7 Linha terminal explicita quando modelo e trocado.
-- [ ] D.8 Linha terminal explicita quando handoff e preparado.
+- [x] D.7 Linha terminal explicita quando modelo e trocado.
+- [x] D.8 Linha terminal explicita quando handoff e preparado.
 - [ ] D.9 Anti-loop pre-turn para mesma decision.
 - [ ] D.10 Teste fixture de pre-turn.
 
@@ -253,7 +253,7 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] E.6 Persistir recovery decision.
 - [x] E.7 Persistir recovery effect application.
 - [x] E.8 Evitar loop no mesmo provider/modelo.
-- [ ] E.9 Mostrar acao pos-falha no terminal.
+- [x] E.9 Mostrar acao pos-falha no terminal.
 - [ ] E.10 Teste fixture de falha e fallback.
 
 ### Faixa F - SDK Session Confirmation

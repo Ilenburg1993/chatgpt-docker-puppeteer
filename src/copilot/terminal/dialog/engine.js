@@ -55,6 +55,7 @@ import {
     TERMINAL_BYOK_ADMISSION_MODE_ENV,
     evaluateTerminalByokTurnBudget,
     readTerminalByokAdmissionMode,
+    describeTerminalByokGatewayAutoEffect,
     runTerminalByokGatewayPostTurnAutomation,
     runTerminalByokGatewayPreTurnAutomation,
 } from '../byok/index.js';
@@ -310,6 +311,12 @@ async function printByokAutoAfterFailureHint(byokFailure) {
         println(
             `\x1b[90m       auto pós-falha: action=${result.status.decision.action} · route=${result.status.decision.selectedRouteKey ?? '-'} · applied=${applied} · skipped=${skipped} · effects=${persistedEffects} · handoffs=${handoffs}\x1b[0m`,
         );
+        const effectDetails = [...(result.application?.applied ?? []), ...(result.application?.skipped ?? [])]
+            .map(describeTerminalByokGatewayAutoEffect)
+            .slice(0, 4);
+        if (effectDetails.length > 0) {
+            println(`\x1b[90m       auto pós-falha detalhe: ${effectDetails.join('; ')}\x1b[0m`);
+        }
     } catch (error) {
         println(
             `\x1b[90m       auto: falha ao replanejar pós-falha (${error instanceof Error ? error.message : String(error)}); use /byok auto record profile:${profile}.\x1b[0m`,
@@ -338,7 +345,7 @@ async function runByokGatewayPreTurnAutomation() {
         });
         if (applied.length > 0) {
             println(
-                `\x1b[90m  ↳ model-gateway auto aplicou ${applied.length} efeito(s): ${applied.map((item) => String(item['kind'] ?? 'effect')).join(', ')}\x1b[0m`,
+                `\x1b[90m  ↳ model-gateway auto: ${applied.map(describeTerminalByokGatewayAutoEffect).join('; ')}\x1b[0m`,
             );
             return;
         }

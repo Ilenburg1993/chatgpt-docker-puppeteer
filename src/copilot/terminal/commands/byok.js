@@ -112,6 +112,7 @@ import {
     applyTerminalByokGatewayAutoEffects,
     buildTerminalByokGatewayAutoStatus,
     classifyTerminalByokSdkBinding,
+    describeTerminalByokGatewayAutoEffect,
     evaluateTerminalByokProbeBudget,
     isSameTerminalByokProviderBoundary,
     parseTerminalByokGatewayAutoArgs,
@@ -3638,21 +3639,11 @@ async function applyByokGatewayAutoEffects(println, controllerStep) {
         return application;
     }
     for (const effect of application.applied) {
-        if (effect['kind'] === 'set_live_model' && typeof effect['model'] === 'string' && effect['model'].trim()) {
-            println(`  \x1b[32mAuto apply solicitou setModel vivo para ${effect['model']}.\x1b[0m`);
-            continue;
-        }
-        println(`  \x1b[32mAuto apply executou efeito terminal: ${String(effect['kind'] ?? 'unknown')}.\x1b[0m`);
+        println(`  \x1b[32mAuto apply: ${describeTerminalByokGatewayAutoEffect(effect)}.\x1b[0m`);
     }
     for (const effect of application.skipped) {
-        if (effect['kind'] === 'prepare_new_sdk_session') {
-            println(
-                '  \x1b[32mAuto apply agendou /session sdk next new para o próximo boot.\x1b[0m',
-            );
-            continue;
-        }
         if (effect['skippedReason'] === 'effect_not_authorized') continue;
-        println(`  \x1b[33mEfeito auto sem executor terminal: ${String(effect['kind'] ?? 'unknown')}.\x1b[0m`);
+        println(`  \x1b[33mAuto apply: ${describeTerminalByokGatewayAutoEffect(effect)}.\x1b[0m`);
     }
     println('');
     return application;

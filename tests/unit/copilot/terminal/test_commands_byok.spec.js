@@ -1275,6 +1275,7 @@ const {
     applyTerminalByokGatewayAutoEffects,
     createTerminalByokGatewayAutoEffectApplicationRecords,
     createTerminalByokGatewaySdkSessionHandoffRecords,
+    describeTerminalByokGatewayAutoEffect,
     runTerminalByokGatewayPostTurnAutomation,
     runTerminalByokGatewayPreTurnAutomation,
 } = await import('../../../../src/copilot/terminal/byok/gateway-auto.js');
@@ -2900,7 +2901,7 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'auto apply profile:repo_agent allow-live-set-model');
 
         expect(setTerminalModelProjection).toHaveBeenCalledWith('openai/gpt-oss-120b');
-        expect(ctx.output()).toContain('Auto apply solicitou setModel vivo');
+        expect(ctx.output()).toContain('Auto apply: modelo vivo atualizado para openai/gpt-oss-120b');
     });
 
     it('persiste auto on sem aplicar efeitos na sessao viva', async () => {
@@ -3047,6 +3048,12 @@ describe('terminal /byok command', () => {
         expect(setTerminalModelProjection).toHaveBeenCalledWith('anthropic/claude-sonnet-4.5');
         expect(scheduleTerminalSdkSessionBootSelection).toHaveBeenCalledWith({ mode: 'new' });
         expect(result.applied).toHaveLength(2);
+        expect(result.applied.map(describeTerminalByokGatewayAutoEffect)).toEqual(
+            expect.arrayContaining([
+                'modelo vivo atualizado para anthropic/claude-sonnet-4.5',
+                'novo boot SDK preparado para anthropic/claude-sonnet-4.5',
+            ]),
+        );
         expect(result.skipped).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({ kind: 'set_live_model', skippedReason: 'effect_not_authorized' }),
