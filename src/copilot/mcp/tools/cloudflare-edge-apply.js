@@ -28,14 +28,19 @@ export const mcpCloudflareEdgePolicyApplyTool = {
             .array(z.enum(['http_request_cache_settings', 'http_ratelimit']))
             .optional()
             .describe('Optional phases to include. Default: cache settings and rate limiting.'),
+        ruleRefs: z
+            .array(z.string().min(1))
+            .optional()
+            .describe('Optional rule refs to include. Required for targeted rate-limit apply.'),
     },
     annotations: boundedWriteAnnotations(),
-    handler: async ({ dryRun, confirmApply, phases }) =>
+    handler: async ({ dryRun, confirmApply, phases, ruleRefs }) =>
         okResult(
             await applyCloudflareEdgePolicy({
                 ...(typeof dryRun === 'boolean' ? { dryRun } : {}),
                 ...(typeof confirmApply === 'boolean' ? { confirmApply } : {}),
                 ...(Array.isArray(phases) ? { phases } : {}),
+                ...(Array.isArray(ruleRefs) ? { ruleRefs } : {}),
             }),
         ),
 };

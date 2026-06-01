@@ -11,6 +11,8 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { formatChatGptConnectorAuthentication } from '../connection/profile.js';
+import { auditCloudflareConfigPosture } from './config-audit.js';
+import { auditCloudflarePlanCapabilities } from './plan-capabilities-audit.js';
 import { readMcpAuthConfig } from '../control-plane/auth.js';
 import { getCanonicalMcpTools } from '../registry.js';
 import { createCloudflareEdgeBackup, listCloudflareEdgeBackups } from './edge-backup.js';
@@ -20,6 +22,9 @@ import { diffCloudflareEdgePolicy } from './edge-policy-diff.js';
 import { buildCloudflareEdgePolicyPlan } from './edge-policy-plan.js';
 import { buildCloudflareEdgeSnapshot } from './edge-snapshot.js';
 import { auditCloudflareRemoteTunnel } from './remote-api.js';
+import { applyCloudflareTunnelOriginPlan, buildCloudflareTunnelOriginPlan } from './tunnel-origin-plan.js';
+import { buildCloudflareMcpPassthroughPlan, diffCloudflareMcpPassthroughPlan } from './mcp-passthrough-plan.js';
+import { auditCloudflareSkipPosture } from './skip-audit.js';
 import {
     buildManagedTunnelArgs,
     buildQuickTunnelArgs,
@@ -54,6 +59,20 @@ try {
         await runSmoke();
     } else if (command === 'remote-audit') {
         await runRemoteAudit();
+    } else if (command === 'origin-plan') {
+        await runTunnelOriginPlan();
+    } else if (command === 'origin-apply') {
+        await runTunnelOriginApply();
+    } else if (command === 'config-audit') {
+        await runConfigAudit();
+    } else if (command === 'plan-capabilities-audit') {
+        await runPlanCapabilitiesAudit();
+    } else if (command === 'skip-audit') {
+        await runSkipAudit();
+    } else if (command === 'mcp-passthrough-plan') {
+        await runMcpPassthroughPlan();
+    } else if (command === 'mcp-passthrough-diff') {
+        await runMcpPassthroughDiff();
     } else if (command === 'edge-audit') {
         await runEdgeAudit();
     } else if (command === 'edge-policy-diff') {
@@ -82,7 +101,7 @@ try {
         );
     } else {
         fail(
-            `Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, remote-audit, edge-audit, edge-policy-diff, edge-policy-plan, edge-policy-apply, edge-snapshot, edge-backup-create, edge-backup-list, up, down, restart, or run.`,
+            `Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, remote-audit, origin-plan, origin-apply, config-audit, plan-capabilities-audit, skip-audit, mcp-passthrough-plan, mcp-passthrough-diff, edge-audit, edge-policy-diff, edge-policy-plan, edge-policy-apply, edge-snapshot, edge-backup-create, edge-backup-list, up, down, restart, or run.`,
         );
     }
 } catch (error) {
@@ -164,6 +183,7 @@ async function runStatus() {
     const permanentOk = config.mode === 'named-permanent' && configuredPublicUrlValidation?.ok === true;
     const managedProcess = await readPidFileStatus(config.managedTunnelPidFile);
     const mcpHttpProcess = await readPidFileStatus(config.mcpHttpPidFile);
+    const runtimeOrigin = await readRuntimeOriginSummary(config);
     const managedReady = permanentOk && managedProcess.alive === true && mcpHttpProcess.alive === true;
     const fallbackReady = quickTunnelSummary.stateValid && quickTunnelSummary.processAlive;
     const authentication = formatChatGptConnectorAuthentication(authConfig);
@@ -178,8 +198,9 @@ async function runStatus() {
                   configured: Boolean(config.publicMcpUrl),
                   connectorUrl: config.publicMcpUrl ?? null,
                   publicHostname: config.publicHostname,
-                  originUrl: config.originUrl,
-                  localMcpUrl: config.localMcpUrl,
+                  originUrl: runtimeOrigin.originUrl,
+                  localMcpUrl: runtimeOrigin.localMcpUrl,
+                  originTransport: runtimeOrigin.transport,
                   authentication,
                   metricsAddr: config.metricsAddr ?? null,
                   loglevel: config.loglevel,
@@ -207,12 +228,14 @@ async function runStatus() {
         permanentTunnel: {
             process: managedProcess,
             mcpHttpProcess,
+            runtimeOrigin,
             lastSmoke: connectorSmoke,
         },
         smokeStateFile: config.smokeStateFile,
         stateFile: config.stateFile,
-        originUrl: config.originUrl,
-        localMcpUrl: config.localMcpUrl,
+        originUrl: runtimeOrigin.originUrl,
+        localMcpUrl: runtimeOrigin.localMcpUrl,
+        originTransport: runtimeOrigin.transport,
         processAlive: config.mode === 'named-permanent' ? managedReady : quickTunnelSummary.processAlive,
         stalePolicy: {
             staleAfterMs: config.staleAfterMs,
@@ -247,6 +270,7 @@ async function runStatus() {
  * @returns {Promise<void>}
  */
 async function runSmoke() {
+    const compactOutput = process.env['COPILOT_MCP_SMOKE_COMPACT'] === '1';
     const config = readCloudflareTunnelConfig();
     const state = await readQuickTunnelState(config.stateFile);
     const connectorUrl = config.publicMcpUrl ?? (isQuickTunnelState(state) ? state.connectorUrl : undefined);
@@ -363,7 +387,7 @@ async function runSmoke() {
         missingCriticalTools,
         missingLocalTools,
         unexpectedRemoteTools,
-        remoteToolNames,
+        ...(compactOutput ? { remoteToolNamesSuppressed: true } : { remoteToolNames }),
     };
     const persistedToolsListSummary = {
         ok: toolsList.ok,
@@ -422,6 +446,69 @@ async function runSmoke() {
  */
 async function runRemoteAudit() {
     const report = await auditCloudflareRemoteTunnel();
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runTunnelOriginPlan() {
+    const report = await buildCloudflareTunnelOriginPlan();
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runTunnelOriginApply() {
+    const report = await applyCloudflareTunnelOriginPlan({
+        dryRun: process.env['COPILOT_MCP_CLOUDFLARE_ORIGIN_APPLY_DRY_RUN'] !== 'false',
+        confirmApply: process.env['COPILOT_MCP_CLOUDFLARE_ORIGIN_APPLY_CONFIRM'] === 'true',
+    });
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runConfigAudit() {
+    const report = await auditCloudflareConfigPosture();
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runSkipAudit() {
+    const report = await auditCloudflareSkipPosture();
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runPlanCapabilitiesAudit() {
+    const report = await auditCloudflarePlanCapabilities();
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (!report.ok) process.exitCode = 1;
+}
+
+async function runMcpPassthroughPlan() {
+    const report = await buildCloudflareMcpPassthroughPlan();
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runMcpPassthroughDiff() {
+    const report = await diffCloudflareMcpPassthroughPlan();
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     if (!report.ok) process.exitCode = 1;
 }
@@ -574,20 +661,47 @@ function summarizeOAuthReadiness(protectedResourceBody, oauthMetadataBody, authM
 }
 
 /**
+ * @param {import('./config.js').CloudflareTunnelConfig} config
+ * @returns {'http' | 'http2'}
+ */
+function selectMcpOriginTransport(config) {
+    const explicit = String(process.env['COPILOT_MCP_ORIGIN_TRANSPORT'] ?? '').trim().toLowerCase();
+    if (explicit === 'http' || explicit === 'http2') return explicit;
+    if (readBooleanEnv(process.env['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'], false)) return 'http2';
+    return config.originUrl.startsWith('https://') ? 'http2' : 'http';
+}
+
+/**
+ * @param {string | undefined} value
+ * @param {boolean} fallback
+ * @returns {boolean}
+ */
+function readBooleanEnv(value, fallback) {
+    const raw = String(value ?? '').trim().toLowerCase();
+    if (!raw) return fallback;
+    if (raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on') return true;
+    if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return false;
+    return fallback;
+}
+
+/**
  * @returns {Promise<void>}
  */
 async function runUp() {
     const config = readCloudflareTunnelConfig();
+    const originTransport = selectMcpOriginTransport(config);
+    await assertRemoteOriginReadyForTransport(originTransport);
     const mcpHttp = await ensureDetachedProcess({
         name: 'mcp-http',
         command: process.execPath,
-        args: ['src/copilot/mcp/index.js', '--transport', 'http'],
+        args: ['src/copilot/mcp/index.js', '--transport', originTransport],
         pidFile: config.mcpHttpPidFile,
         logFile: 'src/copilot/.ai/cloudflare/mcp-http.log',
         env: {
             COPILOT_MCP_PUBLIC_URL: config.publicMcpUrl ?? '',
             COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: config.publicMcpUrl ?? '',
             COPILOT_MCP_CLOUDFLARE_MODE: config.mode,
+            COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN: process.env['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'] ?? '',
             COPILOT_MCP_AUTH_MODE: process.env['COPILOT_MCP_AUTH_MODE'] ?? 'oauth',
             COPILOT_MCP_AUTH_ENFORCEMENT: process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] ?? 'all',
         },
@@ -611,9 +725,12 @@ async function runUp() {
                 ok: true,
                 mode: config.mode,
                 publicMcpUrl: config.publicMcpUrl,
+                origin: buildOriginRuntimeReport(config, originTransport),
+                logs: buildCloudflareLogReport(config),
+                metrics: buildCloudflareMetricsReport(config),
                 mcpHttp,
                 cloudflared,
-                next: ['npm run copilot:mcp:cloudflare:status', 'npm run copilot:mcp:cloudflare:smoke'],
+                next: buildNextActions(originTransport),
             },
             null,
             2,
@@ -636,6 +753,8 @@ async function runDown() {
  */
 async function runRestart() {
     const config = readCloudflareTunnelConfig();
+    const originTransport = selectMcpOriginTransport(config);
+    await assertRemoteOriginReadyForTransport(originTransport);
     const stopped = {
         cloudflared: await stopPidFileProcess(config.managedTunnelPidFile),
         mcpHttp: await stopPidFileProcess(config.mcpHttpPidFile),
@@ -643,13 +762,14 @@ async function runRestart() {
     const mcpHttp = await ensureDetachedProcess({
         name: 'mcp-http',
         command: process.execPath,
-        args: ['src/copilot/mcp/index.js', '--transport', 'http'],
+        args: ['src/copilot/mcp/index.js', '--transport', originTransport],
         pidFile: config.mcpHttpPidFile,
         logFile: 'src/copilot/.ai/cloudflare/mcp-http.log',
         env: {
             COPILOT_MCP_PUBLIC_URL: config.publicMcpUrl ?? '',
             COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: config.publicMcpUrl ?? '',
             COPILOT_MCP_CLOUDFLARE_MODE: config.mode,
+            COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN: process.env['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'] ?? '',
             COPILOT_MCP_AUTH_MODE: process.env['COPILOT_MCP_AUTH_MODE'] ?? 'oauth',
             COPILOT_MCP_AUTH_ENFORCEMENT: process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] ?? 'all',
         },
@@ -673,15 +793,93 @@ async function runRestart() {
                 ok: true,
                 mode: config.mode,
                 publicMcpUrl: config.publicMcpUrl,
+                origin: buildOriginRuntimeReport(config, originTransport),
+                logs: buildCloudflareLogReport(config),
+                metrics: buildCloudflareMetricsReport(config),
                 stopped,
                 mcpHttp,
                 cloudflared,
-                next: ['npm run copilot:mcp:cloudflare:status', 'npm run copilot:mcp:cloudflare:smoke'],
+                next: buildNextActions(originTransport),
             },
             null,
             2,
         )}\n`,
     );
+}
+
+/**
+ * @param {'http' | 'http2'} originTransport
+ * @returns {Promise<void>}
+ */
+async function assertRemoteOriginReadyForTransport(originTransport) {
+    if (originTransport !== 'http2') return;
+    const report = await auditCloudflareRemoteTunnel();
+    if (report.ok) return;
+    throw new Error(
+        [
+            'Refusing to start the local MCP origin in HTTPS/HTTP2 while the Cloudflare named tunnel remote origin is not ready.',
+            'This prevents the hybrid failure where cloudflared keeps proxying http://127.0.0.1:3333 to a TLS origin, causing 502/malformed HTTP responses.',
+            'Run npm run copilot:mcp:cloudflare:h2-origin-apply:dry-run, then npm run copilot:mcp:cloudflare:h2-origin-apply, then npm run copilot:mcp:cloudflare:h2-remote-audit, then retry npm run copilot:mcp:h2:restart.',
+            `Remote audit summary: ${JSON.stringify({ critical: report['critical'] ?? [], warnings: report['warnings'] ?? [] })}`,
+        ].join(' '),
+    );
+}
+
+/**
+ * @param {'http' | 'http2'} originTransport
+ * @returns {string[]}
+ */
+function buildNextActions(originTransport) {
+    const actions = ['npm run copilot:mcp:status'];
+    if (originTransport === 'http2') {
+        actions.push('npm run copilot:mcp:cloudflare:h2-remote-audit');
+    }
+    actions.push('npm run copilot:mcp:cloudflare:smoke');
+    actions.push('npm run copilot:mcp:logs');
+    return actions;
+}
+
+/**
+ * @param {import('./config.js').CloudflareTunnelConfig} config
+ * @param {'http' | 'http2'} originTransport
+ * @returns {Record<string, unknown>}
+ */
+function buildOriginRuntimeReport(config, originTransport) {
+    return {
+        transport: originTransport,
+        url: config.originUrl,
+        healthUrl: config.healthUrl,
+        localMcpUrl: config.localMcpUrl,
+        publicMcpUrl: config.publicMcpUrl ?? null,
+        serverName: config.originServerName ?? null,
+        cloudflareHttp2OriginRequested: readBooleanEnv(process.env['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'], false),
+        authMode: process.env['COPILOT_MCP_AUTH_MODE'] ?? 'oauth',
+        authEnforcement: process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] ?? 'all',
+    };
+}
+
+/**
+ * @param {import('./config.js').CloudflareTunnelConfig} config
+ * @returns {Record<string, string>}
+ */
+function buildCloudflareLogReport(config) {
+    void config;
+    return {
+        mcp: 'src/copilot/.ai/cloudflare/mcp-http.log',
+        cloudflared: 'src/copilot/.ai/cloudflare/cloudflared.log',
+    };
+}
+
+/**
+ * @param {import('./config.js').CloudflareTunnelConfig} config
+ * @returns {Record<string, unknown>}
+ */
+function buildCloudflareMetricsReport(config) {
+    return {
+        cloudflaredMetricsAddr: config.metricsAddr ?? null,
+        cloudflaredMetricsUrl: config.metricsAddr ? `http://${config.metricsAddr}/metrics` : null,
+        tunnelTransportProtocol: config.transportProtocol,
+    };
 }
 
 /**
@@ -807,6 +1005,26 @@ function redactCommandArgs(args) {
         if (arg.startsWith('--token=')) return '--token=<redacted>';
         return arg;
     });
+}
+
+/**
+ * @param {import('./config.js').CloudflareTunnelConfig} config
+ * @returns {Promise<{ transport: 'http' | 'http2'; originUrl: string; localMcpUrl: string; source: string }>}
+ */
+async function readRuntimeOriginSummary(config) {
+    const metadata = await readProcessMetadata(`${config.mcpHttpPidFile}.json`);
+    const signature = asRecord(metadata?.signature);
+    const args = Array.isArray(signature?.['args']) ? signature['args'] : [];
+    const transportFlagIndex = args.findIndex((value) => value === '--transport');
+    const transportArg = transportFlagIndex >= 0 ? args[transportFlagIndex + 1] : undefined;
+    const transport = transportArg === 'http2' ? 'http2' : 'http';
+    const originUrl = transport === 'http2' ? 'https://127.0.0.1:3333' : 'http://127.0.0.1:3333';
+    return {
+        transport,
+        originUrl,
+        localMcpUrl: `${originUrl}/mcp`,
+        source: transportArg === 'http2' || transportArg === 'http' ? 'process-metadata' : 'config-fallback',
+    };
 }
 
 /**

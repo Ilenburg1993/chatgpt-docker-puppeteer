@@ -6,6 +6,10 @@
  */
 
 import { readCloudflareTunnelConfig } from './config.js';
+import {
+    summarizeCloudflaredLatencyHistograms,
+    summarizeCloudflaredOperationalCounters,
+} from './metrics-histograms.js';
 
 /**
  * @typedef {{ name: string; labels: Record<string, string>; value: number }} PrometheusSample
@@ -123,6 +127,8 @@ export function summarizeCloudflaredMetrics(samples) {
         connections: {
             registerConnectionCount: registerConnectionSamples.reduce((total, sample) => total + sample.value, 0),
         },
+        latency: summarizeCloudflaredLatencyHistograms(samples),
+        operational: summarizeCloudflaredOperationalCounters(samples),
     };
 }
 

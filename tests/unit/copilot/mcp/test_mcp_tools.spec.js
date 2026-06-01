@@ -9,6 +9,7 @@ import { describe, it } from 'vitest';
 import { resolveReadPath } from '../../../../src/copilot/mcp/control-plane/paths.js';
 import { getCanonicalMcpTools } from '../../../../src/copilot/mcp/registry.js';
 
+/** @param {string} name */
 function findTool(name) {
     const tool = getCanonicalMcpTools().find((candidate) => candidate.name === name);
     assert.ok(tool, `missing tool ${name}`);

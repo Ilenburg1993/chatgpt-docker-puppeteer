@@ -34,6 +34,7 @@ describe('copilot MCP registry', () => {
             'mcp_auth_profile',
             'mcp_autonomy_power_score',
             'mcp_capabilities_summary',
+            'mcp_cloudflare_config_audit',
             'mcp_cloudflare_edge_audit',
             'mcp_cloudflare_edge_backup_create',
             'mcp_cloudflare_edge_backups_list',
@@ -41,9 +42,18 @@ describe('copilot MCP registry', () => {
             'mcp_cloudflare_edge_policy_diff',
             'mcp_cloudflare_edge_policy_plan',
             'mcp_cloudflare_edge_snapshot',
+            'mcp_cloudflare_mcp_passthrough_apply',
+            'mcp_cloudflare_mcp_passthrough_diff',
+            'mcp_cloudflare_mcp_passthrough_plan',
             'mcp_cloudflare_metrics_snapshot',
+            'mcp_cloudflare_plan_capabilities_audit',
+            'mcp_cloudflare_post_change_gates',
             'mcp_cloudflare_remote_audit',
+            'mcp_cloudflare_skip_audit',
+            'mcp_cloudflare_transport_benchmark_plan',
+            'mcp_connection_readiness',
             'mcp_connector_smoke_refresh',
+            'mcp_devcontainer_network_posture_audit',
             'mcp_golden_prompts',
             'mcp_host_block_diagnostics',
             'mcp_last_validation_summary',
@@ -136,6 +146,12 @@ describe('copilot MCP registry', () => {
         const tools = getCanonicalMcpTools();
         const names = tools.map((tool) => tool.name);
         assert.equal(new Set(names).size, names.length);
+    });
+
+    it('memoizes canonical tool metadata to reduce per-request tools/list overhead', () => {
+        const first = getCanonicalMcpTools();
+        const second = getCanonicalMcpTools();
+        assert.equal(first, second);
     });
 
     it('keeps capability metadata in parity with the canonical registry', () => {

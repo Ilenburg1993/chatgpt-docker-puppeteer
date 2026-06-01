@@ -1,6 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { compareRemoteConfig, parseEnvFile } from '../../../../src/copilot/mcp/cloudflare/remote-api.js';
 
+/**
+ * @returns {import('../../../../src/copilot/mcp/cloudflare/remote-api.js').CloudflareRemoteApiConfig}
+ */
+function testRemoteConfig() {
+    return {
+        apiToken: undefined,
+        accountId: undefined,
+        zoneId: undefined,
+        tunnelId: undefined,
+        tunnelName: 'workspace-mcp-dev',
+        publicHostname: 'mcp.aurelin.org',
+        expectedOriginUrl: 'http://127.0.0.1:3333',
+        expectedPublicMcpUrl: 'https://mcp.aurelin.org/mcp',
+        originServerName: undefined,
+        enableHttp2Origin: false,
+        zone: 'aurelin.org',
+        credentialSources: [],
+    };
+}
+
 describe('mcp/cloudflare/remote-api', () => {
     it('parses local env files without exposing comments', () => {
         expect(
@@ -20,14 +40,7 @@ EMPTY=
 
     it('marks localhost origin drift as critical', () => {
         const result = compareRemoteConfig(
-            {
-                tunnelName: 'workspace-mcp-dev',
-                publicHostname: 'mcp.aurelin.org',
-                expectedOriginUrl: 'http://127.0.0.1:3333',
-                expectedPublicMcpUrl: 'https://mcp.aurelin.org/mcp',
-                zone: 'aurelin.org',
-                credentialSources: [],
-            },
+            testRemoteConfig(),
             {
                 id: '0e81ae66-b74d-44db-87ba-73102826ffdf',
                 tunnel: {
@@ -52,19 +65,13 @@ EMPTY=
         expect(result.critical).toEqual([
             'Ingress service for mcp.aurelin.org is http://localhost:3333; expected http://127.0.0.1:3333.',
         ]);
-        expect(result.remote.config.hostnameRule?.matchesExpectedOrigin).toBe(false);
+        const remote = /** @type {{ config: { hostnameRule?: { matchesExpectedOrigin?: boolean } } }} */ (result.remote);
+        expect(remote.config.hostnameRule?.matchesExpectedOrigin).toBe(false);
     });
 
     it('accepts the canonical permanent tunnel ingress', () => {
         const result = compareRemoteConfig(
-            {
-                tunnelName: 'workspace-mcp-dev',
-                publicHostname: 'mcp.aurelin.org',
-                expectedOriginUrl: 'http://127.0.0.1:3333',
-                expectedPublicMcpUrl: 'https://mcp.aurelin.org/mcp',
-                zone: 'aurelin.org',
-                credentialSources: [],
-            },
+            testRemoteConfig(),
             {
                 id: '0e81ae66-b74d-44db-87ba-73102826ffdf',
                 tunnel: {
@@ -88,7 +95,10 @@ EMPTY=
 
         expect(result.critical).toEqual([]);
         expect(result.warnings).toEqual([]);
-        expect(result.remote.config.hostnameRule?.matchesExpectedOrigin).toBe(true);
-        expect(result.remote.connections.active).toBe(1);
+        const remote = /** @type {{ config: { hostnameRule?: { matchesExpectedOrigin?: boolean } }; connections: { active: number } }} */ (
+            result.remote
+        );
+        expect(remote.config.hostnameRule?.matchesExpectedOrigin).toBe(true);
+        expect(remote.connections.active).toBe(1);
     });
 });

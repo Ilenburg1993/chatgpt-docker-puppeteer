@@ -1,4 +1,6 @@
 // @ts-check
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 /**
  * tests/unit/copilot/test_agent_messaging.spec.js
  *

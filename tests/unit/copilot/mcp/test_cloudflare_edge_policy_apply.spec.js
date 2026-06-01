@@ -13,15 +13,15 @@ describe('mcp/cloudflare/edge-policy-apply', () => {
             'copilot-mcp-oauth-token-rate-limit-v1',
             'copilot-mcp-anonymous-rate-limit-v1',
         ]);
-        expect(rules[0].rule).toMatchObject({
+        expect(rules[0]?.rule).toMatchObject({
             action: 'set_cache_settings',
             action_parameters: { cache: false },
         });
-        expect(rules[1].rule.ratelimit).toMatchObject({
+        expect(rules[1]?.rule.ratelimit).toMatchObject({
             characteristics: ['cf.colo.id', 'ip.src'],
-            period: 60,
-            requests_per_period: 120,
-            mitigation_timeout: 60,
+            period: 10,
+            requests_per_period: 20,
+            mitigation_timeout: 10,
         });
     });
 
@@ -67,6 +67,27 @@ describe('mcp/cloudflare/edge-policy-apply', () => {
                 }),
             ]),
         );
+    });
+
+    it('filters planned actions by explicit rule refs', () => {
+        const desired = buildCloudflareEdgeDesiredApiRules('mcp.aurelin.org');
+        const plan = buildCloudflareEdgeApplyPlan([], desired, {
+            phases: ['http_ratelimit'],
+            ruleRefs: ['copilot-mcp-oauth-token-rate-limit-v1'],
+        });
+
+        expect(plan.summary).toMatchObject({
+            actionCount: 1,
+            createEntrypointRulesets: 1,
+            appendRules: 0,
+            alreadyPresent: 0,
+        });
+        expect(plan.actions).toEqual([
+            expect.objectContaining({
+                ref: 'copilot-mcp-oauth-token-rate-limit-v1',
+                status: 'create-entrypoint-ruleset',
+            }),
+        ]);
     });
 
     it('groups multiple rules in a missing phase under one entrypoint creation', () => {

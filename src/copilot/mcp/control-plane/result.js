@@ -7,6 +7,10 @@
 
 /**
  * @typedef {import('@modelcontextprotocol/sdk/types.js').CallToolResult} CallToolResult
+ * @typedef {CallToolResult & {
+ *     content: { type: 'text'; text: string }[];
+ *     structuredContent: Record<string, any>;
+ * }} StructuredCallToolResult
  */
 
 /**
@@ -22,7 +26,7 @@ export function stringifyForModel(value) {
  * @param {unknown} structuredContent
  * @param {string} [text]
  * @param {Record<string, unknown>} [meta]
- * @returns {CallToolResult}
+ * @returns {StructuredCallToolResult}
  */
 export function okResult(structuredContent, text, meta) {
     const normalizedStructuredContent = asRecord(structuredContent);
@@ -37,7 +41,7 @@ export function okResult(structuredContent, text, meta) {
  * @param {string} message
  * @param {Record<string, unknown>} [details]
  * @param {Record<string, unknown>} [meta]
- * @returns {CallToolResult}
+ * @returns {StructuredCallToolResult}
  */
 export function errorResult(message, details, meta) {
     const code =
@@ -60,7 +64,7 @@ export function errorResult(message, details, meta) {
 
 /**
  * @param {unknown} value
- * @returns {Record<string, unknown>}
+ * @returns {Record<string, any>}
  */
 export function asRecord(value) {
     if (value && typeof value === 'object' && !Array.isArray(value)) {

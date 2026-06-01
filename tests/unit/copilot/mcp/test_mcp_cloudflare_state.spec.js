@@ -15,6 +15,7 @@ import {
     updateQuickTunnelLastSmoke,
 } from '../../../../src/copilot/mcp/cloudflare/state.js';
 
+/** @type {import('../../../../src/copilot/mcp/cloudflare/state.js').QuickTunnelState} */
 const baseState = {
     schemaVersion: 1,
     mode: 'temporary-trycloudflare',

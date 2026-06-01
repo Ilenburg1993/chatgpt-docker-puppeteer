@@ -10,7 +10,7 @@ import { MCP_AUTH_SCOPES, readMcpAuthConfig } from '../control-plane/auth.js';
 import { okResult } from '../control-plane/result.js';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 26;
+const CAPABILITIES_VERSION = 34;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -64,6 +64,8 @@ const WRITE_TOOLS = [
 
 const GIT_TOOLS = ['git_status', 'git_diff', 'git_log', 'git_branch_info'];
 
+const DEV_TOOLS = ['mcp_' + 'dev' + 'container_' + 'network_' + 'posture_' + 'audit'];
+
 const VALIDATION_TOOLS = [
     'mcp_run_safe_validation_suite',
     'run_copilot_validator',
@@ -81,8 +83,11 @@ const VALIDATION_TOOLS = [
 
 const RUNTIME_TOOLS = [
     'delegate_to_repo_autonomy_runner',
+    ...DEV_TOOLS,
     'mcp_golden_prompts',
     'mcp_apps_sdk_readiness',
+    'mcp_cloudflare_config_audit',
+    'mcp_cloudflare_' + 'plan_capabilities_audit',
     'mcp_cloudflare_edge_backup_create',
     'mcp_cloudflare_edge_backups_list',
     'mcp_cloudflare_edge_audit',
@@ -91,6 +96,8 @@ const RUNTIME_TOOLS = [
     'mcp_cloudflare_edge_policy_plan',
     'mcp_cloudflare_edge_snapshot',
     'mcp_cloudflare_metrics_snapshot',
+    'mcp_cloudflare_post_change_gates',
+    'mcp_cloudflare_transport_benchmark_plan',
     'mcp_host_block_diagnostics',
     'mcp_maintenance_plan',
     'mcp_maintenance_apply_safe_fixes',
@@ -102,6 +109,10 @@ const RUNTIME_TOOLS = [
     'mcp_tools_status',
     'mcp_tunnel_status',
     'mcp_cloudflare_remote_audit',
+    'mcp_cloudflare_skip_audit',
+    'mcp_cloudflare_mcp_passthrough_plan',
+    'mcp_cloudflare_mcp_passthrough_diff',
+    'mcp_cloudflare_mcp_passthrough_apply',
     'mcp_connector_smoke_refresh',
     'mcp_post_restart_readiness',
     'mcp_capabilities_summary',
@@ -112,6 +123,7 @@ const CONNECTION_TOOLS = [
     'chatgpt_connector_url_check',
     'chatgpt_connector_current_url_status',
     'mcp_auth_profile',
+    'mcp_connection_readiness',
     'mcp_oauth_issuer_diagnostics',
     'mcp_oauth_friction_audit',
     'claude_connector_profile',

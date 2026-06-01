@@ -14,6 +14,7 @@ import {
     buildQuickTunnelArgs,
     DEFAULT_CLOUDFLARE_PUBLIC_URL,
     normalizeOriginUrl,
+    normalizePublicHostname,
     normalizeStateFile,
     normalizeStaleAfterMs,
     normalizeTunnelMode,
@@ -45,6 +46,8 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
             '--no-autoupdate',
             '--loglevel',
             'info',
+            '--protocol',
+            'http2',
             '--metrics',
             '127.0.0.1:60123',
             '--url',
@@ -56,6 +59,8 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
             '--no-autoupdate',
             '--loglevel',
             'info',
+            '--protocol',
+            'http2',
             '--metrics',
             '127.0.0.1:60123',
             'run',
@@ -69,6 +74,8 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
                 '--no-autoupdate',
                 '--loglevel',
                 'info',
+                '--protocol',
+                'http2',
                 '--metrics',
                 '127.0.0.1:60123',
                 'run',
@@ -77,6 +84,58 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
             ],
         );
         assert.throws(() => buildManagedTunnelArgs(undefined), /CLOUDFLARE_TUNNEL_TOKEN/);
+    });
+
+    it('adds origin server name when the tunnel origin is HTTPS', () => {
+        const config = readCloudflareTunnelConfig({
+            COPILOT_MCP_ORIGIN_TRANSPORT: 'http2',
+            COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: 'https://127.0.0.1:3333',
+            CLOUDFLARE_TUNNEL_TOKEN: 'secret-token',
+        });
+
+        assert.deepEqual(buildQuickTunnelArgs(config), [
+            'tunnel',
+            '--no-autoupdate',
+            '--loglevel',
+            'info',
+            '--protocol',
+            'http2',
+            '--metrics',
+            '127.0.0.1:60123',
+            '--origin-server-name',
+            'mcp.aurelin.org',
+            '--url',
+            'https://127.0.0.1:3333',
+        ]);
+        assert.deepEqual(buildManagedTunnelArgs('secret-token', undefined, config), [
+            'tunnel',
+            '--no-autoupdate',
+            '--loglevel',
+            'info',
+            '--protocol',
+            'http2',
+            '--metrics',
+            '127.0.0.1:60123',
+            '--origin-server-name',
+            'mcp.aurelin.org',
+            'run',
+            '--token',
+            'secret-token',
+        ]);
+    });
+
+    it('requires the public hostname to be the zone or a real subdomain', () => {
+        assert.equal(normalizePublicHostname(undefined, 'workspace-mcp-dev', 'aurelin.org'), 'mcp.aurelin.org');
+        assert.equal(normalizePublicHostname('https://mcp.aurelin.org/mcp', 'workspace-mcp-dev', 'aurelin.org'), 'mcp.aurelin.org');
+        assert.equal(normalizePublicHostname('aurelin.org', 'workspace-mcp-dev', 'aurelin.org'), 'aurelin.org');
+        assert.throws(
+            () => normalizePublicHostname('evilaurelin.org', 'workspace-mcp-dev', 'aurelin.org'),
+            /configured zone or a subdomain/,
+        );
+        assert.throws(
+            () => normalizePublicHostname('mcp.aurelin.org.attacker.test', 'workspace-mcp-dev', 'aurelin.org'),
+            /configured zone or a subdomain/,
+        );
     });
 
     it('keeps temporary quick tunnel as an explicit fallback mode', () => {
@@ -91,9 +150,15 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
     it('validates configured ChatGPT public URLs', () => {
         const config = readCloudflareTunnelConfig({
             COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: 'https://repo-mcp.example.com',
+            COPILOT_MCP_CLOUDFLARE_PUBLIC_HOSTNAME: 'repo-mcp.example.com',
+            COPILOT_MCP_CLOUDFLARE_ZONE: 'example.com',
         });
         assert.equal(config.publicMcpUrl, 'https://repo-mcp.example.com/mcp');
-        assert.deepEqual(validateConfiguredPublicUrl(config), { ok: true });
+        assert.deepEqual(validateConfiguredPublicUrl(config), {
+            ok: true,
+            normalizedUrl: 'https://repo-mcp.example.com/mcp',
+            resource: 'https://repo-mcp.example.com',
+        });
     });
 
     it('extracts and normalizes temporary trycloudflare connector URLs', () => {

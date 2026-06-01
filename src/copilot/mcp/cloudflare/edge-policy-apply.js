@@ -15,13 +15,14 @@ const CACHE_PHASE = 'http_request_cache_settings';
 const RATE_LIMIT_PHASE = 'http_ratelimit';
 
 /**
- * @param {{ env?: NodeJS.ProcessEnv; dryRun?: boolean; confirmApply?: boolean; phases?: string[]; now?: Date }} [options]
+ * @param {{ env?: NodeJS.ProcessEnv; dryRun?: boolean; confirmApply?: boolean; phases?: string[]; ruleRefs?: string[]; now?: Date }} [options]
  * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
  */
 export async function applyCloudflareEdgePolicy(options = {}) {
     const dryRun = options.dryRun !== false;
     const confirmApply = options.confirmApply === true;
     const phases = normalizePhases(options.phases);
+    const ruleRefs = normalizeRefs(options.ruleRefs);
     const env = options.env ?? process.env;
     const backup = await createCloudflareEdgeBackup({
         env,
@@ -31,8 +32,11 @@ export async function applyCloudflareEdgePolicy(options = {}) {
     const actual = await auditCloudflareEdgeRulesets({ env });
     const diff = await diffCloudflareEdgePolicy({ env });
     const desiredRules = buildCloudflareEdgeDesiredApiRules(asString(asRecord(diff['endpoint'])['publicHostname']));
-    const plan = buildCloudflareEdgeApplyPlan(asRulesets(actual['rulesets']), desiredRules, { phases });
-    const preflightOk = backup.ok === true && actual.ok === true && diff.ok === true && diff['mutationReady'] === true;
+    const planOptions = /** @type {any} */ ({ phases, ruleRefs });
+    const plan = buildCloudflareEdgeApplyPlan(asRulesets(actual['rulesets']), desiredRules, planOptions);
+    const rateLimitApplyNeedsRefs = phases.includes(RATE_LIMIT_PHASE) && ruleRefs.length === 0;
+    const preflightOk =
+        backup.ok === true && actual.ok === true && diff.ok === true && diff['mutationReady'] === true && !rateLimitApplyNeedsRefs;
     const canApply = preflightOk && confirmApply && !dryRun;
 
     if (dryRun || !confirmApply) {
@@ -46,9 +50,11 @@ export async function applyCloudflareEdgePolicy(options = {}) {
             backup,
             preflight: summarizePreflight(actual, diff),
             plan,
-            blockedReason: preflightOk
-                ? 'Set dryRun=false and confirmApply=true to apply this exact plan.'
-                : 'Preflight is not clean; do not apply Cloudflare edge policy.',
+            blockedReason: rateLimitApplyNeedsRefs
+                ? 'Rate-limit apply requires selecting one or more explicit ruleRefs.'
+                : preflightOk
+                  ? 'Set dryRun=false and confirmApply=true to apply this exact plan.'
+                  : 'Preflight is not clean; do not apply Cloudflare edge policy.',
         };
     }
 
@@ -138,9 +144,9 @@ export function buildCloudflareEdgeDesiredApiRules(hostname) {
                 action: 'block',
                 ratelimit: {
                     characteristics: ['cf.colo.id', 'ip.src'],
-                    period: 60,
-                    requests_per_period: 120,
-                    mitigation_timeout: 60,
+                    period: 10,
+                    requests_per_period: 20,
+                    mitigation_timeout: 10,
                 },
                 enabled: true,
             },
@@ -152,13 +158,13 @@ export function buildCloudflareEdgeDesiredApiRules(hostname) {
             rule: {
                 ref: 'copilot-mcp-anonymous-rate-limit-v1',
                 description: 'Bound anonymous /mcp traffic',
-                expression: `(${hostExpression} and ${mcpPathExpression} and not exists http.request.headers["authorization"][0])`,
+                expression: `(${hostExpression} and ${mcpPathExpression} and not any(http.request.headers.names[*] eq "authorization"))`,
                 action: 'block',
                 ratelimit: {
                     characteristics: ['cf.colo.id', 'ip.src'],
-                    period: 60,
-                    requests_per_period: 240,
-                    mitigation_timeout: 60,
+                    period: 10,
+                    requests_per_period: 40,
+                    mitigation_timeout: 10,
                 },
                 enabled: true,
             },
@@ -169,14 +175,17 @@ export function buildCloudflareEdgeDesiredApiRules(hostname) {
 /**
  * @param {Record<string, unknown>[]} actualRulesets
  * @param {{ phase: string; name: string; ref: string; rule: Record<string, unknown> }[]} desiredRules
- * @param {{ phases?: string[] }} [options]
+ * @param {unknown} [options]
  * @returns {{ actions: Record<string, unknown>[]; summary: Record<string, unknown>; recommendedSequence: string[] }}
  */
 export function buildCloudflareEdgeApplyPlan(actualRulesets, desiredRules, options = {}) {
-    const phases = normalizePhases(options.phases);
+    const optionRecord = asRecord(options);
+    const phases = normalizePhases(Array.isArray(optionRecord['phases']) ? optionRecord['phases'] : undefined);
+    const ruleRefs = normalizeRefs(optionRecord['ruleRefs']);
+    const scopedDesiredRules = ruleRefs.length > 0 ? desiredRules.filter((rule) => ruleRefs.includes(rule.ref)) : desiredRules;
     const actions = [];
     const plannedCreatedPhases = new Set();
-    for (const desired of desiredRules.filter((rule) => phases.includes(rule.phase))) {
+    for (const desired of scopedDesiredRules.filter((rule) => phases.includes(rule.phase))) {
         const ruleset = actualRulesets.find((item) => asString(item['phase']) === desired.phase) ?? null;
         const rules = Array.isArray(ruleset?.['rules']) ? /** @type {unknown[]} */ (ruleset['rules']) : [];
         const existing = rules.find((rule) => asRecord(rule)['ref'] === desired.ref);
@@ -282,6 +291,16 @@ async function resolveZoneId(client, config) {
         if (record['name'] === config.zone && typeof record['id'] === 'string') return record['id'];
     }
     throw new Error(`Cloudflare zone ${config.zone} was not found.`);
+}
+
+/**
+ * @param {unknown} refs
+ * @returns {string[]}
+ */
+function normalizeRefs(refs) {
+    return Array.isArray(refs)
+        ? [...new Set(refs.filter((item) => typeof item === 'string' && item.length > 0))]
+        : [];
 }
 
 /**

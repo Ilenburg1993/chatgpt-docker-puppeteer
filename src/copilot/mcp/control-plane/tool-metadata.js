@@ -21,7 +21,7 @@ const NOAUTH = /** @type {const} */ ({ type: 'noauth' });
  * shape. This removes the missing-schema class of issue while allowing the next roadmap band to tighten schemas tool by
  * tool.
  *
- * @returns {import('zod').ZodTypeAny}
+ * @returns {import('zod').ZodType}
  */
 export function baseMcpOutputSchema() {
     return z

@@ -45,7 +45,11 @@ describe('copilot MCP ChatGPT connection profile', () => {
     });
 
     it('validates ChatGPT public connector URL requirements', () => {
-        assert.deepEqual(validatePublicConnectorUrl('https://example.com/mcp'), { ok: true });
+        assert.deepEqual(validatePublicConnectorUrl('https://example.com/mcp'), {
+            ok: true,
+            normalizedUrl: 'https://example.com/mcp',
+            resource: 'https://example.com',
+        });
         assert.equal(validatePublicConnectorUrl('http://127.0.0.1:3333/mcp').ok, false);
     });
 
@@ -80,7 +84,7 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.ok(runbook.quickTunnelCommands.includes('npm run copilot:mcp:cloudflare:smoke'));
         assert.ok(runbook.notes.some((note) => note.includes('domínio permanente')));
         assert.ok(runbook.notes.some((note) => note.includes('Quick Tunnel')));
-        assert.ok(runbook.notes.some((note) => note.includes('origin HTTP raiz')));
+        assert.ok(runbook.notes.some((note) => note.includes('origin raiz')));
     });
 
     it('builds OAuth protected resource metadata and challenge previews', () => {
@@ -140,14 +144,14 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.ok(writeTool);
         assert.deepEqual(scopesForMcpTool(readTool), ['repo:read']);
         assert.deepEqual(scopesForMcpTool(writeTool), ['repo:write']);
-        const schemes = securitySchemesForMcpTool(writeTool, {
-            mode: 'mixed-auth',
-            resource: 'https://example.com',
-            protectedResourceMetadataUrl: 'https://example.com/.well-known/oauth-protected-resource',
-            authorizationServers: ['https://auth.example.com'],
-            scopesSupported: ['repo:read', 'repo:write', 'repo:validate', 'repo:admin'],
-            resourceDocumentation: 'https://example.com/docs',
-        });
+        const schemes = securitySchemesForMcpTool(
+            writeTool,
+            readMcpAuthConfig({
+                COPILOT_MCP_AUTH_MODE: 'mixed-auth',
+                COPILOT_MCP_PUBLIC_URL: 'https://example.com/mcp',
+                COPILOT_MCP_OAUTH_ISSUER: 'https://auth.example.com',
+            }),
+        );
         assert.ok(schemes.some((scheme) => scheme.type === 'noauth'));
         assert.ok(schemes.some((scheme) => scheme.type === 'oauth2'));
     });
@@ -168,6 +172,22 @@ describe('copilot MCP ChatGPT connection profile', () => {
         );
         assert.equal(decision.allowed, true);
         assert.equal(decision.required, false);
+    });
+
+    it('does not bypass auth for public OAuth diagnostics outside oauth mode', async () => {
+        const tools = getCanonicalMcpTools();
+        const diagnosticTool = tools.find((tool) => tool.name === 'mcp_oauth_friction_audit');
+        assert.ok(diagnosticTool);
+        const env = {
+            COPILOT_MCP_AUTH_MODE: 'mixed-auth',
+            COPILOT_MCP_AUTH_ENFORCEMENT: 'all',
+            COPILOT_MCP_PUBLIC_URL: 'https://example.com/mcp',
+            COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS: 'true',
+        };
+        const config = readMcpAuthConfig(env);
+        const decision = await authorizeMcpToolCall(diagnosticTool, { bearerToken: undefined }, config, env);
+        assert.equal(decision.allowed, false);
+        assert.equal(decision.code, 'MCP_AUTH_REQUIRED');
     });
 
     it('requires scoped auth when enforcement is enabled and accepts configured static bearer token', async () => {

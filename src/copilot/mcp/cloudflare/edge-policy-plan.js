@@ -6,6 +6,13 @@
  */
 
 import { readCloudflareRemoteApiConfig } from './remote-api.js';
+import {
+    buildCloudflareAnonymousMcpExpression,
+    buildCloudflareCacheBypassRoutesExpression,
+    buildCloudflareMcpCompressionBypassExpression,
+    buildCloudflareOAuthTokenExpression,
+    buildCloudflarePublicMetadataCacheExpression,
+} from './routes.js';
 
 /**
  * @param {{ env?: NodeJS.ProcessEnv }} [options]
@@ -14,20 +21,11 @@ import { readCloudflareRemoteApiConfig } from './remote-api.js';
 export async function buildCloudflareEdgePolicyPlan(options = {}) {
     const config = await readCloudflareRemoteApiConfig(options.env ?? process.env);
     const hostname = config.publicHostname;
-    const hostExpression = `http.host eq "${hostname}"`;
-    const mcpPathExpression = `starts_with(http.request.uri.path, "/mcp")`;
-    const oauthPathExpression = `starts_with(http.request.uri.path, "/oauth/")`;
-    const wellKnownPathExpression = `starts_with(http.request.uri.path, "/.well-known/")`;
-    const healthPathExpression = `http.request.uri.path eq "/health"`;
-    const dynamicPathsExpression = [
-        mcpPathExpression,
-        oauthPathExpression,
-        wellKnownPathExpression,
-        healthPathExpression,
-    ].join(' or ');
-    const dynamicExpression = `(${hostExpression} and (${dynamicPathsExpression}))`;
-    const anonymousMcpExpression = `(${hostExpression} and ${mcpPathExpression} and not exists http.request.headers["authorization"][0])`;
-    const oauthTokenExpression = `(${hostExpression} and http.request.uri.path eq "/oauth/token")`;
+    const cacheBypassExpression = buildCloudflareCacheBypassRoutesExpression(hostname);
+    const publicMetadataCacheExpression = buildCloudflarePublicMetadataCacheExpression(hostname);
+    const mcpCompressionBypassExpression = buildCloudflareMcpCompressionBypassExpression(hostname);
+    const anonymousMcpExpression = buildCloudflareAnonymousMcpExpression(hostname);
+    const oauthTokenExpression = buildCloudflareOAuthTokenExpression(hostname);
 
     return {
         ok: true,
@@ -42,15 +40,50 @@ export async function buildCloudflareEdgePolicyPlan(options = {}) {
         desiredRulesets: [
             {
                 phase: 'http_request_cache_settings',
-                name: 'MCP dynamic routes cache bypass',
-                rationale: 'MCP, OAuth discovery, OAuth token and health responses must never be cached by the edge.',
+                name: 'MCP cache policy',
+                rationale:
+                    'Bypass request-specific MCP/OAuth runtime traffic, but allow short edge TTL for public GET-only discovery metadata.',
                 rules: [
                     {
-                        description: 'Bypass cache for MCP/OAuth dynamic routes',
-                        expression: dynamicExpression,
+                        description: 'Bypass cache for MCP runtime and OAuth token routes',
+                        expression: cacheBypassExpression,
                         action: 'set_cache_settings',
                         actionParameters: {
                             cache: false,
+                        },
+                    },
+                    {
+                        description: 'Short-cache public MCP/OAuth discovery metadata',
+                        expression: publicMetadataCacheExpression,
+                        action: 'set_cache_settings',
+                        actionParameters: {
+                            cache: true,
+                            edgeTtl: { mode: 'override_origin', default: 300 },
+                            browserTtl: { mode: 'override_origin', default: 60 },
+                        },
+                        safety: {
+                            requiresGetOnly: true,
+                            excludes: ['/mcp', '/oauth/*', '/health'],
+                        },
+                    },
+                ],
+            },
+            {
+                phase: 'http_response_compression',
+                name: 'MCP compression policy',
+                rationale:
+                    'Disable edge compression for /mcp JSON-RPC because identity transfer was materially faster and more stable for tools/list in benchmark data.',
+                rules: [
+                    {
+                        description: 'Disable compression for MCP JSON-RPC responses',
+                        expression: mcpCompressionBypassExpression,
+                        action: 'compress_response',
+                        actionParameters: {
+                            algorithms: [],
+                        },
+                        safety: {
+                            requiresPathOnly: ['/mcp', '/mcp/*'],
+                            excludes: ['/.well-known/*', '/chatgpt-connector.json', '/oauth/*', '/health'],
                         },
                     },
                 ],
@@ -66,10 +99,13 @@ export async function buildCloudflareEdgePolicyPlan(options = {}) {
                         expression: oauthTokenExpression,
                         action: 'block',
                         manualReviewRequired: true,
+                        ref: 'copilot-mcp-oauth-token-rate-limit-v1',
                         rateLimitDraft: {
-                            periodSeconds: 60,
-                            requestsPerPeriod: 120,
-                            mitigationTimeoutSeconds: 60,
+                            periodSeconds: 10,
+                            requestsPerPeriod: 20,
+                            mitigationTimeoutSeconds: 10,
+                            equivalentPerMinute: 120,
+                            characteristics: ['cf.colo.id', 'ip.src'],
                         },
                     },
                 ],
@@ -85,10 +121,13 @@ export async function buildCloudflareEdgePolicyPlan(options = {}) {
                         expression: anonymousMcpExpression,
                         action: 'block',
                         manualReviewRequired: true,
+                        ref: 'copilot-mcp-anonymous-rate-limit-v1',
                         rateLimitDraft: {
-                            periodSeconds: 60,
-                            requestsPerPeriod: 240,
-                            mitigationTimeoutSeconds: 60,
+                            periodSeconds: 10,
+                            requestsPerPeriod: 40,
+                            mitigationTimeoutSeconds: 10,
+                            equivalentPerMinute: 240,
+                            characteristics: ['cf.colo.id', 'ip.src'],
                         },
                     },
                 ],

@@ -32,7 +32,7 @@ describe('model-gateway BYOK provider failure taxonomy', () => {
                     { status: 400 },
                 ),
             ).kind,
-        ).toBe('model-or-route');
+        ).toBe('capability-unsupported');
         expect(
             classifyByokProviderFailure(Object.assign(new Error('fetch failed'), { code: 'ECONNRESET' })).kind,
         ).toBe('network');

@@ -6,6 +6,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
+import { readMcpHttpServerTimingPolicy } from '../../../../src/copilot/mcp/adapters/http.js';
+import { readMcpHttp2ServerPolicy } from '../../../../src/copilot/mcp/adapters/http2.js';
+import {
+    buildMcpHttpProtocolReport,
+    createMcpHttpProtocolState,
+    recordMcpHttpProtocolRequest,
+} from '../../../../src/copilot/mcp/adapters/http-protocol.js';
 import {
     compareToolNames,
     extractMcpToolNames,
@@ -32,5 +39,73 @@ describe('copilot MCP local HTTP smoke helpers', () => {
         assert.equal(drift.matches, false);
         assert.deepEqual(drift.missingTools, ['b']);
         assert.deepEqual(drift.unexpectedTools, ['extra']);
+    });
+
+    it('normalizes HTTP timing for Cloudflare loopback keep-alive reuse', () => {
+        assert.deepEqual(readMcpHttpServerTimingPolicy({}), {
+            keepAliveTimeoutMs: 90_000,
+            headersTimeoutMs: 95_000,
+            requestTimeoutMs: 120_000,
+        });
+        assert.deepEqual(
+            readMcpHttpServerTimingPolicy({
+                COPILOT_MCP_HTTP_KEEP_ALIVE_TIMEOUT_MS: '120000',
+                COPILOT_MCP_HTTP_HEADERS_TIMEOUT_MS: '121000',
+                COPILOT_MCP_HTTP_REQUEST_TIMEOUT_MS: '180000',
+            }),
+            {
+                keepAliveTimeoutMs: 120_000,
+                headersTimeoutMs: 121_000,
+                requestTimeoutMs: 180_000,
+            },
+        );
+    });
+
+    it('records origin protocol telemetry without inspecting request bodies', () => {
+        const state = createMcpHttpProtocolState('http1');
+        recordMcpHttpProtocolRequest(
+            state,
+            /** @type {import('node:http').IncomingMessage} */ ({
+                httpVersion: '1.1',
+                httpVersionMajor: 1,
+                method: 'GET',
+                url: '/health?token=redacted',
+                headers: {},
+                socket: {},
+            }),
+        );
+
+        const report = buildMcpHttpProtocolReport(state);
+        assert.equal(report.protocolMode, 'http1');
+        assert.equal(report.observedRequests, 1);
+        assert.deepEqual(report.httpVersionCounts, { '1.1': 1 });
+        assert.deepEqual(report.alpnCounts, { none: 1 });
+        const lastRequest = /** @type {Record<string, unknown>} */ (report.lastRequest);
+        assert.equal(lastRequest.httpVersion, '1.1');
+        assert.equal(lastRequest.path, '/health');
+        assert.equal(lastRequest.encrypted, false);
+    });
+
+    it('normalizes the opt-in HTTP/2 server policy', () => {
+        assert.deepEqual(readMcpHttp2ServerPolicy({}), {
+            certFile: 'src/copilot/.ai/cloudflare/origin-cert.pem',
+            keyFile: 'src/copilot/.ai/cloudflare/origin-key.pem',
+            allowHTTP1: true,
+            maxConcurrentStreams: 50,
+        });
+        assert.deepEqual(
+            readMcpHttp2ServerPolicy({
+                COPILOT_MCP_HTTP2_CERT_FILE: 'cert.pem',
+                COPILOT_MCP_HTTP2_KEY_FILE: 'key.pem',
+                COPILOT_MCP_HTTP2_ALLOW_HTTP1: 'false',
+                COPILOT_MCP_HTTP2_MAX_CONCURRENT_STREAMS: '200',
+            }),
+            {
+                certFile: 'cert.pem',
+                keyFile: 'key.pem',
+                allowHTTP1: false,
+                maxConcurrentStreams: 200,
+            },
+        );
     });
 });

@@ -1,10 +1,14 @@
 // @ts-check
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { timingSafeEqual } from 'node:crypto';
 
 /**
- * MCP auth metadata and scope planning.
+ * Canonical MCP auth metadata, tool-scope planning and resource-server token verification.
  *
- * This module prepares Apps SDK/OAuth metadata for the canonical ChatGPT MCP connector.
+ * This module is intentionally transport-neutral: HTTP adapters decide when to emit HTTP 401 challenges, while the MCP
+ * registry uses this module to decide whether each tool call is allowed and which `_meta["mcp/www_authenticate"]`
+ * challenge ChatGPT should receive. The implementation is aligned with the MCP Authorization 2025-06-18 profile, RFC
+ * 9728 Protected Resource Metadata, OpenAI Apps SDK authentication guidance, and the local built-in dev OAuth issuer.
  *
  * @module copilot/mcp/control-plane/auth
  */
@@ -24,12 +28,20 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
  * @property {McpAuthScope[]} scopesSupported
  * @property {McpAuthScope[]} initialScopes
  * @property {string} resourceDocumentation
+ * @property {string} resourceName
+ * @property {string} resourcePolicyUri
+ * @property {string} resourceTermsOfServiceUri
  * @property {McpAuthEnforcementMode} enforcement
  * @property {string} expectedIssuer
  * @property {string} expectedAudience
  * @property {string[]} acceptedAudiences
  * @property {string} jwksUri
+ * @property {string[]} jwtAlgorithms
+ * @property {string[]} bearerMethodsSupported
  * @property {boolean} staticBearerConfigured
+ * @property {boolean} staticBearerEnabled
+ * @property {boolean} requireResourceClaim
+ * @property {boolean} publicOauthDiagnosticsEnabled
  *
  * @typedef {object} McpAuthContext
  * @property {string | undefined} bearerToken
@@ -54,20 +66,43 @@ export const MCP_AUTH_SCOPES = /** @type {const} */ ({
     admin: 'repo:admin',
 });
 
+const DEFAULT_RESOURCE = 'https://mcp.aurelin.org';
+const DEFAULT_RESOURCE_NAME = 'Copilot Workspace MCP';
+const DEFAULT_RESOURCE_DOCUMENTATION = 'https://developers.openai.com/apps-sdk/build/auth';
+const MAX_AUTHORIZATION_SERVERS = 5;
+const MAX_AUDIENCES = 12;
+const MAX_JWKS_CACHE_ENTRIES = 16;
+const MAX_BEARER_TOKEN_LENGTH = 8192;
+const MAX_SCOPE_TOKENS = 64;
+const MAX_SCOPE_TOKEN_LENGTH = 128;
+const MAX_CHALLENGE_TEXT_LENGTH = 240;
+const MAX_RESOURCE_NAME_LENGTH = 120;
+const MAX_URL_LENGTH = 2048;
+const JWKS_TIMEOUT_MS = 5000;
+const JWKS_CACHE_MAX_AGE_MS = 10 * 60 * 1000;
+const JWKS_COOLDOWN_MS = 30 * 1000;
+const DEFAULT_JWT_ALGORITHMS = /** @type {const} */ (['RS256', 'ES256']);
+const HEADER_BEARER_METHODS = /** @type {const} */ (['header']);
+
 /** @type {Map<string, ReturnType<typeof createRemoteJWKSet>>} */
 const REMOTE_JWKS_CACHE = new Map();
 
 const PUBLIC_OAUTH_DIAGNOSTIC_TOOLS = new Set(['mcp_oauth_friction_audit']);
+
+const ADMIN_TOOL_NAMES = new Set([
+    'job_cancel',
+    'repo_remove_file',
+    'repo_restore_quarantined_file',
+    'mcp_cloudflare_edge_policy_apply',
+    'mcp_cloudflare_mcp_passthrough_apply',
+]);
 
 /**
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {boolean}
  */
 function publicOauthDiagnosticsEnabled(env = process.env) {
-    const raw = String(env['COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS'] ?? 'true')
-        .trim()
-        .toLowerCase();
-    return raw !== '0' && raw !== 'false' && raw !== 'no' && raw !== 'off';
+    return readBooleanEnv(env, 'COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS', false);
 }
 
 /**
@@ -76,18 +111,7 @@ function publicOauthDiagnosticsEnabled(env = process.env) {
  * @returns {boolean}
  */
 export function isPublicOauthDiagnosticTool(tool, env = process.env) {
-    return publicOauthDiagnosticsEnabled(env) && PUBLIC_OAUTH_DIAGNOSTIC_TOOLS.has(tool.name);
-}
-
-/**
- * @param {string | undefined} value
- * @param {McpAuthScope[]} fallback
- * @returns {McpAuthScope[]}
- */
-function normalizeConfiguredScopes(value, fallback) {
-    const allowed = new Set(Object.values(MCP_AUTH_SCOPES));
-    const scopes = splitCsv(value).filter((scope) => allowed.has(/** @type {McpAuthScope} */ (scope)));
-    return scopes.length > 0 ? /** @type {McpAuthScope[]} */ (scopes) : fallback;
+    return publicOauthDiagnosticsEnabled(env) && PUBLIC_OAUTH_DIAGNOSTIC_TOOLS.has(String(tool.name ?? ''));
 }
 
 /**
@@ -100,7 +124,7 @@ export function normalizeMcpAuthMode(value) {
         .toLowerCase();
     if (normalized === 'oauth' || normalized === 'team-oauth') return 'oauth';
     if (normalized === 'mixed' || normalized === 'mixed-auth' || normalized === 'dev-mixed-auth') return 'mixed-auth';
-    if (normalized === 'secure-mcp-tunnel') return 'secure-mcp-tunnel';
+    if (normalized === 'secure-mcp-tunnel' || normalized === 'secure-tunnel') return 'secure-mcp-tunnel';
     if (normalized === 'none' || normalized === 'noauth' || normalized === 'none-dev' || normalized === 'dev-noauth') {
         return 'none-dev';
     }
@@ -126,50 +150,40 @@ export function normalizeMcpAuthEnforcement(value, mode) {
 }
 
 /**
- * @param {string | undefined} value
- * @returns {string}
- */
-function normalizeResourceUrl(value) {
-    const raw = String(value ?? 'https://mcp.aurelin.org')
-        .trim()
-        .replace(/\/+$/, '');
-    return raw.endsWith('/mcp') ? raw.slice(0, -'/mcp'.length) : raw;
-}
-
-/**
- * @param {string | undefined} value
- * @returns {string[]}
- */
-function splitCsv(value) {
-    return String(value ?? '')
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean);
-}
-
-/**
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {McpAuthConfig}
  */
 export function readMcpAuthConfig(env = process.env) {
     const mode = normalizeMcpAuthMode(env['COPILOT_MCP_AUTH_MODE'] ?? env['COPILOT_MCP_CHATGPT_AUTH_MODE']);
-    const resource = normalizeResourceUrl(env['COPILOT_MCP_PUBLIC_URL'] ?? env['COPILOT_MCP_CLOUDFLARE_PUBLIC_URL']);
+    const resource = normalizeResourceBaseUrl(
+        env['COPILOT_MCP_PUBLIC_URL'] ?? env['COPILOT_MCP_CLOUDFLARE_PUBLIC_URL'],
+    );
     const configuredAuthorizationServers = splitCsv(
         env['COPILOT_MCP_OAUTH_AUTHORIZATION_SERVERS'] ?? env['COPILOT_MCP_OAUTH_ISSUER'],
-    );
+        MAX_AUTHORIZATION_SERVERS,
+    )
+        .map((value) => normalizeIssuerUrl(value, '', { allowHttpLocalhost: true }))
+        .filter(Boolean);
     const authorizationServers =
         configuredAuthorizationServers.length > 0
-            ? configuredAuthorizationServers
+            ? uniqueStrings(configuredAuthorizationServers, MAX_AUTHORIZATION_SERVERS)
             : mode === 'oauth' || mode === 'mixed-auth'
               ? [resource]
               : [];
-    const expectedIssuer = env['COPILOT_MCP_OAUTH_EXPECTED_ISSUER'] ?? authorizationServers[0] ?? '';
-    const expectedAudience = env['COPILOT_MCP_OAUTH_AUDIENCE'] ?? resource;
+    const rawExpectedIssuer = env['COPILOT_MCP_OAUTH_EXPECTED_ISSUER'] ?? authorizationServers[0] ?? '';
+    const expectedIssuer = rawExpectedIssuer
+        ? normalizeIssuerUrl(rawExpectedIssuer, authorizationServers[0] ?? '', { allowHttpLocalhost: true })
+        : '';
+    const expectedAudience = normalizeAudience(env['COPILOT_MCP_OAUTH_AUDIENCE'] ?? resource, resource);
     const defaultJwksUri = expectedIssuer
         ? expectedIssuer === resource
             ? `${resource}/oauth/jwks.json`
             : `${expectedIssuer}/.well-known/jwks.json`
         : '';
+    const jwksUri = normalizeMetadataUrl(env['COPILOT_MCP_OAUTH_JWKS_URI'], defaultJwksUri, {
+        allowHttpLocalhost: true,
+    });
+    const staticBearerEnabled = readBooleanEnv(env, 'COPILOT_MCP_STATIC_BEARER_TOKEN_ENABLED', true);
     return {
         mode,
         resource,
@@ -182,26 +196,222 @@ export function readMcpAuthConfig(env = process.env) {
             MCP_AUTH_SCOPES.validate,
             MCP_AUTH_SCOPES.admin,
         ]),
-        resourceDocumentation:
-            env['COPILOT_MCP_RESOURCE_DOCUMENTATION'] ?? 'https://developers.openai.com/apps-sdk/build/auth',
+        resourceDocumentation: normalizeMetadataUrl(
+            env['COPILOT_MCP_RESOURCE_DOCUMENTATION'],
+            DEFAULT_RESOURCE_DOCUMENTATION,
+            { allowHttpLocalhost: false },
+        ),
+        resourceName: normalizeDisplayText(
+            env['COPILOT_MCP_RESOURCE_NAME'],
+            DEFAULT_RESOURCE_NAME,
+            MAX_RESOURCE_NAME_LENGTH,
+        ),
+        resourcePolicyUri: normalizeOptionalHttpsUrl(env['COPILOT_MCP_RESOURCE_POLICY_URI']),
+        resourceTermsOfServiceUri: normalizeOptionalHttpsUrl(env['COPILOT_MCP_RESOURCE_TOS_URI']),
         enforcement: normalizeMcpAuthEnforcement(env['COPILOT_MCP_AUTH_ENFORCEMENT'], mode),
         expectedIssuer,
         expectedAudience,
-        acceptedAudiences: buildAcceptedAudiences(expectedAudience, resource),
-        jwksUri: env['COPILOT_MCP_OAUTH_JWKS_URI'] ?? defaultJwksUri,
-        staticBearerConfigured:
-            typeof env['COPILOT_MCP_STATIC_BEARER_TOKEN'] === 'string' &&
-            env['COPILOT_MCP_STATIC_BEARER_TOKEN'].length > 0,
+        acceptedAudiences: buildAcceptedAudiences(expectedAudience, resource, env),
+        jwksUri,
+        jwtAlgorithms: normalizeJwtAlgorithms(env['COPILOT_MCP_OAUTH_JWT_ALGORITHMS']),
+        bearerMethodsSupported: [...HEADER_BEARER_METHODS],
+        staticBearerConfigured: readStaticBearerToken(env) !== undefined,
+        staticBearerEnabled,
+        requireResourceClaim: readBooleanEnv(env, 'COPILOT_MCP_OAUTH_REQUIRE_RESOURCE_CLAIM', false),
+        publicOauthDiagnosticsEnabled: publicOauthDiagnosticsEnabled(env),
     };
+}
+
+/**
+ * @param {string | undefined} value
+ * @param {McpAuthScope[]} fallback
+ * @returns {McpAuthScope[]}
+ */
+function normalizeConfiguredScopes(value, fallback) {
+    const allowed = new Set(Object.values(MCP_AUTH_SCOPES));
+    const scopes = uniqueStrings(splitCsv(value, MAX_SCOPE_TOKENS), MAX_SCOPE_TOKENS).filter((scope) =>
+        allowed.has(/** @type {McpAuthScope} */ (scope)),
+    );
+    return scopes.length > 0 ? /** @type {McpAuthScope[]} */ (scopes) : fallback;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeResourceBaseUrl(value) {
+    return normalizeResourceIdentifier(value, DEFAULT_RESOURCE, {
+        allowHttpLocalhost: true,
+        allowedPaths: ['', '/mcp'],
+        stripMcpPath: true,
+    });
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} fallback
+ * @param {{ allowHttpLocalhost?: boolean; allowedPaths?: string[]; stripMcpPath?: boolean }} [options]
+ * @returns {string}
+ */
+function normalizeResourceIdentifier(value, fallback, options = {}) {
+    const raw = String(value ?? fallback).trim() || fallback;
+    if (!raw || raw.length > MAX_URL_LENGTH || hasAsciiControlChars(raw)) return fallback;
+    try {
+        const url = new URL(raw);
+        if (url.username || url.password || url.hash || url.search) return fallback;
+        if (
+            url.protocol !== 'https:' &&
+            !(options.allowHttpLocalhost === true && url.protocol === 'http:' && isLoopbackHostname(url.hostname))
+        ) {
+            return fallback;
+        }
+        url.pathname = stripTrailingSlashes(url.pathname);
+        if (options.stripMcpPath === true && url.pathname === '/mcp') url.pathname = '';
+        const pathName = url.pathname === '/' ? '' : url.pathname;
+        const allowedPaths = options.allowedPaths ?? [''];
+        if (!allowedPaths.includes(pathName)) return fallback;
+        url.pathname = pathName;
+        return url.toString().replace(/\/+$/u, '');
+    } catch {
+        return fallback;
+    }
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} fallback
+ * @param {{ allowHttpLocalhost?: boolean }} [options]
+ * @returns {string}
+ */
+function normalizeIssuerUrl(value, fallback, options = {}) {
+    return normalizeResourceIdentifier(value, fallback, {
+        allowHttpLocalhost: options.allowHttpLocalhost === true,
+        allowedPaths: [''],
+    });
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} fallback
+ * @param {{ allowHttpLocalhost?: boolean }} [options]
+ * @returns {string}
+ */
+function normalizeMetadataUrl(value, fallback, options = {}) {
+    const raw = String(value ?? fallback).trim() || fallback;
+    if (!raw || raw.length > MAX_URL_LENGTH || hasAsciiControlChars(raw)) return fallback;
+    try {
+        const url = new URL(raw);
+        if (url.username || url.password || url.hash) return fallback;
+        if (
+            url.protocol !== 'https:' &&
+            !(options.allowHttpLocalhost === true && url.protocol === 'http:' && isLoopbackHostname(url.hostname))
+        ) {
+            return fallback;
+        }
+        return url.toString();
+    } catch {
+        return fallback;
+    }
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeOptionalHttpsUrl(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+    return normalizeMetadataUrl(raw, '', { allowHttpLocalhost: false });
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} fallback
+ * @param {number} maxLength
+ * @returns {string}
+ */
+function normalizeDisplayText(value, fallback, maxLength) {
+    const normalized = replaceAsciiControlChars(String(value ?? ''), ' ')
+        .trim()
+        .replace(/\s+/gu, ' ');
+    return (normalized || fallback).slice(0, maxLength);
+}
+
+/**
+ * @param {string} pathname
+ * @returns {string}
+ */
+function stripTrailingSlashes(pathname) {
+    const stripped = pathname.replace(/\/+$/u, '');
+    return stripped || '';
+}
+
+/**
+ * @param {string | undefined} value
+ * @param {number} [maxItems]
+ * @returns {string[]}
+ */
+function splitCsv(value, maxItems = 64) {
+    return String(value ?? '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, maxItems);
+}
+
+/**
+ * @param {string[]} values
+ * @param {number} [maxItems]
+ * @returns {string[]}
+ */
+function uniqueStrings(values, maxItems = 64) {
+    /** @type {string[]} */
+    const output = [];
+    const seen = new Set();
+    for (const value of values) {
+        const normalized = String(value).trim();
+        if (!normalized || seen.has(normalized)) continue;
+        seen.add(normalized);
+        output.push(normalized);
+        if (output.length >= maxItems) break;
+    }
+    return output;
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {string[]}
+ */
+function normalizeJwtAlgorithms(value) {
+    const allowed = new Set(['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512']);
+    const configured = splitCsv(value, 8)
+        .map((item) => item.toUpperCase())
+        .filter((item) => allowed.has(item));
+    return configured.length > 0 ? uniqueStrings(configured, 8) : [...DEFAULT_JWT_ALGORITHMS];
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} fallback
+ * @returns {string}
+ */
+function normalizeAudience(value, fallback) {
+    const raw = String(value ?? fallback).trim();
+    if (!raw || hasAsciiControlChars(raw) || raw.length > 512) return fallback;
+    return raw.replace(/\/+$/u, '');
 }
 
 /**
  * @param {string} expectedAudience
  * @param {string} resource
+ * @param {NodeJS.ProcessEnv} [env]
  * @returns {string[]}
  */
-function buildAcceptedAudiences(expectedAudience, resource) {
-    return [...new Set([expectedAudience, resource, `${resource}/mcp`].filter(Boolean))];
+function buildAcceptedAudiences(expectedAudience, resource, env = process.env) {
+    const configured = splitCsv(env['COPILOT_MCP_OAUTH_ACCEPTED_AUDIENCES'], MAX_AUDIENCES).map((audience) =>
+        normalizeAudience(audience, ''),
+    );
+    return uniqueStrings([expectedAudience, resource, `${resource}/mcp`, ...configured].filter(Boolean), MAX_AUDIENCES);
 }
 
 /**
@@ -209,11 +419,19 @@ function buildAcceptedAudiences(expectedAudience, resource) {
  * @returns {McpAuthScope[]}
  */
 export function scopesForMcpTool(tool) {
-    if (tool.name === 'job_cancel' || tool.name === 'repo_remove_file') return [MCP_AUTH_SCOPES.admin];
-    if (tool.name.startsWith('run_') || tool.name.includes('validation') || tool.name.includes('validator')) {
+    const name = String(tool.name ?? '');
+    if (ADMIN_TOOL_NAMES.has(name)) return [MCP_AUTH_SCOPES.admin];
+    if (tool.annotations?.destructiveHint === true) return [MCP_AUTH_SCOPES.admin];
+    if (
+        name.startsWith('mcp_cloudflare_') &&
+        (name.includes('_apply') || name.includes('backup_create') || name.includes('policy_apply'))
+    ) {
+        return [MCP_AUTH_SCOPES.admin];
+    }
+    if (name.startsWith('run_') || name.includes('validation') || name.includes('validator')) {
         return [MCP_AUTH_SCOPES.validate];
     }
-    if (tool.annotations.readOnlyHint === true) return [MCP_AUTH_SCOPES.read];
+    if (tool.annotations?.readOnlyHint === true) return [MCP_AUTH_SCOPES.read];
     return [MCP_AUTH_SCOPES.write];
 }
 
@@ -235,13 +453,17 @@ function scopesRequireAuth(scopes, enforcement) {
 }
 
 /**
- * @param {string | undefined} header
+ * @param {string | string[] | undefined} header
  * @returns {string | undefined}
  */
 export function parseBearerToken(header) {
+    if (Array.isArray(header)) return undefined;
     const raw = String(header ?? '').trim();
-    const match = /^Bearer\s+(.+)$/iu.exec(raw);
-    return match?.[1]?.trim() || undefined;
+    if (!raw || raw.length > MAX_BEARER_TOKEN_LENGTH || hasAsciiControlChars(raw)) return undefined;
+    const match = /^Bearer\s+([^\s,]+)$/iu.exec(raw);
+    const token = match?.[1]?.trim();
+    if (!token || token.length > MAX_BEARER_TOKEN_LENGTH || hasAsciiControlChars(token)) return undefined;
+    return token;
 }
 
 /**
@@ -263,31 +485,119 @@ export function securitySchemesForMcpTool(tool, config = readMcpAuthConfig()) {
  * @returns {Record<string, unknown>}
  */
 export function buildProtectedResourceMetadata(config = readMcpAuthConfig(), options = {}) {
-    const resource = typeof options.resource === 'string' ? options.resource.replace(/\/+$/u, '') : config.resource;
-    return {
+    const resource =
+        typeof options.resource === 'string'
+            ? normalizeResourceIdentifier(options.resource, config.resource, {
+                  allowHttpLocalhost: true,
+                  allowedPaths: ['', '/mcp'],
+              })
+            : config.resource;
+    return omitEmptyMetadata({
         resource,
         authorization_servers: [...config.authorizationServers],
-        scopes_supported: [...config.initialScopes],
+        scopes_supported: [...config.scopesSupported],
+        bearer_methods_supported: [...config.bearerMethodsSupported],
+        resource_name: config.resourceName,
         resource_documentation: config.resourceDocumentation,
+        ...(config.resourcePolicyUri ? { resource_policy_uri: config.resourcePolicyUri } : {}),
+        ...(config.resourceTermsOfServiceUri ? { resource_tos_uri: config.resourceTermsOfServiceUri } : {}),
+        // Non-standard compatibility hint retained for existing diagnostics. Authorization server metadata remains the
+        // canonical place for this value, but RFC 9728 allows unrecognized metadata parameters to be ignored.
         token_endpoint_auth_methods_supported: ['none'],
-    };
+    });
+}
+
+/**
+ * @param {Record<string, unknown>} metadata
+ * @returns {Record<string, unknown>}
+ */
+function omitEmptyMetadata(metadata) {
+    /** @type {Record<string, unknown>} */
+    const output = {};
+    for (const [key, value] of Object.entries(metadata)) {
+        if (Array.isArray(value) && value.length === 0) continue;
+        if (typeof value === 'string' && !value) continue;
+        output[key] = value;
+    }
+    return output;
 }
 
 /**
  * @param {string[]} scopes
  * @param {McpAuthConfig} [config]
- * @param {{ error?: string; errorDescription?: string }} [options]
+ * @param {{ error?: string; errorDescription?: string; resourceMetadataUrl?: string; realm?: string }} [options]
  * @returns {string}
  */
 export function buildWwwAuthenticateChallenge(scopes, config = readMcpAuthConfig(), options = {}) {
-    const scopeValue = scopes.filter(Boolean).join(' ');
+    const allowed = new Set(config.scopesSupported);
+    const scopeValue = uniqueStrings(
+        scopes.filter((scope) => allowed.has(/** @type {McpAuthScope} */ (scope))),
+        MAX_SCOPE_TOKENS,
+    ).join(' ');
+    const error = normalizeChallengeToken(options.error);
+    const errorDescription = normalizeChallengeText(options.errorDescription);
+    const realm = normalizeChallengeText(options.realm ?? config.resource);
+    const resourceMetadataUrl = normalizeMetadataUrl(options.resourceMetadataUrl, config.protectedResourceMetadataUrl, {
+        allowHttpLocalhost: true,
+    });
     const params = [
-        ['resource_metadata', config.protectedResourceMetadataUrl],
-        ...(options.error ? [['error', options.error]] : []),
-        ...(options.errorDescription ? [['error_description', options.errorDescription]] : []),
+        ...(realm ? [['realm', realm]] : []),
+        ['resource_metadata', resourceMetadataUrl],
+        ...(error ? [['error', error]] : []),
+        ...(errorDescription ? [['error_description', errorDescription]] : []),
         ...(scopeValue ? [['scope', scopeValue]] : []),
     ];
     return `Bearer ${params.map(([key, value]) => `${key}="${escapeChallengeValue(String(value ?? ''))}"`).join(', ')}`;
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {string}
+ */
+function normalizeChallengeToken(value) {
+    const normalized = String(value ?? '').trim();
+    return /^[a-z_][a-z0-9_.-]{0,63}$/iu.test(normalized) ? normalized : '';
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {string}
+ */
+function normalizeChallengeText(value) {
+    return replaceAsciiControlChars(String(value ?? ''), ' ')
+        .trim()
+        .slice(0, MAX_CHALLENGE_TEXT_LENGTH);
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function hasAsciiControlChars(value) {
+    for (let index = 0; index < value.length; index += 1) {
+        const code = value.charCodeAt(index);
+        if (code <= 31 || code === 127) return true;
+    }
+    return false;
+}
+
+/**
+ * @param {string} value
+ * @param {string} replacement
+ * @returns {string}
+ */
+function replaceAsciiControlChars(value, replacement) {
+    let output = '';
+    for (let index = 0; index < value.length; index += 1) {
+        const code = value.charCodeAt(index);
+        if (code <= 31 || code === 127) {
+            if (!output) output = value.slice(0, index);
+            output += replacement;
+        } else if (output) {
+            output += value[index];
+        }
+    }
+    return output || value;
 }
 
 /**
@@ -303,12 +613,27 @@ function escapeChallengeValue(value) {
  * @returns {string[]}
  */
 function normalizeScopeClaim(value) {
-    if (typeof value === 'string')
-        return value
-            .split(/\s+/u)
-            .map((item) => item.trim())
-            .filter(Boolean);
-    if (Array.isArray(value)) return value.filter((item) => typeof item === 'string' && item.trim()).map(String);
+    const rawScopes =
+        typeof value === 'string'
+            ? value.split(/\s+/u)
+            : Array.isArray(value)
+              ? value.filter((item) => typeof item === 'string')
+              : [];
+    return uniqueStrings(
+        rawScopes
+            .map((item) => String(item).trim())
+            .filter((item) => item.length > 0 && item.length <= MAX_SCOPE_TOKEN_LENGTH && !hasAsciiControlChars(item)),
+        MAX_SCOPE_TOKENS,
+    );
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function normalizeAudienceClaim(value) {
+    if (typeof value === 'string') return [value];
+    if (Array.isArray(value)) return value.filter((item) => typeof item === 'string').map(String);
     return [];
 }
 
@@ -349,6 +674,15 @@ function classifyBearerVerificationError(error) {
             errorDescription: 'Bearer token issuer does not match the configured OAuth issuer.',
         };
     }
+    if (normalized.includes('algorithm') || normalized.includes('alg')) {
+        return {
+            code: 'MCP_AUTH_ALGORITHM_INVALID',
+            message: 'Bearer token signature algorithm is not allowed.',
+            hint: message,
+            wwwAuthenticateError: 'invalid_token',
+            errorDescription: 'Bearer token signature algorithm is not allowed.',
+        };
+    }
     if (normalized.includes('jwks') || normalized.includes('jwk') || normalized.includes('key')) {
         return {
             code: 'MCP_AUTH_JWKS_ERROR',
@@ -368,6 +702,64 @@ function classifyBearerVerificationError(error) {
 }
 
 /**
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {string | undefined}
+ */
+function readStaticBearerToken(env) {
+    const value = String(env['COPILOT_MCP_STATIC_BEARER_TOKEN'] ?? '');
+    if (!value || value.length > MAX_BEARER_TOKEN_LENGTH || hasAsciiControlChars(value)) return undefined;
+    return value;
+}
+
+/**
+ * @param {string} left
+ * @param {string} right
+ * @returns {boolean}
+ */
+function safeEqualString(left, right) {
+    const leftBuffer = Buffer.from(left);
+    const rightBuffer = Buffer.from(right);
+    return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+/**
+ * @param {string} jwksUri
+ * @returns {ReturnType<typeof createRemoteJWKSet>}
+ */
+function getRemoteJwks(jwksUri) {
+    let jwks = REMOTE_JWKS_CACHE.get(jwksUri);
+    if (jwks) return jwks;
+    pruneRemoteJwksCache();
+    jwks = createRemoteJWKSet(new URL(jwksUri), {
+        timeoutDuration: JWKS_TIMEOUT_MS,
+        cooldownDuration: JWKS_COOLDOWN_MS,
+        cacheMaxAge: JWKS_CACHE_MAX_AGE_MS,
+    });
+    REMOTE_JWKS_CACHE.set(jwksUri, jwks);
+    return jwks;
+}
+
+/**
+ * @returns {void}
+ */
+function pruneRemoteJwksCache() {
+    while (REMOTE_JWKS_CACHE.size >= MAX_JWKS_CACHE_ENTRIES) {
+        const oldestKey = REMOTE_JWKS_CACHE.keys().next().value;
+        if (typeof oldestKey !== 'string') return;
+        REMOTE_JWKS_CACHE.delete(oldestKey);
+    }
+}
+
+/**
+ * Clear in-memory auth caches. Intended for focused tests and local diagnostics.
+ *
+ * @returns {void}
+ */
+export function resetMcpAuthRuntimeForTests() {
+    REMOTE_JWKS_CACHE.clear();
+}
+
+/**
  * @param {string} token
  * @param {McpAuthScope[]} requiredScopes
  * @param {McpAuthConfig} config
@@ -375,7 +767,11 @@ function classifyBearerVerificationError(error) {
  * @returns {Promise<McpAuthorizationDecision>}
  */
 async function verifyBearerToken(token, requiredScopes, config, env) {
-    if (env['COPILOT_MCP_STATIC_BEARER_TOKEN'] && token === env['COPILOT_MCP_STATIC_BEARER_TOKEN']) {
+    if (!token || token.length > MAX_BEARER_TOKEN_LENGTH) {
+        return authInvalidTokenDecision(requiredScopes, config, 'Bearer token is malformed or too large.');
+    }
+    const staticBearerToken = readStaticBearerToken(env);
+    if (config.staticBearerEnabled && staticBearerToken && safeEqualString(token, staticBearerToken)) {
         return {
             allowed: true,
             required: true,
@@ -384,7 +780,12 @@ async function verifyBearerToken(token, requiredScopes, config, env) {
             method: 'static-bearer',
         };
     }
-    if (!config.jwksUri || !config.expectedIssuer || !config.expectedAudience) {
+    if (
+        !config.jwksUri ||
+        !config.expectedIssuer ||
+        !config.expectedAudience ||
+        config.acceptedAudiences.length === 0
+    ) {
         return {
             allowed: false,
             required: true,
@@ -392,7 +793,7 @@ async function verifyBearerToken(token, requiredScopes, config, env) {
             requiredScopes,
             code: 'MCP_AUTH_VALIDATOR_NOT_CONFIGURED',
             message: 'OAuth bearer validation is enabled, but issuer, audience or JWKS URI is not configured.',
-            hint: 'Set COPILOT_MCP_OAUTH_EXPECTED_ISSUER, COPILOT_MCP_OAUTH_AUDIENCE and COPILOT_MCP_OAUTH_JWKS_URI, or use none-dev for temporary tunnel testing.',
+            hint: 'Set COPILOT_MCP_OAUTH_EXPECTED_ISSUER, COPILOT_MCP_OAUTH_AUDIENCE and COPILOT_MCP_OAUTH_JWKS_URI, or use none-dev only for controlled local fallback testing.',
             challenge: buildWwwAuthenticateChallenge(requiredScopes, config, {
                 error: 'invalid_token',
                 errorDescription: 'OAuth bearer validation is not fully configured.',
@@ -400,19 +801,40 @@ async function verifyBearerToken(token, requiredScopes, config, env) {
         };
     }
     try {
-        let jwks = REMOTE_JWKS_CACHE.get(config.jwksUri);
-        if (!jwks) {
-            jwks = createRemoteJWKSet(new URL(config.jwksUri));
-            REMOTE_JWKS_CACHE.set(config.jwksUri, jwks);
-        }
+        const jwks = getRemoteJwks(config.jwksUri);
         const verified = await jwtVerify(token, jwks, {
             issuer: config.expectedIssuer,
             audience: config.acceptedAudiences,
+            algorithms: config.jwtAlgorithms,
         });
-        const tokenScopes = new Set([
-            ...normalizeScopeClaim(verified.payload['scope']),
-            ...normalizeScopeClaim(verified.payload['scp']),
-        ]);
+        const payload = verified.payload;
+        const audienceValues = normalizeAudienceClaim(payload.aud);
+        const tokenResource = typeof payload['resource'] === 'string' ? normalizeAudience(payload['resource'], '') : '';
+        if (tokenResource && !config.acceptedAudiences.includes(tokenResource)) {
+            return authInvalidTokenDecision(
+                requiredScopes,
+                config,
+                'Bearer token resource claim does not match this MCP resource.',
+                'MCP_AUTH_RESOURCE_INVALID',
+            );
+        }
+        if (config.requireResourceClaim && !tokenResource) {
+            return authInvalidTokenDecision(
+                requiredScopes,
+                config,
+                'Bearer token is missing the required resource claim.',
+                'MCP_AUTH_RESOURCE_MISSING',
+            );
+        }
+        if (audienceValues.length === 0) {
+            return authInvalidTokenDecision(
+                requiredScopes,
+                config,
+                'Bearer token is missing an audience claim.',
+                'MCP_AUTH_AUDIENCE_MISSING',
+            );
+        }
+        const tokenScopes = new Set([...normalizeScopeClaim(payload['scope']), ...normalizeScopeClaim(payload['scp'])]);
         const missingScopes = requiredScopes.filter((scope) => !tokenScopes.has(scope));
         if (missingScopes.length > 0) {
             return {
@@ -455,6 +877,54 @@ async function verifyBearerToken(token, requiredScopes, config, env) {
 }
 
 /**
+ * @param {McpAuthScope[]} requiredScopes
+ * @param {McpAuthConfig} config
+ * @param {string} errorDescription
+ * @param {string} [code]
+ * @returns {McpAuthorizationDecision}
+ */
+function authInvalidTokenDecision(requiredScopes, config, errorDescription, code = 'MCP_AUTH_TOKEN_INVALID') {
+    return {
+        allowed: false,
+        required: true,
+        enforcement: config.enforcement,
+        requiredScopes,
+        code,
+        message: 'Bearer token could not be verified.',
+        hint: errorDescription,
+        challenge: buildWwwAuthenticateChallenge(requiredScopes, config, {
+            error: 'invalid_token',
+            errorDescription,
+        }),
+    };
+}
+
+/**
+ * @param {string} hostname
+ * @returns {boolean}
+ */
+function isLoopbackHostname(hostname) {
+    const normalized = hostname.toLowerCase().replace(/\.$/u, '');
+    return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '[::1]' || normalized === '::1';
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} env
+ * @param {string} name
+ * @param {boolean} fallback
+ * @returns {boolean}
+ */
+function readBooleanEnv(env, name, fallback) {
+    const raw = String(env[name] ?? '')
+        .trim()
+        .toLowerCase();
+    if (!raw) return fallback;
+    if (raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on') return true;
+    if (raw === '0' || raw === 'false' || raw === 'no' || raw === 'off') return false;
+    return fallback;
+}
+
+/**
  * @param {import('../registry.js').McpToolDefinition} tool
  * @param {McpAuthContext} [context]
  * @param {McpAuthConfig} [config]
@@ -478,7 +948,7 @@ export async function authorizeMcpToolCall(
             method: 'not-required',
         };
     }
-    if (isPublicOauthDiagnosticTool(tool, env)) {
+    if (config.mode === 'oauth' && isPublicOauthDiagnosticTool(tool, env)) {
         return {
             allowed: true,
             required: false,

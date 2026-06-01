@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
-const ROOT = path.resolve(import.meta.dirname, '..');
-const TSCONFIG = path.join(ROOT, 'tsconfig.json');
+const ROOT = path.resolve(import.meta.dirname, '..', '..');
+const TSCONFIG = path.join(ROOT, 'tsconfig.node.json');
 const JSCONFIG = path.join(ROOT, 'jsconfig.json');
 
 // Parse command line arguments

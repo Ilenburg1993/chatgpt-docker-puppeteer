@@ -202,6 +202,14 @@ help:
 	@echo "  $(CYAN)make mcp-diagnose$(NC)      Diagnóstico MCP (RAG/LSP/Ollama)"
 	@echo "  $(CYAN)make copilot-mcp-up$(NC)    Sobe MCP OAuth + Cloudflare permanente"
 	@echo "  $(CYAN)make copilot-mcp-restart$(NC) Reinicia MCP OAuth + Cloudflare"
+	@echo "  $(CYAN)make copilot-mcp-h2-origin-plan$(NC) Planeja origin remoto HTTPS/HTTP2 sem aplicar"
+	@echo "  $(CYAN)make copilot-mcp-h2-origin-apply-dry-run$(NC) Dry-run do apply HTTPS/HTTP2 no named tunnel"
+	@echo "  $(CYAN)make copilot-mcp-h2-origin-apply$(NC) Aplica HTTPS/HTTP2 no named tunnel com confirmação explícita"
+	@echo "  $(CYAN)make copilot-mcp-h2-remote-audit$(NC) Audita Cloudflare contra perfil HTTPS/HTTP2"
+	@echo "  $(CYAN)make copilot-mcp-h2-restart$(NC) Reinicia MCP OAuth + Cloudflare em origin HTTP/2"
+	@echo "  $(CYAN)make copilot-mcp-h2-canary$(NC) Valida canary H2: audit + smoke + status"
+	@echo "  $(CYAN)make copilot-mcp-h2-migrate$(NC) Fluxo canônico completo para migrar origin H2"
+	@echo "  $(CYAN)make copilot-mcp-http1-rollback$(NC) Rollback canônico para origin HTTP/1"
 	@echo "  $(CYAN)make copilot-mcp-edge-audit$(NC) Audita Cloudflare cache/WAF/rate-limit/transforms"
 	@echo "  $(CYAN)make copilot-mcp-edge-backup-create$(NC) Persiste backup local Cloudflare antes de mutar"
 	@echo "  $(CYAN)make copilot-mcp-edge-backup-list$(NC) Lista backups locais Cloudflare"
@@ -1199,7 +1207,7 @@ test-all: test test-unit test-integration test-e2e
 # 9️⃣.1 RAG & MCP
 # =============================================================================
 
-.PHONY: mcp-diagnose copilot-mcp-up copilot-mcp-down copilot-mcp-restart copilot-mcp-status copilot-mcp-remote-audit copilot-mcp-smoke copilot-mcp-smoke-refresh copilot-mcp-oauth-smoke lsp-health semantic-preflight rag-help audit-help rag-preflight rag-health rag-index rag-index-code-config rag-index-docs rag-ask rag-hybrid rag-expand rag-reset rag-watch rag-full-rebuild rag-rebuild-zero rag-rebuild-code-config rag-rebuild-code-config-strict
+.PHONY: mcp-diagnose copilot-mcp-up copilot-mcp-down copilot-mcp-restart copilot-mcp-h2-up copilot-mcp-h2-restart copilot-mcp-h2-status copilot-mcp-h2-remote-audit copilot-mcp-h2-canary copilot-mcp-h2-migrate copilot-mcp-http1-rollback copilot-mcp-status copilot-mcp-remote-audit copilot-mcp-origin-plan copilot-mcp-h2-origin-plan copilot-mcp-h2-origin-apply-dry-run copilot-mcp-h2-origin-apply copilot-mcp-smoke copilot-mcp-smoke-refresh copilot-mcp-oauth-smoke lsp-health semantic-preflight rag-help audit-help rag-preflight rag-health rag-index rag-index-code-config rag-index-docs rag-ask rag-hybrid rag-expand rag-reset rag-watch rag-full-rebuild rag-rebuild-zero rag-rebuild-code-config rag-rebuild-code-config-strict
 
 rag-help:
 	@echo ""
@@ -1244,7 +1252,7 @@ mcp-diagnose:
 
 copilot-mcp-up:
 	@echo "$(CYAN)🔐 Subindo MCP OAuth + Cloudflare permanente$(NC)"
-	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE=src/copilot/.ai/mcp/oauth-refresh-tokens.json COPILOT_MCP_DEV_OAUTH_CLIENT_FILE=src/copilot/.ai/mcp/oauth-clients.json CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:up
+	@$(NPM) run copilot:mcp:up
 
 copilot-mcp-down:
 	@echo "$(CYAN)🛑 Encerrando MCP + Cloudflare permanente$(NC)"
@@ -1252,15 +1260,75 @@ copilot-mcp-down:
 
 copilot-mcp-restart:
 	@echo "$(CYAN)🔁 Reiniciando MCP OAuth + Cloudflare permanente$(NC)"
-	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE=src/copilot/.ai/mcp/oauth-refresh-tokens.json COPILOT_MCP_DEV_OAUTH_CLIENT_FILE=src/copilot/.ai/mcp/oauth-clients.json CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:restart
+	@$(NPM) run copilot:mcp:restart
 
 copilot-mcp-status:
 	@echo "$(CYAN)📡 Status MCP + Cloudflare permanente$(NC)"
-	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:status
+	@$(NPM) run copilot:mcp:status
+
+copilot-mcp-h2-status:
+	@echo "$(CYAN)📡 Status MCP + Cloudflare permanente em origin HTTPS/HTTP2$(NC)"
+	@$(NPM) run copilot:mcp:h2:status
+
+copilot-mcp-h2-restart:
+	@echo "$(CYAN)🚀 Reiniciando MCP OAuth + Cloudflare com origin HTTPS/HTTP2$(NC)"
+	@$(NPM) run copilot:mcp:h2:restart
+
+copilot-mcp-h2-up:
+	@echo "$(CYAN)🚀 Subindo MCP OAuth + Cloudflare com origin HTTPS/HTTP2$(NC)"
+	@$(NPM) run copilot:mcp:h2:up
 
 copilot-mcp-remote-audit:
 	@echo "$(CYAN)☁️  Auditoria remota Cloudflare MCP$(NC)"
 	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:remote-audit
+
+copilot-mcp-origin-plan:
+	@echo "$(CYAN)🧭 Plano de origin remoto Cloudflare MCP$(NC)"
+	@$(NPM) run copilot:mcp:cloudflare:origin-plan
+
+copilot-mcp-h2-origin-plan:
+	@echo "$(CYAN)🧭 Plano de origin remoto HTTPS/HTTP2 Cloudflare MCP$(NC)"
+	@$(NPM) run copilot:mcp:cloudflare:h2-origin-plan
+
+copilot-mcp-h2-origin-apply-dry-run:
+	@echo "$(CYAN)🧪 Dry-run da aplicação do origin HTTPS/HTTP2 no named tunnel$(NC)"
+	@$(NPM) run copilot:mcp:cloudflare:h2-origin-apply:dry-run
+
+copilot-mcp-h2-origin-apply:
+	@echo "$(YELLOW)⚠️  Aplicando origin HTTPS/HTTP2 no named tunnel Cloudflare$(NC)"
+	@$(NPM) run copilot:mcp:cloudflare:h2-origin-apply
+
+copilot-mcp-h2-remote-audit:
+	@echo "$(CYAN)☁️  Auditoria remota Cloudflare MCP em perfil HTTPS/HTTP2$(NC)"
+	@$(NPM) run copilot:mcp:cloudflare:h2-remote-audit
+
+copilot-mcp-h2-canary:
+	@echo "$(CYAN)🧪 Canary HTTPS/HTTP2 MCP: remote audit + smoke + status$(NC)"
+	@$(NPM) run copilot:mcp:cloudflare:h2-canary
+
+copilot-mcp-h2-migrate:
+	@echo "$(YELLOW)⚠️  Fluxo canônico completo para migrar o origin MCP para HTTPS/HTTP2$(NC)"
+	@$(NPM) run copilot:mcp:cloudflare:h2-migrate
+
+copilot-mcp-http1-rollback:
+	@echo "$(YELLOW)↩️  Rollback canônico do origin MCP para HTTP/1$(NC)"
+	@$(NPM) run copilot:mcp:cloudflare:http1-rollback
+
+copilot-mcp-config-audit:
+	@echo "$(CYAN)🧭 Auditoria Cloudflare Config/Products MCP$(NC)"
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:config-audit
+
+copilot-mcp-skip-audit:
+	@echo "$(CYAN)⏭️  Auditoria Cloudflare Skip/Non-interference MCP$(NC)"
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:skip-audit
+
+copilot-mcp-passthrough-plan:
+	@echo "$(CYAN)🧭 Plano Cloudflare MCP passthrough config$(NC)"
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:mcp-passthrough:plan
+
+copilot-mcp-passthrough-diff:
+	@echo "$(CYAN)🧮 Diff Cloudflare MCP passthrough config$(NC)"
+	@COPILOT_MCP_AUTH_MODE=oauth COPILOT_MCP_AUTH_ENFORCEMENT=all CLOUDFLARE_TUNNEL_TOKEN_FILE=src/copilot/.ai/cloudflare/workspace-mcp-dev.token $(NPM) run copilot:mcp:cloudflare:mcp-passthrough:diff
 
 copilot-mcp-edge-audit:
 	@echo "$(CYAN)🛡️  Auditoria Cloudflare Edge/Rulesets MCP$(NC)"

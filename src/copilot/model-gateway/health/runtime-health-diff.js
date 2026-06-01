@@ -41,15 +41,13 @@ function probeStatusOf(probe) {
 function probeStatusesOf(record) {
     const probes = optionalRecord(record['probes']);
     if (!probes) return {};
-    return Object.fromEntries(
-        Object.entries(probes)
-            .map(([kind, probe]) => {
-                const normalizedProbe = optionalRecord(probe);
-                return normalizedProbe ? [kind, probeStatusOf(normalizedProbe)] : null;
-            })
-            .filter((entry) => entry !== null)
-            .sort(([left], [right]) => left.localeCompare(right)),
-    );
+    /** @type {Array<[string, string]>} */
+    const entries = [];
+    for (const [kind, probe] of Object.entries(probes)) {
+        const normalizedProbe = optionalRecord(probe);
+        if (normalizedProbe) entries.push([kind, probeStatusOf(normalizedProbe)]);
+    }
+    return Object.fromEntries(entries.sort(([left], [right]) => left.localeCompare(right)));
 }
 
 /**

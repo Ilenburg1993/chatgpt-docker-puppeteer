@@ -9,13 +9,16 @@ import { logMcp } from './control-plane/audit.js';
 
 /**
  * @param {string[]} argv
- * @returns {'http' | 'stdio'}
+ * @returns {'http' | 'http2' | 'stdio'}
  */
 function parseTransport(argv) {
     const idx = argv.indexOf('--transport');
     const value = idx >= 0 ? argv[idx + 1] : undefined;
-    if (value === 'stdio' || value === 'http') return value;
+    if (value === 'stdio' || value === 'http' || value === 'http2' || value === 'h2') {
+        return value === 'h2' ? 'http2' : value;
+    }
     if (argv.includes('--stdio')) return 'stdio';
+    if (argv.includes('--http2') || argv.includes('--h2')) return 'http2';
     return 'http';
 }
 
@@ -31,10 +34,12 @@ async function main() {
         await startStdioMcpServer();
         return;
     }
-    const { startHttpMcpServer } = await import('./adapters/http.js');
-    const server = await startHttpMcpServer();
+    const server =
+        transport === 'http2'
+            ? await import('./adapters/http2.js').then((module) => module.startHttp2McpServer())
+            : await import('./adapters/http.js').then((module) => module.startHttpMcpServer());
     const shutdown = () => {
-        logMcp('INFO', 'Stopping MCP HTTP server.');
+        logMcp('INFO', 'Stopping MCP HTTP server.', { transport });
         server.close(() => process.exit(0));
     };
     process.on('SIGINT', shutdown);

@@ -17,6 +17,7 @@ const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:3333/mcp';
  * @property {boolean} ok
  * @property {number} [status]
  * @property {unknown} [body]
+ * @property {Record<string, string>} [headers]
  * @property {string} [error]
  * @property {boolean} [skipped]
  * @property {string} [reason]
@@ -61,6 +62,7 @@ export async function runMcpHttpSmoke(options = {}) {
         mcpUrl,
         originUrl,
         health,
+        protocol: extractProtocolReport(health),
         toolsList: {
             ok: toolsList.ok,
             status: toolsList.status ?? null,
@@ -128,7 +130,7 @@ async function probeJson(url, init) {
         } catch {
             body = text;
         }
-        return { ok: response.ok, status: response.status, body };
+        return { ok: response.ok, status: response.status, body, headers: extractTelemetryHeaders(response.headers) };
     } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
@@ -169,6 +171,39 @@ function readSmokeBearerToken() {
  */
 function hasJsonRpcError(body) {
     return Boolean(body && typeof body === 'object' && 'error' in body && body.error);
+}
+
+/**
+ * @param {ProbeResult} health
+ * @returns {Record<string, unknown>}
+ */
+function extractProtocolReport(health) {
+    const body = health.body;
+    const bodyProtocol =
+        body &&
+        typeof body === 'object' &&
+        'http' in body &&
+        body.http &&
+        typeof body.http === 'object' &&
+        'protocol' in body.http
+            ? body.http.protocol
+            : null;
+    return {
+        headers: health.headers ?? {},
+        health: bodyProtocol,
+    };
+}
+
+/**
+ * @param {Headers} headers
+ * @returns {Record<string, string>}
+ */
+function extractTelemetryHeaders(headers) {
+    return {
+        originProtocolMode: headers.get('x-mcp-origin-protocol-mode') ?? '',
+        originHttpVersion: headers.get('x-mcp-origin-http-version') ?? '',
+        originAlpn: headers.get('x-mcp-origin-alpn') ?? '',
+    };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

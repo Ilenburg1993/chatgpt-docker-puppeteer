@@ -33,9 +33,11 @@ describe('copilot MCP runtime metrics', () => {
 
         assert.equal(snapshot.totals.calls, 2);
         assert.equal(snapshot.totals.errors, 1);
-        assert.equal(snapshot.tools.repo_status.calls, 2);
-        assert.equal(snapshot.tools.repo_status.errors, 1);
-        assert.equal(snapshot.tools.repo_status.averageDurationMs, 15);
+        const repoStatus = snapshot.tools['repo_status'];
+        assert.ok(repoStatus);
+        assert.equal(repoStatus.calls, 2);
+        assert.equal(repoStatus.errors, 1);
+        assert.equal(repoStatus.averageDurationMs, 15);
     });
 
     it('exposes metrics through mcp_runtime_health', async () => {

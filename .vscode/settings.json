@@ -1111,4 +1111,8 @@
   "github.copilot.chat.useResponsesApiTruncation": true,
   "js/ts.tsserver.tracing.enabled": false,
   "chat.agent.sandbox.enabled": "off",
+  "workbench.browser.openLocalhostLinks": true,
+  "workbench.browser.showInTitleBar": true,
+  "workbench.browser.enableChatTools": true,
+  "kilo-code.new.browserAutomation.enabled": true,
 }

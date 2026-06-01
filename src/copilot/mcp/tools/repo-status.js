@@ -10,7 +10,7 @@ import { errorResult, okResult } from '../control-plane/result.js';
 import { execGit } from './shared/git.js';
 
 /**
- * @returns {Promise<import('@modelcontextprotocol/sdk/types.js').CallToolResult>}
+ * @returns {Promise<import('../control-plane/result.js').StructuredCallToolResult>}
  */
 export async function repoStatusHandler() {
     const [branch, status, head] = await Promise.all([

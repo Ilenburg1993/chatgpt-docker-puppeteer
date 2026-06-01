@@ -100,6 +100,27 @@ async function readCloudflaredOriginDiagnostics() {
 }
 
 /**
+ * @param {string} stdout
+ * @returns {unknown}
+ */
+export function parseConnectorSmokeJsonOutput(stdout) {
+    const candidates = [stdout.trim()];
+    const jsonStart = /\{\s*"ok"\s*:/u.exec(stdout)?.index;
+    if (typeof jsonStart === 'number' && jsonStart > 0) {
+        candidates.push(stdout.slice(jsonStart).trim());
+    }
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+        try {
+            return JSON.parse(candidate);
+        } catch {
+            // Try the next candidate. The smoke CLI may emit startup logs before the final JSON report.
+        }
+    }
+    throw new Error('No parseable smoke JSON object found in stdout.');
+}
+
+/**
  * @param {unknown} value
  * @param {boolean} includeRemoteToolNames
  * @returns {unknown}
@@ -121,7 +142,7 @@ function compactSmokeReport(value, includeRemoteToolNames) {
 
 /**
  * @param {{ includeRemoteToolNames?: boolean }} input
- * @returns {Promise<import('@modelcontextprotocol/sdk/types.js').CallToolResult>}
+ * @returns {Promise<import('../control-plane/result.js').StructuredCallToolResult>}
  */
 async function runConnectorSmokeRefresh(input) {
     const config = readCloudflareTunnelConfig();
@@ -139,6 +160,7 @@ async function runConnectorSmokeRefresh(input) {
             COPILOT_MCP_AUTH_MODE: process.env['COPILOT_MCP_AUTH_MODE'] ?? 'oauth',
             COPILOT_MCP_AUTH_ENFORCEMENT: process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] ?? 'all',
             COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: config.publicMcpUrl,
+            COPILOT_MCP_SMOKE_COMPACT: '1',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -183,12 +205,13 @@ async function runConnectorSmokeRefresh(input) {
     }
     let parsed;
     try {
-        parsed = JSON.parse(stdout);
-    } catch {
+        parsed = parseConnectorSmokeJsonOutput(stdout);
+    } catch (error) {
         return errorResult('Cloudflare connector smoke refresh did not return JSON.', {
             code: 'ERR_CONNECTOR_SMOKE_INVALID_JSON',
             exitCode: exit.code,
             connectorUrl: config.publicMcpUrl,
+            parseError: error instanceof Error ? error.message : String(error),
             stdoutTail: stdout.slice(-8000),
             stderrTail: stderr.slice(-8000),
         });

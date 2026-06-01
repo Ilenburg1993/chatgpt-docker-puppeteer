@@ -8,6 +8,10 @@
 import Cloudflare from 'cloudflare';
 import { readFile } from 'node:fs/promises';
 import { readCloudflareTunnelConfig } from './config.js';
+import {
+    auditOriginRequestProfile as auditOriginRequestProfileBase,
+    buildDesiredOriginRequestProfile,
+} from './origin-request-profile.js';
 
 const DEFAULT_ENV_FILE = '.env.local';
 
@@ -20,6 +24,8 @@ const DEFAULT_ENV_FILE = '.env.local';
  * @property {string} tunnelName
  * @property {string} publicHostname
  * @property {string} expectedOriginUrl
+ * @property {string | undefined} originServerName
+ * @property {boolean} enableHttp2Origin
  * @property {string} expectedPublicMcpUrl
  * @property {string} zone
  * @property {string[]} credentialSources
@@ -43,6 +49,8 @@ export async function readCloudflareRemoteApiConfig(env = process.env) {
         tunnelName: tunnelConfig.tunnelName,
         publicHostname: tunnelConfig.publicHostname,
         expectedOriginUrl: tunnelConfig.originUrl,
+        originServerName: tunnelConfig.originServerName,
+        enableHttp2Origin: readBooleanEnv(merged['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'], false),
         expectedPublicMcpUrl: tunnelConfig.publicMcpUrl ?? `https://${tunnelConfig.publicHostname}/mcp`,
         zone: tunnelConfig.zone,
         credentialSources: buildCredentialSources(env, fileEnv),
@@ -101,10 +109,7 @@ export async function auditCloudflareRemoteTunnel(options = {}) {
             warnings,
             nextActions:
                 critical.length === 0
-                    ? [
-                          'Keep npm run copilot:mcp:cloudflare:remote-audit in the regular tunnel smoke sequence.',
-                          'Run make copilot-mcp-smoke after remote config or DNS changes.',
-                      ]
+                    ? buildRemoteAuditNextActions(apiConfig.enableHttp2Origin === true)
                     : [
                           'Fix critical Cloudflare drift before relying on ChatGPT or Claude connector sessions.',
                           'The canonical origin service is http://127.0.0.1:3333, not localhost and not a /mcp path.',
@@ -128,6 +133,22 @@ export async function auditCloudflareRemoteTunnel(options = {}) {
             ],
         };
     }
+}
+
+/**
+ * @param {boolean} h2Origin
+ * @returns {string[]}
+ */
+function buildRemoteAuditNextActions(h2Origin) {
+    return h2Origin
+        ? [
+              'Keep npm run copilot:mcp:cloudflare:h2-remote-audit in the HTTP/2 origin smoke sequence.',
+              'Run make copilot-mcp-h2-remote-audit and make copilot-mcp-smoke after H2 remote config or DNS changes.',
+          ]
+        : [
+              'Keep npm run copilot:mcp:cloudflare:remote-audit in the regular tunnel smoke sequence.',
+              'Run make copilot-mcp-smoke after remote config or DNS changes.',
+          ];
 }
 
 /**
@@ -180,6 +201,19 @@ function unquoteEnvValue(value) {
  */
 function firstNonEmpty(...values) {
     return values.map((value) => String(value ?? '').trim()).find(Boolean);
+}
+
+/**
+ * @param {string | undefined} value
+ * @param {boolean} fallback
+ * @returns {boolean}
+ */
+function readBooleanEnv(value, fallback) {
+    const raw = String(value ?? '').trim().toLowerCase();
+    if (!raw) return fallback;
+    if (raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on') return true;
+    if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return false;
+    return fallback;
 }
 
 /**
@@ -242,13 +276,37 @@ function buildDesiredRemoteConfigSummary(config) {
         originService: config.expectedOriginUrl,
         zone: config.zone,
         catchAll: 'http_status:404',
+        desiredOriginRequestProfile: buildDesiredOriginRequestProfile({
+            originServiceUrl: config.expectedOriginUrl,
+            ...(config.originServerName ? { originServerName: config.originServerName } : {}),
+            enableHttp2Origin: config.enableHttp2Origin,
+        }),
     };
+}
+
+/**
+ * @param {{ env?: NodeJS.ProcessEnv }} [options]
+ * @returns {Promise<{ config: CloudflareRemoteApiConfig; tunnelId: string; tunnel: Record<string, unknown> }>}
+ */
+export async function resolveCloudflareRemoteTunnelReference(options = {}) {
+    const config = await readCloudflareRemoteApiConfig(options.env ?? process.env);
+    if (!config.apiToken) throw new Error('CLOUDFLARE_API_TOKEN is required to resolve the remote Cloudflare tunnel.');
+    if (!config.accountId) throw new Error('CLOUDFLARE_ACCOUNT_ID is required to resolve the remote Cloudflare tunnel.');
+    const client = new Cloudflare({ apiToken: config.apiToken, maxRetries: 1, timeout: 15000 });
+    const lookup = await findRemoteTunnel(client, { ...config, accountId: config.accountId });
+    if (!lookup.ok) {
+        throw new Error(`Could not resolve Cloudflare tunnel "${config.tunnelName}": ${lookup.reason}.`);
+    }
+    return { config, tunnelId: lookup.id, tunnel: lookup.tunnel };
 }
 
 /**
  * @param {Cloudflare} client
  * @param {CloudflareRemoteApiConfig} config
- * @returns {Promise<{ ok: true; id: string; tunnel: Record<string, unknown> } | { ok: false; reason: string; matches: Record<string, unknown>[] }>}
+ * @returns {Promise<
+ *     | { ok: true; id: string; tunnel: Record<string, unknown> }
+ *     | { ok: false; reason: string; matches: Record<string, unknown>[] }
+ * >}
  */
 async function findRemoteTunnel(client, config) {
     if (config.tunnelId) {
@@ -317,6 +375,14 @@ export function compareRemoteConfig(config, tunnel, configuration) {
     const ingress = Array.isArray(nestedConfig['ingress']) ? nestedConfig['ingress'].map(asRecord) : [];
     const hostnameRule = ingress.find((rule) => rule['hostname'] === config.publicHostname);
     const catchAllRule = ingress.find((rule) => !rule['hostname'] && rule['service'] === 'http_status:404');
+    const originRequest = hostnameRule ? asRecord(hostnameRule['originRequest']) : {};
+    const originRequestAudit = auditOriginRequestProfileBase(originRequest, {
+        hostnameRulePresent: Boolean(hostnameRule),
+        originServiceUrl: config.expectedOriginUrl,
+        ...(config.originServerName ? { originServerName: config.originServerName } : {}),
+        enableHttp2Origin: config.enableHttp2Origin,
+    });
+    warnings.push(...originRequestAudit.warnings);
     if (!hostnameRule) {
         critical.push(`Missing ingress rule for ${config.publicHostname}.`);
     } else if (hostnameRule['service'] !== config.expectedOriginUrl) {
@@ -356,6 +422,8 @@ export function compareRemoteConfig(config, tunnel, configuration) {
                           hostname: hostnameRule['hostname'],
                           service: hostnameRule['service'],
                           matchesExpectedOrigin: hostnameRule['service'] === config.expectedOriginUrl,
+                          originRequest: originRequestAudit.actual,
+                          originRequestFindings: originRequestAudit,
                       }
                     : null,
                 catchAllConfigured: Boolean(catchAllRule),

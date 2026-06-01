@@ -8,6 +8,7 @@ import {
     writeCloudflareEdgeBackup,
 } from '../../../../src/copilot/mcp/cloudflare/edge-backup.js';
 
+/** @type {string | undefined} */
 let tempDir;
 
 afterEach(async () => {
@@ -49,7 +50,7 @@ describe('mcp/cloudflare/edge-backup', () => {
             fileName: 'cloudflare-edge-snapshot-2026-05-24T17-45-01-123Z-before-rate-limit.json',
         });
 
-        const backup = result.backup;
+        const backup = /** @type {{ relativePath: string }} */ (result.backup);
         const persisted = JSON.parse(await readFile(String(backup.relativePath), 'utf8'));
         expect(persisted.kind).toBe('cloudflare-edge-snapshot-backup');
         expect(persisted.snapshot.readiness.mutationReady).toBe(true);

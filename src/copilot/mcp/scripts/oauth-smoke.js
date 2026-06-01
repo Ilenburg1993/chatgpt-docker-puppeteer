@@ -45,9 +45,15 @@ export async function runMcpOAuthSmoke(options = {}) {
             ? await refreshToken(metadata, resource, String(registrationBody?.['client_id'] ?? ''), dcrTokenBody['refresh_token'])
             : failure('refresh_token missing');
     const dcrRefreshTokenBody = asRecord(dcrRefreshToken.body);
-    const runtimeHealth =
+    const dcrRuntimeAccessToken =
         typeof dcrRefreshTokenBody?.['access_token'] === 'string'
-            ? await callMcpTool(buildMcpUrlFromResource(resource), dcrRefreshTokenBody['access_token'], 'mcp_runtime_health')
+            ? dcrRefreshTokenBody['access_token']
+            : typeof dcrTokenBody?.['access_token'] === 'string'
+              ? dcrTokenBody['access_token']
+              : null;
+    const runtimeHealth =
+        typeof dcrRuntimeAccessToken === 'string'
+            ? await callMcpTool(buildMcpUrlFromResource(resource), dcrRuntimeAccessToken, 'mcp_runtime_health')
             : failure('token missing');
     const cimdClientMetadataUrl = `${authorizationServer}/.well-known/oauth-client/codex-smoke.json`;
     const cimdClientMetadata = await probeJson(cimdClientMetadataUrl, { method: 'GET' });
@@ -250,11 +256,15 @@ async function authorizeAndExchangeClient(metadata, client) {
     authorizeUrl.searchParams.set('resource', client.resource);
     authorizeUrl.searchParams.set('code_challenge', challenge);
     authorizeUrl.searchParams.set('code_challenge_method', 'S256');
-    authorizeUrl.searchParams.set('state', 'codex-smoke');
+    const state = base64Url(randomBytes(16));
+    authorizeUrl.searchParams.set('state', state);
     const authorize = await fetch(authorizeUrl, { redirect: 'manual', signal: AbortSignal.timeout(10000) });
     const location = authorize.headers.get('location') ?? '';
-    const code = location ? new URL(location).searchParams.get('code') : null;
+    const redirectUrl = parseRedirectUrl(location, client.redirectUri);
+    const code = redirectUrl?.searchParams.get('code') ?? null;
+    const returnedState = redirectUrl?.searchParams.get('state') ?? null;
     if (!code) return failure('authorization code missing', authorize.status);
+    if (returnedState !== state) return failure('authorization state mismatch', authorize.status);
     return probeJson(tokenEndpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
@@ -439,6 +449,20 @@ function summarizeUserinfo(probe) {
  */
 function hasJsonRpcError(body) {
     return Boolean(body && typeof body === 'object' && 'error' in body && body.error);
+}
+
+/**
+ * @param {string} location
+ * @param {string} fallbackBaseUrl
+ * @returns {URL | null}
+ */
+function parseRedirectUrl(location, fallbackBaseUrl) {
+    if (!location) return null;
+    try {
+        return new URL(location, fallbackBaseUrl);
+    } catch {
+        return null;
+    }
 }
 
 /**
