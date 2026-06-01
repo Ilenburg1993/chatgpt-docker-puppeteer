@@ -978,6 +978,7 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                     }),
                 ),
                 writeRouteDecisionEvents: vi.fn(() => Promise.resolve()),
+                writeAutomationDecisionRecords: vi.fn(() => Promise.resolve({ automationDecisions: 1 })),
                 readOpenAIModelCatalogList: vi.fn(() => Promise.resolve({ object: 'list', data: [] })),
                 readRuntimeHealthForModel: vi.fn(() => Promise.resolve({ health: null, probes: [] })),
             };
@@ -2785,6 +2786,18 @@ describe('terminal /byok command', () => {
 
         expect(setTerminalModelProjection).toHaveBeenCalledWith('openai/gpt-oss-120b');
         expect(ctx.output()).toContain('Auto apply solicitou setModel vivo');
+    });
+
+    it('registra decisão auto sem aplicar efeitos e explica auto off', async () => {
+        mockProjection();
+        const recordCtx = mockCtx();
+        await cmdByok({ println: recordCtx.println }, 'auto record profile:repo_agent');
+        expect(recordCtx.output()).toContain('decision(s) gravada(s)');
+
+        const offCtx = mockCtx();
+        await cmdByok({ println: offCtx.println }, 'auto off');
+        expect(offCtx.output()).toContain('model-gateway auto off');
+        expect(offCtx.output()).toContain('COPILOT_BYOK_GATEWAY_AUTO');
     });
 
     it('explica bloqueio local padrão na auditoria de seleção pré-runtime', async () => {

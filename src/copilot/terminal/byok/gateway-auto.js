@@ -21,6 +21,7 @@ import {
     listByokProviderModelHealth,
     readModelGatewayRuntimeAutomationPolicy,
     resolveModelGatewaySelectionPolicy,
+    SqliteModelGatewayCatalogStore,
 } from '#copilot/model-gateway';
 
 import { listTerminalSdkSessionInventory } from '../frontend/index.js';
@@ -60,7 +61,7 @@ export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
 
 /**
  * @param {string[]} rest
- * @param {{ allowEffects?: boolean; catalogPath?: string; env?: NodeJS.ProcessEnv }} [options]
+ * @param {{ allowEffects?: boolean; catalogPath?: string; env?: NodeJS.ProcessEnv; persistAutomationDecision?: boolean }} [options]
  * @returns {Promise<{
  *     schema: 'terminal-byok-gateway-auto-status';
  *     args: ReturnType<typeof parseTerminalByokGatewayAutoArgs>;
@@ -68,6 +69,7 @@ export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
  *     inventory: Awaited<ReturnType<typeof listTerminalSdkSessionInventory>>;
  *     decision: ReturnType<typeof buildModelGatewayRuntimeAutomationDecision>;
  *     controllerStep: ReturnType<typeof buildModelGatewayRuntimeAutomationControllerStep>;
+ *     persistence: { automationDecisions: number } | null;
  * }>}
  */
 export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
@@ -112,6 +114,17 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
             allowNewSession: args.allowNewSession,
         },
     });
+    const persistence =
+        options.persistAutomationDecision === true
+            ? await new SqliteModelGatewayCatalogStore().writeAutomationDecisionRecords([
+                  {
+                      ...decision,
+                      decisionId: `terminal-auto:${Date.now()}:${process.pid}`,
+                      timestamp: new Date().toISOString(),
+                      source: 'terminal-byok-auto-status',
+                  },
+              ])
+            : null;
     return {
         schema: 'terminal-byok-gateway-auto-status',
         args,
@@ -119,5 +132,6 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
         inventory,
         decision,
         controllerStep,
+        persistence,
     };
 }

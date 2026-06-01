@@ -577,6 +577,20 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Apply only policy-authorized terminal effects from the model-gateway automation decision.',
     },
     {
+        id: 'terminal.auto-record',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto record profile:repo_agent',
+        summary: 'Persist the current automation decision to SQLite without applying terminal effects.',
+    },
+    {
+        id: 'terminal.auto-off',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto off',
+        summary: 'Explain how to disable persistent model-gateway automation policy for the next boot.',
+    },
+    {
         id: 'terminal.prebuild-readiness',
         phase: 'prebuild',
         surface: 'terminal',

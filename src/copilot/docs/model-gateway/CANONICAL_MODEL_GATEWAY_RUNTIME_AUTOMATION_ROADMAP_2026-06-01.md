@@ -315,7 +315,7 @@ Precisamos de um cockpit operacional unico:
 - [x] D.2 Adicionar `/byok auto status`.
 - [x] D.3 Adicionar `/byok auto plan`.
 - [x] D.4 Adicionar `/byok auto apply`.
-- [ ] D.5 Adicionar `/byok auto off`.
+- [x] D.5 Adicionar `/byok auto off`.
 - [x] D.6 `status` deve mostrar:
   - [x] policy;
   - [x] rota viva;
