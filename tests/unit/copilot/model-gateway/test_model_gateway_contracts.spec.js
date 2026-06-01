@@ -4192,6 +4192,8 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === '/byok auto apply profile:repo_agent allow-live-set-model'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto policy'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto doctor profile:repo_agent'));
+        assert.ok(commands.some((entry) => entry.command === '/byok auto explain profile:repo_agent'));
+        assert.ok(commands.some((entry) => entry.command === '/byok auto switch profile:repo_agent'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto record profile:repo_agent'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto history 10'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto handoffs 10'));

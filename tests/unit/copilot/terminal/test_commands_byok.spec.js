@@ -3021,6 +3021,20 @@ describe('terminal /byok command', () => {
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
     });
 
+    it('explica e aciona switch auto usando apenas efeitos autorizados', async () => {
+        mockProjection();
+        const explainCtx = mockCtx();
+        const switchCtx = mockCtx();
+
+        await cmdByok({ println: explainCtx.println }, 'auto explain profile:repo_agent');
+        await cmdByok({ println: switchCtx.println }, 'auto switch profile:repo_agent');
+
+        expect(explainCtx.output()).toContain('BYOK model-gateway auto');
+        expect(explainCtx.output()).toContain('BYOK model-gateway auto doctor');
+        expect(switchCtx.output()).toContain('BYOK model-gateway auto');
+        expect(switchCtx.output()).toContain('trilha auto:');
+    });
+
     it('centraliza executor terminal dos efeitos auto', async () => {
         const result = await applyTerminalByokGatewayAutoEffects({
             effects: [

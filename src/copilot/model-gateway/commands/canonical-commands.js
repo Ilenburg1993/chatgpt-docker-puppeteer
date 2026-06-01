@@ -619,6 +619,20 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Show auto-mode readiness, policy, selected route and SQLite ledgers inside the terminal cockpit.',
     },
     {
+        id: 'terminal.auto-explain',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto explain profile:repo_agent',
+        summary: 'Explain the selected automation decision, policy gates and operational blockers.',
+    },
+    {
+        id: 'terminal.auto-switch',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto switch profile:repo_agent',
+        summary: 'Apply the best currently selected fallback using only policy-authorized effects.',
+    },
+    {
         id: 'terminal.auto-apply',
         phase: 'automation',
         surface: 'terminal',

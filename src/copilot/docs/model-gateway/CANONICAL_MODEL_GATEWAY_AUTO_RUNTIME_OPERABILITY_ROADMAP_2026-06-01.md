@@ -442,8 +442,8 @@ Todos os checkboxes sao booleanos. Nao usar estados parciais.
 - [x] J.4 `/byok auto history`.
 - [x] J.5 `model-gateway:ops`.
 - [x] J.6 `/byok auto policy`.
-- [ ] J.7 `/byok auto explain`.
-- [ ] J.8 `/byok auto switch`.
+- [x] J.7 `/byok auto explain`.
+- [x] J.8 `/byok auto switch`.
 - [x] J.9 `model-gateway:auto:ready`.
 - [x] J.10 `model-gateway:auto:doctor`.
 - [ ] J.11 Mostrar prepared/live/confirmed em uma linha.

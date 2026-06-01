@@ -63,8 +63,8 @@ O guia anterior continua como historico:
 - [x] Pre-turn auto roda quando policy esta ligada.
 - [x] Pre-turn persiste decision, effect applications e handoffs.
 - [x] `prepare_new_sdk_session` agenda novo boot SDK quando autorizado.
-- [ ] Falta `/byok auto explain`.
-- [ ] Falta `/byok auto switch`.
+- [x] `/byok auto explain`.
+- [x] `/byok auto switch`.
 - [x] `/byok auto doctor` mostra readiness, policy, rota e ledgers no cockpit terminal.
 - [x] `/byok auto handoffs`.
 - [x] `/byok auto confirmations`.
@@ -277,8 +277,8 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] G.4 `/byok auto history`.
 - [x] G.5 `/byok auto policy`.
 - [x] G.6 `/byok auto doctor`.
-- [ ] G.7 `/byok auto explain`.
-- [ ] G.8 `/byok auto switch`.
+- [x] G.7 `/byok auto explain`.
+- [x] G.8 `/byok auto switch`.
 - [x] G.9 `/byok auto handoffs`.
 - [x] G.10 `/byok auto confirmations`.
 
