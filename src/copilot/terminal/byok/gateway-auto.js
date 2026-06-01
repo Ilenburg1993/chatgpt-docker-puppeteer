@@ -19,6 +19,7 @@ import {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
     listByokProviderModelHealth,
+    readModelGatewayRuntimeAutomationEffectivePolicy,
     readModelGatewayRuntimeAutomationPolicy,
     resolveModelGatewaySelectionPolicy,
     SqliteModelGatewayCatalogStore,
@@ -39,16 +40,16 @@ function optionalScalarString(value) {
 
 /**
  * @param {string[]} rest
- * @param {{ env?: NodeJS.ProcessEnv }} [options]
+ * @param {{ env?: NodeJS.ProcessEnv; policy?: ReturnType<typeof readModelGatewayRuntimeAutomationPolicy> }} [options]
  * @returns {{ profileId: string; allowLiveSetModel: boolean; allowNewSession: boolean; allowLocalPrivate: boolean }}
  */
 export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
-    const policy = readModelGatewayRuntimeAutomationPolicy(options.env);
+    const policy = options.policy ?? readModelGatewayRuntimeAutomationPolicy(options.env);
     const profileToken = rest.find((item) => /^(?:profile|perfil|routeProfile|route-profile)[:=]/iu.test(item));
     const profileId =
         optionalScalarString(profileToken?.replace(/^(?:profile|perfil|routeProfile|route-profile)[:=]/iu, '')) ??
         policy.profiles[0] ??
-        optionalScalarString(rest.find((item) => !/^(auto|status|plan|apply|on|off|--|allow-|live-|new-session|local)/iu.test(item))) ??
+        optionalScalarString(rest.find((item) => !/^(auto|status|plan|apply|on|off|history|--|allow-|live-|new-session|local)/iu.test(item))) ??
         'repo_agent';
     return {
         profileId,
@@ -73,7 +74,8 @@ export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
  * }>}
  */
 export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
-    const args = parseTerminalByokGatewayAutoArgs(rest, { env: options.env });
+    const policy = await readModelGatewayRuntimeAutomationEffectivePolicy({ env: options.env });
+    const args = parseTerminalByokGatewayAutoArgs(rest, { env: options.env, policy });
     const store = new JsonModelGatewayCatalogStore({ filePath: options.catalogPath ?? DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const snapshot = await store.readSnapshot();
     const secretRegistry = createEnvSecretRegistry(options.env);
@@ -112,7 +114,7 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
             allowEffects: options.allowEffects === true,
             allowLiveSetModel: args.allowLiveSetModel,
             allowNewSession: args.allowNewSession,
-            accountWideFailureKinds: readModelGatewayRuntimeAutomationPolicy(options.env).accountWideFailureKinds,
+            accountWideFailureKinds: policy.accountWideFailureKinds,
         },
     });
     const persistence =

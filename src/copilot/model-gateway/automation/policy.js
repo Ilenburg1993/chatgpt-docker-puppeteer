@@ -8,6 +8,12 @@
  * @module copilot/model-gateway/automation/policy
  */
 
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+
+export const DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH =
+    'data/copilot/model-gateway/runtime-automation-policy.json';
+
 export const MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV = Object.freeze({
     enabled: 'COPILOT_BYOK_GATEWAY_AUTO',
     policy: 'COPILOT_BYOK_GATEWAY_AUTO_POLICY',
@@ -39,6 +45,109 @@ function csv(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function optionalString(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean | null}
+ */
+function optionalBoolean(value) {
+    if (typeof value === 'boolean') return value;
+    if (value === null || value === undefined || String(value).trim() === '') return null;
+    return truthy(value);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[] | null}
+ */
+function optionalStringList(value) {
+    if (Array.isArray(value)) {
+        const list = value.map(optionalString).filter((item) => item !== null);
+        return list.length > 0 ? list : null;
+    }
+    const list = csv(value);
+    return list.length > 0 ? list : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function record(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+}
+
+/**
+ * @param {Record<string, unknown>} patch
+ * @returns {Record<string, unknown>}
+ */
+function normalizePolicyPatch(patch) {
+    /** @type {Record<string, unknown>} */
+    const normalized = {};
+    const enabled = optionalBoolean(patch['enabled']);
+    const policy = optionalString(patch['policy']);
+    const profiles = optionalStringList(patch['profiles']);
+    const allowLiveSetModel = optionalBoolean(patch['allowLiveSetModel']);
+    const allowNewSession = optionalBoolean(patch['allowNewSession']);
+    const allowProviderProbes = optionalBoolean(patch['allowProviderProbes']);
+    const allowLocalPrivate = optionalBoolean(patch['allowLocalPrivate']);
+    const accountWideFailureKinds = optionalStringList(patch['accountWideFailureKinds']);
+    if (enabled !== null) normalized['enabled'] = enabled;
+    if (policy !== null) normalized['policy'] = policy;
+    if (profiles !== null) normalized['profiles'] = profiles;
+    if (allowLiveSetModel !== null) normalized['allowLiveSetModel'] = allowLiveSetModel;
+    if (allowNewSession !== null) normalized['allowNewSession'] = allowNewSession;
+    if (allowProviderProbes !== null) normalized['allowProviderProbes'] = allowProviderProbes;
+    if (allowLocalPrivate !== null) normalized['allowLocalPrivate'] = allowLocalPrivate;
+    if (accountWideFailureKinds !== null) normalized['accountWideFailureKinds'] = accountWideFailureKinds;
+    return normalized;
+}
+
+/**
+ * @param {Record<string, string | undefined>} env
+ * @returns {Record<string, unknown>}
+ */
+function envPolicyPatch(env) {
+    /** @type {Record<string, unknown>} */
+    const patch = {};
+    for (const [field, envName] of Object.entries(MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV)) {
+        if (env[envName] === undefined) continue;
+        if (field === 'profiles' || field === 'accountWideFailureKinds') {
+            patch[field] = csv(env[envName]);
+        } else if (field === 'policy') {
+            patch[field] = env[envName];
+        } else {
+            patch[field] = truthy(env[envName]);
+        }
+    }
+    return normalizePolicyPatch(patch);
+}
+
+/**
+ * @param {...Record<string, unknown>} patches
+ * @returns {ReturnType<typeof readModelGatewayRuntimeAutomationPolicy>}
+ */
+export function mergeModelGatewayRuntimeAutomationPolicy(...patches) {
+    return /** @type {ReturnType<typeof readModelGatewayRuntimeAutomationPolicy>} */ ({
+        enabled: false,
+        policy: 'prefer_runtime_proved',
+        profiles: [],
+        allowLiveSetModel: false,
+        allowNewSession: false,
+        allowProviderProbes: false,
+        allowLocalPrivate: false,
+        accountWideFailureKinds: [],
+        ...patches.map(normalizePolicyPatch).reduce((merged, patch) => ({ ...merged, ...patch }), {}),
+    });
+}
+
+/**
  * @param {Record<string, string | undefined>} [env]
  * @returns {{
  *   enabled: boolean;
@@ -48,17 +157,49 @@ function csv(value) {
  *   allowNewSession: boolean;
  *   allowProviderProbes: boolean;
  *   allowLocalPrivate: boolean;
+ *   accountWideFailureKinds: string[];
  * }}
  */
 export function readModelGatewayRuntimeAutomationPolicy(env = process.env) {
-    return {
-        enabled: truthy(env[MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV.enabled]),
-        policy: String(env[MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV.policy] || 'prefer_runtime_proved').trim() || 'prefer_runtime_proved',
-        profiles: csv(env[MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV.profiles]),
-        allowLiveSetModel: truthy(env[MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV.allowLiveSetModel]),
-        allowNewSession: truthy(env[MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV.allowNewSession]),
-        allowProviderProbes: truthy(env[MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV.allowProviderProbes]),
-        allowLocalPrivate: truthy(env[MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV.allowLocalPrivate]),
-        accountWideFailureKinds: csv(env[MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV.accountWideFailureKinds]),
-    };
+    return mergeModelGatewayRuntimeAutomationPolicy(envPolicyPatch(env));
+}
+
+/**
+ * @param {{ filePath?: string }} [options]
+ * @returns {Promise<Record<string, unknown>>}
+ */
+export async function readModelGatewayRuntimeAutomationPolicyFile(options = {}) {
+    const filePath = resolve(options.filePath ?? DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH);
+    try {
+        return normalizePolicyPatch(record(JSON.parse(await readFile(filePath, 'utf8'))));
+    } catch (error) {
+        if (/** @type {NodeJS.ErrnoException} */ (error)?.code === 'ENOENT') return {};
+        throw error;
+    }
+}
+
+/**
+ * @param {{ env?: Record<string, string | undefined>; filePath?: string }} [options]
+ * @returns {Promise<ReturnType<typeof readModelGatewayRuntimeAutomationPolicy>>}
+ */
+export async function readModelGatewayRuntimeAutomationEffectivePolicy(options = {}) {
+    return mergeModelGatewayRuntimeAutomationPolicy(
+        await readModelGatewayRuntimeAutomationPolicyFile({ filePath: options.filePath }),
+        envPolicyPatch(options.env ?? process.env),
+    );
+}
+
+/**
+ * @param {Record<string, unknown>} policy
+ * @param {{ filePath?: string }} [options]
+ * @returns {Promise<{ filePath: string; policy: ReturnType<typeof readModelGatewayRuntimeAutomationPolicy> }>}
+ */
+export async function writeModelGatewayRuntimeAutomationPolicyFile(policy, options = {}) {
+    const filePath = resolve(options.filePath ?? DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH);
+    const normalized = mergeModelGatewayRuntimeAutomationPolicy(policy);
+    const temp = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+    await mkdir(dirname(filePath), { recursive: true });
+    await writeFile(temp, `${JSON.stringify(normalized, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+    await rename(temp, filePath);
+    return { filePath, policy: normalized };
 }

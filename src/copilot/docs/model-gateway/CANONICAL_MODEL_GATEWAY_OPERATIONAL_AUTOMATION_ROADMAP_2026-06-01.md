@@ -83,7 +83,7 @@ O sistema deve:
 
 - [x] `model-gateway:ops` deixou de mostrar readiness nulo e le o schema atual.
 - [x] `/byok auto on` e uma superficie propria e mostra env seguro para o proximo boot.
-- [ ] Nao existe policy persistente simples para operador ativar modo auto sem editar env manualmente.
+- [x] Existe policy persistente simples em `data/copilot/model-gateway/runtime-automation-policy.json`.
 - [ ] O controller pre-turn existe como conceito, mas ainda nao roda automaticamente antes de cada turno.
 - [ ] O controller post-turn ainda e parcial; falhas BYOK geram dica, mas nao fecham ciclo automatico.
 - [ ] `apply_live_model` altera projecao terminal, mas nao grava uma confirmacao de aplicacao efetiva.
@@ -91,7 +91,7 @@ O sistema deve:
 - [ ] Falta representar no cockpit a diferenca entre "proximo boot preparado" e "boot SDK ja refeito".
 - [ ] Falta uma linha unica "sistema pronto para live tests" combinando ops, readiness, plan e policy.
 - [ ] Falta teste de contrato do wrapper legado e do comando `model-gateway:live:llm-b`.
-- [ ] Falta teste de terminal para `/byok auto on`.
+- [x] Existe teste de terminal para `/byok auto on`.
 - [ ] Falta teste de terminal para decision persistida + apply autorizado.
 - [ ] Falta teste de terminal para boundary diferente exigindo novo boot.
 - [ ] Falta teste live LLM-B para auto status.
@@ -296,8 +296,8 @@ Novo boot exigido:
 
 ## Faixa B - Policy Persistente Do Operador
 
-- [ ] B.1 Definir arquivo local de policy operacional sem segredos.
-- [ ] B.2 Criar parser de policy combinando env + arquivo + flags de comando.
+- [x] B.1 Definir arquivo local de policy operacional sem segredos.
+- [x] B.2 Criar parser de policy combinando env + arquivo + flags de comando.
 - [x] B.3 Criar `/byok auto on`.
 - [ ] B.4 Criar `/byok auto policy`.
 - [ ] B.5 Criar `/byok auto off` com leitura de policy efetiva.
@@ -399,7 +399,7 @@ Novo boot exigido:
 - [ ] K.2 Automation decision: provider boundary crossing.
 - [ ] K.3 Automation decision: local/private blocked.
 - [ ] K.4 Controller: dry-run vs allowed.
-- [ ] K.5 Terminal: auto on/off/status/record/apply.
+- [x] K.5 Terminal: auto on/off/status/record/apply.
 - [ ] K.6 Ops: readiness summary atual.
 - [ ] K.7 SDK boundary: model changed confirmation.
 - [ ] K.8 SQLite: persistence/retention/redaction.
@@ -438,7 +438,7 @@ Novo boot exigido:
 
 1. Corrigir `model-gateway:ops` para ler o schema atual de readiness.
 2. Criar teste de contrato para `model-gateway:live:llm-b` e paths do barril.
-3. Implementar `/byok auto on` como comando explicativo/policy-aware.
+3. Feito: implementar `/byok auto on` como comando explicativo/policy-aware.
 4. Expor decision id em `/byok auto record`.
 5. Adicionar `/byok auto history` read-only.
 6. Planejar reconciliacao `setModel` -> `session.model_changed`.

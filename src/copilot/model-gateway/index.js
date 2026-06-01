@@ -9,11 +9,16 @@
  */
 
 export {
+    DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH,
     MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV,
     buildModelGatewayRuntimeAutomationControllerStep,
     buildModelGatewayRuntimeAutomationDecision,
+    mergeModelGatewayRuntimeAutomationPolicy,
+    readModelGatewayRuntimeAutomationEffectivePolicy,
     readModelGatewayRuntimeAutomationPolicy,
+    readModelGatewayRuntimeAutomationPolicyFile,
     selectModelGatewayRuntimeAutomationRoute,
+    writeModelGatewayRuntimeAutomationPolicyFile,
 } from './automation/index.js';
 
 export {

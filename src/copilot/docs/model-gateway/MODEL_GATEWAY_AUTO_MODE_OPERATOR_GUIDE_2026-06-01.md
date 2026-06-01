@@ -32,11 +32,16 @@ npm run model-gateway:auto:status -- --write-sqlite
 No terminal:
 
 ```text
+/byok auto on profile:repo_agent allow-live-set-model
 /byok auto status profile:repo_agent
 /byok auto record profile:repo_agent
+/byok auto history 10
 /byok auto apply profile:repo_agent allow-live-set-model
 /byok auto off
 ```
+
+`/byok auto on` grava policy sem segredos em `data/copilot/model-gateway/runtime-automation-policy.json`. Variaveis de
+ambiente `COPILOT_BYOK_GATEWAY_AUTO*` continuam tendo precedencia quando definidas.
 
 ## Estados
 

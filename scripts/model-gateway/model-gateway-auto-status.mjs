@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 
 import {
     buildModelGatewayRuntimeAutomationDecision,
-    readModelGatewayRuntimeAutomationPolicy,
+    readModelGatewayRuntimeAutomationEffectivePolicy,
     SqliteModelGatewayCatalogStore,
 } from '../../src/copilot/model-gateway/index.js';
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from './index.mjs';
@@ -79,7 +79,7 @@ function liveBindingFromArgs() {
 }
 
 const selector = readRuntimeSelectorPlan();
-const envPolicy = readModelGatewayRuntimeAutomationPolicy();
+const envPolicy = await readModelGatewayRuntimeAutomationEffectivePolicy();
 const decision = buildModelGatewayRuntimeAutomationDecision({
     runtimeSelectorPlan: selector.runtimeSelectorPlan,
     profileId: readArg('--profile', 'repo_agent'),

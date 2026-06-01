@@ -89,6 +89,7 @@ import {
     summarizeCanonicalModelProjectionDiff,
     summarizeModelGatewayEligibilityDiff,
     toOpenAIModelCatalogList,
+    writeModelGatewayRuntimeAutomationPolicyFile,
 } from '#copilot/model-gateway';
 
 import {
@@ -3386,6 +3387,15 @@ async function renderByokGatewayAutoOn(println, rest) {
     const args = parseTerminalByokGatewayAutoArgs(rest);
     const status = await buildTerminalByokGatewayAutoStatus(rest);
     const { decision } = status;
+    const written = await writeModelGatewayRuntimeAutomationPolicyFile({
+        enabled: true,
+        policy: 'prefer_runtime_proved',
+        profiles: [args.profileId],
+        allowLiveSetModel: args.allowLiveSetModel,
+        allowNewSession: args.allowNewSession,
+        allowProviderProbes: false,
+        allowLocalPrivate: args.allowLocalPrivate,
+    });
     const exports = [
         'COPILOT_BYOK_GATEWAY_AUTO=true',
         'COPILOT_BYOK_GATEWAY_AUTO_POLICY=prefer_runtime_proved',
@@ -3395,7 +3405,8 @@ async function renderByokGatewayAutoOn(println, rest) {
         `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LOCAL_PRIVATE=${args.allowLocalPrivate ? 'true' : 'false'}`,
     ];
     println('\n  \x1b[36mBYOK model-gateway auto on\x1b[0m');
-    println('  \x1b[90mEste comando nao muta env do processo; ele mostra a policy segura para o proximo boot.\x1b[0m');
+    println('  \x1b[90mPolicy segura persistida para o proximo boot; segredos nao sao gravados nesse arquivo.\x1b[0m');
+    println(`    arquivo:       \x1b[33m${written.filePath}\x1b[0m`);
     println(`    profile:       \x1b[33m${args.profileId}\x1b[0m`);
     println(
         `    flags:         \x1b[33mliveSetModel=${args.allowLiveSetModel ? 'sim' : 'nao'} · newSession=${args.allowNewSession ? 'sim' : 'nao'} · localPrivate=${args.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
