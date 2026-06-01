@@ -84,15 +84,15 @@ O sistema deve:
 - [x] `model-gateway:ops` deixou de mostrar readiness nulo e le o schema atual.
 - [x] `/byok auto on` e uma superficie propria e mostra env seguro para o proximo boot.
 - [x] Existe policy persistente simples em `data/copilot/model-gateway/runtime-automation-policy.json`.
-- [ ] O controller pre-turn existe como conceito, mas ainda nao roda automaticamente antes de cada turno.
-- [ ] O controller post-turn ainda e parcial; falhas BYOK geram dica, mas nao fecham ciclo automatico.
+- [x] O controller pre-turn roda antes de cada turno quando a policy efetiva esta ligada.
+- [ ] O controller post-turn ainda e parcial; falhas BYOK geram dica com policy efetiva, mas nao fecham ciclo automatico.
 - [ ] `apply_live_model` altera projecao terminal, mas nao grava uma confirmacao de aplicacao efetiva.
 - [ ] Falta reconciliacao com `session.model_changed` / `usage/session.model_changed`.
 - [ ] Falta representar no cockpit a diferenca entre "proximo boot preparado" e "boot SDK ja refeito".
 - [ ] Falta uma linha unica "sistema pronto para live tests" combinando ops, readiness, plan e policy.
 - [ ] Falta teste de contrato do wrapper legado e do comando `model-gateway:live:llm-b`.
 - [x] Existe teste de terminal para `/byok auto on`.
-- [ ] Falta teste de terminal para decision persistida + apply autorizado.
+- [x] Existe teste de terminal para executor compartilhado de efeitos auto.
 - [ ] Falta teste de terminal para boundary diferente exigindo novo boot.
 - [ ] Falta teste live LLM-B para auto status.
 - [ ] Falta teste live LLM-B para falha simulada e fallback.
@@ -307,24 +307,24 @@ Novo boot exigido:
 
 ## Faixa C - Pre-Turn Controller Real
 
-- [ ] C.1 Localizar ponto exato antes do envio de mensagem ao SDK.
-- [ ] C.2 Injetar etapa auto pre-turn apenas se policy enabled.
-- [ ] C.3 Rodar runtime selector sem provider execution.
-- [ ] C.4 Aplicar `keep_current` sem ruido.
-- [ ] C.5 Aplicar `apply_live_model` com policy e same-boundary.
-- [ ] C.6 Bloquear provider switch live e preparar novo boot.
-- [ ] C.7 Persistir decision pre-turn.
-- [ ] C.8 Renderizar explicacao curta no terminal.
+- [x] C.1 Localizar ponto exato antes do envio de mensagem ao SDK.
+- [x] C.2 Injetar etapa auto pre-turn apenas se policy enabled.
+- [x] C.3 Rodar runtime selector sem provider execution.
+- [x] C.4 Aplicar `keep_current` sem ruido.
+- [x] C.5 Aplicar `apply_live_model` com policy e same-boundary.
+- [x] C.6 Bloquear provider switch live e preparar novo boot.
+- [x] C.7 Persistir decision pre-turn.
+- [x] C.8 Renderizar explicacao curta no terminal.
 
 ## Faixa D - Post-Turn Recovery
 
-- [ ] D.1 Consolidar hook de falha BYOK no engine.
-- [ ] D.2 Classificar falha com provider failure taxonomy.
-- [ ] D.3 Gravar health com reset/retryAfter quando existir.
+- [x] D.1 Consolidar hook de falha BYOK no engine.
+- [x] D.2 Classificar falha com provider failure taxonomy.
+- [x] D.3 Gravar health com reset/retryAfter quando existir.
 - [ ] D.4 Derivar account overlay quando falha for auth/credits/rate-limit.
 - [ ] D.5 Rodar controller post-turn em dry-run.
 - [ ] D.6 Persistir decision post-turn.
-- [ ] D.7 Mostrar proxima acao no terminal.
+- [x] D.7 Mostrar proxima acao no terminal.
 - [ ] D.8 Evitar repeticao imediata de modelo falho.
 
 ## Faixa E - SDK Boundary E Confirmacao

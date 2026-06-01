@@ -25,7 +25,7 @@ import {
     SqliteModelGatewayCatalogStore,
 } from '#copilot/model-gateway';
 
-import { listTerminalSdkSessionInventory } from '../frontend/index.js';
+import { listTerminalSdkSessionInventory, setTerminalModelProjection } from '../frontend/index.js';
 
 /**
  * @param {unknown} value
@@ -136,5 +136,63 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
         decision,
         controllerStep,
         persistence,
+    };
+}
+
+/**
+ * @param {{ effects?: Array<Record<string, unknown>> }} controllerStep
+ * @returns {{ applied: Array<Record<string, unknown>>; skipped: Array<Record<string, unknown>> }}
+ */
+export function applyTerminalByokGatewayAutoEffects(controllerStep) {
+    const effects = Array.isArray(controllerStep.effects) ? controllerStep.effects : [];
+    const applied = [];
+    const skipped = [];
+    for (const effect of effects) {
+        if (effect['execute'] !== true) {
+            skipped.push({ ...effect, skippedReason: 'effect_not_authorized' });
+            continue;
+        }
+        if (effect['kind'] === 'set_live_model' && typeof effect['model'] === 'string' && effect['model'].trim()) {
+            setTerminalModelProjection(effect['model']);
+            applied.push({ ...effect, applied: true });
+            continue;
+        }
+        skipped.push({ ...effect, skippedReason: 'no_terminal_executor' });
+    }
+    return { applied, skipped };
+}
+
+/**
+ * @param {{ env?: NodeJS.ProcessEnv; catalogPath?: string }} [options]
+ * @returns {Promise<{
+ *   ran: boolean;
+ *   policy: Awaited<ReturnType<typeof readModelGatewayRuntimeAutomationEffectivePolicy>>;
+ *   status: Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>> | null;
+ *   application: ReturnType<typeof applyTerminalByokGatewayAutoEffects> | null;
+ * }>}
+ */
+export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
+    const policy = await readModelGatewayRuntimeAutomationEffectivePolicy({ env: options.env });
+    if (policy.enabled !== true) {
+        return {
+            ran: false,
+            policy,
+            status: null,
+            application: null,
+        };
+    }
+    const profile = policy.profiles[0] ?? 'repo_agent';
+    const status = await buildTerminalByokGatewayAutoStatus([`profile:${profile}`], {
+        allowEffects: true,
+        catalogPath: options.catalogPath,
+        env: options.env,
+        persistAutomationDecision: true,
+    });
+    const application = applyTerminalByokGatewayAutoEffects(status.controllerStep);
+    return {
+        ran: true,
+        policy,
+        status,
+        application,
     };
 }

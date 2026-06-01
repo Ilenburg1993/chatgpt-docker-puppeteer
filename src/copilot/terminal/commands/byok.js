@@ -105,6 +105,7 @@ import {
     setTerminalModelProjection,
 } from '../frontend/index.js';
 import {
+    applyTerminalByokGatewayAutoEffects,
     buildTerminalByokGatewayAutoStatus,
     classifyTerminalByokSdkBinding,
     evaluateTerminalByokProbeBudget,
@@ -3471,23 +3472,29 @@ function renderByokGatewayAutoOff(println) {
  * @returns {void}
  */
 function applyByokGatewayAutoEffects(println, controllerStep) {
-    const executable = controllerStep.effects.filter((effect) => effect['execute'] === true);
-    if (executable.length === 0) {
+    const application = applyTerminalByokGatewayAutoEffects(controllerStep);
+    if (
+        application.applied.length === 0 &&
+        application.skipped.every((effect) => effect['skippedReason'] === 'effect_not_authorized')
+    ) {
         println('  \x1b[33mNenhum efeito auto autorizado pela policy atual. Use /byok auto status para revisar blockers e flags.\x1b[0m\n');
         return;
     }
-    for (const effect of executable) {
+    for (const effect of application.applied) {
         if (effect['kind'] === 'set_live_model' && typeof effect['model'] === 'string' && effect['model'].trim()) {
-            setTerminalModelProjection(effect['model']);
             println(`  \x1b[32mAuto apply solicitou setModel vivo para ${effect['model']}.\x1b[0m`);
             continue;
         }
+        println(`  \x1b[32mAuto apply executou efeito terminal: ${String(effect['kind'] ?? 'unknown')}.\x1b[0m`);
+    }
+    for (const effect of application.skipped) {
         if (effect['kind'] === 'prepare_new_sdk_session') {
             println(
                 '  \x1b[33mAuto apply preparou a decisão, mas novo boot SDK ainda deve ser confirmado via /session sdk next new.\x1b[0m',
             );
             continue;
         }
+        if (effect['skippedReason'] === 'effect_not_authorized') continue;
         println(`  \x1b[33mEfeito auto sem executor terminal: ${String(effect['kind'] ?? 'unknown')}.\x1b[0m`);
     }
     println('');

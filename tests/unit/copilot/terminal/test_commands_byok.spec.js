@@ -1228,6 +1228,9 @@ vi.mock('#copilot/model-gateway', () => ({
 }));
 
 const { cmdByok } = await import('../../../../src/copilot/terminal/commands/byok.js');
+const { applyTerminalByokGatewayAutoEffects, runTerminalByokGatewayPreTurnAutomation } = await import(
+    '../../../../src/copilot/terminal/byok/gateway-auto.js'
+);
 
 const BASE_PROJECTION = Object.freeze({
     envKeys: Object.freeze(['COPILOT_BYOK_ENABLED', 'COPILOT_BYOK_PROFILE', 'KILO_API_KEY']),
@@ -1519,6 +1522,28 @@ describe('terminal /byok command', () => {
         });
         readByokProviderModelHealth.mockReset();
         readByokProviderModelHealth.mockReturnValue(null);
+        readModelGatewayRuntimeAutomationPolicy.mockReset();
+        readModelGatewayRuntimeAutomationPolicy.mockReturnValue({
+            enabled: false,
+            policy: 'prefer_runtime_proved',
+            profiles: [],
+            allowLiveSetModel: false,
+            allowNewSession: false,
+            allowProviderProbes: false,
+            allowLocalPrivate: false,
+            accountWideFailureKinds: [],
+        });
+        readModelGatewayRuntimeAutomationEffectivePolicy.mockReset();
+        readModelGatewayRuntimeAutomationEffectivePolicy.mockResolvedValue({
+            enabled: false,
+            policy: 'prefer_runtime_proved',
+            profiles: [],
+            allowLiveSetModel: false,
+            allowNewSession: false,
+            allowProviderProbes: false,
+            allowLocalPrivate: false,
+            accountWideFailureKinds: [],
+        });
         readConfiguredByokProfilesFromEnv.mockReset();
         readConfiguredByokProfilesFromEnv.mockReturnValue({});
         readFile.mockReset();
@@ -2868,6 +2893,34 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('prepare_new_session');
         expect(ctx.output()).toContain('zai:glm-4.5-flash');
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
+    });
+
+    it('centraliza executor terminal dos efeitos auto', () => {
+        const result = applyTerminalByokGatewayAutoEffects({
+            effects: [
+                { kind: 'set_live_model', model: 'anthropic/claude-sonnet-4.5', execute: true },
+                { kind: 'prepare_new_sdk_session', model: 'anthropic/claude-sonnet-4.5', execute: true },
+                { kind: 'set_live_model', model: 'dry-model', execute: false },
+            ],
+        });
+
+        expect(setTerminalModelProjection).toHaveBeenCalledWith('anthropic/claude-sonnet-4.5');
+        expect(result.applied).toHaveLength(1);
+        expect(result.skipped).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ kind: 'prepare_new_sdk_session', skippedReason: 'no_terminal_executor' }),
+                expect.objectContaining({ kind: 'set_live_model', skippedReason: 'effect_not_authorized' }),
+            ]),
+        );
+    });
+
+    it('não dispara seleção pre-turn quando policy auto efetiva está desligada', async () => {
+        const result = await runTerminalByokGatewayPreTurnAutomation();
+
+        expect(result.ran).toBe(false);
+        expect(result.status).toBeNull();
+        expect(listTerminalSdkSessionInventory).not.toHaveBeenCalled();
+        expect(auditModelGatewayPreRuntimeSelection).not.toHaveBeenCalled();
     });
 
     it('explica bloqueio local padrão na auditoria de seleção pré-runtime', async () => {

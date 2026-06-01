@@ -55,10 +55,11 @@ import {
     TERMINAL_BYOK_ADMISSION_MODE_ENV,
     evaluateTerminalByokTurnBudget,
     readTerminalByokAdmissionMode,
+    runTerminalByokGatewayPreTurnAutomation,
 } from '../byok/index.js';
 import {
     classifyByokProviderFailure,
-    readModelGatewayRuntimeAutomationPolicy,
+    readModelGatewayRuntimeAutomationEffectivePolicy,
     recordByokProviderModelCallFailure,
 } from '#copilot/model-gateway';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
@@ -284,16 +285,52 @@ function resolveByokTurnErrorDescriptor(error, byok) {
 
 /**
  * @param {ReturnType<typeof resolveByokTurnErrorDescriptor>} byokFailure
- * @returns {void}
+ * @returns {Promise<void>}
  */
-function printByokAutoAfterFailureHint(byokFailure) {
+async function printByokAutoAfterFailureHint(byokFailure) {
     if (!byokFailure) return;
-    const policy = readModelGatewayRuntimeAutomationPolicy();
+    const policy = await readModelGatewayRuntimeAutomationEffectivePolicy();
     if (policy.enabled !== true) return;
     const profile = byokFailure.profile ?? policy.profiles[0] ?? 'repo_agent';
     println(
         `\x1b[90m       auto: /byok auto record profile:${profile} registra a decisão pós-falha; /byok auto apply profile:${profile} aplica apenas efeitos autorizados.\x1b[0m`,
     );
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function runByokGatewayPreTurnAutomation() {
+    try {
+        const result = await runTerminalByokGatewayPreTurnAutomation();
+        if (result.ran !== true || !result.status) return;
+        const { decision } = result.status;
+        const applied = result.application?.applied ?? [];
+        const skipped = result.application?.skipped ?? [];
+        recordTerminalActivity('system', 'Model-gateway auto pre-turn avaliado', {
+            detail:
+                `action=${decision.action} · route=${decision.selectedRouteKey ?? '-'} · ` +
+                `applied=${applied.length} · skipped=${skipped.length}`,
+            source: 'dialog',
+            recordHistory: false,
+        });
+        if (applied.length > 0) {
+            println(
+                `\x1b[90m  ↳ model-gateway auto aplicou ${applied.length} efeito(s): ${applied.map((item) => String(item['kind'] ?? 'effect')).join(', ')}\x1b[0m`,
+            );
+            return;
+        }
+        if (decision.action !== 'keep_current') {
+            println(`\x1b[90m  ↳ model-gateway auto: ${decision.operatorSummary}\x1b[0m`);
+        }
+    } catch (error) {
+        recordTerminalActivity('system', 'Model-gateway auto pre-turn falhou em modo seguro', {
+            detail: toError(error).message,
+            source: 'dialog',
+            severity: 'warn',
+            recordHistory: false,
+        });
+    }
 }
 
 /**
@@ -733,6 +770,8 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         metricsSummary,
         message,
     });
+
+    await runByokGatewayPreTurnAutomation();
 
     setBusy(true);
     beginTerminalTurnMaterialization({ timestamp: t0, source: 'terminal/explicit-turn' });
@@ -1176,7 +1215,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 `\x1b[31m[byok] ${byokFailure.errorContext}: ${byokFailure.message} · ${byokFailure.failure.operatorLabel} · sem Premium Request\x1b[0m`,
             );
             println(`\x1b[90m       ação: ${byokFailure.failure.operatorAction}\x1b[0m`);
-            printByokAutoAfterFailureHint(byokFailure);
+            await printByokAutoAfterFailureHint(byokFailure);
         } else {
             clearTerminalTurnMaterialization();
             recordTerminalActivity('error', 'Erro no turno', {
