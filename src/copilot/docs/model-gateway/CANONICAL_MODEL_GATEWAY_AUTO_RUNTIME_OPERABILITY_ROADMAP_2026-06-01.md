@@ -151,7 +151,7 @@ mas mantendo rastreabilidade e sem vazar segredo.
 - [ ] Falta `/byok auto policy`.
 - [ ] Falta `/byok auto explain`.
 - [ ] Falta controller post-turn completo.
-- [ ] Falta executar `prepare_new_sdk_session` como handoff real para proximo boot.
+- [x] `prepare_new_sdk_session` agenda novo boot SDK quando `allow-new-session` esta autorizado.
 
 ### 3.5 Terminal e SDK boundary
 
@@ -412,9 +412,9 @@ Todos os checkboxes sao booleanos. Nao usar estados parciais.
 
 - [ ] H.1 Definir contrato `ModelGatewaySdkSessionHandoff`.
 - [ ] H.2 Converter route env em configuracao BYOK de proximo boot.
-- [ ] H.3 Gravar handoff sem segredo bruto.
-- [ ] H.4 Integrar com `/session sdk next new`.
-- [ ] H.5 Permitir auto request de novo boot quando policy autoriza.
+- [x] H.3 Gravar handoff sem segredo bruto.
+- [x] H.4 Integrar com `/session sdk next new`.
+- [x] H.5 Permitir auto request de novo boot quando policy autoriza.
 - [ ] H.6 Validar boot com binding esperado.
 - [ ] H.7 Detectar mismatch de provider/modelo.
 - [ ] H.8 Persistir confirmacao.

@@ -25,7 +25,11 @@ import {
     SqliteModelGatewayCatalogStore,
 } from '#copilot/model-gateway';
 
-import { listTerminalSdkSessionInventory, setTerminalModelProjection } from '../frontend/index.js';
+import {
+    listTerminalSdkSessionInventory,
+    scheduleTerminalSdkSessionBootSelection,
+    setTerminalModelProjection,
+} from '../frontend/index.js';
 
 /**
  * @param {unknown} value
@@ -143,9 +147,9 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
 
 /**
  * @param {{ effects?: Array<Record<string, unknown>> }} controllerStep
- * @returns {{ applied: Array<Record<string, unknown>>; skipped: Array<Record<string, unknown>> }}
+ * @returns {Promise<{ applied: Array<Record<string, unknown>>; skipped: Array<Record<string, unknown>> }>}
  */
-export function applyTerminalByokGatewayAutoEffects(controllerStep) {
+export async function applyTerminalByokGatewayAutoEffects(controllerStep) {
     const effects = Array.isArray(controllerStep.effects) ? controllerStep.effects : [];
     const applied = [];
     const skipped = [];
@@ -159,6 +163,19 @@ export function applyTerminalByokGatewayAutoEffects(controllerStep) {
             applied.push({ ...effect, applied: true });
             continue;
         }
+        if (effect['kind'] === 'prepare_new_sdk_session') {
+            const schedule = await scheduleTerminalSdkSessionBootSelection({ mode: 'new' });
+            if (schedule?.ok === true) {
+                applied.push({ ...effect, applied: true, sdkBootSelection: 'new' });
+                continue;
+            }
+            skipped.push({
+                ...effect,
+                skippedReason: 'sdk_boot_selection_failed',
+                error: schedule?.error instanceof Error ? schedule.error.message : 'unknown_error',
+            });
+            continue;
+        }
         skipped.push({ ...effect, skippedReason: 'no_terminal_executor' });
     }
     return { applied, skipped };
@@ -166,7 +183,7 @@ export function applyTerminalByokGatewayAutoEffects(controllerStep) {
 
 /**
  * @param {Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>>} status
- * @param {ReturnType<typeof applyTerminalByokGatewayAutoEffects>} application
+ * @param {Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>>} application
  * @param {{ source?: string; timestamp?: string }} [options]
  * @returns {Record<string, unknown>[]}
  */
@@ -196,14 +213,55 @@ export function createTerminalByokGatewayAutoEffectApplicationRecords(status, ap
 
 /**
  * @param {Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>>} status
- * @param {ReturnType<typeof applyTerminalByokGatewayAutoEffects>} application
+ * @param {Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>>} application
  * @param {{ source?: string; timestamp?: string }} [options]
- * @returns {Promise<{ automationEffectApplications: number } | null>}
+ * @returns {Record<string, unknown>[]}
+ */
+export function createTerminalByokGatewaySdkSessionHandoffRecords(status, application, options = {}) {
+    const timestamp = options.timestamp ?? new Date().toISOString();
+    const decisionId = optionalScalarString(status.automationDecisionRecord['decisionId']);
+    const routeProfile = status.decision.routeProfile ?? status.args.profileId;
+    const selectedRouteKey = status.decision.selectedRouteKey;
+    return [...application.applied, ...application.skipped]
+        .filter((effect) => effect['kind'] === 'prepare_new_sdk_session')
+        .map((effect, index) => {
+            const applied = effect['applied'] === true;
+            const skippedReason = optionalScalarString(effect['skippedReason']);
+            return {
+                handoffId: `${decisionId ?? 'terminal-auto'}:handoff:${index}`,
+                decisionId,
+                routeProfile,
+                selectedRouteKey,
+                status: applied ? 'boot_scheduled' : (skippedReason ?? 'skipped'),
+                targetModel: optionalScalarString(effect['model']),
+                requestedAt: timestamp,
+                source: options.source ?? 'terminal-byok-auto-handoff',
+                effect,
+            };
+        });
+}
+
+/**
+ * @param {Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>>} status
+ * @param {Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>>} application
+ * @param {{ source?: string; timestamp?: string }} [options]
+ * @returns {Promise<{ automationEffectApplications: number; sdkSessionHandoffs: number } | null>}
  */
 export async function persistTerminalByokGatewayAutoEffectApplications(status, application, options = {}) {
     const records = createTerminalByokGatewayAutoEffectApplicationRecords(status, application, options);
-    if (records.length === 0) return null;
-    return new SqliteModelGatewayCatalogStore().writeAutomationEffectApplicationRecords(records);
+    const handoffs = createTerminalByokGatewaySdkSessionHandoffRecords(status, application, options);
+    if (records.length === 0 && handoffs.length === 0) return null;
+    const store = new SqliteModelGatewayCatalogStore();
+    const effectResult =
+        records.length > 0
+            ? await store.writeAutomationEffectApplicationRecords(records)
+            : { automationEffectApplications: 0 };
+    const handoffResult =
+        handoffs.length > 0 ? await store.writeSdkSessionHandoffRecords(handoffs) : { sdkSessionHandoffs: 0 };
+    return {
+        automationEffectApplications: effectResult.automationEffectApplications,
+        sdkSessionHandoffs: handoffResult.sdkSessionHandoffs,
+    };
 }
 
 /**
@@ -212,8 +270,8 @@ export async function persistTerminalByokGatewayAutoEffectApplications(status, a
  *   ran: boolean;
  *   policy: Awaited<ReturnType<typeof readModelGatewayRuntimeAutomationEffectivePolicy>>;
  *   status: Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>> | null;
- *   application: ReturnType<typeof applyTerminalByokGatewayAutoEffects> | null;
- *   effectPersistence: { automationEffectApplications: number } | null;
+ *   application: Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>> | null;
+ *   effectPersistence: { automationEffectApplications: number; sdkSessionHandoffs: number } | null;
  * }>}
  */
 export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
@@ -234,7 +292,7 @@ export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
         env: options.env,
         persistAutomationDecision: true,
     });
-    const application = applyTerminalByokGatewayAutoEffects(status.controllerStep);
+    const application = await applyTerminalByokGatewayAutoEffects(status.controllerStep);
     const effectPersistence = await persistTerminalByokGatewayAutoEffectApplications(status, application, {
         source: 'terminal-byok-pre-turn',
     });

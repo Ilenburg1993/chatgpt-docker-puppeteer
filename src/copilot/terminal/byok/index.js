@@ -19,6 +19,7 @@ export {
     applyTerminalByokGatewayAutoEffects,
     buildTerminalByokGatewayAutoStatus,
     createTerminalByokGatewayAutoEffectApplicationRecords,
+    createTerminalByokGatewaySdkSessionHandoffRecords,
     parseTerminalByokGatewayAutoArgs,
     persistTerminalByokGatewayAutoEffectApplications,
     runTerminalByokGatewayPreTurnAutomation,

@@ -3380,13 +3380,13 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
     println(`    resumo:        \x1b[90m${decision.operatorSummary}\x1b[0m`);
     println(`    proximo:       \x1b[90m${decision.nextCommands.join(' && ')}\x1b[0m\n`);
     if (options.apply === true) {
-        const application = applyByokGatewayAutoEffects(println, controllerStep);
+        const application = await applyByokGatewayAutoEffects(println, controllerStep);
         const effectPersistence = await persistTerminalByokGatewayAutoEffectApplications(status, application, {
             source: 'terminal-byok-auto-apply',
         });
         if (effectPersistence) {
             println(
-                `  \x1b[90mtrilha auto: ${effectPersistence.automationEffectApplications} efeito(s) gravado(s) no SQLite.\x1b[0m\n`,
+                `  \x1b[90mtrilha auto: ${effectPersistence.automationEffectApplications} efeito(s) e ${effectPersistence.sdkSessionHandoffs} handoff(s) gravado(s) no SQLite.\x1b[0m\n`,
             );
         }
     }
@@ -3529,8 +3529,8 @@ async function renderByokGatewayAutoOff(println) {
  * @param {{ effects: Array<Record<string, unknown>> }} controllerStep
  * @returns {ReturnType<typeof applyTerminalByokGatewayAutoEffects>}
  */
-function applyByokGatewayAutoEffects(println, controllerStep) {
-    const application = applyTerminalByokGatewayAutoEffects(controllerStep);
+async function applyByokGatewayAutoEffects(println, controllerStep) {
+    const application = await applyTerminalByokGatewayAutoEffects(controllerStep);
     if (
         application.applied.length === 0 &&
         application.skipped.every((effect) => effect['skippedReason'] === 'effect_not_authorized')
@@ -3548,7 +3548,7 @@ function applyByokGatewayAutoEffects(println, controllerStep) {
     for (const effect of application.skipped) {
         if (effect['kind'] === 'prepare_new_sdk_session') {
             println(
-                '  \x1b[33mAuto apply preparou a decisão, mas novo boot SDK ainda deve ser confirmado via /session sdk next new.\x1b[0m',
+                '  \x1b[32mAuto apply agendou /session sdk next new para o próximo boot.\x1b[0m',
             );
             continue;
         }

@@ -308,10 +308,11 @@ async function runByokGatewayPreTurnAutomation() {
         const applied = result.application?.applied ?? [];
         const skipped = result.application?.skipped ?? [];
         const persistedEffects = result.effectPersistence?.automationEffectApplications ?? 0;
+        const persistedHandoffs = result.effectPersistence?.sdkSessionHandoffs ?? 0;
         recordTerminalActivity('system', 'Model-gateway auto pre-turn avaliado', {
             detail:
                 `action=${decision.action} · route=${decision.selectedRouteKey ?? '-'} · ` +
-                `applied=${applied.length} · skipped=${skipped.length} · persistedEffects=${persistedEffects}`,
+                `applied=${applied.length} · skipped=${skipped.length} · persistedEffects=${persistedEffects} · handoffs=${persistedHandoffs}`,
             source: 'dialog',
             recordHistory: false,
         });
