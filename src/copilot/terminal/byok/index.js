@@ -18,6 +18,8 @@ export {
 export {
     applyTerminalByokGatewayAutoEffects,
     buildTerminalByokGatewayAutoStatus,
+    createTerminalByokGatewayAutoEffectApplicationRecords,
     parseTerminalByokGatewayAutoArgs,
+    persistTerminalByokGatewayAutoEffectApplications,
     runTerminalByokGatewayPreTurnAutomation,
 } from './gateway-auto.js';

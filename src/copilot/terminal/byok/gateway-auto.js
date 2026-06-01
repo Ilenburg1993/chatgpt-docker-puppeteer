@@ -70,6 +70,7 @@ export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
  *     inventory: Awaited<ReturnType<typeof listTerminalSdkSessionInventory>>;
  *     decision: ReturnType<typeof buildModelGatewayRuntimeAutomationDecision>;
  *     controllerStep: ReturnType<typeof buildModelGatewayRuntimeAutomationControllerStep>;
+ *     automationDecisionRecord: Record<string, unknown>;
  *     persistence: { automationDecisions: number } | null;
  * }>}
  */
@@ -117,16 +118,16 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
             accountWideFailureKinds: policy.accountWideFailureKinds,
         },
     });
+    const decisionTimestamp = new Date().toISOString();
+    const automationDecisionRecord = {
+        ...decision,
+        decisionId: `terminal-auto:${Date.now()}:${process.pid}`,
+        timestamp: decisionTimestamp,
+        source: 'terminal-byok-auto-status',
+    };
     const persistence =
         options.persistAutomationDecision === true
-            ? await new SqliteModelGatewayCatalogStore().writeAutomationDecisionRecords([
-                  {
-                      ...decision,
-                      decisionId: `terminal-auto:${Date.now()}:${process.pid}`,
-                      timestamp: new Date().toISOString(),
-                      source: 'terminal-byok-auto-status',
-                  },
-              ])
+            ? await new SqliteModelGatewayCatalogStore().writeAutomationDecisionRecords([automationDecisionRecord])
             : null;
     return {
         schema: 'terminal-byok-gateway-auto-status',
@@ -135,6 +136,7 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
         inventory,
         decision,
         controllerStep,
+        automationDecisionRecord,
         persistence,
     };
 }
@@ -163,12 +165,55 @@ export function applyTerminalByokGatewayAutoEffects(controllerStep) {
 }
 
 /**
+ * @param {Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>>} status
+ * @param {ReturnType<typeof applyTerminalByokGatewayAutoEffects>} application
+ * @param {{ source?: string; timestamp?: string }} [options]
+ * @returns {Record<string, unknown>[]}
+ */
+export function createTerminalByokGatewayAutoEffectApplicationRecords(status, application, options = {}) {
+    const timestamp = options.timestamp ?? new Date().toISOString();
+    const decisionId = optionalScalarString(status.automationDecisionRecord['decisionId']);
+    const routeProfile = status.decision.routeProfile ?? status.args.profileId;
+    const selectedRouteKey = status.decision.selectedRouteKey;
+    return [...application.applied, ...application.skipped].map((effect, index) => {
+        const applied = effect['applied'] === true;
+        const kind = optionalScalarString(effect['kind']) ?? 'unknown_effect';
+        const skippedReason = optionalScalarString(effect['skippedReason']);
+        return {
+            ...effect,
+            effectId: `${decisionId ?? 'terminal-auto'}:effect:${index}:${kind}`,
+            decisionId,
+            routeProfile,
+            selectedRouteKey,
+            effectKind: kind,
+            status: applied ? 'applied' : (skippedReason ?? 'skipped'),
+            applied,
+            timestamp,
+            source: options.source ?? 'terminal-byok-auto-effects',
+        };
+    });
+}
+
+/**
+ * @param {Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>>} status
+ * @param {ReturnType<typeof applyTerminalByokGatewayAutoEffects>} application
+ * @param {{ source?: string; timestamp?: string }} [options]
+ * @returns {Promise<{ automationEffectApplications: number } | null>}
+ */
+export async function persistTerminalByokGatewayAutoEffectApplications(status, application, options = {}) {
+    const records = createTerminalByokGatewayAutoEffectApplicationRecords(status, application, options);
+    if (records.length === 0) return null;
+    return new SqliteModelGatewayCatalogStore().writeAutomationEffectApplicationRecords(records);
+}
+
+/**
  * @param {{ env?: NodeJS.ProcessEnv; catalogPath?: string }} [options]
  * @returns {Promise<{
  *   ran: boolean;
  *   policy: Awaited<ReturnType<typeof readModelGatewayRuntimeAutomationEffectivePolicy>>;
  *   status: Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>> | null;
  *   application: ReturnType<typeof applyTerminalByokGatewayAutoEffects> | null;
+ *   effectPersistence: { automationEffectApplications: number } | null;
  * }>}
  */
 export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
@@ -179,6 +224,7 @@ export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
             policy,
             status: null,
             application: null,
+            effectPersistence: null,
         };
     }
     const profile = policy.profiles[0] ?? 'repo_agent';
@@ -189,10 +235,14 @@ export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
         persistAutomationDecision: true,
     });
     const application = applyTerminalByokGatewayAutoEffects(status.controllerStep);
+    const effectPersistence = await persistTerminalByokGatewayAutoEffectApplications(status, application, {
+        source: 'terminal-byok-pre-turn',
+    });
     return {
         ran: true,
         policy,
         status,
         application,
+        effectPersistence,
     };
 }

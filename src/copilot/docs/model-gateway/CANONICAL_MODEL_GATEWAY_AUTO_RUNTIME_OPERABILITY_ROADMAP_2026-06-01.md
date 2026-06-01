@@ -390,7 +390,7 @@ Todos os checkboxes sao booleanos. Nao usar estados parciais.
 - [x] F.4 Aplicar set live model quando autorizado.
 - [x] F.5 Persistir decision pre-turn.
 - [x] F.6 Renderizar resumo curto.
-- [ ] F.7 Persistir effect application.
+- [x] F.7 Persistir effect application.
 - [ ] F.8 Evitar repeticao verbosa a cada turno quando nada mudou.
 - [ ] F.9 Expor no `/activity` decision id.
 - [ ] F.10 Evitar selector pesado quando catalogo/health/policy nao mudaram.
