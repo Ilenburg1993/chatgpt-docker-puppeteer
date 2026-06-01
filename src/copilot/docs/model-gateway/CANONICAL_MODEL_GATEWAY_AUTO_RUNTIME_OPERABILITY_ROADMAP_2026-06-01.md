@@ -247,7 +247,7 @@ manual_required
 - [x] SDK session handoffs.
 - [ ] SDK binding confirmations.
 - [ ] post-turn recovery attempts.
-- [ ] operator policy snapshots.
+- [x] operator policy snapshots.
 - [ ] live-test scenario runs.
 
 ### 4.4 Politica efetiva
@@ -447,7 +447,7 @@ Todos os checkboxes sao booleanos. Nao usar estados parciais.
 - [x] J.9 `model-gateway:auto:ready`.
 - [x] J.10 `model-gateway:auto:doctor`.
 - [ ] J.11 Mostrar prepared/live/confirmed em uma linha.
-- [ ] J.12 Mostrar o que ainda impede automacao total.
+- [x] J.12 Mostrar o que ainda impede automacao total.
 
 ### Faixa K - Account/Key/Quota
 

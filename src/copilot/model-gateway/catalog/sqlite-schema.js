@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/catalog/sqlite-schema
  */
 
-export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 6;
+export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 7;
 
 export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_snapshots',
@@ -32,6 +32,7 @@ export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_health_observations',
     'copilot_model_gateway_route_decisions',
     'copilot_model_gateway_automation_decisions',
+    'copilot_model_gateway_automation_policy_snapshots',
     'copilot_model_gateway_automation_effect_applications',
     'copilot_model_gateway_sdk_session_handoffs',
     'copilot_model_gateway_refresh_log_events',
@@ -351,6 +352,20 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
         ON copilot_model_gateway_automation_decisions(route_profile, selected_route_key, decided_at_ms DESC);
     CREATE INDEX IF NOT EXISTS idx_mg_automation_decisions_action
         ON copilot_model_gateway_automation_decisions(action, status, ok, decided_at_ms DESC);
+
+    CREATE TABLE IF NOT EXISTS copilot_model_gateway_automation_policy_snapshots (
+        policy_snapshot_id TEXT PRIMARY KEY,
+        decision_id        TEXT,
+        route_profile      TEXT NOT NULL DEFAULT 'default',
+        enabled            INTEGER NOT NULL,
+        policy             TEXT NOT NULL,
+        observed_at_ms     INTEGER NOT NULL,
+        payload_json       TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS idx_mg_automation_policy_snapshots_decision
+        ON copilot_model_gateway_automation_policy_snapshots(decision_id, observed_at_ms DESC);
+    CREATE INDEX IF NOT EXISTS idx_mg_automation_policy_snapshots_profile
+        ON copilot_model_gateway_automation_policy_snapshots(route_profile, enabled, observed_at_ms DESC);
 
     CREATE TABLE IF NOT EXISTS copilot_model_gateway_automation_effect_applications (
         effect_id          TEXT PRIMARY KEY,

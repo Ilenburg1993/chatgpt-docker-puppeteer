@@ -75,7 +75,7 @@ export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
  *     decision: ReturnType<typeof buildModelGatewayRuntimeAutomationDecision>;
  *     controllerStep: ReturnType<typeof buildModelGatewayRuntimeAutomationControllerStep>;
  *     automationDecisionRecord: Record<string, unknown>;
- *     persistence: { automationDecisions: number } | null;
+ *     persistence: { automationDecisions: number; automationPolicySnapshots?: number } | null;
  * }>}
  */
 export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
@@ -129,10 +129,29 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
         timestamp: decisionTimestamp,
         source: 'terminal-byok-auto-status',
     };
-    const persistence =
-        options.persistAutomationDecision === true
-            ? await new SqliteModelGatewayCatalogStore().writeAutomationDecisionRecords([automationDecisionRecord])
-            : null;
+    let persistence = null;
+    if (options.persistAutomationDecision === true) {
+        const sqliteStore = new SqliteModelGatewayCatalogStore();
+        const decisionPersistence = await sqliteStore.writeAutomationDecisionRecords([automationDecisionRecord]);
+        const policyPersistence = await sqliteStore.writeAutomationPolicySnapshotRecords([
+            {
+                policySnapshotId: `${automationDecisionRecord.decisionId}:policy`,
+                decisionId: automationDecisionRecord.decisionId,
+                routeProfile: decision.routeProfile ?? args.profileId,
+                enabled: policy.enabled,
+                policy: policy.policy,
+                profiles: policy.profiles,
+                allowLiveSetModel: args.allowLiveSetModel,
+                allowNewSession: args.allowNewSession,
+                allowProviderProbes: policy.allowProviderProbes,
+                allowLocalPrivate: args.allowLocalPrivate,
+                accountWideFailureKinds: policy.accountWideFailureKinds,
+                timestamp: decisionTimestamp,
+                source: 'terminal-byok-auto-status',
+            },
+        ]);
+        persistence = { ...decisionPersistence, ...policyPersistence };
+    }
     return {
         schema: 'terminal-byok-gateway-auto-status',
         args,

@@ -71,9 +71,10 @@ const checks = [
     createCheck(
         'sqlite_operational_layers_visible',
         optionalNumber(database?.['automationDecisionRows']) !== null &&
+            optionalNumber(database?.['automationPolicySnapshotRows']) !== null &&
             optionalNumber(database?.['automationEffectApplicationRows']) !== null &&
             optionalNumber(database?.['sdkSessionHandoffRows']) !== null,
-        `decisions=${database?.['automationDecisionRows'] ?? '-'} effects=${database?.['automationEffectApplicationRows'] ?? '-'} handoffs=${database?.['sdkSessionHandoffRows'] ?? '-'}`,
+        `decisions=${database?.['automationDecisionRows'] ?? '-'} policySnapshots=${database?.['automationPolicySnapshotRows'] ?? '-'} effects=${database?.['automationEffectApplicationRows'] ?? '-'} handoffs=${database?.['sdkSessionHandoffRows'] ?? '-'}`,
     ),
     createCheck(
         'readiness_ok',

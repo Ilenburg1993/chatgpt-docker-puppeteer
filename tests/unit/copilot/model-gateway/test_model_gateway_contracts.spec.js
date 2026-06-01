@@ -4191,6 +4191,7 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === '/byok auto on profile:repo_agent allow-live-set-model'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto apply profile:repo_agent allow-live-set-model'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto policy'));
+        assert.ok(commands.some((entry) => entry.command === '/byok auto doctor profile:repo_agent'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto record profile:repo_agent'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto history 10'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto off'));
@@ -5477,6 +5478,17 @@ describe('model-gateway foundation', () => {
                     timestamp: '2026-05-26T12:00:00.000Z',
                 },
             ]);
+            await store.writeAutomationPolicySnapshotRecords([
+                {
+                    policySnapshotId: 'policy-1',
+                    decisionId: 'automation-1',
+                    routeProfile: 'repo_agent',
+                    enabled: true,
+                    policy: 'prefer_runtime_proved',
+                    allowLiveSetModel: true,
+                    timestamp: '2026-05-26T12:00:00.500Z',
+                },
+            ]);
             await store.writeAutomationEffectApplicationRecords([
                 {
                     effectId: 'effect-1',
@@ -5533,6 +5545,7 @@ describe('model-gateway foundation', () => {
             const loaded = await store.readSnapshot();
             const routeDecisions = await store.readRouteDecisionEvents({ limit: 5 });
             const automationDecisions = await store.readAutomationDecisionRecords({ limit: 5 });
+            const automationPolicies = await store.readAutomationPolicySnapshotRecords({ limit: 5 });
             const automationEffects = await store.readAutomationEffectApplicationRecords({ limit: 5 });
             const sdkHandoffs = await store.readSdkSessionHandoffRecords({ limit: 5 });
             const runtime = await store.readRuntimeHealthForModel({ providerId: 'openrouter', providerModel: 'model-a' });
@@ -5561,6 +5574,8 @@ describe('model-gateway foundation', () => {
             assert.equal(routeDecisions[0].decisionId, 'route-1');
             assert.equal(automationDecisions.length, 1);
             assert.equal(automationDecisions[0].decisionId, 'automation-1');
+            assert.equal(automationPolicies.length, 1);
+            assert.equal(automationPolicies[0].policySnapshotId, 'policy-1');
             assert.equal(automationEffects.length, 1);
             assert.equal(automationEffects[0].effectId, 'effect-1');
             assert.equal(sdkHandoffs.length, 1);
@@ -5577,9 +5592,11 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.runtimeRows, 3);
             assert.equal(diagnostics.routeDecisionRows, 1);
             assert.equal(diagnostics.automationDecisionRows, 1);
+            assert.equal(diagnostics.automationPolicySnapshotRows, 1);
             assert.equal(diagnostics.automationEffectApplicationRows, 1);
             assert.equal(diagnostics.sdkSessionHandoffRows, 1);
             assert.equal(diagnostics.latestAutomationDecision.action, 'prepare_new_session');
+            assert.equal(diagnostics.latestAutomationPolicySnapshot.policy, 'prefer_runtime_proved');
             assert.equal(diagnostics.latestAutomationEffectApplication.effectKind, 'set_live_model');
             assert.equal(diagnostics.latestSdkSessionHandoff.targetModel, 'model-a');
             assert.equal(diagnostics.refreshLogRows, 0);
@@ -5820,6 +5837,11 @@ describe('model-gateway foundation', () => {
                 { decisionId: 'automation-2', timestamp: 2, action: 'apply_live_model', status: 'ready', ok: true },
                 { decisionId: 'automation-3', timestamp: 3, action: 'wait_for_reset', status: 'blocked', ok: false },
             ]);
+            await store.writeAutomationPolicySnapshotRecords([
+                { policySnapshotId: 'policy-1', decisionId: 'automation-1', timestamp: 1, policy: 'prefer_runtime_proved', enabled: true },
+                { policySnapshotId: 'policy-2', decisionId: 'automation-2', timestamp: 2, policy: 'prefer_runtime_proved', enabled: true },
+                { policySnapshotId: 'policy-3', decisionId: 'automation-3', timestamp: 3, policy: 'prefer_runtime_proved', enabled: false },
+            ]);
             await store.writeAutomationEffectApplicationRecords([
                 { effectId: 'effect-1', timestamp: 1, effectKind: 'set_live_model', status: 'applied', applied: true },
                 { effectId: 'effect-2', timestamp: 2, effectKind: 'prepare_new_sdk_session', status: 'skipped', applied: false },
@@ -5892,6 +5914,7 @@ describe('model-gateway foundation', () => {
                 accountHistoryMaxRowsPerTable: 1,
                 routeDecisionMaxRows: 1,
                 automationDecisionMaxRows: 1,
+                automationPolicySnapshotMaxRows: 1,
                 automationEffectApplicationMaxRows: 1,
                 sdkSessionHandoffMaxRows: 1,
                 refreshLogMaxRows: 1,
@@ -5904,14 +5927,16 @@ describe('model-gateway foundation', () => {
 
             assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows > 1, true);
             assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.healthObservationMaxRows > 1, true);
-            assert.equal(result.deletedRows, 22);
+            assert.equal(result.deletedRows, 24);
             assert.equal(diagnostics.catalogRows > 0, true);
             assert.equal(diagnostics.accountHistoryRows, 3);
             assert.equal(diagnostics.routeDecisionRows, 1);
             assert.equal(diagnostics.automationDecisionRows, 1);
+            assert.equal(diagnostics.automationPolicySnapshotRows, 1);
             assert.equal(diagnostics.automationEffectApplicationRows, 1);
             assert.equal(diagnostics.sdkSessionHandoffRows, 1);
             assert.equal(diagnostics.latestAutomationDecision.action, 'wait_for_reset');
+            assert.equal(diagnostics.latestAutomationPolicySnapshot.enabled, false);
             assert.equal(diagnostics.latestAutomationEffectApplication.effectKind, 'wait_for_provider_reset');
             assert.equal(diagnostics.latestSdkSessionHandoff.targetModel, 'model-c');
             assert.equal(diagnostics.refreshLogRows, 1);

@@ -33,6 +33,7 @@ const DEFAULT_POLICY_PROFILE = 'default';
 const DEFAULT_TASK_PROFILE = 'default';
 let _runtimeHealthRunSequence = 0;
 let _automationDecisionSequence = 0;
+let _automationPolicySnapshotSequence = 0;
 let _automationEffectSequence = 0;
 let _sdkSessionHandoffSequence = 0;
 
@@ -43,6 +44,7 @@ export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze(
     accountSpendingSnapshotMaxRows: 20_000,
     routeDecisionMaxRows: 50_000,
     automationDecisionMaxRows: 50_000,
+    automationPolicySnapshotMaxRows: 50_000,
     automationEffectApplicationMaxRows: 50_000,
     sdkSessionHandoffMaxRows: 50_000,
     refreshLogMaxRows: 200_000,
@@ -492,6 +494,15 @@ function createAutomationDecisionId(observedAtMs) {
  * @param {number} observedAtMs
  * @returns {string}
  */
+function createAutomationPolicySnapshotId(observedAtMs) {
+    _automationPolicySnapshotSequence += 1;
+    return `model-gateway:automation-policy:${observedAtMs}:${process.pid}:${_automationPolicySnapshotSequence}`;
+}
+
+/**
+ * @param {number} observedAtMs
+ * @returns {string}
+ */
 function createAutomationEffectId(observedAtMs) {
     _automationEffectSequence += 1;
     return `model-gateway:automation-effect:${observedAtMs}:${process.pid}:${_automationEffectSequence}`;
@@ -841,9 +852,11 @@ export class SqliteModelGatewayCatalogStore {
      *     };
      *     routeDecisionRows: number;
      *     automationDecisionRows: number;
+     *     automationPolicySnapshotRows: number;
      *     automationEffectApplicationRows: number;
      *     sdkSessionHandoffRows: number;
      *     latestAutomationDecision: { action: string | null; status: string | null; ok: boolean | null; selectedRouteKey: string | null; decidedAtMs: number | null };
+     *     latestAutomationPolicySnapshot: { enabled: boolean | null; policy: string | null; routeProfile: string | null; observedAtMs: number | null };
      *     latestAutomationEffectApplication: { effectKind: string | null; status: string | null; applied: boolean | null; observedAtMs: number | null };
      *     latestSdkSessionHandoff: { status: string | null; routeProfile: string | null; selectedRouteKey: string | null; sessionId: string | null; targetModel: string | null; requestedAtMs: number | null; confirmedAtMs: number | null };
      *     refreshLogRows: number;
@@ -936,6 +949,18 @@ export class SqliteModelGatewayCatalogStore {
                 )
                 .get()
         );
+        const latestAutomationPolicySnapshot = /** @type {{ enabled: number | null; policy: string | null; route_profile: string | null; observed_at_ms: number | null } | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT enabled, policy, route_profile, observed_at_ms
+                        FROM copilot_model_gateway_automation_policy_snapshots
+                        ORDER BY observed_at_ms DESC
+                        LIMIT 1
+                    `,
+                )
+                .get()
+        );
         const latestAutomationEffectApplication = /** @type {{ effect_kind: string | null; status: string | null; applied: number | null; observed_at_ms: number | null } | undefined} */ (
             this.#db
                 .prepare(
@@ -989,6 +1014,8 @@ export class SqliteModelGatewayCatalogStore {
             },
             routeDecisionRows: tableCounts['copilot_model_gateway_route_decisions'] ?? 0,
             automationDecisionRows: tableCounts['copilot_model_gateway_automation_decisions'] ?? 0,
+            automationPolicySnapshotRows:
+                tableCounts['copilot_model_gateway_automation_policy_snapshots'] ?? 0,
             automationEffectApplicationRows:
                 tableCounts['copilot_model_gateway_automation_effect_applications'] ?? 0,
             sdkSessionHandoffRows: tableCounts['copilot_model_gateway_sdk_session_handoffs'] ?? 0,
@@ -1003,6 +1030,17 @@ export class SqliteModelGatewayCatalogStore {
                           : null,
                 selectedRouteKey: optionalString(latestAutomationDecision?.selected_route_key),
                 decidedAtMs: optionalInteger(latestAutomationDecision?.decided_at_ms),
+            },
+            latestAutomationPolicySnapshot: {
+                enabled:
+                    latestAutomationPolicySnapshot?.enabled === 1
+                        ? true
+                        : latestAutomationPolicySnapshot?.enabled === 0
+                          ? false
+                          : null,
+                policy: optionalString(latestAutomationPolicySnapshot?.policy),
+                routeProfile: optionalString(latestAutomationPolicySnapshot?.route_profile),
+                observedAtMs: optionalInteger(latestAutomationPolicySnapshot?.observed_at_ms),
             },
             latestAutomationEffectApplication: {
                 effectKind: optionalString(latestAutomationEffectApplication?.effect_kind),
@@ -1230,6 +1268,7 @@ export class SqliteModelGatewayCatalogStore {
      *     runtimeProbeResultMaxRows?: number;
      *     healthObservationMaxRows?: number;
      *     automationDecisionMaxRows?: number;
+     *     automationPolicySnapshotMaxRows?: number;
      *     automationEffectApplicationMaxRows?: number;
      *     sdkSessionHandoffMaxRows?: number;
      * }} [policy]
@@ -1282,6 +1321,10 @@ export class SqliteModelGatewayCatalogStore {
             policy.automationDecisionMaxRows,
             DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.automationDecisionMaxRows,
         );
+        const automationPolicySnapshotMaxRows = retentionLimit(
+            policy.automationPolicySnapshotMaxRows,
+            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.automationPolicySnapshotMaxRows,
+        );
         const automationEffectApplicationMaxRows = retentionLimit(
             policy.automationEffectApplicationMaxRows,
             DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.automationEffectApplicationMaxRows,
@@ -1333,6 +1376,15 @@ export class SqliteModelGatewayCatalogStore {
                     maxRows: automationDecisionMaxRows,
                 }),
                 maxRows: automationDecisionMaxRows,
+            };
+            tables['copilot_model_gateway_automation_policy_snapshots'] = {
+                deletedRows: deleteRowsKeepingLatest(this.#db, {
+                    table: 'copilot_model_gateway_automation_policy_snapshots',
+                    keyColumn: 'policy_snapshot_id',
+                    orderColumn: 'observed_at_ms',
+                    maxRows: automationPolicySnapshotMaxRows,
+                }),
+                maxRows: automationPolicySnapshotMaxRows,
             };
             tables['copilot_model_gateway_automation_effect_applications'] = {
                 deletedRows: deleteRowsKeepingLatest(this.#db, {
@@ -1951,6 +2003,61 @@ export class SqliteModelGatewayCatalogStore {
                     SELECT payload_json
                     FROM copilot_model_gateway_automation_decisions
                     ORDER BY decided_at_ms DESC
+                    LIMIT ?
+                `,
+            )
+            .all(limit)
+            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+    }
+
+    /**
+     * @param {Record<string, unknown>[]} snapshots
+     * @returns {Promise<{ automationPolicySnapshots: number }>}
+     */
+    async writeAutomationPolicySnapshotRecords(snapshots) {
+        const insert = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_automation_policy_snapshots
+                (policy_snapshot_id, decision_id, route_profile, enabled, policy, observed_at_ms, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(policy_snapshot_id) DO UPDATE SET
+                decision_id = excluded.decision_id,
+                route_profile = excluded.route_profile,
+                enabled = excluded.enabled,
+                policy = excluded.policy,
+                observed_at_ms = excluded.observed_at_ms,
+                payload_json = excluded.payload_json
+        `);
+        const writable = snapshots.filter(isRecord);
+        const tx = this.#db.transaction(() => {
+            for (const snapshot of writable) {
+                const observedAtMs = dateMs(snapshot['timestamp']) ?? dateMs(snapshot['observedAt']) ?? Date.now();
+                insert.run(
+                    optionalString(snapshot['policySnapshotId']) ?? createAutomationPolicySnapshotId(observedAtMs),
+                    optionalString(snapshot['decisionId']),
+                    optionalString(snapshot['routeProfile']) ?? DEFAULT_ROUTE_PROFILE,
+                    snapshot['enabled'] === true ? 1 : 0,
+                    optionalString(snapshot['policy']) ?? 'prefer_runtime_proved',
+                    observedAtMs,
+                    operationalPayloadJson(snapshot),
+                );
+            }
+        });
+        tx();
+        return { automationPolicySnapshots: writable.length };
+    }
+
+    /**
+     * @param {{ limit?: number }} [options]
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async readAutomationPolicySnapshotRecords(options = {}) {
+        const limit = Math.max(1, Math.min(optionalInteger(options.limit) ?? 50, 500));
+        return this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_automation_policy_snapshots
+                    ORDER BY observed_at_ms DESC
                     LIMIT ?
                 `,
             )

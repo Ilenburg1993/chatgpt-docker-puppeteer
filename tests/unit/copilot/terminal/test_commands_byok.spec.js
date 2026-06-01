@@ -1005,6 +1005,9 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                 ),
                 writeRouteDecisionEvents: vi.fn(() => Promise.resolve()),
                 writeAutomationDecisionRecords: vi.fn(() => Promise.resolve({ automationDecisions: 1 })),
+                writeAutomationPolicySnapshotRecords: vi.fn(() =>
+                    Promise.resolve({ automationPolicySnapshots: 1 }),
+                ),
                 writeAutomationEffectApplicationRecords: vi.fn(() =>
                     Promise.resolve({ automationEffectApplications: 1 }),
                 ),
@@ -2956,6 +2959,20 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('BYOK model-gateway auto history');
         expect(ctx.output()).toContain('prepare_new_session');
         expect(ctx.output()).toContain('zai:glm-4.5-flash');
+        expect(setTerminalModelProjection).not.toHaveBeenCalled();
+    });
+
+    it('mostra doctor auto no terminal sem aplicar efeitos', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'auto doctor profile:repo_agent');
+
+        expect(ctx.output()).toContain('BYOK model-gateway auto doctor');
+        expect(ctx.output()).toContain('profile=repo_agent');
+        expect(ctx.output()).toContain('activeSnapshot=sim');
+        expect(ctx.output()).toContain('decision:');
+        expect(ctx.output()).toContain('ledgers:');
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
     });
 

@@ -612,6 +612,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Show the effective persistent model-gateway automation policy without printing secrets.',
     },
     {
+        id: 'terminal.auto-doctor',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto doctor profile:repo_agent',
+        summary: 'Show auto-mode readiness, policy, selected route and SQLite ledgers inside the terminal cockpit.',
+    },
+    {
         id: 'terminal.auto-apply',
         phase: 'automation',
         surface: 'terminal',

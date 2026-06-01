@@ -1967,7 +1967,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok auto [on|policy|status|plan|record|history|apply|off] [profile:<id>] [allow-live-set-model] | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway auto [profile:<id>] | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway local | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict|runs|diff] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] [wire:<completions|responses>] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok auto [on|policy|doctor|status|plan|record|history|apply|off] [profile:<id>] [allow-live-set-model] | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway auto [profile:<id>] | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway local | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict|runs|diff] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] [wire:<completions|responses>] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -3508,6 +3508,58 @@ async function renderByokGatewayAutoPolicy(println) {
 
 /**
  * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayAutoDoctor(println, rest) {
+    const [filePolicy, effectivePolicy, status, diagnostics] = await Promise.all([
+        readModelGatewayRuntimeAutomationPolicyFile(),
+        readModelGatewayRuntimeAutomationEffectivePolicy(),
+        buildTerminalByokGatewayAutoStatus(rest),
+        new SqliteModelGatewayCatalogStore().readStorageDiagnostics(),
+    ]);
+    const commandCount = listModelGatewayCanonicalCommands().length;
+    const fileConfigured = Object.keys(filePolicy).length > 0;
+    const activeSnapshot = diagnostics.activeSnapshot?.exists === true;
+    const effectsRows = finitePositiveNumber(diagnostics.automationEffectApplicationRows) ?? 0;
+    const handoffRows = finitePositiveNumber(diagnostics.sdkSessionHandoffRows) ?? 0;
+    const decision = status.decision;
+    const warnings = [];
+    if (effectivePolicy.enabled !== true) warnings.push('policy_disabled');
+    if (effectivePolicy.allowLiveSetModel !== true && effectivePolicy.allowNewSession !== true) {
+        warnings.push('no_effect_policy_enabled');
+    }
+    if (!activeSnapshot) warnings.push('no_active_catalog_snapshot');
+    if (decision.ok !== true) warnings.push('automation_decision_blocked');
+    println('\n  \x1b[36mBYOK model-gateway auto doctor\x1b[0m');
+    println(
+        `  \x1b[90mprofile=${status.args.profileId} · activeSnapshot=${activeSnapshot ? 'sim' : 'nao'} · commands=${commandCount} · warnings=${warnings.length}\x1b[0m`,
+    );
+    println(
+        `    policy:        \x1b[33menabled=${effectivePolicy.enabled ? 'sim' : 'nao'} · file=${fileConfigured ? 'sim' : 'nao'} · liveSetModel=${effectivePolicy.allowLiveSetModel ? 'sim' : 'nao'} · newSession=${effectivePolicy.allowNewSession ? 'sim' : 'nao'}\x1b[0m`,
+    );
+    println(
+        `    decision:      \x1b[33mok=${decision.ok ? 'sim' : 'nao'} · action=${decision.action} · route=${decision.selectedRouteKey ?? '-'}\x1b[0m`,
+    );
+    println(
+        `    target:        \x1b[33m${decision.targetBoundary.preset ?? '-'} · ${decision.targetBoundary.model ?? '-'}\x1b[0m`,
+    );
+    println(
+        `    ledgers:       \x1b[33mdecisions=${diagnostics.automationDecisionRows ?? 0} · policySnapshots=${diagnostics.automationPolicySnapshotRows ?? 0} · effects=${effectsRows} · handoffs=${handoffRows}\x1b[0m`,
+    );
+    println(
+        `    sdk:           \x1b[33msession=${status.inventory.currentSessionId ?? '-'} · live=${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}\x1b[0m`,
+    );
+    if (decision.blockers.length > 0) println(`    blockers:      \x1b[33m${decision.blockers.join(', ')}\x1b[0m`);
+    if (warnings.length > 0) println(`    warnings:      \x1b[33m${warnings.join(', ')}\x1b[0m`);
+    println(`    resumo:        \x1b[90m${decision.operatorSummary}\x1b[0m`);
+    println(
+        `    proximo:       \x1b[90m${warnings.includes('policy_disabled') ? '/byok auto on profile:' + status.args.profileId : decision.nextCommands.join(' && ')}\x1b[0m\n`,
+    );
+}
+
+/**
+ * @param {(text: string) => void} println
  * @returns {Promise<void>}
  */
 async function renderByokGatewayAutoOff(println) {
@@ -4422,6 +4474,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayAutoPolicy(println);
             return;
         }
+        if (rest.some((item) => /^(doctor|diagnostic|diagnostico|diagnóstico|check|ready|readiness)$/iu.test(item))) {
+            await renderByokGatewayAutoDoctor(println, rest);
+            return;
+        }
         if (rest.some((item) => /^(history|historico|histórico|decisions|ledger)$/iu.test(item))) {
             await renderByokGatewayAutoHistory(println, rest);
             return;
@@ -4446,6 +4502,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             }
             if (autoRest.some((item) => /^(policy|politica|política|config|configuracao|configuração)$/iu.test(item))) {
                 await renderByokGatewayAutoPolicy(println);
+                return;
+            }
+            if (autoRest.some((item) => /^(doctor|diagnostic|diagnostico|diagnóstico|check|ready|readiness)$/iu.test(item))) {
+                await renderByokGatewayAutoDoctor(println, autoRest);
                 return;
             }
             if (autoRest.some((item) => /^(history|historico|histórico|decisions|ledger)$/iu.test(item))) {

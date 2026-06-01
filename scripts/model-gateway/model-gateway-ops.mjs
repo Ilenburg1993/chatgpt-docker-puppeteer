@@ -81,6 +81,7 @@ function readDatabaseSummary(diagnostics) {
         catalogRows: optionalNumber(json?.['catalogRows']),
         routeDecisionRows: optionalNumber(json?.['routeDecisionRows']),
         automationDecisionRows: optionalNumber(json?.['automationDecisionRows']),
+        automationPolicySnapshotRows: optionalNumber(json?.['automationPolicySnapshotRows']),
         automationEffectApplicationRows: optionalNumber(json?.['automationEffectApplicationRows']),
         sdkSessionHandoffRows: optionalNumber(json?.['sdkSessionHandoffRows']),
         latestAutomationAction: optionalString(latestAutomationDecision?.['action']),
@@ -174,7 +175,7 @@ if (json) {
 } else {
     process.stdout.write(`model-gateway ops: ok=${summary.ok ? 'yes' : 'no'} profile=${profile}\n`);
     process.stdout.write(
-        `  db: active=${summary.database.activeSnapshotExists ? 'yes' : 'no'} schema=${summary.database.schemaVersion ?? '-'} rows=${summary.database.catalogRows ?? '-'} routeDecisions=${summary.database.routeDecisionRows ?? '-'} automationDecisions=${summary.database.automationDecisionRows ?? '-'} effects=${summary.database.automationEffectApplicationRows ?? '-'} handoffs=${summary.database.sdkSessionHandoffRows ?? '-'}\n`,
+        `  db: active=${summary.database.activeSnapshotExists ? 'yes' : 'no'} schema=${summary.database.schemaVersion ?? '-'} rows=${summary.database.catalogRows ?? '-'} routeDecisions=${summary.database.routeDecisionRows ?? '-'} automationDecisions=${summary.database.automationDecisionRows ?? '-'} policySnapshots=${summary.database.automationPolicySnapshotRows ?? '-'} effects=${summary.database.automationEffectApplicationRows ?? '-'} handoffs=${summary.database.sdkSessionHandoffRows ?? '-'}\n`,
     );
     process.stdout.write(`  db-auto: latestAction=${summary.database.latestAutomationAction ?? '-'}\n`);
     process.stdout.write(

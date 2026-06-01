@@ -100,8 +100,9 @@ const checks = [
     createCheck('active_catalog_snapshot', activeSnapshot?.['exists'] === true, `source=${activeSnapshot?.['source'] ?? '-'}`),
     createCheck(
         'automation_effect_ledger_visible',
+        optionalNumber(diagnosticsJson?.['automationPolicySnapshotRows']) !== null &&
         optionalNumber(diagnosticsJson?.['automationEffectApplicationRows']) !== null,
-        `rows=${diagnosticsJson?.['automationEffectApplicationRows'] ?? '-'}`,
+        `policySnapshots=${diagnosticsJson?.['automationPolicySnapshotRows'] ?? '-'} effects=${diagnosticsJson?.['automationEffectApplicationRows'] ?? '-'}`,
     ),
     createCheck(
         'sdk_handoff_ledger_visible',
@@ -138,6 +139,7 @@ const summary = {
     latestSdkSessionHandoff,
     ledgers: {
         automationDecisionRows: optionalNumber(diagnosticsJson?.['automationDecisionRows']),
+        automationPolicySnapshotRows: optionalNumber(diagnosticsJson?.['automationPolicySnapshotRows']),
         automationEffectApplicationRows: optionalNumber(diagnosticsJson?.['automationEffectApplicationRows']),
         sdkSessionHandoffRows: optionalNumber(diagnosticsJson?.['sdkSessionHandoffRows']),
     },
@@ -160,7 +162,7 @@ if (json) {
         `  decision: action=${decision?.['action'] ?? '-'} route=${decision?.['selectedRouteKey'] ?? '-'} ok=${statusJson?.['ok'] === true ? 'yes' : 'no'}\n`,
     );
     process.stdout.write(
-        `  ledgers: decisions=${summary.ledgers.automationDecisionRows ?? '-'} effects=${summary.ledgers.automationEffectApplicationRows ?? '-'} handoffs=${summary.ledgers.sdkSessionHandoffRows ?? '-'}\n`,
+        `  ledgers: decisions=${summary.ledgers.automationDecisionRows ?? '-'} policySnapshots=${summary.ledgers.automationPolicySnapshotRows ?? '-'} effects=${summary.ledgers.automationEffectApplicationRows ?? '-'} handoffs=${summary.ledgers.sdkSessionHandoffRows ?? '-'}\n`,
     );
     for (const check of checks) {
         process.stdout.write(`  ${check.pass ? 'PASS' : check.severity.toUpperCase()} ${check.id}: ${check.detail}\n`);
