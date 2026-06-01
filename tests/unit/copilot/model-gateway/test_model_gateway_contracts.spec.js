@@ -52,6 +52,7 @@ import {
     buildModelGatewayRuntimeSelectorProbeRun,
     buildModelGatewayRuntimeAutomationControllerStep,
     buildModelGatewayRuntimeAutomationDecision,
+    explainModelGatewayRuntimeAutomationPolicySources,
     buildModelGatewayRuntimeSelectorPlan,
     mergeModelGatewayRuntimeAutomationPolicy,
     readModelGatewayRuntimeAutomationEffectivePolicy,
@@ -1344,6 +1345,18 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(effectivePolicy.profiles, ['repo_agent']);
         assert.equal(effectivePolicy.allowLiveSetModel, true);
         assert.equal(effectivePolicy.allowNewSession, true);
+        const policySources = explainModelGatewayRuntimeAutomationPolicySources({
+            filePolicy: { enabled: true, allowLiveSetModel: true },
+            env: {
+                COPILOT_BYOK_GATEWAY_AUTO_PROFILES: 'repo_agent',
+                COPILOT_BYOK_GATEWAY_AUTO_ALLOW_NEW_SESSION: 'true',
+            },
+        });
+        assert.equal(policySources.enabled.source, 'file');
+        assert.equal(policySources.allowLiveSetModel.source, 'file');
+        assert.equal(policySources.profiles.source, 'env');
+        assert.equal(policySources.allowNewSession.source, 'env');
+        assert.equal(policySources.allowLocalPrivate.source, 'default');
         await rm(policyDir, { recursive: true, force: true });
 
         const noLiveSessionDecision = buildModelGatewayRuntimeAutomationDecision({

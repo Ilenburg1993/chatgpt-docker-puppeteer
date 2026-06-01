@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 
+import {
+    explainModelGatewayRuntimeAutomationPolicySources,
+    readModelGatewayRuntimeAutomationPolicyFile,
+} from '#copilot/model-gateway';
+
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from './index.mjs';
 
 const args = process.argv.slice(2);
@@ -79,6 +84,10 @@ const ready = runJson('autoReady', ['--json', `--profile=${profile}`]);
 const status = runJson('autoStatus', ['--json', `--profile=${profile}`]);
 const diagnostics = runJson('sqliteDiagnostics', ['--json']);
 const commands = runJson('canonicalCommands', ['--json']);
+const policySources = explainModelGatewayRuntimeAutomationPolicySources({
+    filePolicy: await readModelGatewayRuntimeAutomationPolicyFile(),
+    env: process.env,
+});
 
 const readyJson = optionalRecord(ready.json);
 const statusJson = optionalRecord(status.json);
@@ -136,6 +145,7 @@ const summary = {
     blockers,
     warnings,
     policy: policy ?? null,
+    policySources,
     decision: decision ?? null,
     nextRetry: {
         active: cooldown?.['active'] === true,

@@ -3,6 +3,7 @@ export { buildModelGatewayRuntimeAutomationDecision, selectModelGatewayRuntimeAu
 export {
     DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH,
     MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV,
+    explainModelGatewayRuntimeAutomationPolicySources,
     mergeModelGatewayRuntimeAutomationPolicy,
     readModelGatewayRuntimeAutomationEffectivePolicy,
     readModelGatewayRuntimeAutomationPolicy,

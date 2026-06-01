@@ -13,6 +13,7 @@ export {
     MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV,
     buildModelGatewayRuntimeAutomationControllerStep,
     buildModelGatewayRuntimeAutomationDecision,
+    explainModelGatewayRuntimeAutomationPolicySources,
     mergeModelGatewayRuntimeAutomationPolicy,
     readModelGatewayRuntimeAutomationEffectivePolicy,
     readModelGatewayRuntimeAutomationPolicy,

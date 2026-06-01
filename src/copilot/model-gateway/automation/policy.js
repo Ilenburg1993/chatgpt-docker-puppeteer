@@ -25,6 +25,17 @@ export const MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV = Object.freeze({
     accountWideFailureKinds: 'COPILOT_BYOK_GATEWAY_AUTO_ACCOUNT_WIDE_FAILURE_KINDS',
 });
 
+const MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_FIELDS = Object.freeze([
+    'enabled',
+    'policy',
+    'profiles',
+    'allowLiveSetModel',
+    'allowNewSession',
+    'allowProviderProbes',
+    'allowLocalPrivate',
+    'accountWideFailureKinds',
+]);
+
 /**
  * @param {unknown} value
  * @returns {boolean}
@@ -81,6 +92,15 @@ function optionalStringList(value) {
  */
 function record(value) {
     return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+}
+
+/**
+ * @param {Record<string, unknown>} object
+ * @param {string} field
+ * @returns {boolean}
+ */
+function hasOwn(object, field) {
+    return Object.prototype.hasOwnProperty.call(object, field);
 }
 
 /**
@@ -186,6 +206,25 @@ export async function readModelGatewayRuntimeAutomationEffectivePolicy(options =
     return mergeModelGatewayRuntimeAutomationPolicy(
         await readModelGatewayRuntimeAutomationPolicyFile({ filePath: options.filePath }),
         envPolicyPatch(options.env ?? process.env),
+    );
+}
+
+/**
+ * @param {{ env?: Record<string, string | undefined>; filePolicy?: Record<string, unknown> }} [options]
+ * @returns {Record<string, { source: 'default' | 'file' | 'env'; env?: string | null }>}
+ */
+export function explainModelGatewayRuntimeAutomationPolicySources(options = {}) {
+    const filePatch = normalizePolicyPatch(record(options.filePolicy));
+    const envPatch = envPolicyPatch(options.env ?? process.env);
+    return Object.fromEntries(
+        MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_FIELDS.map((field) => {
+            const envName = optionalString(Reflect.get(MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV, field));
+            if (hasOwn(envPatch, field)) {
+                return [field, { source: 'env', env: envName }];
+            }
+            if (hasOwn(filePatch, field)) return [field, { source: 'file', env: envName }];
+            return [field, { source: 'default', env: envName }];
+        }),
     );
 }
 

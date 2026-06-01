@@ -38,6 +38,7 @@ import {
     applyModelGatewayEligibilityToSnapshot,
     evaluateModelGatewayCatalogEligibility,
     evaluateModelGatewayProviderEnvRequirements,
+    explainModelGatewayRuntimeAutomationPolicySources,
     explainModelGatewayAccountLimitOverlays,
     explainModelGatewayCatalogEntry,
     explainModelGatewayProviderEntry,
@@ -3567,6 +3568,7 @@ async function renderByokGatewayAutoDoctor(println, rest) {
     ]);
     const commandCount = listModelGatewayCanonicalCommands().length;
     const fileConfigured = Object.keys(filePolicy).length > 0;
+    const policySources = explainModelGatewayRuntimeAutomationPolicySources({ filePolicy, env: process.env });
     const activeSnapshot = diagnostics.activeSnapshot?.exists === true;
     const effectsRows = finitePositiveNumber(diagnostics.automationEffectApplicationRows) ?? 0;
     const handoffRows = finitePositiveNumber(diagnostics.sdkSessionHandoffRows) ?? 0;
@@ -3585,6 +3587,9 @@ async function renderByokGatewayAutoDoctor(println, rest) {
     );
     println(
         `    policy:        \x1b[33menabled=${effectivePolicy.enabled ? 'sim' : 'nao'} · file=${fileConfigured ? 'sim' : 'nao'} · liveSetModel=${effectivePolicy.allowLiveSetModel ? 'sim' : 'nao'} · newSession=${effectivePolicy.allowNewSession ? 'sim' : 'nao'}\x1b[0m`,
+    );
+    println(
+        `    policy source: \x1b[33menabled=${policySources.enabled.source} · profiles=${policySources.profiles.source} · liveSetModel=${policySources.allowLiveSetModel.source} · newSession=${policySources.allowNewSession.source}\x1b[0m`,
     );
     println(
         `    decision:      \x1b[33mok=${decision.ok ? 'sim' : 'nao'} · action=${decision.action} · route=${decision.selectedRouteKey ?? '-'}\x1b[0m`,
