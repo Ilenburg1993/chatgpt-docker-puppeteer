@@ -3,10 +3,13 @@
 `src/copilot/model-gateway` is the canonical domain for BYOK providers, provider-local models, capability metadata,
 probes, routing decisions, health and cost policy.
 
-The living roadmap and architecture guide is
-[`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_NEXT_GUIDE_2026-05-26.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_NEXT_GUIDE_2026-05-26.md).
+The living runtime automation roadmap is
+[`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_RUNTIME_AUTOMATION_ROADMAP_2026-06-01.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_RUNTIME_AUTOMATION_ROADMAP_2026-06-01.md).
 Use it as the source of truth before changing importers, catalog storage, account access, eligibility, probes or runtime
 selection.
+
+The previous BYOK next guide remains available as legacy context at
+[`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_NEXT_GUIDE_2026-05-26.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_NEXT_GUIDE_2026-05-26.md).
 
 The previous universal guide remains available as legacy context at
 [`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_UNIVERSAL_GUIDE_2026-05-25.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_UNIVERSAL_GUIDE_2026-05-25.md).
@@ -36,3 +39,22 @@ gateway model id: openrouter:deepseek/deepseek-v4-flash:free
 
 Provider secrets never appear in model gateway records. Only redacted `secretRefs` and configured/not-configured facts are
 stored.
+
+## Runtime Automation
+
+The automation layer is split deliberately:
+
+- `automation/decision.js` selects the next route action without mutating terminal or provider state.
+- `automation/controller.js` converts a decision into explicit effect intents.
+- `terminal/byok/gateway-auto.js` adapts the pure decision to the live terminal inventory.
+- `/byok auto status` inspects, `/byok auto record` persists the decision, `/byok auto apply` applies only authorized
+  terminal effects, and `/byok auto off` explains how to disable persistent policy.
+
+The operational CLI cockpit is:
+
+```bash
+npm run model-gateway:ops
+```
+
+That command is read-only and is the fastest way to check whether the metadata database, readiness checks, automation
+decision and command inventory are coherent before live tests.

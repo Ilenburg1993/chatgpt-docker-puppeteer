@@ -357,7 +357,7 @@ Precisamos de um cockpit operacional unico:
 - [x] H.1 Session binding classifier existe.
 - [x] H.2 setModel live e restrito a mesma boundary.
 - [ ] H.3 Automation decision deve consumir classifier.
-- [ ] H.4 Quando provider muda, preparar `session sdk next new`.
+- [x] H.4 Quando provider muda, preparar `session sdk next new`.
 - [x] H.5 Quando so modelo muda, aplicar `setModel` se permitido.
 - [ ] H.6 Confirmar modelo efetivo via usage/session.model_changed.
 
@@ -392,8 +392,8 @@ Precisamos de um cockpit operacional unico:
 ## Faixa L - Documentacao Operacional
 
 - [x] L.1 Este roadmap criado.
-- [ ] L.2 README curto para `scripts/model-gateway/`.
-- [ ] L.3 Atualizar `src/copilot/model-gateway/README.md`.
+- [x] L.2 README curto para `scripts/model-gateway/`.
+- [x] L.3 Atualizar `src/copilot/model-gateway/README.md`.
 - [ ] L.4 Atualizar comandos `/byok` help.
 - [ ] L.5 Atualizar guia de operador para auto mode.
 
