@@ -25,6 +25,14 @@ function record(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function textList(value) {
+    return Array.isArray(value) ? value.map(text).filter((item) => item !== null) : [];
+}
+
+/**
  * @param {Record<string, unknown>} decision
  * @returns {string | null}
  */
@@ -44,7 +52,7 @@ function selectedRouteKey(decision) {
  * @param {object} input
  * @param {'pre_turn' | 'post_turn' | 'manual'} [input.phase]
  * @param {Record<string, unknown>} input.decision
- * @param {{ allowEffects?: boolean; allowLiveSetModel?: boolean; allowNewSession?: boolean }} [input.policy]
+ * @param {{ allowEffects?: boolean; allowLiveSetModel?: boolean; allowNewSession?: boolean; accountWideFailureKinds?: string[] }} [input.policy]
  * @param {{ ok?: boolean; failureKind?: string | null; errorMessage?: string | null }} [input.turnOutcome]
  * @returns {{
  *   schema: 'model-gateway-runtime-automation-controller-step';
@@ -67,6 +75,7 @@ export function buildModelGatewayRuntimeAutomationControllerStep(input) {
         ? decision['blockers'].map(text).filter((item) => item !== null)
         : [];
     const allowEffects = policy.allowEffects === true;
+    const accountWideFailureKinds = new Set(textList(policy.accountWideFailureKinds));
     const effects = [];
     const model = targetModel(decision);
     const routeKey = selectedRouteKey(decision);
@@ -77,6 +86,7 @@ export function buildModelGatewayRuntimeAutomationControllerStep(input) {
             routeKey,
             failureKind: input.turnOutcome.failureKind ?? 'unknown_failure',
             errorMessage: input.turnOutcome.errorMessage ?? null,
+            accountWideFailure: accountWideFailureKinds.has(input.turnOutcome.failureKind ?? ''),
             execute: allowEffects,
         });
     }

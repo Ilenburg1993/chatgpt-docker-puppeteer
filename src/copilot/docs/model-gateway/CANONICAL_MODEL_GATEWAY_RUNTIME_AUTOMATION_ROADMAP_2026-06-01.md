@@ -348,7 +348,7 @@ Precisamos de um cockpit operacional unico:
 
 - [x] G.1 Classificacao de auth/credits/rate-limit existe.
 - [x] G.2 Runtime overlays derivados de health existem.
-- [ ] G.3 Tornar account-wide failure kinds configuraveis no controller.
+- [x] G.3 Tornar account-wide failure kinds configuraveis no controller.
 - [ ] G.4 Diferenciar quota hard, rate-limit resetavel, auth invalid, model unavailable.
 - [x] G.5 Expor cooldown no comando auto status.
 

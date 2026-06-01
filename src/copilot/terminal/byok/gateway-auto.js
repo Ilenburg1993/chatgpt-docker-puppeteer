@@ -112,6 +112,7 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
             allowEffects: options.allowEffects === true,
             allowLiveSetModel: args.allowLiveSetModel,
             allowNewSession: args.allowNewSession,
+            accountWideFailureKinds: readModelGatewayRuntimeAutomationPolicy(options.env).accountWideFailureKinds,
         },
     });
     const persistence =

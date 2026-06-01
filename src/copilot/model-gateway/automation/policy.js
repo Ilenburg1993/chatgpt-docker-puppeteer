@@ -16,6 +16,7 @@ export const MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV = Object.freeze({
     allowNewSession: 'COPILOT_BYOK_GATEWAY_AUTO_ALLOW_NEW_SESSION',
     allowProviderProbes: 'COPILOT_BYOK_GATEWAY_AUTO_ALLOW_PROVIDER_PROBES',
     allowLocalPrivate: 'COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LOCAL_PRIVATE',
+    accountWideFailureKinds: 'COPILOT_BYOK_GATEWAY_AUTO_ACCOUNT_WIDE_FAILURE_KINDS',
 });
 
 /**
@@ -58,5 +59,6 @@ export function readModelGatewayRuntimeAutomationPolicy(env = process.env) {
         allowNewSession: truthy(env[MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV.allowNewSession]),
         allowProviderProbes: truthy(env[MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV.allowProviderProbes]),
         allowLocalPrivate: truthy(env[MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV.allowLocalPrivate]),
+        accountWideFailureKinds: csv(env[MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV.accountWideFailureKinds]),
     };
 }

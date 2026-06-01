@@ -551,6 +551,7 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             allowNewSession: false,
             allowProviderProbes: false,
             allowLocalPrivate: false,
+            accountWideFailureKinds: [],
         })),
         buildModelGatewayRuntimeAutomationDecision: vi.fn((input) => ({
             schema: 'model-gateway-runtime-automation-decision',

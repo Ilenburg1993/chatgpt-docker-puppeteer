@@ -1284,6 +1284,7 @@ describe('model-gateway foundation', () => {
             COPILOT_BYOK_GATEWAY_AUTO_ALLOW_NEW_SESSION: '1',
             COPILOT_BYOK_GATEWAY_AUTO_ALLOW_PROVIDER_PROBES: 'false',
             COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LOCAL_PRIVATE: 'on',
+            COPILOT_BYOK_GATEWAY_AUTO_ACCOUNT_WIDE_FAILURE_KINDS: 'auth,credits,rate-limit',
         });
         assert.deepEqual(autoPolicy, {
             enabled: true,
@@ -1293,6 +1294,7 @@ describe('model-gateway foundation', () => {
             allowNewSession: true,
             allowProviderProbes: false,
             allowLocalPrivate: true,
+            accountWideFailureKinds: ['auth', 'credits', 'rate-limit'],
         });
 
         const noLiveSessionDecision = buildModelGatewayRuntimeAutomationDecision({
@@ -1382,6 +1384,13 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(failureControllerStep.effects[0]['kind'], 'replan_after_turn_failure');
         assert.equal(failureControllerStep.effects[0]['failureKind'], 'rate_limit');
+        const accountWideControllerStep = buildModelGatewayRuntimeAutomationControllerStep({
+            phase: 'post_turn',
+            decision: localPrivateDecision,
+            policy: { accountWideFailureKinds: ['credits'] },
+            turnOutcome: { ok: false, failureKind: 'credits', errorMessage: 'credit exhausted' },
+        });
+        assert.equal(accountWideControllerStep.effects[0]['accountWideFailure'], true);
 
         const hardQuotaDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan: {
