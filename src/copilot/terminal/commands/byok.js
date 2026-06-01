@@ -3592,6 +3592,11 @@ async function renderByokGatewayAutoDoctor(println, rest) {
     println(
         `    target:        \x1b[33m${decision.targetBoundary.preset ?? '-'} · ${decision.targetBoundary.model ?? '-'}\x1b[0m`,
     );
+    if (decision.cooldown?.active === true) {
+        println(
+            `    cooldown:      \x1b[33m${decision.cooldown.reason ?? 'ativo'} · reset=${decision.cooldown.resetAt ?? '-'} · retryAfter=${decision.cooldown.retryAfterSeconds ?? '-'}s\x1b[0m`,
+        );
+    }
     println(
         `    ledgers:       \x1b[33mdecisions=${diagnostics.automationDecisionRows ?? 0} · policySnapshots=${diagnostics.automationPolicySnapshotRows ?? 0} · effects=${effectsRows} · handoffs=${handoffRows} · confirmations=${confirmationRows}\x1b[0m`,
     );

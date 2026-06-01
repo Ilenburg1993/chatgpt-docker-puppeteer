@@ -3010,6 +3010,24 @@ describe('terminal /byok command', () => {
 
     it('mostra doctor auto no terminal sem aplicar efeitos', async () => {
         mockProjection();
+        buildModelGatewayRuntimeAutomationDecision.mockReturnValueOnce({
+            schema: 'model-gateway-runtime-automation-decision',
+            ok: false,
+            status: 'blocked',
+            action: 'wait_for_reset',
+            selectedRouteKey: 'groq:reset-model',
+            routeProfile: 'repo_agent',
+            canApplyLiveModel: false,
+            requiresNewSession: false,
+            blockers: ['blocked:provider_health_cooldown:rate-limit'],
+            currentBoundary: { enabled: false, profile: null, preset: null, providerType: null, baseUrl: null, model: null },
+            targetBoundary: { profile: 'repo_agent', preset: 'groq', providerType: 'openai_compatible', baseUrl: null, model: 'reset-model' },
+            cooldown: { active: true, reason: 'provider_health_cooldown', resetAt: '2026-06-01T10:00:00.000Z', retryAfterSeconds: 120 },
+            blockerClass: 'rate_limit_resettable',
+            nonActionReason: 'route_wait_for_reset',
+            nextCommands: ['npm run model-gateway:runtime-health:diff'],
+            operatorSummary: 'Rota bloqueada por health/cooldown; aguarde reset ou escolha outra rota.',
+        });
         const ctx = mockCtx();
 
         await cmdByok({ println: ctx.println }, 'auto doctor profile:repo_agent');
@@ -3018,6 +3036,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('profile=repo_agent');
         expect(ctx.output()).toContain('activeSnapshot=sim');
         expect(ctx.output()).toContain('decision:');
+        expect(ctx.output()).toContain('cooldown:');
+        expect(ctx.output()).toContain('reset=2026-06-01T10:00:00.000Z');
         expect(ctx.output()).toContain('ledgers:');
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
     });

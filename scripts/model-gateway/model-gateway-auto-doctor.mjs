@@ -86,6 +86,7 @@ const diagnosticsJson = optionalRecord(diagnostics.json);
 const commandRows = Array.isArray(optionalRecord(commands.json)?.['commands']) ? optionalRecord(commands.json)['commands'] : [];
 const policy = optionalRecord(statusJson?.['policy']);
 const decision = optionalRecord(statusJson?.['decision']);
+const cooldown = optionalRecord(decision?.['cooldown']);
 const activeSnapshot = optionalRecord(diagnosticsJson?.['activeSnapshot']);
 const latestAutomationEffectApplication = optionalRecord(diagnosticsJson?.['latestAutomationEffectApplication']);
 const latestSdkSessionHandoff = optionalRecord(diagnosticsJson?.['latestSdkSessionHandoff']);
@@ -136,6 +137,12 @@ const summary = {
     warnings,
     policy: policy ?? null,
     decision: decision ?? null,
+    nextRetry: {
+        active: cooldown?.['active'] === true,
+        reason: optionalString(cooldown?.['reason']),
+        resetAt: optionalString(cooldown?.['resetAt']),
+        retryAfterSeconds: optionalNumber(cooldown?.['retryAfterSeconds']),
+    },
     latestAutomationEffectApplication,
     latestSdkSessionHandoff,
     ledgers: {
@@ -163,6 +170,11 @@ if (json) {
     process.stdout.write(
         `  decision: action=${decision?.['action'] ?? '-'} route=${decision?.['selectedRouteKey'] ?? '-'} ok=${statusJson?.['ok'] === true ? 'yes' : 'no'}\n`,
     );
+    if (summary.nextRetry.active) {
+        process.stdout.write(
+            `  nextRetry: reason=${summary.nextRetry.reason ?? '-'} resetAt=${summary.nextRetry.resetAt ?? '-'} retryAfter=${summary.nextRetry.retryAfterSeconds ?? '-'}s\n`,
+        );
+    }
     process.stdout.write(
         `  ledgers: decisions=${summary.ledgers.automationDecisionRows ?? '-'} policySnapshots=${summary.ledgers.automationPolicySnapshotRows ?? '-'} effects=${summary.ledgers.automationEffectApplicationRows ?? '-'} handoffs=${summary.ledgers.sdkSessionHandoffRows ?? '-'} confirmations=${summary.ledgers.sdkSessionConfirmationRows ?? '-'}\n`,
     );

@@ -91,7 +91,7 @@ O guia anterior continua como historico:
 - [x] Recovery decision e persistida via automation decision post-turn.
 - [x] Replanejamento pos-falha bloqueia repeticao imediata da mesma rota quando ela acabou de falhar.
 - [x] Recovery pos-falha separa escopo conta/key de escopo modelo/rota.
-- [ ] Falta expor ao operador a proxima janela de tentativa em cockpit auto.
+- [x] Cockpit auto expõe `nextRetry`/cooldown/reset quando a rota aguarda nova tentativa.
 
 ## 3. Arquitetura Ideal
 
