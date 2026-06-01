@@ -12,6 +12,10 @@ The active operator/runtime playbook is
 [`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_RUNTIME_PLAYBOOK_2026-06-01.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_RUNTIME_PLAYBOOK_2026-06-01.md).
 Use it before operating auto mode, running terminal live tests or authorizing real BYOK provider calls.
 
+The active operator/code guide is
+[`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_AND_CODE_GUIDE_2026-06-01.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_AND_CODE_GUIDE_2026-06-01.md).
+Use it to understand the code layers, SQLite operational ledgers, command surfaces, configuration and test ladder.
+
 The previous operational automation roadmap remains available as context at
 [`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATIONAL_AUTOMATION_ROADMAP_2026-06-01.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATIONAL_AUTOMATION_ROADMAP_2026-06-01.md).
 

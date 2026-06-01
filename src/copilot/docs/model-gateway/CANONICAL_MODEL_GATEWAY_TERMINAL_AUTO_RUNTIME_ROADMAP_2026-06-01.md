@@ -12,6 +12,7 @@ O guia anterior continua como historico:
 Playbook operacional ativo para humano/LLM:
 
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_RUNTIME_PLAYBOOK_2026-06-01.md`
+- `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_AND_CODE_GUIDE_2026-06-01.md`
 
 ## 1. Escopo
 

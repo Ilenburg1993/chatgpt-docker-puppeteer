@@ -7,6 +7,7 @@ automacao e teste live.
 Roadmap ativo de implementacao:
 
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_TERMINAL_AUTO_RUNTIME_ROADMAP_2026-06-01.md`
+- `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_AND_CODE_GUIDE_2026-06-01.md`
 
 Guias historicos:
 
