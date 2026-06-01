@@ -677,7 +677,9 @@
     "validate:nerv:strict": "node scripts/validate-nerv-constants.js --strict",
     "vscode:check": "node scripts/check-vscode-extensions.js",
     "vscode:list": "code --list-extensions --show-versions",
-    "vscode:update": "code --update-extensions"
+    "vscode:update": "code --update-extensions",
+    "model-gateway:auto:status": "node scripts/model-gateway/model-gateway-auto-status.mjs --json",
+    "model-gateway:auto:plan": "node scripts/model-gateway/model-gateway-auto-status.mjs --json"
   },
   "overrides": {
     "qs": "^6.15.0",

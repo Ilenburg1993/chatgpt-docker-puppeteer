@@ -45,6 +45,7 @@ import {
     applyModelGatewaySelectionTraceRetention,
     buildModelGatewayRuntimeSelectorProbeEnv,
     buildModelGatewayRuntimeSelectorProbeRun,
+    buildModelGatewayRuntimeAutomationDecision,
     buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewaySelectionDecisionTrace,
     createGatewayRuntimeHealthIndex,
@@ -1251,6 +1252,86 @@ describe('model-gateway foundation', () => {
         assert.equal(strictRuntimeSelectorPlan.ready, true);
         assert.equal(strictRuntimeSelectorPlan.summary.selectedProfileCount, 1);
         assert.equal(strictRuntimeSelectorPlan.summary.blockedProfileCount, 1);
+
+        const keepDecision = buildModelGatewayRuntimeAutomationDecision({
+            runtimeSelectorPlan,
+            profileId: 'repo_agent',
+            currentSessionId: 'sdk-live',
+            liveByokBinding: {
+                enabled: true,
+                profile: 'repo_agent',
+                preset: 'openrouter',
+                providerType: 'openai_compatible_aggregator',
+                model: 'openai/gpt-oss-120b:groq',
+            },
+            policy: { allowLiveSetModel: true },
+        });
+        assert.equal(keepDecision.action, 'keep_current');
+        assert.equal(keepDecision.ok, true);
+
+        const noLiveSessionDecision = buildModelGatewayRuntimeAutomationDecision({
+            runtimeSelectorPlan,
+            profileId: 'repo_agent',
+        });
+        assert.equal(noLiveSessionDecision.action, 'prepare_new_session');
+        assert.equal(noLiveSessionDecision.ok, true);
+        assert.equal(noLiveSessionDecision.requiresNewSession, true);
+
+        const liveSwitchDecision = buildModelGatewayRuntimeAutomationDecision({
+            runtimeSelectorPlan,
+            profileId: 'repo_agent',
+            currentSessionId: 'sdk-live',
+            liveByokBinding: {
+                enabled: true,
+                profile: 'repo_agent',
+                preset: 'openrouter',
+                providerType: 'openai_compatible_aggregator',
+                model: 'older-model',
+            },
+            policy: { allowLiveSetModel: true },
+        });
+        assert.equal(liveSwitchDecision.action, 'apply_live_model');
+        assert.equal(liveSwitchDecision.canApplyLiveModel, true);
+        assert.equal(liveSwitchDecision.requiresNewSession, false);
+
+        const newSessionDecision = buildModelGatewayRuntimeAutomationDecision({
+            runtimeSelectorPlan,
+            profileId: 'repo_agent',
+            currentSessionId: 'sdk-live',
+            liveByokBinding: {
+                enabled: true,
+                profile: 'repo_agent',
+                preset: 'zai',
+                providerType: 'openai_compatible_direct',
+                model: 'glm-old',
+            },
+            policy: { allowNewSession: false },
+        });
+        assert.equal(newSessionDecision.action, 'manual_intervention');
+        assert.equal(newSessionDecision.requiresNewSession, true);
+        assert.equal(newSessionDecision.blockers.includes('new_session_requires_explicit_policy'), true);
+
+        const localPrivateDecision = buildModelGatewayRuntimeAutomationDecision({
+            runtimeSelectorPlan: {
+                routes: [
+                    {
+                        profileId: 'repo_agent',
+                        status: 'selected',
+                        selectedRouteKey: 'ollama:llama3.2',
+                        selected: {
+                            id: 'ollama:llama3.2',
+                            providerId: 'ollama',
+                            providerModel: 'llama3.2',
+                            selectorSyntax: 'llama3.2',
+                            localPrivate: true,
+                        },
+                    },
+                ],
+            },
+            policy: { allowLocalPrivate: false },
+        });
+        assert.equal(localPrivateDecision.ok, false);
+        assert.equal(localPrivateDecision.blockers.includes('local_private_requires_explicit_opt_in'), true);
 
         const routeProbeEnv = buildModelGatewayRuntimeSelectorProbeEnv(runtimeSelectorPlan.routes[0].selected, {
             COPILOT_BYOK_PROFILE: 'current-default-profile',

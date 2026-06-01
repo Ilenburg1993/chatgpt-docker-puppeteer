@@ -8,6 +8,8 @@
  * @module copilot/model-gateway
  */
 
+export { buildModelGatewayRuntimeAutomationDecision } from './automation/index.js';
+
 export {
     deriveModelGatewayRuntimeAccountOverlayFromHealth,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
