@@ -63,6 +63,7 @@ import {
     EMITTER_USER_INPUT_COMPLETED,
     EMITTER_USER_INPUT_REQUESTED,
 } from '#copilot/events';
+import { SqliteModelGatewayCatalogStore } from '#copilot/model-gateway';
 import { DialogProtocol } from '../../dialog/protocol.js';
 import {
     consumeRuntimeInterventionMailbox,
@@ -115,6 +116,33 @@ import {
     reconcileTerminalInFlightToolsAtTurnEnd,
 } from './tool-lifecycle-runtime.js';
 import { buildTerminalToolActivityPresentation } from './tool-activity-presenter.js';
+
+/**
+ * @param {string} previousModel
+ * @param {string} newModel
+ * @param {string | null} reasoningEffort
+ * @returns {Promise<void>}
+ */
+async function recordModelGatewaySdkSessionConfirmation(previousModel, newModel, reasoningEffort) {
+    const store = new SqliteModelGatewayCatalogStore();
+    const handoffs = await store.readSdkSessionHandoffRecords({ limit: 10 });
+    const matched = handoffs.find((handoff) => handoff['targetModel'] === newModel) ?? null;
+    const latest = matched ?? handoffs[0] ?? null;
+    const status = matched ? 'matched_handoff' : latest ? 'model_mismatch' : 'observed';
+    await store.writeSdkSessionConfirmationRecords([
+        {
+            confirmationId: `sdk-model-changed:${Date.now()}:${process.pid}:${newModel}`,
+            handoffId: typeof latest?.['handoffId'] === 'string' ? latest['handoffId'] : null,
+            decisionId: typeof latest?.['decisionId'] === 'string' ? latest['decisionId'] : null,
+            previousModel,
+            confirmedModel: newModel,
+            reasoningEffort,
+            status,
+            observedAt: new Date().toISOString(),
+            source: 'terminal-sdk-session-model-changed',
+        },
+    ]);
+}
 
 /**
  * @typedef {{
@@ -771,6 +799,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const newModel = evt?.newModel ?? 'unknown';
         const reasoningEffort = evt?.reasoningEffort ?? null;
         observeTerminalModelChangeProjection({ previousModel, newModel, reasoningEffort });
+        void recordModelGatewaySdkSessionConfirmation(previousModel, newModel, reasoningEffort).catch((error) => {
+            recordTerminalActivity('system', 'Falha ao registrar confirmação SDK no model-gateway', {
+                detail: error instanceof Error ? error.message : String(error),
+                severity: 'warn',
+                source: 'sdk',
+                recordHistory: false,
+            });
+        });
         recordTerminalActivity('system', 'Modelo SDK alterado', {
             detail: `${previousModel} → ${newModel}${reasoningEffort ? ` · ${reasoningEffort}` : ''}`,
             source: 'sdk',

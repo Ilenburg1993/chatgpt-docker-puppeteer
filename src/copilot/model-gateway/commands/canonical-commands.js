@@ -640,6 +640,20 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Read the latest persisted automation decisions from SQLite without executing providers.',
     },
     {
+        id: 'terminal.auto-handoffs',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto handoffs 10',
+        summary: 'Read the latest SDK session handoffs created by model-gateway automation.',
+    },
+    {
+        id: 'terminal.auto-confirmations',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto confirmations 10',
+        summary: 'Read the latest SDK model-change confirmations correlated with automation handoffs.',
+    },
+    {
         id: 'terminal.auto-off',
         phase: 'automation',
         surface: 'terminal',

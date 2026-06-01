@@ -36,6 +36,7 @@ let _automationDecisionSequence = 0;
 let _automationPolicySnapshotSequence = 0;
 let _automationEffectSequence = 0;
 let _sdkSessionHandoffSequence = 0;
+let _sdkSessionConfirmationSequence = 0;
 
 export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze({
     accountHistoryMaxRowsPerTable: 10_000,
@@ -47,6 +48,7 @@ export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze(
     automationPolicySnapshotMaxRows: 50_000,
     automationEffectApplicationMaxRows: 50_000,
     sdkSessionHandoffMaxRows: 50_000,
+    sdkSessionConfirmationMaxRows: 50_000,
     refreshLogMaxRows: 200_000,
     runtimeProbeRunMaxRows: 10_000,
     runtimeProbeResultMaxRows: 100_000,
@@ -518,6 +520,15 @@ function createSdkSessionHandoffId(observedAtMs) {
 }
 
 /**
+ * @param {number} observedAtMs
+ * @returns {string}
+ */
+function createSdkSessionConfirmationId(observedAtMs) {
+    _sdkSessionConfirmationSequence += 1;
+    return `model-gateway:sdk-confirmation:${observedAtMs}:${process.pid}:${_sdkSessionConfirmationSequence}`;
+}
+
+/**
  * @param {Record<string, unknown>} result
  * @returns {string | null}
  */
@@ -855,10 +866,12 @@ export class SqliteModelGatewayCatalogStore {
      *     automationPolicySnapshotRows: number;
      *     automationEffectApplicationRows: number;
      *     sdkSessionHandoffRows: number;
+     *     sdkSessionConfirmationRows: number;
      *     latestAutomationDecision: { action: string | null; status: string | null; ok: boolean | null; selectedRouteKey: string | null; decidedAtMs: number | null };
      *     latestAutomationPolicySnapshot: { enabled: boolean | null; policy: string | null; routeProfile: string | null; observedAtMs: number | null };
      *     latestAutomationEffectApplication: { effectKind: string | null; status: string | null; applied: boolean | null; observedAtMs: number | null };
      *     latestSdkSessionHandoff: { status: string | null; routeProfile: string | null; selectedRouteKey: string | null; sessionId: string | null; targetModel: string | null; requestedAtMs: number | null; confirmedAtMs: number | null };
+     *     latestSdkSessionConfirmation: { status: string | null; handoffId: string | null; decisionId: string | null; sessionId: string | null; previousModel: string | null; confirmedModel: string | null; observedAtMs: number | null };
      *     refreshLogRows: number;
      * }>}
      */
@@ -985,6 +998,18 @@ export class SqliteModelGatewayCatalogStore {
                 )
                 .get()
         );
+        const latestSdkSessionConfirmation = /** @type {{ status: string | null; handoff_id: string | null; decision_id: string | null; session_id: string | null; previous_model: string | null; confirmed_model: string | null; observed_at_ms: number | null } | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT status, handoff_id, decision_id, session_id, previous_model, confirmed_model, observed_at_ms
+                        FROM copilot_model_gateway_sdk_session_confirmations
+                        ORDER BY observed_at_ms DESC
+                        LIMIT 1
+                    `,
+                )
+                .get()
+        );
         /**
          * @param {string[]} tables
          * @returns {number}
@@ -1019,6 +1044,8 @@ export class SqliteModelGatewayCatalogStore {
             automationEffectApplicationRows:
                 tableCounts['copilot_model_gateway_automation_effect_applications'] ?? 0,
             sdkSessionHandoffRows: tableCounts['copilot_model_gateway_sdk_session_handoffs'] ?? 0,
+            sdkSessionConfirmationRows:
+                tableCounts['copilot_model_gateway_sdk_session_confirmations'] ?? 0,
             latestAutomationDecision: {
                 action: optionalString(latestAutomationDecision?.action),
                 status: optionalString(latestAutomationDecision?.status),
@@ -1061,6 +1088,15 @@ export class SqliteModelGatewayCatalogStore {
                 targetModel: optionalString(latestSdkSessionHandoff?.target_model),
                 requestedAtMs: optionalInteger(latestSdkSessionHandoff?.requested_at_ms),
                 confirmedAtMs: optionalInteger(latestSdkSessionHandoff?.confirmed_at_ms),
+            },
+            latestSdkSessionConfirmation: {
+                status: optionalString(latestSdkSessionConfirmation?.status),
+                handoffId: optionalString(latestSdkSessionConfirmation?.handoff_id),
+                decisionId: optionalString(latestSdkSessionConfirmation?.decision_id),
+                sessionId: optionalString(latestSdkSessionConfirmation?.session_id),
+                previousModel: optionalString(latestSdkSessionConfirmation?.previous_model),
+                confirmedModel: optionalString(latestSdkSessionConfirmation?.confirmed_model),
+                observedAtMs: optionalInteger(latestSdkSessionConfirmation?.observed_at_ms),
             },
             refreshLogRows: tableCounts['copilot_model_gateway_refresh_log_events'] ?? 0,
         };
@@ -1271,6 +1307,7 @@ export class SqliteModelGatewayCatalogStore {
      *     automationPolicySnapshotMaxRows?: number;
      *     automationEffectApplicationMaxRows?: number;
      *     sdkSessionHandoffMaxRows?: number;
+     *     sdkSessionConfirmationMaxRows?: number;
      * }} [policy]
      * @returns {Promise<{
      *     schema: string;
@@ -1332,6 +1369,10 @@ export class SqliteModelGatewayCatalogStore {
         const sdkSessionHandoffMaxRows = retentionLimit(
             policy.sdkSessionHandoffMaxRows,
             DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.sdkSessionHandoffMaxRows,
+        );
+        const sdkSessionConfirmationMaxRows = retentionLimit(
+            policy.sdkSessionConfirmationMaxRows,
+            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.sdkSessionConfirmationMaxRows,
         );
         /** @type {Record<string, { deletedRows: number; maxRows: number }>} */
         const tables = {};
@@ -1403,6 +1444,15 @@ export class SqliteModelGatewayCatalogStore {
                     maxRows: sdkSessionHandoffMaxRows,
                 }),
                 maxRows: sdkSessionHandoffMaxRows,
+            };
+            tables['copilot_model_gateway_sdk_session_confirmations'] = {
+                deletedRows: deleteRowsKeepingLatest(this.#db, {
+                    table: 'copilot_model_gateway_sdk_session_confirmations',
+                    keyColumn: 'confirmation_id',
+                    orderColumn: 'observed_at_ms',
+                    maxRows: sdkSessionConfirmationMaxRows,
+                }),
+                maxRows: sdkSessionConfirmationMaxRows,
             };
             tables['copilot_model_gateway_runtime_probe_results'] = {
                 deletedRows: deleteRowsKeepingLatest(this.#db, {
@@ -2180,6 +2230,68 @@ export class SqliteModelGatewayCatalogStore {
                     SELECT payload_json
                     FROM copilot_model_gateway_sdk_session_handoffs
                     ORDER BY requested_at_ms DESC
+                    LIMIT ?
+                `,
+            )
+            .all(limit)
+            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+    }
+
+    /**
+     * @param {Record<string, unknown>[]} confirmations
+     * @returns {Promise<{ sdkSessionConfirmations: number }>}
+     */
+    async writeSdkSessionConfirmationRecords(confirmations) {
+        const insert = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_sdk_session_confirmations
+                (confirmation_id, handoff_id, decision_id, session_id, previous_model, confirmed_model,
+                 reasoning_effort, status, observed_at_ms, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(confirmation_id) DO UPDATE SET
+                handoff_id = excluded.handoff_id,
+                decision_id = excluded.decision_id,
+                session_id = excluded.session_id,
+                previous_model = excluded.previous_model,
+                confirmed_model = excluded.confirmed_model,
+                reasoning_effort = excluded.reasoning_effort,
+                status = excluded.status,
+                observed_at_ms = excluded.observed_at_ms,
+                payload_json = excluded.payload_json
+        `);
+        const writable = confirmations.filter(isRecord);
+        const tx = this.#db.transaction(() => {
+            for (const confirmation of writable) {
+                const observedAtMs = dateMs(confirmation['observedAt']) ?? dateMs(confirmation['timestamp']) ?? Date.now();
+                insert.run(
+                    optionalString(confirmation['confirmationId']) ?? createSdkSessionConfirmationId(observedAtMs),
+                    optionalString(confirmation['handoffId']),
+                    optionalString(confirmation['decisionId']),
+                    optionalString(confirmation['sessionId']),
+                    optionalString(confirmation['previousModel']),
+                    optionalString(confirmation['confirmedModel']) ?? optionalString(confirmation['newModel']) ?? 'unknown',
+                    optionalString(confirmation['reasoningEffort']),
+                    optionalString(confirmation['status']) ?? 'observed',
+                    observedAtMs,
+                    operationalPayloadJson(confirmation),
+                );
+            }
+        });
+        tx();
+        return { sdkSessionConfirmations: writable.length };
+    }
+
+    /**
+     * @param {{ limit?: number }} [options]
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async readSdkSessionConfirmationRecords(options = {}) {
+        const limit = Math.max(1, Math.min(optionalInteger(options.limit) ?? 50, 500));
+        return this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_sdk_session_confirmations
+                    ORDER BY observed_at_ms DESC
                     LIMIT ?
                 `,
             )

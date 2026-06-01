@@ -42,6 +42,8 @@ const mocks = vi.hoisted(() => ({
     recordTerminalUserInputCompleted: vi.fn(() => null),
     shouldSuppressTerminalAssistantMessageAsUserInputEcho: vi.fn(() => false),
     renderTerminalAssistantTranscript: vi.fn(() => true),
+    readSdkSessionHandoffRecords: vi.fn(() => Promise.resolve([])),
+    writeSdkSessionConfirmationRecords: vi.fn(() => Promise.resolve({ sdkSessionConfirmations: 1 })),
 }));
 
 vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
@@ -76,6 +78,15 @@ vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () =
 
 vi.mock('../../../src/copilot/terminal/frontend/projections/index.js', () => ({
     observeTerminalModelChangeProjection: mocks.observeTerminalModelChangeProjection,
+}));
+
+vi.mock('#copilot/model-gateway', () => ({
+    SqliteModelGatewayCatalogStore: vi.fn(function SqliteModelGatewayCatalogStore() {
+        return {
+            readSdkSessionHandoffRecords: mocks.readSdkSessionHandoffRecords,
+            writeSdkSessionConfirmationRecords: mocks.writeSdkSessionConfirmationRecords,
+        };
+    }),
 }));
 
 vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
@@ -295,6 +306,8 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
 
         setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
         agent.emit('session.model_changed', { previousModel: 'auto', newModel: 'gpt-5.4', reasoningEffort: 'high' });
+        await Promise.resolve();
+        await Promise.resolve();
 
         expect(mocks.observeTerminalModelChangeProjection).toHaveBeenCalledWith({
             previousModel: 'auto',
@@ -307,6 +320,15 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             expect.objectContaining({ detail: 'auto → gpt-5.4 · high' }),
         );
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Modelo SDK: auto → gpt-5.4'));
+        expect(mocks.writeSdkSessionConfirmationRecords).toHaveBeenCalledWith([
+            expect.objectContaining({
+                previousModel: 'auto',
+                confirmedModel: 'gpt-5.4',
+                reasoningEffort: 'high',
+                status: 'observed',
+                source: 'terminal-sdk-session-model-changed',
+            }),
+        ]);
 
         mocks.println.mockClear();
         mocks.getShowSessionActivity.mockReturnValue(true);

@@ -31,7 +31,7 @@ O guia anterior continua como historico:
 - [x] SDK session handoffs estao persistidos.
 - [x] Retention ja separa camadas operacionais.
 - [x] Existe tabela/fluxo para policy snapshots por decision.
-- [ ] Falta tabela/fluxo para SDK binding confirmations.
+- [x] Existe tabela/fluxo para SDK binding confirmations.
 - [ ] Falta tabela/fluxo para post-turn recovery attempts.
 - [ ] Falta tabela/fluxo para live test scenario runs.
 
@@ -66,8 +66,8 @@ O guia anterior continua como historico:
 - [ ] Falta `/byok auto explain`.
 - [ ] Falta `/byok auto switch`.
 - [x] `/byok auto doctor` mostra readiness, policy, rota e ledgers no cockpit terminal.
-- [ ] Falta `/byok auto handoffs`.
-- [ ] Falta `/byok auto confirmations`.
+- [x] `/byok auto handoffs`.
+- [x] `/byok auto confirmations`.
 - [ ] Falta post-turn controller completo.
 
 ### 2.4 SDK boundary
@@ -223,7 +223,7 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] C.2 Effect applications.
 - [x] C.3 SDK handoffs.
 - [x] C.4 Policy snapshots.
-- [ ] C.5 SDK confirmations.
+- [x] C.5 SDK confirmations.
 - [ ] C.6 Recovery attempts.
 - [ ] C.7 Live scenario runs.
 - [ ] C.8 Retention para novas tabelas.
@@ -260,8 +260,8 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 
 - [x] F.1 Evento `session.model_changed` observado.
 - [x] F.2 Projecao viva e atualizada.
-- [ ] F.3 Correlacionar event com handoff/effect pendente.
-- [ ] F.4 Persistir confirmation.
+- [x] F.3 Correlacionar event com handoff pendente quando possivel.
+- [x] F.4 Persistir confirmation.
 - [ ] F.5 Persistir mismatch.
 - [ ] F.6 Cockpit prepared/live/confirmed.
 - [ ] F.7 Teste unitario de confirmation.
@@ -279,8 +279,8 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] G.6 `/byok auto doctor`.
 - [ ] G.7 `/byok auto explain`.
 - [ ] G.8 `/byok auto switch`.
-- [ ] G.9 `/byok auto handoffs`.
-- [ ] G.10 `/byok auto confirmations`.
+- [x] G.9 `/byok auto handoffs`.
+- [x] G.10 `/byok auto confirmations`.
 
 ### Faixa H - Runtime Selector Real
 
@@ -350,7 +350,7 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 ## 7. Proxima Sequencia De Implementacao
 
 1. [x] Implementar tabela/records de policy snapshot por decision.
-2. [ ] Implementar tabela/records de SDK confirmation.
+2. [x] Implementar tabela/records de SDK confirmation.
 3. [ ] Implementar `/byok auto doctor` reaproveitando `model-gateway:auto:doctor`.
 4. [ ] Implementar post-turn controller real apos falha BYOK.
 5. [ ] Persistir recovery attempts.

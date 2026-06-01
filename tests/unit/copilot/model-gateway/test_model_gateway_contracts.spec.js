@@ -4194,6 +4194,8 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === '/byok auto doctor profile:repo_agent'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto record profile:repo_agent'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto history 10'));
+        assert.ok(commands.some((entry) => entry.command === '/byok auto handoffs 10'));
+        assert.ok(commands.some((entry) => entry.command === '/byok auto confirmations 10'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto off'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway prebuild'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway selection audit runtime-proof'));
@@ -5512,6 +5514,17 @@ describe('model-gateway foundation', () => {
                     requestedAt: '2026-05-26T12:00:02.000Z',
                 },
             ]);
+            await store.writeSdkSessionConfirmationRecords([
+                {
+                    confirmationId: 'confirmation-1',
+                    handoffId: 'handoff-1',
+                    decisionId: 'automation-1',
+                    previousModel: 'old-model',
+                    confirmedModel: 'model-a',
+                    status: 'matched_handoff',
+                    observedAt: '2026-05-26T12:00:03.000Z',
+                },
+            ]);
             await store.writeRuntimeHealthRecords([
                 {
                     key: 'default|openrouter|model-a',
@@ -5548,6 +5561,7 @@ describe('model-gateway foundation', () => {
             const automationPolicies = await store.readAutomationPolicySnapshotRecords({ limit: 5 });
             const automationEffects = await store.readAutomationEffectApplicationRecords({ limit: 5 });
             const sdkHandoffs = await store.readSdkSessionHandoffRecords({ limit: 5 });
+            const sdkConfirmations = await store.readSdkSessionConfirmationRecords({ limit: 5 });
             const runtime = await store.readRuntimeHealthForModel({ providerId: 'openrouter', providerModel: 'model-a' });
             const diagnostics = await store.readStorageDiagnostics();
             const quotaRows = /** @type {{ count: number } | undefined} */ (
@@ -5580,6 +5594,8 @@ describe('model-gateway foundation', () => {
             assert.equal(automationEffects[0].effectId, 'effect-1');
             assert.equal(sdkHandoffs.length, 1);
             assert.equal(sdkHandoffs[0].handoffId, 'handoff-1');
+            assert.equal(sdkConfirmations.length, 1);
+            assert.equal(sdkConfirmations[0].confirmationId, 'confirmation-1');
             assert.equal(runtime.health?.['lastStatus'], 'ok');
             assert.equal(runtime.probes.length, 1);
             assert.equal(quotaRows?.count, 2);
@@ -5595,10 +5611,12 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.automationPolicySnapshotRows, 1);
             assert.equal(diagnostics.automationEffectApplicationRows, 1);
             assert.equal(diagnostics.sdkSessionHandoffRows, 1);
+            assert.equal(diagnostics.sdkSessionConfirmationRows, 1);
             assert.equal(diagnostics.latestAutomationDecision.action, 'prepare_new_session');
             assert.equal(diagnostics.latestAutomationPolicySnapshot.policy, 'prefer_runtime_proved');
             assert.equal(diagnostics.latestAutomationEffectApplication.effectKind, 'set_live_model');
             assert.equal(diagnostics.latestSdkSessionHandoff.targetModel, 'model-a');
+            assert.equal(diagnostics.latestSdkSessionConfirmation.confirmedModel, 'model-a');
             assert.equal(diagnostics.refreshLogRows, 0);
         } finally {
             db.close();
@@ -5852,6 +5870,11 @@ describe('model-gateway foundation', () => {
                 { handoffId: 'handoff-2', requestedAt: 2, status: 'boot_requested', targetModel: 'model-b' },
                 { handoffId: 'handoff-3', requestedAt: 3, status: 'confirmed', targetModel: 'model-c' },
             ]);
+            await store.writeSdkSessionConfirmationRecords([
+                { confirmationId: 'confirmation-1', observedAt: 1, status: 'observed', confirmedModel: 'model-a' },
+                { confirmationId: 'confirmation-2', observedAt: 2, status: 'model_mismatch', confirmedModel: 'model-b' },
+                { confirmationId: 'confirmation-3', observedAt: 3, status: 'matched_handoff', confirmedModel: 'model-c' },
+            ]);
             await store.writeRefreshLogEvents(
                 [
                     { eventId: 'refresh-1', ts: 1, phase: 'refresh_started' },
@@ -5917,6 +5940,7 @@ describe('model-gateway foundation', () => {
                 automationPolicySnapshotMaxRows: 1,
                 automationEffectApplicationMaxRows: 1,
                 sdkSessionHandoffMaxRows: 1,
+                sdkSessionConfirmationMaxRows: 1,
                 refreshLogMaxRows: 1,
                 runtimeProbeRunMaxRows: 1,
                 runtimeProbeResultMaxRows: 1,
@@ -5927,7 +5951,7 @@ describe('model-gateway foundation', () => {
 
             assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows > 1, true);
             assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.healthObservationMaxRows > 1, true);
-            assert.equal(result.deletedRows, 24);
+            assert.equal(result.deletedRows, 26);
             assert.equal(diagnostics.catalogRows > 0, true);
             assert.equal(diagnostics.accountHistoryRows, 3);
             assert.equal(diagnostics.routeDecisionRows, 1);
@@ -5935,10 +5959,12 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.automationPolicySnapshotRows, 1);
             assert.equal(diagnostics.automationEffectApplicationRows, 1);
             assert.equal(diagnostics.sdkSessionHandoffRows, 1);
+            assert.equal(diagnostics.sdkSessionConfirmationRows, 1);
             assert.equal(diagnostics.latestAutomationDecision.action, 'wait_for_reset');
             assert.equal(diagnostics.latestAutomationPolicySnapshot.enabled, false);
             assert.equal(diagnostics.latestAutomationEffectApplication.effectKind, 'wait_for_provider_reset');
             assert.equal(diagnostics.latestSdkSessionHandoff.targetModel, 'model-c');
+            assert.equal(diagnostics.latestSdkSessionConfirmation.confirmedModel, 'model-c');
             assert.equal(diagnostics.refreshLogRows, 1);
             assert.equal(diagnostics.runtimeRows, 3);
             assert.equal(loaded.projections.length, 1);

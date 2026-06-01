@@ -245,7 +245,7 @@ manual_required
 - [x] automation decisions.
 - [x] automation effect applications.
 - [x] SDK session handoffs.
-- [ ] SDK binding confirmations.
+- [x] SDK binding confirmations.
 - [ ] post-turn recovery attempts.
 - [x] operator policy snapshots.
 - [ ] live-test scenario runs.

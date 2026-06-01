@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/catalog/sqlite-schema
  */
 
-export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 7;
+export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 8;
 
 export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_snapshots',
@@ -35,6 +35,7 @@ export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_automation_policy_snapshots',
     'copilot_model_gateway_automation_effect_applications',
     'copilot_model_gateway_sdk_session_handoffs',
+    'copilot_model_gateway_sdk_session_confirmations',
     'copilot_model_gateway_refresh_log_events',
 ]);
 
@@ -399,6 +400,23 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
         ON copilot_model_gateway_sdk_session_handoffs(route_profile, selected_route_key, requested_at_ms DESC);
     CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_handoffs_status
         ON copilot_model_gateway_sdk_session_handoffs(status, requested_at_ms DESC);
+
+    CREATE TABLE IF NOT EXISTS copilot_model_gateway_sdk_session_confirmations (
+        confirmation_id  TEXT PRIMARY KEY,
+        handoff_id       TEXT,
+        decision_id      TEXT,
+        session_id       TEXT,
+        previous_model   TEXT,
+        confirmed_model  TEXT NOT NULL,
+        reasoning_effort TEXT,
+        status           TEXT NOT NULL,
+        observed_at_ms   INTEGER NOT NULL,
+        payload_json     TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_confirmations_handoff
+        ON copilot_model_gateway_sdk_session_confirmations(handoff_id, observed_at_ms DESC);
+    CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_confirmations_model
+        ON copilot_model_gateway_sdk_session_confirmations(confirmed_model, status, observed_at_ms DESC);
 
     CREATE TABLE IF NOT EXISTS copilot_model_gateway_refresh_log_events (
         event_key      TEXT PRIMARY KEY,

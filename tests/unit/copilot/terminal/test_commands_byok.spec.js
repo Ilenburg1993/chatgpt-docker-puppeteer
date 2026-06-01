@@ -1023,6 +1023,26 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                         },
                     ]),
                 ),
+                readSdkSessionHandoffRecords: vi.fn(() =>
+                    Promise.resolve([
+                        {
+                            requestedAt: '2026-06-01T00:00:01.000Z',
+                            status: 'boot_scheduled',
+                            targetModel: 'glm-4.5-flash',
+                            selectedRouteKey: 'zai:glm-4.5-flash',
+                        },
+                    ]),
+                ),
+                readSdkSessionConfirmationRecords: vi.fn(() =>
+                    Promise.resolve([
+                        {
+                            observedAt: '2026-06-01T00:00:02.000Z',
+                            status: 'matched_handoff',
+                            previousModel: 'auto',
+                            confirmedModel: 'glm-4.5-flash',
+                        },
+                    ]),
+                ),
                 readOpenAIModelCatalogList: vi.fn(() => Promise.resolve({ object: 'list', data: [] })),
                 readRuntimeHealthForModel: vi.fn(() => Promise.resolve({ health: null, probes: [] })),
             };
@@ -2959,6 +2979,21 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('BYOK model-gateway auto history');
         expect(ctx.output()).toContain('prepare_new_session');
         expect(ctx.output()).toContain('zai:glm-4.5-flash');
+        expect(setTerminalModelProjection).not.toHaveBeenCalled();
+    });
+
+    it('mostra handoffs e confirmations auto persistidos sem executar efeitos', async () => {
+        mockProjection();
+        const handoffsCtx = mockCtx();
+        const confirmationsCtx = mockCtx();
+
+        await cmdByok({ println: handoffsCtx.println }, 'auto handoffs 5');
+        await cmdByok({ println: confirmationsCtx.println }, 'auto confirmations 5');
+
+        expect(handoffsCtx.output()).toContain('BYOK model-gateway auto handoffs');
+        expect(handoffsCtx.output()).toContain('boot_scheduled');
+        expect(confirmationsCtx.output()).toContain('BYOK model-gateway auto confirmations');
+        expect(confirmationsCtx.output()).toContain('matched_handoff');
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
     });
 

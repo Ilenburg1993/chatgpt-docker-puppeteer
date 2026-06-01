@@ -106,8 +106,9 @@ const checks = [
     ),
     createCheck(
         'sdk_handoff_ledger_visible',
-        optionalNumber(diagnosticsJson?.['sdkSessionHandoffRows']) !== null,
-        `rows=${diagnosticsJson?.['sdkSessionHandoffRows'] ?? '-'}`,
+        optionalNumber(diagnosticsJson?.['sdkSessionHandoffRows']) !== null &&
+            optionalNumber(diagnosticsJson?.['sdkSessionConfirmationRows']) !== null,
+        `handoffs=${diagnosticsJson?.['sdkSessionHandoffRows'] ?? '-'} confirmations=${diagnosticsJson?.['sdkSessionConfirmationRows'] ?? '-'}`,
     ),
     createCheck('policy_loaded', policy !== null, `source=${policy?.['source'] ?? '-'}`),
     createCheck('policy_enabled', policy?.['enabled'] === true, `enabled=${policy?.['enabled'] === true}`, requireEnabled ? 'error' : 'warn'),
@@ -142,6 +143,7 @@ const summary = {
         automationPolicySnapshotRows: optionalNumber(diagnosticsJson?.['automationPolicySnapshotRows']),
         automationEffectApplicationRows: optionalNumber(diagnosticsJson?.['automationEffectApplicationRows']),
         sdkSessionHandoffRows: optionalNumber(diagnosticsJson?.['sdkSessionHandoffRows']),
+        sdkSessionConfirmationRows: optionalNumber(diagnosticsJson?.['sdkSessionConfirmationRows']),
     },
     commands: {
         count: commandRows.length,
@@ -162,7 +164,7 @@ if (json) {
         `  decision: action=${decision?.['action'] ?? '-'} route=${decision?.['selectedRouteKey'] ?? '-'} ok=${statusJson?.['ok'] === true ? 'yes' : 'no'}\n`,
     );
     process.stdout.write(
-        `  ledgers: decisions=${summary.ledgers.automationDecisionRows ?? '-'} policySnapshots=${summary.ledgers.automationPolicySnapshotRows ?? '-'} effects=${summary.ledgers.automationEffectApplicationRows ?? '-'} handoffs=${summary.ledgers.sdkSessionHandoffRows ?? '-'}\n`,
+        `  ledgers: decisions=${summary.ledgers.automationDecisionRows ?? '-'} policySnapshots=${summary.ledgers.automationPolicySnapshotRows ?? '-'} effects=${summary.ledgers.automationEffectApplicationRows ?? '-'} handoffs=${summary.ledgers.sdkSessionHandoffRows ?? '-'} confirmations=${summary.ledgers.sdkSessionConfirmationRows ?? '-'}\n`,
     );
     for (const check of checks) {
         process.stdout.write(`  ${check.pass ? 'PASS' : check.severity.toUpperCase()} ${check.id}: ${check.detail}\n`);

@@ -73,8 +73,9 @@ const checks = [
         optionalNumber(database?.['automationDecisionRows']) !== null &&
             optionalNumber(database?.['automationPolicySnapshotRows']) !== null &&
             optionalNumber(database?.['automationEffectApplicationRows']) !== null &&
-            optionalNumber(database?.['sdkSessionHandoffRows']) !== null,
-        `decisions=${database?.['automationDecisionRows'] ?? '-'} policySnapshots=${database?.['automationPolicySnapshotRows'] ?? '-'} effects=${database?.['automationEffectApplicationRows'] ?? '-'} handoffs=${database?.['sdkSessionHandoffRows'] ?? '-'}`,
+            optionalNumber(database?.['sdkSessionHandoffRows']) !== null &&
+            optionalNumber(database?.['sdkSessionConfirmationRows']) !== null,
+        `decisions=${database?.['automationDecisionRows'] ?? '-'} policySnapshots=${database?.['automationPolicySnapshotRows'] ?? '-'} effects=${database?.['automationEffectApplicationRows'] ?? '-'} handoffs=${database?.['sdkSessionHandoffRows'] ?? '-'} confirmations=${database?.['sdkSessionConfirmationRows'] ?? '-'}`,
     ),
     createCheck(
         'readiness_ok',
