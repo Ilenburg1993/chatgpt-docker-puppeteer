@@ -178,7 +178,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         {
             id: 'control_no_pr',
             order: 3,
-            command: 'npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000',
+            command: 'npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000',
             executesModelTurn: false,
             executesRuntimeProbes: false,
             consumesProviderQuota: false,
@@ -187,7 +187,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         {
             id: 'byok_fixture_control_plane',
             order: 4,
-            command: 'npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
+            command: 'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
             executesModelTurn: false,
             executesRuntimeProbes: false,
             consumesProviderQuota: false,
@@ -197,7 +197,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
             id: 'byok_real_no_pr_probes',
             order: 5,
             command:
-                `npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000`,
+                `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000`,
             executesModelTurn: false,
             executesRuntimeProbes: true,
             consumesProviderQuota: true,
@@ -208,7 +208,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
             id: 'byok_real_full_turn',
             order: 6,
             command:
-                `npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --timeout-ms=900000`,
+                `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --timeout-ms=900000`,
             executesModelTurn: true,
             executesRuntimeProbes: true,
             consumesProviderQuota: true,

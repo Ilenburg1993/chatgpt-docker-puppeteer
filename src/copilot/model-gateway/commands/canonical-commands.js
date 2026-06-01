@@ -310,14 +310,14 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         id: 'live.terminal.control-no-pr',
         phase: 'live-readiness',
         surface: 'package',
-        command: 'npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000',
+        command: 'npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000',
         summary: 'Run the terminal LLM-B control live test without opening a model turn or consuming provider quota.',
     },
     {
         id: 'live.terminal.byok-fixture',
         phase: 'live-readiness',
         surface: 'package',
-        command: 'npm run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
+        command: 'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
         summary: 'Run the BYOK control-plane live test against a local OpenAI-compatible fixture.',
     },
     {
@@ -325,7 +325,7 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         phase: 'live-readiness',
         surface: 'package',
         command:
-            'npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=900000 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000',
+            'npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=900000 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000',
         summary:
             'Run real BYOK preflight probes only after the runtime selector chooses the route profile to apply.',
     },
@@ -334,7 +334,7 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         phase: 'live-readiness',
         surface: 'package',
         command:
-            'npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=900000 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --timeout-ms=900000',
+            'npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=900000 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --timeout-ms=900000',
         summary:
             'Run the full real BYOK terminal scenario with the same runtime-selector route handoff used by preflight.',
     },

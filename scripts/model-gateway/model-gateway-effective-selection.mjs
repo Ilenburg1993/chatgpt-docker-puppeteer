@@ -274,7 +274,7 @@ const summary = {
     nextCommands: [
         'npm run model-gateway:selection:audit -- --strict --fail-on-unselected',
         'npm run model-gateway:live:readiness',
-        'npm run terminal:llm-b:live-test -- --byok-real --no-pr --timeout-ms=600000',
+        'npm run model-gateway:live:llm-b -- --byok-real --no-pr --timeout-ms=600000',
     ],
 };
 

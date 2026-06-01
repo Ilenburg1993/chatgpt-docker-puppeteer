@@ -75,7 +75,7 @@ provider/perfil exige novo boot de sessão SDK.
 ```bash
 npm run model-gateway:live:readiness
 npm run model-gateway:live:plan
-npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000
+npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000
 ```
 
 Rode testes live reais apenas depois de readiness e plan estarem claros. O caminho real pode consumir quota da key BYOK.

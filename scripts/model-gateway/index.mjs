@@ -11,6 +11,7 @@ export const MODEL_GATEWAY_SCRIPT_PATHS = Object.freeze({
     effectiveSelection: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-effective-selection.mjs'),
     livePlan: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-live-plan.mjs'),
     liveReadiness: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-live-readiness.mjs'),
+    llmBLiveTest: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-terminal-llm-b-live-test.mjs'),
     metadataBuild: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-metadata-build.mjs'),
     ops: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-ops.mjs'),
     redactionAudit: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-redaction-audit.mjs'),
@@ -25,7 +26,11 @@ export const MODEL_GATEWAY_SCRIPT_PATHS = Object.freeze({
     sqliteRetention: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-sqlite-retention.mjs'),
 });
 
-export const COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH = path.join(REPO_ROOT, 'scripts/copilot/run-terminal-llm-b-live-test.mjs');
+export const COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH = MODEL_GATEWAY_SCRIPT_PATHS.llmBLiveTest;
+export const LEGACY_COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH = path.join(
+    REPO_ROOT,
+    'scripts/copilot/run-terminal-llm-b-live-test.mjs',
+);
 
 /**
  * @param {keyof typeof MODEL_GATEWAY_SCRIPT_PATHS} scriptId

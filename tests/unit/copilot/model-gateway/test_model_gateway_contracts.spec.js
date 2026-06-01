@@ -4108,12 +4108,12 @@ describe('model-gateway foundation', () => {
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:selection:trace-diff'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:selection:trace-retention'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:plan'));
-        assert.ok(packageCommands.some((entry) => entry.command === 'npm run terminal:llm-b:live-test -- --no-pr --timeout-ms=180000'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000'));
         assert.ok(
             packageCommands.some(
                 (entry) =>
                     entry.command ===
-                    'npm run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=900000 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000',
+                    'npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=900000 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000',
             ),
         );
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:runtime-health:mirror'));

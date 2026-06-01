@@ -330,7 +330,7 @@ Precisamos de um cockpit operacional unico:
 - [x] E.1 Mover scripts para `scripts/model-gateway/`.
 - [x] E.2 Criar barril `scripts/model-gateway/index.mjs`.
 - [x] E.3 Migrar `package.json`.
-- [x] E.4 Migrar runner llm-b para chamar runtime selector novo.
+- [x] E.4 Migrar runner llm-b para `scripts/model-gateway/` e chamar runtime selector novo.
 - [x] E.5 Criar `model-gateway:auto:status`.
 - [x] E.6 Criar `model-gateway:auto:plan`.
 - [x] E.7 Criar `model-gateway:ops`.
@@ -447,8 +447,4 @@ Precisamos de um cockpit operacional unico:
 
 ## 10. Proxima Acao
 
-Implementar Faixa A com contrato puro e testes.
-
-Depois implementar Faixa E.5/E.6 com script de status/plano.
-
-Depois ligar ao terminal.
+Continuar auditoria de pronto operacional e fechar o caminho auto antes dos testes live LLM-B.
