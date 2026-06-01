@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { access } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH, REPO_ROOT } from './index.mjs';
 
 import {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
@@ -25,14 +25,14 @@ import {
     resolveModelGatewaySelectionPolicy,
     summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewayLocalProviderOptInBlocks,
-} from '../src/copilot/model-gateway/index.js';
-import { setDbLogger } from '../src/copilot/db/sqlite.js';
+} from '../../src/copilot/model-gateway/index.js';
+import { setDbLogger } from '../../src/copilot/db/sqlite.js';
 import { loadModelGatewayDotenv } from './model-gateway-env.mjs';
 
 loadModelGatewayDotenv();
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const LIVE_RUNNER_PATH = path.join(ROOT, 'scripts/copilot/run-terminal-llm-b-live-test.mjs');
+const ROOT = REPO_ROOT;
+const LIVE_RUNNER_PATH = COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH;
 const DEFAULT_SQLITE_PATH = path.join(ROOT, 'data/copilot.sqlite');
 const TERMINAL_LIVE_ROUTE_PROFILES = Object.freeze(['repo_agent', 'code', 'tool_agent']);
 const TERMINAL_LIVE_PREFERRED_PROBE_KINDS = Object.freeze(['live_tool_protocol', 'live_ask_user']);
@@ -45,7 +45,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-live-readiness.mjs [--json] [--fail] [--fail-on-supply-warning]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-live-readiness.mjs [--json] [--fail] [--fail-on-supply-warning]
 
 Check whether the model-gateway metadata database is ready for terminal llm-b live tests.
 This does not start the terminal, execute providers, run models or run runtime probes.

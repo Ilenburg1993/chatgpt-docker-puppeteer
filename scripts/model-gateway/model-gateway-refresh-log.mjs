@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { setDbLogger } from '../src/copilot/db/sqlite.js';
-import { SqliteModelGatewayCatalogStore, summarizeModelGatewayRefreshLogText } from '../src/copilot/model-gateway/index.js';
+import { setDbLogger } from '../../src/copilot/db/sqlite.js';
+import { SqliteModelGatewayCatalogStore, summarizeModelGatewayRefreshLogText } from '../../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
 const hasFlag = (name) => args.includes(name);
@@ -20,7 +20,7 @@ if (hasFlag('--json')) {
 }
 
 if (hasFlag('--help') || hasFlag('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-refresh-log.mjs [options]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-refresh-log.mjs [options]
 
 Summarize a model-gateway refresh JSONL log without touching the catalog.
 

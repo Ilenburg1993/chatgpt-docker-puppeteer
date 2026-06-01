@@ -3,7 +3,7 @@ import {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
     auditModelGatewayCatalogSnapshotIntegrity,
-} from '../src/copilot/model-gateway/index.js';
+} from '../../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
 const json = args.includes('--json');

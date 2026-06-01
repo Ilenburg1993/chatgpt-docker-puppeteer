@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { setDbLogger } from '../src/copilot/db/sqlite.js';
+import { setDbLogger } from '../../src/copilot/db/sqlite.js';
 import {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
@@ -7,7 +7,7 @@ import {
     auditModelGatewayValueRedaction,
     collectModelGatewaySecretAuditEnvValues,
     summarizeModelGatewayRedactionAudits,
-} from '../src/copilot/model-gateway/index.js';
+} from '../../src/copilot/model-gateway/index.js';
 
 const args = new Set(process.argv.slice(2));
 const json = args.has('--json');
@@ -23,7 +23,7 @@ if (json) {
 }
 
 if (args.has('--help') || args.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-redaction-audit.mjs [--json] [--fail] [--repair]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-redaction-audit.mjs [--json] [--fail] [--repair]
 
 Audit persisted model-gateway JSON and SQLite payload surfaces for unredacted secret-looking strings.
 Default mode does not fetch providers, run models, mutate stores or print raw secret values.

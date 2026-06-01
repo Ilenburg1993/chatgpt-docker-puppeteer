@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { setDbLogger } from '../src/copilot/db/sqlite.js';
+import { setDbLogger } from '../../src/copilot/db/sqlite.js';
 import {
     DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION,
     SqliteModelGatewayCatalogStore,
-} from '../src/copilot/model-gateway/index.js';
+} from '../../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
 const hasFlag = (name) => args.includes(name);
@@ -28,7 +28,7 @@ if (hasFlag('--json')) {
 }
 
 if (hasFlag('--help') || hasFlag('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-sqlite-retention.mjs [options]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-sqlite-retention.mjs [options]
 
 Apply operational SQLite retention for model-gateway account/key history, route decisions, refresh logs and runtime health.
 By default this is a dry run. Pass --apply to delete rows beyond the configured limits.

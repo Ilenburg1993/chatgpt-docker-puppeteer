@@ -4,7 +4,7 @@ import {
     compareModelGatewaySelectionDecisionTraces,
     listModelGatewaySelectionDecisionTraceFiles,
     readModelGatewaySelectionDecisionTrace,
-} from '../src/copilot/model-gateway/index.js';
+} from '../../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
 const argSet = new Set(args);
@@ -20,7 +20,7 @@ function readArg(name, fallback = '') {
 }
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-selection-trace-diff.mjs [--json] [--trace-dir <path>] [--left <path>] [--right <path>]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-selection-trace-diff.mjs [--json] [--trace-dir <path>] [--left <path>] [--right <path>]
 
 Compare two persisted model-gateway selection decision traces. If left/right are omitted, compare the two newest
 historical traces in the trace directory. latest.json is intentionally ignored for automatic pair discovery.

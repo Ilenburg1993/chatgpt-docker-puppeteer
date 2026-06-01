@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-import { setDbLogger } from '../src/copilot/db/sqlite.js';
-import { SqliteModelGatewayCatalogStore, flushAndMirrorByokProviderHealthToSqlite } from '../src/copilot/model-gateway/index.js';
+import { setDbLogger } from '../../src/copilot/db/sqlite.js';
+import { SqliteModelGatewayCatalogStore, flushAndMirrorByokProviderHealthToSqlite } from '../../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-runtime-health-mirror.mjs [--json]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-runtime-health-mirror.mjs [--json]
 
 Mirror already-observed BYOK provider/model health into the model-gateway SQLite runtime layer.
 This does not fetch providers, execute models, run probes or mutate canonical catalog metadata.

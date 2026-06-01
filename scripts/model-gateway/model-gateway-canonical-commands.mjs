@@ -2,7 +2,7 @@
 import {
     MODEL_GATEWAY_CANONICAL_COMMANDS,
     renderModelGatewayCanonicalCommandLines,
-} from '../src/copilot/model-gateway/commands/index.js';
+} from '../../src/copilot/model-gateway/commands/index.js';
 
 const args = new Set(process.argv.slice(2));
 const optionValue = (name) => {

@@ -21,8 +21,8 @@ import {
     resolveModelGatewaySelectionPolicy,
     summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewayLocalProviderOptInBlocks,
-} from '../src/copilot/model-gateway/index.js';
-import { setDbLogger } from '../src/copilot/db/sqlite.js';
+} from '../../src/copilot/model-gateway/index.js';
+import { setDbLogger } from '../../src/copilot/db/sqlite.js';
 import { loadModelGatewayDotenv } from './model-gateway-env.mjs';
 
 loadModelGatewayDotenv();
@@ -31,7 +31,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-effective-selection.mjs [--json] [--strict] [--runtime-source file|sqlite|merged] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--require-runtime-proof] [--runtime-proof-weights key=value,...] [--write-trace] [--trace-dir <path>] [--prune-traces] [--trace-retention-apply] [--trace-retention-max <n>] [--fail] [--fail-on-supply-warning]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-effective-selection.mjs [--json] [--strict] [--runtime-source file|sqlite|merged] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--require-runtime-proof] [--runtime-proof-weights key=value,...] [--write-trace] [--trace-dir <path>] [--prune-traces] [--trace-retention-apply] [--trace-retention-max <n>] [--fail] [--fail-on-supply-warning]
 
 Build a non-mutating effective selection view from the persisted metadata catalog plus already-observed account/runtime
 health. This does not fetch providers, execute models, run probes or persist eligibility decisions.

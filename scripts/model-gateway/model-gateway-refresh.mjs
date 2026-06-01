@@ -9,7 +9,7 @@ import {
     JsonModelGatewayCatalogStore,
     planModelGatewayCatalogRefresh,
     refreshModelGatewayCatalog,
-} from '../src/copilot/model-gateway/index.js';
+} from '../../src/copilot/model-gateway/index.js';
 
 loadDotenv({ path: '.env.local', override: false, quiet: true });
 loadDotenv({ path: '.env', override: false, quiet: true });
@@ -34,7 +34,7 @@ const json = hasFlag('--json');
 const logPath = resolve(valuesFor('--log')[0] ?? `logs/model-gateway-refresh/${new Date().toISOString().replace(/[:.]/gu, '-')}.jsonl`);
 
 if (hasFlag('--help') || hasFlag('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-refresh.mjs [options]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-refresh.mjs [options]
 
 Refresh the model-gateway catalog without a full build.
 

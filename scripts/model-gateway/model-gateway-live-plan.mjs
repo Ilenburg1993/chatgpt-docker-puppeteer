@@ -2,16 +2,16 @@
 import { spawnSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from './index.mjs';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = REPO_ROOT;
 const DEFAULT_OUT_DIR = path.join(ROOT, 'artifacts/model-gateway-live-plan');
 const TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS = 900_000;
 const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-live-plan.mjs [--json] [--fail] [--no-write] [--allow-active-overlays] [--local-private-strict] [--out-dir DIR]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-live-plan.mjs [--json] [--fail] [--no-write] [--allow-active-overlays] [--local-private-strict] [--out-dir DIR]
 
 Create a no-runtime terminal llm-b live-test plan from model-gateway readiness. This does not start the terminal, fetch
 providers, run models or execute probes.
@@ -42,7 +42,7 @@ function planRunId(stamp) {
 }
 
 function runReadiness() {
-    const result = spawnSync(process.execPath, [path.join(ROOT, 'scripts/model-gateway-live-readiness.mjs'), '--json'], {
+    const result = spawnSync(process.execPath, [MODEL_GATEWAY_SCRIPT_PATHS.liveReadiness, '--json'], {
         cwd: ROOT,
         encoding: 'utf8',
     });
@@ -55,7 +55,7 @@ function runReadiness() {
 function runLocalPrivateStrictSelection() {
     const result = spawnSync(
         process.execPath,
-        [path.join(ROOT, 'scripts/model-gateway-selection-audit.mjs'), '--profile=local_private_strict', '--fail-on-unselected'],
+        [MODEL_GATEWAY_SCRIPT_PATHS.selectionAudit, '--profile=local_private_strict', '--fail-on-unselected'],
         {
             cwd: ROOT,
             encoding: 'utf8',

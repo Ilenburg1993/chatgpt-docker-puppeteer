@@ -334,7 +334,7 @@ function runRuntimeSelectorLiveRoute({
         };
     }
     const args = [
-        path.join(ROOT, 'scripts/model-gateway-runtime-selector.mjs'),
+        path.join(ROOT, 'scripts/model-gateway/model-gateway-runtime-selector.mjs'),
         '--json',
         '--fail',
         `--profile=${requestedProfile}`,

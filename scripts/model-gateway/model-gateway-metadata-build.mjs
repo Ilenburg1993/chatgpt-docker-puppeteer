@@ -2,7 +2,7 @@
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { config as loadDotenv } from 'dotenv';
-import { setDbLogger } from '../src/copilot/db/sqlite.js';
+import { setDbLogger } from '../../src/copilot/db/sqlite.js';
 import {
     createDefaultModelGatewayCatalogImporters,
     createEnvSecretRegistry,
@@ -18,7 +18,7 @@ import {
     redactModelGatewayAuditedValue,
     refreshModelGatewayCatalog,
     SqliteModelGatewayCatalogStore,
-} from '../src/copilot/model-gateway/index.js';
+} from '../../src/copilot/model-gateway/index.js';
 
 loadDotenv({ path: '.env.local', override: false, quiet: true });
 loadDotenv({ path: '.env', override: false, quiet: true });
@@ -47,7 +47,7 @@ if (json) {
 }
 
 if (hasFlag('--help') || hasFlag('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-metadata-build.mjs [options]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-metadata-build.mjs [options]
 
 Build/materialize the model-gateway metadata database. This is not the application/dist build.
 

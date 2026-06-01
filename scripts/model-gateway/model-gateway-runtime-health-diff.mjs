@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { REPO_ROOT } from './index.mjs';
 
 import {
     SqliteModelGatewayCatalogStore,
@@ -10,16 +10,16 @@ import {
     listByokProviderModelHealth,
     mergeByokProviderHealthRecords,
     summarizeModelGatewayRuntimeHealthRecords,
-} from '../src/copilot/model-gateway/index.js';
-import { setDbLogger } from '../src/copilot/db/sqlite.js';
+} from '../../src/copilot/model-gateway/index.js';
+import { setDbLogger } from '../../src/copilot/db/sqlite.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = REPO_ROOT;
 const DEFAULT_OUT_DIR = path.join(ROOT, 'artifacts/model-gateway-runtime-health');
 const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-runtime-health-diff.mjs [--json] [--baseline FILE] [--write-snapshot] [--out-dir DIR] [--fail-on-regression]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-runtime-health-diff.mjs [--json] [--baseline FILE] [--write-snapshot] [--out-dir DIR] [--fail-on-regression]
 
 Read already-observed BYOK runtime health from the file ledger and SQLite mirror, optionally persist a snapshot, and
 diff it against a previous snapshot. This never calls providers and never runs probes.

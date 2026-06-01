@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { setDbLogger } from '../src/copilot/db/sqlite.js';
-import { SqliteModelGatewayCatalogStore } from '../src/copilot/model-gateway/index.js';
+import { setDbLogger } from '../../src/copilot/db/sqlite.js';
+import { SqliteModelGatewayCatalogStore } from '../../src/copilot/model-gateway/index.js';
 
 const args = new Set(process.argv.slice(2));
 if (args.has('--json')) {
@@ -12,7 +12,7 @@ if (args.has('--json')) {
 }
 
 if (args.has('--help') || args.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-sqlite-diagnostics.mjs [--json]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-sqlite-diagnostics.mjs [--json]
 
 Inspect the current model-gateway SQLite store without mirroring JSON, fetching providers or running models.
 `);

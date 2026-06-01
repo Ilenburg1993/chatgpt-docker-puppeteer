@@ -7,7 +7,7 @@ import {
     createEnvSecretRegistry,
     renderModelGatewayLocalProviderOptInGuidance,
     summarizeModelGatewayLocalProviderOptInBlocks,
-} from '../src/copilot/model-gateway/index.js';
+} from '../../src/copilot/model-gateway/index.js';
 import { loadModelGatewayDotenv } from './model-gateway-env.mjs';
 
 loadModelGatewayDotenv();
@@ -16,7 +16,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway-selection-audit.mjs [--json] [--strict] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--fail-on-unselected] [--fail-on-supply-warning]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-selection-audit.mjs [--json] [--strict] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--fail-on-unselected] [--fail-on-supply-warning]
 
 Audit metadata-first model-gateway route selection from the persisted catalog. This does not fetch providers, execute
 runtime probes or call models.
