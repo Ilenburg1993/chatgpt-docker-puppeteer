@@ -55,7 +55,7 @@ O sistema deve:
 - [x] Scripts operacionais do model-gateway estao em `scripts/model-gateway/`.
 - [x] Existe barril `scripts/model-gateway/index.mjs`.
 - [x] Runner live LLM-B foi migrado para `scripts/model-gateway/model-gateway-terminal-llm-b-live-test.mjs`.
-- [x] Alias legado `scripts/copilot/run-terminal-llm-b-live-test.mjs` foi preservado como wrapper.
+- [x] Wrapper legado `scripts/copilot/run-terminal-llm-b-live-test.mjs` foi removido para evitar dois caminhos concorrentes.
 - [x] `package.json` possui comandos `model-gateway:*`.
 - [x] Makefile possui comandos `model-gateway-*`.
 - [x] `model-gateway:ops` existe e e read-only.
@@ -90,7 +90,7 @@ O sistema deve:
 - [ ] Falta reconciliacao com `session.model_changed` / `usage/session.model_changed`.
 - [ ] Falta representar no cockpit a diferenca entre "proximo boot preparado" e "boot SDK ja refeito".
 - [ ] Falta uma linha unica "sistema pronto para live tests" combinando ops, readiness, plan e policy.
-- [ ] Falta teste de contrato do wrapper legado e do comando `model-gateway:live:llm-b`.
+- [x] Existe teste de contrato do barril `scripts/model-gateway` e do runner `model-gateway:live:llm-b`.
 - [x] Existe teste de terminal para `/byok auto on`.
 - [x] Existe teste de terminal para executor compartilhado de efeitos auto.
 - [ ] Falta teste de terminal para boundary diferente exigindo novo boot.

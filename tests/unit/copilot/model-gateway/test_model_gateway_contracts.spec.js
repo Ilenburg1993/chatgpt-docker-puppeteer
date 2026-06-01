@@ -10,6 +10,11 @@ import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, it } from 'vitest';
+import {
+    COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH,
+    MODEL_GATEWAY_SCRIPT_PATHS,
+    modelGatewayScriptPath,
+} from '../../../../scripts/model-gateway/index.mjs';
 
 import {
     JsonModelGatewayRegistryStore,
@@ -4190,6 +4195,13 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === '/byok gateway health sqlite'));
         assert.ok(commands.every((entry) => MODEL_GATEWAY_CANONICAL_COMMAND_PHASES.includes(entry.phase)));
         assert.ok(terminalLines.some((line) => line.includes('/byok gateway catalog refresh')));
+    });
+
+    it('keeps model-gateway script paths in the scripts/model-gateway barrel', () => {
+        assert.equal(modelGatewayScriptPath('llmBLiveTest'), COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH);
+        assert.ok(COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH.endsWith('scripts/model-gateway/model-gateway-terminal-llm-b-live-test.mjs'));
+        assert.ok(Object.values(MODEL_GATEWAY_SCRIPT_PATHS).every((scriptPath) => scriptPath.includes('/scripts/model-gateway/')));
+        assert.ok(!Object.values(MODEL_GATEWAY_SCRIPT_PATHS).some((scriptPath) => scriptPath.includes('/scripts/copilot/')));
     });
 
     it('creates secret-safe universal catalog evidence contracts', () => {

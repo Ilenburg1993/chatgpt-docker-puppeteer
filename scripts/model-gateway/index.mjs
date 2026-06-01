@@ -27,10 +27,6 @@ export const MODEL_GATEWAY_SCRIPT_PATHS = Object.freeze({
 });
 
 export const COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH = MODEL_GATEWAY_SCRIPT_PATHS.llmBLiveTest;
-export const LEGACY_COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH = path.join(
-    REPO_ROOT,
-    'scripts/copilot/run-terminal-llm-b-live-test.mjs',
-);
 
 /**
  * @param {keyof typeof MODEL_GATEWAY_SCRIPT_PATHS} scriptId
