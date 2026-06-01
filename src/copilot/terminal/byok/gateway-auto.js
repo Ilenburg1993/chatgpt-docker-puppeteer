@@ -60,7 +60,7 @@ export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
 
 /**
  * @param {string[]} rest
- * @param {{ catalogPath?: string; env?: NodeJS.ProcessEnv }} [options]
+ * @param {{ allowEffects?: boolean; catalogPath?: string; env?: NodeJS.ProcessEnv }} [options]
  * @returns {Promise<{
  *     schema: 'terminal-byok-gateway-auto-status';
  *     args: ReturnType<typeof parseTerminalByokGatewayAutoArgs>;
@@ -107,7 +107,7 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
         phase: 'manual',
         decision,
         policy: {
-            allowEffects: false,
+            allowEffects: options.allowEffects === true,
             allowLiveSetModel: args.allowLiveSetModel,
             allowNewSession: args.allowNewSession,
         },

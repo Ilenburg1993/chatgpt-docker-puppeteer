@@ -572,11 +572,12 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             ok: input.decision?.ok === true,
             phase: input.phase ?? 'manual',
             action: input.decision?.action ?? 'manual_intervention',
-            effectMode: 'dry_run',
+            effectMode: input.policy?.allowEffects === true ? 'allowed' : 'dry_run',
             effects: [
                 {
-                    kind: 'prepare_new_sdk_session',
-                    execute: false,
+                    kind: input.decision?.action === 'apply_live_model' ? 'set_live_model' : 'prepare_new_sdk_session',
+                    model: input.decision?.targetBoundary?.model ?? null,
+                    execute: input.policy?.allowEffects === true && input.policy?.allowLiveSetModel === true,
                 },
             ],
             blockers: input.decision?.blockers ?? [],
@@ -2746,6 +2747,44 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('prepare_new_sdk_session:dry');
         expect(ctx.output()).toContain('action=prepare_new_session');
         expect(ctx.output()).toContain('/session sdk next new');
+    });
+
+    it('aplica efeito auto live apenas quando a policy autoriza', async () => {
+        mockProjection();
+        buildModelGatewayRuntimeAutomationDecision.mockReturnValueOnce({
+            schema: 'model-gateway-runtime-automation-decision',
+            ok: true,
+            status: 'ready',
+            action: 'apply_live_model',
+            selectedRouteKey: 'openrouter:openai/gpt-oss-120b',
+            routeProfile: 'repo_agent',
+            canApplyLiveModel: true,
+            requiresNewSession: false,
+            blockers: [],
+            currentBoundary: {
+                enabled: true,
+                profile: 'repo_agent',
+                preset: 'openrouter',
+                providerType: 'openai_compatible',
+                baseUrl: null,
+                model: 'old-model',
+            },
+            targetBoundary: {
+                profile: 'repo_agent',
+                preset: 'openrouter',
+                providerType: 'openai_compatible',
+                baseUrl: null,
+                model: 'openai/gpt-oss-120b',
+            },
+            nextCommands: ['/byok model openai/gpt-oss-120b'],
+            operatorSummary: 'Mesmo provider BYOK; o modelo pode ser aplicado na sessao viva.',
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'auto apply profile:repo_agent allow-live-set-model');
+
+        expect(setTerminalModelProjection).toHaveBeenCalledWith('openai/gpt-oss-120b');
+        expect(ctx.output()).toContain('Auto apply solicitou setModel vivo');
     });
 
     it('explica bloqueio local padrão na auditoria de seleção pré-runtime', async () => {

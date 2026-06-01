@@ -570,6 +570,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Gateway namespace alias for the no-mutation automation decision.',
     },
     {
+        id: 'terminal.auto-apply',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto apply profile:repo_agent allow-live-set-model',
+        summary: 'Apply only policy-authorized terminal effects from the model-gateway automation decision.',
+    },
+    {
         id: 'terminal.prebuild-readiness',
         phase: 'prebuild',
         surface: 'terminal',

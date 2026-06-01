@@ -314,7 +314,7 @@ Precisamos de um cockpit operacional unico:
 - [x] D.1 Adicionar `/byok auto`.
 - [x] D.2 Adicionar `/byok auto status`.
 - [x] D.3 Adicionar `/byok auto plan`.
-- [ ] D.4 Adicionar `/byok auto apply`.
+- [x] D.4 Adicionar `/byok auto apply`.
 - [ ] D.5 Adicionar `/byok auto off`.
 - [x] D.6 `status` deve mostrar:
   - [x] policy;
@@ -358,7 +358,7 @@ Precisamos de um cockpit operacional unico:
 - [x] H.2 setModel live e restrito a mesma boundary.
 - [ ] H.3 Automation decision deve consumir classifier.
 - [ ] H.4 Quando provider muda, preparar `session sdk next new`.
-- [ ] H.5 Quando so modelo muda, aplicar `setModel` se permitido.
+- [x] H.5 Quando so modelo muda, aplicar `setModel` se permitido.
 - [ ] H.6 Confirmar modelo efetivo via usage/session.model_changed.
 
 ## Faixa I - Runtime Selector Mais Operacional
