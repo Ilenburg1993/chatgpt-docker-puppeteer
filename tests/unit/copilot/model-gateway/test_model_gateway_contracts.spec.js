@@ -4161,6 +4161,7 @@ describe('model-gateway foundation', () => {
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:explain'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:handoffs'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:confirmations'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:scenarios'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:plan'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000'));
         assert.ok(
@@ -4188,6 +4189,7 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-auto-explain'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-auto-handoffs'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-auto-confirmations'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-auto-scenarios'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:refresh:log:sqlite -- --json'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:sqlite:retention -- --json'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:sqlite:retention:apply -- --json'));
@@ -4222,6 +4224,7 @@ describe('model-gateway foundation', () => {
         assert.ok(
             modelGatewayScriptPath('autoConfirmations').endsWith('scripts/model-gateway/model-gateway-auto-confirmations.mjs'),
         );
+        assert.ok(modelGatewayScriptPath('autoScenarios').endsWith('scripts/model-gateway/model-gateway-auto-scenarios.mjs'));
         assert.ok(COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH.endsWith('scripts/model-gateway/model-gateway-terminal-llm-b-live-test.mjs'));
         assert.ok(Object.values(MODEL_GATEWAY_SCRIPT_PATHS).every((scriptPath) => scriptPath.includes('/scripts/model-gateway/')));
         assert.ok(!Object.values(MODEL_GATEWAY_SCRIPT_PATHS).some((scriptPath) => scriptPath.includes('/scripts/copilot/')));

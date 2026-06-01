@@ -313,6 +313,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Read persisted SDK model-change confirmations correlated with automation.',
     },
     {
+        id: 'automation.scenarios',
+        phase: 'automation',
+        surface: 'package',
+        command: 'npm run model-gateway:auto:scenarios',
+        summary: 'Build the canonical read-only operator/LLM scenario ladder for terminal auto mode and live testing.',
+    },
+    {
         id: 'runtime-health.diff',
         phase: 'live-readiness',
         surface: 'package',
@@ -596,6 +603,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-auto-confirmations',
         summary: 'Makefile alias for persisted SDK model-change confirmations.',
+    },
+    {
+        id: 'make.auto-scenarios',
+        phase: 'automation',
+        surface: 'make',
+        command: 'make model-gateway-auto-scenarios',
+        summary: 'Makefile alias for the read-only terminal auto scenario ladder.',
     },
     {
         id: 'make.runtime-health-diff',

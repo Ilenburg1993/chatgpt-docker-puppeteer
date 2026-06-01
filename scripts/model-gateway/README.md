@@ -6,7 +6,7 @@ Scripts operacionais canônicos do `src/copilot/model-gateway`.
 
 - `model-gateway:ops`, `model-gateway:commands`, `model-gateway:sqlite:diagnostics`, `model-gateway:live:readiness`,
   `model-gateway:live:plan`, `model-gateway:auto:status`, `model-gateway:auto:plan`,
-  `model-gateway:auto:ready` e `model-gateway:auto:doctor` são caminhos read-only por padrão.
+  `model-gateway:auto:ready`, `model-gateway:auto:doctor` e `model-gateway:auto:scenarios` são caminhos read-only por padrão.
 - Provider/model runtime só deve ser executado por comandos que exigem flag explícita, como runtime selector com execução
   ou live test real.
 - Metadados canônicos não são mutados por runtime health, route decisions ou automation decisions.
@@ -58,6 +58,7 @@ npm run model-gateway:auto:doctor
 npm run model-gateway:auto:explain
 npm run model-gateway:auto:handoffs
 npm run model-gateway:auto:confirmations
+npm run model-gateway:auto:scenarios
 npm run model-gateway:auto:status -- --write-sqlite
 ```
 
@@ -67,6 +68,9 @@ chamar provider.
 `auto:ready` é o gate operacional objetivo para saber se catálogo, SQLite, readiness, decisão auto e superfícies canônicas
 estão visíveis. `auto:doctor` explica a policy efetiva, ledgers de efeitos/handoffs/confirmations e o que ainda impede
 automação total. `auto:handoffs` e `auto:confirmations` leem os ledgers SDK sem SQL manual.
+
+`auto:scenarios` agrega readiness, doctor, explain, ledgers e live-plan em uma escada canônica de cenários para humano
+ou LLM: leitura, policy stateful, troca terminal, fixture e real provider. Ele não chama provider nem inicia o terminal.
 
 No terminal:
 
@@ -85,6 +89,7 @@ provider/perfil exige novo boot de sessão SDK.
 ```bash
 npm run model-gateway:live:readiness
 npm run model-gateway:live:plan
+npm run model-gateway:auto:scenarios
 npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000
 ```
 

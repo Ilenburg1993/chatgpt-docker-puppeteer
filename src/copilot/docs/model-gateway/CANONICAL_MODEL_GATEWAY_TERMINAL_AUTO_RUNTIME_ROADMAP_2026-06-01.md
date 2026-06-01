@@ -25,7 +25,7 @@ O guia anterior continua como historico:
 
 - [x] Catalogo canonico JSON existe.
 - [x] SQLite operacional existe.
-- [x] Schema SQLite esta na versao 6.
+- [x] Schema SQLite esta na versao 8.
 - [x] Catalog rows, route decisions, runtime health e automation decisions estao visiveis.
 - [x] Automation effect applications estao persistidas.
 - [x] SDK session handoffs estao persistidos.
@@ -47,7 +47,7 @@ O guia anterior continua como historico:
 - [x] `Makefile` tem aliases para os comandos auto.
 - [x] Inventario canonico lista package, make e terminal.
 - [x] `model-gateway:auto:explain`.
-- [ ] Falta `model-gateway:auto:scenarios`.
+- [x] `model-gateway:auto:scenarios`.
 - [x] `model-gateway:auto:handoffs`.
 - [x] `model-gateway:auto:confirmations`.
 
@@ -68,7 +68,7 @@ O guia anterior continua como historico:
 - [x] `/byok auto doctor` mostra readiness, policy, rota e ledgers no cockpit terminal.
 - [x] `/byok auto handoffs`.
 - [x] `/byok auto confirmations`.
-- [ ] Falta post-turn controller completo.
+- [x] Post-turn controller automatico roda quando a policy esta ligada.
 
 ### 2.4 SDK boundary
 
@@ -76,9 +76,9 @@ O guia anterior continua como historico:
 - [x] `set_live_model` so e aplicado dentro da mesma boundary quando policy autoriza.
 - [x] Troca de provider/perfil gera handoff de nova sessao.
 - [x] Eventos `session.model_changed` sao observados pelo terminal.
-- [ ] Falta correlacionar `session.model_changed` com decision/effect/handoff.
-- [ ] Falta persistir confirmation do modelo vivo.
-- [ ] Falta reconciliar divergencia entre modelo alvo e modelo confirmado.
+- [x] `session.model_changed` tenta correlacionar com handoff pendente.
+- [x] Confirmation do modelo vivo e persistida.
+- [x] Mismatch inicial e persistido como status operacional.
 - [ ] Falta mostrar linha curta "auto trocou" ou "auto preparou novo boot".
 
 ### 2.5 Falhas, quotas e recovery
@@ -88,7 +88,7 @@ O guia anterior continua como historico:
 - [x] Cooldown e reset window entram na selecao.
 - [x] O erro BYOK nao deve consumir Premium Request do SDK.
 - [x] Pos-falha executa controller automatico quando a policy esta ligada.
-- [ ] Falta decision de recovery persistida.
+- [x] Recovery decision e persistida via automation decision post-turn.
 - [ ] Falta evitar loop infinito de mesma rota apos falha.
 - [ ] Falta separar recovery account-wide de recovery por modelo.
 - [ ] Falta expor ao operador a proxima janela de tentativa em cockpit auto.
@@ -142,18 +142,18 @@ provider metadata/importers
 - [x] `automation_decided`
 - [x] `effect_application_recorded`
 - [x] `sdk_handoff_recorded`
-- [ ] `policy_snapshot_recorded`
+- [x] `policy_snapshot_recorded`
 - [ ] `live_same_boundary_applied`
 - [ ] `next_session_boot_scheduled`
 - [ ] `sdk_boot_started`
-- [ ] `sdk_binding_confirmed`
-- [ ] `model_changed_confirmed`
+- [x] `sdk_binding_confirmed`
+- [x] `model_changed_confirmed`
 - [ ] `turn_started`
 - [ ] `turn_succeeded`
 - [ ] `turn_failed_retriable`
 - [ ] `turn_failed_hard`
-- [ ] `post_turn_recovery_decided`
-- [ ] `post_turn_recovery_applied`
+- [x] `post_turn_recovery_decided`
+- [x] `post_turn_recovery_applied`
 - [ ] `manual_required`
 
 ## 5. Fluxo Do Operador
@@ -202,7 +202,7 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] A.7 `model-gateway:auto:explain`.
 - [x] A.8 `model-gateway:auto:handoffs`.
 - [x] A.9 `model-gateway:auto:confirmations`.
-- [ ] A.10 `model-gateway:auto:scenarios`.
+- [x] A.10 `model-gateway:auto:scenarios`.
 
 ### Faixa B - Policy Explicavel
 
@@ -226,8 +226,8 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] C.5 SDK confirmations.
 - [ ] C.6 Recovery attempts.
 - [ ] C.7 Live scenario runs.
-- [ ] C.8 Retention para novas tabelas.
-- [ ] C.9 Diagnostics para novas tabelas.
+- [x] C.8 Retention para novas tabelas.
+- [x] C.9 Diagnostics para novas tabelas.
 - [ ] C.10 Redaction audit para novas tabelas.
 
 ### Faixa D - Pre-Turn Auto
@@ -262,9 +262,9 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] F.2 Projecao viva e atualizada.
 - [x] F.3 Correlacionar event com handoff pendente quando possivel.
 - [x] F.4 Persistir confirmation.
-- [ ] F.5 Persistir mismatch.
+- [x] F.5 Persistir mismatch.
 - [ ] F.6 Cockpit prepared/live/confirmed.
-- [ ] F.7 Teste unitario de confirmation.
+- [x] F.7 Teste unitario de confirmation.
 - [ ] F.8 Teste fixture com model_changed.
 - [ ] F.9 Auditar compatibilidade com SDK quota snapshots.
 - [ ] F.10 Garantir BYOK quota != SDK quota.
@@ -351,10 +351,10 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 
 1. [x] Implementar tabela/records de policy snapshot por decision.
 2. [x] Implementar tabela/records de SDK confirmation.
-3. [ ] Implementar `/byok auto doctor` reaproveitando `model-gateway:auto:doctor`.
-4. [ ] Implementar post-turn controller real apos falha BYOK.
-5. [ ] Persistir recovery attempts.
-6. [ ] Correlacionar `session.model_changed` com handoffs.
+3. [x] Implementar `/byok auto doctor` reaproveitando `model-gateway:auto:doctor`.
+4. [x] Implementar post-turn controller real apos falha BYOK.
+5. [x] Persistir recovery attempts como decisions/effects post-turn.
+6. [x] Correlacionar `session.model_changed` com handoffs.
 7. [ ] Expandir live fixture de auto.
 8. [ ] Rodar live fixture.
 9. [ ] Corrigir bugs descobertos.
@@ -362,15 +362,15 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 
 ## 8. Definicao De Pronto
 
-- [ ] Catalogo e SQLite estao saudaveis.
-- [ ] Auto ready passa.
-- [ ] Auto doctor passa.
+- [x] Catalogo e SQLite estao saudaveis.
+- [x] Auto ready passa.
+- [x] Auto doctor passa.
 - [ ] Terminal doctor passa.
 - [ ] Pre-turn troca modelo quando autorizado.
 - [ ] Pre-turn prepara nova sessao quando autorizado.
-- [ ] Post-turn replaneja apos falha.
+- [x] Post-turn replaneja apos falha.
 - [ ] Health evita repetir rota quebrada.
-- [ ] SDK confirma modelo efetivo.
+- [x] SDK confirma modelo efetivo.
 - [ ] Cockpit mostra prepared/live/confirmed.
 - [ ] Live fixture passa.
 - [ ] Live real passa.
