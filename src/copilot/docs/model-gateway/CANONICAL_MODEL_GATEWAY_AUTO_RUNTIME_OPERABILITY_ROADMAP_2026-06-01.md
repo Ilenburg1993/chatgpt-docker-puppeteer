@@ -31,7 +31,7 @@ A partir disso, o sistema deve:
 - [x] Fazer selecao pre-runtime sem chamar provider.
 - [x] Aplicar health/overlays operacionais sem corromper metadados canonicos.
 - [x] Rodar um controller pre-turn quando a policy auto estiver ligada.
-- [ ] Rodar um controller post-turn completo quando a chamada BYOK falhar.
+- [x] Rodar um controller post-turn quando a chamada BYOK falhar e a policy auto estiver ligada.
 - [ ] Preparar novo boot SDK automaticamente quando a mudanca de provider/perfil exigir nova sessao.
 - [ ] Confirmar aplicacao real via eventos de sessao/modelo.
 - [ ] Oferecer cockpit unico para saber se o modo auto esta pronto.
@@ -150,7 +150,7 @@ mas mantendo rastreabilidade e sem vazar segredo.
 - [x] `off` edita arquivo persistente.
 - [x] `/byok auto policy`.
 - [ ] Falta `/byok auto explain`.
-- [ ] Falta controller post-turn completo.
+- [x] Controller post-turn roda quando a policy auto esta ligada.
 - [x] `prepare_new_sdk_session` agenda novo boot SDK quando `allow-new-session` esta autorizado.
 
 ### 3.5 Terminal e SDK boundary
@@ -304,7 +304,7 @@ Quando um turno falhar:
 - [ ] Falta `/byok auto switch` ou equivalente para pedir melhor fallback agora.
 - [x] `model-gateway:auto:ready`.
 - [x] `model-gateway:auto:doctor`.
-- [ ] Falta o post-turn controller rodando de verdade.
+- [x] Post-turn controller rodando de verdade.
 - [x] `prepare_new_sdk_session` agenda novo boot SDK quando autorizado.
 - [ ] Falta confirmar `session.model_changed`.
 - [ ] Falta live test fixture cobrindo auto mode sem gastar quota real.
@@ -400,8 +400,8 @@ Todos os checkboxes sao booleanos. Nao usar estados parciais.
 - [x] G.1 Classificar falhas BYOK.
 - [x] G.2 Gravar runtime health.
 - [x] G.3 Mostrar dica auto apos falha.
-- [ ] G.4 Rodar controller post-turn de verdade.
-- [ ] G.5 Persistir recovery decision.
+- [x] G.4 Rodar controller post-turn de verdade.
+- [x] G.5 Persistir recovery decision.
 - [ ] G.6 Replanejar fallback sem provider call.
 - [ ] G.7 Aplicar live fallback quando mesma boundary.
 - [ ] G.8 Preparar novo boot quando provider/perfil mudar.
@@ -511,7 +511,7 @@ Todos os checkboxes sao booleanos. Nao usar estados parciais.
 4. [x] Implementar `model-gateway:auto:ready`.
 5. [x] Implementar `model-gateway:auto:doctor`.
 6. [x] Integrar `prepare_new_sdk_session` ao terminal.
-7. [ ] Implementar controller post-turn.
+7. [x] Implementar controller post-turn.
 8. [ ] Correlacionar eventos SDK.
 9. [ ] Expandir live runner com cenarios auto.
 10. [ ] Rodar live tests e corrigir.

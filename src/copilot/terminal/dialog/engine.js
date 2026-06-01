@@ -55,6 +55,7 @@ import {
     TERMINAL_BYOK_ADMISSION_MODE_ENV,
     evaluateTerminalByokTurnBudget,
     readTerminalByokAdmissionMode,
+    runTerminalByokGatewayPostTurnAutomation,
     runTerminalByokGatewayPreTurnAutomation,
 } from '../byok/index.js';
 import {
@@ -292,9 +293,26 @@ async function printByokAutoAfterFailureHint(byokFailure) {
     const policy = await readModelGatewayRuntimeAutomationEffectivePolicy();
     if (policy.enabled !== true) return;
     const profile = byokFailure.profile ?? policy.profiles[0] ?? 'repo_agent';
-    println(
-        `\x1b[90m       auto: /byok auto record profile:${profile} registra a decisão pós-falha; /byok auto apply profile:${profile} aplica apenas efeitos autorizados.\x1b[0m`,
-    );
+    try {
+        const result = await runTerminalByokGatewayPostTurnAutomation({
+            profile,
+            failureKind: byokFailure.failure.kind,
+            message: byokFailure.message,
+            errorContext: byokFailure.errorContext,
+        });
+        if (result.ran !== true || !result.status) return;
+        const applied = result.application?.applied.length ?? 0;
+        const skipped = result.application?.skipped.length ?? 0;
+        const persistedEffects = result.effectPersistence?.automationEffectApplications ?? 0;
+        const handoffs = result.effectPersistence?.sdkSessionHandoffs ?? 0;
+        println(
+            `\x1b[90m       auto pós-falha: action=${result.status.decision.action} · route=${result.status.decision.selectedRouteKey ?? '-'} · applied=${applied} · skipped=${skipped} · effects=${persistedEffects} · handoffs=${handoffs}\x1b[0m`,
+        );
+    } catch (error) {
+        println(
+            `\x1b[90m       auto: falha ao replanejar pós-falha (${error instanceof Error ? error.message : String(error)}); use /byok auto record profile:${profile}.\x1b[0m`,
+        );
+    }
 }
 
 /**

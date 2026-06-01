@@ -22,5 +22,6 @@ export {
     createTerminalByokGatewaySdkSessionHandoffRecords,
     parseTerminalByokGatewayAutoArgs,
     persistTerminalByokGatewayAutoEffectApplications,
+    runTerminalByokGatewayPostTurnAutomation,
     runTerminalByokGatewayPreTurnAutomation,
 } from './gateway-auto.js';

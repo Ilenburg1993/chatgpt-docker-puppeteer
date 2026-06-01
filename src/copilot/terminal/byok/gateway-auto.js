@@ -323,3 +323,72 @@ export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
         effectPersistence,
     };
 }
+
+/**
+ * @param {{
+ *   profile?: string | null;
+ *   failureKind?: string | null;
+ *   message?: string | null;
+ *   errorContext?: string | null;
+ * }} [turnFailure]
+ * @param {{ env?: NodeJS.ProcessEnv; catalogPath?: string }} [options]
+ * @returns {Promise<{
+ *   ran: boolean;
+ *   policy: Awaited<ReturnType<typeof readModelGatewayRuntimeAutomationEffectivePolicy>>;
+ *   status: Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>> | null;
+ *   controllerStep: ReturnType<typeof buildModelGatewayRuntimeAutomationControllerStep> | null;
+ *   application: Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>> | null;
+ *   effectPersistence: { automationEffectApplications: number; sdkSessionHandoffs: number } | null;
+ * }>}
+ */
+export async function runTerminalByokGatewayPostTurnAutomation(turnFailure = {}, options = {}) {
+    const policy = await readModelGatewayRuntimeAutomationEffectivePolicy({ env: options.env });
+    if (policy.enabled !== true) {
+        return {
+            ran: false,
+            policy,
+            status: null,
+            controllerStep: null,
+            application: null,
+            effectPersistence: null,
+        };
+    }
+    const profile = optionalScalarString(turnFailure.profile) ?? policy.profiles[0] ?? 'repo_agent';
+    const status = await buildTerminalByokGatewayAutoStatus([`profile:${profile}`], {
+        allowEffects: true,
+        catalogPath: options.catalogPath,
+        env: options.env,
+        persistAutomationDecision: true,
+    });
+    const controllerStep = buildModelGatewayRuntimeAutomationControllerStep({
+        phase: 'post_turn',
+        decision: status.decision,
+        policy: {
+            allowEffects: true,
+            allowLiveSetModel: status.args.allowLiveSetModel,
+            allowNewSession: status.args.allowNewSession,
+            accountWideFailureKinds: policy.accountWideFailureKinds,
+        },
+        turnOutcome: {
+            ok: false,
+            failureKind: optionalScalarString(turnFailure.failureKind),
+            errorMessage: optionalScalarString(turnFailure.message) ?? optionalScalarString(turnFailure.errorContext),
+        },
+    });
+    const application = await applyTerminalByokGatewayAutoEffects(controllerStep);
+    const effectPersistence = await persistTerminalByokGatewayAutoEffectApplications(
+        { ...status, controllerStep },
+        application,
+        {
+            source: 'terminal-byok-post-turn',
+        },
+    );
+    return {
+        ran: true,
+        policy,
+        status,
+        controllerStep,
+        application,
+        effectPersistence,
+    };
+}

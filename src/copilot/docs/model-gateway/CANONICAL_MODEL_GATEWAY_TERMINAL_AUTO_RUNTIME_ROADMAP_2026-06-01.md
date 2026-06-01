@@ -87,7 +87,7 @@ O guia anterior continua como historico:
 - [x] Runtime health e gravado em memoria e pode ser espelhado no SQLite.
 - [x] Cooldown e reset window entram na selecao.
 - [x] O erro BYOK nao deve consumir Premium Request do SDK.
-- [ ] Pos-falha ainda mostra hint manual em vez de executar controller automatico.
+- [x] Pos-falha executa controller automatico quando a policy esta ligada.
 - [ ] Falta decision de recovery persistida.
 - [ ] Falta evitar loop infinito de mesma rota apos falha.
 - [ ] Falta separar recovery account-wide de recovery por modelo.
@@ -248,10 +248,10 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] E.1 Classificacao de falha BYOK.
 - [x] E.2 Runtime health local.
 - [x] E.3 Hint manual.
-- [ ] E.4 Controller post-turn automatico.
-- [ ] E.5 Replanejamento com health recem-gravado.
-- [ ] E.6 Persistir recovery decision.
-- [ ] E.7 Persistir recovery effect application.
+- [x] E.4 Controller post-turn automatico.
+- [x] E.5 Replanejamento com health recem-gravado.
+- [x] E.6 Persistir recovery decision.
+- [x] E.7 Persistir recovery effect application.
 - [ ] E.8 Evitar loop no mesmo provider/modelo.
 - [ ] E.9 Mostrar acao pos-falha no terminal.
 - [ ] E.10 Teste fixture de falha e fallback.

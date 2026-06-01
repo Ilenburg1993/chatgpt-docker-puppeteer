@@ -599,6 +599,15 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             action: input.decision?.action ?? 'manual_intervention',
             effectMode: input.policy?.allowEffects === true ? 'allowed' : 'dry_run',
             effects: [
+                ...(input.phase === 'post_turn'
+                    ? [
+                          {
+                              kind: 'replan_after_turn_failure',
+                              failureKind: input.turnOutcome?.failureKind ?? 'unknown_failure',
+                              execute: input.policy?.allowEffects === true,
+                          },
+                      ]
+                    : []),
                 {
                     kind: input.decision?.action === 'apply_live_model' ? 'set_live_model' : 'prepare_new_sdk_session',
                     model: input.decision?.targetBoundary?.model ?? null,
@@ -1266,6 +1275,7 @@ const {
     applyTerminalByokGatewayAutoEffects,
     createTerminalByokGatewayAutoEffectApplicationRecords,
     createTerminalByokGatewaySdkSessionHandoffRecords,
+    runTerminalByokGatewayPostTurnAutomation,
     runTerminalByokGatewayPreTurnAutomation,
 } = await import('../../../../src/copilot/terminal/byok/gateway-auto.js');
 
@@ -3082,6 +3092,34 @@ describe('terminal /byok command', () => {
         expect(result.status).toBeNull();
         expect(listTerminalSdkSessionInventory).not.toHaveBeenCalled();
         expect(auditModelGatewayPreRuntimeSelection).not.toHaveBeenCalled();
+    });
+
+    it('replaneja pós-falha BYOK quando policy auto efetiva está ligada', async () => {
+        readModelGatewayRuntimeAutomationEffectivePolicy.mockResolvedValueOnce({
+            enabled: true,
+            policy: 'prefer_runtime_proved',
+            profiles: ['repo_agent'],
+            allowLiveSetModel: false,
+            allowNewSession: true,
+            allowProviderProbes: false,
+            allowLocalPrivate: false,
+            accountWideFailureKinds: ['rate-limit'],
+        });
+
+        const result = await runTerminalByokGatewayPostTurnAutomation({
+            profile: 'repo_agent',
+            failureKind: 'rate-limit',
+            message: 'quota exhausted',
+        });
+
+        expect(result.ran).toBe(true);
+        expect(result.controllerStep?.phase).toBe('post_turn');
+        expect(result.application?.skipped).toEqual(
+            expect.arrayContaining([expect.objectContaining({ kind: 'replan_after_turn_failure' })]),
+        );
+        expect(result.effectPersistence).toEqual(
+            expect.objectContaining({ automationEffectApplications: expect.any(Number), sdkSessionHandoffs: expect.any(Number) }),
+        );
     });
 
     it('explica bloqueio local padrão na auditoria de seleção pré-runtime', async () => {
