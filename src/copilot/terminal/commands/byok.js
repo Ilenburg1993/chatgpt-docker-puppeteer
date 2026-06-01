@@ -3350,6 +3350,9 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
         persistAutomationDecision: options.persist === true || options.apply === true,
     });
     const { args, controllerStep, decision, inventory, persistence, runtimeSelectorPlan } = status;
+    const activeRoute =
+        runtimeSelectorPlan.routes.find((route) => route.profileId === args.profileId) ?? runtimeSelectorPlan.routes[0] ?? null;
+    const alternativeSummary = activeRoute?.alternativeSummary ?? null;
     println(`\n  \x1b[36mBYOK model-gateway auto\x1b[0m`);
     println(
         `  \x1b[90mprofile=${args.profileId} · runtimeSelector=${runtimeSelectorPlan.ok ? 'ok' : 'blocked'} · selected=${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} · action=${decision.action} · ok=${decision.ok ? 'sim' : 'nao'}\x1b[0m`,
@@ -3371,6 +3374,26 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
         println(
             `    cooldown:      \x1b[33m${decision.cooldown.reason ?? 'ativo'} · reset=${decision.cooldown.resetAt ?? '-'} · retryAfter=${decision.cooldown.retryAfterSeconds ?? '-'}s\x1b[0m`,
         );
+    }
+    if (alternativeSummary) {
+        const rejectionCounts = asRecord(alternativeSummary.rejectionReasonCounts);
+        const topReasons = Object.entries(rejectionCounts)
+            .sort((left, right) => Number(right[1] ?? 0) - Number(left[1] ?? 0))
+            .slice(0, 4)
+            .map(([reason, count]) => `${reason}=${count}`)
+            .join(', ');
+        println(
+            `    alternativas:  \x1b[33musable=${alternativeSummary.usableCount}/${alternativeSummary.evaluatedCount} · providers=${alternativeSummary.providerCount}${topReasons ? ` · ${topReasons}` : ''}\x1b[0m`,
+        );
+        const topBlocked = Array.isArray(alternativeSummary.topBlockedRoutes) ? alternativeSummary.topBlockedRoutes.slice(0, 3) : [];
+        for (const blocked of topBlocked) {
+            const providerId = optionalScalarString(blocked?.providerId) ?? '-';
+            const providerModel = optionalScalarString(blocked?.providerModel) ?? '-';
+            const reasons = Array.isArray(blocked?.reasons)
+                ? blocked.reasons.map(optionalScalarString).filter((item) => item !== null).slice(0, 3).join('+')
+                : '-';
+            println(`      \x1b[90mbloqueada: ${providerId}:${providerModel} · ${reasons || '-'}\x1b[0m`);
+        }
     }
     if (decision.blockers.length > 0) println(`    blockers:      \x1b[33m${decision.blockers.join(', ')}\x1b[0m`);
     if (persistence) {
@@ -3551,11 +3574,15 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
         rest.filter(
             (item) =>
                 !/^(?:recovery-fixture|fixture-recovery|fixture|simulate|simular)$/iu.test(item) &&
-                !/^(?:failure|kind|failureKind|failure-kind)[:=]/iu.test(item),
+                !/^(?:failure|kind|failureKind|failure-kind|provider|providerId|provider-id|model|providerModel|provider-model)[:=]/iu.test(item),
         ),
     );
     const failureKindToken = rest.find((item) => /^(?:failure|kind|failureKind|failure-kind)[:=]/iu.test(item));
     const failureKind = optionalScalarString(failureKindToken?.replace(/^(?:failure|kind|failureKind|failure-kind)[:=]/iu, '')) ?? 'rate-limit';
+    const providerToken = rest.find((item) => /^(?:provider|providerId|provider-id)[:=]/iu.test(item));
+    const modelToken = rest.find((item) => /^(?:model|providerModel|provider-model)[:=]/iu.test(item));
+    const providerId = optionalScalarString(providerToken?.replace(/^(?:provider|providerId|provider-id)[:=]/iu, ''));
+    const providerModel = optionalScalarString(modelToken?.replace(/^(?:model|providerModel|provider-model)[:=]/iu, ''));
     const fixtureEnv = {
         ...process.env,
         COPILOT_BYOK_GATEWAY_AUTO: 'true',
@@ -3568,9 +3595,10 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
     const result = await runTerminalByokGatewayPostTurnAutomation(
         {
             profile: args.profileId,
-            provider: 'fixture-provider',
-            model: 'fixture/model-recovery',
+            provider: providerId,
+            model: providerModel,
             failureKind,
+            retryAfterSeconds: failureKind === 'rate-limit' ? 900 : null,
             message: `fixture ${failureKind} failure for model-gateway post-turn recovery`,
             errorContext: 'terminal.byok.auto_recovery_fixture',
         },
@@ -3595,6 +3623,12 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
     println(
         `    recoveries:    \x1b[33m${result.effectPersistence?.recoveryAttempts ?? 0}\x1b[0m`,
     );
+    const health = result.healthPersistence;
+    if (health) {
+        println(
+            `    health:        \x1b[33mrecorded=${health.recorded ? 'sim' : 'nao'} · route=${health.providerId ?? '-'}:${health.providerModel ?? '-'} · sqlite=${health.sqlite ? `${health.sqlite.healthObservations}/${health.sqlite.records}` : '-'}\x1b[0m`,
+        );
+    }
     const details = [...applied, ...skipped].map(describeTerminalByokGatewayAutoEffect).slice(0, 5);
     if (details.length > 0) println(`    detalhe:       \x1b[90m${details.join('; ')}\x1b[0m`);
     println('  \x1b[90mUse /byok auto recoveries 10 para ler o ledger persistido.\x1b[0m\n');
@@ -3662,6 +3696,11 @@ async function renderByokGatewayAutoDoctor(println, rest) {
     const confirmationRows = finitePositiveNumber(diagnostics.sdkSessionConfirmationRows) ?? 0;
     const liveScenarioRunRows = finitePositiveNumber(diagnostics.liveScenarioRunRows) ?? 0;
     const decision = status.decision;
+    const activeRoute =
+        status.runtimeSelectorPlan.routes.find((route) => route.profileId === status.args.profileId) ??
+        status.runtimeSelectorPlan.routes[0] ??
+        null;
+    const alternativeSummary = activeRoute?.alternativeSummary ?? null;
     const warnings = [];
     if (effectivePolicy.enabled !== true) warnings.push('policy_disabled');
     if (effectivePolicy.allowLiveSetModel !== true && effectivePolicy.allowNewSession !== true) {
@@ -3689,6 +3728,17 @@ async function renderByokGatewayAutoDoctor(println, rest) {
     if (decision.cooldown?.active === true) {
         println(
             `    cooldown:      \x1b[33m${decision.cooldown.reason ?? 'ativo'} · reset=${decision.cooldown.resetAt ?? '-'} · retryAfter=${decision.cooldown.retryAfterSeconds ?? '-'}s\x1b[0m`,
+        );
+    }
+    if (alternativeSummary) {
+        const rejectionCounts = asRecord(alternativeSummary.rejectionReasonCounts);
+        const topReasons = Object.entries(rejectionCounts)
+            .sort((left, right) => Number(right[1] ?? 0) - Number(left[1] ?? 0))
+            .slice(0, 4)
+            .map(([reason, count]) => `${reason}=${count}`)
+            .join(', ');
+        println(
+            `    alternativas:  \x1b[33musable=${alternativeSummary.usableCount}/${alternativeSummary.evaluatedCount} · providers=${alternativeSummary.providerCount}${topReasons ? ` · ${topReasons}` : ''}\x1b[0m`,
         );
     }
     println(

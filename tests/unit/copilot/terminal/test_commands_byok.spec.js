@@ -1248,6 +1248,7 @@ vi.mock('#copilot/model-gateway', () => ({
     explainModelGatewayProviderEntry,
     explainModelGatewayEligibilityDecision,
     explainModelGatewaySelectionComparison,
+    flushAndMirrorByokProviderHealthToSqlite,
     flushByokProviderHealth,
     JsonModelGatewayCatalogStore,
     listByokProviderModelHealth,
@@ -3210,6 +3211,27 @@ describe('terminal /byok command', () => {
                 automationEffectApplications: expect.any(Number),
                 recoveryAttempts: expect.any(Number),
                 sdkSessionHandoffs: expect.any(Number),
+            }),
+        );
+        expect(recordByokProviderModelCallFailure).toHaveBeenCalledWith(
+            expect.objectContaining({
+                routeProfile: 'repo_agent',
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                failureKind: 'rate-limit',
+                failureStatusCode: 429,
+                retryAfterSeconds: 900,
+            }),
+        );
+        expect(flushAndMirrorByokProviderHealthToSqlite).toHaveBeenCalledWith({
+            sqliteStore: expect.anything(),
+        });
+        expect(result.healthPersistence).toEqual(
+            expect.objectContaining({
+                recorded: true,
+                providerId: 'openrouter',
+                providerModel: 'openai/gpt-oss-120b',
+                failureKind: 'rate-limit',
             }),
         );
     });

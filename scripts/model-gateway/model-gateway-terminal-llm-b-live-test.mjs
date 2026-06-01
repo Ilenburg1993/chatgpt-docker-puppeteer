@@ -194,7 +194,7 @@ function buildAutoProbeCommands({ profile = 'repo_agent' } = {}) {
         '/byok auto history 10',
         '/byok auto handoffs 10',
         '/byok auto confirmations 10',
-        `/byok auto recovery-fixture profile:${routeProfile} failure:rate-limit`,
+        `/byok auto recovery-fixture profile:${routeProfile} provider:zai model:glm-4.5-flash failure:rate-limit`,
         '/byok auto recoveries 10',
         '/events 40',
         '/events 80 --raw',
@@ -2286,6 +2286,11 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
             detail: '/byok auto status rendered the selected profile decision',
         },
         {
+            id: 'auto-alternatives-visible',
+            pass: /alternativas:\s+usable=/u.test(plain),
+            detail: '/byok auto status/doctor rendered usable fallback candidate summary',
+        },
+        {
             id: 'auto-doctor-visible',
             pass:
                 /BYOK model-gateway auto doctor/.test(plain) &&
@@ -2321,8 +2326,11 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         },
         {
             id: 'auto-recovery-fixture-visible',
-            pass: /BYOK model-gateway auto recovery fixture/.test(plain) && /providerCall=nao/.test(plain),
-            detail: '/byok auto recovery-fixture ran synthetic post-turn recovery without provider call',
+            pass:
+                /BYOK model-gateway auto recovery fixture/.test(plain) &&
+                /providerCall=nao/.test(plain) &&
+                /health:\s+recorded=sim/.test(plain),
+            detail: '/byok auto recovery-fixture ran synthetic post-turn recovery and persisted health without provider call',
         },
         {
             id: 'auto-recoveries-visible',

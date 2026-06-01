@@ -17,10 +17,12 @@ import {
     compareModelGatewaySelectionAudits,
     createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
+    flushAndMirrorByokProviderHealthToSqlite,
     JsonModelGatewayCatalogStore,
     listByokProviderModelHealth,
     readModelGatewayRuntimeAutomationEffectivePolicy,
     readModelGatewayRuntimeAutomationPolicy,
+    recordByokProviderModelCallFailure,
     resolveModelGatewaySelectionPolicy,
     SqliteModelGatewayCatalogStore,
 } from '#copilot/model-gateway';
@@ -40,6 +42,74 @@ function optionalScalarString(value) {
     if (typeof value === 'number' && Number.isFinite(value)) return String(value);
     if (typeof value === 'boolean') return value ? 'true' : 'false';
     return null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function optionalFiniteNumber(value) {
+    const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN;
+    return Number.isFinite(number) ? number : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function optionalIsoTimestamp(value) {
+    if (value === null || value === undefined) return null;
+    const date = value instanceof Date ? value : new Date(/** @type {string | number} */ (value));
+    return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+/**
+ * @param {string | null} failureKind
+ * @returns {number | null}
+ */
+function defaultFailureStatusCode(failureKind) {
+    if (failureKind === 'rate-limit') return 429;
+    if (failureKind === 'credits') return 402;
+    if (failureKind === 'auth') return 401;
+    return null;
+}
+
+/**
+ * @param {string | null} failureKind
+ * @returns {number | null}
+ */
+function defaultRetryAfterSeconds(failureKind) {
+    return failureKind === 'rate-limit' ? 900 : null;
+}
+
+/**
+ * @param {Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>>} status
+ * @param {Record<string, unknown>} turnFailure
+ * @returns {{ routeProfile: string; providerId: string | null; providerModel: string | null; failureKind: string; message: string | null; errorContext: string | null; failureStatusCode: number | null; retryAfterSeconds: number | null; resetAt: string | null }}
+ */
+function resolvePostTurnHealthFailure(status, turnFailure) {
+    const targetBoundary =
+        status.decision.targetBoundary && typeof status.decision.targetBoundary === 'object'
+            ? /** @type {Record<string, unknown>} */ (status.decision.targetBoundary)
+            : {};
+    const failureKind = optionalScalarString(turnFailure['failureKind']) ?? 'unknown_failure';
+    return {
+        routeProfile: status.decision.routeProfile ?? status.args.profileId,
+        providerId:
+            optionalScalarString(turnFailure['providerId']) ??
+            optionalScalarString(turnFailure['provider']) ??
+            optionalScalarString(targetBoundary['preset']),
+        providerModel:
+            optionalScalarString(turnFailure['providerModel']) ??
+            optionalScalarString(turnFailure['model']) ??
+            optionalScalarString(targetBoundary['model']),
+        failureKind,
+        message: optionalScalarString(turnFailure['message']) ?? `BYOK post-turn failure: ${failureKind}`,
+        errorContext: optionalScalarString(turnFailure['errorContext']) ?? 'terminal.byok.post_turn_failure',
+        failureStatusCode: optionalFiniteNumber(turnFailure['failureStatusCode']) ?? defaultFailureStatusCode(failureKind),
+        retryAfterSeconds: optionalFiniteNumber(turnFailure['retryAfterSeconds']) ?? defaultRetryAfterSeconds(failureKind),
+        resetAt: optionalIsoTimestamp(turnFailure['resetAt']),
+    };
 }
 
 /**
@@ -408,6 +478,9 @@ export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
  *   failureKind?: string | null;
  *   message?: string | null;
  *   errorContext?: string | null;
+ *   failureStatusCode?: number | string | null;
+ *   retryAfterSeconds?: number | string | null;
+ *   resetAt?: string | number | Date | null;
  * }} [turnFailure]
  * @param {{ env?: NodeJS.ProcessEnv; catalogPath?: string }} [options]
  * @returns {Promise<{
@@ -417,6 +490,7 @@ export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
  *   controllerStep: ReturnType<typeof buildModelGatewayRuntimeAutomationControllerStep> | null;
  *   application: Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>> | null;
  *   effectPersistence: { automationEffectApplications: number; recoveryAttempts: number; sdkSessionHandoffs: number } | null;
+ *   healthPersistence: { recorded: boolean; providerId: string | null; providerModel: string | null; routeProfile: string | null; failureKind: string; sqlite: Awaited<ReturnType<typeof flushAndMirrorByokProviderHealthToSqlite>> | null } | null;
  * }>}
  */
 export async function runTerminalByokGatewayPostTurnAutomation(turnFailure = {}, options = {}) {
@@ -429,6 +503,7 @@ export async function runTerminalByokGatewayPostTurnAutomation(turnFailure = {},
             controllerStep: null,
             application: null,
             effectPersistence: null,
+            healthPersistence: null,
         };
     }
     const profile = optionalScalarString(turnFailure.profile) ?? policy.profiles[0] ?? 'repo_agent';
@@ -444,8 +519,45 @@ export async function runTerminalByokGatewayPostTurnAutomation(turnFailure = {},
             failureKind: optionalScalarString(turnFailure.failureKind),
             message: optionalScalarString(turnFailure.message),
             errorContext: optionalScalarString(turnFailure.errorContext),
+            failureStatusCode: optionalFiniteNumber(turnFailure.failureStatusCode),
+            retryAfterSeconds: optionalFiniteNumber(turnFailure.retryAfterSeconds),
+            resetAt: optionalIsoTimestamp(turnFailure.resetAt),
         },
     });
+    const healthFailure = resolvePostTurnHealthFailure(status, /** @type {Record<string, unknown>} */ (turnFailure));
+    let healthPersistence = null;
+    if (healthFailure.providerId && healthFailure.providerModel) {
+        recordByokProviderModelCallFailure({
+            routeProfile: healthFailure.routeProfile,
+            providerId: healthFailure.providerId,
+            providerModel: healthFailure.providerModel,
+            failureKind: healthFailure.failureKind,
+            message: healthFailure.message,
+            errorContext: healthFailure.errorContext,
+            failureStatusCode: healthFailure.failureStatusCode,
+            retryAfterSeconds: healthFailure.retryAfterSeconds,
+            resetAt: healthFailure.resetAt,
+        });
+        const sqliteStore = new SqliteModelGatewayCatalogStore();
+        const sqlite = await flushAndMirrorByokProviderHealthToSqlite({ sqliteStore });
+        healthPersistence = {
+            recorded: true,
+            providerId: healthFailure.providerId,
+            providerModel: healthFailure.providerModel,
+            routeProfile: healthFailure.routeProfile,
+            failureKind: healthFailure.failureKind,
+            sqlite,
+        };
+    } else {
+        healthPersistence = {
+            recorded: false,
+            providerId: healthFailure.providerId,
+            providerModel: healthFailure.providerModel,
+            routeProfile: healthFailure.routeProfile,
+            failureKind: healthFailure.failureKind,
+            sqlite: null,
+        };
+    }
     const controllerStep = buildModelGatewayRuntimeAutomationControllerStep({
         phase: 'post_turn',
         decision: status.decision,
@@ -476,5 +588,6 @@ export async function runTerminalByokGatewayPostTurnAutomation(turnFailure = {},
         controllerStep,
         application,
         effectPersistence,
+        healthPersistence,
     };
 }

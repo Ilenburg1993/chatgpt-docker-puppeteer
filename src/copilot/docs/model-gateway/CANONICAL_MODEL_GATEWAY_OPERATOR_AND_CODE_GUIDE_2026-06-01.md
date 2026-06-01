@@ -262,7 +262,7 @@ Comandos terminal equivalentes:
 /byok auto history 10
 /byok auto handoffs 10
 /byok auto confirmations 10
-/byok auto recovery-fixture profile:repo_agent failure:rate-limit
+/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
 /byok auto recoveries 10
 ```
 
@@ -308,7 +308,7 @@ Variaveis principais:
 5. No terminal, rodar `/byok auto doctor profile:repo_agent`.
 6. Se houver blocker, corrigir a camada apontada.
 7. Se quiser auto, usar `/byok auto on ...`.
-8. Antes de BYOK real, validar recovery sem provider call com `/byok auto recovery-fixture profile:repo_agent failure:rate-limit`.
+8. Antes de BYOK real, validar recovery sem provider call com `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit`.
 9. Se uma falha BYOK ocorrer, consultar `/byok auto recoveries 10` e `/byok gateway health sqlite`.
 10. Antes de BYOK real, rodar live control e fixture.
 
@@ -354,19 +354,22 @@ npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_a
 Validado nesta linha:
 
 - `npm run model-gateway:commands:json`: 134 comandos.
-- `npm run model-gateway:auto:recoveries`: PASS, read-only, rows=2, recovery fixture `rate-limit` aplicada.
-- `npm run model-gateway:auto:doctor`: PASS, schema=10, recoveries=2, liveRuns=5.
+- `npm run model-gateway:auto:recoveries`: PASS, read-only, rows=5, recovery fixture `rate-limit` aplicada.
+- `npm run model-gateway:auto:doctor`: PASS operacional de leitura, schema=10, commands=134, recoveries=5, liveRuns=8; gate auto pode ficar bloqueado quando nao houver alternativa runtime-proved utilizavel.
 - `npm run model-gateway:auto:scenarios`: PASS, inclui `auto_recoveries`.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`: 215 PASS.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js`: 97 PASS.
 - `npm run model-gateway:live:auto-probe`: PASS.
-- Artefato live: `artifacts/terminal-live/2026-06-01T23-09-22-745Z/summary.md`.
-- `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-01T23-09-22-754Z:auto_probe`, `criteriaTotal=27`, `criteriaFailed=0`.
+- Artefato live: `artifacts/terminal-live/2026-06-01T23-21-49-011Z/summary.md`.
+- `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-01T23-21-49-019Z:auto_probe`, `criteriaTotal=28`, `criteriaFailed=0`.
+- `/byok auto status` e `/byok auto doctor` agora mostram resumo de alternativas: usable/evaluated, quantidade de providers e principais blockers.
+- `/byok auto recovery-fixture ... provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery, runtime health e espelho SQLite sem chamada ao provider.
 - `npm run model-gateway:lint`: PASS.
 
 ## 10. Proximas Lacunas De Alto Retorno
 
 - Expandir fixture live de post-turn failure/cooldown/fallback para mais failure kinds e fallback profiles.
+- Resolver a lacuna estrutural revelada pelo auto-probe: `repo_agent` pode ficar com `usable=0/78` quando exige agent-probe verificado e muitas rotas ainda estao `agent_probe_missing` ou `agent_probe_not_verified`.
 - Criar fixture live de pre-turn apply dentro da mesma boundary.
 - Criar fixture live de `session.model_changed` correlacionada com handoff.
 - Criar cockpit visual preparado/live/confirmed mais explicito.

@@ -422,7 +422,7 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] Comando: `npm run model-gateway:live:auto-probe`.
 - [x] Artefato inicial: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`.
 - [x] Artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-57-46-528Z/summary.md`.
-- [x] Artefato com recovery fixture final: `artifacts/terminal-live/2026-06-01T23-09-22-745Z/summary.md`.
+- [x] Artefato com recovery fixture final: `artifacts/terminal-live/2026-06-01T23-21-49-011Z/summary.md`.
 - [x] Resultado: PASS.
 - [x] Terminal error tracker: 0.
 - [x] Sem turno explicito de modelo.
@@ -431,8 +431,10 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] `/byok auto status profile:repo_agent` mostrou decision sem aplicar efeito.
 - [x] `/byok auto doctor profile:repo_agent` mostrou policy, decision, ledgers e blockers.
 - [x] `/byok auto explain profile:repo_agent` explicou action/blockers/next commands.
-- [x] `/byok auto recovery-fixture profile:repo_agent failure:rate-limit` persistiu recovery account-wide sem provider call.
+- [x] `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` persistiu recovery account-wide, runtime health e espelho SQLite sem provider call.
 - [x] `/byok auto history`, `/byok auto handoffs`, `/byok auto confirmations` e `/byok auto recoveries` renderizaram ledger/empty state.
-- [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-01T23-09-22-754Z:auto_probe`.
-- [x] `npm run model-gateway:live:runs` leu 5 registros persistidos e o ultimo com `criteriaTotal=27`.
-- [x] `npm run model-gateway:auto:doctor` mostrou `schema=10`, `commands=134`, `recoveries=2` e `liveRuns=5`.
+- [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-01T23-21-49-019Z:auto_probe`.
+- [x] `npm run model-gateway:live:runs` leu 8 registros persistidos e o ultimo com `criteriaTotal=28`.
+- [x] `npm run model-gateway:auto:doctor` mostrou `schema=10`, `commands=134`, `recoveries=5` e `liveRuns=8`.
+- [x] `/byok auto status` e `/byok auto doctor` mostram resumo de alternativas usaveis/bloqueadas.
+- [ ] Resolver a lacuna de fallback real para `repo_agent`: quando todas as rotas exigem agent-probe verificado, o cockpit pode ficar correto porem bloqueado com `usable=0/78`.
