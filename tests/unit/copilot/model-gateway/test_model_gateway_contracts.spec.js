@@ -1495,6 +1495,22 @@ describe('model-gateway foundation', () => {
         assert.equal(rateLimitResetDecision.cooldown.resetAt, '2026-06-01T10:00:00.000Z');
         assert.equal(rateLimitResetDecision.nextCommands.includes('npm run model-gateway:runtime-health:diff'), true);
 
+        const sameRouteFailureDecision = buildModelGatewayRuntimeAutomationDecision({
+            runtimeSelectorPlan,
+            profileId: 'repo_agent',
+            turnFailure: {
+                profile: 'repo_agent',
+                provider: 'openrouter',
+                model: 'openai/gpt-oss-120b',
+                failureKind: 'rate-limit',
+            },
+        });
+        assert.equal(sameRouteFailureDecision.ok, false);
+        assert.equal(sameRouteFailureDecision.action, 'wait_for_reset');
+        assert.equal(sameRouteFailureDecision.nonActionReason, 'same_route_failed_this_turn');
+        assert.equal(sameRouteFailureDecision.blockerClass, 'rate_limit_resettable');
+        assert.equal(sameRouteFailureDecision.blockers.includes('same_route_failed_this_turn:rate-limit'), true);
+
         const routeProbeEnv = buildModelGatewayRuntimeSelectorProbeEnv(runtimeSelectorPlan.routes[0].selected, {
             COPILOT_BYOK_PROFILE: 'current-default-profile',
             COPILOT_BYOK_PROVIDER_PRESET: 'groq',

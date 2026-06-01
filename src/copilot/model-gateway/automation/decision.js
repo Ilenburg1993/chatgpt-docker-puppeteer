@@ -124,6 +124,35 @@ function policyBlockers(route, options) {
 
 /**
  * @param {Record<string, unknown> | null | undefined} route
+ * @param {Record<string, unknown> | null | undefined} turnFailure
+ * @returns {boolean}
+ */
+function routeMatchesTurnFailure(route, turnFailure) {
+    if (!route || !turnFailure) return false;
+    const selected = selectedRoute(route);
+    const routeProfile = text(route?.['profileId']) ?? text(selected?.['routeProfile']) ?? text(selected?.['taskProfile']);
+    const providerId = text(selected?.['providerId']);
+    const providerModel = text(selected?.['providerModel']) ?? text(selected?.['selectorSyntax']) ?? text(selected?.['id']);
+    const failedProfile = text(turnFailure?.['profile']) ?? text(turnFailure?.['routeProfile']);
+    const failedProvider = text(turnFailure?.['provider']) ?? text(turnFailure?.['providerId']);
+    const failedModel = text(turnFailure?.['model']) ?? text(turnFailure?.['providerModel']);
+    const profileMatches = !failedProfile || !routeProfile || failedProfile === routeProfile;
+    return profileMatches && providerId !== null && providerModel !== null && providerId === failedProvider && providerModel === failedModel;
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} route
+ * @param {Record<string, unknown> | null | undefined} turnFailure
+ * @returns {string[]}
+ */
+function turnFailureBlockers(route, turnFailure) {
+    if (!routeMatchesTurnFailure(route, turnFailure)) return [];
+    const failureKind = text(turnFailure?.['failureKind']) ?? text(record(turnFailure?.['failure'])?.['kind']) ?? 'unknown_failure';
+    return [`same_route_failed_this_turn:${failureKind}`];
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} route
  * @returns {boolean}
  */
 function shouldWaitForReset(route) {
@@ -220,6 +249,7 @@ export function selectModelGatewayRuntimeAutomationRoute(runtimeSelectorPlan, pr
  * @param {boolean} [input.policy.allowLiveSetModel]
  * @param {boolean} [input.policy.allowNewSession]
  * @param {boolean} [input.policy.allowLocalPrivate]
+ * @param {Record<string, unknown> | null | undefined} [input.turnFailure]
  * @returns {{
  *   schema: 'model-gateway-runtime-automation-decision';
  *   ok: boolean;
@@ -245,12 +275,19 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
     const target = targetBoundary(route);
     const current = liveBoundary(input.liveByokBinding);
     const cooldown = routeCooldown(route);
-    const blockers = [...automationRoute.blockers, ...policyBlockers(route, input.policy ?? {})];
+    const blockers = [
+        ...automationRoute.blockers,
+        ...policyBlockers(route, input.policy ?? {}),
+        ...turnFailureBlockers(route, input.turnFailure),
+    ];
     const currentBlockerClass = blockerClass(blockers);
     const selectedKey = automationRoute.selectedRouteKey;
     const routeProfile = automationRoute.routeProfile;
     if (blockers.length > 0) {
-        const wait = automationRoute.waitForReset;
+        const sameRouteFailure = blockers.find((blocker) => blocker.startsWith('same_route_failed_this_turn:')) ?? null;
+        const wait =
+            automationRoute.waitForReset ||
+            (sameRouteFailure !== null && /rate|timeout|temporary|transient|retry/iu.test(sameRouteFailure));
         return {
             schema: 'model-gateway-runtime-automation-decision',
             ok: false,
@@ -265,11 +302,13 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             targetBoundary: target,
             cooldown,
             blockerClass: currentBlockerClass,
-            nonActionReason: wait ? 'route_wait_for_reset' : 'route_blocked',
+            nonActionReason: sameRouteFailure !== null ? 'same_route_failed_this_turn' : wait ? 'route_wait_for_reset' : 'route_blocked',
             nextCommands: wait ? ['npm run model-gateway:runtime-health:diff', 'npm run model-gateway:runtime-selector -- --fail'] : ['npm run model-gateway:selection:audit -- --strict'],
             operatorSummary: wait
-                ? 'Rota bloqueada por health/cooldown; aguarde reset ou escolha outra rota.'
-                : `Automacao bloqueada: ${blockers.join(', ')}`,
+                ? 'Rota bloqueada por health/cooldown ou falha recente; aguarde reset ou escolha outra rota.'
+                : sameRouteFailure !== null
+                  ? 'Rota recem-falhou neste turno; automacao bloqueou repeticao imediata do mesmo provider/modelo.'
+                  : `Automacao bloqueada: ${blockers.join(', ')}`,
         };
     }
     const sameBoundary = sameProviderBoundary(target, current);

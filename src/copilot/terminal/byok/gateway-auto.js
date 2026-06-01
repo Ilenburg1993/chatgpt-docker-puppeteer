@@ -66,7 +66,7 @@ export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
 
 /**
  * @param {string[]} rest
- * @param {{ allowEffects?: boolean; catalogPath?: string; env?: NodeJS.ProcessEnv; persistAutomationDecision?: boolean }} [options]
+ * @param {{ allowEffects?: boolean; catalogPath?: string; env?: NodeJS.ProcessEnv; persistAutomationDecision?: boolean; turnFailure?: Record<string, unknown> | null }} [options]
  * @returns {Promise<{
  *     schema: 'terminal-byok-gateway-auto-status';
  *     args: ReturnType<typeof parseTerminalByokGatewayAutoArgs>;
@@ -111,6 +111,7 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
             allowNewSession: args.allowNewSession,
             allowLocalPrivate: args.allowLocalPrivate,
         },
+        turnFailure: options.turnFailure,
     });
     const controllerStep = buildModelGatewayRuntimeAutomationControllerStep({
         phase: 'manual',
@@ -327,6 +328,8 @@ export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
 /**
  * @param {{
  *   profile?: string | null;
+ *   provider?: string | null;
+ *   model?: string | null;
  *   failureKind?: string | null;
  *   message?: string | null;
  *   errorContext?: string | null;
@@ -359,6 +362,14 @@ export async function runTerminalByokGatewayPostTurnAutomation(turnFailure = {},
         catalogPath: options.catalogPath,
         env: options.env,
         persistAutomationDecision: true,
+        turnFailure: {
+            profile,
+            provider: optionalScalarString(turnFailure.provider),
+            model: optionalScalarString(turnFailure.model),
+            failureKind: optionalScalarString(turnFailure.failureKind),
+            message: optionalScalarString(turnFailure.message),
+            errorContext: optionalScalarString(turnFailure.errorContext),
+        },
     });
     const controllerStep = buildModelGatewayRuntimeAutomationControllerStep({
         phase: 'post_turn',

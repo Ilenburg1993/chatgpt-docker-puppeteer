@@ -89,7 +89,7 @@ O guia anterior continua como historico:
 - [x] O erro BYOK nao deve consumir Premium Request do SDK.
 - [x] Pos-falha executa controller automatico quando a policy esta ligada.
 - [x] Recovery decision e persistida via automation decision post-turn.
-- [ ] Falta evitar loop infinito de mesma rota apos falha.
+- [x] Replanejamento pos-falha bloqueia repeticao imediata da mesma rota quando ela acabou de falhar.
 - [ ] Falta separar recovery account-wide de recovery por modelo.
 - [ ] Falta expor ao operador a proxima janela de tentativa em cockpit auto.
 
@@ -252,7 +252,7 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] E.5 Replanejamento com health recem-gravado.
 - [x] E.6 Persistir recovery decision.
 - [x] E.7 Persistir recovery effect application.
-- [ ] E.8 Evitar loop no mesmo provider/modelo.
+- [x] E.8 Evitar loop no mesmo provider/modelo.
 - [ ] E.9 Mostrar acao pos-falha no terminal.
 - [ ] E.10 Teste fixture de falha e fallback.
 

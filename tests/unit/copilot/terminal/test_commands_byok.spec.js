@@ -3122,11 +3122,23 @@ describe('terminal /byok command', () => {
 
         const result = await runTerminalByokGatewayPostTurnAutomation({
             profile: 'repo_agent',
+            provider: 'openrouter',
+            model: 'openai/gpt-oss-120b',
             failureKind: 'rate-limit',
             message: 'quota exhausted',
         });
 
         expect(result.ran).toBe(true);
+        expect(buildModelGatewayRuntimeAutomationDecision).toHaveBeenCalledWith(
+            expect.objectContaining({
+                turnFailure: expect.objectContaining({
+                    profile: 'repo_agent',
+                    provider: 'openrouter',
+                    model: 'openai/gpt-oss-120b',
+                    failureKind: 'rate-limit',
+                }),
+            }),
+        );
         expect(result.controllerStep?.phase).toBe('post_turn');
         expect(result.application?.skipped).toEqual(
             expect.arrayContaining([expect.objectContaining({ kind: 'replan_after_turn_failure' })]),

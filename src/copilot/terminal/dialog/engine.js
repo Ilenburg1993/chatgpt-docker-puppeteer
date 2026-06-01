@@ -296,6 +296,8 @@ async function printByokAutoAfterFailureHint(byokFailure) {
     try {
         const result = await runTerminalByokGatewayPostTurnAutomation({
             profile,
+            provider: byokFailure.provider,
+            model: byokFailure.model,
             failureKind: byokFailure.failure.kind,
             message: byokFailure.message,
             errorContext: byokFailure.errorContext,
