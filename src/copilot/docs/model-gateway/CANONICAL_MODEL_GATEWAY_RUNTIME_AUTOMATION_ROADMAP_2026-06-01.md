@@ -394,8 +394,8 @@ Precisamos de um cockpit operacional unico:
 - [x] L.1 Este roadmap criado.
 - [x] L.2 README curto para `scripts/model-gateway/`.
 - [x] L.3 Atualizar `src/copilot/model-gateway/README.md`.
-- [ ] L.4 Atualizar comandos `/byok` help.
-- [ ] L.5 Atualizar guia de operador para auto mode.
+- [x] L.4 Atualizar comandos `/byok` help.
+- [x] L.5 Atualizar guia de operador para auto mode.
 
 ## Faixa M - Chancela De Pronto
 

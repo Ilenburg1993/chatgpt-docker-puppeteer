@@ -14,6 +14,9 @@ The previous BYOK next guide remains available as legacy context at
 The previous universal guide remains available as legacy context at
 [`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_UNIVERSAL_GUIDE_2026-05-25.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_UNIVERSAL_GUIDE_2026-05-25.md).
 
+The short operator guide for auto mode lives at
+[`../docs/model-gateway/MODEL_GATEWAY_AUTO_MODE_OPERATOR_GUIDE_2026-06-01.md`](../docs/model-gateway/MODEL_GATEWAY_AUTO_MODE_OPERATOR_GUIDE_2026-06-01.md).
+
 It is not a replacement for the GitHub Copilot SDK wrapper. The SDK layer remains the boundary that knows how to create,
 resume and operate Copilot SDK sessions. The gateway decides what provider/model binding should be used and projects that
 decision into SDK-compatible objects.
