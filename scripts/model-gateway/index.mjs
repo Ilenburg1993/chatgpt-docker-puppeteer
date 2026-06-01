@@ -17,6 +17,7 @@ export const MODEL_GATEWAY_SCRIPT_PATHS = Object.freeze({
     effectiveSelection: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-effective-selection.mjs'),
     livePlan: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-live-plan.mjs'),
     liveReadiness: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-live-readiness.mjs'),
+    liveRuns: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-live-runs.mjs'),
     llmBLiveTest: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-terminal-llm-b-live-test.mjs'),
     metadataBuild: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-metadata-build.mjs'),
     ops: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-ops.mjs'),

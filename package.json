@@ -472,6 +472,7 @@
     "model-gateway:live:readiness": "node scripts/model-gateway/model-gateway-live-readiness.mjs --json",
     "model-gateway:live:plan": "node scripts/model-gateway/model-gateway-live-plan.mjs --json",
     "model-gateway:live:auto-probe": "node scripts/model-gateway/model-gateway-terminal-llm-b-live-test.mjs --auto-probe --timeout-ms=240000",
+    "model-gateway:live:runs": "node scripts/model-gateway/model-gateway-live-runs.mjs --json",
     "model-gateway:selection:audit": "node scripts/model-gateway/model-gateway-selection-audit.mjs --json",
     "model-gateway:prebuild": "npm run model-gateway:commands && npm run model-gateway:validate",
     "model-gateway:refresh": "node scripts/model-gateway/model-gateway-refresh.mjs --commit",

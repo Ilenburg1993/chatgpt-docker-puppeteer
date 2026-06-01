@@ -5280,6 +5280,28 @@ describe('model-gateway foundation', () => {
             );
             db.prepare(
                 `
+                    INSERT INTO copilot_model_gateway_live_scenario_runs
+                        (run_id, scenario_kind, status, ok, started_at_ms, completed_at_ms, duration_ms,
+                         exit_code, artifact_dir, summary_path, criteria_total, criteria_failed, payload_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+            ).run(
+                'live-scenario-1',
+                'auto_probe',
+                'passed',
+                1,
+                10,
+                11,
+                1,
+                0,
+                'artifacts/terminal-live/unit',
+                'artifacts/terminal-live/unit/summary.md',
+                3,
+                0,
+                '{}',
+            );
+            db.prepare(
+                `
                     INSERT INTO copilot_model_gateway_refresh_log_events
                         (event_key, run_id, phase, status, provider_id, importer_id, source_id,
                          progress_pct, observed_at_ms, elapsed_ms, payload_json)
@@ -5577,6 +5599,22 @@ describe('model-gateway foundation', () => {
                     observedAt: '2026-05-26T12:00:03.000Z',
                 },
             ]);
+            await store.writeLiveScenarioRunRecords([
+                {
+                    runId: 'live-scenario-1',
+                    scenarioKind: 'auto_probe',
+                    status: 'passed',
+                    ok: true,
+                    startedAt: '2026-05-26T12:00:04.000Z',
+                    completedAt: '2026-05-26T12:00:05.000Z',
+                    durationMs: 1000,
+                    exitCode: 0,
+                    artifactDir: 'artifacts/terminal-live/unit',
+                    summaryPath: 'artifacts/terminal-live/unit/summary.md',
+                    criteria: [{ id: 'ready', pass: true }],
+                    token: 'secret-that-must-not-leak',
+                },
+            ]);
             await store.writeRuntimeHealthRecords([
                 {
                     key: 'default|openrouter|model-a',
@@ -5614,6 +5652,7 @@ describe('model-gateway foundation', () => {
             const automationEffects = await store.readAutomationEffectApplicationRecords({ limit: 5 });
             const sdkHandoffs = await store.readSdkSessionHandoffRecords({ limit: 5 });
             const sdkConfirmations = await store.readSdkSessionConfirmationRecords({ limit: 5 });
+            const liveScenarioRuns = await store.readLiveScenarioRunRecords({ limit: 5 });
             const runtime = await store.readRuntimeHealthForModel({ providerId: 'openrouter', providerModel: 'model-a' });
             const diagnostics = await store.readStorageDiagnostics();
             const quotaRows = /** @type {{ count: number } | undefined} */ (
@@ -5648,6 +5687,9 @@ describe('model-gateway foundation', () => {
             assert.equal(sdkHandoffs[0].handoffId, 'handoff-1');
             assert.equal(sdkConfirmations.length, 1);
             assert.equal(sdkConfirmations[0].confirmationId, 'confirmation-1');
+            assert.equal(liveScenarioRuns.length, 1);
+            assert.equal(liveScenarioRuns[0].runId, 'live-scenario-1');
+            assert.equal(JSON.stringify(liveScenarioRuns).includes('secret-that-must-not-leak'), false);
             assert.equal(runtime.health?.['lastStatus'], 'ok');
             assert.equal(runtime.probes.length, 1);
             assert.equal(quotaRows?.count, 2);
@@ -5664,11 +5706,13 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.automationEffectApplicationRows, 1);
             assert.equal(diagnostics.sdkSessionHandoffRows, 1);
             assert.equal(diagnostics.sdkSessionConfirmationRows, 1);
+            assert.equal(diagnostics.liveScenarioRunRows, 1);
             assert.equal(diagnostics.latestAutomationDecision.action, 'prepare_new_session');
             assert.equal(diagnostics.latestAutomationPolicySnapshot.policy, 'prefer_runtime_proved');
             assert.equal(diagnostics.latestAutomationEffectApplication.effectKind, 'set_live_model');
             assert.equal(diagnostics.latestSdkSessionHandoff.targetModel, 'model-a');
             assert.equal(diagnostics.latestSdkSessionConfirmation.confirmedModel, 'model-a');
+            assert.equal(diagnostics.latestLiveScenarioRun.scenarioKind, 'auto_probe');
             assert.equal(diagnostics.refreshLogRows, 0);
         } finally {
             db.close();
@@ -5927,6 +5971,11 @@ describe('model-gateway foundation', () => {
                 { confirmationId: 'confirmation-2', observedAt: 2, status: 'model_mismatch', confirmedModel: 'model-b' },
                 { confirmationId: 'confirmation-3', observedAt: 3, status: 'matched_handoff', confirmedModel: 'model-c' },
             ]);
+            await store.writeLiveScenarioRunRecords([
+                { runId: 'live-scenario-1', scenarioKind: 'control_no_pr', startedAtMs: 1, completedAtMs: 1, status: 'passed', ok: true },
+                { runId: 'live-scenario-2', scenarioKind: 'byok_fixture', startedAtMs: 2, completedAtMs: 2, status: 'passed', ok: true },
+                { runId: 'live-scenario-3', scenarioKind: 'auto_probe', startedAtMs: 3, completedAtMs: 3, status: 'passed', ok: true },
+            ]);
             await store.writeRefreshLogEvents(
                 [
                     { eventId: 'refresh-1', ts: 1, phase: 'refresh_started' },
@@ -5993,6 +6042,7 @@ describe('model-gateway foundation', () => {
                 automationEffectApplicationMaxRows: 1,
                 sdkSessionHandoffMaxRows: 1,
                 sdkSessionConfirmationMaxRows: 1,
+                liveScenarioRunMaxRows: 1,
                 refreshLogMaxRows: 1,
                 runtimeProbeRunMaxRows: 1,
                 runtimeProbeResultMaxRows: 1,
@@ -6003,7 +6053,7 @@ describe('model-gateway foundation', () => {
 
             assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows > 1, true);
             assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.healthObservationMaxRows > 1, true);
-            assert.equal(result.deletedRows, 26);
+            assert.equal(result.deletedRows, 28);
             assert.equal(diagnostics.catalogRows > 0, true);
             assert.equal(diagnostics.accountHistoryRows, 3);
             assert.equal(diagnostics.routeDecisionRows, 1);
@@ -6012,11 +6062,13 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.automationEffectApplicationRows, 1);
             assert.equal(diagnostics.sdkSessionHandoffRows, 1);
             assert.equal(diagnostics.sdkSessionConfirmationRows, 1);
+            assert.equal(diagnostics.liveScenarioRunRows, 1);
             assert.equal(diagnostics.latestAutomationDecision.action, 'wait_for_reset');
             assert.equal(diagnostics.latestAutomationPolicySnapshot.enabled, false);
             assert.equal(diagnostics.latestAutomationEffectApplication.effectKind, 'wait_for_provider_reset');
             assert.equal(diagnostics.latestSdkSessionHandoff.targetModel, 'model-c');
             assert.equal(diagnostics.latestSdkSessionConfirmation.confirmedModel, 'model-c');
+            assert.equal(diagnostics.latestLiveScenarioRun.scenarioKind, 'auto_probe');
             assert.equal(diagnostics.refreshLogRows, 1);
             assert.equal(diagnostics.runtimeRows, 3);
             assert.equal(loaded.projections.length, 1);

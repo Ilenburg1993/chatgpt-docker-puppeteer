@@ -93,6 +93,7 @@ npm run model-gateway:auto:scenarios
 npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000
 npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000
 npm run model-gateway:live:auto-probe
+npm run model-gateway:live:runs
 ```
 
 Rode testes live reais apenas depois de readiness, plan, control no-PR, BYOK fixture no-PR e auto-probe estarem claros.

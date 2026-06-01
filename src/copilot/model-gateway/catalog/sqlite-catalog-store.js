@@ -37,6 +37,7 @@ let _automationPolicySnapshotSequence = 0;
 let _automationEffectSequence = 0;
 let _sdkSessionHandoffSequence = 0;
 let _sdkSessionConfirmationSequence = 0;
+let _liveScenarioRunSequence = 0;
 
 export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze({
     accountHistoryMaxRowsPerTable: 10_000,
@@ -49,6 +50,7 @@ export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze(
     automationEffectApplicationMaxRows: 50_000,
     sdkSessionHandoffMaxRows: 50_000,
     sdkSessionConfirmationMaxRows: 50_000,
+    liveScenarioRunMaxRows: 50_000,
     refreshLogMaxRows: 200_000,
     runtimeProbeRunMaxRows: 10_000,
     runtimeProbeResultMaxRows: 100_000,
@@ -529,6 +531,15 @@ function createSdkSessionConfirmationId(observedAtMs) {
 }
 
 /**
+ * @param {number} observedAtMs
+ * @returns {string}
+ */
+function createLiveScenarioRunId(observedAtMs) {
+    _liveScenarioRunSequence += 1;
+    return `model-gateway:live-scenario:${observedAtMs}:${process.pid}:${_liveScenarioRunSequence}`;
+}
+
+/**
  * @param {Record<string, unknown>} result
  * @returns {string | null}
  */
@@ -867,11 +878,13 @@ export class SqliteModelGatewayCatalogStore {
      *     automationEffectApplicationRows: number;
      *     sdkSessionHandoffRows: number;
      *     sdkSessionConfirmationRows: number;
+     *     liveScenarioRunRows: number;
      *     latestAutomationDecision: { action: string | null; status: string | null; ok: boolean | null; selectedRouteKey: string | null; decidedAtMs: number | null };
      *     latestAutomationPolicySnapshot: { enabled: boolean | null; policy: string | null; routeProfile: string | null; observedAtMs: number | null };
      *     latestAutomationEffectApplication: { effectKind: string | null; status: string | null; applied: boolean | null; observedAtMs: number | null };
      *     latestSdkSessionHandoff: { status: string | null; routeProfile: string | null; selectedRouteKey: string | null; sessionId: string | null; targetModel: string | null; requestedAtMs: number | null; confirmedAtMs: number | null };
      *     latestSdkSessionConfirmation: { status: string | null; handoffId: string | null; decisionId: string | null; sessionId: string | null; previousModel: string | null; confirmedModel: string | null; observedAtMs: number | null };
+     *     latestLiveScenarioRun: { runId: string | null; scenarioKind: string | null; status: string | null; ok: boolean | null; completedAtMs: number | null; summaryPath: string | null };
      *     refreshLogRows: number;
      * }>}
      */
@@ -1010,6 +1023,18 @@ export class SqliteModelGatewayCatalogStore {
                 )
                 .get()
         );
+        const latestLiveScenarioRun = /** @type {{ run_id: string | null; scenario_kind: string | null; status: string | null; ok: number | null; completed_at_ms: number | null; summary_path: string | null } | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT run_id, scenario_kind, status, ok, completed_at_ms, summary_path
+                        FROM copilot_model_gateway_live_scenario_runs
+                        ORDER BY completed_at_ms DESC
+                        LIMIT 1
+                    `,
+                )
+                .get()
+        );
         /**
          * @param {string[]} tables
          * @returns {number}
@@ -1046,6 +1071,7 @@ export class SqliteModelGatewayCatalogStore {
             sdkSessionHandoffRows: tableCounts['copilot_model_gateway_sdk_session_handoffs'] ?? 0,
             sdkSessionConfirmationRows:
                 tableCounts['copilot_model_gateway_sdk_session_confirmations'] ?? 0,
+            liveScenarioRunRows: tableCounts['copilot_model_gateway_live_scenario_runs'] ?? 0,
             latestAutomationDecision: {
                 action: optionalString(latestAutomationDecision?.action),
                 status: optionalString(latestAutomationDecision?.status),
@@ -1097,6 +1123,19 @@ export class SqliteModelGatewayCatalogStore {
                 previousModel: optionalString(latestSdkSessionConfirmation?.previous_model),
                 confirmedModel: optionalString(latestSdkSessionConfirmation?.confirmed_model),
                 observedAtMs: optionalInteger(latestSdkSessionConfirmation?.observed_at_ms),
+            },
+            latestLiveScenarioRun: {
+                runId: optionalString(latestLiveScenarioRun?.run_id),
+                scenarioKind: optionalString(latestLiveScenarioRun?.scenario_kind),
+                status: optionalString(latestLiveScenarioRun?.status),
+                ok:
+                    latestLiveScenarioRun?.ok === 1
+                        ? true
+                        : latestLiveScenarioRun?.ok === 0
+                          ? false
+                          : null,
+                completedAtMs: optionalInteger(latestLiveScenarioRun?.completed_at_ms),
+                summaryPath: optionalString(latestLiveScenarioRun?.summary_path),
             },
             refreshLogRows: tableCounts['copilot_model_gateway_refresh_log_events'] ?? 0,
         };
@@ -1308,6 +1347,7 @@ export class SqliteModelGatewayCatalogStore {
      *     automationEffectApplicationMaxRows?: number;
      *     sdkSessionHandoffMaxRows?: number;
      *     sdkSessionConfirmationMaxRows?: number;
+     *     liveScenarioRunMaxRows?: number;
      * }} [policy]
      * @returns {Promise<{
      *     schema: string;
@@ -1373,6 +1413,10 @@ export class SqliteModelGatewayCatalogStore {
         const sdkSessionConfirmationMaxRows = retentionLimit(
             policy.sdkSessionConfirmationMaxRows,
             DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.sdkSessionConfirmationMaxRows,
+        );
+        const liveScenarioRunMaxRows = retentionLimit(
+            policy.liveScenarioRunMaxRows,
+            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.liveScenarioRunMaxRows,
         );
         /** @type {Record<string, { deletedRows: number; maxRows: number }>} */
         const tables = {};
@@ -1453,6 +1497,15 @@ export class SqliteModelGatewayCatalogStore {
                     maxRows: sdkSessionConfirmationMaxRows,
                 }),
                 maxRows: sdkSessionConfirmationMaxRows,
+            };
+            tables['copilot_model_gateway_live_scenario_runs'] = {
+                deletedRows: deleteRowsKeepingLatest(this.#db, {
+                    table: 'copilot_model_gateway_live_scenario_runs',
+                    keyColumn: 'run_id',
+                    orderColumn: 'completed_at_ms',
+                    maxRows: liveScenarioRunMaxRows,
+                }),
+                maxRows: liveScenarioRunMaxRows,
             };
             tables['copilot_model_gateway_runtime_probe_results'] = {
                 deletedRows: deleteRowsKeepingLatest(this.#db, {
@@ -2292,6 +2345,95 @@ export class SqliteModelGatewayCatalogStore {
                     SELECT payload_json
                     FROM copilot_model_gateway_sdk_session_confirmations
                     ORDER BY observed_at_ms DESC
+                    LIMIT ?
+                `,
+            )
+            .all(limit)
+            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+    }
+
+    /**
+     * @param {Record<string, unknown>[]} runs
+     * @returns {Promise<{ liveScenarioRuns: number }>}
+     */
+    async writeLiveScenarioRunRecords(runs) {
+        const insert = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_live_scenario_runs
+                (run_id, scenario_kind, status, ok, started_at_ms, completed_at_ms, duration_ms,
+                 exit_code, artifact_dir, summary_path, criteria_total, criteria_failed, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(run_id) DO UPDATE SET
+                scenario_kind = excluded.scenario_kind,
+                status = excluded.status,
+                ok = excluded.ok,
+                started_at_ms = excluded.started_at_ms,
+                completed_at_ms = excluded.completed_at_ms,
+                duration_ms = excluded.duration_ms,
+                exit_code = excluded.exit_code,
+                artifact_dir = excluded.artifact_dir,
+                summary_path = excluded.summary_path,
+                criteria_total = excluded.criteria_total,
+                criteria_failed = excluded.criteria_failed,
+                payload_json = excluded.payload_json
+        `);
+        const writable = runs.filter(isRecord);
+        const tx = this.#db.transaction(() => {
+            for (const run of writable) {
+                const startedAtMs = dateMs(run['startedAt']) ?? optionalInteger(run['startedAtMs']) ?? Date.now();
+                const durationMs = optionalInteger(run['durationMs']) ?? 0;
+                const completedAtMs =
+                    dateMs(run['completedAt']) ??
+                    optionalInteger(run['completedAtMs']) ??
+                    Math.max(startedAtMs, startedAtMs + durationMs);
+                const criteria = Array.isArray(run['criteria']) ? run['criteria'] : [];
+                const criteriaTotal = optionalInteger(run['criteriaTotal']) ?? criteria.length;
+                const criteriaFailed =
+                    optionalInteger(run['criteriaFailed']) ??
+                    criteria.filter((criterion) => isRecord(criterion) && criterion['pass'] !== true && criterion['severity'] !== 'warning').length;
+                const ok = run['ok'] === true || run['requiredOk'] === true;
+                const status = optionalString(run['status']) ?? (ok ? 'passed' : run['blocked'] === true ? 'blocked' : 'failed');
+                insert.run(
+                    optionalString(run['runId']) ?? createLiveScenarioRunId(completedAtMs),
+                    optionalString(run['scenarioKind']) ?? optionalString(run['kind']) ?? 'unknown',
+                    status,
+                    ok ? 1 : 0,
+                    startedAtMs,
+                    completedAtMs,
+                    Math.max(0, durationMs),
+                    optionalInteger(run['exitCode']),
+                    optionalString(run['artifactDir']),
+                    optionalString(run['summaryPath']),
+                    criteriaTotal,
+                    criteriaFailed,
+                    operationalPayloadJson({
+                        ...run,
+                        status,
+                        ok,
+                        startedAtMs,
+                        completedAtMs,
+                        durationMs,
+                        criteriaTotal,
+                        criteriaFailed,
+                    }),
+                );
+            }
+        });
+        tx();
+        return { liveScenarioRuns: writable.length };
+    }
+
+    /**
+     * @param {{ limit?: number }} [options]
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async readLiveScenarioRunRecords(options = {}) {
+        const limit = Math.max(1, Math.min(optionalInteger(options.limit) ?? 50, 500));
+        return this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_live_scenario_runs
+                    ORDER BY completed_at_ms DESC
                     LIMIT ?
                 `,
             )

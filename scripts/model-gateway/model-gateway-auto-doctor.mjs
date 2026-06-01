@@ -101,6 +101,7 @@ const policyValidation = validateModelGatewayRuntimeAutomationPolicy(policy ?? {
 const activeSnapshot = optionalRecord(diagnosticsJson?.['activeSnapshot']);
 const latestAutomationEffectApplication = optionalRecord(diagnosticsJson?.['latestAutomationEffectApplication']);
 const latestSdkSessionHandoff = optionalRecord(diagnosticsJson?.['latestSdkSessionHandoff']);
+const latestLiveScenarioRun = optionalRecord(diagnosticsJson?.['latestLiveScenarioRun']);
 const requireEnabled = argSet.has('--require-enabled');
 
 const checks = [
@@ -121,6 +122,11 @@ const checks = [
         optionalNumber(diagnosticsJson?.['sdkSessionHandoffRows']) !== null &&
             optionalNumber(diagnosticsJson?.['sdkSessionConfirmationRows']) !== null,
         `handoffs=${diagnosticsJson?.['sdkSessionHandoffRows'] ?? '-'} confirmations=${diagnosticsJson?.['sdkSessionConfirmationRows'] ?? '-'}`,
+    ),
+    createCheck(
+        'live_scenario_ledger_visible',
+        optionalNumber(diagnosticsJson?.['liveScenarioRunRows']) !== null,
+        `liveRuns=${diagnosticsJson?.['liveScenarioRunRows'] ?? '-'}`,
     ),
     createCheck('policy_loaded', policy !== null, `source=${policy?.['source'] ?? '-'}`),
     createCheck('policy_valid', policyValidation.ok, policyValidation.issues.join(',') || 'policy valid'),
@@ -159,12 +165,14 @@ const summary = {
     },
     latestAutomationEffectApplication,
     latestSdkSessionHandoff,
+    latestLiveScenarioRun,
     ledgers: {
         automationDecisionRows: optionalNumber(diagnosticsJson?.['automationDecisionRows']),
         automationPolicySnapshotRows: optionalNumber(diagnosticsJson?.['automationPolicySnapshotRows']),
         automationEffectApplicationRows: optionalNumber(diagnosticsJson?.['automationEffectApplicationRows']),
         sdkSessionHandoffRows: optionalNumber(diagnosticsJson?.['sdkSessionHandoffRows']),
         sdkSessionConfirmationRows: optionalNumber(diagnosticsJson?.['sdkSessionConfirmationRows']),
+        liveScenarioRunRows: optionalNumber(diagnosticsJson?.['liveScenarioRunRows']),
     },
     commands: {
         count: commandRows.length,
@@ -190,7 +198,7 @@ if (json) {
         );
     }
     process.stdout.write(
-        `  ledgers: decisions=${summary.ledgers.automationDecisionRows ?? '-'} policySnapshots=${summary.ledgers.automationPolicySnapshotRows ?? '-'} effects=${summary.ledgers.automationEffectApplicationRows ?? '-'} handoffs=${summary.ledgers.sdkSessionHandoffRows ?? '-'} confirmations=${summary.ledgers.sdkSessionConfirmationRows ?? '-'}\n`,
+        `  ledgers: decisions=${summary.ledgers.automationDecisionRows ?? '-'} policySnapshots=${summary.ledgers.automationPolicySnapshotRows ?? '-'} effects=${summary.ledgers.automationEffectApplicationRows ?? '-'} handoffs=${summary.ledgers.sdkSessionHandoffRows ?? '-'} confirmations=${summary.ledgers.sdkSessionConfirmationRows ?? '-'} liveRuns=${summary.ledgers.liveScenarioRunRows ?? '-'}\n`,
     );
     for (const check of checks) {
         process.stdout.write(`  ${check.pass ? 'PASS' : check.severity.toUpperCase()} ${check.id}: ${check.detail}\n`);

@@ -90,6 +90,7 @@ Responsavel por:
 - automation policy snapshots;
 - SDK session handoffs;
 - SDK model-change confirmations.
+- live scenario runs.
 
 Comandos principais:
 
@@ -99,6 +100,7 @@ npm run model-gateway:runtime-health:mirror
 npm run model-gateway:runtime-health:diff
 npm run model-gateway:sqlite:retention -- --json
 npm run model-gateway:sqlite:retention:apply -- --json
+npm run model-gateway:live:runs
 ```
 
 Regra: tabelas operacionais podem expirar, sofrer retention e refletir janelas de reset. O catalogo nao.
@@ -176,6 +178,7 @@ npm run model-gateway:auto:explain
 npm run model-gateway:auto:handoffs
 npm run model-gateway:auto:confirmations
 npm run model-gateway:auto:scenarios
+npm run model-gateway:live:runs
 ```
 
 Regra: `auto:status`, `auto:ready`, `auto:doctor`, `auto:explain`, `auto:handoffs`, `auto:confirmations` e
@@ -345,16 +348,19 @@ Ele nao abre turno explicito de modelo e nao chama provider.
 Evidencia em 2026-06-01:
 
 - status: PASS;
-- artefato: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`;
-- duracao: 18887ms;
+- artefato inicial: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`;
+- artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-26-51-045Z/summary.md`;
+- duracao mais recente: 18373ms;
 - erros rastreados: 0;
-- criterios PASS: 24;
-- inventario canonico exibiu 128 comandos;
+- criterios PASS mais recentes: 25;
+- inventario canonico exibiu 130 comandos;
 - `/byok auto policy` funcionou;
 - `/byok auto status profile:repo_agent` funcionou;
 - `/byok auto doctor profile:repo_agent` funcionou;
 - `/byok auto explain profile:repo_agent` funcionou;
 - ledgers history/handoffs/confirmations renderizaram corretamente.
+- ledger de live scenarios gravou `terminal-live:2026-06-01T22-26-51-054Z:auto_probe`;
+- `npm run model-gateway:live:runs` leu 2 runs persistidos e confirmou `criteriaTotal=25` no ultimo.
 
 ### 5.6 BYOK real no-PR
 
@@ -397,6 +403,7 @@ Regras:
 npm run model-gateway:ops
 npm run model-gateway:auto:ready
 npm run model-gateway:auto:doctor
+npm run model-gateway:live:runs
 ```
 
 ### 7.2 Diagnostico no terminal
@@ -512,6 +519,7 @@ Isso cria overlay temporario com reset/cooldown.
 - [ ] `npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000` passa.
 - [ ] `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000` passa.
 - [x] `npm run model-gateway:live:auto-probe` passa.
+- [x] `npm run model-gateway:live:runs` mostra o ultimo auto-probe persistido.
 - [x] `/byok auto doctor profile:repo_agent` passa no terminal.
 - [ ] `byok-real-no-pr` passa quando o operador permitir gasto de quota BYOK.
 - [ ] `byok-real-full` passa quando o operador permitir turno real.
@@ -523,7 +531,7 @@ Isso cria overlay temporario com reset/cooldown.
 ## 11. Lacunas Operacionais Ainda Abertas
 
 - Persistencia dedicada de recovery attempts ainda deve virar tabela/fluxo proprio, alem das decisions/effects post-turn.
-- Persistencia dedicada de live scenario runs ainda deve virar tabela/fluxo proprio.
+- Persistencia dedicada de live scenario runs existe; falta apenas ampliar scenarios especificos e rodar redaction audit dedicado.
 - Pre-turn fixture precisa cobrir anti-loop de decision repetida.
 - Post-turn fixture precisa simular falha, cooldown e fallback.
 - Fixture `model_changed` precisa exercitar confirmation correlacionada.

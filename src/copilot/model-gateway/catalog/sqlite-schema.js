@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/catalog/sqlite-schema
  */
 
-export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 8;
+export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 9;
 
 export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_snapshots',
@@ -36,6 +36,7 @@ export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_automation_effect_applications',
     'copilot_model_gateway_sdk_session_handoffs',
     'copilot_model_gateway_sdk_session_confirmations',
+    'copilot_model_gateway_live_scenario_runs',
     'copilot_model_gateway_refresh_log_events',
 ]);
 
@@ -417,6 +418,26 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
         ON copilot_model_gateway_sdk_session_confirmations(handoff_id, observed_at_ms DESC);
     CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_confirmations_model
         ON copilot_model_gateway_sdk_session_confirmations(confirmed_model, status, observed_at_ms DESC);
+
+    CREATE TABLE IF NOT EXISTS copilot_model_gateway_live_scenario_runs (
+        run_id          TEXT PRIMARY KEY,
+        scenario_kind   TEXT NOT NULL DEFAULT 'unknown',
+        status          TEXT NOT NULL,
+        ok              INTEGER NOT NULL,
+        started_at_ms   INTEGER NOT NULL,
+        completed_at_ms INTEGER NOT NULL,
+        duration_ms     INTEGER NOT NULL DEFAULT 0,
+        exit_code       INTEGER,
+        artifact_dir    TEXT,
+        summary_path    TEXT,
+        criteria_total  INTEGER NOT NULL DEFAULT 0,
+        criteria_failed INTEGER NOT NULL DEFAULT 0,
+        payload_json    TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS idx_mg_live_scenario_runs_kind
+        ON copilot_model_gateway_live_scenario_runs(scenario_kind, status, ok, completed_at_ms DESC);
+    CREATE INDEX IF NOT EXISTS idx_mg_live_scenario_runs_completed
+        ON copilot_model_gateway_live_scenario_runs(completed_at_ms DESC);
 
     CREATE TABLE IF NOT EXISTS copilot_model_gateway_refresh_log_events (
         event_key      TEXT PRIMARY KEY,

@@ -1218,6 +1218,7 @@ function buildReport({
     startedAt,
     transport,
     liveHealthRecord,
+    liveScenarioRunRecord,
 }) {
     const ok = allRequiredCriteriaPassed(criteria);
     const status = blocker ? 'BLOCKED' : ok ? 'PASS' : 'FAIL';
@@ -1239,6 +1240,7 @@ function buildReport({
         `- SSE raw output: ${sseRawPath}`,
         `- SSE JSONL: ${sseJsonlPath}`,
         `- BYOK live health record: ${liveHealthRecord?.recorded ? 'recorded' : liveHealthRecord?.attempted ? `not-recorded · ${liveHealthRecord.reason ?? 'unknown'}` : 'n/a'}`,
+        `- Live scenario run record: ${liveScenarioRunRecord?.recorded ? 'recorded' : liveScenarioRunRecord?.attempted ? `not-recorded · ${liveScenarioRunRecord.reason ?? 'unknown'}` : 'n/a'}`,
         '',
         '## SSE',
         '',
@@ -1257,6 +1259,77 @@ function buildReport({
         '',
     ];
     return `${lines.join('\n')}\n`;
+}
+
+function liveScenarioKind({ autoControlProbe, byokControlProbe, byokFixture, byokReal, noPr, sessionCycle }) {
+    if (sessionCycle) return 'session_cycle';
+    if (autoControlProbe) return 'auto_probe';
+    if (byokFixture) return 'byok_fixture_no_pr';
+    if (byokControlProbe) return 'byok_control_no_pr';
+    if (byokReal && noPr) return 'byok_real_no_pr';
+    if (byokReal) return 'byok_real_full';
+    if (noPr) return 'control_no_pr';
+    return 'canonical_full_turn';
+}
+
+async function recordLiveScenarioRunToSqlite({
+    criteria,
+    startedAt,
+    durationMs,
+    exitCode,
+    blocker,
+    scenarioKind,
+    outDir,
+    mdPath,
+    rawPath,
+    plainPath,
+    sseJsonlPath,
+    transport,
+}) {
+    const failedCriteria = criteria.filter(isHardCriterionFailure);
+    const completedAt = new Date(Date.parse(startedAt) + Math.max(0, Number.isFinite(durationMs) ? durationMs : 0)).toISOString();
+    const runId = `terminal-live:${String(startedAt).replace(/[:.]/gu, '-')}:${scenarioKind}`;
+    try {
+        const { SqliteModelGatewayCatalogStore } = await import('../../src/copilot/model-gateway/index.js');
+        const store = new SqliteModelGatewayCatalogStore();
+        const result = await store.writeLiveScenarioRunRecords([
+            {
+                runId,
+                scenarioKind,
+                status: blocker ? 'blocked' : failedCriteria.length === 0 ? 'passed' : 'failed',
+                ok: failedCriteria.length === 0 && !blocker,
+                blocked: Boolean(blocker),
+                blocker,
+                startedAt,
+                completedAt,
+                durationMs,
+                exitCode,
+                artifactDir: path.relative(ROOT, outDir),
+                summaryPath: path.relative(ROOT, mdPath),
+                rawPath: path.relative(ROOT, rawPath),
+                plainPath: path.relative(ROOT, plainPath),
+                sseJsonlPath: path.relative(ROOT, sseJsonlPath),
+                transport,
+                criteriaTotal: criteria.length,
+                criteriaFailed: failedCriteria.length,
+                criteria: criteria.map((criterion) => ({
+                    id: criterion.id,
+                    pass: criterion.pass === true,
+                    required: criterion.required !== false,
+                    severity: criterion.severity ?? null,
+                    detail: criterion.detail ?? null,
+                })),
+            },
+        ]);
+        return { attempted: true, recorded: result.liveScenarioRuns === 1, runId, result };
+    } catch (error) {
+        return {
+            attempted: true,
+            recorded: false,
+            runId,
+            reason: error instanceof Error ? error.message : String(error),
+        };
+    }
 }
 
 async function writeEarlyBlockedSummary({
@@ -2675,6 +2748,7 @@ async function main() {
     const byokReal = hasFlag('--byok-real');
     const byokControlProbe = !byokReal && (byokProbe || byokFixture);
     const autoControlProbe = autoProbe && !byokReal && !byokControlProbe;
+    const scenarioKind = liveScenarioKind({ autoControlProbe, byokControlProbe, byokFixture, byokReal, noPr, sessionCycle });
     const byokRealProfile = readArg('--byok-real-profile', '');
     const byokRealAltProfile = readArg('--byok-real-alt-profile', '');
     const byokRealModel = readArg('--byok-real-model', '');
@@ -3165,6 +3239,58 @@ async function main() {
         noPr,
         byokControlProbe,
     });
+    const preliminaryLiveScenarioRunRecord = await recordLiveScenarioRunToSqlite({
+        criteria,
+        startedAt,
+        durationMs,
+        exitCode,
+        blocker,
+        scenarioKind,
+        outDir,
+        mdPath,
+        rawPath,
+        plainPath,
+        sseJsonlPath,
+        transport,
+    });
+    const provisionalCriteria = [
+        ...criteria,
+        {
+            id: 'live-scenario-run-recorded',
+            pass: preliminaryLiveScenarioRunRecord.recorded === true,
+            detail: preliminaryLiveScenarioRunRecord.recorded
+                ? `SQLite live scenario run recorded as ${preliminaryLiveScenarioRunRecord.runId}`
+                : `SQLite live scenario run not recorded: ${preliminaryLiveScenarioRunRecord.reason ?? 'unknown'}`,
+        },
+    ];
+    const liveScenarioRunRecord =
+        preliminaryLiveScenarioRunRecord.recorded === true
+            ? await recordLiveScenarioRunToSqlite({
+                  criteria: provisionalCriteria,
+                  startedAt,
+                  durationMs,
+                  exitCode,
+                  blocker,
+                  scenarioKind,
+                  outDir,
+                  mdPath,
+                  rawPath,
+                  plainPath,
+                  sseJsonlPath,
+                  transport,
+              })
+            : preliminaryLiveScenarioRunRecord;
+    const finalCriteria =
+        preliminaryLiveScenarioRunRecord.recorded === true && liveScenarioRunRecord.recorded !== true
+            ? [
+                  ...criteria,
+                  {
+                      id: 'live-scenario-run-recorded',
+                      pass: false,
+                      detail: `SQLite live scenario run final update failed: ${liveScenarioRunRecord.reason ?? 'unknown'}`,
+                  },
+              ]
+            : provisionalCriteria;
     await writeFile(rawPath, raw, 'utf8');
     await writeFile(plainPath, plain, 'utf8');
     await writeFile(sseRawPath, sseSummary.raw, 'utf8');
@@ -3177,17 +3303,19 @@ async function main() {
         jsonPath,
         `${JSON.stringify(
             {
-                ok: allRequiredCriteriaPassed(criteria),
-                requiredOk: allRequiredCriteriaPassed(criteria),
+                ok: allRequiredCriteriaPassed(finalCriteria),
+                requiredOk: allRequiredCriteriaPassed(finalCriteria),
                 blocked: Boolean(blocker),
                 blocker,
                 startedAt,
                 durationMs,
                 exitCode,
-                criteria,
+                scenarioKind,
+                criteria: finalCriteria,
                 sse: sseSummary,
                 byokReal: realByok?.redacted ?? null,
                 liveHealthRecord,
+                liveScenarioRunRecord,
                 export: exportSummary
                     ? {
                           ok: exportSummary.ok,
@@ -3207,7 +3335,7 @@ async function main() {
     await writeFile(
         mdPath,
         buildReport({
-            criteria,
+            criteria: finalCriteria,
             durationMs,
             exitCode,
             blocker,
@@ -3221,13 +3349,14 @@ async function main() {
             startedAt,
             transport,
             liveHealthRecord,
+            liveScenarioRunRecord,
         }),
         'utf8',
     );
     if (realByok) {
         await writeFile(path.join(outDir, 'byok.real.redacted.json'), `${JSON.stringify(realByok.redacted, null, 2)}\n`, 'utf8');
     }
-    const failed = criteria.filter(isHardCriterionFailure);
+    const failed = finalCriteria.filter(isHardCriterionFailure);
     console.log(`[terminal-live] summary: ${path.relative(ROOT, mdPath)}`);
     if (failed.length > 0 || exitCode !== 0) {
         console.error(

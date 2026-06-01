@@ -370,6 +370,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Run the terminal auto-mode cockpit probe without opening a model turn or calling providers.',
     },
     {
+        id: 'live.runs',
+        phase: 'live-readiness',
+        surface: 'package',
+        command: 'npm run model-gateway:live:runs',
+        summary: 'Read persisted terminal live scenario run summaries from SQLite without provider calls.',
+    },
+    {
         id: 'live.terminal.byok-real-no-pr',
         phase: 'live-readiness',
         surface: 'package',
@@ -645,6 +652,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-live-auto-probe',
         summary: 'Makefile alias for the terminal auto-mode cockpit probe.',
+    },
+    {
+        id: 'make.live-runs',
+        phase: 'live-readiness',
+        surface: 'make',
+        command: 'make model-gateway-live-runs',
+        summary: 'Makefile alias for the SQLite terminal live scenario run ledger.',
     },
     {
         id: 'terminal.commands',

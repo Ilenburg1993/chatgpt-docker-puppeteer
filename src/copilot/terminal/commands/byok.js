@@ -3575,6 +3575,7 @@ async function renderByokGatewayAutoDoctor(println, rest) {
     const effectsRows = finitePositiveNumber(diagnostics.automationEffectApplicationRows) ?? 0;
     const handoffRows = finitePositiveNumber(diagnostics.sdkSessionHandoffRows) ?? 0;
     const confirmationRows = finitePositiveNumber(diagnostics.sdkSessionConfirmationRows) ?? 0;
+    const liveScenarioRunRows = finitePositiveNumber(diagnostics.liveScenarioRunRows) ?? 0;
     const decision = status.decision;
     const warnings = [];
     if (effectivePolicy.enabled !== true) warnings.push('policy_disabled');
@@ -3606,7 +3607,7 @@ async function renderByokGatewayAutoDoctor(println, rest) {
         );
     }
     println(
-        `    ledgers:       \x1b[33mdecisions=${diagnostics.automationDecisionRows ?? 0} · policySnapshots=${diagnostics.automationPolicySnapshotRows ?? 0} · effects=${effectsRows} · handoffs=${handoffRows} · confirmations=${confirmationRows}\x1b[0m`,
+        `    ledgers:       \x1b[33mdecisions=${diagnostics.automationDecisionRows ?? 0} · policySnapshots=${diagnostics.automationPolicySnapshotRows ?? 0} · effects=${effectsRows} · handoffs=${handoffRows} · confirmations=${confirmationRows} · liveRuns=${liveScenarioRunRows}\x1b[0m`,
     );
     println(
         `    sdk:           \x1b[33msession=${status.inventory.currentSessionId ?? '-'} · live=${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}\x1b[0m`,

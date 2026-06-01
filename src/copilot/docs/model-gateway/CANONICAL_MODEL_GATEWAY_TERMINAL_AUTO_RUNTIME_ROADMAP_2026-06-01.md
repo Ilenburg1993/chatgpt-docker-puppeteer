@@ -29,7 +29,7 @@ Playbook operacional ativo para humano/LLM:
 
 - [x] Catalogo canonico JSON existe.
 - [x] SQLite operacional existe.
-- [x] Schema SQLite esta na versao 8.
+- [x] Schema SQLite esta na versao 9.
 - [x] Catalog rows, route decisions, runtime health e automation decisions estao visiveis.
 - [x] Automation effect applications estao persistidas.
 - [x] SDK session handoffs estao persistidos.
@@ -37,7 +37,7 @@ Playbook operacional ativo para humano/LLM:
 - [x] Existe tabela/fluxo para policy snapshots por decision.
 - [x] Existe tabela/fluxo para SDK binding confirmations.
 - [ ] Falta tabela/fluxo para post-turn recovery attempts.
-- [ ] Falta tabela/fluxo para live test scenario runs.
+- [x] Existe tabela/fluxo para live test scenario runs.
 
 ### 2.2 Scripts canonicos
 
@@ -54,6 +54,7 @@ Playbook operacional ativo para humano/LLM:
 - [x] `model-gateway:auto:scenarios`.
 - [x] `model-gateway:auto:handoffs`.
 - [x] `model-gateway:auto:confirmations`.
+- [x] `model-gateway:live:runs`.
 
 ### 2.3 Terminal
 
@@ -229,7 +230,7 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] C.4 Policy snapshots.
 - [x] C.5 SDK confirmations.
 - [ ] C.6 Recovery attempts.
-- [ ] C.7 Live scenario runs.
+- [x] C.7 Live scenario runs.
 - [x] C.8 Retention para novas tabelas.
 - [x] C.9 Diagnostics para novas tabelas.
 - [ ] C.10 Redaction audit para novas tabelas.
@@ -370,14 +371,14 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] Catalogo e SQLite estao saudaveis.
 - [x] Auto ready passa.
 - [x] Auto doctor passa.
-- [ ] Terminal doctor passa.
+- [x] Terminal doctor passa.
 - [ ] Pre-turn troca modelo quando autorizado.
 - [ ] Pre-turn prepara nova sessao quando autorizado.
 - [x] Post-turn replaneja apos falha.
 - [ ] Health evita repetir rota quebrada.
 - [x] SDK confirma modelo efetivo.
 - [ ] Cockpit mostra prepared/live/confirmed.
-- [ ] Live fixture passa.
+- [x] Live fixture passa.
 - [ ] Live real passa.
 - [ ] Nao ha vazamento de segredo em logs, docs ou SQLite.
 
@@ -412,13 +413,17 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 
 - [x] Rodado em 2026-06-01.
 - [x] Comando: `npm run model-gateway:live:auto-probe`.
-- [x] Artefato: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`.
+- [x] Artefato inicial: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`.
+- [x] Artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-26-51-045Z/summary.md`.
 - [x] Resultado: PASS.
 - [x] Terminal error tracker: 0.
 - [x] Sem turno explicito de modelo.
-- [x] `/byok gateway commands` mostrou inventario canonico com 128 comandos.
+- [x] `/byok gateway commands` mostrou inventario canonico com 130 comandos.
 - [x] `/byok auto policy` mostrou policy efetiva.
 - [x] `/byok auto status profile:repo_agent` mostrou decision sem aplicar efeito.
 - [x] `/byok auto doctor profile:repo_agent` mostrou policy, decision, ledgers e blockers.
 - [x] `/byok auto explain profile:repo_agent` explicou action/blockers/next commands.
 - [x] `/byok auto history`, `/byok auto handoffs` e `/byok auto confirmations` renderizaram ledger/empty state.
+- [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-01T22-26-51-054Z:auto_probe`.
+- [x] `npm run model-gateway:live:runs` leu 2 registros persistidos e o ultimo com `criteriaTotal=25`.
+- [x] `npm run model-gateway:auto:doctor` mostrou `live_scenario_ledger_visible` com `liveRuns=2`.
