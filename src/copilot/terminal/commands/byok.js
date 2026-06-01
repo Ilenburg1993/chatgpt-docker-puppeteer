@@ -108,6 +108,7 @@ import {
     classifyTerminalByokSdkBinding,
     evaluateTerminalByokProbeBudget,
     isSameTerminalByokProviderBoundary,
+    parseTerminalByokGatewayAutoArgs,
 } from '../byok/index.js';
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
@@ -1959,7 +1960,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok auto [status|plan|record|apply|off] [profile:<id>] [allow-live-set-model] | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway auto [profile:<id>] | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway local | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict|runs|diff] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] [wire:<completions|responses>] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok auto [on|status|plan|record|history|apply|off] [profile:<id>] [allow-live-set-model] | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway auto [profile:<id>] | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway local | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict|runs|diff] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] [wire:<completions|responses>] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -3378,6 +3379,71 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
 
 /**
  * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayAutoOn(println, rest) {
+    const args = parseTerminalByokGatewayAutoArgs(rest);
+    const status = await buildTerminalByokGatewayAutoStatus(rest);
+    const { decision } = status;
+    const exports = [
+        'COPILOT_BYOK_GATEWAY_AUTO=true',
+        'COPILOT_BYOK_GATEWAY_AUTO_POLICY=prefer_runtime_proved',
+        `COPILOT_BYOK_GATEWAY_AUTO_PROFILES=${args.profileId}`,
+        `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LIVE_SET_MODEL=${args.allowLiveSetModel ? 'true' : 'false'}`,
+        `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_NEW_SESSION=${args.allowNewSession ? 'true' : 'false'}`,
+        `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LOCAL_PRIVATE=${args.allowLocalPrivate ? 'true' : 'false'}`,
+    ];
+    println('\n  \x1b[36mBYOK model-gateway auto on\x1b[0m');
+    println('  \x1b[90mEste comando nao muta env do processo; ele mostra a policy segura para o proximo boot.\x1b[0m');
+    println(`    profile:       \x1b[33m${args.profileId}\x1b[0m`);
+    println(
+        `    flags:         \x1b[33mliveSetModel=${args.allowLiveSetModel ? 'sim' : 'nao'} · newSession=${args.allowNewSession ? 'sim' : 'nao'} · localPrivate=${args.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
+    );
+    println(`    preview:       \x1b[33maction=${decision.action} · route=${decision.selectedRouteKey ?? '-'} · ok=${decision.ok ? 'sim' : 'nao'}\x1b[0m`);
+    println(`    resumo:        \x1b[90m${decision.operatorSummary}\x1b[0m`);
+    println('    env sugerido:');
+    for (const line of exports) {
+        println(`      \x1b[90mexport ${line}\x1b[0m`);
+    }
+    println('    proximo:       \x1b[90mreinicie o terminal ou exporte as variaveis antes de iniciar a proxima sessao\x1b[0m\n');
+}
+
+/**
+ * @param {string[]} rest
+ * @returns {number}
+ */
+function parseByokGatewayAutoHistoryLimit(rest) {
+    const numeric = rest.map((item) => Number(item)).find((value) => Number.isFinite(value) && value > 0);
+    return Math.min(Math.max(Math.floor(numeric ?? 10), 1), 50);
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayAutoHistory(println, rest) {
+    const limit = parseByokGatewayAutoHistoryLimit(rest);
+    const rows = await new SqliteModelGatewayCatalogStore().readAutomationDecisionRecords({ limit });
+    println('\n  \x1b[36mBYOK model-gateway auto history\x1b[0m');
+    if (rows.length === 0) {
+        println('  \x1b[90mNenhuma decisão auto persistida ainda. Use /byok auto record profile:<id> para gravar uma trilha.\x1b[0m\n');
+        return;
+    }
+    rows.slice(0, limit).forEach((row, index) => {
+        const decidedAt = optionalScalarString(row['timestamp']) ?? optionalScalarString(row['generatedAt']) ?? '-';
+        const action = optionalScalarString(row['action']) ?? '-';
+        const route = optionalScalarString(row['selectedRouteKey']) ?? '-';
+        const profile = optionalScalarString(row['routeProfile']) ?? '-';
+        const ok = row['ok'] === true ? 'ok' : row['ok'] === false ? 'blocked' : optionalScalarString(row['status']) ?? '-';
+        println(`    ${index + 1}. \x1b[33m${action}\x1b[0m route=${route} profile=${profile} status=${ok} at=${decidedAt}`);
+    });
+    println('');
+}
+
+/**
+ * @param {(text: string) => void} println
  * @returns {void}
  */
 function renderByokGatewayAutoOff(println) {
@@ -4271,6 +4337,14 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             renderByokGatewayAutoOff(println);
             return;
         }
+        if (rest.some((item) => /^(on|enable|enabled|ligar)$/iu.test(item))) {
+            await renderByokGatewayAutoOn(println, rest);
+            return;
+        }
+        if (rest.some((item) => /^(history|historico|histórico|decisions|ledger)$/iu.test(item))) {
+            await renderByokGatewayAutoHistory(println, rest);
+            return;
+        }
         await renderByokGatewayAutoStatus(println, rest, {
             apply: rest.some((item) => /^(apply|aplicar|execute|executar)$/iu.test(item)),
             persist: rest.some((item) => /^(record|write|persist|gravar|registrar)$/iu.test(item)),
@@ -4283,6 +4357,14 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             const autoRest = rest.slice(1);
             if (autoRest.some((item) => /^(off|disable|disabled|desligar)$/iu.test(item))) {
                 renderByokGatewayAutoOff(println);
+                return;
+            }
+            if (autoRest.some((item) => /^(on|enable|enabled|ligar)$/iu.test(item))) {
+                await renderByokGatewayAutoOn(println, autoRest);
+                return;
+            }
+            if (autoRest.some((item) => /^(history|historico|histórico|decisions|ledger)$/iu.test(item))) {
+                await renderByokGatewayAutoHistory(println, autoRest);
                 return;
             }
             await renderByokGatewayAutoStatus(println, autoRest, {

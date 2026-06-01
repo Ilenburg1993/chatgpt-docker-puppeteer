@@ -983,6 +983,17 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                 ),
                 writeRouteDecisionEvents: vi.fn(() => Promise.resolve()),
                 writeAutomationDecisionRecords: vi.fn(() => Promise.resolve({ automationDecisions: 1 })),
+                readAutomationDecisionRecords: vi.fn(() =>
+                    Promise.resolve([
+                        {
+                            timestamp: '2026-06-01T00:00:00.000Z',
+                            action: 'prepare_new_session',
+                            selectedRouteKey: 'zai:glm-4.5-flash',
+                            routeProfile: 'repo_agent',
+                            ok: true,
+                        },
+                    ]),
+                ),
                 readOpenAIModelCatalogList: vi.fn(() => Promise.resolve({ object: 'list', data: [] })),
                 readRuntimeHealthForModel: vi.fn(() => Promise.resolve({ health: null, probes: [] })),
             };
@@ -2795,6 +2806,19 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('Auto apply solicitou setModel vivo');
     });
 
+    it('explica auto on sem mutar env nem aplicar efeitos', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'auto on profile:repo_agent allow-live-set-model');
+
+        expect(ctx.output()).toContain('BYOK model-gateway auto on');
+        expect(ctx.output()).toContain('COPILOT_BYOK_GATEWAY_AUTO=true');
+        expect(ctx.output()).toContain('COPILOT_BYOK_GATEWAY_AUTO_PROFILES=repo_agent');
+        expect(ctx.output()).toContain('COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LIVE_SET_MODEL=true');
+        expect(setTerminalModelProjection).not.toHaveBeenCalled();
+    });
+
     it('registra decisão auto sem aplicar efeitos e explica auto off', async () => {
         mockProjection();
         const recordCtx = mockCtx();
@@ -2805,6 +2829,18 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: offCtx.println }, 'auto off');
         expect(offCtx.output()).toContain('model-gateway auto off');
         expect(offCtx.output()).toContain('COPILOT_BYOK_GATEWAY_AUTO');
+    });
+
+    it('mostra historico auto persistido sem executar efeitos', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'auto history 5');
+
+        expect(ctx.output()).toContain('BYOK model-gateway auto history');
+        expect(ctx.output()).toContain('prepare_new_session');
+        expect(ctx.output()).toContain('zai:glm-4.5-flash');
+        expect(setTerminalModelProjection).not.toHaveBeenCalled();
     });
 
     it('explica bloqueio local padrão na auditoria de seleção pré-runtime', async () => {

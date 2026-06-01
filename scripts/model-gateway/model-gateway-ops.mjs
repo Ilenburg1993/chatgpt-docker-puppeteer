@@ -89,18 +89,35 @@ function readDatabaseSummary(diagnostics) {
 
 function readReadinessSummary(readiness) {
     const json = optionalRecord(readiness.json);
-    const summary = optionalRecord(json?.['summary']);
     const selection = optionalRecord(json?.['selection']);
-    const runtimeSelector = optionalRecord(json?.['runtimeSelectorPlan']);
+    const allowProbe = optionalRecord(selection?.['allowProbe']);
+    const strictAccess = optionalRecord(selection?.['strictAccess']);
+    const runtimeSelector = optionalRecord(selection?.['runtimeSelectorPlan']);
+    const terminalRuntimeSelector = optionalRecord(selection?.['terminalLiveRuntimeSelectorPlan']);
+    const livePlan = optionalRecord(json?.['livePlan']);
+    const commandRows = Array.isArray(livePlan?.['commands']) ? livePlan['commands'] : [];
+    const profileCount =
+        optionalNumber(runtimeSelector?.['profiles']) ??
+        optionalNumber(strictAccess?.['profiles']) ??
+        optionalNumber(allowProbe?.['profiles']) ??
+        optionalNumber(runtimeSelector?.['profiles']?.['length']) ??
+        (Array.isArray(runtimeSelector?.['profiles']) ? runtimeSelector['profiles'].length : null) ??
+        (Array.isArray(strictAccess?.['profiles']) ? strictAccess['profiles'].length : null) ??
+        (Array.isArray(allowProbe?.['profiles']) ? allowProbe['profiles'].length : null);
     return {
         ok: readiness.ok && json?.['ok'] !== false,
         warnings: Array.isArray(json?.['warnings']) ? json['warnings'].length : 0,
         errors: Array.isArray(json?.['errors']) ? json['errors'].length : 0,
-        profileCount: optionalNumber(summary?.['profileCount']) ?? optionalNumber(selection?.['summary']?.['profileCount']),
+        profileCount,
         selectedProfileCount:
-            optionalNumber(summary?.['selectedProfileCount']) ?? optionalNumber(runtimeSelector?.['summary']?.['selectedProfileCount']),
-        blockedProfileCount:
-            optionalNumber(summary?.['blockedProfileCount']) ?? optionalNumber(runtimeSelector?.['summary']?.['blockedProfileCount']),
+            optionalNumber(runtimeSelector?.['selected']) ??
+            optionalNumber(strictAccess?.['selected']) ??
+            optionalNumber(allowProbe?.['selected']),
+        blockedProfileCount: optionalNumber(runtimeSelector?.['blocked']),
+        terminalSelectedProfileCount: optionalNumber(terminalRuntimeSelector?.['selected']),
+        terminalBlockedProfileCount: optionalNumber(terminalRuntimeSelector?.['blocked']),
+        livePlanCommandCount: commandRows.length,
+        livePlanExecuteNow: livePlan?.['executeNow'] === true,
     };
 }
 
@@ -159,7 +176,7 @@ if (json) {
     );
     process.stdout.write(`  db-auto: latestAction=${summary.database.latestAutomationAction ?? '-'}\n`);
     process.stdout.write(
-        `  readiness: ok=${summary.readiness.ok ? 'yes' : 'no'} selected=${summary.readiness.selectedProfileCount ?? '-'}/${summary.readiness.profileCount ?? '-'} blocked=${summary.readiness.blockedProfileCount ?? '-'} warnings=${summary.readiness.warnings}\n`,
+        `  readiness: ok=${summary.readiness.ok ? 'yes' : 'no'} selected=${summary.readiness.selectedProfileCount ?? '-'}/${summary.readiness.profileCount ?? '-'} blocked=${summary.readiness.blockedProfileCount ?? '-'} terminalSelected=${summary.readiness.terminalSelectedProfileCount ?? '-'} terminalBlocked=${summary.readiness.terminalBlockedProfileCount ?? '-'} livePlanCommands=${summary.readiness.livePlanCommandCount ?? '-'} warnings=${summary.readiness.warnings}\n`,
     );
     process.stdout.write(
         `  auto: ok=${summary.automation.ok ? 'yes' : 'no'} action=${summary.automation.action ?? '-'} route=${summary.automation.selectedRouteKey ?? '-'}\n`,

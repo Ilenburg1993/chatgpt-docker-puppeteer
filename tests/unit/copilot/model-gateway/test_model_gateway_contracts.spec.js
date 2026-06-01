@@ -4135,8 +4135,10 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-refresh-log-sqlite'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-sqlite-retention'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway commands'));
+        assert.ok(commands.some((entry) => entry.command === '/byok auto on profile:repo_agent allow-live-set-model'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto apply profile:repo_agent allow-live-set-model'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto record profile:repo_agent'));
+        assert.ok(commands.some((entry) => entry.command === '/byok auto history 10'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto off'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway prebuild'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway selection audit runtime-proof'));

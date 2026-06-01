@@ -563,6 +563,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Inspect the next model-gateway automation decision without mutating the live terminal session.',
     },
     {
+        id: 'terminal.auto-on',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto on profile:repo_agent allow-live-set-model',
+        summary: 'Show the safe persistent policy exports required to enable model-gateway automation on the next boot.',
+    },
+    {
         id: 'terminal.gateway-auto',
         phase: 'automation',
         surface: 'terminal',
@@ -582,6 +589,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok auto record profile:repo_agent',
         summary: 'Persist the current automation decision to SQLite without applying terminal effects.',
+    },
+    {
+        id: 'terminal.auto-history',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto history 10',
+        summary: 'Read the latest persisted automation decisions from SQLite without executing providers.',
     },
     {
         id: 'terminal.auto-off',
