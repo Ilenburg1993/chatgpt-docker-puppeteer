@@ -484,6 +484,9 @@ describe('terminal/dialog/engine.js — contrato', () => {
         const health = await import('../../../src/copilot/model-gateway/health/provider-health.js');
         const activity = await import('../../../src/copilot/terminal/state/activity-state.js');
 
+        const previousAuto = process.env.COPILOT_BYOK_GATEWAY_AUTO;
+        process.env.COPILOT_BYOK_GATEWAY_AUTO = 'true';
+        stdoutWriteSpy?.mockClear();
         vi.mocked(activity.recordTerminalActivity).mockClear();
         configMocks.readConfiguredByokSummary.mockReturnValue({
             enabled: true,
@@ -518,6 +521,11 @@ describe('terminal/dialog/engine.js — contrato', () => {
             'Erro no turno',
             expect.anything(),
         );
+        expect(stdoutWriteSpy?.mock.calls.map((call) => String(call[0])).join('')).toContain(
+            '/byok auto record profile:chutes-ai',
+        );
+        if (previousAuto === undefined) delete process.env.COPILOT_BYOK_GATEWAY_AUTO;
+        else process.env.COPILOT_BYOK_GATEWAY_AUTO = previousAuto;
 
         configMocks.readConfiguredByokSummary.mockReturnValue({
             enabled: false,

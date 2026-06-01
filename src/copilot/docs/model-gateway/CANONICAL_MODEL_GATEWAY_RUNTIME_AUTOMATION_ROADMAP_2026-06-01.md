@@ -304,10 +304,10 @@ Precisamos de um cockpit operacional unico:
   - [ ] se boundary diferente, avisar/planejar novo boot.
 - [ ] C.4 Post-turn:
   - [ ] se sucesso, registrar estabilidade;
-  - [ ] se falha, health ja registrado;
+  - [x] se falha, health ja registrado;
   - [ ] derivar overlay;
   - [ ] replanejar fallback;
-  - [ ] exibir next action.
+  - [x] exibir next action.
 
 ## Faixa D - Terminal UX
 

@@ -56,7 +56,11 @@ import {
     evaluateTerminalByokTurnBudget,
     readTerminalByokAdmissionMode,
 } from '../byok/index.js';
-import { classifyByokProviderFailure, recordByokProviderModelCallFailure } from '#copilot/model-gateway';
+import {
+    classifyByokProviderFailure,
+    readModelGatewayRuntimeAutomationPolicy,
+    recordByokProviderModelCallFailure,
+} from '#copilot/model-gateway';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,
@@ -276,6 +280,20 @@ function resolveByokTurnErrorDescriptor(error, byok) {
         model: byok.model ?? null,
         failure,
     };
+}
+
+/**
+ * @param {ReturnType<typeof resolveByokTurnErrorDescriptor>} byokFailure
+ * @returns {void}
+ */
+function printByokAutoAfterFailureHint(byokFailure) {
+    if (!byokFailure) return;
+    const policy = readModelGatewayRuntimeAutomationPolicy();
+    if (policy.enabled !== true) return;
+    const profile = byokFailure.profile ?? policy.profiles[0] ?? 'repo_agent';
+    println(
+        `\x1b[90m       auto: /byok auto record profile:${profile} registra a decisão pós-falha; /byok auto apply profile:${profile} aplica apenas efeitos autorizados.\x1b[0m`,
+    );
 }
 
 /**
@@ -1158,6 +1176,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 `\x1b[31m[byok] ${byokFailure.errorContext}: ${byokFailure.message} · ${byokFailure.failure.operatorLabel} · sem Premium Request\x1b[0m`,
             );
             println(`\x1b[90m       ação: ${byokFailure.failure.operatorAction}\x1b[0m`);
+            printByokAutoAfterFailureHint(byokFailure);
         } else {
             clearTerminalTurnMaterialization();
             recordTerminalActivity('error', 'Erro no turno', {
