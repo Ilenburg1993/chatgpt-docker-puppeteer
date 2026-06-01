@@ -564,6 +564,7 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             blockers: [],
             currentBoundary: { enabled: false, profile: null, preset: null, providerType: null, baseUrl: null, model: null },
             targetBoundary: { profile: input.profileId ?? 'repo_agent', preset: 'openrouter', providerType: 'openai_compatible', baseUrl: null, model: 'openai/gpt-oss-120b' },
+            nonActionReason: null,
             nextCommands: ['/session sdk next new', '/byok model openai/gpt-oss-120b'],
             operatorSummary: 'mock automation decision',
         })),
@@ -2777,6 +2778,7 @@ describe('terminal /byok command', () => {
                 baseUrl: null,
                 model: 'openai/gpt-oss-120b',
             },
+            nonActionReason: null,
             nextCommands: ['/byok model openai/gpt-oss-120b'],
             operatorSummary: 'Mesmo provider BYOK; o modelo pode ser aplicado na sessao viva.',
         });

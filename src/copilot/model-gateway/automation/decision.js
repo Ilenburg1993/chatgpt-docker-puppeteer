@@ -149,6 +149,31 @@ function chooseRoute(plan, profileId) {
 }
 
 /**
+ * @param {Record<string, unknown> | null | undefined} runtimeSelectorPlan
+ * @param {string | null | undefined} [profileId]
+ * @returns {{
+ *   schema: 'model-gateway-runtime-automation-route';
+ *   route: Record<string, unknown> | null;
+ *   routeProfile: string | null;
+ *   selectedRouteKey: string | null;
+ *   blockers: string[];
+ *   waitForReset: boolean;
+ * }}
+ */
+export function selectModelGatewayRuntimeAutomationRoute(runtimeSelectorPlan, profileId) {
+    const route = chooseRoute(record(runtimeSelectorPlan), profileId);
+    const target = targetBoundary(route);
+    return {
+        schema: 'model-gateway-runtime-automation-route',
+        route,
+        routeProfile: text(route?.['profileId']) ?? target.profile,
+        selectedRouteKey: routeKey(route),
+        blockers: routeBlockers(route),
+        waitForReset: shouldWaitForReset(route),
+    };
+}
+
+/**
  * @param {object} input
  * @param {Record<string, unknown> | null | undefined} input.runtimeSelectorPlan
  * @param {string | null | undefined} [input.profileId]
@@ -170,19 +195,21 @@ function chooseRoute(plan, profileId) {
  *   blockers: string[];
  *   currentBoundary: ReturnType<typeof liveBoundary>;
  *   targetBoundary: ReturnType<typeof targetBoundary>;
+ *   nonActionReason: string | null;
  *   nextCommands: string[];
  *   operatorSummary: string;
  * }}
  */
 export function buildModelGatewayRuntimeAutomationDecision(input) {
-    const route = chooseRoute(record(input.runtimeSelectorPlan), input.profileId);
+    const automationRoute = selectModelGatewayRuntimeAutomationRoute(input.runtimeSelectorPlan, input.profileId);
+    const route = automationRoute.route;
     const target = targetBoundary(route);
     const current = liveBoundary(input.liveByokBinding);
-    const blockers = [...routeBlockers(route), ...policyBlockers(route, input.policy ?? {})];
-    const selectedKey = routeKey(route);
-    const routeProfile = text(route?.['profileId']) ?? target.profile;
+    const blockers = [...automationRoute.blockers, ...policyBlockers(route, input.policy ?? {})];
+    const selectedKey = automationRoute.selectedRouteKey;
+    const routeProfile = automationRoute.routeProfile;
     if (blockers.length > 0) {
-        const wait = shouldWaitForReset(route);
+        const wait = automationRoute.waitForReset;
         return {
             schema: 'model-gateway-runtime-automation-decision',
             ok: false,
@@ -195,6 +222,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             blockers,
             currentBoundary: current,
             targetBoundary: target,
+            nonActionReason: wait ? 'route_wait_for_reset' : 'route_blocked',
             nextCommands: wait ? ['npm run model-gateway:runtime-health:diff', 'npm run model-gateway:runtime-selector -- --fail'] : ['npm run model-gateway:selection:audit -- --strict'],
             operatorSummary: wait
                 ? 'Rota bloqueada por health/cooldown; aguarde reset ou escolha outra rota.'
@@ -216,6 +244,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             blockers: [],
             currentBoundary: current,
             targetBoundary: target,
+            nonActionReason: null,
             nextCommands: ['/session sdk next new', target.model ? `/byok model ${target.model}` : '/byok auto apply'],
             operatorSummary: 'Sem sessao viva; a rota selecionada pode ser preparada para o proximo boot.',
         };
@@ -233,6 +262,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             blockers: [],
             currentBoundary: current,
             targetBoundary: target,
+            nonActionReason: 'already_aligned',
             nextCommands: ['continue_terminal_turn'],
             operatorSummary: 'Sessao viva ja esta alinhada com a rota selecionada.',
         };
@@ -250,6 +280,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             blockers: [],
             currentBoundary: current,
             targetBoundary: target,
+            nonActionReason: null,
             nextCommands: target.model ? [`/byok model ${target.model}`] : ['/byok auto apply'],
             operatorSummary: 'Mesmo provider BYOK; o modelo pode ser aplicado na sessao viva.',
         };
@@ -267,6 +298,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
         blockers: requiresNewSession && input.policy?.allowNewSession !== true ? ['new_session_requires_explicit_policy'] : [],
         currentBoundary: current,
         targetBoundary: target,
+        nonActionReason: requiresNewSession ? 'new_session_policy_required' : 'live_set_model_policy_disabled',
         nextCommands: requiresNewSession
             ? ['/session sdk next new', target.model ? `/byok model ${target.model}` : '/byok auto apply']
             : ['/byok auto status'],

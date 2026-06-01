@@ -13,6 +13,7 @@ export {
     buildModelGatewayRuntimeAutomationControllerStep,
     buildModelGatewayRuntimeAutomationDecision,
     readModelGatewayRuntimeAutomationPolicy,
+    selectModelGatewayRuntimeAutomationRoute,
 } from './automation/index.js';
 
 export {

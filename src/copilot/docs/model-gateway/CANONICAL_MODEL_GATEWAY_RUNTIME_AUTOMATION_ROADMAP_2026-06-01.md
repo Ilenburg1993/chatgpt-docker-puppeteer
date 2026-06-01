@@ -367,8 +367,8 @@ Precisamos de um cockpit operacional unico:
 - [x] I.2 Runtime selector execute bounded.
 - [x] I.3 Fallback bounded por provider.
 - [x] I.4 Preferred probes live.
-- [ ] I.5 Expor helper puro para "melhor rota para automacao".
-- [ ] I.6 Retornar motivo de nao acao quando plan ok mas terminal nao pode aplicar.
+- [x] I.5 Expor helper puro para "melhor rota para automacao".
+- [x] I.6 Retornar motivo de nao acao quando plan ok mas terminal nao pode aplicar.
 
 ## Faixa J - Comandos Canonicos Para Operador
 

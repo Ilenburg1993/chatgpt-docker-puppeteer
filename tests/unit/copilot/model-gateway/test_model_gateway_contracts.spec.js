@@ -61,6 +61,7 @@ import {
     persistModelGatewaySelectionDecisionTrace,
     readModelGatewaySelectionDecisionTrace,
     resolveModelGatewaySelectionPolicy,
+    selectModelGatewayRuntimeAutomationRoute,
     selectModelGatewayRuntimeRoute,
     createModelRecord,
     createEnvSecretRegistry,
@@ -1246,6 +1247,10 @@ describe('model-gateway foundation', () => {
         );
         assert.equal(runtimeSelectorPlan.routes[0].selected?.['scoreBreakdown']?.['finalScore'], runtimeSelectorPlan.routes[0].selected?.['score']);
         assert.equal(selectModelGatewayRuntimeRoute(runtimeSelectorPlan, 'repo_agent')?.selectedRouteKey, 'openrouter:openai/gpt-oss-120b');
+        const automationRoute = selectModelGatewayRuntimeAutomationRoute(runtimeSelectorPlan, 'repo_agent');
+        assert.equal(automationRoute.schema, 'model-gateway-runtime-automation-route');
+        assert.equal(automationRoute.selectedRouteKey, 'openrouter:openai/gpt-oss-120b');
+        assert.deepEqual(automationRoute.blockers, []);
 
         const strictRuntimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(requireRuntimeProof, {
             requireRuntimeProof: true,
@@ -1270,6 +1275,7 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(keepDecision.action, 'keep_current');
         assert.equal(keepDecision.ok, true);
+        assert.equal(keepDecision.nonActionReason, 'already_aligned');
         const autoPolicy = readModelGatewayRuntimeAutomationPolicy({
             COPILOT_BYOK_GATEWAY_AUTO: 'true',
             COPILOT_BYOK_GATEWAY_AUTO_POLICY: 'prefer_runtime_proved',
@@ -1338,6 +1344,7 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(newSessionDecision.action, 'manual_intervention');
         assert.equal(newSessionDecision.requiresNewSession, true);
+        assert.equal(newSessionDecision.nonActionReason, 'new_session_policy_required');
         assert.equal(newSessionDecision.blockers.includes('new_session_requires_explicit_policy'), true);
         const newSessionControllerStep = buildModelGatewayRuntimeAutomationControllerStep({
             phase: 'pre_turn',
@@ -1421,6 +1428,7 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(rateLimitResetDecision.ok, false);
         assert.equal(rateLimitResetDecision.action, 'wait_for_reset');
+        assert.equal(rateLimitResetDecision.nonActionReason, 'route_wait_for_reset');
         assert.equal(rateLimitResetDecision.nextCommands.includes('npm run model-gateway:runtime-health:diff'), true);
 
         const routeProbeEnv = buildModelGatewayRuntimeSelectorProbeEnv(runtimeSelectorPlan.routes[0].selected, {
