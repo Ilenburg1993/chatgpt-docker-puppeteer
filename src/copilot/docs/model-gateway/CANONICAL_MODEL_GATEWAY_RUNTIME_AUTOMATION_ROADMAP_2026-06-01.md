@@ -100,7 +100,7 @@ O objetivo e transformar o model-gateway em um sistema operacional completo para
 - [x] `model-gateway:sqlite:diagnostics` passa.
 - [x] `model-gateway:live:readiness` passa.
 - [x] `model-gateway:live:plan --no-write` passa.
-- [ ] Ainda falta comando canonico para explicar "estado operacional completo" em uma tela.
+- [x] Existe comando canonico para explicar "estado operacional completo" em uma tela.
 - [x] Existe comando canonico para o futuro modo auto sem executar provider por acidente.
 
 ## 3. Arquitetura Ideal
@@ -234,7 +234,7 @@ Mas o sistema automatico precisa consumir isso como contrato, nao como texto.
 
 ### Gap 5: Comandos canônicos ainda sao muitos
 
-Ha 95 comandos no inventory.
+Ha 103 comandos no inventory.
 
 Precisamos de um cockpit operacional unico:
 
@@ -333,7 +333,7 @@ Precisamos de um cockpit operacional unico:
 - [x] E.4 Migrar runner llm-b para chamar runtime selector novo.
 - [x] E.5 Criar `model-gateway:auto:status`.
 - [x] E.6 Criar `model-gateway:auto:plan`.
-- [ ] E.7 Criar `model-gateway:ops`.
+- [x] E.7 Criar `model-gateway:ops`.
 
 ## Faixa F - Persistencia E Observabilidade
 
@@ -375,10 +375,10 @@ Precisamos de um cockpit operacional unico:
 - [x] J.1 `model-gateway:commands`.
 - [x] J.2 `model-gateway:live:readiness`.
 - [x] J.3 `model-gateway:live:plan`.
-- [ ] J.4 `model-gateway:ops`.
+- [x] J.4 `model-gateway:ops`.
 - [x] J.5 `model-gateway:auto:status`.
 - [x] J.6 `model-gateway:auto:plan`.
-- [ ] J.7 Makefile targets correspondentes.
+- [x] J.7 Makefile targets correspondentes.
 
 ## Faixa K - Testes Live LLM-B
 

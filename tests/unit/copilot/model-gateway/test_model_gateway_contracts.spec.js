@@ -4058,6 +4058,7 @@ describe('model-gateway foundation', () => {
         const terminalLines = renderModelGatewayCanonicalCommandLines({ surface: 'terminal' });
 
         assert.ok(commands.length >= 20);
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:ops'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:prebuild'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:build'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build:plan'));
@@ -4094,6 +4095,7 @@ describe('model-gateway foundation', () => {
         );
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:runtime-health:mirror'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-ops'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-build'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-effective-selection-trace'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-selection-trace-diff'));

@@ -12,6 +12,7 @@ export const MODEL_GATEWAY_SCRIPT_PATHS = Object.freeze({
     livePlan: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-live-plan.mjs'),
     liveReadiness: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-live-readiness.mjs'),
     metadataBuild: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-metadata-build.mjs'),
+    ops: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-ops.mjs'),
     redactionAudit: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-redaction-audit.mjs'),
     refresh: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-refresh.mjs'),
     refreshLog: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-refresh-log.mjs'),

@@ -38,6 +38,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Emit the canonical command inventory as JSON.',
     },
     {
+        id: 'ops.status',
+        phase: 'orientation',
+        surface: 'package',
+        command: 'npm run model-gateway:ops',
+        summary: 'Show one read-only operational cockpit for database, readiness, automation and command inventory.',
+    },
+    {
         id: 'lint.scoped',
         phase: 'validate',
         surface: 'package',
@@ -337,6 +344,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-commands',
         summary: 'Makefile alias for the canonical command inventory.',
+    },
+    {
+        id: 'make.ops',
+        phase: 'orientation',
+        surface: 'make',
+        command: 'make model-gateway-ops',
+        summary: 'Makefile alias for the read-only model-gateway operational cockpit.',
     },
     {
         id: 'make.validate',

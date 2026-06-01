@@ -456,6 +456,7 @@
     "mcp-server": "npm run start",
     "model-gateway:commands": "node scripts/model-gateway/model-gateway-canonical-commands.mjs",
     "model-gateway:commands:json": "node scripts/model-gateway/model-gateway-canonical-commands.mjs --json",
+    "model-gateway:ops": "node scripts/model-gateway/model-gateway-ops.mjs --json",
     "model-gateway:build": "npm run model-gateway:prebuild && npm run model-gateway:metadata:build",
     "model-gateway:lint": "node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/model-gateway src/copilot/terminal/commands/byok.js tests/unit/copilot/model-gateway tests/unit/copilot/terminal/test_commands_byok.spec.js --cache --cache-location /home/node/.cache/eslint/.eslintcache",
     "model-gateway:metadata:build": "node scripts/model-gateway/model-gateway-metadata-build.mjs --commit --all --force",

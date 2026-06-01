@@ -1519,6 +1519,9 @@ model-gateway-auto-status:
 model-gateway-auto-plan:
 	@$(NPM) run model-gateway:auto:plan
 
+model-gateway-ops:
+	@$(NPM) run model-gateway:ops
+
 model-gateway-runtime-health-diff:
 	@$(NPM) run model-gateway:runtime-health:diff
 
