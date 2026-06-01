@@ -4158,6 +4158,9 @@ describe('model-gateway foundation', () => {
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:selection:trace-retention'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:ready'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:doctor'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:explain'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:handoffs'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:confirmations'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:plan'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000'));
         assert.ok(
@@ -4182,6 +4185,9 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-runtime-health-mirror'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-auto-ready'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-auto-doctor'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-auto-explain'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-auto-handoffs'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-auto-confirmations'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:refresh:log:sqlite -- --json'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:sqlite:retention -- --json'));
         assert.ok(commands.some((entry) => entry.command === 'npm run model-gateway:sqlite:retention:apply -- --json'));
@@ -4211,6 +4217,11 @@ describe('model-gateway foundation', () => {
         assert.equal(modelGatewayScriptPath('llmBLiveTest'), COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH);
         assert.ok(modelGatewayScriptPath('autoReady').endsWith('scripts/model-gateway/model-gateway-auto-ready.mjs'));
         assert.ok(modelGatewayScriptPath('autoDoctor').endsWith('scripts/model-gateway/model-gateway-auto-doctor.mjs'));
+        assert.ok(modelGatewayScriptPath('autoExplain').endsWith('scripts/model-gateway/model-gateway-auto-explain.mjs'));
+        assert.ok(modelGatewayScriptPath('autoHandoffs').endsWith('scripts/model-gateway/model-gateway-auto-handoffs.mjs'));
+        assert.ok(
+            modelGatewayScriptPath('autoConfirmations').endsWith('scripts/model-gateway/model-gateway-auto-confirmations.mjs'),
+        );
         assert.ok(COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH.endsWith('scripts/model-gateway/model-gateway-terminal-llm-b-live-test.mjs'));
         assert.ok(Object.values(MODEL_GATEWAY_SCRIPT_PATHS).every((scriptPath) => scriptPath.includes('/scripts/model-gateway/')));
         assert.ok(!Object.values(MODEL_GATEWAY_SCRIPT_PATHS).some((scriptPath) => scriptPath.includes('/scripts/copilot/')));

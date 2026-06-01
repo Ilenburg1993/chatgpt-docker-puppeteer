@@ -46,10 +46,10 @@ O guia anterior continua como historico:
 - [x] `model-gateway:auto:doctor` existe.
 - [x] `Makefile` tem aliases para os comandos auto.
 - [x] Inventario canonico lista package, make e terminal.
-- [ ] Falta `model-gateway:auto:explain`.
+- [x] `model-gateway:auto:explain`.
 - [ ] Falta `model-gateway:auto:scenarios`.
-- [ ] Falta `model-gateway:auto:handoffs`.
-- [ ] Falta `model-gateway:auto:confirmations`.
+- [x] `model-gateway:auto:handoffs`.
+- [x] `model-gateway:auto:confirmations`.
 
 ### 2.3 Terminal
 
@@ -199,9 +199,9 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] A.4 Package scripts para ready/doctor.
 - [x] A.5 Makefile para ready/doctor.
 - [x] A.6 README de scripts atualizado.
-- [ ] A.7 `model-gateway:auto:explain`.
-- [ ] A.8 `model-gateway:auto:handoffs`.
-- [ ] A.9 `model-gateway:auto:confirmations`.
+- [x] A.7 `model-gateway:auto:explain`.
+- [x] A.8 `model-gateway:auto:handoffs`.
+- [x] A.9 `model-gateway:auto:confirmations`.
 - [ ] A.10 `model-gateway:auto:scenarios`.
 
 ### Faixa B - Policy Explicavel
