@@ -11715,6 +11715,48 @@ Impacto:
 - a ponte `policy engine -> selection audit -> runtime selector -> live plan` preserva explicabilidade;
 - futuras regressions de ranking ficam mais faceis de diagnosticar.
 
+## 21.137. Mudanca 137 - Route decision ledger preserva razoes e score do runtime selector
+
+Data: 2026-06-01.
+
+Problema:
+
+- `runtimeSelectorPlan.routes[].selected` passou a preservar `reasons` e `scoreBreakdown`;
+- mas os eventos persistidos em route decision ainda podiam perder parte dessa explicabilidade;
+- eventos de pre-decision e outcome registravam razoes genericas do seletor, sem carregar integralmente os sinais do
+  candidato quando eles estavam disponiveis;
+- o truncamento de razoes tambem era agressivo demais para uma decisao com muitos sinais de policy/health/probe.
+
+Correcao:
+
+- `buildRouteDecisionEvent()` agora preserva `scoreBreakdown` sanitizado no payload do evento;
+- o limite de `reasons` do evento subiu de 8 para 24 itens;
+- `buildSelectorDecisionEvent()` passa `scoreBreakdown` e combina:
+  - razoes do candidato;
+  - razoes de origem da selecao;
+  - prova runtime presente/ausente;
+- `buildRuntimeOutcomeDecisionEvent()` combina:
+  - razoes do candidato;
+  - razoes da rota;
+  - `runtime_outcome:ok` ou `runtime_outcome:failed`.
+
+Evidencia:
+
+- `node --check src/copilot/model-gateway/observability/events.js`;
+- `node --check src/copilot/model-gateway/routing/runtime-selector.js`;
+- `npx eslint src/copilot/model-gateway/observability/events.js src/copilot/model-gateway/routing/runtime-selector.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`;
+- `npx vitest run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "audits pre-runtime selection across task profiles|records route decisions as a sanitized usage ledger event"`;
+- resultado:
+  - `2 passed`;
+  - `212 skipped`.
+
+Impacto:
+
+- o ledger SQLite de decisoes passa a explicar melhor por que a rota foi escolhida;
+- pre-decision e runtime-result ficam correlacionaveis sem perder sinais de score;
+- auditorias futuras conseguem diferenciar problema de policy, health, probe e outcome sem depender apenas do JSON
+  temporario do runtime selector.
+
 ## 22. Fim Do Documento Inicial
 
 Este arquivo e a nova referencia de continuidade.

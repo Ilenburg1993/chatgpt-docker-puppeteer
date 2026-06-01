@@ -1,5 +1,5 @@
 // @ts-check
-import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { calculateJwkThumbprint, createRemoteJWKSet, importJWK, jwtVerify } from 'jose';
 import { timingSafeEqual } from 'node:crypto';
 
 /**
@@ -7,7 +7,7 @@ import { timingSafeEqual } from 'node:crypto';
  *
  * This module is intentionally transport-neutral: HTTP adapters decide when to emit HTTP 401 challenges, while the MCP
  * registry uses this module to decide whether each tool call is allowed and which `_meta["mcp/www_authenticate"]`
- * challenge ChatGPT should receive. The implementation is aligned with the MCP Authorization 2025-06-18 profile, RFC
+ * challenge ChatGPT should receive. The implementation is aligned with the MCP Authorization 2025-11-25 profile, RFC
  * 9728 Protected Resource Metadata, OpenAI Apps SDK authentication guidance, and the local built-in dev OAuth issuer.
  *
  * @module copilot/mcp/control-plane/auth
@@ -38,6 +38,9 @@ import { timingSafeEqual } from 'node:crypto';
  * @property {string} jwksUri
  * @property {string[]} jwtAlgorithms
  * @property {string[]} bearerMethodsSupported
+ * @property {string[]} tokenEndpointAuthMethodsSupported
+ * @property {string} implementationName
+ * @property {string} implementationVersion
  * @property {boolean} staticBearerConfigured
  * @property {boolean} staticBearerEnabled
  * @property {boolean} requireResourceClaim
@@ -46,6 +49,8 @@ import { timingSafeEqual } from 'node:crypto';
  * @typedef {object} McpAuthContext
  * @property {string | undefined} bearerToken
  * @property {Record<string, string | string[] | undefined>} [headers]
+ * @property {string} [method]
+ * @property {string} [url]
  *
  * @typedef {object} McpAuthorizationDecision
  * @property {boolean} allowed
@@ -66,6 +71,16 @@ export const MCP_AUTH_SCOPES = /** @type {const} */ ({
     admin: 'repo:admin',
 });
 
+export const MCP_AUTH_IMPLEMENTATION_VERSION = '1.3.0';
+export const MCP_AUTH_IMPLEMENTATION_NAME = 'copilot-mcp-auth';
+
+/**
+ * ChatGPT Apps SDK and the MCP 2025-11-25 authorization profile both require the resource server to advertise and
+ * enforce OAuth in a way that is compatible with CIMD, DCR, PKCE and Resource Indicators. These token-endpoint methods
+ * mirror the built-in dev issuer and are also surfaced as a compatibility hint in PRM.
+ */
+const DEFAULT_TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED = /** @type {const} */ (['none', 'private_key_jwt']);
+
 const DEFAULT_RESOURCE = 'https://mcp.aurelin.org';
 const DEFAULT_RESOURCE_NAME = 'Copilot Workspace MCP';
 const DEFAULT_RESOURCE_DOCUMENTATION = 'https://developers.openai.com/apps-sdk/build/auth';
@@ -81,13 +96,24 @@ const MAX_URL_LENGTH = 2048;
 const JWKS_TIMEOUT_MS = 5000;
 const JWKS_CACHE_MAX_AGE_MS = 10 * 60 * 1000;
 const JWKS_COOLDOWN_MS = 30 * 1000;
+const JWT_CLOCK_TOLERANCE_SECONDS = 60;
+const MAX_TOKEN_AGE_SECONDS = 24 * 60 * 60;
 const DEFAULT_JWT_ALGORITHMS = /** @type {const} */ (['RS256', 'ES256']);
 const HEADER_BEARER_METHODS = /** @type {const} */ (['header']);
+const DPOP_SIGNING_ALGORITHMS = /** @type {const} */ (['ES256', 'RS256']);
+const DPOP_MAX_TTL_SECONDS = 5 * 60;
+const DPOP_CLOCK_TOLERANCE_SECONDS = 30;
+const DPOP_REPLAY_CACHE_MAX_ENTRIES = 2000;
+const MAX_DPOP_PROOF_LENGTH = 16 * 1024;
+const MAX_DPOP_JTI_LENGTH = 256;
 
 /** @type {Map<string, ReturnType<typeof createRemoteJWKSet>>} */
 const REMOTE_JWKS_CACHE = new Map();
 
-const PUBLIC_OAUTH_DIAGNOSTIC_TOOLS = new Set(['mcp_oauth_friction_audit']);
+/** @type {Map<string, number>} */
+const DPOP_REPLAY_CACHE = new Map();
+
+const PUBLIC_OAUTH_DIAGNOSTIC_TOOLS = new Set(['mcp_oauth_friction_audit', 'mcp_oauth_issuer_diagnostics']);
 
 const ADMIN_TOOL_NAMES = new Set([
     'job_cancel',
@@ -102,7 +128,7 @@ const ADMIN_TOOL_NAMES = new Set([
  * @returns {boolean}
  */
 function publicOauthDiagnosticsEnabled(env = process.env) {
-    return readBooleanEnv(env, 'COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS', false);
+    return readBooleanEnv(env, 'COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS', true);
 }
 
 /**
@@ -183,7 +209,10 @@ export function readMcpAuthConfig(env = process.env) {
     const jwksUri = normalizeMetadataUrl(env['COPILOT_MCP_OAUTH_JWKS_URI'], defaultJwksUri, {
         allowHttpLocalhost: true,
     });
-    const staticBearerEnabled = readBooleanEnv(env, 'COPILOT_MCP_STATIC_BEARER_TOKEN_ENABLED', true);
+    const staticBearerEnabled = readBooleanEnv(env, 'COPILOT_MCP_STATIC_BEARER_TOKEN_ENABLED', false);
+    const tokenEndpointAuthMethodsSupported = normalizeTokenEndpointAuthMethods(
+        env['COPILOT_MCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED'],
+    );
     return {
         mode,
         resource,
@@ -215,9 +244,12 @@ export function readMcpAuthConfig(env = process.env) {
         jwksUri,
         jwtAlgorithms: normalizeJwtAlgorithms(env['COPILOT_MCP_OAUTH_JWT_ALGORITHMS']),
         bearerMethodsSupported: [...HEADER_BEARER_METHODS],
+        tokenEndpointAuthMethodsSupported,
+        implementationName: MCP_AUTH_IMPLEMENTATION_NAME,
+        implementationVersion: MCP_AUTH_IMPLEMENTATION_VERSION,
         staticBearerConfigured: readStaticBearerToken(env) !== undefined,
         staticBearerEnabled,
-        requireResourceClaim: readBooleanEnv(env, 'COPILOT_MCP_OAUTH_REQUIRE_RESOURCE_CLAIM', false),
+        requireResourceClaim: readBooleanEnv(env, 'COPILOT_MCP_OAUTH_REQUIRE_RESOURCE_CLAIM', true),
         publicOauthDiagnosticsEnabled: publicOauthDiagnosticsEnabled(env),
     };
 }
@@ -391,6 +423,18 @@ function normalizeJwtAlgorithms(value) {
 }
 
 /**
+ * @param {string | undefined} value
+ * @returns {string[]}
+ */
+function normalizeTokenEndpointAuthMethods(value) {
+    const allowed = new Set(['none', 'private_key_jwt', 'client_secret_basic', 'client_secret_post']);
+    const configured = splitCsv(value, 8)
+        .map((item) => item.toLowerCase())
+        .filter((item) => allowed.has(item));
+    return configured.length > 0 ? uniqueStrings(configured, 8) : [...DEFAULT_TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED];
+}
+
+/**
  * @param {unknown} value
  * @param {string} fallback
  * @returns {string}
@@ -411,7 +455,19 @@ function buildAcceptedAudiences(expectedAudience, resource, env = process.env) {
     const configured = splitCsv(env['COPILOT_MCP_OAUTH_ACCEPTED_AUDIENCES'], MAX_AUDIENCES).map((audience) =>
         normalizeAudience(audience, ''),
     );
-    return uniqueStrings([expectedAudience, resource, `${resource}/mcp`, ...configured].filter(Boolean), MAX_AUDIENCES);
+    const base = uniqueStrings(
+        [expectedAudience, resource, `${resource}/mcp`, ...configured].filter(Boolean),
+        MAX_AUDIENCES,
+    );
+    const withSlashVariants = [];
+    for (const audience of base) {
+        withSlashVariants.push(audience);
+        if (audience.startsWith('https://') || audience.startsWith('http://')) {
+            withSlashVariants.push(audience.replace(/\/+$/u, ''));
+            withSlashVariants.push(`${audience.replace(/\/+$/u, '')}/`);
+        }
+    }
+    return uniqueStrings(withSlashVariants.filter(Boolean), MAX_AUDIENCES);
 }
 
 /**
@@ -501,9 +557,11 @@ export function buildProtectedResourceMetadata(config = readMcpAuthConfig(), opt
         resource_documentation: config.resourceDocumentation,
         ...(config.resourcePolicyUri ? { resource_policy_uri: config.resourcePolicyUri } : {}),
         ...(config.resourceTermsOfServiceUri ? { resource_tos_uri: config.resourceTermsOfServiceUri } : {}),
-        // Non-standard compatibility hint retained for existing diagnostics. Authorization server metadata remains the
-        // canonical place for this value, but RFC 9728 allows unrecognized metadata parameters to be ignored.
-        token_endpoint_auth_methods_supported: ['none'],
+        // Non-standard compatibility hints retained for ChatGPT/MCP diagnostics. Authorization server metadata remains
+        // canonical for token endpoint client authentication; RFC 9728 clients ignore unknown metadata safely.
+        token_endpoint_auth_methods_supported: [...config.tokenEndpointAuthMethodsSupported],
+        mcp_auth_implementation: config.implementationName,
+        mcp_auth_implementation_version: config.implementationVersion,
     });
 }
 
@@ -511,6 +569,21 @@ export function buildProtectedResourceMetadata(config = readMcpAuthConfig(), opt
  * @param {Record<string, unknown>} metadata
  * @returns {Record<string, unknown>}
  */
+
+/**
+ * @param {string} resource
+ * @param {McpAuthConfig} [config]
+ * @returns {string}
+ */
+export function protectedResourceMetadataUrlForResource(resource, config = readMcpAuthConfig()) {
+    const normalized = normalizeResourceIdentifier(resource, config.resource, {
+        allowHttpLocalhost: true,
+        allowedPaths: ['', '/mcp'],
+    });
+    const base = config.protectedResourceMetadataUrl.replace(/\/+$/u, '');
+    return normalized.endsWith('/mcp') ? `${base}/mcp` : base;
+}
+
 function omitEmptyMetadata(metadata) {
     /** @type {Record<string, unknown>} */
     const output = {};
@@ -537,7 +610,11 @@ export function buildWwwAuthenticateChallenge(scopes, config = readMcpAuthConfig
     const error = normalizeChallengeToken(options.error);
     const errorDescription = normalizeChallengeText(options.errorDescription);
     const realm = normalizeChallengeText(options.realm ?? config.resource);
-    const resourceMetadataUrl = normalizeMetadataUrl(options.resourceMetadataUrl, config.protectedResourceMetadataUrl, {
+    const defaultResourceMetadataUrl = protectedResourceMetadataUrlForResource(
+        options.realm ?? config.expectedAudience,
+        config,
+    );
+    const resourceMetadataUrl = normalizeMetadataUrl(options.resourceMetadataUrl, defaultResourceMetadataUrl, {
         allowHttpLocalhost: true,
     });
     const params = [
@@ -638,6 +715,18 @@ function normalizeAudienceClaim(value) {
 }
 
 /**
+ * @param {string} value
+ * @param {string[]} accepted
+ * @returns {boolean}
+ */
+function audienceMatchesAnyAccepted(value, accepted) {
+    const normalized = normalizeAudience(value, '');
+    if (!normalized) return false;
+    const variants = new Set([normalized, normalized.replace(/\/+$/u, ''), `${normalized.replace(/\/+$/u, '')}/`]);
+    return accepted.some((audience) => variants.has(audience) || variants.has(audience.replace(/\/+$/u, '')));
+}
+
+/**
  * @param {unknown} error
  * @returns {{ code: string; message: string; hint: string; wwwAuthenticateError: string; errorDescription: string }}
  */
@@ -647,6 +736,15 @@ function classifyBearerVerificationError(error) {
     const name = error instanceof Error ? error.name : '';
     const message = error instanceof Error ? error.message : String(error);
     const normalized = `${joseCode} ${name} ${message}`.toLowerCase();
+    if (normalized.includes('max token age') || normalized.includes('iat')) {
+        return {
+            code: 'MCP_AUTH_TOKEN_TOO_OLD',
+            message: 'Bearer token is too old or has an invalid issued-at time.',
+            hint: message,
+            wwwAuthenticateError: 'invalid_token',
+            errorDescription: 'Bearer token is too old or has an invalid issued-at time; reauthorize.',
+        };
+    }
     if (normalized.includes('expired')) {
         return {
             code: 'MCP_AUTH_TOKEN_EXPIRED',
@@ -757,6 +855,164 @@ function pruneRemoteJwksCache() {
  */
 export function resetMcpAuthRuntimeForTests() {
     REMOTE_JWKS_CACHE.clear();
+    DPOP_REPLAY_CACHE.clear();
+}
+
+/**
+ * @param {import('jose').JWTPayload} payload
+ * @param {McpAuthContext} context
+ * @param {McpAuthScope[]} requiredScopes
+ * @param {McpAuthConfig} config
+ * @returns {Promise<McpAuthorizationDecision | undefined>}
+ */
+async function validateDpopConfirmationForResource(payload, context, requiredScopes, config) {
+    const cnf = payload['cnf'];
+    const expectedJkt =
+        cnf && typeof cnf === 'object' && !Array.isArray(cnf)
+            ? String(/** @type {Record<string, unknown>} */ (cnf)['jkt'] ?? '')
+            : '';
+    if (!expectedJkt) return undefined;
+    const proof = firstAuthContextHeader(context.headers, 'dpop');
+    if (!proof) {
+        return authInvalidTokenDecision(
+            requiredScopes,
+            config,
+            'DPoP-bound access token requires a DPoP proof.',
+            'MCP_AUTH_DPOP_REQUIRED',
+        );
+    }
+    const verified = await verifyResourceDpopProof(proof, expectedJkt, context);
+    if (verified.ok) return undefined;
+    return authInvalidTokenDecision(requiredScopes, config, verified.error, 'MCP_AUTH_DPOP_INVALID');
+}
+
+/**
+ * @param {string | undefined} proof
+ * @param {string} expectedJkt
+ * @param {McpAuthContext} context
+ * @returns {Promise<{ ok: true } | { ok: false; error: string }>}
+ */
+async function verifyResourceDpopProof(proof, expectedJkt, context) {
+    if (!proof || proof.length > MAX_DPOP_PROOF_LENGTH || hasAsciiControlChars(proof)) {
+        return { ok: false, error: 'DPoP proof is missing or too large.' };
+    }
+    try {
+        const header = decodeJwtHeader(proof);
+        const jwk = header['jwk'];
+        const alg = String(header['alg'] ?? '');
+        if (!DPOP_SIGNING_ALGORITHMS.includes(/** @type {'ES256' | 'RS256'} */ (alg))) {
+            return { ok: false, error: 'DPoP proof uses an unsupported signing algorithm.' };
+        }
+        if (!jwk || typeof jwk !== 'object' || Array.isArray(jwk)) {
+            return { ok: false, error: 'DPoP proof is missing an embedded public JWK.' };
+        }
+        if (hasPrivateJwkFields(/** @type {Record<string, unknown>} */ (jwk))) {
+            return { ok: false, error: 'DPoP proof JWK must be public.' };
+        }
+        const publicJwk = /** @type {Record<string, unknown>} */ ({ ...jwk });
+        for (const privateField of ['d', 'p', 'q', 'dp', 'dq', 'qi', 'oth']) delete publicJwk[privateField];
+        const jkt = await calculateJwkThumbprint(publicJwk);
+        if (jkt !== expectedJkt)
+            return { ok: false, error: 'DPoP proof key thumbprint does not match the access token cnf claim.' };
+        const key = await importJWK(publicJwk, alg);
+        const verified = await jwtVerify(proof, key, {
+            algorithms: [...DPOP_SIGNING_ALGORITHMS],
+            clockTolerance: DPOP_CLOCK_TOLERANCE_SECONDS,
+            maxTokenAge: `${DPOP_MAX_TTL_SECONDS}s`,
+        });
+        const method = String(context.method ?? '').toUpperCase();
+        const url = normalizeDpopHtu(String(context.url ?? ''));
+        const htm = String(verified.payload['htm'] ?? '').toUpperCase();
+        const htu = normalizeDpopHtu(String(verified.payload['htu'] ?? ''));
+        const jti = typeof verified.payload.jti === 'string' ? verified.payload.jti : '';
+        if (!method || !url) return { ok: false, error: 'Resource request method/url context is required for DPoP.' };
+        if (htm !== method) return { ok: false, error: 'DPoP proof htm does not match the MCP request method.' };
+        if (htu !== url) return { ok: false, error: 'DPoP proof htu does not match the MCP request URL.' };
+        if (!jti || jti.length > 256 || hasAsciiControlChars(jti))
+            return { ok: false, error: 'DPoP proof jti is missing or invalid.' };
+        pruneDpopReplayCache();
+        const replayKey = `${jkt}:${jti}`;
+        if (DPOP_REPLAY_CACHE.has(replayKey)) return { ok: false, error: 'DPoP proof replay detected.' };
+        const expMs = Number(verified.payload.exp)
+            ? Number(verified.payload.exp) * 1000
+            : Date.now() + DPOP_MAX_TTL_SECONDS * 1000;
+        DPOP_REPLAY_CACHE.set(replayKey, expMs);
+        trimDpopReplayCache(DPOP_REPLAY_CACHE_MAX_ENTRIES);
+        return { ok: true };
+    } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : 'DPoP proof could not be verified.' };
+    }
+}
+
+/**
+ * @param {Record<string, string | string[] | undefined> | undefined} headers
+ * @param {string} name
+ * @returns {string | undefined}
+ */
+function firstAuthContextHeader(headers, name) {
+    const value = headers?.[name.toLowerCase()] ?? headers?.[name];
+    if (Array.isArray(value)) return value.length === 1 ? value[0] : undefined;
+    return typeof value === 'string' ? value : undefined;
+}
+
+/**
+ * @param {Record<string, unknown>} jwk
+ * @returns {boolean}
+ */
+function hasPrivateJwkFields(jwk) {
+    return ['d', 'p', 'q', 'dp', 'dq', 'qi', 'oth'].some((field) => Object.prototype.hasOwnProperty.call(jwk, field));
+}
+
+/**
+ * @param {string} jwt
+ * @returns {Record<string, unknown>}
+ */
+function decodeJwtHeader(jwt) {
+    const [encoded] = jwt.split('.', 1);
+    if (!encoded) throw new Error('JWT header is missing.');
+    return JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeDpopHtu(value) {
+    try {
+        const url = new URL(value);
+        url.hash = '';
+        return url.toString();
+    } catch {
+        return '';
+    }
+}
+
+/**
+ * @param {number} [nowMs]
+ * @returns {number}
+ */
+function pruneDpopReplayCache(nowMs = Date.now()) {
+    let removed = 0;
+    for (const [key, expiresAt] of DPOP_REPLAY_CACHE) {
+        if (expiresAt <= nowMs) {
+            DPOP_REPLAY_CACHE.delete(key);
+            removed += 1;
+        }
+    }
+    return removed;
+}
+
+/**
+ * @param {number} maxSize
+ * @returns {void}
+ */
+function trimDpopReplayCache(maxSize) {
+    if (DPOP_REPLAY_CACHE.size <= maxSize) return;
+    const oldest = [...DPOP_REPLAY_CACHE.entries()].sort((left, right) => left[1] - right[1]);
+    for (const [key] of oldest) {
+        if (DPOP_REPLAY_CACHE.size <= maxSize) break;
+        DPOP_REPLAY_CACHE.delete(key);
+    }
 }
 
 /**
@@ -766,7 +1022,7 @@ export function resetMcpAuthRuntimeForTests() {
  * @param {NodeJS.ProcessEnv} env
  * @returns {Promise<McpAuthorizationDecision>}
  */
-async function verifyBearerToken(token, requiredScopes, config, env) {
+async function verifyBearerToken(token, requiredScopes, config, env, context = {}) {
     if (!token || token.length > MAX_BEARER_TOKEN_LENGTH) {
         return authInvalidTokenDecision(requiredScopes, config, 'Bearer token is malformed or too large.');
     }
@@ -806,11 +1062,15 @@ async function verifyBearerToken(token, requiredScopes, config, env) {
             issuer: config.expectedIssuer,
             audience: config.acceptedAudiences,
             algorithms: config.jwtAlgorithms,
+            clockTolerance: JWT_CLOCK_TOLERANCE_SECONDS,
+            maxTokenAge: `${MAX_TOKEN_AGE_SECONDS}s`,
         });
         const payload = verified.payload;
+        const dpopDecision = await validateDpopConfirmationForResource(payload, context, requiredScopes, config);
+        if (dpopDecision) return dpopDecision;
         const audienceValues = normalizeAudienceClaim(payload.aud);
         const tokenResource = typeof payload['resource'] === 'string' ? normalizeAudience(payload['resource'], '') : '';
-        if (tokenResource && !config.acceptedAudiences.includes(tokenResource)) {
+        if (tokenResource && !audienceMatchesAnyAccepted(tokenResource, config.acceptedAudiences)) {
             return authInvalidTokenDecision(
                 requiredScopes,
                 config,
@@ -972,5 +1232,5 @@ export async function authorizeMcpToolCall(
             }),
         };
     }
-    return verifyBearerToken(context.bearerToken, requiredScopes, config, env);
+    return verifyBearerToken(context.bearerToken, requiredScopes, config, env, context);
 }

@@ -359,6 +359,8 @@
     "copilot:mcp:cloudflare:restart": "node src/copilot/mcp/cloudflare/cli.js restart",
     "copilot:mcp:cloudflare:run": "node src/copilot/mcp/cloudflare/cli.js run",
     "copilot:mcp:cloudflare:smoke": "node src/copilot/mcp/cloudflare/cli.js smoke",
+    "copilot:mcp:cloudflare:oauth-smoke": "node src/copilot/mcp/cloudflare/cli.js oauth-smoke",
+    "copilot:mcp:cloudflare:smoke:authenticated": "node src/copilot/mcp/cloudflare/cli.js oauth-smoke",
     "copilot:mcp:cloudflare:smoke:refresh": "node src/copilot/mcp/cloudflare/cli.js smoke",
     "copilot:mcp:cloudflare:status": "node src/copilot/mcp/cloudflare/cli.js status",
     "copilot:mcp:cloudflare:up": "node src/copilot/mcp/cloudflare/cli.js up",

@@ -485,7 +485,7 @@ function summarizeOAuthMetadata(metadata, requiredScopes, expectedIssuer) {
         warnings.push('grant_types_supported does not include authorization_code.');
     if (metadata['client_id_metadata_document_supported'] !== true) {
         warnings.push(
-            'client_id_metadata_document_supported is not true; ChatGPT may need Dynamic Client Registration.',
+            'client_id_metadata_document_supported is not true; Dynamic Client Registration must be available and is the canonical path for this dev issuer.',
         );
     }
     if (metadata['resource_parameter_supported'] !== true) {
@@ -646,7 +646,7 @@ function buildAuthEnvironmentTemplates(config) {
             COPILOT_MCP_DEV_OAUTH_ENABLED: 'true',
             COPILOT_MCP_DEV_OAUTH_ACCESS_TOKEN_TTL_SECONDS: '36000',
             COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_TTL_SECONDS: '2592000',
-            COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS: 'false',
+            COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS: 'true',
             COPILOT_MCP_STATIC_BEARER_TOKEN_ENABLED: 'false',
         },
         permanentTunnelNoAuthFallback: {
@@ -1028,7 +1028,7 @@ export const connectionTools = [
                     'Authorization Server Metadata publishes authorization_endpoint, token_endpoint, PKCE S256, JWKS, scopes, and public-client auth method none.',
                     'OAuth token validation checks issuer, audience/resource, expiration, signature and scopes before every tool call.',
                     '401 Unauthorized responses and MCP tool error metadata include WWW-Authenticate with resource_metadata, error and error_description.',
-                    'Public OAuth diagnostic tools are disabled unless explicitly enabled for a controlled debugging window.',
+                    'Public OAuth diagnostic tools are enabled by default for low-friction connector debugging and limited to read-only OAuth diagnostics; set COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS=false for hardened windows.',
                     'HTTP/2+ Cloudflare/origin state is synchronized before restart.',
                 ],
                 nextSteps:

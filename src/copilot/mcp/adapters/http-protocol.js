@@ -10,6 +10,8 @@
  * canonical HTTP/2+ deployment policy used by the Cloudflare-backed MCP endpoint, while still making HTTP/1.1 fallback
  * visible in health/diagnostic output.
  *
+ * Version: 1.1.0
+ *
  * @module copilot/mcp/adapters/http-protocol
  */
 
@@ -64,9 +66,9 @@ export function createMcpHttpProtocolState(protocolMode) {
     return {
         protocolMode: normalizedProtocolMode,
         observedRequests: 0,
-        httpVersionCounts: {},
-        alpnCounts: {},
-        transportClassCounts: {},
+        httpVersionCounts: /** @type {Record<string, number>} */ (Object.create(null)),
+        alpnCounts: /** @type {Record<string, number>} */ (Object.create(null)),
+        transportClassCounts: /** @type {Record<string, number>} */ (Object.create(null)),
         lastRequest: null,
         startedAt: Date.now(),
         http2PlusDefault: isHttp2PlusProtocolMode(normalizedProtocolMode),
@@ -158,11 +160,9 @@ export function isHttp2PlusProtocolMode(protocolMode) {
  * @returns {McpHttpProtocolSample}
  */
 function buildMcpHttpProtocolSample(protocolMode, req) {
-    const socket = /** @type {Record<string, unknown> | undefined} */ (
-        /** @type {unknown} */ (req.socket ?? undefined)
-    );
-    const alpnProtocol = normalizeAlpnProtocol(socket?.['alpnProtocol']);
-    const encrypted = Boolean(socket?.['encrypted']);
+    const socketInfo = readRequestSocketInfo(req);
+    const alpnProtocol = normalizeAlpnProtocol(socketInfo.alpnProtocol);
+    const encrypted = Boolean(socketInfo.encrypted);
     const httpVersion = normalizeHttpVersion(req.httpVersion);
     const httpVersionMajor = normalizeHttpVersionMajor(req.httpVersionMajor, httpVersion);
     const transportClass = classifyTransport(httpVersion, httpVersionMajor, alpnProtocol, encrypted);
@@ -178,6 +178,28 @@ function buildMcpHttpProtocolSample(protocolMode, req) {
         method: normalizeMethod(req.method),
         path: typeof url === 'string' ? safePathname(url) : null,
         observedAt: Date.now(),
+    };
+}
+
+/**
+ * Read transport metadata from both Node HTTP/1.1 requests and HTTP/2 compatibility requests.
+ *
+ * For HTTP/2 compatibility mode, ALPN/TLS state is exposed on req.stream.session.socket, not consistently on
+ * req.socket. The adapter keeps this lookup body-neutral and low-cardinality.
+ *
+ * @param {import('node:http').IncomingMessage | import('node:http2').Http2ServerRequest} req
+ * @returns {{ alpnProtocol: unknown; encrypted: boolean }}
+ */
+function readRequestSocketInfo(req) {
+    const request = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (req));
+    const directSocket = /** @type {Record<string, unknown> | undefined} */ (request['socket']);
+    const stream = /** @type {Record<string, unknown> | undefined} */ (request['stream']);
+    const session = /** @type {Record<string, unknown> | undefined} */ (stream?.['session']);
+    const sessionSocket = /** @type {Record<string, unknown> | undefined} */ (session?.['socket']);
+    const socket = sessionSocket ?? directSocket;
+    return {
+        alpnProtocol: socket?.['alpnProtocol'],
+        encrypted: Boolean(socket?.['encrypted']),
     };
 }
 

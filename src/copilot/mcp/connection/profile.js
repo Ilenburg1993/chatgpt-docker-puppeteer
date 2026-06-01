@@ -556,7 +556,7 @@ function buildProfileEnvironmentTemplates(connectorUrl, localMcpUrl, config) {
             COPILOT_MCP_DEV_OAUTH_ENABLED: 'true',
             COPILOT_MCP_DEV_OAUTH_ACCESS_TOKEN_TTL_SECONDS: '3600',
             COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_TTL_SECONDS: '2592000',
-            COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS: 'false',
+            COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS: 'true',
             COPILOT_MCP_STATIC_BEARER_TOKEN_ENABLED: 'false',
         },
         permanentCloudflareOAuthHttpOriginFallback: {

@@ -12,25 +12,23 @@
  * - CORS is route-specific, origin-restricted and never wildcarded for browser origins.
  * - HTTP/2 compatibility requests use :authority/:scheme when Host is absent.
  *
+ * Version: 1.5.0
+ *
  * @module copilot/mcp/adapters/http-shared
  */
 
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createHash } from 'node:crypto';
-import { buildChatGptConnectorProfile } from '#copilot/mcp/connection';
-import {
-    buildProtectedResourceMetadata,
-    handleBuiltInDevOAuthRequest,
-    logMcp,
-    parseBearerToken,
-    readMcpAuthConfig,
-    readMcpIndexAutoBuildState,
-    readMcpMetricsSnapshot,
-    startMcpIndexAutoBuildInBackground,
-} from '#copilot/mcp/control-plane';
+import { buildChatGptConnectorProfile } from '../connection/profile.js';
+import { logMcp } from '../control-plane/audit.js';
+import { buildProtectedResourceMetadata, parseBearerToken, readMcpAuthConfig } from '../control-plane/auth.js';
+import { handleBuiltInDevOAuthRequest } from '../control-plane/dev-oauth.js';
+import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
+import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
 import { createCopilotMcpServer } from '../server.js';
 import { buildMcpHttpProtocolReport, setMcpHttpProtocolResponseHeaders } from './http-protocol.js';
 
+export const MCP_HTTP_SHARED_IMPLEMENTATION_VERSION = '1.5.0';
 export const MCP_PATH = '/mcp';
 
 const DEFAULT_ALLOWED_ORIGINS = /** @type {const} */ ([
@@ -47,6 +45,7 @@ const DEFAULT_CORS_ALLOWED_HEADERS = /** @type {const} */ ([
     'accept',
     'authorization',
     'content-type',
+    'dpop',
     'mcp-session-id',
     'mcp-protocol-version',
     'x-requested-with',
@@ -67,10 +66,17 @@ const DEFAULT_HTTP_REQUEST_TIMEOUT_MS = 120_000;
 const DEFAULT_MCP_SESSION_TTL_MS = 10 * 60 * 1000;
 const DEFAULT_MAX_MCP_SESSIONS = 32;
 const DEFAULT_HSTS_MAX_AGE_SECONDS = 31_536_000;
+const DEFAULT_MAX_MCP_REQUEST_BODY_BYTES = 2 * 1024 * 1024;
+const MAX_REQUEST_TARGET_LENGTH = 4096;
+const MAX_AUTHORITY_LENGTH = 255;
 const PUBLIC_METADATA_CACHE_CONTROL = 'public, max-age=60, s-maxage=300, stale-while-revalidate=300';
 const NO_STORE_CACHE_CONTROL = 'no-store, no-transform';
 const STATEFUL_SESSION_DISABLED_REASON =
     'stateful-session-body-replay-disabled; production adapter is stateless to preserve MCP SDK JSON-RPC compatibility';
+const MCP_PROTOCOL_VERSION = '2025-11-25';
+const MCP_PROTOCOL_MISSING_HEADER_FALLBACK_VERSION = '2025-03-26';
+const DEFAULT_SUPPORTED_MCP_PROTOCOL_VERSIONS = /** @type {const} */ (['2025-11-25', '2025-06-18', '2025-03-26']);
+const PROTOCOL_VERSION_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
 /**
  * @typedef {import('node:http').IncomingMessage | import('node:http2').Http2ServerRequest} McpHttpRequest
@@ -101,8 +107,10 @@ const CORS_ROUTE_POLICIES = {
     '/.well-known/oauth-client/codex-smoke.json': buildCorsPolicy(['GET']),
     '/oauth/jwks.json': buildCorsPolicy(['GET']),
     '/oauth/register': buildCorsPolicy(['POST']),
+    '/oauth/par': buildCorsPolicy(['POST']),
     '/oauth/token': buildCorsPolicy(['POST']),
     '/oauth/revoke': buildCorsPolicy(['POST']),
+    '/oauth/introspect': buildCorsPolicy(['POST']),
     '/oauth/userinfo': buildCorsPolicy(['GET']),
 };
 
@@ -120,8 +128,10 @@ const KNOWN_ROUTE_METHODS = {
     '/oauth/authorize': ['GET'],
     '/oauth/jwks.json': ['GET'],
     '/oauth/register': ['POST'],
+    '/oauth/par': ['POST'],
     '/oauth/token': ['POST'],
     '/oauth/revoke': ['POST'],
+    '/oauth/introspect': ['POST'],
     '/oauth/userinfo': ['GET'],
 };
 
@@ -131,15 +141,13 @@ const KNOWN_ROUTE_METHODS = {
  * @returns {CorsRoutePolicy}
  */
 function buildCorsPolicy(methods, options = {}) {
-    /** @type {CorsRoutePolicy} */
-    const policy = {
+    return {
         methods,
         allowHeaders: [...DEFAULT_CORS_ALLOWED_HEADERS],
         exposeHeaders: [...DEFAULT_CORS_EXPOSED_HEADERS],
         maxAgeSeconds: 600,
+        jsonRpcErrors: options.jsonRpcErrors,
     };
-    if (typeof options.jsonRpcErrors === 'boolean') policy.jsonRpcErrors = options.jsonRpcErrors;
-    return policy;
 }
 
 /**
@@ -209,15 +217,26 @@ export function readMcpHttpSessionRuntimeState() {
  *     nodeHandlerMode: 'http1-and-http2-compat';
  *     cloudflareHttp2ToOriginExpected: true;
  *     statelessMcpTransport: true;
+ *     protocolVersion: string;
+ *     supportedProtocolVersions: string[];
+ *     strictAcceptHeaders: boolean;
+ *     strictContentType: boolean;
+ *     maxRequestBodyBytes: number;
+ *     originValidation: 'all-incoming-connections';
  * }}
  */
 export function readMcpHttpTransportPolicy(env = process.env) {
-    void env;
     return {
         minimumOriginProtocol: 'HTTP/2+',
         nodeHandlerMode: 'http1-and-http2-compat',
         cloudflareHttp2ToOriginExpected: true,
         statelessMcpTransport: true,
+        protocolVersion: MCP_PROTOCOL_VERSION,
+        supportedProtocolVersions: readSupportedMcpProtocolVersions(env),
+        strictAcceptHeaders: readStrictMcpAcceptHeaders(env),
+        strictContentType: readStrictMcpContentType(env),
+        maxRequestBodyBytes: readMaxMcpRequestBodyBytes(env),
+        originValidation: 'all-incoming-connections',
     };
 }
 
@@ -291,11 +310,15 @@ export function createMcpHttpRequestHandler(options) {
             const corsPolicy = readCorsRoutePolicy(url.pathname);
             const requestOrigin = readHeader(req, 'origin');
 
+            if (requestOrigin && !isAllowedOrigin(requestOrigin)) {
+                writeCorsForbidden(
+                    res,
+                    corsPolicy ?? buildCorsPolicy([req.method || 'GET'], { jsonRpcErrors: url.pathname === MCP_PATH }),
+                );
+                return;
+            }
+
             if (corsPolicy) {
-                if (requestOrigin && !isAllowedOrigin(requestOrigin)) {
-                    writeCorsForbidden(res, corsPolicy);
-                    return;
-                }
                 setCorsHeaders(res, requestOrigin, corsPolicy);
             }
 
@@ -305,7 +328,7 @@ export function createMcpHttpRequestHandler(options) {
                     return;
                 }
                 if (url.pathname === '/oauth/authorize') {
-                    writeMethodNotAllowed(res, KNOWN_ROUTE_METHODS['/oauth/authorize'] ?? ['GET']);
+                    writeMethodNotAllowed(res, KNOWN_ROUTE_METHODS['/oauth/authorize']);
                     return;
                 }
                 writeText(res, 404, 'Not Found');
@@ -356,9 +379,23 @@ export function createMcpHttpRequestHandler(options) {
             }
 
             if (url.pathname === MCP_PATH) {
-                const mcpMethods = KNOWN_ROUTE_METHODS[MCP_PATH] ?? ['POST', 'GET', 'DELETE'];
-                if (!req.method || !mcpMethods.includes(req.method)) {
-                    writeMethodNotAllowed(res, mcpMethods);
+                const envelopeError = validateMcpRequestEnvelope(req);
+                if (envelopeError) {
+                    writeMcpTransportError(res, envelopeError.statusCode, envelopeError.error);
+                    return;
+                }
+                const protocolVersionError = validateMcpProtocolVersionHeader(req);
+                if (protocolVersionError) {
+                    writeMcpTransportError(res, 400, protocolVersionError);
+                    return;
+                }
+                const acceptHeaderError = validateMcpAcceptHeader(req);
+                if (acceptHeaderError) {
+                    writeMcpTransportError(res, 406, acceptHeaderError);
+                    return;
+                }
+                if (!req.method || !KNOWN_ROUTE_METHODS[MCP_PATH].includes(req.method)) {
+                    writeMethodNotAllowed(res, KNOWN_ROUTE_METHODS[MCP_PATH]);
                     return;
                 }
                 if (rejectAccessTokenInUri(url, res)) return;
@@ -371,7 +408,7 @@ export function createMcpHttpRequestHandler(options) {
 
                 setNoStoreResponseHeaders(res);
                 try {
-                    await handleMcpRequest(req, res);
+                    await handleMcpRequest(req, res, url);
                 } catch (error) {
                     logMcp('ERROR', 'Error handling MCP HTTP request.', {
                         error: error instanceof Error ? error.message : String(error),
@@ -422,6 +459,7 @@ function buildHealthPayload(protocolState) {
         metrics: readMcpMetricsSnapshot(),
         indexAutoBuild: readMcpIndexAutoBuildState(),
         http: {
+            implementationVersion: MCP_HTTP_SHARED_IMPLEMENTATION_VERSION,
             timingPolicy: readMcpHttpServerTimingPolicy(),
             sessionRuntime: readMcpHttpSessionRuntimeState(),
             transportPolicy: readMcpHttpTransportPolicy(),
@@ -437,9 +475,27 @@ function buildHealthPayload(protocolState) {
  * @returns {URL}
  */
 function buildRequestUrl(req, options) {
-    const scheme = options.publicScheme ?? readHeader(req, ':scheme') ?? 'http';
+    const rawScheme = options.publicScheme ?? readHeader(req, ':scheme') ?? firstForwardedProto(req) ?? 'http';
+    const scheme = rawScheme === 'https' || rawScheme === 'http' ? rawScheme : 'http';
     const authority = readRequestAuthority(req, options);
-    return new URL(req.url ?? '/', `${scheme}://${authority}`);
+    const requestTarget = normalizeRequestTarget(req.url ?? '/');
+    return new URL(requestTarget, `${scheme}://${authority}`);
+}
+
+/**
+ * Accept only origin-form request targets for application routing. Absolute-form targets are proxy-style requests and
+ * are rejected to avoid Host/authority confusion in OAuth metadata.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeRequestTarget(value) {
+    const target = String(value ?? '/').trim() || '/';
+    if (target.length > MAX_REQUEST_TARGET_LENGTH) throw new Error('Request target is too long.');
+    if (target.includes('\0') || /[\r\n]/u.test(target)) throw new Error('Invalid request target.');
+    if (target === '*') return '/';
+    if (/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(target)) throw new Error('Absolute-form request targets are not accepted.');
+    return target.startsWith('/') ? target : `/${target}`;
 }
 
 /**
@@ -458,7 +514,17 @@ function readRequestAuthority(req, options) {
  * @returns {boolean}
  */
 function isSyntacticallySafeAuthority(value) {
-    return /^[A-Za-z0-9.:[\]-]+(?::\d{1,5})?$/u.test(value) && !value.includes('..:');
+    const raw = String(value ?? '').trim();
+    if (!raw || raw.length > MAX_AUTHORITY_LENGTH) return false;
+    if (raw.includes('\0') || /[\s/@\\]/u.test(raw)) return false;
+    try {
+        const parsed = new URL(`http://${raw}`);
+        if (!parsed.hostname || parsed.username || parsed.password || parsed.pathname !== '/') return false;
+        if (parsed.port && (!/^\d{1,5}$/u.test(parsed.port) || Number(parsed.port) > 65535)) return false;
+        return /^[A-Za-z0-9.:[\]-]+(?::\d{1,5})?$/u.test(raw) && !raw.includes('..:');
+    } catch {
+        return false;
+    }
 }
 
 /**
@@ -522,9 +588,208 @@ function isAllowedOrigin(origin) {
 function readAllowedOrigins(env = process.env) {
     const configured = String(env['COPILOT_MCP_ALLOWED_ORIGINS'] ?? '')
         .split(',')
-        .map((item) => item.trim())
+        .map((item) => normalizeAllowedOriginCandidate(item))
         .filter(Boolean);
-    return configured.length > 0 ? configured : [...DEFAULT_ALLOWED_ORIGINS];
+    return configured.length > 0
+        ? /** @type {string[]} */ ([...new Set(configured)])
+        : /** @type {string[]} */ ([
+              ...new Set(DEFAULT_ALLOWED_ORIGINS.map((item) => normalizeAllowedOriginCandidate(item)).filter(Boolean)),
+          ]);
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeAllowedOriginCandidate(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw || raw === '*') return '';
+    try {
+        const parsed = new URL(raw);
+        if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+        if (parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) return '';
+        return parsed.origin;
+    } catch {
+        return '';
+    }
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {string[]}
+ */
+function readSupportedMcpProtocolVersions(env = process.env) {
+    const configured = String(env['COPILOT_MCP_SUPPORTED_PROTOCOL_VERSIONS'] ?? '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => PROTOCOL_VERSION_PATTERN.test(item));
+    return configured.length > 0 ? [...new Set(configured)] : [...DEFAULT_SUPPORTED_MCP_PROTOCOL_VERSIONS];
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {boolean}
+ */
+function readStrictMcpAcceptHeaders(env = process.env) {
+    return readBooleanEnv(env, 'COPILOT_MCP_STRICT_ACCEPT_HEADERS', true);
+}
+
+/**
+ * @param {McpHttpRequest} req
+ * @returns {string}
+ */
+function chooseMcpProtocolVersion(req) {
+    const requested = readHeader(req, 'mcp-protocol-version');
+    if (!requested) return MCP_PROTOCOL_MISSING_HEADER_FALLBACK_VERSION;
+    return PROTOCOL_VERSION_PATTERN.test(requested) && readSupportedMcpProtocolVersions().includes(requested)
+        ? requested
+        : MCP_PROTOCOL_VERSION;
+}
+
+/**
+ * @param {McpHttpRequest} req
+ * @returns {{ statusCode: number; error: { error: string; error_description: string } } | null}
+ */
+function validateMcpRequestEnvelope(req) {
+    const method = String(req.method ?? '').toUpperCase();
+    if (method !== 'POST') return null;
+
+    const contentLength = readHeader(req, 'content-length');
+    if (contentLength) {
+        if (!/^\d+$/u.test(contentLength)) {
+            return {
+                statusCode: 400,
+                error: { error: 'invalid_request', error_description: 'Invalid Content-Length header.' },
+            };
+        }
+        if (Number(contentLength) > readMaxMcpRequestBodyBytes()) {
+            return {
+                statusCode: 413,
+                error: {
+                    error: 'request_entity_too_large',
+                    error_description: 'MCP request body exceeds configured limit.',
+                },
+            };
+        }
+    }
+
+    if (readStrictMcpContentType()) {
+        const contentType = readHeader(req, 'content-type') ?? '';
+        if (!contentType.trim() || !contentTypeHeaderSupportsJson(contentType)) {
+            return {
+                statusCode: 415,
+                error: {
+                    error: 'unsupported_media_type',
+                    error_description: 'MCP POST requests must use application/json content.',
+                },
+            };
+        }
+    }
+    return null;
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {number}
+ */
+function readMaxMcpRequestBodyBytes(env = process.env) {
+    return readPositiveIntegerEnv(env, 'COPILOT_MCP_MAX_REQUEST_BODY_BYTES', DEFAULT_MAX_MCP_REQUEST_BODY_BYTES, 1024);
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {boolean}
+ */
+function readStrictMcpContentType(env = process.env) {
+    return readBooleanEnv(env, 'COPILOT_MCP_STRICT_CONTENT_TYPE', true);
+}
+
+/**
+ * @param {string} header
+ * @returns {boolean}
+ */
+function contentTypeHeaderSupportsJson(header) {
+    const media = header.split(';', 1)[0]?.trim().toLowerCase() ?? '';
+    return media === 'application/json' || media.endsWith('+json');
+}
+
+/**
+ * @param {McpHttpRequest} req
+ * @returns {{ error: string; error_description: string } | null}
+ */
+function validateMcpProtocolVersionHeader(req) {
+    const value = readHeader(req, 'mcp-protocol-version');
+    if (!value) return null;
+    if (!PROTOCOL_VERSION_PATTERN.test(value)) {
+        return { error: 'invalid_request', error_description: 'Invalid MCP-Protocol-Version header.' };
+    }
+    if (!readSupportedMcpProtocolVersions().includes(value)) {
+        return {
+            error: 'unsupported_protocol_version',
+            error_description: `Unsupported MCP protocol version: ${value}.`,
+        };
+    }
+    return null;
+}
+
+/**
+ * @param {McpHttpRequest} req
+ * @returns {{ error: string; error_description: string } | null}
+ */
+function validateMcpAcceptHeader(req) {
+    if (!readStrictMcpAcceptHeaders()) return null;
+    const method = String(req.method ?? '').toUpperCase();
+    if (method !== 'POST' && method !== 'GET') return null;
+    const accept = readHeader(req, 'accept') ?? '';
+    if (!accept.trim())
+        return { error: 'not_acceptable', error_description: 'MCP requests must include an Accept header.' };
+    if (
+        method === 'POST' &&
+        (!acceptHeaderSupports(accept, 'application/json') || !acceptHeaderSupports(accept, 'text/event-stream'))
+    ) {
+        return {
+            error: 'not_acceptable',
+            error_description: 'MCP POST requests must accept both application/json and text/event-stream.',
+        };
+    }
+    if (method === 'GET' && !acceptHeaderSupports(accept, 'text/event-stream')) {
+        return { error: 'not_acceptable', error_description: 'MCP GET requests must accept text/event-stream.' };
+    }
+    return null;
+}
+
+/**
+ * @param {string} header
+ * @param {string} required
+ * @returns {boolean}
+ */
+function acceptHeaderSupports(header, required) {
+    const [requiredType, requiredSubtype] = required.toLowerCase().split('/');
+    for (const item of header.split(',')) {
+        const media = item.split(';', 1)[0]?.trim().toLowerCase() ?? '';
+        if (!media) continue;
+        if (media === '*/*') return true;
+        const [type, subtype] = media.split('/');
+        if ((type === requiredType || type === '*') && (subtype === requiredSubtype || subtype === '*')) return true;
+    }
+    return false;
+}
+
+/**
+ * @param {McpHttpResponse} res
+ * @param {number} statusCode
+ * @param {{ error: string; error_description: string }} error
+ * @returns {void}
+ */
+function writeMcpTransportError(res, statusCode, error) {
+    writeJson(res, statusCode, {
+        jsonrpc: '2.0',
+        error: {
+            code: -32000,
+            message: error.error_description,
+            data: error,
+        },
+    });
 }
 
 /**
@@ -562,6 +827,7 @@ function isLoopbackHostname(hostname) {
  * @returns {void}
  */
 function setDefaultSecurityHeaders(req, res, options) {
+    setHeaderIfAbsent(res, 'MCP-Protocol-Version', chooseMcpProtocolVersion(req));
     setHeaderIfAbsent(res, 'X-Content-Type-Options', 'nosniff');
     setHeaderIfAbsent(res, 'Referrer-Policy', 'no-referrer');
     setHeaderIfAbsent(res, 'X-Frame-Options', 'DENY');
@@ -674,7 +940,6 @@ function shouldIssueMcpUnauthorizedChallenge(req, config) {
 function writeMcpUnauthorizedChallenge(res, config) {
     const resource = `${config.resource}/mcp`;
     const metadataUrl = `${config.resource}/.well-known/oauth-protected-resource/mcp`;
-    /** @type {[string, string][]} */
     const params = [
         ['realm', resource],
         ['resource_metadata', metadataUrl],
@@ -758,11 +1023,13 @@ export function readHeader(req, name) {
  * @param {McpHttpRequest} req
  * @returns {import('../control-plane/auth.js').McpAuthContext}
  */
-function buildAuthContext(req) {
+function buildAuthContext(req, url) {
     const authorizationHeader = readHeader(req, 'authorization');
     return {
         bearerToken: parseBearerToken(authorizationHeader),
         headers: req.headers,
+        method: req.method,
+        url: url.toString(),
     };
 }
 
@@ -771,8 +1038,8 @@ function buildAuthContext(req) {
  * @param {McpHttpResponse} res
  * @returns {Promise<void>}
  */
-async function handleMcpRequest(req, res) {
-    const server = createCopilotMcpServer({ authContext: buildAuthContext(req) });
+async function handleMcpRequest(req, res, url) {
+    const server = createCopilotMcpServer({ authContext: buildAuthContext(req, url) });
     const transport = new StreamableHTTPServerTransport(
         /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransportOptions} */ (
             /** @type {unknown} */ ({ sessionIdGenerator: undefined, enableJsonResponse: true })

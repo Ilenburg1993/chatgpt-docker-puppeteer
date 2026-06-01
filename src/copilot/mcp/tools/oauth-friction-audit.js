@@ -196,7 +196,7 @@ function summarizeToolScopes(tools) {
         destructiveCount: rows.filter((row) => row.destructive).length,
         adminScopeTools: rows.filter((row) => row.scopes.includes('repo:admin')).map((row) => row.name).sort(),
         validateScopeTools: rows.filter((row) => row.scopes.includes('repo:validate')).map((row) => row.name).sort(),
-        publicDiagnosticTools: ['mcp_oauth_friction_audit'],
+        publicDiagnosticTools: ['mcp_oauth_friction_audit', 'mcp_oauth_issuer_diagnostics'],
         maxPowerScopesAdvertisedByDefault: ['repo:read', 'repo:write', 'repo:validate', 'repo:admin'].every(
             (scope) =>
                 rows.some(

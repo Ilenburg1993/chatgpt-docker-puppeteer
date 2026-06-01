@@ -78,6 +78,27 @@ function stringList(value) {
 }
 
 /**
+ * @param {Array<string[] | null | undefined>} lists
+ * @param {number} limit
+ * @returns {string[]}
+ */
+function uniqueStringList(lists, limit) {
+    const seen = new Set();
+    const result = [];
+    for (const list of lists) {
+        if (!Array.isArray(list)) continue;
+        for (const item of list) {
+            const value = optionalString(item);
+            if (!value || seen.has(value)) continue;
+            seen.add(value);
+            result.push(value);
+            if (result.length >= limit) return result;
+        }
+    }
+    return result;
+}
+
+/**
  * @param {unknown} value
  * @returns {number | null}
  */
@@ -468,6 +489,23 @@ function selectionReasons(selected, row) {
 
 /**
  * @param {Record<string, unknown> | null} selected
+ * @param {Record<string, unknown> | null} row
+ * @param {string[]} [extraReasons]
+ * @returns {string[]}
+ */
+function routeDecisionReasons(selected, row, extraReasons = []) {
+    return uniqueStringList(
+        [
+            stringList(selected?.['reasons']),
+            row ? selectionReasons(selected, row) : [],
+            extraReasons,
+        ],
+        32,
+    );
+}
+
+/**
+ * @param {Record<string, unknown> | null} selected
  * @param {Record<string, unknown>} row
  * @param {{ sessionId?: string | null; source?: string; mode?: string }} options
  * @returns {ReturnType<typeof buildRouteDecisionEvent>}
@@ -484,7 +522,8 @@ function buildSelectorDecisionEvent(selected, row, options) {
             selected: route
                 ? {
                       score: optionalNumber(route['score']),
-                      reasons: selectionReasons(selected, row),
+                      scoreBreakdown: optionalRecord(route['scoreBreakdown']),
+                      reasons: routeDecisionReasons(route, row),
                       model: {
                           id: route['id'],
                           providerId: route['providerId'],
@@ -586,10 +625,11 @@ function buildRuntimeOutcomeDecisionEvent(route, outcome) {
             selected: selected
                 ? {
                       score: optionalNumber(selected['score']),
-                      reasons: [
+                      scoreBreakdown: optionalRecord(selected['scoreBreakdown']),
+                      reasons: routeDecisionReasons(selected, null, [
                           ...route.reasons,
                           outcome.ok ? 'runtime_outcome:ok' : 'runtime_outcome:failed',
-                      ],
+                      ]),
                       model: {
                           id: selected['id'],
                           providerId: selected['providerId'],

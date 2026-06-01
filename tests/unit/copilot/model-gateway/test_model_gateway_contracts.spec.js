@@ -1600,6 +1600,10 @@ describe('model-gateway foundation', () => {
                 ['unit-test-runtime-selector:runtime-result', null],
             ],
         );
+        assert.equal(runtimeRouteDecisionEvents[0].reasons.includes('selection_source:post_runtime_proved'), true);
+        assert.equal(runtimeRouteDecisionEvents[0].scoreBreakdown?.['finalScore'], runtimeRouteDecisionEvents[0].score);
+        assert.equal(runtimeRouteDecisionEvents[1].reasons.includes('runtime_outcome:ok'), true);
+        assert.equal(runtimeRouteDecisionEvents[1].reasons.includes('selection_source:post_runtime_proved'), true);
         const directRuntimeProbeRun = buildModelGatewayRuntimeSelectorProbeRun(runtimeExecution, {
             observedAt: '2026-05-28T21:00:00.000Z',
         });
@@ -3561,6 +3565,8 @@ describe('model-gateway foundation', () => {
         assert.equal(event.selected, true);
         assert.equal(event.providerId, 'kilo');
         assert.equal(event.modelId, 'kilo-auto/free');
+        assert.equal(event.scoreBreakdown?.['finalScore'], event.score);
+        assert.equal(event.reasons.includes('preferred:large_context'), true);
         assert.equal(event.candidateCount, 1);
         assert.equal(event.rejectedCount, 1);
         assert.equal(event.estimatedInputTokens, 12345);

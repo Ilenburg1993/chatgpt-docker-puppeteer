@@ -184,6 +184,14 @@ function finiteNumber(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
+function optionalRecord(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+}
+
+/**
  * @param {unknown[]} values
  * @param {number} limit
  * @returns {string[]}
@@ -194,11 +202,11 @@ function safeStringList(values, limit) {
 
 /**
  * @param {Record<string, any> | null | undefined} selected
- * @returns {{ gatewayModelId: string | null; providerId: string | null; modelId: string | null; score: number | null; reasons: string[] }}
+ * @returns {{ gatewayModelId: string | null; providerId: string | null; modelId: string | null; score: number | null; scoreBreakdown: Record<string, unknown> | null; reasons: string[] }}
  */
 function summarizeSelectedRouteCandidate(selected) {
     if (!selected) {
-        return { gatewayModelId: null, providerId: null, modelId: null, score: null, reasons: [] };
+        return { gatewayModelId: null, providerId: null, modelId: null, score: null, scoreBreakdown: null, reasons: [] };
     }
     const model = selected['model'] ?? {};
     return {
@@ -206,7 +214,8 @@ function summarizeSelectedRouteCandidate(selected) {
         providerId: optionalString(model['providerId']),
         modelId: optionalString(model['providerModel']) ?? optionalString(model['id']),
         score: finiteNumber(selected['score']),
-        reasons: safeStringList(Array.isArray(selected['reasons']) ? selected['reasons'] : [], 8),
+        scoreBreakdown: optionalRecord(selected['scoreBreakdown']),
+        reasons: safeStringList(Array.isArray(selected['reasons']) ? selected['reasons'] : [], 24),
     };
 }
 
@@ -265,6 +274,7 @@ function buildRouteDecisionId(timestamp, taskProfile, modelId, input) {
  *     providerId: string | null;
  *     modelId: string | null;
  *     score: number | null;
+ *     scoreBreakdown: Record<string, unknown> | null;
  *     reasons: string[];
  *     candidateCount: number;
  *     rejectedCount: number;
@@ -299,6 +309,7 @@ export function buildRouteDecisionEvent(input) {
         providerId: selected.providerId,
         modelId: selected.modelId,
         score: selected.score,
+        scoreBreakdown: selected.scoreBreakdown,
         reasons: selected.reasons,
         candidateCount: Array.isArray(input.route.candidates) ? input.route.candidates.length : 0,
         rejectedCount: Array.isArray(input.route.rejected) ? input.route.rejected.length : 0,
