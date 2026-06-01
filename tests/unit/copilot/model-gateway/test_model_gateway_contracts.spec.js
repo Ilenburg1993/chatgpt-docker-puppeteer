@@ -53,6 +53,7 @@ import {
     buildModelGatewayRuntimeAutomationControllerStep,
     buildModelGatewayRuntimeAutomationDecision,
     explainModelGatewayRuntimeAutomationPolicySources,
+    validateModelGatewayRuntimeAutomationPolicy,
     buildModelGatewayRuntimeSelectorPlan,
     mergeModelGatewayRuntimeAutomationPolicy,
     readModelGatewayRuntimeAutomationEffectivePolicy,
@@ -1357,6 +1358,10 @@ describe('model-gateway foundation', () => {
         assert.equal(policySources.profiles.source, 'env');
         assert.equal(policySources.allowNewSession.source, 'env');
         assert.equal(policySources.allowLocalPrivate.source, 'default');
+        assert.equal(validateModelGatewayRuntimeAutomationPolicy(effectivePolicy).ok, true);
+        const invalidPolicy = validateModelGatewayRuntimeAutomationPolicy({ policy: 'definitely_wrong' });
+        assert.equal(invalidPolicy.ok, false);
+        assert.equal(invalidPolicy.issues.includes('invalid_policy_mode:definitely_wrong'), true);
         await rm(policyDir, { recursive: true, force: true });
 
         const noLiveSessionDecision = buildModelGatewayRuntimeAutomationDecision({

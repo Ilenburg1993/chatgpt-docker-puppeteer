@@ -94,6 +94,7 @@ import {
     readModelGatewayRuntimeAutomationEffectivePolicy,
     readModelGatewayRuntimeAutomationPolicy,
     readModelGatewayRuntimeAutomationPolicyFile,
+    validateModelGatewayRuntimeAutomationPolicy,
     writeModelGatewayRuntimeAutomationPolicyFile,
 } from '#copilot/model-gateway';
 
@@ -3569,6 +3570,7 @@ async function renderByokGatewayAutoDoctor(println, rest) {
     const commandCount = listModelGatewayCanonicalCommands().length;
     const fileConfigured = Object.keys(filePolicy).length > 0;
     const policySources = explainModelGatewayRuntimeAutomationPolicySources({ filePolicy, env: process.env });
+    const policyValidation = validateModelGatewayRuntimeAutomationPolicy(effectivePolicy);
     const activeSnapshot = diagnostics.activeSnapshot?.exists === true;
     const effectsRows = finitePositiveNumber(diagnostics.automationEffectApplicationRows) ?? 0;
     const handoffRows = finitePositiveNumber(diagnostics.sdkSessionHandoffRows) ?? 0;
@@ -3581,6 +3583,7 @@ async function renderByokGatewayAutoDoctor(println, rest) {
     }
     if (!activeSnapshot) warnings.push('no_active_catalog_snapshot');
     if (decision.ok !== true) warnings.push('automation_decision_blocked');
+    if (policyValidation.ok !== true) warnings.push(...policyValidation.issues);
     println('\n  \x1b[36mBYOK model-gateway auto doctor\x1b[0m');
     println(
         `  \x1b[90mprofile=${status.args.profileId} · activeSnapshot=${activeSnapshot ? 'sim' : 'nao'} · commands=${commandCount} · warnings=${warnings.length}\x1b[0m`,

@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import {
     explainModelGatewayRuntimeAutomationPolicySources,
     readModelGatewayRuntimeAutomationPolicyFile,
+    validateModelGatewayRuntimeAutomationPolicy,
 } from '#copilot/model-gateway';
 
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from './index.mjs';
@@ -96,6 +97,7 @@ const commandRows = Array.isArray(optionalRecord(commands.json)?.['commands']) ?
 const policy = optionalRecord(statusJson?.['policy']);
 const decision = optionalRecord(statusJson?.['decision']);
 const cooldown = optionalRecord(decision?.['cooldown']);
+const policyValidation = validateModelGatewayRuntimeAutomationPolicy(policy ?? {});
 const activeSnapshot = optionalRecord(diagnosticsJson?.['activeSnapshot']);
 const latestAutomationEffectApplication = optionalRecord(diagnosticsJson?.['latestAutomationEffectApplication']);
 const latestSdkSessionHandoff = optionalRecord(diagnosticsJson?.['latestSdkSessionHandoff']);
@@ -121,6 +123,7 @@ const checks = [
         `handoffs=${diagnosticsJson?.['sdkSessionHandoffRows'] ?? '-'} confirmations=${diagnosticsJson?.['sdkSessionConfirmationRows'] ?? '-'}`,
     ),
     createCheck('policy_loaded', policy !== null, `source=${policy?.['source'] ?? '-'}`),
+    createCheck('policy_valid', policyValidation.ok, policyValidation.issues.join(',') || 'policy valid'),
     createCheck('policy_enabled', policy?.['enabled'] === true, `enabled=${policy?.['enabled'] === true}`, requireEnabled ? 'error' : 'warn'),
     createCheck(
         'policy_can_apply_effects',
@@ -146,6 +149,7 @@ const summary = {
     warnings,
     policy: policy ?? null,
     policySources,
+    policyValidation,
     decision: decision ?? null,
     nextRetry: {
         active: cooldown?.['active'] === true,

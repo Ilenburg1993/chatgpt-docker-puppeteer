@@ -8,5 +8,6 @@ export {
     readModelGatewayRuntimeAutomationEffectivePolicy,
     readModelGatewayRuntimeAutomationPolicy,
     readModelGatewayRuntimeAutomationPolicyFile,
+    validateModelGatewayRuntimeAutomationPolicy,
     writeModelGatewayRuntimeAutomationPolicyFile,
 } from './policy.js';

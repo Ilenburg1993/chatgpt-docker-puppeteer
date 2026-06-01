@@ -36,6 +36,12 @@ const MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_FIELDS = Object.freeze([
     'accountWideFailureKinds',
 ]);
 
+const MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_MODES = Object.freeze([
+    'metadata_first',
+    'prefer_runtime_proved',
+    'require_runtime_proof',
+]);
+
 /**
  * @param {unknown} value
  * @returns {boolean}
@@ -226,6 +232,32 @@ export function explainModelGatewayRuntimeAutomationPolicySources(options = {}) 
             return [field, { source: 'default', env: envName }];
         }),
     );
+}
+
+/**
+ * @param {Record<string, unknown>} policy
+ * @returns {{ ok: boolean; issues: string[]; allowedModes: string[] }}
+ */
+export function validateModelGatewayRuntimeAutomationPolicy(policy) {
+    const normalized = mergeModelGatewayRuntimeAutomationPolicy(policy);
+    const issues = [];
+    if (!MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_MODES.includes(normalized.policy)) {
+        issues.push(`invalid_policy_mode:${normalized.policy}`);
+    }
+    if (!Array.isArray(normalized.profiles) || normalized.profiles.some((profile) => optionalString(profile) === null)) {
+        issues.push('invalid_profiles');
+    }
+    if (
+        !Array.isArray(normalized.accountWideFailureKinds) ||
+        normalized.accountWideFailureKinds.some((failureKind) => optionalString(failureKind) === null)
+    ) {
+        issues.push('invalid_account_wide_failure_kinds');
+    }
+    return {
+        ok: issues.length === 0,
+        issues,
+        allowedModes: [...MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_MODES],
+    };
 }
 
 /**

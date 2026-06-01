@@ -214,7 +214,7 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] B.6 `/byok auto policy`.
 - [x] B.7 Policy snapshot por automation decision.
 - [x] B.8 Fonte por campo no JSON do doctor.
-- [ ] B.9 Validacao de policy invalida.
+- [x] B.9 Validacao de policy invalida.
 - [ ] B.10 Modo auto full documentado com limites.
 
 ### Faixa C - Ledger Operacional

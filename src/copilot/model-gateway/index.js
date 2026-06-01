@@ -19,6 +19,7 @@ export {
     readModelGatewayRuntimeAutomationPolicy,
     readModelGatewayRuntimeAutomationPolicyFile,
     selectModelGatewayRuntimeAutomationRoute,
+    validateModelGatewayRuntimeAutomationPolicy,
     writeModelGatewayRuntimeAutomationPolicyFile,
 } from './automation/index.js';
 
