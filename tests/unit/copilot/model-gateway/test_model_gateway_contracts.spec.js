@@ -5280,6 +5280,27 @@ describe('model-gateway foundation', () => {
             );
             db.prepare(
                 `
+                    INSERT INTO copilot_model_gateway_recovery_attempts
+                        (recovery_attempt_id, decision_id, effect_id, route_profile, selected_route_key,
+                         recovery_scope, failure_kind, account_wide, status, applied, observed_at_ms, payload_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+            ).run(
+                'recovery-1',
+                'automation-1',
+                'effect-1',
+                'repo_agent',
+                'openrouter:model-a',
+                'route',
+                'rate-limit',
+                0,
+                'effect_not_authorized',
+                0,
+                10,
+                '{}',
+            );
+            db.prepare(
+                `
                     INSERT INTO copilot_model_gateway_live_scenario_runs
                         (run_id, scenario_kind, status, ok, started_at_ms, completed_at_ms, duration_ms,
                          exit_code, artifact_dir, summary_path, criteria_total, criteria_failed, payload_json)
@@ -5577,6 +5598,22 @@ describe('model-gateway foundation', () => {
                     timestamp: '2026-05-26T12:00:01.000Z',
                 },
             ]);
+            await store.writeRecoveryAttemptRecords([
+                {
+                    recoveryAttemptId: 'recovery-1',
+                    decisionId: 'automation-1',
+                    effectId: 'effect-1',
+                    routeProfile: 'repo_agent',
+                    selectedRouteKey: 'openrouter:model-a',
+                    recoveryScope: 'account',
+                    failureKind: 'rate-limit',
+                    accountWideFailure: true,
+                    status: 'effect_not_authorized',
+                    applied: false,
+                    timestamp: '2026-05-26T12:00:01.500Z',
+                    token: 'secret-that-must-not-leak',
+                },
+            ]);
             await store.writeSdkSessionHandoffRecords([
                 {
                     handoffId: 'handoff-1',
@@ -5650,6 +5687,7 @@ describe('model-gateway foundation', () => {
             const automationDecisions = await store.readAutomationDecisionRecords({ limit: 5 });
             const automationPolicies = await store.readAutomationPolicySnapshotRecords({ limit: 5 });
             const automationEffects = await store.readAutomationEffectApplicationRecords({ limit: 5 });
+            const recoveryAttempts = await store.readRecoveryAttemptRecords({ limit: 5 });
             const sdkHandoffs = await store.readSdkSessionHandoffRecords({ limit: 5 });
             const sdkConfirmations = await store.readSdkSessionConfirmationRecords({ limit: 5 });
             const liveScenarioRuns = await store.readLiveScenarioRunRecords({ limit: 5 });
@@ -5683,6 +5721,10 @@ describe('model-gateway foundation', () => {
             assert.equal(automationPolicies[0].policySnapshotId, 'policy-1');
             assert.equal(automationEffects.length, 1);
             assert.equal(automationEffects[0].effectId, 'effect-1');
+            assert.equal(recoveryAttempts.length, 1);
+            assert.equal(recoveryAttempts[0].recoveryAttemptId, 'recovery-1');
+            assert.equal(recoveryAttempts[0].accountWideFailure, true);
+            assert.equal(JSON.stringify(recoveryAttempts[0]).includes('secret-that-must-not-leak'), false);
             assert.equal(sdkHandoffs.length, 1);
             assert.equal(sdkHandoffs[0].handoffId, 'handoff-1');
             assert.equal(sdkConfirmations.length, 1);
@@ -5704,12 +5746,15 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.automationDecisionRows, 1);
             assert.equal(diagnostics.automationPolicySnapshotRows, 1);
             assert.equal(diagnostics.automationEffectApplicationRows, 1);
+            assert.equal(diagnostics.recoveryAttemptRows, 1);
             assert.equal(diagnostics.sdkSessionHandoffRows, 1);
             assert.equal(diagnostics.sdkSessionConfirmationRows, 1);
             assert.equal(diagnostics.liveScenarioRunRows, 1);
             assert.equal(diagnostics.latestAutomationDecision.action, 'prepare_new_session');
             assert.equal(diagnostics.latestAutomationPolicySnapshot.policy, 'prefer_runtime_proved');
             assert.equal(diagnostics.latestAutomationEffectApplication.effectKind, 'set_live_model');
+            assert.equal(diagnostics.latestRecoveryAttempt.failureKind, 'rate-limit');
+            assert.equal(diagnostics.latestRecoveryAttempt.recoveryScope, 'account');
             assert.equal(diagnostics.latestSdkSessionHandoff.targetModel, 'model-a');
             assert.equal(diagnostics.latestSdkSessionConfirmation.confirmedModel, 'model-a');
             assert.equal(diagnostics.latestLiveScenarioRun.scenarioKind, 'auto_probe');
@@ -5961,6 +6006,11 @@ describe('model-gateway foundation', () => {
                 { effectId: 'effect-2', timestamp: 2, effectKind: 'prepare_new_sdk_session', status: 'skipped', applied: false },
                 { effectId: 'effect-3', timestamp: 3, effectKind: 'wait_for_provider_reset', status: 'skipped', applied: false },
             ]);
+            await store.writeRecoveryAttemptRecords([
+                { recoveryAttemptId: 'recovery-1', timestamp: 1, recoveryScope: 'route', failureKind: 'rate-limit', status: 'skipped', applied: false },
+                { recoveryAttemptId: 'recovery-2', timestamp: 2, recoveryScope: 'account', failureKind: 'credits', status: 'applied', applied: true, accountWideFailure: true },
+                { recoveryAttemptId: 'recovery-3', timestamp: 3, recoveryScope: 'route', failureKind: 'permission', status: 'skipped', applied: false },
+            ]);
             await store.writeSdkSessionHandoffRecords([
                 { handoffId: 'handoff-1', requestedAt: 1, status: 'prepared', targetModel: 'model-a' },
                 { handoffId: 'handoff-2', requestedAt: 2, status: 'boot_requested', targetModel: 'model-b' },
@@ -6040,6 +6090,7 @@ describe('model-gateway foundation', () => {
                 automationDecisionMaxRows: 1,
                 automationPolicySnapshotMaxRows: 1,
                 automationEffectApplicationMaxRows: 1,
+                recoveryAttemptMaxRows: 1,
                 sdkSessionHandoffMaxRows: 1,
                 sdkSessionConfirmationMaxRows: 1,
                 liveScenarioRunMaxRows: 1,
@@ -6053,19 +6104,21 @@ describe('model-gateway foundation', () => {
 
             assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows > 1, true);
             assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.healthObservationMaxRows > 1, true);
-            assert.equal(result.deletedRows, 28);
+            assert.equal(result.deletedRows, 30);
             assert.equal(diagnostics.catalogRows > 0, true);
             assert.equal(diagnostics.accountHistoryRows, 3);
             assert.equal(diagnostics.routeDecisionRows, 1);
             assert.equal(diagnostics.automationDecisionRows, 1);
             assert.equal(diagnostics.automationPolicySnapshotRows, 1);
             assert.equal(diagnostics.automationEffectApplicationRows, 1);
+            assert.equal(diagnostics.recoveryAttemptRows, 1);
             assert.equal(diagnostics.sdkSessionHandoffRows, 1);
             assert.equal(diagnostics.sdkSessionConfirmationRows, 1);
             assert.equal(diagnostics.liveScenarioRunRows, 1);
             assert.equal(diagnostics.latestAutomationDecision.action, 'wait_for_reset');
             assert.equal(diagnostics.latestAutomationPolicySnapshot.enabled, false);
             assert.equal(diagnostics.latestAutomationEffectApplication.effectKind, 'wait_for_provider_reset');
+            assert.equal(diagnostics.latestRecoveryAttempt.failureKind, 'permission');
             assert.equal(diagnostics.latestSdkSessionHandoff.targetModel, 'model-c');
             assert.equal(diagnostics.latestSdkSessionConfirmation.confirmedModel, 'model-c');
             assert.equal(diagnostics.latestLiveScenarioRun.scenarioKind, 'auto_probe');

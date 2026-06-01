@@ -35,6 +35,7 @@ let _runtimeHealthRunSequence = 0;
 let _automationDecisionSequence = 0;
 let _automationPolicySnapshotSequence = 0;
 let _automationEffectSequence = 0;
+let _recoveryAttemptSequence = 0;
 let _sdkSessionHandoffSequence = 0;
 let _sdkSessionConfirmationSequence = 0;
 let _liveScenarioRunSequence = 0;
@@ -48,6 +49,7 @@ export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze(
     automationDecisionMaxRows: 50_000,
     automationPolicySnapshotMaxRows: 50_000,
     automationEffectApplicationMaxRows: 50_000,
+    recoveryAttemptMaxRows: 50_000,
     sdkSessionHandoffMaxRows: 50_000,
     sdkSessionConfirmationMaxRows: 50_000,
     liveScenarioRunMaxRows: 50_000,
@@ -516,6 +518,15 @@ function createAutomationEffectId(observedAtMs) {
  * @param {number} observedAtMs
  * @returns {string}
  */
+function createRecoveryAttemptId(observedAtMs) {
+    _recoveryAttemptSequence += 1;
+    return `model-gateway:recovery:${observedAtMs}:${process.pid}:${_recoveryAttemptSequence}`;
+}
+
+/**
+ * @param {number} observedAtMs
+ * @returns {string}
+ */
 function createSdkSessionHandoffId(observedAtMs) {
     _sdkSessionHandoffSequence += 1;
     return `model-gateway:sdk-handoff:${observedAtMs}:${process.pid}:${_sdkSessionHandoffSequence}`;
@@ -876,12 +887,14 @@ export class SqliteModelGatewayCatalogStore {
      *     automationDecisionRows: number;
      *     automationPolicySnapshotRows: number;
      *     automationEffectApplicationRows: number;
+     *     recoveryAttemptRows: number;
      *     sdkSessionHandoffRows: number;
      *     sdkSessionConfirmationRows: number;
      *     liveScenarioRunRows: number;
      *     latestAutomationDecision: { action: string | null; status: string | null; ok: boolean | null; selectedRouteKey: string | null; decidedAtMs: number | null };
      *     latestAutomationPolicySnapshot: { enabled: boolean | null; policy: string | null; routeProfile: string | null; observedAtMs: number | null };
      *     latestAutomationEffectApplication: { effectKind: string | null; status: string | null; applied: boolean | null; observedAtMs: number | null };
+     *     latestRecoveryAttempt: { recoveryAttemptId: string | null; decisionId: string | null; routeProfile: string | null; selectedRouteKey: string | null; recoveryScope: string | null; failureKind: string | null; status: string | null; applied: boolean | null; observedAtMs: number | null };
      *     latestSdkSessionHandoff: { status: string | null; routeProfile: string | null; selectedRouteKey: string | null; sessionId: string | null; targetModel: string | null; requestedAtMs: number | null; confirmedAtMs: number | null };
      *     latestSdkSessionConfirmation: { status: string | null; handoffId: string | null; decisionId: string | null; sessionId: string | null; previousModel: string | null; confirmedModel: string | null; observedAtMs: number | null };
      *     latestLiveScenarioRun: { runId: string | null; scenarioKind: string | null; status: string | null; ok: boolean | null; completedAtMs: number | null; summaryPath: string | null };
@@ -999,6 +1012,19 @@ export class SqliteModelGatewayCatalogStore {
                 )
                 .get()
         );
+        const latestRecoveryAttempt = /** @type {{ recovery_attempt_id: string | null; decision_id: string | null; route_profile: string | null; selected_route_key: string | null; recovery_scope: string | null; failure_kind: string | null; status: string | null; applied: number | null; observed_at_ms: number | null } | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT recovery_attempt_id, decision_id, route_profile, selected_route_key,
+                               recovery_scope, failure_kind, status, applied, observed_at_ms
+                        FROM copilot_model_gateway_recovery_attempts
+                        ORDER BY observed_at_ms DESC
+                        LIMIT 1
+                    `,
+                )
+                .get()
+        );
         const latestSdkSessionHandoff = /** @type {{ status: string | null; route_profile: string | null; selected_route_key: string | null; session_id: string | null; target_model: string | null; requested_at_ms: number | null; confirmed_at_ms: number | null } | undefined} */ (
             this.#db
                 .prepare(
@@ -1068,6 +1094,7 @@ export class SqliteModelGatewayCatalogStore {
                 tableCounts['copilot_model_gateway_automation_policy_snapshots'] ?? 0,
             automationEffectApplicationRows:
                 tableCounts['copilot_model_gateway_automation_effect_applications'] ?? 0,
+            recoveryAttemptRows: tableCounts['copilot_model_gateway_recovery_attempts'] ?? 0,
             sdkSessionHandoffRows: tableCounts['copilot_model_gateway_sdk_session_handoffs'] ?? 0,
             sdkSessionConfirmationRows:
                 tableCounts['copilot_model_gateway_sdk_session_confirmations'] ?? 0,
@@ -1105,6 +1132,22 @@ export class SqliteModelGatewayCatalogStore {
                           ? false
                           : null,
                 observedAtMs: optionalInteger(latestAutomationEffectApplication?.observed_at_ms),
+            },
+            latestRecoveryAttempt: {
+                recoveryAttemptId: optionalString(latestRecoveryAttempt?.recovery_attempt_id),
+                decisionId: optionalString(latestRecoveryAttempt?.decision_id),
+                routeProfile: optionalString(latestRecoveryAttempt?.route_profile),
+                selectedRouteKey: optionalString(latestRecoveryAttempt?.selected_route_key),
+                recoveryScope: optionalString(latestRecoveryAttempt?.recovery_scope),
+                failureKind: optionalString(latestRecoveryAttempt?.failure_kind),
+                status: optionalString(latestRecoveryAttempt?.status),
+                applied:
+                    latestRecoveryAttempt?.applied === 1
+                        ? true
+                        : latestRecoveryAttempt?.applied === 0
+                          ? false
+                          : null,
+                observedAtMs: optionalInteger(latestRecoveryAttempt?.observed_at_ms),
             },
             latestSdkSessionHandoff: {
                 status: optionalString(latestSdkSessionHandoff?.status),
@@ -1345,6 +1388,7 @@ export class SqliteModelGatewayCatalogStore {
      *     automationDecisionMaxRows?: number;
      *     automationPolicySnapshotMaxRows?: number;
      *     automationEffectApplicationMaxRows?: number;
+     *     recoveryAttemptMaxRows?: number;
      *     sdkSessionHandoffMaxRows?: number;
      *     sdkSessionConfirmationMaxRows?: number;
      *     liveScenarioRunMaxRows?: number;
@@ -1405,6 +1449,10 @@ export class SqliteModelGatewayCatalogStore {
         const automationEffectApplicationMaxRows = retentionLimit(
             policy.automationEffectApplicationMaxRows,
             DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.automationEffectApplicationMaxRows,
+        );
+        const recoveryAttemptMaxRows = retentionLimit(
+            policy.recoveryAttemptMaxRows,
+            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.recoveryAttemptMaxRows,
         );
         const sdkSessionHandoffMaxRows = retentionLimit(
             policy.sdkSessionHandoffMaxRows,
@@ -1479,6 +1527,15 @@ export class SqliteModelGatewayCatalogStore {
                     maxRows: automationEffectApplicationMaxRows,
                 }),
                 maxRows: automationEffectApplicationMaxRows,
+            };
+            tables['copilot_model_gateway_recovery_attempts'] = {
+                deletedRows: deleteRowsKeepingLatest(this.#db, {
+                    table: 'copilot_model_gateway_recovery_attempts',
+                    keyColumn: 'recovery_attempt_id',
+                    orderColumn: 'observed_at_ms',
+                    maxRows: recoveryAttemptMaxRows,
+                }),
+                maxRows: recoveryAttemptMaxRows,
             };
             tables['copilot_model_gateway_sdk_session_handoffs'] = {
                 deletedRows: deleteRowsKeepingLatest(this.#db, {
@@ -2220,6 +2277,79 @@ export class SqliteModelGatewayCatalogStore {
                 `
                     SELECT payload_json
                     FROM copilot_model_gateway_automation_effect_applications
+                    ORDER BY observed_at_ms DESC
+                    LIMIT ?
+                `,
+            )
+            .all(limit)
+            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+    }
+
+    /**
+     * @param {Record<string, unknown>[]} attempts
+     * @returns {Promise<{ recoveryAttempts: number }>}
+     */
+    async writeRecoveryAttemptRecords(attempts) {
+        const insert = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_recovery_attempts
+                (recovery_attempt_id, decision_id, effect_id, route_profile, selected_route_key,
+                 recovery_scope, failure_kind, account_wide, status, applied, observed_at_ms, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(recovery_attempt_id) DO UPDATE SET
+                decision_id = excluded.decision_id,
+                effect_id = excluded.effect_id,
+                route_profile = excluded.route_profile,
+                selected_route_key = excluded.selected_route_key,
+                recovery_scope = excluded.recovery_scope,
+                failure_kind = excluded.failure_kind,
+                account_wide = excluded.account_wide,
+                status = excluded.status,
+                applied = excluded.applied,
+                observed_at_ms = excluded.observed_at_ms,
+                payload_json = excluded.payload_json
+        `);
+        const writable = attempts.filter(isRecord);
+        const tx = this.#db.transaction(() => {
+            for (const attempt of writable) {
+                const observedAtMs = dateMs(attempt['timestamp']) ?? dateMs(attempt['observedAt']) ?? Date.now();
+                const applied = attempt['applied'] === true;
+                const accountWide = attempt['accountWideFailure'] === true || attempt['accountWide'] === true;
+                insert.run(
+                    optionalString(attempt['recoveryAttemptId']) ?? createRecoveryAttemptId(observedAtMs),
+                    optionalString(attempt['decisionId']),
+                    optionalString(attempt['effectId']),
+                    optionalString(attempt['routeProfile']) ?? DEFAULT_ROUTE_PROFILE,
+                    optionalString(attempt['selectedRouteKey']) ?? optionalString(attempt['routeKey']),
+                    optionalString(attempt['recoveryScope']) ?? (accountWide ? 'account' : 'route'),
+                    optionalString(attempt['failureKind']) ?? 'unknown_failure',
+                    accountWide ? 1 : 0,
+                    optionalString(attempt['status']) ?? (applied ? 'applied' : 'skipped'),
+                    applied ? 1 : 0,
+                    observedAtMs,
+                    operationalPayloadJson({
+                        ...attempt,
+                        accountWideFailure: accountWide,
+                        applied,
+                        observedAtMs,
+                    }),
+                );
+            }
+        });
+        tx();
+        return { recoveryAttempts: writable.length };
+    }
+
+    /**
+     * @param {{ limit?: number }} [options]
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async readRecoveryAttemptRecords(options = {}) {
+        const limit = Math.max(1, Math.min(optionalInteger(options.limit) ?? 50, 500));
+        return this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_recovery_attempts
                     ORDER BY observed_at_ms DESC
                     LIMIT ?
                 `,

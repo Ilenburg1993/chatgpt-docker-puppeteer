@@ -194,6 +194,7 @@ function buildAutoProbeCommands({ profile = 'repo_agent' } = {}) {
         '/byok auto history 10',
         '/byok auto handoffs 10',
         '/byok auto confirmations 10',
+        '/byok auto recoveries 10',
         '/events 40',
         '/events 80 --raw',
         '/errors 10',
@@ -2316,6 +2317,11 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
             id: 'auto-confirmations-visible',
             pass: /BYOK model-gateway auto confirmations/.test(plain),
             detail: '/byok auto confirmations rendered SDK confirmation ledger or empty state',
+        },
+        {
+            id: 'auto-recoveries-visible',
+            pass: /BYOK model-gateway auto recoveries/.test(plain),
+            detail: '/byok auto recoveries rendered post-turn recovery ledger or empty state',
         },
         {
             id: 'auto-sse-archive-query-visible',

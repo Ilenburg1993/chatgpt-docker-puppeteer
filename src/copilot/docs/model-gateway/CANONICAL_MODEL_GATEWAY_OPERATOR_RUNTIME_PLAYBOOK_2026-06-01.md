@@ -30,7 +30,7 @@ O objetivo pratico e permitir que o operador humano ou outra LLM tenha um sistem
 - preparar novo boot SDK quando provider/perfil mudar;
 - replanejar apos falhas de BYOK;
 - evitar repetir imediatamente uma rota quebrada;
-- registrar decisions, effects, handoffs e confirmations;
+- registrar decisions, effects, recovery attempts, handoffs e confirmations;
 - testar tudo em escada, primeiro sem PR, depois com fixture, depois com BYOK real.
 
 ## 2. Principios
@@ -87,6 +87,7 @@ Responsavel por:
 - account/key overlays;
 - automation decisions;
 - automation effect applications;
+- post-turn recovery attempts;
 - automation policy snapshots;
 - SDK session handoffs;
 - SDK model-change confirmations.
@@ -177,12 +178,13 @@ npm run model-gateway:auto:doctor
 npm run model-gateway:auto:explain
 npm run model-gateway:auto:handoffs
 npm run model-gateway:auto:confirmations
+npm run model-gateway:auto:recoveries
 npm run model-gateway:auto:scenarios
 npm run model-gateway:live:runs
 ```
 
-Regra: `auto:status`, `auto:ready`, `auto:doctor`, `auto:explain`, `auto:handoffs`, `auto:confirmations` e
-`auto:scenarios` nao devem chamar provider nem mutar terminal.
+Regra: `auto:status`, `auto:ready`, `auto:doctor`, `auto:explain`, `auto:handoffs`, `auto:confirmations`,
+`auto:recoveries` e `auto:scenarios` nao devem chamar provider nem mutar terminal.
 
 ### 3.6 Terminal
 
@@ -199,6 +201,7 @@ Responsavel pela experiencia viva do operador:
 /byok auto switch profile:repo_agent
 /byok auto handoffs 10
 /byok auto confirmations 10
+/byok auto recoveries 10
 /byok auto off
 ```
 
@@ -340,6 +343,7 @@ Esse probe abre o terminal real e valida o cockpit de auto-mode:
 - `/byok auto history 10`;
 - `/byok auto handoffs 10`;
 - `/byok auto confirmations 10`;
+- `/byok auto recoveries 10`;
 - `/events`;
 - `/errors`.
 
@@ -349,18 +353,18 @@ Evidencia em 2026-06-01:
 
 - status: PASS;
 - artefato inicial: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`;
-- artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-26-51-045Z/summary.md`;
-- duracao mais recente: 18373ms;
+- artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-57-46-528Z/summary.md`;
+- duracao mais recente: 28529ms;
 - erros rastreados: 0;
-- criterios PASS mais recentes: 25;
-- inventario canonico exibiu 130 comandos;
+- criterios PASS mais recentes: 26;
+- inventario canonico exibiu 133 comandos apos recovery ledger;
 - `/byok auto policy` funcionou;
 - `/byok auto status profile:repo_agent` funcionou;
 - `/byok auto doctor profile:repo_agent` funcionou;
 - `/byok auto explain profile:repo_agent` funcionou;
-- ledgers history/handoffs/confirmations renderizaram corretamente.
-- ledger de live scenarios gravou `terminal-live:2026-06-01T22-26-51-054Z:auto_probe`;
-- `npm run model-gateway:live:runs` leu 2 runs persistidos e confirmou `criteriaTotal=25` no ultimo.
+- ledgers history/handoffs/confirmations/recoveries renderizaram corretamente.
+- ledger de live scenarios gravou `terminal-live:2026-06-01T22-57-46-546Z:auto_probe`;
+- `npm run model-gateway:live:runs` leu 3 runs persistidos e confirmou `criteriaTotal=26` no ultimo.
 
 ### 5.6 BYOK real no-PR
 
@@ -433,6 +437,7 @@ Depois reiniciar a task/sessao conforme a mensagem do terminal quando houver reb
 /byok auto switch profile:repo_agent
 /byok auto handoffs 10
 /byok auto confirmations 10
+/byok auto recoveries 10
 ```
 
 ### 7.5 Desligar auto
@@ -530,7 +535,7 @@ Isso cria overlay temporario com reset/cooldown.
 
 ## 11. Lacunas Operacionais Ainda Abertas
 
-- Persistencia dedicada de recovery attempts ainda deve virar tabela/fluxo proprio, alem das decisions/effects post-turn.
+- Persistencia dedicada de recovery attempts existe; falta ampliar scenarios fixture de falha/cooldown/fallback.
 - Persistencia dedicada de live scenario runs existe; falta apenas ampliar scenarios especificos e rodar redaction audit dedicado.
 - Pre-turn fixture precisa cobrir anti-loop de decision repetida.
 - Post-turn fixture precisa simular falha, cooldown e fallback.

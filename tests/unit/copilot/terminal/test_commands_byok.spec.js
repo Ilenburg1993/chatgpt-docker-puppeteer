@@ -1019,6 +1019,7 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                         accountHistoryRows: 0,
                         runtimeRows: 0,
                         routeDecisionRows: 0,
+                        recoveryAttemptRows: 0,
                         activeSnapshot: { exists: true, source: 'test' },
                         tableCounts: {},
                     }),
@@ -1031,6 +1032,7 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                 writeAutomationEffectApplicationRecords: vi.fn(() =>
                     Promise.resolve({ automationEffectApplications: 1 }),
                 ),
+                writeRecoveryAttemptRecords: vi.fn(() => Promise.resolve({ recoveryAttempts: 1 })),
                 writeSdkSessionHandoffRecords: vi.fn(() => Promise.resolve({ sdkSessionHandoffs: 1 })),
                 readAutomationDecisionRecords: vi.fn(() =>
                     Promise.resolve([
@@ -1060,6 +1062,17 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                             status: 'matched_handoff',
                             previousModel: 'auto',
                             confirmedModel: 'glm-4.5-flash',
+                        },
+                    ]),
+                ),
+                readRecoveryAttemptRecords: vi.fn(() =>
+                    Promise.resolve([
+                        {
+                            observedAt: '2026-06-01T00:00:03.000Z',
+                            status: 'effect_not_authorized',
+                            recoveryScope: 'account',
+                            failureKind: 'rate-limit',
+                            selectedRouteKey: 'zai:glm-4.5-flash',
                         },
                     ]),
                 ),
@@ -3006,18 +3019,22 @@ describe('terminal /byok command', () => {
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
     });
 
-    it('mostra handoffs e confirmations auto persistidos sem executar efeitos', async () => {
+    it('mostra handoffs, confirmations e recoveries auto persistidos sem executar efeitos', async () => {
         mockProjection();
         const handoffsCtx = mockCtx();
         const confirmationsCtx = mockCtx();
+        const recoveriesCtx = mockCtx();
 
         await cmdByok({ println: handoffsCtx.println }, 'auto handoffs 5');
         await cmdByok({ println: confirmationsCtx.println }, 'auto confirmations 5');
+        await cmdByok({ println: recoveriesCtx.println }, 'auto recoveries 5');
 
         expect(handoffsCtx.output()).toContain('BYOK model-gateway auto handoffs');
         expect(handoffsCtx.output()).toContain('boot_scheduled');
         expect(confirmationsCtx.output()).toContain('BYOK model-gateway auto confirmations');
         expect(confirmationsCtx.output()).toContain('matched_handoff');
+        expect(recoveriesCtx.output()).toContain('BYOK model-gateway auto recoveries');
+        expect(recoveriesCtx.output()).toContain('rate-limit');
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
     });
 
@@ -3185,7 +3202,11 @@ describe('terminal /byok command', () => {
             expect.arrayContaining([expect.objectContaining({ kind: 'replan_after_turn_failure' })]),
         );
         expect(result.effectPersistence).toEqual(
-            expect.objectContaining({ automationEffectApplications: expect.any(Number), sdkSessionHandoffs: expect.any(Number) }),
+            expect.objectContaining({
+                automationEffectApplications: expect.any(Number),
+                recoveryAttempts: expect.any(Number),
+                sdkSessionHandoffs: expect.any(Number),
+            }),
         );
     });
 

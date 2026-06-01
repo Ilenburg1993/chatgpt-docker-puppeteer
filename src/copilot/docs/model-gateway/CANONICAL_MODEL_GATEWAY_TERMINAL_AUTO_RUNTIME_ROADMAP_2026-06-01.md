@@ -19,7 +19,8 @@ Playbook operacional ativo para humano/LLM:
 - O foco de integracao e `src/copilot/terminal/`.
 - Scripts operacionais vivem somente em `scripts/model-gateway/`.
 - O catalogo canonico de metadados nao deve ser corrompido por runtime, quotas ou falhas temporarias.
-- Runtime health, route decisions, automation decisions, effect applications e SDK handoffs sao overlays operacionais.
+- Runtime health, route decisions, automation decisions, effect applications, recovery attempts, SDK handoffs,
+  confirmations e live scenario runs sao overlays operacionais.
 - Ollama/local/private e suportado, mas nunca selecionado por default sem pedido explicito do operador.
 - Validadores devem ser focados nos arquivos alterados, com suites amplas apenas quando realmente necessario.
 
@@ -29,14 +30,14 @@ Playbook operacional ativo para humano/LLM:
 
 - [x] Catalogo canonico JSON existe.
 - [x] SQLite operacional existe.
-- [x] Schema SQLite esta na versao 9.
+- [x] Schema SQLite esta na versao 10.
 - [x] Catalog rows, route decisions, runtime health e automation decisions estao visiveis.
 - [x] Automation effect applications estao persistidas.
 - [x] SDK session handoffs estao persistidos.
 - [x] Retention ja separa camadas operacionais.
 - [x] Existe tabela/fluxo para policy snapshots por decision.
 - [x] Existe tabela/fluxo para SDK binding confirmations.
-- [ ] Falta tabela/fluxo para post-turn recovery attempts.
+- [x] Existe tabela/fluxo para post-turn recovery attempts.
 - [x] Existe tabela/fluxo para live test scenario runs.
 
 ### 2.2 Scripts canonicos
@@ -54,6 +55,7 @@ Playbook operacional ativo para humano/LLM:
 - [x] `model-gateway:auto:scenarios`.
 - [x] `model-gateway:auto:handoffs`.
 - [x] `model-gateway:auto:confirmations`.
+- [x] `model-gateway:auto:recoveries`.
 - [x] `model-gateway:live:runs`.
 
 ### 2.3 Terminal
@@ -73,6 +75,7 @@ Playbook operacional ativo para humano/LLM:
 - [x] `/byok auto doctor` mostra readiness, policy, rota e ledgers no cockpit terminal.
 - [x] `/byok auto handoffs`.
 - [x] `/byok auto confirmations`.
+- [x] `/byok auto recoveries`.
 - [x] Post-turn controller automatico roda quando a policy esta ligada.
 
 ### 2.4 SDK boundary
@@ -178,7 +181,7 @@ provider metadata/importers
 3. Se ligada, pre-turn gera runtime selector plan.
 4. Decision vira controller step.
 5. Executor aplica somente efeitos autorizados.
-6. SQLite grava decision, effect applications e handoffs.
+6. SQLite grava decision, effect applications, recovery attempts e handoffs.
 7. Turno roda.
 8. Se falhar, post-turn classifica e grava health.
 9. Post-turn replaneja com overlays atualizados.
@@ -207,7 +210,8 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] A.7 `model-gateway:auto:explain`.
 - [x] A.8 `model-gateway:auto:handoffs`.
 - [x] A.9 `model-gateway:auto:confirmations`.
-- [x] A.10 `model-gateway:auto:scenarios`.
+- [x] A.10 `model-gateway:auto:recoveries`.
+- [x] A.11 `model-gateway:auto:scenarios`.
 
 ### Faixa B - Policy Explicavel
 
@@ -229,7 +233,7 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] C.3 SDK handoffs.
 - [x] C.4 Policy snapshots.
 - [x] C.5 SDK confirmations.
-- [ ] C.6 Recovery attempts.
+- [x] C.6 Recovery attempts.
 - [x] C.7 Live scenario runs.
 - [x] C.8 Retention para novas tabelas.
 - [x] C.9 Diagnostics para novas tabelas.
@@ -286,6 +290,7 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] G.8 `/byok auto switch`.
 - [x] G.9 `/byok auto handoffs`.
 - [x] G.10 `/byok auto confirmations`.
+- [x] G.11 `/byok auto recoveries`.
 
 ### Faixa H - Runtime Selector Real
 
@@ -359,7 +364,7 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 2. [x] Implementar tabela/records de SDK confirmation.
 3. [x] Implementar `/byok auto doctor` reaproveitando `model-gateway:auto:doctor`.
 4. [x] Implementar post-turn controller real apos falha BYOK.
-5. [x] Persistir recovery attempts como decisions/effects post-turn.
+5. [x] Persistir recovery attempts como decisions/effects post-turn e ledger dedicado.
 6. [x] Correlacionar `session.model_changed` com handoffs.
 7. [ ] Expandir live fixture de auto.
 8. [x] Rodar live fixture.
@@ -414,16 +419,16 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] Rodado em 2026-06-01.
 - [x] Comando: `npm run model-gateway:live:auto-probe`.
 - [x] Artefato inicial: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`.
-- [x] Artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-26-51-045Z/summary.md`.
+- [x] Artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-57-46-528Z/summary.md`.
 - [x] Resultado: PASS.
 - [x] Terminal error tracker: 0.
 - [x] Sem turno explicito de modelo.
-- [x] `/byok gateway commands` mostrou inventario canonico com 130 comandos.
+- [x] `/byok gateway commands` mostrou inventario canonico com 133 comandos apos incluir recovery ledger.
 - [x] `/byok auto policy` mostrou policy efetiva.
 - [x] `/byok auto status profile:repo_agent` mostrou decision sem aplicar efeito.
 - [x] `/byok auto doctor profile:repo_agent` mostrou policy, decision, ledgers e blockers.
 - [x] `/byok auto explain profile:repo_agent` explicou action/blockers/next commands.
-- [x] `/byok auto history`, `/byok auto handoffs` e `/byok auto confirmations` renderizaram ledger/empty state.
-- [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-01T22-26-51-054Z:auto_probe`.
-- [x] `npm run model-gateway:live:runs` leu 2 registros persistidos e o ultimo com `criteriaTotal=25`.
-- [x] `npm run model-gateway:auto:doctor` mostrou `live_scenario_ledger_visible` com `liveRuns=2`.
+- [x] `/byok auto history`, `/byok auto handoffs`, `/byok auto confirmations` e `/byok auto recoveries` renderizaram ledger/empty state.
+- [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-01T22-57-46-546Z:auto_probe`.
+- [x] `npm run model-gateway:live:runs` leu 3 registros persistidos e o ultimo com `criteriaTotal=26`.
+- [x] `npm run model-gateway:auto:doctor` mostrou `schema=10`, `commands=133`, `recoveries=0` e `liveRuns=3`.

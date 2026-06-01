@@ -100,6 +100,7 @@ const cooldown = optionalRecord(decision?.['cooldown']);
 const policyValidation = validateModelGatewayRuntimeAutomationPolicy(policy ?? {});
 const activeSnapshot = optionalRecord(diagnosticsJson?.['activeSnapshot']);
 const latestAutomationEffectApplication = optionalRecord(diagnosticsJson?.['latestAutomationEffectApplication']);
+const latestRecoveryAttempt = optionalRecord(diagnosticsJson?.['latestRecoveryAttempt']);
 const latestSdkSessionHandoff = optionalRecord(diagnosticsJson?.['latestSdkSessionHandoff']);
 const latestLiveScenarioRun = optionalRecord(diagnosticsJson?.['latestLiveScenarioRun']);
 const requireEnabled = argSet.has('--require-enabled');
@@ -122,6 +123,11 @@ const checks = [
         optionalNumber(diagnosticsJson?.['sdkSessionHandoffRows']) !== null &&
             optionalNumber(diagnosticsJson?.['sdkSessionConfirmationRows']) !== null,
         `handoffs=${diagnosticsJson?.['sdkSessionHandoffRows'] ?? '-'} confirmations=${diagnosticsJson?.['sdkSessionConfirmationRows'] ?? '-'}`,
+    ),
+    createCheck(
+        'recovery_attempt_ledger_visible',
+        optionalNumber(diagnosticsJson?.['recoveryAttemptRows']) !== null,
+        `recoveries=${diagnosticsJson?.['recoveryAttemptRows'] ?? '-'}`,
     ),
     createCheck(
         'live_scenario_ledger_visible',
@@ -164,12 +170,14 @@ const summary = {
         retryAfterSeconds: optionalNumber(cooldown?.['retryAfterSeconds']),
     },
     latestAutomationEffectApplication,
+    latestRecoveryAttempt,
     latestSdkSessionHandoff,
     latestLiveScenarioRun,
     ledgers: {
         automationDecisionRows: optionalNumber(diagnosticsJson?.['automationDecisionRows']),
         automationPolicySnapshotRows: optionalNumber(diagnosticsJson?.['automationPolicySnapshotRows']),
         automationEffectApplicationRows: optionalNumber(diagnosticsJson?.['automationEffectApplicationRows']),
+        recoveryAttemptRows: optionalNumber(diagnosticsJson?.['recoveryAttemptRows']),
         sdkSessionHandoffRows: optionalNumber(diagnosticsJson?.['sdkSessionHandoffRows']),
         sdkSessionConfirmationRows: optionalNumber(diagnosticsJson?.['sdkSessionConfirmationRows']),
         liveScenarioRunRows: optionalNumber(diagnosticsJson?.['liveScenarioRunRows']),
@@ -198,7 +206,7 @@ if (json) {
         );
     }
     process.stdout.write(
-        `  ledgers: decisions=${summary.ledgers.automationDecisionRows ?? '-'} policySnapshots=${summary.ledgers.automationPolicySnapshotRows ?? '-'} effects=${summary.ledgers.automationEffectApplicationRows ?? '-'} handoffs=${summary.ledgers.sdkSessionHandoffRows ?? '-'} confirmations=${summary.ledgers.sdkSessionConfirmationRows ?? '-'} liveRuns=${summary.ledgers.liveScenarioRunRows ?? '-'}\n`,
+        `  ledgers: decisions=${summary.ledgers.automationDecisionRows ?? '-'} policySnapshots=${summary.ledgers.automationPolicySnapshotRows ?? '-'} effects=${summary.ledgers.automationEffectApplicationRows ?? '-'} recoveries=${summary.ledgers.recoveryAttemptRows ?? '-'} handoffs=${summary.ledgers.sdkSessionHandoffRows ?? '-'} confirmations=${summary.ledgers.sdkSessionConfirmationRows ?? '-'} liveRuns=${summary.ledgers.liveScenarioRunRows ?? '-'}\n`,
     );
     for (const check of checks) {
         process.stdout.write(`  ${check.pass ? 'PASS' : check.severity.toUpperCase()} ${check.id}: ${check.detail}\n`);

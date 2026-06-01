@@ -58,6 +58,7 @@ npm run model-gateway:auto:doctor
 npm run model-gateway:auto:explain
 npm run model-gateway:auto:handoffs
 npm run model-gateway:auto:confirmations
+npm run model-gateway:auto:recoveries
 npm run model-gateway:auto:scenarios
 npm run model-gateway:auto:status -- --write-sqlite
 ```
@@ -66,8 +67,9 @@ npm run model-gateway:auto:status -- --write-sqlite
 chamar provider.
 
 `auto:ready` é o gate operacional objetivo para saber se catálogo, SQLite, readiness, decisão auto e superfícies canônicas
-estão visíveis. `auto:doctor` explica a policy efetiva, ledgers de efeitos/handoffs/confirmations e o que ainda impede
-automação total. `auto:handoffs` e `auto:confirmations` leem os ledgers SDK sem SQL manual.
+estão visíveis. `auto:doctor` explica a policy efetiva, ledgers de efeitos/recoveries/handoffs/confirmations e o que
+ainda impede automação total. `auto:handoffs`, `auto:confirmations` e `auto:recoveries` leem os ledgers SDK/recovery sem
+SQL manual.
 
 `auto:scenarios` agrega readiness, doctor, explain, ledgers e live-plan em uma escada canônica de cenários para humano
 ou LLM: leitura, policy stateful, troca terminal, fixture e real provider. Ele não chama provider nem inicia o terminal.

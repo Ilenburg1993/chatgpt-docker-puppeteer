@@ -3517,6 +3517,30 @@ async function renderByokGatewayAutoConfirmations(println, rest) {
 }
 
 /**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayAutoRecoveries(println, rest) {
+    const limit = parseByokGatewayAutoHistoryLimit(rest);
+    const rows = await new SqliteModelGatewayCatalogStore().readRecoveryAttemptRecords({ limit });
+    println('\n  \x1b[36mBYOK model-gateway auto recoveries\x1b[0m');
+    if (rows.length === 0) {
+        println('  \x1b[90mNenhum recovery attempt pós-falha persistido ainda.\x1b[0m\n');
+        return;
+    }
+    rows.slice(0, limit).forEach((row, index) => {
+        const status = optionalScalarString(row['status']) ?? '-';
+        const scope = optionalScalarString(row['recoveryScope']) ?? '-';
+        const failureKind = optionalScalarString(row['failureKind']) ?? '-';
+        const route = optionalScalarString(row['selectedRouteKey']) ?? '-';
+        const observedAt = optionalScalarString(row['observedAt']) ?? optionalScalarString(row['timestamp']) ?? '-';
+        println(`    ${index + 1}. \x1b[33m${status}\x1b[0m scope=${scope} failure=${failureKind} route=${route} at=${observedAt}`);
+    });
+    println('');
+}
+
+/**
  * @param {boolean} value
  * @returns {string}
  */
@@ -3573,6 +3597,7 @@ async function renderByokGatewayAutoDoctor(println, rest) {
     const policyValidation = validateModelGatewayRuntimeAutomationPolicy(effectivePolicy);
     const activeSnapshot = diagnostics.activeSnapshot?.exists === true;
     const effectsRows = finitePositiveNumber(diagnostics.automationEffectApplicationRows) ?? 0;
+    const recoveryRows = finitePositiveNumber(diagnostics.recoveryAttemptRows) ?? 0;
     const handoffRows = finitePositiveNumber(diagnostics.sdkSessionHandoffRows) ?? 0;
     const confirmationRows = finitePositiveNumber(diagnostics.sdkSessionConfirmationRows) ?? 0;
     const liveScenarioRunRows = finitePositiveNumber(diagnostics.liveScenarioRunRows) ?? 0;
@@ -3607,7 +3632,7 @@ async function renderByokGatewayAutoDoctor(println, rest) {
         );
     }
     println(
-        `    ledgers:       \x1b[33mdecisions=${diagnostics.automationDecisionRows ?? 0} · policySnapshots=${diagnostics.automationPolicySnapshotRows ?? 0} · effects=${effectsRows} · handoffs=${handoffRows} · confirmations=${confirmationRows} · liveRuns=${liveScenarioRunRows}\x1b[0m`,
+        `    ledgers:       \x1b[33mdecisions=${diagnostics.automationDecisionRows ?? 0} · policySnapshots=${diagnostics.automationPolicySnapshotRows ?? 0} · effects=${effectsRows} · recoveries=${recoveryRows} · handoffs=${handoffRows} · confirmations=${confirmationRows} · liveRuns=${liveScenarioRunRows}\x1b[0m`,
     );
     println(
         `    sdk:           \x1b[33msession=${status.inventory.currentSessionId ?? '-'} · live=${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}\x1b[0m`,
@@ -4551,6 +4576,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayAutoConfirmations(println, rest);
             return;
         }
+        if (rest.some((item) => /^(recoveries|recovery|recuperacoes|recuperações|post-turn)$/iu.test(item))) {
+            await renderByokGatewayAutoRecoveries(println, rest);
+            return;
+        }
         await renderByokGatewayAutoStatus(println, rest, {
             apply: rest.some((item) => /^(apply|aplicar|execute|executar)$/iu.test(item)),
             persist: rest.some((item) => /^(record|write|persist|gravar|registrar)$/iu.test(item)),
@@ -4596,6 +4625,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             }
             if (autoRest.some((item) => /^(confirmations|confirmation|confirmacoes|confirmações|model-changed)$/iu.test(item))) {
                 await renderByokGatewayAutoConfirmations(println, autoRest);
+                return;
+            }
+            if (autoRest.some((item) => /^(recoveries|recovery|recuperacoes|recuperações|post-turn)$/iu.test(item))) {
+                await renderByokGatewayAutoRecoveries(println, autoRest);
                 return;
             }
             await renderByokGatewayAutoStatus(println, autoRest, {

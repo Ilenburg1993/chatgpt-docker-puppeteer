@@ -11,6 +11,7 @@ export const MODEL_GATEWAY_SCRIPT_PATHS = Object.freeze({
     autoExplain: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-explain.mjs'),
     autoHandoffs: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-handoffs.mjs'),
     autoConfirmations: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-confirmations.mjs'),
+    autoRecoveries: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-recoveries.mjs'),
     autoScenarios: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-scenarios.mjs'),
     canonicalCommands: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-canonical-commands.mjs'),
     catalogIntegrity: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-catalog-integrity.mjs'),

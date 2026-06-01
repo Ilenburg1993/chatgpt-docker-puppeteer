@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/catalog/sqlite-schema
  */
 
-export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 9;
+export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 10;
 
 export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_snapshots',
@@ -34,6 +34,7 @@ export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_automation_decisions',
     'copilot_model_gateway_automation_policy_snapshots',
     'copilot_model_gateway_automation_effect_applications',
+    'copilot_model_gateway_recovery_attempts',
     'copilot_model_gateway_sdk_session_handoffs',
     'copilot_model_gateway_sdk_session_confirmations',
     'copilot_model_gateway_live_scenario_runs',
@@ -384,6 +385,25 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
         ON copilot_model_gateway_automation_effect_applications(decision_id, observed_at_ms DESC);
     CREATE INDEX IF NOT EXISTS idx_mg_automation_effects_status
         ON copilot_model_gateway_automation_effect_applications(effect_kind, status, applied, observed_at_ms DESC);
+
+    CREATE TABLE IF NOT EXISTS copilot_model_gateway_recovery_attempts (
+        recovery_attempt_id TEXT PRIMARY KEY,
+        decision_id         TEXT,
+        effect_id           TEXT,
+        route_profile       TEXT NOT NULL DEFAULT 'default',
+        selected_route_key  TEXT,
+        recovery_scope      TEXT NOT NULL DEFAULT 'route',
+        failure_kind        TEXT NOT NULL DEFAULT 'unknown_failure',
+        account_wide        INTEGER NOT NULL DEFAULT 0,
+        status              TEXT NOT NULL,
+        applied             INTEGER NOT NULL,
+        observed_at_ms      INTEGER NOT NULL,
+        payload_json        TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS idx_mg_recovery_attempts_route
+        ON copilot_model_gateway_recovery_attempts(route_profile, selected_route_key, observed_at_ms DESC);
+    CREATE INDEX IF NOT EXISTS idx_mg_recovery_attempts_scope
+        ON copilot_model_gateway_recovery_attempts(recovery_scope, failure_kind, status, observed_at_ms DESC);
 
     CREATE TABLE IF NOT EXISTS copilot_model_gateway_sdk_session_handoffs (
         handoff_id         TEXT PRIMARY KEY,

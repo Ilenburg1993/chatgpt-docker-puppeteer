@@ -313,6 +313,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Read persisted SDK model-change confirmations correlated with automation.',
     },
     {
+        id: 'automation.recoveries',
+        phase: 'automation',
+        surface: 'package',
+        command: 'npm run model-gateway:auto:recoveries',
+        summary: 'Read persisted post-turn recovery attempts created by model-gateway automation.',
+    },
+    {
         id: 'automation.scenarios',
         phase: 'automation',
         surface: 'package',
@@ -619,6 +626,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Makefile alias for persisted SDK model-change confirmations.',
     },
     {
+        id: 'make.auto-recoveries',
+        phase: 'automation',
+        surface: 'make',
+        command: 'make model-gateway-auto-recoveries',
+        summary: 'Makefile alias for persisted post-turn recovery attempts.',
+    },
+    {
         id: 'make.auto-scenarios',
         phase: 'automation',
         surface: 'make',
@@ -750,6 +764,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok auto confirmations 10',
         summary: 'Read the latest SDK model-change confirmations correlated with automation handoffs.',
+    },
+    {
+        id: 'terminal.auto-recoveries',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto recoveries 10',
+        summary: 'Read the latest post-turn recovery attempts created after BYOK failures.',
     },
     {
         id: 'terminal.auto-off',

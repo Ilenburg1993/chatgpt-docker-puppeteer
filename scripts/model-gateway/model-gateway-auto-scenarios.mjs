@@ -106,12 +106,18 @@ function countArray(value) {
     return optionalArray(value).length;
 }
 
-function summarizeGateSummaries({ ready, doctor, explain, handoffs, confirmations, livePlan }) {
+function countRowsOrItems(value) {
+    const record = optionalRecord(value);
+    return countArray(record?.['rows']) || countArray(record?.['items']);
+}
+
+function summarizeGateSummaries({ ready, doctor, explain, handoffs, confirmations, recoveries, livePlan }) {
     const readyJson = optionalRecord(ready);
     const doctorJson = optionalRecord(doctor);
     const explainJson = optionalRecord(explain);
     const handoffsJson = optionalRecord(handoffs);
     const confirmationsJson = optionalRecord(confirmations);
+    const recoveriesJson = optionalRecord(recoveries);
     const livePlanJson = optionalRecord(livePlan);
     return {
         ready: {
@@ -137,11 +143,15 @@ function summarizeGateSummaries({ ready, doctor, explain, handoffs, confirmation
         },
         handoffs: {
             ok: handoffsJson?.['ok'] === true,
-            rows: countArray(handoffsJson?.['items']),
+            rows: countRowsOrItems(handoffsJson),
         },
         confirmations: {
             ok: confirmationsJson?.['ok'] === true,
-            rows: countArray(confirmationsJson?.['items']),
+            rows: countRowsOrItems(confirmationsJson),
+        },
+        recoveries: {
+            ok: recoveriesJson?.['ok'] === true,
+            rows: countRowsOrItems(recoveriesJson),
         },
         livePlan: {
             ok: livePlanJson?.['ok'] === true,
@@ -169,10 +179,10 @@ function buildScenarios(profile) {
             id: 'automation_ledger_inspection',
             order: 2,
             phase: 'read-only',
-            command: 'npm run model-gateway:auto:handoffs && npm run model-gateway:auto:confirmations',
-            terminalCommand: '/byok auto handoffs 10 && /byok auto confirmations 10',
-            purpose: 'Inspect SDK handoff and model-change confirmation ledgers so the operator can correlate expected and observed model binding.',
-            gateIds: ['auto_handoffs', 'auto_confirmations'],
+            command: 'npm run model-gateway:auto:handoffs && npm run model-gateway:auto:confirmations && npm run model-gateway:auto:recoveries',
+            terminalCommand: '/byok auto handoffs 10 && /byok auto confirmations 10 && /byok auto recoveries 10',
+            purpose: 'Inspect SDK handoff, model-change confirmation and post-turn recovery ledgers so the operator can correlate expected and observed model binding plus fallback behavior.',
+            gateIds: ['auto_handoffs', 'auto_confirmations', 'auto_recoveries'],
         }),
         createScenario({
             id: 'terminal_auto_policy_preview',
@@ -270,6 +280,7 @@ const doctor = runJson('autoDoctor', ['--json', `--profile=${profile}`]);
 const explain = runJson('autoExplain', ['--json', `--profile=${profile}`]);
 const handoffs = runJson('autoHandoffs', ['--json', '--limit=5']);
 const confirmations = runJson('autoConfirmations', ['--json', '--limit=5']);
+const recoveries = runJson('autoRecoveries', ['--json', '--limit=5']);
 const livePlan = runJson('livePlan', ['--json', '--no-write']);
 
 const readyJson = optionalRecord(ready.json);
@@ -285,8 +296,9 @@ const checks = [
     ),
     checkFromRun('auto_doctor', doctor, (result) => `ok=${optionalRecord(result)?.['ok'] === true}`),
     checkFromRun('auto_explain', explain, (result) => `ok=${optionalRecord(result)?.['ok'] === true}`),
-    checkFromRun('auto_handoffs', handoffs, (result) => `items=${optionalArray(optionalRecord(result)?.['items']).length}`),
-    checkFromRun('auto_confirmations', confirmations, (result) => `items=${optionalArray(optionalRecord(result)?.['items']).length}`),
+    checkFromRun('auto_handoffs', handoffs, (result) => `rows=${countRowsOrItems(result)}`),
+    checkFromRun('auto_confirmations', confirmations, (result) => `rows=${countRowsOrItems(result)}`),
+    checkFromRun('auto_recoveries', recoveries, (result) => `rows=${countRowsOrItems(result)}`),
     checkFromRun('live_plan', livePlan, (result) => `ok=${optionalRecord(result)?.['ok'] === true}`),
 ];
 const blockers = checks.filter((check) => !check.pass && check.severity === 'error');
@@ -309,6 +321,7 @@ const summary = {
         explain: explainJson,
         handoffs: optionalRecord(handoffs.json),
         confirmations: optionalRecord(confirmations.json),
+        recoveries: optionalRecord(recoveries.json),
         livePlan: livePlanJson,
     }),
     rawGateSummaries: includeGates ? {
@@ -317,6 +330,7 @@ const summary = {
         explain: explainJson,
         handoffs: optionalRecord(handoffs.json),
         confirmations: optionalRecord(confirmations.json),
+        recoveries: optionalRecord(recoveries.json),
         livePlan: livePlanJson,
     } : null,
     nextScenario: scenarios[0] ?? null,

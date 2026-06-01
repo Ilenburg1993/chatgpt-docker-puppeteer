@@ -292,21 +292,65 @@ export function createTerminalByokGatewaySdkSessionHandoffRecords(status, applic
  * @param {Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>>} status
  * @param {Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>>} application
  * @param {{ source?: string; timestamp?: string }} [options]
- * @returns {Promise<{ automationEffectApplications: number; sdkSessionHandoffs: number } | null>}
+ * @returns {Record<string, unknown>[]}
+ */
+export function createTerminalByokGatewayRecoveryAttemptRecords(status, application, options = {}) {
+    const timestamp = options.timestamp ?? new Date().toISOString();
+    const decisionId = optionalScalarString(status.automationDecisionRecord['decisionId']);
+    const routeProfile = status.decision.routeProfile ?? status.args.profileId;
+    const selectedRouteKey = status.decision.selectedRouteKey;
+    return [...application.applied, ...application.skipped]
+        .map((effect, effectIndex) => ({ effect, effectIndex }))
+        .filter(({ effect }) => effect['kind'] === 'replan_after_turn_failure')
+        .map(({ effect, effectIndex }, index) => {
+            const applied = effect['applied'] === true;
+            const skippedReason = optionalScalarString(effect['skippedReason']);
+            const failureKind = optionalScalarString(effect['failureKind']) ?? 'unknown_failure';
+            const recoveryScope = optionalScalarString(effect['recoveryScope']) ?? (effect['accountWideFailure'] === true ? 'account' : 'route');
+            const effectId =
+                optionalScalarString(effect['effectId']) ??
+                `${decisionId ?? 'terminal-auto'}:effect:${effectIndex}:replan_after_turn_failure`;
+            return {
+                recoveryAttemptId: `${decisionId ?? 'terminal-auto'}:recovery:${index}:${failureKind}`,
+                decisionId,
+                effectId,
+                routeProfile,
+                selectedRouteKey,
+                recoveryScope,
+                failureKind,
+                accountWideFailure: effect['accountWideFailure'] === true,
+                status: applied ? 'applied' : (skippedReason ?? 'skipped'),
+                applied,
+                timestamp,
+                source: options.source ?? 'terminal-byok-auto-recovery',
+                effect,
+            };
+        });
+}
+
+/**
+ * @param {Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>>} status
+ * @param {Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>>} application
+ * @param {{ source?: string; timestamp?: string }} [options]
+ * @returns {Promise<{ automationEffectApplications: number; recoveryAttempts: number; sdkSessionHandoffs: number } | null>}
  */
 export async function persistTerminalByokGatewayAutoEffectApplications(status, application, options = {}) {
     const records = createTerminalByokGatewayAutoEffectApplicationRecords(status, application, options);
+    const recoveryAttempts = createTerminalByokGatewayRecoveryAttemptRecords(status, application, options);
     const handoffs = createTerminalByokGatewaySdkSessionHandoffRecords(status, application, options);
-    if (records.length === 0 && handoffs.length === 0) return null;
+    if (records.length === 0 && recoveryAttempts.length === 0 && handoffs.length === 0) return null;
     const store = new SqliteModelGatewayCatalogStore();
     const effectResult =
         records.length > 0
             ? await store.writeAutomationEffectApplicationRecords(records)
             : { automationEffectApplications: 0 };
+    const recoveryResult =
+        recoveryAttempts.length > 0 ? await store.writeRecoveryAttemptRecords(recoveryAttempts) : { recoveryAttempts: 0 };
     const handoffResult =
         handoffs.length > 0 ? await store.writeSdkSessionHandoffRecords(handoffs) : { sdkSessionHandoffs: 0 };
     return {
         automationEffectApplications: effectResult.automationEffectApplications,
+        recoveryAttempts: recoveryResult.recoveryAttempts,
         sdkSessionHandoffs: handoffResult.sdkSessionHandoffs,
     };
 }
@@ -318,7 +362,7 @@ export async function persistTerminalByokGatewayAutoEffectApplications(status, a
  *   policy: Awaited<ReturnType<typeof readModelGatewayRuntimeAutomationEffectivePolicy>>;
  *   status: Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>> | null;
  *   application: Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>> | null;
- *   effectPersistence: { automationEffectApplications: number; sdkSessionHandoffs: number } | null;
+ *   effectPersistence: { automationEffectApplications: number; recoveryAttempts: number; sdkSessionHandoffs: number } | null;
  * }>}
  */
 export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
@@ -368,7 +412,7 @@ export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
  *   status: Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>> | null;
  *   controllerStep: ReturnType<typeof buildModelGatewayRuntimeAutomationControllerStep> | null;
  *   application: Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>> | null;
- *   effectPersistence: { automationEffectApplications: number; sdkSessionHandoffs: number } | null;
+ *   effectPersistence: { automationEffectApplications: number; recoveryAttempts: number; sdkSessionHandoffs: number } | null;
  * }>}
  */
 export async function runTerminalByokGatewayPostTurnAutomation(turnFailure = {}, options = {}) {
