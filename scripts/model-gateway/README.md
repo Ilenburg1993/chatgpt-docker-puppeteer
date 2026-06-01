@@ -85,6 +85,7 @@ No terminal:
 /byok auto record profile:repo_agent
 /byok auto apply profile:repo_agent allow-live-set-model
 /byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
+/byok probe agent provider:zai model:glm-4.5-flash timeout:20000
 /byok auto off
 ```
 
@@ -93,6 +94,8 @@ provider/perfil exige novo boot de sessão SDK.
 `recovery-fixture` simula uma falha post-turn account-wide, grava o ledger de recovery, persiste health operacional no
 SQLite e não chama provider. Quando a decisão atual não tem rota selecionada, use `provider:` e `model:` explícitos para
 testar a persistência de saúde sem depender do selector.
+`/byok probe agent provider:<provider> model:<provider-model>` prova uma rota específica do selector em sessão SDK
+descartável e alimenta o mesmo runtime health que destrava candidatos `repo_agent`/`tool_agent`.
 
 ## Live Tests
 

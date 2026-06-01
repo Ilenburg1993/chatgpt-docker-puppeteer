@@ -2021,6 +2021,53 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('token');
     });
 
+    it('roda probe contra provider/model explícitos para promover rota do runtime selector', async () => {
+        mockProjection();
+        runConfiguredByokAgentProbe.mockResolvedValue({
+            ok: true,
+            status: 'ok',
+            elapsedMs: 321,
+            model: 'glm-4.5-flash',
+            profile: null,
+            preset: 'zai',
+            providerType: 'openai',
+            deltaCount: 4,
+            deltaChars: 32,
+            finalChars: 32,
+            observedFinalEvent: true,
+            toolCallCount: 2,
+            markerToolCallCount: 1,
+            readToolCallCount: 1,
+            userInputRequestCount: 1,
+            userInputAnswerCount: 1,
+            sessionId: 'tmp-zai-agent',
+            errors: [],
+            warnings: [],
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'probe agent provider:zai model:glm-4.5-flash timeout:20000');
+
+        expect(runConfiguredByokAgentProbe).toHaveBeenCalledWith(
+            expect.objectContaining({
+                env: expect.objectContaining({
+                    COPILOT_BYOK_ENABLED: 'true',
+                    COPILOT_BYOK_PROVIDER_PRESET: 'zai',
+                    COPILOT_BYOK_MODEL: 'glm-4.5-flash',
+                }),
+                model: 'glm-4.5-flash',
+                timeoutMs: 20000,
+            }),
+        );
+        expect(recordByokProviderModelAgentProbeSuccess).toHaveBeenCalledWith({
+            routeProfile: null,
+            providerId: 'zai',
+            providerModel: 'glm-4.5-flash',
+        });
+        expect(ctx.output()).toContain('provider=zai');
+        expect(ctx.output()).toContain('model=glm-4.5-flash');
+    });
+
     it('roda agent probe descartável e separa compatibilidade agente do chat canário', async () => {
         mockProjection();
         runConfiguredByokAgentProbe.mockResolvedValue({
@@ -2888,6 +2935,62 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('prepare_new_sdk_session:dry');
         expect(ctx.output()).toContain('action=prepare_new_session');
         expect(ctx.output()).toContain('/session sdk next new');
+    });
+
+    it('mostra comandos de prova por provider/model quando alternativas auto carecem de agent probe', async () => {
+        mockProjection();
+        buildModelGatewayRuntimeSelectorPlan.mockReturnValueOnce({
+            schema: 'model-gateway-runtime-selector-plan',
+            ok: false,
+            ready: false,
+            mode: 'prefer_runtime_proved',
+            summary: {
+                profileCount: 1,
+                selectedProfileCount: 0,
+                blockedProfileCount: 1,
+                runtimeProofSelectedCount: 0,
+                runtimeEnvReadyCount: 1,
+                runtimeEnvBlockedCount: 0,
+            },
+            routes: [
+                {
+                    profileId: 'repo_agent',
+                    status: 'blocked',
+                    source: 'test',
+                    selected: null,
+                    selectedRouteKey: null,
+                    hasRuntimeProof: false,
+                    runtimeEnv: null,
+                    runtimeHealth: null,
+                    providerCooldown: null,
+                    alternativeSummary: {
+                        evaluatedCount: 1,
+                        usableCount: 0,
+                        blockedCount: 1,
+                        providerCount: 1,
+                        rejectionReasonCounts: { 'runtime_health:agent_probe_missing': 1 },
+                        topBlockedRoutes: [
+                            {
+                                label: 'alternate1',
+                                providerId: 'zai',
+                                providerModel: 'glm-4.5-flash',
+                                reasons: ['runtime_health:agent_probe_missing'],
+                            },
+                        ],
+                    },
+                    candidateAlternatives: [],
+                    reasons: ['blocked:no_selected_route'],
+                    nextActions: ['run_runtime_probe_for_profile'],
+                    decisionEvent: { type: 'model_gateway:route_decision' },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'auto status profile:repo_agent');
+
+        expect(ctx.output()).toContain('alternativas:');
+        expect(ctx.output()).toContain('/byok probe agent provider:zai model:glm-4.5-flash timeout:20000');
     });
 
     it('aplica efeito auto live apenas quando a policy autoriza', async () => {

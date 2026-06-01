@@ -3339,6 +3339,36 @@ function parseGatewayCatalogListArgs(rest) {
 }
 
 /**
+ * @param {unknown} alternativeSummary
+ * @param {number} [limit]
+ * @returns {string[]}
+ */
+function buildByokRuntimeProofCommands(alternativeSummary, limit = 3) {
+    const summary = asRecord(alternativeSummary);
+    const blockedRoutes = Array.isArray(summary.topBlockedRoutes) ? summary.topBlockedRoutes : [];
+    const commands = [];
+    const seen = new Set();
+    for (const blocked of blockedRoutes) {
+        const providerId = optionalScalarString(blocked?.providerId);
+        const providerModel = optionalScalarString(blocked?.providerModel);
+        if (!providerId || !providerModel) continue;
+        const reasons = Array.isArray(blocked?.reasons) ? blocked.reasons.map(optionalScalarString).filter((item) => item !== null) : [];
+        const needsAgentProbe = reasons.some((reason) =>
+            /agent_probe_(?:missing|not_verified|failed)|runtime_probe_failed:agent/iu.test(reason),
+        );
+        const needsChatProbe = reasons.some((reason) => /chat_health_failed|health_unknown/iu.test(reason));
+        if (!needsAgentProbe && !needsChatProbe) continue;
+        const mode = needsAgentProbe ? 'agent' : 'chat';
+        const command = `/byok probe ${mode} provider:${providerId} model:${providerModel} timeout:20000`;
+        if (seen.has(command)) continue;
+        seen.add(command);
+        commands.push(command);
+        if (commands.length >= limit) break;
+    }
+    return commands;
+}
+
+/**
  * @param {(text: string) => void} println
  * @param {string[]} rest
  * @param {{ apply?: boolean; persist?: boolean }} [options]
@@ -3393,6 +3423,9 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
                 ? blocked.reasons.map(optionalScalarString).filter((item) => item !== null).slice(0, 3).join('+')
                 : '-';
             println(`      \x1b[90mbloqueada: ${providerId}:${providerModel} · ${reasons || '-'}\x1b[0m`);
+        }
+        for (const command of buildByokRuntimeProofCommands(alternativeSummary)) {
+            println(`      \x1b[90mprovar: ${command}\x1b[0m`);
         }
     }
     if (decision.blockers.length > 0) println(`    blockers:      \x1b[33m${decision.blockers.join(', ')}\x1b[0m`);
@@ -3740,6 +3773,9 @@ async function renderByokGatewayAutoDoctor(println, rest) {
         println(
             `    alternativas:  \x1b[33musable=${alternativeSummary.usableCount}/${alternativeSummary.evaluatedCount} · providers=${alternativeSummary.providerCount}${topReasons ? ` · ${topReasons}` : ''}\x1b[0m`,
         );
+        for (const command of buildByokRuntimeProofCommands(alternativeSummary)) {
+            println(`      \x1b[90mprovar: ${command}\x1b[0m`);
+        }
     }
     println(
         `    ledgers:       \x1b[33mdecisions=${diagnostics.automationDecisionRows ?? 0} · policySnapshots=${diagnostics.automationPolicySnapshotRows ?? 0} · effects=${effectsRows} · recoveries=${recoveryRows} · handoffs=${handoffRows} · confirmations=${confirmationRows} · liveRuns=${liveScenarioRunRows}\x1b[0m`,
@@ -4242,7 +4278,7 @@ function clearRuntimeSelectors(except = []) {
 
 /**
  * @param {string[]} rest
- * @returns {{ env: Record<string, string | undefined>; model: string | null; profile: string | null; timeoutMs: number | undefined }}
+ * @returns {{ env: Record<string, string | undefined>; model: string | null; profile: string | null; provider: string | null; baseUrl: string | null; wireApi: string | null; timeoutMs: number | undefined }}
  */
 function buildByokProbeSelection(rest) {
     /** @type {Record<string, string | undefined>} */
@@ -4251,18 +4287,54 @@ function buildByokProbeSelection(rest) {
     let model = null;
     /** @type {string | null} */
     let profile = null;
+    /** @type {string | null} */
+    let provider = null;
+    /** @type {string | null} */
+    let baseUrl = null;
+    /** @type {string | null} */
+    let wireApi = null;
     /** @type {number | undefined} */
     let timeoutMs;
+    const readTokenValue = (item, colonPrefix, equalsPrefix = colonPrefix.replace(/:$/u, '=')) =>
+        item.toLowerCase().startsWith(colonPrefix)
+            ? item.slice(colonPrefix.length).trim() || null
+            : item.toLowerCase().startsWith(equalsPrefix)
+              ? item.slice(equalsPrefix.length).trim() || null
+              : null;
     for (const raw of rest) {
         const item = raw.trim();
         const lower = item.toLowerCase();
         if (!item || lower === 'active' || lower === '--active') continue;
         if (lower.startsWith('profile:') || lower.startsWith('profile=')) {
-            profile = item.slice(item.indexOf(lower.startsWith('profile:') ? ':' : '=') + 1).trim() || null;
+            profile = readTokenValue(item, 'profile:') ?? profile;
+            continue;
+        }
+        if (lower.startsWith('provider:') || lower.startsWith('provider=')) {
+            provider = readTokenValue(item, 'provider:') ?? provider;
+            continue;
+        }
+        if (lower.startsWith('preset:') || lower.startsWith('preset=')) {
+            provider = readTokenValue(item, 'preset:') ?? provider;
+            continue;
+        }
+        if (lower.startsWith('baseurl:') || lower.startsWith('baseurl=')) {
+            baseUrl = readTokenValue(item, 'baseurl:') ?? baseUrl;
+            continue;
+        }
+        if (lower.startsWith('base-url:') || lower.startsWith('base-url=')) {
+            baseUrl = readTokenValue(item, 'base-url:') ?? baseUrl;
+            continue;
+        }
+        if (lower.startsWith('wire:') || lower.startsWith('wire=')) {
+            wireApi = readTokenValue(item, 'wire:') ?? wireApi;
+            continue;
+        }
+        if (lower.startsWith('wireapi:') || lower.startsWith('wireapi=')) {
+            wireApi = readTokenValue(item, 'wireapi:') ?? wireApi;
             continue;
         }
         if (lower.startsWith('model:') || lower.startsWith('model=')) {
-            model = item.slice(item.indexOf(lower.startsWith('model:') ? ':' : '=') + 1).trim() || null;
+            model = readTokenValue(item, 'model:') ?? model;
             continue;
         }
         if (lower.startsWith('timeout:') || lower.startsWith('timeout=')) {
@@ -4275,6 +4347,11 @@ function buildByokProbeSelection(rest) {
         }
         if (!model) model = item;
     }
+    if (provider) {
+        env['COPILOT_BYOK_ENABLED'] = 'true';
+        env['COPILOT_BYOK_PROVIDER_PRESET'] = provider;
+        delete env['COPILOT_BYOK_PROFILE'];
+    }
     if (profile) {
         env['COPILOT_BYOK_ENABLED'] = 'true';
         env['COPILOT_BYOK_PROFILE'] = profile;
@@ -4283,7 +4360,15 @@ function buildByokProbeSelection(rest) {
         env['COPILOT_BYOK_ENABLED'] = 'true';
         env['COPILOT_BYOK_MODEL'] = model;
     }
-    return { env, model, profile, timeoutMs };
+    if (baseUrl) {
+        env['COPILOT_BYOK_ENABLED'] = 'true';
+        env['COPILOT_BYOK_BASE_URL'] = baseUrl;
+    }
+    if (wireApi) {
+        env['COPILOT_BYOK_ENABLED'] = 'true';
+        env['COPILOT_BYOK_WIRE_API'] = wireApi;
+    }
+    return { env, model, profile, provider, baseUrl, wireApi, timeoutMs };
 }
 
 /**
@@ -4976,7 +5061,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         const selection = buildByokProbeSelection(explicitMode ? rest.slice(1) : rest);
         println(`\n  \x1b[36mBYOK ${mode} probe\x1b[0m`);
         println(
-            `  \x1b[90mEscopo: sessão SDK descartável; não troca o dialog loop nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : mode === 'agent' ? ' Agent exige tools representativas do terminal + ask_user com resposta sintética.' : mode === 'streaming' ? ' Streaming exige assistant.message_delta real; não degrada health de chat.' : mode === 'json' ? ' JSON exige payload parseável; não degrada health de chat.' : ' Vision anexa fixture PNG hermética e exige identificação visual; não degrada health de chat.'}${selection.profile ? ` profile=${selection.profile}` : ''}${selection.model ? ` model=${selection.model}` : ''}\x1b[0m`,
+            `  \x1b[90mEscopo: sessão SDK descartável; não troca o dialog loop nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : mode === 'agent' ? ' Agent exige tools representativas do terminal + ask_user com resposta sintética.' : mode === 'streaming' ? ' Streaming exige assistant.message_delta real; não degrada health de chat.' : mode === 'json' ? ' JSON exige payload parseável; não degrada health de chat.' : ' Vision anexa fixture PNG hermética e exige identificação visual; não degrada health de chat.'}${selection.profile ? ` profile=${selection.profile}` : ''}${selection.provider ? ` provider=${selection.provider}` : ''}${selection.model ? ` model=${selection.model}` : ''}${selection.baseUrl ? ` baseUrl=${selection.baseUrl}` : ''}${selection.wireApi ? ` wire=${selection.wireApi}` : ''}\x1b[0m`,
         );
         const { probe, providerAttempted } = await runByokProbe(mode, selection, eventBus);
         renderByokProbeResult(println, mode, probe, { providerAttempted });

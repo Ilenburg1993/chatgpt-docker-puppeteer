@@ -776,8 +776,15 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         id: 'terminal.auto-recovery-fixture',
         phase: 'automation',
         surface: 'terminal',
-        command: '/byok auto recovery-fixture profile:repo_agent failure:rate-limit',
-        summary: 'Persist a synthetic post-turn recovery attempt without calling providers, for operator/live validation.',
+        command: '/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit',
+        summary: 'Persist a synthetic post-turn recovery attempt and runtime health fact without calling providers, for operator/live validation.',
+    },
+    {
+        id: 'terminal.probe-agent-provider-route',
+        phase: 'runtime-probes',
+        surface: 'terminal',
+        command: '/byok probe agent provider:<provider> model:<provider-model> timeout:20000',
+        summary: 'Run a disposable agent probe against an explicit provider/model route so auto fallback candidates can be promoted into verified runtime health.',
     },
     {
         id: 'terminal.auto-off',

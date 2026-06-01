@@ -203,6 +203,7 @@ Responsavel pela experiencia viva do operador:
 /byok auto handoffs 10
 /byok auto confirmations 10
 /byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
+/byok probe agent provider:zai model:glm-4.5-flash timeout:20000
 /byok auto recoveries 10
 /byok auto off
 ```
@@ -346,6 +347,7 @@ Esse probe abre o terminal real e valida o cockpit de auto-mode:
 - `/byok auto handoffs 10`;
 - `/byok auto confirmations 10`;
 - `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit`;
+- `/byok probe agent provider:zai model:glm-4.5-flash timeout:20000`;
 - `/byok auto recoveries 10`;
 - `/events`;
 - `/errors`.
@@ -357,19 +359,20 @@ Evidencia em 2026-06-01:
 - status: PASS;
 - artefato inicial: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`;
 - artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-57-46-528Z/summary.md`;
-- artefato com recovery fixture final: `artifacts/terminal-live/2026-06-01T23-21-49-011Z/summary.md`;
-- duracao mais recente: 19438ms;
+- artefato com recovery fixture final: `artifacts/terminal-live/2026-06-01T23-33-43-471Z/summary.md`;
+- duracao mais recente: 19877ms;
 - erros rastreados: 0;
 - criterios PASS mais recentes: 28;
-- inventario canonico exibiu 134 comandos apos recovery fixture;
+- inventario canonico exibiu 135 comandos apos recovery fixture;
 - `/byok auto policy` funcionou;
 - `/byok auto status profile:repo_agent` funcionou e mostrou resumo de alternativas usaveis/bloqueadas;
 - `/byok auto doctor profile:repo_agent` funcionou e mostrou resumo de alternativas usaveis/bloqueadas;
+- o cockpit passou a sugerir `/byok probe agent provider:<provider> model:<provider-model> timeout:20000` quando alternativas carecem de agent probe;
 - `/byok auto explain profile:repo_agent` funcionou;
 - `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery account-wide, runtime health e espelho SQLite sem chamada ao provider;
 - ledgers history/handoffs/confirmations/recoveries renderizaram corretamente;
-- ledger de live scenarios gravou `terminal-live:2026-06-01T23-21-49-019Z:auto_probe`;
-- `npm run model-gateway:live:runs` leu 8 runs persistidos e confirmou `criteriaTotal=28` no ultimo;
+- ledger de live scenarios gravou `terminal-live:2026-06-01T23-33-43-478Z:auto_probe`;
+- `npm run model-gateway:live:runs` leu 9 runs persistidos e confirmou `criteriaTotal=28` no ultimo;
 - achado estrutural: depois dos overlays de health, `repo_agent` pode mostrar `usable=0/78` porque exige agent-probe verificado; isso e bloqueio correto, nao falha do cockpit.
 
 ### 5.6 BYOK real no-PR
@@ -444,6 +447,7 @@ Depois reiniciar a task/sessao conforme a mensagem do terminal quando houver reb
 /byok auto handoffs 10
 /byok auto confirmations 10
 /byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
+/byok probe agent provider:zai model:glm-4.5-flash timeout:20000
 /byok auto recoveries 10
 ```
 

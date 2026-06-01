@@ -212,7 +212,7 @@ Regras:
 
 ## 5. Comandos Canonicos
 
-Inventario atual: 134 comandos.
+Inventario atual: 135 comandos.
 
 Distribuicao por fase:
 
@@ -263,6 +263,7 @@ Comandos terminal equivalentes:
 /byok auto handoffs 10
 /byok auto confirmations 10
 /byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
+/byok probe agent provider:zai model:glm-4.5-flash timeout:20000
 /byok auto recoveries 10
 ```
 
@@ -353,17 +354,19 @@ npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_a
 
 Validado nesta linha:
 
-- `npm run model-gateway:commands:json`: 134 comandos.
-- `npm run model-gateway:auto:recoveries`: PASS, read-only, rows=5, recovery fixture `rate-limit` aplicada.
-- `npm run model-gateway:auto:doctor`: PASS operacional de leitura, schema=10, commands=134, recoveries=5, liveRuns=8; gate auto pode ficar bloqueado quando nao houver alternativa runtime-proved utilizavel.
+- `npm run model-gateway:commands:json`: 135 comandos.
+- `npm run model-gateway:auto:recoveries`: PASS, read-only, rows=6, recovery fixture `rate-limit` aplicada.
+- `npm run model-gateway:auto:doctor`: PASS operacional de leitura, schema=10, commands=135, recoveries=6, liveRuns=9; gate auto pode ficar bloqueado quando nao houver alternativa runtime-proved utilizavel.
 - `npm run model-gateway:auto:scenarios`: PASS, inclui `auto_recoveries`.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`: 215 PASS.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js`: 97 PASS.
 - `npm run model-gateway:live:auto-probe`: PASS.
-- Artefato live: `artifacts/terminal-live/2026-06-01T23-21-49-011Z/summary.md`.
-- `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-01T23-21-49-019Z:auto_probe`, `criteriaTotal=28`, `criteriaFailed=0`.
+- Artefato live: `artifacts/terminal-live/2026-06-01T23-33-43-471Z/summary.md`.
+- `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-01T23-33-43-478Z:auto_probe`, `criteriaTotal=28`, `criteriaFailed=0`.
 - `/byok auto status` e `/byok auto doctor` agora mostram resumo de alternativas: usable/evaluated, quantidade de providers e principais blockers.
+- `/byok auto status` e `/byok auto doctor` agora sugerem comandos `provar:` para promover candidatos bloqueados por agent probe ausente/nao verificado.
 - `/byok auto recovery-fixture ... provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery, runtime health e espelho SQLite sem chamada ao provider.
+- `/byok probe agent provider:<provider> model:<provider-model> timeout:20000` prova rota explicita do selector e alimenta o runtime health usado por `repo_agent`/`tool_agent`.
 - `npm run model-gateway:lint`: PASS.
 
 ## 10. Proximas Lacunas De Alto Retorno
