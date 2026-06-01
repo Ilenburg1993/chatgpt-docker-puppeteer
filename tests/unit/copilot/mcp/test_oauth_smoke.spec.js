@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it, vi } from 'vitest';
 
-import { runMcpOAuthSmoke } from '../../../../src/copilot/mcp/scripts/oauth-smoke.js';
+import { runMcpOAuthSmoke } from '#copilot/mcp/scripts';
 
 const originalEnv = { ...process.env };
 

@@ -6,19 +6,21 @@
  */
 
 import { getIoIndexStats } from '#copilot/infra/public/indexing';
-import { readCloudflareTunnelConfig } from '../cloudflare/config.js';
 import {
+    readCloudflareTunnelConfig,
     readConnectorSmokeState,
     readQuickTunnelState,
     summarizeConnectorSmokeState,
     summarizeQuickTunnelState,
-} from '../cloudflare/state.js';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { readMcpIndexAutoBuildState } from '../control-plane/index-auto-build.js';
-import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
-import { getMcpWorkspaceRoot } from '../control-plane/paths.js';
-import { okResult } from '../control-plane/result.js';
-import { readMcpWorkspaceSmokeSummary } from '../control-plane/smoke-state.js';
+} from '#copilot/mcp/cloudflare';
+import {
+    getMcpWorkspaceRoot,
+    okResult,
+    readMcpIndexAutoBuildState,
+    readMcpMetricsSnapshot,
+    readMcpWorkspaceSmokeSummary,
+    readOnlyAnnotations,
+} from '#copilot/mcp/control-plane';
 import { repoStatusHandler } from './repo-status.js';
 
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;

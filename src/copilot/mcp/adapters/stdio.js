@@ -6,7 +6,7 @@
  */
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { logMcp } from '../control-plane/audit.js';
+import { logMcp } from '#copilot/mcp/control-plane';
 import { createCopilotMcpServer } from '../server.js';
 
 /**

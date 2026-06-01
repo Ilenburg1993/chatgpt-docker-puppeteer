@@ -17,12 +17,17 @@
 
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createHash } from 'node:crypto';
-import { buildChatGptConnectorProfile } from '../connection/profile.js';
-import { logMcp } from '../control-plane/audit.js';
-import { buildProtectedResourceMetadata, parseBearerToken, readMcpAuthConfig } from '../control-plane/auth.js';
-import { handleBuiltInDevOAuthRequest } from '../control-plane/dev-oauth.js';
-import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
-import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
+import { buildChatGptConnectorProfile } from '#copilot/mcp/connection';
+import {
+    buildProtectedResourceMetadata,
+    handleBuiltInDevOAuthRequest,
+    logMcp,
+    parseBearerToken,
+    readMcpAuthConfig,
+    readMcpIndexAutoBuildState,
+    readMcpMetricsSnapshot,
+    startMcpIndexAutoBuildInBackground,
+} from '#copilot/mcp/control-plane';
 import { createCopilotMcpServer } from '../server.js';
 import { buildMcpHttpProtocolReport, setMcpHttpProtocolResponseHeaders } from './http-protocol.js';
 

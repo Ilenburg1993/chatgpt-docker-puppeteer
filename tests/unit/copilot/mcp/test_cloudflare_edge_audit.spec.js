@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeEdgeRulesets } from '../../../../src/copilot/mcp/cloudflare/edge-audit.js';
+import { analyzeEdgeRulesets } from '#copilot/mcp/cloudflare';
 
 describe('mcp/cloudflare/edge-audit', () => {
     it('accepts explicit cache bypass and rate-limit rules for the MCP hostname', () => {

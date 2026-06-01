@@ -6,9 +6,8 @@
  */
 
 import { z } from 'zod';
-import { createCloudflareEdgeBackup, listCloudflareEdgeBackups } from '../cloudflare/edge-backup.js';
-import { boundedWriteAnnotations, readOnlyAnnotations } from '../control-plane/annotations.js';
-import { okResult } from '../control-plane/result.js';
+import { createCloudflareEdgeBackup, listCloudflareEdgeBackups } from '#copilot/mcp/cloudflare';
+import { boundedWriteAnnotations, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 /**
  * @type {import('../registry.js').McpToolDefinition}

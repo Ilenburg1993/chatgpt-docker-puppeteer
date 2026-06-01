@@ -10,33 +10,31 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'vitest';
 
-import { startHttpMcpServer } from '../../../../src/copilot/mcp/adapters/http.js';
+import { startHttpMcpServer } from '#copilot/mcp/adapters';
 import {
     buildChatGptConnectorProfile,
     buildCloudflareTunnelRunbook,
     buildSecureTunnelRunbook,
     normalizeMcpUrl,
     validatePublicConnectorUrl,
-} from '../../../../src/copilot/mcp/connection/profile.js';
+} from '#copilot/mcp/connection';
 import {
     authorizeMcpToolCall,
+    buildBuiltInDevOAuthClientMetadata,
+    buildBuiltInDevOAuthMetadata as buildDevOAuthServerMetadata,
     buildProtectedResourceMetadata,
     buildWwwAuthenticateChallenge,
+    isBuiltInDevOAuthEnabled as isDevOAuthServerEnabled,
     normalizeMcpAuthEnforcement,
     normalizeMcpAuthMode,
     parseBearerToken,
+    readDevOAuthPersistenceStatus,
     readMcpAuthConfig,
+    resetDevOAuthRuntimeForTests,
     scopesForMcpTool,
     securitySchemesForMcpTool,
-} from '../../../../src/copilot/mcp/control-plane/auth.js';
-import {
-    buildBuiltInDevOAuthClientMetadata,
-    buildBuiltInDevOAuthMetadata as buildDevOAuthServerMetadata,
-    isBuiltInDevOAuthEnabled as isDevOAuthServerEnabled,
-    readDevOAuthPersistenceStatus,
-    resetDevOAuthRuntimeForTests,
-} from '../../../../src/copilot/mcp/control-plane/dev-oauth.js';
-import { getCanonicalMcpTools } from '../../../../src/copilot/mcp/registry.js';
+} from '#copilot/mcp/control-plane';
+import { getCanonicalMcpTools } from '#copilot/mcp';
 
 describe('copilot MCP ChatGPT connection profile', () => {
     it('normalizes connector URLs to /mcp', () => {

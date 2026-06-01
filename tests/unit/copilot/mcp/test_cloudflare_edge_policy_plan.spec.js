@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCloudflareEdgePolicyPlan } from '../../../../src/copilot/mcp/cloudflare/edge-policy-plan.js';
+import { buildCloudflareEdgePolicyPlan } from '#copilot/mcp/cloudflare';
 
 describe('mcp/cloudflare/edge-policy-plan', () => {
     it('builds a plan-only desired Cloudflare edge policy for the permanent hostname', async () => {

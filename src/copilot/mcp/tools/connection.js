@@ -11,13 +11,14 @@
 import { lookup } from 'node:dns/promises';
 import net from 'node:net';
 import { z } from 'zod';
-import { readCloudflareTunnelConfig, validateConfiguredPublicUrl } from '../cloudflare/config.js';
 import {
+    readCloudflareTunnelConfig,
     readConnectorSmokeState,
     readQuickTunnelState,
     summarizeConnectorSmokeState,
     summarizeQuickTunnelState,
-} from '../cloudflare/state.js';
+    validateConfiguredPublicUrl,
+} from '#copilot/mcp/cloudflare';
 import {
     buildChatGptConnectorProfile,
     buildClaudeConnectorProfile,
@@ -25,14 +26,14 @@ import {
     buildSecureTunnelRunbook,
     normalizeMcpUrl,
     validatePublicConnectorUrl,
-} from '../connection/profile.js';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
+} from '#copilot/mcp/connection';
 import {
     buildProtectedResourceMetadata,
     buildWwwAuthenticateChallenge,
+    okResult,
     readMcpAuthConfig,
-} from '../control-plane/auth.js';
-import { okResult } from '../control-plane/result.js';
+    readOnlyAnnotations,
+} from '#copilot/mcp/control-plane';
 
 const OAUTH_METADATA_PATHS = /** @type {const} */ ([
     '/.well-known/oauth-authorization-server',

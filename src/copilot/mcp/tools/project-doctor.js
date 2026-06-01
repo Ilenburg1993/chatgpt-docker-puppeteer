@@ -7,10 +7,8 @@
 
 import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { getMcpWorkspaceRoot } from '../control-plane/paths.js';
-import { okResult } from '../control-plane/result.js';
-import { execGit } from './shared/git.js';
+import { getMcpWorkspaceRoot, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { execGit } from '#copilot/mcp/tools/shared';
 
 /**
  * @type {import('../registry.js').McpToolDefinition}

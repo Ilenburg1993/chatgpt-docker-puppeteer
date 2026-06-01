@@ -16,10 +16,10 @@ import {
     resetMcpAuthRuntimeForTests,
     scopesForMcpTool,
     securitySchemesForMcpTool,
-} from '../../../../src/copilot/mcp/control-plane/auth.js';
-import { getCanonicalMcpTools } from '../../../../src/copilot/mcp/registry.js';
+} from '#copilot/mcp/control-plane';
+import { getCanonicalMcpTools } from '#copilot/mcp';
 
-/** @type {import('../../../../src/copilot/mcp/registry.js').McpToolDefinition} */
+/** @type {import('#copilot/mcp').McpToolDefinition} */
 const readTool = {
     name: 'repo_read_file',
     title: 'Read file',
@@ -34,7 +34,7 @@ const readTool = {
     handler: () => ({ content: [{ type: 'text', text: 'ok' }], structuredContent: {} }),
 };
 
-/** @type {import('../../../../src/copilot/mcp/registry.js').McpToolDefinition} */
+/** @type {import('#copilot/mcp').McpToolDefinition} */
 const writeTool = {
     name: 'repo_apply_patch',
     title: 'Apply patch',

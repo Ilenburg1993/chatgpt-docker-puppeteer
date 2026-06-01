@@ -6,7 +6,7 @@ import {
     buildCloudflareEdgeBackupFileName,
     listCloudflareEdgeBackups,
     writeCloudflareEdgeBackup,
-} from '../../../../src/copilot/mcp/cloudflare/edge-backup.js';
+} from '#copilot/mcp/cloudflare';
 
 /** @type {string | undefined} */
 let tempDir;

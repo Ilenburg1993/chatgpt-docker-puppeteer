@@ -5,9 +5,8 @@
  * @module copilot/mcp/tools/repo-status
  */
 
-import { getMcpWorkspaceRoot } from '../control-plane/paths.js';
-import { errorResult, okResult } from '../control-plane/result.js';
-import { execGit } from './shared/git.js';
+import { errorResult, getMcpWorkspaceRoot, okResult } from '#copilot/mcp/control-plane';
+import { execGit } from '#copilot/mcp/tools/shared';
 
 /**
  * @returns {Promise<import('../control-plane/result.js').StructuredCallToolResult>}

@@ -10,9 +10,8 @@ import {
     applyCloudflareMcpPassthroughPlan,
     buildCloudflareMcpPassthroughPlan,
     diffCloudflareMcpPassthroughPlan,
-} from '../cloudflare/mcp-passthrough-plan.js';
-import { boundedWriteAnnotations, readOnlyAnnotations } from '../control-plane/annotations.js';
-import { okResult } from '../control-plane/result.js';
+} from '#copilot/mcp/cloudflare';
+import { boundedWriteAnnotations, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 /** @type {import('../registry.js').McpToolDefinition} */
 export const mcpCloudflareMcpPassthroughPlanTool = {

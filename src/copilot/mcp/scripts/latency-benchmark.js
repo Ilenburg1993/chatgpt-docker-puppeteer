@@ -9,7 +9,7 @@
  */
 
 import { pathToFileURL } from 'node:url';
-import { normalizeMcpUrl } from '../connection/profile.js';
+import { normalizeMcpUrl } from '#copilot/mcp/connection';
 
 const DEFAULT_PUBLIC_MCP_URL = 'https://mcp.aurelin.org/mcp';
 const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:3333/mcp';

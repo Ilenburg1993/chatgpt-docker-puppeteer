@@ -7,7 +7,7 @@ import {
     buildCloudflareMcpPathExpression,
     buildCloudflareOAuthTokenExpression,
     buildCloudflarePublicMetadataCacheExpression,
-} from '../../../../src/copilot/mcp/cloudflare/routes.js';
+} from '#copilot/mcp/cloudflare';
 
 describe('mcp/cloudflare/routes', () => {
     it('matches the MCP endpoint exactly or under explicit MCP subroutes', () => {

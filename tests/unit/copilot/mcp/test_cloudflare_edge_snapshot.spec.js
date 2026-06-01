@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCloudflareEdgeSnapshotReport } from '../../../../src/copilot/mcp/cloudflare/edge-snapshot.js';
+import { buildCloudflareEdgeSnapshotReport } from '#copilot/mcp/cloudflare';
 
 describe('mcp/cloudflare/edge-snapshot', () => {
     it('builds a consolidated read-only snapshot for backup planning', () => {

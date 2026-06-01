@@ -6,17 +6,17 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { readMcpHttpServerTimingPolicy } from '../../../../src/copilot/mcp/adapters/http.js';
-import { readMcpHttp2ServerPolicy } from '../../../../src/copilot/mcp/adapters/http2.js';
 import {
     buildMcpHttpProtocolReport,
     createMcpHttpProtocolState,
+    readMcpHttp2ServerPolicy,
+    readMcpHttpServerTimingPolicy,
     recordMcpHttpProtocolRequest,
-} from '../../../../src/copilot/mcp/adapters/http-protocol.js';
+} from '#copilot/mcp/adapters';
 import {
     compareToolNames,
     extractMcpToolNames,
-} from '../../../../src/copilot/mcp/scripts/smoke-http.js';
+} from '#copilot/mcp/scripts';
 
 describe('copilot MCP local HTTP smoke helpers', () => {
     it('extracts tool names from a JSON-RPC tools/list body', () => {

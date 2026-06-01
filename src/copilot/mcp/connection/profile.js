@@ -8,7 +8,7 @@
  * @module copilot/mcp/connection/profile
  */
 
-import { readMcpAuthConfig } from '../control-plane/auth.js';
+import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
 
 const DEFAULT_LOCAL_HTTP_ORIGIN_URL = 'http://127.0.0.1:3333';
 const DEFAULT_LOCAL_HTTP2_ORIGIN_URL = 'https://127.0.0.1:3333';
@@ -263,7 +263,7 @@ export function buildSecureTunnelRunbook(options = {}) {
         ],
         stdioTunnelCommands: [
             'export CONTROL_PLANE_API_KEY="sk-..."',
-            `tunnel-client init --sample sample_mcp_stdio_local --profile repo-devcontainer-stdio --tunnel-id ${profile.tunnelId} --mcp-command "node src/copilot/mcp/index.js --transport stdio"`,
+            `tunnel-client init --sample sample_mcp_stdio_local --profile repo-devcontainer-stdio --tunnel-id ${profile.tunnelId} --mcp-command "node src/copilot/mcp/cli.js --transport stdio"`,
             'tunnel-client doctor --profile repo-devcontainer-stdio --explain',
             'tunnel-client run --profile repo-devcontainer-stdio',
         ],

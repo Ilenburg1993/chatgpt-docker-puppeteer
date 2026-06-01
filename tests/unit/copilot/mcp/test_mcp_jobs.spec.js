@@ -6,9 +6,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { resolveJobTimeoutMs, resolveValidatorCommand } from '../../../../src/copilot/mcp/control-plane/jobs.js';
-import { resolveSafeValidationSuite } from '../../../../src/copilot/mcp/scripts/run-safe-validation-suite.js';
-import { jobTools } from '../../../../src/copilot/mcp/tools/jobs.js';
+import { resolveJobTimeoutMs, resolveValidatorCommand } from '#copilot/mcp/control-plane';
+import { resolveSafeValidationSuite } from '#copilot/mcp/scripts';
+import { jobTools } from '#copilot/mcp/tools';
 
 describe('copilot MCP jobs', () => {
     it('resolves only allowlisted validator commands', () => {

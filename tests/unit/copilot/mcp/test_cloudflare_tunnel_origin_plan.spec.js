@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     applyCloudflareTunnelOriginPlan,
     buildCloudflareTunnelOriginPlan,
-} from '../../../../src/copilot/mcp/cloudflare/tunnel-origin-plan.js';
+} from '#copilot/mcp/cloudflare';
 
 const BASE_ENV = {
     CLOUDFLARE_API_TOKEN: 'cfat_test_token',

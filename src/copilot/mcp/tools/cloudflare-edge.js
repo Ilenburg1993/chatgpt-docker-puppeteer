@@ -5,9 +5,8 @@
  * @module copilot/mcp/tools/cloudflare-edge
  */
 
-import { auditCloudflareEdgeRulesets } from '../cloudflare/edge-audit.js';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { okResult } from '../control-plane/result.js';
+import { auditCloudflareEdgeRulesets } from '#copilot/mcp/cloudflare';
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 /**
  * @type {import('../registry.js').McpToolDefinition}

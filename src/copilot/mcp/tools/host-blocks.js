@@ -6,8 +6,7 @@
  */
 
 import { z } from 'zod';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { okResult } from '../control-plane/result.js';
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const HOST_BLOCK_TEMPLATE = {
     timestamp: '<ISO timestamp>',

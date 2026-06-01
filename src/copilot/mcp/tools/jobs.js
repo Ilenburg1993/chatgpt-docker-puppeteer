@@ -6,9 +6,16 @@
  */
 
 import { z } from 'zod';
-import { boundedWriteAnnotations, readOnlyAnnotations } from '../control-plane/annotations.js';
-import { cancelJob, listJobs, readJobOutput, spawnValidatorJob } from '../control-plane/jobs.js';
-import { errorResult, okResult } from '../control-plane/result.js';
+import {
+    boundedWriteAnnotations,
+    cancelJob,
+    errorResult,
+    listJobs,
+    okResult,
+    readJobOutput,
+    readOnlyAnnotations,
+    spawnValidatorJob,
+} from '#copilot/mcp/control-plane';
 import { projectDoctorTool } from './project-doctor.js';
 
 const validatorSchema = z.enum([

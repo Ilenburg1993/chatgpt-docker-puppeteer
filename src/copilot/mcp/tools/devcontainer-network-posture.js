@@ -6,8 +6,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { okResult } from '../control-plane/result.js';
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const LOCAL_DNS_SUMMARY = '/tmp/devcontainer-local-dns-cache.summary';
 const LOCAL_DNS_ACTION_SUMMARY = '/tmp/devcontainer-local-dns-cache.action.summary';

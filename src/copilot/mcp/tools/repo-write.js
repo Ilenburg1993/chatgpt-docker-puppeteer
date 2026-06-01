@@ -17,15 +17,18 @@ import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import { boundedWriteAnnotations, destructiveAnnotations, readOnlyAnnotations } from '../control-plane/annotations.js';
-import { appendMcpAuditEvent } from '../control-plane/audit.js';
 import {
+    appendMcpAuditEvent,
+    boundedWriteAnnotations,
+    destructiveAnnotations,
+    errorResult,
     getMcpWorkspaceRoot,
+    okResult,
+    readOnlyAnnotations,
     resolveReadPath,
     resolveWritePath,
     toWorkspaceRelativePath,
-} from '../control-plane/paths.js';
-import { errorResult, okResult } from '../control-plane/result.js';
+} from '#copilot/mcp/control-plane';
 
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
 const DEFAULT_MAX_DIFF_LINES = 2000;

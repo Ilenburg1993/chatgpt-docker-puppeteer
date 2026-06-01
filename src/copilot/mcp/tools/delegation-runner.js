@@ -6,10 +6,7 @@
  */
 
 import { z } from 'zod';
-import { boundedWriteAnnotations } from '../control-plane/annotations.js';
-import { spawnValidatorJob } from '../control-plane/jobs.js';
-import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
-import { okResult } from '../control-plane/result.js';
+import { boundedWriteAnnotations, okResult, readMcpMetricsSnapshot, spawnValidatorJob } from '#copilot/mcp/control-plane';
 import { buildMcpCapabilitiesSummary } from './meta.js';
 import { repoStatusHandler } from './repo-status.js';
 import { mcpSmokeWorkspaceTool } from './smoke-workspace.js';

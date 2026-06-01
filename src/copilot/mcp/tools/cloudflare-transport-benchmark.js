@@ -6,10 +6,8 @@
  */
 
 import { z } from 'zod';
-import { readCloudflareTunnelConfig } from '../cloudflare/config.js';
-import { readCloudflaredMetricsSnapshot } from '../cloudflare/metrics.js';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { okResult } from '../control-plane/result.js';
+import { readCloudflaredMetricsSnapshot, readCloudflareTunnelConfig } from '#copilot/mcp/cloudflare';
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const CANDIDATES = ['http2', 'auto', 'quic'];
 const DEFAULT_MIN_SAMPLES = 5;

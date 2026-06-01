@@ -8,15 +8,13 @@ import { beforeEach, describe, it } from 'vitest';
 
 import {
     readMcpIndexAutoBuildConfig,
-    resetMcpIndexAutoBuildStateForTests,
-} from '../../../../src/copilot/mcp/control-plane/index-auto-build.js';
-import {
     readMcpMetricsSnapshot,
     recordMcpToolMetric,
+    resetMcpIndexAutoBuildStateForTests,
     resetMcpMetricsForTests,
-} from '../../../../src/copilot/mcp/control-plane/metrics.js';
-import { resetMcpWorkspaceSmokeSummaryForTests } from '../../../../src/copilot/mcp/control-plane/smoke-state.js';
-import { mcpRuntimeHealthTool } from '../../../../src/copilot/mcp/tools/runtime-health.js';
+    resetMcpWorkspaceSmokeSummaryForTests,
+} from '#copilot/mcp/control-plane';
+import { mcpRuntimeHealthTool } from '#copilot/mcp/tools';
 
 describe('copilot MCP runtime metrics', () => {
     beforeEach(() => {

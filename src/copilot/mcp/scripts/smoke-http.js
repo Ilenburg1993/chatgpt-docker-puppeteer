@@ -6,8 +6,8 @@
  */
 
 import { pathToFileURL } from 'node:url';
-import { normalizeMcpUrl } from '../connection/profile.js';
-import { readMcpAuthConfig } from '../control-plane/auth.js';
+import { normalizeMcpUrl } from '#copilot/mcp/connection';
+import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
 import { getCanonicalMcpTools } from '../registry.js';
 
 const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:3333/mcp';

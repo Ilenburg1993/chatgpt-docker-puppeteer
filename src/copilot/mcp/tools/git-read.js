@@ -6,9 +6,8 @@
  */
 
 import { z } from 'zod';
-import { errorResult, okResult } from '../control-plane/result.js';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { execGit } from './shared/git.js';
+import { errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { execGit } from '#copilot/mcp/tools/shared';
 
 /**
  * @type {import('../registry.js').McpToolDefinition[]}

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     parsePrometheusMetrics,
     summarizeCloudflaredMetrics,
-} from '../../../../src/copilot/mcp/cloudflare/metrics.js';
+} from '#copilot/mcp/cloudflare';
 
 describe('mcp/cloudflare/metrics', () => {
     it('parses and summarizes cloudflared Prometheus metrics', () => {

@@ -10,7 +10,7 @@ import {
     clearActiveSdkSessions,
     registerActiveSdkSession,
 } from '../../../../src/copilot/sdk/session/session-registry.js';
-import { copilotSessionTools } from '../../../../src/copilot/mcp/tools/copilot-session.js';
+import { copilotSessionTools } from '#copilot/mcp/tools';
 
 const listTool = copilotSessionTools.find((tool) => tool.name === 'copilot_sessions_list');
 const getTool = copilotSessionTools.find((tool) => tool.name === 'copilot_session_get');

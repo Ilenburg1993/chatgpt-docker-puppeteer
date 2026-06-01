@@ -7,9 +7,7 @@
 
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { getMcpWorkspaceRoot } from '../control-plane/paths.js';
-import { okResult } from '../control-plane/result.js';
+import { getMcpWorkspaceRoot, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 /** @type {Record<string, string>} */
 const MARKERS = {

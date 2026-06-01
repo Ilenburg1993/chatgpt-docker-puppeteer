@@ -24,10 +24,15 @@ import {
 } from '#copilot/infra/public/indexing';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { z } from 'zod';
-import { boundedWriteAnnotations, readOnlyAnnotations } from '../control-plane/annotations.js';
-import { readMcpIndexAutoBuildState } from '../control-plane/index-auto-build.js';
-import { getMcpWorkspaceRoot, resolveReadPath } from '../control-plane/paths.js';
-import { errorResult, okResult } from '../control-plane/result.js';
+import {
+    boundedWriteAnnotations,
+    errorResult,
+    getMcpWorkspaceRoot,
+    okResult,
+    readMcpIndexAutoBuildState,
+    readOnlyAnnotations,
+    resolveReadPath,
+} from '#copilot/mcp/control-plane';
 
 const DEFAULT_INDEX_PATH = 'src/copilot';
 

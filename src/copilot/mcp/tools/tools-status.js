@@ -5,9 +5,7 @@
  * @module copilot/mcp/tools/tools-status
  */
 
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { MCP_AUTH_SCOPES, readMcpAuthConfig } from '../control-plane/auth.js';
-import { okResult } from '../control-plane/result.js';
+import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,

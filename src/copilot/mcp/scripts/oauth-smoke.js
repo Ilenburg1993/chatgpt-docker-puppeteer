@@ -7,7 +7,7 @@
 
 import { createHash, randomBytes } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { readMcpAuthConfig } from '../control-plane/auth.js';
+import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
 
 const FULL_REPO_SCOPE = 'repo:read repo:write repo:validate repo:admin';
 const FULL_REPO_OIDC_SCOPE = `${FULL_REPO_SCOPE} openid profile email`;

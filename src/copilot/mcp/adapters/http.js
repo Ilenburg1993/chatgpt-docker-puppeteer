@@ -19,7 +19,7 @@ import {
     readMcpHttpSessionRuntimeState,
 } from './http-shared.js';
 import { createMcpHttpProtocolState, recordMcpHttpProtocolRequest } from './http-protocol.js';
-import { logMcp } from '../control-plane/audit.js';
+import { logMcp } from '#copilot/mcp/control-plane';
 
 export { readMcpHttpServerTimingPolicy, readMcpHttpSessionPolicy, readMcpHttpSessionRuntimeState };
 

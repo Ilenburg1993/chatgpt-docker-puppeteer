@@ -17,7 +17,7 @@
  * @module copilot/mcp/cloudflare/config
  */
 
-import { normalizeMcpUrl, validatePublicConnectorUrl } from '../connection/profile.js';
+import { normalizeMcpUrl, validatePublicConnectorUrl } from '#copilot/mcp/connection';
 
 export const DEFAULT_CLOUDFLARE_ORIGIN_URL = 'http://127.0.0.1:3333';
 export const DEFAULT_CLOUDFLARE_H2_ORIGIN_URL = 'https://127.0.0.1:3333';

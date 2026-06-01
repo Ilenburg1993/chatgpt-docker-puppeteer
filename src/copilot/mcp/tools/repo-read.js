@@ -19,9 +19,13 @@ import {
 } from '#copilot/infra/public/io';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { z } from 'zod';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { getMcpWorkspaceRoot, resolveReadPath } from '../control-plane/paths.js';
-import { errorResult, okResult } from '../control-plane/result.js';
+import {
+    errorResult,
+    getMcpWorkspaceRoot,
+    okResult,
+    readOnlyAnnotations,
+    resolveReadPath,
+} from '#copilot/mcp/control-plane';
 import { repoStatusHandler } from './repo-status.js';
 
 const DEFAULT_REPO_READ_PATH = 'src/copilot';

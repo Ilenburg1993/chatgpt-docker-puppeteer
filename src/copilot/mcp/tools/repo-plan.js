@@ -9,10 +9,15 @@ import { getIoIndexStats } from '#copilot/infra/public/indexing';
 import { readText, statPath } from '#copilot/infra/public/io';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { z } from 'zod';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { resolveValidatorCommand } from '../control-plane/jobs.js';
-import { getMcpWorkspaceRoot, resolveReadPath, resolveWritePath } from '../control-plane/paths.js';
-import { errorResult, okResult } from '../control-plane/result.js';
+import {
+    errorResult,
+    getMcpWorkspaceRoot,
+    okResult,
+    readOnlyAnnotations,
+    resolveReadPath,
+    resolveValidatorCommand,
+    resolveWritePath,
+} from '#copilot/mcp/control-plane';
 
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
 const DEFAULT_MAX_DIFF_LINES = 160;

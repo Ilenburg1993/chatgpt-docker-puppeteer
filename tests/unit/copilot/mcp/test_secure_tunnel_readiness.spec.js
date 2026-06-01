@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { auditOpenAiSecureMcpTunnelReadiness } from '../../../../src/copilot/mcp/openai/secure-tunnel-readiness.js';
+import { auditOpenAiSecureMcpTunnelReadiness } from '#copilot/mcp/openai';
 
 describe('OpenAI Secure MCP Tunnel readiness audit', () => {
     it('reports blockers when tunnel credentials are absent', () => {

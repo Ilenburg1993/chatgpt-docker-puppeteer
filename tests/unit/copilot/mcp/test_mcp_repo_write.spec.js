@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'vitest';
 
-import { repoWriteTools } from '../../../../src/copilot/mcp/tools/repo-write.js';
+import { repoWriteTools } from '#copilot/mcp/tools';
 
 const applyPatchTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_patch');
 const applyFileBatchPlanTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_file_batch_plan');

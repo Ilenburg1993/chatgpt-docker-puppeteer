@@ -8,9 +8,7 @@
 import { buildIoIndexForDirectory, getIoIndexStats } from '#copilot/infra/public/indexing';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { z } from 'zod';
-import { boundedWriteAnnotations, readOnlyAnnotations } from '../control-plane/annotations.js';
-import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
-import { okResult } from '../control-plane/result.js';
+import { boundedWriteAnnotations, okResult, readMcpMetricsSnapshot, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 import { buildMcpCapabilitiesSummary } from './meta.js';
 import { repoStatusHandler } from './repo-status.js';
 import { mcpSmokeWorkspaceTool } from './smoke-workspace.js';

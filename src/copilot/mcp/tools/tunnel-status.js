@@ -8,17 +8,22 @@
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { readCloudflareTunnelConfig, validateConfiguredPublicUrl } from '../cloudflare/config.js';
 import {
+    readCloudflareTunnelConfig,
     readConnectorSmokeState,
     readQuickTunnelState,
     summarizeConnectorSmokeState,
     summarizeQuickTunnelState,
-} from '../cloudflare/state.js';
-import { formatChatGptConnectorAuthentication } from '../connection/profile.js';
-import { boundedWriteAnnotations, readOnlyAnnotations } from '../control-plane/annotations.js';
-import { readMcpAuthConfig } from '../control-plane/auth.js';
-import { errorResult, okResult } from '../control-plane/result.js';
+    validateConfiguredPublicUrl,
+} from '#copilot/mcp/cloudflare';
+import { formatChatGptConnectorAuthentication } from '#copilot/mcp/connection';
+import {
+    boundedWriteAnnotations,
+    errorResult,
+    okResult,
+    readMcpAuthConfig,
+    readOnlyAnnotations,
+} from '#copilot/mcp/control-plane';
 
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
 const CONNECTOR_SMOKE_TIMEOUT_MS = 45_000;

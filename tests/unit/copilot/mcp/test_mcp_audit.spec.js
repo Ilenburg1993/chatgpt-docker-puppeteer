@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'vitest';
 
-import { appendMcpAuditEvent } from '../../../../src/copilot/mcp/control-plane/audit.js';
+import { appendMcpAuditEvent } from '#copilot/mcp/control-plane';
 
 describe('copilot MCP audit', () => {
     it('appends JSONL events to the configured audit file', async () => {

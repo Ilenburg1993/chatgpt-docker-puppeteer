@@ -5,9 +5,7 @@
  * @module copilot/mcp/tools/meta
  */
 
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { MCP_AUTH_SCOPES, readMcpAuthConfig } from '../control-plane/auth.js';
-import { okResult } from '../control-plane/result.js';
+import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
 const CAPABILITIES_VERSION = 34;

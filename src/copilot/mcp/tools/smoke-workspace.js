@@ -9,13 +9,14 @@ import { parseFileForContext } from '#copilot/infra';
 import { getIoIndexStats } from '#copilot/infra/public/indexing';
 import { readText, scanDirectory, searchText, searchWorkspaceSymbols, statPath } from '#copilot/infra/public/io';
 import { WORKSPACE_ROOT } from '#copilot/tools';
-import { readCloudflareTunnelConfig } from '../cloudflare/config.js';
-import { readQuickTunnelState, summarizeQuickTunnelState } from '../cloudflare/state.js';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
-import { resolveReadPath } from '../control-plane/paths.js';
-import { okResult } from '../control-plane/result.js';
-import { recordMcpWorkspaceSmokeSummary } from '../control-plane/smoke-state.js';
+import { readCloudflareTunnelConfig, readQuickTunnelState, summarizeQuickTunnelState } from '#copilot/mcp/cloudflare';
+import {
+    okResult,
+    readMcpMetricsSnapshot,
+    readOnlyAnnotations,
+    recordMcpWorkspaceSmokeSummary,
+    resolveReadPath,
+} from '#copilot/mcp/control-plane';
 import { projectDoctorTool } from './project-doctor.js';
 import { repoStatusHandler } from './repo-status.js';
 

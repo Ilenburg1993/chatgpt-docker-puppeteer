@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { compareRemoteConfig, parseEnvFile } from '../../../../src/copilot/mcp/cloudflare/remote-api.js';
+import { compareRemoteConfig, parseEnvFile } from '#copilot/mcp/cloudflare';
 
 /**
- * @returns {import('../../../../src/copilot/mcp/cloudflare/remote-api.js').CloudflareRemoteApiConfig}
+ * @returns {import('#copilot/mcp/cloudflare').CloudflareRemoteApiConfig}
  */
 function testRemoteConfig() {
     return {

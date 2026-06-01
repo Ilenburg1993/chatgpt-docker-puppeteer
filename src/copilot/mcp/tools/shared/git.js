@@ -5,7 +5,7 @@
  * @module copilot/mcp/tools/shared/git
  */
 
-import { getMcpWorkspaceRoot } from '../../control-plane/paths.js';
+import { getMcpWorkspaceRoot } from '#copilot/mcp/control-plane';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 

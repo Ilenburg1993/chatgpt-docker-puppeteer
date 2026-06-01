@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { summarizeLatency } from '../../../../src/copilot/mcp/scripts/latency-benchmark.js';
+import { summarizeLatency } from '#copilot/mcp/scripts';
 
 describe('MCP latency benchmark helpers', () => {
     it('summarizes successful latency samples with stable percentiles', () => {

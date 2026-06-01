@@ -5,20 +5,18 @@
  * @module copilot/mcp/tools/oauth-friction-audit
  */
 
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import {
-    buildProtectedResourceMetadata,
-    readMcpAuthConfig,
-    scopesForMcpTool,
-    securitySchemesForMcpTool,
-} from '../control-plane/auth.js';
 import {
     buildBuiltInDevOAuthMetadata,
+    buildProtectedResourceMetadata,
     isBuiltInDevOAuthEnabled,
+    okResult,
     readDevOAuthPersistenceStatus,
     readDevOAuthTokenLifetimePolicy,
-} from '../control-plane/dev-oauth.js';
-import { okResult } from '../control-plane/result.js';
+    readMcpAuthConfig,
+    readOnlyAnnotations,
+    scopesForMcpTool,
+    securitySchemesForMcpTool,
+} from '#copilot/mcp/control-plane';
 
 /** @type {() => import('../registry.js').McpToolDefinition[]} */
 let toolsProvider = () => [];

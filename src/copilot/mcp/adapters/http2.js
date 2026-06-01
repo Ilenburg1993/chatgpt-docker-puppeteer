@@ -19,7 +19,7 @@ import {
     readMcpHttpSessionRuntimeState,
 } from './http-shared.js';
 import { createMcpHttpProtocolState, recordMcpHttpProtocolRequest } from './http-protocol.js';
-import { logMcp } from '../control-plane/audit.js';
+import { logMcp } from '#copilot/mcp/control-plane';
 
 const DEFAULT_HTTP2_CERT_FILE = 'src/copilot/.ai/cloudflare/origin-cert.pem';
 const DEFAULT_HTTP2_KEY_FILE = 'src/copilot/.ai/cloudflare/origin-key.pem';

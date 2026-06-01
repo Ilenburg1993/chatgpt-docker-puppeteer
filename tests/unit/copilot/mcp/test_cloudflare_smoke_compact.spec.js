@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { parseConnectorSmokeJsonOutput } from '../../../../src/copilot/mcp/tools/tunnel-status.js';
+import { parseConnectorSmokeJsonOutput } from '#copilot/mcp/tools';
 
 describe('cloudflare connector smoke compact mode', () => {
     it('uses compact smoke output when the MCP tool refreshes connector smoke', async () => {

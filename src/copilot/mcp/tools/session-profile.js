@@ -5,9 +5,8 @@
  * @module copilot/mcp/tools/session-profile
  */
 
-import { buildChatGptConnectorProfile } from '../connection/profile.js';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { okResult } from '../control-plane/result.js';
+import { buildChatGptConnectorProfile } from '#copilot/mcp/connection';
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 import { buildMcpCapabilitiesSummary } from './meta.js';
 
 /**

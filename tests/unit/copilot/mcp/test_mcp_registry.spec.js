@@ -6,8 +6,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { getCanonicalMcpTools } from '../../../../src/copilot/mcp/registry.js';
-import { getAdvertisedMcpToolNames } from '../../../../src/copilot/mcp/tools/meta.js';
+import { getCanonicalMcpTools } from '#copilot/mcp';
+import { getAdvertisedMcpToolNames } from '#copilot/mcp/tools';
 
 describe('copilot MCP registry', () => {
     it('exposes the initial read-only tool surface', () => {

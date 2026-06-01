@@ -5,8 +5,7 @@
  * @module copilot/mcp/tools/golden-prompts
  */
 
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { okResult } from '../control-plane/result.js';
+import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const GOLDEN_PROMPTS_VERSION = 4;
 

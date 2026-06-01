@@ -6,9 +6,8 @@
  */
 
 import { z } from 'zod';
-import { applyCloudflareEdgePolicy } from '../cloudflare/edge-policy-apply.js';
-import { boundedWriteAnnotations } from '../control-plane/annotations.js';
-import { okResult } from '../control-plane/result.js';
+import { applyCloudflareEdgePolicy } from '#copilot/mcp/cloudflare';
+import { boundedWriteAnnotations, okResult } from '#copilot/mcp/control-plane';
 
 /**
  * @type {import('../registry.js').McpToolDefinition}

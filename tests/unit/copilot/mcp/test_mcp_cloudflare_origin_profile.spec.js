@@ -6,7 +6,7 @@ import { describe, it } from 'vitest';
 import {
     auditOriginRequestProfile,
     buildRecommendedOriginRequestPatch,
-} from '../../../../src/copilot/mcp/cloudflare/origin-request-profile.js';
+} from '#copilot/mcp/cloudflare';
 
 describe('copilot MCP Cloudflare origin profile', () => {
     it('keeps origin h2 disabled by default', () => {

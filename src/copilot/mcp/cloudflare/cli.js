@@ -10,10 +10,10 @@ import { closeSync, openSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
-import { formatChatGptConnectorAuthentication } from '../connection/profile.js';
+import { formatChatGptConnectorAuthentication } from '#copilot/mcp/connection';
 import { auditCloudflareConfigPosture } from './config-audit.js';
 import { auditCloudflarePlanCapabilities } from './plan-capabilities-audit.js';
-import { readMcpAuthConfig } from '../control-plane/auth.js';
+import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
 import { getCanonicalMcpTools } from '../registry.js';
 import { createCloudflareEdgeBackup, listCloudflareEdgeBackups } from './edge-backup.js';
 import { auditCloudflareEdgeRulesets } from './edge-audit.js';
@@ -694,7 +694,7 @@ async function runUp() {
     const mcpHttp = await ensureDetachedProcess({
         name: 'mcp-http',
         command: process.execPath,
-        args: ['src/copilot/mcp/index.js', '--transport', originTransport],
+        args: ['src/copilot/mcp/cli.js', '--transport', originTransport],
         pidFile: config.mcpHttpPidFile,
         logFile: 'src/copilot/.ai/cloudflare/mcp-http.log',
         env: {
@@ -762,7 +762,7 @@ async function runRestart() {
     const mcpHttp = await ensureDetachedProcess({
         name: 'mcp-http',
         command: process.execPath,
-        args: ['src/copilot/mcp/index.js', '--transport', originTransport],
+        args: ['src/copilot/mcp/cli.js', '--transport', originTransport],
         pidFile: config.mcpHttpPidFile,
         logFile: 'src/copilot/.ai/cloudflare/mcp-http.log',
         env: {

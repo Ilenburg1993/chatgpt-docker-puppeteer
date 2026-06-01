@@ -7,8 +7,7 @@
 
 import { getActiveSdkSession, listActiveSdkSessions } from '#copilot/sdk/session';
 import { z } from 'zod';
-import { readOnlyAnnotations } from '../control-plane/annotations.js';
-import { errorResult, okResult } from '../control-plane/result.js';
+import { errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 /**
  * @param {ReturnType<typeof listActiveSdkSessions>[number]} entry

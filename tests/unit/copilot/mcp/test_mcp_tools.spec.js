@@ -6,8 +6,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { resolveReadPath } from '../../../../src/copilot/mcp/control-plane/paths.js';
-import { getCanonicalMcpTools } from '../../../../src/copilot/mcp/registry.js';
+import { resolveReadPath } from '#copilot/mcp/control-plane';
+import { getCanonicalMcpTools } from '#copilot/mcp';
 
 /** @param {string} name */
 function findTool(name) {

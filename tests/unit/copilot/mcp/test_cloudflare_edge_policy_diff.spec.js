@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildEdgePolicyDiff } from '../../../../src/copilot/mcp/cloudflare/edge-policy-diff.js';
+import { buildEdgePolicyDiff } from '#copilot/mcp/cloudflare';
 
 const desired = {
     ok: true,

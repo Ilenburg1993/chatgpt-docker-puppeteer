@@ -7,7 +7,7 @@ Servidor MCP canônico para conectar ChatGPT ao workspace real do projeto.
 HTTP local:
 
 ```bash
-node src/copilot/mcp/index.js --transport http
+node src/copilot/mcp/cli.js --transport http
 ```
 
 Endpoint local:
@@ -19,7 +19,7 @@ http://127.0.0.1:3333/mcp
 Stdio local:
 
 ```bash
-node src/copilot/mcp/index.js --transport stdio
+node src/copilot/mcp/cli.js --transport stdio
 ```
 
 ## ChatGPT
@@ -167,7 +167,7 @@ COPILOT_MCP_SERVERS=copilot-local npm run terminal:llm-b
 The `copilot-local` server is registered as a stdio MCP config that launches:
 
 ```bash
-node src/copilot/mcp/index.js --transport stdio
+node src/copilot/mcp/cli.js --transport stdio
 ```
 
 By default `COPILOT_MCP_SERVERS` remains empty, so LLM-B boots normally when the MCP server is
