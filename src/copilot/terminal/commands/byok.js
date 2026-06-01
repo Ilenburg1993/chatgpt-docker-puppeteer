@@ -17,6 +17,7 @@ import {
     buildCatalogRefreshStartedEvent,
     buildModelGatewaySelectionDecisionTrace,
     buildModelGatewayRuntimeSelectorPlan,
+    buildModelGatewayRuntimeAutomationDecision,
     compareModelGatewaySelectionAudits,
     buildEligibilityEvaluatedEvent,
     buildModelGatewayPreBuildReadinessReport,
@@ -1958,7 +1959,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway local | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict|runs|diff] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] [wire:<completions|responses>] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok auto [status|plan] [profile:<id>] | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway auto [profile:<id>] | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway local | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict|runs|diff] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] [wire:<completions|responses>] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -3326,6 +3327,77 @@ function parseGatewayCatalogListArgs(rest) {
 }
 
 /**
+ * @param {string[]} rest
+ * @returns {{ profileId: string; allowLiveSetModel: boolean; allowNewSession: boolean; allowLocalPrivate: boolean }}
+ */
+function parseByokGatewayAutoArgs(rest) {
+    const profileToken = rest.find((item) => /^(?:profile|perfil|routeProfile|route-profile)[:=]/iu.test(item));
+    const profileId =
+        optionalScalarString(profileToken?.replace(/^(?:profile|perfil|routeProfile|route-profile)[:=]/iu, '')) ??
+        optionalScalarString(rest.find((item) => !/^(auto|status|plan|apply|on|off|--|allow-|live-|new-session|local)/iu.test(item))) ??
+        'repo_agent';
+    return {
+        profileId,
+        allowLiveSetModel: rest.some((item) => /^(?:--)?allow-live-set-model|live-set-model|set-model$/iu.test(item)),
+        allowNewSession: rest.some((item) => /^(?:--)?allow-new-session|new-session$/iu.test(item)),
+        allowLocalPrivate: rest.some((item) => /^(?:--)?allow-local-private|local-private|ollama$/iu.test(item)),
+    };
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayAutoStatus(println, rest) {
+    const args = parseByokGatewayAutoArgs(rest);
+    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const snapshot = await store.readSnapshot();
+    const secretRegistry = createEnvSecretRegistry();
+    const healthRecords = listByokProviderModelHealth();
+    const selection = auditModelGatewayPreRuntimeSelection(snapshot, {
+        profiles: [args.profileId],
+        secretRegistry,
+    });
+    const postRuntimeSelection = auditModelGatewayPostRuntimeSelection(snapshot, {
+        profiles: [args.profileId],
+        secretRegistry,
+        runtimeHealthRecords: healthRecords,
+    });
+    const comparison = compareModelGatewaySelectionAudits(selection, postRuntimeSelection);
+    const policyResolution = resolveModelGatewaySelectionPolicy(comparison, { mode: 'prefer_runtime_proved' });
+    const runtimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(policyResolution, {
+        source: 'terminal-byok-auto-status',
+        runtimeHealthRecords: healthRecords,
+    });
+    const inventory = await listTerminalSdkSessionInventory();
+    const decision = buildModelGatewayRuntimeAutomationDecision({
+        runtimeSelectorPlan,
+        profileId: args.profileId,
+        currentSessionId: inventory.currentSessionId,
+        liveByokBinding: inventory.persistedByokBinding,
+        policy: {
+            allowLiveSetModel: args.allowLiveSetModel,
+            allowNewSession: args.allowNewSession,
+            allowLocalPrivate: args.allowLocalPrivate,
+        },
+    });
+    println(`\n  \x1b[36mBYOK model-gateway auto\x1b[0m`);
+    println(
+        `  \x1b[90mprofile=${args.profileId} · runtimeSelector=${runtimeSelectorPlan.ok ? 'ok' : 'blocked'} · selected=${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} · action=${decision.action} · ok=${decision.ok ? 'sim' : 'nao'}\x1b[0m`,
+    );
+    println(`    rota:          \x1b[33m${decision.selectedRouteKey ?? '-'}\x1b[0m`);
+    println(`    alvo:          \x1b[33m${decision.targetBoundary.preset ?? '-'} · ${decision.targetBoundary.model ?? '-'}\x1b[0m`);
+    println(`    sessao viva:   \x1b[33m${inventory.currentSessionId ?? '(sem sessão viva)'}\x1b[0m`);
+    println(`    atual:         \x1b[33m${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}\x1b[0m`);
+    println(`    live switch:   \x1b[33m${decision.canApplyLiveModel ? 'sim' : 'nao'}\x1b[0m`);
+    println(`    nova sessao:   \x1b[33m${decision.requiresNewSession ? 'sim' : 'nao'}\x1b[0m`);
+    if (decision.blockers.length > 0) println(`    blockers:      \x1b[33m${decision.blockers.join(', ')}\x1b[0m`);
+    println(`    resumo:        \x1b[90m${decision.operatorSummary}\x1b[0m`);
+    println(`    proximo:       \x1b[90m${decision.nextCommands.join(' && ')}\x1b[0m\n`);
+}
+
+/**
  * @param {(text: string) => void} println
  * @param {string[]} rest
  * @returns {Promise<void>}
@@ -4175,7 +4247,16 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         return;
     }
 
+    if (sub === 'auto' || sub === 'automation') {
+        await renderByokGatewayAutoStatus(println, rest);
+        return;
+    }
+
     if (sub === 'gateway' || sub === 'gate' || sub === 'migration') {
+        if (/^(auto|automation)$/iu.test(rest[0] ?? '')) {
+            await renderByokGatewayAutoStatus(println, rest.slice(1));
+            return;
+        }
         if (/^(commands|command|comandos|canonical|canonico|canônico|help|ajuda)$/iu.test(rest[0] ?? '')) {
             renderByokGatewayCanonicalCommands(println, rest.slice(1));
             return;

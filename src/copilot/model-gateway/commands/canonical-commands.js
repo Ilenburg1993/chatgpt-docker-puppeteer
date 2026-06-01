@@ -542,6 +542,20 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Show canonical package, Makefile and terminal commands inside the terminal cockpit.',
     },
     {
+        id: 'terminal.auto-status',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto status profile:repo_agent',
+        summary: 'Inspect the next model-gateway automation decision without mutating the live terminal session.',
+    },
+    {
+        id: 'terminal.gateway-auto',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok gateway auto profile:repo_agent',
+        summary: 'Gateway namespace alias for the no-mutation automation decision.',
+    },
+    {
         id: 'terminal.prebuild-readiness',
         phase: 'prebuild',
         surface: 'terminal',

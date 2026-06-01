@@ -311,9 +311,9 @@ Precisamos de um cockpit operacional unico:
 
 ## Faixa D - Terminal UX
 
-- [ ] D.1 Adicionar `/byok auto`.
-- [ ] D.2 Adicionar `/byok auto status`.
-- [ ] D.3 Adicionar `/byok auto plan`.
+- [x] D.1 Adicionar `/byok auto`.
+- [x] D.2 Adicionar `/byok auto status`.
+- [x] D.3 Adicionar `/byok auto plan`.
 - [ ] D.4 Adicionar `/byok auto apply`.
 - [ ] D.5 Adicionar `/byok auto off`.
 - [ ] D.6 `status` deve mostrar:
