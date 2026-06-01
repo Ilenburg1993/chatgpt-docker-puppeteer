@@ -67,7 +67,7 @@ O objetivo e transformar o model-gateway em um sistema operacional completo para
 - [x] Runtime selector execution bounded existe.
 - [x] Route decisions sao persistiveis.
 - [x] Score reasons chegam ao runtime selector e ao route decision ledger.
-- [ ] Ainda falta um objeto unico de `runtime automation decision` que combine politica, rota selecionada, aplicabilidade
+- [x] Existe objeto unico de `runtime automation decision` que combina politica, rota selecionada, aplicabilidade
   na sessao viva e proxima acao.
 
 ### 2.4 Terminal
@@ -77,10 +77,10 @@ O objetivo e transformar o model-gateway em um sistema operacional completo para
 - [x] Session binding impede cruzar provider/perfil silenciosamente.
 - [x] Dialog engine registra falhas BYOK de turno como provider health.
 - [x] Admission control bloqueia ou avisa quando o envelope de tokens parece incompatível.
-- [ ] Ainda falta comando de modo automatico do model-gateway no terminal.
+- [x] Existe comando read-only de modo automatico do model-gateway no terminal.
 - [ ] Ainda falta um controlador que rode antes/depois do turno e decida se deve manter, trocar modelo, solicitar novo boot
   ou aguardar reset.
-- [ ] Ainda falta UX didatica para explicar quando a troca pode ser live e quando exige nova sessao.
+- [x] Existe UX read-only para explicar quando a troca pode ser live e quando exige nova sessao.
 
 ### 2.5 SDK boundary
 
@@ -88,7 +88,7 @@ O objetivo e transformar o model-gateway em um sistema operacional completo para
 - [x] Projection preserva provider-local id, gateway id, route id e metadados BYOK.
 - [x] Auto model nativo do GitHub Copilot existe como outra politica.
 - [ ] Ainda falta separar claramente "Copilot SDK auto" de "model-gateway auto".
-- [ ] Ainda falta uma policy que diga quando podemos usar `setModel`, quando precisamos `session sdk next new`, e quando
+- [x] Existe policy inicial que diz quando podemos usar `setModel`, quando precisamos `session sdk next new`, e quando
   devemos apenas preparar env para o proximo boot.
 
 ### 2.6 Scripts e comandos
@@ -101,7 +101,7 @@ O objetivo e transformar o model-gateway em um sistema operacional completo para
 - [x] `model-gateway:live:readiness` passa.
 - [x] `model-gateway:live:plan --no-write` passa.
 - [ ] Ainda falta comando canonico para explicar "estado operacional completo" em uma tela.
-- [ ] Ainda falta comando canonico para o futuro modo auto sem executar provider por acidente.
+- [x] Existe comando canonico para o futuro modo auto sem executar provider por acidente.
 
 ## 3. Arquitetura Ideal
 
@@ -269,11 +269,11 @@ Precisamos de um cockpit operacional unico:
   - [x] `blockers`;
   - [x] `nextCommands`;
   - [x] `operatorSummary`.
-- [ ] A.6 Adicionar testes unitarios para:
+- [x] A.6 Adicionar testes unitarios para:
   - [x] mesmo provider troca live;
   - [x] provider diferente exige novo boot;
-  - [ ] quota esgotada bloqueia rota;
-  - [ ] rate-limit com reset recomenda aguardar;
+  - [x] quota esgotada bloqueia rota;
+  - [x] rate-limit com reset recomenda aguardar;
   - [x] Ollama local sem opt-in nao entra.
 
 ## Faixa B - Politica Auto Do Gateway
@@ -295,8 +295,8 @@ Precisamos de um cockpit operacional unico:
 
 ## Faixa C - Controller Pre/Post Turn
 
-- [ ] C.1 Criar controller puro sem side effects.
-- [ ] C.2 Criar adapter terminal.
+- [x] C.1 Criar controller puro sem side effects.
+- [x] C.2 Criar adapter terminal.
 - [ ] C.3 Pre-turn:
   - [ ] avaliar current route;
   - [ ] se health bloqueia, replanejar;
@@ -316,14 +316,14 @@ Precisamos de um cockpit operacional unico:
 - [x] D.3 Adicionar `/byok auto plan`.
 - [ ] D.4 Adicionar `/byok auto apply`.
 - [ ] D.5 Adicionar `/byok auto off`.
-- [ ] D.6 `status` deve mostrar:
-  - [ ] policy;
-  - [ ] rota viva;
-  - [ ] rota recomendada;
-  - [ ] live switch possivel;
-  - [ ] novo boot necessario;
-  - [ ] blockers;
-  - [ ] next command.
+- [x] D.6 `status` deve mostrar:
+  - [x] policy;
+  - [x] rota viva;
+  - [x] rota recomendada;
+  - [x] live switch possivel;
+  - [x] novo boot necessario;
+  - [x] blockers;
+  - [x] next command.
 
 ## Faixa E - Scripts Operacionais
 

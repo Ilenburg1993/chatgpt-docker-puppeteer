@@ -17,8 +17,6 @@ import {
     buildCatalogRefreshStartedEvent,
     buildModelGatewaySelectionDecisionTrace,
     buildModelGatewayRuntimeSelectorPlan,
-    buildModelGatewayRuntimeAutomationDecision,
-    readModelGatewayRuntimeAutomationPolicy,
     compareModelGatewaySelectionAudits,
     buildEligibilityEvaluatedEvent,
     buildModelGatewayPreBuildReadinessReport,
@@ -106,6 +104,7 @@ import {
     setTerminalModelProjection,
 } from '../frontend/index.js';
 import {
+    buildTerminalByokGatewayAutoStatus,
     classifyTerminalByokSdkBinding,
     evaluateTerminalByokProbeBudget,
     isSameTerminalByokProviderBoundary,
@@ -3328,67 +3327,19 @@ function parseGatewayCatalogListArgs(rest) {
 }
 
 /**
- * @param {string[]} rest
- * @returns {{ profileId: string; allowLiveSetModel: boolean; allowNewSession: boolean; allowLocalPrivate: boolean }}
- */
-function parseByokGatewayAutoArgs(rest) {
-    const policy = readModelGatewayRuntimeAutomationPolicy();
-    const profileToken = rest.find((item) => /^(?:profile|perfil|routeProfile|route-profile)[:=]/iu.test(item));
-    const profileId =
-        optionalScalarString(profileToken?.replace(/^(?:profile|perfil|routeProfile|route-profile)[:=]/iu, '')) ??
-        policy.profiles[0] ??
-        optionalScalarString(rest.find((item) => !/^(auto|status|plan|apply|on|off|--|allow-|live-|new-session|local)/iu.test(item))) ??
-        'repo_agent';
-    return {
-        profileId,
-        allowLiveSetModel:
-            policy.allowLiveSetModel || rest.some((item) => /^(?:--)?allow-live-set-model|live-set-model|set-model$/iu.test(item)),
-        allowNewSession: policy.allowNewSession || rest.some((item) => /^(?:--)?allow-new-session|new-session$/iu.test(item)),
-        allowLocalPrivate: policy.allowLocalPrivate || rest.some((item) => /^(?:--)?allow-local-private|local-private|ollama$/iu.test(item)),
-    };
-}
-
-/**
  * @param {(text: string) => void} println
  * @param {string[]} rest
  * @returns {Promise<void>}
  */
 async function renderByokGatewayAutoStatus(println, rest) {
-    const args = parseByokGatewayAutoArgs(rest);
-    const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
-    const snapshot = await store.readSnapshot();
-    const secretRegistry = createEnvSecretRegistry();
-    const healthRecords = listByokProviderModelHealth();
-    const selection = auditModelGatewayPreRuntimeSelection(snapshot, {
-        profiles: [args.profileId],
-        secretRegistry,
-    });
-    const postRuntimeSelection = auditModelGatewayPostRuntimeSelection(snapshot, {
-        profiles: [args.profileId],
-        secretRegistry,
-        runtimeHealthRecords: healthRecords,
-    });
-    const comparison = compareModelGatewaySelectionAudits(selection, postRuntimeSelection);
-    const policyResolution = resolveModelGatewaySelectionPolicy(comparison, { mode: 'prefer_runtime_proved' });
-    const runtimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(policyResolution, {
-        source: 'terminal-byok-auto-status',
-        runtimeHealthRecords: healthRecords,
-    });
-    const inventory = await listTerminalSdkSessionInventory();
-    const decision = buildModelGatewayRuntimeAutomationDecision({
-        runtimeSelectorPlan,
-        profileId: args.profileId,
-        currentSessionId: inventory.currentSessionId,
-        liveByokBinding: inventory.persistedByokBinding,
-        policy: {
-            allowLiveSetModel: args.allowLiveSetModel,
-            allowNewSession: args.allowNewSession,
-            allowLocalPrivate: args.allowLocalPrivate,
-        },
-    });
+    const status = await buildTerminalByokGatewayAutoStatus(rest);
+    const { args, controllerStep, decision, inventory, runtimeSelectorPlan } = status;
     println(`\n  \x1b[36mBYOK model-gateway auto\x1b[0m`);
     println(
         `  \x1b[90mprofile=${args.profileId} · runtimeSelector=${runtimeSelectorPlan.ok ? 'ok' : 'blocked'} · selected=${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} · action=${decision.action} · ok=${decision.ok ? 'sim' : 'nao'}\x1b[0m`,
+    );
+    println(
+        `    policy:        \x1b[33mliveSetModel=${args.allowLiveSetModel ? 'sim' : 'nao'} · newSession=${args.allowNewSession ? 'sim' : 'nao'} · localPrivate=${args.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
     );
     println(`    rota:          \x1b[33m${decision.selectedRouteKey ?? '-'}\x1b[0m`);
     println(`    alvo:          \x1b[33m${decision.targetBoundary.preset ?? '-'} · ${decision.targetBoundary.model ?? '-'}\x1b[0m`);
@@ -3397,6 +3348,11 @@ async function renderByokGatewayAutoStatus(println, rest) {
     println(`    live switch:   \x1b[33m${decision.canApplyLiveModel ? 'sim' : 'nao'}\x1b[0m`);
     println(`    nova sessao:   \x1b[33m${decision.requiresNewSession ? 'sim' : 'nao'}\x1b[0m`);
     if (decision.blockers.length > 0) println(`    blockers:      \x1b[33m${decision.blockers.join(', ')}\x1b[0m`);
+    if (controllerStep.effects.length > 0) {
+        println(
+            `    efeitos:       \x1b[90m${controllerStep.effects.map((effect) => `${effect['kind']}:${effect['execute'] === true ? 'exec' : 'dry'}`).join(', ')}\x1b[0m`,
+        );
+    }
     println(`    resumo:        \x1b[90m${decision.operatorSummary}\x1b[0m`);
     println(`    proximo:       \x1b[90m${decision.nextCommands.join(' && ')}\x1b[0m\n`);
 }

@@ -10,6 +10,7 @@
 
 export {
     MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV,
+    buildModelGatewayRuntimeAutomationControllerStep,
     buildModelGatewayRuntimeAutomationDecision,
     readModelGatewayRuntimeAutomationPolicy,
 } from './automation/index.js';

@@ -4,7 +4,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeSelectorPlan, buildModelGatewayRuntimeAutomationDecision, readModelGatewayRuntimeAutomationPolicy, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayAccountLimitOverlays, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, explainModelGatewaySelectionComparison, flushAndMirrorByokProviderHealthToSqlite, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayEligibilityDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayProviderQuotaCapabilities, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeSelectorPlan, buildModelGatewayRuntimeAutomationDecision, buildModelGatewayRuntimeAutomationControllerStep, readModelGatewayRuntimeAutomationPolicy, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayAccountLimitOverlays, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, explainModelGatewaySelectionComparison, flushAndMirrorByokProviderHealthToSqlite, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayCatalogRefresh, planModelGatewayProbeBackoff, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayEligibilityDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayProviderQuotaCapabilities, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -567,6 +567,22 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             nextCommands: ['/session sdk next new', '/byok model openai/gpt-oss-120b'],
             operatorSummary: 'mock automation decision',
         })),
+        buildModelGatewayRuntimeAutomationControllerStep: vi.fn((input) => ({
+            schema: 'model-gateway-runtime-automation-controller-step',
+            ok: input.decision?.ok === true,
+            phase: input.phase ?? 'manual',
+            action: input.decision?.action ?? 'manual_intervention',
+            effectMode: 'dry_run',
+            effects: [
+                {
+                    kind: 'prepare_new_sdk_session',
+                    execute: false,
+                },
+            ],
+            blockers: input.decision?.blockers ?? [],
+            selectedRouteKey: input.decision?.selectedRouteKey ?? null,
+            operatorSummary: 'mock controller step',
+        })),
         buildModelGatewayRuntimeSelectorPlan: vi.fn((_policy, options = {}) => ({
             schema: 'model-gateway-runtime-selector-plan',
             ok: true,
@@ -1107,6 +1123,7 @@ vi.mock('#copilot/model-gateway', () => ({
     buildModelGatewayRouteCandidates,
     buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewayRuntimeAutomationDecision,
+    buildModelGatewayRuntimeAutomationControllerStep,
     readModelGatewayRuntimeAutomationPolicy,
     buildModelGatewaySelectionDecisionTrace,
     buildProbeCompletedEvent: buildProbeCompletedEvent,
@@ -2725,6 +2742,8 @@ describe('terminal /byok command', () => {
             }),
         );
         expect(ctx.output()).toContain('BYOK model-gateway auto');
+        expect(ctx.output()).toContain('liveSetModel=nao');
+        expect(ctx.output()).toContain('prepare_new_sdk_session:dry');
         expect(ctx.output()).toContain('action=prepare_new_session');
         expect(ctx.output()).toContain('/session sdk next new');
     });

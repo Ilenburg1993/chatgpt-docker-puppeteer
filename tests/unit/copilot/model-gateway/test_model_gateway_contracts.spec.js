@@ -45,6 +45,7 @@ import {
     applyModelGatewaySelectionTraceRetention,
     buildModelGatewayRuntimeSelectorProbeEnv,
     buildModelGatewayRuntimeSelectorProbeRun,
+    buildModelGatewayRuntimeAutomationControllerStep,
     buildModelGatewayRuntimeAutomationDecision,
     buildModelGatewayRuntimeSelectorPlan,
     readModelGatewayRuntimeAutomationPolicy,
@@ -1312,6 +1313,15 @@ describe('model-gateway foundation', () => {
         assert.equal(liveSwitchDecision.action, 'apply_live_model');
         assert.equal(liveSwitchDecision.canApplyLiveModel, true);
         assert.equal(liveSwitchDecision.requiresNewSession, false);
+        const liveControllerStep = buildModelGatewayRuntimeAutomationControllerStep({
+            phase: 'pre_turn',
+            decision: liveSwitchDecision,
+            policy: { allowEffects: true, allowLiveSetModel: true },
+        });
+        assert.equal(liveControllerStep.schema, 'model-gateway-runtime-automation-controller-step');
+        assert.equal(liveControllerStep.effectMode, 'allowed');
+        assert.equal(liveControllerStep.effects[0]['kind'], 'set_live_model');
+        assert.equal(liveControllerStep.effects[0]['execute'], true);
 
         const newSessionDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan,
@@ -1329,6 +1339,13 @@ describe('model-gateway foundation', () => {
         assert.equal(newSessionDecision.action, 'manual_intervention');
         assert.equal(newSessionDecision.requiresNewSession, true);
         assert.equal(newSessionDecision.blockers.includes('new_session_requires_explicit_policy'), true);
+        const newSessionControllerStep = buildModelGatewayRuntimeAutomationControllerStep({
+            phase: 'pre_turn',
+            decision: newSessionDecision,
+            policy: { allowEffects: false, allowNewSession: false },
+        });
+        assert.equal(newSessionControllerStep.effects[0]['kind'], 'prepare_new_sdk_session');
+        assert.equal(newSessionControllerStep.effects[0]['execute'], false);
 
         const localPrivateDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan: {
@@ -1351,6 +1368,60 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(localPrivateDecision.ok, false);
         assert.equal(localPrivateDecision.blockers.includes('local_private_requires_explicit_opt_in'), true);
+        const failureControllerStep = buildModelGatewayRuntimeAutomationControllerStep({
+            phase: 'post_turn',
+            decision: localPrivateDecision,
+            turnOutcome: { ok: false, failureKind: 'rate_limit', errorMessage: 'quota exhausted' },
+        });
+        assert.equal(failureControllerStep.effects[0]['kind'], 'replan_after_turn_failure');
+        assert.equal(failureControllerStep.effects[0]['failureKind'], 'rate_limit');
+
+        const hardQuotaDecision = buildModelGatewayRuntimeAutomationDecision({
+            runtimeSelectorPlan: {
+                routes: [
+                    {
+                        profileId: 'repo_agent',
+                        status: 'blocked',
+                        selectedRouteKey: 'openrouter:quota-model',
+                        selected: {
+                            id: 'openrouter:quota-model',
+                            providerId: 'openrouter',
+                            providerModel: 'quota-model',
+                            selectorSyntax: 'quota-model',
+                        },
+                        reasons: ['blocked:quota-exhausted'],
+                    },
+                ],
+            },
+            policy: { allowLocalPrivate: false },
+        });
+        assert.equal(hardQuotaDecision.ok, false);
+        assert.equal(hardQuotaDecision.action, 'manual_intervention');
+        assert.equal(hardQuotaDecision.blockers.includes('blocked:quota-exhausted'), true);
+
+        const rateLimitResetDecision = buildModelGatewayRuntimeAutomationDecision({
+            runtimeSelectorPlan: {
+                routes: [
+                    {
+                        profileId: 'repo_agent',
+                        status: 'blocked',
+                        selectedRouteKey: 'groq:reset-model',
+                        selected: {
+                            id: 'groq:reset-model',
+                            providerId: 'groq',
+                            providerModel: 'reset-model',
+                            selectorSyntax: 'reset-model',
+                        },
+                        reasons: ['blocked:provider_health_cooldown:rate-limit'],
+                        providerCooldown: { include: false, resetAt: '2026-06-01T10:00:00.000Z' },
+                    },
+                ],
+            },
+            policy: { allowLocalPrivate: false },
+        });
+        assert.equal(rateLimitResetDecision.ok, false);
+        assert.equal(rateLimitResetDecision.action, 'wait_for_reset');
+        assert.equal(rateLimitResetDecision.nextCommands.includes('npm run model-gateway:runtime-health:diff'), true);
 
         const routeProbeEnv = buildModelGatewayRuntimeSelectorProbeEnv(runtimeSelectorPlan.routes[0].selected, {
             COPILOT_BYOK_PROFILE: 'current-default-profile',

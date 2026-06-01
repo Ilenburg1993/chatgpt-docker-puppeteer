@@ -15,3 +15,4 @@ export {
     renderTerminalPreparedByokSelection,
     renderTerminalSdkProviderBinding,
 } from './session-binding.js';
+export { buildTerminalByokGatewayAutoStatus, parseTerminalByokGatewayAutoArgs } from './gateway-auto.js';
