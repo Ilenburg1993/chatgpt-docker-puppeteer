@@ -1543,6 +1543,9 @@ model-gateway-auto-confirmations:
 model-gateway-auto-recoveries:
 	@$(NPM) run model-gateway:auto:recoveries
 
+model-gateway-auto-proof-plan:
+	@$(NPM) run model-gateway:auto:proof-plan
+
 model-gateway-auto-scenarios:
 	@$(NPM) run model-gateway:auto:scenarios
 

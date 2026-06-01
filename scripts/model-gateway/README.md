@@ -63,6 +63,7 @@ npm run model-gateway:auto:explain
 npm run model-gateway:auto:handoffs
 npm run model-gateway:auto:confirmations
 npm run model-gateway:auto:recoveries
+npm run model-gateway:auto:proof-plan
 npm run model-gateway:auto:scenarios
 npm run model-gateway:auto:status -- --write-sqlite
 ```
@@ -73,10 +74,12 @@ chamar provider.
 `auto:ready` é o gate operacional objetivo para saber se catálogo, SQLite, readiness, decisão auto e superfícies canônicas
 estão visíveis. `auto:doctor` explica a policy efetiva, ledgers de efeitos/recoveries/handoffs/confirmations e o que
 ainda impede automação total. `auto:handoffs`, `auto:confirmations` e `auto:recoveries` leem os ledgers SDK/recovery sem
-SQL manual.
+SQL manual. `auto:proof-plan` transforma alternativas bloqueadas por runtime health em comandos explícitos de
+`/byok probe` por provider/model, sem chamar provider.
 
-`auto:scenarios` agrega readiness, doctor, explain, ledgers e live-plan em uma escada canônica de cenários para humano
-ou LLM: leitura, policy stateful, troca terminal, fixture e real provider. Ele não chama provider nem inicia o terminal.
+`auto:scenarios` agrega readiness, doctor, explain, ledgers, proof-plan e live-plan em uma escada canônica de cenários
+para humano ou LLM: leitura, policy stateful, troca terminal, fixture e real provider. Ele não chama provider nem inicia
+o terminal.
 
 No terminal:
 
@@ -84,6 +87,7 @@ No terminal:
 /byok auto status profile:repo_agent
 /byok auto record profile:repo_agent
 /byok auto apply profile:repo_agent allow-live-set-model
+/byok auto proof-plan profile:repo_agent 12
 /byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
 /byok probe agent provider:zai model:glm-4.5-flash timeout:20000
 /byok auto off

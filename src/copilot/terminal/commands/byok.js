@@ -16,6 +16,7 @@ import {
     buildCatalogRefreshEventBatch,
     buildCatalogRefreshStartedEvent,
     buildModelGatewaySelectionDecisionTrace,
+    buildModelGatewayRuntimeProofCommands,
     buildModelGatewayRuntimeSelectorPlan,
     compareModelGatewaySelectionAudits,
     buildEligibilityEvaluatedEvent,
@@ -3339,36 +3340,6 @@ function parseGatewayCatalogListArgs(rest) {
 }
 
 /**
- * @param {unknown} alternativeSummary
- * @param {number} [limit]
- * @returns {string[]}
- */
-function buildByokRuntimeProofCommands(alternativeSummary, limit = 3) {
-    const summary = asRecord(alternativeSummary);
-    const blockedRoutes = Array.isArray(summary.topBlockedRoutes) ? summary.topBlockedRoutes : [];
-    const commands = [];
-    const seen = new Set();
-    for (const blocked of blockedRoutes) {
-        const providerId = optionalScalarString(blocked?.providerId);
-        const providerModel = optionalScalarString(blocked?.providerModel);
-        if (!providerId || !providerModel) continue;
-        const reasons = Array.isArray(blocked?.reasons) ? blocked.reasons.map(optionalScalarString).filter((item) => item !== null) : [];
-        const needsAgentProbe = reasons.some((reason) =>
-            /agent_probe_(?:missing|not_verified|failed)|runtime_probe_failed:agent/iu.test(reason),
-        );
-        const needsChatProbe = reasons.some((reason) => /chat_health_failed|health_unknown/iu.test(reason));
-        if (!needsAgentProbe && !needsChatProbe) continue;
-        const mode = needsAgentProbe ? 'agent' : 'chat';
-        const command = `/byok probe ${mode} provider:${providerId} model:${providerModel} timeout:20000`;
-        if (seen.has(command)) continue;
-        seen.add(command);
-        commands.push(command);
-        if (commands.length >= limit) break;
-    }
-    return commands;
-}
-
-/**
  * @param {(text: string) => void} println
  * @param {string[]} rest
  * @param {{ apply?: boolean; persist?: boolean }} [options]
@@ -3424,8 +3395,8 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
                 : '-';
             println(`      \x1b[90mbloqueada: ${providerId}:${providerModel} · ${reasons || '-'}\x1b[0m`);
         }
-        for (const command of buildByokRuntimeProofCommands(alternativeSummary)) {
-            println(`      \x1b[90mprovar: ${command}\x1b[0m`);
+        for (const proof of buildModelGatewayRuntimeProofCommands(alternativeSummary)) {
+            println(`      \x1b[90mprovar: ${proof.command}\x1b[0m`);
         }
     }
     if (decision.blockers.length > 0) println(`    blockers:      \x1b[33m${decision.blockers.join(', ')}\x1b[0m`);
@@ -3450,6 +3421,44 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
             );
         }
     }
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
+async function renderByokGatewayAutoProofPlan(println, rest) {
+    const limit = parseByokGatewayAutoHistoryLimit(rest);
+    const status = await buildTerminalByokGatewayAutoStatus(rest, {
+        allowEffects: false,
+        persistAutomationDecision: false,
+    });
+    const rows = status.runtimeSelectorPlan.routes.flatMap((route) =>
+        buildModelGatewayRuntimeProofCommands(route.alternativeSummary, { limit }).map((proof) => ({
+            profileId: route.profileId,
+            status: route.status,
+            alternativeSummary: route.alternativeSummary,
+            ...proof,
+        })),
+    );
+    const visibleRows = rows.slice(0, limit);
+    const evaluated = status.runtimeSelectorPlan.routes.reduce((sum, route) => sum + route.alternativeSummary.evaluatedCount, 0);
+    const usable = status.runtimeSelectorPlan.routes.reduce((sum, route) => sum + route.alternativeSummary.usableCount, 0);
+    println('\n  \x1b[36mBYOK model-gateway auto proof plan\x1b[0m');
+    println(
+        `  \x1b[90mprofile=${status.args.profileId} · runtimeSelector=${status.runtimeSelectorPlan.ok ? 'ok' : 'blocked'} · commands=${rows.length} · alternatives=${usable}/${evaluated} · providerCall=nao\x1b[0m`,
+    );
+    if (visibleRows.length === 0) {
+        println('  \x1b[90mNenhum comando de prova foi derivado das alternativas bloqueadas atuais.\x1b[0m\n');
+        return;
+    }
+    for (const [index, row] of visibleRows.entries()) {
+        println(
+            `    ${index + 1}. \x1b[33m${row.command}\x1b[0m  \x1b[90mprofile=${row.profileId} · reasons=${row.reasons.slice(0, 3).join('+') || '-'}\x1b[0m`,
+        );
+    }
+    println('  \x1b[90mCada comando roda sessão SDK descartável e alimenta o runtime health usado pelo selector; nada é aplicado automaticamente aqui.\x1b[0m\n');
 }
 
 /**
@@ -3773,8 +3782,8 @@ async function renderByokGatewayAutoDoctor(println, rest) {
         println(
             `    alternativas:  \x1b[33musable=${alternativeSummary.usableCount}/${alternativeSummary.evaluatedCount} · providers=${alternativeSummary.providerCount}${topReasons ? ` · ${topReasons}` : ''}\x1b[0m`,
         );
-        for (const command of buildByokRuntimeProofCommands(alternativeSummary)) {
-            println(`      \x1b[90mprovar: ${command}\x1b[0m`);
+        for (const proof of buildModelGatewayRuntimeProofCommands(alternativeSummary)) {
+            println(`      \x1b[90mprovar: ${proof.command}\x1b[0m`);
         }
     }
     println(
@@ -4755,6 +4764,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayAutoDoctor(println, rest);
             return;
         }
+        if (rest.some((item) => /^(proof-plan|proofs|runtime-proofs|provas|plano-provas)$/iu.test(item))) {
+            await renderByokGatewayAutoProofPlan(println, rest);
+            return;
+        }
         if (rest.some((item) => /^(switch|fallback|trocar|mudar|change|apply-best)$/iu.test(item))) {
             await renderByokGatewayAutoStatus(println, rest, { apply: true, persist: true });
             return;
@@ -4808,6 +4821,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             if (autoRest.some((item) => /^(explain|explicar|why|porque|por-que)$/iu.test(item))) {
                 await renderByokGatewayAutoStatus(println, autoRest);
                 await renderByokGatewayAutoDoctor(println, autoRest);
+                return;
+            }
+            if (autoRest.some((item) => /^(proof-plan|proofs|runtime-proofs|provas|plano-provas)$/iu.test(item))) {
+                await renderByokGatewayAutoProofPlan(println, autoRest);
                 return;
             }
             if (autoRest.some((item) => /^(switch|fallback|trocar|mudar|change|apply-best)$/iu.test(item))) {

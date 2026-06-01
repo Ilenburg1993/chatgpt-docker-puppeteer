@@ -320,6 +320,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Read persisted post-turn recovery attempts created by model-gateway automation.',
     },
     {
+        id: 'automation.proof-plan',
+        phase: 'automation',
+        surface: 'package',
+        command: 'npm run model-gateway:auto:proof-plan',
+        summary: 'Build a read-only queue of explicit provider/model runtime proof commands for blocked auto fallback candidates.',
+    },
+    {
         id: 'automation.scenarios',
         phase: 'automation',
         surface: 'package',
@@ -771,6 +778,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok auto recoveries 10',
         summary: 'Read the latest post-turn recovery attempts created after BYOK failures.',
+    },
+    {
+        id: 'terminal.auto-proof-plan',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto proof-plan profile:repo_agent 12',
+        summary: 'Render explicit provider/model probe commands for blocked runtime-selector fallback candidates without calling providers.',
     },
     {
         id: 'terminal.auto-recovery-fixture',

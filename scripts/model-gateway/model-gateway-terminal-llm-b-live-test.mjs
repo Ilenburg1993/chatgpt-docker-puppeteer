@@ -194,6 +194,7 @@ function buildAutoProbeCommands({ profile = 'repo_agent' } = {}) {
         '/byok auto history 10',
         '/byok auto handoffs 10',
         '/byok auto confirmations 10',
+        `/byok auto proof-plan profile:${routeProfile} 5`,
         `/byok auto recovery-fixture profile:${routeProfile} provider:zai model:glm-4.5-flash failure:rate-limit`,
         '/byok auto recoveries 10',
         '/events 40',
@@ -2323,6 +2324,11 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
             id: 'auto-confirmations-visible',
             pass: /BYOK model-gateway auto confirmations/.test(plain),
             detail: '/byok auto confirmations rendered SDK confirmation ledger or empty state',
+        },
+        {
+            id: 'auto-proof-plan-visible',
+            pass: /BYOK model-gateway auto proof plan/.test(plain) && /\/byok probe (?:agent|chat) provider:/u.test(plain),
+            detail: '/byok auto proof-plan rendered explicit provider/model runtime proof commands without provider calls',
         },
         {
             id: 'auto-recovery-fixture-visible',

@@ -336,6 +336,7 @@ export {
     applyModelGatewaySelectionTraceRetention,
     buildModelGatewayRuntimeSelectorProbeEnv,
     buildModelGatewayRuntimeSelectorProbeRun,
+    buildModelGatewayRuntimeProofCommands,
     buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewaySelectionDecisionTrace,
     buildModelGatewayRouteCandidates,

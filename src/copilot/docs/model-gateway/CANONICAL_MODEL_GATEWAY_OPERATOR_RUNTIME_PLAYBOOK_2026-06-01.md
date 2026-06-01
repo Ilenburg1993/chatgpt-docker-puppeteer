@@ -180,12 +180,13 @@ npm run model-gateway:auto:explain
 npm run model-gateway:auto:handoffs
 npm run model-gateway:auto:confirmations
 npm run model-gateway:auto:recoveries
+npm run model-gateway:auto:proof-plan
 npm run model-gateway:auto:scenarios
 npm run model-gateway:live:runs
 ```
 
 Regra: `auto:status`, `auto:ready`, `auto:doctor`, `auto:explain`, `auto:handoffs`, `auto:confirmations`,
-`auto:recoveries` e `auto:scenarios` nao devem chamar provider nem mutar terminal.
+`auto:recoveries`, `auto:proof-plan` e `auto:scenarios` nao devem chamar provider nem mutar terminal.
 
 ### 3.6 Terminal
 
@@ -202,6 +203,7 @@ Responsavel pela experiencia viva do operador:
 /byok auto switch profile:repo_agent
 /byok auto handoffs 10
 /byok auto confirmations 10
+/byok auto proof-plan profile:repo_agent 12
 /byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
 /byok probe agent provider:zai model:glm-4.5-flash timeout:20000
 /byok auto recoveries 10
@@ -359,20 +361,21 @@ Evidencia em 2026-06-01:
 - status: PASS;
 - artefato inicial: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`;
 - artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-57-46-528Z/summary.md`;
-- artefato com recovery fixture final: `artifacts/terminal-live/2026-06-01T23-33-43-471Z/summary.md`;
-- duracao mais recente: 19877ms;
+- artefato com recovery fixture final: `artifacts/terminal-live/2026-06-01T23-49-06-502Z/summary.md`;
+- duracao mais recente: 19447ms;
 - erros rastreados: 0;
 - criterios PASS mais recentes: 28;
-- inventario canonico exibiu 135 comandos apos recovery fixture;
+- inventario canonico exibiu 137 comandos apos recovery fixture e proof-plan;
 - `/byok auto policy` funcionou;
 - `/byok auto status profile:repo_agent` funcionou e mostrou resumo de alternativas usaveis/bloqueadas;
 - `/byok auto doctor profile:repo_agent` funcionou e mostrou resumo de alternativas usaveis/bloqueadas;
+- `/byok auto proof-plan profile:repo_agent 12` agora existe como fila read-only de probes por provider/model;
 - o cockpit passou a sugerir `/byok probe agent provider:<provider> model:<provider-model> timeout:20000` quando alternativas carecem de agent probe;
 - `/byok auto explain profile:repo_agent` funcionou;
 - `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery account-wide, runtime health e espelho SQLite sem chamada ao provider;
 - ledgers history/handoffs/confirmations/recoveries renderizaram corretamente;
-- ledger de live scenarios gravou `terminal-live:2026-06-01T23-33-43-478Z:auto_probe`;
-- `npm run model-gateway:live:runs` leu 9 runs persistidos e confirmou `criteriaTotal=28` no ultimo;
+- ledger de live scenarios gravou `terminal-live:2026-06-01T23-49-06-512Z:auto_probe`;
+- `npm run model-gateway:live:runs` leu 10 runs persistidos e confirmou `criteriaTotal=29` no ultimo;
 - achado estrutural: depois dos overlays de health, `repo_agent` pode mostrar `usable=0/78` porque exige agent-probe verificado; isso e bloqueio correto, nao falha do cockpit.
 
 ### 5.6 BYOK real no-PR
@@ -446,6 +449,7 @@ Depois reiniciar a task/sessao conforme a mensagem do terminal quando houver reb
 /byok auto switch profile:repo_agent
 /byok auto handoffs 10
 /byok auto confirmations 10
+/byok auto proof-plan profile:repo_agent 12
 /byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
 /byok probe agent provider:zai model:glm-4.5-flash timeout:20000
 /byok auto recoveries 10
@@ -529,7 +533,8 @@ Isso cria overlay temporario com reset/cooldown.
 
 - [ ] `npm run model-gateway:auto:ready` passa.
 - [ ] `npm run model-gateway:auto:doctor` passa.
-- [ ] `npm run model-gateway:auto:scenarios` passa.
+- [x] `npm run model-gateway:auto:proof-plan` passa e gera fila read-only de comandos de prova.
+- [ ] `npm run model-gateway:auto:scenarios` passa sem blockers de readiness.
 - [ ] `npm run model-gateway:live:readiness` passa.
 - [ ] `npm run model-gateway:live:plan` passa.
 - [ ] `npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000` passa.
@@ -587,7 +592,8 @@ npm run model-gateway:live:auto-probe
 Resultado:
 
 - `auto:ready`: ok;
-- `auto:scenarios`: ok, 10 cenarios, zero blockers;
+- `auto:proof-plan`: ok, gerou 12 comandos para alternativas bloqueadas.
+- `auto:scenarios`: comandos ok, 11 cenarios, 1 blocker esperado enquanto `repo_agent` permanece sem rota runtime-proved utilizavel;
 - `live control no-PR`: PASS;
 - `BYOK fixture no-PR`: PASS;
 - `auto cockpit no-PR`: PASS;

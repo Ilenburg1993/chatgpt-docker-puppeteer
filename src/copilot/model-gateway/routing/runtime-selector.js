@@ -588,7 +588,7 @@ function summarizeRuntimeSelectorAlternatives(candidateEvaluations) {
         if (candidate['blocked'] !== true) continue;
         const reasons = candidateBlockReasons(candidate);
         for (const reason of reasons) rejectionReasonCounts[reason] = (rejectionReasonCounts[reason] ?? 0) + 1;
-        if (topBlockedRoutes.length < 8) {
+        if (topBlockedRoutes.length < 24) {
             topBlockedRoutes.push({
                 label: optionalString(candidate['label']) ?? 'candidate',
                 providerId,
@@ -605,6 +605,42 @@ function summarizeRuntimeSelectorAlternatives(candidateEvaluations) {
         rejectionReasonCounts,
         topBlockedRoutes,
     };
+}
+
+/**
+ * @param {unknown} alternativeSummary
+ * @param {{ limit?: number; timeoutMs?: number }} [options]
+ * @returns {Array<{ mode: 'agent' | 'chat'; providerId: string; providerModel: string; command: string; reasons: string[] }>}
+ */
+export function buildModelGatewayRuntimeProofCommands(alternativeSummary, options = {}) {
+    const summary = optionalRecord(alternativeSummary) ?? {};
+    const blockedRoutes = Array.isArray(summary['topBlockedRoutes']) ? summary['topBlockedRoutes'] : [];
+    const limit = typeof options.limit === 'number' && Number.isFinite(options.limit) ? Math.max(1, Math.floor(options.limit)) : 3;
+    const timeoutMs =
+        typeof options.timeoutMs === 'number' && Number.isFinite(options.timeoutMs)
+            ? Math.max(5_000, Math.floor(options.timeoutMs))
+            : 20_000;
+    const commands = [];
+    const seen = new Set();
+    for (const blocked of blockedRoutes) {
+        const row = optionalRecord(blocked);
+        const providerId = optionalString(row?.['providerId']);
+        const providerModel = optionalString(row?.['providerModel']);
+        if (!providerId || !providerModel) continue;
+        const reasons = Array.isArray(row?.['reasons']) ? row['reasons'].map(optionalString).filter((item) => item !== null) : [];
+        const needsAgentProbe = reasons.some((reason) =>
+            /agent_probe_(?:missing|not_verified|failed)|runtime_probe_failed:agent/iu.test(reason),
+        );
+        const needsChatProbe = reasons.some((reason) => /chat_health_failed|health_unknown/iu.test(reason));
+        if (!needsAgentProbe && !needsChatProbe) continue;
+        const mode = needsAgentProbe ? 'agent' : 'chat';
+        const command = `/byok probe ${mode} provider:${providerId} model:${providerModel} timeout:${timeoutMs}`;
+        if (seen.has(command)) continue;
+        seen.add(command);
+        commands.push({ mode, providerId, providerModel, command, reasons });
+        if (commands.length >= limit) break;
+    }
+    return commands;
 }
 
 /**

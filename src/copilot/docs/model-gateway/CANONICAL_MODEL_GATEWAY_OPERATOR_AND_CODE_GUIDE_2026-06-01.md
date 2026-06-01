@@ -212,7 +212,7 @@ Regras:
 
 ## 5. Comandos Canonicos
 
-Inventario atual: 135 comandos.
+Inventario atual: 137 comandos.
 
 Distribuicao por fase:
 
@@ -238,6 +238,7 @@ Comandos de saude read-only:
 ```bash
 npm run model-gateway:auto:ready
 npm run model-gateway:auto:doctor
+npm run model-gateway:auto:proof-plan
 npm run model-gateway:auto:scenarios
 npm run model-gateway:sqlite:diagnostics
 ```
@@ -262,6 +263,7 @@ Comandos terminal equivalentes:
 /byok auto history 10
 /byok auto handoffs 10
 /byok auto confirmations 10
+/byok auto proof-plan profile:repo_agent 12
 /byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
 /byok probe agent provider:zai model:glm-4.5-flash timeout:20000
 /byok auto recoveries 10
@@ -354,15 +356,16 @@ npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_a
 
 Validado nesta linha:
 
-- `npm run model-gateway:commands:json`: 135 comandos.
-- `npm run model-gateway:auto:recoveries`: PASS, read-only, rows=6, recovery fixture `rate-limit` aplicada.
-- `npm run model-gateway:auto:doctor`: PASS operacional de leitura, schema=10, commands=135, recoveries=6, liveRuns=9; gate auto pode ficar bloqueado quando nao houver alternativa runtime-proved utilizavel.
-- `npm run model-gateway:auto:scenarios`: PASS, inclui `auto_recoveries`.
+- `npm run model-gateway:commands:json`: 137 comandos.
+- `npm run model-gateway:auto:recoveries`: PASS, read-only, rows=7, recovery fixture `rate-limit` aplicada.
+- `npm run model-gateway:auto:doctor`: PASS operacional de leitura, schema=10, commands=137, recoveries=7, liveRuns=10; gate auto pode ficar bloqueado quando nao houver alternativa runtime-proved utilizavel.
+- `npm run model-gateway:auto:proof-plan`: PASS, read-only, gerou comandos explicitos `/byok probe ... provider:<id> model:<id>`.
+- `npm run model-gateway:auto:scenarios`: comandos PASS, 11 cenarios; gate global pode ficar `ok=false` enquanto `auto_ready_gate` tiver blocker por falta de rota utilizavel.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`: 215 PASS.
-- `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js`: 97 PASS.
+- `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js`: 100 PASS.
 - `npm run model-gateway:live:auto-probe`: PASS.
-- Artefato live: `artifacts/terminal-live/2026-06-01T23-33-43-471Z/summary.md`.
-- `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-01T23-33-43-478Z:auto_probe`, `criteriaTotal=28`, `criteriaFailed=0`.
+- Artefato live: `artifacts/terminal-live/2026-06-01T23-49-06-502Z/summary.md`.
+- `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-01T23-49-06-512Z:auto_probe`, `criteriaTotal=29`, `criteriaFailed=0`.
 - `/byok auto status` e `/byok auto doctor` agora mostram resumo de alternativas: usable/evaluated, quantidade de providers e principais blockers.
 - `/byok auto status` e `/byok auto doctor` agora sugerem comandos `provar:` para promover candidatos bloqueados por agent probe ausente/nao verificado.
 - `/byok auto recovery-fixture ... provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery, runtime health e espelho SQLite sem chamada ao provider.
