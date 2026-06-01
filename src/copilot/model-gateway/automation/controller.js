@@ -81,12 +81,14 @@ export function buildModelGatewayRuntimeAutomationControllerStep(input) {
     const routeKey = selectedRouteKey(decision);
 
     if (phase === 'post_turn' && input.turnOutcome?.ok === false) {
+        const accountWideFailure = accountWideFailureKinds.has(input.turnOutcome.failureKind ?? '');
         effects.push({
             kind: 'replan_after_turn_failure',
             routeKey,
             failureKind: input.turnOutcome.failureKind ?? 'unknown_failure',
             errorMessage: input.turnOutcome.errorMessage ?? null,
-            accountWideFailure: accountWideFailureKinds.has(input.turnOutcome.failureKind ?? ''),
+            accountWideFailure,
+            recoveryScope: accountWideFailure ? 'account' : 'route',
             execute: allowEffects,
         });
     }

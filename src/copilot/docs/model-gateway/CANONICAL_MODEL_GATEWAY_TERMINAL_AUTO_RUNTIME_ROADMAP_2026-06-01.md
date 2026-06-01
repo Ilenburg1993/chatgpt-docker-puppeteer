@@ -90,7 +90,7 @@ O guia anterior continua como historico:
 - [x] Pos-falha executa controller automatico quando a policy esta ligada.
 - [x] Recovery decision e persistida via automation decision post-turn.
 - [x] Replanejamento pos-falha bloqueia repeticao imediata da mesma rota quando ela acabou de falhar.
-- [ ] Falta separar recovery account-wide de recovery por modelo.
+- [x] Recovery pos-falha separa escopo conta/key de escopo modelo/rota.
 - [ ] Falta expor ao operador a proxima janela de tentativa em cockpit auto.
 
 ## 3. Arquitetura Ideal

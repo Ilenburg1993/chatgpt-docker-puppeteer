@@ -1435,6 +1435,7 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(failureControllerStep.effects[0]['kind'], 'replan_after_turn_failure');
         assert.equal(failureControllerStep.effects[0]['failureKind'], 'rate_limit');
+        assert.equal(failureControllerStep.effects[0]['recoveryScope'], 'route');
         const accountWideControllerStep = buildModelGatewayRuntimeAutomationControllerStep({
             phase: 'post_turn',
             decision: localPrivateDecision,
@@ -1442,6 +1443,7 @@ describe('model-gateway foundation', () => {
             turnOutcome: { ok: false, failureKind: 'credits', errorMessage: 'credit exhausted' },
         });
         assert.equal(accountWideControllerStep.effects[0]['accountWideFailure'], true);
+        assert.equal(accountWideControllerStep.effects[0]['recoveryScope'], 'account');
 
         const hardQuotaDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan: {
