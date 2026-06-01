@@ -147,8 +147,8 @@ mas mantendo rastreabilidade e sem vazar segredo.
 - [x] `gateway-auto.js` roda status/plan e aplica efeitos de terminal.
 - [x] Engine chama pre-turn automation quando policy esta ligada.
 - [x] Decisoes pre-turn podem ser persistidas no SQLite.
-- [ ] `off` ainda nao edita arquivo persistente.
-- [ ] Falta `/byok auto policy`.
+- [x] `off` edita arquivo persistente.
+- [x] `/byok auto policy`.
 - [ ] Falta `/byok auto explain`.
 - [ ] Falta controller post-turn completo.
 - [x] `prepare_new_sdk_session` agenda novo boot SDK quando `allow-new-session` esta autorizado.
@@ -173,8 +173,8 @@ mas mantendo rastreabilidade e sem vazar segredo.
 - [x] `Makefile` possui `model-gateway-*`.
 - [x] Wrapper legado em `scripts/copilot` foi removido.
 - [x] Existe contrato que garante paths no barril `scripts/model-gateway`.
-- [ ] Falta comando unico `model-gateway:auto:doctor`.
-- [ ] Falta comando unico `model-gateway:auto:ready`.
+- [x] Comando unico `model-gateway:auto:doctor`.
+- [x] Comando unico `model-gateway:auto:ready`.
 - [ ] Falta script que gere plano de live tests com fixtures e reais.
 
 ---
@@ -296,16 +296,16 @@ Quando um turno falhar:
 
 ## 5. Gaps De Maior Retorno
 
-- [ ] Falta `automation/effects.js` puro para representar resultados de efeitos.
-- [ ] Falta store SQLite para effect applications.
-- [ ] Falta store SQLite para SDK handoffs.
-- [ ] Falta comando `/byok auto policy`.
+- [x] Existe executor puro/compartilhado de efeitos auto no terminal.
+- [x] Store SQLite para effect applications.
+- [x] Store SQLite para SDK handoffs.
+- [x] Comando `/byok auto policy`.
 - [ ] Falta comando `/byok auto explain`.
 - [ ] Falta `/byok auto switch` ou equivalente para pedir melhor fallback agora.
-- [ ] Falta `model-gateway:auto:ready`.
-- [ ] Falta `model-gateway:auto:doctor`.
+- [x] `model-gateway:auto:ready`.
+- [x] `model-gateway:auto:doctor`.
 - [ ] Falta o post-turn controller rodando de verdade.
-- [ ] Falta aplicar `prepare_new_sdk_session`.
+- [x] `prepare_new_sdk_session` agenda novo boot SDK quando autorizado.
 - [ ] Falta confirmar `session.model_changed`.
 - [ ] Falta live test fixture cobrindo auto mode sem gastar quota real.
 - [ ] Falta live test real com fallback profiles.
@@ -326,9 +326,9 @@ Todos os checkboxes sao booleanos. Nao usar estados parciais.
 - [x] A.5 Garantir package scripts canonicos.
 - [x] A.6 Garantir Makefile canonico.
 - [x] A.7 Criar contrato de path do barril.
-- [ ] A.8 Criar `model-gateway:auto:ready`.
-- [ ] A.9 Criar `model-gateway:auto:doctor`.
-- [ ] A.10 Atualizar README de scripts com fluxo auto completo.
+- [x] A.8 Criar `model-gateway:auto:ready`.
+- [x] A.9 Criar `model-gateway:auto:doctor`.
+- [x] A.10 Atualizar README de scripts com fluxo auto completo.
 
 ### Faixa B - Policy Persistente E Explicavel
 
@@ -337,8 +337,8 @@ Todos os checkboxes sao booleanos. Nao usar estados parciais.
 - [x] B.3 Policy file sem segredo.
 - [x] B.4 Merge arquivo + env.
 - [x] B.5 `/byok auto on`.
-- [ ] B.6 `/byok auto policy`.
-- [ ] B.7 `/byok auto off` mutando policy file para disabled.
+- [x] B.6 `/byok auto policy`.
+- [x] B.7 `/byok auto off` mutando policy file para disabled.
 - [ ] B.8 Mostrar fonte de cada campo.
 - [ ] B.9 Validar policy invalida com erro didatico.
 - [ ] B.10 Persistir snapshot de policy usado por cada automation decision.
@@ -441,11 +441,11 @@ Todos os checkboxes sao booleanos. Nao usar estados parciais.
 - [x] J.3 `/byok auto apply`.
 - [x] J.4 `/byok auto history`.
 - [x] J.5 `model-gateway:ops`.
-- [ ] J.6 `/byok auto policy`.
+- [x] J.6 `/byok auto policy`.
 - [ ] J.7 `/byok auto explain`.
 - [ ] J.8 `/byok auto switch`.
-- [ ] J.9 `model-gateway:auto:ready`.
-- [ ] J.10 `model-gateway:auto:doctor`.
+- [x] J.9 `model-gateway:auto:ready`.
+- [x] J.10 `model-gateway:auto:doctor`.
 - [ ] J.11 Mostrar prepared/live/confirmed em uma linha.
 - [ ] J.12 Mostrar o que ainda impede automacao total.
 
@@ -477,8 +477,8 @@ Todos os checkboxes sao booleanos. Nao usar estados parciais.
 
 ### Faixa M - Primeiro Uso Funcional
 
-- [ ] M.1 Rodar `model-gateway:auto:ready`.
-- [ ] M.2 Rodar `model-gateway:auto:doctor`.
+- [x] M.1 Rodar `model-gateway:auto:ready`.
+- [x] M.2 Rodar `model-gateway:auto:doctor`.
 - [ ] M.3 Ligar `/byok auto on` em modo seguro.
 - [ ] M.4 Verificar pre-turn sem mutacao perigosa.
 - [ ] M.5 Autorizar live set model.
@@ -505,16 +505,16 @@ Todos os checkboxes sao booleanos. Nao usar estados parciais.
 
 ## 7. Sequencia Recomendada De Implementacao
 
-1. Criar stores/contratos para effect applications e SDK handoffs.
-2. Implementar `/byok auto policy`.
-3. Implementar `/byok auto off` persistente.
-4. Implementar `model-gateway:auto:ready`.
-5. Implementar `model-gateway:auto:doctor`.
-6. Integrar `prepare_new_sdk_session` ao terminal.
-7. Implementar controller post-turn.
-8. Correlacionar eventos SDK.
-9. Expandir live runner com cenarios auto.
-10. Rodar live tests e corrigir.
+1. [x] Criar stores/contratos para effect applications e SDK handoffs.
+2. [x] Implementar `/byok auto policy`.
+3. [x] Implementar `/byok auto off` persistente.
+4. [x] Implementar `model-gateway:auto:ready`.
+5. [x] Implementar `model-gateway:auto:doctor`.
+6. [x] Integrar `prepare_new_sdk_session` ao terminal.
+7. [ ] Implementar controller post-turn.
+8. [ ] Correlacionar eventos SDK.
+9. [ ] Expandir live runner com cenarios auto.
+10. [ ] Rodar live tests e corrigir.
 
 ---
 
@@ -522,8 +522,8 @@ Todos os checkboxes sao booleanos. Nao usar estados parciais.
 
 O sistema estara pronto para chancela funcional quando:
 
-- [ ] `model-gateway:auto:ready` passa.
-- [ ] `model-gateway:auto:doctor` passa.
+- [x] `model-gateway:auto:ready` passa.
+- [x] `model-gateway:auto:doctor` passa.
 - [ ] `/byok auto status` explica policy e rota.
 - [ ] `/byok auto on` liga policy persistente.
 - [ ] Pre-turn roda em modo auto sem provider call.

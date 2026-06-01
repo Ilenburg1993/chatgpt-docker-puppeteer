@@ -229,6 +229,8 @@ help:
 	@echo "  $(CYAN)make model-gateway-build$(NC)     Prebuild + build do banco de metadados"
 	@echo "  $(CYAN)make model-gateway-selection-audit$(NC)  Auditoria de seleção pré-runtime"
 	@echo "  $(CYAN)make model-gateway-effective-selection$(NC)  Seleção efetiva sem novas probes"
+	@echo "  $(CYAN)make model-gateway-auto-ready$(NC) Gate read-only para automação terminal"
+	@echo "  $(CYAN)make model-gateway-auto-doctor$(NC) Doctor read-only da política e trilhas auto"
 	@echo "  $(CYAN)make model-gateway-live-readiness$(NC)   Gate antes dos testes live llm-b"
 	@echo "  $(CYAN)make model-gateway-live-plan$(NC)  Plano auditável antes dos testes live"
 	@echo "  $(CYAN)make model-gateway-terminal$(NC)  Abrir terminal llm-b para comandos /byok"
@@ -1449,7 +1451,7 @@ rag-rebuild-code-config-strict:
 # MODEL GATEWAY BYOK — COMANDOS CANÔNICOS PRE-BUILD
 # =============================================================================
 
-.PHONY: model-gateway-help model-gateway-commands model-gateway-commands-json model-gateway-lint model-gateway-typecheck model-gateway-test-contracts model-gateway-test-terminal model-gateway-validate model-gateway-prebuild model-gateway-build model-gateway-metadata-build model-gateway-metadata-build-plan model-gateway-metadata-build-preview model-gateway-catalog-integrity model-gateway-redaction-audit model-gateway-selection-audit model-gateway-effective-selection model-gateway-effective-selection-trace model-gateway-selection-trace-diff model-gateway-selection-trace-retention model-gateway-runtime-selector model-gateway-auto-status model-gateway-auto-plan model-gateway-live-readiness model-gateway-live-llm-b model-gateway-refresh model-gateway-refresh-preview model-gateway-refresh-plan model-gateway-refresh-provider model-gateway-refresh-log model-gateway-refresh-log-sqlite model-gateway-runtime-health-diff model-gateway-runtime-health-mirror model-gateway-sqlite-diagnostics model-gateway-sqlite-retention model-gateway-sqlite-retention-apply model-gateway-terminal
+.PHONY: model-gateway-help model-gateway-commands model-gateway-commands-json model-gateway-lint model-gateway-typecheck model-gateway-test-contracts model-gateway-test-terminal model-gateway-validate model-gateway-prebuild model-gateway-build model-gateway-metadata-build model-gateway-metadata-build-plan model-gateway-metadata-build-preview model-gateway-catalog-integrity model-gateway-redaction-audit model-gateway-selection-audit model-gateway-effective-selection model-gateway-effective-selection-trace model-gateway-selection-trace-diff model-gateway-selection-trace-retention model-gateway-runtime-selector model-gateway-auto-status model-gateway-auto-plan model-gateway-auto-ready model-gateway-auto-doctor model-gateway-live-readiness model-gateway-live-llm-b model-gateway-refresh model-gateway-refresh-preview model-gateway-refresh-plan model-gateway-refresh-provider model-gateway-refresh-log model-gateway-refresh-log-sqlite model-gateway-runtime-health-diff model-gateway-runtime-health-mirror model-gateway-sqlite-diagnostics model-gateway-sqlite-retention model-gateway-sqlite-retention-apply model-gateway-terminal
 
 model-gateway-help: model-gateway-commands
 
@@ -1518,6 +1520,12 @@ model-gateway-auto-status:
 
 model-gateway-auto-plan:
 	@$(NPM) run model-gateway:auto:plan
+
+model-gateway-auto-ready:
+	@$(NPM) run model-gateway:auto:ready
+
+model-gateway-auto-doctor:
+	@$(NPM) run model-gateway:auto:doctor
 
 model-gateway-ops:
 	@$(NPM) run model-gateway:ops

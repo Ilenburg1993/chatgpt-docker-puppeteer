@@ -6,6 +6,8 @@ export const REPO_ROOT = path.resolve(MODEL_GATEWAY_SCRIPT_DIR, '../..');
 
 export const MODEL_GATEWAY_SCRIPT_PATHS = Object.freeze({
     autoStatus: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-status.mjs'),
+    autoReady: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-ready.mjs'),
+    autoDoctor: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-doctor.mjs'),
     canonicalCommands: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-canonical-commands.mjs'),
     catalogIntegrity: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-catalog-integrity.mjs'),
     effectiveSelection: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-effective-selection.mjs'),

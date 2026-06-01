@@ -278,6 +278,20 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Inspect the next automatic action for a route profile before terminal integration.',
     },
     {
+        id: 'automation.ready',
+        phase: 'automation',
+        surface: 'package',
+        command: 'npm run model-gateway:auto:ready',
+        summary: 'Run the read-only operational gate for terminal auto mode before live use.',
+    },
+    {
+        id: 'automation.doctor',
+        phase: 'automation',
+        surface: 'package',
+        command: 'npm run model-gateway:auto:doctor',
+        summary: 'Explain model-gateway auto policy, blockers, ledgers and next operational steps without runtime calls.',
+    },
+    {
         id: 'runtime-health.diff',
         phase: 'live-readiness',
         surface: 'package',
@@ -528,6 +542,20 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Makefile alias for inspecting the next automatic model-gateway action.',
     },
     {
+        id: 'make.auto-ready',
+        phase: 'automation',
+        surface: 'make',
+        command: 'make model-gateway-auto-ready',
+        summary: 'Makefile alias for the read-only terminal auto readiness gate.',
+    },
+    {
+        id: 'make.auto-doctor',
+        phase: 'automation',
+        surface: 'make',
+        command: 'make model-gateway-auto-doctor',
+        summary: 'Makefile alias for the read-only terminal auto doctor.',
+    },
+    {
         id: 'make.runtime-health-diff',
         phase: 'live-readiness',
         surface: 'make',
@@ -575,6 +603,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok gateway auto profile:repo_agent',
         summary: 'Gateway namespace alias for the no-mutation automation decision.',
+    },
+    {
+        id: 'terminal.auto-policy',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto policy',
+        summary: 'Show the effective persistent model-gateway automation policy without printing secrets.',
     },
     {
         id: 'terminal.auto-apply',

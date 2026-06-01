@@ -681,7 +681,9 @@
     "vscode:update": "code --update-extensions",
     "model-gateway:live:llm-b": "node scripts/model-gateway/model-gateway-terminal-llm-b-live-test.mjs",
     "model-gateway:auto:status": "node scripts/model-gateway/model-gateway-auto-status.mjs --json",
-    "model-gateway:auto:plan": "node scripts/model-gateway/model-gateway-auto-status.mjs --json"
+    "model-gateway:auto:plan": "node scripts/model-gateway/model-gateway-auto-status.mjs --json",
+    "model-gateway:auto:ready": "node scripts/model-gateway/model-gateway-auto-ready.mjs --json",
+    "model-gateway:auto:doctor": "node scripts/model-gateway/model-gateway-auto-doctor.mjs --json"
   },
   "overrides": {
     "qs": "^6.15.0",

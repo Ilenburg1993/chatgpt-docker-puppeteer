@@ -5,7 +5,8 @@ Scripts operacionais canônicos do `src/copilot/model-gateway`.
 ## Regra De Ouro
 
 - `model-gateway:ops`, `model-gateway:commands`, `model-gateway:sqlite:diagnostics`, `model-gateway:live:readiness`,
-  `model-gateway:live:plan`, `model-gateway:auto:status` e `model-gateway:auto:plan` são caminhos read-only por padrão.
+  `model-gateway:live:plan`, `model-gateway:auto:status`, `model-gateway:auto:plan`,
+  `model-gateway:auto:ready` e `model-gateway:auto:doctor` são caminhos read-only por padrão.
 - Provider/model runtime só deve ser executado por comandos que exigem flag explícita, como runtime selector com execução
   ou live test real.
 - Metadados canônicos não são mutados por runtime health, route decisions ou automation decisions.
@@ -52,11 +53,16 @@ remove apenas histórico operacional acima dos limites configurados; não apaga 
 npm run model-gateway:selection:effective
 npm run model-gateway:runtime-selector
 npm run model-gateway:auto:status
+npm run model-gateway:auto:ready
+npm run model-gateway:auto:doctor
 npm run model-gateway:auto:status -- --write-sqlite
 ```
 
 `auto:status` monta uma decisão pura. `--write-sqlite` grava a decisão como trilha operacional, sem aplicar efeitos e sem
 chamar provider.
+
+`auto:ready` é o gate operacional objetivo para saber se catálogo, SQLite, readiness, decisão auto e superfícies canônicas
+estão visíveis. `auto:doctor` explica a policy efetiva, ledgers de efeitos/handoffs e o que ainda impede automação total.
 
 No terminal:
 
