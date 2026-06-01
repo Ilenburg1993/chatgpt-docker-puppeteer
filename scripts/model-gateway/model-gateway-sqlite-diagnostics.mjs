@@ -29,7 +29,10 @@ if (args.has('--json')) {
         `schema=${diagnostics.schemaVersion} userVersion=${diagnostics.userVersion} active=${diagnostics.activeSnapshot.exists ? 'yes' : 'no'} source=${diagnostics.activeSnapshot.source ?? '-'}\n`,
     );
     process.stdout.write(
-        `rows: catalog=${diagnostics.catalogRows} accountHistory=${diagnostics.accountHistoryRows} runtime=${diagnostics.runtimeRows} routeDecisions=${diagnostics.routeDecisionRows}\n`,
+        `rows: catalog=${diagnostics.catalogRows} accountHistory=${diagnostics.accountHistoryRows} runtime=${diagnostics.runtimeRows} routeDecisions=${diagnostics.routeDecisionRows} automationDecisions=${diagnostics.automationDecisionRows}\n`,
+    );
+    process.stdout.write(
+        `automation: latestAction=${diagnostics.latestAutomationDecision.action ?? '-'} latestStatus=${diagnostics.latestAutomationDecision.status ?? '-'} latestRoute=${diagnostics.latestAutomationDecision.selectedRouteKey ?? '-'}\n`,
     );
     process.stdout.write(
         `runtime: probeRuns=${diagnostics.runtime.probeRuns} probeResults=${diagnostics.runtime.probeResults} health=${diagnostics.runtime.healthObservations} latestHealth=${diagnostics.runtime.latestHealthObservedAtMs ?? '-'} latestProbe=${diagnostics.runtime.latestProbeResultObservedAtMs ?? '-'}\n`,

@@ -40,6 +40,7 @@ Options:
   --account-rate-limit-max-rows=<n>    Account rate-limit snapshot rows to keep.
   --account-spending-max-rows=<n>      Account spending snapshot rows to keep.
   --route-decision-max-rows=<n>        Route decision rows to keep.
+  --automation-decision-max-rows=<n>   Automation decision rows to keep.
   --refresh-log-max-rows=<n>           Refresh log rows to keep.
   --runtime-probe-run-max-rows=<n>     Runtime probe run rows to keep.
   --runtime-probe-result-max-rows=<n>  Runtime probe result rows to keep.
@@ -78,6 +79,10 @@ const policy = {
         '--route-decision-max-rows',
         DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.routeDecisionMaxRows,
     ),
+    automationDecisionMaxRows: numberFor(
+        '--automation-decision-max-rows',
+        DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.automationDecisionMaxRows,
+    ),
     refreshLogMaxRows: numberFor('--refresh-log-max-rows', DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows),
     runtimeProbeRunMaxRows: numberFor(
         '--runtime-probe-run-max-rows',
@@ -111,13 +116,13 @@ if (hasFlag('--json')) {
     process.stdout.write(`model-gateway SQLite operational retention\n`);
     process.stdout.write(`mode=${hasFlag('--apply') ? 'apply' : 'dry-run'}\n`);
     process.stdout.write(
-        `policy: quota=${policy.accountQuotaSnapshotMaxRows} rateLimit=${policy.accountRateLimitSnapshotMaxRows} spending=${policy.accountSpendingSnapshotMaxRows} routeDecisionMaxRows=${policy.routeDecisionMaxRows} refreshLogMaxRows=${policy.refreshLogMaxRows} runtimeProbeRunMaxRows=${policy.runtimeProbeRunMaxRows} runtimeProbeResultMaxRows=${policy.runtimeProbeResultMaxRows} healthObservationMaxRows=${policy.healthObservationMaxRows}\n`,
+        `policy: quota=${policy.accountQuotaSnapshotMaxRows} rateLimit=${policy.accountRateLimitSnapshotMaxRows} spending=${policy.accountSpendingSnapshotMaxRows} routeDecisionMaxRows=${policy.routeDecisionMaxRows} automationDecisionMaxRows=${policy.automationDecisionMaxRows} refreshLogMaxRows=${policy.refreshLogMaxRows} runtimeProbeRunMaxRows=${policy.runtimeProbeRunMaxRows} runtimeProbeResultMaxRows=${policy.runtimeProbeResultMaxRows} healthObservationMaxRows=${policy.healthObservationMaxRows}\n`,
     );
     process.stdout.write(
-        `before: accountHistory=${before.accountHistoryRows} routeDecisions=${before.routeDecisionRows} refreshLogs=${before.refreshLogRows} runtime=${before.runtimeRows}\n`,
+        `before: accountHistory=${before.accountHistoryRows} routeDecisions=${before.routeDecisionRows} automationDecisions=${before.automationDecisionRows} refreshLogs=${before.refreshLogRows} runtime=${before.runtimeRows}\n`,
     );
     process.stdout.write(
-        `after: accountHistory=${after.accountHistoryRows} routeDecisions=${after.routeDecisionRows} refreshLogs=${after.refreshLogRows} runtime=${after.runtimeRows}\n`,
+        `after: accountHistory=${after.accountHistoryRows} routeDecisions=${after.routeDecisionRows} automationDecisions=${after.automationDecisionRows} refreshLogs=${after.refreshLogRows} runtime=${after.runtimeRows}\n`,
     );
     if (result) process.stdout.write(`deleted=${result.deletedRows}\n`);
 }

@@ -72,6 +72,7 @@ function readDatabaseSummary(diagnostics) {
     const json = optionalRecord(diagnostics.json);
     const activeSnapshot = optionalRecord(json?.['activeSnapshot']);
     const runtime = optionalRecord(json?.['runtime']);
+    const latestAutomationDecision = optionalRecord(json?.['latestAutomationDecision']);
     return {
         ok: diagnostics.ok && activeSnapshot?.['exists'] === true,
         schemaVersion: optionalNumber(json?.['schemaVersion']),
@@ -79,6 +80,8 @@ function readDatabaseSummary(diagnostics) {
         activeSnapshotSource: optionalString(activeSnapshot?.['source']),
         catalogRows: optionalNumber(json?.['catalogRows']),
         routeDecisionRows: optionalNumber(json?.['routeDecisionRows']),
+        automationDecisionRows: optionalNumber(json?.['automationDecisionRows']),
+        latestAutomationAction: optionalString(latestAutomationDecision?.['action']),
         runtimeHealthObservations: optionalNumber(runtime?.['healthObservations']),
         latestRuntimeHealthObservedAtMs: optionalNumber(runtime?.['latestHealthObservedAtMs']),
     };
@@ -152,8 +155,9 @@ if (json) {
 } else {
     process.stdout.write(`model-gateway ops: ok=${summary.ok ? 'yes' : 'no'} profile=${profile}\n`);
     process.stdout.write(
-        `  db: active=${summary.database.activeSnapshotExists ? 'yes' : 'no'} schema=${summary.database.schemaVersion ?? '-'} rows=${summary.database.catalogRows ?? '-'} routeDecisions=${summary.database.routeDecisionRows ?? '-'}\n`,
+        `  db: active=${summary.database.activeSnapshotExists ? 'yes' : 'no'} schema=${summary.database.schemaVersion ?? '-'} rows=${summary.database.catalogRows ?? '-'} routeDecisions=${summary.database.routeDecisionRows ?? '-'} automationDecisions=${summary.database.automationDecisionRows ?? '-'}\n`,
     );
+    process.stdout.write(`  db-auto: latestAction=${summary.database.latestAutomationAction ?? '-'}\n`);
     process.stdout.write(
         `  readiness: ok=${summary.readiness.ok ? 'yes' : 'no'} selected=${summary.readiness.selectedProfileCount ?? '-'}/${summary.readiness.profileCount ?? '-'} blocked=${summary.readiness.blockedProfileCount ?? '-'} warnings=${summary.readiness.warnings}\n`,
     );

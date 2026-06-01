@@ -32,6 +32,7 @@ const DEFAULT_ACCOUNT_SCOPE = 'default';
 const DEFAULT_POLICY_PROFILE = 'default';
 const DEFAULT_TASK_PROFILE = 'default';
 let _runtimeHealthRunSequence = 0;
+let _automationDecisionSequence = 0;
 
 export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze({
     accountHistoryMaxRowsPerTable: 10_000,
@@ -39,6 +40,7 @@ export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze(
     accountRateLimitSnapshotMaxRows: 50_000,
     accountSpendingSnapshotMaxRows: 20_000,
     routeDecisionMaxRows: 50_000,
+    automationDecisionMaxRows: 50_000,
     refreshLogMaxRows: 200_000,
     runtimeProbeRunMaxRows: 10_000,
     runtimeProbeResultMaxRows: 100_000,
@@ -474,6 +476,15 @@ function createRuntimeProbeRunId(observedAtMs) {
 }
 
 /**
+ * @param {number} observedAtMs
+ * @returns {string}
+ */
+function createAutomationDecisionId(observedAtMs) {
+    _automationDecisionSequence += 1;
+    return `model-gateway:automation:${observedAtMs}:${process.pid}:${_automationDecisionSequence}`;
+}
+
+/**
  * @param {Record<string, unknown>} result
  * @returns {string | null}
  */
@@ -807,6 +818,8 @@ export class SqliteModelGatewayCatalogStore {
      *       probeStatusCounts: Record<string, number>;
      *     };
      *     routeDecisionRows: number;
+     *     automationDecisionRows: number;
+     *     latestAutomationDecision: { action: string | null; status: string | null; ok: boolean | null; selectedRouteKey: string | null; decidedAtMs: number | null };
      *     refreshLogRows: number;
      * }>}
      */
@@ -885,6 +898,18 @@ export class SqliteModelGatewayCatalogStore {
                     return [item.status, optionalInteger(item.count) ?? 0];
                 }),
         );
+        const latestAutomationDecision = /** @type {{ action: string | null; status: string | null; ok: number | null; selected_route_key: string | null; decided_at_ms: number | null } | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT action, status, ok, selected_route_key, decided_at_ms
+                        FROM copilot_model_gateway_automation_decisions
+                        ORDER BY decided_at_ms DESC
+                        LIMIT 1
+                    `,
+                )
+                .get()
+        );
         /**
          * @param {string[]} tables
          * @returns {number}
@@ -913,6 +938,19 @@ export class SqliteModelGatewayCatalogStore {
                 probeStatusCounts,
             },
             routeDecisionRows: tableCounts['copilot_model_gateway_route_decisions'] ?? 0,
+            automationDecisionRows: tableCounts['copilot_model_gateway_automation_decisions'] ?? 0,
+            latestAutomationDecision: {
+                action: optionalString(latestAutomationDecision?.action),
+                status: optionalString(latestAutomationDecision?.status),
+                ok:
+                    latestAutomationDecision?.ok === 1
+                        ? true
+                        : latestAutomationDecision?.ok === 0
+                          ? false
+                          : null,
+                selectedRouteKey: optionalString(latestAutomationDecision?.selected_route_key),
+                decidedAtMs: optionalInteger(latestAutomationDecision?.decided_at_ms),
+            },
             refreshLogRows: tableCounts['copilot_model_gateway_refresh_log_events'] ?? 0,
         };
     }
@@ -1118,6 +1156,7 @@ export class SqliteModelGatewayCatalogStore {
      *     runtimeProbeRunMaxRows?: number;
      *     runtimeProbeResultMaxRows?: number;
      *     healthObservationMaxRows?: number;
+     *     automationDecisionMaxRows?: number;
      * }} [policy]
      * @returns {Promise<{
      *     schema: string;
@@ -1164,6 +1203,10 @@ export class SqliteModelGatewayCatalogStore {
             policy.healthObservationMaxRows,
             DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.healthObservationMaxRows,
         );
+        const automationDecisionMaxRows = retentionLimit(
+            policy.automationDecisionMaxRows,
+            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.automationDecisionMaxRows,
+        );
         /** @type {Record<string, { deletedRows: number; maxRows: number }>} */
         const tables = {};
         const tx = this.#db.transaction(() => {
@@ -1198,6 +1241,15 @@ export class SqliteModelGatewayCatalogStore {
                     maxRows: refreshLogMaxRows,
                 }),
                 maxRows: refreshLogMaxRows,
+            };
+            tables['copilot_model_gateway_automation_decisions'] = {
+                deletedRows: deleteRowsKeepingLatest(this.#db, {
+                    table: 'copilot_model_gateway_automation_decisions',
+                    keyColumn: 'decision_id',
+                    orderColumn: 'decided_at_ms',
+                    maxRows: automationDecisionMaxRows,
+                }),
+                maxRows: automationDecisionMaxRows,
             };
             tables['copilot_model_gateway_runtime_probe_results'] = {
                 deletedRows: deleteRowsKeepingLatest(this.#db, {
@@ -1740,6 +1792,63 @@ export class SqliteModelGatewayCatalogStore {
                 `
                     SELECT payload_json
                     FROM copilot_model_gateway_route_decisions
+                    ORDER BY decided_at_ms DESC
+                    LIMIT ?
+                `,
+            )
+            .all(limit)
+            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+    }
+
+    /**
+     * @param {Record<string, unknown>[]} decisions
+     * @returns {Promise<{ automationDecisions: number }>}
+     */
+    async writeAutomationDecisionRecords(decisions) {
+        const insert = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_automation_decisions
+                (decision_id, route_profile, selected_route_key, action, status, ok, decided_at_ms, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(decision_id) DO UPDATE SET
+                route_profile = excluded.route_profile,
+                selected_route_key = excluded.selected_route_key,
+                action = excluded.action,
+                status = excluded.status,
+                ok = excluded.ok,
+                decided_at_ms = excluded.decided_at_ms,
+                payload_json = excluded.payload_json
+        `);
+        const writable = decisions.filter(isRecord);
+        const tx = this.#db.transaction(() => {
+            for (const decision of writable) {
+                const decidedAtMs = dateMs(decision['timestamp']) ?? Date.now();
+                insert.run(
+                    optionalString(decision['decisionId']) ?? createAutomationDecisionId(decidedAtMs),
+                    optionalString(decision['routeProfile']) ?? DEFAULT_ROUTE_PROFILE,
+                    optionalString(decision['selectedRouteKey']),
+                    optionalString(decision['action']) ?? 'manual_intervention',
+                    optionalString(decision['status']) ?? (decision['ok'] === true ? 'ready' : 'blocked'),
+                    decision['ok'] === true ? 1 : 0,
+                    decidedAtMs,
+                    operationalPayloadJson(decision),
+                );
+            }
+        });
+        tx();
+        return { automationDecisions: writable.length };
+    }
+
+    /**
+     * @param {{ limit?: number }} [options]
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async readAutomationDecisionRecords(options = {}) {
+        const limit = Math.max(1, Math.min(optionalInteger(options.limit) ?? 50, 500));
+        return this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_automation_decisions
                     ORDER BY decided_at_ms DESC
                     LIMIT ?
                 `,

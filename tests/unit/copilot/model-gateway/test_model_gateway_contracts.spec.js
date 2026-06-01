@@ -5375,6 +5375,17 @@ describe('model-gateway foundation', () => {
             });
 
             await store.writeRouteDecisionEvents([{ decisionId: 'route-1', providerId: 'openrouter', modelId: 'model-a', selected: true }]);
+            await store.writeAutomationDecisionRecords([
+                {
+                    decisionId: 'automation-1',
+                    routeProfile: 'repo_agent',
+                    selectedRouteKey: 'openrouter:model-a',
+                    action: 'prepare_new_session',
+                    status: 'ready',
+                    ok: true,
+                    timestamp: '2026-05-26T12:00:00.000Z',
+                },
+            ]);
             await store.writeRuntimeHealthRecords([
                 {
                     key: 'default|openrouter|model-a',
@@ -5407,6 +5418,7 @@ describe('model-gateway foundation', () => {
 
             const loaded = await store.readSnapshot();
             const routeDecisions = await store.readRouteDecisionEvents({ limit: 5 });
+            const automationDecisions = await store.readAutomationDecisionRecords({ limit: 5 });
             const runtime = await store.readRuntimeHealthForModel({ providerId: 'openrouter', providerModel: 'model-a' });
             const diagnostics = await store.readStorageDiagnostics();
             const quotaRows = /** @type {{ count: number } | undefined} */ (
@@ -5431,6 +5443,8 @@ describe('model-gateway foundation', () => {
             assert.equal(loaded.evidences.length, 0);
             assert.equal(routeDecisions.length, 1);
             assert.equal(routeDecisions[0].decisionId, 'route-1');
+            assert.equal(automationDecisions.length, 1);
+            assert.equal(automationDecisions[0].decisionId, 'automation-1');
             assert.equal(runtime.health?.['lastStatus'], 'ok');
             assert.equal(runtime.probes.length, 1);
             assert.equal(quotaRows?.count, 2);
@@ -5442,6 +5456,8 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.accountHistoryRows, 6);
             assert.equal(diagnostics.runtimeRows, 3);
             assert.equal(diagnostics.routeDecisionRows, 1);
+            assert.equal(diagnostics.automationDecisionRows, 1);
+            assert.equal(diagnostics.latestAutomationDecision.action, 'prepare_new_session');
             assert.equal(diagnostics.refreshLogRows, 0);
         } finally {
             db.close();
@@ -5675,6 +5691,11 @@ describe('model-gateway foundation', () => {
                 { decisionId: 'route-2', timestamp: 2, providerId: 'openrouter', modelId: 'model-b', selected: false },
                 { decisionId: 'route-3', timestamp: 3, providerId: 'openrouter', modelId: 'model-c', selected: false },
             ]);
+            await store.writeAutomationDecisionRecords([
+                { decisionId: 'automation-1', timestamp: 1, action: 'keep_current', status: 'ready', ok: true },
+                { decisionId: 'automation-2', timestamp: 2, action: 'apply_live_model', status: 'ready', ok: true },
+                { decisionId: 'automation-3', timestamp: 3, action: 'wait_for_reset', status: 'blocked', ok: false },
+            ]);
             await store.writeRefreshLogEvents(
                 [
                     { eventId: 'refresh-1', ts: 1, phase: 'refresh_started' },
@@ -5736,6 +5757,7 @@ describe('model-gateway foundation', () => {
             const result = await store.applyOperationalRetention({
                 accountHistoryMaxRowsPerTable: 1,
                 routeDecisionMaxRows: 1,
+                automationDecisionMaxRows: 1,
                 refreshLogMaxRows: 1,
                 runtimeProbeRunMaxRows: 1,
                 runtimeProbeResultMaxRows: 1,
@@ -5746,10 +5768,12 @@ describe('model-gateway foundation', () => {
 
             assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows > 1, true);
             assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.healthObservationMaxRows > 1, true);
-            assert.equal(result.deletedRows, 16);
+            assert.equal(result.deletedRows, 18);
             assert.equal(diagnostics.catalogRows > 0, true);
             assert.equal(diagnostics.accountHistoryRows, 3);
             assert.equal(diagnostics.routeDecisionRows, 1);
+            assert.equal(diagnostics.automationDecisionRows, 1);
+            assert.equal(diagnostics.latestAutomationDecision.action, 'wait_for_reset');
             assert.equal(diagnostics.refreshLogRows, 1);
             assert.equal(diagnostics.runtimeRows, 3);
             assert.equal(loaded.projections.length, 1);

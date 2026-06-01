@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/catalog/sqlite-schema
  */
 
-export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 4;
+export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 5;
 
 export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_snapshots',
@@ -31,6 +31,7 @@ export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_runtime_probe_results',
     'copilot_model_gateway_health_observations',
     'copilot_model_gateway_route_decisions',
+    'copilot_model_gateway_automation_decisions',
     'copilot_model_gateway_refresh_log_events',
 ]);
 
@@ -333,6 +334,21 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
         ON copilot_model_gateway_route_decisions(task_profile, route_profile, decided_at_ms DESC);
     CREATE INDEX IF NOT EXISTS idx_mg_route_decisions_model
         ON copilot_model_gateway_route_decisions(provider_id, provider_model, selected);
+
+    CREATE TABLE IF NOT EXISTS copilot_model_gateway_automation_decisions (
+        decision_id        TEXT PRIMARY KEY,
+        route_profile      TEXT NOT NULL DEFAULT 'default',
+        selected_route_key TEXT,
+        action             TEXT NOT NULL,
+        status             TEXT NOT NULL,
+        ok                 INTEGER NOT NULL,
+        decided_at_ms      INTEGER NOT NULL,
+        payload_json       TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS idx_mg_automation_decisions_route
+        ON copilot_model_gateway_automation_decisions(route_profile, selected_route_key, decided_at_ms DESC);
+    CREATE INDEX IF NOT EXISTS idx_mg_automation_decisions_action
+        ON copilot_model_gateway_automation_decisions(action, status, ok, decided_at_ms DESC);
 
     CREATE TABLE IF NOT EXISTS copilot_model_gateway_refresh_log_events (
         event_key      TEXT PRIMARY KEY,

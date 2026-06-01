@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import {
     buildModelGatewayRuntimeAutomationDecision,
     readModelGatewayRuntimeAutomationPolicy,
+    SqliteModelGatewayCatalogStore,
 } from '../../src/copilot/model-gateway/index.js';
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from './index.mjs';
 
@@ -11,7 +12,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-auto-status.mjs [--json] [--profile ID] [--allow-live-set-model] [--allow-new-session] [--allow-local-private] [--live-profile ID] [--live-preset ID] [--live-model ID] [--live-base-url URL]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-auto-status.mjs [--json] [--profile ID] [--allow-live-set-model] [--allow-new-session] [--allow-local-private] [--write-sqlite] [--live-profile ID] [--live-preset ID] [--live-model ID] [--live-base-url URL]
 
 Build a pure model-gateway runtime automation decision. This command does not execute providers and does not mutate the
 terminal session.
@@ -90,6 +91,17 @@ const decision = buildModelGatewayRuntimeAutomationDecision({
         allowLocalPrivate: envPolicy.allowLocalPrivate || argSet.has('--allow-local-private'),
     },
 });
+let persistence = null;
+if (argSet.has('--write-sqlite')) {
+    persistence = await new SqliteModelGatewayCatalogStore().writeAutomationDecisionRecords([
+        {
+            ...decision,
+            decisionId: `auto-status:${Date.now()}:${process.pid}`,
+            timestamp: new Date().toISOString(),
+            source: 'model-gateway-auto-status',
+        },
+    ]);
+}
 
 const summary = {
     schema: 'model-gateway-auto-status',
@@ -97,6 +109,7 @@ const summary = {
     policy: envPolicy,
     runtimeSelectorOk: selector.ok === true,
     decision,
+    persistence,
 };
 
 if (argSet.has('--json')) {

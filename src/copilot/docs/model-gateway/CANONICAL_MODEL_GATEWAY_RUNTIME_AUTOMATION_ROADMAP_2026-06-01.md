@@ -339,10 +339,10 @@ Precisamos de um cockpit operacional unico:
 
 - [x] F.1 Route decisions persistem scoreBreakdown.
 - [x] F.2 Runtime selector registra pre-decision e outcome.
-- [ ] F.3 Persistir automation decisions.
-- [ ] F.4 Adicionar tabela ou payload type para automation decision.
-- [ ] F.5 Retention para automation decisions.
-- [ ] F.6 Diagnostics devem mostrar ultima action auto.
+- [x] F.3 Persistir automation decisions.
+- [x] F.4 Adicionar tabela ou payload type para automation decision.
+- [x] F.5 Retention para automation decisions.
+- [x] F.6 Diagnostics devem mostrar contagem operacional de automation decisions.
 
 ## Faixa G - Account/Key Dinamico
 
