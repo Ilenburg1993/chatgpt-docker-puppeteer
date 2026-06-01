@@ -1,7 +1,7 @@
 # Canonical Model Gateway Operational Automation Roadmap
 
-Status: guia ativo para tornar o model-gateway funcional no terminal, com selecao automatica, fallback e troca de modelo
-controlada.
+Status: guia historico. O guia ativo agora e
+`CANONICAL_MODEL_GATEWAY_AUTO_RUNTIME_OPERABILITY_ROADMAP_2026-06-01.md`.
 
 Data: 2026-06-01.
 

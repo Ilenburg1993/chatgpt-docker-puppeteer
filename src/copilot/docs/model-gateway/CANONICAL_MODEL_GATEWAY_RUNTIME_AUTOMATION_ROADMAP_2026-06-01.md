@@ -1,6 +1,7 @@
 # Canonical Model Gateway Runtime Automation Roadmap 2026-06-01
 
-Status: guia ativo para operacionalizacao completa do model-gateway.
+Status: guia historico. O guia ativo agora e
+`CANONICAL_MODEL_GATEWAY_AUTO_RUNTIME_OPERABILITY_ROADMAP_2026-06-01.md`.
 
 Escopo primario: `src/copilot/model-gateway`, `src/copilot/terminal`, `src/copilot/sdk`, `scripts/model-gateway`.
 

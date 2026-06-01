@@ -33,6 +33,8 @@ const DEFAULT_POLICY_PROFILE = 'default';
 const DEFAULT_TASK_PROFILE = 'default';
 let _runtimeHealthRunSequence = 0;
 let _automationDecisionSequence = 0;
+let _automationEffectSequence = 0;
+let _sdkSessionHandoffSequence = 0;
 
 export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze({
     accountHistoryMaxRowsPerTable: 10_000,
@@ -41,6 +43,8 @@ export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze(
     accountSpendingSnapshotMaxRows: 20_000,
     routeDecisionMaxRows: 50_000,
     automationDecisionMaxRows: 50_000,
+    automationEffectApplicationMaxRows: 50_000,
+    sdkSessionHandoffMaxRows: 50_000,
     refreshLogMaxRows: 200_000,
     runtimeProbeRunMaxRows: 10_000,
     runtimeProbeResultMaxRows: 100_000,
@@ -485,6 +489,24 @@ function createAutomationDecisionId(observedAtMs) {
 }
 
 /**
+ * @param {number} observedAtMs
+ * @returns {string}
+ */
+function createAutomationEffectId(observedAtMs) {
+    _automationEffectSequence += 1;
+    return `model-gateway:automation-effect:${observedAtMs}:${process.pid}:${_automationEffectSequence}`;
+}
+
+/**
+ * @param {number} observedAtMs
+ * @returns {string}
+ */
+function createSdkSessionHandoffId(observedAtMs) {
+    _sdkSessionHandoffSequence += 1;
+    return `model-gateway:sdk-handoff:${observedAtMs}:${process.pid}:${_sdkSessionHandoffSequence}`;
+}
+
+/**
  * @param {Record<string, unknown>} result
  * @returns {string | null}
  */
@@ -819,7 +841,11 @@ export class SqliteModelGatewayCatalogStore {
      *     };
      *     routeDecisionRows: number;
      *     automationDecisionRows: number;
+     *     automationEffectApplicationRows: number;
+     *     sdkSessionHandoffRows: number;
      *     latestAutomationDecision: { action: string | null; status: string | null; ok: boolean | null; selectedRouteKey: string | null; decidedAtMs: number | null };
+     *     latestAutomationEffectApplication: { effectKind: string | null; status: string | null; applied: boolean | null; observedAtMs: number | null };
+     *     latestSdkSessionHandoff: { status: string | null; routeProfile: string | null; selectedRouteKey: string | null; sessionId: string | null; targetModel: string | null; requestedAtMs: number | null; confirmedAtMs: number | null };
      *     refreshLogRows: number;
      * }>}
      */
@@ -910,6 +936,30 @@ export class SqliteModelGatewayCatalogStore {
                 )
                 .get()
         );
+        const latestAutomationEffectApplication = /** @type {{ effect_kind: string | null; status: string | null; applied: number | null; observed_at_ms: number | null } | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT effect_kind, status, applied, observed_at_ms
+                        FROM copilot_model_gateway_automation_effect_applications
+                        ORDER BY observed_at_ms DESC
+                        LIMIT 1
+                    `,
+                )
+                .get()
+        );
+        const latestSdkSessionHandoff = /** @type {{ status: string | null; route_profile: string | null; selected_route_key: string | null; session_id: string | null; target_model: string | null; requested_at_ms: number | null; confirmed_at_ms: number | null } | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT status, route_profile, selected_route_key, session_id, target_model, requested_at_ms, confirmed_at_ms
+                        FROM copilot_model_gateway_sdk_session_handoffs
+                        ORDER BY requested_at_ms DESC
+                        LIMIT 1
+                    `,
+                )
+                .get()
+        );
         /**
          * @param {string[]} tables
          * @returns {number}
@@ -939,6 +989,9 @@ export class SqliteModelGatewayCatalogStore {
             },
             routeDecisionRows: tableCounts['copilot_model_gateway_route_decisions'] ?? 0,
             automationDecisionRows: tableCounts['copilot_model_gateway_automation_decisions'] ?? 0,
+            automationEffectApplicationRows:
+                tableCounts['copilot_model_gateway_automation_effect_applications'] ?? 0,
+            sdkSessionHandoffRows: tableCounts['copilot_model_gateway_sdk_session_handoffs'] ?? 0,
             latestAutomationDecision: {
                 action: optionalString(latestAutomationDecision?.action),
                 status: optionalString(latestAutomationDecision?.status),
@@ -950,6 +1003,26 @@ export class SqliteModelGatewayCatalogStore {
                           : null,
                 selectedRouteKey: optionalString(latestAutomationDecision?.selected_route_key),
                 decidedAtMs: optionalInteger(latestAutomationDecision?.decided_at_ms),
+            },
+            latestAutomationEffectApplication: {
+                effectKind: optionalString(latestAutomationEffectApplication?.effect_kind),
+                status: optionalString(latestAutomationEffectApplication?.status),
+                applied:
+                    latestAutomationEffectApplication?.applied === 1
+                        ? true
+                        : latestAutomationEffectApplication?.applied === 0
+                          ? false
+                          : null,
+                observedAtMs: optionalInteger(latestAutomationEffectApplication?.observed_at_ms),
+            },
+            latestSdkSessionHandoff: {
+                status: optionalString(latestSdkSessionHandoff?.status),
+                routeProfile: optionalString(latestSdkSessionHandoff?.route_profile),
+                selectedRouteKey: optionalString(latestSdkSessionHandoff?.selected_route_key),
+                sessionId: optionalString(latestSdkSessionHandoff?.session_id),
+                targetModel: optionalString(latestSdkSessionHandoff?.target_model),
+                requestedAtMs: optionalInteger(latestSdkSessionHandoff?.requested_at_ms),
+                confirmedAtMs: optionalInteger(latestSdkSessionHandoff?.confirmed_at_ms),
             },
             refreshLogRows: tableCounts['copilot_model_gateway_refresh_log_events'] ?? 0,
         };
@@ -1157,6 +1230,8 @@ export class SqliteModelGatewayCatalogStore {
      *     runtimeProbeResultMaxRows?: number;
      *     healthObservationMaxRows?: number;
      *     automationDecisionMaxRows?: number;
+     *     automationEffectApplicationMaxRows?: number;
+     *     sdkSessionHandoffMaxRows?: number;
      * }} [policy]
      * @returns {Promise<{
      *     schema: string;
@@ -1207,6 +1282,14 @@ export class SqliteModelGatewayCatalogStore {
             policy.automationDecisionMaxRows,
             DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.automationDecisionMaxRows,
         );
+        const automationEffectApplicationMaxRows = retentionLimit(
+            policy.automationEffectApplicationMaxRows,
+            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.automationEffectApplicationMaxRows,
+        );
+        const sdkSessionHandoffMaxRows = retentionLimit(
+            policy.sdkSessionHandoffMaxRows,
+            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.sdkSessionHandoffMaxRows,
+        );
         /** @type {Record<string, { deletedRows: number; maxRows: number }>} */
         const tables = {};
         const tx = this.#db.transaction(() => {
@@ -1250,6 +1333,24 @@ export class SqliteModelGatewayCatalogStore {
                     maxRows: automationDecisionMaxRows,
                 }),
                 maxRows: automationDecisionMaxRows,
+            };
+            tables['copilot_model_gateway_automation_effect_applications'] = {
+                deletedRows: deleteRowsKeepingLatest(this.#db, {
+                    table: 'copilot_model_gateway_automation_effect_applications',
+                    keyColumn: 'effect_id',
+                    orderColumn: 'observed_at_ms',
+                    maxRows: automationEffectApplicationMaxRows,
+                }),
+                maxRows: automationEffectApplicationMaxRows,
+            };
+            tables['copilot_model_gateway_sdk_session_handoffs'] = {
+                deletedRows: deleteRowsKeepingLatest(this.#db, {
+                    table: 'copilot_model_gateway_sdk_session_handoffs',
+                    keyColumn: 'handoff_id',
+                    orderColumn: 'requested_at_ms',
+                    maxRows: sdkSessionHandoffMaxRows,
+                }),
+                maxRows: sdkSessionHandoffMaxRows,
             };
             tables['copilot_model_gateway_runtime_probe_results'] = {
                 deletedRows: deleteRowsKeepingLatest(this.#db, {
@@ -1850,6 +1951,128 @@ export class SqliteModelGatewayCatalogStore {
                     SELECT payload_json
                     FROM copilot_model_gateway_automation_decisions
                     ORDER BY decided_at_ms DESC
+                    LIMIT ?
+                `,
+            )
+            .all(limit)
+            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+    }
+
+    /**
+     * @param {Record<string, unknown>[]} applications
+     * @returns {Promise<{ automationEffectApplications: number }>}
+     */
+    async writeAutomationEffectApplicationRecords(applications) {
+        const insert = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_automation_effect_applications
+                (effect_id, decision_id, route_profile, selected_route_key, effect_kind, status,
+                 applied, observed_at_ms, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(effect_id) DO UPDATE SET
+                decision_id = excluded.decision_id,
+                route_profile = excluded.route_profile,
+                selected_route_key = excluded.selected_route_key,
+                effect_kind = excluded.effect_kind,
+                status = excluded.status,
+                applied = excluded.applied,
+                observed_at_ms = excluded.observed_at_ms,
+                payload_json = excluded.payload_json
+        `);
+        const writable = applications.filter(isRecord);
+        const tx = this.#db.transaction(() => {
+            for (const application of writable) {
+                const observedAtMs = dateMs(application['timestamp']) ?? dateMs(application['observedAt']) ?? Date.now();
+                insert.run(
+                    optionalString(application['effectId']) ?? createAutomationEffectId(observedAtMs),
+                    optionalString(application['decisionId']),
+                    optionalString(application['routeProfile']) ?? DEFAULT_ROUTE_PROFILE,
+                    optionalString(application['selectedRouteKey']) ?? optionalString(application['routeKey']),
+                    optionalString(application['effectKind']) ?? optionalString(application['kind']) ?? 'unknown_effect',
+                    optionalString(application['status']) ?? (application['applied'] === true ? 'applied' : 'skipped'),
+                    application['applied'] === true ? 1 : 0,
+                    observedAtMs,
+                    operationalPayloadJson(application),
+                );
+            }
+        });
+        tx();
+        return { automationEffectApplications: writable.length };
+    }
+
+    /**
+     * @param {{ limit?: number }} [options]
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async readAutomationEffectApplicationRecords(options = {}) {
+        const limit = Math.max(1, Math.min(optionalInteger(options.limit) ?? 50, 500));
+        return this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_automation_effect_applications
+                    ORDER BY observed_at_ms DESC
+                    LIMIT ?
+                `,
+            )
+            .all(limit)
+            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+    }
+
+    /**
+     * @param {Record<string, unknown>[]} handoffs
+     * @returns {Promise<{ sdkSessionHandoffs: number }>}
+     */
+    async writeSdkSessionHandoffRecords(handoffs) {
+        const insert = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_sdk_session_handoffs
+                (handoff_id, decision_id, route_profile, selected_route_key, status, session_id,
+                 target_model, requested_at_ms, confirmed_at_ms, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(handoff_id) DO UPDATE SET
+                decision_id = excluded.decision_id,
+                route_profile = excluded.route_profile,
+                selected_route_key = excluded.selected_route_key,
+                status = excluded.status,
+                session_id = excluded.session_id,
+                target_model = excluded.target_model,
+                requested_at_ms = excluded.requested_at_ms,
+                confirmed_at_ms = excluded.confirmed_at_ms,
+                payload_json = excluded.payload_json
+        `);
+        const writable = handoffs.filter(isRecord);
+        const tx = this.#db.transaction(() => {
+            for (const handoff of writable) {
+                const requestedAtMs = dateMs(handoff['requestedAt']) ?? dateMs(handoff['timestamp']) ?? Date.now();
+                insert.run(
+                    optionalString(handoff['handoffId']) ?? createSdkSessionHandoffId(requestedAtMs),
+                    optionalString(handoff['decisionId']),
+                    optionalString(handoff['routeProfile']) ?? DEFAULT_ROUTE_PROFILE,
+                    optionalString(handoff['selectedRouteKey']) ?? optionalString(handoff['routeKey']),
+                    optionalString(handoff['status']) ?? 'prepared',
+                    optionalString(handoff['sessionId']),
+                    optionalString(handoff['targetModel']) ?? optionalString(handoff['model']),
+                    requestedAtMs,
+                    dateMs(handoff['confirmedAt']),
+                    operationalPayloadJson(handoff),
+                );
+            }
+        });
+        tx();
+        return { sdkSessionHandoffs: writable.length };
+    }
+
+    /**
+     * @param {{ limit?: number }} [options]
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async readSdkSessionHandoffRecords(options = {}) {
+        const limit = Math.max(1, Math.min(optionalInteger(options.limit) ?? 50, 500));
+        return this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_sdk_session_handoffs
+                    ORDER BY requested_at_ms DESC
                     LIMIT ?
                 `,
             )
