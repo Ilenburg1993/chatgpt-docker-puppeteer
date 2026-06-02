@@ -32,6 +32,7 @@ import {
 import { renderTerminalIntent } from './intent-renderer.js';
 import {
     buildTerminalToolActivityPresentation,
+    compactTerminalDiagnosticId,
     compactTerminalToolText,
     isGenericTerminalToolName,
     mapTerminalToolOperationRole,
@@ -66,6 +67,24 @@ export function objectArgsOrEmpty(value) {
     return value && typeof value === 'object' && !Array.isArray(value)
         ? /** @type {Record<string, unknown>} */ (value)
         : {};
+}
+
+/**
+ * @param {string | null | undefined} requestId
+ * @returns {string | null}
+ */
+function renderToolRequestLabel(requestId) {
+    const compacted = compactTerminalDiagnosticId(requestId, 18);
+    return compacted ? `pedido ${compacted}` : null;
+}
+
+/**
+ * @param {string | null | undefined} requestId
+ * @returns {string}
+ */
+function renderOptionalToolRequestDetail(requestId) {
+    const label = renderToolRequestLabel(requestId);
+    return label ? ` · ${label}` : '';
 }
 
 /**
@@ -740,18 +759,18 @@ export function handleTerminalToolUserRequested(evt) {
     recordTerminalTurnToolActivity({
         toolName,
         operation: 'run',
-        target: requestId,
+        target: renderToolRequestLabel(requestId),
         source: 'sdk',
         status: 'user_requested',
     });
     recordTerminalActivity('tool', 'Tool solicitou ação do usuário', {
-        detail: `${toolName}${requestId ? ` · ${requestId}` : ''}`,
+        detail: `${toolName}${renderOptionalToolRequestDetail(requestId)}`,
         toolName,
         source: 'sdk',
         severity: 'warn',
     });
     println(
-        `\n  \x1b[33m🧩 Tool aguarda usuário:\x1b[0m ${toolName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
+        `\n  \x1b[33m🧩 Tool aguarda usuário:\x1b[0m ${toolName}${requestId ? ` \x1b[90m· ${renderToolRequestLabel(requestId)}\x1b[0m` : ''}`,
     );
     broadcastToolLifecycle(buildToolLifecycleUserRequested({ toolName, requestId: requestId ?? null }));
 }
@@ -792,14 +811,14 @@ export function handleTerminalExternalToolRequested({ registry, evt, verboseNarr
     });
     recordToolTurnProjection(presentation, 'requested', toolCallId, null);
     recordTerminalActivity('tool', 'Integração externa solicitada', {
-        detail: presentation.detail || `${displayToolName}${requestId ? ` · ${requestId}` : ''}`,
+        detail: presentation.detail || `${displayToolName}${renderOptionalToolRequestDetail(requestId)}`,
         toolName: displayToolName,
         source: 'sdk',
     });
     if (getShowToolActivity()) {
         printToolStart({ ...presentation, displayToolName, startLine: presentation.startLine });
     } else if (verboseNarration) {
-        const targetLabel = presentation.target || presentation.path || requestId || '';
+        const targetLabel = presentation.target || presentation.path || renderToolRequestLabel(requestId) || '';
         println(`  \x1b[90m↗ integração externa: ${displayToolName}${targetLabel ? ` · ${targetLabel}` : ''}\x1b[0m`);
     }
     broadcastToolLifecycle(
@@ -875,7 +894,7 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
     recordTerminalActivity('tool', success ? 'Integração externa concluída' : 'Integração externa falhou', {
         detail:
             presentation.completeLine(success, durationLabel) ||
-            `${displayToolName}${requestId ? ` · ${requestId}` : ''}`,
+            `${displayToolName}${renderOptionalToolRequestDetail(requestId)}`,
         toolName: displayToolName,
         source: 'sdk',
         severity: success ? 'info' : 'error',
@@ -884,7 +903,7 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
         printToolComplete(presentation, success, durationLabel, resolvedToolCallId);
     } else if (verboseNarration) {
         println(
-            `  ${success ? '\x1b[32m✓' : '\x1b[31m✗'} integração externa:\x1b[0m ${displayToolName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
+            `  ${success ? '\x1b[32m✓' : '\x1b[31m✗'} integração externa:\x1b[0m ${displayToolName}${requestId ? ` \x1b[90m· ${renderToolRequestLabel(requestId)}\x1b[0m` : ''}`,
         );
     }
     broadcastToolLifecycle(

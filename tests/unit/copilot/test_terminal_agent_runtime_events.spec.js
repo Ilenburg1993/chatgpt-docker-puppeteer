@@ -170,10 +170,17 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             'system',
             'Sessão SDK em foreground',
             expect.objectContaining({
-                detail: expect.stringContaining('id=sdk-session-1'),
+                detail: expect.stringContaining('sessão sdk-session-1'),
                 source: 'sdk.lifecycle',
                 recordHistory: true,
                 updateCurrent: true,
+            }),
+        );
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Sessão SDK em foreground',
+            expect.objectContaining({
+                detail: expect.not.stringContaining('id='),
             }),
         );
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Sessão SDK em foreground'));
@@ -215,7 +222,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             metadata: { startTime: '2026-05-22T00:00:00.000Z' },
         });
 
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('Sessão SDK criada: id=sdk-created-1'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Sessão SDK criada: sessão sdk-created-1'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('id='));
         expect(broadcastSse).toHaveBeenCalledWith(
             'sdk.lifecycle',
             expect.objectContaining({
@@ -301,7 +309,22 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 recordHistory: true,
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('SDK command: terminal_session'));
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Comando SDK executado',
+            expect.objectContaining({
+                detail: expect.stringContaining('comando local /session sdk'),
+            }),
+        );
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Comando SDK executado',
+            expect.objectContaining({
+                detail: expect.not.stringContaining('session='),
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Comando SDK: terminal_session'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('SDK command:'));
         expect(broadcastSse).toHaveBeenCalledWith(
             'sdk.command.executed',
             expect.objectContaining({
@@ -861,17 +884,18 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'task',
             'Agente em background concluído',
-            expect.objectContaining({ detail: 'investigar sessão SDK · status=completed', source: 'agent' }),
+            expect.objectContaining({ detail: 'investigar sessão SDK · concluído', source: 'agent' }),
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'task',
             'Shell concluído',
-            expect.objectContaining({ detail: 'npm run lint:copilot · exit=0', source: 'agent' }),
+            expect.objectContaining({ detail: 'npm run lint:copilot · saída 0', source: 'agent' }),
         );
         expect(println).toHaveBeenCalledWith(
             expect.stringContaining('Background agent concluído: investigar sessão SDK'),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('Shell concluído: npm run lint:copilot · exit=0'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Shell concluído: npm run lint:copilot · saída 0'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('exit='));
         expect(broadcastSse).toHaveBeenCalledWith(
             'agent.background.completed',
             expect.objectContaining({
@@ -919,9 +943,16 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             'task',
             'Tarefa interna concluída',
             expect.objectContaining({
-                detail: 'Persist latest PR consumption snapshot · status=completed',
+                detail: 'Persist latest PR consumption snapshot · concluído',
                 recordHistory: false,
                 updateCurrent: false,
+            }),
+        );
+        expect(recordTerminalActivity).not.toHaveBeenCalledWith(
+            'task',
+            'Tarefa interna concluída',
+            expect.objectContaining({
+                detail: expect.stringContaining('status='),
             }),
         );
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Persist latest PR consumption snapshot'));
@@ -968,14 +999,15 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             'system',
             'Premium Request classificada com divergência de modelo',
             expect.objectContaining({
-                detail: 'modeloCfg=gpt-5 · modeloEfetivo=gpt-5-mini · modeloCobrado=gpt-5-mini · custo=0.0123',
+                detail: 'modelo configurado gpt-5 · modelo efetivo gpt-5-mini · modelo cobrado gpt-5-mini · custo 0.0123',
                 severity: 'warn',
                 source: 'agent',
                 recordHistory: true,
             }),
         );
         expect(println).toHaveBeenCalledWith(expect.stringContaining('PR'));
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('modeloCobrado=gpt-5-mini'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('modelo cobrado gpt-5-mini'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('modeloCobrado='));
         expect(broadcastSse).toHaveBeenCalledWith(
             'pr.consumed',
             expect.objectContaining({
@@ -1064,6 +1096,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         );
         expect(println).toHaveBeenCalledWith(expect.stringContaining('LLM'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('ask_user_continuation'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('classe='));
         expect(broadcastSse).toHaveBeenCalledWith(
             'llm.usage',
             expect.objectContaining({
@@ -1261,6 +1294,20 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 detail: expect.not.stringContaining('auto é a única recuperação permitida'),
             }),
         );
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'error',
+            'Erro de provider BYOK',
+            expect.objectContaining({
+                detail: expect.stringContaining('provider gemini'),
+            }),
+        );
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'error',
+            'Erro de provider BYOK',
+            expect.objectContaining({
+                detail: expect.not.stringContaining('provider='),
+            }),
+        );
         expect(broadcastSse).toHaveBeenCalledWith(
             'agent.error',
             expect.objectContaining({
@@ -1324,6 +1371,20 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             expect.objectContaining({
                 severity: 'error',
                 detail: expect.stringContaining('sem Premium Request'),
+            }),
+        );
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'error',
+            'Erro de sessão BYOK',
+            expect.objectContaining({
+                detail: expect.stringContaining('Erro de consulta:'),
+            }),
+        );
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'error',
+            'Erro de sessão BYOK',
+            expect.objectContaining({
+                detail: expect.not.stringContaining('[query]'),
             }),
         );
         expect(reviseRecentTerminalTurnTraceStatus).toHaveBeenCalledWith(

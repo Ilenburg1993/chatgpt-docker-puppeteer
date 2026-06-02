@@ -116,7 +116,7 @@ import {
     handleTerminalToolUserRequested,
     reconcileTerminalInFlightToolsAtTurnEnd,
 } from './tool-lifecycle-runtime.js';
-import { buildTerminalToolActivityPresentation } from './tool-activity-presenter.js';
+import { buildTerminalToolActivityPresentation, compactTerminalDiagnosticId } from './tool-activity-presenter.js';
 
 /**
  * @param {string} previousModel
@@ -220,6 +220,57 @@ function renderTurnTraceOperationLabel(operation) {
  */
 function pluralPt(value, singular, plural) {
     return `${value} ${value === 1 ? singular : plural}`;
+}
+
+/**
+ * @param {string | null | undefined} requestId
+ * @returns {string}
+ */
+function renderSdkRequestLabel(requestId) {
+    const compacted = compactTerminalDiagnosticId(requestId, 18);
+    return compacted ? `pedido ${compacted}` : 'pedido não informado';
+}
+
+/**
+ * @param {string | null | undefined} requestId
+ * @returns {string}
+ */
+function renderSdkOptionalRequestDetail(requestId) {
+    const compacted = compactTerminalDiagnosticId(requestId, 18);
+    return compacted ? ` · pedido ${compacted}` : '';
+}
+
+/**
+ * @param {string | null | undefined} mode
+ * @returns {string}
+ */
+function renderPermissionModeLabel(mode) {
+    if (mode === 'approve_all') return 'aprovação automática';
+    if (mode === 'audit_only') return 'auditoria sem prompts';
+    if (mode === 'selective') return 'aprovação seletiva';
+    return mode ?? 'modo não informado';
+}
+
+/**
+ * @param {string | null | undefined} result
+ * @param {boolean | null} granted
+ * @returns {string}
+ */
+function renderPermissionDecisionLabel(result, granted) {
+    if (granted === true || result === 'approved') return 'aprovada';
+    if (result === 'denied-by-rules') return 'negada por regras';
+    if (result === 'denied-by-permission-request-hook') return 'negada por política';
+    if (result === 'denied-by-content-exclusion-policy') return 'negada por exclusão de conteúdo';
+    if (granted === false) return 'não aprovada';
+    return result ?? 'concluída';
+}
+
+/**
+ * @param {boolean} wasFreeform
+ * @returns {string}
+ */
+function renderUserInputAnswerModeLabel(wasFreeform) {
+    return wasFreeform ? 'resposta livre' : 'escolha estruturada';
 }
 
 /**
@@ -488,7 +539,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         reconcileTerminalInFlightToolsAtTurnEnd({ registry: _reg, reason: 'assistant.turn_end' });
         const trace = completeTerminalTurnTrace({ turnId });
         recordTerminalActivity('turn', 'Turno do assistente concluído', {
-            detail: turnId ? `turnId=${turnId}` : 'resposta concluída',
+            detail: turnId ? `turno ${compactTerminalDiagnosticId(turnId, 18) ?? turnId}` : 'resposta concluída',
             source: 'sdk',
             recordHistory: false,
         });
@@ -662,12 +713,12 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const data = eventObject(evt);
         const requestId = stringOr(data['requestId'], entry?.id ?? 'unknown');
         recordTerminalActivity('question', 'Elicitation SDK concluída', {
-            detail: requestId,
+            detail: renderSdkRequestLabel(requestId),
             source: 'sdk',
             recordHistory: Boolean(entry),
         });
         if (entry) {
-            println(`  \x1b[32m✓ Elicitation concluída:\x1b[0m \x1b[90m${entry.id}\x1b[0m`);
+            println(`  \x1b[32m✓ Elicitation concluída:\x1b[0m \x1b[90m${renderSdkRequestLabel(entry.id)}\x1b[0m`);
         }
         broadcastSse(
             'elicitation.completed',
@@ -679,12 +730,12 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     const onPermissionRequested = (/** @type {Record<string, unknown>} */ evt) => {
         const entry = recordTerminalPermissionRequested(evt);
         recordTerminalActivity('question', 'Permissão SDK solicitada', {
-            detail: `${entry.permissionType}${entry.requestId ? ` · ${entry.requestId}` : ''}`,
+            detail: `${entry.permissionType}${renderSdkOptionalRequestDetail(entry.requestId)}`,
             source: 'sdk',
             severity: 'warn',
         });
         println(
-            `\n  \x1b[33m🔐 Permissão solicitada:\x1b[0m ${entry.permissionType}${entry.requestId ? ` \x1b[90m(${entry.requestId})\x1b[0m` : ''}`,
+            `\n  \x1b[33m🔐 Permissão solicitada:\x1b[0m ${entry.permissionType}${entry.requestId ? ` \x1b[90m· ${renderSdkRequestLabel(entry.requestId)}\x1b[0m` : ''}`,
         );
         if (!permissionHelpPrinted) {
             println('  \x1b[90mAcompanhe a decisão com /permission list, /status ou /activity.\x1b[0m');
@@ -723,8 +774,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
         recordTerminalActivity('system', label, {
             detail: entry
-                ? `${entry.permissionType}${entry.result ? ` · ${entry.result}` : ''} ${wasDeniedByPolicy ? '[autoaprovado por política]' : ''}`.trim()
-                : 'sem request local',
+                ? `${entry.permissionType} · ${renderPermissionDecisionLabel(entry.result ?? null, typeof granted === 'boolean' ? granted : null)}${wasDeniedByPolicy ? ' · política automática' : ''}`
+                : 'pedido local não encontrado',
             source: 'sdk',
             severity: ok || granted == null ? 'info' : 'warn',
             recordHistory: !ambiguousEcho,
@@ -749,13 +800,13 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const mode = typeof evt?.mode === 'string' ? evt.mode : 'approve_all';
         recordTerminalPermissionModeChanged({ mode, ts: Date.now() });
         recordTerminalActivity('system', 'Modo de permissão alterado', {
-            detail: mode,
+            detail: renderPermissionModeLabel(mode),
             source: 'sdk',
             severity: 'warn',
         });
         if (shouldPrintSessionNarration('important')) {
             println(
-                `  ${terminalThemeBadge('warn', 'PERM')} ${terminalThemeText('warn', `permission.mode_changed → ${mode}`)}`,
+                `  ${terminalThemeBadge('warn', 'PERM')} ${terminalThemeText('warn', `Modo de permissão: ${renderPermissionModeLabel(mode)}`)}`,
             );
         }
         broadcastSse('permission.mode_changed', withSdkSessionSseEnvelope({ mode }, 'sdk/permission.mode_changed'));
@@ -912,7 +963,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
         });
         recordTerminalActivity('question', 'ask_user SDK respondido', {
-            detail: `${requestId ?? 'sem requestId'}${wasFreeform ? ' · freeform' : ' · choice/protocolo'}`,
+            detail: `${renderSdkRequestLabel(requestId)} · ${renderUserInputAnswerModeLabel(wasFreeform)}`,
             source: 'sdk',
             recordHistory: false,
         });
@@ -1348,12 +1399,12 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const serverName = evt?.serverName ?? 'unknown';
         const requestId = evt?.requestId ?? null;
         recordTerminalActivity('question', 'OAuth MCP necessário', {
-            detail: `${serverName}${requestId ? ` · ${requestId}` : ''}`,
+            detail: `${serverName}${renderSdkOptionalRequestDetail(requestId)}`,
             source: 'sdk',
             severity: 'warn',
         });
         println(
-            `\n  \x1b[33m🔑 OAuth MCP necessário:\x1b[0m ${serverName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
+            `\n  \x1b[33m🔑 OAuth MCP necessário:\x1b[0m ${serverName}${requestId ? ` \x1b[90m· ${renderSdkRequestLabel(requestId)}\x1b[0m` : ''}`,
         );
         broadcastSse(
             'mcp.oauth.required',
@@ -1376,7 +1427,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                         recordHistory: false,
                     });
                     println(
-                        `  ${terminalThemeBadge('info', 'MCP')} ${terminalThemeText('info', `oauth.login iniciado via RPC para ${serverName}`)}`,
+                        `  ${terminalThemeBadge('info', 'MCP')} ${terminalThemeText('info', `Login OAuth MCP iniciado para ${serverName}`)}`,
                     );
                     if (loginUrl) {
                         println(`  \x1b[36m${loginUrl}\x1b[0m`);
@@ -1403,7 +1454,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                         recordHistory: false,
                     });
                     println(
-                        `  ${terminalThemeBadge('warn', 'MCP')} ${terminalThemeText('warn', `oauth.login indisponível para ${serverName}: ${message}`)}`,
+                        `  ${terminalThemeBadge('warn', 'MCP')} ${terminalThemeText('warn', `Login OAuth MCP indisponível para ${serverName}: ${message}`)}`,
                     );
                     broadcastSse(
                         'mcp.oauth.login_failed',
@@ -1426,11 +1477,11 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     const onMcpOauthCompleted = (/** @type {{ requestId?: string }} */ evt) => {
         const requestId = evt?.requestId ?? null;
         recordTerminalActivity('system', 'OAuth MCP concluído', {
-            detail: requestId ? `requestId=${requestId}` : 'sem requestId',
+            detail: renderSdkRequestLabel(requestId),
             source: 'sdk',
         });
         if (shouldPrintSessionNarration('important')) {
-            println(`  \x1b[32m✓ OAuth MCP concluído${requestId ? ` (${requestId})` : ''}\x1b[0m`);
+            println(`  \x1b[32m✓ OAuth MCP concluído${requestId ? ` · ${renderSdkRequestLabel(requestId)}` : ''}\x1b[0m`);
         }
         broadcastSse(
             'mcp.oauth.completed',
@@ -1528,13 +1579,13 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const serverName = evt?.serverName ?? 'unknown';
         const mcpRequestId = evt?.mcpRequestId ?? null;
         recordTerminalActivity('question', 'Sampling MCP solicitado', {
-            detail: `${serverName}${requestId ? ` · ${requestId}` : ''}`,
+            detail: `${serverName}${renderSdkOptionalRequestDetail(requestId)}`,
             source: 'sdk',
             severity: 'warn',
         });
         if (shouldPrintSessionNarration('important')) {
             println(
-                `  ${terminalThemeBadge('warn', 'SAMPLE')} ${terminalThemeText('warn', `${serverName} solicitou sampling${requestId ? ` (${requestId})` : ''}`)}`,
+                `  ${terminalThemeBadge('warn', 'SAMPLE')} ${terminalThemeText('warn', `${serverName} solicitou sampling${requestId ? ` · ${renderSdkRequestLabel(requestId)}` : ''}`)}`,
             );
         }
         broadcastSse(
@@ -1554,7 +1605,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     const onSamplingCompleted = (/** @type {{ requestId?: string }} */ evt) => {
         const requestId = evt?.requestId ?? null;
         recordTerminalActivity('system', 'Sampling MCP concluído', {
-            detail: requestId ? `requestId=${requestId}` : 'sampling concluído',
+            detail: requestId ? renderSdkRequestLabel(requestId) : 'sampling concluído',
             source: 'sdk',
             recordHistory: false,
         });
@@ -1595,8 +1646,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const uiCapabilities = evt?.capabilities?.ui ?? {};
         const elicitationEnabled = uiCapabilities.elicitation === true;
         const changeBits = [
-            uiChanges.elicitation !== undefined ? `ui.elicitation=${String(uiChanges.elicitation)}` : null,
-            `snapshot.ui.elicitation=${String(elicitationEnabled)}`,
+            uiChanges.elicitation !== undefined
+                ? `elicitation ${uiChanges.elicitation === true ? 'ativada' : 'desativada'}`
+                : null,
+            `snapshot ${elicitationEnabled ? 'com elicitation' : 'sem elicitation'}`,
         ]
             .filter(Boolean)
             .join(' · ');
@@ -1627,7 +1680,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const requestId = evt?.requestId ?? null;
         const errorCode = evt?.errorCode ?? null;
         recordTerminalActivity('system', 'Troca automática de modo solicitada', {
-            detail: `${requestId ?? 'sem requestId'}${errorCode ? ` · ${errorCode}` : ''}`,
+            detail: `${renderSdkRequestLabel(requestId)}${errorCode ? ` · ${errorCode}` : ''}`,
             source: 'sdk',
             severity: 'warn',
         });
@@ -1647,7 +1700,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const requestId = evt?.requestId ?? null;
         const response = evt?.response ?? null;
         recordTerminalActivity('system', 'Troca automática de modo concluída', {
-            detail: `${requestId ?? 'sem requestId'}${response ? ` · ${response}` : ''}`,
+            detail: `${renderSdkRequestLabel(requestId)}${response ? ` · ${response}` : ''}`,
             source: 'sdk',
             recordHistory: false,
         });
@@ -1673,7 +1726,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
         if (shouldPrintSessionNarration('important')) {
             println(
-                `  ${terminalThemeBadge('warn', 'PLAN')} ${terminalThemeText('warn', `exit_plan_mode solicitado${recommendedAction ? ` · recomendar=${recommendedAction}` : ''}`)}`,
+                `  ${terminalThemeBadge('warn', 'PLAN')} ${terminalThemeText('warn', `Saída do plan mode solicitada${recommendedAction ? ` · recomendar ${recommendedAction}` : ''}`)}`,
             );
             if (actions.length > 0) {
                 println(`  ${terminalThemeText('muted', `ações: ${actions.join(', ')}`)}`);
@@ -1698,18 +1751,19 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     };
 
     const onExitPlanModeCompleted = (/** @type {{ requestId?: string }} */ evt) => {
+        const requestId = evt?.requestId ?? null;
         recordTerminalActivity('system', 'Saída de plan mode concluída', {
-            detail: evt?.requestId ? `requestId=${evt.requestId}` : 'SDK saiu do plan mode',
+            detail: requestId ? renderSdkRequestLabel(requestId) : 'SDK saiu do plan mode',
             source: 'sdk',
         });
         if (shouldPrintSessionNarration('important')) {
             println(
-                `  \x1b[32m✅ SDK concluiu saída do plan mode${evt?.requestId ? ` (${evt.requestId})` : ''}\x1b[0m`,
+                `  \x1b[32m✅ SDK concluiu saída do plan mode${requestId ? ` · ${renderSdkRequestLabel(requestId)}` : ''}\x1b[0m`,
             );
         }
         broadcastSse(
             'exit_plan_mode.completed',
-            withSdkSessionSseEnvelope({ requestId: evt?.requestId }, 'sdk/exit_plan_mode.completed'),
+            withSdkSessionSseEnvelope({ requestId }, 'sdk/exit_plan_mode.completed'),
         );
         refreshPromptIfIdle();
     };

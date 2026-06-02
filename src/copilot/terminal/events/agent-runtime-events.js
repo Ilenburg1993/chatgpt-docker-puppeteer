@@ -69,13 +69,18 @@ import {
     recordByokProviderModelCallSuccess,
 } from '#copilot/model-gateway';
 import { renderTerminalIntent } from './intent-renderer.js';
-import { compactTerminalToolText, getTerminalHumanToolName } from './tool-activity-presenter.js';
+import {
+    compactTerminalDiagnosticId,
+    compactTerminalToolText,
+    getTerminalHumanToolName,
+} from './tool-activity-presenter.js';
 import {
     handleTerminalNativeToolComplete,
     handleTerminalNativeToolPartialResult,
     handleTerminalNativeToolProgress,
     handleTerminalNativeToolStart,
 } from './tool-lifecycle-runtime.js';
+import { formatTerminalIsoTimestamp } from '../state/ui/index.js';
 
 const AGENT_SHELL_COMPLETED_EVENT = 'agent.shell.completed';
 const AGENT_SHELL_DETACHED_COMPLETED_EVENT = 'agent.shell.detached_completed';
@@ -145,6 +150,70 @@ function classifyBackgroundNarration({ description, failed = false }) {
 }
 
 /**
+ * @param {string | null | undefined} value
+ * @returns {string | null}
+ */
+function compactRuntimeId(value) {
+    const compacted = compactTerminalDiagnosticId(value, 18);
+    return compacted && compacted.length > 0 ? compacted : null;
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {string | null}
+ */
+function renderRuntimeSessionLabel(value) {
+    const compacted = compactRuntimeId(value);
+    return compacted ? `sessão ${compacted}` : null;
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {string | null}
+ */
+function renderRuntimeTimestampLabel(value) {
+    if (!value) return null;
+    return formatTerminalIsoTimestamp(value);
+}
+
+/**
+ * @param {string} status
+ * @returns {string}
+ */
+function renderRuntimeStatusLabel(status) {
+    if (status === 'completed' || status === 'success') return 'concluído';
+    if (status === 'failed' || status === 'error') return 'falhou';
+    if (status === 'running' || status === 'active') return 'em andamento';
+    if (status === 'pending') return 'pendente';
+    return status;
+}
+
+/**
+ * @param {string | null | undefined} errorType
+ * @returns {string}
+ */
+function renderRuntimeErrorTypeLabel(errorType) {
+    const normalized = errorType?.trim().toLowerCase() ?? '';
+    if (normalized === 'query') return 'consulta';
+    if (normalized === 'model_call') return 'chamada de modelo';
+    if (normalized === 'rate_limit') return 'limite de taxa';
+    if (normalized === 'quota') return 'quota';
+    if (normalized === 'provider') return 'provider';
+    if (normalized === 'network') return 'rede';
+    if (normalized === 'fetch') return 'rede';
+    return normalized || 'erro';
+}
+
+/**
+ * @param {string[]} args
+ * @returns {string | null}
+ */
+function renderRuntimeArgsLabel(args) {
+    if (args.length === 0) return null;
+    return `argumentos ${args.map((arg) => compactTerminalToolText(arg, 44)).join(' ')}`;
+}
+
+/**
  * @typedef {{
  *     on: (event: string, handler: (...args: any[]) => void) => void;
  *     off: (event: string, handler: (...args: any[]) => void) => void;
@@ -191,9 +260,9 @@ function resolveRecoverableModelCallOperatorDetail(evt) {
     const model = typeof evt?.['byokModel'] === 'string' ? evt['byokModel'].trim() : '';
     const bits = [
         RECOVERABLE_BYOK_MODEL_CALL_OPERATOR_DETAIL,
-        providerType ? `provider=${providerType}` : null,
-        profile ? `perfil=${profile}` : null,
-        model ? `modelo=${model}` : null,
+        providerType ? `provider ${providerType}` : null,
+        profile ? `perfil ${profile}` : null,
+        model ? `modelo ${model}` : null,
     ].filter(Boolean);
     return bits.join(' · ');
 }
@@ -247,10 +316,10 @@ function normalizeSdkLifecycleEvent(evt) {
     const modifiedTime = normalizeSdkLifecycleString(metadata['modifiedTime']);
     const startTime = normalizeSdkLifecycleString(metadata['startTime']);
     const detail = [
-        sessionId ? `id=${sessionId}` : 'id=n/d',
-        summary ? `summary=${summary}` : null,
-        modifiedTime ? `modified=${modifiedTime}` : null,
-        startTime && !modifiedTime ? `start=${startTime}` : null,
+        renderRuntimeSessionLabel(sessionId) ?? 'sessão não informada',
+        summary ? `resumo ${summary}` : null,
+        modifiedTime ? `modificada ${renderRuntimeTimestampLabel(modifiedTime)}` : null,
+        startTime && !modifiedTime ? `iniciada ${renderRuntimeTimestampLabel(startTime)}` : null,
     ]
         .filter(Boolean)
         .join(' · ');
@@ -293,9 +362,9 @@ function resolveByokSessionErrorDescriptor({ errorType, message }) {
     const bits = [
         'erro de sessão BYOK vindo do SDK; registrado como saúde do provider/modelo',
         failure.kind !== 'unknown' ? failure.operatorLabel : null,
-        provider ? `provider=${provider}` : null,
-        byok.profile ? `perfil=${byok.profile}` : null,
-        model ? `modelo=${model}` : null,
+        provider ? `provider ${provider}` : null,
+        byok.profile ? `perfil ${byok.profile}` : null,
+        model ? `modelo ${model}` : null,
         'sem Premium Request',
         `ação: ${failure.operatorAction}`,
     ].filter(Boolean);
@@ -347,14 +416,14 @@ function normalizeUsageBilling(evt) {
 function formatUsageDetail(billing) {
     const parts = [];
     if (billing.mismatch) {
-        if (billing.configuredModel) parts.push(`modeloCfg=${billing.configuredModel}`);
-        if (billing.effectiveModel) parts.push(`modeloEfetivo=${billing.effectiveModel}`);
-        if (billing.billedModel) parts.push(`modeloCobrado=${billing.billedModel}`);
+        if (billing.configuredModel) parts.push(`modelo configurado ${billing.configuredModel}`);
+        if (billing.effectiveModel) parts.push(`modelo efetivo ${billing.effectiveModel}`);
+        if (billing.billedModel) parts.push(`modelo cobrado ${billing.billedModel}`);
     } else if (billing.displayModel) {
-        parts.push(`modelo=${billing.displayModel}`);
+        parts.push(`modelo ${billing.displayModel}`);
     }
     if (billing.cost !== null) {
-        parts.push(`custo=${billing.cost.toFixed(4)}`);
+        parts.push(`custo ${billing.cost.toFixed(4)}`);
     }
     return parts.join(' · ') || 'sem metadados de billing';
 }
@@ -370,8 +439,8 @@ function formatLlmUsageDetail(evt, billing) {
     const reason = typeof evt?.['premiumRequestReason'] === 'string' ? evt['premiumRequestReason'] : null;
     const inputTokens = typeof evt?.['inputTokens'] === 'number' ? evt['inputTokens'] : null;
     const outputTokens = typeof evt?.['outputTokens'] === 'number' ? evt['outputTokens'] : null;
-    if (classification) parts.push(`classe=${classification}`);
-    if (reason) parts.push(`motivo=${reason}`);
+    if (classification) parts.push(`classe ${classification}`);
+    if (reason) parts.push(`motivo ${reason}`);
     if (inputTokens !== null || outputTokens !== null) {
         parts.push(`tokens=${inputTokens ?? '?'}→${outputTokens ?? '?'}`);
     }
@@ -573,7 +642,6 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const msg = sanitizeOperationalErrorMessage(/** @type {string} */ (evt?.['message'] ?? 'unknown error'));
         const errorType = /** @type {string} */ (evt?.['errorType'] ?? 'error');
         const byokError = resolveByokSessionErrorDescriptor({ errorType, message: msg });
-        const detail = byokError.enabled && byokError.operatorDetail ? `[${errorType}] ${msg} · ${byokError.operatorDetail}` : `[${errorType}] ${msg}`;
 
         if (byokError.enabled) {
             const now = Date.now();
@@ -608,13 +676,19 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             }
         }
 
+        const errorTypeLabel = renderRuntimeErrorTypeLabel(errorType);
+        const detail =
+            byokError.enabled && byokError.operatorDetail
+                ? `Erro de ${errorTypeLabel}: ${msg} · ${byokError.operatorDetail}`
+                : `Erro de ${errorTypeLabel}: ${msg}`;
+
         recordTerminalActivity('error', byokError.enabled ? 'Erro de sessão BYOK' : 'Erro de sessão', {
             detail,
             severity: 'error',
             source: 'agent',
         });
         println(
-            `\n  ${terminalThemeBadge('error', byokError.enabled ? 'BYOK' : 'ERROR')} ${terminalThemeText('error', byokError.enabled ? detail : `Erro de sessão [${errorType}]: ${msg}`)}`,
+            `\n  ${terminalThemeBadge('error', byokError.enabled ? 'BYOK' : 'ERROR')} ${terminalThemeText('error', detail)}`,
         );
         broadcastSse(
             'session.error',
@@ -807,7 +881,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
               ? 'Tarefa interna concluída'
               : 'Agente em background concluído';
         recordTerminalActivity('task', activityLabel, {
-            detail: `${description} · status=${status}`,
+            detail: `${description} · ${renderRuntimeStatusLabel(status)}`,
             severity: failed ? 'error' : 'info',
             source: 'agent',
             recordHistory: narration.recordHistory,
@@ -864,15 +938,16 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const description = /** @type {string} */ (evt?.['description'] ?? evt?.['shellId'] ?? 'shell');
         const exitCode = typeof evt?.['exitCode'] === 'number' ? evt['exitCode'] : null;
         const failed = exitCode !== null && exitCode !== 0;
+        const exitLabel = exitCode !== null ? ` · saída ${exitCode}` : '';
         recordTerminalActivity('task', failed ? 'Shell concluído com erro' : 'Shell concluído', {
-            detail: `${description}${exitCode !== null ? ` · exit=${exitCode}` : ''}`,
+            detail: `${description}${exitLabel}`,
             severity: failed ? 'error' : 'info',
             source: 'agent',
         });
         printlnWhenRenderUnlocked(
             failed
-                ? `  \x1b[31m💻 Shell concluído com erro: ${description}${exitCode !== null ? ` · exit=${exitCode}` : ''}\x1b[0m`
-                : `  \x1b[32m💻 Shell concluído: ${description}${exitCode !== null ? ` · exit=${exitCode}` : ''}\x1b[0m`,
+                ? `  \x1b[31m💻 Shell concluído com erro: ${description}${exitLabel}\x1b[0m`
+                : `  \x1b[32m💻 Shell concluído: ${description}${exitLabel}\x1b[0m`,
         );
         broadcastSse(AGENT_SHELL_COMPLETED_EVENT, withAgentSseEnvelope({ ...evt }, 'agent/shell.completed'));
     };
@@ -1035,9 +1110,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const args = Array.isArray(evt?.['args']) ? evt['args'].map((item) => String(item)).filter(Boolean) : [];
         const detail = [
             commandName,
-            localCommand ? `local=${localCommand}` : null,
-            args.length > 0 ? `args=${args.join(' ')}` : null,
-            sessionId ? `session=${sessionId}` : null,
+            localCommand ? `comando local ${localCommand}` : null,
+            renderRuntimeArgsLabel(args),
+            renderRuntimeSessionLabel(sessionId),
         ]
             .filter(Boolean)
             .join(' · ');
@@ -1049,7 +1124,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         });
         if (getShowSessionActivity() && !isTerminalRenderLocked()) {
             println(
-                `  ${terminalThemeBadge('info', 'COMMAND')} ${terminalThemeText('muted', `SDK command: ${detail}`)}`,
+                `  ${terminalThemeBadge('info', 'COMMAND')} ${terminalThemeText('muted', `Comando SDK: ${detail}`)}`,
             );
         }
         broadcastSse(

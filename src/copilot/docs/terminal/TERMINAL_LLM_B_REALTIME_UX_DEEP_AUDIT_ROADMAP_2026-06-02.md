@@ -2295,5 +2295,18 @@
 - [x] Live PTY curta final executada após corrigir `/now`:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/ux-polished-ops-cycle-20260602-1513`.
 - [x] Resultado: PASS completo; `/now` exibiu `ativo kilo-code · kilo-auto/free`, `/health` exibiu `kilo-code · kilo-auto/free` e `/live` exibiu `SSE sem clientes`.
+- [x] `agent-runtime-events.js` passou a renderizar uso/PR, lifecycle SDK, comandos SDK, shell, background tasks e erros BYOK com rótulos humanos.
+- [x] Detalhes de runtime trocaram `modeloCfg=`, `modeloEfetivo=`, `modeloCobrado=`, `custo=`, `classe=`, `motivo=`, `provider=`, `perfil=`, `modelo=`, `status=`, `exit=`, `session=`, `local=`, `args=` e `[query]` por `modelo configurado`, `modelo efetivo`, `modelo cobrado`, `custo`, `classe`, `motivo`, `provider`, `perfil`, `modelo`, `concluído`, `saída`, `sessão`, `comando local`, `argumentos` e `Erro de consulta`.
+- [x] `sdk-session-events.js` passou a renderizar ids de interação como `pedido ...`, usando compactação e sem `requestId=`/parenteses crus na UX default.
+- [x] Sidechannels SDK passaram a trocar `permission.mode_changed`, `audit_only`, `choice/protocolo`, `freeform`, `ui.elicitation=true`, `snapshot.ui.elicitation=true`, `oauth.login`, `sample-1`, `auto-1` e `exit_plan_mode solicitado` por `Modo de permissão`, `auditoria sem prompts`, `escolha estruturada`, `resposta livre`, `elicitation ativada`, `snapshot com elicitation`, `Login OAuth MCP`, `pedido ...` e `Saída do plan mode solicitada`.
+- [x] `tool-lifecycle-runtime.js` passou a apresentar `tool.user_requested` e integrações externas com `pedido ...`, sem request ids crus no texto humano.
+- [x] `terminal-agent-wiring.js` trocou `status=` por `estado` no pré-stall watchdog.
+- [x] `dialog/engine.js` trocou o erro BYOK de turno de `perfil=`/`provider=`/`modelo=` para `perfil`/`provider`/`modelo`, preservando a mensagem operacional de sem Premium Request.
+- [x] Aviso de catálogo configurado BYOK fora do catálogo remoto trocou `perfil=`/`provider=` por `perfil`/`provider`.
+- [x] Testes escopados passaram após o lote:
+  - `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/test_terminal_sdk_session_events_registry.spec.js tests/unit/copilot/test_terminal_dialog_engine.spec.js`.
+- [x] Live PTY curta executada após o polish de runtime/sidechannels:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/ux-runtime-sidechannels-polish-20260602-1532`.
+- [x] Resultado: PASS completo; `/now`, `/health`, `/live`, `/activity` e `/sdk waits` permaneceram humanos, com timestamps ISO e sem telemetria `key=value` na superfície default.
 - [ ] Auditar `/byok persist` e os helpers de health tags restantes para separar default humano de detalhe técnico.
 - [ ] Separar explicitamente “tela default humana” de “detail/raw diagnóstico” nos comandos BYOK, sem perder automação e rastreabilidade.

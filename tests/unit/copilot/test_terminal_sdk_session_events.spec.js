@@ -469,12 +469,12 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
             'Permissão SDK solicitada',
-            expect.objectContaining({ detail: 'file_write · perm-1', severity: 'warn' }),
+            expect.objectContaining({ detail: 'file_write · pedido perm-1', severity: 'warn' }),
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
             'Modo de permissão alterado',
-            expect.objectContaining({ detail: 'audit_only', source: 'sdk' }),
+            expect.objectContaining({ detail: 'auditoria sem prompts', source: 'sdk' }),
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
@@ -487,7 +487,12 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
             'ask_user SDK respondido',
-            expect.objectContaining({ detail: 'ui-1 · choice/protocolo' }),
+            expect.objectContaining({ detail: 'pedido ui-1 · escolha estruturada' }),
+        );
+        expect(mocks.recordTerminalActivity).not.toHaveBeenCalledWith(
+            'question',
+            'ask_user SDK respondido',
+            expect.objectContaining({ detail: expect.stringContaining('choice/protocolo') }),
         );
         expect(mocks.recordTerminalUserInputCompleted).toHaveBeenCalledWith(
             expect.objectContaining({ requestId: 'ui-1' }),
@@ -886,7 +891,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
             'Sampling MCP solicitado',
-            expect.objectContaining({ detail: 'browser · sample-1', severity: 'warn' }),
+            expect.objectContaining({ detail: 'browser · pedido sample-1', severity: 'warn' }),
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
@@ -896,12 +901,17 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
             'Capabilities SDK alteradas',
-            expect.objectContaining({ detail: expect.stringContaining('ui.elicitation=true') }),
+            expect.objectContaining({ detail: expect.stringContaining('elicitation ativada') }),
+        );
+        expect(mocks.recordTerminalActivity).not.toHaveBeenCalledWith(
+            'system',
+            'Capabilities SDK alteradas',
+            expect.objectContaining({ detail: expect.stringContaining('ui.elicitation=') }),
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
             'Troca automática de modo solicitada',
-            expect.objectContaining({ detail: 'auto-1 · rate_limit', severity: 'warn' }),
+            expect.objectContaining({ detail: 'pedido auto-1 · rate_limit', severity: 'warn' }),
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',

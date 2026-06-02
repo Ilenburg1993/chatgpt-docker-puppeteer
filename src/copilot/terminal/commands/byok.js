@@ -1699,7 +1699,7 @@ function buildByokProbeRecommendationInput(snapshot, diff, limit) {
 function renderConfiguredByokCatalogWarnings(discovered, source) {
     const configuredModel = discovered.configuredModel;
     if (!configuredModel?.authoritative || configuredModel.inCatalog !== false || !configuredModel.id) return [];
-    const owner = source.profile ? `perfil=${source.profile}` : source.provider ? `provider=${source.provider}` : 'seleção ativa';
+    const owner = source.profile ? `perfil ${source.profile}` : source.provider ? `provider ${source.provider}` : 'seleção ativa';
     const selector = source.profile ? ` profile:${source.profile}` : '';
     return [
         `${owner}: model configurado '${configuredModel.id}' nao apareceu no catalogo remoto atual. O terminal nao troca seletor silenciosamente; explore /byok models${selector ? ` all-providers${selector}` : ''} e valide um candidato com /byok probe agent${selector} model:<id> antes de /byok model <id>.`,

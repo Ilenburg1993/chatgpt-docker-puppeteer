@@ -1238,8 +1238,8 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             }
             recordTerminalActivity('error', 'Falha de provider BYOK no turno', {
                 detail:
-                    `${byokFailure.errorContext} · perfil=${byokFailure.profile ?? '-'} · ` +
-                    `provider=${byokFailure.provider ?? '-'} · modelo=${byokFailure.model ?? '-'} · ` +
+                    `${byokFailure.errorContext} · perfil ${byokFailure.profile ?? '-'} · ` +
+                    `provider ${byokFailure.provider ?? '-'} · modelo ${byokFailure.model ?? '-'} · ` +
                     'sem Premium Request',
                 severity: 'error',
                 source: 'dialog',

@@ -365,7 +365,7 @@ export function registerAgentEventListeners(printBanner) {
             // Terminal ativo mas sem turno SDK em andamento — ping preventivo para evitar stall falso
             pingTerminalDialogWatchdog();
             recordTerminalActivity('system', 'Pré-stall suprimido (terminal ativo)', {
-                detail: `${secs}s — status=${runtimeState.status}, ping preventivo emitido`,
+                detail: `${secs}s — estado ${runtimeState.status}, ping preventivo emitido`,
                 source: 'watchdog',
             });
             log('INFO', `[TerminalServer] Pré-stall (${secs}s) suprimido: terminal ativo (${runtimeState.status}).`);
