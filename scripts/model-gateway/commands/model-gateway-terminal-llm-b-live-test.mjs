@@ -64,6 +64,7 @@ Common options:
   --auto-probe
   --live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error|file-write-roundtrip>
   --structured-input-cycle
+  --menu-cycle
   --reuse-sdk-session
   --timeout-ms=<ms>
   --transport=<pty|stdio>
@@ -1574,6 +1575,92 @@ async function runStructuredInputCycleLiveTest({ outDir, requestedTransport, tim
     return summary;
 }
 
+function menuCycleCriteria(boot) {
+    const plain = String(boot?.plain ?? '');
+    return [
+        {
+            id: 'menu-cycle-ready',
+            pass: /LLM-B pronta/u.test(plain),
+            detail: 'terminal reached ready state before opening the command palette',
+        },
+        {
+            id: 'menu-cycle-compact-table',
+            pass: /Command Palette/u.test(plain) && /\[01\]\s+Status completo\s+\/status/iu.test(plain),
+            detail: '/menu rendered a compact one-line-per-action table',
+        },
+        {
+            id: 'menu-cycle-human-copy',
+            pass:
+                /pergunta pendente/iu.test(plain) &&
+                !/pending question|troubleshooting|Command Palette \(Terminal Smart UX\)|╔|╚/iu.test(plain),
+            detail: '/menu default copy avoided old technical English and decorative box chrome',
+        },
+        {
+            id: 'menu-cycle-quick-actions',
+            pass: /Ações rápidas:[\s\S]*\/menu 1[\s\S]*\/menu status[\s\S]*\/menu help/iu.test(plain),
+            detail: '/menu rendered compact quick actions footer',
+        },
+        {
+            id: 'menu-cycle-clean-close',
+            pass: boot.exitCode === 0 && /readline fechado/u.test(plain),
+            detail: 'terminal closed cleanly after menu cycle',
+        },
+    ];
+}
+
+async function runMenuCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+    const boot = await runSessionCycleBoot({
+        id: 'menu-cycle',
+        label: 'compact command palette',
+        outDir,
+        commands: [{ line: '/menu', advanceAfterMs: 1_500 }, '/quit'],
+        terminalPort,
+        requestedTransport,
+        timeoutMs,
+    });
+    const criteria = menuCycleCriteria(boot);
+    const durationMs = Date.now() - Date.parse(startedAt);
+    const ok = criteria.every((criterion) => criterion.pass);
+    const summary = {
+        ok,
+        startedAt,
+        durationMs,
+        terminalPort,
+        boot: {
+            id: boot.id,
+            label: boot.label,
+            exitCode: boot.exitCode,
+            sessionId: boot.sessionId || null,
+            transport: boot.transport,
+        },
+        criteria,
+    };
+    await writeFile(path.join(outDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    await writeFile(
+        path.join(outDir, 'summary.md'),
+        [
+            '# Terminal LLM-B Menu Live Test',
+            '',
+            `Started: ${startedAt}`,
+            `Duration: ${durationMs}ms`,
+            `Status: ${ok ? 'PASS' : 'FAIL'}`,
+            `Terminal port: ${terminalPort}`,
+            '',
+            '## Criteria',
+            '',
+            ...criteria.map((criterion) => `- ${criterion.pass ? '[x]' : '[ ]'} ${criterion.id}: ${criterion.detail}`),
+            '',
+            '## Logs',
+            '',
+            `- raw: ${path.relative(ROOT, path.join(outDir, 'menu-cycle.raw.log'))}`,
+            `- plain: ${path.relative(ROOT, path.join(outDir, 'menu-cycle.plain.log'))}`,
+            '',
+        ].join('\n'),
+        'utf8',
+    );
+    return summary;
+}
+
 function hasReturnedToReplPrompt(plain, outputOffset) {
     return REPL_PROMPT_TAIL_RE.test(String(plain ?? '').slice(outputOffset));
 }
@@ -1663,10 +1750,12 @@ function liveScenarioKind({
     noPr,
     sessionCycle,
     structuredInputCycle,
+    menuCycle,
     liveScenario,
 }) {
     if (sessionCycle) return 'session_cycle';
     if (structuredInputCycle) return 'structured_input_cycle';
+    if (menuCycle) return 'menu_cycle';
     if (autoControlProbe) return 'auto_probe';
     if (byokFixture) return 'byok_fixture_no_pr';
     if (byokControlProbe) return 'byok_control_no_pr';
@@ -3736,6 +3825,7 @@ async function main() {
     const noPr = hasFlag('--no-pr');
     const sessionCycle = hasFlag('--session-cycle');
     const structuredInputCycle = hasFlag('--structured-input-cycle');
+    const menuCycle = hasFlag('--menu-cycle');
     const reuseSdkSession = hasFlag('--reuse-sdk-session');
     const byokProbe = hasFlag('--byok-probe');
     const byokFixture = hasFlag('--byok-fixture');
@@ -3753,6 +3843,7 @@ async function main() {
         noPr,
         sessionCycle,
         structuredInputCycle,
+        menuCycle,
         liveScenario,
     });
     const byokRealProfile = readArg('--byok-real-profile', '');
@@ -3875,6 +3966,20 @@ async function main() {
             startedAt,
         });
         console.log(`[terminal-live] structured input summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`);
+        if (!summary.ok) process.exitCode = 1;
+        await byokFixtureProvider?.close();
+        return;
+    }
+
+    if (menuCycle) {
+        const summary = await runMenuCycleLiveTest({
+            outDir,
+            requestedTransport,
+            timeoutMs,
+            terminalPort,
+            startedAt,
+        });
+        console.log(`[terminal-live] menu summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`);
         if (!summary.ok) process.exitCode = 1;
         await byokFixtureProvider?.close();
         return;

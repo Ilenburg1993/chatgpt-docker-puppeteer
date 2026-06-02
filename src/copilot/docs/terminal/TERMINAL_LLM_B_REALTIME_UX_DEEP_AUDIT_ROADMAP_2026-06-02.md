@@ -991,8 +991,17 @@
   - `npx vitest run tests/unit/copilot/terminal/test_commands_menu.spec.js`
   - status PASS;
   - 1 arquivo, 5 testes.
-- Gap residual:
-  - criar cenario live dedicado para `/menu` em PTY, em vez de tentar pipe/headless.
+- Evidencia live executada:
+  - comando:
+    - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --menu-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/menu-compact-cycle-20260602-0817`
+  - artefatos:
+    - `artifacts/terminal-live/menu-compact-cycle-20260602-0817/summary.md`
+    - `artifacts/terminal-live/menu-compact-cycle-20260602-0817/summary.json`
+    - `artifacts/terminal-live/menu-compact-cycle-20260602-0817/menu-cycle.raw.log`
+    - `artifacts/terminal-live/menu-compact-cycle-20260602-0817/menu-cycle.plain.log`
+  - status PASS;
+  - duracao 5677ms;
+  - criterios `menu-cycle-compact-table`, `menu-cycle-human-copy`, `menu-cycle-quick-actions` e `menu-cycle-clean-close` passaram.
 
 ## 03. Achados principais
 
@@ -1403,7 +1412,8 @@
 - [ ] Avaliar fusao do bloco `Ambiente` com auto-brief ready para reduzir altura inicial.
 - [x] Compactar `/menu` em uma linha por ação.
 - [x] Humanizar descrições do `/menu` (`pending question`, `dialog loop`, `troubleshooting`).
-- [ ] Criar live PTY dedicado para `/menu`.
+- [x] Criar live PTY dedicado para `/menu`.
+- [x] Adicionar flag `--menu-cycle` ao runner live.
 
 ### Faixa R - Comandos de diagnostico com dois niveis
 
