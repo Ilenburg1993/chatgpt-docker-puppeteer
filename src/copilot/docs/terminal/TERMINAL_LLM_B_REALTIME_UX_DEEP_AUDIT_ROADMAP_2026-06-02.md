@@ -884,6 +884,47 @@
   - comandos diagnosticos continuam acessiveis durante a espera humana;
   - a resposta humana simples continua sendo o caminho ergonomico principal.
 
+## 02.32 Polimento de nomenclatura humana em help, intent, status, diagnose e usage
+
+- Problema observado apos as primeiras lives:
+  - a UX ja ocultava IDs em tool lifecycle e waits, mas ainda mantinha termos de implementacao em comandos comuns;
+  - `/help` mencionava `report_intent/assistant.intent`;
+  - `/menu` descrevia intents como `assistant.intent/report_intent`;
+  - `/intent` mostrava `tool=...`, `call=...` e ID derivado como linha principal;
+  - `/status` e `/diagnose` expunham `ask_user` e `shadow`;
+  - `/usage now` expunha `classe=ask_user_continuation` no modo default;
+  - `/sdk simulate request-user-input` mostrava `request_user_input diagnóstico`.
+- Decisao:
+  - superficie default deve explicar efeito operacional, nao envelope de protocolo;
+  - envelope tecnico permanece acessivel em `detail`, `raw`, `/events`, `/tools diag` e testes de protocolo;
+  - nomes humanos passam a ser a forma padrao: `pergunta humana`, `pergunta restaurada`, `input estruturado`, `intencao explicita`, `diagnostico de input estruturado`.
+- Mudancas aplicadas:
+  - `/help` passou a falar em perguntas/formularios/permissoes e intencoes explicitas;
+  - `/menu` removeu `assistant.intent/report_intent` da descricao default;
+  - `/intent` default mostra horario, fonte humana e risco humano; `/intent detail` mostra origem, tool, call e id;
+  - `intent-renderer.js` removeu `tool=`/`call=` da impressao ao vivo e do transcript local default;
+  - `/status` e `/diagnose` trocaram `ask_user` por `pergunta humana` e `shadow` por `pergunta restaurada`;
+  - `/sdk waits` trocou frase de `request_user_input pendente` por `input estruturado pendente`;
+  - `/usage now` trocou `classe=ask_user_continuation` por `tipo=continuação da pergunta humana`; `detail` preserva classe/motivo tecnicos;
+  - mensagens de mailbox/zero-PR passaram a falar em `próxima pergunta humana`.
+- Testes escopados executados:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js tests/unit/copilot/terminal/test_commands_intent.spec.js tests/unit/copilot/terminal/test_intent_renderer.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`
+  - status PASS;
+  - 8 arquivos, 110 testes.
+- Evidencia live executada:
+  - comando:
+    - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/structured-input-ux-human-copy-20260602-0804`
+  - artefatos:
+    - `artifacts/terminal-live/structured-input-ux-human-copy-20260602-0804/summary.md`
+    - `artifacts/terminal-live/structured-input-ux-human-copy-20260602-0804/summary.json`
+    - `artifacts/terminal-live/structured-input-ux-human-copy-20260602-0804/structured-input-cycle.raw.log`
+    - `artifacts/terminal-live/structured-input-ux-human-copy-20260602-0804/structured-input-cycle.plain.log`
+  - status PASS;
+  - duracao 8336ms;
+  - a tela mostrou `diagnóstico de input estruturado`, `pergunta=0 · input=1`, `input estruturado pendente` e nenhum request ID default.
+- Gap residual deliberado:
+  - `/events`, `/tools diag`, `/intent detail`, export tecnico e runner live ainda podem mostrar nomes tecnicos, porque sao surfaces de diagnostico/protocolo.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -1234,15 +1275,18 @@
 - [x] Mapear introspeccoes comuns para nomes humanos curtos.
 - [x] Preservar alias tecnico apenas em debug/detalhe.
 - [x] Criar testes unitarios para nomes humanos e alias oculto por default.
+- [x] Humanizar `/help`, `/menu`, `/status`, `/diagnose`, `/usage now` e `/intent` default.
+- [x] Criar modo `/intent detail` para envelope tecnico sem poluir a vista normal.
 
 ### Faixa N - Sanitizacao de IDs na UX default
 
 - [x] Remover `requestId`/`toolCallId` como fallback de target default no presenter.
-- [ ] Mostrar IDs completos apenas em `/events`, export bruto e diagnosticos explicitos.
-- [ ] Mostrar IDs compactos apenas quando o comando for diagnostico.
+- [x] Mostrar IDs completos apenas em `/events`, export bruto, `/intent detail` e diagnosticos explicitos.
+- [x] Mostrar IDs compactos apenas quando o comando for diagnostico.
 - [x] Garantir que `report_intent` use intent como target quando disponivel.
 - [x] Garantir que tools sem target humano nao inventem target com ID tecnico.
 - [x] Adicionar teste contra `chatcmpl-tool-*`/`toolu_*` em linhas default.
+- [x] Adicionar teste de `intent-renderer.js` contra `toolu_*`, `tool=` e `call=` na impressao ao vivo default.
 
 ### Faixa O - ASK como superficie propria
 

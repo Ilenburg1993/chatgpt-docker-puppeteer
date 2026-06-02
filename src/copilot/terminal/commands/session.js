@@ -105,9 +105,9 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const askUserStatus = projection.pendingQuestion
         ? `\x1b[32mvivo\x1b[0m${projection.pendingQuestionKind ? ` [${projection.pendingQuestionKind}]` : ''}`
         : projection.pendingQuestionShadowExpired
-          ? '\x1b[31mshadow expirada\x1b[0m'
+          ? '\x1b[31mpergunta restaurada expirada\x1b[0m'
           : projection.pendingQuestionShadow
-            ? `${shadowState === 'expired' ? '\x1b[31mshadow expirada\x1b[0m' : shadowState === 'expiring_soon' ? '\x1b[33mshadow expirando\x1b[0m' : shadowState === 'fresh' ? '\x1b[36mshadow recém-restaurada\x1b[0m' : '\x1b[33mshadow restaurada\x1b[0m'}${projection.pendingQuestionShadowKind ? ` [${projection.pendingQuestionShadowKind}]` : ''}`
+            ? `${shadowState === 'expired' ? '\x1b[31mpergunta restaurada expirada\x1b[0m' : shadowState === 'expiring_soon' ? '\x1b[33mpergunta restaurada expirando\x1b[0m' : shadowState === 'fresh' ? '\x1b[36mpergunta recém-restaurada\x1b[0m' : '\x1b[33mpergunta restaurada\x1b[0m'}${projection.pendingQuestionShadowKind ? ` [${projection.pendingQuestionShadowKind}]` : ''}`
             : '\x1b[90m(nenhum)\x1b[0m';
     const pendingPreview = projection.pendingQuestionText
         ? projection.pendingQuestionText.slice(0, 80) + (projection.pendingQuestionText.length > 80 ? '…' : '')
@@ -255,7 +255,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
   agente           ${statusColor}${snap['status']}\x1b[0m
         health           ${health ? `${healthColor}${health['status']}\x1b[0m` : '\x1b[90m(n/d)\x1b[0m'}
   dialog loop      ${active ? '\x1b[32m● ativo\x1b[0m' : '\x1b[31m○ inativo\x1b[0m'}
-  ask_user         ${askUserStatus}
+  pergunta humana ${askUserStatus}
   canal input      ${inputChannelColor}${inputChannel.label}\x1b[0m \x1b[90m(${inputChannel.state}${inputChannel.recoveryExpected ? ' · recovery sob demanda' : ''})\x1b[0m
   sdk interrupts   ${sdkInterruptions.length > 0 ? `\x1b[33m${sdkInterruptions.join(' · ')}\x1b[0m` : '\x1b[90m(nenhum)\x1b[0m'}
     sdk ui           \x1b[90melicitation=${uiElicitationFlag == null ? 'n/a' : uiElicitationFlag ? 'available' : 'unavailable'}\x1b[0m
@@ -301,16 +301,16 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
   ─────────────────────────────────────
 `);
     if (pendingPreview) {
-        println(`  pergunta/shadow  \x1b[90m${pendingPreview}\x1b[0m`);
+        println(`  pergunta salva  \x1b[90m${pendingPreview}\x1b[0m`);
     }
     if (shadowExpiry) {
-        println(`  shadow expira em \x1b[90m${shadowExpiry}\x1b[0m`);
+        println(`  salva expira em \x1b[90m${shadowExpiry}\x1b[0m`);
     }
     if (shadowAgeLabel) {
-        println(`  shadow idade    \x1b[90m${shadowAgeLabel}\x1b[0m`);
+        println(`  salva idade     \x1b[90m${shadowAgeLabel}\x1b[0m`);
     }
     if (shadowRemainingLabel && !projection.pendingQuestionShadowExpired) {
-        println(`  shadow restante \x1b[90m${shadowRemainingLabel}\x1b[0m`);
+        println(`  salva restante  \x1b[90m${shadowRemainingLabel}\x1b[0m`);
     }
     if (activity.detail) {
         println(`  atividade info  \x1b[90m${activity.detail}\x1b[0m`);
@@ -341,11 +341,11 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
     }
     if (projection.pendingQuestionShadowExpired) {
         println(
-            '  \x1b[33mDica: a shadow restaurada não é mais respondível; mantenha a limpeza no próximo fluxo operacional.\x1b[0m',
+            '  \x1b[33mDica: a pergunta restaurada não é mais respondível; mantenha a limpeza no próximo fluxo operacional.\x1b[0m',
         );
     } else if (projection.pendingQuestionShadowState === 'expiring_soon') {
         println(
-            '  \x1b[33mDica: a shadow restaurada está perto de expirar; revise ou limpe antes que o estado fique ambíguo.\x1b[0m',
+            '  \x1b[33mDica: a pergunta restaurada está perto de expirar; revise ou limpe antes que o estado fique ambíguo.\x1b[0m',
         );
     }
     if (projection.sdkSessionMode === 'plan') {
@@ -817,7 +817,7 @@ export function cmdAnswer({ println }, arg) {
     }
     const projection = readTerminalStatusProjection(withRuntimeTarget({}, runtimeId));
     if (result.shadowExpired || projection.pendingQuestionShadowExpired) {
-        println('[answer] Nenhuma pergunta viva. Há uma shadow expirada de ask_user pendente de limpeza.');
+        println('[answer] Nenhuma pergunta viva. Há uma pergunta restaurada expirada pendente de limpeza.');
         return;
     }
     println('[answer] Nenhuma pergunta pendente.');
@@ -834,8 +834,8 @@ export function cmdClearShadow({ println }, arg = '') {
     const ok = callWithRuntimeTarget(clearPendingTerminalQuestionShadow, runtimeId);
     println(
         ok
-            ? '[clear-shadow] Shadow persistida de ask_user limpa.'
-            : '[clear-shadow] Nenhuma shadow persistida do ask_user no momento.',
+            ? '[clear-shadow] Pergunta restaurada do disco limpa.'
+            : '[clear-shadow] Nenhuma pergunta restaurada pendente no momento.',
     );
 }
 
@@ -1241,7 +1241,7 @@ async function cmdSessionSdkWaits({ println }, tokens) {
         const repeats = entry.count > 1 ? ` \x1b[90m×${entry.count}\x1b[0m` : '';
         println(`    \x1b[90m${time}\x1b[0m  \x1b[33m${entry.line}\x1b[0m${repeats}`);
     }
-    println('  \x1b[90mask_user, elicitation e permission continuam com comandos próprios; esta é só a trilha agregada.\x1b[0m\n');
+    println('  \x1b[90mPerguntas humanas, formulários e permissões continuam com comandos próprios; esta é só a trilha agregada.\x1b[0m\n');
 }
 
 /**

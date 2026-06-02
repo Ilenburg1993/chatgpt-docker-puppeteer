@@ -80,6 +80,29 @@ function riskTheme(risk) {
 }
 
 /**
+ * @param {import('../state/intent-state.js').TerminalIntentRisk} risk
+ * @returns {string}
+ */
+function humanRiskLabel(risk) {
+    if (risk === 'low') return 'risco=baixo';
+    if (risk === 'medium') return 'risco=médio';
+    if (risk === 'high') return 'risco=alto';
+    return 'risco=n/d';
+}
+
+/**
+ * @param {string} source
+ * @returns {string}
+ */
+function humanIntentSource(source) {
+    const text = source.trim().toLowerCase();
+    if (text.includes('assistant.intent')) return 'fonte=SDK';
+    if (text.includes('report_intent')) return 'fonte=tool de intenção';
+    if (text.includes('terminal')) return 'fonte=terminal';
+    return 'fonte=captura';
+}
+
+/**
  * @param {{
  *     intent: string;
  *     tool?: string | null;
@@ -109,10 +132,8 @@ export function renderTerminalIntent(input) {
 
     const risk = entry.risk;
     const theme = riskTheme(risk);
-    const toolLabel = entry.tool ? ` · tool=${entry.tool}` : '';
-    const callLabel = entry.toolCallId ? ` · call=${compact(entry.toolCallId, 24)}` : '';
-    const sourceLabel = ` · ${entry.source}${toolLabel}${callLabel}`;
-    const renderedRisk = risk === 'unknown' ? 'risk=n/d' : `risk=${risk}`;
+    const renderedRisk = humanRiskLabel(risk);
+    const sourceLabel = ` · ${humanIntentSource(entry.source)}`;
 
     recordTerminalActivity('turn', 'Intenção da LLM-B', {
         detail: compact(intent, 240),
@@ -125,7 +146,7 @@ export function renderTerminalIntent(input) {
     appendTerminalTranscriptTurn({
         role: 'system',
         rawRole: 'intent',
-        content: `[intent] ${renderedRisk}${entry.tool ? ` tool=${entry.tool}` : ''}\n${intent}`,
+        content: `[intent] ${renderedRisk}\n${intent}`,
         source: entry.source,
         timestamp: entry.timestamp,
     });

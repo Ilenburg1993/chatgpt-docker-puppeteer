@@ -718,7 +718,7 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
         }
     }
     if (structuredInputPending > 0) {
-        println('  acao     \x1b[90mdigite a resposta normalmente; o REPL destrava request_user_input pendente\x1b[0m');
+        println('  acao     \x1b[90mdigite a resposta normalmente; o REPL destrava o input estruturado pendente\x1b[0m');
         for (const entry of structuredInputs.slice(0, 3)) {
             const choices = entry.choices.length > 0 ? ` choices=${entry.choices.join(' | ')}` : '';
             const freeform = entry.allowFreeform ? 'livre' : 'selecao obrigatoria';
@@ -729,7 +729,7 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
             println(`           ${compactText(entry.question, 220)}`);
         }
         if (structuredInputs.length > 3) {
-            println(`  input    \x1b[90m+${structuredInputs.length - 3} request_user_input pendente(s)\x1b[0m`);
+            println(`  input    \x1b[90m+${structuredInputs.length - 3} input(s) estruturado(s) pendente(s)\x1b[0m`);
         }
     }
     if (totalPending === 0) {
@@ -814,7 +814,7 @@ function renderSdkSimulate({ println }, rest) {
     const choices = parsed.choices.length > 0 ? ` · opções=${parsed.choices.join(' | ')}` : '';
     println('\n  \x1b[36mInput humano estruturado\x1b[0m');
     println(`  status   \x1b[33maguardando operador\x1b[0m`);
-    println('  origem   \x1b[90mrequest_user_input diagnóstico\x1b[0m');
+    println('  origem   \x1b[90mdiagnóstico de input estruturado\x1b[0m');
     println(`  modo     \x1b[90m${mode}${choices}\x1b[0m`);
     println(`  pergunta ${compactText(parsed.question, 220)}`);
     println('  ação     \x1b[90mdigite a resposta normalmente ou use /answer <texto>\x1b[0m');
@@ -1680,7 +1680,7 @@ export async function cmdElicitation({ println }, arg = '') {
                 '  \x1b[90mUso: /elicitation [list|all|capabilities|confirm <msg>|select <msg> -- a|b|c|input <msg> -- {json}|show latest|clear <id>|request <msg>|request-json <msg> -- <schemaJson>|respond <id> <accept|decline|cancel> [json]]\x1b[0m',
             );
             println(
-                '  \x1b[90mask_user = conversa READY/REPLY; elicitation = formulário/URL estruturado do SDK; confirm/select/input = conveniências de session.ui.*.\x1b[0m\n',
+                '  \x1b[90mpergunta humana = conversa READY/REPLY; elicitation = formulário/URL estruturado do SDK; confirm/select/input = conveniências de session.ui.*.\x1b[0m\n',
             );
         }
     } catch (e) {

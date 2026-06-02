@@ -2,8 +2,7 @@
 /**
  * Comando `/intent` do REPL terminal LLM-B.
  *
- * Consulta o histórico persistente de intents capturados por `assistant.intent`, `report_intent` e
- * `report_intent_local`.
+ * Consulta o histórico persistente de intenções explícitas capturadas da LLM-B.
  *
  * @module copilot/terminal/commands/intent
  */
@@ -53,6 +52,29 @@ function compact(value, max) {
 
 /**
  * @param {import('../state/intent-state.js').TerminalIntentRisk} risk
+ * @returns {string}
+ */
+function humanRiskLabel(risk) {
+    if (risk === 'low') return 'baixo';
+    if (risk === 'medium') return 'médio';
+    if (risk === 'high') return 'alto';
+    return 'n/d';
+}
+
+/**
+ * @param {string} source
+ * @returns {string}
+ */
+function humanIntentSource(source) {
+    const text = source.trim().toLowerCase();
+    if (text.includes('assistant.intent')) return 'SDK';
+    if (text.includes('report_intent')) return 'tool de intenção';
+    if (text.includes('terminal')) return 'terminal';
+    return 'captura';
+}
+
+/**
+ * @param {import('../state/intent-state.js').TerminalIntentRisk} risk
  * @returns {'info' | 'warn' | 'error' | 'muted'}
  */
 function riskTheme(risk) {
@@ -68,38 +90,49 @@ function riskTheme(risk) {
  * @returns {void}
  */
 export function cmdIntent(ctx, arg) {
-    const trimmed = (arg ?? '').trim().toLowerCase();
-    if (trimmed === 'clear') {
+    const tokens = (arg ?? '').trim().split(/\s+/u).filter(Boolean);
+    const normalizedTokens = tokens.map((token) => token.toLowerCase());
+    if (normalizedTokens.includes('clear')) {
         clearTerminalIntentHistory();
-        ctx.println(`\n  ${terminalThemeText('muted', 'Histórico de intents limpo.')}\n`);
+        ctx.println(`\n  ${terminalThemeText('muted', 'Histórico de intenções limpo.')}\n`);
         return;
     }
 
-    const requested = Number.parseInt(trimmed || '20', 10);
+    const detail = normalizedTokens.includes('detail') || normalizedTokens.includes('raw');
+    const numericToken = normalizedTokens.find((token) => /^\d+$/u.test(token));
+    const requested = Number.parseInt(numericToken || '20', 10);
     const limit = Number.isFinite(requested) && requested > 0 ? requested : 20;
     const entries = readTerminalIntentHistory(limit);
     const stats = readTerminalIntentStats();
 
     if (entries.length === 0) {
-        ctx.println(`\n  ${terminalThemeText('muted', 'Nenhum intent capturado ainda.')}\n`);
+        ctx.println(`\n  ${terminalThemeText('muted', 'Nenhuma intenção capturada ainda.')}\n`);
         return;
     }
 
     /** @type {string[]} */
     const lines = [
         '',
-        `  ${terminalThemeBadge('info', 'INTENT')} ${terminalThemeText('info', `Últimos ${entries.length} intents`)} ${terminalThemeText('muted', `· total=${stats.entries} · bytes=${stats.bytes}`)}`,
+        `  ${terminalThemeBadge('info', 'INTENT')} ${terminalThemeText('info', `Últimas ${entries.length} intenções`)} ${terminalThemeText('muted', `· total=${stats.entries} · bytes=${stats.bytes}${detail ? ' · detalhe=técnico' : ''}`)}`,
         '',
     ];
     for (const entry of entries) {
         const theme = riskTheme(entry.risk);
-        const tool = entry.tool ? ` · tool=${entry.tool}` : '';
-        const call = entry.toolCallId ? ` · call=${compact(entry.toolCallId, 18)}` : '';
+        const source = humanIntentSource(entry.source);
         lines.push(
-            `  ${terminalThemeText(theme, entry.id.slice(-10))} ${terminalThemeText('muted', `${formatTime(entry.timestamp)} · ${entry.source}${tool}${call} · risk=${entry.risk}`)}`,
+            `  ${terminalThemeText(theme, '•')} ${terminalThemeText('muted', `${formatTime(entry.timestamp)} · fonte=${source} · risco=${humanRiskLabel(entry.risk)}`)}`,
         );
+        if (detail) {
+            const tool = entry.tool ? ` · tool=${entry.tool}` : '';
+            const call = entry.toolCallId ? ` · call=${compact(entry.toolCallId, 18)}` : '';
+            lines.push(`    ${terminalThemeText('muted', `origem=${entry.source}${tool}${call} · id=${entry.id}`)}`);
+        }
         lines.push(`    ${compact(entry.intent, 180)}`);
     }
-    lines.push('', `  ${terminalThemeText('muted', 'Use /intent <n> para ampliar ou /intent clear para limpar a janela em memória.')}`, '');
+    lines.push(
+        '',
+        `  ${terminalThemeText('muted', 'Use /intent <n> para ampliar, /intent detail para envelope técnico ou /intent clear para limpar a janela em memória.')}`,
+        '',
+    );
     printBlock(ctx, lines);
 }

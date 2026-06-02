@@ -130,7 +130,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     const askUserLine = health?.['pendingQuestion']
         ? `${C.green}vivo${C.reset}${health?.['pendingQuestionKind'] ? ` [${health['pendingQuestionKind']}]` : ''}`
         : health?.['pendingQuestionShadow']
-          ? `${health?.['pendingQuestionShadowExpired'] ? `${C.red}shadow expirada${C.reset}` : health?.['pendingQuestionShadowState'] === 'expiring_soon' ? `${C.yellow}shadow expirando${C.reset}` : health?.['pendingQuestionShadowState'] === 'fresh' ? `${C.cyan}shadow fresh${C.reset}` : `${C.yellow}shadow ativa${C.reset}`}${health?.['pendingQuestionShadowKind'] ? ` [${health['pendingQuestionShadowKind']}]` : ''}`
+          ? `${health?.['pendingQuestionShadowExpired'] ? `${C.red}pergunta restaurada expirada${C.reset}` : health?.['pendingQuestionShadowState'] === 'expiring_soon' ? `${C.yellow}pergunta restaurada expirando${C.reset}` : health?.['pendingQuestionShadowState'] === 'fresh' ? `${C.cyan}pergunta recém-restaurada${C.reset}` : `${C.yellow}pergunta restaurada${C.reset}`}${health?.['pendingQuestionShadowKind'] ? ` [${health['pendingQuestionShadowKind']}]` : ''}`
           : `${C.grey}nenhum${C.reset}`;
     const askUserAgeLine =
         typeof health?.['pendingQuestionShadowAgeMs'] === 'number'
@@ -241,9 +241,9 @@ ${C.cyan}  AGENTE${C.reset}
     quota monitor ${health?.['checks']?.['quota']?.['running'] ? `${C.green}running${C.reset}` : `${C.yellow}stopped${C.reset}`}
     issues        ${health ? (Array.isArray(health['issues']) && health['issues'].length === 0 ? `${C.green}nenhuma${C.reset}` : `${C.yellow}${Array.isArray(health['issues']) ? health['issues'].slice(0, 3).join(', ') : ''}${Array.isArray(health['issues']) && health['issues'].length > 3 ? '…' : ''}${C.reset}`) : `${C.grey}n/d${C.reset}`}
     ação          ${actionLine}
-    ask_user      ${askUserLine}
-    shadow idade  ${askUserAgeLine}
-    shadow rest.  ${askUserRemainingLine}
+    pergunta      ${askUserLine}
+    salva idade   ${askUserAgeLine}
+    salva rest.   ${askUserRemainingLine}
     atividade     ${activityColor}${activity.label}${C.reset}${typeof activity.progress === 'number' ? ` ${C.grey}(${activity.progress}%)${C.reset}` : ''}
     detalhe       ${activityDetail}
     display       ${C.grey}thinking=${display.thinking ? 'on' : 'off'} · streaming=${display.streaming ? 'on' : 'off'} · usage=${display.usage ? 'on' : 'off'} · tools=${display.tools ? 'on' : 'off'} · intent=${display.intent ? 'on' : 'off'}${C.reset}

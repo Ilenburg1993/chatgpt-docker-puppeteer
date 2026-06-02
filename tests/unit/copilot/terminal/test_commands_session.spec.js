@@ -429,7 +429,7 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('display');
         expect(ctx.output()).toContain('permission mode');
         expect(ctx.output()).toContain('sdk prompts=skip');
-        expect(ctx.output()).toContain('shadow expirada');
+        expect(ctx.output()).toContain('pergunta restaurada expirada');
         expect(ctx.output()).toContain('perfil modelo');
         expect(ctx.output()).toContain('runtime id');
         expect(ctx.output()).toContain('*default:gpt-5-mini/idle');
@@ -609,7 +609,7 @@ describe('commands/session — sync commands', () => {
         defaultRuntime.pendingQuestionShadowState = 'expired';
         const ctx = mockCtx();
         cmdAnswer({ println: ctx.println }, 'sim');
-        expect(ctx.output()).toContain('shadow expirada');
+        expect(ctx.output()).toContain('pergunta restaurada expirada');
     });
 
     it('cmdAnswer não intercepta pergunta de protocolo do dialog loop', () => {
@@ -632,7 +632,7 @@ describe('commands/session — sync commands', () => {
     it('cmdClearShadow limpa shadow persistida restaurada', () => {
         const ctx = mockCtx();
         cmdClearShadow({ println: ctx.println });
-        expect(ctx.output()).toContain('Shadow persistida');
+        expect(ctx.output()).toContain('Pergunta restaurada do disco limpa');
         expect(clearPendingQuestionShadow).toHaveBeenCalled();
     });
 

@@ -387,7 +387,7 @@ describe('terminal/commands/sdk', () => {
             }),
         );
         expect(ctx.output()).toContain('Input humano estruturado');
-        expect(ctx.output()).toContain('request_user_input diagnóstico');
+        expect(ctx.output()).toContain('diagnóstico de input estruturado');
         expect(ctx.output()).toContain('aguardando operador');
         expect(ctx.output()).toContain('Continuar teste visual?');
         expect(ctx.output()).toContain('/sdk waits detail');
@@ -617,7 +617,7 @@ describe('terminal/commands/sdk', () => {
         const list = mockCtx();
         await cmdElicitation({ println: list.println }, 'list');
         expect(list.output()).toContain('el-1');
-        expect(list.output()).toContain('ask_user = conversa');
+        expect(list.output()).toContain('pergunta humana = conversa');
 
         const request = mockCtx();
         await cmdElicitation({ println: request.println }, 'request Dados?');

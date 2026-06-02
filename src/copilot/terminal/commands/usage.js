@@ -21,6 +21,21 @@ import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js
  */
 
 /**
+ * @param {string} llmClass
+ * @param {string} llmReason
+ * @returns {string}
+ */
+function humanLlmUsageKind(llmClass, llmReason) {
+    if (/ask_user|user_input/iu.test(llmClass) || /ask_user|user_input/iu.test(llmReason)) {
+        return 'continuação da pergunta humana';
+    }
+    if (/tool/iu.test(llmClass) || /tool/iu.test(llmReason)) return 'tool/automação';
+    if (/stream|delta/iu.test(llmClass) || /stream|delta/iu.test(llmReason)) return 'streaming';
+    if (llmClass === 'unknown' && llmReason === 'n/d') return 'n/d';
+    return llmClass.replace(/[_-]+/gu, ' ');
+}
+
+/**
  * Comando `/usage [on|off|now]`.
  *
  * - Sem argumento: toggle do display pós-turno.
@@ -91,12 +106,15 @@ export function cmdUsage({ println }, arg) {
                 projection.llmUsage['premiumRequest'] === true
                     ? 'Premium Request nesta telemetria'
                     : 'sem Premium Request';
+            const llmUsageKind = humanLlmUsageKind(llmClass, llmReason);
             println(
-                `      Última telemetria LLM: modelo=\x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · classe=\x1b[90m${llmClass}\x1b[0m · motivo=\x1b[90m${llmReason}\x1b[0m · custo=\x1b[33m${llmCost}\x1b[0m`,
+                detail
+                    ? `      Última telemetria LLM: modelo=\x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · tipo=\x1b[90m${llmUsageKind}\x1b[0m · classe=\x1b[90m${llmClass}\x1b[0m · motivo=\x1b[90m${llmReason}\x1b[0m · custo=\x1b[33m${llmCost}\x1b[0m`
+                    : `      Última telemetria LLM: modelo=\x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · tipo=\x1b[90m${llmUsageKind}\x1b[0m · custo=\x1b[33m${llmCost}\x1b[0m \x1b[90m(/usage now detail para classe técnica)\x1b[0m`,
             );
             if (/ask_user|user_input/iu.test(llmClass) || /ask_user|user_input/iu.test(llmReason)) {
                 println(
-                    '      Continuação ask_user: \x1b[32mtelemetria pós-resposta humana separada da fala inicial\x1b[0m \x1b[90m(use /events event=assistant.message e /export para correlacionar source+trace)\x1b[0m',
+                    '      Continuação da pergunta humana: \x1b[32mtelemetria pós-resposta humana separada da fala inicial\x1b[0m \x1b[90m(use /events event=assistant.message e /export para correlacionar source+trace)\x1b[0m',
                 );
             }
         }

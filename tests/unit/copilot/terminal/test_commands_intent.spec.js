@@ -24,7 +24,7 @@ describe('terminal/commands/intent', () => {
         clearTerminalIntentHistory();
     });
 
-    it('lista intents persistidos com tool, risco e origem', () => {
+    it('lista intenções persistidas sem tool/call na vista padrão', () => {
         appendTerminalIntent({
             intent: 'Vou aplicar patch incremental.',
             tool: 'patch_file',
@@ -39,9 +39,30 @@ describe('terminal/commands/intent', () => {
 
         expect(ctx.printlnBlock).toHaveBeenCalledTimes(1);
         expect(ctx.output()).toContain('Vou aplicar patch incremental');
-        expect(ctx.output()).toContain('tool=patch_file');
-        expect(ctx.output()).toContain('risk=medium');
+        expect(ctx.output()).toContain('fonte=tool de intenção');
+        expect(ctx.output()).toContain('risco=médio');
+        expect(ctx.output()).not.toContain('tool=patch_file');
+        expect(ctx.output()).not.toContain('call=call-1');
         expect(readTerminalIntentStats().entries).toBe(1);
+    });
+
+    it('mostra envelope técnico somente em /intent detail', () => {
+        appendTerminalIntent({
+            intent: 'Vou aplicar patch incremental.',
+            tool: 'patch_file',
+            risk: 'medium',
+            source: 'tool/report_intent_local',
+            toolCallId: 'call-1',
+            timestamp: 1_700_000_000_000,
+        });
+        const ctx = mockCtx();
+
+        cmdIntent(ctx, 'detail 5');
+
+        expect(ctx.output()).toContain('detalhe=técnico');
+        expect(ctx.output()).toContain('origem=tool/report_intent_local');
+        expect(ctx.output()).toContain('tool=patch_file');
+        expect(ctx.output()).toContain('call=call-1');
     });
 
     it('limpa histórico em memória', () => {
@@ -50,7 +71,7 @@ describe('terminal/commands/intent', () => {
 
         cmdIntent(ctx, 'clear');
 
-        expect(ctx.output()).toContain('Histórico de intents limpo');
+        expect(ctx.output()).toContain('Histórico de intenções limpo');
         expect(readTerminalIntentStats().entries).toBe(0);
     });
 
@@ -59,7 +80,7 @@ describe('terminal/commands/intent', () => {
 
         cmdIntent(ctx);
 
-        expect(ctx.output()).toContain('Nenhum intent capturado ainda');
+        expect(ctx.output()).toContain('Nenhuma intenção capturada ainda');
         expect(terminalThemeBadge).toBeTypeOf('function');
         expect(terminalThemeText).toBeTypeOf('function');
     });

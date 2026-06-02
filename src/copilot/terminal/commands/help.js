@@ -36,7 +36,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/who\x1b[0m                                 — atores e canais ativos
   \x1b[33m/count\x1b[0m                               — estatísticas da sessão
   \x1b[33m/clear\x1b[0m                               — limpa histórico em memória
-  \x1b[33m/clear-shadow\x1b[0m                        — limpa shadow persistida de ask_user restaurada do disco
+  \x1b[33m/clear-shadow\x1b[0m                        — limpa pergunta humana restaurada do disco
   \x1b[33m/queue <msg>\x1b[0m                         — enfileira intervenção no mailbox zero-PR
   \x1b[33m/turn <msg>\x1b[0m                          — abre novo turno explicitamente (pode consumir PR)
   \x1b[33m/steer <msg>\x1b[0m                         — SDK immediate explícito (bloqueado por padrão para preservar zero-PR)
@@ -46,7 +46,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/session [sdk [n]]\x1b[0m                   — cockpit da sessão SDK persistente; snapshots ficam em save/list/restore
   \x1b[33m/session sdk commands\x1b[0m                — comandos CommandDefinition[] registrados no SDK
   \x1b[33m/session sdk events [n]\x1b[0m              — lifecycle/commands SDK resumidos a partir do archive SSE canônico
-  \x1b[33m/session sdk waits [n]\x1b[0m               — ask_user/elicitation/permission publicados pelo fanout canônico
+  \x1b[33m/session sdk waits [n]\x1b[0m               — perguntas, formulários e permissões publicados pelo fanout canônico
   \x1b[33m/session sdk next <new|resume <id|#n|current|last|foreground>|auto>\x1b[0m — agenda seleção de sessão SDK para o próximo boot
   \x1b[33m/session sdk delete <id|#n>\x1b[0m        — apaga estado persistido SDK fora da sessão viva
   \x1b[33m/restart\x1b[0m                             — reinicia dialog loop
@@ -73,7 +73,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/thinking [on|off]\x1b[0m                   — toggle da expansão ao vivo do thinking/reasoning
   \x1b[33m/thinking list [n]\x1b[0m                  — lista thinkings capturados (colapsados)
   \x1b[33m/thinking show <id>|latest\x1b[0m          — abre thinking completo capturado
-  \x1b[33m/intent [n|clear]\x1b[0m                    — consulta intents persistidos de report_intent/assistant.intent
+  \x1b[33m/intent [n|detail|clear]\x1b[0m             — consulta intenções explícitas capturadas da LLM-B
   \x1b[33m/usage [on|off|now]\x1b[0m                  — telemetria de tokens/custo; PR só quando classificada
   \x1b[33m/tools [diag|all|raw]\x1b[0m                — stats de tools (canônico, diagnóstico e raw)
   \x1b[33m/sdk [status|models|tools|quota|prompt|capabilities|waits|compact]\x1b[0m — catálogo/quota/capabilities/ops SDK via Agent
@@ -137,7 +137,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33mGET /gh/issues\x1b[0m  \x1b[33mGET /gh/prs\x1b[0m  \x1b[33mGET /gh/ci\x1b[0m
   \x1b[33mGET /git/status\x1b[0m  \x1b[33mGET /git/log\x1b[0m
 
-  \x1b[90mTexto livre sem / entra no mailbox zero-PR por padrão e será aplicado na próxima ask_user.\x1b[0m
+  \x1b[90mTexto livre sem / entra no mailbox zero-PR por padrão e será aplicado na próxima pergunta humana.\x1b[0m
   \x1b[90mUse /turn ou prefixo !!turn apenas quando quiser abrir novo turno que pode consumir PR.\x1b[0m
   \x1b[36m╚═══════════════════════════════════════════════════════════════════════╝\x1b[0m
 `);

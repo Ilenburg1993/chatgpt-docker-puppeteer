@@ -69,8 +69,8 @@ export function buildTerminalSmartMenuEntries() {
             commandLine: '/intent 20',
             description:
                 intentStats.entries > 0
-                    ? `${intentStats.entries} intent(s) capturados de assistant.intent/report_intent`
-                    : 'Histórico de report_intent e assistant.intent',
+                    ? `${intentStats.entries} intenção(ões) explícita(s) capturada(s)`
+                    : 'Histórico de intenções explícitas da LLM-B',
         },
         {
             id: 'metrics',
@@ -163,7 +163,7 @@ export function buildTerminalSmartMenuEntries() {
     if (state.pendingQuestionShadowState === 'expired') {
         entries.push({
             id: 'clear-shadow',
-            label: 'Limpar shadow expirada',
+            label: 'Limpar pergunta restaurada',
             commandLine: '/clear-shadow',
             description: 'Evita replay duplicado de pergunta antiga',
             hot: true,

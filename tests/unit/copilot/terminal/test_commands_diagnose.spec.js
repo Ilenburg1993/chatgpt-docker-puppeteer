@@ -291,8 +291,8 @@ describe('commands/diagnose', () => {
             expect(ctx.output()).toContain('reserved');
             expect(ctx.output()).toContain('permission');
             expect(ctx.output()).toContain('sdk prompts=skip');
-            expect(ctx.output()).toContain('ask_user');
-            expect(ctx.output()).toContain('shadow expirando');
+            expect(ctx.output()).toContain('pergunta');
+            expect(ctx.output()).toContain('pergunta restaurada expirando');
             expect(ctx.output()).toContain('runtime id');
             expect(ctx.output()).toContain('sdk-diagnose-1…');
             expect(ctx.output()).toContain('hub-1');

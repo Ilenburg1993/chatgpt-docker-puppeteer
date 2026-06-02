@@ -260,7 +260,7 @@ async function _cmdSteer(message) {
     const interventionPolicy = getTerminalInterventionPolicy();
     if (interventionPolicy.enabled && !interventionPolicy.allowSteer) {
         if (tryApplyImmediateTerminalZeroPr(prompt)) {
-            println('\x1b[36m  [zero-pr] intervenção aplicada imediatamente no ask_user pendente.\x1b[0m');
+            println('\x1b[36m  [zero-pr] intervenção aplicada imediatamente na pergunta pendente.\x1b[0m');
             return;
         }
         println('\x1b[33m  [steer] Bloqueado por política zero-PR para evitar consumo implícito de PR.\x1b[0m');
@@ -271,7 +271,7 @@ async function _cmdSteer(message) {
             message: prompt,
         });
         println(
-            `\x1b[36m  [mailbox] intervenção registrada para próxima ask_user (fila=${queued.queueSize}${queued.dropped > 0 ? ` · descartadas=${queued.dropped}` : ''}).\x1b[0m`,
+            `\x1b[36m  [mailbox] intervenção registrada para próxima pergunta humana (fila=${queued.queueSize}${queued.dropped > 0 ? ` · descartadas=${queued.dropped}` : ''}).\x1b[0m`,
         );
         println(
             '\x1b[90m  Use /abort para interromper sem PR, ou /turn <mensagem> para abrir novo turno explicitamente.\x1b[0m',
@@ -305,7 +305,7 @@ async function _cmdInterrupt(message) {
         const interventionPolicy = getTerminalInterventionPolicy();
         if (interventionPolicy.enabled && !interventionPolicy.allowQueueFallback) {
             if (tryApplyImmediateTerminalZeroPr(prompt)) {
-                println('\x1b[36m  [zero-pr] intervenção aplicada imediatamente no ask_user pendente.\x1b[0m');
+                println('\x1b[36m  [zero-pr] intervenção aplicada imediatamente na pergunta pendente.\x1b[0m');
                 return;
             }
             const aborted = await _cmdAbortCurrentTurn();
@@ -323,7 +323,7 @@ async function _cmdInterrupt(message) {
                 '\x1b[33m  [interrupt] Política zero-PR ativa: substituição não foi enfileirada como turno para evitar consumo de PR.\x1b[0m',
             );
             println(
-                `\x1b[36m  [mailbox] mensagem substituta registrada para próxima ask_user (fila=${queued.queueSize}${queued.dropped > 0 ? ` · descartadas=${queued.dropped}` : ''}).\x1b[0m`,
+                `\x1b[36m  [mailbox] mensagem substituta registrada para próxima pergunta humana (fila=${queued.queueSize}${queued.dropped > 0 ? ` · descartadas=${queued.dropped}` : ''}).\x1b[0m`,
             );
             println('\x1b[90m  Se precisar abrir novo turno manualmente, use /turn <mensagem>.\x1b[0m');
             return;
@@ -427,7 +427,7 @@ function _cmdQueueMailbox(message) {
         return;
     }
     if (tryApplyImmediateTerminalZeroPr(prompt)) {
-        println('\x1b[36m  [queue] intervenção aplicada imediatamente no ask_user pendente (zero-PR).\x1b[0m');
+        println('\x1b[36m  [queue] intervenção aplicada imediatamente na pergunta pendente (zero-PR).\x1b[0m');
         return;
     }
     const queued = enqueueRuntimeInterventionMailbox({

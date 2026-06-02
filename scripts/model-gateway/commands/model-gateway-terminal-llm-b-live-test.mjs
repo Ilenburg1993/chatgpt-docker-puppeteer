@@ -1463,7 +1463,7 @@ function structuredInputCycleCriteria(boot) {
             id: 'structured-input-simulated',
             pass:
                 /Input humano estruturado/iu.test(plain) &&
-                /request_user_input diagnóstico/iu.test(plain) &&
+                /diagnóstico de input estruturado/iu.test(plain) &&
                 /REQUEST_USER_INPUT-SIM:\s+responda para fechar o teste/iu.test(plain),
             detail: '/sdk simulate request-user-input rendered a human-facing diagnostic request',
         },

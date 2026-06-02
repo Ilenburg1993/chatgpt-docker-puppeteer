@@ -131,7 +131,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const structuredInput = structuredInputs.at(0) ?? null;
     if (structuredInput) {
         const questionText = compactLiveStatusText(
-            structuredInput.question ?? 'request_user_input pendente',
+            structuredInput.question ?? 'input humano pendente',
             LIVE_QUESTION_MAX_CHARS,
         );
         const choices = Array.isArray(structuredInput.choices) ? structuredInput.choices : [];
