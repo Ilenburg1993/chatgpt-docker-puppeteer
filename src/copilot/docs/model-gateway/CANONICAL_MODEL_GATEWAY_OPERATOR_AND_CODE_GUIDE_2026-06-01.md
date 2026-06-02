@@ -323,7 +323,7 @@ Variaveis principais:
 5. No terminal, rodar `/byok auto doctor profile:repo_agent`.
 6. Se houver blocker, corrigir a camada apontada.
 7. Se quiser auto, usar `/byok auto on ...`.
-8. Antes de BYOK real, validar recovery sem provider call com `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit`.
+8. Antes de BYOK real, validar recovery sem provider call com `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit`; por padrao a health gravada e sintetica (`model-gateway-fixture:*`), e rota real exige `real-health`.
 9. Se uma falha BYOK ocorrer, consultar `/byok auto recoveries 10` e `/byok gateway health sqlite`.
 10. Antes de BYOK real, rodar live control e fixture.
 
@@ -377,11 +377,11 @@ Validado nesta linha:
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`: 215 PASS.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js`: 101 PASS.
 - `npm run model-gateway:live:auto-probe`: PASS, incluindo `/byok auto standby`.
-- Artefato live: `artifacts/terminal-live/2026-06-02T00-13-15-205Z/summary.md`.
-- `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-02T00-13-15-212Z:auto_probe`, `criteriaTotal=30`, `criteriaFailed=0`.
+- Artefato live: `artifacts/terminal-live/2026-06-02T00-21-42-083Z/summary.md`.
+- `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-02T00-21-42-091Z:auto_probe`, `criteriaTotal=30`, `criteriaFailed=0`.
 - `/byok auto status` e `/byok auto doctor` agora mostram resumo de alternativas: usable/evaluated, quantidade de providers e principais blockers.
 - `/byok auto status` e `/byok auto doctor` agora sugerem comandos `provar:` para promover candidatos bloqueados por agent probe ausente/nao verificado.
-- `/byok auto recovery-fixture ... provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery, runtime health e espelho SQLite sem chamada ao provider.
+- `/byok auto recovery-fixture ... provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery, runtime health sintetica e espelho SQLite sem chamada ao provider.
 - `/byok probe agent provider:<provider> model:<provider-model> timeout:20000` prova rota explicita do selector e alimenta o runtime health usado por `repo_agent`/`tool_agent`.
 - `npm run model-gateway:lint`: PASS.
 

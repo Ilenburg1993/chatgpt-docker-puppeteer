@@ -3662,6 +3662,11 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
     const modelToken = rest.find((item) => /^(?:model|providerModel|provider-model)[:=]/iu.test(item));
     const providerId = optionalScalarString(providerToken?.replace(/^(?:provider|providerId|provider-id)[:=]/iu, ''));
     const providerModel = optionalScalarString(modelToken?.replace(/^(?:model|providerModel|provider-model)[:=]/iu, ''));
+    const writeRealHealth = rest.some((item) => /^(?:real-health|real-route|write-real-health)$/iu.test(item));
+    const healthProviderId = writeRealHealth ? providerId : 'model-gateway-fixture';
+    const healthProviderModel = writeRealHealth
+        ? providerModel
+        : `synthetic-${args.profileId}-${failureKind.replace(/[^a-z0-9_-]+/giu, '-')}`;
     const fixtureEnv = {
         ...process.env,
         COPILOT_BYOK_GATEWAY_AUTO: 'true',
@@ -3674,8 +3679,8 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
     const result = await runTerminalByokGatewayPostTurnAutomation(
         {
             profile: args.profileId,
-            provider: providerId,
-            model: providerModel,
+            provider: healthProviderId,
+            model: healthProviderModel,
             failureKind,
             retryAfterSeconds: failureKind === 'rate-limit' ? 900 : null,
             message: `fixture ${failureKind} failure for model-gateway post-turn recovery`,
@@ -3685,7 +3690,7 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
     );
     println('\n  \x1b[36mBYOK model-gateway auto recovery fixture\x1b[0m');
     println(
-        `  \x1b[90mprofile=${args.profileId} · failure=${failureKind} · ran=${result.ran ? 'sim' : 'nao'} · providerCall=nao\x1b[0m`,
+        `  \x1b[90mprofile=${args.profileId} · failure=${failureKind} · ran=${result.ran ? 'sim' : 'nao'} · providerCall=nao · syntheticHealth=${writeRealHealth ? 'nao' : 'sim'}\x1b[0m`,
     );
     if (result.ran !== true || !result.status) {
         println('    \x1b[33mFixture não executou; verifique policy e snapshot ativo.\x1b[0m\n');

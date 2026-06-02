@@ -3264,6 +3264,7 @@ describe('terminal /byok command', () => {
         expect(confirmationsCtx.output()).toContain('matched_handoff');
         expect(fixtureCtx.output()).toContain('BYOK model-gateway auto recovery fixture');
         expect(fixtureCtx.output()).toContain('providerCall=nao');
+        expect(fixtureCtx.output()).toContain('syntheticHealth=sim');
         expect(recoveriesCtx.output()).toContain('BYOK model-gateway auto recoveries');
         expect(recoveriesCtx.output()).toContain('rate-limit');
         expect(setTerminalModelProjection).not.toHaveBeenCalled();

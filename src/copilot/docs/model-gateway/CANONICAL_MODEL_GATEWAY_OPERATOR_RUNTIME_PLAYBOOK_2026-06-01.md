@@ -371,8 +371,8 @@ Evidencia em 2026-06-01:
 - artefato inicial: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`;
 - artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-57-46-528Z/summary.md`;
 - artefato com recovery fixture final: `artifacts/terminal-live/2026-06-01T23-49-06-502Z/summary.md`;
-- artefato com standby final: `artifacts/terminal-live/2026-06-02T00-13-15-205Z/summary.md`;
-- duracao mais recente: 20826ms;
+- artefato com standby/fixture sintetica final: `artifacts/terminal-live/2026-06-02T00-21-42-083Z/summary.md`;
+- duracao mais recente: 21043ms;
 - erros rastreados: 0;
 - criterios PASS mais recentes: 30;
 - inventario canonico exibiu 141 comandos apos recovery fixture, proof-plan, standby e prova explicita por provider/model;
@@ -383,9 +383,9 @@ Evidencia em 2026-06-01:
 - `/byok auto standby profile:repo_agent 12` agora existe como fila read-only de substitutos e comandos de troca/prova;
 - o cockpit passou a sugerir `/byok probe agent provider:<provider> model:<provider-model> timeout:20000` quando alternativas carecem de agent probe;
 - `/byok auto explain profile:repo_agent` funcionou;
-- `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery account-wide, runtime health e espelho SQLite sem chamada ao provider;
+- `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery account-wide, runtime health sintetica e espelho SQLite sem chamada ao provider;
 - ledgers history/handoffs/confirmations/recoveries renderizaram corretamente;
-- ledger de live scenarios gravou `terminal-live:2026-06-02T00-13-15-212Z:auto_probe`;
+- ledger de live scenarios gravou `terminal-live:2026-06-02T00-21-42-091Z:auto_probe`;
 - `npm run model-gateway:live:runs` confirmou `criteriaTotal=30` no ultimo auto-probe;
 - achado estrutural: depois dos overlays de health, `repo_agent` pode mostrar `usable=0/78` porque exige agent-probe verificado; isso e bloqueio correto, nao falha do cockpit.
 
@@ -553,7 +553,7 @@ Isso cria overlay temporario com reset/cooldown.
 - [ ] `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000` passa.
 - [x] `npm run model-gateway:live:auto-probe` passa.
 - [x] `npm run model-gateway:live:runs` mostra o ultimo auto-probe persistido.
-- [x] `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` persiste recovery, runtime health e SQLite sem provider call.
+- [x] `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` persiste recovery, runtime health sintetica e SQLite sem provider call; health real exige `real-health`.
 - [x] `/byok auto doctor profile:repo_agent` passa no terminal.
 - [ ] `byok-real-no-pr` passa quando o operador permitir gasto de quota BYOK.
 - [ ] `byok-real-full` passa quando o operador permitir turno real.

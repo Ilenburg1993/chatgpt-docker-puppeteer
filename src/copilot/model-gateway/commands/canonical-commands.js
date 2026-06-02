@@ -820,7 +820,7 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         phase: 'automation',
         surface: 'terminal',
         command: '/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit',
-        summary: 'Persist a synthetic post-turn recovery attempt and runtime health fact without calling providers, for operator/live validation.',
+        summary: 'Persist a synthetic post-turn recovery attempt and fixture-scoped runtime health fact without calling providers.',
     },
     {
         id: 'terminal.probe-agent-provider-route',

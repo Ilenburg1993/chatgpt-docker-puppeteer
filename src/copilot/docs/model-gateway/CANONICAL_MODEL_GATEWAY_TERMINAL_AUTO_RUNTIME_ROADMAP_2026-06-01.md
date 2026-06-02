@@ -84,6 +84,7 @@ Playbook operacional ativo para humano/LLM:
 - [x] `/byok auto confirmations`.
 - [x] `/byok auto recoveries`.
 - [x] `/byok auto recovery-fixture`.
+- [x] `/byok auto recovery-fixture` grava health sintetica por padrao e so mira rota real com `real-health`.
 - [x] Post-turn controller automatico roda quando a policy esta ligada.
 
 ### 2.4 SDK boundary
@@ -431,7 +432,7 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] Artefato inicial: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`.
 - [x] Artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-57-46-528Z/summary.md`.
 - [x] Artefato com recovery fixture final: `artifacts/terminal-live/2026-06-01T23-49-06-502Z/summary.md`.
-- [x] Artefato com standby final: `artifacts/terminal-live/2026-06-02T00-13-15-205Z/summary.md`.
+- [x] Artefato com standby e fixture sintetica final: `artifacts/terminal-live/2026-06-02T00-21-42-083Z/summary.md`.
 - [x] Resultado: PASS.
 - [x] Terminal error tracker: 0.
 - [x] Sem turno explicito de modelo.
@@ -440,9 +441,9 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] `/byok auto status profile:repo_agent` mostrou decision sem aplicar efeito.
 - [x] `/byok auto doctor profile:repo_agent` mostrou policy, decision, ledgers e blockers.
 - [x] `/byok auto explain profile:repo_agent` explicou action/blockers/next commands.
-- [x] `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` persistiu recovery account-wide, runtime health e espelho SQLite sem provider call.
+- [x] `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` persistiu recovery account-wide, runtime health sintetica e espelho SQLite sem provider call.
 - [x] `/byok auto history`, `/byok auto handoffs`, `/byok auto confirmations` e `/byok auto recoveries` renderizaram ledger/empty state.
-- [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-02T00-13-15-212Z:auto_probe`.
+- [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-02T00-21-42-091Z:auto_probe`.
 - [x] `npm run model-gateway:live:auto-probe` validou 30 criterios, incluindo `auto-standby-visible`.
 - [x] `npm run model-gateway:auto:doctor` mostrou inventario canonico de 141 comandos antes da fixture; apos recovery fixture, health/cooldown pode bloquear como esperado.
 - [x] `/byok auto status` e `/byok auto doctor` mostram resumo de alternativas usaveis/bloqueadas.
