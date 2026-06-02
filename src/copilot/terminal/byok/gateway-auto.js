@@ -552,7 +552,7 @@ export async function runTerminalByokGatewayPostTurnAutomation(turnFailure = {},
         },
     });
     const healthFailure = resolvePostTurnHealthFailure(status, /** @type {Record<string, unknown>} */ (turnFailure));
-    let healthPersistence = null;
+    let healthPersistence;
     if (healthFailure.providerId && healthFailure.providerModel) {
         recordByokProviderModelCallFailure({
             routeProfile: healthFailure.routeProfile,

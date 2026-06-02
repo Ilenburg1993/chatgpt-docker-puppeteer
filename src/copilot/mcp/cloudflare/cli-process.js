@@ -8,14 +8,34 @@ import process from 'node:process';
 
 export const CLOUDFLARED_TOKEN_FILE_MIN_VERSION = '2025.4.0';
 
+/**
+ * @typedef {{ ok: true; version: string; parsedVersion?: string } | { ok: false; error: string }} CloudflaredVersion
+ *
+ * @typedef {{
+ *   name: string;
+ *   command: string;
+ *   args: string[];
+ *   pidFile: string;
+ *   logFile: string;
+ *   env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
+ * }} DetachedProcessOptions
+ */
+
+/** @returns {CloudflaredVersion} */
 export function readCloudflaredVersion() {
     const result = spawnSync('cloudflared', ['--version'], { encoding: 'utf8' });
     if (result.error) return { ok: false, error: result.error.message };
     if (result.status !== 0) return { ok: false, error: result.stderr.trim() || `cloudflared exited with ${result.status}` };
     const version = result.stdout.trim();
-    return { ok: true, version, parsedVersion: parseCloudflaredVersion(version) ?? undefined };
+    const parsedVersion = parseCloudflaredVersion(version);
+    return parsedVersion ? { ok: true, version, parsedVersion } : { ok: true, version };
 }
 
+/**
+ * @param {CloudflaredVersion} cloudflared
+ * @param {import('./config.js').CloudflareTunnelConfig} config
+ * @returns {{ ok: boolean; reason?: string; minimumVersion?: string; detectedVersion?: string | null }}
+ */
 export function assessCloudflaredCompatibility(cloudflared, config) {
     if (!cloudflared.ok) return { ok: false, reason: cloudflared.error ?? 'cloudflared-not-available' };
     if (!config.hasTunnelTokenFile) return { ok: true };
@@ -27,11 +47,13 @@ export function assessCloudflaredCompatibility(cloudflared, config) {
     return { ok: true, minimumVersion: CLOUDFLARED_TOKEN_FILE_MIN_VERSION, detectedVersion };
 }
 
+/** @param {unknown} text @returns {string | null} */
 function parseCloudflaredVersion(text) {
     const match = String(text ?? '').match(/\b(\d{4}\.\d{1,2}\.\d{1,3})\b/u);
     return match?.[1] ?? null;
 }
 
+/** @param {string} left @param {string} right @returns {-1 | 0 | 1} */
 function compareVersions(left, right) {
     const a = left.split('.').map(Number);
     const b = right.split('.').map(Number);
@@ -42,6 +64,10 @@ function compareVersions(left, right) {
     return 0;
 }
 
+/**
+ * @param {string} pidFile
+ * @returns {Promise<{ pidFile: string; pid: number | null; alive: boolean; state: 'alive' | 'dead' | 'missing' | 'invalid'; error: string | null }>}
+ */
 export async function readPidFileStatus(pidFile) {
     try {
         const pid = Number((await readFile(pidFile, 'utf8')).trim());
@@ -58,11 +84,15 @@ export async function readPidFileStatus(pidFile) {
     }
 }
 
+/**
+ * @param {DetachedProcessOptions} options
+ * @returns {Promise<{ name: string; pidFile: string; logFile: string; metadataFile: string; pid: number; alreadyRunning: boolean; restarted: boolean }>}
+ */
 export async function ensureDetachedProcess(options) {
     const metadataFile = `${options.pidFile}.json`;
     const signature = { command: options.command, args: options.args, env: redactEnv(options.env ?? {}) };
     const existing = await readPidFileStatus(options.pidFile);
-    if (existing.alive) return { name: options.name, pidFile: options.pidFile, logFile: options.logFile, metadataFile, pid: existing.pid, alreadyRunning: true, restarted: false };
+    if (existing.alive && existing.pid !== null) return { name: options.name, pidFile: options.pidFile, logFile: options.logFile, metadataFile, pid: existing.pid, alreadyRunning: true, restarted: false };
     await mkdir(path.dirname(options.pidFile), { recursive: true });
     await mkdir(path.dirname(options.logFile), { recursive: true });
     const out = openSync(options.logFile, 'a');
@@ -79,6 +109,10 @@ export async function ensureDetachedProcess(options) {
     return { name: options.name, pidFile: options.pidFile, logFile: options.logFile, metadataFile, pid: child.pid, alreadyRunning: false, restarted: existing.state === 'dead' };
 }
 
+/**
+ * @param {string} pidFile
+ * @returns {Promise<{ pidFile: string; pid: number | null; wasAlive: boolean; stopped: boolean; error: string | null; processGroupSignalled: boolean }>}
+ */
 export async function stopPidFileProcess(pidFile) {
     const status = await readPidFileStatus(pidFile);
     if (!status.pid) return { pidFile, pid: null, wasAlive: false, stopped: true, error: null, processGroupSignalled: false };
@@ -96,10 +130,12 @@ export async function stopPidFileProcess(pidFile) {
     return { pidFile, pid: status.pid, wasAlive: status.alive, stopped: true, error: null, processGroupSignalled };
 }
 
+/** @param {string} metadataFile @returns {Promise<unknown | null>} */
 export async function readProcessMetadata(metadataFile) {
     try { return JSON.parse(await readFile(metadataFile, 'utf8')); } catch { return null; }
 }
 
+/** @param {NodeJS.ProcessEnv | Record<string, string | undefined>} env @returns {Record<string, string | undefined>} */
 function redactEnv(env) {
     return Object.fromEntries(Object.entries(env).map(([key, value]) => [key, /TOKEN|SECRET|PASSWORD|KEY/u.test(key) ? '<redacted>' : value]));
 }

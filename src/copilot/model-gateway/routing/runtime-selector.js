@@ -726,7 +726,7 @@ export function buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, optio
     const includeSelected = options.includeSelected !== false;
     const rows = [];
     for (const route of runtimeSelectorPlan.routes) {
-        const selectedProviderId = optionalString(optionalRecord(route.selected)['providerId']);
+        const selectedProviderId = optionalString(optionalRecord(route.selected)?.['providerId']);
         const candidates = [
             ...(includeSelected && route.selected
                 ? [
@@ -756,6 +756,13 @@ export function buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, optio
             const providerId = optionalString(selected['providerId']);
             const hasRuntimeProof = candidate.hasRuntimeProof === true;
             rank += 1;
+            /** @type {'selected_route' | 'new_model_same_provider' | 'new_provider'} */
+            const standbyClass =
+                candidate.source === 'selected'
+                    ? 'selected_route'
+                    : providerId && selectedProviderId && providerId === selectedProviderId
+                        ? 'new_model_same_provider'
+                        : 'new_provider';
             rows.push({
                 profileId: route.profileId,
                 rank,
@@ -770,12 +777,7 @@ export function buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, optio
                 score: optionalNumber(selected['score']),
                 hasRuntimeProof,
                 needsProbe: !hasRuntimeProof,
-                standbyClass:
-                    candidate.source === 'selected'
-                        ? 'selected_route'
-                        : providerId && selectedProviderId && providerId === selectedProviderId
-                            ? 'new_model_same_provider'
-                            : 'new_provider',
+                standbyClass,
                 runtimeEnvStatus: optionalString(optionalRecord(candidate.runtimeEnv)?.['status']),
                 reasons: candidate.reasons,
                 commands: runtimeSelectorStandbyCommands(selected, timeoutMs),

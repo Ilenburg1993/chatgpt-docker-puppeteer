@@ -30,6 +30,7 @@ const frontendMocks = vi.hoisted(() => ({
         liveBridgeTailCount: 0,
         syncStatus: 'not_needed',
         syncReason: 'empty',
+        syncBlockedReason: null,
         syncPendingCount: 0,
         syncSyncedCount: 0,
         syncFailedCount: 0,
@@ -82,6 +83,7 @@ describe('terminal/commands/cmdContext', () => {
             liveBridgeTailCount: 0,
             syncStatus: 'not_needed',
             syncReason: 'empty',
+            syncBlockedReason: null,
             syncPendingCount: 0,
             syncSyncedCount: 0,
             syncFailedCount: 0,
@@ -123,6 +125,7 @@ describe('terminal/commands/cmdContext', () => {
             liveBridgeTailCount: 0,
             syncStatus: 'unavailable',
             syncReason: 'no-hub-session',
+            syncBlockedReason: null,
             syncPendingCount: 0,
             syncSyncedCount: 0,
             syncFailedCount: 0,
@@ -157,6 +160,7 @@ describe('terminal/commands/cmdContext', () => {
             liveBridgeTailCount: 0,
             syncStatus: 'not_needed',
             syncReason: 'aligned',
+            syncBlockedReason: null,
             syncPendingCount: 0,
             syncSyncedCount: 0,
             syncFailedCount: 0,
@@ -191,6 +195,7 @@ describe('terminal/commands/cmdContext', () => {
             liveBridgeTailCount: 0,
             syncStatus: 'not_needed',
             syncReason: 'aligned',
+            syncBlockedReason: null,
             syncPendingCount: 0,
             syncSyncedCount: 0,
             syncFailedCount: 0,
@@ -224,6 +229,7 @@ describe('terminal/commands/cmdContext', () => {
             liveBridgeTailCount: 0,
             syncStatus: 'not_needed',
             syncReason: 'aligned',
+            syncBlockedReason: null,
             syncPendingCount: 0,
             syncSyncedCount: 0,
             syncFailedCount: 0,
@@ -257,6 +263,7 @@ describe('terminal/commands/cmdContext', () => {
             liveBridgeTailCount: 1,
             syncStatus: 'scheduled',
             syncReason: 'bridge_tail',
+            syncBlockedReason: null,
             syncPendingCount: 1,
             syncSyncedCount: 0,
             syncFailedCount: 0,
@@ -272,6 +279,42 @@ describe('terminal/commands/cmdContext', () => {
         expect(output).toContain('bridge_tail');
         expect(output).toContain('sync Hub');
         expect(output).toContain('scheduled');
+    });
+
+    it('explica divergência preservando live-tail sem sugerir perda visual', () => {
+        frontendMocks.readTerminalContextProjection.mockReturnValue({
+            isRealData: false,
+            hasHistory: true,
+            usedTokens: 10,
+            maxTokens: 128000,
+            utilization: 10 / 128000,
+            turnCount: 4,
+            totalChars: 40,
+            workspace: {
+                cwd: '/workspaces/test',
+                gitRoot: '/workspaces/test',
+                currentBranch: 'main',
+            },
+            timelineSource: 'mixed',
+            timelineAuthority: 'reconciled',
+            reconciliationStatus: 'diverged',
+            hasPersistentHistory: true,
+            persistedTurnCount: 2,
+            bridgeTurnCount: 2,
+            liveBridgeTailCount: 2,
+            syncStatus: 'blocked',
+            syncReason: 'diverged-no-overlap',
+            syncBlockedReason: 'diverged-no-overlap',
+            syncPendingCount: 2,
+            syncSyncedCount: 0,
+            syncFailedCount: 0,
+            syncLastError: null,
+        });
+        cmdContext({ println });
+        const output = lines.join('\n');
+        expect(output).toContain('sync bloqueado');
+        expect(output).toContain('diverged-no-overlap');
+        expect(output).toContain('live-tail visível foi preservado');
     });
 });
 

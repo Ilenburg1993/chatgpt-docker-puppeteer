@@ -92,6 +92,7 @@ import {
     getTerminalDetailLevel,
     markTerminalActivityIdle,
     recordTerminalActivity,
+    appendTerminalTranscriptTurn,
     recordTerminalElicitationCompleted,
     recordTerminalElicitationPending,
     recordTerminalPermissionCompleted,
@@ -256,7 +257,11 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const SUPPRESSED_PROTOCOL_TTL_MS = 10 * 60_000;
     const SUPPRESSED_PROTOCOL_MAX = 512;
+    const USER_INPUT_TRANSCRIPT_TTL_MS = 30 * 60_000;
+    const USER_INPUT_TRANSCRIPT_MAX = 1024;
     let permissionHelpPrinted = false;
+    /** @type {Map<string, number>} */
+    const userInputTranscriptKeys = new Map();
 
     /**
      * @param {number} [now]
@@ -277,6 +282,96 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 if (removed >= overflow) break;
             }
         }
+    }
+
+    /**
+     * @param {string} key
+     * @param {number} [now]
+     * @returns {boolean}
+     */
+    function claimUserInputTranscriptKey(key, now = Date.now()) {
+        for (const [existingKey, ts] of userInputTranscriptKeys.entries()) {
+            if (now - ts > USER_INPUT_TRANSCRIPT_TTL_MS) {
+                userInputTranscriptKeys.delete(existingKey);
+            }
+        }
+        if (userInputTranscriptKeys.has(key)) return false;
+        userInputTranscriptKeys.set(key, now);
+        if (userInputTranscriptKeys.size > USER_INPUT_TRANSCRIPT_MAX) {
+            const overflow = userInputTranscriptKeys.size - USER_INPUT_TRANSCRIPT_MAX;
+            let removed = 0;
+            for (const existingKey of userInputTranscriptKeys.keys()) {
+                userInputTranscriptKeys.delete(existingKey);
+                removed++;
+                if (removed >= overflow) break;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @param {{
+     *     phase: 'requested' | 'completed';
+     *     requestId: string | null;
+     *     question: string;
+     *     choices?: string[];
+     *     allowFreeform?: boolean;
+     *     answer?: string;
+     *     wasFreeform?: boolean;
+     *     toolCallId?: string | null;
+     *     envelope: Record<string, unknown>;
+     * }} input
+     * @returns {void}
+     */
+    function appendUserInputTranscriptTurn(input) {
+        const timestamp =
+            typeof input.envelope['timestamp'] === 'number' && Number.isFinite(input.envelope['timestamp'])
+                ? input.envelope['timestamp']
+                : Date.now();
+        const baseKey =
+            input.requestId ??
+            (typeof input.toolCallId === 'string' && input.toolCallId.trim() ? input.toolCallId.trim() : null) ??
+            `${input.phase}:${input.question}:${input.answer ?? ''}`;
+        const key = `${input.phase}:${baseKey}`;
+        if (!claimUserInputTranscriptKey(key, timestamp)) return;
+        if (input.phase === 'requested') {
+            const choices = Array.isArray(input.choices) ? input.choices : [];
+            const options = choices.length > 0 ? `\nOpcoes: ${choices.join(' | ')}` : '';
+            appendTerminalTranscriptTurn({
+                role: 'system',
+                rawRole: 'ask_user',
+                content: `ask_user solicitou resposta humana:\n${input.question}${options}`,
+                source: 'sdk/user_input.requested',
+                timestamp,
+                metadata: {
+                    envelope: input.envelope,
+                    requestId: input.requestId,
+                    toolCallId: input.toolCallId ?? null,
+                    choices,
+                    allowFreeform: input.allowFreeform !== false,
+                    terminalInteractionKind: 'ask_user',
+                    terminalInteractionPhase: 'requested',
+                },
+            });
+            return;
+        }
+        const answer = typeof input.answer === 'string' ? input.answer.trim() : '';
+        if (!answer) return;
+        appendTerminalTranscriptTurn({
+            role: 'user',
+            rawRole: 'ask_user_answer',
+            content: `Resposta ao ask_user:\n${answer}`,
+            source: 'sdk/user_input.completed',
+            timestamp,
+            metadata: {
+                envelope: input.envelope,
+                requestId: input.requestId,
+                question: input.question,
+                wasFreeform: input.wasFreeform === true,
+                terminalInteractionKind: 'ask_user',
+                terminalInteractionPhase: 'completed',
+            },
+        });
     }
 
     /**
@@ -666,18 +761,28 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             severity: allowFreeform ? 'info' : 'warn',
         });
+        const requestedEnvelope = withSdkSessionSseEnvelope(
+            {
+                requestId: evt?.requestId ?? null,
+                question,
+                choices,
+                allowFreeform,
+                toolCallId: evt?.toolCallId ?? null,
+            },
+            'sdk/user_input.requested',
+        );
+        appendUserInputTranscriptTurn({
+            phase: 'requested',
+            requestId,
+            question,
+            choices,
+            allowFreeform,
+            toolCallId: evt?.toolCallId ?? null,
+            envelope: requestedEnvelope,
+        });
         broadcastSse(
             'user_input.requested',
-            withSdkSessionSseEnvelope(
-                {
-                    requestId: evt?.requestId ?? null,
-                    question,
-                    choices,
-                    allowFreeform,
-                    toolCallId: evt?.toolCallId ?? null,
-                },
-                'sdk/user_input.requested',
-            ),
+            requestedEnvelope,
         );
         if (shouldPrintSessionNarration('important')) {
             const optionsLabel = choices.length > 0 ? ` · opções=${choices.length}` : '';
@@ -744,7 +849,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             return;
         }
         const wasFreeform = evt?.wasFreeform === true;
-        recordTerminalUserInputCompleted(evt);
+        const completed = recordTerminalUserInputCompleted(evt);
         recordTerminalTurnUserInputActivity({
             requestId,
             status: 'answered',
@@ -756,16 +861,25 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
+        const completedEnvelope = withSdkSessionSseEnvelope(
+            {
+                requestId,
+                answer: evt?.answer ?? '',
+                wasFreeform,
+            },
+            'sdk/user_input.completed',
+        );
+        appendUserInputTranscriptTurn({
+            phase: 'completed',
+            requestId,
+            question: completed?.question ?? '(sem pergunta)',
+            answer: evt?.answer ?? '',
+            wasFreeform,
+            envelope: completedEnvelope,
+        });
         broadcastSse(
             'user_input.completed',
-            withSdkSessionSseEnvelope(
-                {
-                    requestId,
-                    answer: evt?.answer ?? '',
-                    wasFreeform,
-                },
-                'sdk/user_input.completed',
-            ),
+            completedEnvelope,
         );
         refreshPromptIfIdle();
     };

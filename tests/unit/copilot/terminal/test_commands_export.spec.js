@@ -138,6 +138,82 @@ describe('terminal/commands/export', () => {
         expect(String(content)).toContain('streaming=none/already_streamed');
     });
 
+    it('preserva ask_user, resposta humana e continuação pós-ask com autoria correta', async () => {
+        readTerminalTimelineProjection.mockReturnValueOnce({
+            timelineSource: 'mixed',
+            reconciliationStatus: 'diverged',
+            sync: {
+                status: 'blocked',
+            },
+            syncBlockedReason: 'diverged-no-overlap',
+            turns: [
+                {
+                    role: 'system',
+                    rawRole: 'ask_user',
+                    origin: 'terminal',
+                    persisted: false,
+                    content: 'ask_user solicitou resposta humana:\nASK-CANONICAL: responda SIM para fechar o teste\nOpcoes: SIM',
+                    timestamp: 1710000002000,
+                    metadata: {
+                        envelope: {
+                            source: 'sdk/user_input.requested',
+                            traceId: 'turn:1',
+                            turnId: '1',
+                            eventId: 253,
+                        },
+                    },
+                },
+                {
+                    role: 'user',
+                    rawRole: 'ask_user_answer',
+                    origin: 'terminal',
+                    persisted: false,
+                    content: 'Resposta ao ask_user:\nSIM',
+                    timestamp: 1710000002500,
+                    metadata: {
+                        envelope: {
+                            source: 'sdk/user_input.completed',
+                            traceId: 'turn:1',
+                            turnId: '1',
+                            eventId: 262,
+                        },
+                    },
+                },
+                {
+                    role: 'assistant',
+                    rawRole: 'llm_b',
+                    origin: 'terminal',
+                    persisted: false,
+                    content: 'POST-ASK-CANONICAL-FINAL: usuário confirmou SIM',
+                    timestamp: 1710000003000,
+                    metadata: {
+                        assistantMessageEnvelope: {
+                            source: 'sdk/assistant.message',
+                            traceId: 'turn:2',
+                            turnId: '2',
+                            eventId: 280,
+                        },
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
+
+        const [, content] = writeFile.mock.calls[0];
+        const markdown = String(content);
+        expect(markdown).toContain('timeline=mixed/diverged · sync=blocked:diverged-no-overlap');
+        expect(markdown).toContain('## 🧭 Sistema');
+        expect(markdown).toContain('ASK-CANONICAL: responda SIM para fechar o teste');
+        expect(markdown).toContain('## 👤 Usuário');
+        expect(markdown).toContain('Resposta ao ask_user:\nSIM');
+        expect(markdown).toContain('## 🧠 LLM-B');
+        expect(markdown).toContain('POST-ASK-CANONICAL-FINAL: usuário confirmou SIM');
+        expect(markdown).toContain('envelope=sdk/user_input.requested');
+        expect(markdown).toContain('envelope=sdk/user_input.completed');
+    });
+
     it('reporta histórico vazio quando o frontend runtime não tem feed', async () => {
         readTerminalTimelineProjection.mockReturnValueOnce({
             timelineSource: 'empty',

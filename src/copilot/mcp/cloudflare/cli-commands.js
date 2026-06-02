@@ -24,8 +24,23 @@ import { buildCloudflareLogReport, buildCloudflareMetricsReport, readRuntimeOrig
 
 export const CLOUDFLARE_CLI_VERSION = '1.0.0';
 
+/**
+ * @typedef {{
+ *   argv: string[];
+ *   args: string[];
+ *   env: NodeJS.ProcessEnv;
+ *   command: string;
+ * }} CloudflareCliContext
+ *
+ * @typedef {(context: CloudflareCliContext) => void | Promise<void>} CloudflareCliCommandRunner
+ *
+ * @typedef {[name: string, description: string, run: CloudflareCliCommandRunner]} CloudflareCliCommandEntry
+ */
+
+/** @type {Record<string, string>} */
 const COMMAND_ALIASES = { 'smoke-authenticated': 'oauth-smoke', 'smoke:authenticated': 'oauth-smoke', '--help': 'help', '-h': 'help', '--version': 'version', '-v': 'version' };
 
+/** @type {CloudflareCliCommandEntry[]} */
 const COMMANDS = [
     ['doctor', 'Audit local cloudflared, origin, configured URL and process prerequisites.', runDoctor],
     ['quick', 'Run a temporary TryCloudflare tunnel.', runQuick],
@@ -57,6 +72,11 @@ const COMMANDS = [
 ];
 const COMMAND_MAP = new Map(COMMANDS.map(([name, description, run]) => [name, { name, description, run }]));
 
+/**
+ * @param {string[]} [argv]
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {Promise<void>}
+ */
 export async function runCloudflareCli(argv = process.argv, env = process.env) {
     const rawCommand = argv[2] ?? 'doctor';
     const commandName = COMMAND_ALIASES[rawCommand] ?? rawCommand;
@@ -68,16 +88,18 @@ export async function runCloudflareCli(argv = process.argv, env = process.env) {
     await command.run({ argv: argv.slice(3), args: argv.slice(3), env, command: commandName });
 }
 
+/** @param {CloudflareCliContext} context */
 async function runDoctor({ env }) {
     const config = readCloudflareTunnelConfig(env);
     const cloudflared = readCloudflaredVersion();
     const compatibility = assessCloudflaredCompatibility(cloudflared, config);
     const health = await probeHealth(config.healthUrl);
-    const publicUrlValidation = config.publicMcpUrl ? validateConfiguredPublicUrl(config.publicMcpUrl, config) : { ok: false, error: 'missing-public-url' };
+    const publicUrlValidation = validateConfiguredPublicUrl(config) ?? { ok: false, reason: 'missing-public-url' };
     const token = tokenPosture(config);
     await writeJsonAndSetExit({ ok: Boolean(cloudflared.ok && compatibility.ok && publicUrlValidation.ok && (config.mode !== 'named-permanent' || token.ok)), version: CLOUDFLARE_CLI_VERSION, config: publicConfig(config), cloudflared, compatibility, token, health, publicUrlValidation, hints: commandHints(config) });
 }
 
+/** @param {CloudflareCliContext} context */
 async function runStatus({ env }) {
     const config = readCloudflareTunnelConfig(env);
     const quick = await readQuickTunnelState(config.stateFile);
@@ -89,41 +111,65 @@ async function runStatus({ env }) {
     await writeJsonAndSetExit({ ok: true, version: CLOUDFLARE_CLI_VERSION, config: publicConfig(config), authentication, chatgpt: chatgptStatus(quick, config, authentication), quickTunnel: summarizeQuickTunnelState(quick, Date.now(), config.staleAfterMs), connectorSmoke: summarizeConnectorSmokeState(smoke, config.publicMcpUrl ?? null), processes: { mcpHttp, cloudflared }, runtime, logs: buildCloudflareLogReport(), metrics: buildCloudflareMetricsReport(config) });
 }
 
+/** @param {CloudflareCliContext} context */
 function runQuick({ env }) { runQuickTunnel(readCloudflareTunnelConfig(env), env); }
+/** @param {CloudflareCliContext} context */
 async function runSmoke({ env }) { await writeJsonAndSetExit(await runCloudflareSmoke({ config: readCloudflareTunnelConfig(env), authenticated: false, env })); }
+/** @param {CloudflareCliContext} context */
 async function runOAuthSmoke({ env }) { await writeJsonAndSetExit(await runCloudflareSmoke({ config: readCloudflareTunnelConfig(env), authenticated: true, env })); }
+/** @param {CloudflareCliContext} context */
 async function runUp({ env }) { await writeJsonAndSetExit(await startManagedStack({ config: readCloudflareTunnelConfig(env), env, restart: false })); }
+/** @param {CloudflareCliContext} context */
 async function runDown({ env }) { await writeJsonAndSetExit(await stopManagedStack(readCloudflareTunnelConfig(env))); }
+/** @param {CloudflareCliContext} context */
 async function runRestart({ env }) { await writeJsonAndSetExit(await startManagedStack({ config: readCloudflareTunnelConfig(env), env, restart: true })); }
+/** @param {CloudflareCliContext} context */
 function runRun({ env }) { const config = readCloudflareTunnelConfig(env); runCloudflared(buildManagedTunnelArgs(env['CLOUDFLARE_TUNNEL_TOKEN'], config.tunnelTokenFile, config), config.transportProtocol, env); }
 
-async function runOriginApply({ env }) { writeJsonAndSetExit(await applyCloudflareTunnelOriginPlan({ dryRun: env['COPILOT_MCP_CLOUDFLARE_ORIGIN_APPLY_DRY_RUN'] !== 'false', confirmApply: env['COPILOT_MCP_CLOUDFLARE_ORIGIN_APPLY_CONFIRM'] === 'true' })); }
-async function runEdgePolicyApply({ argv }) { writeJsonAndSetExit(await applyCloudflareEdgePolicy({ dryRun: !argv.includes('--apply'), confirmApply: argv.includes('--confirm-apply') })); }
-async function runEdgeBackupCreate({ args }) { writeJsonAndSetExit(await createCloudflareEdgeBackup({ ...(args[0] ? { label: args[0] } : {}) })); }
+/** @param {CloudflareCliContext} context */
+async function runOriginApply({ env }) { await writeJsonAndSetExit(await applyCloudflareTunnelOriginPlan({ dryRun: env['COPILOT_MCP_CLOUDFLARE_ORIGIN_APPLY_DRY_RUN'] !== 'false', confirmApply: env['COPILOT_MCP_CLOUDFLARE_ORIGIN_APPLY_CONFIRM'] === 'true' })); }
+/** @param {CloudflareCliContext} context */
+async function runEdgePolicyApply({ argv }) { await writeJsonAndSetExit(await applyCloudflareEdgePolicy({ dryRun: !argv.includes('--apply'), confirmApply: argv.includes('--confirm-apply') })); }
+/** @param {CloudflareCliContext} context */
+async function runEdgeBackupCreate({ args }) { await writeJsonAndSetExit(await createCloudflareEdgeBackup({ ...(args[0] ? { label: args[0] } : {}) })); }
 
+/** @returns {Promise<void>} */
 function runCommands() { return writeJsonAndSetExit({ ok: true, version: CLOUDFLARE_CLI_VERSION, commands: COMMANDS.map(([name, description]) => ({ name, description })), aliases: COMMAND_ALIASES }); }
+/** @returns {void} */
 function runHelp() { process.stdout.write(`copilot-mcp-cloudflare ${CLOUDFLARE_CLI_VERSION}\n\nUsage: node src/copilot/mcp/cloudflare/cli.js <command> [args]\n\nCommands:\n${COMMANDS.map(([name, description]) => `  ${String(name).padEnd(28)} ${description}`).join('\n')}\n`); }
 
+/**
+ * @param {unknown | Promise<unknown>} report
+ * @returns {Promise<void>}
+ */
 async function writeJsonAndSetExit(report) {
     const resolved = await report;
     process.stdout.write(`${JSON.stringify(resolved, null, 2)}\n`);
-    if (resolved && typeof resolved === 'object' && resolved.ok === false) process.exitCode = 1;
+    if (resolved && typeof resolved === 'object' && /** @type {Record<string, unknown>} */ (resolved)['ok'] === false) process.exitCode = 1;
 }
 
+/** @param {import('./config.js').CloudflareTunnelConfig} config */
 function publicConfig(config) {
     return { mode: config.mode, publicMcpUrl: config.publicMcpUrl ?? null, originUrl: config.originUrl, originTransport: selectMcpOriginTransport(config), tunnelName: config.tunnelName, publicHostname: config.publicHostname, transportProtocol: config.transportProtocol, metricsAddr: config.metricsAddr ?? null, pidFiles: { mcpHttp: config.mcpHttpPidFile, cloudflared: config.managedTunnelPidFile }, hasTunnelToken: config.hasTunnelToken, hasTunnelTokenFile: config.hasTunnelTokenFile };
 }
 
+/** @param {import('./config.js').CloudflareTunnelConfig} config */
 function tokenPosture(config) {
     if (config.hasTunnelTokenFile) return { ok: true, source: 'file', warning: config.hasTunnelToken ? 'env-token-and-token-file-present-token-file-wins' : null };
     if (config.hasTunnelToken) return { ok: true, source: 'env', warning: null };
     return { ok: false, source: 'missing', warning: 'named tunnel requires CLOUDFLARE_TUNNEL_TOKEN or CLOUDFLARE_TUNNEL_TOKEN_FILE' };
 }
 
+/** @param {import('./config.js').CloudflareTunnelConfig} config */
 function commandHints(config) {
     return { quick: `cloudflared ${buildQuickTunnelArgs(config).join(' ')}`, managed: `cloudflared ${buildManagedTunnelArgs('<redacted>', undefined, config).join(' ')}`, status: 'npm run copilot:mcp:cloudflare:status', smoke: 'npm run copilot:mcp:cloudflare:smoke' };
 }
 
+/**
+ * @param {unknown} quick
+ * @param {import('./config.js').CloudflareTunnelConfig} config
+ * @param {unknown} authentication
+ */
 function chatgptStatus(quick, config, authentication) {
     if (isQuickTunnelState(quick)) return { name: quick.chatgpt.name, description: quick.chatgpt.description, mcpServerUrl: config.publicMcpUrl ?? quick.connectorUrl, authentication };
     return { name: 'Repo DevContainer MCP', description: 'Conecta o ChatGPT ao repositório por túnel Cloudflare permanente.', mcpServerUrl: config.publicMcpUrl ?? null, authentication };

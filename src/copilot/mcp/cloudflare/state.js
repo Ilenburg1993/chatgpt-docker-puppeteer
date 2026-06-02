@@ -13,11 +13,11 @@ import path from 'node:path';
  * @property {string} checkedAt
  * @property {boolean} ok
  * @property {string} connectorUrl
- * @property {{ ok: boolean; status?: number; error?: string }} health
+ * @property {{ ok: boolean; status?: number | null; error?: string | null }} health
  * @property {{
  *   ok: boolean;
- *   status?: number;
- *   error?: string;
+ *   status?: number | null;
+ *   error?: string | null;
  *   tools: number;
  *   expectedLocalTools: number;
  *   toolsMatchLocalRegistry: boolean;

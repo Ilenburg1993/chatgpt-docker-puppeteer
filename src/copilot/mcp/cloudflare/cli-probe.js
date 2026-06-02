@@ -2,15 +2,59 @@
 /** HTTP, OAuth and MCP probe helpers for Cloudflare MCP CLI. */
 const DEFAULT_TIMEOUT_MS = 10_000;
 
+/**
+ * @typedef {{
+ *   method?: string;
+ *   headers?: HeadersInit;
+ *   body?: BodyInit | null;
+ *   timeoutMs?: number;
+ *   attempts?: number;
+ *   delayMs?: number;
+ *   protocolVersion?: string;
+ * }} ProbeJsonOptions
+ *
+ * @typedef {{
+ *   ok: boolean;
+ *   status: number;
+ *   body?: unknown;
+ *   rawBody?: string;
+ *   headers?: Record<string, string>;
+ *   error?: string;
+ *   attempts?: number;
+ * }} ProbeJsonResult
+ */
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
 export function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
 }
 
+/** @returns {string | null} */
 export function readSmokeBearerToken() {
     const token = String(process.env['COPILOT_MCP_SMOKE_BEARER_TOKEN'] ?? '').trim();
-    return token && !/[\u0000-\u001f\u007f]/u.test(token) ? token : null;
+    return token && !hasControlCharacters(token) ? token : null;
 }
 
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function hasControlCharacters(value) {
+    for (let index = 0; index < value.length; index += 1) {
+        const code = value.charCodeAt(index);
+        if (code <= 0x1f || code === 0x7f) return true;
+    }
+    return false;
+}
+
+/**
+ * @param {string | null} bearerToken
+ * @param {{ protocolVersion?: string }} [options]
+ * @returns {Record<string, string>}
+ */
 export function buildToolsListSmokeHeaders(bearerToken, options = {}) {
     return {
         'content-type': 'application/json',
@@ -20,6 +64,10 @@ export function buildToolsListSmokeHeaders(bearerToken, options = {}) {
     };
 }
 
+/**
+ * @param {string} url
+ * @returns {Promise<{ ok: boolean; status?: number; error?: string }>}
+ */
 export async function probeHealth(url) {
     try {
         const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
@@ -29,8 +77,14 @@ export async function probeHealth(url) {
     }
 }
 
+/**
+ * @param {string} url
+ * @param {ProbeJsonOptions} [options]
+ * @returns {Promise<ProbeJsonResult>}
+ */
 export async function probeJsonWithRetry(url, options = {}) {
     const attempts = Number(options.attempts ?? 3);
+    /** @type {ProbeJsonResult | undefined} */
     let last;
     for (let i = 1; i <= attempts; i += 1) {
         last = await probeJson(url, options);
@@ -38,12 +92,24 @@ export async function probeJsonWithRetry(url, options = {}) {
         if (last.ok || ![0, 408, 425, 429, 500, 502, 503, 504].includes(last.status ?? 0)) return last;
         await new Promise((resolve) => setTimeout(resolve, Number(options.delayMs ?? 1000)));
     }
-    return last ?? { ok: false, error: 'probe-not-run', attempts: 0 };
+    return last ?? { ok: false, status: 0, error: 'probe-not-run', attempts: 0 };
 }
 
+/**
+ * @param {string} url
+ * @param {ProbeJsonOptions} [options]
+ * @returns {Promise<ProbeJsonResult>}
+ */
 export async function probeJson(url, options = {}) {
     try {
-        const response = await fetch(url, { method: options.method ?? 'GET', headers: options.headers, body: options.body, signal: AbortSignal.timeout(Number(options.timeoutMs ?? DEFAULT_TIMEOUT_MS)) });
+        /** @type {RequestInit} */
+        const init = {
+            method: options.method ?? 'GET',
+            signal: AbortSignal.timeout(Number(options.timeoutMs ?? DEFAULT_TIMEOUT_MS)),
+        };
+        if (options.headers !== undefined) init.headers = options.headers;
+        if (options.body !== undefined) init.body = options.body;
+        const response = await fetch(url, init);
         const rawBody = await response.text();
         const contentType = response.headers.get('content-type') ?? '';
         const parsed = parseJsonOrMcpEventStream(rawBody, contentType);
@@ -53,6 +119,11 @@ export async function probeJson(url, options = {}) {
     }
 }
 
+/**
+ * @param {unknown} rawBody
+ * @param {string} [contentType]
+ * @returns {{ body: unknown }}
+ */
 export function parseJsonOrMcpEventStream(rawBody, contentType = '') {
     const text = String(rawBody ?? '').trim();
     if (!text) return { body: null };
@@ -63,41 +134,78 @@ export function parseJsonOrMcpEventStream(rawBody, contentType = '') {
     return { body: safeJson(text) ?? text };
 }
 
+/** @param {string} text @returns {unknown | null} */
 function safeJson(text) { try { return JSON.parse(text); } catch { return null; } }
 
+/**
+ * @param {ProbeJsonResult} probe
+ * @returns {{ ok: boolean; status: number; toolCount: number; toolNames: string[]; error: string | undefined }}
+ */
 export function summarizeToolsListProbe(probe) {
     const body = asRecord(probe.body);
-    const tools = Array.isArray(body?.result?.tools) ? body.result.tools : Array.isArray(body?.tools) ? body.tools : [];
-    return { ok: probe.ok, status: probe.status, toolCount: tools.length, toolNames: tools.map((tool) => tool?.name).filter(Boolean), error: probe.error };
+    const result = asRecord(body?.['result']);
+    const tools = Array.isArray(result?.['tools']) ? result['tools'] : Array.isArray(body?.['tools']) ? body['tools'] : [];
+    return { ok: probe.ok, status: probe.status, toolCount: tools.length, toolNames: tools.map((tool) => asRecord(tool)?.['name']).filter((name) => typeof name === 'string'), error: probe.error };
 }
 
+/**
+ * @param {ProbeJsonResult | { ok: boolean; status?: number; error?: string }} probe
+ * @returns {{ ok: boolean; status: number | null; error: string | null }}
+ */
 export function summarizeProbeEnvelope(probe) {
-    return { ok: probe.ok, status: probe.status, error: probe.error ?? null };
+    return { ok: probe.ok, status: probe.status ?? null, error: probe.error ?? null };
 }
 
+/**
+ * @param {ProbeJsonResult} protectedResource
+ * @returns {string | null}
+ */
 export function extractAuthorizationServer(protectedResource) {
     const body = asRecord(protectedResource.body);
-    const servers = Array.isArray(body?.authorization_servers) ? body.authorization_servers : [];
+    const servers = Array.isArray(body?.['authorization_servers']) ? body['authorization_servers'] : [];
     return typeof servers[0] === 'string' ? servers[0] : null;
 }
 
+/**
+ * @param {ProbeJsonResult} resourceProbe
+ * @param {ProbeJsonResult | { ok: boolean; status?: number; error?: string }} authorizationProbe
+ * @returns {{ ok: boolean; protectedResource: ReturnType<typeof summarizeProbeEnvelope>; authorizationServer: ReturnType<typeof summarizeProbeEnvelope> }}
+ */
 export function summarizeOAuthReadiness(resourceProbe, authorizationProbe) {
     return { ok: Boolean(resourceProbe.ok && authorizationProbe.ok), protectedResource: summarizeProbeEnvelope(resourceProbe), authorizationServer: summarizeProbeEnvelope(authorizationProbe) };
 }
 
+/**
+ * @param {ProbeJsonResult} probe
+ * @returns {ReturnType<typeof summarizeProbeEnvelope>}
+ */
 export function summarizeProtectedResourceProbe(probe) {
     return summarizeProbeEnvelope(probe);
 }
 
+/**
+ * @param {{ ok: boolean; status: number; toolCount: number }} summary
+ * @returns {{ ok: boolean; status: number; toolCount: number; checkedAt: string }}
+ */
 export function compactPersistedToolsListSummary(summary) {
     return { ok: summary.ok, status: summary.status, toolCount: summary.toolCount, checkedAt: new Date().toISOString() };
 }
 
+/**
+ * @param {string} name
+ * @param {number} fallback
+ * @returns {number}
+ */
 export function readPositiveIntegerEnv(name, fallback) {
     const parsed = Number(process.env[name] ?? '');
     return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+/**
+ * @param {string} name
+ * @param {boolean} [fallback]
+ * @returns {boolean}
+ */
 export function readBooleanEnv(name, fallback = false) {
     const value = String(process.env[name] ?? '').trim().toLowerCase();
     if (!value) return fallback;

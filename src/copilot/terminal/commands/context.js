@@ -97,7 +97,7 @@ export function cmdContext({ println }, arg = '') {
     );
     if (projection.reconciliationStatus === 'diverged') {
         println(
-            '\x1b[33m  Nota: bridge e persistência divergiram; o terminal está priorizando a timeline persistida até nova reconciliação.\x1b[0m',
+            `\x1b[33m  Nota: bridge e persistência divergiram; sync bloqueado${projection.syncBlockedReason ? ` (${projection.syncBlockedReason})` : ''}, mas o live-tail visível foi preservado sem persistir.\x1b[0m`,
         );
     }
     if (projection.syncStatus === 'failed') {

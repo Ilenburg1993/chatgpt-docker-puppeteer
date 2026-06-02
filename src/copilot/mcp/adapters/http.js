@@ -277,46 +277,50 @@ function installHttp1SocketGuards(server, policy) {
  */
 function installHttp1ProtocolGuards(server, policy) {
     server.on('clientError', (error, socket) => {
+        const netSocket = /** @type {import('node:net').Socket} */ (socket);
         logMcp('WARN', 'MCP HTTP/1.1 client protocol error.', {
             code: /** @type {{ code?: unknown }} */ (error).code ?? null,
             message: error instanceof Error ? error.message : String(error),
-            remoteAddress: summarizeAddress(socket.remoteAddress ?? ''),
+            remoteAddress: summarizeAddress(netSocket.remoteAddress ?? ''),
         });
-        if (!socket.destroyed) {
-            socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+        if (!netSocket.destroyed) {
+            netSocket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
         }
     });
 
     server.on('dropRequest', (req, socket) => {
+        const netSocket = /** @type {import('node:net').Socket} */ (socket);
         logMcp('WARN', 'MCP HTTP/1.1 request dropped after maxRequestsPerSocket.', {
             method: req.method ?? null,
             url: summarizeUrlPath(req.url ?? ''),
-            remoteAddress: summarizeAddress(socket.remoteAddress ?? ''),
+            remoteAddress: summarizeAddress(netSocket.remoteAddress ?? ''),
             maxRequestsPerSocket: policy.maxRequestsPerSocket,
         });
     });
 
     if (policy.rejectUpgradeRequests) {
         server.on('upgrade', (req, socket) => {
+            const netSocket = /** @type {import('node:net').Socket} */ (socket);
             logMcp('WARN', 'Rejected unsupported MCP HTTP/1.1 upgrade request.', {
                 method: req.method ?? null,
                 url: summarizeUrlPath(req.url ?? ''),
-                remoteAddress: summarizeAddress(socket.remoteAddress ?? ''),
+                remoteAddress: summarizeAddress(netSocket.remoteAddress ?? ''),
             });
-            if (!socket.destroyed) {
-                socket.end('HTTP/1.1 426 Upgrade Required\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+            if (!netSocket.destroyed) {
+                netSocket.end('HTTP/1.1 426 Upgrade Required\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
             }
         });
     }
 
     if (policy.rejectConnectRequests) {
         server.on('connect', (req, socket) => {
+            const netSocket = /** @type {import('node:net').Socket} */ (socket);
             logMcp('WARN', 'Rejected unsupported MCP HTTP/1.1 CONNECT request.', {
                 url: summarizeUrlPath(req.url ?? ''),
-                remoteAddress: summarizeAddress(socket.remoteAddress ?? ''),
+                remoteAddress: summarizeAddress(netSocket.remoteAddress ?? ''),
             });
-            if (!socket.destroyed) {
-                socket.end('HTTP/1.1 405 Method Not Allowed\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+            if (!netSocket.destroyed) {
+                netSocket.end('HTTP/1.1 405 Method Not Allowed\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
             }
         });
     }
@@ -369,9 +373,8 @@ function installHttp1GracefulClose(server, policy) {
  * @returns {number}
  */
 function destroyTrackedSockets(server) {
-    const sockets = /** @type {Set<import('node:net').Socket> | undefined} */ (
-        /** @type {unknown} */ (server).__mcpHttp1Sockets
-    );
+    const runtimeServer = /** @type {import('node:http').Server & { __mcpHttp1Sockets?: Set<import('node:net').Socket> }} */ (server);
+    const sockets = runtimeServer.__mcpHttp1Sockets;
     let destroyed = 0;
     if (typeof server.closeAllConnections === 'function') {
         server.closeAllConnections();

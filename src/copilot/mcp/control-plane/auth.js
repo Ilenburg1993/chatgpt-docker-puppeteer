@@ -105,7 +105,6 @@ const DPOP_MAX_TTL_SECONDS = 5 * 60;
 const DPOP_CLOCK_TOLERANCE_SECONDS = 30;
 const DPOP_REPLAY_CACHE_MAX_ENTRIES = 2000;
 const MAX_DPOP_PROOF_LENGTH = 16 * 1024;
-const MAX_DPOP_JTI_LENGTH = 256;
 
 /** @type {Map<string, ReturnType<typeof createRemoteJWKSet>>} */
 const REMOTE_JWKS_CACHE = new Map();
@@ -566,11 +565,6 @@ export function buildProtectedResourceMetadata(config = readMcpAuthConfig(), opt
 }
 
 /**
- * @param {Record<string, unknown>} metadata
- * @returns {Record<string, unknown>}
- */
-
-/**
  * @param {string} resource
  * @param {McpAuthConfig} [config]
  * @returns {string}
@@ -584,6 +578,10 @@ export function protectedResourceMetadataUrlForResource(resource, config = readM
     return normalized.endsWith('/mcp') ? `${base}/mcp` : base;
 }
 
+/**
+ * @param {Record<string, unknown>} metadata
+ * @returns {Record<string, unknown>}
+ */
 function omitEmptyMetadata(metadata) {
     /** @type {Record<string, unknown>} */
     const output = {};
@@ -1020,9 +1018,10 @@ function trimDpopReplayCache(maxSize) {
  * @param {McpAuthScope[]} requiredScopes
  * @param {McpAuthConfig} config
  * @param {NodeJS.ProcessEnv} env
+ * @param {McpAuthContext} [context]
  * @returns {Promise<McpAuthorizationDecision>}
  */
-async function verifyBearerToken(token, requiredScopes, config, env, context = {}) {
+async function verifyBearerToken(token, requiredScopes, config, env, context = { bearerToken: undefined }) {
     if (!token || token.length > MAX_BEARER_TOKEN_LENGTH) {
         return authInvalidTokenDecision(requiredScopes, config, 'Bearer token is malformed or too large.');
     }

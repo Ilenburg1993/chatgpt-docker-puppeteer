@@ -47,7 +47,7 @@ const DEFAULT_HTTP2_UNKNOWN_PROTOCOL_TIMEOUT_MS = 2_000;
 const DEFAULT_HTTP2_SHUTDOWN_DESTROY_AFTER_MS = 3_500;
 const DEFAULT_HTTP2_SESSION_IDLE_TIMEOUT_MS = 95_000;
 const DEFAULT_HTTP2_CERT_EXPIRY_WARN_DAYS = 14;
-const DEFAULT_TLS_MIN_VERSION = 'TLSv1.2';
+const DEFAULT_TLS_MIN_VERSION = /** @type {import('node:tls').SecureVersion} */ ('TLSv1.2');
 const MAX_TLS_FILE_BYTES = 1024 * 1024;
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 const PRIVATE_KEY_BEGIN_PATTERN = /^-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/u;
@@ -78,7 +78,7 @@ const ENCRYPTED_PRIVATE_KEY_PATTERN = /^-----BEGIN ENCRYPTED PRIVATE KEY-----/u;
  * @property {number} certificateExpiryWarnDays
  * @property {boolean} allowNonLoopbackBind
  * @property {boolean} allowNonLoopbackClients
- * @property {string} minVersion
+     * @property {import('node:tls').SecureVersion} minVersion
  */
 
 /**
@@ -281,29 +281,31 @@ export function stopHttp2McpServer(server, callback) {
  * @returns {import('node:http2').SecureServerOptions}
  */
 function buildHttp2SecureServerOptions(policy, cert, key) {
-    return {
-        allowHTTP1: policy.allowHTTP1,
-        ALPNProtocols: policy.allowHTTP1 ? ['h2', 'http/1.1'] : ['h2'],
-        cert,
-        key,
-        minVersion: policy.minVersion,
-        maxSessionMemory: policy.maxSessionMemoryMb,
-        maxHeaderListPairs: policy.maxHeaderListPairs,
-        maxSendHeaderBlockLength: policy.maxSendHeaderBlockLength,
-        maxSettings: policy.maxSettings,
-        maxOutstandingPings: policy.maxOutstandingPings,
-        maxSessionInvalidFrames: policy.maxSessionInvalidFrames,
-        maxSessionRejectedStreams: policy.maxSessionRejectedStreams,
-        streamResetBurst: policy.streamResetBurst,
-        streamResetRate: policy.streamResetRate,
-        unknownProtocolTimeout: policy.unknownProtocolTimeoutMs,
-        strictFieldWhitespaceValidation: true,
-        strictSingleValueFields: true,
-        settings: {
-            enablePush: false,
-            maxConcurrentStreams: policy.maxConcurrentStreams,
-        },
-    };
+    return /** @type {import('node:http2').SecureServerOptions} */ (
+        /** @type {unknown} */ ({
+            allowHTTP1: policy.allowHTTP1,
+            ALPNProtocols: policy.allowHTTP1 ? ['h2', 'http/1.1'] : ['h2'],
+            cert,
+            key,
+            minVersion: policy.minVersion,
+            maxSessionMemory: policy.maxSessionMemoryMb,
+            maxHeaderListPairs: policy.maxHeaderListPairs,
+            maxSendHeaderBlockLength: policy.maxSendHeaderBlockLength,
+            maxSettings: policy.maxSettings,
+            maxOutstandingPings: policy.maxOutstandingPings,
+            maxSessionInvalidFrames: policy.maxSessionInvalidFrames,
+            maxSessionRejectedStreams: policy.maxSessionRejectedStreams,
+            streamResetBurst: policy.streamResetBurst,
+            streamResetRate: policy.streamResetRate,
+            unknownProtocolTimeout: policy.unknownProtocolTimeoutMs,
+            strictFieldWhitespaceValidation: true,
+            strictSingleValueFields: true,
+            settings: {
+                enablePush: false,
+                maxConcurrentStreams: policy.maxConcurrentStreams,
+            },
+        })
+    );
 }
 
 /**
@@ -337,7 +339,7 @@ function installHttp2RuntimeGuards(server, policy) {
 
     server.on('session', (session) => {
         if (runtime.closing) {
-            session.close(http2Constants.NGHTTP2_NO_ERROR);
+            closeHttp2Session(session, http2Constants.NGHTTP2_NO_ERROR);
             return;
         }
         if (runtime.activeSessions.size >= policy.maxSessions) {
@@ -346,7 +348,7 @@ function installHttp2RuntimeGuards(server, policy) {
                 activeSessions: runtime.activeSessions.size,
                 maxSessions: policy.maxSessions,
             });
-            session.close(http2Constants.NGHTTP2_ENHANCE_YOUR_CALM);
+            closeHttp2Session(session, http2Constants.NGHTTP2_ENHANCE_YOUR_CALM);
             setTimeout(
                 () => {
                     if (!session.closed && !session.destroyed) session.destroy();
@@ -361,7 +363,7 @@ function installHttp2RuntimeGuards(server, policy) {
             logMcp('WARN', 'Closing idle MCP HTTP/2 session after timeout.', {
                 sessionIdleTimeoutMs: policy.sessionIdleTimeoutMs,
             });
-            session.close(http2Constants.NGHTTP2_NO_ERROR);
+            closeHttp2Session(session, http2Constants.NGHTTP2_NO_ERROR);
         });
         session.on('close', () => runtime.activeSessions.delete(session));
         session.on('error', (error) => {
@@ -404,10 +406,10 @@ function installHttp2RuntimeGuards(server, policy) {
     });
 
     const close = server.close.bind(server);
-    server.closeGracefully = (callback) => closeHttp2ServerGracefully(server, runtime, policy, close, callback);
+    server.closeGracefully = (callback) => closeHttp2ServerGracefully(runtime, policy, close, callback);
     server.close = /** @type {typeof server.close} */ (
         (callback) => {
-            closeHttp2ServerGracefully(server, runtime, policy, close, callback);
+            closeHttp2ServerGracefully(runtime, policy, close, callback);
             return server;
         }
     );
@@ -415,14 +417,13 @@ function installHttp2RuntimeGuards(server, policy) {
 }
 
 /**
- * @param {McpHttp2SecureServer} server
  * @param {McpHttp2RuntimeState} runtime
  * @param {McpHttp2ServerPolicy} policy
  * @param {(callback?: (err?: Error) => void) => McpHttp2SecureServer} close
  * @param {(error?: Error) => void} [callback]
  * @returns {void}
  */
-function closeHttp2ServerGracefully(server, runtime, policy, close, callback) {
+function closeHttp2ServerGracefully(runtime, policy, close, callback) {
     if (runtime.closing) {
         if (callback) setImmediate(callback);
         return;
@@ -446,7 +447,7 @@ function closeHttp2ServerGracefully(server, runtime, policy, close, callback) {
 
     for (const session of runtime.activeSessions) {
         try {
-            if (!session.closed && !session.destroyed) session.close(http2Constants.NGHTTP2_NO_ERROR);
+            if (!session.closed && !session.destroyed) closeHttp2Session(session, http2Constants.NGHTTP2_NO_ERROR);
         } catch (error) {
             logMcp('WARN', 'Failed to send GOAWAY while closing MCP HTTP/2 session.', {
                 error: error instanceof Error ? error.message : String(error),
@@ -458,6 +459,22 @@ function closeHttp2ServerGracefully(server, runtime, policy, close, callback) {
         clearTimeout(destroyTimer);
         callback?.(error);
     });
+}
+
+/**
+ * Node's HTTP/2 runtime accepts GOAWAY error codes here, while the ambient overload can narrow too aggressively under
+ * checkJs. This helper keeps the shutdown semantics in one place and preserves a no-code fallback.
+ *
+ * @param {import('node:http2').ServerHttp2Session} session
+ * @param {number} code
+ * @returns {void}
+ */
+function closeHttp2Session(session, code) {
+    try {
+        /** @type {{ close: (code?: number) => void }} */ (session).close(code);
+    } catch {
+        session.close();
+    }
 }
 
 /**
@@ -765,11 +782,11 @@ function normalizeCertificateHostname(value) {
 
 /**
  * @param {string | undefined} value
- * @returns {string}
+ * @returns {import('node:tls').SecureVersion}
  */
 function normalizeTlsMinVersion(value) {
     const raw = String(value ?? DEFAULT_TLS_MIN_VERSION).trim();
-    return ['TLSv1.2', 'TLSv1.3'].includes(raw) ? raw : DEFAULT_TLS_MIN_VERSION;
+    return raw === 'TLSv1.2' || raw === 'TLSv1.3' ? raw : DEFAULT_TLS_MIN_VERSION;
 }
 
 /**

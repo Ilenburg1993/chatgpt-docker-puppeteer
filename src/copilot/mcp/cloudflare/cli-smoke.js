@@ -3,12 +3,17 @@
 import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
 import { getCanonicalMcpTools } from '../registry.js';
 import { writeConnectorSmokeState } from './state.js';
-import { buildToolsListSmokeHeaders, compactPersistedToolsListSummary, extractAuthorizationServer, probeJsonWithRetry, readSmokeBearerToken, summarizeOAuthReadiness, summarizeProbeEnvelope, summarizeToolsListProbe } from './cli-probe.js';
+import { buildToolsListSmokeHeaders, extractAuthorizationServer, probeJsonWithRetry, readSmokeBearerToken, summarizeOAuthReadiness, summarizeProbeEnvelope, summarizeToolsListProbe } from './cli-probe.js';
 
 const DEFAULT_MCP_PROTOCOL_VERSION = '2025-06-18';
 const DEFAULT_CRITICAL_TOOL_NAMES = ['repo_status', 'repo_tree', 'repo_read_file', 'repo_search_text', 'repo_apply_file_batch', 'mcp_runtime_health', 'mcp_tunnel_status'];
 
+/**
+ * @param {{ config?: import('./config.js').CloudflareTunnelConfig; authenticated?: boolean; env?: NodeJS.ProcessEnv }} [input]
+ * @returns {Promise<Record<string, unknown>>}
+ */
 export async function runCloudflareSmoke({ config, authenticated = false, env = process.env } = {}) {
+    if (!config) throw new Error('Cloudflare smoke requires a resolved tunnel config.');
     const connectorUrl = resolveConnectorUrl(config, env);
     const protocolVersion = String(env['COPILOT_MCP_PROTOCOL_VERSION'] ?? DEFAULT_MCP_PROTOCOL_VERSION).trim();
     const bearerToken = authenticated ? readSmokeBearerToken() : null;
@@ -22,16 +27,26 @@ export async function runCloudflareSmoke({ config, authenticated = false, env = 
     const oauth = summarizeOAuthReadiness(protectedResource, authorization);
     const authConfig = readMcpAuthConfig(env);
     const report = { ok: Boolean(health.ok && protectedResource.ok && (!authenticated || tools.ok) && criticalTools.ok), connectorUrl, protocolVersion, authenticated, authMode: authConfig.mode, health: summarizeProbeEnvelope(health), oauth, tools, criticalTools };
-    try { await writeConnectorSmokeState(config.smokeStateFile, { connectorUrl, checkedAt: new Date().toISOString(), health: report.health, toolsList: { ok: tools.ok, status: tools.status, tools: tools.toolCount, expectedLocalTools: getCanonicalMcpTools().length, toolsMatchLocalRegistry: true, criticalToolsPresent: criticalTools.ok, missingCriticalTools: criticalTools.missing, missingLocalTools: [], unexpectedRemoteTools: [] }, ok: report.ok, oauth }); } catch {}
+    try { await writeConnectorSmokeState(config.smokeStateFile, { connectorUrl, checkedAt: new Date().toISOString(), health: report.health, toolsList: { ok: tools.ok, status: tools.status, tools: tools.toolCount, expectedLocalTools: getCanonicalMcpTools().length, toolsMatchLocalRegistry: true, criticalToolsPresent: criticalTools.ok, missingCriticalTools: criticalTools.missing, missingLocalTools: [], unexpectedRemoteTools: [] }, ok: report.ok, oauth }); } catch { /* smoke state persistence is best-effort */ }
     return report;
 }
 
+/**
+ * @param {import('./config.js').CloudflareTunnelConfig} config
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {string}
+ */
 function resolveConnectorUrl(config, env) {
     const explicit = String(env['COPILOT_MCP_SMOKE_URL'] ?? env['COPILOT_MCP_PUBLIC_URL'] ?? config.publicMcpUrl ?? '').trim();
     if (explicit) return explicit;
     throw new Error('Smoke requires COPILOT_MCP_SMOKE_URL, COPILOT_MCP_PUBLIC_URL, or configured public URL.');
 }
 
+/**
+ * @param {string[]} toolNames
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {{ ok: boolean; expected: string[]; missing: string[]; unknownExpected: string[] }}
+ */
 function summarizeCriticalTools(toolNames, env) {
     const expected = String(env['COPILOT_MCP_CRITICAL_TOOLS'] ?? '').trim() ? String(env['COPILOT_MCP_CRITICAL_TOOLS']).split(',').map((item) => item.trim()).filter(Boolean) : DEFAULT_CRITICAL_TOOL_NAMES;
     const canonical = new Set(getCanonicalMcpTools().map((tool) => tool.name));

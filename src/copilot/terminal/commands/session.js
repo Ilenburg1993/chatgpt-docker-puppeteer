@@ -627,14 +627,21 @@ export function cmdHistory({ println }, n = 10) {
     );
     for (const turn of hist) {
         const ts = new Date(turn.timestamp).toLocaleTimeString('pt-BR');
-        const roleLabel = turn.role === 'user' ? '👤' : turn.rawRole === 'llm_a' ? '🤖' : '🧠';
+        const roleLabel =
+            turn.role === 'user'
+                ? '👤'
+                : turn.role === 'system' || turn.rawRole === 'ask_user'
+                  ? '🧭'
+                  : turn.rawRole === 'llm_a'
+                    ? '🤖'
+                    : '🧠';
         const sourceLabel = turn.persisted ? '' : ' \x1b[33m[live]\x1b[0m';
         const preview = turn.content.slice(0, 160) + (turn.content.length > 160 ? '…' : '');
         println(`  [${ts}] ${roleLabel}${sourceLabel} ${preview}`);
     }
     if (timeline.reconciliationStatus === 'diverged') {
         println(
-            '  \x1b[33mNota: histórico do bridge divergiu; exibindo a timeline persistida como fonte oficial.\x1b[0m',
+            `  \x1b[33mNota: histórico do bridge divergiu; live-tail preservado=${timeline.liveBridgeTailCount} e sync bloqueado${timeline.syncBlockedReason ? ` (${timeline.syncBlockedReason})` : ''}.\x1b[0m`,
         );
     }
     if (timeline.sync.status === 'scheduled' || timeline.sync.status === 'inflight') {

@@ -339,6 +339,16 @@ function buildTimelineSignature(turn) {
 }
 
 /**
+ * @param {TerminalTimelineTurn[]} persistedTurns
+ * @param {TerminalTimelineTurn[]} liveTurns
+ * @returns {TerminalTimelineTurn[]}
+ */
+function filterDivergentLiveTail(persistedTurns, liveTurns) {
+    const persistedSignatures = new Set(persistedTurns.map(buildTimelineSignature));
+    return liveTurns.filter((turn) => !persistedSignatures.has(buildTimelineSignature(turn)));
+}
+
+/**
  * @param {unknown} value
  * @returns {TerminalTimelineSyncPolicy}
  */
@@ -708,6 +718,7 @@ function readLatestTerminalHubTurnsWindow(hubSessionId, limitTurns, newestOffset
  *     liveBridgeTailCount: number;
  *     overlapCount: number;
  *     sync: TerminalTimelineSyncState;
+ *     syncBlockedReason: string | null;
  *     turns: TerminalTimelineTurn[];
  * }}
  */
@@ -774,6 +785,13 @@ export function readTerminalTimelineProjection({
                 }
             } else {
                 reconciliationStatus = 'diverged';
+                liveBridgeTail = filterDivergentLiveTail(persistedTurns, liveTurns);
+                if (liveBridgeTail.length > 0) {
+                    turns = dedupeTimelineTurns([...persistedTurns, ...liveBridgeTail].sort((a, b) => a.timestamp - b.timestamp));
+                    timelineSource = 'mixed';
+                    timelineAuthority = 'reconciled';
+                    liveBridgeTailCount = liveBridgeTail.length;
+                }
             }
         }
     } else if (liveTurns.length > 0) {
@@ -796,6 +814,7 @@ export function readTerminalTimelineProjection({
         bridgeTurns: liveTurns,
         liveBridgeTail,
     });
+    const syncBlockedReason = sync.status === 'blocked' ? sync.reason : null;
 
     return {
         requestedRuntimeId: base.requestedRuntimeId,
@@ -814,6 +833,7 @@ export function readTerminalTimelineProjection({
         liveBridgeTailCount,
         overlapCount,
         sync,
+        syncBlockedReason,
         turns,
     };
 }
@@ -847,6 +867,7 @@ export function readTerminalHistoryProjection(limitPairs = 10, runtimeId) {
  *     liveBridgeTailCount: number;
  *     syncStatus: TerminalTimelineSyncStatus;
  *     syncReason: string | null;
+ *     syncBlockedReason: string | null;
  *     syncPendingCount: number;
  *     syncSyncedCount: number;
  *     syncFailedCount: number;
@@ -888,6 +909,7 @@ export function readTerminalContextProjection(runtimeId) {
         liveBridgeTailCount: timeline.liveBridgeTailCount,
         syncStatus: timeline.sync.status,
         syncReason: timeline.sync.reason,
+        syncBlockedReason: timeline.syncBlockedReason,
         syncPendingCount: timeline.sync.pendingCount,
         syncSyncedCount: timeline.sync.syncedCount,
         syncFailedCount: timeline.sync.failedCount,

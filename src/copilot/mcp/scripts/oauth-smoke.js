@@ -33,7 +33,6 @@ const MAX_RESPONSE_TEXT_BYTES = 256 * 1024;
 const MAX_SUMMARY_TEXT_LENGTH = 500;
 const MAX_URL_LENGTH = 2048;
 const MAX_TOKEN_LENGTH = 64 * 1024;
-const MAX_SCOPE_TOKENS = 80;
 const DEFAULT_PROTOCOL_VERSION = '2025-11-25';
 const FULL_REPO_SCOPE = 'repo:read repo:write repo:validate repo:admin';
 const FULL_REPO_OIDC_SCOPE = `${FULL_REPO_SCOPE} openid profile email`;
@@ -49,6 +48,7 @@ const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion
  *     attempts?: number;
  *     transient?: boolean;
  *     durationMs?: number;
+ *     skipped?: boolean;
  * }} ProbeResult
  *
  *
@@ -545,7 +545,7 @@ async function discoverAuthorizationServerMetadata(authorizationServer, runtime)
             return { url, probe, attempts };
         }
     }
-    return { url: candidates[0], probe: failure('authorization server metadata discovery failed'), attempts };
+    return { url: candidates[0] ?? authorizationServer, probe: failure('authorization server metadata discovery failed'), attempts };
 }
 
 /**
@@ -581,7 +581,9 @@ function buildAuthorizationServerMetadataCandidates(issuer) {
  * @returns {{ ok: boolean; errors: string[]; warnings: string[]; facts: Record<string, unknown> }}
  */
 function buildComplianceProfile(input) {
+    /** @type {string[]} */
     const errors = [];
+    /** @type {string[]} */
     const warnings = [];
     const prm = asRecord(input.protectedResource.body);
     const rootPrm = asRecord(input.rootProtectedResource.body);
@@ -737,7 +739,7 @@ async function runPrivateKeyJwtSmoke(input) {
         const redirectUri =
             normalizeStringArray(registrationBody?.['redirect_uris'])[0] ??
             'https://chatgpt.com/connector/oauth/codex-smoke';
-        const assertionFactory = async (tokenEndpoint) => ({
+        const assertionFactory = async (/** @type {string} */ tokenEndpoint) => ({
             client_assertion_type: CLIENT_ASSERTION_TYPE_JWT_BEARER,
             client_assertion: await buildClientAssertion({
                 privateKey,
@@ -1199,7 +1201,9 @@ async function runCimdSmoke(input) {
  * @returns {{ ok: boolean; errors: string[]; warnings: string[] }}
  */
 function validateCimdClientMetadata(body, expectedClientId) {
+    /** @type {string[]} */
     const errors = [];
+    /** @type {string[]} */
     const warnings = [];
     if (!body) {
         errors.push('client metadata document is not a JSON object.');
@@ -1790,7 +1794,9 @@ function summarizeJwtClaims(value) {
 function validateAccessTokenClaims(value, expectations) {
     const claims = summarizeJwtClaims(value);
     const payload = typeof value === 'string' ? decodeJwtPayload(value) : null;
+    /** @type {string[]} */
     const errors = [];
+    /** @type {string[]} */
     const warnings = [];
     if (!payload) {
         errors.push('access_token is missing or is not a JWT.');

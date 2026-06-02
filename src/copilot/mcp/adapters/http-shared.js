@@ -141,13 +141,15 @@ const KNOWN_ROUTE_METHODS = {
  * @returns {CorsRoutePolicy}
  */
 function buildCorsPolicy(methods, options = {}) {
-    return {
+    /** @type {CorsRoutePolicy} */
+    const policy = {
         methods,
         allowHeaders: [...DEFAULT_CORS_ALLOWED_HEADERS],
         exposeHeaders: [...DEFAULT_CORS_EXPOSED_HEADERS],
         maxAgeSeconds: 600,
-        jsonRpcErrors: options.jsonRpcErrors,
     };
+    if (options.jsonRpcErrors !== undefined) policy.jsonRpcErrors = options.jsonRpcErrors;
+    return policy;
 }
 
 /**
@@ -328,7 +330,7 @@ export function createMcpHttpRequestHandler(options) {
                     return;
                 }
                 if (url.pathname === '/oauth/authorize') {
-                    writeMethodNotAllowed(res, KNOWN_ROUTE_METHODS['/oauth/authorize']);
+                    writeMethodNotAllowed(res, KNOWN_ROUTE_METHODS['/oauth/authorize'] ?? ['GET']);
                     return;
                 }
                 writeText(res, 404, 'Not Found');
@@ -394,8 +396,9 @@ export function createMcpHttpRequestHandler(options) {
                     writeMcpTransportError(res, 406, acceptHeaderError);
                     return;
                 }
-                if (!req.method || !KNOWN_ROUTE_METHODS[MCP_PATH].includes(req.method)) {
-                    writeMethodNotAllowed(res, KNOWN_ROUTE_METHODS[MCP_PATH]);
+                const mcpRouteMethods = KNOWN_ROUTE_METHODS[MCP_PATH] ?? ['POST', 'GET', 'DELETE'];
+                if (!req.method || !mcpRouteMethods.includes(req.method)) {
+                    writeMethodNotAllowed(res, mcpRouteMethods);
                     return;
                 }
                 if (rejectAccessTokenInUri(url, res)) return;
@@ -940,6 +943,7 @@ function shouldIssueMcpUnauthorizedChallenge(req, config) {
 function writeMcpUnauthorizedChallenge(res, config) {
     const resource = `${config.resource}/mcp`;
     const metadataUrl = `${config.resource}/.well-known/oauth-protected-resource/mcp`;
+    /** @type {[string, string][]} */
     const params = [
         ['realm', resource],
         ['resource_metadata', metadataUrl],
@@ -1021,6 +1025,7 @@ export function readHeader(req, name) {
 
 /**
  * @param {McpHttpRequest} req
+ * @param {URL} url
  * @returns {import('../control-plane/auth.js').McpAuthContext}
  */
 function buildAuthContext(req, url) {
@@ -1028,7 +1033,7 @@ function buildAuthContext(req, url) {
     return {
         bearerToken: parseBearerToken(authorizationHeader),
         headers: req.headers,
-        method: req.method,
+        method: req.method ?? 'GET',
         url: url.toString(),
     };
 }
@@ -1036,6 +1041,7 @@ function buildAuthContext(req, url) {
 /**
  * @param {McpHttpRequest} req
  * @param {McpHttpResponse} res
+ * @param {URL} url
  * @returns {Promise<void>}
  */
 async function handleMcpRequest(req, res, url) {

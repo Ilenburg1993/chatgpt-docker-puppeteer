@@ -785,7 +785,7 @@ function validateSecuritySchemes(tool, label, warnings) {
             warnings.push(`${label}: securitySchemes[${index}] should be an object.`);
             continue;
         }
-        if (typeof scheme.type !== 'string' || !scheme.type) {
+        if (typeof scheme['type'] !== 'string' || !scheme['type']) {
             warnings.push(`${label}: securitySchemes[${index}].type should be a non-empty string.`);
         }
     }
@@ -960,7 +960,7 @@ function buildMcpToolDescriptorManifest(tools, options = {}) {
         },
         ...(options.includeDescriptors
             ? { tools: descriptors }
-            : { toolNames: descriptors.map((entry) => entry.name) }),
+            : { toolNames: descriptors.map((entry) => entry['name']) }),
     };
 }
 
@@ -1046,8 +1046,8 @@ function collectToolSecurityScopes(tool) {
         ...normalizeSecuritySchemeArray(tool.securitySchemes),
         ...normalizeSecuritySchemeArray(tool._meta?.['securitySchemes']),
     ]) {
-        if (Array.isArray(scheme.scopes)) {
-            for (const scope of scheme.scopes) if (typeof scope === 'string' && scope) scopes.add(scope);
+        if (Array.isArray(scheme['scopes'])) {
+            for (const scope of scheme['scopes']) if (typeof scope === 'string' && scope) scopes.add(scope);
         }
     }
     return [...scopes].sort();

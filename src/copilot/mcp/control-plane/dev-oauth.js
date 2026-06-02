@@ -1633,7 +1633,7 @@ async function verifyDpopProof(proof, expected) {
         if (!jti || jti.length > 256 || hasControlCharacters(jti))
             return { ok: false, error: 'DPoP proof jti is missing or invalid.' };
         if (isDpopNonceRequired()) {
-            const nonce = typeof payload.nonce === 'string' ? payload.nonce : '';
+            const nonce = typeof payload['nonce'] === 'string' ? payload['nonce'] : '';
             if (!isValidDpopNonce(nonce)) {
                 return {
                     ok: false,
@@ -1655,7 +1655,7 @@ async function verifyDpopProof(proof, expected) {
     } catch (error) {
         return {
             ok: false,
-            error: error instanceof Error ? sanitizeLogString(error.message) : 'DPoP proof could not be verified.',
+            error: error instanceof Error ? sanitizeLogString(error.message, 240) : 'DPoP proof could not be verified.',
         };
     }
 }
@@ -1773,6 +1773,7 @@ function trimDpopNonces(maxSize) {
 /**
  * @param {import('node:http').IncomingMessage} req
  * @param {import('node:http').ServerResponse} res
+ * @param {import('./auth.js').McpAuthConfig} config
  * @returns {Promise<void>}
  */
 async function handleRevoke(req, res, config) {
@@ -1875,7 +1876,7 @@ async function handleIntrospect(req, res, config) {
         }
         writeJson(res, 200, {
             active: true,
-            token_type: payload.cnf ? 'DPoP' : 'Bearer',
+            token_type: payload['cnf'] ? 'DPoP' : 'Bearer',
             client_id: payload['client_id'] ?? null,
             scope: payload['scope'] ?? '',
             sub: payload.sub ?? DEV_OAUTH_SUBJECT,
@@ -1885,7 +1886,7 @@ async function handleIntrospect(req, res, config) {
             exp: payload.exp ?? null,
             iat: payload.iat ?? null,
             jti: payload.jti ?? null,
-            ...(payload.cnf ? { cnf: payload.cnf } : {}),
+            ...(payload['cnf'] ? { cnf: payload['cnf'] } : {}),
         });
     } catch {
         writeJson(res, 200, { active: false });
@@ -2041,6 +2042,8 @@ function devOAuthPersistenceConfigKey(env = process.env) {
  *     loaded: boolean;
  *     loadedFromFile: boolean;
  *     tokenCount: number;
+ *     consumedRefreshTokenHashCount: number;
+ *     revokedRefreshTokenFamilyCount: number;
  *     lastLoadedAt: string | null;
  *     lastPersistedAt: string | null;
  *     lastPersistenceError: string | null;
@@ -3435,7 +3438,7 @@ async function readHttpsJsonDocumentWithPublicDnsOnlyWithCache(url, maxBytes, re
             },
             (incoming) => {
                 void handleClientMetadataIncomingMessage(url, incoming, maxBytes, redirectsRemaining).then(
-                    resolve,
+                    (value) => resolve(value),
                     () => resolve(undefined),
                 );
             },
@@ -3451,7 +3454,7 @@ async function readHttpsJsonDocumentWithPublicDnsOnlyWithCache(url, maxBytes, re
  * @param {import('node:http').IncomingMessage} incoming
  * @param {number} maxBytes
  * @param {number} redirectsRemaining
- * @returns {Promise<unknown | undefined>}
+ * @returns {Promise<{ document: unknown; cacheTtlMs: number } | undefined>}
  */
 async function handleClientMetadataIncomingMessage(currentUrl, incoming, maxBytes, redirectsRemaining) {
     const statusCode = Number(incoming.statusCode ?? 0);
@@ -3888,6 +3891,7 @@ function ensureResponseRequestId(res) {
  * @returns {void}
  */
 function setBearerChallenge(res, config, error = '', description = '', scope = '') {
+    /** @type {[string, string][]} */
     const params = [['realm', config.resource]];
     if (error) params.push(['error', error]);
     if (description) params.push(['error_description', description]);
@@ -3902,6 +3906,7 @@ function setBearerChallenge(res, config, error = '', description = '', scope = '
  * @returns {void}
  */
 function setDpopChallenge(res, error, description) {
+    /** @type {[string, string][]} */
     const params = [['error', error]];
     if (description) params.push(['error_description', description]);
     res.setHeader('WWW-Authenticate', `DPoP ${params.map(([name, value]) => `${name}=${quoteAuthParam(value)}`).join(', ')}`);

@@ -54,8 +54,6 @@ const DEFAULT_MAX_TOOLS = 200;
 
 const SERVER_NAME_PATTERN = /^[A-Za-z0-9_.-]+$/u;
 const TOOL_NAME_PATTERN = /^[A-Za-z0-9_.-]{1,128}$/u;
-const CONTROL_CHARACTERS_PATTERN = /[\u0000-\u001f\u007f]/u;
-const CONTROL_CHARACTERS_GLOBAL_PATTERN = /[\u0000-\u001f\u007f]/gu;
 const SUSPICIOUS_DESCRIPTOR_PATTERNS = /** @type {const} */ ([
     /ignore\s+(?:all\s+)?(?:previous|prior|system|developer)\s+instructions/iu,
     /reveal\s+(?:secrets?|tokens?|credentials?|private\s+keys?)/iu,
@@ -278,9 +276,9 @@ function buildCopilotMcpServerInfo(policy) {
         version: policy.version,
         description: policy.description,
     };
-    if (policy.websiteUrl) info.websiteUrl = policy.websiteUrl;
+    if (policy.websiteUrl) info['websiteUrl'] = policy.websiteUrl;
     if (policy.iconUrl) {
-        info.icons = [
+        info['icons'] = [
             {
                 src: policy.iconUrl,
                 mimeType: inferIconMimeType(policy.iconUrl),
@@ -304,7 +302,7 @@ function buildMcpServerSdkOptions(policy) {
             },
         },
     };
-    if (policy.instructionsEnabled && policy.instructions) options.instructions = policy.instructions;
+    if (policy.instructionsEnabled && policy.instructions) options['instructions'] = policy.instructions;
     return options;
 }
 
@@ -452,8 +450,8 @@ function buildMcpToolDescriptorManifest(tools, validation, profile) {
             protocolVersion: COPILOT_MCP_PROTOCOL_VERSION,
         },
         serverInfo: profile.serverInfo,
-        capabilities: profile.sdkOptions.capabilities,
-        instructionsEnabled: Boolean(profile.sdkOptions.instructions),
+        capabilities: profile.sdkOptions['capabilities'],
+        instructionsEnabled: Boolean(profile.sdkOptions['instructions']),
         toolCount: tools.length,
         descriptorFingerprint,
         validation: {
@@ -493,7 +491,7 @@ function canonicalizeToolDescriptorForManifest(tool) {
 function summarizeSchemaForManifest(schema) {
     if (!schema || typeof schema !== 'object') return { kind: typeof schema };
     const object = /** @type {Record<string, unknown>} */ (schema);
-    const shape = object.shape;
+    const shape = object['shape'];
     return {
         kind: schema.constructor?.name || 'Object',
         keys: Object.keys(object).sort().slice(0, 50),
@@ -555,7 +553,7 @@ function validateOpenAiToolMeta(tool, warnings, name) {
  * @returns {void}
  */
 function updateServerFactoryRuntime(tools, validation, manifest) {
-    const descriptorFingerprint = String(manifest.descriptorFingerprint ?? '');
+    const descriptorFingerprint = String(manifest['descriptorFingerprint'] ?? '');
     const previous = serverFactoryRuntime.lastDescriptorFingerprint;
     serverFactoryRuntime.created += 1;
     serverFactoryRuntime.lastCreatedAt = new Date().toISOString();
@@ -589,13 +587,13 @@ function logServerFactoryProfileOnce(profile, toolCount, validation, manifest) {
         },
         serverInfo: profile.serverInfo,
         sdkOptions: {
-            capabilities: profile.sdkOptions.capabilities,
-            instructionsEnabled: Boolean(profile.sdkOptions.instructions),
-            instructionsLength: String(profile.sdkOptions.instructions ?? '').length,
+            capabilities: profile.sdkOptions['capabilities'],
+            instructionsEnabled: Boolean(profile.sdkOptions['instructions']),
+            instructionsLength: String(profile.sdkOptions['instructions'] ?? '').length,
         },
         tools: {
             count: toolCount,
-            descriptorFingerprint: manifest.descriptorFingerprint,
+            descriptorFingerprint: manifest['descriptorFingerprint'],
             validationErrors: validation.errors.length,
             validationWarnings: validation.warnings.length,
             validationCounts: validation.counts,
@@ -615,9 +613,9 @@ function redactProfileForStatus(profile) {
     return {
         serverInfo: profile.serverInfo,
         sdkOptions: {
-            capabilities: profile.sdkOptions.capabilities,
-            instructionsEnabled: Boolean(profile.sdkOptions.instructions),
-            instructionsLength: String(profile.sdkOptions.instructions ?? '').length,
+            capabilities: profile.sdkOptions['capabilities'],
+            instructionsEnabled: Boolean(profile.sdkOptions['instructions']),
+            instructionsLength: String(profile.sdkOptions['instructions'] ?? '').length,
         },
         policy: {
             name: profile.policy.name,
@@ -647,11 +645,11 @@ function redactProfileForStatus(profile) {
 function stableProfileKey(profile, manifest) {
     return stableJson({
         serverInfo: profile.serverInfo,
-        descriptorFingerprint: manifest.descriptorFingerprint,
+        descriptorFingerprint: manifest['descriptorFingerprint'],
         sdkOptions: {
-            capabilities: profile.sdkOptions.capabilities,
-            instructionsEnabled: Boolean(profile.sdkOptions.instructions),
-            instructionsLength: String(profile.sdkOptions.instructions ?? '').length,
+            capabilities: profile.sdkOptions['capabilities'],
+            instructionsEnabled: Boolean(profile.sdkOptions['instructions']),
+            instructionsLength: String(profile.sdkOptions['instructions'] ?? '').length,
         },
         strictDescriptorValidation: profile.policy.strictDescriptorValidation,
         strictToolRiskValidation: profile.policy.strictToolRiskValidation,
@@ -785,7 +783,11 @@ function readPositiveIntegerEnv(env, name, fallback, minimum, maximum) {
  * @returns {boolean}
  */
 function hasControlCharacters(value) {
-    return CONTROL_CHARACTERS_PATTERN.test(value);
+    for (let index = 0; index < value.length; index += 1) {
+        const code = value.charCodeAt(index);
+        if (code <= 0x1f || code === 0x7f) return true;
+    }
+    return false;
 }
 
 /**
@@ -793,7 +795,12 @@ function hasControlCharacters(value) {
  * @returns {string}
  */
 function stripControlCharacters(value) {
-    return String(value ?? '').replace(CONTROL_CHARACTERS_GLOBAL_PATTERN, '');
+    return Array.from(String(value ?? ''))
+        .filter((char) => {
+            const code = char.charCodeAt(0);
+            return code > 0x1f && code !== 0x7f;
+        })
+        .join('');
 }
 
 /**

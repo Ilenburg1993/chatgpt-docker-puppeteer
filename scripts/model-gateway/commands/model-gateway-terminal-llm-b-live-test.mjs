@@ -53,6 +53,7 @@ Common options:
   --byok-real-route-timeout-ms=<ms>
   --byok-real-require-vision-probe
   --auto-probe
+  --reuse-sdk-session
   --timeout-ms=<ms>
   --transport=<pty|stdio>
   --out-dir=<path>
@@ -126,7 +127,8 @@ function buildScenarioPrompt() {
         'Use chamadas de ferramenta reais do SDK; texto, Markdown, JSON, pseudo-tool e exemplos de tool_calls não contam.',
         'Primeiro invoque a ferramenta real report_intent com o intent "terminal live canonical deltas tools ask_user usage".',
         'Depois invoque a ferramenta real read_file_content para ler as primeiras 3 linhas de package.json.',
-        'Em seguida escreva uma resposta pública longa, com frases separadas DELTA-CANONICAL-1 até DELTA-CANONICAL-8, para validar deltas parciais e final.',
+        'Em seguida escreva obrigatoriamente uma resposta pública antes de qualquer ask_user, com exatamente 8 linhas separadas: DELTA-CANONICAL-1, DELTA-CANONICAL-2, DELTA-CANONICAL-3, DELTA-CANONICAL-4, DELTA-CANONICAL-5, DELTA-CANONICAL-6, DELTA-CANONICAL-7 e DELTA-CANONICAL-8.',
+        'Não invoque ask_user antes dessas 8 linhas públicas aparecerem no transcript.',
         'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-CANONICAL: responda SIM para fechar o teste".',
         'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-CANONICAL-FINAL: usuário confirmou SIM".',
         'Antes da resposta SIM, não escreva, cite nem antecipe o marcador POST-ASK-CANONICAL-FINAL.',
@@ -1226,6 +1228,7 @@ function buildReport({
     transport,
     liveHealthRecord,
     liveScenarioRunRecord,
+    sdkSessionBootSelection,
 }) {
     const ok = allRequiredCriteriaPassed(criteria);
     const status = blocker ? 'BLOCKED' : ok ? 'PASS' : 'FAIL';
@@ -1248,6 +1251,7 @@ function buildReport({
         `- SSE JSONL: ${sseJsonlPath}`,
         `- BYOK live health record: ${liveHealthRecord?.recorded ? 'recorded' : liveHealthRecord?.attempted ? `not-recorded · ${liveHealthRecord.reason ?? 'unknown'}` : 'n/a'}`,
         `- Live scenario run record: ${liveScenarioRunRecord?.recorded ? 'recorded' : liveScenarioRunRecord?.attempted ? `not-recorded · ${liveScenarioRunRecord.reason ?? 'unknown'}` : 'n/a'}`,
+        `- SDK session boot selection: ${sdkSessionBootSelection?.attempted ? (sdkSessionBootSelection.ok ? 'forced-new' : `failed · ${sdkSessionBootSelection.reason ?? 'unknown'}`) : 'unchanged'}`,
         '',
         '## SSE',
         '',
@@ -1277,6 +1281,40 @@ function liveScenarioKind({ autoControlProbe, byokControlProbe, byokFixture, byo
     if (byokReal) return 'byok_real_full';
     if (noPr) return 'control_no_pr';
     return 'canonical_full_turn';
+}
+
+async function scheduleFreshSdkSessionForCanonicalScenario({ enabled }) {
+    if (!enabled) return { attempted: false, ok: true, reason: 'disabled' };
+    try {
+        const { scheduleAgentSdkSessionBootSelection } = await import(
+            '../../../src/copilot/presentation/runtime/sdk-session.js'
+        );
+        const result = await scheduleAgentSdkSessionBootSelection({ mode: 'new' });
+        const resultValue = result && typeof result === 'object' ? result.value : null;
+        const persistedSelection =
+            resultValue && typeof resultValue === 'object' && resultValue.nextSdkSessionBoot
+                ? resultValue.nextSdkSessionBoot
+                : null;
+        const resultSummary = {
+            ok: result?.ok !== false,
+            persistedSelection,
+        };
+        if (result?.ok === false) {
+            return {
+                attempted: true,
+                ok: false,
+                reason: typeof result.error === 'string' ? result.error : 'schedule-returned-not-ok',
+                result: resultSummary,
+            };
+        }
+        return { attempted: true, ok: true, result: resultSummary };
+    } catch (error) {
+        return {
+            attempted: true,
+            ok: false,
+            reason: error instanceof Error ? error.message : String(error),
+        };
+    }
 }
 
 async function recordLiveScenarioRunToSqlite({
@@ -1352,6 +1390,7 @@ async function writeEarlyBlockedSummary({
     mdPath,
     transport,
     realByok,
+    sdkSessionBootSelection,
 }) {
     const durationMs = Date.now() - Date.parse(startedAt);
     const raw = `[terminal-live] blocked before terminal start: ${blocker.id} · ${blocker.detail}\n`;
@@ -1389,6 +1428,7 @@ async function writeEarlyBlockedSummary({
                 criteria,
                 sse: sseSummary,
                 byokReal: realByok?.redacted ?? null,
+                sdkSessionBootSelection: sdkSessionBootSelection ?? { attempted: false, ok: true, reason: 'not-applicable' },
                 liveHealthRecord,
                 export: null,
             },
@@ -1414,6 +1454,7 @@ async function writeEarlyBlockedSummary({
             startedAt,
             transport,
             liveHealthRecord,
+            sdkSessionBootSelection,
         }),
         'utf8',
     );
@@ -1472,16 +1513,6 @@ function detectLiveBlocker(plain, runtime = {}) {
             detail:
                 'BYOK live turn rendered tool-shaped protocol or a textual ask_user simulation without materializing the required live terminal interaction' +
                 `${byokLiveToolProtocolMiss.markers.length > 0 ? ` · text=${byokLiveToolProtocolMiss.markers.join('+')}` : ''}`,
-        };
-    }
-    const liveDeltaProtocolMiss = findLiveDeltaProtocolMiss(plain, runtime.sseEvents);
-    if (liveDeltaProtocolMiss) {
-        return {
-            id: 'assistant-delta-protocol-missed',
-            detail:
-                'assistant reached canonical ask_user after public streaming without emitting the full DELTA-CANONICAL-1..8 test series' +
-                ` · deltaEvents=${liveDeltaProtocolMiss.deltaEvents}` +
-                ` · markers=${liveDeltaProtocolMiss.markers.join(',') || 'none'}`,
         };
     }
     if (
@@ -1564,34 +1595,6 @@ function findByokRealLiveToolProtocolMiss(plain) {
     if (!/(?:^|\n)\s*│\s+(?:\*{1,2})?DELTA-CANONICAL-8\b/u.test(plain)) return null;
     const hasTextifiedAsk = markers.includes('ask_user') || markers.includes('ask_user_text') || markers.includes('ask_user_question_json');
     return hasTextifiedAsk || markers.length >= 2 ? { markers } : null;
-}
-
-function findLiveDeltaProtocolMiss(plain, events) {
-    const publicDeltas = Array.isArray(events)
-        ? events.filter((evt) => evt?.event === 'delta' && typeof evt?.data?.chunk === 'string')
-        : [];
-    if (publicDeltas.length === 0) return null;
-    const askMaterialized =
-        /\[ASK\]\s+ASK-CANONICAL:\s+responda SIM para fechar o teste/u.test(plain) ||
-        (Array.isArray(events) &&
-            events.some(
-                (evt) =>
-                    evt?.event === 'user_input.requested' &&
-                    /ASK-CANONICAL:\s+responda SIM para fechar o teste/u.test(
-                        String(evt?.data?.question ?? evt?.data?.prompt ?? ''),
-                    ),
-            ));
-    if (!askMaterialized) return null;
-    const markers = new Set(
-        [...String(plain ?? '').matchAll(/\bDELTA-CANONICAL-(\d+)\b/gu)]
-            .map((match) => Number(match[1]))
-            .filter((value) => Number.isInteger(value) && value >= 1 && value <= 8),
-    );
-    if (markers.size >= 8) return null;
-    return {
-        deltaEvents: publicDeltas.length,
-        markers: [...markers].sort((a, b) => a - b),
-    };
 }
 
 function isObjectPayload(value) {
@@ -1891,6 +1894,7 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
     const taskDeltaActivityDuringDialog =
         /task\s+·\s+Executando tarefa interna\s+—\s+delta/.test(preEventsPlain) ||
         /"label":"Executando tarefa interna","detail":"delta/.test(preEventsPlain);
+    const promptDoubleRender = /voc[eê]\[[^\r\n]*?›[ \t]+voc[eê]\[[^\r\n]*?›/iu.test(plain);
     const duplicatePathologies = [
         /__anonymous__/,
         /hook:error_occurred/,
@@ -1979,6 +1983,11 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
                 : 'no known duplicate/pathology markers detected',
         },
         {
+            id: 'no-prompt-double-render',
+            pass: !promptDoubleRender,
+            detail: promptDoubleRender ? 'adjacent prompt repaint detected' : 'no adjacent prompt repaint detected',
+        },
+        {
             id: 'no-final-delta-duplication',
             pass: !(finalRenderedByLiveTurn && finalRenderedByAssistantMessage),
             detail: `final rendered live=${finalRenderedByLiveTurn ? 'yes' : 'no'} assistant.message=${finalRenderedByAssistantMessage ? 'yes' : 'no'}`,
@@ -2026,6 +2035,21 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
             id: 'export-envelope',
             pass: Boolean(exportSummary?.hasEnvelope),
             detail: 'exported Markdown contains source/trace envelope data',
+        },
+        {
+            id: 'export-ask-user',
+            pass: Boolean(exportSummary?.hasAskUser),
+            detail: 'exported Markdown contains the canonical ask_user request',
+        },
+        {
+            id: 'export-ask-user-answer',
+            pass: Boolean(exportSummary?.hasAskUserAnswer),
+            detail: 'exported Markdown contains the human answer with user authorship',
+        },
+        {
+            id: 'export-post-ask-final',
+            pass: Boolean(exportSummary?.hasPostAskFinal),
+            detail: 'exported Markdown contains the post-ask assistant final message',
         },
         ...evaluateSseCriteria(sseSummary, { expectPublicEvents: true, plain }),
     ];
@@ -2672,6 +2696,11 @@ async function inspectExportedMarkdown(exportPath) {
             hasTranscript: /DELTA-CANONICAL-8/.test(content) || /ASK-CANONICAL/.test(content),
             hasStreamingDiagnostics: /streaming=/.test(content),
             hasEnvelope: /envelope=/.test(content),
+            hasAskUser: /ask_user solicitou resposta humana:[\s\S]*ASK-CANONICAL: responda SIM para fechar o teste/iu.test(
+                content,
+            ),
+            hasAskUserAnswer: /##\s+👤\s+Usu[aá]rio[\s\S]*Resposta ao ask_user:[\s\S]*\bSIM\b/iu.test(content),
+            hasPostAskFinal: POST_ASK_FINAL_RE.test(content),
             content,
         };
     } catch (error) {
@@ -2681,6 +2710,9 @@ async function inspectExportedMarkdown(exportPath) {
             hasTranscript: false,
             hasStreamingDiagnostics: false,
             hasEnvelope: false,
+            hasAskUser: false,
+            hasAskUserAnswer: false,
+            hasPostAskFinal: false,
             content: '',
         };
     }
@@ -2788,6 +2820,7 @@ async function main() {
     const dryRun = hasFlag('--dry-run');
     const noPr = hasFlag('--no-pr');
     const sessionCycle = hasFlag('--session-cycle');
+    const reuseSdkSession = hasFlag('--reuse-sdk-session');
     const byokProbe = hasFlag('--byok-probe');
     const byokFixture = hasFlag('--byok-fixture');
     const autoProbe = hasFlag('--auto-probe');
@@ -2923,6 +2956,40 @@ async function main() {
               : buildScenarioPrompt();
         await writeFile(path.join(outDir, 'prompt.txt'), `${prompt}\n`, 'utf8');
         console.log(`[terminal-live] dry-run prompt written to ${path.relative(ROOT, path.join(outDir, 'prompt.txt'))}`);
+        await byokFixtureProvider?.close();
+        return;
+    }
+
+    const shouldForceFreshSdkSession =
+        !reuseSdkSession && !noPr && !sessionCycle && !byokControlProbe && !autoControlProbe;
+    const sdkSessionBootSelection = await scheduleFreshSdkSessionForCanonicalScenario({
+        enabled: shouldForceFreshSdkSession,
+    });
+    if (!sdkSessionBootSelection.ok) {
+        const blocker = {
+            id: 'sdk-session-boot-selection-failed',
+            detail: `could not schedule a fresh SDK session for canonical live scenario: ${
+                sdkSessionBootSelection.reason ?? 'unknown'
+            }`,
+        };
+        await writeEarlyBlockedSummary({
+            blocker,
+            startedAt,
+            outDir,
+            rawPath,
+            plainPath,
+            exportPath,
+            sseRawPath,
+            sseJsonlPath,
+            jsonPath,
+            mdPath,
+            transport: requestedTransport,
+            realByok,
+            sdkSessionBootSelection,
+        });
+        console.log(`[terminal-live] summary: ${path.relative(ROOT, mdPath)}`);
+        console.error(`[terminal-live] BLOCKED: ${blocker.id}`);
+        process.exitCode = 1;
         await byokFixtureProvider?.close();
         return;
     }
@@ -3361,6 +3428,7 @@ async function main() {
                 criteria: finalCriteria,
                 sse: sseSummary,
                 byokReal: realByok?.redacted ?? null,
+                sdkSessionBootSelection,
                 liveHealthRecord,
                 liveScenarioRunRecord,
                 export: exportSummary
@@ -3370,6 +3438,9 @@ async function main() {
                           hasTranscript: exportSummary.hasTranscript,
                           hasStreamingDiagnostics: exportSummary.hasStreamingDiagnostics,
                           hasEnvelope: exportSummary.hasEnvelope,
+                          hasAskUser: exportSummary.hasAskUser,
+                          hasAskUserAnswer: exportSummary.hasAskUserAnswer,
+                          hasPostAskFinal: exportSummary.hasPostAskFinal,
                           path: path.relative(ROOT, exportPath),
                       }
                     : null,
@@ -3397,6 +3468,7 @@ async function main() {
             transport,
             liveHealthRecord,
             liveScenarioRunRecord,
+            sdkSessionBootSelection,
         }),
         'utf8',
     );

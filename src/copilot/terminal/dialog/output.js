@@ -34,6 +34,8 @@ let _terminalRenderLockDepth = 0;
 
 /** @type {WeakMap<object, { prompt: ScheduledPrompt; immediate: NodeJS.Immediate }>} */
 const _scheduledPromptRedraws = new WeakMap();
+/** @type {WeakMap<object, { prompt: string; at: number }>} */
+const _lastPromptPaints = new WeakMap();
 
 const ANSI_ESCAPE = String.fromCharCode(27);
 const ANSI_ESCAPE_PATTERN = new RegExp(`${ANSI_ESCAPE}\\[[0-?]*[ -/]*[@-~]`, 'g');
@@ -46,7 +48,10 @@ const INLINE_STATUS_HEIGHT_RATIO = 0.24;
 const INLINE_STATUS_PROMPT_GUARD_ROWS = 5;
 const PROMPT_INPUT_GUARD_COLUMNS = 48;
 const PROMPT_MAX_WIDTH_RATIO = 0.58;
+const INLINE_STATUS_MODE_OFF = 'off';
 const INLINE_STATUS_MODE_OVERLAY = 'overlay';
+const INLINE_STATUS_MODE_RESERVED = 'reserved';
+const PROMPT_REDRAW_DEDUPE_MS = 250;
 
 /**
  * Quantidade de linhas reservadas para status acima do prompt (layout: [status...][prompt]).
@@ -106,14 +111,31 @@ function shouldUseCompactPromptLayout() {
 }
 
 /**
- * A linha viva overlay usa cursor-up/clear-line para pintar acima do prompt. Isso é bonito em PTY controlado, mas
- * frágil em terminais reais: qualquer divergência de altura, wrap ou scrollback pode limpar a viewport. Por padrão o
- * terminal agora é transcript-first; a overlay fica disponível só como opt-in explícito.
+ * @returns {'off' | 'overlay' | 'reserved'}
+ */
+function resolveInlineStatusMode() {
+    const mode = process.env['COPILOT_TERMINAL_INLINE_STATUS'];
+    if (mode === INLINE_STATUS_MODE_OFF) return INLINE_STATUS_MODE_OFF;
+    if (mode === INLINE_STATUS_MODE_OVERLAY) return INLINE_STATUS_MODE_OVERLAY;
+    return INLINE_STATUS_MODE_RESERVED;
+}
+
+/**
+ * A linha viva overlay usa cursor-up/clear-line para pintar acima do prompt e deixa uma linha vazia reservada depois de
+ * blocos permanentes. O modo `reserved` usa o mesmo mecanismo de linhas acima do prompt, mas sem o salto visual extra
+ * do overlay. `reserved` e o default em TTY; `off` preserva o comportamento transcript-first antigo.
  *
  * @returns {boolean}
  */
 function shouldUseInlineStatusOverlay() {
-    return process.env['COPILOT_TERMINAL_INLINE_STATUS'] === INLINE_STATUS_MODE_OVERLAY;
+    return resolveInlineStatusMode() === INLINE_STATUS_MODE_OVERLAY;
+}
+
+/**
+ * @returns {boolean}
+ */
+function shouldUseInlineStatus() {
+    return resolveInlineStatusMode() !== INLINE_STATUS_MODE_OFF;
 }
 
 /**
@@ -471,13 +493,31 @@ function isTerminalReadlineOpen(rl) {
 /**
  * @param {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean }} rl
  * @param {string} prompt
+ * @param {{ force?: boolean }} [options]
  * @returns {void}
  */
-function paintTerminalPrompt(rl, prompt) {
+function paintTerminalPrompt(rl, prompt, options = {}) {
     if (!isTerminalReadlineOpen(rl)) return;
+    if (options.force !== true) {
+        _lastPromptPaints.set(/** @type {object} */ (rl), { prompt, at: Date.now() });
+    }
     rl.setPrompt(prompt);
     if (!isTerminalReadlineOpen(rl)) return;
     rl.prompt();
+}
+
+/**
+ * @param {unknown} rl
+ * @param {string} prompt
+ * @param {number} [now]
+ * @returns {boolean}
+ */
+function shouldSkipDuplicatePromptPaint(rl, prompt, now = Date.now()) {
+    if (!rl || typeof rl !== 'object') return false;
+    const inputLine = /** @type {{ line?: string }} */ (rl).line;
+    if (typeof inputLine === 'string' && inputLine.length > 0) return false;
+    const last = _lastPromptPaints.get(rl);
+    return Boolean(last && last.prompt === prompt && now - last.at >= 0 && now - last.at < PROMPT_REDRAW_DEDUPE_MS);
 }
 
 /**
@@ -498,6 +538,7 @@ function redrawPromptIfInteractive() {
  */
 export function redrawTerminalPrompt(rl, prompt = buildUserPrompt()) {
     if (!rl || !isTerminalReadlineOpen(rl)) return;
+    if (shouldSkipDuplicatePromptPaint(rl, prompt)) return;
     clearTerminalLine();
     paintTerminalPrompt(rl, prompt);
 }
@@ -527,6 +568,8 @@ export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt(
         immediate: setImmediate(() => {
             _scheduledPromptRedraws.delete(key);
             if (_terminalRenderLockDepth > 0 || !isTerminalReadlineOpen(rl)) return;
+            const inputLine = /** @type {{ line?: string }} */ (rl).line;
+            if (typeof inputLine === 'string' && inputLine.length > 0) return;
             const nextPrompt = typeof state.prompt === 'function' ? state.prompt() : state.prompt;
             redrawTerminalPrompt(rl, getBusy() ? buildWaitingPrompt() : nextPrompt);
         }),
@@ -656,7 +699,7 @@ export function printlnBlock(lines) {
 export function writeInlineStatus(text) {
     if (isTerminalRenderLocked()) return;
     if (!process.stdout.isTTY) return;
-    if (!shouldUseInlineStatusOverlay()) return;
+    if (!shouldUseInlineStatus()) return;
     const rows = fitInlineStatusRows(text);
     const rl = getRl();
     if (!rl) {
@@ -719,7 +762,7 @@ export function writeTerminalPrefixedChunk(linePrefix, chunk, options = {}) {
  */
 export function clearInlineStatus() {
     if (isTerminalRenderLocked()) return;
-    if (!shouldUseInlineStatusOverlay()) {
+    if (!shouldUseInlineStatus()) {
         _statusRowsReserved = 0;
         return;
     }

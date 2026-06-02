@@ -36,16 +36,27 @@ export async function cmdExport({ println }, arg) {
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const defaultName = `conversa-${ts}.md`;
     const filePath = arg?.trim() ? resolve(WORKSPACE_ROOT, arg.trim()) : join(WORKSPACE_ROOT, defaultName);
+    const syncDetail =
+        projection.sync.status === 'blocked' && projection.syncBlockedReason
+            ? `${projection.sync.status}:${projection.syncBlockedReason}`
+            : projection.sync.status;
 
     const lines = [`# Conversa LLM-B — ${new Date().toLocaleString('pt-BR')}`, ''];
     lines.push(
-        `> ${projection.turns.length} mensagens · timeline=${projection.timelineSource}/${projection.reconciliationStatus} · sync=${projection.sync.status} · exportado em ${new Date().toISOString()}`,
+        `> ${projection.turns.length} mensagens · timeline=${projection.timelineSource}/${projection.reconciliationStatus} · sync=${syncDetail} · exportado em ${new Date().toISOString()}`,
         '',
     );
 
     for (const turn of projection.turns) {
         const time = new Date(turn.timestamp ?? Date.now()).toLocaleTimeString('pt-BR');
-        const role = turn.role === 'user' ? '👤 Usuário' : turn.rawRole === 'llm_a' ? '🤖 LLM-A' : '🧠 LLM-B';
+        const role =
+            turn.role === 'user'
+                ? '👤 Usuário'
+                : turn.rawRole === 'llm_a'
+                  ? '🤖 LLM-A'
+                  : turn.role === 'system' || turn.rawRole === 'ask_user'
+                    ? '🧭 Sistema'
+                    : '🧠 LLM-B';
         const metadata = turn.metadata && typeof turn.metadata === 'object' ? turn.metadata : null;
         const streamingDiagnostics =
             metadata?.['terminalStreamingDiagnostics'] && typeof metadata['terminalStreamingDiagnostics'] === 'object'
@@ -105,6 +116,11 @@ function readExportEnvelope(metadata) {
             ? extractEnvelopeLike(/** @type {Record<string, unknown>} */ (metadata['assistantMessageEnvelope']))
             : null;
     if (assistantEnvelope) return assistantEnvelope;
+    const eventEnvelope =
+        metadata['envelope'] && typeof metadata['envelope'] === 'object'
+            ? extractEnvelopeLike(/** @type {Record<string, unknown>} */ (metadata['envelope']))
+            : null;
+    if (eventEnvelope) return eventEnvelope;
     const streamingEnvelope =
         metadata['terminalStreamingDiagnostics'] && typeof metadata['terminalStreamingDiagnostics'] === 'object'
             ? extractEnvelopeLike(/** @type {Record<string, unknown>} */ (metadata['terminalStreamingDiagnostics']))
@@ -139,12 +155,18 @@ function extractEnvelopeLike(value) {
         typeof source === 'string' ||
         traceId !== null ||
         turnId !== null ||
-        typeof value['eventId'] === 'string';
+        typeof value['eventId'] === 'string' ||
+        typeof value['eventId'] === 'number';
     if (!hasEnvelope) return null;
     return {
         source: typeof source === 'string' ? source : '-',
         traceId,
         turnId,
-        eventId: typeof value['eventId'] === 'string' ? value['eventId'] : null,
+        eventId:
+            typeof value['eventId'] === 'string'
+                ? value['eventId']
+                : typeof value['eventId'] === 'number'
+                  ? String(value['eventId'])
+                  : null,
     };
 }
