@@ -2163,6 +2163,17 @@
 - [x] `report_intent`/`report_intent_local` passou a aparecer como `Intenção capturada`, não `Intent capturado`.
 - [x] `/sdk waits` detail trocou `elicitation=`, `permission=`, `ask_user=` e `request_user_input=` por `formulários`, `permissões`, `perguntas SDK` e `perguntas estruturadas`.
 - [x] `/sdk waits` e `/sdk simulate request-user-input` passaram a chamar o estado de `pergunta estruturada`, não `input estruturado`.
-- [ ] Auditar `/sdk status`, `/sdk capabilities` e `/sdk quota` para remover `tools.list=`, `ui.elicitation=` e outros dumps de capability da vista default.
-- [ ] Criar live de paleta em PTY real com `/display theme elegant`, `/display theme vivid`, `/display theme mono`, pergunta estruturada e tool em andamento.
+- [x] `/sdk capabilities` removeu `elicitation=true`, `workspace=true`, `confirm=`, `select=`, `input=`, `read=`, `write=` e `delete=` da vista do operador.
+- [x] `/sdk doctor` removeu `sdk.workspace=`, `local.fs.canonico=`, `tools.list=`, `ui.elicitation=`, `ok=`, `errors=` e `coverage(...)`, substituindo por `workspace SDK`, `arquivos locais`, `lista tools`, `formulário UI`, `contrato`, `falhas`, `avisos` e `cobertura`.
+- [ ] Auditar `/sdk status`, `/sdk quota`, `/sdk skills` e `/sdk tools` para remover outros dumps de capability da vista default.
+- [x] Live PTY curta executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/ux-visual-grammar-palette-20260602-1320`.
+- [x] Resultado: PASS completo em help, status, now, health, tools, live, activity, waits e close limpo.
+- [x] Achado visual da live: banner/boot ainda usavam ANSI fixo ciano/amarelo, fora do tema central.
+- [x] Banner compacto passou a usar `terminalThemeText` e o papel `command`, respeitando `elegant/vivid/mono`.
+- [x] `/help` compacto passou a usar `terminalThemeText('assistant'|'command'|'muted')`, removendo ciano/amarelo fixos da tela mais comum de descoberta.
+- [x] Prompt inicial trocou `[NOLOOP]`/`[NL]` por `[STANDBY]`/`[STBY]`, removendo sigla interna da primeira tela.
+- [x] Linha viva de pergunta pendente deixou de exibir `loop`/`noloop` e passou a mostrar `conversa ativa`/`standby`.
+- [x] Fallback de status da linha viva deixou de renderizar `status:loop` e passou a usar `status · conversa ativa/standby`.
+- [x] Papel `command` deixou de ser apenas dim e passou a usar âmbar no tema `elegant`, para comandos ficarem escaneáveis sem competir com tools/perguntas.
 - [ ] Avaliar se precisamos de um renderer de “cartão de pergunta” com moldura discreta para impedir repetição visual quando a pergunta aguarda resposta por muito tempo.

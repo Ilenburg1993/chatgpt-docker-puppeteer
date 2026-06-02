@@ -4,6 +4,16 @@
  * @file Banner operacional do REPL LLM-B.
  */
 
+import { terminalThemeText } from '../state/repl/index.js';
+
+/**
+ * @param {string} command
+ * @returns {string}
+ */
+function command(command) {
+    return terminalThemeText('command', command);
+}
+
 /**
  * @param {number} injectPort
  * @returns {string}
@@ -13,12 +23,12 @@ export function buildTerminalReplBanner(injectPort) {
         return buildTerminalReplFullBanner(injectPort);
     }
     return `
-\x1b[36m┌──────────────────────────────────────────────────────────────┐\x1b[0m
-\x1b[36m│\x1b[0m  \x1b[1mTerminal LLM-B\x1b[0m  \x1b[90m· sessão permanente\x1b[0m                         \x1b[36m│\x1b[0m
-\x1b[36m└──────────────────────────────────────────────────────────────┘\x1b[0m
-  \x1b[33m/status\x1b[0m · \x1b[33m/now\x1b[0m · \x1b[33m/menu\x1b[0m · \x1b[33m/activity 10\x1b[0m · \x1b[33m/help\x1b[0m
-  \x1b[90mtexto livre → fila zero-PR · /turn <msg> abre turno · @arquivo anexa contexto\x1b[0m
-  \x1b[90mHTTP :${injectPort} · /inject · /events · /sessions · diagnóstico: /health /tools\x1b[0m
+${terminalThemeText('accent', '┌──────────────────────────────────────────────────────────────┐')}
+${terminalThemeText('accent', '│')}  \x1b[1mTerminal LLM-B\x1b[0m  ${terminalThemeText('muted', '· sessão permanente')}                         ${terminalThemeText('accent', '│')}
+${terminalThemeText('accent', '└──────────────────────────────────────────────────────────────┘')}
+  ${command('/status')} · ${command('/now')} · ${command('/menu')} · ${command('/activity 10')} · ${command('/help')}
+  ${terminalThemeText('muted', 'texto livre → fila zero-PR · /turn <msg> abre turno · @arquivo anexa contexto')}
+  ${terminalThemeText('muted', `HTTP :${injectPort} · /inject · /events · /sessions · diagnóstico: /health /tools`)}
 `;
 }
 
@@ -28,9 +38,9 @@ export function buildTerminalReplBanner(injectPort) {
  */
 function buildTerminalReplFullBanner(injectPort) {
     return `
-\x1b[36m╔══════════════════════════════════════════════════════════════════════════╗\x1b[0m
-\x1b[36m║\x1b[0m  💬  \x1b[1mTerminal LLM-B\x1b[0m  \x1b[90m—\x1b[0m  Sessão Permanente                            \x1b[36m║\x1b[0m
-\x1b[36m╚══════════════════════════════════════════════════════════════════════════╝\x1b[0m
+${terminalThemeText('accent', '╔══════════════════════════════════════════════════════════════════════════╗')}
+${terminalThemeText('accent', '║')}  💬  \x1b[1mTerminal LLM-B\x1b[0m  ${terminalThemeText('muted', '—')}  Sessão Permanente                            ${terminalThemeText('accent', '║')}
+${terminalThemeText('accent', '╚══════════════════════════════════════════════════════════════════════════╝')}
     \x1b[33m/status\x1b[0m · \x1b[33m/health\x1b[0m · \x1b[33m/now\x1b[0m · \x1b[33m/live [n]\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n] [offset]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/restart\x1b[0m
     \x1b[33m/activity [n]\x1b[0m \x1b[90m← atividade atual + timeline\x1b[0m · \x1b[33m/live [n]\x1b[0m \x1b[90m← loop/stream/SSE/tools/I-O\x1b[0m
   \x1b[33m/model [list|id]\x1b[0m · \x1b[33m/reasoning [low|medium|high|xhigh|off]\x1b[0m · \x1b[33m/count\x1b[0m

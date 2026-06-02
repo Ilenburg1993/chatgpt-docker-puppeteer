@@ -101,7 +101,8 @@ function compactRuntimeStatus(status, loop) {
     if (status === 'idle' && loop === 'loop') return 'conversa ativa';
     if (status === 'processing' && loop === 'loop') return 'conversa ativa';
     if (!status || status === 'processing') return loop === 'loop' ? 'conversa ativa' : 'trabalhando';
-    return `${status}:${loop}`;
+    const statusLabel = status === 'idle' ? 'ocioso' : status === 'paused' ? 'pausado' : status;
+    return `${statusLabel} · ${loop === 'loop' ? 'conversa ativa' : 'standby'}`;
 }
 
 /**
@@ -158,7 +159,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
         return (
             `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
             `${terminalThemeText('question', 'PERGUNTA')}` +
-            `${terminalThemeText('muted', ` · ${questionText}${choiceText} · ${runtime.dialogLoopActive ? 'loop' : 'noloop'}${queue}`)}` +
+            `${terminalThemeText('muted', ` · ${questionText}${choiceText} · ${runtime.dialogLoopActive ? 'conversa ativa' : 'standby'}${queue}`)}` +
             '\x1b[K'
         );
     }

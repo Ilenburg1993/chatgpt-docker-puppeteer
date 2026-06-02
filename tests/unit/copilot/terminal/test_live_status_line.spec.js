@@ -142,6 +142,8 @@ describe('terminal/live-status-line', () => {
         expect(line).toContain('Escolha como continuar');
         expect(line).toContain('opções seguir|pausar');
         expect(line).not.toContain('opções=');
+        expect(line).not.toContain('noloop');
+        expect(line).not.toContain('loop');
         expect(line).not.toContain('read_file_content');
     });
 

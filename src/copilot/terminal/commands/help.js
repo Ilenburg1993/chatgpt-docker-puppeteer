@@ -8,11 +8,21 @@
  * @see EventBus
  */
 
+import { terminalThemeText } from '../state/ui/index.js';
+
 /**
  * @typedef {object} SessionContext
  * @property {number} injectPort
  * @property {(text: string) => void} println
  */
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function command(value) {
+    return terminalThemeText('command', value);
+}
 
 /**
  * Exibe ajuda curta dos comandos do terminal por padrão; `/help full` preserva o catálogo completo.
@@ -29,17 +39,17 @@ export function cmdHelp({ injectPort, println }, arg = '') {
     }
 
     println(`
-  \x1b[36mAjuda rápida — Terminal LLM-B\x1b[0m
+  ${terminalThemeText('assistant', 'Ajuda rápida — Terminal LLM-B')}
   ─────────────────────────────────────
-  Situação agora        \x1b[33m/status\x1b[0m · \x1b[33m/now\x1b[0m · \x1b[33m/activity 10\x1b[0m
-  Conversa              texto livre · \x1b[33m/turn <msg>\x1b[0m · \x1b[33m/answer <texto>\x1b[0m
-  Ações guiadas         \x1b[33m/menu\x1b[0m · \x1b[33m/menu 1\x1b[0m · \x1b[33m/menu status\x1b[0m
-  Arquivos              \x1b[33m@caminho\x1b[0m · \x1b[33m/fs list\x1b[0m · \x1b[33m/fs read <path>\x1b[0m · \x1b[33m/search <termo>\x1b[0m
-  Modelo e acesso       \x1b[33m/byok status\x1b[0m · \x1b[33m/byok recommend\x1b[0m · \x1b[33m/sdk quota\x1b[0m
-  Esperas humanas       \x1b[33m/sdk waits\x1b[0m · \x1b[33m/elicitation show latest\x1b[0m · \x1b[33m/permission show latest\x1b[0m
-  Diagnóstico           \x1b[33m/health\x1b[0m · \x1b[33m/errors 20\x1b[0m · \x1b[33m/display preset focus\x1b[0m
-  Catálogo completo     \x1b[90m/help full\x1b[0m
-  HTTP local            \x1b[90mporta ${injectPort}: /inject · /events · /sessions\x1b[0m
+  Situação agora        ${command('/status')} · ${command('/now')} · ${command('/activity 10')}
+  Conversa              texto livre · ${command('/turn <msg>')} · ${command('/answer <texto>')}
+  Ações guiadas         ${command('/menu')} · ${command('/menu 1')} · ${command('/menu status')}
+  Arquivos              ${command('@caminho')} · ${command('/fs list')} · ${command('/fs read <path>')} · ${command('/search <termo>')}
+  Modelo e acesso       ${command('/byok status')} · ${command('/byok recommend')} · ${command('/sdk quota')}
+  Esperas humanas       ${command('/sdk waits')} · ${command('/elicitation show latest')} · ${command('/permission show latest')}
+  Diagnóstico           ${command('/health')} · ${command('/errors 20')} · ${command('/display preset focus')}
+  Catálogo completo     ${terminalThemeText('muted', '/help full')}
+  HTTP local            ${terminalThemeText('muted', `porta ${injectPort}: /inject · /events · /sessions`)}
   ─────────────────────────────────────
 `);
 }

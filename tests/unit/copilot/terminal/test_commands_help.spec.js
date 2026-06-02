@@ -25,6 +25,8 @@ describe('terminal/commands/help', () => {
         expect(ctx.output()).not.toContain('╔');
         expect(ctx.output()).not.toContain('binding/frescor');
         expect(ctx.output()).not.toContain('CommandDefinition');
+        expect(ctx.output()).not.toContain('\x1b[36mAjuda rápida');
+        expect(ctx.output()).not.toContain('\x1b[33m/status');
     });
 
     it('preserva catálogo completo quando solicitado explicitamente', () => {

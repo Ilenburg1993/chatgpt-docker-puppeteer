@@ -403,7 +403,7 @@ export function buildUserPrompt() {
 
     const bootstrapping = state.status === 'starting';
     if (!state.dialogLoopActive && !bootstrapping) {
-        pushPromptTag(terminalThemeText('error', '[NOLOOP]'), terminalThemeText('error', '[NL]'));
+        pushPromptTag(terminalThemeText('warn', '[STANDBY]'), terminalThemeText('warn', '[STBY]'));
     }
     const sdkMode = getSdkSessionMode();
     if (sdkMode && sdkMode !== 'interactive') {

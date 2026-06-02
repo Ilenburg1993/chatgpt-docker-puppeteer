@@ -257,8 +257,10 @@ describe('terminal/commands/sdk', () => {
         await cmdSdk({ println: ctx.println }, 'capabilities');
         expect(runtimeMocks.getTerminalSdkSessionCapabilities).toHaveBeenCalled();
         expect(ctx.output()).toContain('SDK Capabilities');
-        expect(ctx.output()).toContain('elicitation=true');
-        expect(ctx.output()).toContain('workspace=true');
+        expect(ctx.output()).toContain('formulários sim');
+        expect(ctx.output()).toContain('workspace sim');
+        expect(ctx.output()).not.toContain('elicitation=true');
+        expect(ctx.output()).not.toContain('workspace=true');
     });
 
     it('/sdk doctor valida roteamento entre workspace SDK e FS canônico', async () => {
@@ -301,7 +303,8 @@ describe('terminal/commands/sdk', () => {
         const ctx = mockCtx();
         await cmdSdk({ println: ctx.println }, 'doctor');
 
-        expect(ctx.output()).toContain('local.fs.canonico=true');
+        expect(ctx.output()).toContain('arquivos locais ativos');
+        expect(ctx.output()).not.toContain('local.fs.canonico=true');
         expect(ctx.output()).toContain('local-fs-primary');
 
         registrySpy.mockRestore();

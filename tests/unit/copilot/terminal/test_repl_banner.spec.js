@@ -12,6 +12,8 @@ describe('terminal/repl-banner', () => {
         expect(banner).toContain('/help');
         expect(banner).toContain('HTTP :3010');
         expect(banner).not.toContain('/workspace [list|read|write|sync|mirror|promote]');
+        expect(banner).not.toContain('\x1b[36m┌');
+        expect(banner).not.toContain('\x1b[33m/status');
         expect(banner.split('\n').filter((line) => line.trim().length > 0).length).toBeLessThanOrEqual(6);
     });
 

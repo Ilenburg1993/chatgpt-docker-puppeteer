@@ -214,7 +214,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         expect(prompt).toContain('[PAUSED]');
     });
 
-    it('inclui marcador NOLOOP e fila quando aplicável', async () => {
+    it('inclui marcador STANDBY e fila quando a conversa ainda não está ativa', async () => {
         readTerminalRuntimeState.mockReturnValueOnce({
             ...readTerminalRuntimeState(),
             dialogLoopActive: false,
@@ -223,11 +223,11 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         const { buildUserPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
         const prompt = buildUserPrompt();
 
-        expect(prompt).toContain('[NOLOOP]');
+        expect(prompt).toContain('[STANDBY]');
         expect(prompt).toContain('[Q:2]');
     });
 
-    it('suprime marcador NOLOOP enquanto runtime está starting', async () => {
+    it('suprime marcador STANDBY enquanto runtime está starting', async () => {
         readTerminalRuntimeState.mockReturnValueOnce({
             ...readTerminalRuntimeState(),
             status: 'starting',
@@ -236,7 +236,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         const { buildUserPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
         const prompt = buildUserPrompt();
 
-        expect(prompt).not.toContain('[NOLOOP]');
+        expect(prompt).not.toContain('[STANDBY]');
         expect(prompt).toContain('gpt-5-mini');
     });
 

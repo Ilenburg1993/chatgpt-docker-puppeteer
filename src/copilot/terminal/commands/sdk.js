@@ -95,6 +95,22 @@ function pluralPt(value, singular, plural) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function activeLabel(value) {
+    return value === true ? 'ativo' : 'ausente';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function availableLabel(value) {
+    return value === true ? 'sim' : 'não';
+}
+
+/**
  * @param {{
  *     forms: number;
  *     permissions: number;
@@ -400,13 +416,13 @@ async function renderSdkDoctor({ println }, runtimeId) {
 
     println('\n  \x1b[36mSDK Doctor - roteamento SDK x FS\x1b[0m');
     println(
-        `  surfaces   \x1b[90msdk.workspace=${String(sdkWorkspaceAvailable)} · local.fs.canonico=${String(localFsToolsReady)} · local.exec.canonico=${String(registrySnapshot.hasCanonicalLocalExecTools)} · legacy.shell.loaded=${String(registrySnapshot.hasLegacySdkShellToolsLoaded)} · instructionSources=${String(instructionSourcesAvailable)}\x1b[0m`,
+        `  superfícies \x1b[90mworkspace SDK ${activeLabel(sdkWorkspaceAvailable)} · arquivos locais ${localFsToolsReady ? 'ativos' : 'ausentes'} · terminal local ${activeLabel(registrySnapshot.hasCanonicalLocalExecTools)} · shell legado ${registrySnapshot.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado'} · instruções SDK ${activeLabel(instructionSourcesAvailable)}\x1b[0m`,
     );
     println(
-        `  sdk caps   \x1b[90mtools.list=${String(sdkTools['list'] === true)} · tools.quota=${String(sdkTools['quota'] === true)} · ui.elicitation=${String(sdkUi['elicitation'] === true)}\x1b[0m`,
+        `  SDK        \x1b[90mlista tools ${availableLabel(sdkTools['list'] === true)} · quota ${availableLabel(sdkTools['quota'] === true)} · formulário UI ${availableLabel(sdkUi['elicitation'] === true)}\x1b[0m`,
     );
     println(
-        `  contract   \x1b[90mok=${String(contract.ok)} · errors=${contract.errorCount} · warnings=${contract.warningCount} · coverage(desc=${contract.metadataCoverage.descriptionPct}% schema=${contract.metadataCoverage.parametersPct}% category=${contract.metadataCoverage.categoryPct}% tags=${contract.metadataCoverage.tagsPct}% instructions=${contract.metadataCoverage.instructionsPct}%)\x1b[0m`,
+        `  contrato   \x1b[90m${contract.ok ? 'ok' : 'atenção'} · falhas ${contract.errorCount} · avisos ${contract.warningCount} · cobertura: descrição ${contract.metadataCoverage.descriptionPct}% · schema ${contract.metadataCoverage.parametersPct}% · categoria ${contract.metadataCoverage.categoryPct}% · tags ${contract.metadataCoverage.tagsPct}% · instruções ${contract.metadataCoverage.instructionsPct}%\x1b[0m`,
     );
     println(`  mode       \x1b[33m${routingMode}\x1b[0m`);
     if (routingMode === 'local-fs-primary') {
@@ -867,13 +883,13 @@ function renderSdkCapabilitiesSummary({ println }, runtimeId) {
 
     println('\n  \x1b[36mSDK Capabilities\x1b[0m');
     println(
-        `  ui       \x1b[90melicitation=${String(ui['elicitation'] ?? false)} · confirm=${String(ui['confirm'] ?? false)} · select=${String(ui['select'] ?? false)} · input=${String(ui['input'] ?? false)}\x1b[0m`,
+        `  UI       \x1b[90mformulários ${availableLabel(ui['elicitation'])} · confirmações ${availableLabel(ui['confirm'])} · seleção ${availableLabel(ui['select'])} · texto livre ${availableLabel(ui['input'])}\x1b[0m`,
     );
     println(
-        `  tools    \x1b[90mworkspace=${String(tools['workspace'] ?? false)} · list=${String(tools['list'] ?? false)} · quota=${String(tools['quota'] ?? false)}\x1b[0m`,
+        `  tools    \x1b[90mworkspace ${availableLabel(tools['workspace'])} · lista ${availableLabel(tools['list'])} · quota ${availableLabel(tools['quota'])}\x1b[0m`,
     );
     println(
-        `  plan     \x1b[90mread=${String(plan['read'] ?? false)} · write=${String(plan['write'] ?? false)} · delete=${String(plan['delete'] ?? false)}\x1b[0m`,
+        `  plano    \x1b[90mleitura ${availableLabel(plan['read'])} · escrita ${availableLabel(plan['write'])} · remoção ${availableLabel(plan['delete'])}\x1b[0m`,
     );
     println(`  raw      \x1b[90m${pretty(capabilities, 1200)}\x1b[0m\n`);
 }
