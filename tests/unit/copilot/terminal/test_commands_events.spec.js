@@ -87,9 +87,10 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('visão resumida');
         expect(ctx.output()).toContain('/events --raw');
         expect(ctx.output()).toContain('#42');
+        expect(ctx.output()).toContain('Streaming');
         expect(ctx.output()).toContain('DELTA-CANONICAL-1');
-        expect(ctx.output()).toContain('call=call_123');
-        expect(ctx.output()).toContain('req=req-123');
+        expect(ctx.output()).not.toContain('call=call_123');
+        expect(ctx.output()).not.toContain('req=req-123');
     });
 
     it('consulta por tool call, request e hub session', async () => {
@@ -144,9 +145,11 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('tool=call_123');
         expect(ctx.output()).toContain('request=req-123');
         expect(ctx.output()).toContain('hub=hub-1');
-        expect(ctx.output()).toContain('call=call_123');
-        expect(ctx.output()).toContain('req=req-123');
-        expect(ctx.output()).toContain('tool=Ler arquivo');
+        expect(ctx.output()).toContain('Ferramenta');
+        expect(ctx.output()).toContain('ferramenta Ler arquivo');
+        expect(ctx.output()).toContain('call call_123');
+        expect(ctx.output()).toContain('req req-123');
+        expect(ctx.output()).not.toContain('tool=Ler arquivo');
         expect(ctx.output()).not.toContain('tool=read_file_content');
     });
 
@@ -216,12 +219,15 @@ describe('terminal/commands/events', () => {
 
         await cmdEvents({ println: ctx.println }, '20');
 
-        expect(ctx.output()).toContain('transcript=LLM-B · export=envelope:sdk/assistant.message trace=turn:1 turn=1');
+        expect(ctx.output()).toContain('Mensagem da LLM-B');
+        expect(ctx.output()).toContain('Pergunta ao operador');
+        expect(ctx.output()).toContain('Resposta do operador');
+        expect(ctx.output()).toContain('transcript LLM-B · export envelope:sdk/assistant.message trace=turn:1 turn=1');
         expect(ctx.output()).toContain(
-            'transcript=Sistema/ask_user · export=envelope:sdk/user_input.requested trace=turn:1 turn=1',
+            'transcript Sistema/ask_user · export envelope:sdk/user_input.requested trace=turn:1 turn=1',
         );
         expect(ctx.output()).toContain(
-            'transcript=Usuário/ask_user · export=envelope:sdk/user_input.completed trace=turn:1 turn=1',
+            'transcript Usuário/ask_user · export envelope:sdk/user_input.completed trace=turn:1 turn=1',
         );
     });
 

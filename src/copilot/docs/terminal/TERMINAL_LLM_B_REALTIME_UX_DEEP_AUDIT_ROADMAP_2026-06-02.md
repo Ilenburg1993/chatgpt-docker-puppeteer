@@ -1912,11 +1912,20 @@
 
 ### 11.04 Proximas lacunas de UX
 
-- [ ] Revisar `/events` padrao para nao parecer despejo JSON quando o operador pede apenas contexto recente.
-- [ ] Revisar `/events` para traduzir status resumido (`status=success`) sem prejudicar `/events --raw`.
+- [x] Revisar `/events` padrao para nao parecer despejo JSON quando o operador pede apenas contexto recente.
+- [x] Revisar `/events` para traduzir status resumido (`status=success`) sem prejudicar `/events --raw`.
 - [ ] Revisar `/live` e `/live full` para separar modo humano, modo diagnostico e modo raw.
 - [ ] Revisar `/session`, `/now` e `/status` buscando restos de `source=`, `modelo=`, `classe=`, `motivo=` fora de modo detail.
 - [ ] Revisar banner e auto-brief para reduzir linhas densas quando o terminal ja esta pronto.
 - [ ] Fazer nova live `long-tool-heartbeat` apos criterios endurecidos.
 - [ ] Fazer live `recoverable-tool-error` apos consolidar `/activity` humano.
 - [ ] Fazer live com `file-write-roundtrip` para confirmar badges `CRIAR`, `MOVER`, `EXCLUIR` e ausencia de permissao/ids crus.
+
+### 11.05 `/events` humano
+
+- [x] Modo texto de `/events` passou a mostrar rotulos humanos de evento: `Mensagem da LLM-B`, `Pergunta ao operador`, `Resposta do operador`, `Ferramenta`, `Atividade`.
+- [x] Modo texto de `/events` passou a traduzir `status=success` para `estado concluido`.
+- [x] Modo texto de `/events` passou a ocultar call/request ids por padrao e a exibi-los apenas quando o operador filtra por `tool`, `request` ou `hub`.
+- [x] Modo texto de `/events` passou a trocar `transcript=`/`export=` por `transcript ...`/`export envelope...`.
+- [x] `/events --raw` e `/events --json` continuam preservando o envelope bruto para auditoria e automacao.
+- [x] `test_commands_events.spec.js` cobre o novo contrato humano e preserva raw/json.

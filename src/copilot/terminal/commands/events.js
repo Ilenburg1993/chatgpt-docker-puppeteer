@@ -131,6 +131,66 @@ function compact(value, max = 100) {
 }
 
 /**
+ * @param {string} event
+ * @returns {string}
+ */
+function humanEventLabel(event) {
+    if (event === 'assistant.message') return 'Mensagem da LLM-B';
+    if (event === 'user_input.requested') return 'Pergunta ao operador';
+    if (event === 'user_input.completed') return 'Resposta do operador';
+    if (event === 'tool.lifecycle') return 'Ferramenta';
+    if (event === 'terminal.activity' || event === 'activity.changed') return 'Atividade';
+    if (event === 'agent.background.completed') return 'Tarefa em background concluída';
+    if (event === 'agent.background.idle') return 'Background ocioso';
+    if (event === 'dialog.turn_start' || event === 'assistant.turn_start') return 'Turno iniciado';
+    if (event === 'dialog.turn_end' || event === 'assistant.turn_end') return 'Turno concluído';
+    if (event === 'sdk.lifecycle') return 'Sessão SDK';
+    if (event === 'hook.start') return 'Hook iniciado';
+    if (event === 'hook.end') return 'Hook concluído';
+    if (event === 'llm.usage' || event === 'session.usage') return 'Uso LLM';
+    if (event === 'streaming.progress' || event === 'delta') return 'Streaming';
+    if (event === 'busy') return 'Ocupado';
+    return event.replace(/[._-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function humanStatus(value) {
+    const text = normalizeEventSummaryText(value).toLowerCase();
+    if (!text) return '';
+    if (text === 'success' || text === 'completed' || text === 'done') return 'concluído';
+    if (text === 'failed' || text === 'failure' || text === 'error') return 'falhou';
+    if (text === 'active' || text === 'running' || text === 'started') return 'em andamento';
+    if (text === 'requested' || text === 'pending') return 'pendente';
+    if (text === 'ask_user_continuation') return 'continuação da pergunta humana';
+    if (text === 'session.updated') return 'sessão atualizada';
+    return text.replace(/[_-]+/gu, ' ');
+}
+
+/**
+ * @param {string | null | undefined} source
+ * @returns {string}
+ */
+function humanEventSource(source) {
+    const text = normalizeEventSummaryText(source ?? '');
+    const lower = text.toLowerCase();
+    if (!text) return '-';
+    if (lower.startsWith('sdk/user_input')) return 'SDK ask_user';
+    if (lower.startsWith('sdk/assistant')) return 'SDK assistant';
+    if (lower.startsWith('agent/background')) return 'agente/background';
+    if (lower.startsWith('agent/llm')) return 'agente/usage';
+    if (lower.startsWith('terminal-boot')) return 'terminal';
+    if (lower.startsWith('terminal-dialog') || lower.startsWith('terminal-agent-wiring')) return 'diálogo';
+    if (lower === 'sdk' || lower.startsWith('sdk/')) return 'SDK';
+    if (lower === 'agent' || lower.startsWith('agent/')) return 'agente';
+    if (lower === 'dialog' || lower.startsWith('dialog')) return 'diálogo';
+    if (lower.includes('terminal')) return 'terminal';
+    return text;
+}
+
+/**
  * @param {unknown} value
  * @returns {string}
  */
@@ -141,20 +201,23 @@ function normalizeEventSummaryText(value) {
 
 /**
  * @param {Record<string, unknown>} payload
+ * @param {{ showIds?: boolean }} [opts]
  * @returns {string}
  */
-function summarizePayload(payload) {
+function summarizePayload(payload, opts = {}) {
     const toolName = payload['toolName'] ?? payload['tool'];
     const toolCallId = payload['toolCallId'] ?? payload['callId'];
     const requestId = payload['requestId'] ?? payload['pendingRequestId'];
     const content = payload['content'] ?? payload['chunk'] ?? payload['question'] ?? payload['message'] ?? null;
     const status = payload['status'] ?? payload['type'] ?? payload['classification'] ?? null;
     const humanToolName = typeof toolName === 'string' ? getTerminalHumanToolName(toolName) : null;
+    const showIds = Boolean(opts.showIds);
+    const renderedStatus = humanStatus(status);
     return [
-        humanToolName ? `tool=${compact(humanToolName, 48)}` : null,
-        toolCallId ? `call=${compactTerminalDiagnosticId(String(toolCallId), 14)}` : null,
-        requestId ? `req=${compactTerminalDiagnosticId(String(requestId), 14)}` : null,
-        status ? `status=${compact(status)}` : null,
+        humanToolName ? `ferramenta ${compact(humanToolName, 48)}` : null,
+        showIds && toolCallId ? `call ${compactTerminalDiagnosticId(String(toolCallId), 14)}` : null,
+        showIds && requestId ? `req ${compactTerminalDiagnosticId(String(requestId), 14)}` : null,
+        renderedStatus ? `estado ${compact(renderedStatus)}` : null,
         content ? compact(content) : null,
     ]
         .filter(Boolean)
@@ -175,7 +238,7 @@ function buildTranscriptExportHint(entry) {
     const source = entry.eventSource ?? entry.source ?? entry.event;
     const trace = entry.traceId ? ` trace=${entry.traceId}` : '';
     const turn = entry.turnId ? ` turn=${entry.turnId}` : '';
-    return `transcript=${transcript} · export=envelope:${source}${trace}${turn}`;
+    return `transcript ${transcript} · export envelope:${source}${trace}${turn}`;
 }
 
 /**
@@ -260,15 +323,17 @@ export async function cmdEvents({ println }, arg = '') {
 
     for (const entry of entries) {
         const time = new Date(entry.timestamp).toLocaleTimeString('pt-BR');
-        const origin = compact(entry.eventSource ?? entry.source ?? '-', 52);
-        const trace = entry.traceId ? ` · trace=${entry.traceId}` : '';
-        const turn = entry.turnId ? ` · turn=${entry.turnId}` : '';
-        const hub = entry.hubSessionId ? ` · hub=${compactTerminalDiagnosticId(entry.hubSessionId, 14)}` : '';
-        const summary = summarizePayload(entry.payload ?? {});
+        const origin = compact(humanEventSource(entry.eventSource ?? entry.source ?? '-'), 52);
+        const trace = entry.traceId ? ` · trace ${entry.traceId}` : '';
+        const turn = entry.turnId ? ` · turno ${entry.turnId}` : '';
+        const hub = entry.hubSessionId ? ` · hub ${compactTerminalDiagnosticId(entry.hubSessionId, 14)}` : '';
+        const summary = summarizePayload(entry.payload ?? {}, {
+            showIds: Boolean(filters.toolCallId || filters.requestId || filters.hubSessionId),
+        });
         const transcriptHint = buildTranscriptExportHint(entry);
         const detail = [summary, transcriptHint].filter(Boolean).join(' · ');
         println(
-            `    \x1b[90m${time}\x1b[0m  #${entry.eventId} \x1b[33m${entry.event}\x1b[0m  \x1b[90m${origin}${trace}${turn}${hub}\x1b[0m${detail ? ` — ${detail}` : ''}`,
+            `    \x1b[90m${time}\x1b[0m  #${entry.eventId} \x1b[33m${humanEventLabel(entry.event)}\x1b[0m  \x1b[90m${origin}${trace}${turn}${hub}\x1b[0m${detail ? ` — ${detail}` : ''}`,
         );
     }
     println('');
