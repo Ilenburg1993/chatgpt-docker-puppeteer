@@ -252,6 +252,18 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).not.toContain('restante=');
     });
 
+    it('/sdk quota usa frase humana no modo default', async () => {
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'quota');
+        expect(ctx.output()).toContain('Quota SDK');
+        expect(ctx.output()).toContain('91.0%');
+        expect(ctx.output()).toContain('restante · reset');
+        expect(ctx.output()).toContain('escopo');
+        expect(ctx.output()).not.toContain('restante=');
+        expect(ctx.output()).not.toContain('reset=');
+        expect(ctx.output()).not.toContain('escopo=');
+    });
+
     it('/sdk capabilities exibe capacidades consolidadas da sessão SDK', async () => {
         const ctx = mockCtx();
         await cmdSdk({ println: ctx.println }, 'capabilities');

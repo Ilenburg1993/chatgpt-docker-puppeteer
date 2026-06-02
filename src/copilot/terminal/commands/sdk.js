@@ -1360,7 +1360,7 @@ async function renderSdkQuota({ println }, runtimeId, opts = {}) {
         println(
             opts.compact
                 ? `  Quota    ${color}${row.quotaId}\x1b[0m  \x1b[33m${pct}\x1b[0m restante · reset \x1b[90m${row.resetAt ?? '-'}\x1b[0m · escopo \x1b[90m${row.scope}\x1b[0m`
-                : `  ${color}${row.quotaId}\x1b[0m  restante=\x1b[33m${pct}\x1b[0m  reset=\x1b[90m${row.resetAt ?? '-'}\x1b[0m  escopo=\x1b[90m${row.scope}\x1b[0m`,
+                : `  ${color}${row.quotaId}\x1b[0m  \x1b[33m${pct}\x1b[0m restante · reset \x1b[90m${row.resetAt ?? '-'}\x1b[0m · escopo \x1b[90m${row.scope}\x1b[0m`,
         );
     }
     if (Object.keys(snapshots).length === 0) println('  \x1b[90mSem snapshots de quota no retorno SDK.\x1b[0m');

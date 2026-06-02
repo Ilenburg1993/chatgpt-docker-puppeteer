@@ -181,6 +181,37 @@ function valueOrDash(value) {
 }
 
 /**
+ * @param {Array<string | null | undefined | false>} parts
+ * @returns {string}
+ */
+function joinTerminalSummary(parts) {
+    return parts.filter((part) => typeof part === 'string' && part.length > 0).join(' · ');
+}
+
+/**
+ * @param {unknown} seconds
+ * @returns {string}
+ */
+function formatTerminalDurationSeconds(seconds) {
+    if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return '-';
+    if (seconds < 60) return `${Math.max(0, Math.round(seconds))}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.round(seconds % 60);
+    if (minutes < 60) return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+}
+
+/**
+ * @param {boolean | undefined} value
+ * @returns {string}
+ */
+function yesNoPlain(value) {
+    return value === true ? 'sim' : value === false ? 'nao' : '-';
+}
+
+/**
  * Explica a fronteira entre seletor BYOK e sessão SDK viva. Provider/profile vivem no contrato de criação/retomada de
  * sessão; `/restart` reinicia apenas o dialog loop e não pode ser narrado como rebind de provider.
  *
@@ -2071,17 +2102,17 @@ function renderByokProviderEndpointInventory(println, rest) {
     }
 
     for (const inventory of inventories) {
-        println(`    \x1b[33m${inventory.providerId}\x1b[0m  \x1b[90mkind=${inventory.providerKind} · adapter=${inventory.adapterId}\x1b[0m`);
-        println(`      \x1b[90mbase=${inventory.baseUrls.slice(0, 3).join(' · ')}${inventory.baseUrls.length > 3 ? ' · ...' : ''}\x1b[0m`);
+        println(`    \x1b[33m${inventory.providerId}\x1b[0m  \x1b[90mtipo ${inventory.providerKind} · adapter ${inventory.adapterId}\x1b[0m`);
+        println(`      \x1b[90mbases ${inventory.baseUrls.slice(0, 3).join(' · ')}${inventory.baseUrls.length > 3 ? ' · ...' : ''}\x1b[0m`);
         const sources = inventory.modelCatalogSources
             .slice(0, 3)
             .map((source) => `${source.method} ${source.url} (${source.richness})`);
-        println(`      \x1b[90mcatalog=${sources.join(' · ')}${inventory.modelCatalogSources.length > 3 ? ' · ...' : ''}\x1b[0m`);
+        println(`      \x1b[90mcatálogo ${sources.join(' · ')}${inventory.modelCatalogSources.length > 3 ? ' · ...' : ''}\x1b[0m`);
         const runtime = inventory.runtimeEndpoints
             .slice(0, 4)
             .map((endpoint) => `${endpoint.method} ${endpoint.path}`);
-        println(`      \x1b[90mruntime=${runtime.join(' · ')}${inventory.runtimeEndpoints.length > 4 ? ' · ...' : ''}\x1b[0m`);
-        println(`      \x1b[90mselectors=${inventory.routeSelectors.join(',')}\x1b[0m`);
+        println(`      \x1b[90mruntime ${runtime.join(' · ')}${inventory.runtimeEndpoints.length > 4 ? ' · ...' : ''}\x1b[0m`);
+        println(`      \x1b[90mseletores ${inventory.routeSelectors.join(',')}\x1b[0m`);
     }
     println('\n  \x1b[90mPróximo passo: catalog importers vão usar este mapa como fonte inicial antes de probes e seleção runtime.\x1b[0m\n');
 }
@@ -2117,10 +2148,10 @@ function renderByokGatewayImporterAudit(println, rest) {
 
     println(`\n  \x1b[36mBYOK model-gateway importer audit\x1b[0m`);
     println(
-        `  \x1b[90mselector=${selector ?? '-'} · importers=${audit.importerCount}/${allImporters.length} · providers=${audit.providerCount} · public=${audit.publicImporterCount} · auth=${audit.authenticatedImporterCount}\x1b[0m`,
+        `  \x1b[90mFiltro: ${selector ?? '-'} · importers ${audit.importerCount}/${allImporters.length} · providers ${audit.providerCount} · públicos ${audit.publicImporterCount} · autenticados ${audit.authenticatedImporterCount}\x1b[0m`,
     );
     println(
-        `  \x1b[90mproviderEvidence=${audit.providerEvidenceImporterCount} · routeOptions=${audit.routeOptionImporterCount} · accountOverlays=${audit.accountOverlayImporterCount} · endpointCoverage=${coveredSourceCount}/${totalSourceCount}\x1b[0m`,
+        `  \x1b[90mEvidências de provider ${audit.providerEvidenceImporterCount} · rotas ${audit.routeOptionImporterCount} · overlays de conta ${audit.accountOverlayImporterCount} · cobertura de endpoints ${coveredSourceCount}/${totalSourceCount}\x1b[0m`,
     );
     println('  \x1b[90mAuditoria local e pré-runtime; não chama fetchRaw, não usa rede, não executa provider/modelo e não imprime segredos.\x1b[0m\n');
 
@@ -2139,9 +2170,9 @@ function renderByokGatewayImporterAudit(println, rest) {
                 .join(',');
             const envRequirements = descriptor.envRequirements.length > 0 ? descriptor.envRequirements.join(',') : '-';
             println(
-                `    \x1b[33m${descriptor.id}\x1b[0m  \x1b[90mprovider=${descriptor.providerId} · source=${descriptor.sourceKind} · auth=${descriptor.requiresAuth ? 'sim' : 'nao'} · ttl=${descriptor.ttlSeconds ?? '-'}\x1b[0m`,
+                `    \x1b[33m${descriptor.id}\x1b[0m  \x1b[90mprovider ${descriptor.providerId} · fonte ${descriptor.sourceKind} · auth ${descriptor.requiresAuth ? 'sim' : 'nao'} · TTL ${formatTerminalDurationSeconds(descriptor.ttlSeconds)}\x1b[0m`,
             );
-            println(`      \x1b[90mhooks=${hookTags || '-'} · env=${envRequirements}\x1b[0m`);
+            println(`      \x1b[90mhooks ${hookTags || '-'} · env ${envRequirements}\x1b[0m`);
         }
         if (audit.descriptors.length > 32) println(`\n  \x1b[90mexibindo 32/${audit.descriptors.length}; filtre com provider id.\x1b[0m`);
     }
@@ -2149,9 +2180,9 @@ function renderByokGatewayImporterAudit(println, rest) {
     const uncovered = audit.uncoveredCatalogSourceIds.slice(0, 12).join(', ');
     const missingHooks = audit.missingRequiredHooks.slice(0, 12).join(', ');
     const providersWithoutImporters = audit.providersWithoutImporters.slice(0, 12).join(', ');
-    println(`\n  \x1b[90muncoveredCatalogSources=${uncovered || '-'}\x1b[0m`);
-    println(`  \x1b[90mprovidersWithoutImporters=${providersWithoutImporters || '-'}\x1b[0m`);
-    println(`  \x1b[90mmissingRequiredHooks=${missingHooks || '-'}\x1b[0m`);
+    println(`\n  \x1b[90mFontes de catálogo sem cobertura: ${uncovered || '-'}\x1b[0m`);
+    println(`  \x1b[90mProviders sem importer: ${providersWithoutImporters || '-'}\x1b[0m`);
+    println(`  \x1b[90mHooks obrigatórios ausentes: ${missingHooks || '-'}\x1b[0m`);
     println('  \x1b[90mUse isto antes de catalog refresh para decidir quais importers/docs/account overlays devem ser aprofundados.\x1b[0m\n');
 }
 
@@ -2182,21 +2213,21 @@ function renderByokProviderGatewayTraits(println, rest) {
         const richnessTags = Array.isArray(item['richnessTags']) ? item['richnessTags'].slice(0, 8).join(',') : '-';
         const richnessCategories = Array.isArray(item['richnessCategories']) ? item['richnessCategories'].slice(0, 8).join(',') : '-';
         println(
-            `    \x1b[33m${optionalScalarString(item['providerId']) ?? '-'}\x1b[0m  \x1b[90mtopology=${optionalScalarString(item['topology']) ?? '-'} · kind=${optionalScalarString(item['providerKind']) ?? '-'} · openaiCompat=${item['openAICompatible'] === true ? 'sim' : 'nao'}\x1b[0m`,
+            `    \x1b[33m${optionalScalarString(item['providerId']) ?? '-'}\x1b[0m  \x1b[90mtopologia ${optionalScalarString(item['topology']) ?? '-'} · tipo ${optionalScalarString(item['providerKind']) ?? '-'} · compatível com OpenAI ${item['openAICompatible'] === true ? 'sim' : 'nao'}\x1b[0m`,
         );
         println(
-            `      \x1b[90mcatalog=${item['catalogSourceCount'] ?? 0} · runtime=${item['runtimeEndpointCount'] ?? 0} · public=${item['publicCatalogSourceCount'] ?? 0} · auth=${item['authenticatedCatalogSourceCount'] ?? 0} · parameterized=${item['parameterizedCatalogSourceCount'] ?? 0}\x1b[0m`,
+            `      \x1b[90mfontes de catálogo ${item['catalogSourceCount'] ?? 0} · endpoints runtime ${item['runtimeEndpointCount'] ?? 0} · públicos ${item['publicCatalogSourceCount'] ?? 0} · autenticados ${item['authenticatedCatalogSourceCount'] ?? 0} · parametrizados ${item['parameterizedCatalogSourceCount'] ?? 0}\x1b[0m`,
         );
         println(
-            `      \x1b[90mruntimeKinds=${Array.isArray(item['runtimeKinds']) ? item['runtimeKinds'].join(',') || '-' : '-'} · selectors=${routeSelectors}\x1b[0m`,
+            `      \x1b[90mtipos runtime ${Array.isArray(item['runtimeKinds']) ? item['runtimeKinds'].join(',') || '-' : '-'} · seletores ${routeSelectors}\x1b[0m`,
         );
         println(
-            `      \x1b[90mcapabilities=chat:${capabilities['chatCompletions'] === true ? 'sim' : 'nao'},responses:${capabilities['responses'] === true ? 'sim' : 'nao'},fim:${capabilities['fim'] === true ? 'sim' : 'nao'},embeddings:${capabilities['embeddings'] === true ? 'sim' : 'nao'}\x1b[0m`,
+            `      \x1b[90mcapacidades chat:${capabilities['chatCompletions'] === true ? 'sim' : 'nao'}, responses:${capabilities['responses'] === true ? 'sim' : 'nao'}, FIM:${capabilities['fim'] === true ? 'sim' : 'nao'}, embeddings:${capabilities['embeddings'] === true ? 'sim' : 'nao'}\x1b[0m`,
         );
         println(
-            `      \x1b[90mrouting=auto:${routing['supportsAutoSelection'] === true ? 'sim' : 'nao'},fallback:${routing['supportsFallback'] === true ? 'sim' : 'nao'},providerOrder:${routing['supportsProviderOrder'] === true ? 'sim' : 'nao'},byok:${routing['supportsGatewayByok'] === true ? 'sim' : 'nao'} · metadata=pricing:${metadata['hasPricingMetadata'] === true ? 'sim' : 'nao'},context:${metadata['hasContextMetadata'] === true ? 'sim' : 'nao'},provider:${metadata['hasProviderMetadata'] === true ? 'sim' : 'nao'}\x1b[0m`,
+            `      \x1b[90mroteamento auto:${routing['supportsAutoSelection'] === true ? 'sim' : 'nao'}, fallback:${routing['supportsFallback'] === true ? 'sim' : 'nao'}, ordem de providers:${routing['supportsProviderOrder'] === true ? 'sim' : 'nao'}, BYOK:${routing['supportsGatewayByok'] === true ? 'sim' : 'nao'} · metadados preço:${metadata['hasPricingMetadata'] === true ? 'sim' : 'nao'}, contexto:${metadata['hasContextMetadata'] === true ? 'sim' : 'nao'}, provider:${metadata['hasProviderMetadata'] === true ? 'sim' : 'nao'}\x1b[0m`,
         );
-        println(`      \x1b[90mrichness=${richnessTags} · categories=${richnessCategories}\x1b[0m`);
+        println(`      \x1b[90mriqueza ${richnessTags} · categorias ${richnessCategories}\x1b[0m`);
     }
     println('\n  \x1b[90mUse estes traits como filtro inicial; eligibility e probes continuam em fases separadas.\x1b[0m\n');
 }
@@ -2207,11 +2238,11 @@ function renderByokProviderGatewayTraits(println, rest) {
  */
 function renderByokGatewayLocalGuidance(println) {
     println(`\n  \x1b[36mBYOK model-gateway local/Ollama\x1b[0m`);
-    println('  \x1b[90mdefault=excluido · daemon=nao_iniciado · runtime=nao · opt-in=obrigatorio\x1b[0m\n');
-    println(`    \x1b[90mreason=${MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON}\x1b[0m`);
-    println('    \x1b[90mpolicy=excludeLocalProvidersByDefault:true\x1b[0m');
-    println('    \x1b[90mopt-in provider: /byok gateway selection audit provider:ollama\x1b[0m');
-    println('    \x1b[90mopt-in profile:  /byok gateway selection audit local_private\x1b[0m');
+    println('  \x1b[90mPadrão: excluído · daemon não iniciado · sem runtime · opt-in obrigatório\x1b[0m\n');
+    println(`    \x1b[90mMotivo: ${MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON}\x1b[0m`);
+    println('    \x1b[90mPolítica: excluir providers locais por padrão\x1b[0m');
+    println('    \x1b[90mOpt-in por provider: /byok gateway selection audit provider:ollama\x1b[0m');
+    println('    \x1b[90mOpt-in por perfil:   /byok gateway selection audit local_private\x1b[0m');
     println('    \x1b[90mmodelo ativo:   /byok provider ollama-local <modelo> http://127.0.0.1:11434/v1\x1b[0m');
     println('    \x1b[90mchecagem:       /byok gateway selection audit strict local_private_strict\x1b[0m\n');
     println('  \x1b[90mEste comando nao inicia Ollama, nao faz probe e nao altera env. Ele apenas mostra o caminho explicito.\x1b[0m\n');
@@ -2229,7 +2260,7 @@ function renderByokGatewayProbeMatrix(println, rest) {
 
     println(`\n  \x1b[36mBYOK provider/wire probe matrix\x1b[0m`);
     println(
-        `  \x1b[90mproviders=${summary.providerCount} · rows=${summary.rowCount} · selector=${selector ?? '-'} · fase=pre-runtime-planning\x1b[0m\n`,
+        `  \x1b[90mProviders ${summary.providerCount} · linhas ${summary.rowCount} · filtro ${selector ?? '-'} · fase: planejamento pré-runtime\x1b[0m\n`,
     );
 
     if (rows.length === 0) {
@@ -2242,9 +2273,9 @@ function renderByokGatewayProbeMatrix(println, rest) {
         const pending = Array.isArray(row['pendingProbeKinds']) ? row['pendingProbeKinds'].join(',') : '-';
         const notes = Array.isArray(row['notes']) ? row['notes'].join(',') : '-';
         println(
-            `    \x1b[33m${optionalScalarString(row['providerId']) ?? '-'}\x1b[0m  \x1b[90mwire=${optionalScalarString(row['wireApi']) ?? '-'} · runtime=${optionalScalarString(row['runtimeKind']) ?? '-'} · topology=${optionalScalarString(row['topology']) ?? '-'}\x1b[0m`,
+            `    \x1b[33m${optionalScalarString(row['providerId']) ?? '-'}\x1b[0m  \x1b[90mwire ${optionalScalarString(row['wireApi']) ?? '-'} · runtime ${optionalScalarString(row['runtimeKind']) ?? '-'} · topologia ${optionalScalarString(row['topology']) ?? '-'}\x1b[0m`,
         );
-        println(`      \x1b[90mimplemented=${implemented || '-'} · pending=${pending || '-'} · notes=${notes || '-'}\x1b[0m`);
+        println(`      \x1b[90mimplementados ${implemented || '-'} · pendentes ${pending || '-'} · notas ${notes || '-'}\x1b[0m`);
     }
     if (rows.length > 24) println(`\n  \x1b[90mexibindo 24/${rows.length}; filtre com provider id.\x1b[0m`);
 
@@ -2252,7 +2283,7 @@ function renderByokGatewayProbeMatrix(println, rest) {
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([kind, count]) => `${kind}:${count}`)
         .join(', ');
-    println(`\n  \x1b[90mpendingKinds=${pendingKinds || '-'}\x1b[0m`);
+    println(`\n  \x1b[90mTipos de probe pendentes: ${pendingKinds || '-'}\x1b[0m`);
     println('  \x1b[90mMatriz não executa provider/modelo; ela só orienta probes runtime futuros e seleção por policy.\x1b[0m\n');
 }
 
@@ -2282,22 +2313,22 @@ async function renderByokGatewayProbeBackoff(println, rest) {
         .join(',');
     println(`\n  \x1b[36mBYOK probe backoff planner\x1b[0m`);
     println(
-        `  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · recommendations=${filteredRecommendations.length}/${recommendations.length} · ready=${plan.summary.ready} · deferred=${plan.summary.deferred} · reasons=${reasonCounts || '-'}\x1b[0m\n`,
+        `  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · recomendações ${filteredRecommendations.length}/${recommendations.length} · prontas ${plan.summary.ready} · adiadas ${plan.summary.deferred} · motivos ${reasonCounts || '-'}\x1b[0m\n`,
     );
     if (filteredRecommendations.length === 0) {
         println('    \x1b[33mNenhuma recomendação de probe disponível no último diff persistido.\x1b[0m\n');
         return;
     }
     for (const item of plan.deferred.slice(0, args.limit)) {
-        const retry = item.resetAt ? `reset=${item.resetAt}` : item.retryAfterSeconds ? `retry=${item.retryAfterSeconds}s` : 'reset=-';
-        const probe = item.probeKind ? ` · probe=${item.probeKind}` : '';
+        const retry = item.resetAt ? `reset ${item.resetAt}` : item.retryAfterSeconds ? `retentar em ${item.retryAfterSeconds}s` : 'reset -';
+        const probe = item.probeKind ? ` · probe ${item.probeKind}` : '';
         println(
-            `    \x1b[33mDEFER\x1b[0m ${item.key}  \x1b[90mreason=${item.reason}${probe} · ${retry} · provider=${item.providerId}\x1b[0m`,
+            `    \x1b[33mADIAR\x1b[0m ${item.key}  \x1b[90mmotivo ${item.reason}${probe} · ${retry} · provider ${item.providerId}\x1b[0m`,
         );
     }
     for (const item of plan.ready.slice(0, Math.max(0, args.limit - plan.deferred.length))) {
         println(
-            `    \x1b[32mREADY\x1b[0m ${item.key}  \x1b[90mprobes=${item.probeKinds.join(',') || '-'} · reasons=${item.reasons.slice(0, 3).join(',') || '-'}\x1b[0m`,
+            `    \x1b[32mPRONTO\x1b[0m ${item.key}  \x1b[90mprobes ${item.probeKinds.join(',') || '-'} · motivos ${item.reasons.slice(0, 3).join(',') || '-'}\x1b[0m`,
         );
     }
     println('  \x1b[90mPlanner não executa provider/modelo; ele só evita probes durante janelas dinâmicas conhecidas.\x1b[0m\n');
@@ -2315,7 +2346,7 @@ function renderByokGatewayEnvRequirements(println, rest) {
 
     println(`\n  \x1b[36mBYOK provider env requirements\x1b[0m`);
     println(
-        `  \x1b[90mproviders=${summary.providerCount} · ready=${summary.readyCount} · partial=${summary.partialCount} · missing=${summary.missingCount} · selector=${selector ?? '-'}\x1b[0m\n`,
+        `  \x1b[90mProviders ${summary.providerCount} · prontos ${summary.readyCount} · parciais ${summary.partialCount} · ausentes ${summary.missingCount} · filtro ${selector ?? '-'}\x1b[0m\n`,
     );
 
     if (rows.length === 0) {
@@ -2327,11 +2358,11 @@ function renderByokGatewayEnvRequirements(println, rest) {
         const configured = row.configuredKeys.length > 0 ? row.configuredKeys.join(',') : '-';
         const missing = row.missingRequiredKeys.length > 0 ? row.missingRequiredKeys.join(',') : '-';
         const recommended = row.missingRecommendedKeys.length > 0 ? row.missingRecommendedKeys.join(',') : '-';
-        const aliases = Array.isArray(row.providerAliases) && row.providerAliases.length > 0 ? ` · aliases=${row.providerAliases.join(',')}` : '';
+        const aliases = Array.isArray(row.providerAliases) && row.providerAliases.length > 0 ? ` · aliases ${row.providerAliases.join(',')}` : '';
         println(
-            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mstatus=${row.status} · required=${row.satisfiedRequiredGroupCount}/${row.requiredGroupCount} · recommended=${row.satisfiedRecommendedGroupCount}/${row.recommendedGroupCount}${aliases}\x1b[0m`,
+            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mestado ${row.status} · obrigatórias ${row.satisfiedRequiredGroupCount}/${row.requiredGroupCount} · recomendadas ${row.satisfiedRecommendedGroupCount}/${row.recommendedGroupCount}${aliases}\x1b[0m`,
         );
-        println(`      \x1b[90mconfigured=${configured} · missingRequired=${missing} · missingRecommended=${recommended}\x1b[0m`);
+        println(`      \x1b[90mconfiguradas ${configured} · obrigatórias ausentes ${missing} · recomendadas ausentes ${recommended}\x1b[0m`);
     }
     if (rows.length > 24) println(`\n  \x1b[90mexibindo 24/${rows.length}; filtre com provider id.\x1b[0m`);
     println('\n  \x1b[90mA saída lista apenas nomes de variáveis; nenhum valor de segredo é impresso.\x1b[0m\n');
@@ -2345,7 +2376,7 @@ function renderByokGatewayPreKGate(println) {
     const report = buildModelGatewayPreKCompatibilityReport();
     println(`\n  \x1b[36mBYOK model-gateway pre-K gate\x1b[0m`);
     println(
-        `  \x1b[90mstage=${report.stage} · ready=${report.ready ? 'sim' : 'nao'} · checks=${report.passed}/${report.total} · failed=${report.failed}\x1b[0m\n`,
+        `  \x1b[90mEtapa ${report.stage} · pronto ${report.ready ? 'sim' : 'nao'} · checks ${report.passed}/${report.total} · falhas ${report.failed}\x1b[0m\n`,
     );
     for (const check of report.checks) {
         const mark = check.passed ? '\x1b[32m[x]\x1b[0m' : '\x1b[31m[ ]\x1b[0m';
@@ -2362,7 +2393,7 @@ function renderByokGatewayPreBuildReadiness(println) {
     const report = buildModelGatewayPreBuildReadinessReport();
     println(`\n  \x1b[36mBYOK model-gateway pre-build readiness\x1b[0m`);
     println(
-        `  \x1b[90mstage=${report.stage} · ready=${report.ready ? 'sim' : 'nao'} · checks=${report.passed}/${report.total} · failed=${report.failed}\x1b[0m\n`,
+        `  \x1b[90mEtapa ${report.stage} · pronto ${report.ready ? 'sim' : 'nao'} · checks ${report.passed}/${report.total} · falhas ${report.failed}\x1b[0m\n`,
     );
     for (const check of report.checks) {
         const mark = check.passed ? '\x1b[32m[x]\x1b[0m' : '\x1b[31m[ ]\x1b[0m';
@@ -2384,7 +2415,7 @@ function renderByokGatewayCanonicalCommands(println, rest) {
     const commands = listModelGatewayCanonicalCommands({ surface, phase });
     println(`\n  \x1b[36mBYOK model-gateway canonical commands\x1b[0m`);
     println(
-        `  \x1b[90mtrack=Y · scope=package+make+terminal · build=preparacao · surface=${surface ?? '-'} · phase=${phase ?? '-'} · commands=${commands.length}\x1b[0m\n`,
+        `  \x1b[90mFaixa Y · escopo package + make + terminal · build em preparação · superfície ${surface ?? '-'} · fase ${phase ?? '-'} · comandos ${commands.length}\x1b[0m\n`,
     );
     for (const line of renderModelGatewayCanonicalCommandLines({ surface, phase })) {
         const [head, summary] = line.split(' :: ');
@@ -2534,7 +2565,7 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
     };
     println(`\n  \x1b[36mBYOK model-gateway catalog refresh\x1b[0m`);
     println(
-        `  \x1b[90mstore=${store.filePath} · selector=${normalizedSelector ?? '-'} · importers=${importers.map((importer) => importer.id).join(',') || '-'} · schema=OpenAI+x_model_gateway\x1b[0m\n`,
+        `  \x1b[90mCatálogo: ${store.filePath} · Filtro: ${normalizedSelector ?? '-'} · Importers: ${importers.map((importer) => importer.id).join(', ') || '-'} · Schema: OpenAI + x_model_gateway\x1b[0m\n`,
     );
     if (importers.length === 0) {
         println('    \x1b[33mNenhum importer habilitado para este seletor. Configure rede/credenciais, remova o filtro ou use uma fonte pública disponível.\x1b[0m\n');
@@ -2572,22 +2603,35 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
                 if (!shouldPrint) return;
                 lastProgressPct = Math.max(lastProgressPct, progressPct);
                 const importer = event.importer && typeof event.importer === 'object' ? event.importer['importerId'] : null;
-                const counts = [
-                    typeof event.selectedCount === 'number' ? `selected=${event.selectedCount}` : '',
-                    typeof event.skippedCount === 'number' ? `skipped=${event.skippedCount}` : '',
-                    typeof event.rowCount === 'number' ? `rows=${event.rowCount}` : '',
-                    typeof event.evidenceCount === 'number' ? `evidence=${event.evidenceCount}` : '',
-                    typeof event.projectionCount === 'number' ? `projections=${event.projectionCount}` : '',
-                    typeof event.eligibilityDecisionCount === 'number' ? `eligibility=${event.eligibilityDecisionCount}` : '',
-                    typeof event.eligibilityAddedCount === 'number' ? `elig+${event.eligibilityAddedCount}` : '',
-                    typeof event.eligibilityRemovedCount === 'number' ? `elig-${event.eligibilityRemovedCount}` : '',
-                    typeof event.eligibilityChangedCount === 'number' ? `elig~${event.eligibilityChangedCount}` : '',
-                    typeof event.addedCount === 'number' ? `added=${event.addedCount}` : '',
-                    typeof event.removedCount === 'number' ? `removed=${event.removedCount}` : '',
-                    typeof event.changedCount === 'number' ? `changed=${event.changedCount}` : '',
-                ].filter(Boolean).join(' · ');
+                /** @type {Record<string, string>} */
+                const phaseLabels = {
+                    refresh_plan_ready: 'plano pronto',
+                    refresh_completed: 'refresh concluído',
+                    eligibility_evaluated: 'elegibilidade recalculada',
+                    snapshot_written: 'snapshot gravado',
+                    snapshot_previewed: 'snapshot pré-visualizado',
+                };
+                const phase = phaseLabels[event.phase] ?? event.phase
+                    .replace(/:importer_started$/u, ': importer iniciado')
+                    .replace(/:importer_completed$/u, ': importer concluído')
+                    .replace(/:importer_failed$/u, ': importer falhou')
+                    .replaceAll('_', ' ');
+                const counts = joinTerminalSummary([
+                    typeof event.selectedCount === 'number' ? `selecionados ${event.selectedCount}` : '',
+                    typeof event.skippedCount === 'number' ? `adiados ${event.skippedCount}` : '',
+                    typeof event.rowCount === 'number' ? `linhas ${event.rowCount}` : '',
+                    typeof event.evidenceCount === 'number' ? `evidências ${event.evidenceCount}` : '',
+                    typeof event.projectionCount === 'number' ? `projeções ${event.projectionCount}` : '',
+                    typeof event.eligibilityDecisionCount === 'number' ? `decisões ${event.eligibilityDecisionCount}` : '',
+                    typeof event.eligibilityAddedCount === 'number' ? `elegibilidade +${event.eligibilityAddedCount}` : '',
+                    typeof event.eligibilityRemovedCount === 'number' ? `elegibilidade -${event.eligibilityRemovedCount}` : '',
+                    typeof event.eligibilityChangedCount === 'number' ? `elegibilidade ~${event.eligibilityChangedCount}` : '',
+                    typeof event.addedCount === 'number' ? `novos ${event.addedCount}` : '',
+                    typeof event.removedCount === 'number' ? `removidos ${event.removedCount}` : '',
+                    typeof event.changedCount === 'number' ? `alterados ${event.changedCount}` : '',
+                ]);
                 println(
-                    `    \x1b[90mprogress=${String(progressPct).padStart(3)}% · ${event.phase}${importer ? ` · importer=${importer}` : ''}${counts ? ` · ${counts}` : ''}\x1b[0m`,
+                    `    \x1b[90m${String(progressPct).padStart(3)}% · ${phase}${importer ? ` · importer ${importer}` : ''}${counts ? ` · ${counts}` : ''}\x1b[0m`,
                 );
             },
             retentionPolicy: {
@@ -2605,29 +2649,29 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
         });
         for (const event of refreshEvents.events) eventBus?.emit?.(event);
         println(
-            `    \x1b[32mrefresh concluído\x1b[0m  \x1b[90mprojections=${result.snapshot.projections.length} · openai=${result.openai.data.length} · runs=${result.snapshot.importRuns.length}\x1b[0m`,
+            `    \x1b[32mRefresh concluído\x1b[0m  \x1b[90mprojeções ${result.snapshot.projections.length} · modelos OpenAI ${result.openai.data.length} · runs retidos ${result.snapshot.importRuns.length}\x1b[0m`,
         );
         println(
-            `    \x1b[90mdiff: added=${result.diff.added.length} · removed=${result.diff.removed.length} · changed=${result.diff.changed.length}\x1b[0m`,
+            `    \x1b[90mDiferença do catálogo: novos ${result.diff.added.length} · removidos ${result.diff.removed.length} · alterados ${result.diff.changed.length}\x1b[0m`,
         );
         println(
-            `    \x1b[90mwrite=${result.writePolicy.mode} · committed=${result.writePolicy.committed ? 'sim' : 'nao'} · overlays=${result.overlayRefresh.total} · eligibility=${result.eligibilityRefresh.decisionCount} · retained-runs=${result.retention.importRuns.after}\x1b[0m`,
+            `    \x1b[90mPersistência: ${result.writePolicy.mode} · commit ${yesNoPlain(result.writePolicy.committed)} · overlays ${result.overlayRefresh.total} · elegibilidade ${result.eligibilityRefresh.decisionCount} · runs retidos ${result.retention.importRuns.after}\x1b[0m`,
         );
         const eligibilityDiffSummary = result.eligibilityRefresh.diffSummary;
         if (eligibilityDiffSummary) {
             println(
-                `    \x1b[90meligibility diff: added=${eligibilityDiffSummary.addedCount} · removed=${eligibilityDiffSummary.removedCount} · changed=${eligibilityDiffSummary.changedCount} · becameEligible=${eligibilityDiffSummary.becameEligibleCount} · becameExcluded=${eligibilityDiffSummary.becameExcludedCount}\x1b[0m`,
+                `    \x1b[90mDiferença de elegibilidade: novas ${eligibilityDiffSummary.addedCount} · removidas ${eligibilityDiffSummary.removedCount} · alteradas ${eligibilityDiffSummary.changedCount} · ficaram elegíveis ${eligibilityDiffSummary.becameEligibleCount} · ficaram excluídas ${eligibilityDiffSummary.becameExcludedCount}\x1b[0m`,
             );
             if (eligibilityDiffSummary.changedKinds.length > 0) {
-                println(`    \x1b[90meligibility diff kinds: ${eligibilityDiffSummary.changedKinds.join(',')}\x1b[0m`);
+                println(`    \x1b[90mTipos de mudança em elegibilidade: ${eligibilityDiffSummary.changedKinds.join(',')}\x1b[0m`);
             }
         }
         if (refreshEvents.completedEvent.changedKinds.length > 0) {
-            println(`    \x1b[90mdiff kinds: ${refreshEvents.completedEvent.changedKinds.join(',')}\x1b[0m`);
+            println(`    \x1b[90mTipos de mudança no catálogo: ${refreshEvents.completedEvent.changedKinds.join(',')}\x1b[0m`);
         }
         const probeRecommendations = recommendCatalogDiffProbes(buildByokProbeRecommendationInput(result.snapshot, result.diff, 5));
         if (probeRecommendations.length > 0) {
-            println(`    \x1b[90mprobe suggestions: ${probeRecommendations.length}\x1b[0m`);
+            println(`    \x1b[90mSugestões de prova runtime: ${probeRecommendations.length}\x1b[0m`);
             for (const recommendation of probeRecommendations) {
                 println(
                     `      \x1b[90m? ${recommendation.key}: ${recommendation.probeKinds.join(',')} · ${recommendation.priority} · ${recommendation.reasons.slice(0, 4).join(',')}\x1b[0m`,
@@ -2663,7 +2707,7 @@ async function renderByokGatewayCatalogRefreshPlan(println, selector = null) {
           )
         : allImporters;
     println(`\n  \x1b[36mBYOK model-gateway catalog refresh plan\x1b[0m`);
-    println(`  \x1b[90mstore=${store.filePath} · selector=${normalizedSelector ?? '-'} · sem rede · sem escrita\x1b[0m\n`);
+    println(`  \x1b[90mCatálogo: ${store.filePath} · Filtro: ${normalizedSelector ?? '-'} · Prévia local, sem rede e sem escrita\x1b[0m\n`);
     if (importers.length === 0) {
         println('    \x1b[33mNenhum importer habilitado para este seletor.\x1b[0m\n');
         return;
@@ -2674,13 +2718,17 @@ async function renderByokGatewayCatalogRefreshPlan(println, selector = null) {
         sources: snapshot.sources,
     });
     println(
-        `    \x1b[90mimporters=${plan.importerCount} · selected=${plan.selected.length} · skipped=${plan.skipped.length} · knownSources=${plan.sourceCount}\x1b[0m`,
+        `    \x1b[90mImporters avaliados ${plan.importerCount} · executar agora ${plan.selected.length} · adiar ${plan.skipped.length} · fontes conhecidas ${plan.sourceCount}\x1b[0m`,
     );
     for (const item of plan.selected.slice(0, 16)) {
-        println(`      \x1b[32mrun\x1b[0m ${item.sourceId} \x1b[90mprovider=${item.providerId} · reason=${item.reason} · ttl=${item.ttlSeconds ?? '-'} · age=${item.ageSeconds ?? '-'}\x1b[0m`);
+        println(
+            `      \x1b[32mexecutar\x1b[0m ${item.sourceId} \x1b[90mprovider ${item.providerId} · motivo ${item.reason} · TTL ${formatTerminalDurationSeconds(item.ttlSeconds)} · idade ${formatTerminalDurationSeconds(item.ageSeconds)}\x1b[0m`,
+        );
     }
     for (const item of plan.skipped.slice(0, 16)) {
-        println(`      \x1b[90mskip ${item.sourceId} provider=${item.providerId} · reason=${item.reason} · ttl=${item.ttlSeconds ?? '-'} · age=${item.ageSeconds ?? '-'}\x1b[0m`);
+        println(
+            `      \x1b[90madiar ${item.sourceId} · provider ${item.providerId} · motivo ${item.reason} · TTL ${formatTerminalDurationSeconds(item.ttlSeconds)} · idade ${formatTerminalDurationSeconds(item.ageSeconds)}\x1b[0m`,
+        );
     }
     println('\n  \x1b[90mUse npm run model-gateway:refresh -- --provider=<provider> --force para executar somente o provider desejado.\x1b[0m\n');
 }
@@ -2724,22 +2772,22 @@ async function renderByokGatewayCatalogRefreshLog(println) {
     }
     const text = await fs.readFile(logPath, 'utf8');
     const summary = summarizeModelGatewayRefreshLogText(text, { logPath });
-    println(`  \x1b[90mlog=${logPath} · events=${summary.eventCount} · invalid=${summary.invalidLineCount}\x1b[0m\n`);
+    println(`  \x1b[90mLog: ${logPath} · eventos ${summary.eventCount} · linhas inválidas ${summary.invalidLineCount}\x1b[0m\n`);
     println(
-        `    \x1b[90mcompleted=${summary.completed ? 'sim' : 'nao'} · committed=${summary.committed ? 'sim' : 'nao'} · elapsed=${summary.elapsedMs ?? '-'}ms\x1b[0m`,
+        `    \x1b[90mRefresh completo ${yesNoPlain(summary.completed)} · commit ${yesNoPlain(summary.committed)} · duração ${summary.elapsedMs ?? '-'}ms\x1b[0m`,
     );
     println(
-        `    \x1b[90mprojections=${summary.totals.projections ?? '-'} · openai=${summary.totals.openai ?? '-'} · overlays=${summary.totals.overlays ?? '-'} · added=${summary.totals.added ?? '-'} · removed=${summary.totals.removed ?? '-'} · changed=${summary.totals.changed ?? '-'}\x1b[0m`,
+        `    \x1b[90mTotais: projeções ${summary.totals.projections ?? '-'} · modelos OpenAI ${summary.totals.openai ?? '-'} · overlays ${summary.totals.overlays ?? '-'} · novos ${summary.totals.added ?? '-'} · removidos ${summary.totals.removed ?? '-'} · alterados ${summary.totals.changed ?? '-'}\x1b[0m`,
     );
     const importerEntries = Object.entries(summary.importers);
-    println(`    \x1b[90mimporters=${importerEntries.length} · failures=${summary.failures.length}\x1b[0m`);
+    println(`    \x1b[90mImporters com eventos ${importerEntries.length} · falhas ${summary.failures.length}\x1b[0m`);
     for (const [importerId, importer] of importerEntries.slice(0, 12)) {
         println(
-            `      \x1b[90m${importerId}: started=${importer.started} · completed=${importer.completed} · failed=${importer.failed} · rows=${importer.rowCount} · evidence=${importer.evidenceCount}\x1b[0m`,
+            `      \x1b[90m${importerId}: iniciados ${importer.started} · concluídos ${importer.completed} · falhas ${importer.failed} · linhas ${importer.rowCount} · evidências ${importer.evidenceCount}\x1b[0m`,
         );
     }
     for (const failure of summary.failures.slice(0, 8)) {
-        println(`      \x1b[31mfalha\x1b[0m \x1b[90m${failure.phase} · importer=${failure.importerId ?? '-'} · ${failure.errors.join('; ')}\x1b[0m`);
+        println(`      \x1b[31mfalha\x1b[0m \x1b[90m${failure.phase} · importer ${failure.importerId ?? '-'} · ${failure.errors.join('; ')}\x1b[0m`);
     }
     println('');
 }
@@ -2835,7 +2883,7 @@ async function renderByokGatewayEligibilityRuns(println, rest) {
         .sort((left, right) => String(right['completedAt'] ?? '').localeCompare(String(left['completedAt'] ?? '')))
         .slice(0, limit);
     println(`\n  \x1b[36mBYOK model-gateway eligibility runs\x1b[0m`);
-    println(`  \x1b[90mstore=${store.filePath} · runs=${allRuns.length} · sem runtime\x1b[0m\n`);
+    println(`  \x1b[90mCatálogo: ${store.filePath} · runs persistidos ${allRuns.length} · sem runtime\x1b[0m\n`);
     if (runs.length === 0) {
         println('    \x1b[33mNenhum run de eligibility persistido. Rode /byok gateway catalog refresh primeiro.\x1b[0m\n');
         return;
@@ -2843,14 +2891,14 @@ async function renderByokGatewayEligibilityRuns(println, rest) {
     for (const run of runs) {
         const summary = run['diffSummary'] ? summarizeModelGatewayEligibilityDiff(normalizeEligibilityDiffForDisplay(run['diff'])) : null;
         println(
-            `    \x1b[33m${run['runId'] ?? '-'}\x1b[0m  \x1b[90mpolicy=${run['policyProfile'] ?? '-'} · task=${run['taskProfile'] ?? '-'} · account=${run['accountScope'] ?? '-'} · status=${run['status'] ?? '-'}\x1b[0m`,
+            `    \x1b[33m${run['runId'] ?? '-'}\x1b[0m  \x1b[90mpolítica ${run['policyProfile'] ?? '-'} · tarefa ${run['taskProfile'] ?? '-'} · conta ${run['accountScope'] ?? '-'} · estado ${run['status'] ?? '-'}\x1b[0m`,
         );
         println(
-            `      \x1b[90mcompleted=${run['completedAt'] ?? '-'} · models=${run['modelCount'] ?? 0} · eligible=${run['eligibleCount'] ?? 0} · unknown=${run['unknownCount'] ?? 0} · excluded=${run['excludedCount'] ?? 0}\x1b[0m`,
+            `      \x1b[90mconcluído ${run['completedAt'] ?? '-'} · modelos ${run['modelCount'] ?? 0} · elegíveis ${run['eligibleCount'] ?? 0} · desconhecidos ${run['unknownCount'] ?? 0} · excluídos ${run['excludedCount'] ?? 0}\x1b[0m`,
         );
         if (summary) {
             println(
-                `      \x1b[90mdiff added=${summary.addedCount} · removed=${summary.removedCount} · changed=${summary.changedCount} · becameEligible=${summary.becameEligibleCount} · becameExcluded=${summary.becameExcludedCount}\x1b[0m`,
+                `      \x1b[90mdiferença: novas ${summary.addedCount} · removidas ${summary.removedCount} · alteradas ${summary.changedCount} · ficaram elegíveis ${summary.becameEligibleCount} · ficaram excluídas ${summary.becameExcludedCount}\x1b[0m`,
             );
         }
     }
@@ -2866,7 +2914,7 @@ async function renderByokGatewayEligibilityDiff(println) {
     const snapshot = await store.readSnapshot();
     const run = findLatestEligibilityRun(snapshot);
     println(`\n  \x1b[36mBYOK model-gateway eligibility diff\x1b[0m`);
-    println(`  \x1b[90mstore=${store.filePath} · fonte=ultimo eligibility run persistido · sem runtime\x1b[0m\n`);
+    println(`  \x1b[90mCatálogo: ${store.filePath} · fonte: último run de elegibilidade persistido · sem runtime\x1b[0m\n`);
     if (!run) {
         println('    \x1b[33mNenhum diff de eligibility persistido. Rode /byok gateway catalog refresh primeiro.\x1b[0m\n');
         return;
@@ -2874,9 +2922,9 @@ async function renderByokGatewayEligibilityDiff(println) {
     const diff = normalizeEligibilityDiffForDisplay(run['diff']);
     const summary = summarizeModelGatewayEligibilityDiff(diff);
     println(
-        `    \x1b[90mrun=${run['runId'] ?? '-'} · added=${summary.addedCount} · removed=${summary.removedCount} · changed=${summary.changedCount} · becameEligible=${summary.becameEligibleCount} · becameExcluded=${summary.becameExcludedCount}\x1b[0m`,
+        `    \x1b[90mRun ${run['runId'] ?? '-'} · novas ${summary.addedCount} · removidas ${summary.removedCount} · alteradas ${summary.changedCount} · ficaram elegíveis ${summary.becameEligibleCount} · ficaram excluídas ${summary.becameExcludedCount}\x1b[0m`,
     );
-    if (summary.changedKinds.length > 0) println(`    \x1b[90mdiff kinds: ${summary.changedKinds.join(',')}\x1b[0m`);
+    if (summary.changedKinds.length > 0) println(`    \x1b[90mTipos de mudança: ${summary.changedKinds.join(',')}\x1b[0m`);
     for (const id of diff.added.slice(0, 8)) println(`      \x1b[32m+\x1b[0m ${id}`);
     for (const id of diff.removed.slice(0, 8)) println(`      \x1b[31m-\x1b[0m ${id}`);
     for (const item of diff.changed.slice(0, 8)) {
@@ -2893,7 +2941,7 @@ async function renderByokGatewayEligibilityDiff(println) {
 async function renderByokGatewayCatalogDiff(println) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     println(`\n  \x1b[36mBYOK model-gateway catalog diff\x1b[0m`);
-    println(`  \x1b[90mstore=${store.filePath} · fonte=ultimo refresh persistido · sem rede\x1b[0m\n`);
+    println(`  \x1b[90mCatálogo: ${store.filePath} · fonte: último refresh persistido · sem rede\x1b[0m\n`);
     const snapshot = await store.readSnapshot();
     const latestRun = findLatestCatalogRefreshRun(snapshot);
     if (!latestRun) {
@@ -2904,10 +2952,10 @@ async function renderByokGatewayCatalogDiff(println) {
     const summary = summarizeCanonicalModelProjectionDiff(diff);
     const recommendations = recommendCatalogDiffProbes(buildByokProbeRecommendationInput(snapshot, diff, 8));
     println(
-        `    \x1b[90mrun=${latestRun['runId'] ?? '-'} · added=${summary.addedCount} · removed=${summary.removedCount} · changed=${summary.changedCount} · conflicts=${snapshot.conflicts.length}\x1b[0m`,
+        `    \x1b[90mRun ${latestRun['runId'] ?? '-'} · novos ${summary.addedCount} · removidos ${summary.removedCount} · alterados ${summary.changedCount} · conflitos ${snapshot.conflicts.length}\x1b[0m`,
     );
     if (summary.changedKinds.length > 0) {
-        println(`    \x1b[90mdiff kinds: ${summary.changedKinds.join(',')}\x1b[0m`);
+        println(`    \x1b[90mTipos de mudança: ${summary.changedKinds.join(',')}\x1b[0m`);
     }
     for (const id of diff.added.slice(0, 8)) println(`      \x1b[32m+\x1b[0m ${id}`);
     for (const id of diff.removed.slice(0, 8)) println(`      \x1b[31m-\x1b[0m ${id}`);
@@ -2916,7 +2964,7 @@ async function renderByokGatewayCatalogDiff(println) {
         println(`      \x1b[33m~\x1b[0m ${item.key} (${item.changedFields.join(',')}${kinds})`);
     }
     if (recommendations.length > 0) {
-        println(`\n    \x1b[90mprobe suggestions: ${recommendations.length}\x1b[0m`);
+        println(`\n    \x1b[90mSugestões de prova runtime: ${recommendations.length}\x1b[0m`);
         for (const recommendation of recommendations.slice(0, 5)) {
             println(`      \x1b[90m? ${recommendation.key}: ${recommendation.probeKinds.join(',')} · ${recommendation.reasons.slice(0, 4).join(',')}\x1b[0m`);
             println(`        \x1b[90m${recommendation.commands[0]}\x1b[0m`);
@@ -2935,12 +2983,12 @@ async function renderByokGatewayCatalogIntegrity(println) {
     const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
     println(`\n  \x1b[36mBYOK model-gateway catalog integrity\x1b[0m`);
     println(
-        `  \x1b[90mstore=${store.filePath} · ok=${integrity.ok ? 'sim' : 'nao'} · redactedIdentities=${integrity.redactedIdentityCount} · sem rede\x1b[0m\n`,
+        `  \x1b[90mCatálogo: ${store.filePath} · integridade ${integrity.ok ? 'ok' : 'falha'} · identidades redigidas ${integrity.redactedIdentityCount} · sem rede\x1b[0m\n`,
     );
     for (const [field, check] of Object.entries(integrity.duplicateChecks)) {
         const color = check.duplicateExtraRowCount === 0 ? '\x1b[32m' : '\x1b[31m';
         println(
-            `    ${color}${field}\x1b[0m \x1b[90mrows=${check.rowCount} · unique=${check.uniqueKeyCount} · duplicateKeys=${check.duplicateKeyCount} · extra=${check.duplicateExtraRowCount}\x1b[0m`,
+            `    ${color}${field}\x1b[0m \x1b[90mlinhas ${check.rowCount} · únicas ${check.uniqueKeyCount} · chaves duplicadas ${check.duplicateKeyCount} · excedentes ${check.duplicateExtraRowCount}\x1b[0m`,
         );
     }
     for (const sample of integrity.redactedIdentitySamples.slice(0, 8)) {
@@ -4089,16 +4137,16 @@ async function renderByokGatewayCatalogSearch(println, rest) {
     const results = searchModelGatewayCatalogEntries(snapshot, args);
     println(`\n  \x1b[36mBYOK model-gateway catalog search\x1b[0m`);
     println(
-        `  \x1b[90mstore=${store.filePath} · query=${args.query || '-'} · provider=${args.providerId ?? '-'} · eligible=${args.onlyEligible ? 'sim' : 'nao'} · tools=${args.requireTools ? 'sim' : 'nao'} · results=${results.length}\x1b[0m\n`,
+        `  \x1b[90mCatálogo: ${store.filePath} · busca ${args.query || '-'} · provider ${args.providerId ?? '-'} · só elegíveis ${args.onlyEligible ? 'sim' : 'nao'} · exige tools ${args.requireTools ? 'sim' : 'nao'} · resultados ${results.length}\x1b[0m\n`,
     );
     if (results.length === 0) {
         println('    \x1b[33mNenhum modelo encontrado para os filtros informados.\x1b[0m\n');
         return;
     }
     for (const result of results) {
-        println(`    \x1b[33m${result.key}\x1b[0m  \x1b[90mscore=${result.score} · eligibility=${result.eligibilityStatus}\x1b[0m`);
+        println(`    \x1b[33m${result.key}\x1b[0m  \x1b[90mscore ${result.score} · elegibilidade ${result.eligibilityStatus}\x1b[0m`);
         println(
-            `      \x1b[90m${result.displayName} · routes=${result.routeOptionCount} · overlays=${result.accountOverlayCount} · matched=${result.matchedFields.slice(0, 4).join(',') || '-'}\x1b[0m`,
+            `      \x1b[90m${result.displayName} · rotas ${result.routeOptionCount} · overlays ${result.accountOverlayCount} · campos encontrados ${result.matchedFields.slice(0, 4).join(',') || '-'}\x1b[0m`,
         );
     }
     println('');
@@ -4115,7 +4163,7 @@ async function renderByokGatewayRoutes(println, rest) {
     const snapshot = await store.readSnapshot();
     const routes = snapshot.routeOptions.filter((route) => matchesGatewayCatalogRecordSelector(route, args.selector));
     println(`\n  \x1b[36mBYOK model-gateway routes\x1b[0m`);
-    println(`  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · routes=${routes.length}/${snapshot.routeOptions.length}\x1b[0m\n`);
+    println(`  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · rotas ${routes.length}/${snapshot.routeOptions.length}\x1b[0m\n`);
     if (routes.length === 0) {
         println('    \x1b[33mNenhuma route option encontrada para o filtro informado.\x1b[0m\n');
         return;
@@ -4123,10 +4171,10 @@ async function renderByokGatewayRoutes(println, rest) {
     for (const route of routes.slice(0, args.limit)) {
         const policy = asRecord(route['normalizedPolicy']);
         println(
-            `    \x1b[33m${optionalScalarString(route['providerId']) ?? '-'}:${optionalScalarString(route['providerModel']) ?? '-'}\x1b[0m  \x1b[90mrouteProfile=${optionalScalarString(route['routeProfile']) ?? 'default'} · selector=${optionalScalarString(route['selectorKind']) ?? '-'}:${optionalScalarString(route['selectorSyntax']) ?? '-'}\x1b[0m`,
+            `    \x1b[33m${optionalScalarString(route['providerId']) ?? '-'}:${optionalScalarString(route['providerModel']) ?? '-'}\x1b[0m  \x1b[90mperfil ${optionalScalarString(route['routeProfile']) ?? 'default'} · seletor ${optionalScalarString(route['selectorKind']) ?? '-'}:${optionalScalarString(route['selectorSyntax']) ?? '-'}\x1b[0m`,
         );
         println(
-            `      \x1b[90mlayer=${optionalScalarString(policy['routeLayer']) ?? '-'} · wire=${optionalScalarString(policy['wireApi']) ?? '-'} · source=${optionalScalarString(route['sourceId']) ?? '-'} · confidence=${optionalScalarString(route['confidence']) ?? '-'}\x1b[0m`,
+            `      \x1b[90mcamada ${optionalScalarString(policy['routeLayer']) ?? '-'} · wire ${optionalScalarString(policy['wireApi']) ?? '-'} · fonte ${optionalScalarString(route['sourceId']) ?? '-'} · confiança ${optionalScalarString(route['confidence']) ?? '-'}\x1b[0m`,
         );
     }
     if (routes.length > args.limit) println(`\n  \x1b[90mexibindo ${args.limit}/${routes.length}; use filtro ou limite numerico.\x1b[0m`);
@@ -4147,7 +4195,7 @@ async function renderByokGatewayOverlays(println, rest) {
     );
     println(`\n  \x1b[36mBYOK model-gateway account overlays\x1b[0m`);
     println(
-        `  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · overlays=${overlays.length}/${snapshot.accountOverlays.length} · secret-safe=sim\x1b[0m\n`,
+        `  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · overlays ${overlays.length}/${snapshot.accountOverlays.length} · segredos protegidos sim\x1b[0m\n`,
     );
     if (overlays.length === 0) {
         println('    \x1b[33mNenhum account overlay encontrado para o filtro informado.\x1b[0m\n');
@@ -4157,9 +4205,9 @@ async function renderByokGatewayOverlays(println, rest) {
         const enabled = Array.isArray(overlay['enabledModels']) ? overlay['enabledModels'].length : 0;
         const blocked = Array.isArray(overlay['blockedModels']) ? overlay['blockedModels'].length : 0;
         println(
-            `    \x1b[33m${optionalScalarString(overlay['providerId']) ?? '-'}\x1b[0m  \x1b[90mscope=${optionalScalarString(overlay['accountScope']) ?? 'default'} · secretRef=${optionalScalarString(overlay['secretRef']) ?? '-'} · source=${optionalScalarString(overlay['sourceId']) ?? '-'} · confidence=${optionalScalarString(overlay['confidence']) ?? '-'}\x1b[0m`,
+            `    \x1b[33m${optionalScalarString(overlay['providerId']) ?? '-'}\x1b[0m  \x1b[90mescopo ${optionalScalarString(overlay['accountScope']) ?? 'default'} · segredo ${optionalScalarString(overlay['secretRef']) ?? '-'} · fonte ${optionalScalarString(overlay['sourceId']) ?? '-'} · confiança ${optionalScalarString(overlay['confidence']) ?? '-'}\x1b[0m`,
         );
-        println(`      \x1b[90menabled=${enabled} · blocked=${blocked} · redaction=${optionalScalarString(overlay['redactionStatus']) ?? '-'}\x1b[0m`);
+        println(`      \x1b[90mhabilitados ${enabled} · bloqueados ${blocked} · redigido ${optionalScalarString(overlay['redactionStatus']) ?? '-'}\x1b[0m`);
     }
     if (overlays.length > args.limit) println(`\n  \x1b[90mexibindo ${args.limit}/${overlays.length}; use filtro ou limite numerico.\x1b[0m`);
     println('');
@@ -4183,27 +4231,27 @@ async function renderByokGatewayAccounts(println, rest) {
         .join(',');
     println(`\n  \x1b[36mBYOK model-gateway accounts/keys\x1b[0m`);
     println(
-        `  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · overlays=${accountSummary.summary.matched}/${accountSummary.summary.total} · runtime=${runtimeOverlays.length} · providers=${accountSummary.summary.providers} · status=${statusCounts || '-'}\x1b[0m\n`,
+        `  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · overlays ${accountSummary.summary.matched}/${accountSummary.summary.total} · sinais runtime ${runtimeOverlays.length} · providers ${accountSummary.summary.providers} · estados ${statusCounts || '-'}\x1b[0m\n`,
     );
     if (accountSummary.rows.length === 0) {
         println('    \x1b[33mNenhuma conta/key overlay encontrada para o filtro informado.\x1b[0m\n');
         return;
     }
     for (const row of accountSummary.rows.slice(0, args.limit)) {
-        const retry = row.resetAt ? `reset=${row.resetAt}` : row.retryAfterSeconds ? `retry=${row.retryAfterSeconds}s` : 'reset=-';
-        const resetState = row.quotaResetExpired === true ? 'resetState=expired' : row.quotaResetActive === true ? 'resetState=active' : null;
+        const retry = row.resetAt ? `reset ${row.resetAt}` : row.retryAfterSeconds ? `retentar em ${row.retryAfterSeconds}s` : 'reset -';
+        const resetState = row.quotaResetExpired === true ? 'janela expirada' : row.quotaResetActive === true ? 'janela ativa' : null;
         const remaining = [
-            row.remainingUsd !== null ? `remainingUsd=${row.remainingUsd}` : null,
-            row.remainingCreditsUsd !== null ? `creditsUsd=${row.remainingCreditsUsd}` : null,
+            row.remainingUsd !== null ? `USD restante ${row.remainingUsd}` : null,
+            row.remainingCreditsUsd !== null ? `créditos USD ${row.remainingCreditsUsd}` : null,
             resetState,
         ]
             .filter(Boolean)
             .join(' · ');
         println(
-            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mscope=${row.accountScope} · secretRef=${row.secretRef ?? '-'} · status=${row.limitStatus} · ${retry}\x1b[0m`,
+            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mescopo ${row.accountScope} · segredo ${row.secretRef ?? '-'} · estado ${row.limitStatus} · ${retry}\x1b[0m`,
         );
         println(
-            `      \x1b[90msource=${row.sourceId ?? '-'} · kind=${row.sourceKind} · confidence=${row.confidence} · freshness=${row.freshnessStatus} · enabled=${row.enabledModelCount} · blocked=${row.blockedModelCount} · ${remaining || 'remaining=-'}\x1b[0m`,
+            `      \x1b[90mfonte ${row.sourceId ?? '-'} · tipo ${row.sourceKind} · confiança ${row.confidence} · frescor ${row.freshnessStatus} · habilitados ${row.enabledModelCount} · bloqueados ${row.blockedModelCount} · ${remaining || 'saldo -'}\x1b[0m`,
         );
     }
     if (accountSummary.rows.length > args.limit) {
@@ -4238,29 +4286,29 @@ async function renderByokGatewayLimits(println, rest) {
     const explanation = explainModelGatewayAccountLimitOverlays([...catalogOverlays, ...runtimeOverlays], { selector: args.selector });
     println(`\n  \x1b[36mBYOK model-gateway account limits\x1b[0m`);
     println(
-        `  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · overlays=${explanation.summary.matched}/${explanation.summary.total} · active=${explanation.summary.activeBlockers} · expired=${explanation.summary.expiredSignals} · temporary=${explanation.summary.temporaryBlockers} · runtime=${runtimeSummary.activeCount}/${runtimeSummary.total}\x1b[0m`,
+        `  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · overlays ${explanation.summary.matched}/${explanation.summary.total} · bloqueios ativos ${explanation.summary.activeBlockers} · sinais expirados ${explanation.summary.expiredSignals} · temporários ${explanation.summary.temporaryBlockers} · runtime ${runtimeSummary.activeCount}/${runtimeSummary.total}\x1b[0m`,
     );
     println(
-        `  \x1b[90mstatus=${renderGatewayCountMap(explanation.summary.byStatus)} · sourceLayer=${renderGatewayCountMap(explanation.summary.bySourceLayer)}\x1b[0m\n`,
+        `  \x1b[90mEstados: ${renderGatewayCountMap(explanation.summary.byStatus)} · camadas de fonte: ${renderGatewayCountMap(explanation.summary.bySourceLayer)}\x1b[0m\n`,
     );
     if (explanation.rows.length === 0) {
         println('    \x1b[33mNenhum limite account/key encontrado para o filtro informado.\x1b[0m\n');
         return;
     }
     for (const row of explanation.rows.slice(0, args.limit)) {
-        const state = row.activeBlocker ? 'active' : row.expiredSignal ? 'expired' : 'clear';
-        const reset = row.resetAt ? `reset=${row.resetAt}` : row.retryAfterSeconds ? `retry=${row.retryAfterSeconds}s` : 'reset=-';
+        const state = row.activeBlocker ? 'ativo' : row.expiredSignal ? 'expirado' : 'livre';
+        const reset = row.resetAt ? `reset ${row.resetAt}` : row.retryAfterSeconds ? `retentar em ${row.retryAfterSeconds}s` : 'reset -';
         const money = [
-            row.remainingUsd !== null ? `remainingUsd=${row.remainingUsd}` : null,
-            row.remainingCreditsUsd !== null ? `creditsUsd=${row.remainingCreditsUsd}` : null,
+            row.remainingUsd !== null ? `USD restante ${row.remainingUsd}` : null,
+            row.remainingCreditsUsd !== null ? `créditos USD ${row.remainingCreditsUsd}` : null,
         ].filter(Boolean).join(' · ');
         println(
-            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mscope=${row.accountScope} · status=${row.limitStatus} · state=${state} · freshness=${row.freshnessStatus} · resetWindow=${row.resetWindowClass} · ${reset} · expires=${row.expiresAt ?? row.effectiveExpiresAt ?? '-'}\x1b[0m`,
+            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mescopo ${row.accountScope} · estado ${row.limitStatus} · sinal ${state} · frescor ${row.freshnessStatus} · janela ${row.resetWindowClass} · ${reset} · expira ${row.expiresAt ?? row.effectiveExpiresAt ?? '-'}\x1b[0m`,
         );
         println(
-            `      \x1b[90msource=${row.sourceKind}:${row.sourceId ?? '-'} · layer=${row.sourceLayer} · failure=${row.failureKind ?? '-'} · secretRef=${row.secretRef ?? '-'} · refresh=${row.nextRefreshAfter ?? '-'} · ${money || 'remaining=-'}\x1b[0m`,
+            `      \x1b[90mfonte ${row.sourceKind}:${row.sourceId ?? '-'} · camada ${row.sourceLayer} · falha ${row.failureKind ?? '-'} · segredo ${row.secretRef ?? '-'} · próxima atualização ${row.nextRefreshAfter ?? '-'} · ${money || 'saldo -'}\x1b[0m`,
         );
-        println(`      \x1b[90mnext=${row.nextAction}\x1b[0m`);
+        println(`      \x1b[90mpróxima ação ${row.nextAction}\x1b[0m`);
     }
     if (explanation.rows.length > args.limit) {
         println(`\n  \x1b[90mexibindo ${args.limit}/${explanation.rows.length}; use filtro ou limite numerico.\x1b[0m`);
@@ -4280,21 +4328,21 @@ function renderByokGatewayQuotaMatrix(println, rest) {
     const matrix = summarizeModelGatewayProviderQuotaCapabilities({ selector: args.selector });
     println(`\n  \x1b[36mBYOK model-gateway provider quota matrix\x1b[0m`);
     println(
-        `  \x1b[90mselector=${args.selector ?? '-'} · providers=${matrix.summary.providerCount}/${matrix.summary.total} · accountVisibility=${matrix.summary.accountVisibilityCount} · quotaSnapshots=${matrix.summary.quotaSnapshotCount} · runtimeOverlay=${matrix.summary.runtimeFailureOverlayCount} · sdkQuotaByokTruth=${matrix.summary.sdkQuotaByokTruthCount}\x1b[0m`,
+        `  \x1b[90mFiltro ${args.selector ?? '-'} · providers ${matrix.summary.providerCount}/${matrix.summary.total} · visibilidade de conta ${matrix.summary.accountVisibilityCount} · snapshots de quota ${matrix.summary.quotaSnapshotCount} · overlays runtime ${matrix.summary.runtimeFailureOverlayCount} · quota SDK aplicável a BYOK ${matrix.summary.sdkQuotaByokTruthCount}\x1b[0m`,
     );
-    println(`  \x1b[90mquota=${renderGatewayCountMap(matrix.summary.byQuotaSnapshot)}\x1b[0m\n`);
+    println(`  \x1b[90mTipos de quota: ${renderGatewayCountMap(matrix.summary.byQuotaSnapshot)}\x1b[0m\n`);
     if (matrix.rows.length === 0) {
         println('    \x1b[33mNenhum provider encontrado para o filtro informado.\x1b[0m\n');
         return;
     }
     for (const row of matrix.rows.slice(0, args.limit)) {
         println(
-            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mvisibility=${row.accountVisibility} · quota=${row.quotaSnapshot} · spending=${row.spendingLimit} · rate=${row.rateLimit}\x1b[0m`,
+            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mvisibilidade ${row.accountVisibility} · quota ${row.quotaSnapshot} · gasto ${row.spendingLimit} · rate-limit ${row.rateLimit}\x1b[0m`,
         );
         println(
-            `      \x1b[90mruntimeOverlay=${row.runtimeFailureOverlay ? 'sim' : 'nao'} · sdkQuotaByokTruth=${row.sdkQuotaAppliesToByok ? 'sim' : 'nao'} · env=${row.requiredEnv.join(',') || '-'}\x1b[0m`,
+            `      \x1b[90moverlay runtime ${row.runtimeFailureOverlay ? 'sim' : 'nao'} · quota SDK cobre BYOK ${row.sdkQuotaAppliesToByok ? 'sim' : 'nao'} · env ${row.requiredEnv.join(',') || '-'}\x1b[0m`,
         );
-        println(`      \x1b[90mendpoints=${row.endpoints.slice(0, 4).join(',') || '-'}\x1b[0m`);
+        println(`      \x1b[90mendpoints ${row.endpoints.slice(0, 4).join(',') || '-'}\x1b[0m`);
     }
     if (matrix.rows.length > args.limit) {
         println(`\n  \x1b[90mexibindo ${args.limit}/${matrix.rows.length}; use filtro ou limite numerico.\x1b[0m`);
@@ -4309,7 +4357,7 @@ function renderByokGatewayQuotaMatrix(println, rest) {
 async function renderByokGatewayCatalogConflicts(println) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     println(`\n  \x1b[36mBYOK model-gateway catalog conflicts\x1b[0m`);
-    println(`  \x1b[90mstore=${store.filePath} · fonte=snapshot persistido · sem rede\x1b[0m\n`);
+    println(`  \x1b[90mCatálogo: ${store.filePath} · fonte: snapshot persistido · sem rede\x1b[0m\n`);
     const snapshot = await store.readSnapshot();
     if (snapshot.conflicts.length === 0) {
         println('    \x1b[32mNenhum conflito de evidência no snapshot atual.\x1b[0m\n');
@@ -4323,7 +4371,7 @@ async function renderByokGatewayCatalogConflicts(println) {
         const conflicting = Array.isArray(record['conflictingEvidenceIds'])
             ? record['conflictingEvidenceIds'].map(String).slice(0, 4).join(',')
             : '-';
-        println(`    \x1b[33m${projectionKey}\x1b[0m  \x1b[90mfield=${fieldPath} · selected=${selected} · conflicts=${conflicting}\x1b[0m`);
+        println(`    \x1b[33m${projectionKey}\x1b[0m  \x1b[90mcampo ${fieldPath} · evidência selecionada ${selected} · conflitos ${conflicting}\x1b[0m`);
     }
     if (snapshot.conflicts.length > 20) {
         println(`\n  \x1b[90mexibindo 20/${snapshot.conflicts.length}; refine depois com /models explain <provider:model>.\x1b[0m`);
@@ -4348,7 +4396,7 @@ async function renderByokGatewayCatalogFreshness(println, rest) {
         }))
         .sort((a, b) => b.at.localeCompare(a.at));
     println(`\n  \x1b[36mBYOK model-gateway catalog freshness\x1b[0m`);
-    println(`  \x1b[90mstore=${store.filePath} · selector=${args.selector ?? '-'} · sources=${sources.length}/${snapshot.sources.length}\x1b[0m\n`);
+    println(`  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · fontes ${sources.length}/${snapshot.sources.length}\x1b[0m\n`);
     if (sources.length === 0) {
         println('    \x1b[33mNenhuma source encontrada para o filtro informado.\x1b[0m\n');
         return;
@@ -4356,7 +4404,7 @@ async function renderByokGatewayCatalogFreshness(println, rest) {
     for (const item of sources.slice(0, args.limit)) {
         const source = item.source;
         println(
-            `    \x1b[33m${optionalScalarString(source['id']) ?? '-'}\x1b[0m  \x1b[90mprovider=${optionalScalarString(source['providerId']) ?? '-'} · kind=${optionalScalarString(source['kind']) ?? '-'} · auth=${optionalScalarString(source['authMode']) ?? '-'} · refresh=${optionalScalarString(source['refreshPolicy']) ?? '-'} · at=${item.at}\x1b[0m`,
+            `    \x1b[33m${optionalScalarString(source['id']) ?? '-'}\x1b[0m  \x1b[90mprovider ${optionalScalarString(source['providerId']) ?? '-'} · tipo ${optionalScalarString(source['kind']) ?? '-'} · auth ${optionalScalarString(source['authMode']) ?? '-'} · refresh ${optionalScalarString(source['refreshPolicy']) ?? '-'} · atualizado ${item.at}\x1b[0m`,
         );
     }
     if (sources.length > args.limit) println(`\n  \x1b[90mexibindo ${args.limit}/${sources.length}; use filtro ou limite numerico.\x1b[0m`);

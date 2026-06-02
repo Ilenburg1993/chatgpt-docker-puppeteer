@@ -2240,5 +2240,10 @@
 - [x] `/byok auto doctor` passou a usar `perfil`, `snapshot ativo`, `política`, `origem policy`, `decisão`, `ação`, `rota`, `reset` e `nova tentativa`, sem `profile=`, `activeSnapshot=`, `policy source:` ou `reset=`.
 - [x] `/byok gateway selection audit effective` passou a usar `modo`, `sem runtime`, `persistido`, `perfis`, `health observado`, `pós-runtime perfis`, `comparação mudou`, `policy`, `seletor runtime` e `trace persistido`.
 - [x] Teste BYOK completo passou com 105 testes após as mudanças de UX.
-- [ ] Auditar `/byok gateway catalog/build/refresh/importer/sqlite/accounts/limits/sources/eligibility/routes`, que ainda têm muitos blocos default de diagnóstico bruto.
+- [x] `/byok gateway catalog refresh`, `refresh-plan`, `refresh-log`, `diff`, `eligibility runs`, `eligibility diff` e `integrity` trocaram `store=`, `selector=`, `selected=`, `events=`, `diff added=`, `write=`, `rows=` e `redactedIdentities=` por rótulos humanos.
+- [x] `/byok gateway importers`, `providers endpoints`, `provider traits`, `gateway local`, `probes matrix`, `probes backoff`, `secrets/env`, `pre-K gate`, `prebuild` e `commands` passaram a mostrar filtros, contagens, política local/Ollama e readiness sem cabeçalhos de telemetria bruta.
+- [x] `/byok gateway search`, `routes`, `overlays`, `accounts`, `limits`, `quota-matrix`, `conflicts` e `freshness` passaram a usar `Catálogo`, `filtro`, `rotas`, `overlays`, `segredos`, `estado`, `reset`, `próxima ação`, `Tipos de quota` e `fontes` em vez de `store=`, `query=`, `provider=`, `status=`, `reset=`, `next=` e afins.
+- [x] `/sdk quota` default passou a usar a mesma frase humana do modo compacto, com `91.0% restante · reset ... · escopo ...`, e teste bloqueia `restante=`, `reset=` e `escopo=`.
+- [x] Testes escopados passaram para BYOK e SDK após o lote: `test_commands_byok.spec.js` e `test_commands_sdk.spec.js`.
+- [ ] Auditar `/byok gateway sqlite/openai/explain/provider explain/eligibility strict/probe/profiles/models`, que ainda podem carregar blocos default de diagnóstico bruto ou misturar raw com vista default.
 - [ ] Separar explicitamente “tela default humana” de “detail/raw diagnóstico” nos comandos BYOK, sem perder automação e rastreabilidade.
