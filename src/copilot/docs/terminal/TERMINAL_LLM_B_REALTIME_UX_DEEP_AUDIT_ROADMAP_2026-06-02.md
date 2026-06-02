@@ -107,6 +107,30 @@
 - `/usage now` agora destaca telemetria de continuacao `ask_user` separada da fala inicial e aponta para correlacao por `/events` + `/export`.
 - `/health` agora mostra o modo efetivo de inline status (`reserved`, `overlay` ou `off`) e a origem da policy.
 
+## 02.03 Evidencia apos criterios estruturados
+
+- Comando:
+  - `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=240000 --transport=pty --out-dir=data/copilot-terminal/live-runs/terminal-ux-audit-20260602-040434`
+- Status:
+  - PASS.
+  - 41/41 criterios obrigatorios passaram.
+  - `sdkSessionBootSelection=forced-new`.
+  - 232 eventos SSE, 230 com id/source e 174 com traceId.
+  - Zero erros no terminal.
+- Artefatos:
+  - `data/copilot-terminal/live-runs/terminal-ux-audit-20260602-040434/summary.md`
+  - `data/copilot-terminal/live-runs/terminal-ux-audit-20260602-040434/terminal.raw.log`
+  - `data/copilot-terminal/live-runs/terminal-ux-audit-20260602-040434/terminal.plain.log`
+  - `data/copilot-terminal/live-runs/terminal-ux-audit-20260602-040434/terminal.sse.jsonl`
+  - `data/copilot-terminal/live-runs/terminal-ux-audit-20260602-040434/conversation-export.md`
+- Pontos validados:
+  - `tool-start-done` passou por lifecycle estruturado de `read_file_content`.
+  - `report-intent-lifecycle` passou por lifecycle estruturado de `report_intent`.
+  - `sse-canonical-transcript-events` identificou delta, ask_user, resposta humana e final pos-ask.
+  - `export-sse-correlation` casou ask, resposta humana e pos-ask por `source + trace/turn`.
+  - `/usage now` exibiu continuacao `ask_user` sem Premium Request.
+  - `/health` exibiu `inline status reserved source=default`.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -350,7 +374,7 @@
 - [x] Adicionar coalescing temporal pequeno para prompt redraw.
 - [x] Evitar duplicacao `prompt prompt` apos blocos permanentes.
 - [x] Garantir que input digitado nao seja perdido.
-- [ ] Garantir que `printlnBlock` nao repinte prompt quando render lock estiver ativo.
+- [x] Garantir que `printlnBlock` nao repinte prompt quando render lock estiver ativo.
 - [x] Adicionar teste unitario de prompt redraw coalesced.
 - [x] Atualizar live runner para medir prompt churn.
 
@@ -421,7 +445,7 @@
 - [x] Atualizar este MD apos cada bloco grande de implementacao.
 - [x] Registrar decisoes arquiteturais que afetem timeline.
 - [x] Registrar comandos canonicos para reproduzir live.
-- [ ] Registrar gaps residuais antes de commit.
+- [x] Registrar gaps residuais antes de commit.
 - [x] Registrar validadores executados.
 
 ## 06.01 Gaps residuais apos PASS live

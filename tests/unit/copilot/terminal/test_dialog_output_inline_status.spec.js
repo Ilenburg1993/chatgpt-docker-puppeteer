@@ -81,9 +81,15 @@ vi.mock('../../../../src/copilot/terminal/state/ui-preferences.js', () => ({
 
 const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-const { clearInlineStatus, redrawTerminalPrompt, scheduleTerminalPromptRedraw, writeInlineStatus } = await import(
-    '../../../../src/copilot/terminal/dialog/output.js'
-);
+const {
+    beginTerminalRenderLock,
+    clearInlineStatus,
+    endTerminalRenderLock,
+    printlnBlock,
+    redrawTerminalPrompt,
+    scheduleTerminalPromptRedraw,
+    writeInlineStatus,
+} = await import('../../../../src/copilot/terminal/dialog/output.js');
 
 describe('terminal/dialog/output inline status', () => {
     /** @type {PropertyDescriptor | undefined} */
@@ -149,5 +155,19 @@ describe('terminal/dialog/output inline status', () => {
 
         expect(mocks.rl.setPrompt).toHaveBeenCalledTimes(1);
         expect(mocks.rl.prompt).toHaveBeenCalledTimes(1);
+    });
+
+    it('não repinta prompt em printlnBlock enquanto render lock está ativo', () => {
+        beginTerminalRenderLock();
+        try {
+            printlnBlock(['linha permanente durante streaming']);
+        } finally {
+            endTerminalRenderLock();
+        }
+
+        const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(output).toContain('linha permanente durante streaming');
+        expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
+        expect(mocks.rl.prompt).not.toHaveBeenCalled();
     });
 });
