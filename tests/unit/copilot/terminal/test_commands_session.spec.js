@@ -421,6 +421,7 @@ describe('commands/session — sync commands', () => {
         cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
         expect(ctx.println).toHaveBeenCalled();
         expect(ctx.output()).toContain('Status do Terminal LLM-B');
+        expect(ctx.output()).not.toContain('\x1b[36mStatus do Terminal LLM-B');
         expect(ctx.output()).toContain('Conversa');
         expect(ctx.output()).toContain('Entrada');
         expect(ctx.output()).toContain('Detalhe');
@@ -553,6 +554,7 @@ describe('commands/session — sync commands', () => {
         const ctx = mockCtx();
         cmdLive({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
         expect(ctx.output()).toContain('Fluxo da conversa');
+        expect(ctx.output()).not.toContain('\x1b[36mFluxo da conversa');
         expect(ctx.output()).toContain('Estado');
         expect(ctx.output()).toContain('Sinais');
         expect(ctx.output()).toContain('/live full');

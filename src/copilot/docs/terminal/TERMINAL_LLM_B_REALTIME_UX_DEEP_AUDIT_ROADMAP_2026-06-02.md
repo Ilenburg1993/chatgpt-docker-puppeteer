@@ -2185,3 +2185,13 @@
 - [x] `/sdk simulate request-user-input` passou a mostrar `Pergunta humana estruturada` e usar tema central em título/status/ação.
 - [x] `/sdk waits` passou a usar `Esperas humanas` temático, `ação` com acento e comandos coloridos por papel `command`.
 - [ ] Avaliar se o cartão de pergunta deve ganhar moldura discreta multi-linha; a live atual mostra formato limpo, mas ainda sem uma “caixa” visual dedicada.
+
+### 11.23 Headers default integrados ao tema
+
+- [x] Auditoria pós-live identificou que `/status`, `/live`, `/activity` e `/health` ainda usavam headers ciano fixos em telas default.
+- [x] `/status` compacto passou a usar `terminalThemeText('assistant', 'Status do Terminal LLM-B')`.
+- [x] `/live` compacto passou a usar `terminalThemeText('assistant', 'Fluxo da conversa')`.
+- [x] `/activity` default passou a usar `terminalThemeText('assistant', 'Atividade Atual da LLM-B')`.
+- [x] `/health` compacto passou a usar `terminalThemeText('assistant', 'Saúde do Terminal LLM-B')`.
+- [x] Testes bloqueiam regressão para `\x1b[36m...` nesses headers default.
+- [ ] Fazer nova live UX cycle para confirmar visual integrado de banner, help, status, health, activity e waits após o lote.

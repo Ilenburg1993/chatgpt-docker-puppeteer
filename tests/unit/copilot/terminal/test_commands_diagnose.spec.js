@@ -331,6 +331,7 @@ describe('commands/diagnose', () => {
 
         const output = ctx.output();
         expect(output).toContain('Saúde do Terminal LLM-B');
+        expect(output).not.toContain('\x1b[36mSaúde do Terminal LLM-B');
         expect(output).toContain('Conversa');
         expect(output).toContain('Entrada');
         expect(output).toContain('Ferramentas');

@@ -2,6 +2,7 @@
 
 import { readTerminalIoActivityProjection } from '../events/index.js';
 import { readTerminalActivityProjection } from '../frontend/index.js';
+import { terminalThemeText } from '../state/ui/index.js';
 import {
     buildTerminalToolActivityPresentation,
     compactTerminalDiagnosticId,
@@ -344,7 +345,7 @@ export function cmdActivity({ println }, arg) {
         current.severity === 'error' ? '\x1b[31m' : current.severity === 'warn' ? '\x1b[33m' : '\x1b[32m';
     const progressLabel = typeof current.progress === 'number' ? ` · ${current.progress}%` : '';
     println(`
-  \x1b[36mAtividade Atual da LLM-B\x1b[0m
+  ${terminalThemeText('assistant', 'Atividade Atual da LLM-B')}
   ─────────────────────────────────────
   estado          ${severityColor}${renderActivityPhaseLabel(current.phase)}\x1b[0m
   evento          ${compactActivityLabel(current.label)}${progressLabel}

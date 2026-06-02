@@ -19,7 +19,7 @@
  */
 
 import { readTerminalConfigProjection, readTerminalDiagnoseProjection } from '../frontend/index.js';
-import { terminalPermissionModeSkipsSdkPrompts } from '../state/index.js';
+import { terminalPermissionModeSkipsSdkPrompts, terminalThemeText } from '../state/index.js';
 import {
     compactTerminalDiagnosticId,
     compactTerminalToolText,
@@ -220,7 +220,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
 
     if (!wantsFull) {
         println(`
-${C.bold}${C.cyan}Saúde do Terminal LLM-B${C.reset}
+${terminalThemeText('assistant', 'Saúde do Terminal LLM-B')}
   Conversa     ${agentStatusColor}${renderHumanRuntimeStatus(String(snap['status'] ?? 'unknown'))}${C.reset} ${dialogLoopActive ? `${C.grey}· loop ativo${C.reset}` : `${C.yellow}· loop parado${C.reset}`}
   Modelo       ${C.magenta}${snap['model']}${C.reset} ${C.grey}· raciocínio ${configProjection.currentReasoningEffort}${C.reset}
   Acesso       ${renderCompactByokLine(byok)}

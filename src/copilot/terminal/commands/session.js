@@ -47,7 +47,11 @@ import {
     compactTerminalToolText,
     isTerminalInternalCallIdentifier,
 } from '../events/tool-activity-presenter.js';
-import { readTerminalSseEventArchiveTail, terminalPermissionModeSkipsSdkPrompts } from '../state/index.js';
+import {
+    readTerminalSseEventArchiveTail,
+    terminalPermissionModeSkipsSdkPrompts,
+    terminalThemeText,
+} from '../state/index.js';
 
 const DISABLED_BYOK_SUMMARY = Object.freeze({
     enabled: false,
@@ -355,7 +359,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         const action = rawAction ?? (waitCount > 0 ? '/sdk waits' : '/menu');
 
         println(`
-  \x1b[36mStatus do Terminal LLM-B\x1b[0m
+  ${terminalThemeText('assistant', 'Status do Terminal LLM-B')}
   ─────────────────────────────────────
   Conversa     ${statusColor}${renderHumanTerminalStatus(snap['status'])}\x1b[0m · ${active ? '\x1b[32mativa\x1b[0m' : '\x1b[31minativa\x1b[0m'} · fila ${queue}
   Saúde        ${health ? `${healthColor}${renderHumanTerminalHealth(health['status'])}\x1b[0m` : '\x1b[90msem leitura\x1b[0m'}
@@ -874,7 +878,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
         const stateLabel = renderLiveFlowStateLabel(projection.state);
         const activityLine = renderLiveActivitySummary(current);
         println(`
-  \x1b[36mFluxo da conversa\x1b[0m
+  ${terminalThemeText('assistant', 'Fluxo da conversa')}
   ─────────────────────────────────────
   Estado       ${stateColor}${stateLabel}\x1b[0m \x1b[90m${projection.summary}\x1b[0m
   Conversa     \x1b[90m${status.dialogLoopActive ? 'ativa' : 'inativa'} · ${renderHumanTerminalStatus(status.snap['status'])}${status.snap['dialogPaused'] ? ' · pausada' : ''}\x1b[0m
