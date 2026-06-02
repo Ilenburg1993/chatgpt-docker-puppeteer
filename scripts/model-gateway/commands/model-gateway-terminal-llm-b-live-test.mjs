@@ -2496,6 +2496,11 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                           ? 'approve_all emitted SDK permission prompt/event'
                           : 'approve_all executed permissioned scenario tools without SDK permission prompt/event',
                   },
+                  {
+                      id: 'health-permission-policy-visible',
+                      pass: /permission\s+approve_all[\s\S]{0,120}sdk prompts=skip/iu.test(plain),
+                      detail: '/health rendered approve_all with sdk prompts=skip for permissioned live scenario',
+                  },
               ]
             : []),
         {

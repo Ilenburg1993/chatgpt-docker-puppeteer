@@ -293,6 +293,7 @@
   - `/status` mostra `permission mode approve_all · sdk prompts=skip`;
   - `/health` mostra `permission approve_all · sdk prompts=skip`;
   - `selective` continua descrito como modo que pode solicitar autorizacao conforme policy.
+  - o runner live exige `health-permission-policy-visible` em cenarios permissionados.
 - Validacao:
   - `tests/unit/copilot/terminal/test_sdk_interactions.spec.js` cobre o helper;
   - `tests/unit/copilot/terminal/test_commands_sdk.spec.js` cobre `/permission mode`;
@@ -588,6 +589,7 @@
 - [x] Remover falso alerta de file-tools ausentes no `auto-brief:boot` parcial mantendo warnings reais.
 - [x] Separar contagem de tools SDK dinamicas da contagem de registry local em `session.tools_updated`.
 - [x] Expor `sdk prompts=skip/selective` em `/permission mode`, `/status` e `/health`.
+- [x] Adicionar criterio live para `/health` renderizar `approve_all · sdk prompts=skip`.
 
 ### Faixa J - Teste live LLM-B
 
