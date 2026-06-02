@@ -20,6 +20,7 @@ import { readTerminalDisplayState, resolveTerminalBootDisplayPreset } from '../s
 
 /** @type {Map<string, string>} */
 const _lastAutoBriefFingerprintByPhase = new Map();
+const TRANSIENT_BOOT_TOOL_WARNING = 'file-tools canônicas locais não estão totalmente disponíveis';
 
 /**
  * @param {unknown} value
@@ -54,6 +55,16 @@ function summarizeIoRuntime(ioRuntime) {
         cache,
         index,
     };
+}
+
+/**
+ * @param {string[]} warnings
+ * @param {{ phase: TerminalAutoBriefPhase; ready: boolean }} context
+ * @returns {string[]}
+ */
+function filterAutoBriefWarnings(warnings, context) {
+    if (context.phase !== 'boot' || context.ready) return warnings;
+    return warnings.filter((warning) => warning !== TRANSIENT_BOOT_TOOL_WARNING);
 }
 
 /**
@@ -149,8 +160,9 @@ export function buildTerminalAutoBrief(input = {}) {
             `[auto-brief:${phase}] estado=parcial · registry/dialog ainda subindo; um brief pós-bootstrap será emitido quando houver dados reais.`,
         );
     }
-    if (guidance.warnings.length > 0) {
-        lines.push(`[auto-brief:${phase}] atenção=${guidance.warnings.join(' | ')}`);
+    const visibleWarnings = filterAutoBriefWarnings(guidance.warnings, { phase, ready });
+    if (visibleWarnings.length > 0) {
+        lines.push(`[auto-brief:${phase}] atenção=${visibleWarnings.join(' | ')}`);
     }
     return { phase, ready, fingerprint: buildAutoBriefFingerprint(projection), lines };
 }

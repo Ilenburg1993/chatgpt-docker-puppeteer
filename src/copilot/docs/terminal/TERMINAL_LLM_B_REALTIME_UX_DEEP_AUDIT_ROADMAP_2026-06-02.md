@@ -256,6 +256,20 @@
   - SQLite: `terminal-live:2026-06-02T08-13-58-566Z:canonical_full_turn_file-write-roundtrip`.
   - artefato: `data/copilot-terminal/live-runs/terminal-ux-file-write-move-presenter-sdk-20260602-0515/summary.md`.
 
+## 02.08 Saneamento de auto-brief parcial de boot
+
+- Problema observado:
+  - o `auto-brief:boot` roda antes de o registry/dialog estar pronto;
+  - nessa janela parcial, a mensagem `file-tools canonicas locais nao estao totalmente disponiveis` podia aparecer como alerta, embora o `auto-brief:ready` logo em seguida confirmasse `tools=105`, `fs=sim` e `exec=sim`;
+  - isso induzia operador humano e LLM a suspeitar de ausencia de tools locais quando havia apenas boot parcial.
+- Correcao aplicada:
+  - `src/copilot/terminal/repl/auto-brief.js` filtra apenas o warning transitorio de file-tools ausentes durante `phase=boot` ainda nao pronto;
+  - o proprio `estado=parcial` continua visivel e explica que um brief pos-bootstrap sera emitido;
+  - warnings reais, como arquivos de instrucoes ausentes, continuam aparecendo mesmo no boot parcial.
+- Validacao:
+  - `tests/unit/copilot/terminal/test_auto_brief.spec.js` cobre a supressao do warning transitorio;
+  - o mesmo teste confirma que warning de instrucoes ausentes permanece visivel.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -542,6 +556,7 @@
 - [x] Revisar `/events` para linkar evento bruto ao transcript.
 - [x] Revisar `/usage now` para contexto pos-ask.
 - [x] Revisar `/health` para indicar inline status mode.
+- [x] Remover falso alerta de file-tools ausentes no `auto-brief:boot` parcial mantendo warnings reais.
 
 ### Faixa J - Teste live LLM-B
 
