@@ -297,24 +297,24 @@ export async function cmdEvents({ println }, arg = '') {
     }
 
     const filterParts = [
-        filters.event ? `event=${filters.event}` : null,
-        filters.traceId ? `trace=${filters.traceId}` : null,
-        filters.turnId ? `turn=${filters.turnId}` : null,
-        filters.source ? `source=${filters.source}` : null,
-        filters.toolCallId ? `tool=${filters.toolCallId}` : null,
-        filters.requestId ? `request=${filters.requestId}` : null,
-        filters.hubSessionId ? `hub=${filters.hubSessionId}` : null,
+        filters.event ? `evento ${filters.event}` : null,
+        filters.traceId ? `trace ${filters.traceId}` : null,
+        filters.turnId ? `turno ${filters.turnId}` : null,
+        filters.source ? `fonte ${filters.source}` : null,
+        filters.toolCallId ? `tool ${filters.toolCallId}` : null,
+        filters.requestId ? `request ${filters.requestId}` : null,
+        filters.hubSessionId ? `hub ${filters.hubSessionId}` : null,
     ].filter(Boolean);
 
     println(`\n  \x1b[36m🧾 Eventos SSE — visão resumida · últimas ${filters.limit}\x1b[0m`);
     println(
-        `  \x1b[90marquivo=${compact(state.path ?? '(sem arquivo)', 88)} · eventos=${state.events} · fila=${state.queueDepth} · filtro=${filterParts.join(' ') || 'nenhum'}\x1b[0m`,
+        `  \x1b[90marquivo ${compact(state.path ?? '(sem arquivo)', 88)} · ${state.events} evento(s) · fila ${state.queueDepth} · filtro ${filterParts.join(' ') || 'nenhum'}\x1b[0m`,
     );
     println(
         '  \x1b[90mUse /events --raw para JSONL bruto, /events --json para automação, /events sources para mapa de fontes.\x1b[0m',
     );
     if (state.error) {
-        println(`  \x1b[31merro=${state.error}\x1b[0m`);
+        println(`  \x1b[31merro ${state.error}\x1b[0m`);
     }
     if (entries.length === 0) {
         println('  \x1b[33mNenhum evento encontrado no archive SSE.\x1b[0m\n');

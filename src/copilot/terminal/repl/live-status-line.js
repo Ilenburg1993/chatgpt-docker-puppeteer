@@ -151,8 +151,8 @@ export function formatTerminalLiveStatusLine(input = {}) {
     if (hasHumanPendingQuestion(runtime)) {
         const questionText = compactLiveStatusText(runtime.pendingQuestion.question ?? 'pergunta pendente', LIVE_QUESTION_MAX_CHARS);
         const choices = Array.isArray(runtime.pendingQuestion.choices) ? runtime.pendingQuestion.choices : [];
-        const choiceText = choices.length > 0 ? ` · opções=${choices.join('|')}` : '';
-        const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila=${runtime.queueSize}` : '';
+        const choiceText = choices.length > 0 ? ` · opções ${choices.join('|')}` : '';
+        const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila ${runtime.queueSize}` : '';
         return (
             `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
             `${terminalThemeText('question', 'ASK')}` +
@@ -168,8 +168,8 @@ export function formatTerminalLiveStatusLine(input = {}) {
             LIVE_QUESTION_MAX_CHARS,
         );
         const choices = Array.isArray(structuredInput.choices) ? structuredInput.choices : [];
-        const choiceText = choices.length > 0 ? ` · opções=${choices.join('|')}` : '';
-        const queue = structuredInputs.length > 1 ? ` · fila=${structuredInputs.length}` : '';
+        const choiceText = choices.length > 0 ? ` · opções ${choices.join('|')}` : '';
+        const queue = structuredInputs.length > 1 ? ` · fila ${structuredInputs.length}` : '';
         return (
             `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
             `${terminalThemeText('question', 'INPUT')}` +
@@ -181,7 +181,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const detail = compactLiveStatusText(activity.detail ?? activity.toolName ?? '', LIVE_DETAIL_MAX_CHARS);
     const progress = activity.progress !== null ? ` · ${activity.progress}%` : '';
     const loop = runtime.dialogLoopActive ? 'loop' : 'noloop';
-    const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila=${runtime.queueSize}` : '';
+    const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila ${runtime.queueSize}` : '';
     const displayStatus =
         activity.phase === 'idle' && Number(runtime.queueSize ?? 0) === 0 && runtime.status === 'processing'
             ? 'idle'

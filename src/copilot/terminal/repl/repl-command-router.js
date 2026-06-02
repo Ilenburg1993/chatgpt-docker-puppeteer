@@ -271,7 +271,7 @@ async function _cmdSteer(message) {
             message: prompt,
         });
         println(
-            `\x1b[36m  [mailbox] intervenção registrada para próxima pergunta humana (fila=${queued.queueSize}${queued.dropped > 0 ? ` · descartadas=${queued.dropped}` : ''}).\x1b[0m`,
+            `\x1b[36m  [mailbox] intervenção registrada para próxima pergunta humana (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''}).\x1b[0m`,
         );
         println(
             '\x1b[90m  Use /abort para interromper sem PR, ou /turn <mensagem> para abrir novo turno explicitamente.\x1b[0m',
@@ -323,7 +323,7 @@ async function _cmdInterrupt(message) {
                 '\x1b[33m  [interrupt] Política zero-PR ativa: substituição não foi enfileirada como turno para evitar consumo de PR.\x1b[0m',
             );
             println(
-                `\x1b[36m  [mailbox] mensagem substituta registrada para próxima pergunta humana (fila=${queued.queueSize}${queued.dropped > 0 ? ` · descartadas=${queued.dropped}` : ''}).\x1b[0m`,
+                `\x1b[36m  [mailbox] mensagem substituta registrada para próxima pergunta humana (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''}).\x1b[0m`,
             );
             println('\x1b[90m  Se precisar abrir novo turno manualmente, use /turn <mensagem>.\x1b[0m');
             return;
@@ -365,7 +365,7 @@ function _cmdMailbox(arg) {
             return;
         }
         println(
-            `\x1b[36m  [mailbox] consumido ${entry.id} (${entry.source}/${entry.modeHint}) · ${entry.message.slice(0, 140)}\x1b[0m`,
+            `\x1b[36m  [mailbox] intervenção consumida · origem ${entry.source} · modo ${entry.modeHint} · ${entry.message.slice(0, 140)}\x1b[0m`,
         );
         deliverEntryAsTurnIfIdle(entry, 'manual_consume');
         return;
@@ -373,11 +373,11 @@ function _cmdMailbox(arg) {
     const summary = readRuntimeInterventionMailboxSummary(null);
     const latest = summary.latest;
     println(
-        `\x1b[36m  [mailbox] fila=${summary.queueSize} · descartadas=${summary.dropped} · runtime=${summary.runtimeId}\x1b[0m`,
+        `\x1b[36m  [mailbox] ${summary.queueSize} na fila · ${summary.dropped} descartada(s) · runtime ${summary.runtimeId}\x1b[0m`,
     );
     if (latest) {
         println(
-            `\x1b[90m  latest=${latest.id} (${latest.source}/${latest.modeHint}) merges=${latest.mergedCount} · ${latest.message.slice(0, 180)}\x1b[0m`,
+            `\x1b[90m  última intervenção · origem ${latest.source} · modo ${latest.modeHint} · mesclas ${latest.mergedCount} · ${latest.message.slice(0, 180)}\x1b[0m`,
         );
     }
     println('\x1b[90m  comandos: /mailbox status | /mailbox consume | /mailbox clear\x1b[0m');
@@ -437,7 +437,7 @@ function _cmdQueueMailbox(message) {
         message: prompt,
     });
     println(
-        `\x1b[36m  [queue] intervenção enfileirada no mailbox zero-PR (fila=${queued.queueSize}${queued.dropped > 0 ? ` · descartadas=${queued.dropped}` : ''}).\x1b[0m`,
+        `\x1b[36m  [queue] intervenção enfileirada no mailbox zero-PR (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''}).\x1b[0m`,
     );
 }
 

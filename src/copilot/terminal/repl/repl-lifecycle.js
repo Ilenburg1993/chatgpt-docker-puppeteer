@@ -139,7 +139,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         }
         const runtimeSuffix =
             pendingAnswer.runtimeId && pendingAnswer.runtimeId !== 'default'
-                ? ` · runtime=${pendingAnswer.runtimeId}`
+                ? ` · runtime ${pendingAnswer.runtimeId}`
                 : '';
         println(
             pendingAnswer.ok
@@ -226,7 +226,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             `[TerminalServer] immediate intervention mailbox enqueue runtime=${queued.runtimeId} merged=${queued.merged} queue=${queued.queueSize} dropped=${queued.dropped}`,
         );
         println(
-            `\x1b[36m  [immediate] intervenção registrada para aplicação prioritária na próxima pergunta humana (fila=${summary.queueSize}${summary.dropped > 0 ? ` · descartadas=${summary.dropped}` : ''}).\x1b[0m`,
+            `\x1b[36m  [immediate] intervenção registrada para aplicação prioritária na próxima pergunta humana (${summary.queueSize} na fila${summary.dropped > 0 ? ` · ${summary.dropped} descartada(s)` : ''}).\x1b[0m`,
         );
         println(
             '\x1b[90m  Este caminho preserva zero-PR. Use /steer apenas quando quiser intervenção SDK immediate explícita.\x1b[0m',

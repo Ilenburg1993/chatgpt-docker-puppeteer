@@ -1981,3 +1981,32 @@
 - [x] A quota compacta troca `restante=`, `reset=` e `escopo=` por `91.0% restante · reset ... · escopo ...`.
 - [x] Teste bloqueia `reasoning=` e `restante=` na tela compacta.
 - [ ] Avaliar se precisamos de `/sdk status detail` explícito ou se `/sdk doctor`, `/sdk quota` e `/events --raw` já cobrem a necessidade técnica.
+
+### 11.10 Linha viva de perguntas sem `opções=`
+
+- [x] A linha viva `ASK` e `INPUT` deixou de renderizar `opções=azul|verde`.
+- [x] O novo formato é `opções azul|verde`, reduzindo aparência de key-value em interação humana.
+- [x] Evento visual de `ask_user SDK solicitado` deixou de gravar `choices=` no detalhe de atividade.
+- [x] Teste `test_live_status_line.spec.js` bloqueia `opções=` em `ASK` e `INPUT`.
+- [x] Teste de registry SDK continua passando após a troca.
+
+### 11.11 Mailbox zero-PR sem `fila=`/`latest=` no padrão
+
+- [x] `/mailbox status` deixou de renderizar `fila=`, `descartadas=` e `runtime=`.
+- [x] A linha principal agora diz `N na fila · M descartada(s) · runtime <id>`.
+- [x] A intervenção mais recente deixou de renderizar `latest=<id> (source/mode) merges=`.
+- [x] O consumo manual deixou de exibir o ID interno da intervenção.
+- [x] Confirmações de `/steer`, `/interrupt`, `/queue` e intervenção immediate trocaram `fila=` por `N na fila`.
+- [x] Aplicação automática via `ask_user` trocou `source/mode`, `merges=` e `fila restante=` por frase humana.
+- [x] Linha viva trocou `fila=` por `fila N`.
+- [x] `node --check src/copilot/terminal/repl/repl-command-router.js` passou.
+- [x] Teste `test_live_status_line.spec.js` e registry SDK passaram após a troca.
+- [ ] Adicionar teste unitário dedicado para `/mailbox status` se a rota ganhar parser isolável.
+
+### 11.12 `/events` default sem metadados `key=value` no cabeçalho
+
+- [x] O cabeçalho de `/events` default deixou de renderizar `arquivo=`, `eventos=`, `fila=` e `filtro=`.
+- [x] Filtros explícitos passaram de `tool=call_123`, `request=req-123`, `hub=hub-1` para `tool call_123`, `request req-123`, `hub hub-1`.
+- [x] Erro do archive passou de `erro=<texto>` para `erro <texto>`.
+- [x] `/events --raw` e `/events --json` seguem preservando dados brutos para automação.
+- [x] Teste `test_commands_events.spec.js` cobre o novo rodapé humano.

@@ -142,9 +142,10 @@ describe('terminal/commands/events', () => {
                 source: 'sdk',
             }),
         );
-        expect(ctx.output()).toContain('tool=call_123');
-        expect(ctx.output()).toContain('request=req-123');
-        expect(ctx.output()).toContain('hub=hub-1');
+        expect(ctx.output()).toContain('tool call_123');
+        expect(ctx.output()).toContain('request req-123');
+        expect(ctx.output()).toContain('hub hub-1');
+        expect(ctx.output()).not.toContain('tool=call_123');
         expect(ctx.output()).toContain('Ferramenta');
         expect(ctx.output()).toContain('ferramenta Ler arquivo');
         expect(ctx.output()).toContain('call call_123');

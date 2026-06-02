@@ -812,7 +812,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
         });
         recordTerminalActivity('question', 'ask_user SDK solicitado', {
-            detail: `${question.slice(0, 160)}${choices.length > 0 ? ` · choices=${choices.join('|')}` : ''}`,
+            detail: `${question.slice(0, 160)}${choices.length > 0 ? ` · opções ${choices.join('|')}` : ''}`,
             source: 'sdk',
             severity: allowFreeform ? 'info' : 'warn',
         });
@@ -853,13 +853,13 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             if (answered) {
                 const mailboxSummary = readRuntimeInterventionMailboxSummary(runtimeId);
                 recordTerminalActivity('question', 'Mailbox zero-PR aplicado em ask_user', {
-                    detail: `${mailboxEntry.source}/${mailboxEntry.modeHint}${mailboxEntry.mergedCount > 0 ? ` · merges=${mailboxEntry.mergedCount}` : ''}`,
+                    detail: `origem ${mailboxEntry.source} · modo ${mailboxEntry.modeHint}${mailboxEntry.mergedCount > 0 ? ` · ${mailboxEntry.mergedCount} mescla(s)` : ''}`,
                     source: 'sdk',
                     severity: 'info',
                     recordHistory: false,
                 });
                 println(
-                    `  ${terminalThemeBadge('info', 'MAILBOX')} ${terminalThemeText('info', `intervenção aplicada automaticamente (${mailboxEntry.source}/${mailboxEntry.modeHint})`)}${terminalThemeText('muted', ` · fila restante=${mailboxSummary.queueSize}`)}`,
+                    `  ${terminalThemeBadge('info', 'MAILBOX')} ${terminalThemeText('info', `intervenção aplicada automaticamente`)}${terminalThemeText('muted', ` · origem ${mailboxEntry.source} · modo ${mailboxEntry.modeHint} · ${mailboxSummary.queueSize} restante(s) na fila`)}`,
                 );
                 broadcastSse(
                     'intervention.mailbox.applied',
