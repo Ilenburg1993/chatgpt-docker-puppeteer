@@ -13,6 +13,7 @@ import {
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
+    terminalPermissionModeSkipsSdkPrompts,
 } from '../../../../src/copilot/terminal/state/sdk-interactions.js';
 
 describe('terminal/sdk-interactions', () => {
@@ -20,6 +21,13 @@ describe('terminal/sdk-interactions', () => {
         clearTerminalElicitation('all');
         clearTerminalPermissions();
         clearTerminalUserInputs();
+    });
+
+    it('deriva quando o modo de permissão pula prompts SDK', () => {
+        expect(terminalPermissionModeSkipsSdkPrompts('approve_all')).toBe(true);
+        expect(terminalPermissionModeSkipsSdkPrompts('audit_only')).toBe(true);
+        expect(terminalPermissionModeSkipsSdkPrompts('selective')).toBe(false);
+        expect(terminalPermissionModeSkipsSdkPrompts('unknown')).toBe(true);
     });
 
     it('preserva pendências vivas e limita histórico concluído em sessões longas', () => {

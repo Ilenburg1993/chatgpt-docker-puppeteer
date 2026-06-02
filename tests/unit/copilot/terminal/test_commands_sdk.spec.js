@@ -902,11 +902,13 @@ describe('terminal/commands/sdk', () => {
         await cmdPermission({ println: show.println }, 'mode');
         expect(agentRuntimeMocks.readTerminalRuntimePermissionMode).toHaveBeenCalled();
         expect(show.output()).toContain('approve_all');
+        expect(show.output()).toContain('sdk prompts=skip');
 
         const set = mockCtx();
         await cmdPermission({ println: set.println }, 'mode audit_only');
         expect(agentRuntimeMocks.setTerminalRuntimePermissionMode).toHaveBeenCalledWith('audit_only', null);
         expect(set.output()).toContain('Permission mode atualizado');
+        expect(set.output()).toContain('sdk prompts=skip');
     });
 
     it('/permission show/respond latest respeita runtimeId e evita bleed entre runtimes', async () => {

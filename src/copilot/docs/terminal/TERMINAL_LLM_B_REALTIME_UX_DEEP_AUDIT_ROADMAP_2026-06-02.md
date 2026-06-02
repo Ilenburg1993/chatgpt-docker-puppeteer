@@ -282,6 +282,21 @@
 - Validacao:
   - `tests/unit/copilot/test_terminal_sdk_session_events.spec.js` cobre contagem SDK materializada, contagem ausente e lista SDK materializada vazia.
 
+## 02.10 Diagnostico explicito de prompts SDK por permission mode
+
+- Problema observado:
+  - `/status` e `/permission mode` exibiam `approve_all`, `audit_only` ou `selective`, mas nao traduziam o efeito operacional para prompts/janelas SDK;
+  - depois da policy `skipPermission=true` em `approve_all`/`audit_only`, o operador precisava inferir que janelas SDK estavam desativadas por padrao.
+- Correcao aplicada:
+  - `src/copilot/terminal/state/sdk-interactions.js` exporta `terminalPermissionModeSkipsSdkPrompts`;
+  - `/permission mode` mostra `sdk prompts=skip` quando o modo efetivo pula prompts SDK;
+  - `/status` mostra `permission mode approve_all · sdk prompts=skip`;
+  - `selective` continua descrito como modo que pode solicitar autorizacao conforme policy.
+- Validacao:
+  - `tests/unit/copilot/terminal/test_sdk_interactions.spec.js` cobre o helper;
+  - `tests/unit/copilot/terminal/test_commands_sdk.spec.js` cobre `/permission mode`;
+  - `tests/unit/copilot/terminal/test_commands_session.spec.js` cobre `/status`.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -570,6 +585,7 @@
 - [x] Revisar `/health` para indicar inline status mode.
 - [x] Remover falso alerta de file-tools ausentes no `auto-brief:boot` parcial mantendo warnings reais.
 - [x] Separar contagem de tools SDK dinamicas da contagem de registry local em `session.tools_updated`.
+- [x] Expor `sdk prompts=skip/selective` em `/permission mode` e `/status`.
 
 ### Faixa J - Teste live LLM-B
 

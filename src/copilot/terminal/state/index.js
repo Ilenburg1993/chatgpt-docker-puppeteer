@@ -69,6 +69,7 @@ export {
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
+    terminalPermissionModeSkipsSdkPrompts,
 } from './sdk-interactions.js';
 export {
     clearTerminalPromptHookEvents,

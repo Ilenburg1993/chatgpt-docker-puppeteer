@@ -23,6 +23,7 @@ export {
     recordTerminalPermissionRequested,
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
+    terminalPermissionModeSkipsSdkPrompts,
 } from '../sdk-interactions.js';
 export {
     clearTerminalPromptHookEvents,

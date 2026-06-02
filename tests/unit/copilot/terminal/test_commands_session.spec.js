@@ -428,6 +428,7 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('bg tasks');
         expect(ctx.output()).toContain('display');
         expect(ctx.output()).toContain('permission mode');
+        expect(ctx.output()).toContain('sdk prompts=skip');
         expect(ctx.output()).toContain('shadow expirada');
         expect(ctx.output()).toContain('perfil modelo');
         expect(ctx.output()).toContain('runtime id');
@@ -543,7 +544,8 @@ describe('commands/session — sync commands', () => {
         cmdHistory({ println: ctx.println }, 5);
         expect(ctx.println).toHaveBeenCalled();
         expect(ctx.output()).toContain('a');
-        expect(ctx.output()).toContain('hub');
+        expect(ctx.output()).toContain('Histórico');
+        expect(ctx.output()).toContain('mixed');
     });
 
     it('cmdWho imprime atores com porta', () => {

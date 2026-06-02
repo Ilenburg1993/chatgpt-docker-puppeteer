@@ -455,6 +455,15 @@ function normalizePermissionMode(mode) {
 }
 
 /**
+ * @param {unknown} mode
+ * @returns {boolean}
+ */
+export function terminalPermissionModeSkipsSdkPrompts(mode) {
+    const normalized = normalizePermissionMode(mode);
+    return normalized === 'approve_all' || normalized === 'audit_only';
+}
+
+/**
  * @param {unknown} evt
  * @returns {TerminalPermissionModeEntry}
  */

@@ -67,6 +67,7 @@ import {
     readTerminalUserInputSummary,
     recordTerminalPermissionCompleted,
     recordTerminalPermissionRequested,
+    terminalPermissionModeSkipsSdkPrompts,
 } from '../state/sdk/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
@@ -1604,7 +1605,11 @@ export async function cmdPermission({ println }, arg = '') {
         const next = rest[0];
         if (!next) {
             const current = readTerminalRuntimePermissionMode(runtimeId);
+            const sdkPromptsSkipped = terminalPermissionModeSkipsSdkPrompts(current);
             println(`\n  \x1b[36mPermission mode\x1b[0m  \x1b[33m${current}\x1b[0m`);
+            println(
+                `  \x1b[90msdk prompts=${sdkPromptsSkipped ? 'skip' : 'selective'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme policy'}\x1b[0m`,
+            );
             println('  \x1b[90mUso: /permission mode <approve_all|audit_only|selective>\x1b[0m\n');
             return;
         }
@@ -1613,7 +1618,11 @@ export async function cmdPermission({ println }, arg = '') {
             return;
         }
         const updated = setTerminalRuntimePermissionMode(next, runtimeId);
+        const sdkPromptsSkipped = terminalPermissionModeSkipsSdkPrompts(updated);
         println(`\n  \x1b[32m? Permission mode atualizado:\x1b[0m \x1b[33m${updated}\x1b[0m\n`);
+        println(
+            `  \x1b[90msdk prompts=${sdkPromptsSkipped ? 'skip' : 'selective'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme policy'}\x1b[0m\n`,
+        );
         return;
     }
     if (sub === 'show') {

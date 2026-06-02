@@ -42,7 +42,7 @@ import {
     classifyTerminalByokSdkBinding,
     renderTerminalSdkProviderBinding,
 } from '../byok/index.js';
-import { readTerminalSseEventArchiveTail } from '../state/index.js';
+import { readTerminalSseEventArchiveTail, terminalPermissionModeSkipsSdkPrompts } from '../state/index.js';
 
 const DISABLED_BYOK_SUMMARY = Object.freeze({
     enabled: false,
@@ -247,6 +247,8 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const customAgentsLine = agentSelection.enabled.length
         ? `${agentSelection.enabled.join(', ')}${agentSelection.disabled.length ? ` · disabled=${agentSelection.disabled.join(', ')}` : ''}`
         : '(none)';
+    const permissionModeSkipsSdkPrompts = terminalPermissionModeSkipsSdkPrompts(projection.permissionMode);
+    const permissionModeDetail = `${projection.permissionMode} · sdk prompts=${permissionModeSkipsSdkPrompts ? 'skip' : 'selective'}`;
     println(`
   \x1b[36mStatus do Terminal LLM-B\x1b[0m
   ─────────────────────────────────────
@@ -260,7 +262,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
   modelo           \x1b[36m${snap['model']}\x1b[0m
 ${byokLine ? `${byokLine}\n` : ''}  reasoning        \x1b[35m${effort}\x1b[0m
     modo SDK         ${sdkModeColor}${sdkMode}\x1b[0m
-        permission mode  \x1b[33m${projection.permissionMode}\x1b[0m
+        permission mode  \x1b[33m${permissionModeDetail}\x1b[0m
     plan arquivo     ${sdkPlanOpLabel}
         bg tasks         ${health?.['backgroundPendingCount'] ?? 0}
         issues           ${Array.isArray(health?.['issues']) ? health['issues'].length : 0}
