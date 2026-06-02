@@ -381,12 +381,13 @@ Validado nesta linha:
 - `npm run model-gateway:auto:doctor`: PASS operacional de leitura; gate auto pode ficar bloqueado quando health/cooldown operacional pedir prova ou limpeza.
 - `npm run model-gateway:auto:proof-plan`: PASS, read-only, gerou comandos explicitos `/byok probe ... provider:<id> model:<id>`.
 - `npm run model-gateway:auto:standby`: PASS, read-only, lista rotas de prontidao e comandos de substituicao sem chamar provider.
-- `npm run model-gateway:auto:scenarios`: PASS, 12 cenarios, `auto_standby` ok, sem provider call.
+- `npm run model-gateway:auto:scenarios`: PASS, 12 cenarios, `auto_standby` ok, sem provider call; `live_plan_ready`
+  pode ficar como warning quando o plano live real ainda aponta um `nextCommand` bloqueante.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`: 215 PASS.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js`: 101 PASS.
-- `npm run model-gateway:live:auto-probe`: PASS, incluindo `/byok auto standby`.
-- Artefato live: `artifacts/terminal-live/2026-06-02T00-21-42-083Z/summary.md`.
-- `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-02T00-21-42-091Z:auto_probe`, `criteriaTotal=30`, `criteriaFailed=0`.
+- `npm run model-gateway:live:auto-probe`: PASS, incluindo `/byok auto standby`, recovery fixture sintetica e health clear disponivel.
+- Artefato live: `artifacts/terminal-live/2026-06-02T00-36-27-248Z/summary.md`.
+- `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-02T00-36-27-258Z:auto_probe`, `criteriaTotal=30`, `criteriaFailed=0`.
 - `/byok auto status` e `/byok auto doctor` agora mostram resumo de alternativas: usable/evaluated, quantidade de providers e principais blockers.
 - `/byok auto status` e `/byok auto doctor` agora sugerem comandos `provar:` para promover candidatos bloqueados por agent probe ausente/nao verificado.
 - `/byok auto recovery-fixture ... provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery, runtime health sintetica e espelho SQLite sem chamada ao provider.

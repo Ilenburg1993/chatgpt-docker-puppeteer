@@ -447,8 +447,11 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] `/byok auto explain profile:repo_agent` explicou action/blockers/next commands.
 - [x] `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` persistiu recovery account-wide, runtime health sintetica e espelho SQLite sem provider call.
 - [x] `/byok auto history`, `/byok auto handoffs`, `/byok auto confirmations` e `/byok auto recoveries` renderizaram ledger/empty state.
-- [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-02T00-21-42-091Z:auto_probe`.
-- [x] `npm run model-gateway:live:auto-probe` validou 30 criterios, incluindo `auto-standby-visible`.
+- [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-02T00-36-27-258Z:auto_probe` no run mais recente.
+- [x] `npm run model-gateway:live:auto-probe` validou 30 criterios, incluindo `auto-standby-visible`, recovery fixture
+      sintetica e ausencia de erros rastreados.
+- [x] `npm run model-gateway:auto:scenarios` separa `live_plan_command` de `live_plan_ready`; plano live real bloqueado
+      vira warning, nao falso PASS contraditorio.
 - [x] `npm run model-gateway:auto:doctor` mostrou inventario canonico; apos recovery fixture, health/cooldown pode bloquear como esperado e `runtime-health:clear` e o reset operacional canonico.
 - [x] `/byok auto status` e `/byok auto doctor` mostram resumo de alternativas usaveis/bloqueadas.
 - [x] `/byok auto status` e `/byok auto doctor` sugerem `/byok probe agent provider:<provider> model:<provider-model> timeout:20000` para candidatos bloqueados por agent probe ausente/nao verificado.

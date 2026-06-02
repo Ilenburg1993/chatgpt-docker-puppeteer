@@ -95,7 +95,8 @@ utilizaveis com comandos de prova, troca live no mesmo provider, provider/persis
 
 `auto:scenarios` agrega readiness, doctor, explain, ledgers, proof-plan, standby e live-plan em uma escada canônica de cenários
 para humano ou LLM: leitura, policy stateful, troca terminal, fixture e real provider. Ele não chama provider nem inicia
-o terminal.
+o terminal. O gate `live_plan_command` valida que o plano live foi materializado; `live_plan_ready` pode aparecer como
+warning quando o plano live real ainda esta bloqueado, sem invalidar a escada read-only.
 
 No terminal:
 

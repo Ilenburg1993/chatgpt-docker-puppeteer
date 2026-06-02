@@ -209,8 +209,9 @@ export async function readModelGatewayRuntimeAutomationPolicyFile(options = {}) 
  * @returns {Promise<ReturnType<typeof readModelGatewayRuntimeAutomationPolicy>>}
  */
 export async function readModelGatewayRuntimeAutomationEffectivePolicy(options = {}) {
+    const fileOptions = typeof options.filePath === 'string' ? { filePath: options.filePath } : {};
     return mergeModelGatewayRuntimeAutomationPolicy(
-        await readModelGatewayRuntimeAutomationPolicyFile({ filePath: options.filePath }),
+        await readModelGatewayRuntimeAutomationPolicyFile(fileOptions),
         envPolicyPatch(options.env ?? process.env),
     );
 }

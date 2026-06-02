@@ -554,7 +554,8 @@ Isso cria overlay temporario com reset/cooldown.
 - [ ] `npm run model-gateway:auto:doctor` passa.
 - [x] `npm run model-gateway:auto:proof-plan` passa e gera fila read-only de comandos de prova.
 - [x] `npm run model-gateway:auto:standby` passa e lista rotas de prontidao sem chamar provider.
-- [ ] `npm run model-gateway:auto:scenarios` passa sem blockers de readiness.
+- [x] `npm run model-gateway:auto:scenarios` passa sem blockers de readiness; `live_plan_ready` pode ser warning ate o
+      plano live real estar liberado.
 - [ ] `npm run model-gateway:live:readiness` passa.
 - [ ] `npm run model-gateway:live:plan` passa.
 - [ ] `npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000` passa.

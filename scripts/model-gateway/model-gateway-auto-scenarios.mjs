@@ -263,7 +263,7 @@ function buildScenarios(profile) {
             phase: 'terminal-live-control',
             command: 'npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000',
             purpose: 'Boot the terminal live harness without an LLM turn to validate command surface, event stream and redaction.',
-            gateIds: ['live_plan'],
+            gateIds: ['live_plan_command'],
         }),
         createScenario({
             id: 'terminal_live_byok_fixture',
@@ -272,7 +272,7 @@ function buildScenarios(profile) {
             command: 'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
             purpose: 'Exercise BYOK control-plane commands against the local OpenAI-compatible fixture before any real provider call.',
             executesRuntimeProbes: true,
-            gateIds: ['live_plan'],
+            gateIds: ['live_plan_command'],
         }),
         createScenario({
             id: 'terminal_live_real_no_pr_probes',
@@ -284,7 +284,7 @@ function buildScenarios(profile) {
             executesRuntimeProbes: true,
             consumesProviderQuota: true,
             requiresHumanConfirmation: true,
-            gateIds: ['live_plan', 'auto_doctor'],
+            gateIds: ['live_plan_ready', 'auto_doctor'],
         }),
         createScenario({
             id: 'terminal_live_real_full_turn',
@@ -297,7 +297,7 @@ function buildScenarios(profile) {
             executesRuntimeProbes: true,
             consumesProviderQuota: true,
             requiresHumanConfirmation: true,
-            gateIds: ['live_plan', 'auto_doctor'],
+            gateIds: ['live_plan_ready', 'auto_doctor'],
         }),
     ];
 }
@@ -334,9 +334,18 @@ const checks = [
     checkFromRun('auto_recoveries', recoveries, (result) => `rows=${countRowsOrItems(result)}`),
     checkFromRun('auto_proof_plan', proofPlan, (result) => `commands=${optionalRecord(optionalRecord(result)?.['summary'])?.['commandCount'] ?? 0}`),
     checkFromRun('auto_standby', standby, (result) => `routes=${optionalRecord(optionalRecord(result)?.['summary'])?.['routeCount'] ?? 0}`),
-    checkFromRun('live_plan', livePlan, (result) => `ok=${optionalRecord(result)?.['ok'] === true}`),
+    checkFromRun('live_plan_command', livePlan, (result) => `command=ok livePlanReady=${optionalRecord(result)?.['ok'] === true}`),
+    {
+        id: 'live_plan_ready',
+        pass: livePlan.ok && livePlanJson?.['ok'] === true,
+        severity: 'warn',
+        detail: livePlan.ok
+            ? `ok=${livePlanJson?.['ok'] === true} next=${String(livePlanJson?.['nextCommand'] ?? '-')}`
+            : String(livePlan.error ?? 'failed'),
+    },
 ];
 const blockers = checks.filter((check) => !check.pass && check.severity === 'error');
+const warnings = checks.filter((check) => !check.pass && check.severity === 'warn');
 const scenarios = buildScenarios(profile);
 const summary = {
     schema: 'model-gateway-auto-scenarios',
@@ -348,6 +357,7 @@ const summary = {
     terminalStarted: false,
     checks,
     blockers,
+    warnings,
     scenarioCount: scenarios.length,
     scenarios,
     gateSummaries: summarizeGateSummaries({
