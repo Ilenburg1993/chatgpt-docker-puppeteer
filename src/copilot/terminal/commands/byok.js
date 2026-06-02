@@ -2490,6 +2490,14 @@ async function renderByokGatewayOperatorReady(println, rest) {
         println(
             `    standby ${index + 1}:  \x1b[33m${row.providerId}:${row.providerModel}\x1b[0m \x1b[90m${row.source} · proof=${row.hasRuntimeProof ? 'sim' : 'nao'} · env=${row.runtimeEnvStatus ?? '-'}\x1b[0m`,
         );
+        println(`      \x1b[90mprovar: ${row.commands.probeAgent ?? '-'}\x1b[0m`);
+        println(`      \x1b[90musar: ${row.commands.liveModel ?? '-'}\x1b[0m`);
+        println(`      \x1b[90mnovo boot: ${row.commands.newSession ?? '-'} && ${row.commands.provider ?? '-'}\x1b[0m`);
+        if (row.providerId && row.providerModel) {
+            println(
+                `      \x1b[90mclear: /byok health clear provider:${row.providerId} model:${row.providerModel} profile:${row.profileId ?? status.args.profileId}\x1b[0m`,
+            );
+        }
     }
     println(
         `    standby db:   \x1b[33mrows=${persistedStandbyRows} · latest=${latestPersistedStandby.standbyPlanId ?? '-'} · profile=${latestPersistedStandby.routeProfile ?? '-'} · routes=${latestPersistedStandby.routeCount ?? '-'}\x1b[0m`,

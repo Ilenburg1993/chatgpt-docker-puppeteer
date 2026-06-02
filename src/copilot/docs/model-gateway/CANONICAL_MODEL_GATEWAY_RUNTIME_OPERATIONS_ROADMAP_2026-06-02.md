@@ -106,7 +106,7 @@ O sistema ideal deve permitir:
 - [x] A lista de standby virou artefato persistivel de primeira classe.
 - [x] A lista de standby aparece no cockpit com gerado agora vs persistido.
 - [ ] A lista de standby ainda precisa ganhar fluxo manual de troca por item/rank.
-- [ ] O terminal precisa expor com mais clareza "modelo vivo", "modelo preparado", "rota selecionada" e "proximos substitutos".
+- [x] O terminal expõe "modelo vivo", "modelo preparado", rota selecionada, proximos substitutos e comandos por standby.
 - [ ] A policy deve ter presets claros para humano, LLM operadora e modo conservador.
 - [ ] A troca automatica por quota esgotada precisa diferenciar quota temporaria, creditos, auth, modelo inexistente e timeout.
 - [ ] O sistema precisa saber quando nao tentar de novo antes do reset.
@@ -328,7 +328,7 @@ metadata importers
 
 ### Faixa K - Operador Humano
 
-- [ ] K.1 `/byok gateway operator-ready` deve ser o cockpit inicial.
+- [x] K.1 `/byok gateway operator-ready` deve ser o cockpit inicial.
 - [x] K.2 `/byok auto standby` deve listar substitutos claros.
 - [ ] K.3 `/byok auto apply` deve explicar antes/depois.
 - [ ] K.4 `/byok auto switch` deve ser seguro e reversivel.

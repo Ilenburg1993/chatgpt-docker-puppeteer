@@ -3110,6 +3110,9 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('standby 1:');
         expect(ctx.output()).toContain('standby db:');
         expect(ctx.output()).toContain('live db:');
+        expect(ctx.output()).toContain('provar:');
+        expect(ctx.output()).toContain('novo boot:');
+        expect(ctx.output()).toContain('clear: /byok health clear provider:');
         expect(ctx.output()).toContain('artifacts/terminal-live/unit/summary.md');
         expect(ctx.output()).toContain('kilo-code:kilo-auto/free');
         expect(ctx.output()).toContain('--write-sqlite');
