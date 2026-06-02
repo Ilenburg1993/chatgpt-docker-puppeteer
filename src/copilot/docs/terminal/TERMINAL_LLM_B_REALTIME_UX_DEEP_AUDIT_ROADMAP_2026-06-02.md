@@ -2115,3 +2115,24 @@
 - [x] Archive SSE passou a mostrar `último id`, `flush em andamento/agendado/ocioso`, `falhas` e `descartados`.
 - [x] Inject passou a mostrar `timeout`, `preflight`, `contexto`, `anexos`, `diálogo`, `autostart sim/não` e `recuperação sim/não`.
 - [x] Teste `test_commands_metrics_usage.spec.js` atualizado para o novo contrato humano de `/metrics`, preservando `/usage detail` técnico.
+
+### 11.20 Live curta pós-polimento e `/health` sem falso negativo de ferramentas
+
+- [x] Live curta executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/default-ux-cycle-session-metrics-thinking-20260602-1018`.
+- [x] Resultado: PASS completo em help, status, now, health, tools, live, activity, waits e close limpo.
+- [x] Artefatos:
+  - `artifacts/terminal-live/default-ux-cycle-session-metrics-thinking-20260602-1018/summary.md`;
+  - `artifacts/terminal-live/default-ux-cycle-session-metrics-thinking-20260602-1018/default-ux-cycle.plain.log`;
+  - `artifacts/terminal-live/default-ux-cycle-session-metrics-thinking-20260602-1018/default-ux-cycle.raw.log`.
+- [x] Achado visual da live: `/health` dizia `Ferramentas ponte MCP indisponível` mesmo quando o terminal anunciava ferramentas locais ativas.
+- [x] `readTerminalDiagnoseProjection` passou a expor `toolLoad` mínimo para o renderer compacto.
+- [x] `renderCompactMcpLine` passou a mostrar `locais ativas · arquivos · terminal/workspace SDK · MCP remoto ausente` quando ferramentas locais estão prontas e apenas o MCP remoto falta.
+- [x] Teste `test_commands_diagnose.spec.js` bloqueia a regressão para `ponte MCP indisponível` nesse caso.
+- [x] Live curta repetida após o patch:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/default-ux-cycle-health-local-tools-20260602-1020`.
+- [x] Resultado: PASS completo, com `/health` mostrando `Ferramentas locais ativas · arquivos · terminal · MCP remoto ausente`.
+- [x] Artefatos:
+  - `artifacts/terminal-live/default-ux-cycle-health-local-tools-20260602-1020/summary.md`;
+  - `artifacts/terminal-live/default-ux-cycle-health-local-tools-20260602-1020/default-ux-cycle.plain.log`;
+  - `artifacts/terminal-live/default-ux-cycle-health-local-tools-20260602-1020/default-ux-cycle.raw.log`.

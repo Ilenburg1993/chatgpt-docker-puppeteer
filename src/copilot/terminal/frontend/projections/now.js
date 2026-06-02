@@ -399,6 +399,12 @@ export function searchTerminalTurnsProjection({ query, hubSessionId = null, limi
  *     activity: import('../../state/activity-state.js').TerminalActivitySnapshot;
  *     display: ReturnType<typeof readTerminalDisplayProjection>;
  *     lifecycle: ReturnType<typeof readRuntimeLifecycleSnapshot>;
+ *     toolLoad: {
+ *         total: number;
+ *         hasCanonicalLocalFsTools: boolean;
+ *         hasCanonicalLocalExecTools: boolean;
+ *         hasSdkWorkspaceTooling: boolean;
+ *     };
  *     sdkSessionMode: 'interactive' | 'plan' | 'autopilot' | 'shell' | null;
  *     sdkPlanOperation: 'create' | 'update' | 'delete' | null;
  *     sdkPlanChangedAt: number | null;
@@ -478,6 +484,12 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null, runt
             turnCount: timeline.turns.length,
             persistedTurnCount: timeline.totalPersistedTurns,
             liveBridgeTailCount: timeline.liveBridgeTailCount,
+        },
+        toolLoad: {
+            total: toolLoadSnapshot.total,
+            hasCanonicalLocalFsTools: toolLoadSnapshot.hasCanonicalLocalFsTools,
+            hasCanonicalLocalExecTools: toolLoadSnapshot.hasCanonicalLocalExecTools,
+            hasSdkWorkspaceTooling: toolLoadSnapshot.hasSdkWorkspaceTooling,
         },
         sdkFsRouting,
     };

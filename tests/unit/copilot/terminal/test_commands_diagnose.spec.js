@@ -334,6 +334,8 @@ describe('commands/diagnose', () => {
         expect(output).toContain('Conversa');
         expect(output).toContain('Entrada');
         expect(output).toContain('Ferramentas');
+        expect(output).toContain('locais ativas');
+        expect(output).not.toContain('ponte MCP indisponível');
         expect(output).toContain('/health full');
         expect(output).not.toContain('Diagnóstico do Terminal LLM-B');
         expect(output).not.toContain('runtime id');

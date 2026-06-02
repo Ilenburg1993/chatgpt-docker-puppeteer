@@ -82,6 +82,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         hub,
         todos,
         topToolStats,
+        toolLoad,
         activity,
         display,
         lifecycle,
@@ -225,7 +226,7 @@ ${C.bold}${C.cyan}Saúde do Terminal LLM-B${C.reset}
   Acesso       ${renderCompactByokLine(byok)}
   Gateway      ${renderCompactGatewayLine(gatewayProjection, gatewayActive)}
   Entrada      ${askUserLine}${typeof health?.['backgroundPendingCount'] === 'number' && health['backgroundPendingCount'] > 0 ? ` ${C.grey}· ${health['backgroundPendingCount']} tarefa(s) em segundo plano${C.reset}` : ''}
-  Ferramentas  ${renderCompactMcpLine(mcp)}
+  Ferramentas  ${renderCompactMcpLine(mcp, toolLoad)}
   Atividade    ${activityColor}${activity.label}${C.reset}${typeof activity.progress === 'number' ? ` ${C.grey}(${activity.progress}%)${C.reset}` : ''} ${activity.detail ? `${C.grey}· ${activity.detail}${C.reset}` : ''}
   Infra        ${renderHumanHealthStatus(String(health?.['status'] ?? 'unknown'))} ${C.grey}· memória ${memMB}MB · uptime ${Math.floor(uptimeSec / 60)}m${C.reset}
   Próximo      ${renderCompactActionLine(health?.['recommendedAction'])}
@@ -371,11 +372,23 @@ function renderCompactGatewayLine(projection, active) {
 
 /**
  * @param {{ available: boolean; circuitOpen: boolean; toolCount: number; latencyMs: number | null }} mcp
+ * @param {{ total?: number; hasCanonicalLocalFsTools?: boolean; hasCanonicalLocalExecTools?: boolean; hasSdkWorkspaceTooling?: boolean } | null | undefined} toolLoad
  * @returns {string}
  */
-function renderCompactMcpLine(mcp) {
+function renderCompactMcpLine(mcp, toolLoad) {
     if (mcp.available && !mcp.circuitOpen && mcp.toolCount > 0) {
         return `${C.green}${mcp.toolCount} ferramenta(s) disponíveis${C.reset}${typeof mcp.latencyMs === 'number' ? ` ${C.grey}· ${mcp.latencyMs}ms${C.reset}` : ''}`;
+    }
+    const localReady = Boolean(
+        toolLoad?.hasCanonicalLocalFsTools || toolLoad?.hasCanonicalLocalExecTools || toolLoad?.hasSdkWorkspaceTooling,
+    );
+    if (localReady) {
+        const signals = [
+            toolLoad?.hasCanonicalLocalFsTools ? 'arquivos' : null,
+            toolLoad?.hasCanonicalLocalExecTools ? 'terminal' : null,
+            toolLoad?.hasSdkWorkspaceTooling ? 'workspace SDK' : null,
+        ].filter(Boolean);
+        return `${C.green}locais ativas${C.reset} ${C.grey}· ${signals.join(' · ') || 'registry local'} · MCP remoto ausente${C.reset}`;
     }
     if (mcp.circuitOpen) return `${C.red}ponte MCP pausada${C.reset}`;
     return `${C.yellow}ponte MCP indisponível${C.reset}`;
