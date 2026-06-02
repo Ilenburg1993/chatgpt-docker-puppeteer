@@ -349,7 +349,7 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('ask_user=1');
     });
 
-    it('/sdk waits detalha request_user_input pendente', async () => {
+    it('/sdk waits mostra request_user_input pendente sem vazar ID no default', async () => {
         runtimeMocks.pendingStructuredInputs.push({
             requestId: 'request-user-input-test-1',
             question: 'Escolha a estrategia de continuidade com contexto longo',
@@ -365,9 +365,13 @@ describe('terminal/commands/sdk', () => {
         await cmdSdk({ println: ctx.println }, 'waits');
 
         expect(ctx.output()).toContain('request_user_input=1');
-        expect(ctx.output()).toContain('request-user-input-test-1');
+        expect(ctx.output()).not.toContain('request-user-input-test-1');
         expect(ctx.output()).toContain('choices=seguir | pausar');
         expect(ctx.output()).toContain('Escolha a estrategia');
+
+        const detail = mockCtx();
+        await cmdSdk({ println: detail.println }, 'waits detail');
+        expect(detail.output()).toContain('request-user-input-test-1');
     });
 
     it('/sdk simulate request-user-input cria pendência estruturada diagnóstica', async () => {
@@ -385,7 +389,8 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('request_user_input diagnóstico');
         expect(ctx.output()).toContain('aguardando operador');
         expect(ctx.output()).toContain('Continuar teste visual?');
-        expect(ctx.output()).toContain('request-user-input-sim-1');
+        expect(ctx.output()).toContain('/sdk waits detail');
+        expect(ctx.output()).not.toContain('request-user-input-sim-1');
     });
 
     it('/sdk prompt exibe status canônico do system prompt e instruction sources', async () => {

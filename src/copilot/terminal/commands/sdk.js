@@ -673,9 +673,11 @@ function parseElicitationResult(action, rest, schema) {
 /**
  * @param {CommandContext} ctx
  * @param {string | null | undefined} runtimeId
+ * @param {{ detail?: boolean }} [options]
  * @returns {void}
  */
-function renderSdkWaitsSummary({ println }, runtimeId) {
+function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
+    const detail = options.detail === true;
     const scopedRuntimeId = runtimeId ?? null;
     const pendingElicitations = readTerminalElicitationSummary({ runtimeId: scopedRuntimeId });
     const permissionSummary = readTerminalPermissionSummary({ runtimeId: scopedRuntimeId });
@@ -707,8 +709,9 @@ function renderSdkWaitsSummary({ println }, runtimeId) {
             const choices = latest.choices.length > 0 ? ` choices=${latest.choices.join(' | ')}` : '';
             const freeform = latest.allowFreeform ? 'livre' : 'selecao obrigatoria';
             println(
-                `  ask      \x1b[90m${latest.id} - ${formatAge(latest.createdAt)} - ${latest.kind} - ${freeform}${choices}\x1b[0m`,
+                `  ask      \x1b[90m${formatAge(latest.createdAt)} - ${latest.kind} - ${freeform}${choices}\x1b[0m`,
             );
+            if (detail) println(`  id       \x1b[90m${latest.id}\x1b[0m`);
             println(`           ${compactText(latest.question, 220)}`);
         }
     }
@@ -718,8 +721,9 @@ function renderSdkWaitsSummary({ println }, runtimeId) {
             const choices = entry.choices.length > 0 ? ` choices=${entry.choices.join(' | ')}` : '';
             const freeform = entry.allowFreeform ? 'livre' : 'selecao obrigatoria';
             println(
-                `  input    \x1b[90m${entry.requestId} - ${formatAge(entry.createdAt)} - ${freeform}${choices}\x1b[0m`,
+                `  input    \x1b[90m${formatAge(entry.createdAt)} - ${freeform}${choices}\x1b[0m`,
             );
+            if (detail) println(`  id       \x1b[90m${entry.requestId}\x1b[0m`);
             println(`           ${compactText(entry.question, 220)}`);
         }
         if (structuredInputs.length > 3) {
@@ -812,7 +816,7 @@ function renderSdkSimulate({ println }, rest) {
     println(`  modo     \x1b[90m${mode}${choices}\x1b[0m`);
     println(`  pergunta ${compactText(parsed.question, 220)}`);
     println('  ação     \x1b[90mdigite a resposta normalmente ou use /answer <texto>\x1b[0m');
-    println(`  id       \x1b[90m${created.requestId}\x1b[0m\n`);
+    println('  detalhe  \x1b[90m/sdk waits detail\x1b[0m\n');
     void created.promise;
 }
 
@@ -901,7 +905,9 @@ export async function cmdSdk({ println }, arg = '') {
         } else if (sub === 'headers') {
             renderSdkRequestHeadersSummary({ println }, rest);
         } else if (sub === 'waits') {
-            renderSdkWaitsSummary({ println }, runtimeId);
+            renderSdkWaitsSummary({ println }, runtimeId, {
+                detail: rest.includes('detail') || rest.includes('--detail') || rest.includes('debug') || rest.includes('--debug'),
+            });
         } else if (sub === 'simulate') {
             renderSdkSimulate({ println }, rest);
         } else if (sub === 'compact') {

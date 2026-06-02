@@ -1483,6 +1483,11 @@ function structuredInputCycleCriteria(boot) {
             detail: '/sdk waits saw one pending structured input before the answer',
         },
         {
+            id: 'structured-input-no-default-id-leak',
+            pass: !/request-user-input-[a-z0-9-]+/iu.test(plain),
+            detail: 'default structured input UX hid internal request ids; detail mode remains available',
+        },
+        {
             id: 'structured-input-answer-routed',
             pass: /Resposta enviada para pergunta pendente/u.test(plain),
             detail: 'plain human answer was routed to the pending structured input',
