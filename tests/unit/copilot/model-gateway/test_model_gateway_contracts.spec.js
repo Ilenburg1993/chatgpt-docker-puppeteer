@@ -1534,6 +1534,16 @@ describe('model-gateway foundation', () => {
         assert.equal(rateLimitResetDecision.cooldown.active, true);
         assert.equal(rateLimitResetDecision.cooldown.resetAt, '2026-06-01T10:00:00.000Z');
         assert.equal(rateLimitResetDecision.nextCommands.includes('npm run model-gateway:runtime-health:diff'), true);
+        assert.equal(
+            rateLimitResetDecision.nextCommands.includes(
+                'npm run model-gateway:runtime-health:clear -- --provider=groq --model=reset-model --profile=repo_agent',
+            ),
+            true,
+        );
+        assert.equal(
+            rateLimitResetDecision.nextCommands.includes('/byok health clear provider:groq model:reset-model profile:repo_agent'),
+            true,
+        );
 
         const sameRouteFailureDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan,
@@ -1550,6 +1560,12 @@ describe('model-gateway foundation', () => {
         assert.equal(sameRouteFailureDecision.nonActionReason, 'same_route_failed_this_turn');
         assert.equal(sameRouteFailureDecision.blockerClass, 'rate_limit_resettable');
         assert.equal(sameRouteFailureDecision.blockers.includes('same_route_failed_this_turn:rate-limit'), true);
+        assert.equal(
+            sameRouteFailureDecision.nextCommands.includes(
+                'npm run model-gateway:runtime-health:clear -- --provider=openrouter --model=openai/gpt-oss-120b --profile=repo_agent',
+            ),
+            true,
+        );
 
         const routeProbeEnv = buildModelGatewayRuntimeSelectorProbeEnv(runtimeSelectorPlan.routes[0].selected, {
             COPILOT_BYOK_PROFILE: 'current-default-profile',

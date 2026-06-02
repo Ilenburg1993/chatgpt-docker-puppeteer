@@ -257,6 +257,9 @@ com comandos separados para prova descartavel, troca live no mesmo provider, pro
 
 Quando uma quota/cooldown resetar, ou quando uma fixture antiga tiver contaminado health real, o caminho canonico e
 `model-gateway:runtime-health:clear` em preview e depois com `--apply`, ou `/byok health clear ...` no terminal.
+Quando a propria decisao auto estiver em `wait_for_reset` por health/cooldown, os `nextCommands` devem incluir o
+preview escopado de `runtime-health:clear` e o comando terminal equivalente, sempre usando `providerModel` da rota de
+health e nao necessariamente o `selectorSyntax` usado para aplicar o modelo vivo.
 
 Comandos de ledgers:
 

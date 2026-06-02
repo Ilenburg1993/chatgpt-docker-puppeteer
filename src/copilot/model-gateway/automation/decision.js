@@ -65,6 +65,39 @@ function targetBoundary(route) {
 }
 
 /**
+ * @param {Record<string, unknown> | null | undefined} route
+ * @param {string | null | undefined} fallbackProfile
+ * @returns {{ routeProfile: string | null; providerId: string | null; providerModel: string | null }}
+ */
+function routeHealthIdentity(route, fallbackProfile) {
+    const selected = selectedRoute(route);
+    return {
+        routeProfile:
+            text(route?.['profileId']) ??
+            text(selected?.['routeProfile']) ??
+            text(selected?.['taskProfile']) ??
+            text(fallbackProfile),
+        providerId: text(selected?.['providerId']),
+        providerModel: text(selected?.['providerModel']) ?? text(selected?.['selectorSyntax']) ?? text(selected?.['id']),
+    };
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} route
+ * @param {string | null | undefined} routeProfile
+ * @returns {string[]}
+ */
+function scopedRuntimeHealthClearCommands(route, routeProfile) {
+    const identity = routeHealthIdentity(route, routeProfile);
+    if (!identity.providerId || !identity.providerModel) return [];
+    const profile = identity.routeProfile || 'repo_agent';
+    return [
+        `npm run model-gateway:runtime-health:clear -- --provider=${identity.providerId} --model=${identity.providerModel} --profile=${profile}`,
+        `/byok health clear provider:${identity.providerId} model:${identity.providerModel} profile:${profile}`,
+    ];
+}
+
+/**
  * @param {Record<string, unknown> | null | undefined} binding
  * @returns {{ enabled: boolean; profile: string | null; preset: string | null; providerType: string | null; baseUrl: string | null; model: string | null }}
  */
@@ -123,13 +156,17 @@ function policyBlockers(route, options) {
 }
 
 /**
+ * @param {Record<string, unknown> | null | undefined} route
  * @param {string | null} routeProfile
  * @param {string[]} blockers
  * @param {boolean} wait
  * @returns {string[]}
  */
-function blockedRouteNextCommands(routeProfile, blockers, wait) {
-    if (wait) return ['npm run model-gateway:runtime-health:diff', 'npm run model-gateway:runtime-selector -- --fail'];
+function blockedRouteNextCommands(route, routeProfile, blockers, wait) {
+    const healthClearCommands = scopedRuntimeHealthClearCommands(route, routeProfile);
+    if (wait) {
+        return ['npm run model-gateway:runtime-health:diff', ...healthClearCommands, 'npm run model-gateway:runtime-selector -- --fail'];
+    }
     const profile = routeProfile || 'repo_agent';
     const needsRuntimeProofPlan = blockers.some((blocker) =>
         /selected_route_missing|runtime_selector_route_blocked|runtime_health|runtime_probe|runtime_proof|provider_health_cooldown/iu.test(
@@ -143,6 +180,7 @@ function blockedRouteNextCommands(routeProfile, blockers, wait) {
                   `/byok auto proof-plan profile:${profile} 12`,
               ]
             : []),
+        ...healthClearCommands,
         'npm run model-gateway:selection:audit -- --strict',
     ];
 }
@@ -328,7 +366,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             cooldown,
             blockerClass: currentBlockerClass,
             nonActionReason: sameRouteFailure !== null ? 'same_route_failed_this_turn' : wait ? 'route_wait_for_reset' : 'route_blocked',
-            nextCommands: blockedRouteNextCommands(routeProfile, blockers, wait),
+            nextCommands: blockedRouteNextCommands(route, routeProfile, blockers, wait),
             operatorSummary: wait
                 ? 'Rota bloqueada por health/cooldown ou falha recente; aguarde reset ou escolha outra rota.'
                 : sameRouteFailure !== null

@@ -111,6 +111,8 @@ Playbook operacional ativo para humano/LLM:
 - [x] Replanejamento pos-falha bloqueia repeticao imediata da mesma rota quando ela acabou de falhar.
 - [x] Recovery pos-falha separa escopo conta/key de escopo modelo/rota.
 - [x] Cockpit auto expõe `nextRetry`/cooldown/reset quando a rota aguarda nova tentativa.
+- [x] Decisao auto em `wait_for_reset` lista `runtime-health:diff`, preview escopado de `runtime-health:clear`,
+      `/byok health clear ...` e reexecucao do selector.
 
 ## 3. Arquitetura Ideal
 

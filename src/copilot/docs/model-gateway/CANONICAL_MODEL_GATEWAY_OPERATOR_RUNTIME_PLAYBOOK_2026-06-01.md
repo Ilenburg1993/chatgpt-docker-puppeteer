@@ -199,6 +199,9 @@ separando comandos de prova, troca live no mesmo provider, provider/persist e no
 
 Regra de limpeza: `model-gateway:runtime-health:clear` e `/byok health clear` removem apenas health operacional, nao
 metadados canônicos. O script package e dry-run por padrao; `--apply` e obrigatorio para mutar.
+Regra de decisao: quando `auto:status`, `auto:doctor` ou o cockpit terminal produzirem `wait_for_reset`, os
+`nextCommands` devem listar `runtime-health:diff`, o preview escopado de `runtime-health:clear`, o equivalente
+`/byok health clear ...` e entao o selector. Isso torna reset de quota/cooldown uma acao visivel, nao uma suposicao.
 
 ### 3.6 Terminal
 
