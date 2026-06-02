@@ -13,7 +13,8 @@ import { ADVISORY_TIMEOUT_MS, runPipeline, runProcess, splitPipelineSegments, to
  *
  * Restrições:
  *
- * - skipPermission: false em todas as tools (requerem aprovação explícita)
+ * - Em `selective`, a sessão SDK pode pedir aprovação explícita. Em `approve_all`/`audit_only`, o bootstrap aplica
+ *   `skipPermission=true` às tools entregues ao SDK para evitar prompts/janelas redundantes, mantendo auditoria.
  * - Cwd restrito a /workspaces/ (sem saída para /etc, /usr, /root, etc.)
  * - Blocklist de comandos perigosos (rm -rf, dd, mkfs, etc.)
  * - Timeouts e volume de output são informativos; não bloqueiam a operação da LLM-B

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { setCustomToolsBuilder } from '#copilot/sdk';
 import { createRegistry } from '#copilot/sdk/tools';
-import { bootstrapTools, buildTool } from '#copilot/tools';
+import { applySessionToolPermissionPolicy, bootstrapTools, buildTool } from '#copilot/tools';
 
 setCustomToolsBuilder(/** @type {Parameters<typeof setCustomToolsBuilder>[0]} */ (buildTool));
 
@@ -32,5 +32,22 @@ describe('tools bootstrap file capabilities', () => {
                 ).not.toHaveLength(0);
             }
         }
+    });
+
+    it('aplica skipPermission às tools de sessão em approve_all/audit_only e preserva selective', () => {
+        const tools = [
+            { name: 'unsafe_write', handler: async () => 'ok', skipPermission: false },
+            { name: 'already_open', handler: async () => 'ok', skipPermission: true },
+        ];
+
+        expect(applySessionToolPermissionPolicy(tools, 'approve_all').map((tool) => tool.skipPermission)).toEqual([
+            true,
+            true,
+        ]);
+        expect(applySessionToolPermissionPolicy(tools, 'audit_only').map((tool) => tool.skipPermission)).toEqual([
+            true,
+            true,
+        ]);
+        expect(applySessionToolPermissionPolicy(tools, 'selective')).toBe(tools);
     });
 });

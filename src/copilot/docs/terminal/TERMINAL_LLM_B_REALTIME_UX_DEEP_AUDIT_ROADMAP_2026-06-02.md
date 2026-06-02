@@ -189,6 +189,38 @@
   - artefato: `data/copilot-terminal/live-runs/terminal-ux-recoverable-tool-error-20260602-0439/summary.md`.
   - nota de auditoria: um run anterior com arquivo ausente (`terminal-ux-recoverable-tool-error-20260602-0428`) tinha criterio falso positivo por texto; isso foi corrigido para exigir dado estruturado.
 
+## 02.06 Evidencia live de permissao maxima sem janela SDK
+
+- Objetivo:
+  - garantir que o modo default `approve_all` entregue maxima autonomia ao ChatGPT/LLM-B sem prompts/janelas redundantes de permissao para tools locais;
+  - preservar `selective` como modo explicito para policy granular;
+  - manter auditoria por lifecycle, hooks e `/tools diag` mesmo quando o SDK nao pede permissao interativa.
+- Correcao aplicada:
+  - `src/copilot/tools/bootstrap.js` agora aplica `skipPermission=true` nas tools entregues a sessao SDK quando `AGENT_PERMISSION_MODE` e `approve_all` ou `audit_only`;
+  - a policy e aplicada no array de sessao, depois do registry e antes de `wrapWithStats`;
+  - `selective` preserva o contrato original de cada tool;
+  - o bootstrap le `AGENT_PERMISSION_MODE` diretamente para evitar ciclo ESM com `#copilot/config`;
+  - um primeiro live expôs bug TDZ por sombreamento do import `sessionTools`; a variavel local foi renomeada para `sdkSessionTools`.
+- Runner:
+  - `scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs` adicionou criterio hard `no-sdk-permission-prompt-in-approve-all`;
+  - o criterio falha se o transcript/archive contiver `permission.requested`, `Permissao solicitada` ou texto equivalente;
+  - o criterio e ativado nos cenarios que usam tool permissionada, como `long-tool-heartbeat` e `recoverable-tool-error`.
+- Tentativa BYOK diagnosticada:
+  - comando: `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=240000 --transport=pty --live-scenario=long-tool-heartbeat --out-dir=data/copilot-terminal/live-runs/terminal-ux-long-tool-no-permission-20260602-0447`
+  - status: BLOCKED por `assistant-empty-turn` em `kilo-auto/free`;
+  - nao houve `permission.requested`, mas o modelo nao executou tools; portanto o run foi descartado como prova de permissao.
+- Prova SDK/Copilot:
+  - comando: `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --transport=pty --live-scenario=long-tool-heartbeat --out-dir=data/copilot-terminal/live-runs/terminal-ux-long-tool-no-permission-sdk-20260602-0450`
+  - status: PASS.
+  - criterios: 44/44 obrigatorios.
+  - SSE: 346 eventos, 342 com id/source, 264 com traceId, zero erros.
+  - Validou `exec_command` real com lifecycle `start`, `external_completed` e `postToolUse` success.
+  - Validou marker `LONG-TOOL-HEARTBEAT-DONE` dentro do resultado real de tool.
+  - Validou `/tools diag`: `exec_command calls=1 blocked=0 errors=0`.
+  - Validou `no-sdk-permission-prompt-in-approve-all`: nenhuma ocorrencia de `permission.requested` ou janela equivalente.
+  - SQLite: `terminal-live:2026-06-02T07-47-31-174Z:canonical_full_turn_long-tool-heartbeat`.
+  - artefato: `data/copilot-terminal/live-runs/terminal-ux-long-tool-no-permission-sdk-20260602-0450/summary.md`.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -446,6 +478,9 @@
 - [x] Garantir que tool real sempre vença texto simulado.
 - [x] Adicionar teste de tool activity com ask_user.
 - [x] Adicionar teste direto do estado bounded de `tool.lifecycle`.
+- [x] Aplicar `skipPermission=true` nas tools de sessao SDK em `approve_all`/`audit_only`.
+- [x] Preservar prompts SDK apenas no modo explicito `selective`.
+- [x] Validar por live que `exec_command` roda com `blocked=0` e sem `permission.requested`.
 
 ### Faixa G - SSE e archive
 
@@ -490,6 +525,8 @@
 - [x] Rodar live test com choice invalida.
 - [x] Rodar live test com tool longa e heartbeat.
 - [x] Rodar live test com erro de tool recuperavel.
+- [x] Adicionar criterio hard para ausencia de prompt de permissao em cenarios permissionados.
+- [x] Rodar live SDK/Copilot com `COPILOT_BYOK_ENABLED=false` para isolar permissao de instabilidade BYOK.
 
 ### Faixa K - Validadores
 
@@ -499,6 +536,8 @@
 - [x] Rodar lint escopado quando o conjunto estabilizar.
 - [x] Rodar teste live real apos patches.
 - [x] Registrar artifacts novos no documento ou em relatorio de rodada.
+- [x] Rodar teste unitario estrutural para policy de `skipPermission` do bootstrap.
+- [x] Rodar suite de bootstrap apos corrigir TDZ de `sessionTools`.
 
 ### Faixa L - Documentacao continua
 
@@ -507,6 +546,7 @@
 - [x] Registrar comandos canonicos para reproduzir live.
 - [x] Registrar gaps residuais antes de commit.
 - [x] Registrar validadores executados.
+- [x] Registrar evidencia live de maxima permissao sem janela SDK.
 
 ## 06.01 Gaps residuais apos PASS live
 

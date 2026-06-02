@@ -215,9 +215,11 @@ export function bootstrapTools(registry, mcpTools) {
     }
 
     const allTools = getRegistryTools(registry);
+    const permissionMode = readBootstrapPermissionMode();
+    const sdkSessionTools = applySessionToolPermissionPolicy(allTools, permissionMode);
 
     // F7.3: instrumentar todas as tools com wrapWithStats para capturar latência e erros automaticamente
-    const instrumentedTools = allTools.map(wrapWithStats);
+    const instrumentedTools = sdkSessionTools.map(wrapWithStats);
 
     // Expõe registry para as ferramentas de introspecção (necessário antes de iniciar sessão)
     registerForIntrospection(registry);
@@ -253,7 +255,44 @@ export function bootstrapTools(registry, mcpTools) {
     if (mcpTools.length > 0) categoryCount.set('mcp', mcpTools.length);
     if (customTools.length > 0) categoryCount.set('custom', customTools.length);
     const summary = [...categoryCount.entries()].map(([cat, n]) => `${cat}:${n}`).join(', ');
-    log('INFO', `[tools-bootstrap] Bootstrap concluído: ${allTools.length} tools registradas (${summary})`);
+    log(
+        'INFO',
+        `[tools-bootstrap] Bootstrap concluído: ${allTools.length} tools registradas (${summary}); permissionMode=${permissionMode}; sdkSkipPermission=${shouldSkipSdkPermissionPrompts(permissionMode) ? 'yes' : 'no'}`,
+    );
 
     return instrumentedTools;
+}
+
+/**
+ * Lê o modo de permissão sem importar `#copilot/config`, porque o bootstrap de tools é uma raiz de composição e precisa
+ * evitar ciclos ESM com módulos que também dependem de `#copilot/tools`.
+ *
+ * @returns {'approve_all' | 'audit_only' | 'selective'}
+ */
+function readBootstrapPermissionMode() {
+    const mode = process.env['AGENT_PERMISSION_MODE'];
+    if (mode === 'audit_only' || mode === 'selective') return mode;
+    return 'approve_all';
+}
+
+/**
+ * Em modo operacional approve_all/audit_only, o handler de permissão continua existindo para auditoria, mas a sessão SDK
+ * não deve abrir prompts/janelas para cada tool. Em selective, preservamos o contrato original para que a policy granular
+ * continue tendo oportunidade de intervir.
+ *
+ * @param {Tool[]} tools
+ * @param {'approve_all' | 'audit_only' | 'selective'} permissionMode
+ * @returns {Tool[]}
+ */
+export function applySessionToolPermissionPolicy(tools, permissionMode = 'approve_all') {
+    if (!shouldSkipSdkPermissionPrompts(permissionMode)) return tools;
+    return tools.map((tool) => (tool.skipPermission === true ? tool : { ...tool, skipPermission: true }));
+}
+
+/**
+ * @param {'approve_all' | 'audit_only' | 'selective'} permissionMode
+ * @returns {boolean}
+ */
+export function shouldSkipSdkPermissionPrompts(permissionMode = 'approve_all') {
+    return permissionMode === 'approve_all' || permissionMode === 'audit_only';
 }

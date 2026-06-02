@@ -2367,6 +2367,11 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         (text, marker) => text.replaceAll(marker, 'EXPECTED_SCENARIO_MARKER'),
         plain,
     );
+    const sdkPermissionPromptObserved =
+        /permission\.requested/iu.test(plain) ||
+        /Permiss[aã]o solicitada/iu.test(plain) ||
+        /permission request/iu.test(plain);
+    const scenarioUsesPermissionedTool = scenario.expectedLifecycleTools.length > 0;
     return [
         {
             id: 'ready',
@@ -2430,6 +2435,17 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             pass: observedInToolResult,
             detail: `scenario output marker ${marker} ${observedInToolResult ? 'observed in tool result' : 'missing from tool results'}`,
         })),
+        ...(scenarioUsesPermissionedTool
+            ? [
+                  {
+                      id: 'no-sdk-permission-prompt-in-approve-all',
+                      pass: !sdkPermissionPromptObserved,
+                      detail: sdkPermissionPromptObserved
+                          ? 'approve_all emitted SDK permission prompt/event'
+                          : 'approve_all executed permissioned scenario tools without SDK permission prompt/event',
+                  },
+              ]
+            : []),
         {
             id: 'ask-user-visible',
             pass: scenario.askRenderedRe.test(plain),

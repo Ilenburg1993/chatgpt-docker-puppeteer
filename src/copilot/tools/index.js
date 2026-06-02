@@ -15,6 +15,7 @@
 
 // ─── API de bootstrap/composição ──────────────────────────────────────────────
 export {
+    applySessionToolPermissionPolicy,
     allTools,
     bootstrapTools,
     configureHookTools,
@@ -24,6 +25,7 @@ export {
     setHub,
     setPermissionAgent,
     setSessionRpc,
+    shouldSkipSdkPermissionPrompts,
 } from './bootstrap.js';
 export {
     TOOLS_MODULE_LAYOUT,

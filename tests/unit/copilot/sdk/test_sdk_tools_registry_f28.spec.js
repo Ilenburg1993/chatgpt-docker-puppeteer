@@ -89,6 +89,14 @@ describe('F133 — tools-bootstrap não importa sdk/tools-registry diretamente',
         const src = readFileSync(join(ROOT, 'src/copilot/tools/bootstrap.js'), 'utf8');
         expect(src).toContain("registerTools } from '#copilot/sdk/tools'");
     });
+
+    it('tools-bootstrap aplica skipPermission SDK em approve_all/audit_only sem importar config', () => {
+        const src = readFileSync(join(ROOT, 'src/copilot/tools/bootstrap.js'), 'utf8');
+        expect(src).toContain('const sdkSessionTools = applySessionToolPermissionPolicy(allTools, permissionMode)');
+        expect(src).toContain("permissionMode === 'approve_all' || permissionMode === 'audit_only'");
+        expect(src).toContain("process.env['AGENT_PERMISSION_MODE']");
+        expect(src).not.toContain("from '#copilot/config'");
+    });
 });
 
 // ─── F134: barrel exporta todas as funções de tools-registry ───────────────
