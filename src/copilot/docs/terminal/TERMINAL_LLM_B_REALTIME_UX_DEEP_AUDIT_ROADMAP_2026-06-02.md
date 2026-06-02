@@ -100,6 +100,8 @@
 - O resumo de `sdkSessionBootSelection` no artefato foi reduzido para nao gravar o estado persistido inteiro.
 - `tool.lifecycle` agora alimenta um estado diagnostico bounded para `/tools diag`, sem substituir o registry operacional session-scoped.
 - `/tools diag` agora mostra lifecycle ativo/recente com `toolCallId`, `requestId`, trace, status, progresso e duracao em formato compacto.
+- `/export` agora aplica redaction explicita em conteudo de turno e campos textuais de envelope/streaming antes de gravar Markdown.
+- O runner live agora exige `tool.lifecycle` estruturado para `report_intent` e `read_file_content`; texto simulado em stdout nao satisfaz mais a prova de tool real.
 
 ## 03. Achados principais
 
@@ -332,7 +334,7 @@
 - [x] Incluir metadata compacta de `toolCallId` quando existir.
 - [x] Incluir aviso quando timeline estiver divergente mas com tail vivo.
 - [x] Adicionar teste export contendo pergunta, resposta e pos-ask.
-- [ ] Garantir que export nao escreva segredos de tool args sensiveis.
+- [x] Garantir que export nao escreva segredos de tool args sensiveis.
 - [x] Garantir que markdown nao quebre com respostas multiline.
 
 ### Faixa E - Linha viva e prompt estavel
@@ -355,8 +357,9 @@
 - [x] Exibir `toolCallId` e `requestId` de forma compacta.
 - [x] Separar start/progress/done visualmente.
 - [x] Evitar que ask_user como tool duplique pergunta em transcript.
-- [ ] Garantir que tool real sempre vença texto simulado.
+- [x] Garantir que tool real sempre vença texto simulado.
 - [x] Adicionar teste de tool activity com ask_user.
+- [x] Adicionar teste direto do estado bounded de `tool.lifecycle`.
 
 ### Faixa G - SSE e archive
 
@@ -421,12 +424,12 @@
 
 - [x] Definir metadata `syncBlockedReason` para timeline divergente.
 - [x] Revisar `/context` e `/history` com a semantica de `timeline=mixed/diverged`.
-- [ ] Garantir redaction de args sensiveis em export quando tool metadata entrar no Markdown.
+- [x] Garantir redaction de args sensiveis em export quando tool metadata entrar no Markdown.
 - [x] Revisar `tool-lifecycle-runtime` para status vivo sem excesso de writes.
 - [x] Melhorar resumo de `/tools diag`.
 - [x] Exibir `toolCallId` e `requestId` de forma compacta em tools operacionais, nao apenas no envelope do export.
 - [x] Separar start/progress/done visualmente em tool diagnostics.
-- [ ] Garantir que texto simulando tool nunca satisfaça criterio de tool real.
+- [x] Garantir que texto simulando tool nunca satisfaça criterio de tool real.
 - [ ] Adicionar correlacao mais clara entre stdout e SSE para pos-ask.
 - [ ] Atualizar live runner para comparar export contra SSE em termos de eventos correlacionados, nao apenas texto.
 - [ ] Revisar `turn-materialization-state` para cenarios pos-ask alternativos.

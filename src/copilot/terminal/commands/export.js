@@ -12,6 +12,7 @@ import { WORKSPACE_ROOT } from '#copilot/boot';
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
+import { redactSecretText } from '../../core/security/redaction.js';
 import { readTerminalTimelineProjection } from '../frontend/index.js';
 
 /**
@@ -43,7 +44,7 @@ export async function cmdExport({ println }, arg) {
 
     const lines = [`# Conversa LLM-B — ${new Date().toLocaleString('pt-BR')}`, ''];
     lines.push(
-        `> ${projection.turns.length} mensagens · timeline=${projection.timelineSource}/${projection.reconciliationStatus} · sync=${syncDetail} · exportado em ${new Date().toISOString()}`,
+        `> ${projection.turns.length} mensagens · timeline=${sanitizeExportInline(projection.timelineSource)}/${sanitizeExportInline(projection.reconciliationStatus)} · sync=${sanitizeExportInline(syncDetail)} · redaction=enabled · exportado em ${new Date().toISOString()}`,
         '',
     );
 
@@ -67,7 +68,7 @@ export async function cmdExport({ println }, arg) {
         lines.push(`> origem=${turn.origin}${turn.persisted ? ' · persistido' : ' · vivo'}`, '');
         if (envelope) {
             lines.push(
-                `> envelope=${envelope.source} · trace=${envelope.traceId ?? '-'} · turn=${envelope.turnId ?? '-'} · evento=${envelope.eventId ?? '-'}`,
+                `> envelope=${sanitizeExportInline(envelope.source)} · trace=${sanitizeExportInline(envelope.traceId ?? '-')} · turn=${sanitizeExportInline(envelope.turnId ?? '-')} · evento=${sanitizeExportInline(envelope.eventId ?? '-')}`,
                 '',
             );
         }
@@ -86,11 +87,11 @@ export async function cmdExport({ println }, arg) {
                     ? /** @type {Record<string, any>} */ (streamingDiagnostics['publicStream'])
                     : {};
             lines.push(
-                `> streaming=${String(finalReconciliation['mode'] ?? '-')}/${String(finalReconciliation['reason'] ?? '-')} · materializacao=${String(materialization['source'] ?? '-')} · deltas=${String(materialization['deltaSlices'] ?? 0)}/${String(materialization['deltaChars'] ?? 0)}ch · streamVisivel=${String(publicStream['visibleChars'] ?? 0)}ch`,
+                `> streaming=${sanitizeExportInline(finalReconciliation['mode'] ?? '-')}/${sanitizeExportInline(finalReconciliation['reason'] ?? '-')} · materializacao=${sanitizeExportInline(materialization['source'] ?? '-')} · deltas=${sanitizeExportInline(materialization['deltaSlices'] ?? 0)}/${sanitizeExportInline(materialization['deltaChars'] ?? 0)}ch · streamVisivel=${sanitizeExportInline(publicStream['visibleChars'] ?? 0)}ch`,
                 '',
             );
         }
-        lines.push(turn.content, '');
+        lines.push(sanitizeExportBlock(turn.content), '');
         lines.push('---', '');
     }
 
@@ -101,6 +102,22 @@ export async function cmdExport({ println }, arg) {
     } catch (e) {
         println(`  \x1b[31m❌ Erro ao exportar: ${toError(e).message ?? e}\x1b[0m`);
     }
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function sanitizeExportInline(value) {
+    return redactSecretText(value).replace(/[\r\n]+/gu, ' ').trim();
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function sanitizeExportBlock(value) {
+    return redactSecretText(value);
 }
 
 /**

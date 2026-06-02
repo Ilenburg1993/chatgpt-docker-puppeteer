@@ -214,6 +214,64 @@ describe('terminal/commands/export', () => {
         expect(markdown).toContain('envelope=sdk/user_input.completed');
     });
 
+    it('redige segredos em conteúdo e envelope antes de escrever Markdown', async () => {
+        readTerminalTimelineProjection.mockReturnValueOnce({
+            timelineSource: 'hub',
+            reconciliationStatus: 'aligned',
+            sync: {
+                status: 'not_needed',
+            },
+            turns: [
+                {
+                    role: 'assistant',
+                    rawRole: 'llm_b',
+                    origin: 'terminal',
+                    persisted: false,
+                    content:
+                        'tool args: Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456 api_key=sk-testsecret123456789 ghp_exampletoken1234567890',
+                    timestamp: 1710000003000,
+                    metadata: {
+                        assistantMessageEnvelope: {
+                            source: 'sdk/assistant.message',
+                            traceId: 'trace\nAuthorization: Bearer tokenvalue1234567890',
+                            turnId: 'turn-export-secret',
+                            eventId: 'evt-export-secret',
+                        },
+                        terminalStreamingDiagnostics: {
+                            materialization: {
+                                source: 'stream_delta',
+                                deltaSlices: 1,
+                                deltaChars: 12,
+                            },
+                            finalReconciliation: {
+                                mode: 'suffix',
+                                reason: 'secret=supersecretvalue',
+                            },
+                            publicStream: {
+                                visibleChars: 12,
+                            },
+                        },
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
+
+        const [, content] = writeFile.mock.calls[0];
+        const markdown = String(content);
+        expect(markdown).toContain('redaction=enabled');
+        expect(markdown).toContain('Bearer [redacted]');
+        expect(markdown).toContain('api_key=[redacted]');
+        expect(markdown).toContain('[redacted]');
+        expect(markdown).not.toContain('abcdefghijklmnopqrstuvwxyz123456');
+        expect(markdown).not.toContain('sk-testsecret123456789');
+        expect(markdown).not.toContain('ghp_exampletoken1234567890');
+        expect(markdown).not.toContain('supersecretvalue');
+        expect(markdown).not.toContain('\nAuthorization: Bearer tokenvalue1234567890');
+    });
+
     it('reporta histórico vazio quando o frontend runtime não tem feed', async () => {
         readTerminalTimelineProjection.mockReturnValueOnce({
             timelineSource: 'empty',

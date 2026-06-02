@@ -1669,6 +1669,67 @@ function summarizeSseEvents(events) {
     };
 }
 
+function normalizeLifecycleToolName(payload) {
+    const names = [
+        payload?.rawToolName,
+        payload?.toolName,
+        payload?.correlatedToolName,
+        payload?.name,
+        payload?.tool,
+    ];
+    for (const value of names) {
+        if (typeof value === 'string' && value.trim().length > 0) return value.trim().toLowerCase();
+    }
+    return '';
+}
+
+function isLifecycleTool(payload, expectedName) {
+    const name = normalizeLifecycleToolName(payload);
+    return name === expectedName || name.endsWith(`.${expectedName}`) || name === `${expectedName}_local`;
+}
+
+function isLifecycleStartType(type) {
+    return type === 'start' || type === 'external_requested';
+}
+
+function isLifecycleCompletionType(type) {
+    return type === 'complete' || type === 'external_completed' || type === 'io_op';
+}
+
+function summarizeCanonicalToolLifecycle(events) {
+    const summary = {
+        reportIntentStart: false,
+        reportIntentDone: false,
+        readFileStart: false,
+        readFileDone: false,
+        readFileIo: false,
+        toolLifecycleEvents: 0,
+        matchedEventIds: [],
+    };
+    for (const evt of events) {
+        if (evt?.event !== 'tool.lifecycle') continue;
+        const payload = eventPayload(evt);
+        if (!payload) continue;
+        summary.toolLifecycleEvents += 1;
+        const type = typeof payload.type === 'string' ? payload.type : '';
+        const success = payload.success !== false;
+        const eventId = eventPublicId(evt);
+        if (isLifecycleTool(payload, 'report_intent')) {
+            if (isLifecycleStartType(type)) summary.reportIntentStart = true;
+            if (isLifecycleCompletionType(type) && success) summary.reportIntentDone = true;
+            if (Number.isFinite(eventId)) summary.matchedEventIds.push(eventId);
+        }
+        if (isLifecycleTool(payload, 'read_file_content')) {
+            if (isLifecycleStartType(type)) summary.readFileStart = true;
+            if (isLifecycleCompletionType(type) && success) summary.readFileDone = true;
+            if (type === 'io_op' && success) summary.readFileIo = true;
+            if (Number.isFinite(eventId)) summary.matchedEventIds.push(eventId);
+        }
+    }
+    summary.matchedEventIds = [...new Set(summary.matchedEventIds)].sort((a, b) => a - b);
+    return summary;
+}
+
 function extractArchiveRawEvents(plain) {
     const entries = [];
     for (const line of plain.split('\n')) {
@@ -1861,6 +1922,7 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
     const markerCount = (plain.match(/DELTA-CANONICAL-\d/g) ?? []).length;
     const preEventsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b/i)[0] ?? plain;
     const archiveRawEvents = extractArchiveRawEvents(plain);
+    const canonicalToolLifecycle = summarizeCanonicalToolLifecycle([...sseSummary.events, ...archiveRawEvents]);
     const sseIds = summarizeSseEvents(sseSummary.events).ids;
     const archiveIds = archiveRawEvents.map((evt) => evt.eventId).filter((id) => Number.isFinite(id));
     const archiveSseOverlap = archiveIds.filter((id) => sseIds.includes(id));
@@ -1923,8 +1985,21 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
         },
         {
             id: 'tool-start-done',
-            pass: /\[TOOL\].*read_file_content/s.test(plain) && /✅ \[DONE\] read_file_content/s.test(plain),
-            detail: 'read_file_content start and done were rendered',
+            pass:
+                canonicalToolLifecycle.readFileStart &&
+                canonicalToolLifecycle.readFileDone &&
+                /\[TOOL\].*read_file_content/s.test(plain) &&
+                /✅ \[DONE\] read_file_content/s.test(plain),
+            detail:
+                `read_file_content lifecycle start=${canonicalToolLifecycle.readFileStart ? 'yes' : 'no'} done=${canonicalToolLifecycle.readFileDone ? 'yes' : 'no'} io=${canonicalToolLifecycle.readFileIo ? 'yes' : 'no'} ` +
+                `rendered=${/\[TOOL\].*read_file_content/s.test(plain) && /✅ \[DONE\] read_file_content/s.test(plain) ? 'yes' : 'no'} events=${canonicalToolLifecycle.matchedEventIds.slice(0, 8).join(',') || '-'}`,
+        },
+        {
+            id: 'report-intent-lifecycle',
+            pass: canonicalToolLifecycle.reportIntentStart && canonicalToolLifecycle.reportIntentDone,
+            detail:
+                `report_intent lifecycle start=${canonicalToolLifecycle.reportIntentStart ? 'yes' : 'no'} done=${canonicalToolLifecycle.reportIntentDone ? 'yes' : 'no'} ` +
+                `toolLifecycleEvents=${canonicalToolLifecycle.toolLifecycleEvents}`,
         },
         {
             id: 'ask-user-visible',
