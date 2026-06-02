@@ -2912,7 +2912,7 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('/byok models refresh provider:groq');
         expect(ctx.output()).toContain('metadados tier,owner');
         expect(ctx.output()).toContain('custo perfil gratuito');
-        expect(ctx.output()).toContain('chat=ok');
+        expect(ctx.output()).toContain('chat ok');
         expect(ctx.output()).not.toContain('secret');
     });
 
@@ -3556,8 +3556,14 @@ describe('terminal /byok command', () => {
         expect(fixtureCtx.output()).toContain('BYOK model-gateway auto recovery fixture');
         expect(fixtureCtx.output()).toContain('sem chamada provider');
         expect(fixtureCtx.output()).toContain('health sintético sim');
+        expect(fixtureCtx.output()).not.toContain('action=');
+        expect(fixtureCtx.output()).not.toContain('applied=');
+        expect(fixtureCtx.output()).not.toContain('recorded=');
         expect(recoveriesCtx.output()).toContain('BYOK model-gateway auto recoveries');
         expect(recoveriesCtx.output()).toContain('rate-limit');
+        expect(recoveriesCtx.output()).toContain('escopo');
+        expect(recoveriesCtx.output()).not.toContain('scope=');
+        expect(recoveriesCtx.output()).not.toContain('failure=');
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
     });
 
@@ -4166,10 +4172,15 @@ describe('terminal /byok command', () => {
 
         expect(ctx.output()).toContain('BYOK operational health');
         expect(ctx.output()).toContain('byok-provider-health.json');
-        expect(ctx.output()).toContain('providerId=kilo-code');
-        expect(ctx.output()).toContain('chat=ok');
-        expect(ctx.output()).toContain('capabilities=streaming=okx2 vision=failed');
-        expect(ctx.output()).toContain('protocol=live_ask_user=ok live_tool_protocol=ok');
+        expect(ctx.output()).toContain('provider kilo-code');
+        expect(ctx.output()).toContain('chat ok');
+        expect(ctx.output()).toContain('capacidades streaming ok');
+        expect(ctx.output()).toContain('vision failed');
+        expect(ctx.output()).toContain('protocolo live_ask_user ok');
+        expect(ctx.output()).toContain('live_tool_protocol ok');
+        expect(ctx.output()).not.toContain('providerId=');
+        expect(ctx.output()).not.toContain('chat=');
+        expect(ctx.output()).not.toContain('capabilities=');
     });
 
     it('filtra health operacional BYOK por provider/model/profile', async () => {
@@ -4220,8 +4231,9 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('filtro provider openrouter');
         expect(ctx.output()).toContain('BYOK operational health');
         expect(ctx.output()).toContain('(1)');
-        expect(ctx.output()).toContain('providerId=openrouter');
-        expect(ctx.output()).not.toContain('providerId=groq');
+        expect(ctx.output()).toContain('provider openrouter');
+        expect(ctx.output()).not.toContain('provider groq');
+        expect(ctx.output()).not.toContain('providerId=');
     });
 
     it('limpa health operacional BYOK quando solicitado', async () => {
@@ -5598,8 +5610,8 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'recommend free reasoning 2');
 
-        expect(ctx.output()).toContain('chat=ok(probe,');
-        expect(ctx.output()).toContain('chat=ok(turno,');
+        expect(ctx.output()).toContain('chat ok (probe');
+        expect(ctx.output()).toContain('chat ok (turno');
     });
 
     it('exclui de recommend safe modelo com falha operacional recente', async () => {
@@ -5724,7 +5736,7 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'models free reasoning 5');
 
         expect(ctx.output()).toContain('gpt-oss-120b');
-        expect(ctx.output()).toContain('chat=failed');
+        expect(ctx.output()).toContain('chat falhou');
     });
 
     it('recomenda modelos BYOK filtrando provider e modelos medidos', async () => {

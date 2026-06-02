@@ -1401,14 +1401,18 @@ function readHealthForByokProfile(profile) {
  * @returns {string}
  */
 function renderByokHealthTag(health) {
-    if (!health) return 'chat=?';
+    if (!health) return 'chat sem registro';
     if (isByokHealthCurrentlyFailed(health)) {
-        const limit = health.lastResetAt ? `,reset=${health.lastResetAt}` : health.lastRetryAfterSeconds ? `,retry=${health.lastRetryAfterSeconds}s` : '';
-        const failure = health.lastFailureKind ? `${health.lastFailureKind}:` : '';
-        return `chat=failed(${failure}${renderByokChatHealthEvidence(health.lastErrorContext)},${formatByokHealthAge(health.lastFailureAt)}${limit}${health.failureCount > 1 ? `,x${health.failureCount}` : ''})`;
+        const limit = health.lastResetAt
+            ? ` · reset ${health.lastResetAt}`
+            : health.lastRetryAfterSeconds
+              ? ` · retry ${health.lastRetryAfterSeconds}s`
+              : '';
+        const failure = health.lastFailureKind ? `${health.lastFailureKind} · ` : '';
+        return `chat falhou (${failure}${renderByokChatHealthEvidence(health.lastErrorContext)} · ${formatByokHealthAge(health.lastFailureAt)}${limit}${health.failureCount > 1 ? ` · x${health.failureCount}` : ''})`;
     }
-    if (health.lastStatus !== 'ok') return 'chat=?';
-    return `chat=ok(${renderByokChatHealthEvidence(health.lastSuccessContext)},${formatByokHealthAge(health.lastSuccessAt)}${health.successCount > 1 ? `,x${health.successCount}` : ''})`;
+    if (health.lastStatus !== 'ok') return 'chat sem registro';
+    return `chat ok (${renderByokChatHealthEvidence(health.lastSuccessContext)} · ${formatByokHealthAge(health.lastSuccessAt)}${health.successCount > 1 ? ` · x${health.successCount}` : ''})`;
 }
 
 /**
@@ -1416,11 +1420,11 @@ function renderByokHealthTag(health) {
  * @returns {string}
  */
 function renderByokAgentProbeHealthTag(health) {
-    if (!health || !health.agentProbeStatus) return 'agent=?';
+    if (!health || !health.agentProbeStatus) return 'agente sem registro';
     if (isByokAgentProbeCurrentlyFailed(health)) {
-        return `agent=failed(${formatByokHealthAge(health.lastAgentProbeFailureAt)}${health.agentProbeFailureCount > 1 ? `,x${health.agentProbeFailureCount}` : ''})`;
+        return `agente falhou (${formatByokHealthAge(health.lastAgentProbeFailureAt)}${health.agentProbeFailureCount > 1 ? ` · x${health.agentProbeFailureCount}` : ''})`;
     }
-    return `agent=ok(${formatByokHealthAge(health.lastAgentProbeSuccessAt)}${health.agentProbeSuccessCount > 1 ? `,x${health.agentProbeSuccessCount}` : ''})`;
+    return `agente ok (${formatByokHealthAge(health.lastAgentProbeSuccessAt)}${health.agentProbeSuccessCount > 1 ? ` · x${health.agentProbeSuccessCount}` : ''})`;
 }
 
 /**
@@ -1428,7 +1432,7 @@ function renderByokAgentProbeHealthTag(health) {
  * @returns {string}
  */
 function renderByokProbeHealthItem(probe) {
-    return `${probe.kind}=${probe.status}${probe.providerAttempted ? '' : ':local'}${probe.count && probe.count > 1 ? `x${probe.count}` : ''}`;
+    return `${probe.kind} ${probe.status}${probe.providerAttempted ? '' : ' local'}${probe.count && probe.count > 1 ? ` · x${probe.count}` : ''}`;
 }
 
 /**
@@ -1437,7 +1441,7 @@ function renderByokProbeHealthItem(probe) {
  */
 function renderByokProbeHealthSummaries(health) {
     const probes = health?.probes && typeof health.probes === 'object' ? Object.values(health.probes) : [];
-    if (probes.length === 0) return ['probes=?'];
+    if (probes.length === 0) return ['probes sem registro'];
     const sorted = probes.sort((a, b) => String(a.kind).localeCompare(String(b.kind)));
     const capabilityKinds = new Set(['streaming', 'json', 'vision']);
     const protocolKinds = new Set(['live_ask_user', 'live_tool_protocol']);
@@ -1445,9 +1449,9 @@ function renderByokProbeHealthSummaries(health) {
     const protocol = sorted.filter((probe) => protocolKinds.has(String(probe.kind)));
     const other = sorted.filter((probe) => !capabilityKinds.has(String(probe.kind)) && !protocolKinds.has(String(probe.kind)));
     return [
-        capabilities.length > 0 ? `capabilities=${capabilities.map(renderByokProbeHealthItem).join(' ')}` : null,
-        protocol.length > 0 ? `protocol=${protocol.map(renderByokProbeHealthItem).join(' ')}` : null,
-        other.length > 0 ? `probes=${other.map(renderByokProbeHealthItem).join(' ')}` : null,
+        capabilities.length > 0 ? `capacidades ${capabilities.map(renderByokProbeHealthItem).join(' · ')}` : null,
+        protocol.length > 0 ? `protocolo ${protocol.map(renderByokProbeHealthItem).join(' · ')}` : null,
+        other.length > 0 ? `probes ${other.map(renderByokProbeHealthItem).join(' · ')}` : null,
     ].filter((item) => item !== null);
 }
 
@@ -2019,14 +2023,14 @@ function renderByokHealth(println, scope = {}) {
     });
     println(`\n  \x1b[36mBYOK operational health\x1b[0m (${records.length})`);
     println(
-        `  \x1b[90mpersist=${state.enabled ? 'on' : 'off'} · arquivo=${state.path ?? '-'} · carregado=${state.loaded ? 'sim' : 'nao'} · dirty=${state.dirty ? 'sim' : 'nao'}\x1b[0m`,
+        `  \x1b[90mpersistência ${state.enabled ? 'on' : 'off'} · arquivo ${state.path ?? '-'} · carregado ${state.loaded ? 'sim' : 'nao'} · alterações pendentes ${state.dirty ? 'sim' : 'nao'}\x1b[0m`,
     );
     if (scope.providerId || scope.providerModel || scope.routeProfile) {
         println(
             `  \x1b[90mfiltro provider ${scope.providerId ?? '*'} · modelo ${scope.providerModel ?? '*'} · perfil ${scope.routeProfile ?? '*'}\x1b[0m`,
         );
     }
-    if (state.error) println(`  \x1b[31merro=${state.error}\x1b[0m`);
+    if (state.error) println(`  \x1b[31merro ${state.error}\x1b[0m`);
     if (records.length === 0) {
         println('  \x1b[90mNenhum turno BYOK real registrou sucesso ou falha neste estado ainda.\x1b[0m\n');
         return;
@@ -2034,28 +2038,28 @@ function renderByokHealth(println, scope = {}) {
     for (const record of records.slice(0, 30)) {
         const label = renderByokHealthTag(record);
         const parts = [
-            record.routeProfile ? `routeProfile=${record.routeProfile}` : null,
-            record.providerId ? `providerId=${record.providerId}` : null,
-            record.providerModel ? `providerModel=${record.providerModel}` : null,
+            record.routeProfile ? `perfil ${record.routeProfile}` : null,
+            record.providerId ? `provider ${record.providerId}` : null,
+            record.providerModel ? `modelo ${record.providerModel}` : null,
             label,
             renderByokAgentProbeHealthTag(record),
             ...renderByokProbeHealthSummaries(record),
         ].filter(Boolean);
         println(`    \x1b[33m${record.key}\x1b[0m`);
         println(`      \x1b[90m${parts.join(' · ')}\x1b[0m`);
-        if (record.lastMessage) println(`      \x1b[90multimo erro=${record.lastMessage}\x1b[0m`);
-        if (record.lastErrorContext) println(`      \x1b[90mcontexto=${record.lastErrorContext}\x1b[0m`);
+        if (record.lastMessage) println(`      \x1b[90multimo erro ${record.lastMessage}\x1b[0m`);
+        if (record.lastErrorContext) println(`      \x1b[90mcontexto ${record.lastErrorContext}\x1b[0m`);
         if (record.lastFailureKind || record.lastFailureStatusCode || record.lastRetryAfterSeconds || record.lastResetAt) {
             const failureBits = [
-                record.lastFailureKind ? `kind=${record.lastFailureKind}` : null,
-                record.lastFailureStatusCode ? `http=${record.lastFailureStatusCode}` : null,
-                record.lastRetryAfterSeconds ? `retryAfter=${record.lastRetryAfterSeconds}s` : null,
-                record.lastResetAt ? `resetAt=${record.lastResetAt}` : null,
+                record.lastFailureKind ? `tipo ${record.lastFailureKind}` : null,
+                record.lastFailureStatusCode ? `http ${record.lastFailureStatusCode}` : null,
+                record.lastRetryAfterSeconds ? `retry após ${record.lastRetryAfterSeconds}s` : null,
+                record.lastResetAt ? `reset ${record.lastResetAt}` : null,
             ].filter(Boolean);
-            println(`      \x1b[90mlimite/falha=${failureBits.join(' · ')}\x1b[0m`);
+            println(`      \x1b[90mlimite/falha ${failureBits.join(' · ')}\x1b[0m`);
         }
-        if (record.lastAgentProbeMessage) println(`      \x1b[90multimo erro agent=${record.lastAgentProbeMessage}\x1b[0m`);
-        if (record.lastAgentProbeErrorContext) println(`      \x1b[90mcontexto agent=${record.lastAgentProbeErrorContext}\x1b[0m`);
+        if (record.lastAgentProbeMessage) println(`      \x1b[90multimo erro agente ${record.lastAgentProbeMessage}\x1b[0m`);
+        if (record.lastAgentProbeErrorContext) println(`      \x1b[90mcontexto agente ${record.lastAgentProbeErrorContext}\x1b[0m`);
     }
     if (records.length > 30) {
         println(`  \x1b[90m... ${records.length - 30} registro(s) omitidos. Use filtros de /byok models ou /byok providers para cockpit resumido.\x1b[0m`);
@@ -2464,22 +2468,22 @@ async function renderByokGatewayOperatorReady(println, rest) {
         {
             id: 'runtime_selector',
             pass: status.runtimeSelectorPlan.ok === true && status.runtimeSelectorPlan.ready === true,
-            detail: `selected=${status.runtimeSelectorPlan.summary.selectedProfileCount}/${status.runtimeSelectorPlan.summary.profileCount}`,
+            detail: `selecionados ${status.runtimeSelectorPlan.summary.selectedProfileCount}/${status.runtimeSelectorPlan.summary.profileCount}`,
         },
         {
             id: 'automation_decision',
             pass: status.decision.ok === true || status.decision.action === 'keep_current',
-            detail: `action=${status.decision.action} blockers=${status.decision.blockers.length}`,
+            detail: `ação ${status.decision.action} · bloqueios ${status.decision.blockers.length}`,
         },
         {
             id: 'standby_routes',
             pass: standbyRows.length > 0,
-            detail: `routes=${standbyRows.length} providers=${standbyProviderCount}`,
+            detail: `rotas ${standbyRows.length} · provedores ${standbyProviderCount}`,
         },
         {
             id: 'terminal_boundary',
             pass: Boolean(status.inventory.currentSessionId) || status.decision.requiresNewSession === true,
-            detail: `session=${status.inventory.currentSessionId ?? '-'} current=${status.decision.currentBoundary.preset ?? '-'}:${status.decision.currentBoundary.model ?? '-'}`,
+            detail: `sessão ${status.inventory.currentSessionId ?? '-'} · atual ${status.decision.currentBoundary.preset ?? '-'}:${status.decision.currentBoundary.model ?? '-'}`,
         },
     ];
     const blockers = checks.filter((check) => !check.pass);
@@ -3839,7 +3843,9 @@ async function renderByokGatewayAutoConfirmations(println, rest) {
         const previousModel = optionalScalarString(row['previousModel']) ?? '-';
         const confirmedModel = optionalScalarString(row['confirmedModel']) ?? optionalScalarString(row['newModel']) ?? '-';
         const observedAt = optionalScalarString(row['observedAt']) ?? optionalScalarString(row['timestamp']) ?? '-';
-        println(`    ${index + 1}. \x1b[33m${status}\x1b[0m ${previousModel} -> ${confirmedModel} at=${observedAt}`);
+        println(
+            `    ${index + 1}. \x1b[33m${status}\x1b[0m  \x1b[90m${previousModel} -> ${confirmedModel} · observado ${observedAt}\x1b[0m`,
+        );
     });
     println('');
 }
@@ -3863,7 +3869,9 @@ async function renderByokGatewayAutoRecoveries(println, rest) {
         const failureKind = optionalScalarString(row['failureKind']) ?? '-';
         const route = optionalScalarString(row['selectedRouteKey']) ?? '-';
         const observedAt = optionalScalarString(row['observedAt']) ?? optionalScalarString(row['timestamp']) ?? '-';
-        println(`    ${index + 1}. \x1b[33m${status}\x1b[0m scope=${scope} failure=${failureKind} route=${route} at=${observedAt}`);
+        println(
+            `    ${index + 1}. \x1b[33m${status}\x1b[0m  \x1b[90mescopo ${scope} · falha ${failureKind} · rota ${route} · observado ${observedAt}\x1b[0m`,
+        );
     });
     println('');
 }
@@ -3924,10 +3932,10 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
     const applied = result.application?.applied ?? [];
     const skipped = result.application?.skipped ?? [];
     println(
-        `    decision:      \x1b[33maction=${result.status.decision.action} · route=${result.status.decision.selectedRouteKey ?? '-'}\x1b[0m`,
+        `    decisão:       \x1b[33mação ${result.status.decision.action} · rota ${result.status.decision.selectedRouteKey ?? '-'}\x1b[0m`,
     );
     println(
-        `    effects:       \x1b[33mapplied=${applied.length} · skipped=${skipped.length} · persisted=${result.effectPersistence?.automationEffectApplications ?? 0}\x1b[0m`,
+        `    efeitos:       \x1b[33maplicados ${applied.length} · pulados ${skipped.length} · persistidos ${result.effectPersistence?.automationEffectApplications ?? 0}\x1b[0m`,
     );
     println(
         `    recoveries:    \x1b[33m${result.effectPersistence?.recoveryAttempts ?? 0}\x1b[0m`,
@@ -3935,7 +3943,7 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
     const health = result.healthPersistence;
     if (health) {
         println(
-            `    health:        \x1b[33mrecorded=${health.recorded ? 'sim' : 'nao'} · route=${health.providerId ?? '-'}:${health.providerModel ?? '-'} · sqlite=${health.sqlite ? `${health.sqlite.healthObservations}/${health.sqlite.records}` : '-'}\x1b[0m`,
+            `    health:        \x1b[33mregistrado ${health.recorded ? 'sim' : 'nao'} · rota ${health.providerId ?? '-'}:${health.providerModel ?? '-'} · SQLite ${health.sqlite ? `${health.sqlite.healthObservations}/${health.sqlite.records}` : '-'}\x1b[0m`,
         );
     }
     const details = [...applied, ...skipped].map(describeTerminalByokGatewayAutoEffect).slice(0, 5);
@@ -4056,20 +4064,20 @@ async function renderByokGatewayAutoDoctor(println, rest) {
         const topReasons = Object.entries(rejectionCounts)
             .sort((left, right) => Number(right[1] ?? 0) - Number(left[1] ?? 0))
             .slice(0, 4)
-            .map(([reason, count]) => `${reason}=${count}`)
+            .map(([reason, count]) => `${reason} ${count}`)
             .join(', ');
         println(
-            `    alternativas:  \x1b[33musable=${alternativeSummary.usableCount}/${alternativeSummary.evaluatedCount} · providers=${alternativeSummary.providerCount}${topReasons ? ` · ${topReasons}` : ''}\x1b[0m`,
+            `    alternativas:  \x1b[33musáveis ${alternativeSummary.usableCount}/${alternativeSummary.evaluatedCount} · provedores ${alternativeSummary.providerCount}${topReasons ? ` · ${topReasons}` : ''}\x1b[0m`,
         );
         for (const proof of buildModelGatewayRuntimeProofCommands(alternativeSummary)) {
             println(`      \x1b[90mprovar: ${proof.command}\x1b[0m`);
         }
     }
     println(
-        `    ledgers:       \x1b[33mdecisions=${diagnostics.automationDecisionRows ?? 0} · policySnapshots=${diagnostics.automationPolicySnapshotRows ?? 0} · effects=${effectsRows} · recoveries=${recoveryRows} · handoffs=${handoffRows} · confirmations=${confirmationRows} · liveRuns=${liveScenarioRunRows}\x1b[0m`,
+        `    ledgers:       \x1b[33mdecisões ${diagnostics.automationDecisionRows ?? 0} · policy snapshots ${diagnostics.automationPolicySnapshotRows ?? 0} · efeitos ${effectsRows} · recoveries ${recoveryRows} · handoffs ${handoffRows} · confirmações ${confirmationRows} · live runs ${liveScenarioRunRows}\x1b[0m`,
     );
     println(
-        `    sdk:           \x1b[33msession=${status.inventory.currentSessionId ?? '-'} · live=${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}\x1b[0m`,
+        `    sdk:           \x1b[33msessão ${status.inventory.currentSessionId ?? '-'} · live ${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}\x1b[0m`,
     );
     if (decision.blockers.length > 0) println(`    blockers:      \x1b[33m${decision.blockers.join(', ')}\x1b[0m`);
     if (warnings.length > 0) println(`    warnings:      \x1b[33m${warnings.join(', ')}\x1b[0m`);

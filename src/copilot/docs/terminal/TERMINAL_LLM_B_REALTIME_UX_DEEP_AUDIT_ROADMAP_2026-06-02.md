@@ -2268,5 +2268,14 @@
 - [x] Teste escopado passou após esse lote: `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
 - [x] `/permission mode` passou a renderizar `Modo de permissões` e `prompts SDK`, removendo `Permission mode` e `sdk prompts=` da superfície humana.
 - [x] Teste escopado passou novamente após esse lote: `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
-- [ ] Auditar `/byok operational health` detalhado, `/byok confirmations/recoveries`, `/byok persist`, `/byok models grouped` e helpers de health tags para separar default humano de detalhe técnico.
+- [x] Tags centrais de saúde BYOK passaram de `chat=ok(...)`, `chat=failed(...)`, `agent=ok(...)`, `capabilities=...`, `protocol=...` e `probes=...` para `chat ok (...)`, `chat falhou (...)`, `agente ok (...)`, `capacidades ...`, `protocolo ...` e `probes ...`.
+- [x] `/byok health` passou a renderizar `persistência`, `arquivo`, `carregado`, `alterações pendentes`, `provider`, `modelo`, `perfil`, `contexto`, `limite/falha`, `tipo`, `retry após`, `reset`, `último erro agente` e `contexto agente`, removendo `persist=`, `dirty=`, `providerId=`, `providerModel=`, `routeProfile=`, `contexto=`, `limite/falha=`, `kind=`, `retryAfter=` e `resetAt=`.
+- [x] Teste BYOK completo passou após esse lote: `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js` (105 testes).
+- [x] `/byok auto confirmations` trocou `at=` por `observado`, preservando o modelo anterior e o confirmado.
+- [x] `/byok auto recoveries` trocou `scope=`, `failure=`, `route=` e `at=` por `escopo`, `falha`, `rota` e `observado`.
+- [x] `/byok auto recovery-fixture` trocou `decision: action=`, `effects: applied=`, `recorded=`, `route=` e `sqlite=` por `decisão`, `ação`, `efeitos`, `aplicados`, `pulados`, `persistidos`, `registrado`, `rota` e `SQLite`.
+- [x] `/byok gateway operator-ready` trocou detalhes `selected=`, `action=`, `routes=`, `providers=`, `session=` e `current=` por `selecionados`, `ação`, `rotas`, `provedores`, `sessão` e `atual`.
+- [x] `/byok auto status` trocou `usable=`, `providers=`, `decisions=`, `policySnapshots=`, `effects=`, `recoveries=`, `handoffs=`, `confirmations=`, `liveRuns=`, `session=` e `live=` por `usáveis`, `provedores`, `decisões`, `policy snapshots`, `efeitos`, `recoveries`, `handoffs`, `confirmações`, `live runs`, `sessão` e `live`.
+- [x] Teste BYOK completo passou novamente após esse lote: `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js` (105 testes).
+- [ ] Auditar `/byok persist`, `/byok models grouped` e helpers de health tags restantes para separar default humano de detalhe técnico.
 - [ ] Separar explicitamente “tela default humana” de “detail/raw diagnóstico” nos comandos BYOK, sem perder automação e rastreabilidade.
