@@ -25,18 +25,33 @@ import { compactTerminalDiagnosticId, getTerminalHumanToolName } from '../events
  */
 function renderLifecycleDiagnosticLine(entry) {
     const ids = [
-        entry.toolCallId ? `call=${compactTerminalDiagnosticId(entry.toolCallId)}` : null,
-        entry.requestId ? `req=${compactTerminalDiagnosticId(entry.requestId)}` : null,
-        entry.traceId ? `trace=${compactTerminalDiagnosticId(entry.traceId, 16)}` : null,
+        entry.toolCallId ? `chamada ${compactTerminalDiagnosticId(entry.toolCallId)}` : null,
+        entry.requestId ? `requisição ${compactTerminalDiagnosticId(entry.requestId)}` : null,
+        entry.traceId ? `trace ${compactTerminalDiagnosticId(entry.traceId, 16)}` : null,
     ].filter(Boolean);
     const target = entry.path ?? entry.target;
     const progress = entry.progress !== null ? ` · ${entry.progress}%` : '';
     const duration = entry.durationMs !== null ? ` · ${Math.max(0, Math.round(entry.durationMs))}ms` : '';
     const visualName = getTerminalHumanToolName(entry.toolName);
-    const technicalName = visualName === entry.toolName ? null : `tool=${entry.toolName}`;
-    const rawName = entry.rawToolName && entry.rawToolName !== entry.toolName ? `raw=${entry.rawToolName}` : null;
-    const suffix = [entry.operation, target, technicalName, rawName, ids.join(' · ')].filter(Boolean).join(' · ');
-    return `    \x1b[33m${visualName}\x1b[0m  ${entry.status}${progress}${duration}${suffix ? `  \x1b[90m${suffix}\x1b[0m` : ''}`;
+    const technicalName = visualName === entry.toolName ? null : `técnico ${entry.toolName}`;
+    const rawName = entry.rawToolName && entry.rawToolName !== entry.toolName ? `origem SDK ${entry.rawToolName}` : null;
+    const operation = entry.operation ? `ação ${entry.operation}` : null;
+    const targetLabel = target ? `alvo ${target}` : null;
+    const status = renderLifecycleStatusLabel(entry.status);
+    const suffix = [operation, targetLabel, technicalName, rawName, ids.join(' · ')].filter(Boolean).join(' · ');
+    return `    \x1b[33m${visualName}\x1b[0m  ${status}${progress}${duration}${suffix ? `  \x1b[90m${suffix}\x1b[0m` : ''}`;
+}
+
+/**
+ * @param {string} status
+ * @returns {string}
+ */
+function renderLifecycleStatusLabel(status) {
+    if (status === 'running') return 'em execução';
+    if (status === 'completed') return 'concluída';
+    if (status === 'failed') return 'falhou';
+    if (status === 'waiting-user') return 'aguardando operador';
+    return status.replace(/-/gu, ' ');
 }
 
 /**
@@ -91,7 +106,7 @@ export function cmdTools({ println }, arg = '') {
         const visualName = wantsRaw ? name : getTerminalHumanToolName(name);
         if (wantsRaw || wantsDiag) {
             println(
-                `    \x1b[33m${visualName}\x1b[0m  calls=\x1b[36m${calls}\x1b[0m  blocked=${blockedColor}${blocked}\x1b[0m  errors=${errorColor}${errors}\x1b[0m  avg=${latency}`,
+                `    \x1b[33m${visualName}\x1b[0m  chamadas \x1b[36m${calls}\x1b[0m · bloqueios ${blockedColor}${blocked}\x1b[0m · falhas ${errorColor}${errors}\x1b[0m · latência ${latency}`,
             );
         } else {
             const healthLabel = errors > 0 ? `${errorColor}${errors} falha(s)${C_RESET}` : `${errorColor}sem falhas${C_RESET}`;
@@ -108,7 +123,7 @@ export function cmdTools({ println }, arg = '') {
             println(`      \x1b[90maliases: ${d.aliases.join(', ')}\x1b[0m`);
         }
         if (wantsDiag && typeof d.kind === 'string' && d.kind.length > 0) {
-            println(`      \x1b[90mkind: ${d.kind}\x1b[0m`);
+            println(`      \x1b[90mtipo: ${d.kind}\x1b[0m`);
         }
     }
 
@@ -128,14 +143,14 @@ export function cmdTools({ println }, arg = '') {
     avgLatencyMs?: number;
 }} */ (agg);
             println(
-                `    \x1b[33m${cat}\x1b[0m  calls=\x1b[36m${info.totalCalls ?? 0}\x1b[0m  blocked=${info.totalBlocked ?? 0}  errors=${info.totalErrors ?? 0}  avg=${info.avgLatencyMs ?? 0}ms`,
+                `    \x1b[33m${cat}\x1b[0m  chamadas \x1b[36m${info.totalCalls ?? 0}\x1b[0m · bloqueios ${info.totalBlocked ?? 0} · falhas ${info.totalErrors ?? 0} · latência ${info.avgLatencyMs ?? 0}ms`,
             );
         }
 
         const toolLoad = status.toolLoad;
         println('\n  \x1b[36mSuperfícies de tools\x1b[0m');
         println(
-            `    \x1b[90mfsCanônico=${toolLoad.hasCanonicalLocalFsTools} · execCanônico=${toolLoad.hasCanonicalLocalExecTools} · sdkWorkspace=${toolLoad.hasSdkWorkspaceTooling} · legacyShellLoaded=${toolLoad.hasLegacySdkShellToolsLoaded} · disabled=${toolLoad.disabled.length}\x1b[0m`,
+            `    \x1b[90marquivos locais ${toolLoad.hasCanonicalLocalFsTools ? 'ativos' : 'ausentes'} · terminal local ${toolLoad.hasCanonicalLocalExecTools ? 'ativo' : 'ausente'} · workspace SDK ${toolLoad.hasSdkWorkspaceTooling ? 'ativo' : 'ausente'} · shell legado ${toolLoad.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado'} · desabilitadas ${toolLoad.disabled.length}\x1b[0m`,
         );
         if (toolLoad.disabled.length > 0) {
             println(`    \x1b[90mdisabled: ${toolLoad.disabled.join(', ')}\x1b[0m`);
@@ -144,12 +159,12 @@ export function cmdTools({ println }, arg = '') {
         const contract = toolLoad.toolContract;
         const contractColor =
             contract.errorCount > 0 ? '\x1b[31m' : contract.warningCount > 0 ? '\x1b[33m' : '\x1b[32m';
-        println('\n  \x1b[36mTool Contract Verifier\x1b[0m');
+        println('\n  \x1b[36mContrato das ferramentas\x1b[0m');
         println(
-            `    ${contractColor}${contract.ok ? 'ok' : 'attention'}\x1b[0m \x1b[90merrors=${contract.errorCount} · warnings=${contract.warningCount}\x1b[0m`,
+            `    ${contractColor}${contract.ok ? 'ok' : 'atenção'}\x1b[0m \x1b[90mfalhas ${contract.errorCount} · avisos ${contract.warningCount}\x1b[0m`,
         );
         println(
-            `    \x1b[90mcoverage: description=${contract.metadataCoverage.descriptionPct}% · schema=${contract.metadataCoverage.parametersPct}% · category=${contract.metadataCoverage.categoryPct}% · tags=${contract.metadataCoverage.tagsPct}% · instructions=${contract.metadataCoverage.instructionsPct}%\x1b[0m`,
+            `    \x1b[90mcobertura: descrição ${contract.metadataCoverage.descriptionPct}% · schema ${contract.metadataCoverage.parametersPct}% · categoria ${contract.metadataCoverage.categoryPct}% · tags ${contract.metadataCoverage.tagsPct}% · instruções ${contract.metadataCoverage.instructionsPct}%\x1b[0m`,
         );
         const detailedContract = readTerminalToolRegistrySnapshot().toolContract;
         if (detailedContract.issues.length > 0) {
@@ -169,7 +184,7 @@ export function cmdTools({ println }, arg = '') {
         if (lifecycle) {
             println('\n  \x1b[36mLifecycle recente\x1b[0m');
             println(
-                `    \x1b[90mactive=${lifecycle.summary.active} · waitingUser=${lifecycle.summary.waitingUser} · recent=${lifecycle.summary.recent} · failedRecent=${lifecycle.summary.failedRecent}\x1b[0m`,
+                `    \x1b[90mativas ${lifecycle.summary.active} · aguardando operador ${lifecycle.summary.waitingUser} · recentes ${lifecycle.summary.recent} · falhas recentes ${lifecycle.summary.failedRecent}\x1b[0m`,
             );
             const active = lifecycle.active.slice(0, 8);
             if (active.length > 0) {

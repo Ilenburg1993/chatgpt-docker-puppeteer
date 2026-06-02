@@ -2096,7 +2096,12 @@
 - [x] `/model stats` passou a mostrar `chamadas`, `latência média`, `sucesso` e `tokens`.
 - [x] Mensagem de BYOK ativo passou a mostrar `preset` e `provedor` sem key-value.
 - [x] Mensagem pós-troca de modelo passou a mostrar `Capacidades: raciocínio ... · visão ... · contexto ...`.
-- [ ] Avaliar se `/reasoning` deve trocar `Reasoning effort`/`Reasoning trocado` por rótulos 100% em português.
+- [x] `/reasoning` trocou `Reasoning effort`, `Reasoning trocado` e `Raciocínio extendido` por `Nível de raciocínio`, `Raciocínio alterado` e `Raciocínio estendido`.
+
+### 11.17.1 `/help` deve ensinar a sintaxe que a UX realmente aceita
+
+- [x] Ajuda de `/events` deixou de sugerir apenas `trace=<id>`/`tool=<id>` e passou a expor `trace <id>`/`tool <id>` com filtro humano por `delta`.
+- [ ] Auditar demais linhas de ajuda para remover padrões de sintaxe herdados que parecem parâmetros internos quando o comando já aceita uma forma humana.
 
 ### 11.18 `/thinking` como raciocínio do operador
 
@@ -2136,3 +2141,28 @@
   - `artifacts/terminal-live/default-ux-cycle-health-local-tools-20260602-1020/summary.md`;
   - `artifacts/terminal-live/default-ux-cycle-health-local-tools-20260602-1020/default-ux-cycle.plain.log`;
   - `artifacts/terminal-live/default-ux-cycle-health-local-tools-20260602-1020/default-ux-cycle.raw.log`.
+
+### 11.21 `/tools diag` sem vazamento de IDs crus
+
+- [x] Auditoria identificou que `/tools diag` ainda renderizava `active=`, `tool=`, `call=`, `req=`, `calls=`, `blocked=`, `errors=`, `fsCanônico=` e `Tool Contract Verifier`.
+- [x] Lifecycle recente passou a mostrar `ativas`, `aguardando operador`, `recentes` e `falhas recentes`.
+- [x] Linhas de tool em voo/recentes passaram a mostrar `técnico`, `chamada`, `requisição` e `trace` como diagnóstico legível, sem `tool=`/`call=`/`req=`.
+- [x] Agregados diagnósticos passaram a mostrar `chamadas`, `bloqueios`, `falhas` e `latência`.
+- [x] Superfícies de tools passaram a dizer `arquivos locais ativos`, `terminal local ativo`, `workspace SDK ausente` e `shell legado não carregado`.
+- [x] `Tool Contract Verifier` foi traduzido para `Contrato das ferramentas`, com cobertura em português.
+- [ ] Fazer live curta com `/tools diag` para verificar alinhamento visual em PTY real após o próximo lote de comandos.
+
+### 11.22 Gramática visual, cores e perguntas humanas
+
+- [x] Auditoria visual das screenshots consolidou que LLM-B, operador, thinking, tools, perguntas, intents e erros estavam competindo por ciano/verde sem hierarquia clara.
+- [x] `ui-theme.js` ganhou papéis explícitos `assistant`, `user` e `system`, separando fala da LLM-B e prompt do operador de `success`.
+- [x] Tema `elegant` passou de ANSI básico para paleta 256-color: LLM-B em ciano suave, operador em verde suave, sistema em lavanda, raciocínio em violeta, tools em azul, perguntas em âmbar, warning em laranja e erro em vermelho coral.
+- [x] Linha viva trocou `ASK` e `INPUT` por `PERGUNTA`, removendo a aparência de tool interna em `request_user_input`.
+- [x] Prompt do operador trocou `[ASK:...]`, `[ASK]`, `[REQUEST_USER_INPUT]` e `[INPUT]` por `[PERGUNTA:...]` e `[PERGUNTA]`.
+- [x] Perguntas renderizadas por eventos SDK passaram a usar badge `PERGUNTA`/`PERGUNTA AO OPERADOR`.
+- [x] `report_intent`/`report_intent_local` passou a aparecer como `Intenção capturada`, não `Intent capturado`.
+- [x] `/sdk waits` detail trocou `elicitation=`, `permission=`, `ask_user=` e `request_user_input=` por `formulários`, `permissões`, `perguntas SDK` e `perguntas estruturadas`.
+- [x] `/sdk waits` e `/sdk simulate request-user-input` passaram a chamar o estado de `pergunta estruturada`, não `input estruturado`.
+- [ ] Auditar `/sdk status`, `/sdk capabilities` e `/sdk quota` para remover `tools.list=`, `ui.elicitation=` e outros dumps de capability da vista default.
+- [ ] Criar live de paleta em PTY real com `/display theme elegant`, `/display theme vivid`, `/display theme mono`, pergunta estruturada e tool em andamento.
+- [ ] Avaliar se precisamos de um renderer de “cartão de pergunta” com moldura discreta para impedir repetição visual quando a pergunta aguarda resposta por muito tempo.

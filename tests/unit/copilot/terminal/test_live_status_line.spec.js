@@ -138,7 +138,7 @@ describe('terminal/live-status-line', () => {
         const line = formatTerminalLiveStatusLine();
 
         expect(shouldRenderTerminalLiveStatusLine()).toBe(true);
-        expect(line).toContain('INPUT');
+        expect(line).toContain('PERGUNTA');
         expect(line).toContain('Escolha como continuar');
         expect(line).toContain('opções seguir|pausar');
         expect(line).not.toContain('opções=');
@@ -335,7 +335,7 @@ describe('terminal/live-status-line', () => {
 
         expect(shouldRenderTerminalLiveStatusLine()).toBe(true);
         const line = formatTerminalLiveStatusLine();
-        expect(line).toContain('ASK');
+        expect(line).toContain('PERGUNTA');
         expect(line).toContain('Qual cor devo usar');
         expect(line).toContain('opções azul|verde');
         expect(line).not.toContain('opções=');

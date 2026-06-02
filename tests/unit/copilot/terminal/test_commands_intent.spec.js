@@ -61,9 +61,11 @@ describe('terminal/commands/intent', () => {
         cmdIntent(ctx, 'detail 5');
 
         expect(ctx.output()).toContain('detalhe técnico');
-        expect(ctx.output()).toContain('origem=tool/report_intent_local');
-        expect(ctx.output()).toContain('tool=patch_file');
-        expect(ctx.output()).toContain('call=call-1');
+        expect(ctx.output()).toContain('origem bruta tool/report_intent_local');
+        expect(ctx.output()).toContain('ferramenta patch_file');
+        expect(ctx.output()).toContain('chamada call-1');
+        expect(ctx.output()).not.toContain('tool=patch_file');
+        expect(ctx.output()).not.toContain('call=call-1');
     });
 
     it('limpa histórico em memória', () => {

@@ -154,7 +154,7 @@ export function renderTerminalIntent(input) {
     if (input.print !== false) {
         const lines = [
             SEPARATOR,
-            `  ${terminalThemeBadge(theme, 'INTENÇÃO')} ${terminalThemeText(theme, renderedRisk)} ${terminalThemeText('muted', sourceLabel)}`,
+            `  ${terminalThemeBadge(theme, 'INTENÇÃO CAPTURADA')} ${terminalThemeText(theme, renderedRisk)} ${terminalThemeText('muted', sourceLabel)}`,
             '',
         ];
         for (const line of intent.split('\n')) {

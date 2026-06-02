@@ -113,7 +113,7 @@ export function cmdIntent(ctx, arg) {
     /** @type {string[]} */
     const lines = [
         '',
-        `  ${terminalThemeBadge('info', 'INTENÇÃO')} ${terminalThemeText('info', `Últimas ${entries.length} intenções`)} ${terminalThemeText('muted', `· total=${stats.entries} · bytes=${stats.bytes}${detail ? ' · detalhe técnico' : ''}`)}`,
+        `  ${terminalThemeBadge('info', 'INTENÇÃO CAPTURADA')} ${terminalThemeText('info', `Últimas ${entries.length} intenções`)} ${terminalThemeText('muted', `· total ${stats.entries} · ${stats.bytes} bytes${detail ? ' · detalhe técnico' : ''}`)}`,
         '',
     ];
     for (const entry of entries) {
@@ -123,9 +123,9 @@ export function cmdIntent(ctx, arg) {
             `  ${terminalThemeText(theme, '•')} ${terminalThemeText('muted', `${formatTime(entry.timestamp)} · origem ${source} · risco ${humanRiskLabel(entry.risk)}`)}`,
         );
         if (detail) {
-            const tool = entry.tool ? ` · tool=${entry.tool}` : '';
-            const call = entry.toolCallId ? ` · call=${compact(entry.toolCallId, 18)}` : '';
-            lines.push(`    ${terminalThemeText('muted', `origem=${entry.source}${tool}${call} · id=${entry.id}`)}`);
+            const tool = entry.tool ? ` · ferramenta ${entry.tool}` : '';
+            const call = entry.toolCallId ? ` · chamada ${compact(entry.toolCallId, 18)}` : '';
+            lines.push(`    ${terminalThemeText('muted', `origem bruta ${entry.source}${tool}${call} · registro ${entry.id}`)}`);
         }
         lines.push(`    ${compact(entry.intent, 180)}`);
     }

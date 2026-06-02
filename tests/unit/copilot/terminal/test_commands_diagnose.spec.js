@@ -310,7 +310,7 @@ describe('commands/diagnose', () => {
             expect(ctx.output()).toContain('sdk↔fs route');
             expect(ctx.output()).toContain('degraded');
             expect(ctx.output()).toContain('Ler arquivo');
-            expect(ctx.output()).toContain('Intent capturado');
+            expect(ctx.output()).toContain('Intenção capturada');
             expect(ctx.output()).not.toContain('read_file_content');
             expect(ctx.output()).not.toContain('report_intent_local');
         } finally {

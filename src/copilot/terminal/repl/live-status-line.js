@@ -157,7 +157,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
         const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila ${runtime.queueSize}` : '';
         return (
             `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
-            `${terminalThemeText('question', 'ASK')}` +
+            `${terminalThemeText('question', 'PERGUNTA')}` +
             `${terminalThemeText('muted', ` · ${questionText}${choiceText} · ${runtime.dialogLoopActive ? 'loop' : 'noloop'}${queue}`)}` +
             '\x1b[K'
         );
@@ -174,7 +174,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
         const queue = structuredInputs.length > 1 ? ` · fila ${structuredInputs.length}` : '';
         return (
             `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
-            `${terminalThemeText('question', 'INPUT')}` +
+            `${terminalThemeText('question', 'PERGUNTA')}` +
             `${terminalThemeText('muted', ` · ${questionText}${choiceText}${queue}`)}` +
             '\x1b[K'
         );

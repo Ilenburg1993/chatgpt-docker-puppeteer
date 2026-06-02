@@ -34,8 +34,8 @@ const GENERIC_TOOL_NAMES = new Set(['external_tool', 'external tool', 'tool', 'u
 const HUMAN_TOOL_NAMES = Object.freeze({
     ask_user: 'Pergunta ao operador',
     request_user_input: 'Pergunta ao operador',
-    report_intent: 'Intent capturado',
-    report_intent_local: 'Intent capturado',
+    report_intent: 'Intenção capturada',
+    report_intent_local: 'Intenção capturada',
     read_file_content: 'Ler arquivo',
     create_file: 'Criar arquivo',
     write_file: 'Escrever arquivo',

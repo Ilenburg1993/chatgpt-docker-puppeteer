@@ -386,7 +386,7 @@ export function createDeltaCallback(state) {
             });
             println(SEPARATOR);
             println(
-                `  ${terminalThemeText('muted', `[${tsNow}]`)}  🧠  ${terminalThemeText('success', 'LLM-B')}  ${terminalThemeText('muted', '·')}  ${terminalThemeText('info', state.model)}  ${terminalThemeText('muted', '·')}  ${terminalThemeText('thinking', state.effort)}`,
+                `  ${terminalThemeText('muted', `[${tsNow}]`)}  🧠  ${terminalThemeText('assistant', 'LLM-B')}  ${terminalThemeText('muted', '·')}  ${terminalThemeText('assistant', state.model)}  ${terminalThemeText('muted', '·')}  ${terminalThemeText('thinking', state.effort)}`,
             );
             println('');
         }

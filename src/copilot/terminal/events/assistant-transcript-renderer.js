@@ -107,11 +107,11 @@ export function renderTerminalAssistantTranscript(input) {
 
     const lines = [
         SEPARATOR,
-        `  ${terminalThemeBadge(badgeRole, 'LLM-B')} ${terminalThemeText('success', title)} ${terminalThemeText('muted', `· ${source}`)}${detail}`,
+        `  ${terminalThemeBadge(badgeRole, 'LLM-B')} ${terminalThemeText('assistant', title)} ${terminalThemeText('muted', `· ${source}`)}${detail}`,
         '',
     ];
     for (const line of content.split('\n')) {
-        lines.push(`  ${terminalThemeText('success', '│')}  ${line}`);
+        lines.push(`  ${terminalThemeText('assistant', '│')}  ${line}`);
     }
     if (input.truncated) {
         lines.push('', `  ${terminalThemeText('warn', '… conteúdo preservado parcialmente em memória; veja o archive do transcript')}`);

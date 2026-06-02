@@ -268,7 +268,7 @@ export async function cmdModel({ println }, arg) {
  *
  * - Sem argumento: exibe o nível atual.
  * - `<level>`: troca para `low`, `medium`, `high` ou `xhigh`.
- * - `off` / `none`: desativa raciocínio extendido (undefined).
+ * - `off` / `none`: desativa raciocínio estendido (undefined).
  *
  * @param {ConfigContext} ctx
  * @param {string} [arg] - Argumento fornecido pelo usuário
@@ -279,7 +279,7 @@ export function cmdReasoning({ println }, arg) {
     const { currentReasoningEffort: current } = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
 
     if (!cleanArg || cleanArg.trim() === '') {
-        println(`\n  🧠  Reasoning effort: \x1b[36m${current}\x1b[0m`);
+        println(`\n  🧠  Nível de raciocínio: \x1b[36m${current}\x1b[0m`);
         println(`  \x1b[90mUso: /reasoning low | medium | high | xhigh | off\x1b[0m\n`);
         return;
     }
@@ -288,12 +288,12 @@ export function cmdReasoning({ println }, arg) {
 
     if (trimmed === 'off' || trimmed === 'none') {
         callWithRuntimeTarget(setTerminalReasoningProjection, runtimeId, undefined);
-        println(`\n  🧠  Raciocínio extendido \x1b[33mdesativado\x1b[0m (modelo decide autonomamente)\n`);
+        println(`\n  🧠  Raciocínio estendido \x1b[33mdesativado\x1b[0m (modelo decide autonomamente)\n`);
         return;
     }
 
     if (!VALID_EFFORTS.includes(/** @type {ReasoningEffort} */ (trimmed))) {
-        println(`\n  \x1b[31m[erro]\x1b[0m Nível inválido: "${trimmed}". Use: ${VALID_EFFORTS.join(' | ')} | off\n`);
+        println(`\n  \x1b[31m[erro]\x1b[0m Nível de raciocínio inválido: "${trimmed}". Use: ${VALID_EFFORTS.join(' | ')} | off\n`);
         return;
     }
 
@@ -302,6 +302,6 @@ export function cmdReasoning({ println }, arg) {
         runtimeId,
         /** @type {ReasoningEffort} */ (trimmed),
     );
-    println(`\n  🧠  Reasoning trocado: \x1b[90m${previous}\x1b[0m → \x1b[36m${trimmed}\x1b[0m`);
+    println(`\n  🧠  Raciocínio alterado: \x1b[90m${previous}\x1b[0m → \x1b[36m${trimmed}\x1b[0m`);
     println('  \x1b[90mEfetivo no próximo turno.\x1b[0m\n');
 }

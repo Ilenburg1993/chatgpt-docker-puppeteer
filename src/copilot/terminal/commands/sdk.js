@@ -108,7 +108,7 @@ function renderHumanSdkWaitCounts(waits) {
         pluralPt(waits.forms, 'formulário', 'formulários'),
         pluralPt(waits.permissions, 'permissão', 'permissões'),
         pluralPt(waits.questions, 'pergunta', 'perguntas'),
-        pluralPt(waits.inputs, 'input estruturado', 'inputs estruturados'),
+        pluralPt(waits.inputs, 'pergunta estruturada', 'perguntas estruturadas'),
     ].join(' · ');
 }
 
@@ -722,7 +722,7 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
     );
     println(
         detail
-            ? `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · request_user_input=${structuredInputPending}\x1b[0m`
+            ? `  detalhe  \x1b[90mformulários ${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permissões ${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · perguntas SDK ${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · perguntas estruturadas ${structuredInputPending}\x1b[0m`
             : `  resumo   \x1b[90m${renderHumanSdkWaitCounts({
                   forms: pendingElicitations.pending,
                   permissions: permissionSummary.pending,
@@ -742,25 +742,25 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
         const latest = userInputSummary.latest;
         if (latest) {
             const choices = latest.choices.length > 0 ? ` · opções ${latest.choices.join(' | ')}` : '';
-            const freeform = latest.allowFreeform ? 'livre' : 'selecao obrigatoria';
+            const freeform = latest.allowFreeform ? 'livre' : 'seleção obrigatória';
             println(`  pergunta \x1b[90m${formatAge(latest.createdAt)} - ${latest.kind} - ${freeform}${choices}\x1b[0m`);
             if (detail) println(`  id       \x1b[90m${latest.id}\x1b[0m`);
             println(`           ${compactText(latest.question, 220)}`);
         }
     }
     if (structuredInputPending > 0) {
-        println('  acao     \x1b[90mdigite a resposta normalmente; o REPL destrava o input estruturado pendente\x1b[0m');
+        println('  acao     \x1b[90mdigite a resposta normalmente; o REPL destrava a pergunta estruturada pendente\x1b[0m');
         for (const entry of structuredInputs.slice(0, 3)) {
             const choices = entry.choices.length > 0 ? ` · opções ${entry.choices.join(' | ')}` : '';
-            const freeform = entry.allowFreeform ? 'livre' : 'selecao obrigatoria';
+            const freeform = entry.allowFreeform ? 'livre' : 'seleção obrigatória';
             println(
-                `  entrada  \x1b[90m${formatAge(entry.createdAt)} - ${freeform}${choices}\x1b[0m`,
+                `  pergunta estruturada \x1b[90m${formatAge(entry.createdAt)} - ${freeform}${choices}\x1b[0m`,
             );
             if (detail) println(`  id       \x1b[90m${entry.requestId}\x1b[0m`);
             println(`           ${compactText(entry.question, 220)}`);
         }
         if (structuredInputs.length > 3) {
-            println(`  entrada  \x1b[90m+${structuredInputs.length - 3} input(s) estruturado(s) pendente(s)\x1b[0m`);
+            println(`  pergunta estruturada \x1b[90m+${structuredInputs.length - 3} pendente(s)\x1b[0m`);
         }
     }
     if (totalPending === 0) {
@@ -845,7 +845,7 @@ function renderSdkSimulate({ println }, rest) {
     const choices = parsed.choices.length > 0 ? ` · opções ${parsed.choices.join(' | ')}` : '';
     println('\n  \x1b[36mInput humano estruturado\x1b[0m');
     println(`  status   \x1b[33maguardando operador\x1b[0m`);
-    println('  origem   \x1b[90mdiagnóstico de input estruturado\x1b[0m');
+    println('  origem   \x1b[90mdiagnóstico de pergunta estruturada\x1b[0m');
     println(`  modo     \x1b[90m${mode}${choices}\x1b[0m`);
     println(`  pergunta ${compactText(parsed.question, 220)}`);
     println('  ação     \x1b[90mdigite a resposta normalmente ou use /answer <texto>\x1b[0m');

@@ -170,7 +170,16 @@ describe('terminal commands config/errors com frontend canônico', () => {
         cmdReasoning({ println: ctx.println }, 'medium');
 
         expect(setTerminalReasoningProjection).toHaveBeenCalledWith('medium');
-        expect(ctx.output()).toContain('Reasoning trocado');
+        expect(ctx.output()).toContain('Raciocínio alterado');
+    });
+
+    it('cmdReasoning mostra rótulo cotidiano ao consultar o nível atual', () => {
+        const ctx = mockCtx();
+
+        cmdReasoning({ println: ctx.println }, '');
+
+        expect(ctx.output()).toContain('Nível de raciocínio');
+        expect(ctx.output()).not.toContain('Reasoning effort');
     });
 
     it('cmdReasoning encaminha runtimeId explícito para a mutation', () => {

@@ -247,7 +247,7 @@ function normalizeInlineStatusText(text) {
         .replace(/\b(?:toolu|call)_[a-z0-9_-]+\b/giu, 'id interno')
         .replace(/\bexec_command\b/giu, 'Executar comando')
         .replace(/\bread_file_content\b/giu, 'Ler arquivo')
-        .replace(/\breport_intent(?:_local)?\b/giu, 'Intent capturado');
+        .replace(/\breport_intent(?:_local)?\b/giu, 'Intenção capturada');
 }
 
 /**
@@ -423,13 +423,16 @@ export function buildUserPrompt() {
     }
     if (state.pendingQuestion && state.pendingQuestionKind && state.pendingQuestionKind !== 'ready') {
         pushPromptTag(
-            terminalThemeText('question', compactDetail ? '[ASK]' : `[ASK:${state.pendingQuestionKind.toUpperCase()}]`),
-            terminalThemeText('question', '[ASK]'),
+            terminalThemeText(
+                'question',
+                compactDetail ? '[PERGUNTA]' : `[PERGUNTA:${state.pendingQuestionKind.toUpperCase()}]`,
+            ),
+            terminalThemeText('question', '[PERG]'),
         );
     } else if (getTerminalPendingStructuredUserInputCount() > 0) {
         pushPromptTag(
-            terminalThemeText('question', compactDetail ? '[INPUT]' : '[REQUEST_USER_INPUT]'),
-            terminalThemeText('question', '[INPUT]'),
+            terminalThemeText('question', '[PERGUNTA]'),
+            terminalThemeText('question', '[PERG]'),
         );
     } else if (state.pendingQuestionShadowState) {
         const shadowTag =
@@ -460,12 +463,12 @@ export function buildUserPrompt() {
             terminalThemeText('warn', '[MODEL?]'),
         );
     }
-    const prompt = `${terminalThemeText('success', 'você')}${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}${tags.join('')}${terminalThemeText('muted', '›')} `;
+    const prompt = `${terminalThemeText('user', 'você')}${terminalThemeText('muted', '[')}${terminalThemeText('assistant', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}${tags.join('')}${terminalThemeText('muted', '›')} `;
     if (!process.stdout.isTTY || visibleTextLength(prompt) <= resolvePromptBudgetColumns()) {
         return prompt;
     }
     const compactModel = shortenPromptToken(modelProjection.displayModel || state.model, 10);
-    return `${terminalThemeText('success', 'você')}${terminalThemeText('muted', '[')}${terminalThemeText('info', compactModel)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}${compactTags.join('')}${terminalThemeText('muted', '›')} `;
+    return `${terminalThemeText('user', 'você')}${terminalThemeText('muted', '[')}${terminalThemeText('assistant', compactModel)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}${compactTags.join('')}${terminalThemeText('muted', '›')} `;
 }
 
 /**
@@ -487,16 +490,16 @@ export function buildWaitingPrompt() {
     const tags = [];
     if (promptPolicy.showQueueTag && runtime.queueSize > 0) tags.push(`Q:${runtime.queueSize}`);
     if (runtime.pendingQuestion && runtime.pendingQuestionKind && runtime.pendingQuestionKind !== 'ready') {
-        tags.push(`ASK:${runtime.pendingQuestionKind.toUpperCase()}`);
+        tags.push(`PERGUNTA:${runtime.pendingQuestionKind.toUpperCase()}`);
     } else if (getTerminalPendingStructuredUserInputCount() > 0) {
-        tags.push('INPUT');
+        tags.push('PERGUNTA');
     }
     if (promptPolicy.showNonCriticalShadowTag && runtime.pendingQuestionShadowState === 'expiring_soon') {
         tags.push('SHDW:SOON');
     }
     if (runtime.pendingQuestionShadowState === 'expired') tags.push('SHDW:EXP');
     const tagsStr = tags.length > 0 ? ` ${terminalThemeText('muted', `[${tags.join('|')}]`)}` : '';
-    const modelEffort = `${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}`;
+    const modelEffort = `${terminalThemeText('muted', '[')}${terminalThemeText('assistant', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}`;
     if (!promptPolicy.showWaitingActivity || compactDetail) {
         return `${terminalThemeText('thinking', 'LLM-B pensando')}${tagsStr} ${modelEffort} `;
     }

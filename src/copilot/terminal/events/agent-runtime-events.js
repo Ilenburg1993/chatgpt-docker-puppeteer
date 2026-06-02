@@ -499,7 +499,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
 
         rl?.pause();
         println(
-            `\n${terminalThemeBadge('question', compactDetail ? 'ASK' : 'QUESTION')} ${terminalThemeText('question', `LLM-B perguntou: "${questionText}"`)}`,
+            `\n${terminalThemeBadge('question', compactDetail ? 'PERGUNTA' : 'PERGUNTA AO OPERADOR')} ${terminalThemeText('question', `LLM-B perguntou: "${questionText}"`)}`,
         );
         if (choices.length > 0) {
             const maxInlineChoices = 6;

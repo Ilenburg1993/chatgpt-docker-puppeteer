@@ -103,7 +103,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         expect(prompt).toContain('[MODE:PLAN]');
     });
 
-    it('inclui marcador ASK quando há pergunta viva', async () => {
+    it('inclui marcador PERGUNTA quando há pergunta viva', async () => {
         readTerminalRuntimeState.mockReturnValueOnce(
             /** @type {any} */ ({
                 ...readTerminalRuntimeState(),
@@ -114,10 +114,10 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         const { buildUserPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
         const prompt = buildUserPrompt();
 
-        expect(prompt).toContain('[ASK:QUESTION]');
+        expect(prompt).toContain('[PERGUNTA:QUESTION]');
     });
 
-    it('não mostra READY como ASK no prompt normal', async () => {
+    it('não mostra READY como pergunta no prompt normal', async () => {
         readTerminalRuntimeState.mockReturnValueOnce(
             /** @type {any} */ ({
                 ...readTerminalRuntimeState(),
@@ -128,19 +128,19 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         const { buildUserPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
         const prompt = buildUserPrompt();
 
-        expect(prompt).not.toContain('[ASK:READY]');
+        expect(prompt).not.toContain('[PERGUNTA:READY]');
         expect(prompt).toContain('gpt-5-mini');
         expect(prompt).toContain('high');
     });
 
-    it('inclui marcador INPUT quando há request_user_input pendente sem ask_user vivo', async () => {
+    it('inclui marcador PERGUNTA quando há request_user_input pendente sem ask_user vivo', async () => {
         getTerminalPendingStructuredUserInputCount.mockReturnValue(1);
         const { buildUserPrompt, buildWaitingPrompt } = await import(
             '../../../../src/copilot/terminal/dialog/output.js'
         );
 
-        expect(buildUserPrompt()).toContain('[REQUEST_USER_INPUT]');
-        expect(buildWaitingPrompt()).toContain('[INPUT]');
+        expect(buildUserPrompt()).toContain('[PERGUNTA]');
+        expect(buildWaitingPrompt()).toContain('[PERGUNTA]');
     });
 
     it('mantém o modelo ativo como identidade do prompt e sinaliza mismatch observado', async () => {
@@ -292,10 +292,10 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         const { buildUserPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
         const prompt = buildUserPrompt();
 
-        expect(prompt).toContain('[ASK]');
+        expect(prompt).toContain('[PERGUNTA]');
         expect(prompt).toContain('[MODEL?]');
         expect(prompt).toContain('[Q:3]');
-        expect(prompt).not.toContain('[ASK:QUESTION]');
+        expect(prompt).not.toContain('[PERGUNTA:QUESTION]');
         expect(prompt).not.toContain('[MODEL-CHECK:gpt-5.4→claude-haiku-4.5]');
 
         prefs.setTerminalDetailLevel('detailed');
@@ -346,7 +346,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
             const prompt = buildUserPrompt();
             const plain = stripAnsiEscapes(prompt);
 
-            expect(plain).toContain('[ASK]');
+            expect(plain).toContain('[PERG]');
             expect(plain).toContain('[MODEL?]');
             expect(plain).not.toContain('[MODEL-CHECK:gpt-5.4→claude-haiku-4.5]');
             expect(plain.length).toBeLessThanOrEqual(34);

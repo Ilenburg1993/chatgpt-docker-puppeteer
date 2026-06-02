@@ -12,7 +12,7 @@ import {
 describe('terminal/tool-activity-presenter', () => {
     it('expõe helpers canônicos para diagnósticos humanos sem duplicar glossário', () => {
         expect(getTerminalHumanToolName('read_file_content')).toBe('Ler arquivo');
-        expect(getTerminalHumanToolName('report_intent_local')).toBe('Intent capturado');
+        expect(getTerminalHumanToolName('report_intent_local')).toBe('Intenção capturada');
         expect(getTerminalHumanToolName('tool.fast')).toBe('tool.fast');
         expect(isTerminalInternalCallIdentifier('chatcmpl-tool-80d5a00b25801fef')).toBe(true);
         expect(compactTerminalDiagnosticId('chatcmpl-tool-80d5a00b25801fef')).toBe('chatcmpl-too…');
@@ -108,7 +108,7 @@ describe('terminal/tool-activity-presenter', () => {
         expect(workspace.detail).toContain('inspecionando contexto');
         expect(telemetry.operation).toBe('inspect');
         expect(intent.canonicalToolName).toBe('report_intent_local');
-        expect(intent.displayToolName).toBe('Intent capturado');
+        expect(intent.displayToolName).toBe('Intenção capturada');
         expect(intent.operation).toBe('intent');
     });
 
@@ -119,7 +119,7 @@ describe('terminal/tool-activity-presenter', () => {
             toolCallId: 'toolu_bdrk_019v9X862pjamNysAemC1UAW',
         });
 
-        expect(presentation.displayToolName).toBe('Intent capturado');
+        expect(presentation.displayToolName).toBe('Intenção capturada');
         expect(presentation.target).toBe('validar estética do terminal');
         expect(presentation.detail).toContain('validar estética do terminal');
         expect(presentation.detail).not.toContain('toolu_bdrk');

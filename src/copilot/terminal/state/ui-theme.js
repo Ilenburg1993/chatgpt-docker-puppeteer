@@ -12,6 +12,9 @@
  * @typedef {'info'
  *     | 'accent'
  *     | 'muted'
+ *     | 'assistant'
+ *     | 'user'
+ *     | 'system'
  *     | 'success'
  *     | 'warn'
  *     | 'error'
@@ -43,24 +46,27 @@ const TERMINAL_THEME_PROFILES = Object.freeze({
     elegant: {
         name: 'elegant',
         label: 'Elegant',
-        description: 'Paleta sóbria e equilibrada para uso contínuo.',
+        description: 'Paleta sóbria, com papéis visuais separados para LLM-B, operador, raciocínio, perguntas e tools.',
         palette: {
-            info: '\x1b[36m',
-            accent: '\x1b[34m',
+            info: '\x1b[38;5;81m',
+            accent: '\x1b[38;5;75m',
             muted: '\x1b[90m',
-            success: '\x1b[32m',
-            warn: '\x1b[33m',
-            error: '\x1b[31m',
-            thinking: '\x1b[35m',
-            tool: '\x1b[36m',
-            question: '\x1b[96m',
-            fileRead: '\x1b[36m',
-            fileWrite: '\x1b[32m',
-            fileEdit: '\x1b[33m',
-            fileDelete: '\x1b[31m',
-            index: '\x1b[33m',
+            assistant: '\x1b[38;5;81m',
+            user: '\x1b[38;5;114m',
+            system: '\x1b[38;5;147m',
+            success: '\x1b[38;5;114m',
+            warn: '\x1b[38;5;214m',
+            error: '\x1b[38;5;203m',
+            thinking: '\x1b[38;5;177m',
+            tool: '\x1b[38;5;75m',
+            question: '\x1b[38;5;222m',
+            fileRead: '\x1b[38;5;110m',
+            fileWrite: '\x1b[38;5;114m',
+            fileEdit: '\x1b[38;5;214m',
+            fileDelete: '\x1b[38;5;203m',
+            index: '\x1b[38;5;186m',
             command: '\x1b[2m',
-            hot: '\x1b[31m',
+            hot: '\x1b[38;5;203m',
         },
     },
     vivid: {
@@ -71,6 +77,9 @@ const TERMINAL_THEME_PROFILES = Object.freeze({
             info: '\x1b[96m',
             accent: '\x1b[94m',
             muted: '\x1b[37m',
+            assistant: '\x1b[96m',
+            user: '\x1b[92m',
+            system: '\x1b[95m',
             success: '\x1b[92m',
             warn: '\x1b[93m',
             error: '\x1b[91m',
@@ -94,6 +103,9 @@ const TERMINAL_THEME_PROFILES = Object.freeze({
             info: '',
             accent: '',
             muted: '',
+            assistant: '',
+            user: '',
+            system: '',
             success: '',
             warn: '',
             error: '',

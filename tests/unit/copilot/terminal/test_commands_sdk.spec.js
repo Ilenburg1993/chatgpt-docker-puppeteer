@@ -368,14 +368,15 @@ describe('terminal/commands/sdk', () => {
         const ctx = mockCtx();
         await cmdSdk({ println: ctx.println }, 'waits');
 
-        expect(ctx.output()).toContain('1 input estruturado');
+        expect(ctx.output()).toContain('1 pergunta estruturada');
         expect(ctx.output()).not.toContain('request-user-input-test-1');
         expect(ctx.output()).toContain('opções seguir | pausar');
         expect(ctx.output()).toContain('Escolha a estrategia');
 
         const detail = mockCtx();
         await cmdSdk({ println: detail.println }, 'waits detail');
-        expect(detail.output()).toContain('request_user_input=1');
+        expect(detail.output()).toContain('perguntas estruturadas 1');
+        expect(detail.output()).not.toContain('request_user_input=1');
         expect(detail.output()).toContain('request-user-input-test-1');
     });
 
@@ -391,7 +392,7 @@ describe('terminal/commands/sdk', () => {
             }),
         );
         expect(ctx.output()).toContain('Input humano estruturado');
-        expect(ctx.output()).toContain('diagnóstico de input estruturado');
+        expect(ctx.output()).toContain('diagnóstico de pergunta estruturada');
         expect(ctx.output()).toContain('aguardando operador');
         expect(ctx.output()).toContain('Continuar teste visual?');
         expect(ctx.output()).toContain('/sdk waits detail');

@@ -143,7 +143,7 @@ describe('commands/tools', () => {
         cmdTools({ println: defaultCtx.println });
 
         expect(defaultCtx.output()).toContain('Ler arquivo');
-        expect(defaultCtx.output()).toContain('Intent capturado');
+        expect(defaultCtx.output()).toContain('Intenção capturada');
         expect(defaultCtx.output()).not.toContain('read_file_content');
         expect(defaultCtx.output()).not.toContain('report_intent_local');
         expect(defaultCtx.output()).toContain('Detalhes técnicos: /tools diag');
@@ -278,13 +278,16 @@ describe('commands/tools', () => {
 
         const output = ctx.output();
         expect(output).toContain('Lifecycle recente');
-        expect(output).toContain('active=1');
+        expect(output).toContain('ativas 1');
         expect(output).toContain('Ler arquivo');
-        expect(output).toContain('tool=read_file_content');
-        expect(output).toContain('call=call-1234567…');
-        expect(output).toContain('req=req-12345678…');
-        expect(output).toContain('Intent capturado');
-        expect(output).toContain('tool=report_intent_local');
-        expect(output).toContain('completed');
+        expect(output).toContain('técnico read_file_content');
+        expect(output).toContain('chamada call-1234567…');
+        expect(output).toContain('requisição req-12345678…');
+        expect(output).toContain('Intenção capturada');
+        expect(output).toContain('técnico report_intent_local');
+        expect(output).toContain('concluída');
+        expect(output).not.toContain('active=');
+        expect(output).not.toContain('tool=report_intent_local');
+        expect(output).not.toContain('call=call-1234567');
     });
 });
