@@ -173,6 +173,29 @@ export function buildTerminalAutoBrief(input = {}) {
             projection.toolLoad.hasCanonicalLocalExecTools ? 'exec' : null,
             projection.toolLoad.toolContract.ok ? null : `${projection.toolLoad.toolContract.errorCount} contrato`,
         ].filter(Boolean);
+        if (phase === 'boot') {
+            const byokBits = byok.enabled
+                ? [
+                      byok.ready ? 'BYOK pronto' : 'BYOK incompleto',
+                      byok.model ?? null,
+                      renderAutoBriefAuthLabel(byok.auth),
+                  ].filter(Boolean)
+                : [];
+            lines.push(
+                briefLine(
+                    'Boot',
+                    [
+                        `${model}/${reasoning}`,
+                        displayPreset,
+                        toolBits.join(' · ') || 'ferramentas subindo',
+                        ...byokBits,
+                    ].join(' · '),
+                ),
+            );
+            lines.push(briefLine('Próximo', guidance.nextCommand ?? '/status'));
+            if (visibleWarnings.length > 0) lines.push(briefLine('Atenção', visibleWarnings.join(' | ')));
+            return { phase, ready, fingerprint: buildAutoBriefFingerprint(projection), lines };
+        }
         lines.push(
             briefLine('Sessão', `${model}/${reasoning} · ${sessionTag} · ${displayPreset} · ${toolBits.join(' · ') || 'ferramentas subindo'}`),
         );

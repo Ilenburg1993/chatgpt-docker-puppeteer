@@ -37,20 +37,14 @@ export function buildTerminalStandaloneBannerView(opts, deps = {}) {
     /** @type {string[]} */
     const lines = [
         '',
-        `  Ambiente ${modeLine}`,
-        `  Acesso    ${opts.serverUrl} · /inject · /events · /sessions`,
-        '  Sessão    SDK auto-resume · /session sdk',
-        '',
+        `  Ambiente ${modeLine} · ${opts.serverUrl}`,
+        '  Ações     /tools · /health · /session sdk · /events',
     ];
 
-    if (isStandalone) {
-        lines.push('  Ações     ferramentas locais ativas · detalhes em /tools ou /health');
-        lines.push('');
-    }
     if (warnings.length > 0) {
         lines.push(`  Atenção  Preflight SDK: ${warnings[0]}`);
-        lines.push('');
     }
+    lines.push('');
 
     return {
         lines,

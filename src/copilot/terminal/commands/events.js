@@ -6,7 +6,13 @@
  */
 
 import { listTerminalPublicStreamSourcePolicies } from '../events/index.js';
-import { formatTerminalIsoTimestamp, readTerminalSseEventArchiveTail } from '../state/index.js';
+import {
+    formatTerminalIsoTimestamp,
+    readTerminalSseEventArchiveTail,
+    terminalThemeHeadline,
+    terminalThemeRow,
+    terminalThemeText,
+} from '../state/index.js';
 import { compactTerminalDiagnosticId, getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
 
 /**
@@ -135,6 +141,18 @@ function parseSourcesLimit(arg) {
 }
 
 /**
+ * @param {string} arg
+ * @returns {boolean}
+ */
+function isEventsSourcesDetailArg(arg) {
+    return arg
+        .trim()
+        .split(/\s+/u)
+        .filter(Boolean)
+        .some((token) => token === 'detail' || token === 'full' || token === '--detail' || token === '--full');
+}
+
+/**
  * @param {{ canonicalEmitter: string; publicEvents: string[] }} policy
  * @returns {string}
  */
@@ -143,6 +161,33 @@ function buildPolicyQueryHints(policy) {
     const eventHint = event ? `/events ${event} 50` : null;
     const sourceHint = policy.canonicalEmitter ? `/events source ${policy.canonicalEmitter} 50` : null;
     return [eventHint, sourceHint].filter(Boolean).join(' · ');
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function humanPolicyOwner(value) {
+    const lower = value.toLowerCase();
+    if (lower.includes('turn-display')) return 'streaming da resposta';
+    if (lower.includes('sdk') && lower.includes('user')) return 'pergunta humana SDK';
+    if (lower.includes('sdk') && lower.includes('assistant')) return 'mensagens da LLM-B';
+    if (lower.includes('agent') && lower.includes('background')) return 'tarefas em segundo plano';
+    if (lower.includes('quota')) return 'quota e limites';
+    if (lower.includes('byok')) return 'model-gateway/BYOK';
+    if (lower.includes('terminal')) return 'terminal';
+    if (lower.includes('dialog')) return 'conversa';
+    return value.replace(/[._/-]+/gu, ' ');
+}
+
+/**
+ * @param {{ canonicalEmitter: string; owner: string }} policy
+ * @returns {string}
+ */
+function humanPolicyOwnerSummary(policy) {
+    const owner = humanPolicyOwner(policy.owner);
+    const emitter = humanEventSource(policy.canonicalEmitter);
+    return owner === emitter ? owner : `${owner} · ${emitter}`;
 }
 
 /**
@@ -171,6 +216,17 @@ function humanEventLabel(event) {
     if (event === 'session.model_changed') return 'Modelo alterado';
     if (event === 'session.skills_loaded') return 'Skills carregadas';
     if (event === 'session.info') return 'Info da sessão';
+    if (event === 'session.error') return 'Erro da sessão';
+    if (event === 'byok.provider.config') return 'Configuração BYOK';
+    if (event === 'dialog.ready') return 'Conversa pronta';
+    if (event === 'dialog.stopped') return 'Conversa parada';
+    if (event === 'terminal.runtime.wire_failed') return 'Runtime falhou';
+    if (event === 'skills.reloaded') return 'Skills recarregadas';
+    if (event === 'elicitation.pending') return 'Formulário pendente';
+    if (event === 'elicitation.completed') return 'Formulário concluído';
+    if (event === 'permission.requested') return 'Permissão solicitada';
+    if (event === 'permission.completed') return 'Permissão concluída';
+    if (event === 'permission.mode_changed') return 'Permissões alteradas';
     if (event === 'agent.background.completed') return 'Tarefa em segundo plano concluída';
     if (event === 'agent.background.idle') return 'Tarefa em segundo plano ociosa';
     if (event === 'question.answered') return 'Resposta do operador';
@@ -210,7 +266,7 @@ function humanEventSource(source) {
     const text = normalizeEventSummaryText(source ?? '');
     const lower = text.toLowerCase();
     if (!text) return '-';
-    if (lower.startsWith('sdk/user_input')) return 'SDK ask_user';
+    if (lower.startsWith('sdk/user_input')) return 'pergunta humana SDK';
     if (lower.startsWith('sdk/assistant')) return 'SDK assistant';
     if (lower.startsWith('agent/background')) return 'tarefa em segundo plano';
     if (lower.startsWith('agent/llm')) return 'agente/usage';
@@ -265,13 +321,13 @@ function buildTranscriptExportHint(entry) {
     /** @type {string | null} */
     let transcript = null;
     if (entry.event === 'assistant.message') transcript = 'LLM-B';
-    if (entry.event === 'user_input.requested') transcript = 'Sistema/ask_user';
-    if (entry.event === 'user_input.completed') transcript = 'Usuário/ask_user';
+    if (entry.event === 'user_input.requested') transcript = 'Sistema/pergunta humana';
+    if (entry.event === 'user_input.completed') transcript = 'Operador/pergunta humana';
     if (!transcript) return null;
     const source = entry.eventSource ?? entry.source ?? entry.event;
-    const trace = entry.traceId ? ` trace=${entry.traceId}` : '';
-    const turn = entry.turnId ? ` turn=${entry.turnId}` : '';
-    return `transcript ${transcript} · export envelope:${source}${trace}${turn}`;
+    const trace = entry.traceId ? ` · rastreamento ${compactTerminalDiagnosticId(entry.traceId, 18)}` : '';
+    const turn = entry.turnId ? ` · turno ${compactTerminalDiagnosticId(entry.turnId, 18)}` : '';
+    return `transcript ${transcript} · export envelope ${humanEventSource(source)}${trace}${turn}`;
 }
 
 /**
@@ -283,6 +339,7 @@ export async function cmdEvents({ println }, arg = '') {
     if (isEventsSourcesArg(arg)) {
         const policies = listTerminalPublicStreamSourcePolicies();
         const limit = parseSourcesLimit(arg);
+        const detailMode = isEventsSourcesDetailArg(arg);
         const projection = await readTerminalSseEventArchiveTail({
             limit,
             event: null,
@@ -297,20 +354,39 @@ export async function cmdEvents({ println }, arg = '') {
         for (const entry of projection.entries) {
             counts.set(entry.event, (counts.get(entry.event) ?? 0) + 1);
         }
-        println('\n  \x1b[36m🧭 Fontes canônicas do terminal\x1b[0m');
+        println('');
+        println(terminalThemeHeadline('accent', detailMode ? 'Fontes do Terminal - Detalhe' : 'Fontes do Terminal'));
         println(
-            `  \x1b[90mjanela últimos ${projection.filters.limit} eventos · arquivo ${projection.state.path ?? '(sem arquivo)'}\x1b[0m`,
+            terminalThemeRow(
+                'Janela',
+                `${projection.filters.limit} eventos recentes · arquivo ${projection.state.path ?? '(sem arquivo)'}`,
+                { role: 'muted' },
+            ),
         );
+        if (!detailMode) {
+            println(terminalThemeRow('Detalhe', '/events sources detail', { role: 'command' }));
+        }
         for (const policy of policies) {
             const policyCount = policy.publicEvents.reduce((sum, event) => sum + (counts.get(event) ?? 0), 0);
-            println(`  \x1b[33m${policy.id}\x1b[0m \x1b[90m(${policy.class})\x1b[0m`);
-            println(`    dono        \x1b[90m${policy.owner}\x1b[0m`);
-            println(`    emissor     \x1b[90m${policy.canonicalEmitter}\x1b[0m`);
-            println(`    eventos     \x1b[90m${policy.publicEvents.join(', ')} · recentes ${policyCount}\x1b[0m`);
-            println(`    investigar  \x1b[90m${buildPolicyQueryHints(policy)}\x1b[0m`);
-            println(`    aceita      \x1b[90m${policy.accepts.join(', ')}\x1b[0m`);
-            println(`    suprime     \x1b[90m${policy.suppresses.join(', ')}\x1b[0m`);
-            println(`    fallback    \x1b[90m${policy.fallback}\x1b[0m`);
+            const events = policy.publicEvents.map(humanEventLabel).join(', ');
+            const title = detailMode ? policy.id : policy.publicEvents.map(humanEventLabel).slice(0, 2).join(' + ');
+            println(terminalThemeText('accent', `  ${title || policy.id}`));
+            println(terminalThemeRow('Responsável', humanPolicyOwnerSummary(policy), { role: 'muted' }));
+            println(
+                terminalThemeRow('Eventos', `${events} · ${policyCount} recentes`, {
+                    role: policyCount > 0 ? 'info' : 'muted',
+                }),
+            );
+            println(terminalThemeRow('Investigar', buildPolicyQueryHints(policy) || '/events 50', { role: 'command' }));
+            if (detailMode) {
+                println(terminalThemeRow('ID', policy.id, { role: 'muted' }));
+                println(terminalThemeRow('Classe', policy.class, { role: 'muted' }));
+                println(terminalThemeRow('Dono técnico', policy.owner, { role: 'muted' }));
+                println(terminalThemeRow('Emissor', policy.canonicalEmitter, { role: 'muted' }));
+                println(terminalThemeRow('Aceita', policy.accepts.join(', ') || '-', { role: 'muted' }));
+                println(terminalThemeRow('Suprime', policy.suppresses.join(', ') || '-', { role: 'muted' }));
+                println(terminalThemeRow('Fallback', policy.fallback, { role: 'muted' }));
+            }
         }
         println('');
         return;
@@ -331,7 +407,7 @@ export async function cmdEvents({ println }, arg = '') {
 
     const filterParts = [
         filters.event ? `evento ${filters.event}` : null,
-        filters.traceId ? `trace ${filters.traceId}` : null,
+        filters.traceId ? `rastreamento ${filters.traceId}` : null,
         filters.turnId ? `turno ${filters.turnId}` : null,
         filters.source ? `fonte ${filters.source}` : null,
         filters.toolCallId ? `tool ${filters.toolCallId}` : null,
@@ -339,26 +415,31 @@ export async function cmdEvents({ println }, arg = '') {
         filters.hubSessionId ? `hub ${filters.hubSessionId}` : null,
     ].filter(Boolean);
 
-    println(`\n  \x1b[36m🧾 Eventos SSE — visão resumida · últimas ${filters.limit}\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('accent', `Eventos SSE - últimas ${filters.limit}`));
     println(
-        `  \x1b[90marquivo ${compact(state.path ?? '(sem arquivo)', 88)} · ${state.events} evento(s) · fila ${state.queueDepth} · filtro ${filterParts.join(' ') || 'nenhum'}\x1b[0m`,
+        terminalThemeRow(
+            'Archive',
+            `${compact(state.path ?? '(sem arquivo)', 88)} · ${state.events} evento(s) · fila ${state.queueDepth}`,
+            { role: 'muted' },
+        ),
     );
-    println(
-        '  \x1b[90mUse /events --raw para JSONL bruto, /events --json para automação, /events sources para mapa de fontes.\x1b[0m',
-    );
+    println(terminalThemeRow('Filtro', filterParts.join(' · ') || 'nenhum', { role: 'muted' }));
+    println(terminalThemeRow('Detalhe', '/events --raw · /events --json · /events sources', { role: 'command' }));
     if (state.error) {
-        println(`  \x1b[31merro ${state.error}\x1b[0m`);
+        println(terminalThemeRow('Erro', state.error, { role: 'error' }));
     }
     if (entries.length === 0) {
-        println('  \x1b[33mNenhum evento encontrado no archive SSE.\x1b[0m\n');
+        println(terminalThemeRow('Resultado', 'Nenhum evento encontrado no archive SSE.', { role: 'warn' }));
+        println('');
         return;
     }
 
     for (const entry of entries) {
         const time = formatTerminalIsoTimestamp(entry.timestamp);
         const origin = compact(humanEventSource(entry.eventSource ?? entry.source ?? '-'), 52);
-        const trace = entry.traceId ? ` · trace ${entry.traceId}` : '';
-        const turn = entry.turnId ? ` · turno ${entry.turnId}` : '';
+        const trace = entry.traceId ? ` · rastreamento ${compactTerminalDiagnosticId(entry.traceId, 18)}` : '';
+        const turn = entry.turnId ? ` · turno ${compactTerminalDiagnosticId(entry.turnId, 18)}` : '';
         const hub = entry.hubSessionId ? ` · hub ${compactTerminalDiagnosticId(entry.hubSessionId, 14)}` : '';
         const summary = summarizePayload(entry.payload ?? {}, {
             showIds: Boolean(filters.toolCallId || filters.requestId || filters.hubSessionId),
@@ -366,7 +447,7 @@ export async function cmdEvents({ println }, arg = '') {
         const transcriptHint = buildTranscriptExportHint(entry);
         const detail = [summary, transcriptHint].filter(Boolean).join(' · ');
         println(
-            `    \x1b[90m${time}\x1b[0m  #${entry.eventId} \x1b[33m${humanEventLabel(entry.event)}\x1b[0m  \x1b[90m${origin}${trace}${turn}${hub}\x1b[0m${detail ? ` — ${detail}` : ''}`,
+            `  ${terminalThemeText('muted', time)}  #${entry.eventId} ${terminalThemeText('accent', humanEventLabel(entry.event))}  ${terminalThemeText('muted', `${origin}${trace}${turn}${hub}`)}${detail ? ` - ${detail}` : ''}`,
         );
     }
     println('');

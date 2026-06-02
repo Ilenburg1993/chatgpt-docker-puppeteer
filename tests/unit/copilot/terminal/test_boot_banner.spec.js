@@ -25,14 +25,14 @@ describe('terminal/terminal-phases/boot-banner', () => {
         );
         assert.equal(
             view.lines.some((line) => line.includes('Ações') && line.includes('ferramentas locais ativas')),
-            true,
-        );
-        assert.equal(
-            view.lines.some((line) => line.includes('Sessão') && line.includes('SDK auto-resume')),
-            true,
+            false,
         );
         assert.equal(
             view.lines.some((line) => line.includes('/session sdk')),
+            true,
+        );
+        assert.equal(
+            view.lines.some((line) => line.includes('Ações') && line.includes('/tools') && line.includes('/events')),
             true,
         );
         assert.equal(

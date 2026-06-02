@@ -43,6 +43,11 @@ const readTerminalSseEventArchiveTail = vi.fn(async () => ({
 vi.mock('../../../../src/copilot/terminal/state/index.js', () => ({
     formatTerminalIsoTimestamp: vi.fn((/** @type {unknown} */ value) => new Date(Number(value)).toISOString()),
     readTerminalSseEventArchiveTail,
+    terminalThemeHeadline: vi.fn((/** @type {string} */ _role, /** @type {string} */ title) => `  ${title}`),
+    terminalThemeRow: vi.fn(
+        (/** @type {string} */ label, /** @type {string} */ value) => `  ${label.padEnd(12)} ${value}`,
+    ),
+    terminalThemeText: vi.fn((/** @type {string} */ _role, /** @type {string} */ text) => text),
 }));
 
 const { cmdEvents } = await import('../../../../src/copilot/terminal/commands/events.js');
@@ -63,15 +68,27 @@ describe('terminal/commands/events', () => {
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith(
             expect.objectContaining({ limit: 50, event: null, source: null }),
         );
-        expect(ctx.output()).toContain('Fontes canônicas do terminal');
-        expect(ctx.output()).toContain('janela últimos 5 eventos');
-        expect(ctx.output()).toContain('assistant.text.delta');
-        expect(ctx.output()).toContain('recentes 1');
+        expect(ctx.output()).toContain('Fontes do Terminal');
+        expect(ctx.output()).toContain('5 eventos recentes');
+        expect(ctx.output()).toContain('Streaming');
+        expect(ctx.output()).toContain('1 recentes');
         expect(ctx.output()).toContain('/events delta 50');
         expect(ctx.output()).toContain('/events source terminal/dialog/turn-display.createDeltaCallback 50');
+        expect(ctx.output()).toContain('Pergunta ao operador');
+        expect(ctx.output()).toContain('Configuração BYOK');
+        expect(ctx.output()).toContain('/events sources detail');
+        expect(ctx.output()).not.toContain('task.delta only when dialog loop is inactive');
+        expect(ctx.output()).not.toContain('COPILOT_BYOK_* resolved into SDK provider');
+    });
+
+    it('preserva mapa técnico de fontes no modo detail', async () => {
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, 'sources detail 50');
+
+        expect(ctx.output()).toContain('Fontes do Terminal - Detalhe');
+        expect(ctx.output()).toContain('assistant.text.delta');
         expect(ctx.output()).toContain('task.delta only when dialog loop is inactive');
-        expect(ctx.output()).toContain('ask_user.visible-question');
-        expect(ctx.output()).toContain('byok.provider.config');
         expect(ctx.output()).toContain('COPILOT_BYOK_* resolved into SDK provider');
         expect(ctx.output()).toContain('/byok env · /byok profiles · /byok models refresh · /status');
     });
@@ -103,7 +120,7 @@ describe('terminal/commands/events', () => {
             expect.objectContaining({ limit: 5, event: 'delta', traceId: 'turn:abc' }),
         );
         expect(ctx.output()).toContain('Eventos SSE');
-        expect(ctx.output()).toContain('visão resumida');
+        expect(ctx.output()).toContain('últimas 5');
         expect(ctx.output()).toContain('/events --raw');
         expect(ctx.output()).toContain('#42');
         expect(ctx.output()).toContain('Streaming');
@@ -402,13 +419,15 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('Mensagem da LLM-B');
         expect(ctx.output()).toContain('Pergunta ao operador');
         expect(ctx.output()).toContain('Resposta do operador');
-        expect(ctx.output()).toContain('transcript LLM-B · export envelope:sdk/assistant.message trace=turn:1 turn=1');
+        expect(ctx.output()).toContain('transcript LLM-B · export envelope SDK assistant · rastreamento turn:1 · turno 1');
         expect(ctx.output()).toContain(
-            'transcript Sistema/ask_user · export envelope:sdk/user_input.requested trace=turn:1 turn=1',
+            'transcript Sistema/pergunta humana · export envelope pergunta humana SDK · rastreamento turn:1 · turno 1',
         );
         expect(ctx.output()).toContain(
-            'transcript Usuário/ask_user · export envelope:sdk/user_input.completed trace=turn:1 turn=1',
+            'transcript Operador/pergunta humana · export envelope pergunta humana SDK · rastreamento turn:1 · turno 1',
         );
+        expect(ctx.output()).not.toContain('ask_user');
+        expect(ctx.output()).not.toContain('trace=');
     });
 
     it('normaliza quebras internas no resumo humano sem afetar raw/json', async () => {

@@ -2541,4 +2541,47 @@
 - [x] Achado da live corrigido: `/tools` vazio trocou rótulo `Tools` por `Ferramentas`.
 - [x] Teste escopado pós-achado passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js`.
-- [ ] Committar/pushar esta grande leva visual e continuar para a próxima camada de UX.
+- [x] Committar/pushar esta grande leva visual e continuar para a próxima camada de UX.
+
+### 11.30 Boot condensado e transição visual boot -> ready
+
+- [x] Achado visual depois da primeira grande leva: a tela inicial ainda tinha densidade acima do ideal porque o banner compacto, o bloco de ambiente e o auto-brief de boot narravam estado sobreposto.
+- [x] Decisão canônica: boot default deve responder apenas três perguntas:
+  - onde estou;
+  - quais ações principais existem;
+  - qual é o próximo comando útil.
+- [x] `terminal-phases/boot-banner.js` condensou o bloco de ambiente para duas linhas úteis:
+  - `Ambiente ... <url>`;
+  - `Ações /tools /health /session sdk /events`.
+- [x] `auto-brief.js` passou a usar forma especial compacta durante `phase=boot`, com `Boot`, `Próximo` e `Atenção`, evitando repetir `Sessão`, `BYOK`, `Fluxo` e `Boot parcial` antes do registry estar pronto.
+- [x] O modo detalhado continua opt-in por `COPILOT_TERMINAL_AUTO_BRIEF=full`.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_auto_brief.spec.js tests/unit/copilot/terminal/test_boot_banner.spec.js tests/unit/copilot/terminal/test_repl_banner.spec.js`.
+- [x] Live PTY curta passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=60000 --transport=pty --out-dir=artifacts/terminal-live/ux-boot-brief-condensed-20260602-1823`.
+- [x] Resultado live: PASS; primeira tela reduziu altura e manteve `/status`, `/now`, `/health`, `/tools`, `/live`, `/activity` e `/sdk waits` humanos.
+- [ ] Próxima lacuna de alto retorno: limpar mensagens de erro/auto-recuperação do engine que ainda imprimem `action=`, `route=`, `source=` e `actor=` na superfície humana default.
+- [x] Próxima lacuna de alto retorno: limpar mensagens de erro/auto-recuperação do engine que ainda imprimem `action=`, `route=`, `source=` e `actor=` na superfície humana default.
+- [x] Próxima lacuna de alto retorno: revisar `/events` para que filtros humanos sejam a forma exibida no default, preservando `trace=`, `source=` e `tool=` apenas como compatibilidade/detail.
+
+### 11.31 Engine e `/events` sem telemetria crua no default
+
+- [x] Achado: o engine de diálogo ainda podia escrever em stdout linhas de recuperação BYOK como `action=`, `route=`, `applied=`, `skipped=`, `effects=` e `handoffs=`.
+- [x] Achado: detalhes de atividade de turno ainda usavam `actor=`, `source=`, `deltas=`, `chars=` e `assistantMessages=`, que podiam reaparecer em painéis humanos.
+- [x] Correção: `engine.js` ganhou conversão humana de ação automática e pluralização local, mantendo a decisão operacional igual e trocando a apresentação para `Seleção`, `Detalhe`, `ação`, `rota`, `efeitos`, `persistências` e `entregas SDK`.
+- [x] Correção: atividades de turno passaram a registrar `autor`, `origem`, `fragmentos`, `caracteres`, `visíveis` e `mensagens assistente`.
+- [x] Achado: `/events sources` era um mapa técnico útil, mas ruim como tela default: mostrava emoji, owner, emissor, aceita, suprime, fallback e IDs de política como título principal.
+- [x] Correção: `/events sources` virou painel humano de fontes, com título humano, responsável, eventos recentes e comando de investigação.
+- [x] Preservação: `/events sources detail` mantém IDs, classe, dono técnico, emissor, aceita, suprime e fallback.
+- [x] Correção: `/events` default passou para `headline`/`row`/`text`, sem emoji estrutural nem ANSI local.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/test_terminal_dialog_engine.spec.js`.
+- [x] `/events` default trocou `trace` por `rastreamento`, `SDK ask_user` por `pergunta humana SDK` e `Sistema/ask_user` por `Sistema/pergunta humana`; `trace=` fica apenas em raw/json/export técnico.
+- [x] `/sdk doctor` passou a usar `headline`/`row`/`text`, removendo ANSI local e o token cru `local-fs-primary` da superfície default.
+- [x] `/sdk doctor` agora mostra `Rota arquivos locais como rota principal`, `Decisão`, `Domínio`, `Contexto`, `Motivo` e `Arquivos` em vocabulário humano.
+- [x] Testes escopados passaram após `/sdk doctor` e `/events`:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/test_terminal_dialog_engine.spec.js`.
+- [x] Live PTY curta após esta leva confirmou boot e painéis default no terminal real:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=60000 --transport=pty --out-dir=artifacts/terminal-live/ux-events-engine-humanized-20260602-1828`.
+  - Resultado: PASS.
+- [ ] Próxima lacuna: revisar `/status full` e `/session` detalhado, que ainda usam blocos herdados com ANSI local em modo `full`; decidir o que é humano detalhado e o que deve virar `detail/raw`.

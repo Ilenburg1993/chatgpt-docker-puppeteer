@@ -279,7 +279,7 @@ describe('terminal/commands/sdk', () => {
         const ctx = mockCtx();
         await cmdSdk({ println: ctx.println }, 'doctor');
         expect(ctx.output()).toContain('SDK Doctor');
-        expect(ctx.output()).toContain('local-fs-primary');
+        expect(ctx.output()).toContain('arquivos locais como rota principal');
         expect(ctx.output()).toContain('/fs');
         expect(ctx.output()).toContain('contexto');
         expect(ctx.output()).toContain('/activity 5');
@@ -317,7 +317,7 @@ describe('terminal/commands/sdk', () => {
 
         expect(ctx.output()).toContain('arquivos locais ativos');
         expect(ctx.output()).not.toContain('local.fs.canonico=true');
-        expect(ctx.output()).toContain('local-fs-primary');
+        expect(ctx.output()).toContain('arquivos locais como rota principal');
 
         registrySpy.mockRestore();
         readSpy.mockRestore();

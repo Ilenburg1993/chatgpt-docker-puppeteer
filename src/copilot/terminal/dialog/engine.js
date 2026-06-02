@@ -118,6 +118,44 @@ export { drainPendingNotifications, getPersistenceFailureCount };
  */
 
 const MAX_TURN_QUEUE_SIZE = 10;
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {string}
+ */
+function humanizeTerminalAutomationAction(value) {
+    switch (value) {
+        case 'keep_current':
+            return 'manter modelo atual';
+        case 'apply_route':
+            return 'aplicar rota alternativa';
+        case 'switch_model':
+            return 'trocar modelo';
+        case 'switch_provider':
+            return 'trocar provedor';
+        case 'disable_byok':
+            return 'desativar BYOK';
+        case 'record_failure':
+            return 'registrar falha';
+        case 'none':
+        case '':
+        case null:
+        case undefined:
+            return 'nenhuma ação imediata';
+        default:
+            return String(value).replace(/[_-]+/gu, ' ');
+    }
+}
+
+/**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function pluralCount(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
 /** @type {number} */
 let _turnQueueDepth = 0;
 
@@ -321,17 +359,32 @@ async function printByokAutoAfterFailureHint(byokFailure) {
         const persistedEffects = result.effectPersistence?.automationEffectApplications ?? 0;
         const handoffs = result.effectPersistence?.sdkSessionHandoffs ?? 0;
         println(
-            `\x1b[90m       auto pós-falha: action=${result.status.decision.action} · route=${result.status.decision.selectedRouteKey ?? '-'} · applied=${applied} · skipped=${skipped} · effects=${persistedEffects} · handoffs=${handoffs}\x1b[0m`,
+            terminalThemeRow(
+                'Seleção',
+                [
+                    `pós-falha ${humanizeTerminalAutomationAction(result.status.decision.action)}`,
+                    result.status.decision.selectedRouteKey ? `rota ${result.status.decision.selectedRouteKey}` : null,
+                    pluralCount(applied, 'efeito aplicado', 'efeitos aplicados'),
+                    skipped > 0 ? pluralCount(skipped, 'efeito ignorado', 'efeitos ignorados') : null,
+                    persistedEffects > 0 ? pluralCount(persistedEffects, 'persistência', 'persistências') : null,
+                    handoffs > 0 ? pluralCount(handoffs, 'entrega SDK', 'entregas SDK') : null,
+                ]
+                    .filter(Boolean)
+                    .join(' · '),
+            ),
         );
         const effectDetails = [...(result.application?.applied ?? []), ...(result.application?.skipped ?? [])]
             .map(describeTerminalByokGatewayAutoEffect)
             .slice(0, 4);
         if (effectDetails.length > 0) {
-            println(`\x1b[90m       auto pós-falha detalhe: ${effectDetails.join('; ')}\x1b[0m`);
+            println(terminalThemeRow('Detalhe', effectDetails.join('; ')));
         }
     } catch (error) {
         println(
-            `\x1b[90m       auto: falha ao replanejar pós-falha (${error instanceof Error ? error.message : String(error)}); use /byok auto record profile:${profile}.\x1b[0m`,
+            terminalThemeRow(
+                'Seleção',
+                `falha ao replanejar pós-falha: ${error instanceof Error ? error.message : String(error)} · use /byok auto record profile:${profile}`,
+            ),
         );
     }
 }
@@ -350,19 +403,20 @@ async function runByokGatewayPreTurnAutomation() {
         const persistedHandoffs = result.effectPersistence?.sdkSessionHandoffs ?? 0;
         recordTerminalActivity('system', 'Model-gateway auto pre-turn avaliado', {
             detail:
-                `action=${decision.action} · route=${decision.selectedRouteKey ?? '-'} · ` +
-                `applied=${applied.length} · skipped=${skipped.length} · persistedEffects=${persistedEffects} · handoffs=${persistedHandoffs}`,
+                `ação ${humanizeTerminalAutomationAction(decision.action)} · rota ${decision.selectedRouteKey ?? 'nenhuma'} · ` +
+                `${pluralCount(applied.length, 'efeito aplicado', 'efeitos aplicados')} · ` +
+                `${pluralCount(skipped.length, 'efeito ignorado', 'efeitos ignorados')} · ` +
+                `${pluralCount(persistedEffects, 'persistência', 'persistências')} · ` +
+                `${pluralCount(persistedHandoffs, 'entrega SDK', 'entregas SDK')}`,
             source: 'dialog',
             recordHistory: false,
         });
         if (applied.length > 0) {
-            println(
-                `\x1b[90m  ↳ model-gateway auto: ${applied.map(describeTerminalByokGatewayAutoEffect).join('; ')}\x1b[0m`,
-            );
+            println(terminalThemeRow('Seleção', applied.map(describeTerminalByokGatewayAutoEffect).join('; ')));
             return;
         }
         if (decision.action !== 'keep_current') {
-            println(`\x1b[90m  ↳ model-gateway auto: ${decision.operatorSummary}\x1b[0m`);
+            println(terminalThemeRow('Seleção', decision.operatorSummary));
         }
     } catch (error) {
         recordTerminalActivity('system', 'Model-gateway auto pre-turn falhou em modo seguro', {
@@ -417,9 +471,9 @@ function recordTerminalExplicitEmptyOutput(input) {
     }
 
     const failureDetail =
-        `actor=${input.actor} · source=${input.materialization.sourceDetail} · ` +
-        `deltas=${input.materialization.diagnostics.deltaSlices}/${input.materialization.diagnostics.deltaChars}ch · ` +
-        `assistantMessages=${input.materialization.diagnostics.assistantMessageCount}`;
+        `autor ${input.actor} · origem ${input.materialization.sourceDetail} · ` +
+        `fragmentos ${input.materialization.diagnostics.deltaSlices}/${input.materialization.diagnostics.deltaChars} caracteres · ` +
+        `mensagens assistente ${input.materialization.diagnostics.assistantMessageCount}`;
     reviseRecentTerminalTurnTraceStatus({ timestamp, status: 'failed' });
     recordTerminalActivity('error', 'Turno sem saída pública materializada', {
         detail: `${failureDetail} · sem pergunta humana ou formulário pendente`,
@@ -1054,10 +1108,10 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
 
         recordTerminalActivity('turn', 'Reply do turno explícito resolvido', {
             detail:
-                `canal=${turnResult.channel} · source=${effectiveReplySource} · ` +
-                `detail=${materializedReply.sourceDetail} · chars=${typeof reply === 'string' ? reply.length : 0} · ` +
-                `visíveis=${replyVisibleChars} · deltas=${materializedReply.diagnostics.deltaSlices}/${materializedReply.diagnostics.deltaChars}ch · ` +
-                `assistantMessages=${materializedReply.diagnostics.assistantMessageCount}`,
+                `canal ${turnResult.channel} · origem ${effectiveReplySource} · ` +
+                `detalhe ${materializedReply.sourceDetail} · caracteres ${typeof reply === 'string' ? reply.length : 0} · ` +
+                `visíveis ${replyVisibleChars} · fragmentos ${materializedReply.diagnostics.deltaSlices}/${materializedReply.diagnostics.deltaChars} caracteres · ` +
+                `mensagens assistente ${materializedReply.diagnostics.assistantMessageCount}`,
             source: 'dialog',
             recordHistory: false,
         });

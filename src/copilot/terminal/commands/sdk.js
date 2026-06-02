@@ -415,35 +415,56 @@ async function renderSdkDoctor({ println }, runtimeId) {
             appendFileMissingCount: instructionSourcesAvailable ? 0 : 1,
         },
     });
+    const routingLabel =
+        routingMode === 'local-fs-primary'
+            ? 'arquivos locais como rota principal'
+            : routingMode === 'sdk-workspace-only'
+              ? 'workspace SDK como fallback'
+              : 'rota degradada';
+    const decisionLabel =
+        routingMode === 'local-fs-primary'
+            ? 'arquivos locais canônicos primários; workspace SDK fica como auxiliar'
+            : routingMode === 'sdk-workspace-only'
+              ? 'usar workspace SDK até recuperar ferramentas locais de arquivo'
+              : 'restaurar boot/load antes de operar em arquivos';
 
-    println('\n  \x1b[36mSDK Doctor - roteamento SDK x FS\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('accent', 'SDK Doctor', ['roteamento arquivos + SDK']));
     println(
-        `  superfícies \x1b[90mworkspace SDK ${activeLabel(sdkWorkspaceAvailable)} · arquivos locais ${localFsToolsReady ? 'ativos' : 'ausentes'} · terminal local ${activeLabel(registrySnapshot.hasCanonicalLocalExecTools)} · shell legado ${registrySnapshot.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado'} · instruções SDK ${activeLabel(instructionSourcesAvailable)}\x1b[0m`,
+        terminalThemeRow(
+            'Superfícies',
+            `workspace SDK ${activeLabel(sdkWorkspaceAvailable)} · arquivos locais ${localFsToolsReady ? 'ativos' : 'ausentes'} · terminal local ${activeLabel(registrySnapshot.hasCanonicalLocalExecTools)} · shell legado ${registrySnapshot.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado'} · instruções SDK ${activeLabel(instructionSourcesAvailable)}`,
+        ),
     );
     println(
-        `  SDK        \x1b[90mlista tools ${availableLabel(sdkTools['list'] === true)} · quota ${availableLabel(sdkTools['quota'] === true)} · formulário UI ${availableLabel(sdkUi['elicitation'] === true)}\x1b[0m`,
+        terminalThemeRow(
+            'SDK',
+            `lista de ferramentas ${availableLabel(sdkTools['list'] === true)} · quota ${availableLabel(sdkTools['quota'] === true)} · formulário UI ${availableLabel(sdkUi['elicitation'] === true)}`,
+        ),
     );
     println(
-        `  contrato   \x1b[90m${contract.ok ? 'ok' : 'atenção'} · falhas ${contract.errorCount} · avisos ${contract.warningCount} · cobertura: descrição ${contract.metadataCoverage.descriptionPct}% · schema ${contract.metadataCoverage.parametersPct}% · categoria ${contract.metadataCoverage.categoryPct}% · tags ${contract.metadataCoverage.tagsPct}% · instruções ${contract.metadataCoverage.instructionsPct}%\x1b[0m`,
+        terminalThemeRow(
+            'Contrato',
+            `${contract.ok ? 'ok' : 'atenção'} · falhas ${contract.errorCount} · avisos ${contract.warningCount} · descrição ${contract.metadataCoverage.descriptionPct}% · schema ${contract.metadataCoverage.parametersPct}% · categoria ${contract.metadataCoverage.categoryPct}% · tags ${contract.metadataCoverage.tagsPct}% · instruções ${contract.metadataCoverage.instructionsPct}%`,
+            { role: contract.ok ? 'success' : 'warn' },
+        ),
     );
-    println(`  mode       \x1b[33m${routingMode}\x1b[0m`);
-    if (routingMode === 'local-fs-primary') {
-        println('  decisao    \x1b[32mFS local canonico primario (SDK workspace como auxiliar).\x1b[0m');
-    } else if (routingMode === 'sdk-workspace-only') {
-        println('  decisao    \x1b[33mFallback em workspace SDK ate recuperar file-tools locais.\x1b[0m');
-    } else {
-        println('  decisao    \x1b[31mDegradado: restaurar boot/load antes de operar em arquivo.\x1b[0m');
-    }
-    println(`  dominio    \x1b[90m${guidance.domainHint}\x1b[0m`);
-    println(`  contexto   \x1b[90m${guidance.contextHint}\x1b[0m`);
+    println(terminalThemeRow('Rota', routingLabel, { role: routingMode === 'local-fs-primary' ? 'success' : 'warn' }));
+    println(terminalThemeRow('Decisão', decisionLabel));
+    println(terminalThemeRow('Domínio', guidance.domainHint));
+    println(terminalThemeRow('Contexto', guidance.contextHint));
     if (guidance.warnings.length > 0) {
-        println(`  atencao    \x1b[33m${guidance.warnings.join(' | ')}\x1b[0m`);
+        println(terminalThemeRow('Atenção', guidance.warnings.join(' | '), { role: 'warn' }));
     }
-    println(`  razao      \x1b[90m${routing.reason}\x1b[0m`);
-    println(`  local fs   \x1b[90m${localFsToolNames.join(', ')}\x1b[0m`);
+    println(terminalThemeRow('Motivo', routing.reason));
+    println(terminalThemeRow('Arquivos', localFsToolNames.join(', ')));
     if (registrySnapshot.hasLegacySdkShellToolsLoaded && registrySnapshot.hasCanonicalLocalExecTools) {
         println(
-            '  shell      \x1b[33mLegacy shell ainda carregada no registry; negar exposicao na sessao via excludedTools.\x1b[0m',
+            terminalThemeRow(
+                'Terminal',
+                'shell legado ainda carregado no registry; negar exposição na sessão via excludedTools',
+                { role: 'warn' },
+            ),
         );
     }
     println('');
