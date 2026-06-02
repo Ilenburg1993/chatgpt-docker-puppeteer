@@ -3074,7 +3074,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'sse-archive-query-visible',
-            pass: /Eventos SSE/.test(plain) && /arquivo=/.test(plain),
+            pass: /Eventos SSE/.test(plain) && /arquivo(?:=|\s)/.test(plain),
             detail: '/events rendered the durable public SSE archive tail',
         },
         {
@@ -3311,7 +3311,7 @@ function evaluateNoPrOutput(plain, sseSummary) {
         },
         {
             id: 'sse-archive-query-visible',
-            pass: /Eventos SSE/.test(plain) && /arquivo=/.test(plain),
+            pass: /Eventos SSE/.test(plain) && /arquivo(?:=|\s)/.test(plain),
             detail: '/events rendered the durable public SSE archive tail without opening a turn',
         },
         {
@@ -3411,7 +3411,7 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
         },
         {
             id: 'sse-archive-query-visible',
-            pass: /Eventos SSE/.test(plain) && /arquivo=/.test(plain),
+            pass: /Eventos SSE/.test(plain) && /arquivo(?:=|\s)/.test(plain),
             detail: '/events rendered the durable public SSE archive tail',
         },
         {
@@ -3594,7 +3594,7 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         },
         {
             id: 'auto-sse-archive-query-visible',
-            pass: /Eventos SSE/.test(plain) && /arquivo=/.test(plain),
+            pass: /Eventos SSE/.test(plain) && /arquivo(?:=|\s)/.test(plain),
             detail: '/events rendered the durable public SSE archive tail',
         },
         {

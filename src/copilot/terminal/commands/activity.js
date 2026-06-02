@@ -229,7 +229,7 @@ function printTurnTraceSummary(println, title, trace, opts) {
         for (const userInput of userInputs.slice(0, 5)) {
             const choices =
                 Array.isArray(userInput.choices) && userInput.choices.length > 0
-                    ? ` · opções=${userInput.choices.join('|')}`
+                    ? ` · opções ${userInput.choices.join('|')}`
                     : '';
             const answer = userInput.answerPreview ? ` · resposta=${userInput.answerPreview}` : '';
             const requestId = opts.detail && userInput.requestId ? ` · req=${compactTerminalDiagnosticId(userInput.requestId)}` : '';

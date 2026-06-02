@@ -252,6 +252,23 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(90);
     });
 
+    it('traduz pending messages na linha viva de turno', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'turn',
+            label: 'Pending messages alteradas',
+            detail: '0 mensagem(ns) pendente(s)',
+            toolName: null,
+        };
+
+        const line = formatTerminalLiveStatusLine();
+
+        expect(line).toContain('Contexto atualizado');
+        expect(line).not.toContain('Pending messages alteradas');
+    });
+
     it('humaniza estado de boot sem stopped:noloop ou starting:noloop', async () => {
         const { formatTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');

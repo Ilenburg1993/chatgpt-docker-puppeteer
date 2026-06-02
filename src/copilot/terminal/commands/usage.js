@@ -123,11 +123,15 @@ export function cmdUsage({ println }, arg) {
             const sdkLabel = renderUsageBindingId(projection.binding.sdkSessionId, detail);
             const hubLabel = renderUsageBindingId(projection.binding.hubSessionId, detail);
             println(
-                `      Binding: runtime=\x1b[90m${runtimeLabel}\x1b[0m · sdk=\x1b[90m${sdkLabel}\x1b[0m · hub=\x1b[90m${hubLabel}\x1b[0m${detail ? '' : ' \x1b[90m(/usage now detail para IDs completos)\x1b[0m'}`,
+                detail
+                    ? `      Binding: runtime=\x1b[90m${runtimeLabel}\x1b[0m · sdk=\x1b[90m${sdkLabel}\x1b[0m · hub=\x1b[90m${hubLabel}\x1b[0m`
+                    : `      Vínculo: runtime \x1b[90m${runtimeLabel}\x1b[0m · SDK \x1b[90m${sdkLabel}\x1b[0m · hub \x1b[90m${hubLabel}\x1b[0m \x1b[90m(/usage now detail para IDs completos)\x1b[0m`,
             );
         }
         println(
-            `      Modo: sdk=\x1b[90m${configProjection.sdkSessionMode ?? 'interactive'}\x1b[0m · planFile=\x1b[90m${configProjection.sdkPlanOperation ?? '(sem alterações)'}\x1b[0m`,
+            detail
+                ? `      Modo: sdk=\x1b[90m${configProjection.sdkSessionMode ?? 'interactive'}\x1b[0m · planFile=\x1b[90m${configProjection.sdkPlanOperation ?? '(sem alterações)'}\x1b[0m`
+                : `      Modo: SDK \x1b[90m${configProjection.sdkSessionMode ?? 'interactive'}\x1b[0m · plano \x1b[90m${configProjection.sdkPlanOperation ?? '(sem alterações)'}\x1b[0m`,
         );
         println('');
         return;

@@ -842,7 +842,7 @@ function renderSdkSimulate({ println }, rest) {
         data: { command: '/sdk simulate request-user-input' },
     });
     const mode = parsed.allowFreeform ? 'resposta livre' : 'seleção obrigatória';
-    const choices = parsed.choices.length > 0 ? ` · opções=${parsed.choices.join(' | ')}` : '';
+    const choices = parsed.choices.length > 0 ? ` · opções ${parsed.choices.join(' | ')}` : '';
     println('\n  \x1b[36mInput humano estruturado\x1b[0m');
     println(`  status   \x1b[33maguardando operador\x1b[0m`);
     println('  origem   \x1b[90mdiagnóstico de input estruturado\x1b[0m');

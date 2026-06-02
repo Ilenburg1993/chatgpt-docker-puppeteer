@@ -484,7 +484,7 @@ function formatLiveWaitingStatus({ startedAt, model, effort, timeoutMs, timeoutS
         const choices = Array.isArray(runtimeState.pendingQuestion?.choices)
             ? runtimeState.pendingQuestion.choices.join('|')
             : '';
-        return `  \x1b[90m⏸ aguardando resposta humana\x1b[0m\x1b[90m · ${questionText}${choices ? ` · opções=${choices}` : ''} · [/answer <texto>] [/status]\x1b[0m`;
+        return `  \x1b[90m⏸ aguardando resposta humana\x1b[0m\x1b[90m · ${questionText}${choices ? ` · opções ${choices}` : ''} · [/answer <texto>] [/status]\x1b[0m`;
     }
     const elapsedMs = Math.max(0, Date.now() - startedAt);
     const elapsed = `${(elapsedMs / 1000).toFixed(1)}s`;
@@ -1189,15 +1189,15 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                         }
                     } else if (modelBilling.displayModel !== '-') {
                         parts.push(
-                            `${prefersLlmUsage ? 'llm' : 'modelo'}=\x1b[36m${modelBilling.displayModel}\x1b[0m`,
+                            `${prefersLlmUsage ? 'LLM' : 'modelo'} \x1b[36m${modelBilling.displayModel}\x1b[0m`,
                         );
                     }
                     if (modelBilling.cost !== null) {
-                        parts.push(`custo=\x1b[33m${modelBilling.cost.toFixed(4)}\x1b[0m`);
+                        parts.push(`custo \x1b[33m${modelBilling.cost.toFixed(4)}\x1b[0m`);
                     }
                 }
                 if (ctxWin) {
-                    parts.push(`ctx=${(ctxWin.utilization * 100).toFixed(0)}%`);
+                    parts.push(`contexto ${(ctxWin.utilization * 100).toFixed(0)}%`);
                     parts.push(
                         `${ctxWin.tokens.toLocaleString('pt-BR')}/${ctxWin.tokenLimit.toLocaleString('pt-BR')} tokens`,
                     );

@@ -63,6 +63,8 @@ function compactLiveStatusText(value, max) {
         .replace(/\b(?:chatcmpl-tool|toolu|call)_[a-z0-9_-]+\b/giu, 'id interno')
         .replace(/\bchatcmpl-tool-[a-z0-9-]+\b/giu, 'id interno')
         .replace(/\bturnId=\d+\b/giu, 'turno concluído')
+        .replace(/^Pending messages alteradas$/iu, 'Contexto atualizado')
+        .replace(/^LLM-B trabalhando$/iu, 'Aguardando resposta')
         .replace(/\s+/g, ' ')
         .trim();
     return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1))}…`;

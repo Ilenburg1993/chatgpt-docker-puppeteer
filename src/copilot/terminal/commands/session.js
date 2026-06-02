@@ -215,7 +215,7 @@ function compactLiveDetail(value) {
         .replace(/\bstatus=success\b/giu, 'concluída')
         .replace(/\bstatus=completed\b/giu, 'concluída')
         .replace(/\bstatus=failed\b/giu, 'falhou')
-        .replace(/\bchoices=/giu, 'opções=')
+        .replace(/\bchoices=/giu, 'opções ')
         .replace(/\bread\s+·/giu, 'leitura ·')
         .replace(/\bwrite\s+·/giu, 'escrita ·');
 }

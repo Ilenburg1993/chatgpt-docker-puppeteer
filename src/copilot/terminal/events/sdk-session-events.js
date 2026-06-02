@@ -840,7 +840,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             requestedEnvelope,
         );
         if (shouldPrintSessionNarration('important')) {
-            const optionsLabel = choices.length > 0 ? ` · opções=${choices.length}` : '';
+            const optionsLabel = choices.length > 0 ? ` · ${choices.length} opção(ões)` : '';
             println(
                 `  ${terminalThemeBadge('question', 'ASK')} ${terminalThemeText('question', tracked.question.slice(0, 120))}${terminalThemeText('muted', optionsLabel)}`,
             );

@@ -2023,3 +2023,40 @@
 - [x] Achado visual residual: `/activity` timeline ainda podia mostrar `display=full`.
 - [x] `compactOperatorDetail` passou a traduzir `display=`, `reasoning=`, `source=` e `choices=`.
 - [x] Teste `test_commands_activity.spec.js` cobre `display=full` virando `tela full`.
+
+### 11.14 Live real `long-tool-heartbeat` pós-polimento
+
+- [x] Live real executado:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=long-tool-heartbeat --timeout-ms=240000 --transport=pty --out-dir=artifacts/terminal-live/long-tool-heartbeat-polished-copy-20260602-0955`.
+- [x] Artefatos:
+  - `artifacts/terminal-live/long-tool-heartbeat-polished-copy-20260602-0955/summary.md`;
+  - `artifacts/terminal-live/long-tool-heartbeat-polished-copy-20260602-0955/terminal.plain.log`;
+  - `artifacts/terminal-live/long-tool-heartbeat-polished-copy-20260602-0955/terminal.sse.jsonl`;
+  - `artifacts/terminal-live/long-tool-heartbeat-polished-copy-20260602-0955/conversation-export.md`.
+- [x] Resultado: FAIL apenas em `sse-archive-query-visible`.
+- [x] Causa da falha: runner ainda exigia `arquivo=` depois da humanização de `/events`.
+- [x] Runner atualizado para aceitar `arquivo` humano e `arquivo=` legado.
+- [x] Achados visuais corrigidos após o live:
+  - `Pending messages alteradas` na linha viva virou `Contexto atualizado`;
+  - `LLM-B trabalhando` na linha viva virou `Aguardando resposta`;
+  - `[ASK] ... opções=1` virou `1 opção(ões)`;
+  - `/activity` em interação humana trocou `opções=SIM` por `opções SIM`;
+  - prompt de espera humana trocou `opções=` por `opções `;
+  - telemetria inline trocou `llm=`, `custo=` e `ctx=` por `LLM`, `custo` e `contexto`;
+  - `/usage now` trocou `Binding: runtime=`/`Modo: sdk=` por `Vínculo: runtime`/`Modo: SDK`.
+- [x] Testes focados passaram para live status, usage, SDK waits/activity e registry SDK.
+- [x] Live real repetido depois dos patches:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=long-tool-heartbeat --timeout-ms=240000 --transport=pty --out-dir=artifacts/terminal-live/long-tool-heartbeat-polished-copy-pass-20260602-1000`.
+- [x] Artefatos do PASS:
+  - `artifacts/terminal-live/long-tool-heartbeat-polished-copy-pass-20260602-1000/summary.md`;
+  - `artifacts/terminal-live/long-tool-heartbeat-polished-copy-pass-20260602-1000/terminal.plain.log`;
+  - `artifacts/terminal-live/long-tool-heartbeat-polished-copy-pass-20260602-1000/terminal.sse.jsonl`;
+  - `artifacts/terminal-live/long-tool-heartbeat-polished-copy-pass-20260602-1000/conversation-export.md`.
+- [x] Resultado: PASS completo, incluindo `/events` durable archive, ask_user, resposta humana, SSE/export, no-duplication, no-terminal-errors e close limpo.
+- [x] Confirmação visual no terminal real:
+  - `/usage now` mostra `Vínculo: runtime ... · SDK ... · hub ...` e `Modo: SDK ... · plano ...`;
+  - linha viva mostra `Contexto atualizado` e `Aguardando resposta`;
+  - telemetria inline mostra `LLM ... · custo ... · contexto ...`;
+  - `ASK` mostra `1 opção(ões)`;
+  - `/activity` mostra `opções SIM`;
+  - `/events` mostra `arquivo ... · N evento(s) · fila 0 · filtro nenhum`.
