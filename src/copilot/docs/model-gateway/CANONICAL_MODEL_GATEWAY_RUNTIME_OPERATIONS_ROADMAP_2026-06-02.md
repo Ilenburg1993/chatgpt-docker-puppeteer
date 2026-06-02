@@ -5,6 +5,10 @@ ponta no terminal, para operador humano ou LLM. O foco nao e apenas selecionar u
 grande de modelos prontos, aplicar defaults seguros, permitir troca automatica quando houver falha/quota/esgotamento,
 preservar explicabilidade, e testar o fluxo no mesmo ambiente do operador.
 
+Documentos operacionais relacionados:
+
+- `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_RUNTIME_OPERATOR_AUTOMATION_GUIDE_2026-06-02.md`
+
 Documentos anteriores continuam como historico e fonte de contexto:
 
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_RUNTIME_PLAYBOOK_2026-06-01.md`
@@ -187,8 +191,12 @@ metadata importers
 - [x] A.6 Proteger por teste que package nao aponta diretamente para `model-gateway-*.mjs`.
 - [x] A.7 Criar comando `model-gateway:operator-ready` com resumo unico.
 - [x] A.8 Adicionar `make model-gateway-operator-ready`.
-- [ ] A.9 Expor `/byok gateway operator-ready`.
-- [ ] A.10 Documentar IDs do runner no inventario canonico.
+- [x] A.9 Mover executaveis internos para `scripts/model-gateway/commands/`.
+- [x] A.10 Mover helper dotenv para `scripts/model-gateway/lib/env.mjs`.
+- [x] A.11 Expor manifesto JSON do runner via `npm run model-gateway:scripts` e `make model-gateway-scripts`.
+- [x] A.12 Proteger por teste que comandos package usam o runner, nao caminhos fisicos internos.
+- [x] A.13 Documentar IDs do runner no inventario canonico.
+- [x] A.14 Expor `/byok gateway operator-ready`.
 
 ### Faixa B - Cockpit Operacional Unico
 
@@ -199,7 +207,7 @@ metadata importers
 - [ ] B.5 Mostrar proximo comando seguro para humano.
 - [ ] B.6 Mostrar proximo comando seguro para LLM operadora.
 - [ ] B.7 Garantir JSON estavel para automacao.
-- [ ] B.8 Garantir texto curto e escaneavel para terminal.
+- [x] B.8 Garantir texto curto e escaneavel para terminal.
 
 ### Faixa C - Default Auto
 
@@ -335,8 +343,8 @@ metadata importers
 - [x] M.1 Criar este roadmap.
 - [x] M.2 Linkar este roadmap nos guias ativos.
 - [ ] M.3 Marcar guias antigos como historicos.
-- [ ] M.4 Atualizar `scripts/model-gateway/README.md`.
-- [ ] M.5 Atualizar inventario canonico.
+- [x] M.4 Atualizar `scripts/model-gateway/README.md`.
+- [x] M.5 Atualizar inventario canonico.
 - [ ] M.6 Atualizar checklist de live tests.
 - [ ] M.7 Registrar cada live test relevante com artifact.
 - [ ] M.8 Registrar comandos para recovery.

@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { afterEach, describe, it } from 'vitest';
 import {
     COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH,
+    MODEL_GATEWAY_SCRIPT_MANIFEST,
     MODEL_GATEWAY_SCRIPT_PATHS,
     modelGatewayScriptPath,
 } from '../../../../scripts/model-gateway/index.mjs';
@@ -4315,6 +4316,7 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.length >= 20);
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:ops'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:operator-ready'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:scripts'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:prebuild'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:build'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build:plan'));
@@ -4358,6 +4360,7 @@ describe('model-gateway foundation', () => {
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:runtime-health:mirror'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-operator-ready'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-scripts'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-ops'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-build'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-effective-selection-trace'));
@@ -4418,22 +4421,25 @@ describe('model-gateway foundation', () => {
 
     it('keeps model-gateway script paths in the scripts/model-gateway barrel', () => {
         assert.ok(modelGatewayScriptPath('runner').endsWith('scripts/model-gateway/run.mjs'));
-        assert.ok(modelGatewayScriptPath('operatorReady').endsWith('scripts/model-gateway/model-gateway-operator-ready.mjs'));
+        assert.ok(modelGatewayScriptPath('operatorReady').endsWith('scripts/model-gateway/commands/model-gateway-operator-ready.mjs'));
         assert.equal(modelGatewayScriptPath('llmBLiveTest'), COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH);
-        assert.ok(modelGatewayScriptPath('autoReady').endsWith('scripts/model-gateway/model-gateway-auto-ready.mjs'));
-        assert.ok(modelGatewayScriptPath('autoDoctor').endsWith('scripts/model-gateway/model-gateway-auto-doctor.mjs'));
-        assert.ok(modelGatewayScriptPath('autoExplain').endsWith('scripts/model-gateway/model-gateway-auto-explain.mjs'));
-        assert.ok(modelGatewayScriptPath('autoHandoffs').endsWith('scripts/model-gateway/model-gateway-auto-handoffs.mjs'));
+        assert.ok(modelGatewayScriptPath('autoReady').endsWith('scripts/model-gateway/commands/model-gateway-auto-ready.mjs'));
+        assert.ok(modelGatewayScriptPath('autoDoctor').endsWith('scripts/model-gateway/commands/model-gateway-auto-doctor.mjs'));
+        assert.ok(modelGatewayScriptPath('autoExplain').endsWith('scripts/model-gateway/commands/model-gateway-auto-explain.mjs'));
+        assert.ok(modelGatewayScriptPath('autoHandoffs').endsWith('scripts/model-gateway/commands/model-gateway-auto-handoffs.mjs'));
         assert.ok(
-            modelGatewayScriptPath('autoConfirmations').endsWith('scripts/model-gateway/model-gateway-auto-confirmations.mjs'),
+            modelGatewayScriptPath('autoConfirmations').endsWith('scripts/model-gateway/commands/model-gateway-auto-confirmations.mjs'),
         );
-        assert.ok(modelGatewayScriptPath('autoProofPlan').endsWith('scripts/model-gateway/model-gateway-auto-proof-plan.mjs'));
-        assert.ok(modelGatewayScriptPath('autoStandby').endsWith('scripts/model-gateway/model-gateway-auto-standby.mjs'));
-        assert.ok(modelGatewayScriptPath('autoScenarios').endsWith('scripts/model-gateway/model-gateway-auto-scenarios.mjs'));
-        assert.ok(modelGatewayScriptPath('runtimeHealthClear').endsWith('scripts/model-gateway/model-gateway-runtime-health-clear.mjs'));
-        assert.ok(COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH.endsWith('scripts/model-gateway/model-gateway-terminal-llm-b-live-test.mjs'));
+        assert.ok(modelGatewayScriptPath('autoProofPlan').endsWith('scripts/model-gateway/commands/model-gateway-auto-proof-plan.mjs'));
+        assert.ok(modelGatewayScriptPath('autoStandby').endsWith('scripts/model-gateway/commands/model-gateway-auto-standby.mjs'));
+        assert.ok(modelGatewayScriptPath('autoScenarios').endsWith('scripts/model-gateway/commands/model-gateway-auto-scenarios.mjs'));
+        assert.ok(modelGatewayScriptPath('runtimeHealthClear').endsWith('scripts/model-gateway/commands/model-gateway-runtime-health-clear.mjs'));
+        assert.ok(COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH.endsWith('scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs'));
         assert.ok(Object.values(MODEL_GATEWAY_SCRIPT_PATHS).every((scriptPath) => scriptPath.includes('/scripts/model-gateway/')));
         assert.ok(!Object.values(MODEL_GATEWAY_SCRIPT_PATHS).some((scriptPath) => scriptPath.includes('/scripts/copilot/')));
+        assert.equal(MODEL_GATEWAY_SCRIPT_MANIFEST.length, Object.keys(MODEL_GATEWAY_SCRIPT_PATHS).length);
+        assert.ok(MODEL_GATEWAY_SCRIPT_MANIFEST.every((entry) => entry.runnerCommand.startsWith('node scripts/model-gateway/run.mjs')));
+        assert.ok(MODEL_GATEWAY_SCRIPT_MANIFEST.some((entry) => entry.id === 'operatorReady' && entry.role === 'command'));
     });
 
     it('routes package model-gateway commands through the script barrel runner', async () => {
@@ -4443,11 +4449,12 @@ describe('model-gateway foundation', () => {
             ([name]) => name.startsWith('model-gateway:') || name === 'terminal:llm-b:live-test',
         );
         const directlyCoupledScripts = modelGatewayScripts.filter(([, command]) =>
-            String(command).includes('scripts/model-gateway/model-gateway-'),
+            String(command).includes('scripts/model-gateway/commands/model-gateway-'),
         );
 
         assert.equal(scripts['model-gateway:commands'], 'node scripts/model-gateway/run.mjs canonicalCommands');
         assert.equal(scripts['model-gateway:operator-ready'], 'node scripts/model-gateway/run.mjs operatorReady --json');
+        assert.equal(scripts['model-gateway:scripts'], 'node scripts/model-gateway/run.mjs --list-json');
         assert.equal(scripts['model-gateway:live:llm-b'], 'node scripts/model-gateway/run.mjs llmBLiveTest');
         assert.deepEqual(directlyCoupledScripts, []);
     });

@@ -900,6 +900,7 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             { surface: 'package', phase: 'prebuild', command: 'npm run model-gateway:prebuild' },
             { surface: 'make', phase: 'prebuild', command: 'make model-gateway-prebuild' },
             { surface: 'terminal', phase: 'orientation', command: '/byok gateway commands' },
+            { surface: 'terminal', phase: 'orientation', command: '/byok gateway operator-ready profile:repo_agent' },
         ]),
         listProviderEndpointInventory: vi.fn(() => [
             {
@@ -1049,6 +1050,7 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             'package  prebuild    npm run model-gateway:prebuild :: Run pre-build validators.',
             'make     prebuild    make model-gateway-prebuild :: Run pre-build validators.',
             'terminal orientation /byok gateway commands :: Show commands.',
+            'terminal orientation /byok gateway operator-ready profile:repo_agent :: Show operator readiness.',
         ]),
         routeGatewayModels: vi.fn(),
         searchModelGatewayCatalogEntries: vi.fn(() => []),
@@ -1461,6 +1463,7 @@ describe('terminal /byok command', () => {
             { surface: 'package', phase: 'prebuild', command: 'npm run model-gateway:prebuild' },
             { surface: 'make', phase: 'prebuild', command: 'make model-gateway-prebuild' },
             { surface: 'terminal', phase: 'orientation', command: '/byok gateway commands' },
+            { surface: 'terminal', phase: 'orientation', command: '/byok gateway operator-ready profile:repo_agent' },
         ]);
         listProviderEndpointInventory.mockReset();
         listProviderEndpointInventory.mockReturnValue([
@@ -1622,6 +1625,7 @@ describe('terminal /byok command', () => {
             'package  prebuild    npm run model-gateway:prebuild :: Run pre-build validators.',
             'make     prebuild    make model-gateway-prebuild :: Run pre-build validators.',
             'terminal orientation /byok gateway commands :: Show commands.',
+            'terminal orientation /byok gateway operator-ready profile:repo_agent :: Show operator readiness.',
         ]);
         runConfiguredByokChatProbe.mockReset();
         runConfiguredByokAgentProbe.mockReset();
@@ -2993,6 +2997,7 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('npm run model-gateway:prebuild');
         expect(ctx.output()).toContain('make model-gateway-prebuild');
         expect(ctx.output()).toContain('/byok gateway commands');
+        expect(ctx.output()).toContain('/byok gateway operator-ready profile:repo_agent');
     });
 
     it('filtra comandos canônicos do model-gateway pela fase live-readiness', async () => {
@@ -3003,6 +3008,20 @@ describe('terminal /byok command', () => {
 
         expect(listModelGatewayCanonicalCommands).toHaveBeenCalledWith({ surface: undefined, phase: 'live-readiness' });
         expect(renderModelGatewayCanonicalCommandLines).toHaveBeenCalledWith({ surface: undefined, phase: 'live-readiness' });
+    });
+
+    it('renderiza cockpit operator-ready no terminal sem chamar provider', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway operator-ready profile:repo_agent 5');
+
+        expect(ctx.output()).toContain('BYOK model-gateway operator-ready');
+        expect(ctx.output()).toContain('providerCall=nao');
+        expect(ctx.output()).toContain('runtime_selector');
+        expect(ctx.output()).toContain('standby 1:');
+        expect(ctx.output()).toContain('kilo-code:kilo-auto/free');
+        expect(ctx.output()).toContain('/byok auto standby profile:repo_agent 5');
     });
 
     it('mostra auditoria de seleção pré-runtime do model-gateway sem executar probes', async () => {
@@ -3047,6 +3066,37 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('prepare_new_sdk_session:dry');
         expect(ctx.output()).toContain('action=prepare_new_session');
         expect(ctx.output()).toContain('/session sdk next new');
+    });
+
+    it('mostra origem e motivo de fallback no auto status quando a decisão promove standby', async () => {
+        mockProjection();
+        buildModelGatewayRuntimeAutomationDecision.mockReturnValueOnce({
+            schema: 'model-gateway-runtime-automation-decision',
+            ok: true,
+            status: 'ready',
+            action: 'prepare_new_session',
+            selectedRouteKey: 'groq:fallback-model',
+            routeProfile: 'repo_agent',
+            fallbackFromSelectedRouteKey: 'openrouter:primary-model',
+            fallbackReason: 'rate-limit',
+            canApplyLiveModel: false,
+            requiresNewSession: true,
+            blockers: [],
+            currentBoundary: { enabled: true, profile: 'repo_agent', preset: 'openrouter', providerType: 'openai_compatible', baseUrl: null, model: 'primary-model' },
+            targetBoundary: { profile: 'repo_agent', preset: 'groq', providerType: 'openai_compatible', baseUrl: null, model: 'fallback-model' },
+            cooldown: { active: false, reason: null, resetAt: null, retryAfterSeconds: null },
+            blockerClass: 'none',
+            nonActionReason: null,
+            nextCommands: ['/session sdk next new', '/byok provider groq fallback-model'],
+            operatorSummary: 'fallback standby promoted',
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'auto status profile:repo_agent');
+
+        expect(ctx.output()).toContain('fallback:');
+        expect(ctx.output()).toContain('from=openrouter:primary-model');
+        expect(ctx.output()).toContain('reason=rate-limit');
     });
 
     it('mostra comandos de prova por provider/model quando alternativas auto carecem de agent probe', async () => {

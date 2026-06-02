@@ -2,17 +2,36 @@
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
-import { MODEL_GATEWAY_SCRIPT_PATHS } from './index.mjs';
+import { MODEL_GATEWAY_SCRIPT_MANIFEST, MODEL_GATEWAY_SCRIPT_PATHS } from './index.mjs';
 
 const [scriptId, ...scriptArgs] = process.argv.slice(2);
 
 function printHelp() {
-    const ids = Object.keys(MODEL_GATEWAY_SCRIPT_PATHS)
-        .filter((id) => id !== 'runner')
-        .sort();
-    process.stdout.write(`Usage: node scripts/model-gateway/run.mjs <script-id> [args...]\n\n`);
+    const commands = MODEL_GATEWAY_SCRIPT_MANIFEST.filter((entry) => entry.role === 'command').sort((left, right) =>
+        left.id.localeCompare(right.id),
+    );
+    process.stdout.write(`Usage: node scripts/model-gateway/run.mjs <script-id> [args...]\n`);
+    process.stdout.write(`       node scripts/model-gateway/run.mjs --list-json\n\n`);
     process.stdout.write(`Script ids:\n`);
-    for (const id of ids) process.stdout.write(`  - ${id}\n`);
+    for (const entry of commands) process.stdout.write(`  - ${entry.id} :: ${entry.runnerCommand}\n`);
+}
+
+function printJsonManifest() {
+    process.stdout.write(
+        `${JSON.stringify(
+            {
+                schema: 'model-gateway-script-runner-manifest',
+                scripts: MODEL_GATEWAY_SCRIPT_MANIFEST,
+            },
+            null,
+            2,
+        )}\n`,
+    );
+}
+
+if (scriptId === '--list-json' || scriptId === 'list-json') {
+    printJsonManifest();
+    process.exit(0);
 }
 
 if (!scriptId || scriptId === '--help' || scriptId === '-h') {

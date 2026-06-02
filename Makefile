@@ -224,6 +224,7 @@ help:
 	@echo ""
 	@echo "$(MAGENTA)$(BOLD)🤖 Model Gateway BYOK:$(NC)"
 	@echo "  $(CYAN)make model-gateway-commands$(NC)  Inventário canônico package/make/terminal"
+	@echo "  $(CYAN)make model-gateway-scripts$(NC)  Manifesto JSON do runner/barrel de scripts"
 	@echo "  $(CYAN)make model-gateway-operator-ready$(NC)  Cockpit único read-only para operador/LLM"
 	@echo "  $(CYAN)make model-gateway-validate$(NC)  Lint + typecheck strict + testes escopados"
 	@echo "  $(CYAN)make model-gateway-prebuild$(NC)  Sequência canônica antes do primeiro build"
@@ -1456,7 +1457,7 @@ rag-rebuild-code-config-strict:
 # MODEL GATEWAY BYOK — COMANDOS CANÔNICOS PRE-BUILD
 # =============================================================================
 
-.PHONY: model-gateway-help model-gateway-commands model-gateway-commands-json model-gateway-operator-ready model-gateway-lint model-gateway-typecheck model-gateway-test-contracts model-gateway-test-terminal model-gateway-validate model-gateway-prebuild model-gateway-build model-gateway-metadata-build model-gateway-metadata-build-plan model-gateway-metadata-build-preview model-gateway-catalog-integrity model-gateway-redaction-audit model-gateway-selection-audit model-gateway-effective-selection model-gateway-effective-selection-trace model-gateway-selection-trace-diff model-gateway-selection-trace-retention model-gateway-runtime-selector model-gateway-auto-status model-gateway-auto-plan model-gateway-auto-ready model-gateway-auto-doctor model-gateway-auto-explain model-gateway-auto-handoffs model-gateway-auto-confirmations model-gateway-auto-recoveries model-gateway-auto-scenarios model-gateway-live-readiness model-gateway-live-auto-probe model-gateway-live-runs model-gateway-live-llm-b model-gateway-refresh model-gateway-refresh-preview model-gateway-refresh-plan model-gateway-refresh-provider model-gateway-refresh-log model-gateway-refresh-log-sqlite model-gateway-runtime-health-diff model-gateway-runtime-health-clear model-gateway-runtime-health-mirror model-gateway-sqlite-diagnostics model-gateway-sqlite-retention model-gateway-sqlite-retention-apply model-gateway-terminal
+.PHONY: model-gateway-help model-gateway-commands model-gateway-commands-json model-gateway-scripts model-gateway-operator-ready model-gateway-lint model-gateway-typecheck model-gateway-test-contracts model-gateway-test-terminal model-gateway-validate model-gateway-prebuild model-gateway-build model-gateway-metadata-build model-gateway-metadata-build-plan model-gateway-metadata-build-preview model-gateway-catalog-integrity model-gateway-redaction-audit model-gateway-selection-audit model-gateway-effective-selection model-gateway-effective-selection-trace model-gateway-selection-trace-diff model-gateway-selection-trace-retention model-gateway-runtime-selector model-gateway-auto-status model-gateway-auto-plan model-gateway-auto-ready model-gateway-auto-doctor model-gateway-auto-explain model-gateway-auto-handoffs model-gateway-auto-confirmations model-gateway-auto-recoveries model-gateway-auto-scenarios model-gateway-live-readiness model-gateway-live-auto-probe model-gateway-live-runs model-gateway-live-llm-b model-gateway-refresh model-gateway-refresh-preview model-gateway-refresh-plan model-gateway-refresh-provider model-gateway-refresh-log model-gateway-refresh-log-sqlite model-gateway-runtime-health-diff model-gateway-runtime-health-clear model-gateway-runtime-health-mirror model-gateway-sqlite-diagnostics model-gateway-sqlite-retention model-gateway-sqlite-retention-apply model-gateway-terminal
 
 model-gateway-help: model-gateway-commands
 
@@ -1465,6 +1466,9 @@ model-gateway-commands:
 
 model-gateway-commands-json:
 	@$(NPM) run model-gateway:commands:json
+
+model-gateway-scripts:
+	@$(NPM) --silent run model-gateway:scripts
 
 model-gateway-operator-ready:
 	@$(NPM) --silent run model-gateway:operator-ready

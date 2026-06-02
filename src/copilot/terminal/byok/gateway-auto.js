@@ -176,8 +176,9 @@ export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
  * }>}
  */
 export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
-    const policy = await readModelGatewayRuntimeAutomationEffectivePolicy({ env: options.env });
-    const args = parseTerminalByokGatewayAutoArgs(rest, { env: options.env, policy });
+    const envOptions = options.env ? { env: options.env } : {};
+    const policy = await readModelGatewayRuntimeAutomationEffectivePolicy(envOptions);
+    const args = parseTerminalByokGatewayAutoArgs(rest, { ...envOptions, policy });
     const store = new JsonModelGatewayCatalogStore({ filePath: options.catalogPath ?? DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const snapshot = await store.readSnapshot();
     const secretRegistry = createEnvSecretRegistry(options.env);
@@ -440,7 +441,9 @@ export async function persistTerminalByokGatewayAutoEffectApplications(status, a
  * }>}
  */
 export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
-    const policy = await readModelGatewayRuntimeAutomationEffectivePolicy({ env: options.env });
+    const envOptions = options.env ? { env: options.env } : {};
+    const catalogOptions = typeof options.catalogPath === 'string' ? { catalogPath: options.catalogPath } : {};
+    const policy = await readModelGatewayRuntimeAutomationEffectivePolicy(envOptions);
     if (policy.enabled !== true) {
         return {
             ran: false,
@@ -453,8 +456,8 @@ export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
     const profile = policy.profiles[0] ?? 'repo_agent';
     const status = await buildTerminalByokGatewayAutoStatus([`profile:${profile}`], {
         allowEffects: true,
-        catalogPath: options.catalogPath,
-        env: options.env,
+        ...catalogOptions,
+        ...envOptions,
         persistAutomationDecision: true,
     });
     const application = await applyTerminalByokGatewayAutoEffects(status.controllerStep);
@@ -494,7 +497,9 @@ export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
  * }>}
  */
 export async function runTerminalByokGatewayPostTurnAutomation(turnFailure = {}, options = {}) {
-    const policy = await readModelGatewayRuntimeAutomationEffectivePolicy({ env: options.env });
+    const envOptions = options.env ? { env: options.env } : {};
+    const catalogOptions = typeof options.catalogPath === 'string' ? { catalogPath: options.catalogPath } : {};
+    const policy = await readModelGatewayRuntimeAutomationEffectivePolicy(envOptions);
     if (policy.enabled !== true) {
         return {
             ran: false,
@@ -509,8 +514,8 @@ export async function runTerminalByokGatewayPostTurnAutomation(turnFailure = {},
     const profile = optionalScalarString(turnFailure.profile) ?? policy.profiles[0] ?? 'repo_agent';
     const status = await buildTerminalByokGatewayAutoStatus([`profile:${profile}`], {
         allowEffects: true,
-        catalogPath: options.catalogPath,
-        env: options.env,
+        ...catalogOptions,
+        ...envOptions,
         persistAutomationDecision: true,
         turnFailure: {
             profile,

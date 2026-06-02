@@ -456,6 +456,7 @@
     "mcp-server": "npm run start",
     "model-gateway:commands": "node scripts/model-gateway/run.mjs canonicalCommands",
     "model-gateway:commands:json": "node scripts/model-gateway/run.mjs canonicalCommands --json",
+    "model-gateway:scripts": "node scripts/model-gateway/run.mjs --list-json",
     "model-gateway:ops": "node scripts/model-gateway/run.mjs ops --json",
     "model-gateway:operator-ready": "node scripts/model-gateway/run.mjs operatorReady --json",
     "model-gateway:build": "npm run model-gateway:prebuild && npm run model-gateway:metadata:build",

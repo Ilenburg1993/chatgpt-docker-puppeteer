@@ -5,20 +5,22 @@ Scripts operacionais canônicos do `src/copilot/model-gateway`.
 Guia canonico transversal:
 
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_RUNTIME_OPERATIONS_ROADMAP_2026-06-02.md`
+- `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_RUNTIME_OPERATOR_AUTOMATION_GUIDE_2026-06-02.md`
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_AND_CODE_GUIDE_2026-06-01.md`
 
 ## Entrada Estavel
 
-Os scripts ficam nesta pasta, mas consumidores externos devem preferir os comandos `npm run model-gateway:*` ou o runner
-logico:
+Os consumidores externos devem preferir os comandos `npm run model-gateway:*` ou o runner logico:
 
 ```bash
 node scripts/model-gateway/run.mjs <script-id> [args...]
 node scripts/model-gateway/run.mjs --help
+npm run model-gateway:scripts
 ```
 
-O runner resolve `<script-id>` pelo barril `scripts/model-gateway/index.mjs`. Isso permite reorganizar arquivos internos
-sem espalhar caminhos fisicos por `package.json`, Makefile, testes ou docs operacionais.
+O runner resolve `<script-id>` pelo barril `scripts/model-gateway/index.mjs`. Os executaveis internos ficam em
+`scripts/model-gateway/commands/` e utilitarios compartilhados ficam em `scripts/model-gateway/lib/`. Isso permite
+reorganizar arquivos internos sem espalhar caminhos fisicos por `package.json`, Makefile, testes ou docs operacionais.
 
 ## Regra De Ouro
 

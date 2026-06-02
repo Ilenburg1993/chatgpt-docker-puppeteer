@@ -122,7 +122,7 @@ Regra de evolucao:
 Arquivos principais:
 
 - `src/copilot/model-gateway/routing/runtime-selector.js`
-- `scripts/model-gateway/model-gateway-runtime-selector.mjs`
+- `scripts/model-gateway/commands/model-gateway-runtime-selector.mjs`
 - `scripts/model-gateway/run.mjs runtimeSelector`
 
 Responsabilidade:

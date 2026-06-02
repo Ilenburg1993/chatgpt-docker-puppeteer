@@ -39,6 +39,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Emit the canonical command inventory as JSON.',
     },
     {
+        id: 'scripts.manifest',
+        phase: 'orientation',
+        surface: 'package',
+        command: 'npm run model-gateway:scripts',
+        summary: 'Emit the script runner/barrel manifest as JSON with internal script ids and runner commands.',
+    },
+    {
         id: 'ops.status',
         phase: 'orientation',
         surface: 'package',
@@ -438,6 +445,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Makefile alias for the canonical command inventory.',
     },
     {
+        id: 'make.scripts',
+        phase: 'orientation',
+        surface: 'make',
+        command: 'make model-gateway-scripts',
+        summary: 'Makefile alias for the script runner/barrel manifest.',
+    },
+    {
         id: 'make.ops',
         phase: 'orientation',
         surface: 'make',
@@ -737,6 +751,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok gateway commands',
         summary: 'Show canonical package, Makefile and terminal commands inside the terminal cockpit.',
+    },
+    {
+        id: 'terminal.operator-ready',
+        phase: 'orientation',
+        surface: 'terminal',
+        command: '/byok gateway operator-ready profile:repo_agent',
+        summary: 'Show the read-only operator/LLM readiness cockpit inside the terminal without provider calls.',
     },
     {
         id: 'terminal.auto-status',

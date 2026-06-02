@@ -7351,7 +7351,7 @@ Correcoes aplicadas:
 
 Tambem foi criado bootstrap comum:
 
-`scripts/model-gateway-env.mjs`
+`scripts/model-gateway/lib/env.mjs`
 
 Ele carrega:
 

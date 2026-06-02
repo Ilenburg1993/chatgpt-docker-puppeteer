@@ -54,7 +54,7 @@ O sistema deve:
 
 - [x] Scripts operacionais do model-gateway estao em `scripts/model-gateway/`.
 - [x] Existe barril `scripts/model-gateway/index.mjs`.
-- [x] Runner live LLM-B foi migrado para `scripts/model-gateway/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Runner live LLM-B foi migrado para `scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`, acessado pelo runner `scripts/model-gateway/run.mjs`.
 - [x] Wrapper legado `scripts/copilot/run-terminal-llm-b-live-test.mjs` foi removido para evitar dois caminhos concorrentes.
 - [x] `package.json` possui comandos `model-gateway:*`.
 - [x] Makefile possui comandos `model-gateway-*`.
