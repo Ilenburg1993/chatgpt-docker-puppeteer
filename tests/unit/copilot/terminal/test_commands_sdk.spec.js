@@ -445,13 +445,14 @@ describe('terminal/commands/sdk', () => {
             skillDirectories: ['/extra-skills'],
         });
         expect(ctx.output()).toContain('Skills SDK (1)');
-        expect(ctx.output()).toContain('enabled=1');
-        expect(ctx.output()).toContain('project=1');
+        expect(ctx.output()).toContain('ativas 1');
+        expect(ctx.output()).toContain('fontes project=1');
         expect(ctx.output()).toContain('skill-pdf');
         expect(ctx.output()).toContain('slash');
-        expect(ctx.output()).toContain('filtros: project=/repo');
-        expect(ctx.output()).toContain('dir=/extra-skills');
+        expect(ctx.output()).toContain('filtros: projeto /repo');
+        expect(ctx.output()).toContain('diretório /extra-skills');
         expect(ctx.output()).toContain('custom agent = definicao declarativa');
+        expect(ctx.output()).not.toContain('enabled=1');
     });
 
     it('/sdk skills config separa config de sessão, runtime disabled e semântica custom agent/subagent', async () => {
@@ -460,7 +461,7 @@ describe('terminal/commands/sdk', () => {
 
         expect(runtimeMocks.readTerminalSdkSkillsGovernance).toHaveBeenCalled();
         expect(ctx.output()).toContain('Skills SDK Config');
-        expect(ctx.output()).toContain('skillDirectories=1');
+        expect(ctx.output()).toContain('diretórios 1');
         expect(ctx.output()).toContain('security-scan');
         expect(ctx.output()).toContain('SessionConfig.customAgents');
         expect(ctx.output()).toContain('subagent.*');
@@ -473,9 +474,10 @@ describe('terminal/commands/sdk', () => {
 
         expect(ctx.output()).toContain('Custom Agents x Skills');
         expect(ctx.output()).toContain('security-auditor');
-        expect(ctx.output()).toContain('preload=security-scan, skill-pdf');
-        expect(ctx.output()).toContain('disabled=security-scan');
+        expect(ctx.output()).toContain('preload security-scan, skill-pdf');
+        expect(ctx.output()).toContain('desativadas security-scan');
         expect(ctx.output()).toContain('subagent.*');
+        expect(ctx.output()).not.toContain('preload=');
     });
 
     it('/sdk skills disable e enable atualizam disabledSkills via SDK server-scoped', async () => {

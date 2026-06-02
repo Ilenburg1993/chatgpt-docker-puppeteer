@@ -1108,12 +1108,12 @@ async function renderSdkSkills({ println }, rest, runtimeId) {
 
     println(`\n  \x1b[36mSkills SDK (${skills.length})\x1b[0m`);
     println(
-        `  \x1b[90menabled=${enabledCount} · disabled=${skills.length - enabledCount} · slash=${invocableCount}${sourceSummary ? ` · ${sourceSummary}` : ''}\x1b[0m`,
+        `  \x1b[90mativas ${enabledCount} · desativadas ${skills.length - enabledCount} · invocáveis ${invocableCount}${sourceSummary ? ` · fontes ${sourceSummary}` : ''}\x1b[0m`,
     );
     if (options.projectPaths?.length || options.skillDirectories?.length) {
         const filters = [
-            options.projectPaths?.length ? `project=${options.projectPaths.join(', ')}` : null,
-            options.skillDirectories?.length ? `dir=${options.skillDirectories.join(', ')}` : null,
+            options.projectPaths?.length ? `projeto ${options.projectPaths.join(', ')}` : null,
+            options.skillDirectories?.length ? `diretório ${options.skillDirectories.join(', ')}` : null,
         ]
             .filter(Boolean)
             .join(' · ');
@@ -1136,8 +1136,8 @@ async function renderSdkSkills({ println }, rest, runtimeId) {
         println(
             `  \x1b[33m${name}\x1b[0m${badges ? `  \x1b[90m[${badges}]\x1b[0m` : ''}${desc ? `  \x1b[90m${desc}\x1b[0m` : ''}`,
         );
-        if (projectPath) println(`    \x1b[90mproject=${projectPath}\x1b[0m`);
-        if (path && path !== projectPath) println(`    \x1b[90mpath=${path}\x1b[0m`);
+        if (projectPath) println(`    \x1b[90mprojeto ${projectPath}\x1b[0m`);
+        if (path && path !== projectPath) println(`    \x1b[90mcaminho ${path}\x1b[0m`);
     }
     if (skills.length > 40) println(`  \x1b[90m... ${skills.length - 40} skills omitidas\x1b[0m`);
     println(
@@ -1169,7 +1169,7 @@ async function renderSdkSkillsConfig({ println }, runtimeId) {
 
     println('\n  \x1b[36mSkills SDK Config\x1b[0m');
     println(
-        `  \x1b[90mskillDirectories=${skillDirectories.length} | disabledSkills(boot)=${disabledSkills.length} | disabledSkills(runtime)=${discoveredDisabled.length}\x1b[0m`,
+        `  \x1b[90mdiretórios ${skillDirectories.length} | desativadas no boot ${disabledSkills.length} | desativadas runtime ${discoveredDisabled.length}\x1b[0m`,
     );
     println(`  session dirs      \x1b[90m${skillDirectories.length > 0 ? skillDirectories.join(', ') : '-'}\x1b[0m`);
     println(`  boot disabled     \x1b[90m${disabledSkills.length > 0 ? disabledSkills.join(', ') : '-'}\x1b[0m`);
@@ -1204,7 +1204,7 @@ async function renderSdkSkillsAgents({ println }, runtimeId) {
 
     println(`\n  \x1b[36mCustom Agents x Skills (${customAgents.length})\x1b[0m`);
     println(
-        `  \x1b[90magentsWithPreload=${agentsWithSkills.length} | inferable=${customAgents.filter((agent) => objectOrNull(agent)?.['infer'] !== false).length}\x1b[0m`,
+        `  \x1b[90magentes com preload ${agentsWithSkills.length} | inferíveis ${customAgents.filter((agent) => objectOrNull(agent)?.['infer'] !== false).length}\x1b[0m`,
     );
     println(
         '  \x1b[90mcustom agent = definicao de sessao; subagent = quando o runtime seleciona/invoca esse custom agent e emite subagent.*\x1b[0m',
@@ -1225,16 +1225,16 @@ async function renderSdkSkillsAgents({ println }, runtimeId) {
         const tools = Array.isArray(entry['tools']) ? entry['tools'].map(String) : null;
 
         println(
-            `  \x1b[33m${name}\x1b[0m  \x1b[90m(${displayName}) | infer=${String(infer)} | tools=${tools ? tools.join(', ') || '[]' : 'all'}\x1b[0m`,
+            `  \x1b[33m${name}\x1b[0m  \x1b[90m(${displayName}) | inferir ${String(infer)} | tools ${tools ? tools.join(', ') || '[]' : 'all'}\x1b[0m`,
         );
         if (preloadSkills.length === 0) {
             println('    \x1b[90mpreload skills: -\x1b[0m');
             continue;
         }
-        println(`    \x1b[90mpreload=${preloadSkills.join(', ')}\x1b[0m`);
-        if (preloadEnabledSkills.length > 0) println(`    \x1b[32menabled=${preloadEnabledSkills.join(', ')}\x1b[0m`);
+        println(`    \x1b[90mpreload ${preloadSkills.join(', ')}\x1b[0m`);
+        if (preloadEnabledSkills.length > 0) println(`    \x1b[32mativas ${preloadEnabledSkills.join(', ')}\x1b[0m`);
         if (preloadDisabledSkills.length > 0)
-            println(`    \x1b[31mdisabled=${preloadDisabledSkills.join(', ')}\x1b[0m`);
+            println(`    \x1b[31mdesativadas ${preloadDisabledSkills.join(', ')}\x1b[0m`);
     }
 
     if (customAgents.length === 0) {
@@ -1278,8 +1278,8 @@ async function updateSdkDisabledSkills({ println }, action, names, runtimeId) {
     await callWithRuntimeTarget(setTerminalSdkDisabledSkills, runtimeId, disabledSkills);
 
     println(`\n  \x1b[32m[OK] disabledSkills runtime atualizadas via SDK (${action}).\x1b[0m`);
-    println(`  \x1b[90mrequested=${requested.join(', ')}\x1b[0m`);
-    println(`  \x1b[90mruntime disabled=${disabledSkills.length > 0 ? disabledSkills.join(', ') : '-'}\x1b[0m`);
+    println(`  \x1b[90msolicitadas ${requested.join(', ')}\x1b[0m`);
+    println(`  \x1b[90mdesativadas runtime ${disabledSkills.length > 0 ? disabledSkills.join(', ') : '-'}\x1b[0m`);
     println(
         '  \x1b[90mEscopo: altera o runtime/CLI atual via server RPC; n�o reescreve automaticamente COPILOT_DISABLED_SKILLS do processo.\x1b[0m\n',
     );
@@ -1314,7 +1314,7 @@ async function renderSdkTools({ println }, model, runtimeId) {
             `  \x1b[33m${name}\x1b[0m${badges ? `  \x1b[90m[${badges}]\x1b[0m` : ''}${desc ? `  \x1b[90m${desc}\x1b[0m` : ''}`,
         );
         if (namespacedName && rawName && namespacedName !== rawName) {
-            println(`    \x1b[90mraw=${rawName}\x1b[0m`);
+            println(`    \x1b[90mnome bruto ${rawName}\x1b[0m`);
         }
         if (hasInstructions) {
             const instructions = String(t['instructions']).replace(/\s+/g, ' ').slice(0, 140);
@@ -1323,13 +1323,13 @@ async function renderSdkTools({ println }, model, runtimeId) {
     }
     if (tools.length > 50) println(`  \x1b[90m... ${tools.length - 50} tools omitidas\x1b[0m`);
     println(
-        `\n  \x1b[36mRegistry local canonico\x1b[0m\n  total=\x1b[33m${registrySnapshot.total}\x1b[0m  fsCanonico=\x1b[33m${String(registrySnapshot.hasCanonicalLocalFsTools)}\x1b[0m  execCanonico=\x1b[33m${String(registrySnapshot.hasCanonicalLocalExecTools)}\x1b[0m  legacyShellLoaded=\x1b[33m${String(registrySnapshot.hasLegacySdkShellToolsLoaded)}\x1b[0m  disabled=\x1b[33m${registrySnapshot.disabled.length}\x1b[0m`,
+        `\n  \x1b[36mRegistry local canonico\x1b[0m\n  total \x1b[33m${registrySnapshot.total}\x1b[0m  fs canônico \x1b[33m${String(registrySnapshot.hasCanonicalLocalFsTools)}\x1b[0m  exec canônico \x1b[33m${String(registrySnapshot.hasCanonicalLocalExecTools)}\x1b[0m  shell legado carregado \x1b[33m${String(registrySnapshot.hasLegacySdkShellToolsLoaded)}\x1b[0m  desativadas \x1b[33m${registrySnapshot.disabled.length}\x1b[0m`,
     );
     if (registrySnapshot.disabled.length > 0) {
-        println(`  \x1b[90mdisabled: ${registrySnapshot.disabled.join(', ')}\x1b[0m`);
+        println(`  \x1b[90mdesativadas: ${registrySnapshot.disabled.join(', ')}\x1b[0m`);
     }
     println(
-        `  \x1b[90mcontract: ok=${String(contract.ok)} · errors=${contract.errorCount} · warnings=${contract.warningCount} · desc=${contract.metadataCoverage.descriptionPct}% · schema=${contract.metadataCoverage.parametersPct}% · category=${contract.metadataCoverage.categoryPct}% · tags=${contract.metadataCoverage.tagsPct}% · instructions=${contract.metadataCoverage.instructionsPct}%\x1b[0m`,
+        `  \x1b[90mcontrato: ${contract.ok ? 'ok' : 'atenção'} · falhas ${contract.errorCount} · avisos ${contract.warningCount} · descrições ${contract.metadataCoverage.descriptionPct}% · schema ${contract.metadataCoverage.parametersPct}% · categoria ${contract.metadataCoverage.categoryPct}% · tags ${contract.metadataCoverage.tagsPct}% · instruções ${contract.metadataCoverage.instructionsPct}%\x1b[0m`,
     );
     println('');
 }

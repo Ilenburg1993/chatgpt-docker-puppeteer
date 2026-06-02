@@ -2165,7 +2165,8 @@
 - [x] `/sdk waits` e `/sdk simulate request-user-input` passaram a chamar o estado de `pergunta estruturada`, não `input estruturado`.
 - [x] `/sdk capabilities` removeu `elicitation=true`, `workspace=true`, `confirm=`, `select=`, `input=`, `read=`, `write=` e `delete=` da vista do operador.
 - [x] `/sdk doctor` removeu `sdk.workspace=`, `local.fs.canonico=`, `tools.list=`, `ui.elicitation=`, `ok=`, `errors=` e `coverage(...)`, substituindo por `workspace SDK`, `arquivos locais`, `lista tools`, `formulário UI`, `contrato`, `falhas`, `avisos` e `cobertura`.
-- [ ] Auditar `/sdk status`, `/sdk quota`, `/sdk skills` e `/sdk tools` para remover outros dumps de capability da vista default.
+- [x] Auditar `/sdk status`, `/sdk quota`, `/sdk skills` e `/sdk tools` para remover outros dumps de capability da vista default.
+- [x] `/sdk skills`, `/sdk skills config`, `/sdk skills agents`, `/sdk skills enable/disable` e `/sdk tools` passaram a usar `ativas`, `desativadas`, `fontes`, `projeto`, `diretório`, `agentes com preload`, `inferíveis`, `preload`, `solicitadas`, `desativadas runtime`, `registry local`, `contrato`, `falhas` e `avisos`, sem `enabled=`, `skillDirectories=`, `agentsWithPreload=`, `infer=`, `preload=`, `requested=`, `raw=`, `total=`, `fsCanonico=` ou `contract: ok=`.
 - [x] Live PTY curta executada:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/ux-visual-grammar-palette-20260602-1320`.
 - [x] Resultado: PASS completo em help, status, now, health, tools, live, activity, waits e close limpo.
@@ -2249,5 +2250,8 @@
 - [x] `/byok auto status`, `auto proof-plan`, `auto standby`, `auto standby persisted`, `auto history`, `auto handoffs`, `auto recovery fixture`, `auto on` e `auto policy` passaram a remover `profile=`, `runtimeSelector=`, `liveSetModel=`, `providerCall=nao`, `routes=`, `status=`, `model=`, `route=` e `action=` do modo default.
 - [x] `/byok gateway eligibility`, `/byok probe`, `/byok providers`, `/byok profiles`, `/byok models`, `/byok recommend` e `/byok probe shortlist` passaram a usar tags humanas (`contexto`, `max req`, `provider`, `perfil`, `fonte`, `filtros`, `hint gratuito`, `deltas`, `tool calls`, `fixture`) em vez de `ctx=`, `maxReq=`, `provider=`, `profile=`, `fonte=`, `filtros=`, `freeHint=`, `deltas=`, `toolCalls=` e `fixture=`.
 - [x] Teste BYOK completo passou novamente com 105 testes após o segundo sublote.
+- [x] Live PTY curta executada após o polish BYOK/SDK:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/ux-byok-polish-cycle-20260602-1440`.
+- [x] Resultado: PASS completo em help, status, now, health, tools, live, activity, waits e close limpo; evidência em `artifacts/terminal-live/ux-byok-polish-cycle-20260602-1440/summary.md`.
 - [ ] Auditar `/byok operational health` detalhado, `/byok confirmations/recoveries`, `/byok persist`, `/byok models grouped` e helpers de health tags para separar default humano de detalhe técnico.
 - [ ] Separar explicitamente “tela default humana” de “detail/raw diagnóstico” nos comandos BYOK, sem perder automação e rastreabilidade.
