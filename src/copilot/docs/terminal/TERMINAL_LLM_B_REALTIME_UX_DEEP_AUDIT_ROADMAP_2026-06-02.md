@@ -2625,4 +2625,8 @@
 - [x] `/byok gateway catalog refresh plan` removeu uma linha residual com ANSI local e passou a renderizar `Importers`, `Executar`, `Adiar` e `Comando` com `terminalThemeRow`.
 - [x] Teste escopado BYOK passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js`.
+- [x] Live PTY curta após a sequência de polimentos passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=60000 --transport=pty --out-dir=artifacts/terminal-live/ux-session-byok-polish-20260602-1852`.
+  - Resultado: PASS.
+- [x] Achado da live: `/status`, `/now`, `/health`, `/live` e `/activity` compactos estão funcionais e humanos, mas ainda usam algumas cores locais herdadas; a estética já melhorou, porém a unificação total da paleta ainda cabe em rodada própria.
 - [ ] Próxima lacuna: migrar outros comandos que só precisam de tema para o barrel estreito, reduzindo acoplamento acidental em testes e cold start.
