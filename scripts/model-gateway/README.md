@@ -4,6 +4,7 @@ Scripts operacionais canônicos do `src/copilot/model-gateway`.
 
 Guia canonico transversal:
 
+- `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATIONAL_AND_CODE_REFERENCE_2026-06-02.md`
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_RUNTIME_OPERATIONS_ROADMAP_2026-06-02.md`
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_RUNTIME_OPERATOR_AUTOMATION_GUIDE_2026-06-02.md`
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_AND_CODE_GUIDE_2026-06-01.md`

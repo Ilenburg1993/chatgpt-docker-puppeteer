@@ -3,6 +3,10 @@
 `src/copilot/model-gateway` is the canonical domain for BYOK providers, provider-local models, capability metadata,
 probes, routing decisions, health and cost policy.
 
+The current canonical operational and code reference is
+[`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATIONAL_AND_CODE_REFERENCE_2026-06-02.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATIONAL_AND_CODE_REFERENCE_2026-06-02.md).
+Read it first before changing code, operating auto mode or running live tests.
+
 The active terminal auto runtime roadmap is
 [`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_TERMINAL_AUTO_RUNTIME_ROADMAP_2026-06-01.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_TERMINAL_AUTO_RUNTIME_ROADMAP_2026-06-01.md).
 Use it as the source of truth before changing importers, catalog storage, account access, eligibility, probes, runtime

@@ -7,6 +7,7 @@ preservar explicabilidade, e testar o fluxo no mesmo ambiente do operador.
 
 Documentos operacionais relacionados:
 
+- `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATIONAL_AND_CODE_REFERENCE_2026-06-02.md`
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_RUNTIME_OPERATOR_AUTOMATION_GUIDE_2026-06-02.md`
 
 Documentos anteriores continuam como historico e fonte de contexto:
@@ -85,12 +86,18 @@ O sistema ideal deve permitir:
 - [x] Live control no-PR passou.
 - [x] Live BYOK fixture no-PR passou.
 - [x] Live BYOK real no-PR passou em `artifacts/terminal-live/2026-06-02T01-11-14-561Z/summary.md`.
+- [x] Live auto-probe passou em `artifacts/terminal-live/2026-06-02T02-44-38-191Z/summary.md`.
+- [x] Live control no-PR passou em `artifacts/terminal-live/2026-06-02T02-45-10-607Z/summary.md`.
+- [x] Live BYOK fixture no-PR passou em `artifacts/terminal-live/2026-06-02T02-45-29-920Z/summary.md`.
+- [x] Live BYOK real no-PR passou em `artifacts/terminal-live/2026-06-02T02-45-55-239Z/summary.md`.
 - [x] `model-gateway:commands:json` roda pelo runner.
 - [x] `model-gateway:live:readiness -- --fail` roda pelo runner.
 - [x] `model-gateway:auto:ready` roda pelo runner.
 - [x] `model-gateway:operator-ready` existe como cockpit read-only para humano/LLM.
 - [x] Standby plans podem ser persistidos no SQLite operacional por perfil.
 - [x] Standby persistido pode ser lido sem recalcular selector por `--read-sqlite`/`persisted`.
+- [x] `auto:scenarios` inclui cockpit, standby persistido e etapa de persistencia de standby.
+- [x] Referencia canonica operacional/estrutural foi criada.
 
 ### 2.2 Lacunas De Base Ainda Abertas
 
@@ -107,6 +114,8 @@ O sistema ideal deve permitir:
 - [ ] O sistema precisa preservar historico sem deixar lixo operacional ressuscitar selecao.
 - [ ] A camada de comandos canonicos precisa incluir "status de pronto para operar" em uma saida unica e didatica.
 - [ ] Live tests com LLM-B ainda precisam cobrir turnos reais, falhas simuladas e fallback efetivo.
+- [ ] Vision nao deve ser tratado como bloqueio geral: falha de vision deve bloquear apenas capacidades multimodais.
+- [ ] Side-channel GitHub Copilot quota deve continuar separado de BYOK quota/creditos/rate-limit.
 
 ## 3. Invariantes
 
@@ -306,9 +315,9 @@ metadata importers
 
 ### Faixa J - Live Tests LLM-B
 
-- [ ] J.1 Control no-PR deve permanecer verde.
-- [ ] J.2 BYOK fixture no-PR deve permanecer verde.
-- [ ] J.3 BYOK real no-PR deve permanecer verde.
+- [x] J.1 Control no-PR deve permanecer verde.
+- [x] J.2 BYOK fixture no-PR deve permanecer verde.
+- [x] J.3 BYOK real no-PR deve permanecer verde.
 - [ ] J.4 Live real com turno simples deve ser criado.
 - [ ] J.5 Live real com tool/ask_user deve ser criado.
 - [ ] J.6 Live fixture de quota esgotada deve ser criado.
@@ -347,11 +356,11 @@ metadata importers
 
 - [x] M.1 Criar este roadmap.
 - [x] M.2 Linkar este roadmap nos guias ativos.
-- [ ] M.3 Marcar guias antigos como historicos.
+- [x] M.3 Criar referencia canonica operacional e estrutural atual.
 - [x] M.4 Atualizar `scripts/model-gateway/README.md`.
 - [x] M.5 Atualizar inventario canonico.
-- [ ] M.6 Atualizar checklist de live tests.
-- [ ] M.7 Registrar cada live test relevante com artifact.
+- [x] M.6 Atualizar checklist de live tests.
+- [x] M.7 Registrar cada live test relevante com artifact.
 - [ ] M.8 Registrar comandos para recovery.
 - [ ] M.9 Registrar comandos para fallback.
 - [ ] M.10 Registrar comandos para clear/probe.
@@ -376,9 +385,11 @@ npm run model-gateway:commands:json
 npm run model-gateway:ops
 npm run model-gateway:auto:ready
 npm run model-gateway:auto:doctor
+npm run model-gateway:operator-ready
 npm run model-gateway:auto:standby -- --profile=repo_agent --limit=12
 npm run model-gateway:auto:standby -- --profile=repo_agent --limit=12 --write-sqlite
 npm run model-gateway:auto:standby -- --profile=repo_agent --read-sqlite --json
+npm run model-gateway:auto:scenarios -- --profile=repo_agent --json
 npm run model-gateway:runtime-selector -- --fail
 npm run model-gateway:runtime-health:diff -- --write-snapshot --fail-on-regression
 npm run model-gateway:live:readiness -- --fail

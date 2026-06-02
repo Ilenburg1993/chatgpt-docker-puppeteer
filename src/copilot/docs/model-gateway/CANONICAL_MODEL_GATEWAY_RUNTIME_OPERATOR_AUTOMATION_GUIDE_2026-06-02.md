@@ -5,6 +5,10 @@ Os guias anteriores continuam como historico e contexto, mas este arquivo organi
 pronto para uso por operador humano ou LLM, com fluxos claros, comandos canonicos, standby, fallback, selecao
 pre-runtime, selecao runtime e testes live LLM-B.
 
+Referencia canonica transversal atual:
+
+- `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATIONAL_AND_CODE_REFERENCE_2026-06-02.md`
+
 ## 1. Escopo
 
 - Sistema principal: `src/copilot/model-gateway/`.
@@ -42,6 +46,7 @@ pre-runtime, selecao runtime e testes live LLM-B.
 - [x] `operator-ready` agrega ops, auto-ready, selector, standby e health diff.
 - [x] Standby plans podem ser persistidos no SQLite operacional por perfil sem tocar no catalogo canonico.
 - [x] Standby persistido pode ser inspecionado sem recalcular selector por `--read-sqlite`/`persisted`.
+- [x] `auto:scenarios` inclui cockpit operator-ready, standby gerado, standby persistido e snapshot persistivel.
 - [x] Scripts foram movidos para `scripts/model-gateway/commands/`.
 - [x] Runner/barrel vive em `scripts/model-gateway/run.mjs` e `scripts/model-gateway/index.mjs`.
 - [x] Manifesto JSON do runner existe em `npm run model-gateway:scripts`.
@@ -194,13 +199,14 @@ pre-runtime, selecao runtime e testes live LLM-B.
 - [x] H.1 Runner live esta em `scripts/model-gateway/commands/`.
 - [x] H.2 Live no-PR real ja foi executado com sucesso anteriormente.
 - [x] H.3 Live readiness passou apos reorganizacao.
-- [ ] H.4 Rodar live control no-PR apos terminal operator-ready.
-- [ ] H.5 Rodar live BYOK fixture no-PR.
+- [x] H.4 Rodar live control no-PR apos terminal operator-ready.
+- [x] H.5 Rodar live BYOK fixture no-PR.
 - [x] H.6 Rodar live auto-probe.
-- [ ] H.7 Rodar live real no-PR com runtime selector.
+- [x] H.7 Rodar live real no-PR com runtime selector.
 - [ ] H.8 Rodar live fallback fixture com post-turn recovery.
 - [x] H.9 Registrar artifact paths no guia e no ledger.
-- [ ] H.10 Corrigir bugs encontrados e repetir readiness.
+- [ ] H.10 Reduzir latencia de `auto:scenarios` se o caminho agregado passar de 60s no ambiente do operador.
+- [ ] H.11 Corrigir bugs encontrados e repetir readiness.
 
 ### Faixa I - Integracao Ao Runtime Automatizado
 
@@ -239,7 +245,7 @@ pre-runtime, selecao runtime e testes live LLM-B.
 - [x] K.5 Testes cobrem fallback fields no terminal.
 - [ ] K.6 Testes cobrem presets de policy.
 - [x] K.9 Testes cobrem `model-gateway-runtime-standby-plan`.
-- [ ] K.7 Live tests cobrem fixture e real no-PR.
+- [x] K.7 Live tests cobrem fixture e real no-PR.
 - [ ] K.8 Typecheck strict deve ser reavaliado depois das proximas mudancas grandes.
 
 ## 6. Sequencia Imediata
@@ -256,7 +262,7 @@ pre-runtime, selecao runtime e testes live LLM-B.
 10. [x] Persistir standby plan por perfil.
 11. [x] Rodar testes terminal escopados.
 12. [x] Commit/push da reorganizacao e cockpit terminal.
-13. [ ] Continuar para live tests LLM-B em escada.
+13. [x] Continuar para live tests LLM-B em escada.
 
 ## 7. Comandos Canonicos Desta Fase
 
@@ -269,6 +275,7 @@ npm run model-gateway:auto:standby -- --profile=repo_agent --limit=12
 npm run model-gateway:auto:standby -- --profile=repo_agent --limit=12 --write-sqlite
 npm run model-gateway:auto:standby -- --profile=repo_agent --read-sqlite --json
 npm run model-gateway:auto:status -- --profile=repo_agent
+npm run model-gateway:auto:scenarios -- --profile=repo_agent --json
 npm run model-gateway:live:readiness -- --fail
 npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000
 ```
@@ -277,13 +284,13 @@ npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000
 
 - [ ] Operator-ready package ok.
 - [x] Operator-ready terminal ok.
-- [ ] Runtime selector ok.
-- [ ] Standby com pelo menos duas rotas de providers diferentes.
+- [x] Runtime selector ok.
+- [x] Standby com pelo menos duas rotas de providers diferentes.
 - [ ] Runtime health diff sem regressao nova.
 - [ ] Auto status explica fallback quando houver falha simulada.
 - [x] Recovery fixture grava ledger e nao chama provider.
-- [ ] Lint escopado passa.
-- [ ] Testes model-gateway e terminal escopados passam.
+- [x] Lint escopado passa.
+- [x] Testes model-gateway e terminal escopados passam.
 
 ## 9. Evidencias Live Recentes
 
@@ -292,3 +299,17 @@ npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000
 - [x] Check `gateway-operator-ready-visible` confirmou `/byok gateway operator-ready`.
 - [x] Check `auto-recovery-fixture-visible` confirmou recovery sintético com health persistida.
 - [x] Check `no-terminal-errors` confirmou error tracker limpo.
+- [x] 2026-06-02T02:44:38.197Z - `npm run model-gateway:live:auto-probe` passou em escada completa de cockpit,
+  standby, recovery fixture, SSE e ledger.
+- [x] Artifact: `artifacts/terminal-live/2026-06-02T02-44-38-191Z/summary.md`.
+- [x] 2026-06-02T02:45:10.607Z - `npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000`
+  passou como controle terminal.
+- [x] Artifact: `artifacts/terminal-live/2026-06-02T02-45-10-607Z/summary.md`.
+- [x] 2026-06-02T02:45:29.927Z - `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`
+  passou com fixture, troca de perfil/modelo, catalogo e redacao.
+- [x] Artifact: `artifacts/terminal-live/2026-06-02T02-45-29-920Z/summary.md`.
+- [x] 2026-06-02T02:45:55.246Z - live real no-PR com runtime selector passou com `repo_agent -> kilo-code:kilo-auto/free`,
+  chat, streaming, JSON, agent e shortlist agent OK.
+- [x] Artifact: `artifacts/terminal-live/2026-06-02T02-45-55-239Z/summary.md`.
+- [x] Vision real falhou com HTTP 400, mas foi gravado como capability nao provada sem degradar chat/agent.
+- [x] Side-channel `quota.warning` GitHub Copilot apareceu, mas a UI classificou BYOK como provider/model ativo separado.
