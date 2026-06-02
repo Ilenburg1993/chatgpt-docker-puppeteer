@@ -232,7 +232,7 @@ function printTurnTraceSummary(println, title, trace, opts) {
                 Array.isArray(userInput.choices) && userInput.choices.length > 0
                     ? ` · opções ${userInput.choices.join('|')}`
                     : '';
-            const answer = userInput.answerPreview ? ` · resposta=${userInput.answerPreview}` : '';
+            const answer = userInput.answerPreview ? ` · resposta ${userInput.answerPreview}` : '';
             const requestId = opts.detail && userInput.requestId ? ` · req=${compactTerminalDiagnosticId(userInput.requestId)}` : '';
             const source = opts.detail ? ` · ${renderSourceLabel(userInput.source ?? 'sdk')}` : '';
             println(

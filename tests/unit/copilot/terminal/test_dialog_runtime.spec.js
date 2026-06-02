@@ -56,6 +56,20 @@ describe('terminal/dialog/dialog-runtime', () => {
             'utf8',
         );
         expect(sdkEvents).toContain("'Modelo confirmado'");
+        expect(sdkEvents).toContain("'Pergunta ao operador'");
+        expect(sdkEvents).toContain("'Resposta do operador'");
         expect(sdkEvents).not.toContain("'Modelo SDK alterado'");
+        expect(sdkEvents).not.toContain("'ask_user SDK solicitado'");
+        expect(sdkEvents).not.toContain("'ask_user SDK respondido'");
+
+        const agentEvents = await readFile(
+            new URL('../../../../src/copilot/terminal/events/agent-runtime-events.js', import.meta.url),
+            'utf8',
+        );
+        expect(agentEvents).toContain("'Pergunta ao operador reconciliada'");
+        expect(agentEvents).not.toContain("'question.pending reconciliado pelo ask_user SDK'");
+
+        expect(src).toContain('sem pergunta humana ou formulário pendente');
+        expect(src).not.toContain('sem ask_user/elicitation pendente');
     });
 });

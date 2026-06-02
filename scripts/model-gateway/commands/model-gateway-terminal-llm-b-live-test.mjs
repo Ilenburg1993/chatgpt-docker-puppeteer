@@ -142,7 +142,7 @@ function buildExactLineRegex(value) {
 }
 
 function buildAskRenderedRegex(question) {
-    return new RegExp(`\\[ASK\\]\\s+${escapeRegExp(question)}`, 'u');
+    return new RegExp(`\\[(?:PERGUNTA|ASK)\\]\\s+${escapeRegExp(question)}`, 'u');
 }
 
 function buildQuestionPendingRegex(question) {
@@ -896,7 +896,7 @@ function healthToolStatsUseHumanNames(plain) {
     const section = extractHealthToolStatsSection(plain);
     if (!section) return false;
     if (/\b(?:read_file_content|report_intent_local)\b/u.test(section)) return false;
-    return /(?:Ler arquivo|Intent capturado)/u.test(section);
+    return /(?:Ler arquivo|Intenção capturada)/u.test(section);
 }
 
 function byokLiveMaterializationState(plain, criteria = [], scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
@@ -1533,8 +1533,11 @@ function structuredInputCycleCriteria(boot) {
         },
         {
             id: 'structured-input-no-durable-spam',
-            pass: !/request_user_input ainda executando|LLM-B ainda trabalhando/iu.test(plain),
-            detail: 'structured input cycle did not print old durable waiting spam',
+            pass:
+                !/request_user_input ainda executando|LLM-B ainda trabalhando|chatcmpl-tool-[a-z0-9-]+|ask_user SDK/iu.test(
+                    plain,
+                ),
+            detail: 'structured input cycle did not print old durable waiting spam, raw ids, or SDK ask_user labels',
         },
         {
             id: 'structured-input-clean-close',
@@ -3133,7 +3136,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'ux-human-tool-names',
             pass:
-                /\[INTENÇÃO\] Intent capturado/.test(plain) &&
+                /\[INTENÇÃO\] Intenção capturada/.test(plain) &&
                 /\[LER\]\s+Ler arquivo/.test(plain) &&
                 /✅ \[OK\] Ler arquivo/.test(plain),
             detail: 'default tool narration uses human tool names',
@@ -3147,8 +3150,11 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'ux-no-durable-waiting-spam',
-            pass: !/LLM-B ainda trabalhando|request_user_input ainda executando/.test(plain),
-            detail: 'durable waiting/tool heartbeat spam was not printed',
+            pass:
+                !/LLM-B ainda trabalhando|request_user_input ainda executando|chatcmpl-tool-[a-z0-9-]+|ask_user SDK/iu.test(
+                    plain,
+                ),
+            detail: 'durable waiting/tool heartbeat spam, raw ids, and SDK ask_user labels were not printed',
         },
         {
             id: 'ux-single-live-status-source',

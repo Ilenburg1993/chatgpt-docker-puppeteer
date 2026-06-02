@@ -401,7 +401,7 @@ function recordTerminalExplicitEmptyOutput(input) {
     const runtimeState = readTerminalRuntimeState();
     if (hasPendingHumanInputOutcome(runtimeState)) {
         recordTerminalActivity('question', 'Turno sem transcript final aguardando input humano', {
-            detail: `kind=${runtimeState.pendingQuestionKind ?? 'question'} · source=${input.materialization.sourceDetail}`,
+            detail: `pergunta humana pendente · origem ${input.materialization.sourceDetail}`,
             source: 'dialog',
             severity: 'info',
             recordHistory: false,
@@ -415,7 +415,7 @@ function recordTerminalExplicitEmptyOutput(input) {
         `assistantMessages=${input.materialization.diagnostics.assistantMessageCount}`;
     reviseRecentTerminalTurnTraceStatus({ timestamp, status: 'failed' });
     recordTerminalActivity('error', 'Turno sem saída pública materializada', {
-        detail: `${failureDetail} · sem ask_user/elicitation pendente`,
+        detail: `${failureDetail} · sem pergunta humana ou formulário pendente`,
         source: 'dialog',
         severity: 'error',
     });
@@ -434,7 +434,7 @@ function recordTerminalExplicitEmptyOutput(input) {
         }),
     );
     println(
-        '\x1b[31m  ⛔ Turno terminou sem saída pública, sem delta materializado e sem ask_user/elicitation pendente.\x1b[0m',
+        '\x1b[31m  ⛔ Turno terminou sem saída pública, sem delta materializado e sem pergunta humana ou formulário pendente.\x1b[0m',
     );
     println('\x1b[90m     Consulte /activity, /live e /byok health para separar provider, SDK e transcript.\x1b[0m');
 

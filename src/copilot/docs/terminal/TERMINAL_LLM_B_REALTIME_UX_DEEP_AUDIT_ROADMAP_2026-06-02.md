@@ -2369,3 +2369,46 @@
 - [x] `/byok auto policy` passou a renderizar nomes humanos de preset (`auto: mesma fronteira`, `auto: preparar nova sessão`) antes do identificador técnico copiável, removendo a linha visual `auto_same_boundary: ...`.
 - [ ] Auditar `/byok persist` e os helpers de health tags restantes para separar default humano de detalhe técnico.
 - [ ] Separar explicitamente “tela default humana” de “detail/raw diagnóstico” nos comandos BYOK, sem perder automação e rastreabilidade.
+
+### 11.27 Pergunta humana sem vazamento de taxonomia SDK
+
+- [x] Auditoria das screenshots confirmou que o pior ruído visual restante vem quando a pergunta humana é narrada como tool:
+  - `request_user_input ainda executando`;
+  - `ask_user SDK solicitado`;
+  - `chatcmpl-tool-*`;
+  - linhas duráveis de espera competindo com a linha viva;
+  - pergunta aparecendo como mais uma operação técnica, não como bloqueio humano.
+- [x] Decisão canônica:
+  - `ask_user` e `request_user_input` continuam preservados no SSE/archive/export bruto;
+  - a superfície default deve falar apenas em `Pergunta ao operador`, `Resposta do operador` e `pergunta humana/formulário pendente`;
+  - request/call ids ficam reservados para `/events --raw`, `/sdk waits detail`, `/activity detail`, export e diagnósticos explícitos;
+  - a linha viva deve ser a única região de espera contínua, sem repetir heartbeat durável para pergunta humana.
+- [x] `sdk-session-events.js` passou a gravar activity de `user_input.requested` como `Pergunta ao operador`, não `ask_user SDK solicitado`.
+- [x] `sdk-session-events.js` passou a gravar activity de `user_input.completed` como `Resposta do operador`, sem request id no detalhe default.
+- [x] `agent-runtime-events.js` trocou a reconciliação silenciosa de `question.pending` por `Pergunta ao operador reconciliada`.
+- [x] `dialog/engine.js` trocou o erro de turno vazio de `sem ask_user/elicitation pendente` para `sem pergunta humana ou formulário pendente`.
+- [x] O runner live reforçou os critérios para reprovar `request_user_input ainda executando`, `LLM-B ainda trabalhando`, `chatcmpl-tool-*` e `ask_user SDK` na superfície default.
+- [x] Testes de runtime passaram a bloquear regressão textual para `ask_user SDK solicitado`, `ask_user SDK respondido`, `question.pending reconciliado pelo ask_user SDK` e `sem ask_user/elicitation pendente`.
+- [x] Rodar live PTY `--structured-input-cycle` novamente após este lote e verificar visualmente o mesmo terminal que o operador humano vê.
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=60000 --transport=pty --out-dir=artifacts/terminal-live/structured-input-human-taxonomy-20260602-1622`.
+- [x] Resultado: PASS completo; `Pergunta humana estruturada`, prompt `[PERG]`, `/sdk waits` humano, resposta roteada, nenhuma ocorrência default de `request_user_input ainda executando`, `LLM-B ainda trabalhando`, `chatcmpl-tool-*` ou `ask_user SDK`.
+- [x] Rodar live PTY com turno real contendo `ask_user` SDK após este lote para confirmar que o fluxo completo continua humano e sem regressão de export/SSE.
+  - Primeira tentativa: `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=240000 --transport=pty --live-scenario=freeform --out-dir=artifacts/terminal-live/ask-user-human-taxonomy-20260602-1624`.
+  - Resultado: BLOCKED por `live-timeout`; a UX ficou correta (`[PERGUNTA]`, prompt `[PERG]`, activity `Pergunta ao operador`), mas o harness ainda esperava badge antigo `[ASK]` para injetar a resposta.
+- [x] Runner live corrigido: `buildAskRenderedRegex()` agora reconhece `PERGUNTA` e mantém compatibilidade diagnóstica com `ASK`.
+- [x] Repetir live PTY de `ask_user` SDK após correção do harness.
+  - `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=240000 --transport=pty --live-scenario=freeform --out-dir=artifacts/terminal-live/ask-user-human-taxonomy-20260602-1630`.
+  - Resultado funcional: ask_user real, resposta humana livre, continuação pós-ask, SSE/export e erros verdes.
+  - Resultado UX: FAIL apenas em critério defasado `ux-human-tool-names`, porque o runner ainda procurava `Intent capturado` embora a UI já renderizasse `Intenção capturada`.
+- [x] Runner live corrigido para aceitar `Intenção capturada` em `ux-human-tool-names` e health tool stats.
+- [x] Achado visual da live corrigido: `/activity` trocou `resposta=...` por `resposta ...` na seção `interações humanas`.
+- [x] Repetir live PTY de `ask_user` SDK após o ajuste do critério e de `/activity`.
+  - `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=240000 --transport=pty --live-scenario=freeform --out-dir=artifacts/terminal-live/ask-user-human-taxonomy-20260602-1632`.
+- [x] Resultado: PASS completo; 258/258 eventos públicos com source/eventSource; ask_user real, resposta humana, continuação pós-ask, SSE/export, nomes humanos de tools, ausência de IDs crus/spam de espera e `/activity` com `resposta ...` sem `resposta=`.
+- [x] Após a live, auditar se `/activity`, `/events`, `/sdk waits`, `/status`, `/now` e a linha viva usam exatamente a mesma terminologia de pergunta humana.
+  - `/activity`: `Pergunta ao operador`, `interações humanas`, `resposta ...`;
+  - `/events`: `Pergunta ao operador`, `Resposta do operador`, `Mensagem da LLM-B`;
+  - `/sdk waits`: `Esperas humanas`, `pergunta estruturada`, `perguntas`;
+  - `/usage now`: `Continuação da pergunta humana`;
+  - linha viva: `PERGUNTA`.
+- [ ] Próxima lacuna estética observada em live: `/health full` ainda usa alguns termos técnicos (`runtime id`, `bg tasks`, `keepalive standby(dialog)`, `ação none`) por ser modo detalhado; decidir se `full` deve continuar técnico ou se só `detail/raw` deve preservar essa taxonomia.

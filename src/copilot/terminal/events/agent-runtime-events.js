@@ -546,7 +546,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             return;
         }
         if (source === 'event') {
-            recordTerminalActivity('question', 'question.pending reconciliado pelo ask_user SDK', {
+            recordTerminalActivity('question', 'Pergunta ao operador reconciliada', {
                 detail: question.slice(0, 160),
                 source: 'agent',
                 recordHistory: false,

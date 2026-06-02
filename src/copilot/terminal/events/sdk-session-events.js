@@ -862,7 +862,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             status: 'requested',
             source: 'sdk',
         });
-        recordTerminalActivity('question', 'ask_user SDK solicitado', {
+        recordTerminalActivity('question', 'Pergunta ao operador', {
             detail: `${question.slice(0, 160)}${choices.length > 0 ? ` · opções ${choices.join('|')}` : ''}`,
             source: 'sdk',
             severity: allowFreeform ? 'info' : 'warn',
@@ -962,8 +962,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             answerPreview: String(evt?.answer ?? '').slice(0, 120),
             source: 'sdk',
         });
-        recordTerminalActivity('question', 'ask_user SDK respondido', {
-            detail: `${renderSdkRequestLabel(requestId)} · ${renderUserInputAnswerModeLabel(wasFreeform)}`,
+        recordTerminalActivity('question', 'Resposta do operador', {
+            detail: renderUserInputAnswerModeLabel(wasFreeform),
             source: 'sdk',
             recordHistory: false,
         });

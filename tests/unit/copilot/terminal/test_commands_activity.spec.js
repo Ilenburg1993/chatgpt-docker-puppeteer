@@ -175,6 +175,8 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('workspace.read_file');
         expect(ctx.output()).toContain('interações humanas');
         expect(ctx.output()).toContain('Qual ambiente devo usar?');
+        expect(ctx.output()).toContain('resposta prod');
+        expect(ctx.output()).not.toContain('resposta=');
         expect(ctx.output()).toContain('I/O real recente');
         expect(ctx.output()).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}\]/u);
         expect(ctx.output()).not.toMatch(/\[\d{2}:\d{2}:\d{2}\]/u);
@@ -350,5 +352,7 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Ler arquivo');
         expect(ctx.output()).toContain('Interação humana recente');
         expect(ctx.output()).toContain('ASK-CANONICAL?');
+        expect(ctx.output()).toContain('resposta SIM');
+        expect(ctx.output()).not.toContain('resposta=');
     });
 });
