@@ -19,6 +19,7 @@
  */
 
 import { readTerminalConfigProjection, readTerminalDiagnoseProjection } from '../frontend/index.js';
+import { terminalPermissionModeSkipsSdkPrompts } from '../state/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -135,6 +136,11 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     const sdkModeLine = configProjection.sdkSessionMode
         ? `${C.magenta}${configProjection.sdkSessionMode}${C.reset}`
         : `${C.grey}desconhecido${C.reset}`;
+    const permissionMode =
+        configProjection.permissionMode === 'audit_only' || configProjection.permissionMode === 'selective'
+            ? configProjection.permissionMode
+            : 'approve_all';
+    const permissionLine = `${C.magenta}${permissionMode}${C.reset} ${C.grey}· sdk prompts=${terminalPermissionModeSkipsSdkPrompts(permissionMode) ? 'skip' : 'selective'}${C.reset}`;
     const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
     const byokLine = byok.enabled
         ? `${byok.ready ? `${C.green}ready${C.reset}` : `${C.red}incompleto${C.reset}`} ${C.grey}preset=${byok.preset ?? '-'} · provider=${byok.providerType ?? '-'} · model=${byok.model ?? '-'} · auth=${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'none'}${C.reset}`
@@ -213,6 +219,7 @@ ${C.cyan}  AGENTE${C.reset}
     gateway       ${gatewayLine}
     reasoning     ${C.magenta}${configProjection.currentReasoningEffort}${C.reset}
     modo sdk      ${sdkModeLine}
+    permission    ${permissionLine}
     plan arquivo  ${planOpLine}
     runtime id    ${C.grey}${configProjection.runtimeId}${C.reset}
     runtimes      ${C.grey}${runtimesLine}${C.reset}

@@ -45,6 +45,7 @@ function resolveSdkSessionModeProjection(storedMode, binding) {
  * @returns {{
  *     currentModel: string;
  *     currentReasoningEffort: string;
+ *     permissionMode: 'approve_all' | 'audit_only' | 'selective';
  *     sdkSessionMode: 'interactive' | 'plan' | 'autopilot' | 'shell' | null;
  *     sdkPlanOperation: 'create' | 'update' | 'delete' | null;
  *     sdkPlanChangedAt: number | null;
@@ -80,11 +81,16 @@ export function readTerminalConfigProjection(runtimeId) {
     const base = readTerminalRuntimeBase(runtimeId);
     const currentModel = String(base.model ?? base.snap['model'] ?? 'unknown');
     const currentReasoningEffort = String(base.reasoningEffort ?? base.snap['reasoningEffort'] ?? 'off');
+    const permissionMode =
+        base.snap['permissionMode'] === 'audit_only' || base.snap['permissionMode'] === 'selective'
+            ? /** @type {'audit_only' | 'selective'} */ (base.snap['permissionMode'])
+            : 'approve_all';
     const autoModelPolicy = readRuntimeAutoModelPolicyProjection(base.runtimeId);
     const modelGateway = buildEnvByokModelGatewaySnapshot();
     return {
         currentModel,
         currentReasoningEffort,
+        permissionMode,
         sdkSessionMode: resolveSdkSessionModeProjection(getSdkSessionMode(), base.binding),
         sdkPlanOperation: getLastSdkPlanOperation(),
         sdkPlanChangedAt: getLastSdkPlanChangedAt(),
