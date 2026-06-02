@@ -218,7 +218,7 @@ describe('terminal/live-status-line', () => {
 
         expect(shouldRenderTerminalLiveStatusLine()).toBe(true);
         const line = formatTerminalLiveStatusLine();
-        expect(line).toContain('waiting-human/aguardando resposta humana');
+        expect(line).toContain('ASK/aguardando operador');
         expect(line).toContain('Qual cor devo usar');
         expect(line).toContain('opções=azul|verde');
         expect(line).not.toContain('LLM-B trabalhando');

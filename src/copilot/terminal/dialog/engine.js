@@ -7,7 +7,12 @@
  */
 
 import { emitNerv } from '#copilot/bridges';
-import { LLM_B_BOOT_TIMEOUT_MS, TERMINAL_BYOK_TURN_TIMEOUT_MS, readConfiguredByokSummary } from '#copilot/config';
+import {
+    LLM_B_BOOT_TIMEOUT_MS,
+    TERMINAL_BYOK_TURN_TIMEOUT_MS,
+    TERMINAL_LIVE_STATUS_ENABLED,
+    readConfiguredByokSummary,
+} from '#copilot/config';
 import { cancelTimer, container, registerInterval, sleepMs, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { log, METRICS_STORE } from '#copilot/observability';
@@ -839,7 +844,8 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         const effort = reasoningEffort;
         liveTurnSignal.model = model;
         liveTurnSignal.effort = effort;
-        const renderWaitingStatus = () =>
+        const renderWaitingStatus = () => {
+            if (TERMINAL_LIVE_STATUS_ENABLED) return;
             writeInlineStatus(
                 formatLiveWaitingStatus({
                     startedAt: t0,
@@ -849,6 +855,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                     timeoutStrategy: timeoutDecision.strategy,
                 }),
             );
+        };
         const narrateWaitingStatus = () => {
             const runtimeState = readTerminalRuntimeState();
             if (runtimeState.status === 'waiting_for_input' && runtimeState.pendingQuestionKind === 'question') return;
@@ -862,9 +869,11 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 source: 'dialog',
                 recordHistory: false,
             });
-            println(
-                `  \x1b[90m↳ LLM-B ainda trabalhando · ${liveTurnSignal.model}/${liveTurnSignal.effort} · ${(elapsedMs / 1000).toFixed(0)}s sem saída incremental\x1b[0m`,
-            );
+            if (process.env['COPILOT_TERMINAL_DURABLE_WAITING_NARRATION'] === 'true') {
+                println(
+                    `  \x1b[90m↳ LLM-B ainda trabalhando · ${liveTurnSignal.model}/${liveTurnSignal.effort} · ${(elapsedMs / 1000).toFixed(0)}s sem saída incremental\x1b[0m`,
+                );
+            }
         };
         renderWaitingStatus();
         rl.setPrompt(buildWaitingPrompt());

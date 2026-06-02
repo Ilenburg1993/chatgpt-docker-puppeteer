@@ -282,9 +282,9 @@ const LIVE_SCENARIOS = Object.freeze({
             'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-FILEWRITE-FINAL: arquivo criado, movido, deletado e usuário confirmou SIM".',
         allowedTools: ['report_intent', 'read_file_content', 'create_file', 'move_file', 'delete_file', 'ask_user'],
         expectedLifecycleTools: [
-            { name: 'create_file', renderedName: 'create_file' },
-            { name: 'move_file', renderedName: 'move_file' },
-            { name: 'delete_file', renderedName: 'delete_file' },
+            { name: 'create_file', renderedName: 'Criar arquivo' },
+            { name: 'move_file', renderedName: 'Mover arquivo' },
+            { name: 'delete_file', renderedName: 'Excluir arquivo' },
         ],
         expectedOutputMarkers: ['TERMINAL-PERMISSION-ROUNDTRIP'],
         expectedTerminalRender: [{ toolName: 'move_file', badge: 'MOVE', forbiddenBadge: 'INSPECT' }],
@@ -843,13 +843,26 @@ function byokLiveRouteIdentity(realByok) {
     return { routeProfile, providerId, providerModel };
 }
 
+function renderedReadFileToolOk(plain) {
+    return /\[TOOL\].*(?:read_file_content|Ler arquivo)/s.test(plain) && /✅ \[DONE\].*(?:read_file_content|Ler arquivo)/s.test(plain);
+}
+
+function defaultToolNarrationLines(plain) {
+    return String(plain ?? '')
+        .split(/\r?\n/u)
+        .filter((line) => /\[(?:TOOL|INTENT|DONE|TOOLS|ASK)\]/u.test(line));
+}
+
+function hasRawInternalIdInDefaultToolNarration(plain) {
+    return defaultToolNarrationLines(plain).some((line) => /(?:chatcmpl-tool-|toolu_|report_intent_local \(alias:)/iu.test(line));
+}
+
 function byokLiveMaterializationState(plain, criteria = [], scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
     const passed = new Set(criteria.filter((criterion) => criterion?.pass === true).map((criterion) => criterion.id));
     return {
         toolProtocolOk:
             passed.has('tool-start-done') &&
-            /\[TOOL\].*read_file_content/s.test(plain) &&
-            /✅ \[DONE\] read_file_content/s.test(plain),
+            renderedReadFileToolOk(plain),
         askUserOk:
             passed.has('ask-user-visible') &&
             passed.has('ask-user-answer') &&
@@ -1798,11 +1811,7 @@ function findByokRealLiveToolProtocolMiss(plain, scenario = LIVE_SCENARIOS[DEFAU
             : null,
         /(?:^|\n)\s*│\s+The requested actions have been executed\b/mu.test(plain) ? 'claimed_execution' : null,
     ].filter(Boolean);
-    if (
-        markers.length > 0 &&
-        !/\[TOOL\].*read_file_content/s.test(plain) &&
-        !/✅ \[DONE\] read_file_content/s.test(plain)
-    ) {
+    if (markers.length > 0 && !renderedReadFileToolOk(plain)) {
         return { markers };
     }
     if (!/(?:^|\n)\s*│\s+(?:\*{1,2})?DELTA-CANONICAL-8\b/u.test(plain)) return null;
@@ -2436,14 +2445,10 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'tool-start-done',
-            pass:
-                canonicalToolLifecycle.readFileStart &&
-                canonicalToolLifecycle.readFileDone &&
-                /\[TOOL\].*read_file_content/s.test(plain) &&
-                /✅ \[DONE\] read_file_content/s.test(plain),
+            pass: canonicalToolLifecycle.readFileStart && canonicalToolLifecycle.readFileDone && renderedReadFileToolOk(plain),
             detail:
                 `read_file_content lifecycle start=${canonicalToolLifecycle.readFileStart ? 'yes' : 'no'} done=${canonicalToolLifecycle.readFileDone ? 'yes' : 'no'} io=${canonicalToolLifecycle.readFileIo ? 'yes' : 'no'} ` +
-                `rendered=${/\[TOOL\].*read_file_content/s.test(plain) && /✅ \[DONE\] read_file_content/s.test(plain) ? 'yes' : 'no'} events=${canonicalToolLifecycle.matchedEventIds.slice(0, 8).join(',') || '-'}`,
+                `rendered=${renderedReadFileToolOk(plain) ? 'yes' : 'no'} events=${canonicalToolLifecycle.matchedEventIds.slice(0, 8).join(',') || '-'}`,
         },
         {
             id: 'report-intent-lifecycle',
@@ -2616,6 +2621,39 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             detail: truncatedTurnEndDuplicate
                 ? `dialog.turn_end #${truncatedTurnEndDuplicate.turnEndEventId ?? '?'} repeated prefix of assistant.message #${truncatedTurnEndDuplicate.assistantMessageEventId ?? '?'}`
                 : 'no known duplicate/pathology markers detected',
+        },
+        {
+            id: 'ux-compact-boot-banner',
+            pass:
+                /Terminal LLM-B/.test(plain) &&
+                /\[brief:ready\]/.test(plain) &&
+                !/\/workspace \[list\|read\|write\|sync\|mirror\|promote\]/.test(plain),
+            detail: 'boot rendered compact banner/brief instead of the full command catalog',
+        },
+        {
+            id: 'ux-human-tool-names',
+            pass:
+                /\[INTENT\] Intent capturado/.test(plain) &&
+                /\[TOOL\]\s+\[READ\]\s+Ler arquivo/.test(plain) &&
+                /✅ \[DONE\] Ler arquivo/.test(plain),
+            detail: 'default tool narration uses human tool names',
+        },
+        {
+            id: 'ux-no-raw-tool-ids-in-default-tool-lines',
+            pass: !hasRawInternalIdInDefaultToolNarration(plain),
+            detail: hasRawInternalIdInDefaultToolNarration(plain)
+                ? 'default tool narration leaked raw tool id/alias'
+                : 'default tool narration kept raw ids in diagnostics only',
+        },
+        {
+            id: 'ux-no-durable-waiting-spam',
+            pass: !/LLM-B ainda trabalhando|request_user_input ainda executando/.test(plain),
+            detail: 'durable waiting/tool heartbeat spam was not printed',
+        },
+        {
+            id: 'ux-single-live-status-source',
+            pass: !/[⏳⌛] aguardando .*watchdog\//.test(plain),
+            detail: 'dialog watchdog did not render a second live-status line when permanent live status is enabled',
         },
         {
             id: 'no-prompt-double-render',

@@ -21,6 +21,7 @@ import { readTerminalDisplayState, resolveTerminalBootDisplayPreset } from '../s
 /** @type {Map<string, string>} */
 const _lastAutoBriefFingerprintByPhase = new Map();
 const TRANSIENT_BOOT_TOOL_WARNING = 'file-tools canônicas locais não estão totalmente disponíveis';
+const AUTO_BRIEF_MODE_FULL = 'full';
 
 /**
  * @param {unknown} value
@@ -135,6 +136,27 @@ export function buildTerminalAutoBrief(input = {}) {
     const byok = readTerminalByokProjection().summary;
     /** @type {string[]} */
     const lines = [];
+    const visibleWarnings = filterAutoBriefWarnings(guidance.warnings, { phase, ready });
+    if (process.env['COPILOT_TERMINAL_AUTO_BRIEF'] !== AUTO_BRIEF_MODE_FULL) {
+        const toolBits = [
+            `${projection.toolLoad.total} tools`,
+            projection.toolLoad.hasCanonicalLocalFsTools ? 'fs' : null,
+            projection.toolLoad.hasCanonicalLocalExecTools ? 'exec' : null,
+            projection.toolLoad.toolContract.ok ? null : `${projection.toolLoad.toolContract.errorCount} contrato`,
+        ].filter(Boolean);
+        lines.push(
+            `[brief:${phase}] ${model}/${reasoning} · sessão ${sessionTag} · ${displayPreset} · ${toolBits.join(' · ') || 'tools subindo'}`,
+        );
+        if (byok.enabled) {
+            lines.push(
+                `[brief:${phase}] BYOK ${byok.ready ? 'pronto' : 'incompleto'} · ${byok.providerType ?? '-'} · ${byok.model ?? '-'} · auth=${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'none'}`,
+            );
+        }
+        lines.push(`[brief:${phase}] rota ${guidance.mode} · próximo ${guidance.nextCommand ?? '/status'}`);
+        if (!ready) lines.push(`[brief:${phase}] boot parcial · aguardando registry/dialog`);
+        if (visibleWarnings.length > 0) lines.push(`[brief:${phase}] atenção ${visibleWarnings.join(' | ')}`);
+        return { phase, ready, fingerprint: buildAutoBriefFingerprint(projection), lines };
+    }
     lines.push(
         `[auto-brief:${phase}] runtime=${projection.runtimeId} · modelo=${model}/${reasoning} · sessão=${sessionTag} · display=${displayPreset} · thinking=${displayState.thinking ? 'on' : 'off'} · streaming=${displayState.streaming ? 'on' : 'off'}`,
     );
@@ -160,7 +182,6 @@ export function buildTerminalAutoBrief(input = {}) {
             `[auto-brief:${phase}] estado=parcial · registry/dialog ainda subindo; um brief pós-bootstrap será emitido quando houver dados reais.`,
         );
     }
-    const visibleWarnings = filterAutoBriefWarnings(guidance.warnings, { phase, ready });
     if (visibleWarnings.length > 0) {
         lines.push(`[auto-brief:${phase}] atenção=${visibleWarnings.join(' | ')}`);
     }

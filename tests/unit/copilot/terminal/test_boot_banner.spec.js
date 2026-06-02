@@ -24,7 +24,7 @@ describe('terminal/terminal-phases/boot-banner', () => {
             true,
         );
         assert.equal(
-            view.lines.some((line) => line.includes('MCP tools indisponíveis')),
+            view.lines.some((line) => line.includes('registry local continua ativo')),
             true,
         );
         assert.equal(
@@ -32,7 +32,7 @@ describe('terminal/terminal-phases/boot-banner', () => {
             true,
         );
         assert.equal(
-            view.lines.some((line) => line.includes('/session sdk next new|resume|auto')),
+            view.lines.some((line) => line.includes('next new|resume|auto')),
             true,
         );
     });

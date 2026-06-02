@@ -318,11 +318,15 @@ function printToolStart(presentation) {
     if (!getShowToolActivity()) return;
     const compactDetail = getTerminalDetailLevel() === 'compact';
     const operationRole = mapTerminalToolOperationRole(presentation.operation);
-    const opLabel = presentation.operation.toUpperCase();
+    const opLabel = presentation.operation === 'ask' ? 'ASK' : presentation.operation === 'intent' ? 'INTENT' : presentation.operation.toUpperCase();
+    const primaryBadge =
+        presentation.operation === 'ask' || presentation.operation === 'intent'
+            ? terminalThemeBadge(operationRole, opLabel)
+            : `${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)}`;
     println(
         compactDetail
-            ? `  ${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)} ${terminalThemeText('tool', compactTerminalToolText(presentation.displayToolName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(presentation.startLine, 86))}`
-            : `  ${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)} ${terminalThemeText('tool', presentation.displayToolName)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.startLine)}`,
+            ? `  ${primaryBadge} ${terminalThemeText('tool', compactTerminalToolText(presentation.displayToolName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(presentation.startLine, 86))}`
+            : `  ${primaryBadge} ${terminalThemeText('tool', presentation.displayToolName)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.startLine)}`,
     );
 }
 

@@ -323,7 +323,7 @@ describe('terminal/commands/activity', () => {
         cmdActivity({ println: ctx.println }, '5');
 
         expect(ctx.output()).toContain('Último turno concluído');
-        expect(ctx.output()).toContain('read_file_content');
+        expect(ctx.output()).toContain('Ler arquivo');
         expect(ctx.output()).toContain('Interação humana recente');
         expect(ctx.output()).toContain('ASK-CANONICAL?');
     });

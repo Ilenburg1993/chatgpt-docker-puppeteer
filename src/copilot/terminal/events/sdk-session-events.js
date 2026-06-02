@@ -179,6 +179,31 @@ function compactSummaryText(value, max = 36) {
 }
 
 /**
+ * @param {string | null | undefined} value
+ * @returns {boolean}
+ */
+function isLikelyInternalId(value) {
+    if (!value) return false;
+    const text = value.trim();
+    return (
+        /^chatcmpl-tool-[a-z0-9-]+$/iu.test(text) ||
+        /^toolu_[a-z0-9]+$/iu.test(text) ||
+        /^call_[a-z0-9_-]+$/iu.test(text) ||
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(text)
+    );
+}
+
+/**
+ * @param {string} operation
+ * @returns {string}
+ */
+function renderTurnTraceOperationLabel(operation) {
+    if (operation === 'ask') return 'ASK';
+    if (operation === 'intent') return 'INTENT';
+    return operation.toUpperCase();
+}
+
+/**
  * Envelope único para eventos vanilla do SDK expostos via SSE do terminal.
  *
  * @template {Record<string, unknown>} T
@@ -204,10 +229,21 @@ function renderTurnTraceSummary(trace) {
     }
     const compactDetail = getTerminalDetailLevel() === 'compact';
     const toolItems = trace.tools.slice(0, compactDetail ? 2 : 3).map((tool) => {
-        const target = tool.path ?? tool.target ?? tool.toolName;
+        const targetCandidate = tool.path ?? tool.target ?? null;
+        const target = isLikelyInternalId(targetCandidate) ? null : targetCandidate;
+        const presentation = buildTerminalToolActivityPresentation(
+            {
+                toolName: tool.toolName,
+                operation: tool.operation,
+                args: target ? { path: tool.path ?? target } : {},
+            },
+            tool.toolName,
+        );
+        const displayName = presentation.displayToolName;
+        const operationLabel = renderTurnTraceOperationLabel(tool.operation);
         const label = compactDetail
-            ? `${tool.operation.toUpperCase()} ${compactSummaryText(target ?? tool.toolName, 28)}`
-            : `${tool.operation.toUpperCase()} ${tool.toolName} · ${compactSummaryText(target ?? tool.toolName, 46)}`;
+            ? `${operationLabel} ${compactSummaryText(target ?? displayName, 28)}`
+            : `${operationLabel} ${displayName}${target ? ` · ${compactSummaryText(target, 46)}` : ''}`;
         return terminalThemeText('tool', label);
     });
     const fileItems = trace.files.slice(0, compactDetail ? 2 : 3).map((file) => {

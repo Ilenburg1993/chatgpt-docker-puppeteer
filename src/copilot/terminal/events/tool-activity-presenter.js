@@ -30,8 +30,35 @@ const INSPECTION_TOOL_PATTERNS = /** @type {const} */ ([
 
 const GENERIC_TOOL_NAMES = new Set(['external_tool', 'external tool', 'tool', 'unknown', 'unknown_tool']);
 
+/** @type {Readonly<Record<string, string>>} */
+const HUMAN_TOOL_NAMES = Object.freeze({
+    ask_user: 'Pergunta ao operador',
+    request_user_input: 'Pergunta ao operador',
+    report_intent: 'Intent capturado',
+    report_intent_local: 'Intent capturado',
+    read_file_content: 'Ler arquivo',
+    create_file: 'Criar arquivo',
+    write_file: 'Escrever arquivo',
+    move_file: 'Mover arquivo',
+    copy_file: 'Copiar arquivo',
+    delete_file: 'Excluir arquivo',
+    get_session_state: 'Estado da sessão',
+    hooks_get_pending_tasks: 'Pendências de hooks',
+    read_briefing: 'Briefing da sessão',
+    get_workspace_info: 'Contexto do workspace',
+    get_telemetry: 'Telemetria',
+});
+
+const TOOL_ID_PATTERNS = [
+    /^chatcmpl-tool-[a-z0-9-]+$/iu,
+    /^toolu_[a-z0-9]+$/iu,
+    /^call_[a-z0-9_-]+$/iu,
+    /^ext:[a-z0-9_-]+/iu,
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu,
+];
+
 /**
- * @typedef {'read' | 'write' | 'edit' | 'copy' | 'move' | 'delete' | 'list' | 'run' | 'inspect' | 'unknown'} TerminalToolOperation
+ * @typedef {'read' | 'write' | 'edit' | 'copy' | 'move' | 'delete' | 'list' | 'run' | 'inspect' | 'ask' | 'intent' | 'unknown'} TerminalToolOperation
  *
  * @typedef {{
  *     toolName: string;
@@ -195,6 +222,56 @@ function inferQuestion(args) {
 }
 
 /**
+ * @param {Record<string, unknown>} record
+ * @returns {string | null}
+ */
+function inferIntentText(record) {
+    const candidates = [
+        record,
+        objectOrNull(record['args']),
+        objectOrNull(record['arguments']),
+        objectOrNull(record['input']),
+        objectOrNull(record['data']),
+        objectOrParsedJson(record['args']),
+        objectOrParsedJson(record['arguments']),
+        objectOrParsedJson(record['input']),
+        objectOrParsedJson(record['data']),
+    ];
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+        const intent =
+            stringOrNull(candidate['intent']) ??
+            stringOrNull(candidate['message']) ??
+            stringOrNull(candidate['summary']) ??
+            stringOrNull(candidate['description']);
+        if (intent) return intent;
+    }
+    return null;
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {boolean}
+ */
+function isInternalCallIdentifier(value) {
+    if (!value) return false;
+    const text = value.trim();
+    return TOOL_ID_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+/**
+ * @param {string} toolName
+ * @param {string | null} canonicalToolName
+ * @returns {string}
+ */
+function resolveHumanToolName(toolName, canonicalToolName) {
+    const canonical = canonicalToolName?.trim();
+    if (canonical && HUMAN_TOOL_NAMES[canonical]) return HUMAN_TOOL_NAMES[canonical];
+    const raw = toolName.trim();
+    return HUMAN_TOOL_NAMES[raw] ?? raw;
+}
+
+/**
  * @param {{
  *     fileTargets: string[];
  *     urlTargets: string[];
@@ -252,6 +329,10 @@ function normalizeExplicitOperation(value) {
     if (/\b(inspect|status|health|diagnostic|telemetry|metrics)\b/u.test(operation)) {
         return { operation: 'inspect', label: 'inspecionando diagnóstico' };
     }
+    if (/\b(ask|question|elicitation|input request|request user input|human input)\b/u.test(operation)) {
+        return { operation: 'ask', label: 'aguardando decisão humana' };
+    }
+    if (/\b(intent|report intent)\b/u.test(operation)) return { operation: 'intent', label: 'registrando intenção' };
     return null;
 }
 
@@ -272,11 +353,16 @@ function inferOperation(toolName, path, explicitOperation) {
         return { operation: 'run', label: 'executando integração externa' };
     }
 
-    if (/\b(report|intent|telemetry|diagnostic|health|status)\b/i.test(normalized)) {
-        return { operation: 'inspect', label: 'inspecionando diagnóstico' };
-    }
     if (/\b(ask user|request user input|permission|elicitation)\b/i.test(normalized)) {
-        return { operation: 'run', label: 'coletando decisão humana' };
+        return { operation: 'ask', label: 'aguardando decisão humana' };
+    }
+
+    if (/\b(report intent|intent)\b/i.test(normalized)) {
+        return { operation: 'intent', label: 'registrando intenção' };
+    }
+
+    if (/\b(report|telemetry|diagnostic|health|status)\b/i.test(normalized)) {
+        return { operation: 'inspect', label: 'inspecionando diagnóstico' };
     }
 
     for (const pattern of INSPECTION_TOOL_PATTERNS) {
@@ -312,13 +398,15 @@ export function compactTerminalToolText(text, max = 140) {
 
 /**
  * @param {TerminalToolOperation} operation
- * @returns {'fileRead' | 'fileWrite' | 'fileEdit' | 'fileDelete' | 'tool'}
+ * @returns {'fileRead' | 'fileWrite' | 'fileEdit' | 'fileDelete' | 'question' | 'thinking' | 'tool'}
  */
 export function mapTerminalToolOperationRole(operation) {
     if (operation === 'read') return 'fileRead';
     if (operation === 'write' || operation === 'copy') return 'fileWrite';
     if (operation === 'edit' || operation === 'move') return 'fileEdit';
     if (operation === 'delete') return 'fileDelete';
+    if (operation === 'ask') return 'question';
+    if (operation === 'intent') return 'thinking';
     return 'tool';
 }
 
@@ -335,23 +423,20 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
             ? explicitToolName
             : (nestedToolName ?? fallbackName);
     const canonicalToolName = resolveToolName(toolName);
-    const displayToolName =
-        canonicalToolName && canonicalToolName !== toolName ? `${canonicalToolName} (alias: ${toolName})` : toolName;
+    const displayToolName = resolveHumanToolName(toolName, canonicalToolName);
     const rawToolArgs = evt['args'] ?? evt['arguments'] ?? evt['input'] ?? evt['data'];
     const toolArgs = normalizeToolArgsPayload(rawToolArgs);
     const toolResult = evt['result'] ?? evt['output'] ?? null;
     const meta = introspectToolTargets({ args: toolArgs, result: toolResult });
     const isStructuredInputTool = (canonicalToolName ?? toolName) === 'request_user_input';
+    const isIntentTool = (canonicalToolName ?? toolName) === 'report_intent_local' || toolName === 'report_intent';
     const questionPreview = isStructuredInputTool ? inferQuestion(toolArgs) : null;
+    const intentPreview = isIntentTool ? inferIntentText({ ...evt, args: toolArgs }) : null;
     const path = isStructuredInputTool ? null : (meta.fileTargets[0] ?? null);
     const { operation, label } = inferOperation(toolName, path, evt['operation']);
-    const target =
-        questionPreview ??
-        buildTargetSummary(meta) ??
-        stringOrNull(evt['mcpServerName']) ??
-        stringOrNull(evt['requestId']) ??
-        stringOrNull(evt['toolCallId']) ??
-        null;
+    const targetCandidate =
+        questionPreview ?? intentPreview ?? buildTargetSummary(meta) ?? stringOrNull(evt['mcpServerName']) ?? null;
+    const target = isInternalCallIdentifier(targetCandidate) ? null : targetCandidate;
     const targetSuffix = target ? ` · ${target}` : '';
     const effectiveLabel = isStructuredInputTool ? 'aguardando decisão humana' : label;
     const detail = `${effectiveLabel}${targetSuffix}`;

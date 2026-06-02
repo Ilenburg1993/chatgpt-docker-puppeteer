@@ -9,6 +9,24 @@
  * @returns {string}
  */
 export function buildTerminalReplBanner(injectPort) {
+    if (process.env['COPILOT_TERMINAL_BOOT_MENU'] === 'full') {
+        return buildTerminalReplFullBanner(injectPort);
+    }
+    return `
+\x1b[36m┌──────────────────────────────────────────────────────────────┐\x1b[0m
+\x1b[36m│\x1b[0m  \x1b[1mTerminal LLM-B\x1b[0m  \x1b[90m· sessão permanente\x1b[0m                         \x1b[36m│\x1b[0m
+\x1b[36m└──────────────────────────────────────────────────────────────┘\x1b[0m
+  \x1b[33m/status\x1b[0m · \x1b[33m/health\x1b[0m · \x1b[33m/now\x1b[0m · \x1b[33m/activity 10\x1b[0m · \x1b[33m/tools\x1b[0m · \x1b[33m/events 20\x1b[0m · \x1b[33m/help\x1b[0m
+  \x1b[90mturno explícito: /turn <msg> · fila zero-PR: /queue <msg> · menu completo: /help\x1b[0m
+  \x1b[90mHTTP :${injectPort} · /inject · /events · /sessions · @caminho/arquivo para anexar\x1b[0m
+`;
+}
+
+/**
+ * @param {number} injectPort
+ * @returns {string}
+ */
+function buildTerminalReplFullBanner(injectPort) {
     return `
 \x1b[36m╔══════════════════════════════════════════════════════════════════════════╗\x1b[0m
 \x1b[36m║\x1b[0m  💬  \x1b[1mTerminal LLM-B\x1b[0m  \x1b[90m—\x1b[0m  Sessão Permanente                            \x1b[36m║\x1b[0m

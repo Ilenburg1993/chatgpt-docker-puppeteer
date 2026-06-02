@@ -18,7 +18,8 @@ import { readTerminalActivitySnapshot, terminalThemeText } from '../state/repl/i
 const MIN_LIVE_STATUS_INTERVAL_MS = 250;
 const MIN_LIVE_STATUS_HEARTBEAT_MS = 1_000;
 const DEFAULT_LIVE_STATUS_HEARTBEAT_MS = 5_000;
-const LIVE_DETAIL_CATASTROPHIC_CHARS = 2_000;
+const LIVE_DETAIL_MAX_CHARS = 96;
+const LIVE_QUESTION_MAX_CHARS = 92;
 
 /**
  * @param {ReturnType<typeof readTerminalRuntimeState>} runtime
@@ -35,6 +36,9 @@ function hasHumanPendingQuestion(runtime) {
  */
 function compactLiveStatusText(value, max) {
     const text = String(value ?? '')
+        .replace(/\b(?:chatcmpl-tool|toolu|call)_[a-z0-9_-]+\b/giu, 'id interno')
+        .replace(/\bchatcmpl-tool-[a-z0-9-]+\b/giu, 'id interno')
+        .replace(/\bturnId=\d+\b/giu, 'turno concluído')
         .replace(/\s+/g, ' ')
         .trim();
     return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1))}…`;
@@ -87,19 +91,19 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const model = stream?.model || runtime.model || '-';
     const effort = stream?.reasoningEffort || runtime.reasoningEffort || '-';
     if (hasHumanPendingQuestion(runtime)) {
-        const questionText = compactLiveStatusText(runtime.pendingQuestion.question ?? 'pergunta pendente', 160);
+        const questionText = compactLiveStatusText(runtime.pendingQuestion.question ?? 'pergunta pendente', LIVE_QUESTION_MAX_CHARS);
         const choices = Array.isArray(runtime.pendingQuestion.choices) ? runtime.pendingQuestion.choices : [];
         const choiceText = choices.length > 0 ? ` · opções=${choices.join('|')}` : '';
         const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila=${runtime.queueSize}` : '';
         return (
             `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
-            `${terminalThemeText('question', 'waiting-human/aguardando resposta humana')}` +
-            `${terminalThemeText('muted', ` · ${questionText}${choiceText} · ${model}/${effort} · waiting_for_input:${runtime.dialogLoopActive ? 'loop' : 'noloop'}${queue}`)}` +
+            `${terminalThemeText('question', 'ASK/aguardando operador')}` +
+            `${terminalThemeText('muted', ` · ${questionText}${choiceText} · ${model}/${effort} · ${runtime.dialogLoopActive ? 'loop' : 'noloop'}${queue}`)}` +
             '\x1b[K'
         );
     }
     const ageMs = Math.max(0, now - activity.startedAt);
-    const detail = compactLiveStatusText(activity.detail ?? activity.toolName ?? '', LIVE_DETAIL_CATASTROPHIC_CHARS);
+    const detail = compactLiveStatusText(activity.detail ?? activity.toolName ?? '', LIVE_DETAIL_MAX_CHARS);
     const progress = activity.progress !== null ? ` · ${activity.progress}%` : '';
     const loop = runtime.dialogLoopActive ? 'loop' : 'noloop';
     const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila=${runtime.queueSize}` : '';

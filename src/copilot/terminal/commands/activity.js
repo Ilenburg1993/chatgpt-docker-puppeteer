@@ -2,10 +2,68 @@
 
 import { readTerminalIoActivityProjection } from '../events/index.js';
 import { readTerminalActivityProjection } from '../frontend/index.js';
+import { buildTerminalToolActivityPresentation, compactTerminalToolText } from '../events/tool-activity-presenter.js';
 
 /**
  * @typedef {{ println: (text: string) => void }} ActivityContext
  */
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isLikelyInternalId(value) {
+    if (!value) return false;
+    const text = String(value).trim();
+    return (
+        /^chatcmpl-tool-[a-z0-9-]+$/iu.test(text) ||
+        /^toolu_[a-z0-9]+$/iu.test(text) ||
+        /^call_[a-z0-9_-]+$/iu.test(text) ||
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(text)
+    );
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {string | null}
+ */
+function compactDiagnosticId(value) {
+    if (!value) return null;
+    const text = String(value).trim();
+    return text.length <= 18 ? text : `${text.slice(0, 14)}…`;
+}
+
+/**
+ * @param {string} operation
+ * @returns {string}
+ */
+function renderOperationLabel(operation) {
+    if (operation === 'ask') return 'ASK';
+    if (operation === 'intent') return 'INTENT';
+    return operation;
+}
+
+/**
+ * @param {{ toolName: string; operation: string; path?: string | null; target?: string | null }} tool
+ * @returns {{ name: string; target: string | null }}
+ */
+function renderToolSummary(tool) {
+    const targetCandidate = tool.path ?? tool.target ?? null;
+    const presentation = buildTerminalToolActivityPresentation(
+        {
+            toolName: tool.toolName,
+            operation: tool.operation,
+            args: targetCandidate && !isLikelyInternalId(targetCandidate) ? { path: targetCandidate } : {},
+        },
+        tool.toolName,
+    );
+    const target = targetCandidate
+        ? isLikelyInternalId(targetCandidate)
+            ? `id ${compactDiagnosticId(targetCandidate)}`
+            : compactTerminalToolText(targetCandidate, 72)
+        : null;
+    return { name: presentation.displayToolName, target };
+}
 
 /**
  * @param {ActivityContext['println']} println
@@ -35,9 +93,9 @@ function printTurnTraceSummary(println, title, trace) {
     if (trace.tools.length > 0) {
         println('  tools');
         for (const tool of trace.tools.slice(0, 5)) {
-            const target = tool.path ?? tool.target;
+            const rendered = renderToolSummary(tool);
             println(
-                `    - ${tool.toolName} · ${tool.operation}${target ? ` · ${target}` : ''}${tool.status ? ` · ${tool.status}` : ''} · ${tool.source}`,
+                `    - ${rendered.name} · ${renderOperationLabel(tool.operation)}${rendered.target ? ` · ${rendered.target}` : ''}${tool.status ? ` · ${tool.status}` : ''} · ${tool.source}`,
             );
         }
     }
@@ -51,7 +109,7 @@ function printTurnTraceSummary(println, title, trace) {
                     ? ` · opções=${userInput.choices.join('|')}`
                     : '';
             const answer = userInput.answerPreview ? ` · resposta=${userInput.answerPreview}` : '';
-            const requestId = userInput.requestId ? ` · ${userInput.requestId}` : '';
+            const requestId = userInput.requestId ? ` · id ${compactDiagnosticId(userInput.requestId)}` : '';
             println(
                 `    - ${userInput.kind ?? 'question'} · ${userInput.status ?? 'requested'}${requestId} · ${userInput.question}${choices}${answer} · ${userInput.source ?? 'sdk'}`,
             );

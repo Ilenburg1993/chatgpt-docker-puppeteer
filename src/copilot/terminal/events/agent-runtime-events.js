@@ -402,6 +402,14 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             const compactDetail = getTerminalDetailLevel() === 'compact';
             for (const entry of inFlight) {
                 const toolCallId = entry.toolCallId;
+                if (
+                    entry.toolName === 'ask_user' ||
+                    entry.toolName === 'request_user_input' ||
+                    entry.canonicalName === 'request_user_input' ||
+                    entry.presentation?.operation === 'ask'
+                ) {
+                    continue;
+                }
                 const elapsedMs = now - entry.t0;
                 if (elapsedMs < TOOL_HEARTBEAT_INTERVAL_MS) continue;
                 if (now - entry.lastHeartbeatAt < TOOL_HEARTBEAT_INTERVAL_MS) continue;

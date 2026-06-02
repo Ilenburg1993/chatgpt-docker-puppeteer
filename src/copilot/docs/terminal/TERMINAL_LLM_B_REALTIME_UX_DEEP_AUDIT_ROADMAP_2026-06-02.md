@@ -6,10 +6,10 @@
 - Escopo primario: `src/copilot/terminal`.
 - Escopo associado: `src/copilot/mcp`, `src/copilot/model-gateway`, scripts de teste live e estado local do terminal.
 - Objetivo: orientar a consolidacao do terminal LLM-B como superficie realtime confiavel.
-- Estado atual: teste live real canonico passou apos correcoes de transcript, export, timeline divergente, prompt e runner.
-- Prioridade imediata: preservar a nova trilha verde em validadores strict/lint/testes focados.
-- Prioridade secundaria: expandir cenarios live para freeform, choice invalida, tool longa, erro recuperavel e diagnosticos operacionais.
-- Prioridade terciaria: revisar comandos `/activity`, `/history`, `/context`, `/events`, `/usage now` e `/health` para expor os metadados novos com consistencia.
+- Estado atual: trilha funcional passou, mas a superficie visual ainda esta ruim em PTY real e nas screenshots do operador.
+- Prioridade imediata: fazer uma revolucao de UX sem quebrar transcript/export/SSE ja estabilizados.
+- Prioridade secundaria: eliminar status duplicado, IDs crus, labels tecnicos e pergunta humana tratada como tool comum.
+- Prioridade terciaria: compactar banner, menu, auto-brief, health/activity/tools e artefatos de diagnostico com layout responsivo.
 
 ## 01. Principios
 
@@ -30,6 +30,11 @@
 - Persistencia no hub deve ser lazy e segura, sem bloquear UX.
 - Quando hub e feed vivo divergem, o usuario precisa ver a divergencia e o export nao deve perder eventos recentes.
 - Teste live deve validar comportamento de usuario real, nao apenas ausencia de crash.
+- A UX padrao deve esconder IDs internos longos; eles continuam disponiveis em `/events`, `/tools diag`, `/activity` detalhado e export.
+- Pergunta humana nao e tool comum na narrativa visual; e um estado de bloqueio humano com card proprio, prompt proprio e answer path proprio.
+- Linha viva e watchdog nao podem competir na mesma regiao visual.
+- O modo full pode ser rico, mas nao deve despejar menus gigantes no primeiro viewport.
+- Toda linha duravel deve caber em largura razoavel ou ser quebrada de forma intencional.
 
 ## 02. Evidencia objetiva coletada
 
@@ -300,6 +305,244 @@
   - `tests/unit/copilot/terminal/test_commands_session.spec.js` cobre `/status`.
   - `tests/unit/copilot/terminal/test_commands_diagnose.spec.js` cobre `/health`.
 
+## 02.11 Auditoria visual profunda das screenshots do operador
+
+- Contexto:
+  - as screenshots do operador mostram o terminal dentro do painel integrado do VS Code;
+  - a largura util parece ficar entre 80 e 100 colunas;
+  - a UX atual tenta imprimir uma superficie de operacao grande demais para esse viewport;
+  - a UX tambem mistura output duravel com status que deveria ser transitorio.
+- Screenshot A, loop com timeout:
+  - linhas repetidas `LLM-B ainda trabalhando`;
+  - linhas repetidas `request_user_input ainda executando`;
+  - ID bruto `chatcmpl-tool-...` exposto em linha normal;
+  - o operador nao ve uma pergunta em destaque;
+  - o terminal termina com timeout por ausencia de resposta;
+  - a ausencia de resposta parece falha do modelo, mas o estado real e espera humana pendente.
+- Screenshot B, boot e primeira tool:
+  - `request_user_input` aparece como `[TOOL] [RUN]`;
+  - `report_intent_local (alias: report_intent)` aparece como nome visual primario;
+  - ha mistura de `[INTENT]`, `[TOOL]`, `[IO]`, `[TURN]`, `[TOOLS]`, `[FILES]` sem hierarchy suficiente;
+  - nomes internos como `report_intent`, `hooks_get_pending_tasks` e `get_session_state` competem com texto humano;
+  - linhas de tool e linhas de resumo nao alinham visualmente;
+  - a pergunta humana vira mais uma entrada no log, nao um estado bloqueante.
+- Screenshot C, banner/menu:
+  - menu inicial excede o primeiro viewport;
+  - quase todos os comandos sao despejados de uma vez;
+  - linhas longas quebram no meio;
+  - o box inicial aparece duplicado em relacao ao banner grande;
+  - auto-brief em key/value ocupa muitas linhas com pouco ganho imediato;
+  - termos como `auto-brief:boot`, `sdkWorkspace`, `parser=0`, `cache=hit=0%` sao bons para debug, ruins como tela inicial padrao.
+- Screenshot D, modo standalone:
+  - o box `Terminal Permanente LLM-B` tem colunas desalinhadas;
+  - a mensagem de MCP indisponivel e correta, mas parece alerta central mesmo quando tools locais estao ativas;
+  - `você[kilo-auto/free/high]` compete com blocos de status;
+  - apos o primeiro turno, detalhes tecnicos do SDK aparecem cedo demais.
+- Conclusao visual:
+  - o problema nao e apenas cor ou icone;
+  - o problema e uma arquitetura de renderizacao sem camadas visuais rigidas;
+  - a UX precisa separar status vivo, narracao duravel, tool cards, prompt, pergunta humana e diagnostico bruto;
+  - o modo default deve ser bonito, compacto e operacional;
+  - o modo debug deve continuar profundo, mas sob comando explicito.
+
+## 02.12 Evidencia live PTY da rodada de UX visual
+
+- Comando executado:
+  - `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --transport=pty --live-scenario=canonical --out-dir=data/copilot-terminal/live-runs/terminal-ux-revolution-baseline-sdk-20260602-0557`
+- Artefatos:
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-baseline-sdk-20260602-0557/summary.md`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-baseline-sdk-20260602-0557/terminal.raw.log`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-baseline-sdk-20260602-0557/terminal.plain.log`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-baseline-sdk-20260602-0557/terminal.sse.jsonl`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-baseline-sdk-20260602-0557/conversation-export.md`
+- Resultado funcional:
+  - status PASS;
+  - 281 eventos SSE;
+  - 0 erros;
+  - export com ask_user, resposta humana e final pos-ask;
+  - inline status renderizado;
+  - permissao SDK em `approve_all` confirmada por `/health`.
+- Problemas visuais confirmados no `terminal.plain.log`:
+  - `⟲ LLM-B boot/Subindo servidor copilot` aparece colado ao prompt inicial;
+  - menu inicial despeja dezenas de comandos no primeiro viewport;
+  - auto-brief `boot` e `ready` aparece como linhas densas de key/value;
+  - existem duas linhas vivas concorrentes: `⏳ aguardando auto` e `⟲ LLM-B ...`;
+  - `report_intent_local (alias: report_intent)` aparece como display normal;
+  - `toolu_bdrk_...` aparece como target de `report_intent`;
+  - o resumo `[TOOLS]` tambem mostra o ID longo;
+  - o prompt `você[auto/high]›` fica visualmente colado ao `[ASK]`;
+  - a linha viva waiting-human quebra em quatro linhas e a resposta `SIM` fica na mesma regiao visual;
+  - apos a resposta, `turnId=1` aparece em status vivo como informacao tecnica de baixo valor;
+  - `/activity` ainda mostra IDs longos em modo comum.
+- Diferenca entre funcionalidade e UX:
+  - o teste passa porque a semantica esta correta;
+  - a experiencia humana continua ruim porque o output bruto revela muitos detalhes de infraestrutura;
+  - a proxima fase deve manter os criterios funcionais e adicionar criterios esteticos/ergonomicos.
+
+## 02.13 Mapa causal da UX ruim
+
+- Causa 1: `dialog/output.js` tenta reservar linhas acima do prompt, mas qualquer bloco permanente limpa e re-reserva a area.
+- Causa 2: `dialog/engine.js` imprime narracao duravel `LLM-B ainda trabalhando` alem do status vivo transitorio.
+- Causa 3: `repl/live-status-line.js` tambem imprime `⟲ LLM-B` em intervalo proprio.
+- Causa 4: `formatLiveWaitingStatus()` e a linha viva permanente usam estilos diferentes para o mesmo estado.
+- Causa 5: `agent-runtime-events.js` imprime heartbeat de tool com `toolCallId` bruto.
+- Causa 6: `tool-activity-presenter.js` usa `requestId` e `toolCallId` como fallback de target.
+- Causa 7: `tool-activity-presenter.js` mostra alias tecnico como texto normal.
+- Causa 8: `request_user_input` recebe label semantico de espera humana, mas continua com operation `run`.
+- Causa 9: `tool-lifecycle-runtime.js` renderiza operation `run` como `[RUN]`, entao pergunta humana parece tool executavel.
+- Causa 10: `intent-renderer.js` ainda mostra `call=` no modo visual comum.
+- Causa 11: `commands/menu.js` e banner inicial privilegiam completude sobre escaneabilidade.
+- Causa 12: `auto-brief.js` renderiza dados tecnicos em primeira tela sem agrupamento visual.
+- Causa 13: `commands/activity.js`, `/tools diag` e `/events` nao diferenciam suficientemente modo operador e modo debug.
+- Causa 14: nomes de tools e nomes de eventos nao passam por um glossario visual canonico.
+- Causa 15: a linha viva permite detalhes longos demais (`LIVE_DETAIL_CATASTROPHIC_CHARS = 2000`).
+
+## 02.14 Situacao ideal visual proposta
+
+- Camada A: prompt.
+  - sempre estavel;
+  - sempre em uma linha limpa quando houver largura;
+  - tags curtas e padronizadas;
+  - `[ASK]` so aparece quando ha pergunta pendente;
+  - input digitado pelo operador nunca divide linha com status.
+- Camada B: status vivo.
+  - exatamente um mecanismo ativo por vez;
+  - maximo de duas linhas fisicas no default;
+  - sem IDs internos longos;
+  - sem repetir como log permanente;
+  - com progresso temporal compacto: `12s`, `1m04s`, `2h03m`.
+- Camada C: tool cards.
+  - cada tool tem um nome humano curto;
+  - cada tool tem uma acao humana: `READ`, `WRITE`, `MOVE`, `ASK`, `INTENT`, `CHECK`, `RUN`;
+  - IDs e requestIds ficam ocultos por default;
+  - aliases aparecem apenas em debug;
+  - target e caminho aparecem com truncamento inteligente.
+- Camada D: pergunta humana.
+  - card proprio `ASK`;
+  - uma renderizacao duravel, nao repetida;
+  - escolhas alinhadas;
+  - dica clara: `responda digitando uma opcao ou texto`;
+  - timeout de modelo nao deve disparar enquanto o estado real e espera humana.
+- Camada E: transcript.
+  - fala da LLM-B continua legivel e separada;
+  - reasoning continua recolhido por default;
+  - uso/custo aparece em linha curta;
+  - blocos longos sao truncados com comando de drill-down.
+- Camada F: boot.
+  - primeira tela deve mostrar no maximo:
+    - titulo compacto;
+    - estado do agente;
+    - modelo/provider;
+    - permissao;
+    - tools locais;
+    - comandos essenciais;
+    - proximo passo;
+  - menu completo fica em `/help`.
+- Camada G: diagnostico.
+  - `/activity`, `/tools diag`, `/events`, `/health` podem mostrar IDs, mas com `compactId` e label claro;
+  - modo full/debug pode ser ativado, nao deve ser despejado sempre.
+
+## 02.15 Glossario visual canonico inicial
+
+- `report_intent` e `report_intent_local`:
+  - nome tecnico preservado em SSE/export;
+  - nome visual default: `Intent capturado`;
+  - badge default: `[INTENT]`;
+  - target default: texto do intent, nunca `toolCallId`;
+  - alias tecnico apenas em detalhe.
+- `request_user_input`:
+  - nome tecnico preservado em SSE/export;
+  - nome visual default: `Pergunta ao operador`;
+  - badge default: `[ASK]`;
+  - operation visual: `ask`;
+  - target default: pergunta;
+  - heartbeat duravel: suprimido.
+- `ask_user`:
+  - nome visual default: `Pergunta ao operador`;
+  - badge default: `[ASK]`;
+  - nao deve ser tratado como tool comum no transcript.
+- `read_file_content`:
+  - nome visual default: `Ler arquivo`;
+  - badge default: `[READ]`;
+  - target default: caminho e range.
+- `get_session_state`:
+  - nome visual default: `Estado da sessao`;
+  - badge default: `[CHECK]`.
+- `hooks_get_pending_tasks`:
+  - nome visual default: `Pendencias de hooks`;
+  - badge default: `[CHECK]`.
+- `create_file`:
+  - nome visual default: `Criar arquivo`;
+  - badge default: `[WRITE]`.
+- `move_file`:
+  - nome visual default: `Mover arquivo`;
+  - badge default: `[MOVE]`.
+- `delete_file`:
+  - nome visual default: `Excluir arquivo`;
+  - badge default: `[DELETE]`.
+
+## 02.16 Requisitos ergonomicos novos
+
+- Requisito UX-01:
+  - nenhum `chatcmpl-tool-*`, `toolu_*`, UUID ou requestId completo deve aparecer na narrativa default de tool.
+- Requisito UX-02:
+  - `report_intent` nao deve aparecer como `report_intent_local (alias: report_intent)` na linha visual comum.
+- Requisito UX-03:
+  - `request_user_input` nao deve aparecer como `[TOOL] [RUN]`.
+- Requisito UX-04:
+  - `request_user_input` nao deve receber heartbeat duravel `ainda executando`.
+- Requisito UX-05:
+  - quando ha pergunta humana pendente, o timeout de turno deve mostrar `aguardando operador`, nao `mensagem nao produziu resposta`.
+- Requisito UX-06:
+  - linha viva deve truncar detalhes agressivamente antes de quebrar quatro linhas.
+- Requisito UX-07:
+  - boot default deve caber no primeiro viewport de 80x24 com comandos essenciais.
+- Requisito UX-08:
+  - menu completo deve ir para `/help`, nao para boot default.
+- Requisito UX-09:
+  - auto-brief default deve ser agrupado em 3 a 5 linhas, com modo detalhado sob comando.
+- Requisito UX-10:
+  - live runner deve ter checks esteticos simples, alem dos checks semanticos.
+
+## 02.17 Evidencia live PTY apos revolucao visual M-P
+
+- Comando executado:
+  - `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --transport=pty --live-scenario=canonical --out-dir=data/copilot-terminal/live-runs/terminal-ux-revolution-pass3-sdk-20260602-0621`
+- Artefatos:
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass3-sdk-20260602-0621/summary.md`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass3-sdk-20260602-0621/terminal.raw.log`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass3-sdk-20260602-0621/terminal.plain.log`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass3-sdk-20260602-0621/terminal.sse.jsonl`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass3-sdk-20260602-0621/conversation-export.md`
+- Resultado funcional:
+  - status PASS;
+  - 293 eventos SSE;
+  - 0 erros;
+  - export com ask_user, resposta humana e final pos-ask;
+  - permissao SDK em `approve_all` confirmada por `/health`;
+  - criterios de streaming, tool lifecycle, ask_user, SSE archive e export continuaram verdes.
+- Resultado visual novo:
+  - `ux-compact-boot-banner` passou;
+  - `ux-human-tool-names` passou;
+  - `ux-no-raw-tool-ids-in-default-tool-lines` passou;
+  - `ux-no-durable-waiting-spam` passou;
+  - `ux-single-live-status-source` passou;
+  - `no-prompt-double-render` passou;
+  - `inline-status-rendered` passou.
+- Melhorias observadas no `terminal.plain.log`:
+  - `report_intent_local (alias: report_intent)` virou `Intent capturado`;
+  - `read_file_content` virou `Ler arquivo`;
+  - `request_user_input`/`ask_user` virou superficie `[ASK]`;
+  - `chatcmpl-tool-*` e `toolu_*` deixaram de aparecer nas linhas default de `[TOOL]`, `[DONE]`, `[TOOLS]`, `[ASK]` e `[INTENT]`;
+  - a narracao duravel `LLM-B ainda trabalhando` deixou de competir com a linha viva;
+  - o status de watchdog nao renderizou uma segunda linha viva quando a linha permanente estava habilitada.
+- Gaps visuais residuais confirmados:
+  - `/health` ainda mostra nomes tecnicos em `TOOL STATS`, como `report_intent_local` e `read_file_content`;
+  - o banner REPL compacto e o box standalone ainda aparecem como duas superficies de boot;
+  - a linha viva de ASK ainda pode ocupar tres linhas fisicas em largura estreita;
+  - a resposta `SIM` ainda pode aparecer muito perto da area reservada da linha viva em PTY;
+  - `/events --raw` e SSE bruto continuam corretamente tecnicos, mas comandos de diagnostico precisam de headers mais claros.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -319,6 +562,7 @@
 - O runner agora exige ask_user, resposta humana e pos-ask no Markdown.
 - O runner tambem registra se a sessao SDK foi forcada como nova antes do cenario full-turn.
 - O teste live `033250` confirmou PASS em todos os criterios obrigatorios.
+- O teste live `terminal-ux-revolution-pass3-sdk-20260602-0621` confirmou PASS nos criterios esteticos novos e preservou os criterios funcionais existentes.
 
 ### 03.03 Transcript e timeline
 
@@ -635,6 +879,81 @@
 - [x] Registrar gaps residuais antes de commit.
 - [x] Registrar validadores executados.
 - [x] Registrar evidencia live de maxima permissao sem janela SDK.
+- [x] Registrar auditoria visual das screenshots do operador.
+- [x] Registrar evidencia PTY da rodada `terminal-ux-revolution-baseline-sdk-20260602-0557`.
+- [x] Registrar evidencia PTY da rodada `terminal-ux-revolution-pass3-sdk-20260602-0621`.
+
+### Faixa M - Glossario visual e nomes humanos
+
+- [x] Criar camada canonica de apresentacao visual de tools sem alterar nomes tecnicos em SSE/export.
+- [x] Mapear `report_intent`/`report_intent_local` para `Intent capturado`.
+- [x] Mapear `request_user_input`/`ask_user` para `Pergunta ao operador`.
+- [x] Mapear introspeccoes comuns para nomes humanos curtos.
+- [x] Preservar alias tecnico apenas em debug/detalhe.
+- [x] Criar testes unitarios para nomes humanos e alias oculto por default.
+
+### Faixa N - Sanitizacao de IDs na UX default
+
+- [x] Remover `requestId`/`toolCallId` como fallback de target default no presenter.
+- [ ] Mostrar IDs completos apenas em `/events`, export bruto e diagnosticos explicitos.
+- [ ] Mostrar IDs compactos apenas quando o comando for diagnostico.
+- [x] Garantir que `report_intent` use intent como target quando disponivel.
+- [x] Garantir que tools sem target humano nao inventem target com ID tecnico.
+- [x] Adicionar teste contra `chatcmpl-tool-*`/`toolu_*` em linhas default.
+
+### Faixa O - ASK como superficie propria
+
+- [x] Adicionar operation visual `ask` ao presenter/runtime.
+- [x] Renderizar `request_user_input` como `[ASK]`, nao `[RUN]`.
+- [x] Renderizar `ask_user` e `request_user_input` sob a mesma semantica visual.
+- [x] Suprimir heartbeat duravel de pergunta humana pendente.
+- [ ] Manter pergunta humana em card duravel unico.
+- [ ] Garantir que resposta humana nao fique colada na linha viva.
+- [ ] Tratar timeout durante espera humana como `aguardando operador`, nao erro de modelo.
+- [x] Adicionar teste unitario de `request_user_input` sem `[TOOL] [RUN]`.
+- [ ] Adicionar live scenario especifico para `request_user_input` local, alem de `ask_user` SDK.
+
+### Faixa P - Linha viva unificada
+
+- [x] Escolher uma unica fonte de linha viva por estado.
+- [x] Reduzir `LIVE_DETAIL_CATASTROPHIC_CHARS` para budget visual real.
+- [x] Compactar `waiting-human` em ate duas linhas fisicas no default.
+- [x] Remover `turnId=` da linha viva default.
+- [x] Evitar narracao duravel repetitiva `LLM-B ainda trabalhando` em modo normal.
+- [x] Manter watchdog visivel sem competir com `⟲ LLM-B`.
+- [x] Criar testes de formatacao com largura estreita.
+- [x] Criar criterio live para ausencia de status duplicado.
+
+### Faixa Q - Boot, menu e auto-brief
+
+- [x] Substituir menu inicial gigante por resumo compacto.
+- [x] Manter `/help` como superficie de comandos completos.
+- [x] Compactar auto-brief default em grupos humanos.
+- [x] Mover detalhes `parser/cache/index/scopes` para `/activity`, `/health` ou modo debug.
+- [ ] Ajustar box standalone para largura responsiva.
+- [x] Rebaixar alerta MCP indisponivel quando tools locais estao ativas.
+- [x] Adicionar teste snapshot/regex do boot compacto.
+- [x] Adicionar live criterion de primeiro viewport sem overflow obvio.
+
+### Faixa R - Comandos de diagnostico com dois niveis
+
+- [ ] Revisar `/activity` para modo default sem IDs longos.
+- [ ] Revisar `/tools diag` para IDs compactos e drill-down claro.
+- [ ] Revisar `/events` para continuar bruto, mas com header explicito de debug.
+- [ ] Revisar `/health` para reduzir ruido visual default.
+- [ ] Adicionar flags ou subcomandos `detail`, `raw` ou `debug` onde fizer sentido.
+- [ ] Testar que dados tecnicos continuam acessiveis.
+
+### Faixa S - Lives esteticos com LLM-B
+
+- [x] Atualizar runner para detectar IDs crus em narrativa default.
+- [x] Atualizar runner para detectar status vivo duplicado.
+- [x] Atualizar runner para detectar `request_user_input` como `[RUN]`.
+- [x] Atualizar runner para detectar menu inicial excessivamente longo.
+- [x] Rodar live SDK/Copilot apos Faixas M-P.
+- [ ] Rodar live BYOK quando a superficie estiver estabilizada.
+- [ ] Rodar live com `request_user_input` local real.
+- [x] Registrar artefatos e decisao no roadmap.
 
 ## 06.01 Gaps residuais apos PASS live
 
@@ -692,6 +1011,17 @@
 - Rodar strict.
 - Rodar live test real.
 - Atualizar este documento com resultado.
+
+### 07.05 Bloco UX visual imediato
+
+- Implementar glossario visual no `tool-activity-presenter`.
+- Remover fallback de target por IDs tecnicos na UX default.
+- Promover `request_user_input` para operation visual `ask`.
+- Ajustar renderer de lifecycle para badge `[ASK]`.
+- Suprimir heartbeat duravel de `ask_user`/`request_user_input`.
+- Reduzir detalhes da linha viva e limpar status concorrentes mais ruidosos.
+- Criar testes unitarios focados antes de lives longos.
+- Atualizar runner live com criterios esteticos depois dos patches iniciais.
 
 ## 08. Riscos
 

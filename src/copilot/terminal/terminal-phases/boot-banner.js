@@ -34,21 +34,19 @@ export function buildTerminalStandaloneBannerView(opts, deps = {}) {
     /** @type {string[]} */
     const lines = [
         '',
-        '┌─────────────────────────────────────────────────────────────┐',
-        '│  Terminal Permanente LLM-B                                  │',
+        '┌─ Terminal Permanente LLM-B ─────────────────────────────────┐',
         isStandalone
-            ? '│  Modo: STANDALONE  (server 3008 não detectado)              │'
-            : `│  Modo: CONECTADO   (MCP: ${String(mcp.toolCount).padEnd(2)} tools via :3008)              │`,
-        `│  Inject server: ${opts.serverUrl.padEnd(40).slice(0, 40)} │`,
-        '│  Comandos: /help  /status  /queue  /turn  /mailbox         │',
-        '│  Sessão SDK: auto-resume padrão; gestão em /session sdk     │',
-        '│  Pré-boot seguinte: /session sdk next new|resume|auto       │',
-        '└─────────────────────────────────────────────────────────────┘',
+            ? '│  STANDALONE · MCP server :3008 ausente · tools locais ativas │'
+            : `│  CONECTADO · MCP :3008 · ${String(mcp.toolCount).padStart(2)} tools                         │`,
+        `│  inject ${opts.serverUrl.padEnd(48).slice(0, 48)} │`,
+        '│  /help · /status · /queue · /turn · /mailbox · /session sdk  │',
+        '│  Sessão SDK: auto-resume padrão · next new|resume|auto       │',
+        '└──────────────────────────────────────────────────────────────┘',
         '',
     ];
 
     if (isStandalone) {
-        lines.push('  ⚠  MCP tools indisponíveis — tools locais ativas. Inicie src/server para habilitar.');
+        lines.push('  MCP remoto indisponível; registry local continua ativo. Use /tools e /health.');
         lines.push('');
     }
     if (warnings.length > 0) {

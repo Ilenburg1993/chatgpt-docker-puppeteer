@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { buildTerminalToolActivityPresentation } from '../../../../src/copilot/terminal/events/tool-activity-presenter.js';
 
 describe('terminal/tool-activity-presenter', () => {
-    it('explicita alias legado e mantém operação canônica inferida', () => {
+    it('usa nome humano para alias legado e mantém operação canônica inferida', () => {
         const presentation = buildTerminalToolActivityPresentation({
             toolName: 'view',
             args: { path: 'src/copilot/terminal/repl/live-status-line.js' },
@@ -13,10 +13,11 @@ describe('terminal/tool-activity-presenter', () => {
 
         expect(presentation.toolName).toBe('view');
         expect(presentation.canonicalToolName).toBe('read_file_content');
-        expect(presentation.displayToolName).toBe('read_file_content (alias: view)');
+        expect(presentation.displayToolName).toBe('Ler arquivo');
         expect(presentation.operation).toBe('read');
         expect(presentation.detail).toContain('lendo arquivo');
-        expect(presentation.progressLinePrefix).toContain('read_file_content (alias: view)');
+        expect(presentation.progressLinePrefix).toContain('Ler arquivo');
+        expect(presentation.progressLinePrefix).not.toContain('alias');
     });
 
     it('não adiciona ruído de alias para tool já canônica', () => {
@@ -26,7 +27,7 @@ describe('terminal/tool-activity-presenter', () => {
         });
 
         expect(presentation.canonicalToolName).toBe('read_file_content');
-        expect(presentation.displayToolName).toBe('read_file_content');
+        expect(presentation.displayToolName).toBe('Ler arquivo');
         expect(presentation.detail).not.toContain('alias');
     });
 
@@ -36,6 +37,8 @@ describe('terminal/tool-activity-presenter', () => {
             args: { question: 'Qual caminho seguir?' },
         });
 
+        expect(presentation.displayToolName).toBe('Pergunta ao operador');
+        expect(presentation.operation).toBe('ask');
         expect(presentation.detail).toContain('aguardando decisão humana');
         expect(presentation.startLine).toContain('Qual caminho seguir?');
         expect(presentation.completeLine(true, '1.0s')).toContain('aguardando decisão humana concluído');
@@ -77,7 +80,34 @@ describe('terminal/tool-activity-presenter', () => {
         expect(workspace.detail).toContain('inspecionando contexto');
         expect(telemetry.operation).toBe('inspect');
         expect(intent.canonicalToolName).toBe('report_intent_local');
-        expect(intent.operation).toBe('inspect');
+        expect(intent.displayToolName).toBe('Intent capturado');
+        expect(intent.operation).toBe('intent');
+    });
+
+    it('usa intent como alvo visual e não vaza id interno de report_intent', () => {
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'report_intent',
+            args: { intent: 'validar estética do terminal' },
+            toolCallId: 'toolu_bdrk_019v9X862pjamNysAemC1UAW',
+        });
+
+        expect(presentation.displayToolName).toBe('Intent capturado');
+        expect(presentation.target).toBe('validar estética do terminal');
+        expect(presentation.detail).toContain('validar estética do terminal');
+        expect(presentation.detail).not.toContain('toolu_bdrk');
+        expect(presentation.startLine).not.toContain('toolu_bdrk');
+    });
+
+    it('não usa toolCallId/requestId como target visual default', () => {
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'external_tool',
+            requestId: 'chatcmpl-tool-80d5a00b25801fef',
+            toolCallId: 'toolu_bdrk_019v9X862pjamNysAemC1UAW',
+        });
+
+        expect(presentation.target).toBeNull();
+        expect(presentation.detail).not.toContain('chatcmpl-tool');
+        expect(presentation.detail).not.toContain('toolu_bdrk');
     });
 
     it('ignora nomes genéricos do SDK quando há fallback real', () => {
