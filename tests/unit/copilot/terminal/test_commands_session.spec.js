@@ -875,9 +875,10 @@ describe('commands/session — async commands', () => {
         });
         expect(ctx.output()).toContain('filtro branch main');
         expect(ctx.output()).toContain('deslocamento 1');
-        expect(ctx.output()).toContain('arquivos da sessão:');
+        expect(ctx.output()).toContain('Arquivos');
         expect(ctx.output()).toContain('workspace:.copilot/sdk-session-fs');
-        expect(ctx.output()).toContain('metadados locais: modelo kilo-auto/free');
+        expect(ctx.output()).toContain('Metadados');
+        expect(ctx.output()).toContain('modelo kilo-auto/free');
         expect(ctx.output()).toContain('limite provider-boundary');
         expect(ctx.output()).not.toContain('sdk-first');
     });
@@ -886,7 +887,8 @@ describe('commands/session — async commands', () => {
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, 'next new');
         expect(scheduleTerminalSdkSessionBootSelection).toHaveBeenCalledWith({ mode: 'new' });
-        expect(ctx.output()).toContain('Próximo boot: criar nova sessão SDK');
+        expect(ctx.output()).toContain('Próximo boot');
+        expect(ctx.output()).toContain('criar nova sessão SDK');
     });
 
     it('cmdSessionSdk agenda resume por indice do inventário', async () => {
@@ -917,7 +919,8 @@ describe('commands/session — async commands', () => {
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, 'delete #1');
         expect(deleteTerminalSdkSession).toHaveBeenCalledWith('sdk-old', null);
-        expect(ctx.output()).toContain('Sessão SDK apagada: sdk-old (#1)');
+        expect(ctx.output()).toContain('Sessão SDK');
+        expect(ctx.output()).toContain('apagada: sdk-old (#1)');
         expect(ctx.output()).toContain('deleteSession');
     });
 
@@ -925,7 +928,8 @@ describe('commands/session — async commands', () => {
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, 'delete current');
         expect(deleteTerminalSdkSession).not.toHaveBeenCalled();
-        expect(ctx.output()).toContain('Sessão SDK viva não apagada');
+        expect(ctx.output()).toContain('Proteção');
+        expect(ctx.output()).toContain('sessão SDK viva não apagada');
         expect(ctx.output()).toContain('/session sdk next new');
     });
 
@@ -974,11 +978,11 @@ describe('commands/session — async commands', () => {
         });
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '');
-        expect(ctx.output()).toContain('vínculo BYOK');
+        expect(ctx.output()).toContain('Vínculo BYOK');
         expect(ctx.output()).toContain('BYOK · perfil groq-free');
         expect(ctx.output()).toContain('BYOK pronto');
-        expect(ctx.output()).toContain('limite BYOK');
-        expect(ctx.output()).toContain('último boot');
+        expect(ctx.output()).toContain('Limite BYOK');
+        expect(ctx.output()).toContain('Último boot');
         expect(ctx.output()).toContain('provider-boundary');
     });
 
@@ -1090,7 +1094,7 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('sdk.lifecycle');
         expect(ctx.output()).toContain('×2');
         expect(ctx.output()).toContain('terminal_status');
-        expect(ctx.output()).toContain('Este comando não cria eventos');
+        expect(ctx.output()).toContain('este comando não cria eventos');
     });
 
     it('cmdSessionSdk commands lista CommandDefinition[] expostos ao SDK', async () => {
@@ -1217,7 +1221,7 @@ describe('commands/session — async commands', () => {
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'user_input.requested', limit: 6 });
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'elicitation.pending', limit: 6 });
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'permission.requested', limit: 6 });
-        expect(ctx.output()).toContain('Waits SDK da sessão');
+        expect(ctx.output()).toContain('Esperas SDK da sessão');
         expect(ctx.output()).toContain('perguntas 2');
         expect(ctx.output()).toContain('formulários 1');
         expect(ctx.output()).toContain('permissões 1');

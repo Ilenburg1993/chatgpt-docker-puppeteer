@@ -1697,16 +1697,21 @@ async function cmdSessionSdkEvents({ println }, tokens) {
         })
         .slice(-limit);
     const state = lifecycle.state.path || commands.state.path ? lifecycle.state : commands.state;
-    println('\n  \x1b[36mEventos SDK da sessão\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('assistant', 'Eventos SDK da sessão'));
     println(
-        `  \x1b[90mfonte archive SSE canônico · arquivo ${state.path ?? '(sem arquivo)'} · janela ${limit} · ciclo de vida ${lifecycle.entries.length} · comandos ${commands.entries.length}\x1b[0m`,
+        terminalThemeRow(
+            'Archive',
+            `arquivo ${state.path ?? 'sem arquivo'} · janela ${limit} · ciclo de vida ${lifecycle.entries.length} · comandos ${commands.entries.length}`,
+        ),
     );
     if (lifecycle.state.error || commands.state.error) {
-        println(`  \x1b[31merro ${lifecycle.state.error ?? commands.state.error}\x1b[0m`);
+        println(terminalThemeRow('Erro', lifecycle.state.error ?? commands.state.error ?? 'erro desconhecido', { role: 'error' }));
     }
     if (merged.length === 0) {
-        println('  \x1b[33mNenhum sdk.lifecycle ou sdk.command.executed arquivado ainda.\x1b[0m');
-        println('  \x1b[90mRode /events event=sdk.lifecycle 20 ou /events event=sdk.command.executed 20 para diagnóstico bruto.\x1b[0m\n');
+        println(terminalThemeRow('Resultado', 'nenhum ciclo de vida SDK ou comando SDK arquivado ainda', { role: 'warn' }));
+        println(terminalThemeRow('Detalhe', '/events event=sdk.lifecycle 20 · /events event=sdk.command.executed 20'));
+        println('');
         return;
     }
     /** @type {{ key: string; line: string; firstTimestamp: number; count: number }[]} */
@@ -1727,10 +1732,11 @@ async function cmdSessionSdkEvents({ println }, tokens) {
     }
     for (const entry of collapsed) {
         const time = entry.firstTimestamp ? formatTerminalIsoTimestamp(entry.firstTimestamp) : 'sem horário';
-        const repeats = entry.count > 1 ? ` \x1b[90m×${entry.count}\x1b[0m` : '';
-        println(`    \x1b[90m${time}\x1b[0m  \x1b[33m${entry.line}\x1b[0m${repeats}`);
+        const repeats = entry.count > 1 ? ` ×${entry.count}` : '';
+        println(terminalThemeRow(time, `${entry.line}${repeats}`));
     }
-    println('  \x1b[90mEste comando não cria eventos; ele resume o mesmo JSONL usado por /events e pelos testes live.\x1b[0m\n');
+    println(terminalThemeRow('Nota', 'este comando não cria eventos; ele resume o mesmo JSONL usado por /events e pelos testes live'));
+    println('');
 }
 
 /**
@@ -1755,15 +1761,20 @@ async function cmdSessionSdkWaits({ println }, tokens) {
     const state = projections.find((projection) => projection.state.path)?.state ?? projections[0]?.state;
     const counts = new Map(SDK_SESSION_WAIT_ARCHIVE_EVENTS.map((event) => [event, 0]));
     for (const entry of merged) counts.set(entry.event, (counts.get(entry.event) ?? 0) + 1);
-    println('\n  \x1b[36mWaits SDK da sessão\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('assistant', 'Esperas SDK da sessão'));
     println(
-        `  \x1b[90mfonte archive SSE canônico · arquivo ${state?.path ?? '(sem arquivo)'} · janela ${limit} · perguntas ${(counts.get('user_input.requested') ?? 0) + (counts.get('user_input.completed') ?? 0)} · formulários ${(counts.get('elicitation.pending') ?? 0) + (counts.get('elicitation.completed') ?? 0)} · permissões ${(counts.get('permission.requested') ?? 0) + (counts.get('permission.completed') ?? 0) + (counts.get('permission.mode_changed') ?? 0)}\x1b[0m`,
+        terminalThemeRow(
+            'Archive',
+            `arquivo ${state?.path ?? 'sem arquivo'} · janela ${limit} · perguntas ${(counts.get('user_input.requested') ?? 0) + (counts.get('user_input.completed') ?? 0)} · formulários ${(counts.get('elicitation.pending') ?? 0) + (counts.get('elicitation.completed') ?? 0)} · permissões ${(counts.get('permission.requested') ?? 0) + (counts.get('permission.completed') ?? 0) + (counts.get('permission.mode_changed') ?? 0)}`,
+        ),
     );
     const error = projections.find((projection) => projection.state.error)?.state.error;
-    if (error) println(`  \x1b[31merro ${error}\x1b[0m`);
+    if (error) println(terminalThemeRow('Erro', error, { role: 'error' }));
     if (merged.length === 0) {
-        println('  \x1b[33mNenhum wait SDK arquivado ainda.\x1b[0m');
-        println('  \x1b[90mUse /sdk waits para pendências vivas e /events event=user_input.requested 20 para bruto.\x1b[0m\n');
+        println(terminalThemeRow('Resultado', 'nenhuma espera SDK arquivada ainda', { role: 'warn' }));
+        println(terminalThemeRow('Detalhe', '/sdk waits para pendências vivas · /events event=user_input.requested 20 para bruto'));
+        println('');
         return;
     }
     /** @type {{ key: string; line: string; firstTimestamp: number; count: number }[]} */
@@ -1784,10 +1795,11 @@ async function cmdSessionSdkWaits({ println }, tokens) {
     }
     for (const entry of collapsed) {
         const time = entry.firstTimestamp ? formatTerminalIsoTimestamp(entry.firstTimestamp) : 'sem horário';
-        const repeats = entry.count > 1 ? ` \x1b[90m×${entry.count}\x1b[0m` : '';
-        println(`    \x1b[90m${time}\x1b[0m  \x1b[33m${entry.line}\x1b[0m${repeats}`);
+        const repeats = entry.count > 1 ? ` ×${entry.count}` : '';
+        println(terminalThemeRow(time, `${entry.line}${repeats}`));
     }
-    println('  \x1b[90mPerguntas humanas, formulários e permissões continuam com comandos próprios; esta é só a trilha agregada.\x1b[0m\n');
+    println(terminalThemeRow('Nota', 'perguntas humanas, formulários e permissões continuam com comandos próprios; esta é só a trilha agregada'));
+    println('');
 }
 
 /**
@@ -1798,15 +1810,15 @@ async function cmdSessionSdkWaits({ println }, tokens) {
  */
 function cmdSessionSdkCommands({ println }) {
     const specs = listTerminalSdkCommandSpecs();
-    println('\n  \x1b[36mComandos SDK expostos ao Copilot\x1b[0m');
-    println(
-        `  \x1b[90mfonte agent/session/commands · ${specs.length} comando(s) · safelist observável; execução local continua no REPL\x1b[0m`,
-    );
+    println('');
+    println(terminalThemeHeadline('assistant', 'Comandos SDK expostos ao Copilot'));
+    println(terminalThemeRow('Fonte', `agent/session/commands · ${specs.length} comando(s) · safelist observável; execução local continua no REPL`));
     for (const spec of specs) {
-        println(`    \x1b[33m${spec.name}\x1b[0m → \x1b[90m${spec.localCommand}${spec.safe ? ' · safe' : ''}\x1b[0m`);
-        println(`      \x1b[90m${spec.description}\x1b[0m`);
+        println(terminalThemeRow(spec.name, `${spec.localCommand}${spec.safe ? ' · seguro' : ''}`));
+        println(terminalThemeRow('Descrição', spec.description));
     }
-    println('  \x1b[90mQuando o SDK chama um desses comandos, o terminal publica sdk.command.executed no fanout canônico.\x1b[0m\n');
+    println(terminalThemeRow('Nota', 'quando o SDK chama um desses comandos, o terminal publica sdk.command.executed no fanout canônico'));
+    println('');
 }
 
 /**
@@ -1839,11 +1851,11 @@ export async function cmdSessionSdk({ println }, arg = '') {
         if (mode === 'new') {
             const result = await scheduleTerminalSdkSessionBootSelection({ mode: 'new' });
             if (!result.ok) throw result.error;
-            println('  \x1b[32mPróximo boot: criar nova sessão SDK.\x1b[0m');
+            println(terminalThemeRow('Próximo boot', 'criar nova sessão SDK', { role: 'success' }));
         } else if (mode === 'resume') {
             const target = modeRest.join(' ').trim();
             if (!target) {
-                println('  \x1b[33mUso: /session sdk next resume <sessionId|#n|current|last|foreground>\x1b[0m');
+                println(terminalThemeRow('Uso', '/session sdk next resume <sessionId|#n|current|last|foreground>', { role: 'warn' }));
                 return;
             }
             let resolved;
@@ -1852,12 +1864,12 @@ export async function cmdSessionSdk({ println }, arg = '') {
                 try {
                     inventory = await listTerminalSdkSessionInventory(runtimeId);
                 } catch (error) {
-                    println(`  \x1b[31mNão foi possível resolver o atalho de sessão SDK: ${toError(error).message}\x1b[0m`);
+                    println(terminalThemeRow('Erro', `não foi possível resolver o atalho de sessão SDK: ${toError(error).message}`, { role: 'error' }));
                     return;
                 }
                 resolved = resolveSdkSessionResumeTarget(target, inventory);
                 if (!resolved) {
-                    println(`  \x1b[33mAtalho de sessão SDK indisponível: ${target}. Rode /session sdk para ver o inventário.\x1b[0m`);
+                    println(terminalThemeRow('Atalho', `${target} indisponível · rode /session sdk para ver o inventário`, { role: 'warn' }));
                     return;
                 }
             } else {
@@ -1869,7 +1881,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
                 });
             }
             if (!resolved) {
-                println(`  \x1b[33mSessão SDK não resolvida para ${target}. Rode /session sdk para ver o inventário.\x1b[0m`);
+                println(terminalThemeRow('Sessão SDK', `não resolvida para ${target} · rode /session sdk para ver o inventário`, { role: 'warn' }));
                 return;
             }
             const result = await scheduleTerminalSdkSessionBootSelection({
@@ -1878,53 +1890,61 @@ export async function cmdSessionSdk({ println }, arg = '') {
             });
             if (!result.ok) throw result.error;
             println(
-                `  \x1b[32mPróximo boot: tentar retomar sessão SDK ${resolved.sessionId}${resolved.source === 'id' ? '' : ` (${resolved.source})`}.\x1b[0m`,
+                terminalThemeRow(
+                    'Próximo boot',
+                    `tentar retomar sessão SDK ${resolved.sessionId}${resolved.source === 'id' ? '' : ` (${resolved.source})`}`,
+                    { role: 'success' },
+                ),
             );
         } else if (mode === 'auto' || mode === 'clear') {
             const result = await scheduleTerminalSdkSessionBootSelection(null);
             if (!result.ok) throw result.error;
-            println('  \x1b[32mPróximo boot: seleção automática restaurada; a sessão persistida anterior volta a ser o padrão.\x1b[0m');
+            println(terminalThemeRow('Próximo boot', 'seleção automática restaurada; a sessão persistida anterior volta a ser o padrão', { role: 'success' }));
         } else {
-            println('  \x1b[33mUso: /session sdk next <new|resume <sessionId|#n|current|last|foreground>|auto>\x1b[0m');
+            println(terminalThemeRow('Uso', '/session sdk next <new|resume <sessionId|#n|current|last|foreground>|auto>', { role: 'warn' }));
             return;
         }
-        println('  \x1b[90mA diretiva é consumida pelo initializer no próximo boot; /restart reinicia só a conversa.\x1b[0m');
+        println(terminalThemeRow('Nota', 'a diretiva é consumida pelo initializer no próximo boot; /restart reinicia só a conversa'));
         return;
     }
     if (action === 'delete' || action === 'remove') {
         const target = rest.join(' ').trim();
         if (!target) {
-            println('  \x1b[33mUso: /session sdk delete <sessionId|#n>\x1b[0m');
-            println('  \x1b[90mA sessão SDK viva é protegida; para sair dela, agende /session sdk next new.\x1b[0m');
+            println(terminalThemeRow('Uso', '/session sdk delete <sessionId|#n>', { role: 'warn' }));
+            println(terminalThemeRow('Proteção', 'a sessão SDK viva é protegida; para sair dela, agende /session sdk next new'));
             return;
         }
         let inventory;
         try {
             inventory = await listTerminalSdkSessionInventory(runtimeId);
         } catch (error) {
-            println(`  \x1b[31mNão foi possível listar sessões SDK antes da exclusão: ${toError(error).message}\x1b[0m`);
+            println(terminalThemeRow('Erro', `não foi possível listar sessões SDK antes da exclusão: ${toError(error).message}`, { role: 'error' }));
             return;
         }
         const resolved = resolveSdkSessionResumeTarget(target, inventory);
         if (!resolved) {
-            println(`  \x1b[33mSessão SDK não resolvida para exclusão: ${target}. Rode /session sdk para ver o inventário.\x1b[0m`);
+            println(terminalThemeRow('Sessão SDK', `não resolvida para exclusão: ${target} · rode /session sdk para ver o inventário`, { role: 'warn' }));
             return;
         }
         if (resolved.sessionId === inventory.currentSessionId) {
-            println(`  \x1b[31mSessão SDK viva não apagada: ${resolved.sessionId}.\x1b[0m`);
-            println('  \x1b[90mAgende /session sdk next new ou retome outra sessão no próximo boot antes de apagar esta.\x1b[0m');
+            println(terminalThemeRow('Proteção', `sessão SDK viva não apagada: ${resolved.sessionId}`, { role: 'error' }));
+            println(terminalThemeRow('Ação', 'agende /session sdk next new ou retome outra sessão no próximo boot antes de apagar esta'));
             return;
         }
         try {
             await deleteTerminalSdkSession(resolved.sessionId, runtimeId);
         } catch (error) {
-            println(`  \x1b[31mFalha ao apagar sessão SDK ${resolved.sessionId}: ${toError(error).message}\x1b[0m`);
+            println(terminalThemeRow('Erro', `falha ao apagar sessão SDK ${resolved.sessionId}: ${toError(error).message}`, { role: 'error' }));
             return;
         }
         println(
-            `  \x1b[32mSessão SDK apagada: ${resolved.sessionId}${resolved.source === 'id' ? '' : ` (${resolved.source})`}.\x1b[0m`,
+            terminalThemeRow(
+                'Sessão SDK',
+                `apagada: ${resolved.sessionId}${resolved.source === 'id' ? '' : ` (${resolved.source})`}`,
+                { role: 'success' },
+            ),
         );
-        println('  \x1b[90mdeleteSession remove estado persistido; /session sdk next controla apenas o próximo attach/create.\x1b[0m');
+        println(terminalThemeRow('Nota', 'deleteSession remove estado persistido; /session sdk next controla apenas o próximo attach/create'));
         return;
     }
 
@@ -1937,8 +1957,8 @@ export async function cmdSessionSdk({ println }, arg = '') {
             enrichLimit: inventoryArgs.limit,
         });
     } catch (error) {
-        println(`  \x1b[31mNão foi possível listar sessões SDK: ${toError(error).message}\x1b[0m`);
-        println('  \x1b[90mAinda assim: /resume atua no hub; /session save|list|restore atua em snapshots locais.\x1b[0m');
+        println(terminalThemeRow('Erro', `não foi possível listar sessões SDK: ${toError(error).message}`, { role: 'error' }));
+        println(terminalThemeRow('Nota', '/resume atua no hub; /session save|list|restore atua em snapshots locais'));
         return;
     }
 
@@ -1948,36 +1968,47 @@ export async function cmdSessionSdk({ println }, arg = '') {
             : bootSelection?.mode === 'new'
               ? 'criar nova sessão'
               : 'automático';
-    println('\n  \x1b[36mSessão SDK\x1b[0m');
-    println(`    atual:          \x1b[33m${inventory.currentSessionId ?? '(sem sessão viva)'}\x1b[0m`);
-    println(`    última SDK:     \x1b[33m${inventory.lastSessionId ?? '-'}\x1b[0m`);
-    println(`    foreground:     \x1b[33m${inventory.foregroundSessionId ?? '-'}\x1b[0m`);
-    println(`    próximo boot:   \x1b[33m${nextLabel}\x1b[0m`);
-    println(`    arquivos:       \x1b[90m${renderSdkSessionFsState(inventory.sessionFs)}\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('assistant', 'Sessão SDK'));
+    println(terminalThemeRow('Atual', inventory.currentSessionId ?? 'sem sessão viva'));
+    println(terminalThemeRow('Última SDK', inventory.lastSessionId ?? '-'));
+    println(terminalThemeRow('Foreground', inventory.foregroundSessionId ?? '-'));
+    println(terminalThemeRow('Próximo boot', nextLabel));
+    println(terminalThemeRow('Arquivos', renderSdkSessionFsState(inventory.sessionFs)));
     const byokBinding = classifyTerminalByokSdkBinding(
         readTerminalByokProjection().summary,
         inventory.persistedByokBinding,
         inventory.currentSessionId,
     );
-    println(`    vínculo BYOK:   \x1b[33m${renderTerminalSdkProviderBinding(inventory.persistedByokBinding)}\x1b[0m`);
-    println(`    BYOK pronto:    \x1b[33m${byokBinding.preparedLabel}\x1b[0m`);
-    println(`    limite BYOK:    \x1b[90m${byokBinding.headline}\x1b[0m`);
+    println(terminalThemeRow('Vínculo BYOK', renderTerminalSdkProviderBinding(inventory.persistedByokBinding)));
+    println(terminalThemeRow('BYOK pronto', byokBinding.preparedLabel));
+    println(terminalThemeRow('Limite BYOK', byokBinding.headline));
     if (byokBinding.action) {
-        println(`      \x1b[90m${byokBinding.action}\x1b[0m`);
+        println(terminalThemeRow('Ação BYOK', byokBinding.action));
     }
     const bootDecision = renderSdkSessionBootDecision(inventory.lastBootDecision);
     if (bootDecision) {
-        println(`    último boot:    \x1b[90m${bootDecision}\x1b[0m`);
+        println(terminalThemeRow('Último boot', bootDecision));
     }
     println(
-        '    \x1b[90m/session sdk controla sessão SDK; /restart reinicia só a conversa; /resume injeta histórico do hub; /session save|list|restore são snapshots locais.\x1b[0m',
+        terminalThemeRow(
+            'Comandos',
+            '/session sdk controla sessão SDK; /restart reinicia só a conversa; /resume injeta histórico do hub; /session save|list|restore são snapshots locais',
+        ),
     );
     if (inventory.sessions.length === 0) {
-        println('    \x1b[90mNenhuma sessão SDK listada pelo client atual.\x1b[0m\n');
+        println(terminalThemeRow('Sessões', 'nenhuma sessão SDK listada pelo client atual'));
+        println('');
         return;
     }
+    println('');
     println(
-        `\n  \x1b[36mSessões SDK listadas\x1b[0m (${inventory.sessions.length}) \x1b[90mfiltro ${inventoryArgs.filterLabel} · deslocamento ${inventoryArgs.offset} · limite ${inventoryArgs.limit}\x1b[0m`,
+        terminalThemeHeadline('assistant', 'Sessões SDK listadas', [
+            `${inventory.sessions.length}`,
+            `filtro ${inventoryArgs.filterLabel}`,
+            `deslocamento ${inventoryArgs.offset}`,
+            `limite ${inventoryArgs.limit}`,
+        ]),
     );
     const visibleSessions = inventory.sessions.slice(inventoryArgs.offset, inventoryArgs.offset + inventoryArgs.limit);
     for (const [index, entry] of visibleSessions.entries()) {
@@ -2000,26 +2031,29 @@ export async function cmdSessionSdk({ println }, arg = '') {
                 ? /** @type {Record<string, unknown>} */ (entry.localMetadata)
                 : null,
         );
-        println(`    \x1b[90m#${absoluteIndex + 1}\x1b[0m \x1b[33m${entry.sessionId}\x1b[0m  \x1b[90m${flags || '-'}\x1b[0m`);
-        println(`      \x1b[90minício ${start} · alterada ${modified}${summary ? ` · ${summary}` : ''}\x1b[0m`);
+        println(terminalThemeRow(`#${absoluteIndex + 1}`, `${entry.sessionId} · ${flags || '-'}`));
+        println(terminalThemeRow('Tempo', `início ${start} · alterada ${modified}${summary ? ` · ${summary}` : ''}`));
         if (localMetadata) {
-            println(`      \x1b[90mmetadados locais: ${localMetadata}\x1b[0m`);
+            println(terminalThemeRow('Metadados', localMetadata));
         }
         if (entry.sessionFs) {
-            println(`      \x1b[90marquivos da sessão: ${renderSdkSessionFsState(entry.sessionFs)}\x1b[0m`);
+            println(terminalThemeRow('Arquivos', renderSdkSessionFsState(entry.sessionFs)));
         }
     }
     if (inventory.sessions.length > inventoryArgs.offset + visibleSessions.length) {
         println(
-            `    \x1b[90m... ${inventory.sessions.length - inventoryArgs.offset - visibleSessions.length} sessão(ões) omitida(s). Use /session sdk ${inventoryArgs.limit} offset=${inventoryArgs.offset + visibleSessions.length}.\x1b[0m`,
+            terminalThemeRow(
+                'Mais',
+                `${inventory.sessions.length - inventoryArgs.offset - visibleSessions.length} sessão(ões) omitida(s). Use /session sdk ${inventoryArgs.limit} offset=${inventoryArgs.offset + visibleSessions.length}.`,
+            ),
         );
     }
-    println(
-        '\n  \x1b[90mPróximo boot: /session sdk next new | /session sdk next resume <id|#n|current|last|foreground> | /session sdk next auto\x1b[0m',
-    );
-    println('  \x1b[90mFiltros: /session sdk <n> offset=<n> cwd=<path> gitRoot=<path> repo=<owner/repo> branch=<nome>.\x1b[0m');
-    println('  \x1b[90mLimpeza persistida: /session sdk delete <id|#n>; sessão viva é protegida contra exclusão.\x1b[0m');
-    println('  \x1b[90mprobe-residue marca canários persistidos por diagnósticos antigos; probes novos usam sessão efêmera.\x1b[0m\n');
+    println('');
+    println(terminalThemeRow('Próximo boot', '/session sdk next new | /session sdk next resume <id|#n|current|last|foreground> | /session sdk next auto'));
+    println(terminalThemeRow('Filtros', '/session sdk <n> offset=<n> cwd=<path> gitRoot=<path> repo=<owner/repo> branch=<nome>'));
+    println(terminalThemeRow('Limpeza', '/session sdk delete <id|#n>; sessão viva é protegida contra exclusão'));
+    println(terminalThemeRow('Probes', 'probe-residue marca canários persistidos por diagnósticos antigos; probes novos usam sessão efêmera'));
+    println('');
 }
 
 /**

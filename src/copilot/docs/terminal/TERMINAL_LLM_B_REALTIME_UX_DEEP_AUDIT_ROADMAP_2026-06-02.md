@@ -2598,4 +2598,22 @@
 - [x] Teste escopado passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
 - [ ] Próxima lacuna: revisar o `/status` compacto restante, que ainda tem ANSI local em algumas linhas, e decidir se vale migrar agora ou manter até a próxima rodada de compactação.
-- [ ] Próxima lacuna: revisar `/session sdk` inventário/controle, que ainda contém mensagens com ANSI local em ações de boot.
+- [x] Próxima lacuna: revisar `/session sdk` inventário/controle, que ainda contém mensagens com ANSI local em ações de boot.
+
+### 11.33 `/session sdk` com cockpit visual consistente
+
+- [x] Achado: `/session sdk next`, `/session sdk delete`, inventário, eventos, waits e catálogo de comandos ainda tinham ANSI local e pontuação antiga (`Próximo boot:`, `Waits SDK`, `vínculo BYOK`, `arquivos da sessão:`).
+- [x] `cmdSessionSdk` passou a usar `terminalThemeHeadline` e `terminalThemeRow` para:
+  - diretivas de próximo boot;
+  - proteção contra apagar sessão SDK viva;
+  - erros de inventário;
+  - estado atual/última/foreground;
+  - vínculo BYOK;
+  - sessões listadas;
+  - filtros, limpeza e probes.
+- [x] `/session sdk events`, `/session sdk waits` e `/session sdk commands` também passaram para o tema comum.
+- [x] A terminologia default virou `Esperas SDK da sessão`, `Eventos SDK da sessão`, `Comandos SDK expostos ao Copilot`, `Vínculo BYOK`, `Último boot`, `Metadados` e `Arquivos`.
+- [x] IDs de sessão continuam copiáveis, mas aparecem dentro de linhas alinhadas e com rótulo humano.
+- [x] Teste escopado passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
+- [ ] Próxima lacuna: revisar se `/status` compacto deve migrar totalmente para tema, removendo os ANSI locais remanescentes sem perder contraste rápido.
