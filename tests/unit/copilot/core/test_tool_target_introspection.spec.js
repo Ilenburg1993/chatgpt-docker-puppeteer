@@ -37,4 +37,16 @@ describe('core/tool-target-introspection', () => {
         expect(meta.fileTargets).toContain('src/copilot/tools/file/write-tools.js');
         expect(meta.fileTargets).toContain('src/copilot/tools/file');
     });
+
+    it('captura source e destination usados por copy_file e move_file', () => {
+        const meta = introspectToolTargets({
+            args: {
+                source: 'data/live/source.txt',
+                destination: 'data/live/destination.txt',
+            },
+        });
+
+        expect(meta.fileTargets).toEqual(['data/live/source.txt', 'data/live/destination.txt']);
+        expect(meta.primaryTarget).toBe('data/live/source.txt');
+    });
 });

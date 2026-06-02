@@ -161,6 +161,7 @@ function createLiveScenario({
     allowedTools = ['report_intent', 'read_file_content', 'ask_user'],
     expectedLifecycleTools = [],
     expectedOutputMarkers = [],
+    expectedTerminalRender = [],
     invalidChoiceExpected = false,
     recoverableToolErrorExpected = false,
 }) {
@@ -176,6 +177,7 @@ function createLiveScenario({
         allowedTools: Object.freeze(allowedTools),
         expectedLifecycleTools: Object.freeze(expectedLifecycleTools.map((tool) => Object.freeze({ ...tool }))),
         expectedOutputMarkers: Object.freeze(expectedOutputMarkers),
+        expectedTerminalRender: Object.freeze(expectedTerminalRender.map((item) => Object.freeze({ ...item }))),
         invalidChoiceExpected,
         recoverableToolErrorExpected,
         askRenderedRe: buildAskRenderedRegex(askQuestion),
@@ -285,6 +287,7 @@ const LIVE_SCENARIOS = Object.freeze({
             { name: 'delete_file', renderedName: 'delete_file' },
         ],
         expectedOutputMarkers: ['TERMINAL-PERMISSION-ROUNDTRIP'],
+        expectedTerminalRender: [{ toolName: 'move_file', badge: 'MOVE', forbiddenBadge: 'INSPECT' }],
     }),
 });
 
@@ -2347,6 +2350,20 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         marker,
         observedInToolResult: scenarioMarkerObservedInToolResults(canonicalEvents, marker),
     }));
+    const scenarioTerminalRender = scenario.expectedTerminalRender.map((item) => {
+        const toolName = String(item.toolName ?? '');
+        const badge = String(item.badge ?? '');
+        const forbiddenBadge = String(item.forbiddenBadge ?? '');
+        return {
+            toolName,
+            badge,
+            forbiddenBadge,
+            expectedRe: new RegExp(`\\[TOOL\\]\\s+\\[${escapeRegExp(badge)}\\]\\s+${escapeRegExp(toolName)}\\b`, 'u'),
+            forbiddenRe: forbiddenBadge
+                ? new RegExp(`\\[TOOL\\]\\s+\\[${escapeRegExp(forbiddenBadge)}\\]\\s+${escapeRegExp(toolName)}\\b`, 'u')
+                : null,
+        };
+    });
     const canonicalTranscriptEvents = summarizeCanonicalTranscriptEvents(canonicalEvents, scenario);
     const exportSseAskRequested = exportEnvelopeMatchesEvent(exportSummary, canonicalTranscriptEvents.askRequested);
     const exportSseAskCompleted = exportEnvelopeMatchesEvent(exportSummary, canonicalTranscriptEvents.askCompleted);
@@ -2459,6 +2476,17 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             pass: observedInToolResult,
             detail: `scenario output marker ${marker} ${observedInToolResult ? 'observed in tool result' : 'missing from tool results'}`,
         })),
+        ...scenarioTerminalRender.map(({ toolName, badge, forbiddenBadge, expectedRe, forbiddenRe }) => {
+            const expectedObserved = expectedRe.test(plain);
+            const forbiddenObserved = forbiddenRe ? forbiddenRe.test(plain) : false;
+            return {
+                id: `scenario-render-${toolName.toLowerCase().replace(/[^a-z0-9]+/gu, '-')}-${badge.toLowerCase()}`,
+                pass: expectedObserved && !forbiddenObserved,
+                detail:
+                    `${toolName} render expected=[${badge}] observed=${expectedObserved ? 'yes' : 'no'}` +
+                    (forbiddenBadge ? ` forbidden=[${forbiddenBadge}] observed=${forbiddenObserved ? 'yes' : 'no'}` : ''),
+            };
+        }),
         ...(scenarioUsesPermissionedTool
             ? [
                   {

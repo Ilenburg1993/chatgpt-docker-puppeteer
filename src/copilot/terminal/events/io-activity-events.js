@@ -110,9 +110,10 @@ function normalizeIoMessage(value) {
  */
 function mapIoOperationToTurnOperation(operation) {
     if (operation === 'read' || operation === 'fetch') return 'read';
-    if (operation === 'write' || operation === 'append' || operation === 'mkdir' || operation === 'copy')
-        return 'write';
-    if (operation === 'patch' || operation === 'move') return 'edit';
+    if (operation === 'write' || operation === 'append' || operation === 'mkdir') return 'write';
+    if (operation === 'copy') return 'copy';
+    if (operation === 'patch') return 'edit';
+    if (operation === 'move') return 'move';
     if (operation === 'delete') return 'delete';
     if (operation === 'scan' || operation === 'search' || operation === 'stat') return 'list';
     return 'unknown';
@@ -124,8 +125,8 @@ function mapIoOperationToTurnOperation(operation) {
  */
 function mapTurnOperationToRole(operation) {
     if (operation === 'read' || operation === 'list') return 'fileRead';
-    if (operation === 'write') return 'fileWrite';
-    if (operation === 'edit') return 'fileEdit';
+    if (operation === 'write' || operation === 'copy') return 'fileWrite';
+    if (operation === 'edit' || operation === 'move') return 'fileEdit';
     if (operation === 'delete') return 'fileDelete';
     return 'tool';
 }

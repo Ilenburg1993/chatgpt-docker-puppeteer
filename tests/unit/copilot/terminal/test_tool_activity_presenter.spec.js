@@ -116,4 +116,26 @@ describe('terminal/tool-activity-presenter', () => {
         expect(fromJsonArguments.toolName).toBe('read_file_content');
         expect(fromJsonArguments.operation).toBe('read');
     });
+
+    it('classifica copy_file e move_file como operações canônicas com source/destination reais', () => {
+        const copy = buildTerminalToolActivityPresentation({
+            toolName: 'copy_file',
+            args: { source: 'src/a.txt', destination: 'src/b.txt' },
+        });
+        const move = buildTerminalToolActivityPresentation({
+            toolName: 'move_file',
+            operation: 'move',
+            args: { source: 'src/b.txt', destination: 'src/c.txt' },
+            toolCallId: 'call-move',
+        });
+
+        expect(copy.operation).toBe('copy');
+        expect(copy.detail).toContain('copiando arquivo');
+        expect(copy.fileTargets).toEqual(['src/a.txt', 'src/b.txt']);
+        expect(move.operation).toBe('move');
+        expect(move.detail).toContain('movendo arquivo');
+        expect(move.target).toContain('src/b.txt');
+        expect(move.target).not.toContain('call-move');
+        expect(move.completeLine(true, '0.1s')).toContain('movendo arquivo concluído');
+    });
 });

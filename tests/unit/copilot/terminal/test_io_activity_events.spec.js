@@ -128,4 +128,49 @@ describe('terminal/io-activity-events', () => {
         expect(broadcastSse).not.toHaveBeenCalled();
         expect(println).not.toHaveBeenCalled();
     });
+
+    it('preserva operação move no turn trace e na saída de I/O', async () => {
+        const { clearTerminalIoActivityProjection, setupTerminalIoActivityEvents } =
+            await import('../../../../src/copilot/terminal/events/io-activity-events.js');
+        clearTerminalIoActivityProjection();
+        const cleanup = setupTerminalIoActivityEvents();
+        const target = join(process.cwd(), 'data/copilot-terminal/live-scratch/source.txt');
+
+        try {
+            channel('copilot.io.operation').publish({
+                ts: 321,
+                success: true,
+                io: {
+                    operation: 'move',
+                    target,
+                    targetKind: 'file',
+                    bytesRead: 12,
+                    durationMs: 3,
+                    engine: 'io-engine.fs.rename',
+                    riskClass: 'medium',
+                    traceId: 'trace-io-move',
+                },
+            });
+        } finally {
+            cleanup();
+        }
+
+        expect(recordTerminalTurnFileActivity).toHaveBeenCalledWith(
+            expect.objectContaining({
+                path: 'data/copilot-terminal/live-scratch/source.txt',
+                operation: 'move',
+                source: 'io',
+                timestamp: 321,
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('[MOVE]'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'tool.lifecycle',
+            expect.objectContaining({
+                type: 'io_op',
+                operation: 'move',
+                target: 'data/copilot-terminal/live-scratch/source.txt',
+            }),
+        );
+    });
 });

@@ -234,6 +234,28 @@
   - SQLite: `terminal-live:2026-06-02T07-54-18-007Z:canonical_full_turn_file-write-roundtrip`.
   - artefato: `data/copilot-terminal/live-runs/terminal-ux-file-write-no-permission-sdk-20260602-0454/summary.md`.
 
+## 02.07 Evidencia live de semantica MOVE no terminal
+
+- Problema observado:
+  - `move_file` executava corretamente, mas era renderizado como `[INSPECT] move_file · executando tool generica`;
+  - o I/O bruto ja mostrava `[MOVE]`, criando divergencia entre lifecycle SDK, turn trace e atividade de I/O.
+- Correcao aplicada:
+  - `src/copilot/core/tool-target-introspection.js` agora reconhece `source` e `destination` como alvos de arquivo;
+  - `src/copilot/terminal/events/tool-activity-presenter.js` reconhece `copy` e `move`, inclusive por `evt.operation`;
+  - `src/copilot/terminal/events/io-activity-events.js` preserva `copy` e `move` na projecao do turn trace;
+  - `src/copilot/terminal/state/turn-trace-state.js` aceita `copy` e `move` como operacoes canonicas.
+  - `scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs` passou a exigir `[TOOL] [MOVE] move_file` e proibir `[TOOL] [INSPECT] move_file` no cenario `file-write-roundtrip`.
+- Prova SDK/Copilot:
+  - comando: `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --transport=pty --live-scenario=file-write-roundtrip --out-dir=data/copilot-terminal/live-runs/terminal-ux-file-write-move-presenter-sdk-20260602-0515`
+  - status: PASS.
+  - SSE: 353 eventos, 349 com id/source, 251 com traceId, zero erros.
+  - Validou `move_file` renderizado como `[TOOL] [MOVE] move_file · movendo arquivo`.
+  - Validou resumo de turno com `[TOOLS] MOVE move_file` e `[FILES] MOVE ...`.
+  - Validou ausencia de `[INSPECT] move_file` no transcript plain.
+  - Validou `no-sdk-permission-prompt-in-approve-all` e scratch limpo apos roundtrip.
+  - SQLite: `terminal-live:2026-06-02T08-13-58-566Z:canonical_full_turn_file-write-roundtrip`.
+  - artefato: `data/copilot-terminal/live-runs/terminal-ux-file-write-move-presenter-sdk-20260602-0515/summary.md`.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -542,6 +564,9 @@
 - [x] Adicionar criterio hard para ausencia de prompt de permissao em cenarios permissionados.
 - [x] Rodar live SDK/Copilot com `COPILOT_BYOK_ENABLED=false` para isolar permissao de instabilidade BYOK.
 - [x] Rodar live SDK/Copilot com `file-write-roundtrip` para provar create/move/delete sem prompt.
+- [x] Corrigir presenter para `move_file` deixar de aparecer como `[INSPECT]` generico.
+- [x] Adicionar criterio hard no runner live para regressao `[INSPECT] move_file`.
+- [x] Rodar live SDK/Copilot provando `move_file` como `[MOVE]`, com `source`/`destination` visiveis.
 
 ### Faixa K - Validadores
 

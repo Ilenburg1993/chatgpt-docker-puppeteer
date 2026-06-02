@@ -15,6 +15,8 @@ const FILE_OPERATION_PATTERNS = /** @type {const} */ ([
     { match: /\b(read|view|open|cat|show)\b/i, operation: 'read', label: 'lendo arquivo' },
     { match: /\b(write|create|save)\b/i, operation: 'write', label: 'escrevendo arquivo' },
     { match: /\b(edit|patch|apply|update|replace)\b/i, operation: 'edit', label: 'editando arquivo' },
+    { match: /\b(copy|cp)\b/i, operation: 'copy', label: 'copiando arquivo' },
+    { match: /\b(move|mv|rename)\b/i, operation: 'move', label: 'movendo arquivo' },
     { match: /\b(delete|remove|rm)\b/i, operation: 'delete', label: 'removendo arquivo' },
     { match: /\b(list|ls|glob|find|search)\b/i, operation: 'list', label: 'inspecionando arquivos' },
 ]);
@@ -29,7 +31,7 @@ const INSPECTION_TOOL_PATTERNS = /** @type {const} */ ([
 const GENERIC_TOOL_NAMES = new Set(['external_tool', 'external tool', 'tool', 'unknown', 'unknown_tool']);
 
 /**
- * @typedef {'read' | 'write' | 'edit' | 'delete' | 'list' | 'run' | 'inspect' | 'unknown'} TerminalToolOperation
+ * @typedef {'read' | 'write' | 'edit' | 'copy' | 'move' | 'delete' | 'list' | 'run' | 'inspect' | 'unknown'} TerminalToolOperation
  *
  * @typedef {{
  *     toolName: string;
@@ -229,11 +231,40 @@ function buildTargetSummary(meta) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {{ operation: TerminalToolOperation; label: string } | null}
+ */
+function normalizeExplicitOperation(value) {
+    const operation = stringOrNull(value)?.toLowerCase().replace(/[_:-]+/g, ' ') ?? null;
+    if (!operation) return null;
+    if (/\b(read|view|fetch|open)\b/u.test(operation)) return { operation: 'read', label: 'lendo arquivo' };
+    if (/\b(write|create|append|mkdir|save)\b/u.test(operation)) {
+        return { operation: 'write', label: 'escrevendo arquivo' };
+    }
+    if (/\b(edit|patch|update|replace)\b/u.test(operation)) return { operation: 'edit', label: 'editando arquivo' };
+    if (/\b(copy|cp)\b/u.test(operation)) return { operation: 'copy', label: 'copiando arquivo' };
+    if (/\b(move|mv|rename)\b/u.test(operation)) return { operation: 'move', label: 'movendo arquivo' };
+    if (/\b(delete|remove|rm|unlink)\b/u.test(operation)) return { operation: 'delete', label: 'removendo arquivo' };
+    if (/\b(list|scan|search|stat|glob|find)\b/u.test(operation)) {
+        return { operation: 'list', label: 'inspecionando arquivos' };
+    }
+    if (/\b(run|exec|shell|command|terminal)\b/u.test(operation)) return { operation: 'run', label: 'executando comando' };
+    if (/\b(inspect|status|health|diagnostic|telemetry|metrics)\b/u.test(operation)) {
+        return { operation: 'inspect', label: 'inspecionando diagnóstico' };
+    }
+    return null;
+}
+
+/**
  * @param {string} toolName
  * @param {string | null} path
+ * @param {unknown} explicitOperation
  * @returns {{ operation: TerminalToolOperation; label: string }}
  */
-function inferOperation(toolName, path) {
+function inferOperation(toolName, path, explicitOperation) {
+    const normalizedExplicitOperation = normalizeExplicitOperation(explicitOperation);
+    if (normalizedExplicitOperation) return normalizedExplicitOperation;
+
     const canonical = resolveToolName(toolName) ?? toolName;
     const normalized = `${toolName} ${canonical}`.replace(/[_:-]+/g, ' ');
 
@@ -285,8 +316,8 @@ export function compactTerminalToolText(text, max = 140) {
  */
 export function mapTerminalToolOperationRole(operation) {
     if (operation === 'read') return 'fileRead';
-    if (operation === 'write') return 'fileWrite';
-    if (operation === 'edit') return 'fileEdit';
+    if (operation === 'write' || operation === 'copy') return 'fileWrite';
+    if (operation === 'edit' || operation === 'move') return 'fileEdit';
     if (operation === 'delete') return 'fileDelete';
     return 'tool';
 }
@@ -313,7 +344,7 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
     const isStructuredInputTool = (canonicalToolName ?? toolName) === 'request_user_input';
     const questionPreview = isStructuredInputTool ? inferQuestion(toolArgs) : null;
     const path = isStructuredInputTool ? null : (meta.fileTargets[0] ?? null);
-    const { operation, label } = inferOperation(toolName, path);
+    const { operation, label } = inferOperation(toolName, path, evt['operation']);
     const target =
         questionPreview ??
         buildTargetSummary(meta) ??
