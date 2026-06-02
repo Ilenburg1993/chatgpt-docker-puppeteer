@@ -54,13 +54,13 @@ function pct(value) {
  */
 function summarizeIoRuntime(ioRuntime) {
     const hitRatio = ioRuntime.cache.aggregate.hitRatio;
-    const cache = `hit=${pct(hitRatio)} l2=${yn(Boolean(ioRuntime.cache.l2?.['enabled']))}`;
+    const cache = `acerto ${pct(hitRatio)} · L2 ${yn(Boolean(ioRuntime.cache.l2?.['enabled']))}`;
     const indexRecord = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});
     const index = indexRecord['available']
-        ? `ok files=${String(indexRecord['files'] ?? indexRecord['fileCount'] ?? '-')}`
-        : `off:${String(indexRecord['reason'] ?? 'unavailable')}`;
+        ? `ok · arquivos ${String(indexRecord['files'] ?? indexRecord['fileCount'] ?? '-')}`
+        : `off · ${String(indexRecord['reason'] ?? 'unavailable')}`;
     return {
-        io: `scopes=${ioRuntime.scopes.active} parser=${String(ioRuntime.parser?.size ?? 0)}`,
+        io: `escopos ${ioRuntime.scopes.active} · parser ${String(ioRuntime.parser?.size ?? 0)}`,
         cache,
         index,
     };

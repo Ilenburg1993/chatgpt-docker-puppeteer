@@ -2280,5 +2280,8 @@
 - [x] `/byok providers` trocou o cabeçalho `ativo=`, `prontos=` e `presets=` por `ativo`, `prontos` e `presets`, com contagem de presets legível.
 - [x] `/byok models grouped` e `/byok recommend grouped` trocaram `variants=` por `variantes`, com separação visual ` | ` entre perfis/provedores.
 - [x] Teste BYOK completo passou novamente após esse lote: `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js` (105 testes).
+- [x] Auto-brief detalhado de boot trocou `hit=`, `l2=`, `files=`, `scopes=` e `off:<reason>` por `acerto`, `L2`, `arquivos`, `escopos` e `off · motivo`, melhorando o primeiro viewport do terminal.
+- [x] Teste escopado passou após esse lote: `npx vitest run tests/unit/copilot/terminal/test_auto_brief.spec.js`.
+- [x] Roteador REPL trocou `messageId=`, `reason=` e `status=` nas superfícies `/steer` e `/handoff` por `mensagem`, `motivo` e `status`.
 - [ ] Auditar `/byok persist` e os helpers de health tags restantes para separar default humano de detalhe técnico.
 - [ ] Separar explicitamente “tela default humana” de “detail/raw diagnóstico” nos comandos BYOK, sem perder automação e rastreabilidade.

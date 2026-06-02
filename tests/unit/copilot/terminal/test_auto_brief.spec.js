@@ -117,8 +117,14 @@ describe('terminal/repl/auto-brief', () => {
         expect(text).toContain('Briefing detalhado (boot)');
         expect(text).toContain('Runtime');
         expect(text).toContain('Estado    parcial');
+        expect(text).toContain('acerto 0%');
+        expect(text).toContain('arquivos 0');
+        expect(text).toContain('escopos 0');
         expect(text).not.toContain('runtime=');
         expect(text).not.toContain('streaming=');
+        expect(text).not.toContain('hit=');
+        expect(text).not.toContain('files=');
+        expect(text).not.toContain('scopes=');
         vi.unstubAllEnvs();
     });
 });

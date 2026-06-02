@@ -281,7 +281,7 @@ async function _cmdSteer(message) {
     try {
         const messageId = await steerTerminalMessage(prompt);
         println(
-            `\x1b[36m  [steer] Intervenção immediate enviada ao SDK${messageId ? ` (messageId=${messageId})` : ''}.\x1b[0m`,
+            `\x1b[36m  [steer] Intervenção immediate enviada ao SDK${messageId ? ` (mensagem ${messageId})` : ''}.\x1b[0m`,
         );
         println('\x1b[90m  Observação: /steer pode consumir PR via SDK immediate.\x1b[0m');
     } catch (e) {
@@ -455,7 +455,7 @@ function _cmdHandoff() {
     for (const h of history) {
         const ts = new Date(Number(h.receivedAt)).toISOString();
         println(
-            `  \x1b[90m${ts}\x1b[0m  ${h.fromAgent}→\x1b[33m${h.toAgent}\x1b[0m  reason=\x1b[90m${h.reason ?? '-'}\x1b[0m  status=\x1b[36m${h.status}\x1b[0m`,
+            `  \x1b[90m${ts}\x1b[0m  ${h.fromAgent}→\x1b[33m${h.toAgent}\x1b[0m  motivo \x1b[90m${h.reason ?? '-'}\x1b[0m  status \x1b[36m${h.status}\x1b[0m`,
         );
     }
 }
