@@ -544,10 +544,11 @@ describe('commands/session — sync commands', () => {
             expect(ctx.output()).toContain('prompts approve_all');
             expect(ctx.output()).toContain('1 provedor');
             expect(ctx.output()).toContain('3 modelos');
-            expect(ctx.output()).toContain('ativo openrouter:deepseek/deepseek-v4-flash:free @ openrouter');
+            expect(ctx.output()).toContain('ativo openrouter · deepseek/deepseek-v4-flash:free');
             expect(ctx.output()).not.toContain('runtime=');
             expect(ctx.output()).not.toContain('gateway=providers');
             expect(ctx.output()).not.toContain('PM:approve_all');
+            expect(ctx.output()).not.toContain('@openrouter');
             expect(ctx.output()).not.toContain('test-byok-key-that-must-not-render');
         } finally {
             for (const [key, value] of Object.entries(previousEnv)) {
@@ -567,12 +568,14 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).not.toContain('\x1b[36mFluxo da conversa');
         expect(ctx.output()).toContain('Estado');
         expect(ctx.output()).toContain('Sinais');
+        expect(ctx.output()).toContain('SSE sem clientes');
         expect(ctx.output()).toContain('/live full');
         expect(ctx.output()).not.toContain('\x1b[90m/live full · /activity');
         expect(ctx.output()).not.toContain('Terminal Live Flow');
         expect(ctx.output()).not.toContain('runtime');
         expect(ctx.output()).not.toContain('streaming=');
         expect(ctx.output()).not.toContain('cache/scope');
+        expect(ctx.output()).not.toContain('SSE 0/0');
         expect(ctx.output()).not.toContain('· idle');
     });
 

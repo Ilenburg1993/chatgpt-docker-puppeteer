@@ -304,7 +304,8 @@ describe('commands/diagnose', () => {
             expect(ctx.output()).toContain('1 provedor');
             expect(ctx.output()).toContain('3 modelos');
             expect(ctx.output()).toContain('3 habilitados');
-            expect(ctx.output()).toContain('ativo openrouter:deepseek/deepseek-v4-flash:free @ openrouter');
+            expect(ctx.output()).toContain('ativo openrouter · deepseek/deepseek-v4-flash:free');
+            expect(ctx.output()).not.toContain('@openrouter');
             expect(ctx.output()).not.toContain('providers=');
             expect(ctx.output()).not.toContain('active=');
             expect(ctx.output()).not.toContain('test-diagnose-byok-key-that-must-not-render');
@@ -339,7 +340,9 @@ describe('commands/diagnose', () => {
         expect(output).not.toContain('\x1b[36mSaúde do Terminal LLM-B');
         expect(output).toContain('Conversa');
         expect(output).toContain('Entrada');
+        expect(output).toContain('Gateway');
         expect(output).toContain('Ferramentas');
+        expect(output).not.toContain('@');
         expect(output).toContain('locais ativas');
         expect(output).not.toContain('ponte MCP indisponível');
         expect(output).not.toContain('\x1b[90m/health full · /diagnose');

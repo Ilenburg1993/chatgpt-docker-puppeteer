@@ -172,7 +172,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         gatewayProjection.active && typeof gatewayProjection.active === 'object' ? gatewayProjection.active : null;
     const gatewayLine =
         gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0
-            ? `${C.grey}${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados · ativo ${gatewayActive?.['modelId'] ?? '-'}${gatewayActive?.['providerId'] ? ` @ ${gatewayActive['providerId']}` : ''}${C.reset}`
+            ? `${C.grey}${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados · ativo ${renderGatewayActiveLabel(gatewayActive)}${C.reset}`
             : `${C.grey}off${C.reset}`;
     const planOpLine = configProjection.sdkPlanOperation
         ? `${C.yellow}${configProjection.sdkPlanOperation}${C.reset}${configProjection.sdkPlanChangedAt ? ` ${C.grey}@ ${formatTerminalIsoTimestamp(configProjection.sdkPlanChangedAt)}${C.reset}` : ''}`
@@ -373,9 +373,20 @@ function renderCompactByokLine(byok) {
  */
 function renderCompactGatewayLine(projection, active) {
     if (projection.providerCount <= 0 && projection.modelCount <= 0) return `${C.grey}catálogo desligado${C.reset}`;
-    const model = typeof active?.['modelId'] === 'string' ? active['modelId'] : 'sem modelo ativo';
-    const provider = typeof active?.['providerId'] === 'string' ? `@${active['providerId']}` : '';
-    return `${C.grey}${pluralPt(projection.providerCount, 'provedor', 'provedores')} · ${projection.enabledModelCount} de ${projection.modelCount} modelos habilitados · ${model}${provider}${C.reset}`;
+    const activeLabel = renderGatewayActiveLabel(active);
+    return `${C.grey}${pluralPt(projection.providerCount, 'provedor', 'provedores')} · ${projection.enabledModelCount} de ${projection.modelCount} modelos habilitados · ${activeLabel}${C.reset}`;
+}
+
+/**
+ * @param {Record<string, unknown> | null} active
+ * @returns {string}
+ */
+function renderGatewayActiveLabel(active) {
+    if (!active) return 'sem modelo ativo';
+    const provider = typeof active?.['providerId'] === 'string' ? active['providerId'] : '';
+    const rawModel = typeof active?.['modelId'] === 'string' ? active['modelId'] : 'sem modelo ativo';
+    const model = provider && rawModel.startsWith(`${provider}:`) ? rawModel.slice(provider.length + 1) : rawModel;
+    return provider ? `${provider} · ${model}` : model;
 }
 
 /**

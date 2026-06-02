@@ -2283,5 +2283,17 @@
 - [x] Auto-brief detalhado de boot trocou `hit=`, `l2=`, `files=`, `scopes=` e `off:<reason>` por `acerto`, `L2`, `arquivos`, `escopos` e `off · motivo`, melhorando o primeiro viewport do terminal.
 - [x] Teste escopado passou após esse lote: `npx vitest run tests/unit/copilot/terminal/test_auto_brief.spec.js`.
 - [x] Roteador REPL trocou `messageId=`, `reason=` e `status=` nas superfícies `/steer` e `/handoff` por `mensagem`, `motivo` e `status`.
+- [x] Live PTY curta executada após os lotes de UX operacional:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/ux-polished-ops-cycle-20260602-1506`.
+- [x] Resultado: PASS completo em help, boot copy, status, now, health, tools, live, activity, waits e close limpo; evidência em `artifacts/terminal-live/ux-polished-ops-cycle-20260602-1506/summary.md`.
+- [x] Achado residual live resolvido: `/health` Gateway compacto passou de `provider:model@provider` para `provider · model`, mantendo detalhes técnicos em superfícies de detail.
+- [x] Achado residual live resolvido: `/live` default passou de `SSE 0/0` para `SSE sem clientes`, mantendo contadores no detail.
+- [x] Live PTY curta repetida após os achados residuais:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/ux-polished-ops-cycle-20260602-1510`.
+- [x] Resultado: PASS completo; `/health` exibiu `kilo-code · kilo-auto/free` e `/live` exibiu `SSE sem clientes`.
+- [x] Achado extra da segunda live resolvido: `/now` também passou a compactar o modelo ativo do catálogo como `provider · model`, sem `provider:model`.
+- [x] Live PTY curta final executada após corrigir `/now`:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/ux-polished-ops-cycle-20260602-1513`.
+- [x] Resultado: PASS completo; `/now` exibiu `ativo kilo-code · kilo-auto/free`, `/health` exibiu `kilo-code · kilo-auto/free` e `/live` exibiu `SSE sem clientes`.
 - [ ] Auditar `/byok persist` e os helpers de health tags restantes para separar default humano de detalhe técnico.
 - [ ] Separar explicitamente “tela default humana” de “detail/raw diagnóstico” nos comandos BYOK, sem perder automação e rastreabilidade.

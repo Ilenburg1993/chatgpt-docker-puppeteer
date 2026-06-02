@@ -253,6 +253,27 @@ function renderLiveToggle(value) {
 }
 
 /**
+ * @param {{ clients: number; criticalClients: number }} sse
+ * @returns {string}
+ */
+function renderCompactSseLine(sse) {
+    if (sse.clients <= 0 && sse.criticalClients <= 0) return 'SSE sem clientes';
+    return `SSE ${sse.clients}/${sse.criticalClients}`;
+}
+
+/**
+ * @param {Record<string, unknown> | null} active
+ * @returns {string}
+ */
+function renderCompactGatewayActive(active) {
+    if (!active) return '-';
+    const provider = typeof active['providerId'] === 'string' ? active['providerId'] : '';
+    const rawModel = typeof active['modelId'] === 'string' ? active['modelId'] : '-';
+    const model = provider && rawModel.startsWith(`${provider}:`) ? rawModel.slice(provider.length + 1) : rawModel;
+    return provider ? `${provider} · ${model}` : model;
+}
+
+/**
  * @param {unknown} mode
  * @returns {string}
  */
@@ -782,7 +803,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         println(`  Modelo       \x1b[90m${modelLine}\x1b[0m`);
         if (gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0) {
             println(
-                `  Catálogo     \x1b[90m${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ativo ${gatewayActive?.['modelId'] ?? '-'}\x1b[0m`,
+                `  Catálogo     \x1b[90m${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ativo ${renderCompactGatewayActive(gatewayActive)}\x1b[0m`,
             );
         }
         if (projection.activity?.label) {
@@ -832,7 +853,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
     println(`  Modelo       \x1b[90m${modelLine}\x1b[0m`);
     if (gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0) {
         println(
-            `  Catálogo     \x1b[90m${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados · ativo ${gatewayActive?.['modelId'] ?? '-'}${gatewayActive?.['providerId'] ? ` @ ${gatewayActive['providerId']}` : ''}\x1b[0m`,
+            `  Catálogo     \x1b[90m${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados · ativo ${renderCompactGatewayActive(gatewayActive)}\x1b[0m`,
         );
     }
     if (projection.activity?.label) {
@@ -911,7 +932,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
   Sinais       \x1b[90m${streamBits.join(' · ') || 'sinais reduzidos'}\x1b[0m
   Atividade    \x1b[90m${activityLine}\x1b[0m
   Turno        \x1b[90m${traceSummary.join(' · ') || 'sem ações recentes'}\x1b[0m
-  Conexões     \x1b[90mSSE ${projection.sse.clients}/${projection.sse.criticalClients} · timeline ${projection.counters.timelineTurns} turno(s)\x1b[0m
+  Conexões     \x1b[90m${renderCompactSseLine(projection.sse)} · timeline ${projection.counters.timelineTurns} turno(s)\x1b[0m
   Detalhe      ${renderCommandList(['/live full', `/activity ${requestedLimit} detail`, `/events ${requestedLimit}`])}
   ─────────────────────────────────────
 `);
