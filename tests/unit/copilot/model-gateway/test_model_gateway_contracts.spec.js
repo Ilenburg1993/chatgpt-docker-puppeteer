@@ -10491,6 +10491,10 @@ describe('model-gateway foundation', () => {
         assert.equal(summary.expiredCount, 0);
         assert.deepEqual(summary.byProvider, { chutes: 1, groq: 1, openrouter: 1 });
         assert.deepEqual(summary.byFailureKind, { credits: 2, 'rate-limit': 1 });
+        assert.deepEqual(summary.activeByProvider, { chutes: 1, groq: 1, openrouter: 1 });
+        assert.deepEqual(summary.expiredByProvider, {});
+        assert.deepEqual(summary.activeByFailureKind, { credits: 2, 'rate-limit': 1 });
+        assert.deepEqual(summary.expiredByFailureKind, {});
         assert.equal(summary.items.length, 2);
         assert.deepEqual(summary.items[0], {
             providerId: 'chutes',

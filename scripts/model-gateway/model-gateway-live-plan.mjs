@@ -90,6 +90,11 @@ function countMapText(counts) {
         .join(',') || '-';
 }
 
+function countMapValue(counts, key) {
+    const value = counts && typeof counts === 'object' ? counts[key] : null;
+    return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
 function terminalLiveRouteMatrix(readiness) {
     const routes =
         readiness?.terminalLiveRuntimeSelectorPlan?.selectedRoutes ??
@@ -112,6 +117,8 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
     const runtimeSelector = readinessCheck(readiness, 'runtime_selector_plan_ready');
     const terminalLiveRuntimeSelector = readinessCheck(readiness, 'terminal_live_runtime_selector_plan_ready');
     const runtimeNotPromoted = readinessCheck(readiness, 'runtime_not_promoted');
+    const syntheticFixtureActiveCount = countMapValue(overlaySummary.activeByProvider, 'model-gateway-fixture');
+    const blockingActiveOverlayCount = Math.max(0, overlaySummary.activeCount - syntheticFixtureActiveCount);
     const prerequisites = [
         {
             id: 'readiness_ok',
@@ -145,8 +152,9 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         },
         {
             id: 'active_runtime_overlays',
-            ok: allowActiveOverlays || overlaySummary.activeCount === 0,
-            detail: `active=${overlaySummary.activeCount}, expired=${overlaySummary.expiredCount}, providers=${countMapText(overlaySummary.byProvider)}, failures=${countMapText(overlaySummary.byFailureKind)}`,
+            ok: allowActiveOverlays || blockingActiveOverlayCount === 0,
+            detail:
+                `blockingActive=${blockingActiveOverlayCount}, active=${overlaySummary.activeCount}, syntheticFixtureActive=${syntheticFixtureActiveCount}, expired=${overlaySummary.expiredCount}, activeProviders=${countMapText(overlaySummary.activeByProvider)}, providers=${countMapText(overlaySummary.byProvider)}, failures=${countMapText(overlaySummary.byFailureKind)}`,
         },
         {
             id: 'local_private_strict_selection',

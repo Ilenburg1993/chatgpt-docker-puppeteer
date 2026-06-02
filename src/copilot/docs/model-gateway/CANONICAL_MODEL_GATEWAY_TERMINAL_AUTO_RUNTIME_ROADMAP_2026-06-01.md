@@ -450,8 +450,10 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-02T00-36-27-258Z:auto_probe` no run mais recente.
 - [x] `npm run model-gateway:live:auto-probe` validou 30 criterios, incluindo `auto-standby-visible`, recovery fixture
       sintetica e ausencia de erros rastreados.
-- [x] `npm run model-gateway:auto:scenarios` separa `live_plan_command` de `live_plan_ready`; plano live real bloqueado
-      vira warning, nao falso PASS contraditorio.
+- [x] `npm run model-gateway:auto:scenarios` separa `live_plan_command` de `live_plan_ready`; apos excluir fixture
+      sintetica dos blockers reais, `live_plan_ready=true`.
+- [x] `npm run model-gateway:live:plan -- --json --no-write` passa com `blockingActive=0`, `active=1`,
+      `syntheticFixtureActive=1`.
 - [x] `npm run model-gateway:auto:doctor` mostrou inventario canonico; apos recovery fixture, health/cooldown pode bloquear como esperado e `runtime-health:clear` e o reset operacional canonico.
 - [x] `/byok auto status` e `/byok auto doctor` mostram resumo de alternativas usaveis/bloqueadas.
 - [x] `/byok auto status` e `/byok auto doctor` sugerem `/byok probe agent provider:<provider> model:<provider-model> timeout:20000` para candidatos bloqueados por agent probe ausente/nao verificado.

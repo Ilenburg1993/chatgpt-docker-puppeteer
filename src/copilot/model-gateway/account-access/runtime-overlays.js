@@ -258,6 +258,10 @@ export function deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords
  *   expiredCount: number,
  *   byProvider: Record<string, number>,
  *   byFailureKind: Record<string, number>,
+ *   activeByProvider: Record<string, number>,
+ *   expiredByProvider: Record<string, number>,
+ *   activeByFailureKind: Record<string, number>,
+ *   expiredByFailureKind: Record<string, number>,
  *   items: Array<{
  *     providerId: string,
  *     failureKind: string,
@@ -280,6 +284,14 @@ export function summarizeModelGatewayRuntimeAccountOverlays(overlays, options = 
     const byProvider = {};
     /** @type {Record<string, number>} */
     const byFailureKind = {};
+    /** @type {Record<string, number>} */
+    const activeByProvider = {};
+    /** @type {Record<string, number>} */
+    const expiredByProvider = {};
+    /** @type {Record<string, number>} */
+    const activeByFailureKind = {};
+    /** @type {Record<string, number>} */
+    const expiredByFailureKind = {};
     let activeCount = 0;
     let expiredCount = 0;
     const normalized = (Array.isArray(overlays) ? overlays : []).filter(isRecord).map((overlay) => {
@@ -295,8 +307,15 @@ export function summarizeModelGatewayRuntimeAccountOverlays(overlays, options = 
             : [];
         byProvider[providerId] = (byProvider[providerId] ?? 0) + 1;
         byFailureKind[failureKind] = (byFailureKind[failureKind] ?? 0) + 1;
-        if (expired) expiredCount += 1;
-        else activeCount += 1;
+        if (expired) {
+            expiredCount += 1;
+            expiredByProvider[providerId] = (expiredByProvider[providerId] ?? 0) + 1;
+            expiredByFailureKind[failureKind] = (expiredByFailureKind[failureKind] ?? 0) + 1;
+        } else {
+            activeCount += 1;
+            activeByProvider[providerId] = (activeByProvider[providerId] ?? 0) + 1;
+            activeByFailureKind[failureKind] = (activeByFailureKind[failureKind] ?? 0) + 1;
+        }
         return {
             providerId,
             failureKind,
@@ -323,6 +342,10 @@ export function summarizeModelGatewayRuntimeAccountOverlays(overlays, options = 
         expiredCount,
         byProvider,
         byFailureKind,
+        activeByProvider,
+        expiredByProvider,
+        activeByFailureKind,
+        expiredByFailureKind,
         items: normalized.slice(0, maxItems),
     };
 }

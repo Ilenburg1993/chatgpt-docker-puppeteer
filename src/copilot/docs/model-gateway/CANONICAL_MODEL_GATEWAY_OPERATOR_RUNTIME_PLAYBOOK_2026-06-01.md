@@ -551,13 +551,12 @@ Isso cria overlay temporario com reset/cooldown.
 ## 10. Checklist Antes De Chancelar
 
 - [ ] `npm run model-gateway:auto:ready` passa.
-- [ ] `npm run model-gateway:auto:doctor` passa.
+- [x] `npm run model-gateway:auto:doctor` passa.
 - [x] `npm run model-gateway:auto:proof-plan` passa e gera fila read-only de comandos de prova.
 - [x] `npm run model-gateway:auto:standby` passa e lista rotas de prontidao sem chamar provider.
-- [x] `npm run model-gateway:auto:scenarios` passa sem blockers de readiness; `live_plan_ready` pode ser warning ate o
-      plano live real estar liberado.
-- [ ] `npm run model-gateway:live:readiness` passa.
-- [ ] `npm run model-gateway:live:plan` passa.
+- [x] `npm run model-gateway:auto:scenarios` passa sem blockers de readiness e com `live_plan_ready=true`.
+- [x] `npm run model-gateway:live:readiness` passa.
+- [x] `npm run model-gateway:live:plan -- --json --no-write` passa; health sintetica de fixture nao bloqueia live real.
 - [ ] `npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000` passa.
 - [ ] `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000` passa.
 - [x] `npm run model-gateway:live:auto-probe` passa.

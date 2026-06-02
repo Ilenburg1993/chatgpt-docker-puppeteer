@@ -381,8 +381,9 @@ Validado nesta linha:
 - `npm run model-gateway:auto:doctor`: PASS operacional de leitura; gate auto pode ficar bloqueado quando health/cooldown operacional pedir prova ou limpeza.
 - `npm run model-gateway:auto:proof-plan`: PASS, read-only, gerou comandos explicitos `/byok probe ... provider:<id> model:<id>`.
 - `npm run model-gateway:auto:standby`: PASS, read-only, lista rotas de prontidao e comandos de substituicao sem chamar provider.
-- `npm run model-gateway:auto:scenarios`: PASS, 12 cenarios, `auto_standby` ok, sem provider call; `live_plan_ready`
-  pode ficar como warning quando o plano live real ainda aponta um `nextCommand` bloqueante.
+- `npm run model-gateway:auto:scenarios`: PASS, 12 cenarios, `auto_standby` ok, `live_plan_ready=true`, sem provider call.
+- `npm run model-gateway:live:plan -- --json --no-write`: PASS; `active_runtime_overlays` mostrou `blockingActive=0`
+  mesmo com `syntheticFixtureActive=1`, pois fixture sintetica nao bloqueia live real.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`: 215 PASS.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js`: 101 PASS.
 - `npm run model-gateway:live:auto-probe`: PASS, incluindo `/byok auto standby`, recovery fixture sintetica e health clear disponivel.
