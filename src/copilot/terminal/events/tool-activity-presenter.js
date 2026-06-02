@@ -47,6 +47,10 @@ const HUMAN_TOOL_NAMES = Object.freeze({
     read_briefing: 'Briefing da sessão',
     get_workspace_info: 'Contexto do workspace',
     get_telemetry: 'Telemetria',
+    exec_command: 'Executar comando',
+    bash: 'Executar comando',
+    shell: 'Executar comando',
+    browser_action: 'Ação no navegador',
 });
 
 const TOOL_ID_PATTERNS = [
@@ -366,6 +370,10 @@ function inferOperation(toolName, path, explicitOperation) {
         return { operation: 'intent', label: 'registrando intenção' };
     }
 
+    if (/\b(shell|terminal|exec|bash|command|npm|node|test)\b/i.test(normalized)) {
+        return { operation: 'run', label: 'executando comando' };
+    }
+
     if (/\b(report|telemetry|diagnostic|health|status)\b/i.test(normalized)) {
         return { operation: 'inspect', label: 'inspecionando diagnóstico' };
     }
@@ -385,9 +393,6 @@ function inferOperation(toolName, path, explicitOperation) {
         }
     }
     if (path) return { operation: 'inspect', label: 'operando arquivo' };
-    if (/\b(shell|terminal|exec|bash|npm|node|test)\b/i.test(normalized)) {
-        return { operation: 'run', label: 'executando comando' };
-    }
     return { operation: 'inspect', label: 'executando tool genérica' };
 }
 

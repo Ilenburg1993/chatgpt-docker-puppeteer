@@ -57,6 +57,21 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.completeLine(true, '1.0s')).toContain('aguardando decisão humana concluído');
     });
 
+    it('classifica exec_command como execução mesmo quando o cwd aparece como alvo', () => {
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'exec_command',
+            args: {
+                command: "node -e \"console.log('ok')\"",
+                cwd: '/workspaces/chatgpt-docker-puppeteer',
+            },
+        });
+
+        expect(presentation.displayToolName).toBe('Executar comando');
+        expect(presentation.operation).toBe('run');
+        expect(presentation.detail).toContain('executando comando');
+        expect(presentation.detail).not.toContain('operando arquivo');
+    });
+
     it('enriquece leitura com range efetivamente retornado no resultado', () => {
         const presentation = buildTerminalToolActivityPresentation({
             toolName: 'read_file_content',

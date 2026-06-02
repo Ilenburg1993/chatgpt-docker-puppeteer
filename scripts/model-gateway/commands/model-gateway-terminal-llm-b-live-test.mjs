@@ -244,8 +244,11 @@ const LIVE_SCENARIOS = Object.freeze({
         finalInstruction:
             'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-LONGTOOL-FINAL: tool longa concluída e usuário confirmou SIM".',
         allowedTools: ['report_intent', 'read_file_content', 'exec_command', 'ask_user'],
-        expectedLifecycleTools: [{ name: 'exec_command', renderedName: 'exec_command' }],
+        expectedLifecycleTools: [{ name: 'exec_command', renderedName: 'Executar comando' }],
         expectedOutputMarkers: ['LONG-TOOL-HEARTBEAT-DONE'],
+        expectedTerminalRender: [
+            { toolName: 'exec_command', renderedName: 'Executar comando', badge: 'EXEC', forbiddenBadge: 'VER' },
+        ],
     }),
     'recoverable-tool-error': createLiveScenario({
         id: 'recoverable-tool-error',
@@ -263,8 +266,11 @@ const LIVE_SCENARIOS = Object.freeze({
         finalInstruction:
             'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-RECOVERABLE-FINAL: erro de tool foi recuperado e usuário confirmou SIM".',
         allowedTools: ['report_intent', 'read_file_content', 'exec_command', 'ask_user'],
-        expectedLifecycleTools: [{ name: 'exec_command', renderedName: 'exec_command', expectedOutcome: 'failure' }],
+        expectedLifecycleTools: [{ name: 'exec_command', renderedName: 'Executar comando', expectedOutcome: 'failure' }],
         expectedOutputMarkers: ['RECOVERABLE-TOOL-ERROR'],
+        expectedTerminalRender: [
+            { toolName: 'exec_command', renderedName: 'Executar comando', badge: 'EXEC', forbiddenBadge: 'VER' },
+        ],
         recoverableToolErrorExpected: true,
     }),
     'file-write-roundtrip': createLiveScenario({
@@ -290,7 +296,9 @@ const LIVE_SCENARIOS = Object.freeze({
             { name: 'delete_file', renderedName: 'Excluir arquivo' },
         ],
         expectedOutputMarkers: ['TERMINAL-PERMISSION-ROUNDTRIP'],
-        expectedTerminalRender: [{ toolName: 'move_file', badge: 'MOVE', forbiddenBadge: 'INSPECT' }],
+        expectedTerminalRender: [
+            { toolName: 'move_file', renderedName: 'Mover arquivo', badge: 'MOVER', forbiddenBadge: 'VER' },
+        ],
     }),
 });
 
@@ -847,7 +855,7 @@ function byokLiveRouteIdentity(realByok) {
 }
 
 function renderedReadFileToolOk(plain) {
-    return /\[TOOL\].*(?:read_file_content|Ler arquivo)/s.test(plain) && /✅ \[DONE\].*(?:read_file_content|Ler arquivo)/s.test(plain);
+    return /\[LER\].*(?:read_file_content|Ler arquivo)/s.test(plain) && /✅ \[OK\].*(?:read_file_content|Ler arquivo)/s.test(plain);
 }
 
 function defaultToolNarrationLines(plain) {
@@ -2402,14 +2410,25 @@ function summarizeCanonicalToolLifecycle(events) {
         reportIntentDone: false,
         readFileStart: false,
         readFileDone: false,
+        readFilePostToolSuccess: false,
+        readFilePostToolFailure: false,
         readFileIo: false,
         toolLifecycleEvents: 0,
         matchedEventIds: [],
     };
     for (const evt of events) {
-        if (evt?.event !== 'tool.lifecycle') continue;
         const payload = eventPayload(evt);
         if (!payload) continue;
+        if (evt?.event === 'hook.start') {
+            const readFilePostToolUse = summarizePostToolUseResult(payload, 'read_file_content');
+            if (!readFilePostToolUse) continue;
+            if (readFilePostToolUse.success) summary.readFilePostToolSuccess = true;
+            if (readFilePostToolUse.failure) summary.readFilePostToolFailure = true;
+            const eventId = eventPublicId(evt);
+            if (Number.isFinite(eventId)) summary.matchedEventIds.push(eventId);
+            continue;
+        }
+        if (evt?.event !== 'tool.lifecycle') continue;
         summary.toolLifecycleEvents += 1;
         const type = typeof payload.type === 'string' ? payload.type : '';
         const success = payload.success !== false;
@@ -2797,8 +2816,8 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const scenarioToolLifecycle = scenario.expectedLifecycleTools.map((tool) => ({
         ...tool,
         lifecycle: summarizeNamedToolLifecycle(canonicalEvents, tool.name),
-        renderedRe: new RegExp(`\\[TOOL\\].*${escapeRegExp(tool.renderedName ?? tool.name)}`, 's'),
-        doneRe: new RegExp(`✅ \\[DONE\\].*${escapeRegExp(tool.renderedName ?? tool.name)}`, 's'),
+        renderedRe: new RegExp(`\\[[^\\]]+\\].*${escapeRegExp(tool.renderedName ?? tool.name)}`, 's'),
+        doneRe: new RegExp(`✅ \\[OK\\].*${escapeRegExp(tool.renderedName ?? tool.name)}`, 's'),
     }));
     const scenarioOutputMarkers = scenario.expectedOutputMarkers.map((marker) => ({
         marker,
@@ -2810,11 +2829,15 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         const forbiddenBadge = String(item.forbiddenBadge ?? '');
         return {
             toolName,
+            renderedName: String(item.renderedName ?? toolName),
             badge,
             forbiddenBadge,
-            expectedRe: new RegExp(`\\[TOOL\\]\\s+\\[${escapeRegExp(badge)}\\]\\s+${escapeRegExp(toolName)}\\b`, 'u'),
+            expectedRe: new RegExp(`\\[${escapeRegExp(badge)}\\]\\s+${escapeRegExp(String(item.renderedName ?? toolName))}\\b`, 'u'),
             forbiddenRe: forbiddenBadge
-                ? new RegExp(`\\[TOOL\\]\\s+\\[${escapeRegExp(forbiddenBadge)}\\]\\s+${escapeRegExp(toolName)}\\b`, 'u')
+                ? new RegExp(
+                      `\\[${escapeRegExp(forbiddenBadge)}\\]\\s+${escapeRegExp(String(item.renderedName ?? toolName))}\\b`,
+                      'u',
+                  )
                 : null,
         };
     });
@@ -2890,9 +2913,12 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'tool-start-done',
-            pass: canonicalToolLifecycle.readFileStart && canonicalToolLifecycle.readFileDone && renderedReadFileToolOk(plain),
+            pass:
+                canonicalToolLifecycle.readFileStart &&
+                (canonicalToolLifecycle.readFileDone || canonicalToolLifecycle.readFilePostToolSuccess) &&
+                renderedReadFileToolOk(plain),
             detail:
-                `read_file_content lifecycle start=${canonicalToolLifecycle.readFileStart ? 'yes' : 'no'} done=${canonicalToolLifecycle.readFileDone ? 'yes' : 'no'} io=${canonicalToolLifecycle.readFileIo ? 'yes' : 'no'} ` +
+                `read_file_content lifecycle start=${canonicalToolLifecycle.readFileStart ? 'yes' : 'no'} done=${canonicalToolLifecycle.readFileDone ? 'yes' : 'no'} postSuccess=${canonicalToolLifecycle.readFilePostToolSuccess ? 'yes' : 'no'} io=${canonicalToolLifecycle.readFileIo ? 'yes' : 'no'} ` +
                 `rendered=${renderedReadFileToolOk(plain) ? 'yes' : 'no'} events=${canonicalToolLifecycle.matchedEventIds.slice(0, 8).join(',') || '-'}`,
         },
         {
@@ -2947,9 +2973,9 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                           : 'approve_all executed permissioned scenario tools without SDK permission prompt/event',
                   },
                   {
-                      id: 'health-permission-policy-visible',
+                      id: 'health-full-permission-policy-visible',
                       pass: /permission\s+approve_all[\s\S]{0,120}sdk prompts=skip/iu.test(plain),
-                      detail: '/health rendered approve_all with sdk prompts=skip for permissioned live scenario',
+                      detail: '/health full rendered approve_all with sdk prompts=skip for permissioned live scenario',
                   },
               ]
             : []),
@@ -3040,6 +3066,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'llm-usage-visible',
             pass:
+                /Uso BYOK sem Premium Request/.test(plain) ||
                 /Telemetria LLM sem Premium Request/.test(plain) ||
                 /Última telemetria LLM/.test(plain) ||
                 /Premium Request classificada/.test(plain),
@@ -3071,7 +3098,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'ux-compact-boot-banner',
             pass:
                 /Terminal LLM-B/.test(plain) &&
-                /\[brief:ready\]/.test(plain) &&
+                /LLM-B pronta/.test(plain) &&
                 !/\/workspace \[list\|read\|write\|sync\|mirror\|promote\]/.test(plain),
             detail: 'boot rendered compact banner/brief instead of the full command catalog',
         },
@@ -3083,9 +3110,9 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'ux-human-tool-names',
             pass:
-                /\[INTENT\] Intent capturado/.test(plain) &&
-                /\[TOOL\]\s+\[READ\]\s+Ler arquivo/.test(plain) &&
-                /✅ \[DONE\] Ler arquivo/.test(plain),
+                /\[INTENÇÃO\] Intent capturado/.test(plain) &&
+                /\[LER\]\s+Ler arquivo/.test(plain) &&
+                /✅ \[OK\] Ler arquivo/.test(plain),
             detail: 'default tool narration uses human tool names',
         },
         {
@@ -3107,13 +3134,28 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'ux-compact-no-delta-live-status',
-            pass: !/thinking\/LLM-B trabalhando[\s\S]{0,160}sem delta visível/iu.test(plain),
+            pass: !/thinking\/LLM-B trabalhando[\s\S]{0,160}sem delta visível/iu.test(plain) && !/thinking\//iu.test(plain),
             detail: 'no-delta live status stayed semantic/compact instead of repeating the full working label',
         },
         {
             id: 'ux-compact-turn-live-status',
-            pass: !/turn\/Intenção da LLM-B[\s\S]{0,160}terminal live canonical/iu.test(plain),
+            pass: !/turn\/Intenção da LLM-B[\s\S]{0,160}terminal live canonical/iu.test(plain) && !/turn\//iu.test(plain),
             detail: 'turn live status avoided repeating long intent details',
+        },
+        {
+            id: 'ux-compact-tool-live-status',
+            pass: !/tool\/Ferramenta em uso/iu.test(plain) && !/tool\/Executando tool/iu.test(plain),
+            detail: 'tool live status used human phase labels instead of raw phase/tool prefixes',
+        },
+        {
+            id: 'ux-no-technical-tool-name-in-live-status',
+            pass: !/⟲ LLM-B[^\n\r]*(?:tool\/|ferramenta ·)[^\n\r]*\bexec_command\b/iu.test(plain),
+            detail: 'live status did not expose exec_command in the default visual line',
+        },
+        {
+            id: 'ux-intent-label-portuguese',
+            pass: /\[INTENÇÃO\]/u.test(plain) && !/\[INTENT\]/u.test(plain),
+            detail: 'intent blocks use the Portuguese operator-facing label',
         },
         {
             id: 'ux-compact-ask-live-status',
@@ -4334,7 +4376,15 @@ async function main() {
             postAnswerCommandTimer = null;
         }
         setTimeout(() => {
-            const diagnostics = ['/usage now', '/activity 40', '/tools diag', '/events 60', '/events 100 --raw', '/errors 10', '/health'];
+            const diagnostics = [
+                '/usage now',
+                '/activity 40',
+                '/tools diag',
+                '/events 60',
+                '/events 100 --raw',
+                '/errors 10',
+                '/health full',
+            ];
             if (byokReal) {
                 diagnostics.push('/byok providers', '/byok health', '/byok recommend reasoning safe 8');
             }

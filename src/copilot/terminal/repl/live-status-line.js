@@ -18,6 +18,7 @@ import {
     readTerminalRuntimeState,
 } from '../frontend/gateways/index.js';
 import { readTerminalActivitySnapshot, terminalThemeText } from '../state/repl/index.js';
+import { getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
 
 const MIN_LIVE_STATUS_INTERVAL_MS = 250;
 const MIN_LIVE_STATUS_HEARTBEAT_MS = 1_000;
@@ -25,6 +26,24 @@ const DEFAULT_LIVE_STATUS_HEARTBEAT_MS = 5_000;
 const LIVE_LABEL_MAX_CHARS = 28;
 const LIVE_DETAIL_MAX_CHARS = 48;
 const LIVE_QUESTION_MAX_CHARS = 56;
+
+/**
+ * @param {string} phase
+ * @returns {string}
+ */
+function renderLivePhaseLabel(phase) {
+    if (phase === 'idle') return 'pronta';
+    if (phase === 'boot') return 'iniciando';
+    if (phase === 'tool') return 'ferramenta';
+    if (phase === 'turn') return 'turno';
+    if (phase === 'thinking') return 'pensando';
+    if (phase === 'streaming') return 'respondendo';
+    if (phase === 'question') return 'aguardando operador';
+    if (phase === 'task') return 'tarefa';
+    if (phase === 'compaction') return 'compactando';
+    if (phase === 'error') return 'erro';
+    return 'trabalhando';
+}
 
 /**
  * @param {ReturnType<typeof readTerminalRuntimeState>} runtime
@@ -47,6 +66,16 @@ function compactLiveStatusText(value, max) {
         .replace(/\s+/g, ' ')
         .trim();
     return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1))}…`;
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
+ * @returns {string}
+ */
+function renderLiveToolName(activity) {
+    const name = activity.toolName ?? '';
+    if (!name) return '';
+    return compactLiveStatusText(getTerminalHumanToolName(name), 28);
 }
 
 /**
@@ -163,7 +192,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
     if (noDeltaStatus) {
         return (
             `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
-            `${terminalThemeText(severityRole, 'thinking')}` +
+            `${terminalThemeText(severityRole, 'pensando')}` +
             `${terminalThemeText('muted', ` · ${noDeltaStatus} · ${model}/${effort} · ${runtimeTail}${queue}`)}` +
             '\x1b[K'
         );
@@ -172,17 +201,18 @@ export function formatTerminalLiveStatusLine(input = {}) {
     if (activity.phase === 'turn') {
         return (
             `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
-            `${terminalThemeText(severityRole, `turn · ${label}`)}` +
+            `${terminalThemeText(severityRole, `turno · ${label}`)}` +
             `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)} · ${model}/${effort} · ${runtimeTail}${queue}`)}` +
             '\x1b[K'
         );
     }
-    const target = activity.toolName ? ` · ${compactLiveStatusText(activity.toolName, 24)}` : '';
+    const target = renderLiveToolName(activity);
+    const targetText = target ? ` · ${target}` : '';
     const detailText = detail ? ` · ${detail}` : '';
     return (
         `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
-        `${terminalThemeText(severityRole, `${activity.phase}/${label}`)}` +
-        `${terminalThemeText('tool', target)}` +
+        `${terminalThemeText(severityRole, `${renderLivePhaseLabel(activity.phase)} · ${label}`)}` +
+        `${terminalThemeText('tool', targetText)}` +
         `${terminalThemeText('muted', `${detailText}${progress} · ${formatLiveDuration(ageMs)} · ${model}/${effort} · ${runtimeTail}${queue}`)}` +
         '\x1b[K'
     );

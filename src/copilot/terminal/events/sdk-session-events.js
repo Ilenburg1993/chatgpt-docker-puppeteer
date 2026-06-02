@@ -198,9 +198,28 @@ function isLikelyInternalId(value) {
  * @returns {string}
  */
 function renderTurnTraceOperationLabel(operation) {
-    if (operation === 'ask') return 'ASK';
-    if (operation === 'intent') return 'INTENT';
-    return operation.toUpperCase();
+    if (operation === 'ask') return 'PERGUNTA';
+    if (operation === 'intent') return 'INTENÇÃO';
+    if (operation === 'read') return 'LER';
+    if (operation === 'write') return 'CRIAR';
+    if (operation === 'edit') return 'EDITAR';
+    if (operation === 'copy') return 'COPIAR';
+    if (operation === 'move') return 'MOVER';
+    if (operation === 'delete') return 'EXCLUIR';
+    if (operation === 'list') return 'LISTAR';
+    if (operation === 'run') return 'EXEC';
+    if (operation === 'inspect') return 'VER';
+    return 'AÇÃO';
+}
+
+/**
+ * @param {number} value
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function pluralPt(value, singular, plural) {
+    return `${value} ${value === 1 ? singular : plural}`;
 }
 
 /**
@@ -249,25 +268,25 @@ function renderTurnTraceSummary(trace) {
     const fileItems = trace.files.slice(0, compactDetail ? 2 : 3).map((file) => {
         const label = compactDetail
             ? compactSummaryText(file.path, 24)
-            : `${file.operation.toUpperCase()} ${compactSummaryText(file.path, 42)}`;
+            : `${renderTurnTraceOperationLabel(file.operation)} ${compactSummaryText(file.path, 42)}`;
         return terminalThemeText('info', label);
     });
     const headline = [
-        trace.tools.length > 0 ? `${trace.tools.length} tool(s)` : null,
-        trace.files.length > 0 ? `${trace.files.length} arquivo(s)` : null,
+        trace.tools.length > 0 ? pluralPt(trace.tools.length, 'ação', 'ações') : null,
+        trace.files.length > 0 ? pluralPt(trace.files.length, 'arquivo', 'arquivos') : null,
     ]
         .filter(Boolean)
         .join(' · ');
 
-    println(`  ${terminalThemeBadge('info', 'TURN')} ${terminalThemeText('muted', headline)}`);
+    println(`  ${terminalThemeBadge('info', 'TURNO')} ${terminalThemeText('muted', headline)}`);
     if (toolItems.length > 0) {
         println(
-            `   ${terminalThemeBadge('tool', compactDetail ? 'OPS' : 'TOOLS')} ${toolItems.join(terminalThemeText('muted', '  ·  '))}`,
+            `   ${terminalThemeBadge('tool', 'AÇÕES')} ${toolItems.join(terminalThemeText('muted', '  ·  '))}`,
         );
     }
     if (fileItems.length > 0) {
         println(
-            `   ${terminalThemeBadge('fileRead', compactDetail ? 'FILES' : 'FILES')} ${fileItems.join(terminalThemeText('muted', '  ·  '))}`,
+            `   ${terminalThemeBadge('fileRead', 'ARQUIVOS')} ${fileItems.join(terminalThemeText('muted', '  ·  '))}`,
         );
     }
 }
@@ -1062,20 +1081,20 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const registrySnapshot = readTerminalToolRegistrySnapshot();
         const localCount = Number(registrySnapshot.total ?? 0);
         const localToolsLabel =
-            localCount > 0 ? `${localCount} tool(s) locais ativas em /tools` : 'registry local sem tools ativas';
+            localCount > 0 ? `${pluralPt(localCount, 'ferramenta local ativa', 'ferramentas locais ativas')} em /tools` : 'sem ferramentas locais ativas';
         const countLabel =
             sdkCount === null
                 ? `SDK sinalizou atualização sem contagem materializada; ${localToolsLabel}`
-                : `${sdkCount} tool(s) SDK dinâmicas; ${localToolsLabel}`;
-        recordTerminalActivity('system', 'Tools dinâmicas SDK atualizadas', {
+                : `${pluralPt(sdkCount, 'ferramenta dinâmica do SDK', 'ferramentas dinâmicas do SDK')}; ${localToolsLabel}`;
+        recordTerminalActivity('system', 'Ferramentas dinâmicas do SDK atualizadas', {
             detail: countLabel,
             source: 'sdk',
             recordHistory: false,
         });
         if (shouldPrintSessionNarration('verbose')) {
             const sdkLabel = sdkCount === null ? 'contagem SDK n/d' : `${sdkCount} SDK`;
-            const localLabel = localCount > 0 ? `tools locais ativas: ${localCount} (/tools)` : 'registry local sem tools';
-            println(`  \x1b[90m🧰 Tools dinâmicas SDK atualizadas: ${sdkLabel} · ${localLabel}\x1b[0m`);
+            const localLabel = localCount > 0 ? `ferramentas locais ativas: ${localCount} (/tools)` : 'sem ferramentas locais ativas';
+            println(`  \x1b[90m🧰 Ferramentas dinâmicas do SDK atualizadas: ${sdkLabel} · ${localLabel}\x1b[0m`);
         }
         broadcastSse(
             'session.tools_updated',

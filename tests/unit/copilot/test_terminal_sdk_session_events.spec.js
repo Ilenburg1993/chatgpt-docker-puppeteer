@@ -701,9 +701,9 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Tools dinâmicas SDK atualizadas',
+            'Ferramentas dinâmicas do SDK atualizadas',
             expect.objectContaining({
-                detail: expect.stringContaining('92 tool(s) SDK dinâmicas;'),
+                detail: expect.stringContaining('92 ferramentas dinâmicas do SDK;'),
                 recordHistory: false,
             }),
         );
@@ -721,7 +721,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             expect.objectContaining({ count: 4 }),
         );
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Skills SDK'));
-        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Tools dinâmicas SDK atualizadas'));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Ferramentas dinâmicas do SDK atualizadas'));
     });
 
     it('mostra narrativa verbose de sessão quando o toggle session está ativo', async () => {
@@ -735,8 +735,10 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         agent.emit('session.tools_updated', { count: 92 });
 
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Skills SDK: 2/3 habilitadas'));
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Tools dinâmicas SDK atualizadas: 92 SDK'));
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('registry local'));
+        expect(mocks.println).toHaveBeenCalledWith(
+            expect.stringContaining('Ferramentas dinâmicas do SDK atualizadas: 92 SDK'),
+        );
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('sem ferramentas locais'));
     });
 
     it('não apresenta count 0 como lista SDK real quando o evento não materializou tools', async () => {
@@ -750,13 +752,13 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
 
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Tools dinâmicas SDK atualizadas',
+            'Ferramentas dinâmicas do SDK atualizadas',
             expect.objectContaining({
                 detail: expect.stringContaining('SDK sinalizou atualização sem contagem materializada'),
             }),
         );
         expect(mocks.println).toHaveBeenCalledWith(
-            expect.stringContaining('Tools dinâmicas SDK atualizadas: contagem SDK n/d'),
+            expect.stringContaining('Ferramentas dinâmicas do SDK atualizadas: contagem SDK n/d'),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'session.tools_updated',
@@ -775,20 +777,20 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
 
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Tools dinâmicas SDK atualizadas',
+            'Ferramentas dinâmicas do SDK atualizadas',
             expect.objectContaining({
-                detail: expect.stringContaining('0 tool(s) SDK dinâmicas;'),
+                detail: expect.stringContaining('0 ferramentas dinâmicas do SDK;'),
             }),
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Tools dinâmicas SDK atualizadas',
+            'Ferramentas dinâmicas do SDK atualizadas',
             expect.objectContaining({
-                detail: expect.stringContaining('registry local sem tools ativas'),
+                detail: expect.stringContaining('sem ferramentas locais ativas'),
             }),
         );
         expect(mocks.println).toHaveBeenCalledWith(
-            expect.stringContaining('Tools dinâmicas SDK atualizadas: 0 SDK · registry local sem tools'),
+            expect.stringContaining('Ferramentas dinâmicas do SDK atualizadas: 0 SDK · sem ferramentas locais'),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'session.tools_updated',

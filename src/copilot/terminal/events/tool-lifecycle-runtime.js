@@ -317,11 +317,7 @@ function printToolStart(presentation) {
     if (!getShowToolActivity()) return;
     const compactDetail = getTerminalDetailLevel() === 'compact';
     const operationRole = mapTerminalToolOperationRole(presentation.operation);
-    const opLabel = presentation.operation === 'ask' ? 'ASK' : presentation.operation === 'intent' ? 'INTENT' : presentation.operation.toUpperCase();
-    const primaryBadge =
-        presentation.operation === 'ask' || presentation.operation === 'intent'
-            ? terminalThemeBadge(operationRole, opLabel)
-            : `${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)}`;
+    const primaryBadge = terminalThemeBadge(operationRole, renderToolOperationBadgeLabel(presentation.operation));
     println(
         compactDetail
             ? `  ${primaryBadge} ${terminalThemeText('tool', compactTerminalToolText(presentation.displayToolName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(presentation.startLine, 86))}`
@@ -351,6 +347,25 @@ function shouldPersistToolProgressMilestone(entry, progress, progressMessage) {
     if (messageChanged && intervalElapsed) return true;
     if (progressJumpedEnough && intervalElapsed) return true;
     return false;
+}
+
+/**
+ * @param {import('./tool-activity-presenter.js').TerminalToolOperation} operation
+ * @returns {string}
+ */
+function renderToolOperationBadgeLabel(operation) {
+    if (operation === 'read') return 'LER';
+    if (operation === 'write') return 'CRIAR';
+    if (operation === 'edit') return 'EDITAR';
+    if (operation === 'copy') return 'COPIAR';
+    if (operation === 'move') return 'MOVER';
+    if (operation === 'delete') return 'EXCLUIR';
+    if (operation === 'list') return 'LISTAR';
+    if (operation === 'run') return 'EXEC';
+    if (operation === 'inspect') return 'VER';
+    if (operation === 'ask') return 'PERGUNTA';
+    if (operation === 'intent') return 'INTENÇÃO';
+    return 'AÇÃO';
 }
 
 /**
@@ -385,7 +400,7 @@ function printToolComplete(presentation, success, durationLabel, fallbackToolCal
     if (!getShowToolActivity()) return;
     const compactDetail = getTerminalDetailLevel() === 'compact';
     const icon = success ? terminalThemeText('success', '✅') : terminalThemeText('error', '❌');
-    const statusBadge = success ? terminalThemeBadge('success', 'DONE') : terminalThemeBadge('error', 'FAIL');
+    const statusBadge = success ? terminalThemeBadge('success', 'OK') : terminalThemeBadge('error', 'FALHA');
     const operationRole = mapTerminalToolOperationRole(presentation.operation);
     if (compactDetail) clearInlineStatus();
     const hasOnlyCallIdTarget =
@@ -472,7 +487,7 @@ export function handleTerminalNativeToolStart({ registry, evt }) {
         });
     }
     recordToolTurnProjection(presentation, 'started', toolCallId, null);
-    recordTerminalActivity('tool', 'Executando tool', {
+    recordTerminalActivity('tool', 'Ferramenta em uso', {
         detail: presentation.detail,
         toolName: canonicalName,
         source: 'sdk',
@@ -533,7 +548,7 @@ export function handleTerminalNativeToolProgress({ registry, evt }) {
     }
     const effectiveDetail =
         progressMessage ?? (progress !== null ? `${presentation.detail} · ${progress}%` : presentation.detail);
-    recordTerminalActivity('tool', persistMilestone ? 'Progresso de tool' : 'Executando tool', {
+    recordTerminalActivity('tool', persistMilestone ? 'Progresso da ferramenta' : 'Ferramenta em uso', {
         detail: effectiveDetail,
         toolName: name,
         progress,
@@ -751,18 +766,19 @@ export function handleTerminalExternalToolRequested({ registry, evt, verboseNarr
         source: `sdk/external/${toolName}`,
         toolCallId,
     });
-    const displayToolName = presentation.canonicalToolName ?? toolName;
-    if (registry.isNameInFlight(displayToolName)) {
-        registry.markRequestIdForExternalTool(requestId ?? toolCallId, displayToolName);
+    const registryToolName = presentation.canonicalToolName ?? toolName;
+    const displayToolName = presentation.displayToolName;
+    if (registry.isNameInFlight(registryToolName)) {
+        registry.markRequestIdForExternalTool(requestId ?? toolCallId, registryToolName);
         return;
     }
-    registry.register(toolCallId, displayToolName, 'external', {
+    registry.register(toolCallId, registryToolName, 'external', {
         requestId,
         canonicalName: presentation.canonicalToolName,
         presentation,
     });
     recordToolTurnProjection(presentation, 'requested', toolCallId, null);
-    recordTerminalActivity('tool', 'External tool solicitada', {
+    recordTerminalActivity('tool', 'Integração externa solicitada', {
         detail: presentation.detail || `${displayToolName}${requestId ? ` · ${requestId}` : ''}`,
         toolName: displayToolName,
         source: 'sdk',
@@ -771,7 +787,7 @@ export function handleTerminalExternalToolRequested({ registry, evt, verboseNarr
         printToolStart({ ...presentation, displayToolName, startLine: presentation.startLine });
     } else if (verboseNarration) {
         const targetLabel = presentation.target || presentation.path || requestId || '';
-        println(`  \x1b[90m↗ external tool: ${displayToolName}${targetLabel ? ` · ${targetLabel}` : ''}\x1b[0m`);
+        println(`  \x1b[90m↗ integração externa: ${displayToolName}${targetLabel ? ` · ${targetLabel}` : ''}\x1b[0m`);
     }
     broadcastToolLifecycle(
         buildToolLifecycleExternalRequested({
@@ -837,12 +853,13 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
     const presentation = hasSemanticToolTarget(completionPresentation)
         ? completionPresentation
         : (resolvedEntry?.presentation ?? completionPresentation);
-    const displayToolName = presentation.canonicalToolName ?? toolName;
+    const statsToolName = presentation.canonicalToolName ?? toolName;
+    const displayToolName = presentation.displayToolName;
     const durationMs = completedEntry ? Date.now() - completedEntry.t0 : 0;
-    recordTerminalDiagnosticToolStats(displayToolName, durationMs, success);
+    recordTerminalDiagnosticToolStats(statsToolName, durationMs, success);
     const durationLabel = buildToolCompletionDurationLabel(completedEntry ?? resolvedEntry, durationMs);
     recordToolTurnProjection(presentation, success ? 'completed' : 'failed', resolvedToolCallId, success);
-    recordTerminalActivity('tool', success ? 'External tool concluída' : 'External tool falhou', {
+    recordTerminalActivity('tool', success ? 'Integração externa concluída' : 'Integração externa falhou', {
         detail:
             presentation.completeLine(success, durationLabel) ||
             `${displayToolName}${requestId ? ` · ${requestId}` : ''}`,
@@ -854,7 +871,7 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
         printToolComplete(presentation, success, durationLabel, resolvedToolCallId);
     } else if (verboseNarration) {
         println(
-            `  ${success ? '\x1b[32m✓' : '\x1b[31m✗'} external tool:\x1b[0m ${displayToolName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
+            `  ${success ? '\x1b[32m✓' : '\x1b[31m✗'} integração externa:\x1b[0m ${displayToolName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
         );
     }
     broadcastToolLifecycle(

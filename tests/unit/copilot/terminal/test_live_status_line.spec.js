@@ -110,8 +110,10 @@ describe('terminal/live-status-line', () => {
         const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:12.000-03:00') });
 
         expect(line).toContain('LLM-B');
-        expect(line).toContain('tool/Executando tool');
-        expect(line).toContain('read_file_content');
+        expect(line).toContain('ferramenta · Executando tool');
+        expect(line).toContain('Ler arquivo');
+        expect(line).not.toContain('tool/');
+        expect(line).not.toContain('read_file_content');
         expect(line).toContain('lendo arquivo');
         expect(line).toContain('12s');
         expect(line).toContain('claude-sonnet-4.6/xhigh');
@@ -241,9 +243,10 @@ describe('terminal/live-status-line', () => {
 
         const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:18.000-03:00') });
 
-        expect(line).toContain('thinking');
+        expect(line).toContain('pensando');
         expect(line).toContain('20s sem delta');
         expect(line).toContain('auto/high');
+        expect(line).not.toContain('thinking');
         expect(line).not.toContain('LLM-B trabalhando');
         expect(line.length).toBeLessThan(90);
     });
@@ -281,7 +284,7 @@ describe('terminal/live-status-line', () => {
 
         const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:12.000-03:00') });
 
-        expect(line).toContain('turn · Intenção da LLM-B');
+        expect(line).toContain('turno · Intenção da LLM-B');
         expect(line).toContain('12s');
         expect(line).not.toContain('terminal live canonical');
         expect(line.length).toBeLessThan(88);

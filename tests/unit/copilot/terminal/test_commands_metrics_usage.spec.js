@@ -400,7 +400,8 @@ describe('commands/metrics + usage', () => {
             cmdUsage({ println: ctx.println }, 'now');
 
             expect(ctx.output()).toContain('Última telemetria LLM');
-            expect(ctx.output()).toContain('tipo=');
+            expect(ctx.output()).toContain('tipo');
+            expect(ctx.output()).not.toContain('tipo=');
             expect(ctx.output()).toContain('continuação da pergunta humana');
             expect(ctx.output()).not.toContain('ask_user_continuation');
             expect(ctx.output()).toContain('Continuação da pergunta humana');

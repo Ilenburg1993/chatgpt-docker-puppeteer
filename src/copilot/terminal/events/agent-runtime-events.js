@@ -69,7 +69,7 @@ import {
     recordByokProviderModelCallSuccess,
 } from '#copilot/model-gateway';
 import { renderTerminalIntent } from './intent-renderer.js';
-import { compactTerminalToolText } from './tool-activity-presenter.js';
+import { compactTerminalToolText, getTerminalHumanToolName } from './tool-activity-presenter.js';
 import {
     handleTerminalNativeToolComplete,
     handleTerminalNativeToolPartialResult,
@@ -379,6 +379,30 @@ function formatLlmUsageDetail(evt, billing) {
 }
 
 /**
+ * @param {Record<string, unknown>} evt
+ * @param {ReturnType<typeof normalizeUsageBilling>} billing
+ * @returns {string}
+ */
+function formatLlmUsageOperatorDetail(evt, billing) {
+    const parts = [];
+    if (billing.mismatch) {
+        parts.push(formatUsageDetail(billing));
+    } else if (billing.displayModel) {
+        parts.push(`modelo ${billing.displayModel}`);
+    }
+    if (billing.cost !== null) {
+        parts.push(`custo ${billing.cost.toFixed(4)}`);
+    }
+    parts.push('sem Premium Request');
+    const inputTokens = typeof evt?.['inputTokens'] === 'number' ? evt['inputTokens'] : null;
+    const outputTokens = typeof evt?.['outputTokens'] === 'number' ? evt['outputTokens'] : null;
+    if (inputTokens !== null || outputTokens !== null) {
+        parts.push(`tokens ${inputTokens ?? '?'}→${outputTokens ?? '?'}`);
+    }
+    return parts.filter(Boolean).join(' · ');
+}
+
+/**
  * @param {{
  *     agent: AgentEventHost;
  *     rl?: import('node:readline').Interface | null;
@@ -416,17 +440,18 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                 _reg.touch(toolCallId, { lastHeartbeatAt: now, lastSignalAt: entry.lastSignalAt });
                 const elapsed = (elapsedMs / 1000).toFixed(0);
                 const sinceSignal = ((now - entry.lastSignalAt) / 1000).toFixed(0);
-                const detailBase = entry.presentation?.detail ?? entry.toolName;
+                const detailBase = entry.presentation?.detail ?? getTerminalHumanToolName(entry.toolName);
                 const renderedName = entry.canonicalName ?? entry.toolName;
-                recordTerminalActivity('tool', 'Tool em andamento', {
+                const displayName = getTerminalHumanToolName(renderedName);
+                recordTerminalActivity('tool', 'Ferramenta em andamento', {
                     detail: `${detailBase} · ${elapsed}s ativos · ${sinceSignal}s sem progresso`,
-                    toolName: renderedName,
+                    toolName: displayName,
                     source: 'sdk',
                     recordHistory: false,
                 });
                 if (getShowToolActivity()) {
                     const line =
-                        `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', compactDetail ? compactTerminalToolText(renderedName, 32) : renderedName)} ${terminalThemeText('muted', `ainda executando · ${elapsed}s · ${toolCallId || 'sem id'}`)}`.trimEnd();
+                        `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', compactDetail ? compactTerminalToolText(displayName, 32) : displayName)} ${terminalThemeText('muted', `ainda trabalhando · ${elapsed}s sem novo progresso`)}`.trimEnd();
                     if (compactDetail) {
                         println(line);
                         writeInlineStatus(line);
@@ -913,21 +938,22 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             });
         }
 
-        const detail = formatLlmUsageDetail(evt, billing);
+        const technicalDetail = formatLlmUsageDetail(evt, billing);
+        const operatorDetail = formatLlmUsageOperatorDetail(evt, billing);
         const showUsage = getShowUsage();
         const shouldPersist = showUsage || billing.mismatch;
         const label = billing.mismatch
-            ? 'Telemetria LLM sem Premium Request com divergência de modelo'
-            : 'Telemetria LLM sem Premium Request';
+            ? 'Uso BYOK sem Premium Request com divergência de modelo'
+            : 'Uso BYOK sem Premium Request';
         recordTerminalActivity('system', label, {
-            detail,
+            detail: operatorDetail,
             source: 'agent',
             severity: billing.mismatch ? 'warn' : 'info',
             recordHistory: shouldPersist,
         });
         if ((showUsage || billing.mismatch) && !isTerminalRenderLocked()) {
             println(
-                `  ${terminalThemeBadge(billing.mismatch ? 'warn' : 'info', 'LLM')} ${terminalThemeText(billing.mismatch ? 'warn' : 'muted', detail)}`,
+                `  ${terminalThemeBadge(billing.mismatch ? 'warn' : 'info', 'LLM')} ${terminalThemeText(billing.mismatch ? 'warn' : 'muted', billing.mismatch ? technicalDetail : operatorDetail)}`,
             );
         }
     };

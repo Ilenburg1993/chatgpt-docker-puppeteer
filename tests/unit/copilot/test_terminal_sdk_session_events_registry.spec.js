@@ -166,7 +166,8 @@ describe('sdk-session-events.js — integração com ToolCallRegistry', () => {
         const entry = registry.resolveByRequestId('req-001');
         expect(entry?.toolName).toBe('browser_action');
         expect(entry?.kind).toBe('external');
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('[TOOL]'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Ação no navegador'));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('[TOOL]'));
     });
 
     it('onExternalToolRequested resolve nome real em payload aninhado antes de registrar', async () => {

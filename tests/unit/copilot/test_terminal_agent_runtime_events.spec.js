@@ -363,7 +363,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(println).toHaveBeenCalledWith(expect.stringContaining('lendo arquivo'));
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'tool',
-            'Executando tool',
+            'Ferramenta em uso',
             expect.objectContaining({
                 detail: 'lendo arquivo · arquivo: src/copilot/terminal/repl/repl.js',
                 toolName: 'workspace.read_file',
@@ -483,9 +483,11 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         await vi.advanceTimersByTimeAsync(10_000);
 
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('ainda executando · 10s · tool-long-compact'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Executar comando'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('ainda trabalhando · 10s sem novo progresso'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('tool-long-compact'));
         expect(writeInlineStatus).toHaveBeenCalledWith(
-            expect.stringContaining('ainda executando · 10s · tool-long-compact'),
+            expect.stringContaining('ainda trabalhando · 10s sem novo progresso'),
         );
 
         cleanup();
@@ -522,7 +524,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 ([event, payload]) => event === 'tool.lifecycle' && payload?.type === 'start',
             ),
         ).toHaveLength(1);
-        expect(println.mock.calls.filter(([line]) => String(line).includes('read_file_content'))).toHaveLength(1);
+        expect(println.mock.calls.filter(([line]) => String(line).includes('Ler arquivo'))).toHaveLength(1);
+        expect(println.mock.calls.some(([line]) => String(line).includes('read_file_content'))).toBe(false);
     });
 
     it('preserva alvo da tool quando completion chega sem toolName e com toolCallId divergente', async () => {
@@ -590,7 +593,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'tool',
-            'Executando tool',
+            'Ferramenta em uso',
             expect.objectContaining({
                 toolName: 'patch_file',
                 detail: expect.stringContaining('editando arquivo'),
@@ -632,7 +635,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             },
         });
 
-        expect(printlnBlock).toHaveBeenCalledWith(expect.arrayContaining([expect.stringContaining('INTENT')]));
+        expect(printlnBlock).toHaveBeenCalledWith(expect.arrayContaining([expect.stringContaining('INTENÇÃO')]));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Vou editar read-tools'));
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'turn',
@@ -783,7 +786,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         );
         expect(recordTerminalActivity).not.toHaveBeenCalledWith(
             'tool',
-            'Executando tool',
+            'Ferramenta em uso',
             expect.objectContaining({ toolName: 'ask_user' }),
         );
     });
@@ -816,13 +819,14 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'tool',
-            'Tool em andamento',
+            'Ferramenta em andamento',
             expect.objectContaining({
-                toolName: 'exec_command',
+                toolName: 'Executar comando',
                 detail: expect.stringContaining('10s ativos'),
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('ainda executando · 10s · bash-long'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('ainda trabalhando · 10s sem novo progresso'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('bash-long'));
 
         cleanup();
     });
@@ -1051,15 +1055,15 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Telemetria LLM sem Premium Request',
+            'Uso BYOK sem Premium Request',
             expect.objectContaining({
-                detail: 'modelo=gpt-5.4 · custo=0.0123 · classe=ask_user_continuation · motivo=user_input_completed_continuation · tokens=10→4',
+                detail: 'modelo gpt-5.4 · custo 0.0123 · sem Premium Request · tokens 10→4',
                 source: 'agent',
                 recordHistory: true,
             }),
         );
         expect(println).toHaveBeenCalledWith(expect.stringContaining('LLM'));
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('ask_user_continuation'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('ask_user_continuation'));
         expect(broadcastSse).toHaveBeenCalledWith(
             'llm.usage',
             expect.objectContaining({

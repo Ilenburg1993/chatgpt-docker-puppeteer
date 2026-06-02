@@ -39,8 +39,9 @@ describe('terminal/commands/intent', () => {
 
         expect(ctx.printlnBlock).toHaveBeenCalledTimes(1);
         expect(ctx.output()).toContain('Vou aplicar patch incremental');
-        expect(ctx.output()).toContain('fonte=tool de intenção');
-        expect(ctx.output()).toContain('risco=médio');
+        expect(ctx.output()).toContain('origem ferramenta de intenção');
+        expect(ctx.output()).toContain('risco médio');
+        expect(ctx.output()).not.toContain('fonte=');
         expect(ctx.output()).not.toContain('tool=patch_file');
         expect(ctx.output()).not.toContain('call=call-1');
         expect(readTerminalIntentStats().entries).toBe(1);
@@ -59,7 +60,7 @@ describe('terminal/commands/intent', () => {
 
         cmdIntent(ctx, 'detail 5');
 
-        expect(ctx.output()).toContain('detalhe=técnico');
+        expect(ctx.output()).toContain('detalhe técnico');
         expect(ctx.output()).toContain('origem=tool/report_intent_local');
         expect(ctx.output()).toContain('tool=patch_file');
         expect(ctx.output()).toContain('call=call-1');

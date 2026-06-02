@@ -1233,6 +1233,91 @@
   - `artifacts/terminal-live/default-ux-cycle-health-tools-now-20260602-0855/default-ux-cycle.raw.log`;
   - `artifacts/terminal-live/default-ux-cycle-health-tools-now-20260602-0855/default-ux-cycle.plain.log`.
 
+## 02.42 Heartbeats longos sem IDs e sem termos crus
+
+- Problema observado:
+  - os screenshots mostravam linhas repetidas de espera como `LLM-B ainda trabalhando · modelo/esforço · Ns sem saída incremental`;
+  - o heartbeat de ferramenta longa ainda podia imprimir `ainda executando · Ns · toolCallId`;
+  - esses textos são úteis como sinal de vida, mas ruins como UX durável quando trazem IDs ou taxonomia interna.
+- Mudanças aplicadas:
+  - heartbeat de tool longa virou `Ferramenta em andamento`;
+  - `exec_command`, `bash` e `shell` passaram a renderizar `Executar comando`;
+  - a linha visual de tool longa agora usa `ainda trabalhando · Ns sem novo progresso`;
+  - `toolCallId` deixou de aparecer na linha visual;
+  - a narração durável do dialog loop virou `LLM-B pensando · Ns sem resposta visível`;
+  - `modelo/esforço` e `sem saída incremental` saíram da narração durável padrão.
+- Garantias:
+  - IDs continuam preservados nos diagnósticos e eventos;
+  - `/tools diag` e `/events` continuam sendo os locais corretos para correlacionar `toolCallId`;
+  - os testes de eventos agora bloqueiam `tool-long-compact`, `bash-long` e `read_file_content` no stdout humano.
+
+## 02.43 Lifecycle de ferramentas sem badge `[TOOL]`
+
+- Problema observado:
+  - o renderer canônico de lifecycle ainda imprimia `[TOOL] [READ]`, `[TOOL] [INSPECT]` e similares;
+  - isso deixava a UI com cara de log técnico e repetia o tipo genérico antes da ação real;
+  - eventos externos ainda podiam aparecer como `external tool`.
+- Mudanças aplicadas:
+  - o badge genérico `[TOOL]` foi removido da linha visual de início;
+  - operações foram traduzidas para badges curtos:
+    - `LER`, `CRIAR`, `EDITAR`, `COPIAR`, `MOVER`, `EXCLUIR`, `LISTAR`, `EXEC`, `VER`, `PERGUNTA`, `INTENÇÃO`, `AÇÃO`;
+  - conclusão de tool passou de `DONE/FAIL` para `OK/FALHA`;
+  - `Executando tool` virou `Ferramenta em uso`;
+  - `External tool solicitada/concluída/falhou` virou `Integração externa solicitada/concluída/falhou`;
+  - fallback visual `external tool:` virou `integração externa:`;
+  - `browser_action` passou a renderizar `Ação no navegador`.
+- Testes escopados executados:
+  - `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/test_terminal_sdk_session_events_registry.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js`;
+  - status PASS;
+  - 3 arquivos, 49 testes.
+
+## 02.44 Live real de tool longa e achados de segunda ordem
+
+- Live executado:
+  - comando:
+    - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=long-tool-heartbeat --timeout-ms=240000 --transport=pty --out-dir=artifacts/terminal-live/long-tool-heartbeat-human-lifecycle-20260602-0905`
+  - o turno usou tools reais:
+    - `report_intent`;
+    - `read_file_content`;
+    - `exec_command`;
+    - `ask_user`;
+  - o operador viu `[INTENÇÃO]`, `[LER]`, `[EXEC]` e `✅ [OK]`, sem `[TOOL]`.
+- Status do live:
+  - funcionalmente executou o cenário;
+  - export, SSE, ask_user e resposta humana passaram;
+  - falhou em critérios de runner defasados e em UX residual:
+    - `tool-start-done` ainda exigia `done` direto em vez de aceitar `postToolUse` como sucesso estruturado;
+    - `ux-compact-boot-banner` procurava `[brief:ready]`, que foi substituído pela primeira tela calma;
+    - `ux-human-tool-names` ainda esperava `[TOOL] [READ]` e `✅ [DONE]`.
+- Correções aplicadas no runner:
+  - `tool-start-done` aceita `postToolUse` de `read_file_content` como prova de sucesso estruturado;
+  - o critério de boot passa a procurar `LLM-B pronta`;
+  - `ux-human-tool-names` passa a esperar `[INTENÇÃO]`, `[LER]` e `✅ [OK]`;
+  - cenários com `exec_command` passam a esperar `Executar comando`;
+  - o roundtrip de arquivo passa a esperar `[MOVER] Mover arquivo` e bloquear `[VER] Mover arquivo`.
+
+## 02.45 Resumo de turno e atualização de ferramentas em PT-BR
+
+- Problema observado no live:
+  - após tools reais, o terminal ainda imprimia:
+    - `[TURN] 2 tool(s)`;
+    - `[TOOLS] INTENT ... READ ...`;
+    - `[FILES] READ ...`;
+    - `Tools dinâmicas SDK atualizadas`;
+  - essas linhas eram uma das fontes visuais mais parecidas com os screenshots iniciais.
+- Mudanças aplicadas:
+  - `[TURN]` virou `[TURNO]`;
+  - `[TOOLS]`/`[OPS]` virou `[AÇÕES]`;
+  - `[FILES]` virou `[ARQUIVOS]`;
+  - `tool(s)` virou `ação/ações`;
+  - operações no resumo passaram a usar `PERGUNTA`, `INTENÇÃO`, `LER`, `CRIAR`, `EDITAR`, `COPIAR`, `MOVER`, `EXCLUIR`, `LISTAR`, `EXEC`, `VER` e `AÇÃO`;
+  - `Tools dinâmicas SDK atualizadas` virou `Ferramentas dinâmicas do SDK atualizadas`;
+  - `registry local sem tools` virou `sem ferramentas locais ativas`.
+- Testes escopados executados:
+  - `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/test_terminal_sdk_session_events_registry.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`;
+  - status PASS;
+  - 3 arquivos, 59 testes.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -1788,3 +1873,50 @@
 - O teste live real usa custo/latencia reais; executar com criterio depois de patches significativos.
 - Validadores de teste amplo devem ser menos frequentes que testes unitarios focados.
 - O strict geral de `src/copilot` deve continuar sendo gate antes de commit.
+
+## 11. Rodada visual pos-live PASS
+
+### 11.01 Evidencia
+
+- [x] Live `long-tool-heartbeat` passou em `artifacts/terminal-live/long-tool-heartbeat-human-lifecycle-20260602-0910`.
+- [x] Live `long-tool-heartbeat` passou novamente com criterios endurecidos em `artifacts/terminal-live/long-tool-heartbeat-human-status-20260602-0920`.
+- [x] Live `long-tool-heartbeat` passou com criterio `[EXEC]` obrigatorio em `artifacts/terminal-live/long-tool-heartbeat-exec-badge-20260602-0925`.
+- [x] O runner validou tool longa real, ask_user real, resposta humana, SSE, export, health compact e names humanos de tool.
+- [x] A live revelou residuos esteticos que nao quebravam funcionalmente: `tool/Ferramenta em uso`, `exec_command` na linha viva, `[INTENT]`, `classe=`/`motivo=` na linha de usage e `/activity` com `run · completed · sdk`.
+- [x] Esses residuos foram promovidos a contrato de UX em testes unitarios e criterios live.
+- [x] A segunda live revelou `exec_command` classificado como `[VER]` quando `cwd` virava alvo; corrigido para `[EXEC]`.
+- [x] A segunda live revelou `modelo=`/`status=success` em usage/activity padrao; corrigido para frase humana.
+
+### 11.02 Contratos novos
+
+- [x] Linha viva deve usar fase humana: `pensando`, `turno`, `ferramenta`, `respondendo`, `aguardando operador`.
+- [x] Linha viva nao deve exibir `tool/`, `turn/`, `thinking/` ou nome tecnico como `exec_command`.
+- [x] Tool longa deve aparecer como `Executar comando`, com duracao e sem id interno.
+- [x] Intent deve aparecer como `[INTENÇÃO]`, com `origem ferramenta de intenção`, sem `[INTENT]`, `fonte=` ou `report_intent` na superficie padrao.
+- [x] Usage BYOK deve aparecer como `Uso BYOK sem Premium Request`, com modelo, custo e tokens, deixando `classe` e `motivo` para comandos detalhados.
+- [x] `/activity` padrao deve traduzir operacoes e status: `execução`, `leitura`, `concluída`, `respondida`, sem `run · completed · sdk`.
+- [x] `/activity detail` continua sendo a rota para source, request id, engine e trace completo.
+
+### 11.03 Implementado nesta subrodada
+
+- [x] `live-status-line.js` recebeu labels humanos de fase e humanizacao de tool via `getTerminalHumanToolName`.
+- [x] `activity.js` recebeu labels humanos para operacao, status, fonte e bytes.
+- [x] `intent-renderer.js` e `/intent` passaram para `[INTENÇÃO]` e texto sem `fonte=`.
+- [x] `agent-runtime-events.js` separou detail tecnico de detail operador para `llm.usage`.
+- [x] `usage.js` removeu pares `modelo=`/`provider=`/`custo=` da vista padrao de `/usage now`.
+- [x] `tool-activity-presenter.js` priorizou comandos reais antes de tratar `cwd` como alvo inspecionado.
+- [x] `activity.js` traduziu status de turn trace, labels de timeline e details de usage para texto humano.
+- [x] `model-gateway-terminal-llm-b-live-test.mjs` passou a detectar `tool/`, `turn/`, `thinking/`, `exec_command` em status vivo e `[INTENT]` antigo.
+- [x] `model-gateway-terminal-llm-b-live-test.mjs` passou a exigir `[EXEC] Executar comando` nos cenarios de command tool.
+- [x] Testes focados passaram: live status, activity, intent, usage e agent runtime events.
+
+### 11.04 Proximas lacunas de UX
+
+- [ ] Revisar `/events` padrao para nao parecer despejo JSON quando o operador pede apenas contexto recente.
+- [ ] Revisar `/events` para traduzir status resumido (`status=success`) sem prejudicar `/events --raw`.
+- [ ] Revisar `/live` e `/live full` para separar modo humano, modo diagnostico e modo raw.
+- [ ] Revisar `/session`, `/now` e `/status` buscando restos de `source=`, `modelo=`, `classe=`, `motivo=` fora de modo detail.
+- [ ] Revisar banner e auto-brief para reduzir linhas densas quando o terminal ja esta pronto.
+- [ ] Fazer nova live `long-tool-heartbeat` apos criterios endurecidos.
+- [ ] Fazer live `recoverable-tool-error` apos consolidar `/activity` humano.
+- [ ] Fazer live com `file-write-roundtrip` para confirmar badges `CRIAR`, `MOVER`, `EXCLUIR` e ausencia de permissao/ids crus.

@@ -44,10 +44,12 @@ describe('terminal/events/intent-renderer', () => {
 
         expect(dialogMocks.printlnBlock).toHaveBeenCalledTimes(1);
         const output = dialogMocks.printlnBlock.mock.calls[0]?.[0]?.join('\n') ?? '';
-        expect(output).toContain('INTENT');
-        expect(output).toContain('risco=médio');
-        expect(output).toContain('fonte=tool de intenção');
+        expect(output).toContain('INTENÇÃO');
+        expect(output).toContain('risco médio');
+        expect(output).toContain('origem ferramenta de intenção');
         expect(output).toContain('Vou revisar a UX do terminal');
+        expect(output).not.toContain('INTENT');
+        expect(output).not.toContain('fonte=');
         expect(output).not.toContain('tool=report_intent_local');
         expect(output).not.toContain('call=');
         expect(output).not.toContain('toolu_bdrk');

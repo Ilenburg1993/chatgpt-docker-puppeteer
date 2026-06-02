@@ -864,15 +864,14 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             if (liveTurnSignal.firstOutputAt > 0 || elapsedMs < LIVE_TURN_NARRATION_INTERVAL_MS) return;
             if (now - liveTurnSignal.lastNarrationAt < LIVE_TURN_NARRATION_INTERVAL_MS) return;
             liveTurnSignal.lastNarrationAt = now;
+            const elapsedSeconds = (elapsedMs / 1000).toFixed(0);
             recordTerminalActivity('thinking', 'LLM-B trabalhando', {
-                detail: `${liveTurnSignal.model} · ${liveTurnSignal.effort} · ${(elapsedMs / 1000).toFixed(0)}s sem delta visível`,
+                detail: `${elapsedSeconds}s sem resposta visível`,
                 source: 'dialog',
                 recordHistory: false,
             });
             if (process.env['COPILOT_TERMINAL_DURABLE_WAITING_NARRATION'] === 'true') {
-                println(
-                    `  \x1b[90m↳ LLM-B ainda trabalhando · ${liveTurnSignal.model}/${liveTurnSignal.effort} · ${(elapsedMs / 1000).toFixed(0)}s sem saída incremental\x1b[0m`,
-                );
+                println(`  \x1b[90m↳ LLM-B pensando · ${elapsedSeconds}s sem resposta visível\x1b[0m`);
             }
         };
         renderWaitingStatus();

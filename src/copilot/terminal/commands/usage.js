@@ -74,19 +74,19 @@ export function cmdUsage({ println }, arg) {
             const cost = modelBilling.cost === null ? '?' : modelBilling.cost.toFixed(4);
             const modelLabel = modelBilling.mismatch
                 ? `cfg=\x1b[35m${modelBilling.configuredModel ?? '-'}\x1b[0m · cobrado=\x1b[36m${modelBilling.billedModel ?? '-'}\x1b[0m`
-                : `modelo=\x1b[36m${modelBilling.displayModel}\x1b[0m`;
+                : `modelo \x1b[36m${modelBilling.displayModel}\x1b[0m`;
             if (byokActive) {
                 println(
-                    `      GitHub Copilot quota/PR side-channel: ${modelLabel} · custo=\x1b[33m${cost}\x1b[0m \x1b[90m(histórica; BYOK ativo usa provider=${byok.preset ?? byok.providerType ?? '-'} · modelo=${byok.model ?? '-'}; não é cobrança BYOK)\x1b[0m`,
+                    `      GitHub Copilot quota/PR side-channel: ${modelLabel} · custo \x1b[33m${cost}\x1b[0m \x1b[90m(histórica; BYOK ativo usa provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}; não é cobrança BYOK)\x1b[0m`,
                 );
             } else {
                 println(
-                    `      Última telemetria PR classificada: ${modelLabel} · custo=\x1b[33m${cost}\x1b[0m \x1b[90m(histórica; não implica consumo neste boot/probe)\x1b[0m`,
+                    `      Última telemetria PR classificada: ${modelLabel} · custo \x1b[33m${cost}\x1b[0m \x1b[90m(histórica; não implica consumo neste boot/probe)\x1b[0m`,
                 );
             }
         } else if (byokActive) {
             println(
-                `      GitHub Copilot quota/PR side-channel: \x1b[90msem snapshot histórico; BYOK ativo usa provider=${byok.preset ?? byok.providerType ?? '-'} · modelo=${byok.model ?? '-'}\x1b[0m`,
+                `      GitHub Copilot quota/PR side-channel: \x1b[90msem snapshot histórico; BYOK ativo usa provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}\x1b[0m`,
             );
         } else {
             println('      Premium Request: \x1b[90msem snapshot histórico classificado\x1b[0m');
@@ -110,7 +110,7 @@ export function cmdUsage({ println }, arg) {
             println(
                 detail
                     ? `      Última telemetria LLM: modelo=\x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · tipo=\x1b[90m${llmUsageKind}\x1b[0m · classe=\x1b[90m${llmClass}\x1b[0m · motivo=\x1b[90m${llmReason}\x1b[0m · custo=\x1b[33m${llmCost}\x1b[0m`
-                    : `      Última telemetria LLM: modelo=\x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · tipo=\x1b[90m${llmUsageKind}\x1b[0m · custo=\x1b[33m${llmCost}\x1b[0m \x1b[90m(/usage now detail para classe técnica)\x1b[0m`,
+                    : `      Última telemetria LLM: modelo \x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · tipo \x1b[90m${llmUsageKind}\x1b[0m · custo \x1b[33m${llmCost}\x1b[0m \x1b[90m(/usage now detail para classe técnica)\x1b[0m`,
             );
             if (/ask_user|user_input/iu.test(llmClass) || /ask_user|user_input/iu.test(llmReason)) {
                 println(

@@ -20,7 +20,29 @@ import {
 function renderOperationLabel(operation) {
     if (operation === 'ask') return 'pergunta';
     if (operation === 'intent') return 'intenção';
+    if (operation === 'read') return 'leitura';
+    if (operation === 'write') return 'criação';
+    if (operation === 'edit') return 'edição';
+    if (operation === 'copy') return 'cópia';
+    if (operation === 'move') return 'movimento';
+    if (operation === 'delete') return 'exclusão';
+    if (operation === 'list') return 'listagem';
+    if (operation === 'run') return 'execução';
+    if (operation === 'inspect') return 'inspeção';
     return operation;
+}
+
+/**
+ * @param {string | null | undefined} status
+ * @returns {string}
+ */
+function renderStatusLabel(status) {
+    if (status === 'active' || status === 'running' || status === 'started') return 'em andamento';
+    if (status === 'completed' || status === 'done' || status === 'success') return 'concluída';
+    if (status === 'failed' || status === 'error') return 'falhou';
+    if (status === 'requested' || status === 'pending') return 'pendente';
+    if (status === 'answered') return 'respondida';
+    return status ?? 'registrada';
 }
 
 /**
@@ -34,6 +56,45 @@ function renderActivityPhaseLabel(phase) {
     if (phase === 'thinking') return 'pensando';
     if (phase === 'error') return 'erro';
     return phase;
+}
+
+/**
+ * @param {string} source
+ * @returns {string}
+ */
+function renderSourceLabel(source) {
+    const normalized = source.trim().toLowerCase();
+    if (!normalized) return 'terminal';
+    if (normalized === 'sdk' || normalized.startsWith('sdk/')) return 'SDK';
+    if (normalized === 'agent' || normalized.startsWith('agent/')) return 'agente';
+    if (normalized === 'dialog' || normalized.startsWith('dialog')) return 'diálogo';
+    if (normalized === 'io') return 'I/O';
+    if (normalized.includes('terminal')) return 'terminal';
+    return source;
+}
+
+/**
+ * @param {string} operation
+ * @returns {string}
+ */
+function renderIoOperationLabel(operation) {
+    if (operation === 'read') return 'leitura';
+    if (operation === 'write') return 'escrita';
+    if (operation === 'mkdir') return 'criação de pasta';
+    if (operation === 'rename') return 'renomeação';
+    if (operation === 'unlink') return 'exclusão';
+    if (operation === 'stat') return 'inspeção';
+    return renderOperationLabel(operation);
+}
+
+/**
+ * @param {number} bytes
+ * @returns {string}
+ */
+function renderBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /**
@@ -61,6 +122,35 @@ function parseActivityArg(arg = '') {
 function compactHumanText(value) {
     const text = typeof value === 'string' ? value : value == null ? '' : String(value);
     return compactTerminalToolText(text.replace(/\s+/gu, ' ').trim(), 96);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function compactOperatorDetail(value) {
+    return compactHumanText(value)
+        .replace(/\bmodelo=/giu, 'modelo ')
+        .replace(/\bcusto=/giu, 'custo ')
+        .replace(/\bstatus=success\b/giu, 'concluída')
+        .replace(/\bstatus=completed\b/giu, 'concluída')
+        .replace(/\bstatus=failed\b/giu, 'falhou')
+        .replace(/\bchoices=/giu, 'opções=')
+        .replace(/\bread\s+·/giu, 'leitura ·')
+        .replace(/\bwrite\s+·/giu, 'escrita ·');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function compactActivityLabel(value) {
+    return compactHumanText(value)
+        .replace(/^Tool concluída\b/iu, 'Ferramenta concluída')
+        .replace(/^Tool falhou\b/iu, 'Ferramenta falhou')
+        .replace(/^I\/O read concluído\b/iu, 'I/O leitura concluída')
+        .replace(/^I\/O write concluído\b/iu, 'I/O escrita concluída')
+        .replace(/^ask_user SDK solicitado\b/iu, 'Pergunta ao operador solicitada');
 }
 
 /**
@@ -100,7 +190,7 @@ function printTurnTraceSummary(println, title, trace, opts) {
     const stateColor = trace.status === 'active' ? '\x1b[33m' : trace.status === 'completed' ? '\x1b[32m' : '\x1b[31m';
     println(`  \x1b[36m${title}\x1b[0m
   ─────────────────────────────────────
-  estado          ${stateColor}${trace.status}\x1b[0m
+  estado          ${stateColor}${renderStatusLabel(trace.status)}\x1b[0m
   ferramentas     \x1b[90m${trace.toolCount}\x1b[0m
   arquivos        \x1b[90m${trace.fileCount}\x1b[0m
   input humano    \x1b[90m${trace.userInputCount ?? trace.userInputs?.length ?? 0}\x1b[0m`);
@@ -111,8 +201,9 @@ function printTurnTraceSummary(println, title, trace, opts) {
     if (trace.files.length > 0) {
         println('  arquivos tocados');
         for (const file of trace.files.slice(0, 5)) {
+            const source = opts.detail ? ` · ${renderSourceLabel(file.source)}` : '';
             println(
-                `    - ${file.operation} · ${compactHumanText(file.path)}${file.count > 1 ? ` ×${file.count}` : ''} · ${file.source}`,
+                `    - ${renderOperationLabel(file.operation)} · ${compactHumanText(file.path)}${file.count > 1 ? ` ×${file.count}` : ''}${source}`,
             );
         }
     }
@@ -121,8 +212,10 @@ function printTurnTraceSummary(println, title, trace, opts) {
         println('  ferramentas');
         for (const tool of trace.tools.slice(0, 5)) {
             const rendered = renderToolSummary(tool, opts);
+            const status = tool.status ? ` · ${renderStatusLabel(tool.status)}` : '';
+            const source = opts.detail ? ` · ${renderSourceLabel(tool.source)}` : '';
             println(
-                `    - ${rendered.name} · ${renderOperationLabel(tool.operation)}${rendered.target ? ` · ${rendered.target}` : ''}${tool.status ? ` · ${tool.status}` : ''} · ${tool.source}`,
+                `    - ${rendered.name} · ${renderOperationLabel(tool.operation)}${rendered.target ? ` · ${rendered.target}` : ''}${status}${source}`,
             );
         }
     }
@@ -137,8 +230,9 @@ function printTurnTraceSummary(println, title, trace, opts) {
                     : '';
             const answer = userInput.answerPreview ? ` · resposta=${userInput.answerPreview}` : '';
             const requestId = opts.detail && userInput.requestId ? ` · req=${compactTerminalDiagnosticId(userInput.requestId)}` : '';
+            const source = opts.detail ? ` · ${renderSourceLabel(userInput.source ?? 'sdk')}` : '';
             println(
-                `    - ${userInput.kind ?? 'question'} · ${userInput.status ?? 'requested'}${requestId} · ${compactHumanText(userInput.question)}${choices}${answer} · ${userInput.source ?? 'sdk'}`,
+                `    - pergunta · ${renderStatusLabel(userInput.status)}${requestId} · ${compactHumanText(userInput.question)}${choices}${answer}${source}`,
             );
         }
     }
@@ -250,8 +344,8 @@ export function cmdActivity({ println }, arg) {
   \x1b[36mAtividade Atual da LLM-B\x1b[0m
   ─────────────────────────────────────
   estado          ${severityColor}${renderActivityPhaseLabel(current.phase)}\x1b[0m
-  evento          ${compactHumanText(current.label)}${progressLabel}
-  detalhe         ${current.detail ? compactHumanText(current.detail) : '\x1b[90m(nenhum)\x1b[0m'}
+  evento          ${compactActivityLabel(current.label)}${progressLabel}
+  detalhe         ${current.detail ? compactOperatorDetail(current.detail) : '\x1b[90m(nenhum)\x1b[0m'}
   idade           \x1b[90m${Math.round(current.ageMs / 1000)}s\x1b[0m
   ─────────────────────────────────────`);
     if (detail) {
@@ -288,14 +382,16 @@ export function cmdActivity({ println }, arg) {
             const sev = entry.success ? '\x1b[90m' : '\x1b[31m';
             const bytes =
                 typeof entry.bytesRead === 'number'
-                    ? ` · read=${entry.bytesRead}B`
+                    ? ` · ${renderBytes(entry.bytesRead)} lidos`
                     : typeof entry.bytesWritten === 'number'
-                      ? ` · write=${entry.bytesWritten}B`
+                      ? ` · ${renderBytes(entry.bytesWritten)} escritos`
                       : '';
             const duration = typeof entry.durationMs === 'number' ? ` · ${entry.durationMs}ms` : '';
             const engine = entry.engine ? ` · ${entry.engine}` : '';
             const engineDetail = detail ? engine : '';
-            println(`  ${sev}[${ts}]\x1b[0m ${entry.operation} · ${compactHumanText(entry.target)}${bytes}${duration}${engineDetail}`);
+            println(
+                `  ${sev}[${ts}]\x1b[0m ${renderIoOperationLabel(entry.operation)} · ${compactHumanText(entry.target)}${bytes}${duration}${engineDetail}`,
+            );
         }
         println('  ─────────────────────────────────────');
     }
@@ -317,9 +413,11 @@ export function cmdActivity({ println }, arg) {
             second: '2-digit',
         });
         const sev = entry.severity === 'error' ? '\x1b[31m' : entry.severity === 'warn' ? '\x1b[33m' : '\x1b[90m';
-        const extra = entry.detail ? ` — ${compactHumanText(entry.detail)}` : '';
+        const extra = entry.detail ? ` — ${compactOperatorDetail(entry.detail)}` : '';
         const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';
-        println(`  ${sev}[${ts}]\x1b[0m ${renderActivityPhaseLabel(entry.phase)} · ${compactHumanText(entry.label)}${progress}${extra}`);
+        println(
+            `  ${sev}[${ts}]\x1b[0m ${renderActivityPhaseLabel(entry.phase)} · ${compactActivityLabel(entry.label)}${progress}${extra}`,
+        );
     }
     println('');
 }

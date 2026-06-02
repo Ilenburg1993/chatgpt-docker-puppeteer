@@ -58,7 +58,7 @@ function humanRiskLabel(risk) {
     if (risk === 'low') return 'baixo';
     if (risk === 'medium') return 'médio';
     if (risk === 'high') return 'alto';
-    return 'n/d';
+    return 'não informado';
 }
 
 /**
@@ -68,7 +68,7 @@ function humanRiskLabel(risk) {
 function humanIntentSource(source) {
     const text = source.trim().toLowerCase();
     if (text.includes('assistant.intent')) return 'SDK';
-    if (text.includes('report_intent')) return 'tool de intenção';
+    if (text.includes('report_intent')) return 'ferramenta de intenção';
     if (text.includes('terminal')) return 'terminal';
     return 'captura';
 }
@@ -113,14 +113,14 @@ export function cmdIntent(ctx, arg) {
     /** @type {string[]} */
     const lines = [
         '',
-        `  ${terminalThemeBadge('info', 'INTENT')} ${terminalThemeText('info', `Últimas ${entries.length} intenções`)} ${terminalThemeText('muted', `· total=${stats.entries} · bytes=${stats.bytes}${detail ? ' · detalhe=técnico' : ''}`)}`,
+        `  ${terminalThemeBadge('info', 'INTENÇÃO')} ${terminalThemeText('info', `Últimas ${entries.length} intenções`)} ${terminalThemeText('muted', `· total=${stats.entries} · bytes=${stats.bytes}${detail ? ' · detalhe técnico' : ''}`)}`,
         '',
     ];
     for (const entry of entries) {
         const theme = riskTheme(entry.risk);
         const source = humanIntentSource(entry.source);
         lines.push(
-            `  ${terminalThemeText(theme, '•')} ${terminalThemeText('muted', `${formatTime(entry.timestamp)} · fonte=${source} · risco=${humanRiskLabel(entry.risk)}`)}`,
+            `  ${terminalThemeText(theme, '•')} ${terminalThemeText('muted', `${formatTime(entry.timestamp)} · origem ${source} · risco ${humanRiskLabel(entry.risk)}`)}`,
         );
         if (detail) {
             const tool = entry.tool ? ` · tool=${entry.tool}` : '';
