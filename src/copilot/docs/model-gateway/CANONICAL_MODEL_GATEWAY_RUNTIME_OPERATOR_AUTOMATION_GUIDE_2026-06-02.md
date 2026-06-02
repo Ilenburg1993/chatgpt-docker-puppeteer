@@ -40,6 +40,7 @@ pre-runtime, selecao runtime e testes live LLM-B.
 - [x] Post-turn recovery grava falha em health operacional e SQLite.
 - [x] Falha da rota selecionada pode promover fallback standby no decision core.
 - [x] `operator-ready` agrega ops, auto-ready, selector, standby e health diff.
+- [x] Standby plans podem ser persistidos no SQLite operacional por perfil sem tocar no catalogo canonico.
 - [x] Scripts foram movidos para `scripts/model-gateway/commands/`.
 - [x] Runner/barrel vive em `scripts/model-gateway/run.mjs` e `scripts/model-gateway/index.mjs`.
 - [x] Manifesto JSON do runner existe em `npm run model-gateway:scripts`.
@@ -48,7 +49,8 @@ pre-runtime, selecao runtime e testes live LLM-B.
 ### 3.2 Gaps Atuais De Maior Retorno
 
 - [x] O cockpit `operator-ready` esta exposto diretamente no terminal por `/byok gateway operator-ready`.
-- [ ] O standby ainda precisa virar contrato persistivel com snapshot por perfil.
+- [x] O standby virou contrato de dados reutilizavel por `model-gateway-runtime-standby-plan`.
+- [x] O standby virou contrato persistivel com snapshot por perfil em `copilot_model_gateway_standby_plans`.
 - [ ] O terminal ainda nao mostra `fallbackFromSelectedRouteKey` e `fallbackReason` em auto status.
 - [ ] A policy default ainda esta conservadora demais para o modo operador/LLM guardado.
 - [ ] Falta preset claro para `operator_manual`, `llm_operator_guarded`, `auto_same_boundary` e `auto_prepare_new_session`.
@@ -140,8 +142,8 @@ pre-runtime, selecao runtime e testes live LLM-B.
 - [x] D.1 Gerar standby routes a partir do runtime selector.
 - [x] D.2 Incluir comandos probe/live/provider/persist/new-session em cada rota.
 - [x] D.3 Usar standby no post-turn fallback decision.
-- [ ] D.4 Criar objeto `model-gateway-runtime-standby-plan`.
-- [ ] D.5 Persistir ultimo standby plan por profile no SQLite.
+- [x] D.4 Criar objeto `model-gateway-runtime-standby-plan`.
+- [x] D.5 Persistir ultimo standby plan por profile no SQLite.
 - [ ] D.6 Separar `same_boundary`, `new_model_same_provider`, `new_provider`, `needs_probe`.
 - [ ] D.7 Registrar origem da exclusao quando standby estiver vazio.
 - [ ] D.8 Expor standby plan no cockpit terminal.
@@ -218,10 +220,12 @@ pre-runtime, selecao runtime e testes live LLM-B.
 - [x] J.4 SDK confirmations no SQLite.
 - [x] J.5 Recovery attempts no SQLite.
 - [x] J.6 Live runs no SQLite.
-- [ ] J.7 Registrar selected standby snapshot.
-- [ ] J.8 Registrar fallback selected after failure.
-- [ ] J.9 Registrar artifact path do operator-ready.
-- [ ] J.10 Criar resumo final por sessao de testes live.
+- [x] J.7 Registrar selected standby snapshot.
+- [x] J.8 Diagnostico SQLite expoe `standbyPlanRows` e ultimo standby plan.
+- [x] J.9 Retencao operacional inclui standby plans sem tocar no catalogo canonico.
+- [ ] J.10 Registrar fallback selected after failure.
+- [ ] J.11 Registrar artifact path do operator-ready.
+- [ ] J.12 Criar resumo final por sessao de testes live.
 
 ### Faixa K - Testes E Validadores
 
@@ -231,6 +235,7 @@ pre-runtime, selecao runtime e testes live LLM-B.
 - [x] K.4 Testes terminal cobrem `/byok gateway operator-ready`.
 - [x] K.5 Testes cobrem fallback fields no terminal.
 - [ ] K.6 Testes cobrem presets de policy.
+- [x] K.9 Testes cobrem `model-gateway-runtime-standby-plan`.
 - [ ] K.7 Live tests cobrem fixture e real no-PR.
 - [ ] K.8 Typecheck strict deve ser reavaliado depois das proximas mudancas grandes.
 
@@ -244,10 +249,11 @@ pre-runtime, selecao runtime e testes live LLM-B.
 6. [x] Criar este guia operacional.
 7. [x] Implementar `/byok gateway operator-ready`.
 8. [x] Mostrar fallback origin/reason em `/byok auto status`.
-9. [ ] Criar contrato/persistencia de standby plan.
-10. [ ] Rodar testes terminal escopados.
-11. [ ] Commit/push da reorganizacao e cockpit terminal.
-12. [ ] Continuar para live tests LLM-B em escada.
+9. [x] Criar contrato de standby plan.
+10. [x] Persistir standby plan por perfil.
+11. [x] Rodar testes terminal escopados.
+12. [x] Commit/push da reorganizacao e cockpit terminal.
+13. [ ] Continuar para live tests LLM-B em escada.
 
 ## 7. Comandos Canonicos Desta Fase
 
@@ -257,6 +263,7 @@ npm run model-gateway:commands:json
 npm run model-gateway:operator-ready
 npm run model-gateway:runtime-selector -- --fail
 npm run model-gateway:auto:standby -- --profile=repo_agent --limit=12
+npm run model-gateway:auto:standby -- --profile=repo_agent --limit=12 --write-sqlite
 npm run model-gateway:auto:status -- --profile=repo_agent
 npm run model-gateway:live:readiness -- --fail
 npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000

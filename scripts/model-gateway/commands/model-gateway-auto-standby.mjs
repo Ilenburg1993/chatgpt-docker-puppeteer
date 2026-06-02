@@ -1,18 +1,28 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 
-import { buildModelGatewayRuntimeStandbyRoutes } from '#copilot/model-gateway';
+import { SqliteModelGatewayCatalogStore, buildModelGatewayRuntimeStandbyPlan } from '#copilot/model-gateway';
 
+import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
 
 const args = process.argv.slice(2);
 const argSet = new Set(args);
 
+if (argSet.has('--json')) {
+    setDbLogger((level, msg) => {
+        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
+            process.stderr.write(`[db][${level}] ${msg}\n`);
+        }
+    });
+}
+
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-standby.mjs [--json] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--temporary-failure-cooldown-ms N] [--limit N] [--timeout-ms N] [--alternates-only]
+    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-standby.mjs [--json] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--temporary-failure-cooldown-ms N] [--limit N] [--timeout-ms N] [--alternates-only] [--write-sqlite]
 
 Build a read-only standby route list for model-gateway auto mode. It does not call providers, run probes, mutate env or
 touch the terminal session. It renders ready replacement routes and the explicit terminal commands an operator may choose.
+Use --write-sqlite to persist the generated standby plan as operational history.
 `);
     process.exit(0);
 }
@@ -64,35 +74,46 @@ const limit = readPositiveInt('--limit', 12);
 const timeoutMs = readPositiveInt('--timeout-ms', 20_000);
 const includeSelected = !argSet.has('--alternates-only');
 const selector = readRuntimeSelectorPlan(profile);
-const routes = buildModelGatewayRuntimeStandbyRoutes(selector.runtimeSelectorPlan, { limit, timeoutMs, includeSelected });
-const summary = {
-    routeCount: routes.length,
-    selectedCount: routes.filter((row) => row.source === 'selected').length,
-    alternateCount: routes.filter((row) => row.source === 'candidate_alternative').length,
-    runtimeProofCount: routes.filter((row) => row.hasRuntimeProof).length,
-    providerCount: new Set(routes.map((row) => row.providerId).filter(Boolean)).size,
-};
+const standbyPlan = buildModelGatewayRuntimeStandbyPlan(selector.runtimeSelectorPlan, {
+    limit,
+    timeoutMs,
+    includeSelected,
+    profileId: profile,
+});
+const persistence = argSet.has('--write-sqlite')
+    ? await new SqliteModelGatewayCatalogStore().writeStandbyPlanRecords([
+          {
+              ...standbyPlan,
+              source: 'model-gateway-auto-standby',
+              profile,
+          },
+      ])
+    : { standbyPlans: 0 };
 const output = {
     schema: 'model-gateway-auto-standby-routes',
-    ok: true,
+    ok: standbyPlan.ok,
     profile,
     selectorOk: selector.ok === true,
     runtimeSelectorReady: selector.runtimeSelectorPlan?.ready === true,
-    generatedAt: new Date().toISOString(),
-    summary,
-    routes,
-    nextCommands: routes
-        .slice(0, Math.min(routes.length, 5))
-        .flatMap((row) => [row.commands.probeAgent, row.commands.liveModel, row.commands.provider].filter(Boolean)),
+    standbyPlan,
+    generatedAt: standbyPlan.generatedAt,
+    summary: standbyPlan.summary,
+    routes: standbyPlan.routes,
+    nextCommands: standbyPlan.nextCommands,
+    persistence: {
+        requested: argSet.has('--write-sqlite'),
+        standbyPlans: persistence.standbyPlans,
+    },
 };
 
 if (argSet.has('--json')) {
     process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
 } else {
+    const { summary } = standbyPlan;
     process.stdout.write(
-        `model-gateway auto standby: routes=${summary.routeCount} selected=${summary.selectedCount} alternates=${summary.alternateCount} proof=${summary.runtimeProofCount} providers=${summary.providerCount}\n`,
+        `model-gateway auto standby: routes=${summary.routeCount} selected=${summary.selectedCount} alternates=${summary.alternateCount} proof=${summary.runtimeProofCount} providers=${summary.providerCount} persisted=${persistence.standbyPlans}\n`,
     );
-    for (const row of routes.slice(0, limit)) {
+    for (const row of standbyPlan.routes.slice(0, limit)) {
         process.stdout.write(
             `  ${row.profileId} #${row.rank} ${row.source} ${row.providerId}:${row.providerModel} proof=${row.hasRuntimeProof ? 'yes' : 'no'} env=${row.runtimeEnvStatus ?? '-'} score=${row.score ?? '-'}\n`,
         );
@@ -100,7 +121,7 @@ if (argSet.has('--json')) {
         process.stdout.write(`    live:  ${row.commands.liveModel ?? '-'}\n`);
         process.stdout.write(`    next:  ${row.commands.newSession} && ${row.commands.provider ?? '-'}\n`);
     }
-    if (routes.length === 0) {
+    if (standbyPlan.routes.length === 0) {
         process.stdout.write('  No standby routes are currently derivable from the runtime selector plan.\n');
     }
 }

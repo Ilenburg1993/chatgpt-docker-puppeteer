@@ -53,6 +53,7 @@ import {
     buildModelGatewayRuntimeSelectorProbeRun,
     buildModelGatewayRuntimeAutomationControllerStep,
     buildModelGatewayRuntimeAutomationDecision,
+    buildModelGatewayRuntimeStandbyPlan,
     buildModelGatewayRuntimeStandbyRoutes,
     explainModelGatewayRuntimeAutomationPolicySources,
     validateModelGatewayRuntimeAutomationPolicy,
@@ -1271,6 +1272,17 @@ describe('model-gateway foundation', () => {
         assert.equal(standbyRoutes[0].commands.liveModel, '/byok model openai/gpt-oss-120b:groq');
         assert.equal(standbyRoutes[0].commands.provider, '/byok provider openrouter openai/gpt-oss-120b:groq');
         assert.equal(standbyRoutes[0].commands.persistProvider, '/byok persist provider openrouter openai/gpt-oss-120b:groq');
+        const standbyPlan = buildModelGatewayRuntimeStandbyPlan(runtimeSelectorPlan, {
+            limit: 4,
+            timeoutMs: 15_000,
+            profileId: 'repo_agent',
+        });
+        assert.equal(standbyPlan.schema, 'model-gateway-runtime-standby-plan');
+        assert.equal(standbyPlan.ok, true);
+        assert.equal(standbyPlan.profileId, 'repo_agent');
+        assert.equal(standbyPlan.summary.routeCount, standbyPlan.routes.length);
+        assert.equal(standbyPlan.summary.providerCount > 0, true);
+        assert.equal(standbyPlan.nextCommands.includes('/byok probe agent provider:openrouter model:openai/gpt-oss-120b timeout:15000'), true);
 
         const strictRuntimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(requireRuntimeProof, {
             requireRuntimeProof: true,
@@ -5516,6 +5528,25 @@ describe('model-gateway foundation', () => {
             );
             db.prepare(
                 `
+                    INSERT INTO copilot_model_gateway_standby_plans
+                        (standby_plan_id, route_profile, status, route_count, provider_count,
+                         runtime_proof_count, selected_route_key, generated_at_ms, source, payload_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+            ).run(
+                'standby-plan-1',
+                'repo_agent',
+                'ready',
+                3,
+                2,
+                1,
+                'openrouter:model-a',
+                11,
+                'unit-schema',
+                '{}',
+            );
+            db.prepare(
+                `
                     INSERT INTO copilot_model_gateway_refresh_log_events
                         (event_key, run_id, phase, status, provider_id, importer_id, source_id,
                          progress_pct, observed_at_ms, elapsed_ms, payload_json)
@@ -5845,6 +5876,23 @@ describe('model-gateway foundation', () => {
                     token: 'secret-that-must-not-leak',
                 },
             ]);
+            await store.writeStandbyPlanRecords([
+                {
+                    standbyPlanId: 'standby-1',
+                    profileId: 'repo_agent',
+                    generatedAt: '2026-05-26T12:00:06.000Z',
+                    ok: true,
+                    status: 'ready',
+                    source: 'unit-standby',
+                    summary: { routeCount: 2, providerCount: 2, runtimeProofCount: 1 },
+                    routes: [
+                        { source: 'selected', routeKey: 'openrouter:model-a', providerId: 'openrouter', providerModel: 'model-a' },
+                        { source: 'alternate', routeKey: 'groq:model-b', providerId: 'groq', providerModel: 'model-b' },
+                    ],
+                    nextCommands: ['/byok auto probe openrouter:model-a'],
+                    token: 'secret-that-must-not-leak',
+                },
+            ]);
             await store.writeRuntimeHealthRecords([
                 {
                     key: 'default|openrouter|model-a',
@@ -5884,6 +5932,7 @@ describe('model-gateway foundation', () => {
             const sdkHandoffs = await store.readSdkSessionHandoffRecords({ limit: 5 });
             const sdkConfirmations = await store.readSdkSessionConfirmationRecords({ limit: 5 });
             const liveScenarioRuns = await store.readLiveScenarioRunRecords({ limit: 5 });
+            const standbyPlans = await store.readStandbyPlanRecords({ limit: 5, profileId: 'repo_agent' });
             const runtime = await store.readRuntimeHealthForModel({ providerId: 'openrouter', providerModel: 'model-a' });
             const diagnostics = await store.readStorageDiagnostics();
             const quotaRows = /** @type {{ count: number } | undefined} */ (
@@ -5925,6 +5974,9 @@ describe('model-gateway foundation', () => {
             assert.equal(liveScenarioRuns.length, 1);
             assert.equal(liveScenarioRuns[0].runId, 'live-scenario-1');
             assert.equal(JSON.stringify(liveScenarioRuns).includes('secret-that-must-not-leak'), false);
+            assert.equal(standbyPlans.length, 1);
+            assert.equal(standbyPlans[0].standbyPlanId, 'standby-1');
+            assert.equal(JSON.stringify(standbyPlans).includes('secret-that-must-not-leak'), false);
             assert.equal(runtime.health?.['lastStatus'], 'ok');
             assert.equal(runtime.probes.length, 1);
             assert.equal(quotaRows?.count, 2);
@@ -5942,6 +5994,7 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.recoveryAttemptRows, 1);
             assert.equal(diagnostics.sdkSessionHandoffRows, 1);
             assert.equal(diagnostics.sdkSessionConfirmationRows, 1);
+            assert.equal(diagnostics.standbyPlanRows, 1);
             assert.equal(diagnostics.liveScenarioRunRows, 1);
             assert.equal(diagnostics.latestAutomationDecision.action, 'prepare_new_session');
             assert.equal(diagnostics.latestAutomationPolicySnapshot.policy, 'prefer_runtime_proved');
@@ -5950,6 +6003,8 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.latestRecoveryAttempt.recoveryScope, 'account');
             assert.equal(diagnostics.latestSdkSessionHandoff.targetModel, 'model-a');
             assert.equal(diagnostics.latestSdkSessionConfirmation.confirmedModel, 'model-a');
+            assert.equal(diagnostics.latestStandbyPlan.routeProfile, 'repo_agent');
+            assert.equal(diagnostics.latestStandbyPlan.routeCount, 2);
             assert.equal(diagnostics.latestLiveScenarioRun.scenarioKind, 'auto_probe');
             assert.equal(diagnostics.refreshLogRows, 0);
         } finally {
@@ -6219,6 +6274,11 @@ describe('model-gateway foundation', () => {
                 { runId: 'live-scenario-2', scenarioKind: 'byok_fixture', startedAtMs: 2, completedAtMs: 2, status: 'passed', ok: true },
                 { runId: 'live-scenario-3', scenarioKind: 'auto_probe', startedAtMs: 3, completedAtMs: 3, status: 'passed', ok: true },
             ]);
+            await store.writeStandbyPlanRecords([
+                { standbyPlanId: 'standby-1', generatedAtMs: 1, profileId: 'repo_agent', routes: [{ routeKey: 'a' }] },
+                { standbyPlanId: 'standby-2', generatedAtMs: 2, profileId: 'repo_agent', routes: [{ routeKey: 'b' }] },
+                { standbyPlanId: 'standby-3', generatedAtMs: 3, profileId: 'repo_agent', routes: [{ routeKey: 'c' }] },
+            ]);
             await store.writeRefreshLogEvents(
                 [
                     { eventId: 'refresh-1', ts: 1, phase: 'refresh_started' },
@@ -6286,6 +6346,7 @@ describe('model-gateway foundation', () => {
                 recoveryAttemptMaxRows: 1,
                 sdkSessionHandoffMaxRows: 1,
                 sdkSessionConfirmationMaxRows: 1,
+                standbyPlanMaxRows: 1,
                 liveScenarioRunMaxRows: 1,
                 refreshLogMaxRows: 1,
                 runtimeProbeRunMaxRows: 1,
@@ -6297,7 +6358,8 @@ describe('model-gateway foundation', () => {
 
             assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows > 1, true);
             assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.healthObservationMaxRows > 1, true);
-            assert.equal(result.deletedRows, 30);
+            assert.equal(DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.standbyPlanMaxRows > 1, true);
+            assert.equal(result.deletedRows, 32);
             assert.equal(diagnostics.catalogRows > 0, true);
             assert.equal(diagnostics.accountHistoryRows, 3);
             assert.equal(diagnostics.routeDecisionRows, 1);
@@ -6307,6 +6369,7 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.recoveryAttemptRows, 1);
             assert.equal(diagnostics.sdkSessionHandoffRows, 1);
             assert.equal(diagnostics.sdkSessionConfirmationRows, 1);
+            assert.equal(diagnostics.standbyPlanRows, 1);
             assert.equal(diagnostics.liveScenarioRunRows, 1);
             assert.equal(diagnostics.latestAutomationDecision.action, 'wait_for_reset');
             assert.equal(diagnostics.latestAutomationPolicySnapshot.enabled, false);
@@ -6314,6 +6377,7 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.latestRecoveryAttempt.failureKind, 'permission');
             assert.equal(diagnostics.latestSdkSessionHandoff.targetModel, 'model-c');
             assert.equal(diagnostics.latestSdkSessionConfirmation.confirmedModel, 'model-c');
+            assert.equal(diagnostics.latestStandbyPlan.standbyPlanId, 'standby-3');
             assert.equal(diagnostics.latestLiveScenarioRun.scenarioKind, 'auto_probe');
             assert.equal(diagnostics.refreshLogRows, 1);
             assert.equal(diagnostics.runtimeRows, 3);

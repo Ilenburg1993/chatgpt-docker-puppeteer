@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/catalog/sqlite-schema
  */
 
-export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 10;
+export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 11;
 
 export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_snapshots',
@@ -37,6 +37,7 @@ export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_recovery_attempts',
     'copilot_model_gateway_sdk_session_handoffs',
     'copilot_model_gateway_sdk_session_confirmations',
+    'copilot_model_gateway_standby_plans',
     'copilot_model_gateway_live_scenario_runs',
     'copilot_model_gateway_refresh_log_events',
 ]);
@@ -438,6 +439,23 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
         ON copilot_model_gateway_sdk_session_confirmations(handoff_id, observed_at_ms DESC);
     CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_confirmations_model
         ON copilot_model_gateway_sdk_session_confirmations(confirmed_model, status, observed_at_ms DESC);
+
+    CREATE TABLE IF NOT EXISTS copilot_model_gateway_standby_plans (
+        standby_plan_id       TEXT PRIMARY KEY,
+        route_profile         TEXT NOT NULL DEFAULT 'default',
+        status                TEXT NOT NULL DEFAULT 'ready',
+        route_count           INTEGER NOT NULL DEFAULT 0,
+        provider_count        INTEGER NOT NULL DEFAULT 0,
+        runtime_proof_count   INTEGER NOT NULL DEFAULT 0,
+        selected_route_key    TEXT,
+        generated_at_ms       INTEGER NOT NULL,
+        source                TEXT NOT NULL DEFAULT 'unknown',
+        payload_json          TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS idx_mg_standby_plans_profile
+        ON copilot_model_gateway_standby_plans(route_profile, status, generated_at_ms DESC);
+    CREATE INDEX IF NOT EXISTS idx_mg_standby_plans_generated
+        ON copilot_model_gateway_standby_plans(generated_at_ms DESC);
 
     CREATE TABLE IF NOT EXISTS copilot_model_gateway_live_scenario_runs (
         run_id          TEXT PRIMARY KEY,

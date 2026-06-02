@@ -44,6 +44,7 @@ export {
     buildModelGatewayRuntimeSelectorProbeEnv,
     buildModelGatewayRuntimeSelectorProbeRun,
     buildModelGatewayRuntimeProofCommands,
+    buildModelGatewayRuntimeStandbyPlan,
     buildModelGatewayRuntimeStandbyRoutes,
     buildModelGatewayRuntimeSelectorPlan,
     evaluateModelGatewayRuntimeSelectorRouteEnv,

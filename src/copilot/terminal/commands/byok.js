@@ -17,7 +17,7 @@ import {
     buildCatalogRefreshStartedEvent,
     buildModelGatewaySelectionDecisionTrace,
     buildModelGatewayRuntimeProofCommands,
-    buildModelGatewayRuntimeStandbyRoutes,
+    buildModelGatewayRuntimeStandbyPlan,
     buildModelGatewayRuntimeSelectorPlan,
     compareModelGatewaySelectionAudits,
     buildEligibilityEvaluatedEvent,
@@ -2413,8 +2413,12 @@ async function renderByokGatewayOperatorReady(println, rest) {
         }),
         new SqliteModelGatewayCatalogStore().readStorageDiagnostics(),
     ]);
-    const standbyRows = buildModelGatewayRuntimeStandbyRoutes(status.runtimeSelectorPlan, { limit });
-    const standbyProviderCount = new Set(standbyRows.map((row) => row.providerId).filter(Boolean)).size;
+    const standbyPlan = buildModelGatewayRuntimeStandbyPlan(status.runtimeSelectorPlan, {
+        limit,
+        profileId: status.args.profileId,
+    });
+    const standbyRows = standbyPlan.routes;
+    const standbyProviderCount = standbyPlan.summary.providerCount;
     const activeSnapshot = diagnostics.activeSnapshot?.exists === true;
     const policy = await readModelGatewayRuntimeAutomationEffectivePolicy();
     const checks = [
@@ -2449,6 +2453,7 @@ async function renderByokGatewayOperatorReady(println, rest) {
         ...status.decision.nextCommands,
         `/byok auto standby profile:${status.args.profileId} ${limit}`,
         `/byok auto proof-plan profile:${status.args.profileId} ${limit}`,
+        ...standbyPlan.nextCommands,
         'npm run model-gateway:runtime-health:diff -- --write-snapshot --fail-on-regression',
     ];
     println('\n  \x1b[36mBYOK model-gateway operator-ready\x1b[0m');
@@ -3563,10 +3568,14 @@ async function renderByokGatewayAutoStandby(println, rest) {
         allowEffects: false,
         persistAutomationDecision: false,
     });
-    const rows = buildModelGatewayRuntimeStandbyRoutes(status.runtimeSelectorPlan, { limit });
+    const standbyPlan = buildModelGatewayRuntimeStandbyPlan(status.runtimeSelectorPlan, {
+        limit,
+        profileId: status.args.profileId,
+    });
+    const rows = standbyPlan.routes;
     const visibleRows = rows.slice(0, limit);
-    const proofCount = rows.filter((row) => row.hasRuntimeProof).length;
-    const providerCount = new Set(rows.map((row) => row.providerId).filter(Boolean)).size;
+    const proofCount = standbyPlan.summary.runtimeProofCount;
+    const providerCount = standbyPlan.summary.providerCount;
     println('\n  \x1b[36mBYOK model-gateway auto standby\x1b[0m');
     println(
         `  \x1b[90mprofile=${status.args.profileId} · runtimeSelector=${status.runtimeSelectorPlan.ok ? 'ok' : 'blocked'} · routes=${rows.length} · proof=${proofCount} · providers=${providerCount} · providerCall=nao\x1b[0m`,

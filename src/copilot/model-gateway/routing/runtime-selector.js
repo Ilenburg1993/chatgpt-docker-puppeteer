@@ -71,6 +71,14 @@ function optionalString(value) {
 
 /**
  * @param {unknown} value
+ * @returns {value is string}
+ */
+function isNonEmptyString(value) {
+    return typeof value === 'string' && value.length > 0;
+}
+
+/**
+ * @param {unknown} value
  * @returns {string[]}
  */
 function stringList(value) {
@@ -764,6 +772,74 @@ export function buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, optio
         }
     }
     return rows;
+}
+
+/**
+ * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>} runtimeSelectorPlan
+ * @param {{ limit?: number; timeoutMs?: number; includeSelected?: boolean; profileId?: string | null; nextCommandLimit?: number }} [options]
+ * @returns {{
+ *   schema: 'model-gateway-runtime-standby-plan';
+ *   ok: boolean;
+ *   generatedAt: string;
+ *   profileId: string | null;
+ *   selectorOk: boolean;
+ *   runtimeSelectorReady: boolean;
+ *   summary: {
+ *     routeCount: number;
+ *     selectedCount: number;
+ *     alternateCount: number;
+ *     runtimeProofCount: number;
+ *     providerCount: number;
+ *     sameBoundaryCommandCount: number;
+ *     newProviderCommandCount: number;
+ *     probeCommandCount: number;
+ *   };
+ *   routes: ReturnType<typeof buildModelGatewayRuntimeStandbyRoutes>;
+ *   nextCommands: string[];
+ * }}
+ */
+export function buildModelGatewayRuntimeStandbyPlan(runtimeSelectorPlan, options = {}) {
+    const routes = buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, options);
+    const nextCommandLimit =
+        typeof options.nextCommandLimit === 'number' && Number.isFinite(options.nextCommandLimit)
+            ? Math.max(1, Math.floor(options.nextCommandLimit))
+            : 5;
+    /** @type {string[]} */
+    const nextCommandCandidates = routes
+        .slice(0, Math.min(routes.length, nextCommandLimit))
+        .flatMap((row) =>
+            [
+                row.commands.probeAgent,
+                row.commands.liveModel,
+                row.commands.provider,
+                row.commands.persistProvider,
+            ].filter(isNonEmptyString),
+        );
+    const nextCommands = [
+        ...new Set(
+            nextCommandCandidates,
+        ),
+    ];
+    return {
+        schema: 'model-gateway-runtime-standby-plan',
+        ok: routes.length > 0,
+        generatedAt: new Date().toISOString(),
+        profileId: optionalString(options.profileId),
+        selectorOk: runtimeSelectorPlan.ok === true,
+        runtimeSelectorReady: runtimeSelectorPlan.ready === true,
+        summary: {
+            routeCount: routes.length,
+            selectedCount: routes.filter((row) => row.source === 'selected').length,
+            alternateCount: routes.filter((row) => row.source === 'candidate_alternative').length,
+            runtimeProofCount: routes.filter((row) => row.hasRuntimeProof).length,
+            providerCount: new Set(routes.map((row) => row.providerId).filter(Boolean)).size,
+            sameBoundaryCommandCount: routes.filter((row) => row.commands.liveModel).length,
+            newProviderCommandCount: routes.filter((row) => row.commands.provider).length,
+            probeCommandCount: routes.filter((row) => row.commands.probeAgent || row.commands.probeChat).length,
+        },
+        routes,
+        nextCommands,
+    };
 }
 
 /**

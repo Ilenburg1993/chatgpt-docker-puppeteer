@@ -38,6 +38,7 @@ let _automationEffectSequence = 0;
 let _recoveryAttemptSequence = 0;
 let _sdkSessionHandoffSequence = 0;
 let _sdkSessionConfirmationSequence = 0;
+let _standbyPlanSequence = 0;
 let _liveScenarioRunSequence = 0;
 
 export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze({
@@ -52,6 +53,7 @@ export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze(
     recoveryAttemptMaxRows: 50_000,
     sdkSessionHandoffMaxRows: 50_000,
     sdkSessionConfirmationMaxRows: 50_000,
+    standbyPlanMaxRows: 50_000,
     liveScenarioRunMaxRows: 50_000,
     refreshLogMaxRows: 200_000,
     runtimeProbeRunMaxRows: 10_000,
@@ -545,6 +547,15 @@ function createSdkSessionConfirmationId(observedAtMs) {
  * @param {number} observedAtMs
  * @returns {string}
  */
+function createStandbyPlanId(observedAtMs) {
+    _standbyPlanSequence += 1;
+    return `model-gateway:standby:${observedAtMs}:${process.pid}:${_standbyPlanSequence}`;
+}
+
+/**
+ * @param {number} observedAtMs
+ * @returns {string}
+ */
 function createLiveScenarioRunId(observedAtMs) {
     _liveScenarioRunSequence += 1;
     return `model-gateway:live-scenario:${observedAtMs}:${process.pid}:${_liveScenarioRunSequence}`;
@@ -890,6 +901,7 @@ export class SqliteModelGatewayCatalogStore {
      *     recoveryAttemptRows: number;
      *     sdkSessionHandoffRows: number;
      *     sdkSessionConfirmationRows: number;
+     *     standbyPlanRows: number;
      *     liveScenarioRunRows: number;
      *     latestAutomationDecision: { action: string | null; status: string | null; ok: boolean | null; selectedRouteKey: string | null; decidedAtMs: number | null };
      *     latestAutomationPolicySnapshot: { enabled: boolean | null; policy: string | null; routeProfile: string | null; observedAtMs: number | null };
@@ -897,6 +909,7 @@ export class SqliteModelGatewayCatalogStore {
      *     latestRecoveryAttempt: { recoveryAttemptId: string | null; decisionId: string | null; routeProfile: string | null; selectedRouteKey: string | null; recoveryScope: string | null; failureKind: string | null; status: string | null; applied: boolean | null; observedAtMs: number | null };
      *     latestSdkSessionHandoff: { status: string | null; routeProfile: string | null; selectedRouteKey: string | null; sessionId: string | null; targetModel: string | null; requestedAtMs: number | null; confirmedAtMs: number | null };
      *     latestSdkSessionConfirmation: { status: string | null; handoffId: string | null; decisionId: string | null; sessionId: string | null; previousModel: string | null; confirmedModel: string | null; observedAtMs: number | null };
+     *     latestStandbyPlan: { standbyPlanId: string | null; status: string | null; routeProfile: string | null; routeCount: number | null; providerCount: number | null; runtimeProofCount: number | null; selectedRouteKey: string | null; source: string | null; generatedAtMs: number | null };
      *     latestLiveScenarioRun: { runId: string | null; scenarioKind: string | null; status: string | null; ok: boolean | null; completedAtMs: number | null; summaryPath: string | null };
      *     refreshLogRows: number;
      * }>}
@@ -1049,6 +1062,19 @@ export class SqliteModelGatewayCatalogStore {
                 )
                 .get()
         );
+        const latestStandbyPlan = /** @type {{ standby_plan_id: string | null; route_profile: string | null; status: string | null; route_count: number | null; provider_count: number | null; runtime_proof_count: number | null; selected_route_key: string | null; generated_at_ms: number | null; source: string | null } | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT standby_plan_id, route_profile, status, route_count, provider_count,
+                               runtime_proof_count, selected_route_key, generated_at_ms, source
+                        FROM copilot_model_gateway_standby_plans
+                        ORDER BY generated_at_ms DESC
+                        LIMIT 1
+                    `,
+                )
+                .get()
+        );
         const latestLiveScenarioRun = /** @type {{ run_id: string | null; scenario_kind: string | null; status: string | null; ok: number | null; completed_at_ms: number | null; summary_path: string | null } | undefined} */ (
             this.#db
                 .prepare(
@@ -1098,6 +1124,7 @@ export class SqliteModelGatewayCatalogStore {
             sdkSessionHandoffRows: tableCounts['copilot_model_gateway_sdk_session_handoffs'] ?? 0,
             sdkSessionConfirmationRows:
                 tableCounts['copilot_model_gateway_sdk_session_confirmations'] ?? 0,
+            standbyPlanRows: tableCounts['copilot_model_gateway_standby_plans'] ?? 0,
             liveScenarioRunRows: tableCounts['copilot_model_gateway_live_scenario_runs'] ?? 0,
             latestAutomationDecision: {
                 action: optionalString(latestAutomationDecision?.action),
@@ -1166,6 +1193,17 @@ export class SqliteModelGatewayCatalogStore {
                 previousModel: optionalString(latestSdkSessionConfirmation?.previous_model),
                 confirmedModel: optionalString(latestSdkSessionConfirmation?.confirmed_model),
                 observedAtMs: optionalInteger(latestSdkSessionConfirmation?.observed_at_ms),
+            },
+            latestStandbyPlan: {
+                standbyPlanId: optionalString(latestStandbyPlan?.standby_plan_id),
+                routeProfile: optionalString(latestStandbyPlan?.route_profile),
+                status: optionalString(latestStandbyPlan?.status),
+                routeCount: optionalInteger(latestStandbyPlan?.route_count),
+                providerCount: optionalInteger(latestStandbyPlan?.provider_count),
+                runtimeProofCount: optionalInteger(latestStandbyPlan?.runtime_proof_count),
+                selectedRouteKey: optionalString(latestStandbyPlan?.selected_route_key),
+                source: optionalString(latestStandbyPlan?.source),
+                generatedAtMs: optionalInteger(latestStandbyPlan?.generated_at_ms),
             },
             latestLiveScenarioRun: {
                 runId: optionalString(latestLiveScenarioRun?.run_id),
@@ -1391,6 +1429,7 @@ export class SqliteModelGatewayCatalogStore {
      *     recoveryAttemptMaxRows?: number;
      *     sdkSessionHandoffMaxRows?: number;
      *     sdkSessionConfirmationMaxRows?: number;
+     *     standbyPlanMaxRows?: number;
      *     liveScenarioRunMaxRows?: number;
      * }} [policy]
      * @returns {Promise<{
@@ -1461,6 +1500,10 @@ export class SqliteModelGatewayCatalogStore {
         const sdkSessionConfirmationMaxRows = retentionLimit(
             policy.sdkSessionConfirmationMaxRows,
             DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.sdkSessionConfirmationMaxRows,
+        );
+        const standbyPlanMaxRows = retentionLimit(
+            policy.standbyPlanMaxRows,
+            DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.standbyPlanMaxRows,
         );
         const liveScenarioRunMaxRows = retentionLimit(
             policy.liveScenarioRunMaxRows,
@@ -1554,6 +1597,15 @@ export class SqliteModelGatewayCatalogStore {
                     maxRows: sdkSessionConfirmationMaxRows,
                 }),
                 maxRows: sdkSessionConfirmationMaxRows,
+            };
+            tables['copilot_model_gateway_standby_plans'] = {
+                deletedRows: deleteRowsKeepingLatest(this.#db, {
+                    table: 'copilot_model_gateway_standby_plans',
+                    keyColumn: 'standby_plan_id',
+                    orderColumn: 'generated_at_ms',
+                    maxRows: standbyPlanMaxRows,
+                }),
+                maxRows: standbyPlanMaxRows,
             };
             tables['copilot_model_gateway_live_scenario_runs'] = {
                 deletedRows: deleteRowsKeepingLatest(this.#db, {
@@ -2529,6 +2581,109 @@ export class SqliteModelGatewayCatalogStore {
             )
             .all(limit)
             .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+    }
+
+    /**
+     * @param {Record<string, unknown>[]} plans
+     * @returns {Promise<{ standbyPlans: number }>}
+     */
+    async writeStandbyPlanRecords(plans) {
+        const insert = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_standby_plans
+                (standby_plan_id, route_profile, status, route_count, provider_count, runtime_proof_count,
+                 selected_route_key, generated_at_ms, source, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(standby_plan_id) DO UPDATE SET
+                route_profile = excluded.route_profile,
+                status = excluded.status,
+                route_count = excluded.route_count,
+                provider_count = excluded.provider_count,
+                runtime_proof_count = excluded.runtime_proof_count,
+                selected_route_key = excluded.selected_route_key,
+                generated_at_ms = excluded.generated_at_ms,
+                source = excluded.source,
+                payload_json = excluded.payload_json
+        `);
+        const writable = plans.filter(isRecord);
+        const tx = this.#db.transaction(() => {
+            for (const plan of writable) {
+                const summary = isRecord(plan['summary']) ? plan['summary'] : {};
+                const routes = Array.isArray(plan['routes']) ? plan['routes'].filter(isRecord) : [];
+                const selectedRoute = routes.find((route) => route['source'] === 'selected') ?? routes[0];
+                const generatedAtMs =
+                    dateMs(plan['generatedAt']) ??
+                    optionalInteger(plan['generatedAtMs']) ??
+                    dateMs(plan['timestamp']) ??
+                    Date.now();
+                const routeProfile =
+                    optionalString(plan['profileId']) ??
+                    optionalString(plan['profile']) ??
+                    optionalString(plan['routeProfile']) ??
+                    DEFAULT_ROUTE_PROFILE;
+                const routeCount = optionalInteger(summary['routeCount']) ?? routes.length;
+                const providerCount =
+                    optionalInteger(summary['providerCount']) ??
+                    new Set(routes.map((route) => optionalString(route['providerId'])).filter(Boolean)).size;
+                const runtimeProofCount =
+                    optionalInteger(summary['runtimeProofCount']) ??
+                    routes.filter((route) => route['hasRuntimeProof'] === true).length;
+                const status = optionalString(plan['status']) ?? (plan['ok'] === false ? 'blocked' : 'ready');
+                insert.run(
+                    optionalString(plan['standbyPlanId']) ?? createStandbyPlanId(generatedAtMs),
+                    routeProfile,
+                    status,
+                    routeCount,
+                    providerCount,
+                    runtimeProofCount,
+                    optionalString(plan['selectedRouteKey']) ?? optionalString(selectedRoute?.['routeKey']),
+                    generatedAtMs,
+                    optionalString(plan['source']) ?? 'unknown',
+                    operationalPayloadJson({
+                        ...plan,
+                        routeProfile,
+                        status,
+                        generatedAtMs,
+                        summary: {
+                            ...summary,
+                            routeCount,
+                            providerCount,
+                            runtimeProofCount,
+                        },
+                    }),
+                );
+            }
+        });
+        tx();
+        return { standbyPlans: writable.length };
+    }
+
+    /**
+     * @param {{ limit?: number; profileId?: string; routeProfile?: string }} [options]
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async readStandbyPlanRecords(options = {}) {
+        const limit = Math.max(1, Math.min(optionalInteger(options.limit) ?? 50, 500));
+        const profile = optionalString(options.profileId) ?? optionalString(options.routeProfile);
+        const statement = profile
+            ? this.#db.prepare(
+                  `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_standby_plans
+                    WHERE route_profile = ?
+                    ORDER BY generated_at_ms DESC
+                    LIMIT ?
+                `,
+              )
+            : this.#db.prepare(
+                  `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_standby_plans
+                    ORDER BY generated_at_ms DESC
+                    LIMIT ?
+                `,
+              );
+        const rows = profile ? statement.all(profile, limit) : statement.all(limit);
+        return rows.map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
     }
 
     /**

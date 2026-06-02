@@ -43,7 +43,7 @@ O sistema ideal deve permitir:
 
 - [x] Catalogo canonico JSON existe.
 - [x] SQLite operacional existe.
-- [x] Schema SQLite operacional esta na versao 10.
+- [x] Schema SQLite operacional esta na versao 11.
 - [x] Importers por provider existem para fontes principais ja mapeadas.
 - [x] OpenAI-compatible schema existe como alvo normalizado.
 - [x] Account overlays existem.
@@ -89,12 +89,14 @@ O sistema ideal deve permitir:
 - [x] `model-gateway:live:readiness -- --fail` roda pelo runner.
 - [x] `model-gateway:auto:ready` roda pelo runner.
 - [x] `model-gateway:operator-ready` existe como cockpit read-only para humano/LLM.
+- [x] Standby plans podem ser persistidos no SQLite operacional por perfil.
 
 ### 2.2 Lacunas De Base Ainda Abertas
 
 - [ ] O default auto ainda precisa de uma definicao operacional final: quando ligar, quando aplicar, quando apenas sugerir.
 - [ ] O fallback real em turno ainda precisa ser fechado para falha durante runtime.
-- [ ] A lista de standby precisa virar artefato/cockpit de primeira classe para troca rapida.
+- [x] A lista de standby virou artefato persistivel de primeira classe.
+- [ ] A lista de standby ainda precisa virar cockpit visual de primeira classe para troca rapida.
 - [ ] O terminal precisa expor com mais clareza "modelo vivo", "modelo preparado", "rota selecionada" e "proximos substitutos".
 - [ ] A policy deve ter presets claros para humano, LLM operadora e modo conservador.
 - [ ] A troca automatica por quota esgotada precisa diferenciar quota temporaria, creditos, auth, modelo inexistente e timeout.
@@ -163,7 +165,7 @@ metadata importers
 - [ ] `account_overlay_ready`
 - [ ] `pre_runtime_candidates_ready`
 - [ ] `runtime_selector_ready`
-- [ ] `standby_ready`
+- [x] `standby_ready`
 - [ ] `auto_policy_ready`
 - [ ] `terminal_boundary_known`
 - [ ] `same_boundary_switch_possible`
@@ -223,10 +225,10 @@ metadata importers
 
 ### Faixa D - Standby E Substituicao
 
-- [ ] D.1 Fazer standby virar contrato de dados, nao apenas comando.
-- [ ] D.2 Persistir ultima standby list por perfil.
-- [ ] D.3 Separar standby por mesma boundary e por novo provider.
-- [ ] D.4 Marcar candidatos ja provados para agent.
+- [x] D.1 Fazer standby virar contrato de dados, nao apenas comando.
+- [x] D.2 Persistir ultima standby list por perfil.
+- [x] D.3 Separar standby por mesma boundary e por novo provider.
+- [x] D.4 Marcar candidatos ja provados para agent.
 - [ ] D.5 Marcar candidatos que precisam de probe.
 - [ ] D.6 Marcar candidatos bloqueados por quota/reset.
 - [ ] D.7 Marcar candidatos bloqueados por auth/key.
@@ -315,7 +317,7 @@ metadata importers
 ### Faixa K - Operador Humano
 
 - [ ] K.1 `/byok gateway operator-ready` deve ser o cockpit inicial.
-- [ ] K.2 `/byok auto standby` deve listar substitutos claros.
+- [x] K.2 `/byok auto standby` deve listar substitutos claros.
 - [ ] K.3 `/byok auto apply` deve explicar antes/depois.
 - [ ] K.4 `/byok auto switch` deve ser seguro e reversivel.
 - [ ] K.5 `/byok auto off` deve ser sempre claro.
@@ -331,7 +333,7 @@ metadata importers
 - [ ] L.2 JSON deve conter `nextSafeCommands`.
 - [ ] L.3 JSON deve conter `requiresHumanDecision`.
 - [ ] L.4 JSON deve conter `canApplyAutomatically`.
-- [ ] L.5 JSON deve conter standby list.
+- [x] L.5 JSON deve conter standby list.
 - [ ] L.6 JSON deve conter blockers por candidato.
 - [ ] L.7 JSON deve conter clear/probe commands.
 - [ ] L.8 JSON deve conter live test commands.
@@ -354,7 +356,7 @@ metadata importers
 ## 6. Prioridade Imediata
 
 1. [x] Criar `operator-ready` read-only.
-2. [ ] Consolidar standby como contrato reutilizavel.
+2. [x] Consolidar standby como contrato reutilizavel.
 3. [x] Ligar standby ao post-turn recovery.
 4. [ ] Melhorar cockpit terminal de boundary/prepared/live.
 5. [ ] Criar live fixtures de fallback/recovery.
@@ -372,6 +374,7 @@ npm run model-gateway:ops
 npm run model-gateway:auto:ready
 npm run model-gateway:auto:doctor
 npm run model-gateway:auto:standby -- --profile=repo_agent --limit=12
+npm run model-gateway:auto:standby -- --profile=repo_agent --limit=12 --write-sqlite
 npm run model-gateway:runtime-selector -- --fail
 npm run model-gateway:runtime-health:diff -- --write-snapshot --fail-on-regression
 npm run model-gateway:live:readiness -- --fail
