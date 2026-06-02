@@ -4257,6 +4257,7 @@ describe('model-gateway foundation', () => {
 
         assert.ok(commands.length >= 20);
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:ops'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:operator-ready'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:prebuild'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:build'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:metadata:build:plan'));
@@ -4299,6 +4300,7 @@ describe('model-gateway foundation', () => {
         );
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:runtime-health:mirror'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-prebuild'));
+        assert.ok(commands.some((entry) => entry.command === 'make model-gateway-operator-ready'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-ops'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-build'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-effective-selection-trace'));
@@ -4358,6 +4360,8 @@ describe('model-gateway foundation', () => {
     });
 
     it('keeps model-gateway script paths in the scripts/model-gateway barrel', () => {
+        assert.ok(modelGatewayScriptPath('runner').endsWith('scripts/model-gateway/run.mjs'));
+        assert.ok(modelGatewayScriptPath('operatorReady').endsWith('scripts/model-gateway/model-gateway-operator-ready.mjs'));
         assert.equal(modelGatewayScriptPath('llmBLiveTest'), COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH);
         assert.ok(modelGatewayScriptPath('autoReady').endsWith('scripts/model-gateway/model-gateway-auto-ready.mjs'));
         assert.ok(modelGatewayScriptPath('autoDoctor').endsWith('scripts/model-gateway/model-gateway-auto-doctor.mjs'));
@@ -4373,6 +4377,22 @@ describe('model-gateway foundation', () => {
         assert.ok(COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH.endsWith('scripts/model-gateway/model-gateway-terminal-llm-b-live-test.mjs'));
         assert.ok(Object.values(MODEL_GATEWAY_SCRIPT_PATHS).every((scriptPath) => scriptPath.includes('/scripts/model-gateway/')));
         assert.ok(!Object.values(MODEL_GATEWAY_SCRIPT_PATHS).some((scriptPath) => scriptPath.includes('/scripts/copilot/')));
+    });
+
+    it('routes package model-gateway commands through the script barrel runner', async () => {
+        const packageJson = JSON.parse(await readFile('package.json', 'utf8'));
+        const scripts = packageJson.scripts ?? {};
+        const modelGatewayScripts = Object.entries(scripts).filter(
+            ([name]) => name.startsWith('model-gateway:') || name === 'terminal:llm-b:live-test',
+        );
+        const directlyCoupledScripts = modelGatewayScripts.filter(([, command]) =>
+            String(command).includes('scripts/model-gateway/model-gateway-'),
+        );
+
+        assert.equal(scripts['model-gateway:commands'], 'node scripts/model-gateway/run.mjs canonicalCommands');
+        assert.equal(scripts['model-gateway:operator-ready'], 'node scripts/model-gateway/run.mjs operatorReady --json');
+        assert.equal(scripts['model-gateway:live:llm-b'], 'node scripts/model-gateway/run.mjs llmBLiveTest');
+        assert.deepEqual(directlyCoupledScripts, []);
     });
 
     it('creates secret-safe universal catalog evidence contracts', () => {

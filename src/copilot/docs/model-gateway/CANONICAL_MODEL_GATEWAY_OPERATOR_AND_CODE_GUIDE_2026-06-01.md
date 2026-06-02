@@ -123,6 +123,7 @@ Arquivos principais:
 
 - `src/copilot/model-gateway/routing/runtime-selector.js`
 - `scripts/model-gateway/model-gateway-runtime-selector.mjs`
+- `scripts/model-gateway/run.mjs runtimeSelector`
 
 Responsabilidade:
 
@@ -131,6 +132,10 @@ Responsabilidade:
 - limitar tentativas por provider;
 - permitir probe apenas com opt-in;
 - registrar route decisions e runtime probe/health quando executado explicitamente.
+
+Regra de acoplamento: consumidores externos devem chamar comandos `npm run model-gateway:*` ou
+`node scripts/model-gateway/run.mjs <script-id>`. Caminhos fisicos dos scripts ficam concentrados em
+`scripts/model-gateway/index.mjs`.
 
 Regra de evolucao:
 
@@ -232,6 +237,7 @@ Distribuicao por fase:
 Comandos de orientacao:
 
 ```bash
+npm run model-gateway:operator-ready
 npm run model-gateway:commands
 npm run model-gateway:commands:json
 npm run model-gateway:ops

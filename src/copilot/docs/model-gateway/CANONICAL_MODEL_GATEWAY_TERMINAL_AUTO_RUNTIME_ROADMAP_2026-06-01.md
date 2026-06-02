@@ -11,6 +11,7 @@ O guia anterior continua como historico:
 
 Playbook operacional ativo para humano/LLM:
 
+- `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_RUNTIME_OPERATIONS_ROADMAP_2026-06-02.md`
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_RUNTIME_PLAYBOOK_2026-06-01.md`
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_AND_CODE_GUIDE_2026-06-01.md`
 
@@ -44,6 +45,8 @@ Playbook operacional ativo para humano/LLM:
 ### 2.2 Scripts canonicos
 
 - [x] `scripts/model-gateway/index.mjs` e o barril unico.
+- [x] `scripts/model-gateway/run.mjs` como runner logico para package/operador/LLM.
+- [x] `package.json` chama scripts de model-gateway por ID de barril, nao por caminho fisico de cada script.
 - [x] Runner LLM-B vive em `scripts/model-gateway/`.
 - [x] Wrapper legado em `scripts/copilot/` foi removido.
 - [x] `model-gateway:ops` existe.

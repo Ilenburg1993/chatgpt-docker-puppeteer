@@ -6,6 +6,7 @@ automacao e teste live.
 
 Roadmap ativo de implementacao:
 
+- `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_RUNTIME_OPERATIONS_ROADMAP_2026-06-02.md`
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_TERMINAL_AUTO_RUNTIME_ROADMAP_2026-06-01.md`
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_AND_CODE_GUIDE_2026-06-01.md`
 
@@ -149,6 +150,7 @@ Comando base:
 
 ```bash
 npm run model-gateway:runtime-selector
+node scripts/model-gateway/run.mjs runtimeSelector --json
 ```
 
 Comando real somente quando intencional:
@@ -158,6 +160,8 @@ npm run model-gateway:runtime-selector -- --execute --allow-probe
 ```
 
 Regra: `--execute` e `--allow-probe` devem ser escolhas explicitas.
+Regra de acoplamento: `npm run model-gateway:*` usa `scripts/model-gateway/run.mjs`, e o runner usa o barril
+`scripts/model-gateway/index.mjs`. Operador humano e LLM devem usar comandos npm ou ids do runner como API estavel.
 
 ### 3.5 Automation
 
@@ -173,6 +177,7 @@ Responsavel por converter selecao em decisao e depois em efeitos:
 Comandos principais:
 
 ```bash
+npm run model-gateway:operator-ready
 npm run model-gateway:auto:status
 npm run model-gateway:auto:ready
 npm run model-gateway:auto:doctor
@@ -189,6 +194,7 @@ npm run model-gateway:live:runs
 
 Regra: `auto:status`, `auto:ready`, `auto:doctor`, `auto:explain`, `auto:handoffs`, `auto:confirmations`,
 `auto:recoveries`, `auto:proof-plan`, `auto:standby` e `auto:scenarios` nao devem chamar provider nem mutar terminal.
+`operator-ready` tambem e read-only e deve ser a primeira saida para humano/LLM antes de aplicar qualquer efeito.
 
 Regra de bloqueio: quando a decisao auto encontra `runtime_proof_required`, rota bloqueada, health runtime falha
 ou candidato sem selecao, os `nextCommands` devem apontar primeiro para `model-gateway:auto:proof-plan` e para

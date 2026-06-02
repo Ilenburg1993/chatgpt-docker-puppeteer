@@ -4,7 +4,21 @@ Scripts operacionais canônicos do `src/copilot/model-gateway`.
 
 Guia canonico transversal:
 
+- `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_RUNTIME_OPERATIONS_ROADMAP_2026-06-02.md`
 - `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_AND_CODE_GUIDE_2026-06-01.md`
+
+## Entrada Estavel
+
+Os scripts ficam nesta pasta, mas consumidores externos devem preferir os comandos `npm run model-gateway:*` ou o runner
+logico:
+
+```bash
+node scripts/model-gateway/run.mjs <script-id> [args...]
+node scripts/model-gateway/run.mjs --help
+```
+
+O runner resolve `<script-id>` pelo barril `scripts/model-gateway/index.mjs`. Isso permite reorganizar arquivos internos
+sem espalhar caminhos fisicos por `package.json`, Makefile, testes ou docs operacionais.
 
 ## Regra De Ouro
 
@@ -21,12 +35,15 @@ Guia canonico transversal:
 
 ```bash
 npm run model-gateway:ops
+npm run model-gateway:operator-ready
 npm run model-gateway:commands
 npm run model-gateway:commands:json
 ```
 
 `model-gateway:ops` é o cockpit rápido: resume banco SQLite, readiness, decisão auto e inventário de comandos sem buscar
 providers, rodar modelos ou mutar a sessão terminal.
+`model-gateway:operator-ready` agrega ops, auto-ready, runtime-selector, standby e runtime-health diff em checks
+booleanos e comandos seguros para humano/LLM.
 
 ## Banco De Metadados
 

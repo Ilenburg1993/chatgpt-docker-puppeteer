@@ -5,6 +5,7 @@ export const MODEL_GATEWAY_SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.u
 export const REPO_ROOT = path.resolve(MODEL_GATEWAY_SCRIPT_DIR, '../..');
 
 export const MODEL_GATEWAY_SCRIPT_PATHS = Object.freeze({
+    runner: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'run.mjs'),
     autoStatus: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-status.mjs'),
     autoReady: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-ready.mjs'),
     autoDoctor: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-doctor.mjs'),
@@ -24,6 +25,7 @@ export const MODEL_GATEWAY_SCRIPT_PATHS = Object.freeze({
     llmBLiveTest: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-terminal-llm-b-live-test.mjs'),
     metadataBuild: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-metadata-build.mjs'),
     ops: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-ops.mjs'),
+    operatorReady: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-operator-ready.mjs'),
     redactionAudit: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-redaction-audit.mjs'),
     refresh: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-refresh.mjs'),
     refreshLog: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-refresh-log.mjs'),

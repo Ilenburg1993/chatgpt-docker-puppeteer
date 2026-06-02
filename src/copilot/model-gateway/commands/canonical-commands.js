@@ -46,6 +46,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Show one read-only operational cockpit for database, readiness, automation and command inventory.',
     },
     {
+        id: 'operator.ready',
+        phase: 'orientation',
+        surface: 'package',
+        command: 'npm run model-gateway:operator-ready',
+        summary: 'Show the read-only operator/LLM readiness cockpit with checks, standby routes and next safe commands.',
+    },
+    {
         id: 'lint.scoped',
         phase: 'validate',
         surface: 'package',
@@ -513,6 +520,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'make',
         command: 'make model-gateway-prebuild',
         summary: 'Makefile alias for the pre-build command sequence.',
+    },
+    {
+        id: 'make.operator-ready',
+        phase: 'orientation',
+        surface: 'make',
+        command: 'make model-gateway-operator-ready',
+        summary: 'Makefile alias for the operator/LLM readiness cockpit.',
     },
     {
         id: 'make.first-build',
