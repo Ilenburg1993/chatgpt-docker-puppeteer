@@ -441,34 +441,34 @@ describe('commands/session — sync commands', () => {
         cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, 'full');
         expect(ctx.println).toHaveBeenCalled();
         expect(ctx.output()).toContain('gpt-5-mini');
-        expect(ctx.output()).toContain('healthy');
-        expect(ctx.output()).toContain('modo SDK');
-        expect(ctx.output()).toContain('canal input');
+        expect(ctx.output()).toContain('saúde ok');
+        expect(ctx.output()).toContain('Modo SDK');
+        expect(ctx.output()).toContain('Entrada');
         expect(ctx.output()).not.toContain('plan local');
-        expect(ctx.output()).toContain('tarefas fundo');
+        expect(ctx.output()).toContain('Tarefas fundo');
         expect(ctx.output()).not.toContain('bg tasks');
-        expect(ctx.output()).toContain('display');
-        expect(ctx.output()).toContain('modo permissões');
+        expect(ctx.output()).toContain('Display');
+        expect(ctx.output()).toContain('Permissões');
         expect(ctx.output()).toContain('prompts SDK ignorados');
         expect(ctx.output()).not.toContain('permission mode');
         expect(ctx.output()).not.toContain('sdk prompts=');
         expect(ctx.output()).toContain('pergunta restaurada expirada');
-        expect(ctx.output()).toContain('perfil modelo');
-        expect(ctx.output()).toContain('runtime alvo');
+        expect(ctx.output()).toContain('Perfil modelo');
+        expect(ctx.output()).toContain('Runtime alvo');
         expect(ctx.output()).not.toContain('runtime id');
         expect(ctx.output()).toContain('*default:gpt-5-mini/idle');
-        expect(ctx.output()).toContain('billing/modelo');
-        expect(ctx.output()).toContain('último PR');
-        expect(ctx.output()).toContain('prompt digest');
-        expect(ctx.output()).toContain('prompt frescor');
+        expect(ctx.output()).toContain('Billing/modelo');
+        expect(ctx.output()).toContain('Último PR');
+        expect(ctx.output()).toContain('Prompt digest');
+        expect(ctx.output()).toContain('Prompt frescor');
         expect(ctx.output()).toContain('binding ok');
-        expect(ctx.output()).toContain('ferramentas');
+        expect(ctx.output()).toContain('Ferramentas');
         expect(ctx.output()).not.toContain('tools load');
-        expect(ctx.output()).toContain('instruções');
+        expect(ctx.output()).toContain('Instruções');
         expect(ctx.output()).not.toContain('instr. load');
-        expect(ctx.output()).toContain('rota sdk↔fs');
+        expect(ctx.output()).toContain('Rota SDK/FS');
         expect(ctx.output()).not.toContain('sdk↔fs route');
-        expect(ctx.output()).toContain('coleta ctx');
+        expect(ctx.output()).toContain('Coleta ctx');
         expect(ctx.output()).toContain('/sdk doctor');
     });
 
@@ -486,7 +486,7 @@ describe('commands/session — sync commands', () => {
         cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: nowCtx.println });
 
         expect(statusCtx.output()).toContain('standby sem READY vivo');
-        expect(statusCtx.output()).toContain('recovery sob demanda');
+        expect(statusCtx.output()).toContain('recuperação sob demanda');
         expect(nowCtx.output()).toContain('Agora');
         expect(nowCtx.output()).toContain('Conversa');
         expect(nowCtx.output()).toContain('ativa');
@@ -600,7 +600,7 @@ describe('commands/session — sync commands', () => {
     it('cmdStatus aceita runtimeId explícito na sintaxe do REPL', () => {
         const ctx = mockCtx();
         cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, '--runtime alt full');
-        expect(ctx.output()).toContain('runtime alvo');
+        expect(ctx.output()).toContain('Runtime alvo');
         expect(ctx.output()).not.toContain('runtime id');
         expect(ctx.output()).toContain('alt');
         expect(ctx.output()).toContain('gpt-4.1-mini');

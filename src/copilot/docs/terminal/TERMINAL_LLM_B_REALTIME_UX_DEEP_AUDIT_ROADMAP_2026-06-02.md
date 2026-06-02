@@ -2584,4 +2584,18 @@
 - [x] Live PTY curta após esta leva confirmou boot e painéis default no terminal real:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=60000 --transport=pty --out-dir=artifacts/terminal-live/ux-events-engine-humanized-20260602-1828`.
   - Resultado: PASS.
-- [ ] Próxima lacuna: revisar `/status full` e `/session` detalhado, que ainda usam blocos herdados com ANSI local em modo `full`; decidir o que é humano detalhado e o que deve virar `detail/raw`.
+- [x] Próxima lacuna: revisar `/status full` e `/session` detalhado, que ainda usam blocos herdados com ANSI local em modo `full`; decidir o que é humano detalhado e o que deve virar `detail/raw`.
+
+### 11.32 `/status full` como painel humano detalhado
+
+- [x] Achado: `/status full` ainda era uma string monolítica com ANSI local, rótulos desalinhados e vocabulário misto (`healthy`, `recovery`, `runtime alvo`, `prompt reason`, `fase/source`, `timeline sync`).
+- [x] Decisão: `full` é tela humana detalhada, não raw técnico; rótulos crus devem ficar em comandos `detail/raw`, SSE, JSON ou export técnico.
+- [x] `cmdStatus` full passou a renderizar o bloco principal por `terminalThemeHeadline`, `terminalThemeRow` e `terminalThemeDivider`.
+- [x] A saúde do agente passou a aparecer como `saúde ok/atenção/problema`, sem `healthy`.
+- [x] Entrada e detalhe do canal traduzem `ask_user`, `recovery`, `direct dispatch` e `runtime` para `pergunta humana`, `recuperação`, `envio direto` e `ambiente`.
+- [x] Notas condicionais de pergunta restaurada, ações pendentes, timeline e sync Hub passaram a usar `terminalThemeRow`, sem ANSI local.
+- [x] Teste de sessão foi atualizado para bloquear os rótulos técnicos antigos e aceitar os novos rótulos humanos capitalizados.
+- [x] Teste escopado passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
+- [ ] Próxima lacuna: revisar o `/status` compacto restante, que ainda tem ANSI local em algumas linhas, e decidir se vale migrar agora ou manter até a próxima rodada de compactação.
+- [ ] Próxima lacuna: revisar `/session sdk` inventário/controle, que ainda contém mensagens com ANSI local em ações de boot.

@@ -85,6 +85,34 @@ function renderHumanTerminalStatus(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderHumanInputChannelState(value) {
+    const state = String(value ?? '');
+    if (state === 'ready') return 'pronto';
+    if (state === 'standby') return 'standby';
+    if (state === 'waiting-human') return 'aguardando operador';
+    if (state === 'shadow') return 'pergunta restaurada';
+    if (state === 'paused') return 'pausado';
+    if (state === 'offline') return 'offline';
+    if (state === 'missing') return 'ausente';
+    return state || 'n/d';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderHumanInputChannelText(value) {
+    return String(value ?? '')
+        .replace(/\bask_user\b/giu, 'pergunta humana')
+        .replace(/\brecovery\b/giu, 'recuperação')
+        .replace(/\bdirect dispatch\b/giu, 'envio direto')
+        .replace(/\bruntime\b/giu, 'ambiente');
+}
+
+/**
  * @param {string | null | undefined} role
  * @param {string | null | undefined} rawRole
  * @returns {{ label: string; role: 'user' | 'assistant' | 'system' | 'question' | 'muted' }}
@@ -464,22 +492,19 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     }
     const effort = configProjection.currentReasoningEffort;
     const sdkMode = projection.sdkSessionMode ?? 'interactive';
-    const sdkModeColor = sdkMode === 'plan' ? '\x1b[35m' : sdkMode === 'autopilot' ? '\x1b[36m' : '\x1b[90m';
     const sdkPlanOpLabel = projection.sdkPlanOperation
         ? `${projection.sdkPlanOperation}${projection.sdkPlanChangedAt ? ` @ ${formatTerminalIsoTimestamp(projection.sdkPlanChangedAt)}` : ''}`
-        : '\x1b[90m(sem alterações)\x1b[0m';
-    const healthColor =
-        health?.['status'] === 'healthy' ? '\x1b[32m' : health?.['status'] === 'degraded' ? '\x1b[33m' : '\x1b[31m';
+        : 'sem alterações';
     const ws = projection.workspace;
-    const branchStr = ws.currentBranch ? `\x1b[32m${ws.currentBranch}\x1b[0m` : '\x1b[90m(sem branch)\x1b[0m';
+    const branchStr = ws.currentBranch ? ws.currentBranch : 'sem branch';
     const shadowState = projection.pendingQuestionShadowState;
     const askUserStatus = projection.pendingQuestion
-        ? `\x1b[32mvivo\x1b[0m${projection.pendingQuestionKind ? ` [${projection.pendingQuestionKind}]` : ''}`
+        ? `viva${projection.pendingQuestionKind ? ` (${projection.pendingQuestionKind})` : ''}`
         : projection.pendingQuestionShadowExpired
-          ? '\x1b[31mpergunta restaurada expirada\x1b[0m'
+          ? 'pergunta restaurada expirada'
           : projection.pendingQuestionShadow
-            ? `${shadowState === 'expired' ? '\x1b[31mpergunta restaurada expirada\x1b[0m' : shadowState === 'expiring_soon' ? '\x1b[33mpergunta restaurada expirando\x1b[0m' : shadowState === 'fresh' ? '\x1b[36mpergunta recém-restaurada\x1b[0m' : '\x1b[33mpergunta restaurada\x1b[0m'}${projection.pendingQuestionShadowKind ? ` [${projection.pendingQuestionShadowKind}]` : ''}`
-            : '\x1b[90m(nenhum)\x1b[0m';
+            ? `${shadowState === 'expired' ? 'pergunta restaurada expirada' : shadowState === 'expiring_soon' ? 'pergunta restaurada expirando' : shadowState === 'fresh' ? 'pergunta recém-restaurada' : 'pergunta restaurada'}${projection.pendingQuestionShadowKind ? ` (${projection.pendingQuestionShadowKind})` : ''}`
+            : 'nenhuma';
     const pendingPreview = projection.pendingQuestionText
         ? projection.pendingQuestionText.slice(0, 80) + (projection.pendingQuestionText.length > 80 ? '…' : '')
         : projection.pendingQuestionShadowText
@@ -487,14 +512,6 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             (projection.pendingQuestionShadowText.length > 80 ? '…' : '')
           : null;
     const inputChannel = projection.dialogInputChannel;
-    const inputChannelColor =
-        inputChannel.state === 'ready' || inputChannel.state === 'standby'
-            ? '\x1b[32m'
-            : inputChannel.state === 'waiting-human' || inputChannel.state === 'shadow' || inputChannel.state === 'paused'
-              ? '\x1b[33m'
-              : inputChannel.state === 'offline' || inputChannel.state === 'missing'
-                ? '\x1b[31m'
-                : '\x1b[90m';
     const shadowExpiry =
         typeof projection.pendingQuestionShadowExpiresAt === 'number'
             ? formatTerminalIsoTimestamp(projection.pendingQuestionShadowExpiresAt)
@@ -515,27 +532,25 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             ? ` · ok ${lifecycle.boot.okCount} · pulados ${lifecycle.boot.skippedCount} · falhas ${lifecycle.boot.failedCount} · timeouts ${lifecycle.boot.timeoutCount}`
             : '';
     const bootLine = lifecycle.boot
-        ? `${lifecycle.boot.status === 'ok' ? '\x1b[32m' : '\x1b[31m'}${lifecycle.boot.status}\x1b[0m \x1b[90m${lifecycle.boot.phases} fases · ${lifecycle.boot.durationMs}ms${bootDetail}${lifecycle.boot.failedPhase ? ` · falha=${lifecycle.boot.failedPhase}` : ''}\x1b[0m`
-        : '\x1b[90m(n/d)\x1b[0m';
+        ? `${lifecycle.boot.status} · ${lifecycle.boot.phases} fases · ${lifecycle.boot.durationMs}ms${bootDetail}${lifecycle.boot.failedPhase ? ` · falha ${lifecycle.boot.failedPhase}` : ''}`
+        : 'n/d';
     const shutdownLine = lifecycle.shuttingDown
-        ? `\x1b[33mem andamento\x1b[0m \x1b[90m${lifecycle.registeredShutdownHandlers} handlers\x1b[0m`
+        ? `em andamento · ${lifecycle.registeredShutdownHandlers} handlers`
         : lifecycle.shutdown
-          ? `${lifecycle.shutdown.status === 'ok' ? '\x1b[32m' : '\x1b[31m'}${lifecycle.shutdown.status}\x1b[0m \x1b[90m${lifecycle.shutdown.handlers} handlers · ${lifecycle.shutdown.durationMs}ms${lifecycle.shutdown.failedHandler ? ` · falha=${lifecycle.shutdown.failedHandler}` : ''}\x1b[0m`
-          : `\x1b[90mparado · ${lifecycle.registeredShutdownHandlers} handlers registrados\x1b[0m`;
+          ? `${lifecycle.shutdown.status} · ${lifecycle.shutdown.handlers} handlers · ${lifecycle.shutdown.durationMs}ms${lifecycle.shutdown.failedHandler ? ` · falha ${lifecycle.shutdown.failedHandler}` : ''}`
+          : `parado · ${lifecycle.registeredShutdownHandlers} handlers registrados`;
     const modelMeta = configProjection.modelMeta ?? configProjection.observedModelMeta;
     const autoPolicy = configProjection.autoModelPolicy;
     const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
     const autoPolicyLine =
         configProjection.currentModel === 'auto'
-            ? `        política auto   \x1b[90mpreferido ${autoPolicy.preferredModel}/${autoPolicy.preferredReasoningEffort} · autoridade GitHub Copilot · último ${autoPolicy.observedModel ?? 'n/d'}\x1b[0m`
+            ? `preferido ${autoPolicy.preferredModel}/${autoPolicy.preferredReasoningEffort} · autoridade GitHub Copilot · último ${autoPolicy.observedModel ?? 'n/d'}`
             : '';
     const byokLine = byok.enabled
-        ? `    BYOK provedor    ${byok.ready ? '\x1b[32mpronto\x1b[0m' : '\x1b[31mincompleto\x1b[0m'} \x1b[90mpreset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · autenticação ${renderTerminalAuthLabel(byok.auth)} · /byok\x1b[0m`
+        ? `${byok.ready ? 'pronto' : 'incompleto'} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · autenticação ${renderTerminalAuthLabel(byok.auth)} · /byok`
         : '';
     const modelBilling = projection.modelBilling;
     const display = readTerminalDisplayProjection();
-    const activitySeverityColor =
-        activity.severity === 'error' ? '\x1b[31m' : activity.severity === 'warn' ? '\x1b[33m' : '\x1b[32m';
     const activityProgress = typeof activity.progress === 'number' ? ` (${activity.progress}%)` : '';
     const sdkInterruptions = [
         projection.pendingElicitations > 0
@@ -579,34 +594,21 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             : 'none';
     const promptFreshnessLabel =
         promptIsStale === true
-            ? '\x1b[31mstale\x1b[0m'
+            ? 'desatualizado'
             : promptRecommendedAction === 'observe-live-reload'
-              ? '\x1b[33mlive-reload\x1b[0m'
+              ? 'recarregamento vivo'
               : promptIsStale === false
-                ? '\x1b[32mok\x1b[0m'
-                : '\x1b[90m(n/d)\x1b[0m';
+                ? 'ok'
+                : 'n/d';
     const toolLoad = projection.toolLoad;
-    const toolLoadColor = toolLoad.hasCanonicalLocalFsTools ? '\x1b[32m' : '\x1b[33m';
     const toolContract = toolLoad.toolContract;
-    const toolContractColor =
-        toolContract.errorCount > 0 ? '\x1b[31m' : toolContract.warningCount > 0 ? '\x1b[33m' : '\x1b[32m';
     const instructionLoad = projection.instructionLoad;
-    const instructionLoadColor =
-        instructionLoad.sectionsMissingFileCount === 0 && instructionLoad.appendFileMissingCount === 0
-            ? '\x1b[32m'
-            : '\x1b[33m';
     const sdkFsRouting = projection.sdkFsRouting;
     const operationalGuidance = buildTerminalOperationalGuidance({
         sdkFsRouting,
         toolLoad,
         instructionLoad,
     });
-    const sdkFsRoutingColor =
-        sdkFsRouting.mode === 'local-fs-primary'
-            ? '\x1b[32m'
-            : sdkFsRouting.mode === 'sdk-workspace-only'
-              ? '\x1b[33m'
-              : '\x1b[31m';
     const ioRuntime = projection.ioRuntime;
     const ioHitRatio = Number(ioRuntime.cache.aggregate.hitRatio || 0).toFixed(3);
     const ioL1 = ioRuntime.cache.l1;
@@ -617,124 +619,185 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const agentSelection = getEffectiveSdkAgentSelection();
     const customAgentsLine = agentSelection.enabled.length
         ? `${agentSelection.enabled.join(', ')}${agentSelection.disabled.length ? ` · desativados ${agentSelection.disabled.join(', ')}` : ''}`
-        : '(none)';
+        : 'nenhum';
     const permissionModeSkipsSdkPrompts = terminalPermissionModeSkipsSdkPrompts(projection.permissionMode);
     const permissionModeDetail = `${projection.permissionMode} · prompts SDK ${permissionModeSkipsSdkPrompts ? 'ignorados' : 'seletivos'}`;
-    println(`
-  \x1b[36mStatus do Terminal LLM-B\x1b[0m
-  ─────────────────────────────────────
-  agente           ${statusColor}${snap['status']}\x1b[0m
-        health           ${health ? `${healthColor}${health['status']}\x1b[0m` : '\x1b[90m(n/d)\x1b[0m'}
-  conversa viva   ${active ? '\x1b[32m● ativa\x1b[0m' : '\x1b[31m○ inativa\x1b[0m'}
-  pergunta humana ${askUserStatus}
-  canal input      ${inputChannelColor}${inputChannel.label}\x1b[0m \x1b[90m(${inputChannel.state}${inputChannel.recoveryExpected ? ' · recovery sob demanda' : ''})\x1b[0m
-  esperas SDK      ${sdkInterruptions.length > 0 ? `\x1b[33m${sdkInterruptions.join(' · ')}\x1b[0m` : '\x1b[90m(nenhuma)\x1b[0m'}
-    UI SDK           \x1b[90mformulários ${uiElicitationFlag == null ? 'n/d' : uiElicitationFlag ? 'disponíveis' : 'indisponíveis'}\x1b[0m
-  modelo           \x1b[36m${snap['model']}\x1b[0m
-${byokLine ? `${byokLine}\n` : ''}  reasoning        \x1b[35m${effort}\x1b[0m
-    modo SDK         ${sdkModeColor}${sdkMode}\x1b[0m
-        modo permissões  \x1b[33m${permissionModeDetail}\x1b[0m
-    plan arquivo     ${sdkPlanOpLabel}
-        tarefas fundo    ${health?.['backgroundPendingCount'] ?? 0}
-        alertas          ${Array.isArray(health?.['issues']) ? health['issues'].length : 0}
-        próximo passo    ${renderTerminalActionLabel(projection.recommendedAction)}
-    sessão runtime   \x1b[90m${projection.runtimeSessionId ?? '(sem runtime)'}\x1b[0m
-    runtime alvo     \x1b[90m${projection.runtimeId}\x1b[0m
-    perfil runtime   \x1b[90m${projection.agentProfileId ?? '(sem perfil)'}\x1b[0m
-    mapa runtime     \x1b[90m${projection.runtimeTopologyLabel}\x1b[0m
-    timeline         \x1b[90m${projection.timelineSource} · ${projection.timelineAuthority} · ${projection.timelineReconciliationStatus} · ${projection.timelineTurnCount} turns${timelineSyncLabel}\x1b[0m
-    prompt digest    \x1b[90m${promptBindingDigest ?? '(sem binding)'}\x1b[0m
-    prompt frescor   ${promptFreshnessLabel} \x1b[90m(${renderTerminalActionLabel(promptRecommendedAction)})\x1b[0m
-    ferramentas      ${toolLoadColor}${toolLoad.total} registradas\x1b[0m \x1b[90m(arquivos locais ${toolLoad.hasCanonicalLocalFsTools} · terminal local ${toolLoad.hasCanonicalLocalExecTools} · workspace SDK ${toolLoad.hasSdkWorkspaceTooling} · shell legado ${toolLoad.hasLegacySdkShellToolsLoaded} · desativadas ${toolLoad.disabled.length})\x1b[0m
-    contrato tools   ${toolContractColor}${toolContract.ok ? 'ok' : 'atenção'}\x1b[0m \x1b[90m(falhas ${toolContract.errorCount} · avisos ${toolContract.warningCount} · descrições ${toolContract.metadataCoverage.descriptionPct}% · schema ${toolContract.metadataCoverage.parametersPct}% · categoria ${toolContract.metadataCoverage.categoryPct}% · tags ${toolContract.metadataCoverage.tagsPct}% · instruções ${toolContract.metadataCoverage.instructionsPct}%)\x1b[0m
-    instruções       ${instructionLoadColor}${instructionLoad.liveReloadMechanism}\x1b[0m \x1b[90m(seções ${instructionLoad.sectionCount} · seções ausentes ${instructionLoad.sectionsMissingFileCount} · anexos ausentes ${instructionLoad.appendFileMissingCount} · fontes RPC ${instructionLoad.sdkSupportsInstructionSourcesRpc})\x1b[0m
-    rota sdk↔fs      ${sdkFsRoutingColor}${sdkFsRouting.mode}\x1b[0m \x1b[90m${sdkFsRouting.reason}\x1b[0m
-    agentes extras   \x1b[90mperfil ${COPILOT_OPERATIONAL_PROFILE} · ${customAgentsLine}\x1b[0m
-    io cache         \x1b[90m${ioCacheLine}\x1b[0m
-    io scope         \x1b[90m${ioScopeLine}\x1b[0m
-    sessão SDK       \x1b[90m${projection.sdkSessionId ?? '(sem sdk)'}\x1b[0m
-    sessão hub       \x1b[90m${projection.hubSessionId ?? '(sem hub)'}\x1b[0m
-    turnos canon     ${projection.turnCount} \x1b[90m(persistidos ${projection.persistedTimelineTurnCount} · bridge ${projection.bridgeTurnCount} · live-tail ${projection.liveBridgeTailCount})\x1b[0m
-    inject port      ${projection.injectPort}
-        atividade atual  ${activitySeverityColor}${activity.label}\x1b[0m${activityProgress}
-        fase/source      \x1b[90m${activity.phase} · ${activity.source}\x1b[0m
-        boot             ${bootLine}
-        shutdown         ${shutdownLine}
-        display          \x1b[90mraciocínio ${display.thinking ? 'ativo' : 'inativo'} · streaming ${display.streaming ? 'ativo' : 'inativo'} · uso ${display.usage ? 'ativo' : 'inativo'} · ferramentas ${display.tools ? 'ativo' : 'inativo'} · intenção ${display.intent ? 'ativo' : 'inativo'}\x1b[0m
-          último PR         \x1b[90m${modelBilling.at ?? '(sem consumo ainda)'}\x1b[0m
-          billing/modelo    ${modelBilling.mismatch ? `\x1b[31mdivergente\x1b[0m \x1b[90m(configurado ${modelBilling.configuredModel ?? '-'} · cobrado ${modelBilling.billedModel ?? '-'})\x1b[0m` : `\x1b[32mok\x1b[0m \x1b[90m(${modelBilling.displayModel})\x1b[0m`}
-          custo último PR   \x1b[90m${modelBilling.cost == null ? '(n/d)' : modelBilling.cost.toFixed(4)}\x1b[0m
-        perfil modelo    \x1b[90m${modelMeta ? `custo ${modelMeta.costTier ?? 'n/a'} · velocidade ${modelMeta.speedTier ?? 'n/a'} · contexto ${typeof modelMeta.contextWindow === 'number' ? modelMeta.contextWindow.toLocaleString('pt-BR') : 'n/a'}` : '(sem metadados locais)'}\x1b[0m
-${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ─────────────────────────────────────
-  workspace        \x1b[90m${ws.cwd}\x1b[0m
-  git root         \x1b[90m${ws.gitRoot ?? '(não é git repo)'}\x1b[0m
-  branch           ${branchStr}
-  ─────────────────────────────────────
-`);
+    println('');
+    println(terminalThemeHeadline('assistant', 'Status do Terminal LLM-B', ['detalhado']));
+    println(terminalThemeRow('Agente', `${renderHumanTerminalStatus(snap['status'])} · saúde ${health ? renderHumanTerminalHealth(health['status']) : 'sem leitura'}`));
+    println(terminalThemeRow('Conversa', `${active ? 'ativa' : 'inativa'} · fila ${snap['queueSize'] ?? 0}`));
+    println(terminalThemeRow('Pergunta', askUserStatus));
+    println(
+        terminalThemeRow(
+            'Entrada',
+            `${renderHumanInputChannelText(inputChannel.label)} · ${renderHumanInputChannelState(inputChannel.state)}${inputChannel.recoveryExpected ? ' · recuperação sob demanda' : ''}`,
+        ),
+    );
+    println(terminalThemeRow('Esperas SDK', sdkInterruptions.length > 0 ? sdkInterruptions.join(' · ') : 'nenhuma'));
+    println(terminalThemeRow('UI SDK', `formulários ${uiElicitationFlag == null ? 'n/d' : uiElicitationFlag ? 'disponíveis' : 'indisponíveis'}`));
+    println(terminalThemeRow('Modelo', `${snap['model']} · raciocínio ${effort}`));
+    if (byokLine) println(terminalThemeRow('BYOK provedor', byokLine, { role: byok.ready ? 'success' : 'warn' }));
+    println(terminalThemeRow('Modo SDK', renderLiveSdkMode(sdkMode)));
+    println(terminalThemeRow('Permissões', permissionModeDetail));
+    println(terminalThemeRow('Plan arquivo', sdkPlanOpLabel));
+    println(terminalThemeRow('Tarefas fundo', String(health?.['backgroundPendingCount'] ?? 0)));
+    println(terminalThemeRow('Alertas', String(Array.isArray(health?.['issues']) ? health['issues'].length : 0)));
+    println(terminalThemeRow('Próximo passo', renderTerminalActionLabel(projection.recommendedAction), { role: 'command' }));
+    println(terminalThemeRow('Sessão runtime', projection.runtimeSessionId ?? 'sem runtime'));
+    println(terminalThemeRow('Runtime alvo', projection.runtimeId));
+    println(terminalThemeRow('Perfil runtime', projection.agentProfileId ?? 'sem perfil'));
+    println(terminalThemeRow('Mapa runtime', projection.runtimeTopologyLabel));
+    println(
+        terminalThemeRow(
+            'Timeline',
+            `${projection.timelineSource} · ${projection.timelineAuthority} · ${projection.timelineReconciliationStatus} · ${projection.timelineTurnCount} turnos${timelineSyncLabel}`,
+        ),
+    );
+    println(terminalThemeRow('Prompt digest', promptBindingDigest ?? 'sem binding'));
+    println(terminalThemeRow('Prompt frescor', `${promptFreshnessLabel} · ${renderTerminalActionLabel(promptRecommendedAction)}`));
+    println(
+        terminalThemeRow(
+            'Ferramentas',
+            `${toolLoad.total} registradas · arquivos locais ${toolLoad.hasCanonicalLocalFsTools ? 'sim' : 'não'} · terminal local ${toolLoad.hasCanonicalLocalExecTools ? 'sim' : 'não'} · workspace SDK ${toolLoad.hasSdkWorkspaceTooling ? 'sim' : 'não'} · shell legado ${toolLoad.hasLegacySdkShellToolsLoaded ? 'sim' : 'não'} · desativadas ${toolLoad.disabled.length}`,
+            { role: toolLoad.hasCanonicalLocalFsTools ? 'success' : 'warn' },
+        ),
+    );
+    println(
+        terminalThemeRow(
+            'Contrato tools',
+            `${toolContract.ok ? 'ok' : 'atenção'} · falhas ${toolContract.errorCount} · avisos ${toolContract.warningCount} · descrições ${toolContract.metadataCoverage.descriptionPct}% · schema ${toolContract.metadataCoverage.parametersPct}% · categoria ${toolContract.metadataCoverage.categoryPct}% · tags ${toolContract.metadataCoverage.tagsPct}% · instruções ${toolContract.metadataCoverage.instructionsPct}%`,
+            { role: toolContract.ok ? 'success' : 'warn' },
+        ),
+    );
+    println(
+        terminalThemeRow(
+            'Instruções',
+            `${instructionLoad.liveReloadMechanism} · seções ${instructionLoad.sectionCount} · seções ausentes ${instructionLoad.sectionsMissingFileCount} · anexos ausentes ${instructionLoad.appendFileMissingCount} · fontes RPC ${instructionLoad.sdkSupportsInstructionSourcesRpc ? 'sim' : 'não'}`,
+        ),
+    );
+    println(terminalThemeRow('Rota SDK/FS', `${sdkFsRouting.mode} · ${sdkFsRouting.reason}`));
+    println(terminalThemeRow('Agentes extras', `perfil ${COPILOT_OPERATIONAL_PROFILE} · ${customAgentsLine}`));
+    println(terminalThemeRow('I/O cache', ioCacheLine));
+    println(terminalThemeRow('I/O scope', ioScopeLine));
+    println(terminalThemeRow('Sessão SDK', projection.sdkSessionId ?? 'sem sdk'));
+    println(terminalThemeRow('Sessão hub', projection.hubSessionId ?? 'sem hub'));
+    println(
+        terminalThemeRow(
+            'Turnos canon',
+            `${projection.turnCount} · persistidos ${projection.persistedTimelineTurnCount} · bridge ${projection.bridgeTurnCount} · live-tail ${projection.liveBridgeTailCount}`,
+        ),
+    );
+    println(terminalThemeRow('Inject port', String(projection.injectPort)));
+    println(terminalThemeRow('Atividade', `${activity.label}${activityProgress}`));
+    println(terminalThemeRow('Origem', `${activity.phase} · ${activity.source}`));
+    println(terminalThemeRow('Boot', bootLine));
+    println(terminalThemeRow('Shutdown', shutdownLine));
+    println(
+        terminalThemeRow(
+            'Display',
+            `raciocínio ${display.thinking ? 'ativo' : 'inativo'} · streaming ${display.streaming ? 'ativo' : 'inativo'} · uso ${display.usage ? 'ativo' : 'inativo'} · ferramentas ${display.tools ? 'ativo' : 'inativo'} · intenção ${display.intent ? 'ativo' : 'inativo'}`,
+        ),
+    );
+    println(terminalThemeRow('Último PR', modelBilling.at ?? 'sem consumo ainda'));
+    println(
+        terminalThemeRow(
+            'Billing/modelo',
+            modelBilling.mismatch
+                ? `divergente · configurado ${modelBilling.configuredModel ?? '-'} · cobrado ${modelBilling.billedModel ?? '-'}`
+                : `ok · ${modelBilling.displayModel}`,
+            { role: modelBilling.mismatch ? 'error' : 'success' },
+        ),
+    );
+    println(terminalThemeRow('Custo último PR', modelBilling.cost == null ? 'n/d' : modelBilling.cost.toFixed(4)));
+    println(
+        terminalThemeRow(
+            'Perfil modelo',
+            modelMeta
+                ? `custo ${modelMeta.costTier ?? 'n/a'} · velocidade ${modelMeta.speedTier ?? 'n/a'} · contexto ${typeof modelMeta.contextWindow === 'number' ? modelMeta.contextWindow.toLocaleString('pt-BR') : 'n/a'}`
+                : 'sem metadados locais',
+        ),
+    );
+    if (autoPolicyLine) println(terminalThemeRow('Política auto', autoPolicyLine));
+    println(terminalThemeDivider(37));
+    println(terminalThemeRow('Workspace', ws.cwd));
+    println(terminalThemeRow('Git root', ws.gitRoot ?? 'não é git repo'));
+    println(terminalThemeRow('Branch', branchStr));
+    println(terminalThemeDivider(37));
     if (pendingPreview) {
-        println(`  pergunta salva  \x1b[90m${pendingPreview}\x1b[0m`);
+        println(terminalThemeRow('Pergunta salva', pendingPreview));
     }
     if (shadowExpiry) {
-        println(`  salva expira em \x1b[90m${shadowExpiry}\x1b[0m`);
+        println(terminalThemeRow('Expira em', shadowExpiry));
     }
     if (shadowAgeLabel) {
-        println(`  salva idade     \x1b[90m${shadowAgeLabel}\x1b[0m`);
+        println(terminalThemeRow('Idade salva', shadowAgeLabel));
     }
     if (shadowRemainingLabel && !projection.pendingQuestionShadowExpired) {
-        println(`  salva restante  \x1b[90m${shadowRemainingLabel}\x1b[0m`);
+        println(terminalThemeRow('Tempo restante', shadowRemainingLabel));
     }
     if (activity.detail) {
-        println(`  atividade info  \x1b[90m${activity.detail}\x1b[0m`);
+        println(terminalThemeRow('Atividade info', activity.detail));
     }
     if (inputChannel.detail) {
-        println(`  canal detalhe  \x1b[90m${inputChannel.detail}\x1b[0m`);
+        println(terminalThemeRow('Canal detalhe', renderHumanInputChannelText(inputChannel.detail)));
     }
     if (promptFreshnessReason) {
-        println(`  prompt reason   \x1b[90m${promptFreshnessReason}\x1b[0m`);
+        println(terminalThemeRow('Prompt motivo', promptFreshnessReason));
     }
-    println(`  guia operação  \x1b[90m${operationalGuidance.summary}\x1b[0m`);
-    println(`  domínio ativo  \x1b[90m${operationalGuidance.domainHint}\x1b[0m`);
-    println(`  coleta ctx     \x1b[90m${operationalGuidance.contextHint}\x1b[0m`);
+    println(terminalThemeRow('Guia operação', operationalGuidance.summary));
+    println(terminalThemeRow('Domínio ativo', operationalGuidance.domainHint));
+    println(terminalThemeRow('Coleta ctx', operationalGuidance.contextHint));
     if (operationalGuidance.warnings.length > 0) {
-        println(`  atenção boot   \x1b[33m${operationalGuidance.warnings.join(' | ')}\x1b[0m`);
+        println(terminalThemeRow('Atenção boot', operationalGuidance.warnings.join(' | '), { role: 'warn' }));
     }
     if (activityProjection.history.length > 0) {
         println(
-            '  atividade rec.  \x1b[90m' +
+            terminalThemeRow(
+                'Atividade rec.',
                 activityProjection.history
                     .map((entry) => {
                         const progress = typeof entry.progress === 'number' ? ` ${entry.progress}%` : '';
                         return `${entry.phase}:${entry.label}${progress}`;
                     })
-                    .join('  •  ') +
-                '\x1b[0m',
+                    .join('  •  '),
+            ),
         );
     }
     if (projection.pendingQuestionShadowExpired) {
         println(
-            '  \x1b[33mDica: a pergunta restaurada não é mais respondível; mantenha a limpeza no próximo fluxo operacional.\x1b[0m',
+            terminalThemeRow(
+                'Dica',
+                'a pergunta restaurada não é mais respondível; mantenha a limpeza no próximo fluxo operacional.',
+                { role: 'warn' },
+            ),
         );
     } else if (projection.pendingQuestionShadowState === 'expiring_soon') {
         println(
-            '  \x1b[33mDica: a pergunta restaurada está perto de expirar; revise ou limpe antes que o estado fique ambíguo.\x1b[0m',
+            terminalThemeRow(
+                'Dica',
+                'a pergunta restaurada está perto de expirar; revise ou limpe antes que o estado fique ambíguo.',
+                { role: 'warn' },
+            ),
         );
     }
     if (projection.sdkSessionMode === 'plan') {
-        println(
-            '  \x1b[90mNota: a sessão SDK está em plan mode vanilla; use /plan off para voltar a interactive.\x1b[0m',
-        );
+        println(terminalThemeRow('Nota', 'a sessão SDK está em modo plano; use /plan off para voltar ao modo interativo.'));
     }
     if (projection.pendingElicitations > 0) {
-        println('  \x1b[33mAção: há elicitation pendente; use /elicitation list e /elicitation show latest.\x1b[0m');
+        println(terminalThemeRow('Ação', 'há formulário pendente; use /elicitation list e /elicitation show latest.', { role: 'warn' }));
     }
     if (projection.pendingPermissions > 0) {
         println(
-            '  \x1b[33mAção: há permissão SDK pendente; acompanhe /activity e aguarde o hook/runtime decidir.\x1b[0m',
+            terminalThemeRow('Ação', 'há permissão SDK pendente; acompanhe /activity e aguarde o runtime decidir.', {
+                role: 'warn',
+            }),
         );
     }
     if (projection.pendingUserInputs > 0) {
         println(
-            '  \x1b[33mAção: há pergunta humana pendente; responda via conversa normal ou use /answer <texto>.\x1b[0m',
+            terminalThemeRow('Ação', 'há pergunta humana pendente; responda via conversa normal ou use /answer <texto>.', {
+                role: 'warn',
+            }),
         );
         if (projection.latestUserInput) {
             const latest = projection.latestUserInput;
@@ -744,12 +807,16 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
                 Array.isArray(latest.choices) && latest.choices.length > 0
                     ? ` opções ${latest.choices.join(' | ')}`
                     : '';
-            println(`  \x1b[90mUltima pergunta SDK:${choices} ${question}\x1b[0m`);
+            println(terminalThemeRow('Última pergunta', `${choices} ${question}`.trim()));
         }
     }
     if (projection.pendingStructuredUserInputs > 0) {
         println(
-            '  \x1b[33mAção: há pergunta estruturada pendente; digite a resposta normalmente ou use /answer <texto>.\x1b[0m',
+            terminalThemeRow(
+                'Ação',
+                'há pergunta estruturada pendente; digite a resposta normalmente ou use /answer <texto>.',
+                { role: 'warn' },
+            ),
         );
         if (projection.latestStructuredUserInput) {
             const latest = projection.latestStructuredUserInput;
@@ -759,27 +826,42 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
                 Array.isArray(latest.choices) && latest.choices.length > 0
                     ? ` opções ${latest.choices.join(' | ')}`
                     : '';
-            println(`  \x1b[90mÚltima pergunta estruturada:${choices} ${question}\x1b[0m`);
+            println(terminalThemeRow('Última estrutura', `${choices} ${question}`.trim()));
         }
     }
     if (modelBilling.mismatch) {
         println(
-            '  \x1b[33mAção recomendada: valide fallback/model switch com /sdk quota, /status e um turno curto de confirmação.\x1b[0m',
+            terminalThemeRow(
+                'Ação recomendada',
+                'valide fallback/troca de modelo com /sdk quota, /status e um turno curto de confirmação.',
+                { role: 'warn' },
+            ),
         );
     }
     if (projection.usedDefaultRuntimeFallback) {
         println(
-            `  \x1b[33mNota: runtime solicitado ${projection.requestedRuntimeId ?? '(desconhecido)'} não encontrado; usando runtime default (${projection.runtimeId}).\x1b[0m`,
+            terminalThemeRow(
+                'Nota',
+                `runtime solicitado ${projection.requestedRuntimeId ?? 'desconhecido'} não encontrado; usando runtime default (${projection.runtimeId}).`,
+                { role: 'warn' },
+            ),
         );
     }
     if (projection.timelineReconciliationStatus === 'diverged') {
         println(
-            '  \x1b[33mNota: timeline do bridge divergiu da persistência; a UX está priorizando o hub como autoridade canônica.\x1b[0m',
+            terminalThemeRow(
+                'Nota',
+                'timeline do bridge divergiu da persistência; a UX está priorizando o hub como autoridade canônica.',
+                { role: 'warn' },
+            ),
         );
     }
     if (projection.timelineSyncStatus === 'scheduled' || projection.timelineSyncStatus === 'inflight') {
         println(
-            `  \x1b[90mTimeline sync: ${projection.timelineSyncStatus} (${projection.timelineSyncPendingCount} turnos pendentes para materializar no Hub).\x1b[0m`,
+            terminalThemeRow(
+                'Sync Hub',
+                `${renderTerminalSyncStatusLabel(projection.timelineSyncStatus)} · ${projection.timelineSyncPendingCount} turnos pendentes para materializar no Hub`,
+            ),
         );
     }
     if (projection.timelineSyncStatus === 'failed') {
@@ -788,7 +870,9 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
                 ? ` próxima tentativa ${formatTerminalIsoTimestamp(projection.timelineSyncNextRetryAt)}`
                 : '';
         println(
-            `  \x1b[33mTimeline sync falhou: ${projection.timelineSyncLastError ?? 'erro desconhecido'}${retryLabel}.\x1b[0m`,
+            terminalThemeRow('Sync Hub', `falhou: ${projection.timelineSyncLastError ?? 'erro desconhecido'}${retryLabel}`, {
+                role: 'warn',
+            }),
         );
     }
 }
