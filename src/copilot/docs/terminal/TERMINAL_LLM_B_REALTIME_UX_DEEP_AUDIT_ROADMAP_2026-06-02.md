@@ -2097,3 +2097,21 @@
 - [x] Mensagem de BYOK ativo passou a mostrar `preset` e `provedor` sem key-value.
 - [x] Mensagem pós-troca de modelo passou a mostrar `Capacidades: raciocínio ... · visão ... · contexto ...`.
 - [ ] Avaliar se `/reasoning` deve trocar `Reasoning effort`/`Reasoning trocado` por rótulos 100% em português.
+
+### 11.18 `/thinking` como raciocínio do operador
+
+- [x] Auditoria identificou que `/thinking list/show` ainda renderizava `thinking`, `chars`, `fonte=`, `status=` e `chars=`.
+- [x] `/thinking list` passou a mostrar `Raciocínio capturado` e `N caracteres`.
+- [x] `/thinking show/latest` passou a mostrar `raciocínio`, `fonte ...`, `estado ...`, `N caracteres` e `duração ...`.
+- [x] Toggle passou a mostrar `Exibição expandida de raciocínio: ativa/inativa`.
+- [x] Teste novo `test_commands_thinking.spec.js` bloqueia regressão para `fonte=`, `status=` e `chars=`.
+
+### 11.19 `/metrics` sem telemetria com aparência de dump
+
+- [x] Auditoria identificou que `/metrics` ainda renderizava `cfg=`, `provider=`, `modelo=`, `pendentes=`, `digest=`, `aceitos=`, `final mismatch=`, `lastId=`, `flush=`, `timeout=`, `preflight=`, `dialog=`, `autostart=yes` e `recovery=no`.
+- [x] Billing passou a mostrar `configurado ... · cobrado ... · divergente`, com BYOK como `provedor ... · modelo ...`.
+- [x] Sync Hub passou a mostrar `pendentes`, `agendados`, `gravados`, `falhas`, `retentativas` e `cache` sem `key=value`.
+- [x] Streaming público passou a mostrar `aceitos`, `normalizados`, `suprimidos`, `divergências`, `sem delta` e `vazio`.
+- [x] Archive SSE passou a mostrar `último id`, `flush em andamento/agendado/ocioso`, `falhas` e `descartados`.
+- [x] Inject passou a mostrar `timeout`, `preflight`, `contexto`, `anexos`, `diálogo`, `autostart sim/não` e `recuperação sim/não`.
+- [x] Teste `test_commands_metrics_usage.spec.js` atualizado para o novo contrato humano de `/metrics`, preservando `/usage detail` técnico.

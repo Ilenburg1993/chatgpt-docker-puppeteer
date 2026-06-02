@@ -308,10 +308,10 @@ describe('commands/metrics + usage', () => {
             expect(ctx.output()).toContain('transporte');
             expect(ctx.output()).toContain('digest-alt');
             expect(ctx.output()).toContain('resume-session');
-            expect(ctx.output()).toContain('preflight=5ms');
-            expect(ctx.output()).toContain('dialog=100ms');
-            expect(ctx.output()).toContain('autostart=yes');
-            expect(ctx.output()).toContain('recovery=no');
+            expect(ctx.output()).toContain('preflight 5ms');
+            expect(ctx.output()).toContain('diálogo 100ms');
+            expect(ctx.output()).toContain('autostart sim');
+            expect(ctx.output()).toContain('recuperação não');
             expect(ctx.output()).not.toContain('digest-default');
         } finally {
             clearRuntimeInjectHistory();
@@ -427,9 +427,9 @@ describe('commands/metrics + usage', () => {
             cmdMetrics({ println: metricsCtx.println });
             cmdUsage({ println: usageCtx.println }, 'now');
 
-            expect(metricsCtx.output()).toContain('mismatch');
-            expect(metricsCtx.output()).toContain('cfg=gpt-5');
-            expect(metricsCtx.output()).toContain('cobrado=gpt-5-mini');
+            expect(metricsCtx.output()).toContain('divergente');
+            expect(metricsCtx.output()).toContain('configurado gpt-5');
+            expect(metricsCtx.output()).toContain('cobrado gpt-5-mini');
             expect(usageCtx.output()).toContain('cfg=');
             expect(usageCtx.output()).toContain('cobrado=');
         } finally {

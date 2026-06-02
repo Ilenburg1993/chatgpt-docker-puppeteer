@@ -17,6 +17,27 @@ import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js
  */
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function yesNoPt(value) {
+    if (typeof value !== 'boolean') return 'n/d';
+    return value ? 'sim' : 'não';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function humanMetricStatus(value) {
+    const status = String(value ?? '').trim().toLowerCase();
+    if (status === 'completed' || status === 'success' || status === 'ok') return 'concluído';
+    if (status === 'error' || status === 'failed') return 'falhou';
+    if (status === 'pending') return 'pendente';
+    return status || 'n/d';
+}
+
+/**
  * Exibe métricas consolidadas da sessão.
  *
  * @param {MetricsContext} ctx
@@ -72,12 +93,12 @@ export function cmdMetrics({ println }, arg = '') {
 
     // ── Billing ──────────────────────────────────────────────────────
     const lastModel = modelBilling.mismatch
-        ? `cfg=${modelBilling.configuredModel ?? '-'} · cobrado=${modelBilling.billedModel ?? '-'}`
+        ? `configurado ${modelBilling.configuredModel ?? '-'} · cobrado ${modelBilling.billedModel ?? '-'}`
         : modelBilling.displayModel;
     const costStr = modelBilling.cost === null ? '-' : `$${modelBilling.cost.toFixed(4)}`;
-    const billingStatus = modelBilling.mismatch ? '\x1b[31mmismatch\x1b[0m' : '\x1b[32mok\x1b[0m';
+    const billingStatus = modelBilling.mismatch ? '\x1b[31mdivergente\x1b[0m' : '\x1b[32mok\x1b[0m';
     const billingLine = byokActive
-        ? `github PR side-channel ${lastModel} · ${costStr} · ${billingStatus} \x1b[90m(histórica; BYOK ativo provider=${byok.preset ?? byok.providerType ?? '-'} · modelo=${byok.model ?? '-'}; não é cobrança BYOK)\x1b[0m`
+        ? `GitHub PR lateral ${lastModel} · ${costStr} · ${billingStatus} \x1b[90m(histórica; BYOK ativo provedor ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}; não é cobrança BYOK)\x1b[0m`
         : `telemetria PR ${lastModel} · ${costStr} · ${billingStatus} \x1b[90m(histórica)\x1b[0m`;
     const promptDigest = typeof systemPromptBinding?.['digest'] === 'string' ? systemPromptBinding['digest'] : null;
     const promptIsStale =
@@ -101,7 +122,7 @@ export function cmdMetrics({ println }, arg = '') {
     const latestInjectOutcome = latestInject?.outcome ?? (latestInject?.ok ? 'completed' : 'error');
     const latestInjectTimeout =
         typeof latestInject?.timeoutMs === 'number'
-            ? ` / timeout=${latestInject.timeoutMs}ms${latestInject.timeoutStrategy ? ` (${latestInject.timeoutStrategy})` : ''}`
+            ? ` / timeout ${latestInject.timeoutMs}ms${latestInject.timeoutStrategy ? ` (${latestInject.timeoutStrategy})` : ''}`
             : '';
     const latestInjectPrompt = latestInject?.promptDigest ?? promptDigest ?? '-';
     const latestInjectFreshness =
@@ -166,10 +187,10 @@ export function cmdMetrics({ println }, arg = '') {
   ─────────────────────────────────────
   turns       ${turnCount} \x1b[90m(timeline canônica)\x1b[0m
   bridge/live ${bridgeTurnCount} \x1b[90m(${timelineSource} · ${timelineAuthority} · ${timelineReconciliationStatus})\x1b[0m
-  sync Hub    ${timelineSyncStatus} \x1b[90m(pendentes=${timelineSyncPendingCount} · agendados=${timelineSyncTelemetry.scheduledTotal} · gravados=${timelineSyncTelemetry.turnsSyncedTotal} · falhas=${timelineSyncTelemetry.failedTotal} · retries=${timelineSyncTelemetry.retryTotal} · cache=${timelineSyncTelemetry.completedCacheSize}/${timelineSyncTelemetry.failureCacheSize})\x1b[0m
+  sync Hub    ${timelineSyncStatus} \x1b[90m(pendentes ${timelineSyncPendingCount} · agendados ${timelineSyncTelemetry.scheduledTotal} · gravados ${timelineSyncTelemetry.turnsSyncedTotal} · falhas ${timelineSyncTelemetry.failedTotal} · retentativas ${timelineSyncTelemetry.retryTotal} · cache ${timelineSyncTelemetry.completedCacheSize}/${timelineSyncTelemetry.failureCacheSize})\x1b[0m
   contexto    ${ctxStr}
   ${billingLine}
-  prompt      ${promptLabel} \x1b[90m(digest=${promptDigest ?? '-'} · ação=${promptAction})\x1b[0m
+  prompt      ${promptLabel} \x1b[90m(digest ${promptDigest ?? '-'} · ação ${promptAction})\x1b[0m
 
   \x1b[35m🔧 Ferramentas\x1b[0m
   ─────────────────────────────────────
@@ -189,25 +210,25 @@ export function cmdMetrics({ println }, arg = '') {
 
   \x1b[35m🌊 Streaming público\x1b[0m
   ─────────────────────────────────────
-  deltas      aceitos=${streamDiagnostics.counters.deltaAccepted} · normalizados=${streamDiagnostics.counters.deltaNormalized} · suprimidos=${streamDiagnostics.counters.deltaSuppressed}
-    causal      \x1b[90maceitos=${streamDiagnostics.counters.deltaCausalAccepted} · duplicados=${streamDiagnostics.counters.deltaCausalDuplicateSuppressed} · fallback temporal=${streamDiagnostics.counters.deltaTemporalFallbackSuppressed}\x1b[0m
-    cumulativo  \x1b[90mnormalizados=${streamDiagnostics.counters.deltaCumulativeNormalized} · suprimidos=${streamDiagnostics.counters.deltaCumulativeSuppressed} · overlap=${streamDiagnostics.counters.deltaOverlapNormalized} · sufixo dup=${streamDiagnostics.counters.deltaDuplicateSuppressed}\x1b[0m
-  final       ok=${streamDiagnostics.counters.finalAlreadyStreamed} · sufixo=${streamDiagnostics.counters.finalSuffix} · mismatch=${streamDiagnostics.counters.finalMismatch} · sem-delta=${streamDiagnostics.counters.finalNoVisibleStream} · vazio=${streamDiagnostics.counters.finalEmpty}
+  deltas      aceitos ${streamDiagnostics.counters.deltaAccepted} · normalizados ${streamDiagnostics.counters.deltaNormalized} · suprimidos ${streamDiagnostics.counters.deltaSuppressed}
+    causal      \x1b[90maceitos ${streamDiagnostics.counters.deltaCausalAccepted} · duplicados ${streamDiagnostics.counters.deltaCausalDuplicateSuppressed} · fallback temporal ${streamDiagnostics.counters.deltaTemporalFallbackSuppressed}\x1b[0m
+    cumulativo  \x1b[90mnormalizados ${streamDiagnostics.counters.deltaCumulativeNormalized} · suprimidos ${streamDiagnostics.counters.deltaCumulativeSuppressed} · overlap ${streamDiagnostics.counters.deltaOverlapNormalized} · sufixo dup ${streamDiagnostics.counters.deltaDuplicateSuppressed}\x1b[0m
+  final       ok ${streamDiagnostics.counters.finalAlreadyStreamed} · sufixo ${streamDiagnostics.counters.finalSuffix} · divergências ${streamDiagnostics.counters.finalMismatch} · sem delta ${streamDiagnostics.counters.finalNoVisibleStream} · vazio ${streamDiagnostics.counters.finalEmpty}
 
   \x1b[35mArchive SSE\x1b[0m
   ─────────────────────────────────────
-  eventos     ${sseEventArchive.events} \x1b[90m(lastId=${sseEventArchive.lastEventId ?? '-'})\x1b[0m
-  fila        ${sseEventArchive.queueDepth} \x1b[90m(flush=${sseEventArchive.flushInFlight ? 'inflight' : sseEventArchive.flushScheduled ? 'scheduled' : 'idle'} · falhas=${sseEventArchive.failedEvents} · dropped=${sseEventArchive.droppedEvents})\x1b[0m
+  eventos     ${sseEventArchive.events} \x1b[90m(último id ${sseEventArchive.lastEventId ?? '-'})\x1b[0m
+  fila        ${sseEventArchive.queueDepth} \x1b[90m(flush ${sseEventArchive.flushInFlight ? 'em andamento' : sseEventArchive.flushScheduled ? 'agendado' : 'ocioso'} · falhas ${sseEventArchive.failedEvents} · descartados ${sseEventArchive.droppedEvents})\x1b[0m
   arquivo     \x1b[90m${sseEventArchive.enabled ? sseEventArchive.path ?? '(aguardando primeiro evento)' : 'desabilitado'}\x1b[0m${sseEventArchive.error ? `\n  erro        \x1b[31m${sseEventArchive.error}\x1b[0m` : ''}
 
   \x1b[35m🚀 Inject\x1b[0m
   ─────────────────────────────────────
-  último      ${latestInject ? `${latestInjectOutcome} · ${latestInject.durationMs}ms${latestInjectTimeout}` : '\x1b[90m(nenhum)\x1b[0m'}
+  último      ${latestInject ? `${humanMetricStatus(latestInjectOutcome)} · ${latestInject.durationMs}ms${latestInjectTimeout}` : '\x1b[90m(nenhum)\x1b[0m'}
     transporte  \x1b[90m${latestInjectTransport}\x1b[0m
   prompt      \x1b[90m${latestInjectPrompt} · ${latestInjectFreshness}\x1b[0m
   motivo      \x1b[90m${latestInjectReason}\x1b[0m
-    fases       \x1b[90mpreflight=${latestInjectPreflightMs ?? '-'}ms · context=${latestInjectContextMs ?? '-'}ms · attachments=${latestInjectAttachmentsMs ?? '-'}ms · dialog=${latestInjectDialogMs ?? '-'}ms\x1b[0m
-    runtime     \x1b[90mautostart=${latestInjectAutoStart === null ? 'n/d' : latestInjectAutoStart ? 'yes' : 'no'} · recovery=${latestInjectRecovery === null ? 'n/d' : latestInjectRecovery ? 'yes' : 'no'}\x1b[0m
+    fases       \x1b[90mpreflight ${latestInjectPreflightMs ?? '-'}ms · contexto ${latestInjectContextMs ?? '-'}ms · anexos ${latestInjectAttachmentsMs ?? '-'}ms · diálogo ${latestInjectDialogMs ?? '-'}ms\x1b[0m
+    runtime     \x1b[90mautostart ${yesNoPt(latestInjectAutoStart)} · recuperação ${yesNoPt(latestInjectRecovery)}\x1b[0m
   ═════════════════════════════════════
 `);
 }
