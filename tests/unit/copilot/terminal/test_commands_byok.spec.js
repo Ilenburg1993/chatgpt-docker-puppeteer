@@ -2913,6 +2913,9 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('metadados tier,owner');
         expect(ctx.output()).toContain('custo perfil gratuito');
         expect(ctx.output()).toContain('chat ok');
+        expect(ctx.output()).not.toContain('ativo=');
+        expect(ctx.output()).not.toContain('prontos=');
+        expect(ctx.output()).not.toContain('presets=');
         expect(ctx.output()).not.toContain('secret');
     });
 
@@ -5232,7 +5235,8 @@ describe('terminal /byok command', () => {
 
         expect(ctx.output()).toContain('(1 grupos/2)');
         expect(ctx.output()).toContain('shared/free-model');
-        expect(ctx.output()).toContain('variants=openrouter-free/openrouter|groq-free/groq');
+        expect(ctx.output()).toContain('variantes openrouter-free/openrouter | groq-free/groq');
+        expect(ctx.output()).not.toContain('variants=');
     });
 
     it('recomenda em todos os perfis filtrando o provider antes da descoberta', async () => {

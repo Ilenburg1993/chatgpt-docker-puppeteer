@@ -2277,5 +2277,8 @@
 - [x] `/byok gateway operator-ready` trocou detalhes `selected=`, `action=`, `routes=`, `providers=`, `session=` e `current=` por `selecionados`, `ação`, `rotas`, `provedores`, `sessão` e `atual`.
 - [x] `/byok auto status` trocou `usable=`, `providers=`, `decisions=`, `policySnapshots=`, `effects=`, `recoveries=`, `handoffs=`, `confirmations=`, `liveRuns=`, `session=` e `live=` por `usáveis`, `provedores`, `decisões`, `policy snapshots`, `efeitos`, `recoveries`, `handoffs`, `confirmações`, `live runs`, `sessão` e `live`.
 - [x] Teste BYOK completo passou novamente após esse lote: `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js` (105 testes).
-- [ ] Auditar `/byok persist`, `/byok models grouped` e helpers de health tags restantes para separar default humano de detalhe técnico.
+- [x] `/byok providers` trocou o cabeçalho `ativo=`, `prontos=` e `presets=` por `ativo`, `prontos` e `presets`, com contagem de presets legível.
+- [x] `/byok models grouped` e `/byok recommend grouped` trocaram `variants=` por `variantes`, com separação visual ` | ` entre perfis/provedores.
+- [x] Teste BYOK completo passou novamente após esse lote: `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js` (105 testes).
+- [ ] Auditar `/byok persist` e os helpers de health tags restantes para separar default humano de detalhe técnico.
 - [ ] Separar explicitamente “tela default humana” de “detail/raw diagnóstico” nos comandos BYOK, sem perder automação e rastreabilidade.

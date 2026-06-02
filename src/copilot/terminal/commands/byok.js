@@ -1032,8 +1032,8 @@ function groupByokModelVariants(models) {
  */
 function renderByokVariantSummary(variants) {
     const visible = variants.slice(0, 4);
-    const overflow = variants.length > visible.length ? `,+${variants.length - visible.length}` : '';
-    return `${visible.join('|')}${overflow}`;
+    const overflow = variants.length > visible.length ? ` · +${variants.length - visible.length}` : '';
+    return `${visible.join(' | ')}${overflow}`;
 }
 
 /**
@@ -5440,10 +5440,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         }
         const configuredPresets = [...presetCounts.entries()]
             .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
-            .map(([preset, count]) => `${preset}=${count}`)
+            .map(([preset, count]) => `${preset} ${count}`)
             .join(' · ');
         println(`\n  \x1b[36mBYOK providers\x1b[0m (${profiles.length} perfil(is))`);
-        println(`  \x1b[90mativo=${summary.profile ?? summary.preset ?? 'sdk'} · prontos=${profiles.length} · presets=${configuredPresets || '-'}\x1b[0m\n`);
+        println(`  \x1b[90mativo ${summary.profile ?? summary.preset ?? 'sdk'} · prontos ${profiles.length} · presets ${configuredPresets || '-'}\x1b[0m\n`);
         if (profiles.length === 0) {
             println('    \x1b[33mNenhum provider BYOK configurado. Adicione perfis em COPILOT_BYOK_PROFILES_JSON no .env.local.\x1b[0m\n');
             return;
@@ -5543,7 +5543,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             return;
         }
         for (const entry of visibleEntries) {
-            const variantLabel = filters.grouped ? ` · variants=${renderByokVariantSummary(entry.variants)}` : '';
+            const variantLabel = filters.grouped ? ` · variantes ${renderByokVariantSummary(entry.variants)}` : '';
             println(`    \x1b[33m${entry.model.id}\x1b[0m  \x1b[90m${renderModelTags(entry.model)}${variantLabel}\x1b[0m`);
         }
         if (visibleEntries.length < modelEntries.length) {
@@ -5601,7 +5601,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         for (const entry of recommendedEntries) {
             const budget = classifyByokModelBudget(entry.model, runtimeBudget);
             const color = budget.level === 'ok' ? '\x1b[32m' : budget.level === 'caution' ? '\x1b[33m' : '\x1b[31m';
-            const variantLabel = filters.grouped ? ` · variants=${renderByokVariantSummary(entry.variants)}` : '';
+            const variantLabel = filters.grouped ? ` · variantes ${renderByokVariantSummary(entry.variants)}` : '';
             println(`    ${index}. \x1b[33m${entry.model.id}\x1b[0m`);
             println(`       \x1b[90m${renderModelTags(entry.model)}${variantLabel}\x1b[0m`);
             println(`       ${color}${budget.label}\x1b[0m`);
