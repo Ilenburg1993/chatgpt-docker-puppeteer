@@ -161,6 +161,9 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Atividade Atual da LLM-B');
         expect(ctx.output()).toContain('Executando tool');
         expect(ctx.output()).toContain('web_fetch');
+        expect(ctx.output()).toContain('estado');
+        expect(ctx.output()).toContain('evento');
+        expect(ctx.output()).toContain('ferramentas');
         expect(ctx.output()).toContain('Timeline recente');
         expect(ctx.output()).toContain('Resumo do turno atual');
         expect(ctx.output()).toContain('Último turno concluído');
@@ -169,7 +172,10 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('interações humanas');
         expect(ctx.output()).toContain('Qual ambiente devo usar?');
         expect(ctx.output()).toContain('I/O real recente');
-        expect(ctx.output()).toContain('IDs/trace completos ficam em /activity detail');
+        expect(ctx.output()).toContain('Detalhes técnicos ficam em /activity detail');
+        expect(ctx.output()).not.toContain('source');
+        expect(ctx.output()).not.toContain('Streaming público');
+        expect(ctx.output()).not.toContain('deltas');
         expect(ctx.output()).not.toContain('io-engine.fs.readFile.text');
         expect(ctx.output()).not.toContain('turn:turn-1');
     });
@@ -182,6 +188,7 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('io-engine.fs.readFile.text');
         expect(ctx.output()).toContain('turn:turn-1');
         expect(ctx.output()).toContain('req=ui-1');
+        expect(ctx.output()).toContain('origem');
         expect(ctx.output()).toContain(
             '/workspaces/chatgpt-docker-puppeteer/src/copilot/terminal/commands/activity.js',
         );

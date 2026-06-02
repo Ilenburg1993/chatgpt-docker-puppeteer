@@ -544,9 +544,23 @@ describe('commands/session — sync commands', () => {
         }
     });
 
-    it('cmdLive imprime fluxo operacional live consolidado', () => {
+    it('cmdLive imprime fluxo humano compacto por padrão', () => {
         const ctx = mockCtx();
         cmdLive({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
+        expect(ctx.output()).toContain('Fluxo da conversa');
+        expect(ctx.output()).toContain('Estado');
+        expect(ctx.output()).toContain('Sinais');
+        expect(ctx.output()).toContain('/live full');
+        expect(ctx.output()).not.toContain('Terminal Live Flow');
+        expect(ctx.output()).not.toContain('runtime');
+        expect(ctx.output()).not.toContain('streaming=');
+        expect(ctx.output()).not.toContain('cache/scope');
+        expect(ctx.output()).not.toContain('· idle');
+    });
+
+    it('cmdLive full preserva fluxo operacional live consolidado', () => {
+        const ctx = mockCtx();
+        cmdLive({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, 'full');
         expect(ctx.output()).toContain('Terminal Live Flow');
         expect(ctx.output()).toContain('estado');
         expect(ctx.output()).toContain('streaming');

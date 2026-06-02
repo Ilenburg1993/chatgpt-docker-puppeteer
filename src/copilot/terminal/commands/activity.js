@@ -18,9 +18,22 @@ import {
  * @returns {string}
  */
 function renderOperationLabel(operation) {
-    if (operation === 'ask') return 'ASK';
-    if (operation === 'intent') return 'INTENT';
+    if (operation === 'ask') return 'pergunta';
+    if (operation === 'intent') return 'intenção';
     return operation;
+}
+
+/**
+ * @param {string} phase
+ * @returns {string}
+ */
+function renderActivityPhaseLabel(phase) {
+    if (phase === 'idle') return 'pronto';
+    if (phase === 'tool') return 'ferramenta';
+    if (phase === 'turn') return 'turno';
+    if (phase === 'thinking') return 'pensando';
+    if (phase === 'error') return 'erro';
+    return phase;
 }
 
 /**
@@ -87,8 +100,8 @@ function printTurnTraceSummary(println, title, trace, opts) {
     const stateColor = trace.status === 'active' ? '\x1b[33m' : trace.status === 'completed' ? '\x1b[32m' : '\x1b[31m';
     println(`  \x1b[36m${title}\x1b[0m
   ─────────────────────────────────────
-  status          ${stateColor}${trace.status}\x1b[0m
-  tools           \x1b[90m${trace.toolCount}\x1b[0m
+  estado          ${stateColor}${trace.status}\x1b[0m
+  ferramentas     \x1b[90m${trace.toolCount}\x1b[0m
   arquivos        \x1b[90m${trace.fileCount}\x1b[0m
   input humano    \x1b[90m${trace.userInputCount ?? trace.userInputs?.length ?? 0}\x1b[0m`);
     if (opts.detail) {
@@ -105,7 +118,7 @@ function printTurnTraceSummary(println, title, trace, opts) {
     }
 
     if (trace.tools.length > 0) {
-        println('  tools');
+        println('  ferramentas');
         for (const tool of trace.tools.slice(0, 5)) {
             const rendered = renderToolSummary(tool, opts);
             println(
@@ -236,14 +249,16 @@ export function cmdActivity({ println }, arg) {
     println(`
   \x1b[36mAtividade Atual da LLM-B\x1b[0m
   ─────────────────────────────────────
-  fase            ${severityColor}${current.phase}\x1b[0m
-  label           ${compactHumanText(current.label)}${progressLabel}
+  estado          ${severityColor}${renderActivityPhaseLabel(current.phase)}\x1b[0m
+  evento          ${compactHumanText(current.label)}${progressLabel}
   detalhe         ${current.detail ? compactHumanText(current.detail) : '\x1b[90m(nenhum)\x1b[0m'}
-  source          \x1b[90m${current.source}\x1b[0m
   idade           \x1b[90m${Math.round(current.ageMs / 1000)}s\x1b[0m
   ─────────────────────────────────────`);
+    if (detail) {
+        println(`  origem          \x1b[90m${current.source}\x1b[0m`);
+    }
     if (!detail) {
-        println('  \x1b[90mIDs/trace completos ficam em /activity detail.\x1b[0m');
+        println('  \x1b[90mDetalhes técnicos ficam em /activity detail.\x1b[0m');
     }
 
     if (activeTurnTrace) {
@@ -285,7 +300,9 @@ export function cmdActivity({ println }, arg) {
         println('  ─────────────────────────────────────');
     }
 
-    printStreamDiagnostics(println, projection.streamDiagnostics);
+    if (detail) {
+        printStreamDiagnostics(println, projection.streamDiagnostics);
+    }
 
     if (projection.history.length === 0) {
         println('  \x1b[90mSem histórico de atividade ainda.\x1b[0m\n');
@@ -302,7 +319,7 @@ export function cmdActivity({ println }, arg) {
         const sev = entry.severity === 'error' ? '\x1b[31m' : entry.severity === 'warn' ? '\x1b[33m' : '\x1b[90m';
         const extra = entry.detail ? ` — ${compactHumanText(entry.detail)}` : '';
         const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';
-        println(`  ${sev}[${ts}]\x1b[0m ${entry.phase} · ${compactHumanText(entry.label)}${progress}${extra}`);
+        println(`  ${sev}[${ts}]\x1b[0m ${renderActivityPhaseLabel(entry.phase)} · ${compactHumanText(entry.label)}${progress}${extra}`);
     }
     println('');
 }

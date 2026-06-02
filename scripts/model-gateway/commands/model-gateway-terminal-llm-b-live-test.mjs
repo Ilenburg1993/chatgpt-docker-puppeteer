@@ -1671,8 +1671,10 @@ function defaultUxCycleCriteria(boot) {
     const helpStart = plain.indexOf('Ajuda rápida');
     const statusStart = plain.indexOf('Status do Terminal LLM-B');
     const nowStart = plain.indexOf('[agora]');
+    const liveStart = plain.indexOf('Fluxo da conversa');
+    const activityStart = plain.indexOf('Atividade Atual da LLM-B');
     const waitsStart = plain.indexOf('Esperas humanas');
-    const defaultSurface = [helpStart, statusStart, nowStart, waitsStart]
+    const defaultSurface = [helpStart, statusStart, nowStart, liveStart, activityStart, waitsStart]
         .filter((index) => index >= 0)
         .sort((a, b) => a - b)
         .map((index, position, indexes) => plain.slice(index, indexes[position + 1] ?? plain.length))
@@ -1713,6 +1715,21 @@ function defaultUxCycleCriteria(boot) {
             detail: '/now default rendered human labels instead of runtime key-value telemetry',
         },
         {
+            id: 'ux-cycle-live-compact',
+            pass:
+                /Fluxo da conversa[\s\S]*Estado[\s\S]*Sinais[\s\S]*Detalhe\s+\/live full/iu.test(plain) &&
+                !/Terminal Live Flow|cache\/scope|streaming=|sdk\/session|runtime\s+|·\s+idle/iu.test(defaultSurface),
+            detail: '/live default rendered compact conversation flow instead of telemetry grid',
+        },
+        {
+            id: 'ux-cycle-activity-human',
+            pass:
+                /Atividade Atual da LLM-B[\s\S]*estado[\s\S]*evento[\s\S]*Detalhes técnicos ficam em \/activity detail/iu.test(
+                    plain,
+                ) && !/\bsource\b|\btools\b|\btrace\b|Streaming público|\bdeltas\b|cumulativo/iu.test(defaultSurface),
+            detail: '/activity default rendered human labels and moved technical identifiers behind detail mode',
+        },
+        {
             id: 'ux-cycle-waits-human',
             pass:
                 /Esperas humanas[\s\S]*nenhuma pendência[\s\S]*Sem bloqueios de input humano do SDK/iu.test(plain) &&
@@ -1736,6 +1753,8 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
             { line: '/help', advanceAfterMs: 1_000 },
             { line: '/status', advanceAfterMs: 1_000 },
             { line: '/now', advanceAfterMs: 1_000 },
+            { line: '/live', advanceAfterMs: 1_000 },
+            { line: '/activity 5', advanceAfterMs: 1_000 },
             { line: '/sdk waits', advanceAfterMs: 1_000 },
             '/quit',
         ],

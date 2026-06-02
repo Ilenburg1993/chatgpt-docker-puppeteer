@@ -1098,9 +1098,72 @@
   - incluida no ciclo `default-ux-cycle-human-boot-criteria-20260602-0850`;
   - o criterio `ux-cycle-boot-human-copy` bloqueia regressao de `Subindo servidor copilot`, `runtime do agente`, `stopped:noloop`, `starting:noloop`, `Tools locais` e `0 tools`.
 - Gap residual:
-  - boot ainda mostra `tools locais`, `runtime do agente` e alguns termos tecnicos;
   - o status compacto ainda pode ganhar badges visuais melhores para `Saúde`, `Entrada` e `Acesso`;
-  - a superficie `/live` segue diagnostica demais e deve ganhar modo humano padrao depois.
+  - algumas linhas ainda mantem `fs`, `exec`, `BYOK`, `SSE` e nomes de comandos porque sao atalhos operacionais importantes;
+  - avaliar se `/health` e `/tools` tambem devem ganhar modo compacto padrao.
+
+## 02.37 `/live` compacto por padrao
+
+- Problema observado:
+  - `/live` ainda abria `Terminal Live Flow` por padrao;
+  - a tela mostrava `runtime`, `sdk/session`, `streaming=`, `sse`, `timeline`, `cache/scope` e `trace`;
+  - isso era util para diagnostico, mas pesado demais como superficie cotidiana.
+- Mudancas aplicadas:
+  - `/live` agora renderiza `Fluxo da conversa` por padrao;
+  - a tela compacta mostra `Estado`, `Conversa`, `Sinais`, `Atividade`, `Turno`, `Conexões` e `Detalhe`;
+  - sinais de streaming sao traduzidos como `resposta ao vivo`, `raciocínio visível`, `ferramentas visíveis` e `uso visível`;
+  - `idle` cru foi substituido por `ocioso`;
+  - `/live full`, `/live detail`, `/live detalhe` e `/live --detail` preservam a grade tecnica antiga.
+- Testes escopados executados:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`
+  - status PASS;
+  - 1 arquivo, 43 testes.
+- Validadores de sintaxe executados:
+  - `node --check src/copilot/terminal/commands/session.js`
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`
+  - status PASS.
+- Evidencia live executada:
+  - comando:
+    - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/default-ux-cycle-activity-no-stream-counters-20260602-0908`
+  - artefatos:
+    - `artifacts/terminal-live/default-ux-cycle-activity-no-stream-counters-20260602-0908/summary.md`
+    - `artifacts/terminal-live/default-ux-cycle-activity-no-stream-counters-20260602-0908/summary.json`
+    - `artifacts/terminal-live/default-ux-cycle-activity-no-stream-counters-20260602-0908/default-ux-cycle.raw.log`
+    - `artifacts/terminal-live/default-ux-cycle-activity-no-stream-counters-20260602-0908/default-ux-cycle.plain.log`
+  - status PASS;
+  - criterio novo `ux-cycle-live-compact` passou;
+  - o criterio bloqueia `Terminal Live Flow`, `cache/scope`, `streaming=`, `sdk/session`, `runtime` e `idle` cru na superficie padrao.
+
+## 02.38 `/activity` sem contadores tecnicos no padrao
+
+- Problema observado:
+  - `/activity` ainda exibia `fase`, `label`, `source`, `tools`, `trace` e o bloco `Streaming público`;
+  - mesmo sem atividade relevante, o operador via contadores `deltas`, `cumulativo`, `final`, `fallback temporal`;
+  - essa informacao pertence ao diagnostico, nao à superficie cotidiana.
+- Mudancas aplicadas:
+  - `fase` virou `estado`;
+  - `label` virou `evento`;
+  - `source` virou `origem` apenas em `/activity detail`;
+  - `tools` virou `ferramentas`;
+  - `ASK` e `INTENT` viraram `pergunta` e `intenção`;
+  - fases como `idle`, `tool`, `turn` e `thinking` agora renderizam `pronto`, `ferramenta`, `turno` e `pensando`;
+  - a frase de detalhe passou de `IDs/trace completos...` para `Detalhes técnicos ficam em /activity detail`;
+  - `Streaming público` e seus contadores agora aparecem somente quando há `detail`.
+- Testes escopados executados:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js`
+  - status PASS;
+  - 2 arquivos, 47 testes.
+- Validadores de sintaxe executados:
+  - `node --check src/copilot/terminal/commands/activity.js`
+  - `node --check src/copilot/terminal/commands/session.js`
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`
+  - status PASS.
+- Evidencia live executada:
+  - comando:
+    - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/default-ux-cycle-activity-no-stream-counters-20260602-0908`
+  - status PASS;
+  - criterio `ux-cycle-activity-human` passou;
+  - o criterio bloqueia `source`, `tools`, `trace`, `Streaming público`, `deltas` e `cumulativo` na superficie padrao.
 
 ## 03. Achados principais
 

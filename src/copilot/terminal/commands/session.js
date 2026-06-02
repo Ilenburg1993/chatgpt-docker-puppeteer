@@ -605,7 +605,9 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
  */
 export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     const { runtimeId, arg: rest } = extractRuntimeTarget(arg);
-    const requestedLimit = Number(rest) || 6;
+    const tokens = rest.trim().split(/\s+/u).filter(Boolean);
+    const requestedLimit = Number(tokens.find((token) => /^\d+$/u.test(token)) ?? '') || 6;
+    const detailMode = tokens.some((token) => /^(full|detail|detalhe|debug|--full|--detail)$/iu.test(token));
     const projection = readTerminalLiveFlowProjection(
         withRuntimeTarget(
             {
@@ -637,6 +639,43 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     const ioRuntime = status.ioRuntime;
     const cacheHitRatio = Number(ioRuntime.cache.aggregate.hitRatio || 0).toFixed(3);
     const ioIndex = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});
+
+    if (!detailMode) {
+        const streamBits = [
+            projection.stream.streaming ? 'resposta ao vivo' : null,
+            projection.stream.thinking ? 'raciocínio visível' : null,
+            projection.stream.toolActivity ? 'ferramentas visíveis' : null,
+            projection.stream.usage ? 'uso visível' : null,
+        ].filter(Boolean);
+        const traceSummary = [
+            projection.counters.toolCount > 0 ? `${projection.counters.toolCount} ferramenta(s)` : null,
+            projection.counters.fileCount > 0 ? `${projection.counters.fileCount} arquivo(s)` : null,
+            projection.counters.recentIoCount > 0 ? `${projection.counters.recentIoCount} I/O recente` : null,
+        ].filter(Boolean);
+        const stateLabel =
+            projection.state === 'ready'
+                ? 'pronto'
+                : projection.state === 'active-turn'
+                  ? 'turno ativo'
+                  : projection.state === 'waiting-human'
+                    ? 'aguardando você'
+                    : projection.state === 'paused'
+                      ? 'pausado'
+                      : projection.state;
+        println(`
+  \x1b[36mFluxo da conversa\x1b[0m
+  ─────────────────────────────────────
+  Estado       ${stateColor}${stateLabel}\x1b[0m \x1b[90m${projection.summary}\x1b[0m
+  Conversa     \x1b[90m${status.dialogLoopActive ? 'ativa' : 'inativa'} · ${renderHumanTerminalStatus(status.snap['status'])}${status.snap['dialogPaused'] ? ' · pausada' : ''}\x1b[0m
+  Sinais       \x1b[90m${streamBits.join(' · ') || 'sinais reduzidos'}\x1b[0m
+  Atividade    \x1b[90m${current.label}${current.detail ? ` · ${current.detail}` : ''}\x1b[0m
+  Turno        \x1b[90m${traceSummary.join(' · ') || 'sem ações recentes'}\x1b[0m
+  Conexões     \x1b[90mSSE ${projection.sse.clients}/${projection.sse.criticalClients} · timeline ${projection.counters.timelineTurns} turno(s)\x1b[0m
+  Detalhe      \x1b[90m/live full · /activity ${requestedLimit} detail · /events ${requestedLimit}\x1b[0m
+  ─────────────────────────────────────
+`);
+        return;
+    }
 
     println(`
   \x1b[36mTerminal Live Flow\x1b[0m
