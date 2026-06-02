@@ -28,6 +28,7 @@ export const MODEL_GATEWAY_SCRIPT_PATHS = Object.freeze({
     refresh: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-refresh.mjs'),
     refreshLog: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-refresh-log.mjs'),
     runtimeHealthDiff: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-runtime-health-diff.mjs'),
+    runtimeHealthClear: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-runtime-health-clear.mjs'),
     runtimeHealthMirror: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-runtime-health-mirror.mjs'),
     runtimeSelector: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-runtime-selector.mjs'),
     selectionAudit: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-selection-audit.mjs'),

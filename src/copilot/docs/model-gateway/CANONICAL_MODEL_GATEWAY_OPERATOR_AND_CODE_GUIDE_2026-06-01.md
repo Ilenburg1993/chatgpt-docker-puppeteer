@@ -212,7 +212,7 @@ Regras:
 
 ## 5. Comandos Canonicos
 
-Inventario atual: 141 comandos.
+Inventario atual: 144 comandos.
 
 Distribuicao por fase:
 
@@ -222,7 +222,7 @@ Distribuicao por fase:
 - metadata: 35
 - pre-runtime: 13
 - selection: 17
-- live-readiness: 17
+- live-readiness: 20
 - automation: 39
 - runtime-probes: 1
 
@@ -243,6 +243,7 @@ npm run model-gateway:auto:proof-plan
 npm run model-gateway:auto:standby
 npm run model-gateway:auto:scenarios
 npm run model-gateway:sqlite:diagnostics
+npm run model-gateway:runtime-health:clear -- --provider=zai --model=glm-4.5-flash --profile=repo_agent
 ```
 
 Quando `auto:ready` ou a decisao de automacao bloquear uma rota por falta de prova runtime, health bloqueada,
@@ -253,6 +254,9 @@ real de provider.
 Quando a pergunta for "quais modelos ficam de prontidao para substituir o atual?", o caminho canonico e
 `model-gateway:auto:standby` ou `/byok auto standby`. Essa saida lista rota selecionada e alternativas utilizaveis
 com comandos separados para prova descartavel, troca live no mesmo provider, provider/persist e novo boot SDK.
+
+Quando uma quota/cooldown resetar, ou quando uma fixture antiga tiver contaminado health real, o caminho canonico e
+`model-gateway:runtime-health:clear` em preview e depois com `--apply`, ou `/byok health clear ...` no terminal.
 
 Comandos de ledgers:
 
@@ -277,6 +281,7 @@ Comandos terminal equivalentes:
 /byok auto proof-plan profile:repo_agent 12
 /byok auto standby profile:repo_agent 12
 /byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
+/byok health clear provider:zai model:glm-4.5-flash profile:repo_agent
 /byok probe agent provider:zai model:glm-4.5-flash timeout:20000
 /byok auto recoveries 10
 ```
@@ -368,9 +373,9 @@ npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_a
 
 Validado nesta linha:
 
-- `npm run model-gateway:commands:json`: 141 comandos.
+- `npm run model-gateway:commands:json`: 144 comandos.
 - `npm run model-gateway:auto:recoveries`: PASS, read-only, rows=7, recovery fixture `rate-limit` aplicada.
-- `npm run model-gateway:auto:doctor`: PASS operacional de leitura, schema=10, commands=141, recoveries=7, liveRuns=10; gate auto pode ficar bloqueado quando nao houver alternativa runtime-proved utilizavel.
+- `npm run model-gateway:auto:doctor`: PASS operacional de leitura; gate auto pode ficar bloqueado quando health/cooldown operacional pedir prova ou limpeza.
 - `npm run model-gateway:auto:proof-plan`: PASS, read-only, gerou comandos explicitos `/byok probe ... provider:<id> model:<id>`.
 - `npm run model-gateway:auto:standby`: PASS, read-only, lista rotas de prontidao e comandos de substituicao sem chamar provider.
 - `npm run model-gateway:auto:scenarios`: PASS, 12 cenarios, `auto_standby` ok, sem provider call.

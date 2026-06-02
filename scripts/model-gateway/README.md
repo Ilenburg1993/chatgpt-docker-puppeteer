@@ -52,6 +52,18 @@ npm run model-gateway:sqlite:retention:apply -- --json
 Diagnostics mostra snapshot ativo, contagens por camada, runtime health, route decisions e automation decisions. Retention
 remove apenas histórico operacional acima dos limites configurados; não apaga o catálogo canônico ativo.
 
+## Runtime Health Operacional
+
+```bash
+npm run model-gateway:runtime-health:diff
+npm run model-gateway:runtime-health:clear -- --provider=zai --model=glm-4.5-flash --profile=repo_agent
+npm run model-gateway:runtime-health:clear -- --provider=zai --model=glm-4.5-flash --profile=repo_agent --apply
+npm run model-gateway:runtime-health:mirror
+```
+
+`runtime-health:clear` faz preview por padrão e só remove health operacional com `--apply`. Use após reset de
+quota/cooldown ou para desfazer contaminação de fixture antiga. Ele não chama provider e não altera metadados canônicos.
+
 ## Seleção E Automação
 
 ```bash

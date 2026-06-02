@@ -183,6 +183,7 @@ npm run model-gateway:auto:recoveries
 npm run model-gateway:auto:proof-plan
 npm run model-gateway:auto:standby
 npm run model-gateway:auto:scenarios
+npm run model-gateway:runtime-health:clear -- --provider=zai --model=glm-4.5-flash --profile=repo_agent
 npm run model-gateway:live:runs
 ```
 
@@ -195,6 +196,9 @@ ou candidato sem selecao, os `nextCommands` devem apontar primeiro para `model-g
 
 Regra de prontidao: `model-gateway:auto:standby` e `/byok auto standby` mostram substitutos ja derivados do selector,
 separando comandos de prova, troca live no mesmo provider, provider/persist e novo boot SDK.
+
+Regra de limpeza: `model-gateway:runtime-health:clear` e `/byok health clear` removem apenas health operacional, nao
+metadados canônicos. O script package e dry-run por padrao; `--apply` e obrigatorio para mutar.
 
 ### 3.6 Terminal
 
@@ -214,6 +218,7 @@ Responsavel pela experiencia viva do operador:
 /byok auto proof-plan profile:repo_agent 12
 /byok auto standby profile:repo_agent 12
 /byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
+/byok health clear provider:zai model:glm-4.5-flash profile:repo_agent
 /byok probe agent provider:zai model:glm-4.5-flash timeout:20000
 /byok auto recoveries 10
 /byok auto off
@@ -375,7 +380,7 @@ Evidencia em 2026-06-01:
 - duracao mais recente: 21043ms;
 - erros rastreados: 0;
 - criterios PASS mais recentes: 30;
-- inventario canonico exibiu 141 comandos apos recovery fixture, proof-plan, standby e prova explicita por provider/model;
+- inventario canonico exibiu 144 comandos apos recovery fixture, proof-plan, standby, health clear e prova explicita por provider/model;
 - `/byok auto policy` funcionou;
 - `/byok auto status profile:repo_agent` funcionou e mostrou resumo de alternativas usaveis/bloqueadas;
 - `/byok auto doctor profile:repo_agent` funcionou e mostrou resumo de alternativas usaveis/bloqueadas;

@@ -4240,6 +4240,13 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-redaction-audit'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-live-plan'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-runtime-health-mirror'));
+        assert.ok(
+            commands.some(
+                (entry) =>
+                    entry.command ===
+                    'make model-gateway-runtime-health-clear ARGS="--provider=zai --model=glm-4.5-flash --profile=repo_agent"',
+            ),
+        );
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-auto-ready'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-auto-doctor'));
         assert.ok(commands.some((entry) => entry.command === 'make model-gateway-auto-explain'));
@@ -4268,6 +4275,14 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === '/byok gateway selection audit runtime-proof'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway selection audit strict local_private_strict'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway health sqlite'));
+        assert.ok(commands.some((entry) => entry.command === '/byok health clear provider:zai model:glm-4.5-flash profile:repo_agent'));
+        assert.ok(
+            commands.some(
+                (entry) =>
+                    entry.command ===
+                    'npm run model-gateway:runtime-health:clear -- --provider=zai --model=glm-4.5-flash --profile=repo_agent --apply',
+            ),
+        );
         assert.ok(commands.every((entry) => MODEL_GATEWAY_CANONICAL_COMMAND_PHASES.includes(entry.phase)));
         assert.ok(terminalLines.some((line) => line.includes('/byok gateway catalog refresh')));
     });
@@ -4284,6 +4299,7 @@ describe('model-gateway foundation', () => {
         assert.ok(modelGatewayScriptPath('autoProofPlan').endsWith('scripts/model-gateway/model-gateway-auto-proof-plan.mjs'));
         assert.ok(modelGatewayScriptPath('autoStandby').endsWith('scripts/model-gateway/model-gateway-auto-standby.mjs'));
         assert.ok(modelGatewayScriptPath('autoScenarios').endsWith('scripts/model-gateway/model-gateway-auto-scenarios.mjs'));
+        assert.ok(modelGatewayScriptPath('runtimeHealthClear').endsWith('scripts/model-gateway/model-gateway-runtime-health-clear.mjs'));
         assert.ok(COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH.endsWith('scripts/model-gateway/model-gateway-terminal-llm-b-live-test.mjs'));
         assert.ok(Object.values(MODEL_GATEWAY_SCRIPT_PATHS).every((scriptPath) => scriptPath.includes('/scripts/model-gateway/')));
         assert.ok(!Object.values(MODEL_GATEWAY_SCRIPT_PATHS).some((scriptPath) => scriptPath.includes('/scripts/copilot/')));

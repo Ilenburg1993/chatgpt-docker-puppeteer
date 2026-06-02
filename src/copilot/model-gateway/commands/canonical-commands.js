@@ -350,6 +350,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
             'Snapshot and diff already-observed runtime health before or after live tests without provider calls; --write-snapshot now writes latest.json and latest-diff.json.',
     },
     {
+        id: 'runtime-health.clear',
+        phase: 'live-readiness',
+        surface: 'package',
+        command: 'npm run model-gateway:runtime-health:clear -- --provider=zai --model=glm-4.5-flash --profile=repo_agent --apply',
+        summary: 'Clear scoped operational runtime health after reset or fixture contamination; dry-run unless --apply is provided.',
+    },
+    {
         id: 'live.readiness',
         phase: 'live-readiness',
         surface: 'package',
@@ -676,6 +683,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Makefile alias for runtime health snapshot/diff.',
     },
     {
+        id: 'make.runtime-health-clear',
+        phase: 'live-readiness',
+        surface: 'make',
+        command: 'make model-gateway-runtime-health-clear ARGS="--provider=zai --model=glm-4.5-flash --profile=repo_agent"',
+        summary: 'Makefile alias for scoped runtime health clear preview/apply.',
+    },
+    {
         id: 'make.live-readiness',
         phase: 'live-readiness',
         surface: 'make',
@@ -821,6 +835,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit',
         summary: 'Persist a synthetic post-turn recovery attempt and fixture-scoped runtime health fact without calling providers.',
+    },
+    {
+        id: 'terminal.health-clear',
+        phase: 'live-readiness',
+        surface: 'terminal',
+        command: '/byok health clear provider:zai model:glm-4.5-flash profile:repo_agent',
+        summary: 'Clear scoped BYOK runtime health from the live terminal when quota resets or an operator wants to retry a route.',
     },
     {
         id: 'terminal.probe-agent-provider-route',
