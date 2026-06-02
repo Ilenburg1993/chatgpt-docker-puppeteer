@@ -2468,4 +2468,25 @@
 - [x] `/byok providers`, health e telas de gateway associadas passaram a usar `provedor` e `autenticação` em vez de `provider`/`auth`, preservando `provider:<id>` apenas como sintaxe copiável.
 - [x] Testes escopados passaram:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js tests/unit/copilot/terminal/test_auto_brief.spec.js`.
-- [ ] Próxima lacuna: revisar as palavras `Chat`, `Agent`, `Vision`, `health`, `eligibility`, `wire`, `refresh` em `/byok gateway*`, decidindo quais são termos técnicos aceitáveis e quais devem virar rótulos humanos default.
+- [x] Próxima lacuna executada: revisar as palavras `Chat`, `Agent`, `Vision`, `health`, `eligibility`, `wire`, `refresh` em `/byok gateway*`, decidindo quais são termos técnicos aceitáveis e quais devem virar rótulos humanos default.
+- [x] `byok.js` ganhou vocabulário central para fontes, protocolos e tokens técnicos de BYOK, evitando que cada painel converta `provider-cache:model`, `openai_chat_completions`, `runtime_health`, `admission-blocked`, `provider_explicit`, `rate-limit` e equivalentes de forma ad hoc.
+- [x] `/byok gateway*`, `/byok models route`, `/byok probe`, `/byok health`, `/byok accounts`, `/byok limits`, `/byok quota`, `/byok providers`, `/byok importer-audit`, `/byok traits`, `/byok probe matrix`, `/byok catalog explain`, `/byok provider explain`, `/byok auto*`, `/byok operator-ready`, `/byok standby`, `/byok selection audit` e superfícies associadas passaram a usar `provedor`, `saúde`, `execução`, `sonda`, `protocolo`, `elegibilidade`, `quota`, `créditos`, `seleção`, `política`, `alternativas`, `admitidos`, `pontuação` e `visão`.
+- [x] A tela default deixou de exibir `wire`, `health`, `eligibility`, `selectorKind`, `runtime overlays`, `post-runtime`, `policy`, `probe`, `provider`, `capability`, `adapter`, `importers`, `hooks`, `traits`, `source layer`, `freshness`, `account_api`, `rate-limit` e `admission-blocked` como rótulos primários.
+- [x] A sintaxe operacional copiável foi preservada onde importa: subcomandos, flags, nomes de modelo, ids de provedor e valores crus continuam disponíveis nas rotas raw/detail, fixtures e campos canônicos.
+- [x] Teste escopado BYOK passou após a revisão:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js`.
+- [x] Validadores regulares passaram após a revisão:
+  - `npm run typecheck:strict:src.copilot`;
+  - `npm run lint:copilot`.
+
+### 11.29 Paleta, alinhamento e fluxo visual canônico
+
+- [ ] Auditar a paleta ANSI atual por família semântica: comando do operador, resposta da LLM-B, raciocínio, pergunta humana, ferramenta, arquivo, erro, aviso, sucesso, espera viva, bloco técnico e raw/detail.
+- [ ] Definir uma tabela canônica de cores e estilos com poucos papéis estáveis, sem carnaval cromático, preservando contraste em terminal escuro e legibilidade em VS Code.
+- [ ] Revisar `ui-theme`, `turn-display`, `live-status-line`, `tool-lifecycle-runtime`, `intent-renderer`, `task-stream-events`, `io-activity-events`, `repl-banner` e `terminal-output` para que todos usem a mesma semântica visual.
+- [ ] Separar visualmente pergunta humana de tool: pergunta como bloqueio de decisão do operador, não como tool em execução.
+- [ ] Reduzir a repetição de esperas duráveis quando a linha viva já está informando progresso; deixar histórico durável apenas em transições reais.
+- [ ] Alinhar colunas, badges e blocos com largura previsível, mantendo compatibilidade com terminais estreitos.
+- [ ] Eliminar ids e hashes da superfície default quando eles não são a ação principal do operador.
+- [ ] Criar snapshots ou testes de texto para os blocos centrais: banner, `/health`, `/now`, `/activity`, pergunta humana, tool file, tool inspect, erro BYOK e final de turno.
+- [ ] Rodar live PTY LLM-B focada em estética quando a paleta e os blocos centrais estiverem consolidados, capturando artefatos para comparação visual.

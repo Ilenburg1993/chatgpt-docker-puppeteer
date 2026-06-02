@@ -189,6 +189,114 @@ function joinTerminalSummary(parts) {
 }
 
 /**
+ * @param {string | null | undefined} value
+ * @returns {string}
+ */
+function renderByokSourceLabel(value) {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) return '-';
+    const labels = /** @type {Record<string, string>} */ ({
+        'active-runtime': 'seleção viva',
+        'provider-cache:model': 'cache do provedor',
+        'model-gateway:model': 'catálogo normalizado',
+        'provider-default': 'default do provedor',
+        remote: 'catálogo remoto',
+        'remote-cache': 'cache remoto',
+        provider: 'catálogo do provedor',
+        'provider-cache': 'cache do provedor',
+        static: 'semente estática',
+        'static-fallback': 'fallback estático',
+        'terminal-catalog': 'catálogo do terminal',
+        'model-gateway': 'model-gateway',
+        env_compat: 'env compatível',
+        runtime: 'execução observada',
+        unavailable: 'indisponível',
+    });
+    return labels[normalized] ?? normalized.replace(/[_-]+/gu, ' ');
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {string}
+ */
+function renderByokWireLabel(value) {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) return '-';
+    const labels = /** @type {Record<string, string>} */ ({
+        completions: 'chat completions',
+        responses: 'responses',
+        openai_chat_completions: 'chat completions',
+        openai_responses: 'responses',
+    });
+    return labels[normalized] ?? normalized.replace(/[_-]+/gu, ' ');
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {string}
+ */
+function renderByokTokenLabel(value) {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) return '-';
+    const labels = /** @type {Record<string, string>} */ ({
+        chat: 'chat',
+        agent: 'agente',
+        runtime: 'agente',
+        full: 'agente',
+        streaming: 'streaming',
+        stream: 'streaming',
+        json: 'JSON',
+        structured: 'JSON',
+        vision: 'visão',
+        image: 'visão',
+        imagem: 'visão',
+        vlm: 'visão',
+        health: 'saúde',
+        'runtime-health': 'saúde runtime',
+        probes: 'sondas',
+        provider_explicit: 'provedor explícito',
+        exact_model: 'modelo exato',
+        local_provider_requires_explicit_request: 'provedor local exige pedido explícito',
+        route_decision_ready: 'decisão de rota pronta',
+        post_runtime_proved_better_route: 'rota provada em runtime venceu',
+        consider_prefer_runtime_proved_policy: 'considerar política que prefere prova runtime',
+        require_runtime_proof: 'exigir prova runtime',
+        metadata_first: 'metadados primeiro',
+        prefer_runtime_proved: 'preferir rota provada',
+        allow_probe_unknown: 'permitir sonda quando acesso é desconhecido',
+        block_unknown: 'bloquear acesso desconhecido',
+        strict_access_only: 'somente acesso confirmado',
+        terminal: 'terminal',
+        runtime_health: 'saúde runtime',
+        authenticated_account_api: 'API autenticada da conta',
+        authenticated_catalog: 'catálogo autenticado',
+        probe_failed: 'sonda falhou',
+        account: 'conta/key',
+        catalog: 'catálogo',
+        rate_limited: 'limitado por taxa',
+        quota: 'quota',
+        credits: 'créditos',
+        'rate-limit': 'limite de taxa',
+        ok: 'ok',
+        failed: 'falhou',
+        pass: 'ok',
+        blocked: 'bloqueado',
+        'admission-blocked': 'bloqueado na admissão',
+        ready: 'pronto',
+        deferred: 'adiado',
+    });
+    return labels[normalized] ?? normalized.replace(/[_-]+/gu, ' ');
+}
+
+/**
+ * @param {string[]} values
+ * @returns {string}
+ */
+function renderByokTokenList(values) {
+    return values.map(renderByokTokenLabel).join(', ');
+}
+
+/**
  * @param {unknown} seconds
  * @returns {string}
  */
@@ -224,7 +332,7 @@ function printByokSdkSessionBoundaryHint(println, options = {}) {
         ? 'A seleção persistida será aplicada por uma nova sessão SDK.'
         : 'A seleção BYOK foi preparada no processo atual.';
     println(
-        `  \x1b[90m${prefix} Para entrar/sair de BYOK ou trocar provider/perfil, agende /session sdk next new e reinicie a task do terminal; /restart reinicia só a conversa.\x1b[0m`,
+        `  \x1b[90m${prefix} Para entrar/sair de BYOK ou trocar provedor/perfil, agende /session sdk next new e reinicie a tarefa do terminal; /restart reinicia só a conversa.\x1b[0m`,
     );
     println(
         '  \x1b[90m/byok model <id> tenta trocar o modelo na sessão viva apenas quando ela já nasceu com o mesmo provedor BYOK.\x1b[0m',
@@ -264,7 +372,7 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
             `  \x1b[32mModelo BYOK solicitado na sessão viva: ${model}.\x1b[0m`,
         );
         println(
-            '  \x1b[90mProvider/perfil foram preservados; confirme o modelo efetivo no próximo turno por uso registrado ou evento de modelo confirmado.\x1b[0m',
+            '  \x1b[90mProvedor/perfil foram preservados; confirme o modelo efetivo no próximo turno por uso registrado ou evento de modelo confirmado.\x1b[0m',
         );
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -627,10 +735,10 @@ function readByokProfileCostHint(profileName) {
  */
 function classifyByokModelCost(model) {
     const meta = getByokModelMetadata(model);
-    if (meta?.freeTier === true) return { kind: 'free', label: 'free' };
-    if (meta?.freeTier === false) return { kind: 'metered', label: 'metered' };
-    if (meta?.profileFreeTier === true) return { kind: 'profile-free', label: 'profile-free' };
-    return { kind: 'unknown', label: 'cost?' };
+    if (meta?.freeTier === true) return { kind: 'free', label: 'gratuito' };
+    if (meta?.freeTier === false) return { kind: 'metered', label: 'pago/medido' };
+    if (meta?.profileFreeTier === true) return { kind: 'profile-free', label: 'gratuito pelo perfil' };
+    return { kind: 'unknown', label: 'custo desconhecido' };
 }
 
 /**
@@ -716,7 +824,7 @@ function classifyByokModelBudget(model, runtimeBudget = null) {
     if (health && isByokHealthCurrentlyFailed(health)) {
         return {
             level: 'blocked',
-            label: `chat real falhou (${formatByokHealthAge(health.lastFailureAt)}); trocar modelo/provider ou testar novamente`,
+            label: `chat real falhou (${formatByokHealthAge(health.lastFailureAt)}); trocar modelo/provedor ou testar novamente`,
         };
     }
     const meta = getByokModelMetadata(model);
@@ -724,13 +832,13 @@ function classifyByokModelBudget(model, runtimeBudget = null) {
     if (limit !== null && runtimeBudget !== null && runtimeBudget.estimatedRequestTokens > limit) {
         return {
             level: 'blocked',
-            label: `bloqueado para contexto atual (${runtimeBudget.estimatedRequestTokens}/${limit} tokens); use /compact, sessão fresca ou provider maior`,
+            label: `bloqueado para contexto atual (${runtimeBudget.estimatedRequestTokens}/${limit} tokens); use /compact, sessão fresca ou provedor maior`,
         };
     }
     if (limit !== null && limit < BYOK_LOW_REQUEST_TOKEN_LIMIT) {
         return {
             level: 'blocked',
-            label: `baixo para turno real (${limit} tokens); use sessão fresca, prompt mínimo ou outro provider`,
+            label: `baixo para turno real (${limit} tokens); use sessão fresca, prompt mínimo ou outro provedor`,
         };
     }
     if (limit !== null && limit < BYOK_COMFORTABLE_REQUEST_TOKEN_LIMIT) {
@@ -865,19 +973,19 @@ function matchesRecommendFilters(model, filters, runtimeBudget = null) {
  */
 function renderByokFilterLabel(filters) {
     return [
-        filters.allProviders ? 'all-providers' : null,
-        filters.grouped ? 'grouped' : null,
-        filters.activeOnly ? 'active' : null,
-        filters.provider ? `provider:${filters.provider}` : null,
-        filters.freeOnly ? 'free' : null,
-        filters.meteredOnly ? 'metered' : null,
-        filters.unknownCostOnly ? 'cost?' : null,
-        filters.reasoning ? 'reasoning' : null,
-        filters.vision ? 'vision' : null,
+        filters.allProviders ? 'todos os perfis' : null,
+        filters.grouped ? 'agrupado' : null,
+        filters.activeOnly ? 'ativo' : null,
+        filters.provider ? `provedor:${filters.provider}` : null,
+        filters.freeOnly ? 'gratuito' : null,
+        filters.meteredOnly ? 'pago/medido' : null,
+        filters.unknownCostOnly ? 'custo desconhecido' : null,
+        filters.reasoning ? 'raciocínio' : null,
+        filters.vision ? 'visão' : null,
         filters.tools ? 'tools' : null,
         filters.streaming ? 'streaming' : null,
-        filters.probeVerified ? 'probe-ok' : null,
-        filters.avoidLowLimit ? 'safe' : null,
+        filters.probeVerified ? 'sonda ok' : null,
+        filters.avoidLowLimit ? 'modo seguro' : null,
         filters.minContext !== null ? `ctx>${filters.minContext}` : null,
         filters.minRequest !== null ? `maxReq>${filters.minRequest}` : null,
     ]
@@ -1004,7 +1112,7 @@ function renderByokVariantLabel(model) {
     const profile = meta?.profile ?? null;
     const provider = meta?.provider ?? null;
     if (profile && provider) return `${profile}/${provider}`;
-    return profile ?? provider ?? 'provider?';
+    return profile ?? provider ?? 'provedor?';
 }
 
 /**
@@ -1188,14 +1296,14 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
 
     println(`\n  \x1b[36mBYOK model route\x1b[0m`);
     println(
-        `  \x1b[90mperfil ${profileId} · modo ${strict ? 'strict/probe-verificada' : 'pre-probe'} · fonte ${discovered.sourceLabel}${discovered.profileCount > 1 ? ` · perfis ${discovered.profileCount}` : ''}${discovered.endpoint ? ` · endpoint ${discovered.endpoint}` : ''} · filtros ${filterLabel || '-'}\x1b[0m\n`,
+        `  \x1b[90mperfil ${profileId} · modo ${strict ? 'estrito/sonda verificada' : 'pré-sonda'} · fonte ${renderByokSourceLabel(discovered.sourceLabel)}${discovered.profileCount > 1 ? ` · perfis ${discovered.profileCount}` : ''}${discovered.endpoint ? ` · endpoint ${discovered.endpoint}` : ''} · filtros ${filterLabel || '-'}\x1b[0m\n`,
     );
     for (const error of discovered.errors.slice(0, 6)) {
         println(`  \x1b[33m  aviso: descoberta remota indisponível (${error}); usando catálogo disponível.\x1b[0m`);
     }
     renderByokCatalogWarnings(println, discovered.warnings);
     if (candidates.length === 0) {
-        println('    \x1b[33mNenhum candidato encontrado para roteamento. Remova filtros, use active/current ou rode /models refresh.\x1b[0m\n');
+        println('    \x1b[33mNenhum candidato encontrado para roteamento. Remova filtros, use active/current ou rode /byok models refresh.\x1b[0m\n');
         return;
     }
 
@@ -1237,19 +1345,19 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
     eventBus?.emit?.(decisionEvent);
 
     println(
-        `  \x1b[90mDecisão ${decisionEvent.decisionId} · admissão ${route.candidates.length}/${candidates.length} · rejeitados ${route.rejected.length} · fallback ${route.fallbackChain.length}\x1b[0m\n`,
+        `  \x1b[90mDecisão ${decisionEvent.decisionId} · admitidos ${route.candidates.length}/${candidates.length} · rejeitados ${route.rejected.length} · alternativas ${route.fallbackChain.length}\x1b[0m\n`,
     );
     if (!route.selected) {
         println(
-            `    \x1b[33mNenhum modelo passou na política ${strict ? 'strict' : 'pre-probe'}. Use /byok models route ${profileId} --show-rejected para ver causas.\x1b[0m\n`,
+            `    \x1b[33mNenhum modelo passou na política ${strict ? 'estrita' : 'pré-sonda'}. Use /byok models route ${profileId} --show-rejected para ver causas.\x1b[0m\n`,
         );
     } else {
         const model = route.selected.model;
         const reasons = route.selected.reasons.slice(0, 5).join(' · ') || 'sem motivo adicional';
         const health = route.selected.health
             ? `${renderByokHealthTag(route.selected.health)} · ${renderByokAgentProbeHealthTag(route.selected.health)}`
-            : 'health=sem registro';
-        println(`    \x1b[32mselecionado\x1b[0m ${model['providerModel'] ?? model['id']}  \x1b[90mprovider ${model['providerId']} · score ${route.selected.score}\x1b[0m`);
+            : 'saúde sem registro';
+        println(`    \x1b[32mselecionado\x1b[0m ${model['providerModel'] ?? model['id']}  \x1b[90mprovedor ${model['providerId']} · pontuação ${route.selected.score}\x1b[0m`);
         println(`      \x1b[90m${reasons} · ${health}\x1b[0m`);
         println(
             `      \x1b[90mpróximo passo: /byok probe agent provider:${model['providerId']} model:${model['providerModel'] ?? model['id']} e então /byok use <perfil> + /byok model <id>.\x1b[0m`,
@@ -1261,7 +1369,7 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
     }
 
     if (route.fallbackChain.length > 0) {
-        println(`\n  \x1b[90mcadeia de fallback: ${route.fallbackChain.slice(0, 8).join(' -> ')}${route.fallbackChain.length > 8 ? ' -> ...' : ''}\x1b[0m`);
+        println(`\n  \x1b[90mcadeia de alternativas: ${route.fallbackChain.slice(0, 8).join(' -> ')}${route.fallbackChain.length > 8 ? ' -> ...' : ''}\x1b[0m`);
     }
     if (showRejected && route.rejected.length > 0) {
         println('\n  \x1b[90mRejeitados principais:\x1b[0m');
@@ -1432,7 +1540,7 @@ function renderByokAgentProbeHealthTag(health) {
  * @returns {string}
  */
 function renderByokProbeHealthItem(probe) {
-    return `${probe.kind} ${probe.status}${probe.providerAttempted ? '' : ' local'}${probe.count && probe.count > 1 ? ` · x${probe.count}` : ''}`;
+    return `${renderByokTokenLabel(probe.kind)} ${renderByokTokenLabel(probe.status)}${probe.providerAttempted ? '' : ' local'}${probe.count && probe.count > 1 ? ` · x${probe.count}` : ''}`;
 }
 
 /**
@@ -1451,7 +1559,7 @@ function renderByokProbeHealthSummaries(health) {
     return [
         capabilities.length > 0 ? `capacidades ${capabilities.map(renderByokProbeHealthItem).join(' · ')}` : null,
         protocol.length > 0 ? `protocolo ${protocol.map(renderByokProbeHealthItem).join(' · ')}` : null,
-        other.length > 0 ? `probes ${other.map(renderByokProbeHealthItem).join(' · ')}` : null,
+        other.length > 0 ? `sondas ${other.map(renderByokProbeHealthItem).join(' · ')}` : null,
     ].filter((item) => item !== null);
 }
 
@@ -1699,10 +1807,10 @@ function buildByokProbeRecommendationInput(snapshot, diff, limit) {
 function renderConfiguredByokCatalogWarnings(discovered, source) {
     const configuredModel = discovered.configuredModel;
     if (!configuredModel?.authoritative || configuredModel.inCatalog !== false || !configuredModel.id) return [];
-    const owner = source.profile ? `perfil ${source.profile}` : source.provider ? `provider ${source.provider}` : 'seleção ativa';
+    const owner = source.profile ? `perfil ${source.profile}` : source.provider ? `provedor ${source.provider}` : 'seleção ativa';
     const selector = source.profile ? ` profile:${source.profile}` : '';
     return [
-        `${owner}: model configurado '${configuredModel.id}' nao apareceu no catalogo remoto atual. O terminal nao troca seletor silenciosamente; explore /byok models${selector ? ` all-providers${selector}` : ''} e valide um candidato com /byok probe agent${selector} model:<id> antes de /byok model <id>.`,
+        `${owner}: modelo configurado '${configuredModel.id}' nao apareceu no catalogo remoto atual. O terminal nao troca seletor silenciosamente; explore /byok models${selector ? ` all-providers${selector}` : ''} e valide um candidato com /byok probe agent${selector} model:<id> antes de /byok model <id>.`,
     ];
 }
 
@@ -1733,11 +1841,11 @@ function renderModelTags(model) {
         const detail = meta?.profileCostDetail ? String(meta.profileCostDetail).slice(0, 48) : meta?.profileCostSource ?? 'profile';
         tags.push(`hint gratuito ${detail}`);
     }
-    tags.push(supportsByokReasoning(model) ? 'reasoning' : 'no-reasoning');
+    tags.push(supportsByokReasoning(model) ? 'raciocínio' : 'raciocínio n/d');
     if (supportsByokReasoning(model) && !model.capabilities?.supports?.reasoningEffort) {
-        tags.push('reasoning SDK off');
+        tags.push('SDK sem flag de raciocínio');
     }
-    tags.push(model.capabilities?.supports?.vision ? 'vision' : 'no-vision');
+    tags.push(model.capabilities?.supports?.vision ? 'visão' : 'visão n/d');
     tags.push(`contexto ${model.capabilities?.limits?.max_context_window_tokens ?? 'n/a'}`);
     if (meta?.pricing && (meta.pricing.prompt !== null || meta.pricing.completion !== null || meta.pricing.request !== null)) {
         tags.push(`preço ${compactNumber(meta.pricing.prompt)}/${compactNumber(meta.pricing.completion)}`);
@@ -1746,10 +1854,10 @@ function renderModelTags(model) {
     if (meta?.rateLimits?.tokensPerMinute) tags.push(`TPM ${meta.rateLimits.tokensPerMinute}`);
     if (meta?.rateLimits?.requestsPerMinute) tags.push(`RPM ${meta.rateLimits.requestsPerMinute}`);
     if (meta?.rateLimits?.dailyRequests) tags.push(`RPD ${meta.rateLimits.dailyRequests}`);
-    if (meta?.provider) tags.push(`provider ${meta.provider}`);
+    if (meta?.provider) tags.push(`provedor ${meta.provider}`);
     if (meta?.profile) tags.push(`perfil ${meta.profile}`);
-    if (meta?.source) tags.push(`fonte ${meta.source}`);
-    if (meta?.confidence) tags.push(`confiança ${meta.confidence}`);
+    if (meta?.source) tags.push(`fonte ${renderByokSourceLabel(meta.source)}`);
+    if (meta?.confidence) tags.push(`confiança ${renderByokTokenLabel(meta.confidence)}`);
     const health = readHealthForByokModel(model);
     if (health) tags.push(renderByokHealthTag(health), renderByokAgentProbeHealthTag(health));
     const inputs = meta?.inputModalities?.length ? meta.inputModalities.join('+') : '';
@@ -1811,7 +1919,7 @@ function renderActiveByokHealthGuidance(projection, activeHealth, println) {
         .filter(Boolean)
         .join(' + ');
     println(
-        `  \x1b[31m  healthGate: seleção ativa com falha recente em ${failureScope}; catálogo disponível não equivale a runtime saudável.\x1b[0m`,
+        `  \x1b[31m  Bloqueio de saúde: seleção ativa com falha recente em ${failureScope}; catálogo disponível não equivale a execução saudável.\x1b[0m`,
     );
     const alternatives = listActiveByokHealthAlternatives(projection);
     if (alternatives.length === 0) {
@@ -1925,7 +2033,7 @@ async function renderStatus(projection, println) {
     println(`    Estado         ativo ${yesNo(summary.enabled)} · pronto ${yesNo(summary.ready)}`);
     println(`    Perfil         \x1b[33m${valueOrDash(summary.profile)}\x1b[0m · preset ${valueOrDash(summary.preset)}`);
     println(`    Provedor       \x1b[33m${valueOrDash(summary.providerType)}\x1b[0m · base ${valueOrDash(summary.baseUrl)}`);
-    println(`    Modelo         \x1b[33m${valueOrDash(summary.model)}\x1b[0m · wire ${valueOrDash(summary.wireApi)} · Azure ${valueOrDash(summary.azureApiVersion)}`);
+    println(`    Modelo         \x1b[33m${valueOrDash(summary.model)}\x1b[0m · protocolo ${renderByokWireLabel(summary.wireApi)} · Azure ${valueOrDash(summary.azureApiVersion)}`);
     println(
         `    Autenticação   chave API ${yesNo(summary.auth.apiKeyConfigured)} · token bearer ${yesNo(summary.auth.bearerTokenConfigured)} · headers ${yesNo(summary.auth.headersConfigured)}`,
     );
@@ -1934,7 +2042,7 @@ async function renderStatus(projection, println) {
     );
     if (statusCapabilities.modelId) {
         println(
-            `    Modelo fonte   \x1b[33m${statusCapabilities.modelId} · origem ${statusCapabilities.source}${statusCapabilities.differsFromProviderDefault ? ' · sobrescreve defaults do provider' : ''}\x1b[0m`,
+            `    Modelo fonte   \x1b[33m${statusCapabilities.modelId} · origem ${renderByokSourceLabel(statusCapabilities.source)}${statusCapabilities.differsFromProviderDefault ? ' · sobrescreve defaults do provedor' : ''}\x1b[0m`,
         );
     }
     const limitParts = [
@@ -1953,8 +2061,8 @@ async function renderStatus(projection, println) {
         model: summary.model,
     });
     if (activeHealth) {
-        println(`    Health chat    \x1b[33m${renderByokHealthTag(activeHealth)}\x1b[0m`);
-        println(`    Health agente  \x1b[33m${renderByokAgentProbeHealthTag(activeHealth)}\x1b[0m`);
+        println(`    Saúde chat     \x1b[33m${renderByokHealthTag(activeHealth)}\x1b[0m`);
+        println(`    Saúde agente   \x1b[33m${renderByokAgentProbeHealthTag(activeHealth)}\x1b[0m`);
     }
     const costTag = renderByokProfileCostTag(summary.profile);
     if (costTag) {
@@ -1972,7 +2080,7 @@ async function renderStatus(projection, println) {
             },
         };
     println(
-        `    Gateway        \x1b[33m${gateway.diagnostics.providerCount} provedores · ${gateway.diagnostics.modelCount} modelos · ${gateway.diagnostics.enabledModelCount} habilitados · origem ${gateway.source}\x1b[0m`,
+        `    Gateway        \x1b[33m${gateway.diagnostics.providerCount} provedores · ${gateway.diagnostics.modelCount} modelos · ${gateway.diagnostics.enabledModelCount} habilitados · origem ${renderByokSourceLabel(gateway.source)}\x1b[0m`,
     );
     const gatewayActive = /** @type {{ modelId?: string | null }} */ (gateway.active);
     if (gatewayActive.modelId) {
@@ -2003,7 +2111,7 @@ async function renderStatus(projection, println) {
         println(`  \x1b[31m  erro: ${error}\x1b[0m`);
     }
     renderActiveByokHealthGuidance(projection, activeHealth, println);
-    println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
+    println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; a sessão SDK recebe a seleção no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
     println('  \x1b[90mUso: /byok | /byok reload | /byok auto [on|policy|doctor|explain|standby|standby persisted|proof-plan|switch|status|plan|record|history|handoffs|confirmations|apply|off] [profile:<id>] [preset:<operator_manual|llm_operator_guarded|auto_same_boundary|auto_prepare_new_session>] [allow-live-set-model] | /byok providers | /byok profiles | /byok gateway operator-ready [profile:<id>] | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway auto [profile:<id>|standby|proof-plan] | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway local | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict|runs|diff] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] [wire:<completions|responses>] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
@@ -2039,7 +2147,7 @@ function renderByokHealth(println, scope = {}) {
         const label = renderByokHealthTag(record);
         const parts = [
             record.routeProfile ? `perfil ${record.routeProfile}` : null,
-            record.providerId ? `provider ${record.providerId}` : null,
+            record.providerId ? `provedor ${record.providerId}` : null,
             record.providerModel ? `modelo ${record.providerModel}` : null,
             label,
             renderByokAgentProbeHealthTag(record),
@@ -2097,8 +2205,8 @@ function renderByokProviderEndpointInventory(println, rest) {
         ? [resolveProviderEndpointInventory(selector)].filter((item) => item !== null)
         : listProviderEndpointInventory();
 
-    println(`\n  \x1b[36mBYOK provider endpoints\x1b[0m (${inventories.length})`);
-    println('  \x1b[90mInventário estático de coleta; não prova acesso nem capability. Use probes para promover confiança runtime.\x1b[0m\n');
+    println(`\n  \x1b[36mBYOK endpoints de provedores\x1b[0m (${inventories.length})`);
+    println('  \x1b[90mInventário estático de coleta; não prova acesso nem capacidade. Use sondas para promover confiança de execução.\x1b[0m\n');
 
     if (inventories.length === 0) {
         println(`    \x1b[33mProvedor não encontrado no inventário: ${selector ?? '-'}.\x1b[0m\n`);
@@ -2106,7 +2214,7 @@ function renderByokProviderEndpointInventory(println, rest) {
     }
 
     for (const inventory of inventories) {
-        println(`    \x1b[33m${inventory.providerId}\x1b[0m  \x1b[90mtipo ${inventory.providerKind} · adapter ${inventory.adapterId}\x1b[0m`);
+        println(`    \x1b[33m${inventory.providerId}\x1b[0m  \x1b[90mtipo ${renderByokTokenLabel(inventory.providerKind)} · adaptador ${inventory.adapterId}\x1b[0m`);
         println(`      \x1b[90mbases ${inventory.baseUrls.slice(0, 3).join(' · ')}${inventory.baseUrls.length > 3 ? ' · ...' : ''}\x1b[0m`);
         const sources = inventory.modelCatalogSources
             .slice(0, 3)
@@ -2115,10 +2223,10 @@ function renderByokProviderEndpointInventory(println, rest) {
         const runtime = inventory.runtimeEndpoints
             .slice(0, 4)
             .map((endpoint) => `${endpoint.method} ${endpoint.path}`);
-        println(`      \x1b[90mruntime ${runtime.join(' · ')}${inventory.runtimeEndpoints.length > 4 ? ' · ...' : ''}\x1b[0m`);
+        println(`      \x1b[90mexecução ${runtime.join(' · ')}${inventory.runtimeEndpoints.length > 4 ? ' · ...' : ''}\x1b[0m`);
         println(`      \x1b[90mseletores ${inventory.routeSelectors.join(',')}\x1b[0m`);
     }
-    println('\n  \x1b[90mPróximo passo: catalog importers vão usar este mapa como fonte inicial antes de probes e seleção runtime.\x1b[0m\n');
+    println('\n  \x1b[90mPróximo passo: importadores de catálogo usam este mapa como fonte inicial antes de sondas e seleção de execução.\x1b[0m\n');
 }
 
 /**
@@ -2150,14 +2258,14 @@ function renderByokGatewayImporterAudit(println, rest) {
     const coveredSourceCount = coverageRows.reduce((total, row) => total + row.coveredCatalogSourceCount, 0);
     const totalSourceCount = coverageRows.reduce((total, row) => total + row.catalogSourceCount, 0);
 
-    println(`\n  \x1b[36mBYOK model-gateway importer audit\x1b[0m`);
+    println(`\n  \x1b[36mBYOK auditoria de importadores\x1b[0m`);
     println(
-        `  \x1b[90mFiltro: ${selector ?? '-'} · importers ${audit.importerCount}/${allImporters.length} · providers ${audit.providerCount} · públicos ${audit.publicImporterCount} · autenticados ${audit.authenticatedImporterCount}\x1b[0m`,
+        `  \x1b[90mFiltro: ${selector ?? '-'} · importadores ${audit.importerCount}/${allImporters.length} · provedores ${audit.providerCount} · públicos ${audit.publicImporterCount} · autenticados ${audit.authenticatedImporterCount}\x1b[0m`,
     );
     println(
-        `  \x1b[90mEvidências de provider ${audit.providerEvidenceImporterCount} · rotas ${audit.routeOptionImporterCount} · overlays de conta ${audit.accountOverlayImporterCount} · cobertura de endpoints ${coveredSourceCount}/${totalSourceCount}\x1b[0m`,
+        `  \x1b[90mEvidências de provedor ${audit.providerEvidenceImporterCount} · rotas ${audit.routeOptionImporterCount} · overlays de conta ${audit.accountOverlayImporterCount} · cobertura de endpoints ${coveredSourceCount}/${totalSourceCount}\x1b[0m`,
     );
-    println('  \x1b[90mAuditoria local e pré-runtime; não chama fetchRaw, não usa rede, não executa provider/modelo e não imprime segredos.\x1b[0m\n');
+    println('  \x1b[90mAuditoria local e pré-execução; não chama fetchRaw, não usa rede, não executa provedor/modelo e não imprime segredos.\x1b[0m\n');
 
     if (selector && inventories.length === 0) {
         println(`    \x1b[33mProvedor não encontrado no inventário: ${selector}.\x1b[0m\n`);
@@ -2176,7 +2284,7 @@ function renderByokGatewayImporterAudit(println, rest) {
             println(
                 `    \x1b[33m${descriptor.id}\x1b[0m  \x1b[90mprovedor ${descriptor.providerId} · fonte ${descriptor.sourceKind} · autenticação ${descriptor.requiresAuth ? 'sim' : 'nao'} · TTL ${formatTerminalDurationSeconds(descriptor.ttlSeconds)}\x1b[0m`,
             );
-            println(`      \x1b[90mhooks ${hookTags || '-'} · env ${envRequirements}\x1b[0m`);
+            println(`      \x1b[90metapas ${hookTags || '-'} · env ${envRequirements}\x1b[0m`);
         }
         if (audit.descriptors.length > 32) println(`\n  \x1b[90mexibindo 32/${audit.descriptors.length}; filtre com provider id.\x1b[0m`);
     }
@@ -2185,9 +2293,9 @@ function renderByokGatewayImporterAudit(println, rest) {
     const missingHooks = audit.missingRequiredHooks.slice(0, 12).join(', ');
     const providersWithoutImporters = audit.providersWithoutImporters.slice(0, 12).join(', ');
     println(`\n  \x1b[90mFontes de catálogo sem cobertura: ${uncovered || '-'}\x1b[0m`);
-    println(`  \x1b[90mProviders sem importer: ${providersWithoutImporters || '-'}\x1b[0m`);
-    println(`  \x1b[90mHooks obrigatórios ausentes: ${missingHooks || '-'}\x1b[0m`);
-    println('  \x1b[90mUse isto antes de catalog refresh para decidir quais importers/docs/account overlays devem ser aprofundados.\x1b[0m\n');
+    println(`  \x1b[90mProvedores sem importador: ${providersWithoutImporters || '-'}\x1b[0m`);
+    println(`  \x1b[90mEtapas obrigatórias ausentes: ${missingHooks || '-'}\x1b[0m`);
+    println('  \x1b[90mUse isto antes de atualizar catálogo para decidir quais importadores, docs e overlays de conta devem ser aprofundados.\x1b[0m\n');
 }
 
 /**
@@ -2201,11 +2309,11 @@ function renderByokProviderGatewayTraits(println, rest) {
         ? [resolveProviderGatewayTraits(selector)].filter((item) => item !== null)
         : listProviderGatewayTraits();
 
-    println(`\n  \x1b[36mBYOK provider/gateway traits\x1b[0m (${traits.length})`);
-    println('  \x1b[90mMetadados pré-runtime derivados de specs/endpoints; não provam acesso, saúde ou execução do modelo.\x1b[0m\n');
+    println(`\n  \x1b[36mBYOK características de provedores\x1b[0m (${traits.length})`);
+    println('  \x1b[90mMetadados pré-execução derivados de specs/endpoints; não provam acesso, saúde ou execução do modelo.\x1b[0m\n');
 
     if (traits.length === 0) {
-        println(`    \x1b[33mProvedor não encontrado para traits: ${selector ?? '-'}.\x1b[0m\n`);
+        println(`    \x1b[33mProvedor não encontrado para características: ${selector ?? '-'}.\x1b[0m\n`);
         return;
     }
 
@@ -2217,13 +2325,13 @@ function renderByokProviderGatewayTraits(println, rest) {
         const richnessTags = Array.isArray(item['richnessTags']) ? item['richnessTags'].slice(0, 8).join(',') : '-';
         const richnessCategories = Array.isArray(item['richnessCategories']) ? item['richnessCategories'].slice(0, 8).join(',') : '-';
         println(
-            `    \x1b[33m${optionalScalarString(item['providerId']) ?? '-'}\x1b[0m  \x1b[90mtopologia ${optionalScalarString(item['topology']) ?? '-'} · tipo ${optionalScalarString(item['providerKind']) ?? '-'} · compatível com OpenAI ${item['openAICompatible'] === true ? 'sim' : 'nao'}\x1b[0m`,
+            `    \x1b[33m${optionalScalarString(item['providerId']) ?? '-'}\x1b[0m  \x1b[90mtopologia ${renderByokTokenLabel(optionalScalarString(item['topology']))} · tipo ${renderByokTokenLabel(optionalScalarString(item['providerKind']))} · compatível com OpenAI ${item['openAICompatible'] === true ? 'sim' : 'nao'}\x1b[0m`,
         );
         println(
             `      \x1b[90mfontes de catálogo ${item['catalogSourceCount'] ?? 0} · endpoints runtime ${item['runtimeEndpointCount'] ?? 0} · públicos ${item['publicCatalogSourceCount'] ?? 0} · autenticados ${item['authenticatedCatalogSourceCount'] ?? 0} · parametrizados ${item['parameterizedCatalogSourceCount'] ?? 0}\x1b[0m`,
         );
         println(
-            `      \x1b[90mtipos runtime ${Array.isArray(item['runtimeKinds']) ? item['runtimeKinds'].join(',') || '-' : '-'} · seletores ${routeSelectors}\x1b[0m`,
+            `      \x1b[90mtipos de execução ${Array.isArray(item['runtimeKinds']) ? renderByokTokenList(item['runtimeKinds'].map(String)) || '-' : '-'} · seletores ${routeSelectors}\x1b[0m`,
         );
         println(
             `      \x1b[90mcapacidades chat:${capabilities['chatCompletions'] === true ? 'sim' : 'nao'}, responses:${capabilities['responses'] === true ? 'sim' : 'nao'}, FIM:${capabilities['fim'] === true ? 'sim' : 'nao'}, embeddings:${capabilities['embeddings'] === true ? 'sim' : 'nao'}\x1b[0m`,
@@ -2233,7 +2341,7 @@ function renderByokProviderGatewayTraits(println, rest) {
         );
         println(`      \x1b[90mriqueza ${richnessTags} · categorias ${richnessCategories}\x1b[0m`);
     }
-    println('\n  \x1b[90mUse estes traits como filtro inicial; eligibility e probes continuam em fases separadas.\x1b[0m\n');
+    println('\n  \x1b[90mUse estas características como filtro inicial; elegibilidade e sondas continuam em fases separadas.\x1b[0m\n');
 }
 
 /**
@@ -2262,9 +2370,9 @@ function renderByokGatewayProbeMatrix(println, rest) {
     const rows = listProviderWireProbeMatrix({ providerId: selector ?? undefined });
     const summary = summarizeProviderWireProbeMatrix(rows);
 
-    println(`\n  \x1b[36mBYOK provider/wire probe matrix\x1b[0m`);
+    println(`\n  \x1b[36mBYOK matriz de sondas por protocolo\x1b[0m`);
     println(
-        `  \x1b[90mProviders ${summary.providerCount} · linhas ${summary.rowCount} · filtro ${selector ?? '-'} · fase: planejamento pré-runtime\x1b[0m\n`,
+        `  \x1b[90mProvedores ${summary.providerCount} · linhas ${summary.rowCount} · filtro ${selector ?? '-'} · fase: planejamento pré-execução\x1b[0m\n`,
     );
 
     if (rows.length === 0) {
@@ -2273,11 +2381,11 @@ function renderByokGatewayProbeMatrix(println, rest) {
     }
 
     for (const row of rows.slice(0, 24)) {
-        const implemented = Array.isArray(row['implementedProbeKinds']) ? row['implementedProbeKinds'].join(',') : '-';
-        const pending = Array.isArray(row['pendingProbeKinds']) ? row['pendingProbeKinds'].join(',') : '-';
+        const implemented = Array.isArray(row['implementedProbeKinds']) ? renderByokTokenList(row['implementedProbeKinds'].map(String)) : '-';
+        const pending = Array.isArray(row['pendingProbeKinds']) ? renderByokTokenList(row['pendingProbeKinds'].map(String)) : '-';
         const notes = Array.isArray(row['notes']) ? row['notes'].join(',') : '-';
         println(
-            `    \x1b[33m${optionalScalarString(row['providerId']) ?? '-'}\x1b[0m  \x1b[90mwire ${optionalScalarString(row['wireApi']) ?? '-'} · runtime ${optionalScalarString(row['runtimeKind']) ?? '-'} · topologia ${optionalScalarString(row['topology']) ?? '-'}\x1b[0m`,
+            `    \x1b[33m${optionalScalarString(row['providerId']) ?? '-'}\x1b[0m  \x1b[90mprotocolo ${renderByokWireLabel(optionalScalarString(row['wireApi']))} · execução ${renderByokTokenLabel(optionalScalarString(row['runtimeKind']))} · topologia ${renderByokTokenLabel(optionalScalarString(row['topology']))}\x1b[0m`,
         );
         println(`      \x1b[90mimplementados ${implemented || '-'} · pendentes ${pending || '-'} · notas ${notes || '-'}\x1b[0m`);
     }
@@ -2285,10 +2393,10 @@ function renderByokGatewayProbeMatrix(println, rest) {
 
     const pendingKinds = Object.entries(summary.pendingProbeKindCounts)
         .sort(([left], [right]) => left.localeCompare(right))
-        .map(([kind, count]) => `${kind}:${count}`)
+        .map(([kind, count]) => `${renderByokTokenLabel(kind)}:${count}`)
         .join(', ');
-    println(`\n  \x1b[90mTipos de probe pendentes: ${pendingKinds || '-'}\x1b[0m`);
-    println('  \x1b[90mMatriz não executa provider/modelo; ela só orienta probes runtime futuros e seleção por policy.\x1b[0m\n');
+    println(`\n  \x1b[90mTipos de sonda pendentes: ${pendingKinds || '-'}\x1b[0m`);
+    println('  \x1b[90mMatriz não executa provedor/modelo; ela só orienta sondas futuras e seleção por política.\x1b[0m\n');
 }
 
 /**
@@ -2315,7 +2423,7 @@ async function renderByokGatewayProbeBackoff(println, rest) {
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([reason, count]) => `${reason}:${count}`)
         .join(',');
-    println(`\n  \x1b[36mBYOK probe backoff planner\x1b[0m`);
+    println(`\n  \x1b[36mBYOK planejador de pausa para sondas\x1b[0m`);
     println(
         `  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · recomendações ${filteredRecommendations.length}/${recommendations.length} · prontas ${plan.summary.ready} · adiadas ${plan.summary.deferred} · motivos ${reasonCounts || '-'}\x1b[0m\n`,
     );
@@ -2327,15 +2435,15 @@ async function renderByokGatewayProbeBackoff(println, rest) {
         const retry = item.resetAt ? `reset ${item.resetAt}` : item.retryAfterSeconds ? `retentar em ${item.retryAfterSeconds}s` : 'reset -';
         const probe = item.probeKind ? ` · probe ${item.probeKind}` : '';
         println(
-            `    \x1b[33mADIAR\x1b[0m ${item.key}  \x1b[90mmotivo ${item.reason}${probe} · ${retry} · provider ${item.providerId}\x1b[0m`,
+            `    \x1b[33mADIAR\x1b[0m ${item.key}  \x1b[90mmotivo ${renderByokTokenLabel(item.reason)}${probe} · ${retry} · provedor ${item.providerId}\x1b[0m`,
         );
     }
     for (const item of plan.ready.slice(0, Math.max(0, args.limit - plan.deferred.length))) {
         println(
-            `    \x1b[32mPRONTO\x1b[0m ${item.key}  \x1b[90mprobes ${item.probeKinds.join(',') || '-'} · motivos ${item.reasons.slice(0, 3).join(',') || '-'}\x1b[0m`,
+            `    \x1b[32mPRONTO\x1b[0m ${item.key}  \x1b[90msondas ${renderByokTokenList(item.probeKinds) || '-'} · motivos ${renderByokTokenList(item.reasons.slice(0, 3)) || '-'}\x1b[0m`,
         );
     }
-    println('  \x1b[90mPlanner não executa provider/modelo; ele só evita probes durante janelas dinâmicas conhecidas.\x1b[0m\n');
+    println('  \x1b[90mPlanner não executa provedor/modelo; ele só evita sondas durante janelas dinâmicas conhecidas.\x1b[0m\n');
 }
 
 /**
@@ -2497,20 +2605,20 @@ async function renderByokGatewayOperatorReady(println, rest) {
     ];
     println('\n  \x1b[36mBYOK model-gateway operator-ready\x1b[0m');
     println(
-        `  \x1b[90mperfil ${status.args.profileId} · ok ${blockers.length === 0 ? 'sim' : 'nao'} · checagens ${checks.length - blockers.length}/${checks.length} · standby ${standbyRows.length} · persistidos ${persistedStandbyRows} · provedores ${standbyProviderCount} · sem chamada provider\x1b[0m`,
+        `  \x1b[90mperfil ${status.args.profileId} · ok ${blockers.length === 0 ? 'sim' : 'nao'} · checagens ${checks.length - blockers.length}/${checks.length} · standby ${standbyRows.length} · persistidos ${persistedStandbyRows} · provedores ${standbyProviderCount} · sem chamada a provedor\x1b[0m`,
     );
     println(
-        `    política:      \x1b[33mativa ${policy.enabled ? 'sim' : 'nao'} · preset ${policy.preset} · modo ${policy.policy} · set model vivo ${policy.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${policy.allowNewSession ? 'sim' : 'nao'} · local privado ${policy.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
+        `    política:      \x1b[33mativa ${policy.enabled ? 'sim' : 'nao'} · preset ${policy.preset} · modo ${renderByokTokenLabel(policy.policy)} · modelo vivo ${policy.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${policy.allowNewSession ? 'sim' : 'nao'} · local privado ${policy.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
     );
     println(
         `    vivo:          \x1b[33m${status.decision.currentBoundary.preset ?? '-'} · ${status.decision.currentBoundary.model ?? '-'}\x1b[0m`,
     );
     println(
-        `    alvo:          \x1b[33m${status.decision.targetBoundary.preset ?? '-'} · ${status.decision.targetBoundary.model ?? '-'} · ação ${status.decision.action}\x1b[0m`,
+        `    alvo:          \x1b[33m${status.decision.targetBoundary.preset ?? '-'} · ${status.decision.targetBoundary.model ?? '-'} · ação ${renderByokTokenLabel(status.decision.action)}\x1b[0m`,
     );
     if (status.decision.fallbackFromSelectedRouteKey || status.decision.fallbackReason) {
         println(
-            `    fallback:      \x1b[33mde ${status.decision.fallbackFromSelectedRouteKey ?? '-'} · motivo ${status.decision.fallbackReason ?? '-'}\x1b[0m`,
+            `    alternativa:   \x1b[33mde ${status.decision.fallbackFromSelectedRouteKey ?? '-'} · motivo ${renderByokTokenLabel(status.decision.fallbackReason)}\x1b[0m`,
         );
     }
     for (const check of checks) {
@@ -2520,7 +2628,7 @@ async function renderByokGatewayOperatorReady(println, rest) {
     }
     for (const [index, row] of standbyRows.slice(0, Math.min(limit, 5)).entries()) {
         println(
-            `    standby ${index + 1}:  \x1b[33m${row.providerId}:${row.providerModel}\x1b[0m \x1b[90m${row.source} · classe ${row.standbyClass ?? '-'} · probe ${row.needsProbe ? 'sim' : 'nao'} · prova ${row.hasRuntimeProof ? 'sim' : 'nao'} · env ${row.runtimeEnvStatus ?? '-'}\x1b[0m`,
+            `    standby ${index + 1}:  \x1b[33m${row.providerId}:${row.providerModel}\x1b[0m \x1b[90m${renderByokSourceLabel(row.source)} · classe ${renderByokTokenLabel(row.standbyClass)} · sonda ${row.needsProbe ? 'sim' : 'nao'} · prova ${row.hasRuntimeProof ? 'sim' : 'nao'} · env ${renderByokTokenLabel(row.runtimeEnvStatus)}\x1b[0m`,
         );
         println(`      \x1b[90mprovar: ${row.commands.probeAgent ?? '-'}\x1b[0m`);
         println(`      \x1b[90musar: ${row.commands.liveModel ?? '-'}\x1b[0m`);
@@ -3155,17 +3263,17 @@ async function renderByokGatewaySelectionAudit(println, rest) {
     const persistedStatus = tracePersistence?.written === true ? 'sim' : args.writeTrace ? 'falha' : 'nao';
     println(`\n  \x1b[36mBYOK model-gateway selection audit\x1b[0m`);
     println(
-        `  \x1b[90mcatálogo ${store.filePath} · integridade ${integrity.ok ? 'ok' : 'falha'} · modo ${selection.mode}${args.effective ? '+effective' : ''}${args.requireRuntimeProof ? '+require-proof' : ''} · sem runtime · persistido ${persistedStatus} · perfis ${selection.summary.selectedProfileCount}/${selection.summary.profileCount}\x1b[0m`,
+            `  \x1b[90mcatálogo ${store.filePath} · integridade ${integrity.ok ? 'ok' : 'falha'} · modo ${renderByokTokenLabel(selection.mode)}${args.effective ? '+efetivo' : ''}${args.requireRuntimeProof ? '+prova obrigatória' : ''} · sem execução · persistido ${persistedStatus} · perfis ${selection.summary.selectedProfileCount}/${selection.summary.profileCount}\x1b[0m`,
     );
     println(
-        `  \x1b[90mprojeções ${selection.snapshotContext['projectionCount']} · rotas ${selection.snapshotContext['routeOptionCount']} · overlays ${selection.snapshotContext['accountOverlayCount']} · eligibility ${selection.snapshotContext['eligibilityDecisionCount']} · candidatos ${selection.snapshotContext['candidateCount']}\x1b[0m\n`,
+            `  \x1b[90mprojeções ${selection.snapshotContext['projectionCount']} · rotas ${selection.snapshotContext['routeOptionCount']} · overlays ${selection.snapshotContext['accountOverlayCount']} · elegibilidade ${selection.snapshotContext['eligibilityDecisionCount']} · candidatos ${selection.snapshotContext['candidateCount']}\x1b[0m\n`,
     );
     if (args.effective) {
         println(
-            `  \x1b[90mhealth observado ${healthRecords.length} · overlays runtime ${runtimeOverlays.length} · ativos ${runtimeOverlaySummary?.activeCount ?? 0} · expirados ${runtimeOverlaySummary?.expiredCount ?? 0} · falhas ${formatCountMap(runtimeOverlaySummary?.byFailureKind ?? {})} · provedores ${formatCountMap(runtimeOverlaySummary?.byProvider ?? {})} · eligibility efetiva ${effectiveEligibility?.decisions.length ?? 0}\x1b[0m\n`,
+            `  \x1b[90msaúde observada ${healthRecords.length} · overlays de execução ${runtimeOverlays.length} · ativos ${runtimeOverlaySummary?.activeCount ?? 0} · expirados ${runtimeOverlaySummary?.expiredCount ?? 0} · falhas ${formatCountMap(runtimeOverlaySummary?.byFailureKind ?? {})} · provedores ${formatCountMap(runtimeOverlaySummary?.byProvider ?? {})} · elegibilidade efetiva ${effectiveEligibility?.decisions.length ?? 0}\x1b[0m\n`,
         );
         println(
-            `  \x1b[90mpós-runtime perfis ${postRuntimeSelection?.summary.selectedProfileCount ?? 0}/${postRuntimeSelection?.summary.profileCount ?? 0} · health casado ${postRuntimeSelection?.summary.healthRecordCount ?? 0} · provas health ${postRuntimeSelection?.summary.runtimeHealthProofCount ?? 0} · provas agente ${postRuntimeSelection?.summary.runtimeAgentProbeProofCount ?? 0} · provas probe ${postRuntimeSelection?.summary.runtimeProbeProofCount ?? 0} · provedores ${formatCountMap(postRuntimeSelection?.summary.selectedProviders ?? {})}\x1b[0m\n`,
+            `  \x1b[90mpós-execução perfis ${postRuntimeSelection?.summary.selectedProfileCount ?? 0}/${postRuntimeSelection?.summary.profileCount ?? 0} · saúde casada ${postRuntimeSelection?.summary.healthRecordCount ?? 0} · provas de saúde ${postRuntimeSelection?.summary.runtimeHealthProofCount ?? 0} · provas agente ${postRuntimeSelection?.summary.runtimeAgentProbeProofCount ?? 0} · provas de sonda ${postRuntimeSelection?.summary.runtimeProbeProofCount ?? 0} · provedores ${formatCountMap(postRuntimeSelection?.summary.selectedProviders ?? {})}\x1b[0m\n`,
         );
         println(
             `  \x1b[90mcomparação mudou ${selectionComparison?.summary.changedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0} · prova pós-runtime selecionada ${selectionComparison?.summary.postRuntimeProofSelectedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0}\x1b[0m\n`,
@@ -3174,10 +3282,10 @@ async function renderByokGatewaySelectionAudit(println, rest) {
             `  \x1b[90mrazões da comparação ${formatCountMap(selectionComparisonExplanation?.summary.reasonCounts ?? {})} · próximos ${selectionComparisonExplanation?.summary.nextActions.slice(0, 4).join(',') || '-'}\x1b[0m\n`,
         );
         println(
-            `  \x1b[90mpolicy ${policyResolution?.mode ?? args.selectionPolicy} · selecionados finais ${policyResolution?.summary.selectedCount ?? 0}/${policyResolution?.summary.profileCount ?? 0} · vencedores pós-runtime ${policyResolution?.summary.postRuntimeWinnerCount ?? 0} · mudou do pré-runtime ${policyResolution?.summary.changedFromPreRuntimeCount ?? 0}\x1b[0m\n`,
+            `  \x1b[90mpolítica ${renderByokTokenLabel(policyResolution?.mode ?? args.selectionPolicy)} · selecionados finais ${policyResolution?.summary.selectedCount ?? 0}/${policyResolution?.summary.profileCount ?? 0} · vencedores pós-execução ${policyResolution?.summary.postRuntimeWinnerCount ?? 0} · mudou do pré-runtime ${policyResolution?.summary.changedFromPreRuntimeCount ?? 0}\x1b[0m\n`,
         );
         println(
-            `  \x1b[90mseletor runtime ${runtimeSelectorPlan?.ready ? 'pronto' : 'bloqueado'} · selecionados ${runtimeSelectorPlan?.summary.selectedProfileCount ?? 0}/${runtimeSelectorPlan?.summary.profileCount ?? 0} · bloqueados ${runtimeSelectorPlan?.summary.blockedProfileCount ?? 0} · env pronto ${runtimeSelectorPlan?.summary.runtimeEnvReadyCount ?? 0} · env bloqueado ${runtimeSelectorPlan?.summary.runtimeEnvBlockedCount ?? 0} · prova selecionada ${runtimeSelectorPlan?.summary.runtimeProofSelectedCount ?? 0}\x1b[0m\n`,
+            `  \x1b[90mseletor de execução ${runtimeSelectorPlan?.ready ? 'pronto' : 'bloqueado'} · selecionados ${runtimeSelectorPlan?.summary.selectedProfileCount ?? 0}/${runtimeSelectorPlan?.summary.profileCount ?? 0} · bloqueados ${runtimeSelectorPlan?.summary.blockedProfileCount ?? 0} · env pronto ${runtimeSelectorPlan?.summary.runtimeEnvReadyCount ?? 0} · env bloqueado ${runtimeSelectorPlan?.summary.runtimeEnvBlockedCount ?? 0} · prova selecionada ${runtimeSelectorPlan?.summary.runtimeProofSelectedCount ?? 0}\x1b[0m\n`,
         );
         if (args.writeTrace) {
             println(
@@ -3198,7 +3306,7 @@ async function renderByokGatewaySelectionAudit(println, rest) {
                 : '';
         if (selected) {
             println(
-                `    \x1b[32m${profile.profileId}\x1b[0m  \x1b[90m${selected['providerId']}:${selected['providerModel']} · seletor ${selected['selectorKind']} · score ${selected['score'] ?? '-'} · candidatos ${profile.candidateCount} · rejeitados ${profile.rejectedCount}\x1b[0m`,
+                `    \x1b[32m${profile.profileId}\x1b[0m  \x1b[90m${selected['providerId']}:${selected['providerModel']} · seletor ${renderByokTokenLabel(optionalScalarString(selected['selectorKind']))} · pontuação ${selected['score'] ?? '-'} · candidatos ${profile.candidateCount} · rejeitados ${profile.rejectedCount}\x1b[0m`,
             );
         } else {
             println(
@@ -3214,10 +3322,10 @@ async function renderByokGatewaySelectionAudit(println, rest) {
         if (comparisonRow?.changed || (args.effective && comparisonRow?.postSelected)) {
             const postSelected = comparisonRow.postSelected;
             const postLabel = postSelected
-                ? `${postSelected['providerId']}:${postSelected['providerModel']} · seletor ${postSelected['selectorKind']} · score ${postSelected['score'] ?? '-'}`
+                ? `${postSelected['providerId']}:${postSelected['providerModel']} · seletor ${renderByokTokenLabel(optionalScalarString(postSelected['selectorKind']))} · pontuação ${postSelected['score'] ?? '-'}`
                 : 'sem selecionado';
             println(
-                `      \x1b[90mpós-runtime ${comparisonRow.changed ? 'mudou' : 'igual'} -> ${postLabel} · prova runtime ${comparisonRow.postSelectedHasRuntimeProof ? 'sim' : 'nao'}\x1b[0m`,
+                `      \x1b[90mpós-execução ${comparisonRow.changed ? 'mudou' : 'igual'} -> ${postLabel} · prova runtime ${comparisonRow.postSelectedHasRuntimeProof ? 'sim' : 'nao'}\x1b[0m`,
             );
         }
         if (args.effective && comparisonExplanation) {
@@ -3234,7 +3342,7 @@ async function renderByokGatewaySelectionAudit(println, rest) {
         println(`\n  \x1b[33m${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderBlocks.blockedProfileIds })}\x1b[0m`);
     }
     println(
-        `\n  \x1b[90mEsta auditoria encerra a etapa ${args.effective ? 'efetiva sem novas probes' : 'pré-runtime'}: ela rankeia por metadados/overlays/policy${args.effective ? ' e health já observado' : ''}; probes live ficam para a fase seguinte.\x1b[0m\n`,
+        `\n  \x1b[90mEsta auditoria encerra a etapa ${args.effective ? 'efetiva sem novas sondas' : 'pré-runtime'}: ela rankeia por metadados/overlays/política${args.effective ? ' e saúde já observada' : ''}; sondas live ficam para a fase seguinte.\x1b[0m\n`,
     );
 }
 
@@ -3259,10 +3367,10 @@ async function renderByokGatewayCatalogSqliteMirror(println) {
         `    \x1b[32mSnapshot espelhado no SQLite\x1b[0m  \x1b[90mfonte ${result.sqliteSnapshot.source} · projeções ${counts.projections} · evidências ${counts.evidences} · rotas ${counts.routeOptions} · overlays ${counts.accountOverlays} · elegibilidade ${counts.modelEligibilityDecisions}\x1b[0m`,
     );
     println(
-        `    \x1b[90mproviders ${counts.providerProjections} · evidências de provider ${counts.providerEvidences} · refs brutas ${counts.rawPayloadRefs} · conflitos ${counts.conflicts} · runs de importação ${counts.importRuns}\x1b[0m`,
+        `    \x1b[90mprovedores ${counts.providerProjections} · evidências de provedor ${counts.providerEvidences} · refs brutas ${counts.rawPayloadRefs} · conflitos ${counts.conflicts} · runs de importação ${counts.importRuns}\x1b[0m`,
     );
     println(
-        `    \x1b[90mSQLite: versão ${diagnostics.userVersion} · linhas de catálogo ${diagnostics.catalogRows} · histórico de conta ${diagnostics.accountHistoryRows} · runtime ${diagnostics.runtimeRows} · decisões de rota ${diagnostics.routeDecisionRows}\x1b[0m`,
+        `    \x1b[90mSQLite: versão ${diagnostics.userVersion} · linhas de catálogo ${diagnostics.catalogRows} · histórico de conta ${diagnostics.accountHistoryRows} · execução ${diagnostics.runtimeRows} · decisões de rota ${diagnostics.routeDecisionRows}\x1b[0m`,
     );
     println(
         `    \x1b[90mParidade ${result.parity.ok ? 'ok' : 'divergente'} · snapshot ${result.parity.snapshotIdMatches ? 'ok' : 'diferente'} · divergências ${result.parity.countMismatches.length}\x1b[0m`,
@@ -3278,11 +3386,11 @@ async function renderByokGatewayCatalogSqliteMirror(println) {
  */
 async function renderByokGatewayHealthSqliteMirror(println) {
     const sqliteStore = new SqliteModelGatewayCatalogStore();
-    println(`\n  \x1b[36mBYOK model-gateway runtime health SQLite mirror\x1b[0m`);
-    println('  \x1b[90mFonte: byok-provider-health · destino: copilot.sqlite · fatos runtime separados do catálogo\x1b[0m\n');
+    println(`\n  \x1b[36mBYOK espelho SQLite da saúde runtime\x1b[0m`);
+    println('  \x1b[90mFonte: byok-provider-health · destino: copilot.sqlite · fatos de execução separados do catálogo\x1b[0m\n');
     const result = await flushAndMirrorByokProviderHealthToSqlite({ sqliteStore });
     println(
-        `    \x1b[32mHealth runtime espelhado no SQLite\x1b[0m  \x1b[90mflush ${result.flushed ? 'sim' : 'nao'} · registros ${result.records} · observações ${result.healthObservations} · probes ${result.probeResults} · run ${result.runId}\x1b[0m\n`,
+        `    \x1b[32mSaúde runtime espelhada no SQLite\x1b[0m  \x1b[90mflush ${result.flushed ? 'sim' : 'nao'} · registros ${result.records} · observações ${result.healthObservations} · sondas ${result.probeResults} · run ${result.runId}\x1b[0m\n`,
     );
 }
 
@@ -3302,7 +3410,7 @@ async function renderByokGatewayCatalogOpenAISchema(println, options = {}) {
               eligibilityDecisions: snapshot?.modelEligibilityDecisions ?? [],
               routeOptions: snapshot?.routeOptions ?? [],
     });
-    println(`\n  \x1b[36mBYOK model-gateway OpenAI schema\x1b[0m`);
+    println(`\n  \x1b[36mBYOK schema OpenAI normalizado\x1b[0m`);
     println(
         `  \x1b[90mFonte: ${useSqlite ? 'sqlite' : 'json'} · objeto ${openaiList.object} · modelos ${openaiList.data.length} · extensão x_model_gateway\x1b[0m\n`,
     );
@@ -3311,7 +3419,7 @@ async function renderByokGatewayCatalogOpenAISchema(println, options = {}) {
         const providerId = optionalScalarString(gateway['provider_id']) ?? '-';
         const providerModel = optionalScalarString(gateway['provider_model']) ?? model.id;
         const eligibility = asRecord(gateway['eligibility']);
-        const eligibilityStatus = optionalScalarString(eligibility['status']) ?? '-';
+        const eligibilityStatus = renderByokTokenLabel(optionalScalarString(eligibility['status']));
         const routeOptionCount = Array.isArray(gateway['route_options']) ? gateway['route_options'].length : 0;
         println(
             `    \x1b[33m${model.id}\x1b[0m  \x1b[90mprovedor ${providerId} · modelo do provedor ${providerModel} · rotas ${routeOptionCount} · elegibilidade ${eligibilityStatus}\x1b[0m`,
@@ -3331,10 +3439,10 @@ async function renderByokGatewayCatalogOpenAISchema(println, options = {}) {
 async function renderByokGatewayCatalogExplain(println, selector) {
     const normalizedSelector = optionalScalarString(selector);
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
-    println(`\n  \x1b[36mBYOK model-gateway catalog explain\x1b[0m`);
+    println(`\n  \x1b[36mBYOK explicação do catálogo\x1b[0m`);
     println(`  \x1b[90mCatálogo: ${store.filePath} · filtro ${normalizedSelector ?? '-'} · sem runtime\x1b[0m\n`);
     if (!normalizedSelector) {
-        println('    \x1b[33mInforme um modelo, provider:model ou trecho do display name.\x1b[0m\n');
+        println('    \x1b[33mInforme um modelo, provedor:modelo ou trecho do nome exibido.\x1b[0m\n');
         return;
     }
     const snapshot = await store.readSnapshot();
@@ -3360,7 +3468,7 @@ async function renderByokGatewayCatalogExplain(println, selector) {
     }
     const projection = explanation.projection;
     if (!projection) {
-        println('    \x1b[33mModelo não encontrado após juntar runtime health.\x1b[0m\n');
+        println('    \x1b[33mModelo não encontrado após juntar saúde runtime.\x1b[0m\n');
         return;
     }
     const eligibility = explanation.eligibility;
@@ -3372,7 +3480,7 @@ async function renderByokGatewayCatalogExplain(println, selector) {
         `      \x1b[90mrotas ${explanation.routeOptions.length} · overlays ${explanation.accountOverlays.length} · elegibilidade ${eligibility?.status ?? '-'} · OpenAI id ${explanation.openai?.id ?? '-'}\x1b[0m`,
     );
     println(
-        `      \x1b[90mhealth runtime ${explanation.runtimeHealth?.status ?? '-'} · probes runtime ${explanation.runtimeProbes.length}\x1b[0m`,
+        `      \x1b[90msaúde runtime ${renderByokTokenLabel(explanation.runtimeHealth?.status)} · sondas runtime ${explanation.runtimeProbes.length}\x1b[0m`,
     );
     println(
         `      \x1b[90mmetadados: campos com confiança ${explanation.metadataCoverage.confidenceFields} · proveniência ${explanation.metadataCoverage.provenanceFields} · parâmetros suportados ${explanation.metadataCoverage.supportedParameters} · não suportados ${explanation.metadataCoverage.unsupportedParameters}\x1b[0m`,
@@ -3380,7 +3488,7 @@ async function renderByokGatewayCatalogExplain(println, selector) {
     for (const route of explanation.routeOptions.slice(0, 4)) {
         const policy = asRecord(route['normalizedPolicy']);
         println(
-            `      \x1b[90mrota ${optionalScalarString(route['selectorKind']) ?? '-'}:${optionalScalarString(route['selectorSyntax']) ?? '-'} · camada ${optionalScalarString(policy['routeLayer']) ?? '-'} · wire ${optionalScalarString(policy['wireApi']) ?? '-'}\x1b[0m`,
+            `      \x1b[90mrota ${renderByokTokenLabel(optionalScalarString(route['selectorKind']))}:${optionalScalarString(route['selectorSyntax']) ?? '-'} · camada ${renderByokTokenLabel(optionalScalarString(policy['routeLayer']))} · protocolo ${renderByokWireLabel(optionalScalarString(policy['wireApi']))}\x1b[0m`,
         );
     }
     for (const overlay of explanation.accountOverlays.slice(0, 3)) {
@@ -3404,10 +3512,10 @@ async function renderByokGatewayCatalogExplain(println, selector) {
 async function renderByokGatewayProviderExplain(println, selector) {
     const normalizedSelector = optionalScalarString(selector);
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
-    println(`\n  \x1b[36mBYOK model-gateway provider explain\x1b[0m`);
+    println(`\n  \x1b[36mBYOK explicação do provedor\x1b[0m`);
     println(`  \x1b[90mCatálogo: ${store.filePath} · filtro ${normalizedSelector ?? '-'} · sem runtime\x1b[0m\n`);
     if (!normalizedSelector) {
-        println('    \x1b[33mInforme um provider id ou display name.\x1b[0m\n');
+        println('    \x1b[33mInforme um id de provedor ou nome exibido.\x1b[0m\n');
         return;
     }
     const explanation = explainModelGatewayProviderEntry(await store.readSnapshot(), normalizedSelector);
@@ -3424,12 +3532,12 @@ async function renderByokGatewayProviderExplain(println, selector) {
     );
     if (explanation.providerProjection) {
         println(
-            `      \x1b[90mnome ${optionalScalarString(explanation.providerProjection['displayName']) ?? '-'} · provedor assunto ${optionalScalarString(explanation.providerProjection['subjectProviderId']) ?? '-'}\x1b[0m`,
+            `      \x1b[90mnome ${optionalScalarString(explanation.providerProjection['displayName']) ?? '-'} · provedor descrito ${optionalScalarString(explanation.providerProjection['subjectProviderId']) ?? '-'}\x1b[0m`,
         );
     }
     for (const source of explanation.sources.slice(0, 4)) {
         println(
-            `      \x1b[90mfonte ${optionalScalarString(source['id']) ?? '-'} · tipo ${optionalScalarString(source['kind']) ?? '-'} · autenticação ${optionalScalarString(source['authMode']) ?? '-'} · refresh ${optionalScalarString(source['refreshPolicy']) ?? '-'}\x1b[0m`,
+            `      \x1b[90mfonte ${optionalScalarString(source['id']) ?? '-'} · tipo ${renderByokTokenLabel(optionalScalarString(source['kind']))} · autenticação ${renderByokTokenLabel(optionalScalarString(source['authMode']))} · atualização ${renderByokTokenLabel(optionalScalarString(source['refreshPolicy']))}\x1b[0m`,
         );
     }
     const firstConflict = explanation.conflicts[0] ?? null;
@@ -3522,7 +3630,7 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
     const alternativeSummary = activeRoute?.alternativeSummary ?? null;
     println(`\n  \x1b[36mBYOK model-gateway auto\x1b[0m`);
     println(
-        `  \x1b[90mperfil ${args.profileId} · seletor runtime ${runtimeSelectorPlan.ok ? 'ok' : 'bloqueado'} · selecionados ${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} · ação ${decision.action} · ok ${decision.ok ? 'sim' : 'nao'}\x1b[0m`,
+        `  \x1b[90mperfil ${args.profileId} · seletor de execução ${runtimeSelectorPlan.ok ? 'ok' : 'bloqueado'} · selecionados ${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} · ação ${renderByokTokenLabel(decision.action)} · ok ${decision.ok ? 'sim' : 'nao'}\x1b[0m`,
     );
     println(
         `    política:      \x1b[33mtroca viva ${args.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${args.allowNewSession ? 'sim' : 'nao'} · local privado ${args.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
@@ -3530,7 +3638,7 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
     println(`    rota:          \x1b[33m${decision.selectedRouteKey ?? '-'}\x1b[0m`);
     if (decision.fallbackFromSelectedRouteKey || decision.fallbackReason) {
         println(
-            `    fallback:      \x1b[33morigem ${decision.fallbackFromSelectedRouteKey ?? '-'} · motivo ${decision.fallbackReason ?? '-'}\x1b[0m`,
+            `    alternativa:   \x1b[33morigem ${decision.fallbackFromSelectedRouteKey ?? '-'} · motivo ${renderByokTokenLabel(decision.fallbackReason)}\x1b[0m`,
         );
     }
     println(`    alvo:          \x1b[33m${decision.targetBoundary.preset ?? '-'} · ${decision.targetBoundary.model ?? '-'}\x1b[0m`);
@@ -3552,10 +3660,10 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
         const topReasons = Object.entries(rejectionCounts)
             .sort((left, right) => Number(right[1] ?? 0) - Number(left[1] ?? 0))
             .slice(0, 4)
-            .map(([reason, count]) => `${reason}:${count}`)
+            .map(([reason, count]) => `${renderByokTokenLabel(reason)}:${count}`)
             .join(', ');
         println(
-            `    alternativas:  \x1b[33musáveis ${alternativeSummary.usableCount}/${alternativeSummary.evaluatedCount} · providers ${alternativeSummary.providerCount}${topReasons ? ` · ${topReasons}` : ''}\x1b[0m`,
+            `    alternativas:  \x1b[33musáveis ${alternativeSummary.usableCount}/${alternativeSummary.evaluatedCount} · provedores ${alternativeSummary.providerCount}${topReasons ? ` · ${topReasons}` : ''}\x1b[0m`,
         );
         const topBlocked = Array.isArray(alternativeSummary.topBlockedRoutes) ? alternativeSummary.topBlockedRoutes.slice(0, 3) : [];
         for (const blocked of topBlocked) {
@@ -3564,7 +3672,7 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
             const reasons = Array.isArray(blocked?.reasons)
                 ? blocked.reasons.map(optionalScalarString).filter((item) => item !== null).slice(0, 3).join('+')
                 : '-';
-            println(`      \x1b[90mbloqueada: ${providerId}:${providerModel} · ${reasons || '-'}\x1b[0m`);
+            println(`      \x1b[90mbloqueada: ${providerId}:${providerModel} · ${renderByokTokenList((reasons || '-').split('+'))}\x1b[0m`);
         }
         for (const proof of buildModelGatewayRuntimeProofCommands(alternativeSummary)) {
             println(`      \x1b[90mprovar: ${proof.command}\x1b[0m`);
@@ -3616,9 +3724,9 @@ async function renderByokGatewayAutoProofPlan(println, rest) {
     const visibleRows = rows.slice(0, limit);
     const evaluated = status.runtimeSelectorPlan.routes.reduce((sum, route) => sum + route.alternativeSummary.evaluatedCount, 0);
     const usable = status.runtimeSelectorPlan.routes.reduce((sum, route) => sum + route.alternativeSummary.usableCount, 0);
-    println('\n  \x1b[36mBYOK model-gateway auto proof plan\x1b[0m');
+    println('\n  \x1b[36mBYOK plano de provas automáticas\x1b[0m');
     println(
-        `  \x1b[90mperfil ${status.args.profileId} · seletor runtime ${status.runtimeSelectorPlan.ok ? 'ok' : 'bloqueado'} · comandos ${rows.length} · alternativas ${usable}/${evaluated} · sem chamada provider\x1b[0m`,
+        `  \x1b[90mperfil ${status.args.profileId} · seletor de execução ${status.runtimeSelectorPlan.ok ? 'ok' : 'bloqueado'} · comandos ${rows.length} · alternativas ${usable}/${evaluated} · sem chamada a provedor\x1b[0m`,
     );
     if (visibleRows.length === 0) {
         println('  \x1b[90mNenhum comando de prova foi derivado das alternativas bloqueadas atuais.\x1b[0m\n');
@@ -3626,10 +3734,10 @@ async function renderByokGatewayAutoProofPlan(println, rest) {
     }
     for (const [index, row] of visibleRows.entries()) {
         println(
-            `    ${index + 1}. \x1b[33m${row.command}\x1b[0m  \x1b[90mperfil ${row.profileId} · motivos ${row.reasons.slice(0, 3).join('+') || '-'}\x1b[0m`,
+            `    ${index + 1}. \x1b[33m${row.command}\x1b[0m  \x1b[90mperfil ${row.profileId} · motivos ${renderByokTokenList(row.reasons.slice(0, 3)) || '-'}\x1b[0m`,
         );
     }
-    println('  \x1b[90mCada comando roda sessão SDK descartável e alimenta o runtime health usado pelo selector; nada é aplicado automaticamente aqui.\x1b[0m\n');
+    println('  \x1b[90mCada comando roda sessão SDK descartável e alimenta a saúde runtime usada pelo seletor; nada é aplicado automaticamente aqui.\x1b[0m\n');
 }
 
 /**
@@ -3650,7 +3758,7 @@ async function renderByokGatewayAutoStandby(println, rest) {
         const latestRoutes = Array.isArray(latest?.['routes']) ? latest['routes'] : [];
         println('\n  \x1b[36mBYOK model-gateway auto standby persistido\x1b[0m');
         println(
-            `  \x1b[90mperfil ${profile} · planos ${plans.length} · rotas mais recentes ${latestSummary['routeCount'] ?? latestRoutes.length} · sem chamada provider\x1b[0m`,
+            `  \x1b[90mperfil ${profile} · planos ${plans.length} · rotas mais recentes ${latestSummary['routeCount'] ?? latestRoutes.length} · sem chamada a provedor\x1b[0m`,
         );
         if (plans.length === 0) {
             println(
@@ -3662,7 +3770,7 @@ async function renderByokGatewayAutoStandby(println, rest) {
             const summary = asRecord(plan['summary']);
             const routes = Array.isArray(plan['routes']) ? plan['routes'] : [];
             println(
-                `    ${index + 1}. \x1b[33m${plan['standbyPlanId'] ?? '-'}\x1b[0m  \x1b[90mestado ${plan['status'] ?? '-'} · rotas ${summary['routeCount'] ?? routes.length} · providers ${summary['providerCount'] ?? 0} · gerado ${plan['generatedAt'] ?? plan['generatedAtMs'] ?? '-'}\x1b[0m`,
+                `    ${index + 1}. \x1b[33m${plan['standbyPlanId'] ?? '-'}\x1b[0m  \x1b[90mestado ${renderByokTokenLabel(optionalScalarString(plan['status']))} · rotas ${summary['routeCount'] ?? routes.length} · provedores ${summary['providerCount'] ?? 0} · gerado ${plan['generatedAt'] ?? plan['generatedAtMs'] ?? '-'}\x1b[0m`,
             );
         }
         return;
@@ -3681,7 +3789,7 @@ async function renderByokGatewayAutoStandby(println, rest) {
     const providerCount = standbyPlan.summary.providerCount;
     println('\n  \x1b[36mBYOK model-gateway auto standby\x1b[0m');
     println(
-        `  \x1b[90mperfil ${status.args.profileId} · seletor runtime ${status.runtimeSelectorPlan.ok ? 'ok' : 'bloqueado'} · rotas ${rows.length} · provas ${proofCount} · providers ${providerCount} · sem chamada provider\x1b[0m`,
+        `  \x1b[90mperfil ${status.args.profileId} · seletor de execução ${status.runtimeSelectorPlan.ok ? 'ok' : 'bloqueado'} · rotas ${rows.length} · provas ${proofCount} · provedores ${providerCount} · sem chamada a provedor\x1b[0m`,
     );
     if (visibleRows.length === 0) {
         println('  \x1b[90mNenhuma rota de prontidao foi derivada do selector atual.\x1b[0m\n');
@@ -3690,10 +3798,10 @@ async function renderByokGatewayAutoStandby(println, rest) {
     for (const [index, row] of visibleRows.entries()) {
         const source = row.source === 'selected' ? 'selecionada' : 'alternativa';
         println(
-            `    ${index + 1}. \x1b[33m${row.providerId}:${row.providerModel}\x1b[0m  \x1b[90m${source} · classe ${row.standbyClass ?? '-'} · precisa probe ${row.needsProbe ? 'sim' : 'nao'} · perfil ${row.profileId} · prova ${row.hasRuntimeProof ? 'sim' : 'nao'} · env ${row.runtimeEnvStatus ?? '-'} · score ${row.score ?? '-'}\x1b[0m`,
+            `    ${index + 1}. \x1b[33m${row.providerId}:${row.providerModel}\x1b[0m  \x1b[90m${source} · classe ${renderByokTokenLabel(row.standbyClass)} · precisa sonda ${row.needsProbe ? 'sim' : 'nao'} · perfil ${row.profileId} · prova ${row.hasRuntimeProof ? 'sim' : 'nao'} · env ${renderByokTokenLabel(row.runtimeEnvStatus)} · pontuação ${row.score ?? '-'}\x1b[0m`,
         );
         println(`       \x1b[90mprovar: ${row.commands.probeAgent ?? '-'}\x1b[0m`);
-        println(`       \x1b[90mmesmo provider: ${row.commands.liveModel ?? '-'}\x1b[0m`);
+        println(`       \x1b[90mmesmo provedor: ${row.commands.liveModel ?? '-'}\x1b[0m`);
         println(`       \x1b[90mnovo boot: ${row.commands.newSession} && ${row.commands.provider ?? '-'}\x1b[0m`);
         println(`       \x1b[90mpersistir: ${row.commands.persistProvider ?? '-'}\x1b[0m`);
     }
@@ -3923,7 +4031,7 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
     );
     println('\n  \x1b[36mBYOK model-gateway auto recovery fixture\x1b[0m');
     println(
-        `  \x1b[90mperfil ${args.profileId} · falha ${failureKind} · executou ${result.ran ? 'sim' : 'nao'} · sem chamada provider · health sintético ${writeRealHealth ? 'nao' : 'sim'}\x1b[0m`,
+        `  \x1b[90mperfil ${args.profileId} · falha ${renderByokTokenLabel(failureKind)} · executou ${result.ran ? 'sim' : 'nao'} · sem chamada a provedor · saúde sintética ${writeRealHealth ? 'nao' : 'sim'}\x1b[0m`,
     );
     if (result.ran !== true || !result.status) {
         println('    \x1b[33mFixture não executou; verifique policy e snapshot ativo.\x1b[0m\n');
@@ -4251,9 +4359,9 @@ async function renderByokGatewayAccounts(println, rest) {
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([status, count]) => `${status}:${count}`)
         .join(',');
-    println(`\n  \x1b[36mBYOK model-gateway accounts/keys\x1b[0m`);
+    println(`\n  \x1b[36mBYOK contas e chaves\x1b[0m`);
     println(
-        `  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · overlays ${accountSummary.summary.matched}/${accountSummary.summary.total} · sinais runtime ${runtimeOverlays.length} · providers ${accountSummary.summary.providers} · estados ${statusCounts || '-'}\x1b[0m\n`,
+        `  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · overlays ${accountSummary.summary.matched}/${accountSummary.summary.total} · sinais runtime ${runtimeOverlays.length} · provedores ${accountSummary.summary.providers} · estados ${statusCounts || '-'}\x1b[0m\n`,
     );
     if (accountSummary.rows.length === 0) {
         println('    \x1b[33mNenhuma conta/key overlay encontrada para o filtro informado.\x1b[0m\n');
@@ -4273,13 +4381,13 @@ async function renderByokGatewayAccounts(println, rest) {
             `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mescopo ${row.accountScope} · segredo ${row.secretRef ?? '-'} · estado ${row.limitStatus} · ${retry}\x1b[0m`,
         );
         println(
-            `      \x1b[90mfonte ${row.sourceId ?? '-'} · tipo ${row.sourceKind} · confiança ${row.confidence} · frescor ${row.freshnessStatus} · habilitados ${row.enabledModelCount} · bloqueados ${row.blockedModelCount} · ${remaining || 'saldo -'}\x1b[0m`,
+            `      \x1b[90mfonte ${row.sourceId ?? '-'} · tipo ${renderByokTokenLabel(row.sourceKind)} · confiança ${renderByokTokenLabel(row.confidence)} · frescor ${renderByokTokenLabel(row.freshnessStatus)} · habilitados ${row.enabledModelCount} · bloqueados ${row.blockedModelCount} · ${remaining || 'saldo -'}\x1b[0m`,
         );
     }
     if (accountSummary.rows.length > args.limit) {
         println(`\n  \x1b[90mexibindo ${args.limit}/${accountSummary.rows.length}; use filtro ou limite numerico.\x1b[0m`);
     }
-    println('  \x1b[90mEsta visão é account/key-scoped e não executa modelo; runtime health continua em /byok health.\x1b[0m\n');
+    println('  \x1b[90mEsta visão é da conta/key e não executa modelo; saúde runtime continua em /byok health.\x1b[0m\n');
 }
 
 /**
@@ -4306,9 +4414,9 @@ async function renderByokGatewayLimits(println, rest) {
     const runtimeOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(listByokProviderModelHealth());
     const runtimeSummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeOverlays);
     const explanation = explainModelGatewayAccountLimitOverlays([...catalogOverlays, ...runtimeOverlays], { selector: args.selector });
-    println(`\n  \x1b[36mBYOK model-gateway account limits\x1b[0m`);
+    println(`\n  \x1b[36mBYOK limites de conta\x1b[0m`);
     println(
-        `  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · overlays ${explanation.summary.matched}/${explanation.summary.total} · bloqueios ativos ${explanation.summary.activeBlockers} · sinais expirados ${explanation.summary.expiredSignals} · temporários ${explanation.summary.temporaryBlockers} · runtime ${runtimeSummary.activeCount}/${runtimeSummary.total}\x1b[0m`,
+        `  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · overlays ${explanation.summary.matched}/${explanation.summary.total} · bloqueios ativos ${explanation.summary.activeBlockers} · sinais expirados ${explanation.summary.expiredSignals} · temporários ${explanation.summary.temporaryBlockers} · execução ${runtimeSummary.activeCount}/${runtimeSummary.total}\x1b[0m`,
     );
     println(
         `  \x1b[90mEstados: ${renderGatewayCountMap(explanation.summary.byStatus)} · camadas de fonte: ${renderGatewayCountMap(explanation.summary.bySourceLayer)}\x1b[0m\n`,
@@ -4328,7 +4436,7 @@ async function renderByokGatewayLimits(println, rest) {
             `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mescopo ${row.accountScope} · estado ${row.limitStatus} · sinal ${state} · frescor ${row.freshnessStatus} · janela ${row.resetWindowClass} · ${reset} · expira ${row.expiresAt ?? row.effectiveExpiresAt ?? '-'}\x1b[0m`,
         );
         println(
-            `      \x1b[90mfonte ${row.sourceKind}:${row.sourceId ?? '-'} · camada ${row.sourceLayer} · falha ${row.failureKind ?? '-'} · segredo ${row.secretRef ?? '-'} · próxima atualização ${row.nextRefreshAfter ?? '-'} · ${money || 'saldo -'}\x1b[0m`,
+            `      \x1b[90mfonte ${renderByokTokenLabel(row.sourceKind)}:${row.sourceId ?? '-'} · camada ${renderByokTokenLabel(row.sourceLayer)} · falha ${renderByokTokenLabel(row.failureKind)} · segredo ${row.secretRef ?? '-'} · próxima atualização ${row.nextRefreshAfter ?? '-'} · ${money || 'saldo -'}\x1b[0m`,
         );
         println(`      \x1b[90mpróxima ação ${row.nextAction}\x1b[0m`);
     }
@@ -4348,9 +4456,9 @@ async function renderByokGatewayLimits(println, rest) {
 function renderByokGatewayQuotaMatrix(println, rest) {
     const args = parseGatewayCatalogListArgs(rest);
     const matrix = summarizeModelGatewayProviderQuotaCapabilities({ selector: args.selector });
-    println(`\n  \x1b[36mBYOK model-gateway provider quota matrix\x1b[0m`);
+    println(`\n  \x1b[36mBYOK matriz de quotas dos provedores\x1b[0m`);
     println(
-        `  \x1b[90mFiltro ${args.selector ?? '-'} · providers ${matrix.summary.providerCount}/${matrix.summary.total} · visibilidade de conta ${matrix.summary.accountVisibilityCount} · snapshots de quota ${matrix.summary.quotaSnapshotCount} · overlays runtime ${matrix.summary.runtimeFailureOverlayCount} · quota SDK aplicável a BYOK ${matrix.summary.sdkQuotaByokTruthCount}\x1b[0m`,
+        `  \x1b[90mFiltro ${args.selector ?? '-'} · provedores ${matrix.summary.providerCount}/${matrix.summary.total} · visibilidade de conta ${matrix.summary.accountVisibilityCount} · snapshots de quota ${matrix.summary.quotaSnapshotCount} · overlays runtime ${matrix.summary.runtimeFailureOverlayCount} · quota SDK aplicável a BYOK ${matrix.summary.sdkQuotaByokTruthCount}\x1b[0m`,
     );
     println(`  \x1b[90mTipos de quota: ${renderGatewayCountMap(matrix.summary.byQuotaSnapshot)}\x1b[0m\n`);
     if (matrix.rows.length === 0) {
@@ -4359,7 +4467,7 @@ function renderByokGatewayQuotaMatrix(println, rest) {
     }
     for (const row of matrix.rows.slice(0, args.limit)) {
         println(
-            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mvisibilidade ${row.accountVisibility} · quota ${row.quotaSnapshot} · gasto ${row.spendingLimit} · rate-limit ${row.rateLimit}\x1b[0m`,
+            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mvisibilidade ${renderByokTokenLabel(row.accountVisibility)} · quota ${renderByokTokenLabel(row.quotaSnapshot)} · gasto ${renderByokTokenLabel(row.spendingLimit)} · limite de taxa ${renderByokTokenLabel(row.rateLimit)}\x1b[0m`,
         );
         println(
             `      \x1b[90moverlay runtime ${row.runtimeFailureOverlay ? 'sim' : 'nao'} · quota SDK cobre BYOK ${row.sdkQuotaAppliesToByok ? 'sim' : 'nao'} · env ${row.requiredEnv.join(',') || '-'}\x1b[0m`,
@@ -4369,7 +4477,7 @@ function renderByokGatewayQuotaMatrix(println, rest) {
     if (matrix.rows.length > args.limit) {
         println(`\n  \x1b[90mexibindo ${args.limit}/${matrix.rows.length}; use filtro ou limite numerico.\x1b[0m`);
     }
-    println('  \x1b[90mA matriz descreve fontes pre-runtime possiveis; ela nao prova acesso runtime nem altera catalogo.\x1b[0m\n');
+    println('  \x1b[90mA matriz descreve fontes pré-runtime possíveis; ela não prova acesso runtime nem altera catálogo.\x1b[0m\n');
 }
 
 /**
@@ -4758,14 +4866,14 @@ function renderByokProbeResult(println, mode, probe, options = {}) {
     const indent = options.indent ?? '    ';
     const color = probe.ok ? '\x1b[32m' : '\x1b[31m';
     println(
-        `${indent}resultado: ${color}${probe.status}\x1b[0m · perfil ${valueOrDash(probe.profile)} · preset ${valueOrDash(probe.preset)} · provedor ${valueOrDash(probe.providerType)} · modelo ${valueOrDash(probe.model)}`,
+        `${indent}resultado: ${color}${renderByokTokenLabel(probe.status)}\x1b[0m · perfil ${valueOrDash(probe.profile)} · preset ${valueOrDash(probe.preset)} · provedor ${valueOrDash(probe.providerType)} · modelo ${valueOrDash(probe.model)}`,
     );
     println(
         `${indent}sinal:     ${probe.deltaCount} fragmentos · ${probe.deltaChars} ${probe.deltaChars === 1 ? 'caractere' : 'caracteres'} parciais · final ${probe.finalChars} ${probe.finalChars === 1 ? 'caractere' : 'caracteres'} · evento final ${yesNo(probe.observedFinalEvent)} · ${probe.elapsedMs}ms`,
     );
     if (mode === 'agent') {
         println(
-            `${indent}agente:    tool calls ${Number(Reflect.get(probe, 'toolCallCount') ?? 0)} · marcador ${Number(Reflect.get(probe, 'markerToolCallCount') ?? 0)} · leituras ${Number(Reflect.get(probe, 'readToolCallCount') ?? 0)} · perguntas ${Number(Reflect.get(probe, 'userInputRequestCount') ?? 0)} · respostas ${Number(Reflect.get(probe, 'userInputAnswerCount') ?? 0)}`,
+            `${indent}agente:    chamadas de ferramenta ${Number(Reflect.get(probe, 'toolCallCount') ?? 0)} · marcador ${Number(Reflect.get(probe, 'markerToolCallCount') ?? 0)} · leituras ${Number(Reflect.get(probe, 'readToolCallCount') ?? 0)} · perguntas ${Number(Reflect.get(probe, 'userInputRequestCount') ?? 0)} · respostas ${Number(Reflect.get(probe, 'userInputAnswerCount') ?? 0)}`,
         );
     }
     if (mode === 'vision') {
@@ -4773,11 +4881,11 @@ function renderByokProbeResult(println, mode, probe, options = {}) {
         const attachmentMimeType = Reflect.get(probe, 'attachmentMimeType');
         const attachmentBytes = Reflect.get(probe, 'attachmentBytes');
         println(
-            `${indent}vision:    prova ${yesNo(Reflect.get(probe, 'visionProved') === true)} · cor ${valueOrDash(typeof dominantColor === 'string' ? dominantColor : null)} · fixture ${valueOrDash(typeof attachmentMimeType === 'string' ? attachmentMimeType : null)}${typeof attachmentBytes === 'number' ? `/${attachmentBytes} bytes` : ''}`,
+            `${indent}visão:     prova ${yesNo(Reflect.get(probe, 'visionProved') === true)} · cor ${valueOrDash(typeof dominantColor === 'string' ? dominantColor : null)} · fixture ${valueOrDash(typeof attachmentMimeType === 'string' ? attachmentMimeType : null)}${typeof attachmentBytes === 'number' ? `/${attachmentBytes} bytes` : ''}`,
         );
     }
     if (options.showSession !== false && probe.sessionId) {
-        println(`${indent}\x1b[90msessão temporária=${probe.sessionId}\x1b[0m`);
+        println(`${indent}\x1b[90msessão temporária ${probe.sessionId}\x1b[0m`);
     }
     if (options.showWarnings !== false) {
         if (probe.providerFailure) {
@@ -5401,22 +5509,22 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         const selection = buildByokProbeSelection(explicitMode ? rest.slice(1) : rest);
         println(`\n  \x1b[36mBYOK ${mode} probe\x1b[0m`);
         println(
-            `  \x1b[90mEscopo: sessão SDK descartável; não troca a conversa viva nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : mode === 'agent' ? ' Agent exige tools representativas do terminal + ask_user com resposta sintética.' : mode === 'streaming' ? ' Streaming exige assistant.message_delta real; não degrada health de chat.' : mode === 'json' ? ' JSON exige payload parseável; não degrada health de chat.' : ' Vision anexa fixture PNG hermética e exige identificação visual; não degrada health de chat.'}${selection.profile ? ` perfil ${selection.profile}` : ''}${selection.provider ? ` provedor ${selection.provider}` : ''}${selection.model ? ` modelo ${selection.model}` : ''}${selection.baseUrl ? ` base URL ${selection.baseUrl}` : ''}${selection.wireApi ? ` wire ${selection.wireApi}` : ''}\x1b[0m`,
+            `  \x1b[90mEscopo: sessão SDK descartável; não troca a conversa viva nem grava transcript live.${mode === 'chat' ? ' Sonda de chat não usa ferramentas.' : mode === 'agent' ? ' Sonda agente exige ferramentas representativas do terminal + ask_user com resposta sintética.' : mode === 'streaming' ? ' Sonda de streaming exige delta real; não degrada saúde de chat.' : mode === 'json' ? ' Sonda JSON exige payload parseável; não degrada saúde de chat.' : ' Sonda de visão anexa fixture PNG hermética e exige identificação visual; não degrada saúde de chat.'}${selection.profile ? ` perfil ${selection.profile}` : ''}${selection.provider ? ` provedor ${selection.provider}` : ''}${selection.model ? ` modelo ${selection.model}` : ''}${selection.baseUrl ? ` base URL ${selection.baseUrl}` : ''}${selection.wireApi ? ` protocolo ${renderByokWireLabel(selection.wireApi)}` : ''}\x1b[0m`,
         );
         const { probe, providerAttempted } = await runByokProbe(mode, selection, eventBus);
         renderByokProbeResult(println, mode, probe, { providerAttempted });
         println(
             mode === 'agent'
-                ? '  \x1b[90mAgent probe confirma a fronteira exigida pelo terminal: streaming + tools representativas + ask_user. Chat probe isolado continua disponível com /byok probe chat.\x1b[0m\n'
+                ? '  \x1b[90mSonda agente confirma a fronteira exigida pelo terminal: streaming + ferramentas representativas + ask_user. Sonda de chat isolada continua disponível com /byok probe chat.\x1b[0m\n'
                 : mode === 'streaming'
-                  ? '  \x1b[90mStreaming probe separa resposta final de delta incremental. Falha no delta não implica que o chat seja inutilizável, mas a UX live ficaria cega.\x1b[0m\n'
+                  ? '  \x1b[90mSonda de streaming separa resposta final de delta incremental. Falha no delta não implica que o chat seja inutilizável, mas a UX live ficaria cega.\x1b[0m\n'
                   : mode === 'json'
-                    ? '  \x1b[90mJSON probe confirma saída estruturada parseável. Use junto com agent probe antes de promover modelo para fluxos automatizados.\x1b[0m\n'
+                    ? '  \x1b[90mSonda JSON confirma saída estruturada parseável. Use junto com sonda agente antes de promover modelo para fluxos automatizados.\x1b[0m\n'
                     : mode === 'vision'
                       ? probe.ok
-                          ? '  \x1b[90mVision probe confirma que o provider aceitou attachment de imagem e interpretou a fixture. Use junto com agent/JSON quando o fluxo precisar automação multimodal.\x1b[0m\n'
-                          : '  \x1b[90mVision probe registrou resultado explícito sem prova visual positiva; chat/agent não são degradados por essa capacidade multimodal.\x1b[0m\n'
-                    : '  \x1b[90mCatálogo mostra oferta; chat probe confirma conversa canária. Para validar runtime agente, rode /byok probe agent antes do live.\x1b[0m\n',
+                          ? '  \x1b[90mSonda de visão confirma que o provedor aceitou anexo de imagem e interpretou a fixture. Use junto com agente/JSON quando o fluxo precisar automação multimodal.\x1b[0m\n'
+                          : '  \x1b[90mSonda de visão registrou resultado explícito sem prova visual positiva; chat/agente não são degradados por essa capacidade multimodal.\x1b[0m\n'
+                    : '  \x1b[90mCatálogo mostra oferta; sonda de chat confirma conversa canária. Para validar execução agente, rode /byok probe agent antes do live.\x1b[0m\n',
         );
         return;
     }
