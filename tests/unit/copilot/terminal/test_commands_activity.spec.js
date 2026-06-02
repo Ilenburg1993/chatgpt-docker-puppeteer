@@ -168,6 +168,7 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('evento');
         expect(ctx.output()).toContain('ferramentas');
         expect(ctx.output()).toContain('Timeline recente');
+        expect(ctx.output()).not.toContain('\x1b[36mTimeline recente');
         expect(ctx.output()).toContain('Resumo do turno atual');
         expect(ctx.output()).toContain('Último turno concluído');
         expect(ctx.output()).toContain('arquivos tocados');
@@ -175,6 +176,8 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('interações humanas');
         expect(ctx.output()).toContain('Qual ambiente devo usar?');
         expect(ctx.output()).toContain('I/O real recente');
+        expect(ctx.output()).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}\]/u);
+        expect(ctx.output()).not.toMatch(/\[\d{2}:\d{2}:\d{2}\]/u);
         expect(ctx.output()).toContain('Detalhes técnicos ficam em /activity detail');
         expect(ctx.output()).not.toContain('source');
         expect(ctx.output()).not.toContain('Streaming público');

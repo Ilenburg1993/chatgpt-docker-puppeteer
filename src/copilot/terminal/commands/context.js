@@ -12,6 +12,7 @@
  */
 
 import { readTerminalContextProjection, requestTerminalCompactionProjection } from '../frontend/index.js';
+import { formatTerminalIsoTimestamp } from '../state/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -103,7 +104,7 @@ export function cmdContext({ println }, arg = '') {
     if (projection.syncStatus === 'failed') {
         const retryLabel =
             typeof projection.syncNextRetryAt === 'number'
-                ? ` próxima tentativa=${new Date(projection.syncNextRetryAt).toLocaleTimeString('pt-BR')}`
+                ? ` próxima tentativa ${formatTerminalIsoTimestamp(projection.syncNextRetryAt)}`
                 : '';
         println(`\x1b[33m  Sync Hub falhou: ${projection.syncLastError ?? 'erro desconhecido'}${retryLabel}.\x1b[0m`);
     }

@@ -65,16 +65,18 @@ describe('terminal/commands/scope', () => {
         expect(ctx.output()).toContain('alphaHelper');
 
         await cmdScope(ctx, 'find scope-terminal-test alphaHelper --exact');
-        expect(ctx.output()).toContain('Scope symbol search');
-        expect(ctx.output()).toContain('matches=1');
+        expect(ctx.output()).toContain('Busca de símbolo no escopo');
+        expect(ctx.output()).toContain('resultados 1');
         expect(ctx.output()).toContain('alphaHelper');
 
         await cmdScope(ctx, `refresh scope-terminal-test ${tmpRel}/alpha.js`);
         expect(ctx.output()).toContain('/scope refresh');
-        expect(ctx.output()).toContain('refreshed=1');
+        expect(ctx.output()).toContain('atualizados 1');
 
         await cmdScope(ctx, 'close scope-terminal-test');
         expect(ctx.output()).toContain('Escopo fechado');
+        expect(ctx.output()).not.toContain('files=');
+        expect(ctx.output()).not.toContain('parsed=');
     });
 
     it('/scope list mostra escopos ativos e filtros advisory não cortam a declaração', async () => {
@@ -89,6 +91,7 @@ describe('terminal/commands/scope', () => {
 
         expect(ctx.output()).toContain('Escopos ativos');
         expect(ctx.output()).toContain('scope-terminal-filtered');
-        expect(ctx.output()).toContain('files=1');
+        expect(ctx.output()).toContain('arquivos 1');
+        expect(ctx.output()).not.toContain('files=');
     });
 });

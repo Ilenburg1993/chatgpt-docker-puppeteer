@@ -11,6 +11,7 @@
  */
 
 import { readTerminalErrorsProjection } from '../frontend/index.js';
+import { formatTerminalIsoTimestamp } from '../state/index.js';
 
 /**
  * @typedef {object} ErrorsContext
@@ -39,7 +40,7 @@ export function cmdErrors({ println }, arg) {
     }
 
     for (const err of recent) {
-        const ts = new Date(err.timestamp).toLocaleTimeString('pt-BR');
+        const ts = formatTerminalIsoTimestamp(err.timestamp);
         const sevColor = '\x1b[31m';
         const type = err.errorType ?? 'Error';
         const src = err.source ? `\x1b[90m[${err.source}]\x1b[0m ` : '';

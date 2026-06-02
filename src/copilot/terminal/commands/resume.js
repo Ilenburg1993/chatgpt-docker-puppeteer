@@ -12,6 +12,7 @@
 
 import { toError } from '#copilot/core';
 import { readTerminalResumeListProjection, readTerminalResumeProjection } from '../frontend/index.js';
+import { formatTerminalIsoTimestamp } from '../state/index.js';
 
 /**
  * Handler do comando `/resume`.
@@ -37,7 +38,7 @@ export async function cmdResume({ println, hubSessionId }, arg) {
             println('');
             println('\x1b[36m  ─── Sessões Anteriores ─────────────────────────────────────────\x1b[0m');
             for (const s of sessions) {
-                const ts = new Date(String(s['created_at'] ?? '')).toLocaleString('pt-BR');
+                const ts = formatTerminalIsoTimestamp(String(s['created_at'] ?? ''));
                 const current = s['id'] === currentHubSessionId ? ' \x1b[32m← atual\x1b[0m' : '';
                 println(
                     `  \x1b[33m${String(s['id'] ?? '').slice(0, 8)}\x1b[90m…\x1b[0m  ${s['title'] ?? 'sem título'}  \x1b[90m(${s['status'] ?? 'unknown'}, ${ts})${current}\x1b[0m`,

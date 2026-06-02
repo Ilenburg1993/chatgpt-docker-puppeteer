@@ -20,6 +20,7 @@ import {
 import {
     getTerminalDetailLevel,
     readTerminalActivitySnapshot,
+    formatTerminalIsoTimestamp,
     readTerminalPromptDisplayPolicy,
     terminalThemeText,
 } from '../state/dialog/index.js';
@@ -836,7 +837,7 @@ export function resetStatusRowState() {
  * @returns {void}
  */
 export function printExchange(actor, message, reply, durationMs) {
-    const ts = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const ts = formatTerminalIsoTimestamp(Date.now());
     const secs = (durationMs / 1000).toFixed(1);
     const { model, reasoningEffort } = readTerminalDialogStreamMeta();
     const effort = reasoningEffort;

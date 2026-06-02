@@ -6,7 +6,7 @@
  */
 
 import { listTerminalPublicStreamSourcePolicies } from '../events/index.js';
-import { readTerminalSseEventArchiveTail } from '../state/index.js';
+import { formatTerminalIsoTimestamp, readTerminalSseEventArchiveTail } from '../state/index.js';
 import { compactTerminalDiagnosticId, getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
 
 /**
@@ -346,7 +346,7 @@ export async function cmdEvents({ println }, arg = '') {
     }
 
     for (const entry of entries) {
-        const time = new Date(entry.timestamp).toLocaleTimeString('pt-BR');
+        const time = formatTerminalIsoTimestamp(entry.timestamp);
         const origin = compact(humanEventSource(entry.eventSource ?? entry.source ?? '-'), 52);
         const trace = entry.traceId ? ` · trace ${entry.traceId}` : '';
         const turn = entry.turnId ? ` · turno ${entry.turnId}` : '';

@@ -30,3 +30,4 @@ export {
     terminalThemeBadge,
     terminalThemeText,
 } from '../ui-theme.js';
+export { formatTerminalIsoTimestamp } from '../time-format.js';

@@ -2194,4 +2194,41 @@
 - [x] `/activity` default passou a usar `terminalThemeText('assistant', 'Atividade Atual da LLM-B')`.
 - [x] `/health` compacto passou a usar `terminalThemeText('assistant', 'Saúde do Terminal LLM-B')`.
 - [x] Testes bloqueiam regressão para `\x1b[36m...` nesses headers default.
-- [ ] Fazer nova live UX cycle para confirmar visual integrado de banner, help, status, health, activity e waits após o lote.
+- [x] Live UX cycle pós-headers executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/ux-themed-default-surfaces-20260602-1338`.
+- [x] Resultado: PASS completo em help, status, now, health, tools, live, activity, waits e close limpo.
+- [x] Achado da live: `/now` ainda usava `[agora]` em ciano fixo e `/activity` ainda usava `Timeline recente` em ciano fixo.
+- [x] `/now` default passou a usar badge `[agora]` via `terminalThemeText('assistant'|'muted')`.
+- [x] `Timeline recente` passou a usar `terminalThemeText('assistant')`.
+
+### 11.24 Fluxo canônico e timestamps ISO 8601
+
+- [x] Auditar fluxo visual completo do terminal: prompt do operador, LLM-B pensando, tools em início/progresso/conclusão, deltas parciais, delta final, intenção capturada, pergunta ao operador, resposta humana e pós-pergunta.
+- [x] Criar helpers centrais para timestamp humano em ISO 8601 completo com timezone local explícito, evitando `HH:mm:ss` solto em superfícies operacionais importantes.
+- [x] Definir política de densidade: ISO completo em eventos persistentes/timeline; idade relativa em linha viva; horário curto só quando explicitamente compacto.
+- [x] `/activity` passou a usar timestamp ISO completo em streaming público, I/O real e timeline recente.
+- [x] `turn-display.js` passou a usar timestamp ISO completo nos blocos duráveis de thinking e streaming da LLM-B.
+- [x] `/session`, `/history`, `/db-history`, `/db-sessions`, `/session sdk events`, `/session sdk waits`, `/events`, `/intent`, `/errors`, `/audit`, `/resume`, `/memory`, `/search`, `/export`, `/plan`, `/context`, `/sdk permission`, `/index` e display LLM-A passaram a usar o helper ISO quando exibem datas operacionais.
+- [x] Testes escopados bloqueiam regressão para `[HH:mm:ss]` em `/activity` e no display vivo de streaming.
+- [ ] Padronizar prefixos visuais do fluxo: `você`, `LLM-B`, `pensando`, `tool`, `intenção`, `pergunta`, `resposta`, `sistema`.
+- [ ] Garantir que deltas parciais e finais não misturem cor/label de sucesso com identidade da LLM-B.
+- [ ] Auditar `assistant-transcript-renderer.js`, `task-stream-events.js`, `tool-lifecycle-runtime.js`, `intent-renderer.js`, `sdk-session-events.js`, `/session`, `/activity` e `/events`.
+- [ ] Fazer live real com turno contendo thinking, tool, intent e ask_user para observar o fluxo completo como o operador humano vê.
+
+### 11.25 Terminal base sem dumps `key=value`
+
+- [x] `/permission cockpit` virou `Permissões SDK`, com `recente`, `requisição`, `mudanças de modo` e `atalhos` em vez de `latest`, `requestId=`, `mode log` e `quick`.
+- [x] `/elicitation show` virou `Formulário SDK`, com `estado`, `modo`, `origem`, `ação`, `resultado` e `conteúdo da resposta`.
+- [x] `/permission show` passou a usar `estado`, `tipo`, `requisição`, `aprovação`, `resultado`, `criada` e `concluída`, com timestamps ISO centralizados.
+- [x] `/status full` trocou `input estruturado` por `pergunta estruturada` e limpou cache/escopo de I/O para frase humana.
+- [x] `/index status/search/symbol` trocou `files=`, `latest=` e `matches=` por `arquivos`, `última indexação` e `resultados`.
+- [x] `/scope declare/context/find/refresh/close/list` trocou `files=`, `parsed=`, `matches=` e `refreshed=` por `arquivos`, `analisados`, `resultados` e `atualizados`.
+- [x] `/fs` trocou `io=`, `engine=` e `matches=` por `I/O`, `motor` e `resultados`.
+- [x] Testes escopados protegem `/fs`, `/index`, `/scope`, `/session`, `/sdk`, `/activity`, `/events`, `/intent`, `/export` e `turn-display`.
+- [x] Live PTY curta executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/ux-iso-humanized-base-surfaces-20260602-1357`.
+- [x] Resultado: PASS completo em help, status, now, health, tools, live, activity, waits e close limpo.
+- [x] Evidência visual: `/activity` no PTY real passou a renderizar `2026-06-02T13:57:43.907-03:00` com offset local explícito.
+- [ ] Reduzir densidade visual de `/now`: a live mostrou `[agora]` repetido em todas as linhas; a informação é correta, mas o marcador deve virar cabeçalho único.
+- [ ] Auditar `/byok` default, que ainda contém blocos diagnósticos extensos com `rows=`, `latest=`, `store=`, `postRuntimeProfiles=`, `tracePersisted=`, `source=`, `freshness=` e afins.
+- [ ] Separar explicitamente “tela default humana” de “detail/raw diagnóstico” nos comandos BYOK, sem perder automação e rastreabilidade.

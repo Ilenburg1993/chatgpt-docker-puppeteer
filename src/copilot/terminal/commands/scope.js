@@ -222,7 +222,7 @@ function printScopeStats(ctx, stats) {
     }
     const ready = stats.ready ? '\x1b[32mready\x1b[0m' : '\x1b[33mwarming\x1b[0m';
     ctx.println(
-        `  \x1b[36m${stats.sessionId}\x1b[0m · ${ready} · files=${stats.pathCount} · l1=${stats.preloaded} · parsed=${stats.parsed} · invalidated=${stats.invalidated} · failed=${stats.failed} · ${Math.round(stats.warmDurationMs)}ms`,
+        `  \x1b[36m${stats.sessionId}\x1b[0m · ${ready} · arquivos ${stats.pathCount} · cache L1 ${stats.preloaded} · analisados ${stats.parsed} · invalidados ${stats.invalidated} · falhas ${stats.failed} · ${Math.round(stats.warmDurationMs)}ms`,
     );
 }
 
@@ -295,7 +295,7 @@ function runContext(ctx, parts) {
     }
     const ready = scope.ready ? '\x1b[32mready\x1b[0m' : '\x1b[33mwarming\x1b[0m';
     ctx.println(`\n  \x1b[36mContexto de escopo\x1b[0m ${scope.sessionId} · ${ready}`);
-    ctx.println(`  files=${scope.files} · symbols=${scope.symbols} · exports=${scope.topExports.length}`);
+    ctx.println(`  arquivos ${scope.files} · símbolos ${scope.symbols} · exports ${scope.topExports.length}`);
     for (const item of scope.topExports.slice(0, 30)) ctx.println(`  \x1b[90m- ${item}\x1b[0m`);
     if (scope.topExports.length > 30)
         ctx.println(`  \x1b[90m… ${scope.topExports.length - 30} exports adicionais\x1b[0m`);
@@ -315,7 +315,7 @@ function runFind(ctx, parts) {
         return;
     }
     const results = findSymbol(sessionId, symbol, { exactMatch: args.exactMatch });
-    ctx.println(`\n  \x1b[36mScope symbol search\x1b[0m ${sessionId} · "${symbol}" · matches=${results.length}`);
+    ctx.println(`\n  \x1b[36mBusca de símbolo no escopo\x1b[0m ${sessionId} · "${symbol}" · resultados ${results.length}`);
     for (const result of results.slice(0, 80)) {
         ctx.println(
             `  \x1b[33m${result.symbol.kind}\x1b[0m ${result.symbol.name} · ${compactPath(result.filePath)}:${result.symbol.line}`,
@@ -335,7 +335,7 @@ async function runRefresh(ctx, parts) {
     const modifiedPaths = args.rest.length > 0 ? args.rest : undefined;
     const result = await refreshScope(sessionId, modifiedPaths);
     ctx.println(
-        `\n  \x1b[36m/scope refresh\x1b[0m ${sessionId} · refreshed=${result.refreshed} · failed=${result.failed}\n`,
+        `\n  \x1b[36m/scope refresh\x1b[0m ${sessionId} · atualizados ${result.refreshed} · falhas ${result.failed}\n`,
     );
 }
 
@@ -350,7 +350,7 @@ function runClose(ctx, parts) {
         ctx.println(`\x1b[33m  Escopo não encontrado: ${sessionId}\x1b[0m`);
         return;
     }
-    ctx.println(`\x1b[32m  Escopo fechado:\x1b[0m ${sessionId} · files=${stats.pathCount} · parsed=${stats.parsed}`);
+    ctx.println(`\x1b[32m  Escopo fechado:\x1b[0m ${sessionId} · arquivos ${stats.pathCount} · analisados ${stats.parsed}`);
 }
 
 /**

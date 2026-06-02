@@ -13,6 +13,7 @@ import {
     recallTerminalMemoriesProjection,
     rememberTerminalMemoryProjection,
 } from '../frontend/index.js';
+import { formatTerminalIsoTimestamp } from '../state/index.js';
 
 /**
  * @typedef {object} SessionContext
@@ -52,7 +53,7 @@ export function cmdRecall({ println }, arg) {
     println(`\n  \x1b[36mMemórias\x1b[0m ${label ? `[${arg}]` : '(todas)'}`);
     println('  ─────────────────────────────────────────────');
     for (const m of memories) {
-        const ts = new Date(String(m['created_at'] ?? '')).toLocaleString('pt-BR');
+        const ts = formatTerminalIsoTimestamp(String(m['created_at'] ?? ''));
         println(`  \x1b[90m[${ts}]\x1b[0m \x1b[33m${m['tag'] ?? ''}\x1b[0m  ${m['content'] ?? ''}`);
     }
     println('  ─────────────────────────────────────────────\n');

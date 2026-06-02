@@ -18,6 +18,7 @@ import {
     getIoIndexStats,
     searchIoIndex,
 } from '../../infra/index.js';
+import { formatTerminalIsoTimestamp } from '../state/ui/index.js';
 
 /**
  * @typedef {{ println: (text: string) => void }} IndexCommandContext
@@ -166,18 +167,18 @@ function printStats(ctx) {
         return;
     }
     const latest =
-        typeof stats['latestIndexedAtMs'] === 'number' ? new Date(stats['latestIndexedAtMs']).toISOString() : '-';
+        typeof stats['latestIndexedAtMs'] === 'number' ? formatTerminalIsoTimestamp(stats['latestIndexedAtMs']) : '-';
     ctx.println('\n  \x1b[36mÍndice L2 local\x1b[0m');
     ctx.println(
-        `  available=${String(stats['available'])} · files=${numberLabel(stats['files'])} · fresh=${numberLabel(stats['freshFiles'])} · failed=${numberLabel(stats['failedFiles'])}`,
+        `  disponibilidade ${String(stats['available'])} · arquivos ${numberLabel(stats['files'])} · frescos ${numberLabel(stats['freshFiles'])} · falhas ${numberLabel(stats['failedFiles'])}`,
     );
     ctx.println(
-        `  symbols=${numberLabel(stats['symbols'])} · imports=${numberLabel(stats['imports'])} · chunks=${numberLabel(stats['chunks'])} · bytes=${bytesLabel(stats['bytesIndexed'])}`,
+        `  símbolos ${numberLabel(stats['symbols'])} · imports ${numberLabel(stats['imports'])} · chunks ${numberLabel(stats['chunks'])} · bytes ${bytesLabel(stats['bytesIndexed'])}`,
     );
     ctx.println(
-        `  builds=${numberLabel(stats['builds'])} · indexed=${numberLabel(stats['indexed'])} · skipped=${numberLabel(stats['skipped'])} · pruned=${numberLabel(stats['pruned'])} · searches=${numberLabel(stats['searches'])}`,
+        `  builds ${numberLabel(stats['builds'])} · indexados ${numberLabel(stats['indexed'])} · ignorados ${numberLabel(stats['skipped'])} · podados ${numberLabel(stats['pruned'])} · buscas ${numberLabel(stats['searches'])}`,
     );
-    ctx.println(`  latest=${latest} · freshness=${String(stats['freshness'] ?? '-')}\n`);
+    ctx.println(`  última indexação ${latest} · frescor ${String(stats['freshness'] ?? '-')}\n`);
 }
 
 /**
@@ -226,7 +227,7 @@ function runSearch(ctx, parts) {
         return;
     }
     const results = searchIoIndex(query).slice(0, 20);
-    ctx.println(`\n  \x1b[36m/index search\x1b[0m "${query}" · matches=${results.length}`);
+    ctx.println(`\n  \x1b[36m/index search\x1b[0m "${query}" · resultados ${results.length}`);
     for (const item of results) {
         ctx.println(`  \x1b[90m- ${item.relativePath}\x1b[0m ${String(item.snippet ?? '').replace(/\s+/gu, ' ')}`);
     }
@@ -246,7 +247,7 @@ function runSymbol(ctx, parts) {
         return;
     }
     const results = findIoIndexSymbol(symbol).slice(0, 30);
-    ctx.println(`\n  \x1b[36m/index symbol\x1b[0m ${symbol} · matches=${results.length}`);
+    ctx.println(`\n  \x1b[36m/index symbol\x1b[0m ${symbol} · resultados ${results.length}`);
     for (const item of results) {
         ctx.println(
             `  \x1b[90m- ${item.relativePath}:${item.line || 0}\x1b[0m ${item.symbolKind} ${item.symbolName}${item.exported ? ' export' : ''}`,

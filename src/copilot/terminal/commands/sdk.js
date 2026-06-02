@@ -69,6 +69,7 @@ import {
     recordTerminalPermissionCompleted,
     recordTerminalPermissionRequested,
     terminalPermissionModeSkipsSdkPrompts,
+    formatTerminalIsoTimestamp,
 } from '../state/sdk/index.js';
 import { terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
@@ -243,7 +244,7 @@ function ioSummary(result) {
     const operation = typeof io['operation'] === 'string' ? io['operation'] : null;
     const engine = typeof io['engine'] === 'string' ? io['engine'] : null;
     if (!operation && !engine) return '';
-    return `io=${operation ?? '-'} · engine=${engine ?? '-'}`;
+    return `I/O ${operation ?? '-'} · motor ${engine ?? '-'}`;
 }
 
 /**
@@ -1905,9 +1906,7 @@ export async function cmdPermission({ println }, arg = '') {
             );
         }
     }
-    println(
-        '  \x1b[90mUso: /permission [list|pending|reset-approvals|cockpit|all|show latest|clear <id>|clear all|mode [approve_all|audit_only|selective]|respond <id> <decision> [json]]\x1b[0m',
-    );
+    println('  \x1b[90mUso: /permission [list|pending|reset-approvals|cockpit|all|show latest|clear <id>|clear all|mode [approve_all|audit_only|selective]|respond <id> <decision> [json]]\x1b[0m');
     println('  \x1b[90mPermissões são decididas pelo SDK/hook; este comando é observabilidade operacional.\x1b[0m\n');
 }
 
@@ -1921,16 +1920,16 @@ function renderElicitationEntry({ println }, entry) {
         println('\x1b[33m  Elicitation não encontrada.\x1b[0m');
         return;
     }
-    println(`\n  \x1b[36mElicitation ${entry.id}\x1b[0m`);
-    println(`  status  \x1b[33m${entry.status}\x1b[0m`);
-    println(`  mode    \x1b[33m${entry.mode}\x1b[0m`);
+    println(`\n  \x1b[36mFormulário SDK ${entry.id}\x1b[0m`);
+    println(`  estado  \x1b[33m${entry.status}\x1b[0m`);
+    println(`  modo    \x1b[33m${entry.mode}\x1b[0m`);
     println(`  msg     ${entry.message}`);
     if (entry.url) println(`  url     \x1b[36m${entry.url}\x1b[0m`);
-    if (entry.source) println(`  source  \x1b[90m${entry.source}\x1b[0m`);
+    if (entry.source) println(`  origem  \x1b[90m${entry.source}\x1b[0m`);
     if (entry.toolCallId) println(`  tool    \x1b[90m${entry.toolCallId}\x1b[0m`);
-    if (entry.actionable) println('  action  \x1b[32mrespondível pelo runtime\x1b[0m');
-    if (entry.resultAction) println(`  result  \x1b[33m${entry.resultAction}\x1b[0m`);
-    if (entry.resultContent) println(`\n  result content:\n${pretty(entry.resultContent, 2500)}`);
+    if (entry.actionable) println('  ação    \x1b[32mrespondível pelo runtime\x1b[0m');
+    if (entry.resultAction) println(`  resultado \x1b[33m${entry.resultAction}\x1b[0m`);
+    if (entry.resultContent) println(`\n  conteúdo da resposta:\n${pretty(entry.resultContent, 2500)}`);
     if (entry.requestedSchema) println(`\n  schema:\n${pretty(entry.requestedSchema, 2500)}`);
     if (entry.actionable) {
         const shorthand = describeElicitationShorthand(entry.requestedSchema);
@@ -1951,13 +1950,13 @@ function renderPermissionEntry({ println }, entry) {
         return;
     }
     println(`\n  \x1b[36mPermissão ${entry.id}\x1b[0m`);
-    println(`  status  \x1b[33m${entry.status}\x1b[0m`);
-    println(`  type    \x1b[33m${entry.permissionType}\x1b[0m`);
-    if (entry.requestId) println(`  request \x1b[90m${entry.requestId}\x1b[0m`);
-    if (entry.granted !== null) println(`  granted \x1b[33m${String(entry.granted)}\x1b[0m`);
-    if (entry.result) println(`  result  \x1b[33m${entry.result}\x1b[0m`);
-    println(`  created \x1b[90m${new Date(entry.createdAt).toISOString()}\x1b[0m`);
-    if (entry.completedAt) println(`  done    \x1b[90m${new Date(entry.completedAt).toISOString()}\x1b[0m`);
+    println(`  estado      \x1b[33m${entry.status}\x1b[0m`);
+    println(`  tipo        \x1b[33m${entry.permissionType}\x1b[0m`);
+    if (entry.requestId) println(`  requisição  \x1b[90m${entry.requestId}\x1b[0m`);
+    if (entry.granted !== null) println(`  aprovação   \x1b[33m${String(entry.granted)}\x1b[0m`);
+    if (entry.result) println(`  resultado   \x1b[33m${entry.result}\x1b[0m`);
+    println(`  criada      \x1b[90m${formatTerminalIsoTimestamp(entry.createdAt)}\x1b[0m`);
+    if (entry.completedAt) println(`  concluída   \x1b[90m${formatTerminalIsoTimestamp(entry.completedAt)}\x1b[0m`);
     if (entry.status === 'pending' && entry.requestId) {
         println(
             '  \x1b[90mAção: /permission respond <id> <approve-once|approve-for-session|approve-for-location|reject|user-not-available>\x1b[0m',
@@ -1983,34 +1982,35 @@ function renderPermissionCockpit({ println }, runtimeId) {
     const latest = readTerminalPermissionSummary({ runtimeId: scopedRuntimeId }).latest;
     const modeChanges = listTerminalPermissionModeHistory({ limit: 4 });
 
-    println('\n  \x1b[36mPermission cockpit\x1b[0m');
+    println('\n  \x1b[36mPermissões SDK\x1b[0m');
     println(`  pendentes  \x1b[33m${pending.length}\x1b[0m`);
     if (latest) {
+        const request = latest.requestId ? ` · requisição ${latest.requestId}` : '';
         println(
-            `  latest     \x1b[90m${latest.id}\x1b[0m ${latest.permissionType}${latest.requestId ? ` · requestId=${latest.requestId}` : ''}`,
+            `  recente    \x1b[90m${latest.id}\x1b[0m ${latest.permissionType}${request}`,
         );
     } else {
-        println('  latest     \x1b[90m(nenhuma permissão observada)\x1b[0m');
+        println('  recente    \x1b[90m(nenhuma permissão observada)\x1b[0m');
     }
 
     if (typeRows.length > 0) {
-        println('  por tipo   \x1b[90m' + typeRows.map(([type, count]) => `${type}=${count}`).join(' · ') + '\x1b[0m');
+        println('  por tipo   \x1b[90m' + typeRows.map(([type, count]) => `${type} ${count}`).join(' · ') + '\x1b[0m');
     } else {
         println('  por tipo   \x1b[90m(nenhuma pendência)\x1b[0m');
     }
 
     if (modeChanges.length > 0) {
-        println('  mode log');
+        println('  mudanças de modo');
         for (const item of modeChanges) {
-            println(`    \x1b[90m${new Date(item.ts).toLocaleTimeString('pt-BR')}\x1b[0m  ${item.mode}`);
+            println(`    \x1b[90m${formatTerminalIsoTimestamp(item.ts)}\x1b[0m  ${item.mode}`);
         }
     } else {
-        println('  mode log   \x1b[90m(sem mudanças recentes no runtime local)\x1b[0m');
+        println('  mudanças de modo \x1b[90m(sem mudanças recentes no runtime local)\x1b[0m');
     }
 
-    println('  quick      \x1b[90m/permission pending · /permission show latest · /permission mode selective\x1b[0m');
+    println('  atalhos    \x1b[90m/permission pending · /permission show latest · /permission mode selective\x1b[0m');
     if (latest?.requestId && latest.status === 'pending') {
-        println(`  quick      \x1b[90m/permission respond ${latest.id} approve-once\x1b[0m`);
+        println(`  atalho     \x1b[90m/permission respond ${latest.id} approve-once\x1b[0m`);
     }
     println('');
 }

@@ -24,6 +24,7 @@ import {
     setTerminalSdkModeProjection,
     updateTerminalSdkPlanProjection,
 } from '../frontend/index.js';
+import { formatTerminalIsoTimestamp } from '../state/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -44,7 +45,7 @@ export async function cmdPlan({ println }, arg) {
             ? projection.plan.content.slice(0, 160) + (projection.plan.content.length > 160 ? '…' : '')
             : null;
         const op = projection.lastObservedPlanOperation
-            ? `${projection.lastObservedPlanOperation}${projection.lastObservedPlanChangedAt ? ` @ ${new Date(projection.lastObservedPlanChangedAt).toLocaleTimeString('pt-BR')}` : ''}`
+            ? `${projection.lastObservedPlanOperation}${projection.lastObservedPlanChangedAt ? ` @ ${formatTerminalIsoTimestamp(projection.lastObservedPlanChangedAt)}` : ''}`
             : '(sem alterações observadas)';
 
         println(`\x1b[36m  /plan\x1b[0m → modo SDK atual: \x1b[35m${projection.currentMode.toUpperCase()}\x1b[0m`);

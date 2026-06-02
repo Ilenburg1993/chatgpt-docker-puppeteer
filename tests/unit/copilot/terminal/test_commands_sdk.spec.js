@@ -1001,7 +1001,7 @@ describe('terminal/commands/sdk', () => {
 
         const showAudit = mockCtx();
         await cmdElicitation({ println: showAudit.println }, 'show latest --runtime audit');
-        expect(showAudit.output()).toContain('Elicitation el-audit-1');
+        expect(showAudit.output()).toContain('Formulário SDK el-audit-1');
 
         const respondAudit = mockCtx();
         await cmdElicitation(
@@ -1028,12 +1028,13 @@ describe('terminal/commands/sdk', () => {
         const ctx = mockCtx();
         await cmdPermission({ println: ctx.println }, 'cockpit');
 
-        expect(ctx.output()).toContain('Permission cockpit');
+        expect(ctx.output()).toContain('Permissões SDK');
         expect(ctx.output()).toContain('pendentes');
-        expect(ctx.output()).toContain('file_write=2');
-        expect(ctx.output()).toContain('shell=1');
-        expect(ctx.output()).toContain('mode log');
+        expect(ctx.output()).toContain('file_write 2');
+        expect(ctx.output()).toContain('shell 1');
+        expect(ctx.output()).toContain('mudanças de modo');
         expect(ctx.output()).toContain('selective');
         expect(ctx.output()).toContain('/permission pending');
+        expect(ctx.output()).not.toContain('requestId=');
     });
 });

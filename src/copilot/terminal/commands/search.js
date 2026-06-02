@@ -12,6 +12,7 @@
 
 import { toError } from '#copilot/core';
 import { searchTerminalTurnsProjection } from '../frontend/index.js';
+import { formatTerminalIsoTimestamp } from '../state/index.js';
 
 /**
  * @typedef {object} SearchContext
@@ -53,7 +54,7 @@ export function cmdSearch({ println, hubSessionId }, arg) {
             const role = r['role'] ?? '?';
             const content = typeof r['content'] === 'string' ? r['content'] : String(r['content'] ?? '');
             const preview = content.length > 120 ? content.slice(0, 120) + '…' : content;
-            const ts = r['created_at'] ? new Date(String(r['created_at'])).toLocaleTimeString('pt-BR') : '';
+            const ts = r['created_at'] ? formatTerminalIsoTimestamp(String(r['created_at'])) : 'sem horário';
             println(`  \x1b[90m[${ts}]\x1b[0m \x1b[33m${role}\x1b[0m: ${preview}`);
         }
         println('');

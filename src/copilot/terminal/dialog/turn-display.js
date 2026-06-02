@@ -11,6 +11,7 @@
 import { appendThinkingHistoryChunk, finalizeThinkingHistoryEntry } from '../../presentation/state/index.js';
 import {
     formatTerminalThinkingRef,
+    formatTerminalIsoTimestamp,
     recordTerminalActivity,
     recordTerminalStreamDeltaDiagnostic,
     readTerminalTurnCorrelation,
@@ -227,11 +228,7 @@ export function createReasoningCallback(state) {
                 source: 'dialog',
             });
             if (state.showThinking) {
-                const tsNow = new Date().toLocaleTimeString('pt-BR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                });
+                const tsNow = formatTerminalIsoTimestamp(Date.now());
                 println(SEPARATOR);
                 println(
                     `  ${terminalThemeText('muted', `[${tsNow}]`)}  💭  ${terminalThemeText('thinking', 'Thinking capturado')}  ${terminalThemeText('muted', `· ${state.model} · ${state.effort}`)}`,
@@ -379,11 +376,7 @@ export function createDeltaCallback(state) {
             } else {
                 clearInlineStatus();
             }
-            const tsNow = new Date().toLocaleTimeString('pt-BR', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-            });
+            const tsNow = formatTerminalIsoTimestamp(now);
             println(SEPARATOR);
             println(
                 `  ${terminalThemeText('muted', `[${tsNow}]`)}  🧠  ${terminalThemeText('assistant', 'LLM-B')}  ${terminalThemeText('muted', '·')}  ${terminalThemeText('assistant', state.model)}  ${terminalThemeText('muted', '·')}  ${terminalThemeText('thinking', state.effort)}`,

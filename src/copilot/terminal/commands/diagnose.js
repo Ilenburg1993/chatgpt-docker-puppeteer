@@ -19,7 +19,7 @@
  */
 
 import { readTerminalConfigProjection, readTerminalDiagnoseProjection } from '../frontend/index.js';
-import { terminalPermissionModeSkipsSdkPrompts, terminalThemeText } from '../state/index.js';
+import { formatTerminalIsoTimestamp, terminalPermissionModeSkipsSdkPrompts, terminalThemeText } from '../state/index.js';
 import {
     compactTerminalDiagnosticId,
     compactTerminalToolText,
@@ -44,6 +44,14 @@ const C = {
     grey: '\x1b[90m',
     magenta: '\x1b[35m',
 };
+
+/**
+ * @param {string[]} commands
+ * @returns {string}
+ */
+function renderCommandList(commands) {
+    return commands.map((command) => terminalThemeText('command', command)).join(terminalThemeText('muted', ' · '));
+}
 
 const DISABLED_BYOK_SUMMARY = Object.freeze({
     enabled: false,
@@ -167,7 +175,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
             ? `${C.grey}providers=${gatewayProjection.providerCount} · models=${gatewayProjection.modelCount} · enabled=${gatewayProjection.enabledModelCount} · active=${gatewayActive?.['modelId'] ?? '-'}${gatewayActive?.['providerId'] ? `@${gatewayActive['providerId']}` : ''}${C.reset}`
             : `${C.grey}off${C.reset}`;
     const planOpLine = configProjection.sdkPlanOperation
-        ? `${C.yellow}${configProjection.sdkPlanOperation}${C.reset}${configProjection.sdkPlanChangedAt ? ` ${C.grey}@ ${new Date(configProjection.sdkPlanChangedAt).toLocaleTimeString('pt-BR')}${C.reset}` : ''}`
+        ? `${C.yellow}${configProjection.sdkPlanOperation}${C.reset}${configProjection.sdkPlanChangedAt ? ` ${C.grey}@ ${formatTerminalIsoTimestamp(configProjection.sdkPlanChangedAt)}${C.reset}` : ''}`
         : `${C.grey}(sem alteração)${C.reset}`;
     const runtimesLine =
         Array.isArray(configProjection.agentRuntimes) && configProjection.agentRuntimes.length > 0
@@ -230,7 +238,7 @@ ${terminalThemeText('assistant', 'Saúde do Terminal LLM-B')}
   Atividade    ${activityColor}${activity.label}${C.reset}${typeof activity.progress === 'number' ? ` ${C.grey}(${activity.progress}%)${C.reset}` : ''} ${activity.detail ? `${C.grey}· ${activity.detail}${C.reset}` : ''}
   Infra        ${renderHumanHealthStatus(String(health?.['status'] ?? 'unknown'))} ${C.grey}· memória ${memMB}MB · uptime ${Math.floor(uptimeSec / 60)}m${C.reset}
   Próximo      ${renderCompactActionLine(health?.['recommendedAction'])}
-  Detalhe      ${C.grey}/health full · /diagnose · /tools diag · /activity detail${C.reset}
+  Detalhe      ${renderCommandList(['/health full', '/diagnose', '/tools diag', '/activity detail'])}
 `);
         if (configProjection.runtimeFallbackWarning) {
             println(

@@ -2,7 +2,7 @@
 
 import { readTerminalIoActivityProjection } from '../events/index.js';
 import { readTerminalActivityProjection } from '../frontend/index.js';
-import { terminalThemeText } from '../state/ui/index.js';
+import { formatTerminalIsoTimestamp, terminalThemeText } from '../state/ui/index.js';
 import {
     buildTerminalToolActivityPresentation,
     compactTerminalDiagnosticId,
@@ -303,11 +303,7 @@ function printStreamDiagnostics(println, diagnostics) {
     if (diagnostics.recent.length > 0) {
         println('  decisões recentes');
         for (const entry of diagnostics.recent.slice(0, 5)) {
-            const ts = new Date(entry.timestamp).toLocaleTimeString('pt-BR', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-            });
+            const ts = formatTerminalIsoTimestamp(entry.timestamp);
             if (entry.kind === 'delta') {
                 const color =
                     entry.action === 'suppressed' ? '\x1b[33m' : entry.action === 'normalized' ? '\x1b[36m' : '\x1b[90m';
@@ -378,11 +374,7 @@ export function cmdActivity({ println }, arg) {
     if (recentIo.length > 0) {
         println('  \x1b[36mI/O real recente\x1b[0m');
         for (const entry of recentIo.slice(0, 8)) {
-            const ts = new Date(entry.timestamp).toLocaleTimeString('pt-BR', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-            });
+            const ts = formatTerminalIsoTimestamp(entry.timestamp);
             const sev = entry.success ? '\x1b[90m' : '\x1b[31m';
             const bytes =
                 typeof entry.bytesRead === 'number'
@@ -409,13 +401,9 @@ export function cmdActivity({ println }, arg) {
         return;
     }
 
-    println('  \x1b[36mTimeline recente\x1b[0m');
+    println(`  ${terminalThemeText('assistant', 'Timeline recente')}`);
     for (const entry of projection.history) {
-        const ts = new Date(entry.ts).toLocaleTimeString('pt-BR', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-        });
+        const ts = formatTerminalIsoTimestamp(entry.ts);
         const sev = entry.severity === 'error' ? '\x1b[31m' : entry.severity === 'warn' ? '\x1b[33m' : '\x1b[90m';
         const extra = entry.detail ? ` — ${compactOperatorDetail(entry.detail)}` : '';
         const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';

@@ -41,6 +41,7 @@ const readTerminalSseEventArchiveTail = vi.fn(async () => ({
 }));
 
 vi.mock('../../../../src/copilot/terminal/state/index.js', () => ({
+    formatTerminalIsoTimestamp: vi.fn((/** @type {unknown} */ value) => new Date(Number(value)).toISOString()),
     readTerminalSseEventArchiveTail,
 }));
 

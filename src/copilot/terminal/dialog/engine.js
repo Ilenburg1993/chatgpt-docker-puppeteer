@@ -42,7 +42,7 @@ import {
     startTerminalDialogMode,
 } from '../frontend/gateways/index.js';
 import { normalizeTerminalModelBillingProjection } from '../frontend/projections/index.js';
-import { markTerminalActivityIdle, recordTerminalActivity } from '../state/dialog/index.js';
+import { formatTerminalIsoTimestamp, markTerminalActivityIdle, recordTerminalActivity } from '../state/dialog/index.js';
 import {
     beginTerminalTurnMaterialization,
     clearTerminalTurnMaterialization,
@@ -924,11 +924,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         await ensureDialogLoop();
 
         if (actor === 'llm-a') {
-            const tsNow = new Date().toLocaleTimeString('pt-BR', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-            });
+            const tsNow = formatTerminalIsoTimestamp(Date.now());
             println(SEPARATOR);
             println(`  \x1b[90m[${tsNow}]\x1b[0m  🤖  \x1b[34mLLM-A\x1b[0m`);
             println('');

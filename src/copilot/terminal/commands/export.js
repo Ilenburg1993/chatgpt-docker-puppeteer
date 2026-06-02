@@ -14,6 +14,7 @@ import { join, resolve } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { redactSecretText } from '../../core/security/redaction.js';
 import { readTerminalTimelineProjection } from '../frontend/index.js';
+import { formatTerminalIsoTimestamp } from '../state/index.js';
 
 /**
  * @typedef {object} ExportContext
@@ -42,14 +43,15 @@ export async function cmdExport({ println }, arg) {
             ? `${projection.sync.status}:${projection.syncBlockedReason}`
             : projection.sync.status;
 
-    const lines = [`# Conversa LLM-B — ${new Date().toLocaleString('pt-BR')}`, ''];
+    const exportedAt = formatTerminalIsoTimestamp(Date.now());
+    const lines = [`# Conversa LLM-B — ${exportedAt}`, ''];
     lines.push(
-        `> ${projection.turns.length} mensagens · timeline=${sanitizeExportInline(projection.timelineSource)}/${sanitizeExportInline(projection.reconciliationStatus)} · sync=${sanitizeExportInline(syncDetail)} · redaction=enabled · exportado em ${new Date().toISOString()}`,
+        `> ${projection.turns.length} mensagens · timeline=${sanitizeExportInline(projection.timelineSource)}/${sanitizeExportInline(projection.reconciliationStatus)} · sync=${sanitizeExportInline(syncDetail)} · redaction=enabled · exportado em ${exportedAt}`,
         '',
     );
 
     for (const turn of projection.turns) {
-        const time = new Date(turn.timestamp ?? Date.now()).toLocaleTimeString('pt-BR');
+        const time = formatTerminalIsoTimestamp(turn.timestamp ?? Date.now());
         const role =
             turn.role === 'user'
                 ? '👤 Usuário'

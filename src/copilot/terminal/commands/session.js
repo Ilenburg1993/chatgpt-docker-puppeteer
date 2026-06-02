@@ -49,6 +49,7 @@ import {
 } from '../events/tool-activity-presenter.js';
 import {
     readTerminalSseEventArchiveTail,
+    formatTerminalIsoTimestamp,
     terminalPermissionModeSkipsSdkPrompts,
     terminalThemeText,
 } from '../state/index.js';
@@ -90,6 +91,14 @@ function renderHumanTerminalHealth(value) {
     if (status === 'degraded') return 'atenção';
     if (status === 'unhealthy' || status === 'error') return 'problema';
     return status;
+}
+
+/**
+ * @param {string[]} commands
+ * @returns {string}
+ */
+function renderCommandList(commands) {
+    return commands.map((command) => terminalThemeText('command', command)).join(terminalThemeText('muted', ' · '));
 }
 
 /**
@@ -348,8 +357,8 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             : '\x1b[90mSDK Copilot\x1b[0m';
         const modelBilling = projection.modelBilling;
         const modelLabel = modelBilling.mismatch
-            ? `\x1b[33m${modelBilling.displayModel}\x1b[0m \x1b[90m(ver /status full)\x1b[0m`
-            : `\x1b[36m${modelBilling.displayModel}\x1b[0m`;
+            ? `${terminalThemeText('warn', modelBilling.displayModel)} ${terminalThemeText('muted', '(ver /status full)')}`
+            : terminalThemeText('assistant', modelBilling.displayModel);
         const gatewayProjection = configProjection.modelGatewayProjection ?? {
             providerCount: 0,
             modelCount: 0,
@@ -368,8 +377,8 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
   Acesso       ${byokLabel}
   Catálogo     \x1b[90m${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados\x1b[0m
   Atividade    \x1b[90m${renderLiveActivitySummary(projection.activity)}\x1b[0m
-  Próximo      \x1b[33m${action}\x1b[0m
-  Detalhe      \x1b[90m/status full · /now · /health · /menu\x1b[0m
+  Próximo      ${terminalThemeText('command', action)}
+  Detalhe      ${renderCommandList(['/status full', '/now', '/health', '/menu'])}
   ─────────────────────────────────────
 `);
         return;
@@ -378,7 +387,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const sdkMode = projection.sdkSessionMode ?? 'interactive';
     const sdkModeColor = sdkMode === 'plan' ? '\x1b[35m' : sdkMode === 'autopilot' ? '\x1b[36m' : '\x1b[90m';
     const sdkPlanOpLabel = projection.sdkPlanOperation
-        ? `${projection.sdkPlanOperation}${projection.sdkPlanChangedAt ? ` @ ${new Date(projection.sdkPlanChangedAt).toLocaleTimeString('pt-BR')}` : ''}`
+        ? `${projection.sdkPlanOperation}${projection.sdkPlanChangedAt ? ` @ ${formatTerminalIsoTimestamp(projection.sdkPlanChangedAt)}` : ''}`
         : '\x1b[90m(sem alterações)\x1b[0m';
     const healthColor =
         health?.['status'] === 'healthy' ? '\x1b[32m' : health?.['status'] === 'degraded' ? '\x1b[33m' : '\x1b[31m';
@@ -409,7 +418,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
                 : '\x1b[90m';
     const shadowExpiry =
         typeof projection.pendingQuestionShadowExpiresAt === 'number'
-            ? new Date(projection.pendingQuestionShadowExpiresAt).toISOString()
+            ? formatTerminalIsoTimestamp(projection.pendingQuestionShadowExpiresAt)
             : null;
     const shadowAgeLabel =
         typeof projection.pendingQuestionShadowAgeMs === 'number'
@@ -524,8 +533,8 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const ioL1 = ioRuntime.cache.l1;
     const ioL2 = ioRuntime.cache.l2;
     const ioIndex = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});
-    const ioCacheLine = `l1=${ioL1['enabled'] ? 'on' : 'off'} entries=${ioL1['size'] ?? 0} bytes=${ioL1['bytesStored'] ?? 0} · l2=${ioL2['enabled'] ? 'on' : 'off'} entries=${ioL2['size'] ?? 0} · hitRatio=${ioHitRatio}`;
-    const ioScopeLine = `scopes=${ioRuntime.scopes.active} · parser=${ioRuntime.parser.size}/${ioRuntime.parser.maxSize} · index=${ioIndex['available'] ? 'on' : 'empty'}:${ioIndex['files'] ?? 0}`;
+    const ioCacheLine = `L1 ${ioL1['enabled'] ? 'ativo' : 'off'} · entradas ${ioL1['size'] ?? 0} · bytes ${ioL1['bytesStored'] ?? 0} · L2 ${ioL2['enabled'] ? 'ativo' : 'off'} · entradas ${ioL2['size'] ?? 0} · acerto ${ioHitRatio}`;
+    const ioScopeLine = `escopos ${ioRuntime.scopes.active} · parser ${ioRuntime.parser.size}/${ioRuntime.parser.maxSize} · índice ${ioIndex['available'] ? 'ativo' : 'vazio'}:${ioIndex['files'] ?? 0}`;
     const agentSelection = getEffectiveSdkAgentSelection();
     const customAgentsLine = agentSelection.enabled.length
         ? `${agentSelection.enabled.join(', ')}${agentSelection.disabled.length ? ` · disabled=${agentSelection.disabled.join(', ')}` : ''}`
@@ -661,7 +670,7 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
     }
     if (projection.pendingStructuredUserInputs > 0) {
         println(
-            '  \x1b[33mAção: há input estruturado pendente; digite a resposta normalmente ou use /answer <texto>.\x1b[0m',
+            '  \x1b[33mAção: há pergunta estruturada pendente; digite a resposta normalmente ou use /answer <texto>.\x1b[0m',
         );
         if (projection.latestStructuredUserInput) {
             const latest = projection.latestStructuredUserInput;
@@ -671,7 +680,7 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
                 Array.isArray(latest.choices) && latest.choices.length > 0
                     ? ` opções ${latest.choices.join(' | ')}`
                     : '';
-            println(`  \x1b[90mUltimo input estruturado:${choices} ${question}\x1b[0m`);
+            println(`  \x1b[90mÚltima pergunta estruturada:${choices} ${question}\x1b[0m`);
         }
     }
     if (modelBilling.mismatch) {
@@ -697,7 +706,7 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
     if (projection.timelineSyncStatus === 'failed') {
         const retryLabel =
             typeof projection.timelineSyncNextRetryAt === 'number'
-                ? ` próxima tentativa=${new Date(projection.timelineSyncNextRetryAt).toLocaleTimeString('pt-BR')}`
+                ? ` próxima tentativa ${formatTerminalIsoTimestamp(projection.timelineSyncNextRetryAt)}`
                 : '';
         println(
             `  \x1b[33mTimeline sync falhou: ${projection.timelineSyncLastError ?? 'erro desconhecido'}${retryLabel}.\x1b[0m`,
@@ -781,23 +790,25 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         const modelLine = modelBilling.mismatch
             ? `${modelBilling.displayModel} · revisar /status full`
             : modelBilling.displayModel;
+        const nowBadge = terminalThemeText('assistant', '[agora]');
+        const mutedNowBadge = terminalThemeText('muted', '[agora]');
         println(
-            `\x1b[36m[agora]\x1b[0m ${renderHumanTerminalStatus(state)} · conversa ${projection.dialogLoopActive ? 'ativa' : 'inativa'} · fila ${queue} · ${askLine}`,
+            `${nowBadge} ${renderHumanTerminalStatus(state)} · conversa ${projection.dialogLoopActive ? 'ativa' : 'inativa'} · fila ${queue} · ${askLine}`,
         );
         println(
-            `\x1b[90m[agora]\x1b[0m entrada ${channel.label} · ${waitLine} · modelo ${modelLine}`,
+            `${mutedNowBadge} entrada ${channel.label} · ${waitLine} · modelo ${modelLine}`,
         );
         if (gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0) {
             println(
-                `\x1b[90m[agora]\x1b[0m catálogo ${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ativo ${gatewayActive?.['modelId'] ?? '-'}`,
+                `${mutedNowBadge} catálogo ${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ativo ${gatewayActive?.['modelId'] ?? '-'}`,
             );
         }
         if (projection.activity?.label) {
             const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';
-            println(`\x1b[90m[agora]\x1b[0m atividade ${projection.activity.label}${detail}`);
+            println(`${mutedNowBadge} atividade ${projection.activity.label}${detail}`);
         }
         if (projection.recommendedAction && projection.recommendedAction !== 'none') {
-            println(`\x1b[90m[agora]\x1b[0m próximo ${projection.recommendedAction}`);
+            println(`${mutedNowBadge} próximo ${projection.recommendedAction}`);
         }
         return;
     }
@@ -886,7 +897,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
   Atividade    \x1b[90m${activityLine}\x1b[0m
   Turno        \x1b[90m${traceSummary.join(' · ') || 'sem ações recentes'}\x1b[0m
   Conexões     \x1b[90mSSE ${projection.sse.clients}/${projection.sse.criticalClients} · timeline ${projection.counters.timelineTurns} turno(s)\x1b[0m
-  Detalhe      \x1b[90m/live full · /activity ${requestedLimit} detail · /events ${requestedLimit}\x1b[0m
+  Detalhe      ${renderCommandList(['/live full', `/activity ${requestedLimit} detail`, `/events ${requestedLimit}`])}
   ─────────────────────────────────────
 `);
         return;
@@ -921,11 +932,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     if (projection.recentIo.length > 0) {
         println('  I/O real');
         for (const entry of projection.recentIo.slice(0, 6)) {
-            const ts = new Date(entry.timestamp).toLocaleTimeString('pt-BR', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-            });
+            const ts = formatTerminalIsoTimestamp(entry.timestamp);
             const statusLabel = entry.success ? 'concluída' : 'falhou';
             const bytes =
                 typeof entry.bytesRead === 'number'
@@ -943,11 +950,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     if (projection.activity.history.length > 0) {
         println('  eventos recentes');
         for (const entry of projection.activity.history.slice(0, 6)) {
-            const ts = new Date(entry.ts).toLocaleTimeString('pt-BR', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-            });
+            const ts = formatTerminalIsoTimestamp(entry.ts);
             const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';
             println(`    - [${ts}] ${renderLiveActivitySummary(entry, { includePhase: true })}${progress}`);
         }
@@ -977,7 +980,7 @@ export function cmdHistory({ println }, n = 10) {
         `\n── Histórico (${timeline.timelineSource} · ${timeline.timelineAuthority} · ${timeline.reconciliationStatus}) ──`,
     );
     for (const turn of hist) {
-        const ts = new Date(turn.timestamp).toLocaleTimeString('pt-BR');
+        const ts = formatTerminalIsoTimestamp(turn.timestamp);
         const roleLabel =
             turn.role === 'user'
                 ? '👤'
@@ -1029,7 +1032,7 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
         println(`\n  \x1b[36mÚltimos ${turns.length} turnos da sessão atual${offsetLabel}\x1b[0m`);
         println('  ─────────────────────────────────────────────────');
         for (const t of turns) {
-            const ts = new Date(String(t['created_at'] ?? '')).toLocaleTimeString('pt-BR');
+            const ts = formatTerminalIsoTimestamp(String(t['created_at'] ?? ''));
             const role = String(t['role'] ?? 'user');
             const content = String(t['content'] ?? '');
             const emoji = role === 'llm_b' ? '🧠' : role === 'llm_a' ? '🤖' : '👤';
@@ -1065,7 +1068,7 @@ export function cmdDbSessions({ hubSessionId, println }, n = 10) {
         println(`\n  \x1b[36mÚltimas ${sessions.length} hub sessions\x1b[0m`);
         println('  ──────────────────────────────────────────────────────────────');
         for (const s of sessions) {
-            const createdAt = new Date(String(s['created_at'] ?? '')).toLocaleString('pt-BR');
+            const createdAt = formatTerminalIsoTimestamp(String(s['created_at'] ?? ''));
             const sessionId = String(s['id'] ?? '');
             const sessionStatus = String(s['status'] ?? 'unknown');
             const title = String(s['title'] ?? '(sem título)');
@@ -1548,7 +1551,7 @@ async function cmdSessionSdkEvents({ println }, tokens) {
         });
     }
     for (const entry of collapsed) {
-        const time = entry.firstTimestamp ? new Date(entry.firstTimestamp).toLocaleTimeString('pt-BR') : '--:--:--';
+        const time = entry.firstTimestamp ? formatTerminalIsoTimestamp(entry.firstTimestamp) : 'sem horário';
         const repeats = entry.count > 1 ? ` \x1b[90m×${entry.count}\x1b[0m` : '';
         println(`    \x1b[90m${time}\x1b[0m  \x1b[33m${entry.line}\x1b[0m${repeats}`);
     }
@@ -1605,7 +1608,7 @@ async function cmdSessionSdkWaits({ println }, tokens) {
         });
     }
     for (const entry of collapsed) {
-        const time = entry.firstTimestamp ? new Date(entry.firstTimestamp).toLocaleTimeString('pt-BR') : '--:--:--';
+        const time = entry.firstTimestamp ? formatTerminalIsoTimestamp(entry.firstTimestamp) : 'sem horário';
         const repeats = entry.count > 1 ? ` \x1b[90m×${entry.count}\x1b[0m` : '';
         println(`    \x1b[90m${time}\x1b[0m  \x1b[33m${entry.line}\x1b[0m${repeats}`);
     }
@@ -1879,8 +1882,8 @@ export async function cmdSessionList({ println }) {
         const createdAt = s['createdAt'];
         const date =
             typeof createdAt === 'number' || typeof createdAt === 'string'
-                ? new Date(createdAt).toISOString().replace('T', ' ').slice(0, 19)
-                : 'invalid-date';
+                ? formatTerminalIsoTimestamp(createdAt)
+                : 'data inválida';
         println(
             `    ${String(s['snapshotId'] ?? '')}  ${date}  modelo ${String(s['model'] ?? '')}  ${String(s['reason'] ?? '')}`,
         );
@@ -1911,8 +1914,8 @@ export async function cmdSessionRestore({ println }, snapshotId) {
     const createdAt = snap['createdAt'];
     const createdAtIso =
         typeof createdAt === 'number' || typeof createdAt === 'string'
-            ? new Date(createdAt).toISOString()
-            : 'invalid-date';
+            ? formatTerminalIsoTimestamp(createdAt)
+            : 'data inválida';
     println(`    Criado: ${createdAtIso}`);
     println(`    Sessão: ${String(snap['sessionId'] ?? '(nenhuma)')}`);
     println(`    Modelo: ${String(snap['model'] ?? 'desconhecido')}  Status: ${String(snap['status'] ?? 'desconhecido')}`);
@@ -1936,10 +1939,10 @@ export async function cmdSessionRestore({ println }, snapshotId) {
         const shadowKind = typeof shadow.meta?.kind === 'string' ? ` [${shadow.meta.kind}]` : '';
         println(`    Pergunta restaurada${shadowKind}: ${String(shadow.question ?? '(sem texto)')}`);
         if (typeof shadow.restoredAt === 'number') {
-            println(`    Shadow restoredAt: ${new Date(shadow.restoredAt).toISOString()}`);
+            println(`    Restaurada em: ${formatTerminalIsoTimestamp(shadow.restoredAt)}`);
         }
         if (typeof shadow.expiresAt === 'number') {
-            println(`    Shadow expiresAt: ${new Date(shadow.expiresAt).toISOString()}`);
+            println(`    Expira em: ${formatTerminalIsoTimestamp(shadow.expiresAt)}`);
         }
     }
     if (snap['prMetrics']) {

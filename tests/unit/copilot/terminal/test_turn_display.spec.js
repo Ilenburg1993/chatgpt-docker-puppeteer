@@ -101,6 +101,9 @@ describe('terminal/dialog/turn-display', () => {
         expect(state.streamingStarted).toBe(true);
         expect(state.streamingChars).toBe(3);
         expect(state.streamingContent).toBe('abc');
+        const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(output).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}\]/u);
+        expect(output).not.toMatch(/\[\d{2}:\d{2}:\d{2}\]/u);
         expect(isTerminalRenderLocked()).toBe(false);
     });
 

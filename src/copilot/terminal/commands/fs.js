@@ -90,7 +90,7 @@ function ioSummary(result) {
     const engine = typeof io['engine'] === 'string' ? io['engine'] : null;
     const operation = typeof io['operation'] === 'string' ? io['operation'] : null;
     if (!engine && !operation) return '';
-    return `  \x1b[90mio=${operation ?? '-'} · engine=${engine ?? '-'}\x1b[0m`;
+    return `  \x1b[90mI/O ${operation ?? '-'} · motor ${engine ?? '-'}\x1b[0m`;
 }
 
 /**
@@ -215,7 +215,7 @@ async function runSearch(ctx, parts) {
     }
     ctx.println(`\n  \x1b[36mFS search\x1b[0m  \x1b[90m${String(result['searchPath'] ?? path)}\x1b[0m`);
     ctx.println(pretty(String(result['output'] ?? ''), 8000));
-    ctx.println(`  \x1b[90mmatches=${String(result['matchCount'] ?? 0)}\x1b[0m`);
+    ctx.println(`  \x1b[90mresultados ${String(result['matchCount'] ?? 0)}\x1b[0m`);
     const io = ioSummary(result);
     if (io) ctx.println(io);
     ctx.println('');

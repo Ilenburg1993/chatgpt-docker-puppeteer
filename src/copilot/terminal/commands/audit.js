@@ -11,6 +11,7 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit';
+import { formatTerminalIsoTimestamp } from '../state/index.js';
 
 /**
  * @typedef {object} AuditContext
@@ -44,7 +45,7 @@ export async function cmdAudit({ println }, arg) {
         const e = /** @type {Record<string, unknown>} */ (entry);
         const type = typeof e['type'] === 'string' ? e['type'] : 'unknown';
         categories[type] = (categories[type] ?? 0) + 1;
-        const ts = typeof e['ts'] === 'number' ? new Date(e['ts']).toLocaleTimeString('pt-BR') : '?';
+        const ts = typeof e['ts'] === 'number' ? formatTerminalIsoTimestamp(e['ts']) : 'sem horário';
         const desc = typeof e['description'] === 'string' ? e['description'] : type;
         println(`    \x1b[90m${ts}\x1b[0m  \x1b[33m${type}\x1b[0m  ${desc}`);
     }

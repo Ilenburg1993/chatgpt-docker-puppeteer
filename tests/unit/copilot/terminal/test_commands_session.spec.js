@@ -426,6 +426,7 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('Entrada');
         expect(ctx.output()).toContain('Detalhe');
         expect(ctx.output()).toContain('/status full');
+        expect(ctx.output()).not.toContain('\x1b[90m/status full · /now');
         expect(ctx.output()).toContain('gpt-5-mini');
         expect(ctx.output()).toContain('ok');
         expect(ctx.output()).not.toContain('healthy');
@@ -505,6 +506,7 @@ describe('commands/session — sync commands', () => {
         const ctx = mockCtx();
         cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
         expect(ctx.output()).toContain('[agora]');
+        expect(ctx.output()).not.toContain('\x1b[36m[agora]');
         expect(ctx.output()).toContain('conversa');
         expect(ctx.output()).toContain('sem pendências humanas');
         expect(ctx.output()).not.toContain('próximo=none');
@@ -558,6 +560,7 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('Estado');
         expect(ctx.output()).toContain('Sinais');
         expect(ctx.output()).toContain('/live full');
+        expect(ctx.output()).not.toContain('\x1b[90m/live full · /activity');
         expect(ctx.output()).not.toContain('Terminal Live Flow');
         expect(ctx.output()).not.toContain('runtime');
         expect(ctx.output()).not.toContain('streaming=');

@@ -51,17 +51,21 @@ describe('terminal/commands/index', () => {
 
         await cmdIndex(ctx, 'status');
         expect(ctx.output()).toContain('Índice L2 local');
-        const filesMatch = ctx.output().match(/files=(\d+)/u);
+        const filesMatch = ctx.output().match(/arquivos\s+(\d+)/u);
         expect(filesMatch).toBeTruthy();
         expect(Number(filesMatch?.[1] ?? 0)).toBeGreaterThanOrEqual(2);
+        expect(ctx.output()).not.toContain('files=');
+        expect(ctx.output()).not.toContain('latest=');
 
         await cmdIndex(ctx, 'search semantic terminal index token');
         expect(ctx.output()).toContain('/index search');
+        expect(ctx.output()).toContain('resultados');
         expect(ctx.output()).toContain('beta.md');
 
         await cmdIndex(ctx, 'symbol alphaHelper');
         expect(ctx.output()).toContain('/index symbol');
         expect(ctx.output()).toContain('alphaHelper');
+        expect(ctx.output()).not.toContain('matches=');
 
         await cmdIndex(ctx, 'clear');
         expect(ctx.output()).toContain('Índice L2 limpo');

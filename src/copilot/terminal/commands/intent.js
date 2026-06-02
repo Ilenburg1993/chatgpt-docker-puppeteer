@@ -11,6 +11,7 @@ import {
     clearTerminalIntentHistory,
     readTerminalIntentHistory,
     readTerminalIntentStats,
+    formatTerminalIsoTimestamp,
     terminalThemeBadge,
     terminalThemeText,
 } from '../state/index.js';
@@ -36,7 +37,7 @@ function printBlock(ctx, lines) {
  * @returns {string}
  */
 function formatTime(timestamp) {
-    return new Date(timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return formatTerminalIsoTimestamp(timestamp);
 }
 
 /**
