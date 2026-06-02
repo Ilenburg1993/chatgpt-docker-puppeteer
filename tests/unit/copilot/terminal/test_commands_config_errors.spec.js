@@ -132,8 +132,10 @@ describe('terminal commands config/errors com frontend canônico', () => {
 
         await cmdModel({ println: ctx.println });
 
-        expect(ctx.output()).toContain('preferência local=gpt-5.4/high');
-        expect(ctx.output()).toContain('último efetivo=claude-haiku-4.5');
+        expect(ctx.output()).toContain('preferência local gpt-5.4/high');
+        expect(ctx.output()).toContain('último efetivo claude-haiku-4.5');
+        expect(ctx.output()).not.toContain('preferência local=');
+        expect(ctx.output()).not.toContain('último efetivo=');
     });
 
     it('cmdModel stats usa stats projection', async () => {
@@ -196,7 +198,8 @@ describe('terminal commands config/errors com frontend canônico', () => {
         await cmdModel({ println: ctx.println }, 'gpt-4.1');
 
         expect(setTerminalModelProjection).toHaveBeenCalledWith('gpt-4.1');
-        expect(ctx.output()).toContain('Reasoning ajustado');
+        expect(ctx.output()).toContain('Raciocínio ajustado');
+        expect(ctx.output()).not.toContain('Reasoning ajustado');
         expect(ctx.output()).toContain('raciocínio não');
         expect(ctx.output()).toContain('Último modelo efetivo observado na sessão: claude-haiku-4.5');
     });

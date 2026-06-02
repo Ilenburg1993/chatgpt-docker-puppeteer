@@ -2308,5 +2308,24 @@
 - [x] Live PTY curta executada após o polish de runtime/sidechannels:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/ux-runtime-sidechannels-polish-20260602-1532`.
 - [x] Resultado: PASS completo; `/now`, `/health`, `/live`, `/activity` e `/sdk waits` permaneceram humanos, com timestamps ISO e sem telemetria `key=value` na superfície default.
+
+### 11.26 Seleção automática e troca de modelo como fluxo humano
+
+- [x] Auditoria nova consolidou que `/model`, `session.model_changed` e `/byok auto` ainda misturavam intenção do operador, decisão pré-runtime, efeito preparado e confirmação efetiva em linguagem técnica.
+- [x] `session.model_changed` passou a registrar atividade como `de <modelo anterior> para <modelo novo> · raciocínio <nível>`, preservando o evento bruto apenas em SSE/export.
+- [x] Narração verbose de troca de modelo passou de `Modelo SDK: ...` para `SDK confirmou ...`, deixando claro que a confirmação vem do SDK/uso observado, não apenas do pedido local.
+- [x] `/model` em modo auto passou a explicar `autoridade GitHub Copilot`, `preferência local ... (observável)` e `último efetivo ...`, sem `autoridade=`, `preferência local=` ou `último efetivo=`.
+- [x] Mensagem de ajuste de raciocínio passou de `Reasoning ajustado` para `Raciocínio ajustado`, com texto compatível com operador humano.
+- [x] BYOK boundary hint passou a falar `trocar provider/perfil`, `reinicia só a conversa` e `trocar o modelo na sessão viva`, sem `rebind`, `dialog loop`, `bound` ou `setModel` na tela default.
+- [x] `/byok auto status` passou a usar `troca viva`, `sessão viva`, `sem ação`, `bloqueios`, `persistência`, `efeitos ... executar/simular` e `próximo`, removendo `live setModel`, `live switch`, `nao-acao`, `blockers`, `decision(s)`, `:dry` e `proximo`.
+- [x] Fallback auto passou a narrar `origem ... · motivo ...`, sem `from=`/`reason=`.
+- [x] `/byok auto on`, `auto policy`, `auto doctor` e `gateway operator-ready` passaram a usar `troca viva`, `nova sessão`, `perfis`, `conta`, `registros`, `sessão viva`, `bloqueios`, `avisos` e `próximo`.
+- [x] `/byok gateway selection audit` passou a chamar o arquivo canônico de `catálogo`, e traces passaram a dizer `mais recente`.
+- [x] `/byok probe shortlist` passou a encerrar como `aprovados N/N · providers tentados N/N`, sem `ok=N/N` ou `providerTentado=`.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/terminal/test_commands_config_errors.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js` (137 testes).
+- [ ] Criar/rodar live PTY dedicada a seleção/troca de modelo, cobrindo `/model auto`, `/model <id>`, `/byok auto status`, `/byok auto policy`, `/byok auto doctor`, fallback standby e confirmação `session.model_changed`.
+- [ ] Revisar o runner live para capturar explicitamente se a tela default contém `from=`, `reason=`, `live setModel`, `Modelo SDK:`, `preferência local=` ou IDs longos de tool/model switch.
+- [ ] Avaliar se o operador precisa de um painel único “Modelo solicitado x modelo efetivo” em `/now` ou `/status`, para reduzir ambiguidade entre pedido local, seleção BYOK e confirmação SDK.
 - [ ] Auditar `/byok persist` e os helpers de health tags restantes para separar default humano de detalhe técnico.
 - [ ] Separar explicitamente “tela default humana” de “detail/raw diagnóstico” nos comandos BYOK, sem perder automação e rastreabilidade.

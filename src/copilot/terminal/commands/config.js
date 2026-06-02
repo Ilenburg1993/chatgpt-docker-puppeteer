@@ -117,7 +117,7 @@ export async function cmdModel({ println }, arg) {
         println(`\n  🤖  Modelo ativo: \x1b[36m${current}\x1b[0m`);
         if (current === 'auto' && autoModelPolicy) {
             println(
-                `  \x1b[90m    auto: autoridade=GitHub Copilot · preferência local=${autoModelPolicy.preferredModel}/${autoModelPolicy.preferredReasoningEffort} (${autoModelPolicy.canForcePreference ? 'forçável' : 'advisory'})\x1b[0m`,
+                `  \x1b[90m    auto: autoridade GitHub Copilot · preferência local ${autoModelPolicy.preferredModel}/${autoModelPolicy.preferredReasoningEffort} (${autoModelPolicy.canForcePreference ? 'forçável' : 'observável'})\x1b[0m`,
             );
             if (autoModelPolicy.observedModel) {
                 const satisfied =
@@ -126,7 +126,7 @@ export async function cmdModel({ println }, arg) {
                         : autoModelPolicy.preferenceSatisfied === false
                           ? 'roteamento diferente'
                           : 'sem conclusão';
-                println(`  \x1b[90m    último efetivo=${autoModelPolicy.observedModel} · ${satisfied}\x1b[0m`);
+                println(`  \x1b[90m    último efetivo ${autoModelPolicy.observedModel} · ${satisfied}\x1b[0m`);
             }
         }
         if (meta) {
@@ -240,16 +240,16 @@ export async function cmdModel({ println }, arg) {
     }
     if (reasoningAdjusted) {
         println(
-            `  \x1b[33mReasoning ajustado: ${previousReasoningEffort} → ${currentReasoningEffort} (modelo sem suporte explícito a reasoning effort).\x1b[0m`,
+            `  \x1b[33mRaciocínio ajustado: ${previousReasoningEffort} → ${currentReasoningEffort} (modelo sem suporte explícito a controle de raciocínio).\x1b[0m`,
         );
     }
     if (observed.observedModel && observed.observedModel !== trimmed) {
         println(
-            `  \x1b[33mÚltimo modelo efetivo observado na sessão: ${observed.observedModel}. A troca para ${trimmed} ainda precisa ser confirmada pelo SDK/usage.\x1b[0m`,
+            `  \x1b[33mÚltimo modelo efetivo observado na sessão: ${observed.observedModel}. A troca para ${trimmed} ainda precisa ser confirmada pelo SDK ou por uso registrado.\x1b[0m`,
         );
     } else if (observed.modelMismatch && observed.configuredModel === trimmed) {
         println(
-            `  \x1b[33mHá mismatch entre o modelo configurado e o efetivo observado. Use /status, /sdk status ou um turno curto para revalidar a sessão.\x1b[0m`,
+            `  \x1b[33mHá divergência entre o modelo configurado e o efetivo observado. Use /status, /sdk status ou um turno curto para revalidar a sessão.\x1b[0m`,
         );
     } else {
         println(

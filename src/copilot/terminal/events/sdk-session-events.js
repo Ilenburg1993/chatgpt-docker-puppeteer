@@ -1028,12 +1028,12 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             });
         });
         recordTerminalActivity('system', 'Modelo SDK alterado', {
-            detail: `${previousModel} → ${newModel}${reasoningEffort ? ` · ${reasoningEffort}` : ''}`,
+            detail: `de ${previousModel} para ${newModel}${reasoningEffort ? ` · raciocínio ${reasoningEffort}` : ''}`,
             source: 'sdk',
         });
         if (shouldPrintSessionNarration('verbose')) {
             println(
-                `  \x1b[36m🧠 Modelo SDK: ${previousModel} → ${newModel}${reasoningEffort ? ` · ${reasoningEffort}` : ''}\x1b[0m`,
+                `  ${terminalThemeBadge('info', 'MODELO')} ${terminalThemeText('info', `SDK confirmou ${previousModel} → ${newModel}`)}${reasoningEffort ? terminalThemeText('muted', ` · raciocínio ${reasoningEffort}`) : ''}`,
             );
         }
         broadcastSse(

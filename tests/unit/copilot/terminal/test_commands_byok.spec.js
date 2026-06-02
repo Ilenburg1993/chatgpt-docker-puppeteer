@@ -1932,7 +1932,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('Preparada');
         expect(ctx.output()).toContain('Sessão viva');
         expect(ctx.output()).toContain('/session sdk next new');
-        expect(ctx.output()).toContain('/restart reinicia só o dialog loop');
+        expect(ctx.output()).toContain('/restart reinicia só a conversa');
+        expect(ctx.output()).not.toContain('dialog loop');
         expect(ctx.output()).not.toContain('secret');
     });
 
@@ -2452,7 +2453,9 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('BYOK shortlist agent probe');
         expect(ctx.output()).toContain('kilo/model-a');
         expect(ctx.output()).toContain('openrouter/model-b');
-        expect(ctx.output()).toContain('Shortlist encerrada: ok=2/2');
+        expect(ctx.output()).toContain('Shortlist encerrada: aprovados 2/2');
+        expect(ctx.output()).not.toContain('ok=2/2');
+        expect(ctx.output()).not.toContain('providerTentado=');
         expect(ctx.output()).toContain('/byok recommend ... safe');
         expect(ctx.output()).not.toContain('tmp-kilo-shortlist');
     });
@@ -2520,7 +2523,9 @@ describe('terminal /byok command', () => {
                 providerModel: 'kilo-auto/free',
             }),
         );
-        expect(ctx.output()).toContain('Shortlist encerrada: ok=1/1');
+        expect(ctx.output()).toContain('Shortlist encerrada: aprovados 1/1');
+        expect(ctx.output()).not.toContain('ok=1/1');
+        expect(ctx.output()).not.toContain('providerTentado=');
         expect(ctx.output()).not.toContain("COPILOT_BYOK_PROFILE 'kilo-code'");
     });
 
@@ -3210,6 +3215,8 @@ describe('terminal /byok command', () => {
             }),
         );
         expect(ctx.output()).toContain('BYOK model-gateway selection audit');
+        expect(ctx.output()).toContain('catálogo ');
+        expect(ctx.output()).not.toContain('store ');
         expect(ctx.output()).toContain('sem runtime');
         expect(ctx.output()).toContain('repo_agent');
         expect(ctx.output()).toContain('provider_explicit');
@@ -3232,8 +3239,10 @@ describe('terminal /byok command', () => {
             }),
         );
         expect(ctx.output()).toContain('BYOK model-gateway auto');
-        expect(ctx.output()).toContain('live setModel nao');
-        expect(ctx.output()).toContain('prepare_new_sdk_session:dry');
+        expect(ctx.output()).toContain('troca viva nao');
+        expect(ctx.output()).not.toContain('live setModel');
+        expect(ctx.output()).toContain('prepare_new_sdk_session · simular');
+        expect(ctx.output()).not.toContain('prepare_new_sdk_session:dry');
         expect(ctx.output()).toContain('ação prepare_new_session');
         expect(ctx.output()).toContain('/session sdk next new');
     });
@@ -3265,8 +3274,10 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'auto status profile:repo_agent');
 
         expect(ctx.output()).toContain('fallback:');
-        expect(ctx.output()).toContain('from=openrouter:primary-model');
-        expect(ctx.output()).toContain('reason=rate-limit');
+        expect(ctx.output()).toContain('origem openrouter:primary-model');
+        expect(ctx.output()).toContain('motivo rate-limit');
+        expect(ctx.output()).not.toContain('from=');
+        expect(ctx.output()).not.toContain('reason=');
     });
 
     it('mostra comandos de prova por provider/model quando alternativas auto carecem de agent probe', async () => {
@@ -3491,10 +3502,12 @@ describe('terminal /byok command', () => {
 
         expect(policyCtx.output()).toContain('BYOK model-gateway auto policy');
         expect(policyCtx.output()).toContain(DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH);
-        expect(policyCtx.output()).toContain('enabled');
+        expect(policyCtx.output()).toContain('ativo');
         expect(policyCtx.output()).toContain('auto_same_boundary');
         expect(policyCtx.output()).toContain('auto_prepare_new_session');
         expect(policyCtx.output()).toContain('repo_agent');
+        expect(policyCtx.output()).toContain('troca viva sim');
+        expect(policyCtx.output()).not.toContain('live setModel');
 
         readModelGatewayRuntimeAutomationEffectivePolicy.mockResolvedValueOnce({
             enabled: true,
@@ -3520,7 +3533,7 @@ describe('terminal /byok command', () => {
         mockProjection();
         const recordCtx = mockCtx();
         await cmdByok({ println: recordCtx.println }, 'auto record profile:repo_agent');
-        expect(recordCtx.output()).toContain('decision(s) gravada(s)');
+        expect(recordCtx.output()).toContain('decisão(ões) gravada(s)');
 
         const offCtx = mockCtx();
         await cmdByok({ println: offCtx.println }, 'auto off');
@@ -3601,7 +3614,11 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('origem policy:');
         expect(ctx.output()).toContain('cooldown:');
         expect(ctx.output()).toContain('reset 2026-06-01T10:00:00.000Z');
-        expect(ctx.output()).toContain('ledgers:');
+        expect(ctx.output()).toContain('registros:');
+        expect(ctx.output()).toContain('bloqueios:');
+        expect(ctx.output()).toContain('próximo:');
+        expect(ctx.output()).not.toContain('blockers:');
+        expect(ctx.output()).not.toContain('proximo:');
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
     });
 
@@ -3944,6 +3961,8 @@ describe('terminal /byok command', () => {
             { directory: DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR },
         );
         expect(ctx.output()).toContain('trace persistido sim');
+        expect(ctx.output()).toContain('mais recente /tmp/latest-model-gateway-selection-trace.json');
+        expect(ctx.output()).not.toContain('latest /tmp/latest-model-gateway-selection-trace.json');
         expect(ctx.output()).toContain('persistido sim');
         expect(ctx.output()).toContain('/tmp/model-gateway-selection-trace.json');
     });
@@ -4394,7 +4413,9 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'model anthropic/claude-sonnet-4.5');
 
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
-        expect(ctx.output()).toContain('Sessão viva não está bound ao mesmo provider BYOK');
+        expect(ctx.output()).toContain('Sessão viva não usa o mesmo provider BYOK');
+        expect(ctx.output()).toContain('sem troca cruzando provider');
+        expect(ctx.output()).not.toContain('bound ao mesmo provider');
     });
 
     it('lista modelos descobertos automaticamente pelo provider', async () => {

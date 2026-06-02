@@ -224,10 +224,10 @@ function printByokSdkSessionBoundaryHint(println, options = {}) {
         ? 'A seleção persistida será aplicada por uma nova sessão SDK.'
         : 'A seleção BYOK foi preparada no processo atual.';
     println(
-        `  \x1b[90m${prefix} Para entrar/sair de BYOK ou rebind de provider/perfil, agende /session sdk next new e reinicie a task do terminal; /restart reinicia só o dialog loop.\x1b[0m`,
+        `  \x1b[90m${prefix} Para entrar/sair de BYOK ou trocar provider/perfil, agende /session sdk next new e reinicie a task do terminal; /restart reinicia só a conversa.\x1b[0m`,
     );
     println(
-        '  \x1b[90m/byok model <id> tenta setModel na sessão viva apenas quando ela já está bound ao mesmo provider BYOK.\x1b[0m',
+        '  \x1b[90m/byok model <id> tenta trocar o modelo na sessão viva apenas quando ela já nasceu com o mesmo provider BYOK.\x1b[0m',
     );
 }
 
@@ -254,7 +254,7 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
     }
     if (!inventory.currentSessionId || !isSameTerminalByokProviderBoundary(summary, inventory.persistedByokBinding)) {
         println(
-            '  \x1b[33mSessão viva não está bound ao mesmo provider BYOK; modelo preparado para o próximo boot, sem setModel cruzando provider.\x1b[0m',
+            '  \x1b[33mSessão viva não usa o mesmo provider BYOK; modelo preparado para o próximo boot, sem troca cruzando provider.\x1b[0m',
         );
         return;
     }
@@ -264,12 +264,12 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
             `  \x1b[32mModelo BYOK solicitado na sessão viva: ${model}.\x1b[0m`,
         );
         println(
-            '  \x1b[90mProvider/perfil foram preservados; confirme o modelo efetivo no próximo turno por usage/session.model_changed.\x1b[0m',
+            '  \x1b[90mProvider/perfil foram preservados; confirme o modelo efetivo no próximo turno por uso registrado ou evento de modelo confirmado.\x1b[0m',
         );
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         println(
-            `  \x1b[33mNão foi possível pedir setModel BYOK no runtime vivo: ${message}. A seleção do processo continua pronta para o próximo boot.\x1b[0m`,
+            `  \x1b[33mNão foi possível pedir troca de modelo BYOK no runtime vivo: ${message}. A seleção do processo continua pronta para o próximo boot.\x1b[0m`,
         );
     }
 }
@@ -2542,9 +2542,9 @@ async function renderByokGatewayOperatorReady(println, rest) {
             `    live ${index + 1}:     \x1b[33m${optionalScalarString(run['scenarioKind']) ?? optionalScalarString(run['kind']) ?? '-'}\x1b[0m \x1b[90mestado ${optionalScalarString(run['status']) ?? '-'} · ok ${run['ok'] === true ? 'sim' : run['ok'] === false ? 'nao' : '-'} · resumo ${optionalScalarString(run['summaryPath']) ?? '-'}\x1b[0m`,
         );
     }
-    if (status.decision.blockers.length > 0) println(`    blockers:      \x1b[33m${status.decision.blockers.join(', ')}\x1b[0m`);
+    if (status.decision.blockers.length > 0) println(`    bloqueios:     \x1b[33m${status.decision.blockers.join(', ')}\x1b[0m`);
     println(`    resumo:        \x1b[90m${status.decision.operatorSummary}\x1b[0m`);
-    println(`    proximo:       \x1b[90m${[...new Set(nextCommands)].slice(0, 5).join(' && ')}\x1b[0m\n`);
+    println(`    próximo:       \x1b[90m${[...new Set(nextCommands)].slice(0, 5).join(' && ')}\x1b[0m\n`);
 }
 
 /**
@@ -3155,7 +3155,7 @@ async function renderByokGatewaySelectionAudit(println, rest) {
     const persistedStatus = tracePersistence?.written === true ? 'sim' : args.writeTrace ? 'falha' : 'nao';
     println(`\n  \x1b[36mBYOK model-gateway selection audit\x1b[0m`);
     println(
-        `  \x1b[90mstore ${store.filePath} · integridade ${integrity.ok ? 'ok' : 'falha'} · modo ${selection.mode}${args.effective ? '+effective' : ''}${args.requireRuntimeProof ? '+require-proof' : ''} · sem runtime · persistido ${persistedStatus} · perfis ${selection.summary.selectedProfileCount}/${selection.summary.profileCount}\x1b[0m`,
+        `  \x1b[90mcatálogo ${store.filePath} · integridade ${integrity.ok ? 'ok' : 'falha'} · modo ${selection.mode}${args.effective ? '+effective' : ''}${args.requireRuntimeProof ? '+require-proof' : ''} · sem runtime · persistido ${persistedStatus} · perfis ${selection.summary.selectedProfileCount}/${selection.summary.profileCount}\x1b[0m`,
     );
     println(
         `  \x1b[90mprojeções ${selection.snapshotContext['projectionCount']} · rotas ${selection.snapshotContext['routeOptionCount']} · overlays ${selection.snapshotContext['accountOverlayCount']} · eligibility ${selection.snapshotContext['eligibilityDecisionCount']} · candidatos ${selection.snapshotContext['candidateCount']}\x1b[0m\n`,
@@ -3181,7 +3181,7 @@ async function renderByokGatewaySelectionAudit(println, rest) {
         );
         if (args.writeTrace) {
             println(
-                `  \x1b[90mtrace persistido ${tracePersistence?.written ? 'sim' : 'nao'} · arquivo ${tracePersistence?.filePath ?? '-'} · latest ${tracePersistence?.latestPath ?? '-'} · erro ${tracePersistence?.error ?? '-'}\x1b[0m\n`,
+                `  \x1b[90mtrace persistido ${tracePersistence?.written ? 'sim' : 'nao'} · arquivo ${tracePersistence?.filePath ?? '-'} · mais recente ${tracePersistence?.latestPath ?? '-'} · erro ${tracePersistence?.error ?? '-'}\x1b[0m\n`,
             );
         }
     }
@@ -3525,23 +3525,23 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
         `  \x1b[90mperfil ${args.profileId} · seletor runtime ${runtimeSelectorPlan.ok ? 'ok' : 'bloqueado'} · selecionados ${runtimeSelectorPlan.summary.selectedProfileCount}/${runtimeSelectorPlan.summary.profileCount} · ação ${decision.action} · ok ${decision.ok ? 'sim' : 'nao'}\x1b[0m`,
     );
     println(
-        `    política:      \x1b[33mlive setModel ${args.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${args.allowNewSession ? 'sim' : 'nao'} · local privado ${args.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
+        `    política:      \x1b[33mtroca viva ${args.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${args.allowNewSession ? 'sim' : 'nao'} · local privado ${args.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
     );
     println(`    rota:          \x1b[33m${decision.selectedRouteKey ?? '-'}\x1b[0m`);
     if (decision.fallbackFromSelectedRouteKey || decision.fallbackReason) {
         println(
-            `    fallback:      \x1b[33mfrom=${decision.fallbackFromSelectedRouteKey ?? '-'} · reason=${decision.fallbackReason ?? '-'}\x1b[0m`,
+            `    fallback:      \x1b[33morigem ${decision.fallbackFromSelectedRouteKey ?? '-'} · motivo ${decision.fallbackReason ?? '-'}\x1b[0m`,
         );
     }
     println(`    alvo:          \x1b[33m${decision.targetBoundary.preset ?? '-'} · ${decision.targetBoundary.model ?? '-'}\x1b[0m`);
-    println(`    sessao viva:   \x1b[33m${inventory.currentSessionId ?? '(sem sessão viva)'}\x1b[0m`);
+    println(`    sessão viva:   \x1b[33m${inventory.currentSessionId ?? '(sem sessão viva)'}\x1b[0m`);
     println(`    atual:         \x1b[33m${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}\x1b[0m`);
-    println(`    live switch:   \x1b[33m${decision.canApplyLiveModel ? 'sim' : 'nao'}\x1b[0m`);
+    println(`    troca viva:    \x1b[33m${decision.canApplyLiveModel ? 'sim' : 'nao'}\x1b[0m`);
     println(`    nova sessao:   \x1b[33m${decision.requiresNewSession ? 'sim' : 'nao'}\x1b[0m`);
     if (decision.blockerClass && decision.blockerClass !== 'none') {
         println(`    classe:        \x1b[33m${decision.blockerClass}\x1b[0m`);
     }
-    if (decision.nonActionReason) println(`    nao-acao:      \x1b[33m${decision.nonActionReason}\x1b[0m`);
+    if (decision.nonActionReason) println(`    sem ação:      \x1b[33m${decision.nonActionReason}\x1b[0m`);
     if (decision.cooldown?.active === true) {
         println(
             `    cooldown:      \x1b[33m${decision.cooldown.reason ?? 'ativo'} · reset ${decision.cooldown.resetAt ?? '-'} · nova tentativa ${decision.cooldown.retryAfterSeconds ?? '-'}s\x1b[0m`,
@@ -3570,17 +3570,17 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
             println(`      \x1b[90mprovar: ${proof.command}\x1b[0m`);
         }
     }
-    if (decision.blockers.length > 0) println(`    blockers:      \x1b[33m${decision.blockers.join(', ')}\x1b[0m`);
+    if (decision.blockers.length > 0) println(`    bloqueios:     \x1b[33m${decision.blockers.join(', ')}\x1b[0m`);
     if (persistence) {
-        println(`    persistencia:  \x1b[32m${persistence.automationDecisions} decision(s) gravada(s)\x1b[0m`);
+        println(`    persistência:  \x1b[32m${persistence.automationDecisions} decisão(ões) gravada(s)\x1b[0m`);
     }
     if (controllerStep.effects.length > 0) {
         println(
-            `    efeitos:       \x1b[90m${controllerStep.effects.map((effect) => `${effect['kind']}:${effect['execute'] === true ? 'exec' : optionalScalarString(effect['authorization']) ?? 'dry'}${effect['blockedReason'] ? `:${effect['blockedReason']}` : ''}`).join(', ')}\x1b[0m`,
+            `    efeitos:       \x1b[90m${controllerStep.effects.map((effect) => `${effect['kind']} · ${effect['execute'] === true ? 'executar' : optionalScalarString(effect['authorization']) ?? 'simular'}${effect['blockedReason'] ? ` · bloqueio ${effect['blockedReason']}` : ''}`).join(', ')}\x1b[0m`,
         );
     }
     println(`    resumo:        \x1b[90m${decision.operatorSummary}\x1b[0m`);
-    println(`    proximo:       \x1b[90m${decision.nextCommands.join(' && ')}\x1b[0m\n`);
+    println(`    próximo:       \x1b[90m${decision.nextCommands.join(' && ')}\x1b[0m\n`);
     if (options.apply === true) {
         const application = await applyByokGatewayAutoEffects(println, controllerStep);
         const effectPersistence = await persistTerminalByokGatewayAutoEffectApplications(status, application, {
@@ -3758,7 +3758,7 @@ async function renderByokGatewayAutoOn(println, rest) {
     println(`    preset:        \x1b[33m${written.policy.preset}\x1b[0m`);
     println(`    policy:        \x1b[33m${written.policy.policy}\x1b[0m`);
     println(
-        `    flags:         \x1b[33mlive setModel ${args.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${args.allowNewSession ? 'sim' : 'nao'} · local privado ${args.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
+        `    flags:         \x1b[33mtroca viva ${args.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${args.allowNewSession ? 'sim' : 'nao'} · local privado ${args.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
     );
     println(`    preview:       \x1b[33mação ${decision.action} · rota ${decision.selectedRouteKey ?? '-'} · ok ${decision.ok ? 'sim' : 'nao'}\x1b[0m`);
     println(`    resumo:        \x1b[90m${decision.operatorSummary}\x1b[0m`);
@@ -3766,7 +3766,7 @@ async function renderByokGatewayAutoOn(println, rest) {
     for (const line of exports) {
         println(`      \x1b[90mexport ${line}\x1b[0m`);
     }
-    println('    proximo:       \x1b[90mreinicie o terminal ou exporte as variaveis antes de iniciar a proxima sessao\x1b[0m\n');
+    println('    próximo:       \x1b[90mreinicie o terminal ou exporte as variaveis antes de iniciar a proxima sessao\x1b[0m\n');
 }
 
 /**
@@ -3956,7 +3956,7 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
  * @returns {string}
  */
 function enabledDisabled(value) {
-    return value ? 'enabled' : 'disabled';
+    return value ? 'ativo' : 'desativado';
 }
 
 /**
@@ -3982,18 +3982,18 @@ async function renderByokGatewayAutoPolicy(println) {
     println(`    env cfg:       \x1b[33m${envConfigured ? 'sim' : 'nao'}\x1b[0m`);
     println(`    efetivo:       \x1b[33m${enabledDisabled(effectivePolicy.enabled)}\x1b[0m`);
     println(`    preset:        \x1b[33m${effectivePolicy.preset}\x1b[0m  \x1b[90mfonte ${policySources['preset']?.source ?? '-'}\x1b[0m`);
-    println(`    policy:        \x1b[33m${effectivePolicy.policy}\x1b[0m`);
-    println(`    profiles:      \x1b[33m${effectivePolicy.profiles.join(', ') || '-'}\x1b[0m`);
+    println(`    regra:         \x1b[33m${effectivePolicy.policy}\x1b[0m`);
+    println(`    perfis:        \x1b[33m${effectivePolicy.profiles.join(', ') || '-'}\x1b[0m`);
     println(
-        `    flags:         \x1b[33mlive setModel ${effectivePolicy.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${effectivePolicy.allowNewSession ? 'sim' : 'nao'} · probes provider ${effectivePolicy.allowProviderProbes ? 'sim' : 'nao'} · local privado ${effectivePolicy.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
+        `    flags:         \x1b[33mtroca viva ${effectivePolicy.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${effectivePolicy.allowNewSession ? 'sim' : 'nao'} · probes provider ${effectivePolicy.allowProviderProbes ? 'sim' : 'nao'} · local privado ${effectivePolicy.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
     );
     println(
-        `    account-wide:  \x1b[33m${effectivePolicy.accountWideFailureKinds.join(', ') || '-'}\x1b[0m`,
+        `    conta:         \x1b[33mfalhas globais ${effectivePolicy.accountWideFailureKinds.join(', ') || '-'}\x1b[0m`,
     );
     println('    presets:');
     for (const preset of presets) {
         println(
-            `      \x1b[90m${preset['preset']}: policy ${preset['policy']} · live setModel ${preset['allowLiveSetModel'] ? 'sim' : 'nao'} · nova sessão ${preset['allowNewSession'] ? 'sim' : 'nao'} · local privado ${preset['allowLocalPrivate'] ? 'sim' : 'nao'}\x1b[0m`,
+            `      \x1b[90m${preset['preset']}: regra ${preset['policy']} · troca viva ${preset['allowLiveSetModel'] ? 'sim' : 'nao'} · nova sessão ${preset['allowNewSession'] ? 'sim' : 'nao'} · local privado ${preset['allowLocalPrivate'] ? 'sim' : 'nao'}\x1b[0m`,
         );
     }
     if (envConfigured && envPolicy.enabled !== effectivePolicy.enabled) {
@@ -4074,16 +4074,16 @@ async function renderByokGatewayAutoDoctor(println, rest) {
         }
     }
     println(
-        `    ledgers:       \x1b[33mdecisões ${diagnostics.automationDecisionRows ?? 0} · policy snapshots ${diagnostics.automationPolicySnapshotRows ?? 0} · efeitos ${effectsRows} · recoveries ${recoveryRows} · handoffs ${handoffRows} · confirmações ${confirmationRows} · live runs ${liveScenarioRunRows}\x1b[0m`,
+        `    registros:     \x1b[33mdecisões ${diagnostics.automationDecisionRows ?? 0} · políticas ${diagnostics.automationPolicySnapshotRows ?? 0} · efeitos ${effectsRows} · recoveries ${recoveryRows} · handoffs ${handoffRows} · confirmações ${confirmationRows} · testes vivos ${liveScenarioRunRows}\x1b[0m`,
     );
     println(
-        `    sdk:           \x1b[33msessão ${status.inventory.currentSessionId ?? '-'} · live ${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}\x1b[0m`,
+        `    sdk:           \x1b[33msessão ${status.inventory.currentSessionId ?? '-'} · sessão viva ${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}\x1b[0m`,
     );
-    if (decision.blockers.length > 0) println(`    blockers:      \x1b[33m${decision.blockers.join(', ')}\x1b[0m`);
-    if (warnings.length > 0) println(`    warnings:      \x1b[33m${warnings.join(', ')}\x1b[0m`);
+    if (decision.blockers.length > 0) println(`    bloqueios:     \x1b[33m${decision.blockers.join(', ')}\x1b[0m`);
+    if (warnings.length > 0) println(`    avisos:        \x1b[33m${warnings.join(', ')}\x1b[0m`);
     println(`    resumo:        \x1b[90m${decision.operatorSummary}\x1b[0m`);
     println(
-        `    proximo:       \x1b[90m${warnings.includes('policy_disabled') ? '/byok auto on profile:' + status.args.profileId : decision.nextCommands.join(' && ')}\x1b[0m\n`,
+        `    próximo:       \x1b[90m${warnings.includes('policy_disabled') ? '/byok auto on profile:' + status.args.profileId : decision.nextCommands.join(' && ')}\x1b[0m\n`,
     );
 }
 
@@ -5367,7 +5367,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                 println('');
             }
             println(
-                `  \x1b[90mShortlist encerrada: ok=${passed}/${candidates.length} · providerTentado=${attempted}/${candidates.length}. A saúde persistida alimenta /byok recommend ... safe; a sessão viva só muda com /byok use e /byok model.\x1b[0m\n`,
+                `  \x1b[90mShortlist encerrada: aprovados ${passed}/${candidates.length} · providers tentados ${attempted}/${candidates.length}. A saúde persistida alimenta /byok recommend ... safe; a sessão viva só muda com /byok use e /byok model.\x1b[0m\n`,
             );
             return;
         }
