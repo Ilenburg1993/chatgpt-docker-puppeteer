@@ -469,7 +469,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'question',
-            'question.pending reconciliado pelo ask_user SDK',
+            'Pergunta ao operador reconciliada',
             expect.objectContaining({ detail: expect.stringContaining('Confirme se deseja abrir') }),
         );
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('LLM-B perguntou'));
@@ -763,7 +763,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'question',
-            'question.pending reconciliado pelo ask_user SDK',
+            'Pergunta ao operador reconciliada',
             expect.objectContaining({ detail: 'Confirmar operação?' }),
         );
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('LLM-B perguntou: "Confirmar operação?"'));
@@ -883,7 +883,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'task',
-            'Agente em background concluído',
+            'Tarefa em segundo plano concluída',
             expect.objectContaining({ detail: 'investigar sessão SDK · concluído', source: 'agent' }),
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
@@ -892,7 +892,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             expect.objectContaining({ detail: 'npm run lint:copilot · saída 0', source: 'agent' }),
         );
         expect(println).toHaveBeenCalledWith(
-            expect.stringContaining('Background agent concluído: investigar sessão SDK'),
+            expect.stringContaining('Tarefa em segundo plano concluída: investigar sessão SDK'),
         );
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Shell concluído: npm run lint:copilot · saída 0'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('exit='));
@@ -1450,14 +1450,11 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: /** @type {any} */ (rl) });
 
-        expect(println).toHaveBeenCalledWith(
-            expect.stringContaining('LLM-B perguntou: "Qual arquivo devo revisar agora?"'),
-        );
-        expect(
-            println.mock.calls.some(([line]) => String(line).includes('OPTIONS') && String(line).includes('A | B')),
-        ).toBe(true);
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('SELECT'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('decisão pendente'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Qual arquivo devo revisar agora?'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Opções'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('[1] A   [2] B'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Atalhos'));
         expect(rl.pause).toHaveBeenCalled();
         expect(rl.resume).toHaveBeenCalled();
         expect(rl.setPrompt).toHaveBeenCalledWith('prompt> ');
@@ -1500,9 +1497,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         });
 
         expect(println).toHaveBeenCalledTimes(5);
-        expect(println).toHaveBeenCalledWith(
-            expect.stringContaining('LLM-B perguntou: "Qual arquivo devo revisar agora?"'),
-        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('decisão pendente'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Qual arquivo devo revisar agora?'));
     });
 
     it('não reanuncia protocolo READY como pergunta visível', async () => {
@@ -1564,12 +1560,9 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: /** @type {any} */ (rl) });
 
-        expect(println).toHaveBeenCalledWith(
-            expect.stringContaining('LLM-B perguntou: "Você confirma aplicar o patch mínimo?"'),
-        );
-        expect(
-            println.mock.calls.some(([line]) => String(line).includes('OPTIONS') && String(line).includes('sim | não')),
-        ).toBe(true);
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('decisão pendente'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Você confirma aplicar o patch mínimo?'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Opções'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('[1] sim   [2] não'));
         expect(rl.pause).toHaveBeenCalled();
         expect(rl.resume).toHaveBeenCalled();

@@ -16,6 +16,7 @@
  */
 
 import { handleGetSkills, handleSetSkills } from '../handlers/index.js';
+import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 
 /**
  * @typedef {Object} CmdContext
@@ -43,10 +44,10 @@ export async function cmdSkills({ println }, arg) {
                 /** @type {Record<string, unknown>} */ (result.body)['skills']
             );
             if (!skills.paths.length) {
-                println('  (nenhum skill/path configurado)');
+                println(terminalThemeRow('Skills', 'nenhum caminho configurado', { role: 'muted' }));
             } else {
-                println(`  Skills (${skills.paths.length}):`);
-                for (const p of skills.paths) println(`    · ${p}`);
+                println(terminalThemeHeadline('command', 'Skills', [`${skills.paths.length} caminho(s)`]));
+                for (const p of skills.paths) println(terminalThemeRow('Caminho', p, { role: 'fileRead' }));
             }
             break;
         }
@@ -61,8 +62,8 @@ export async function cmdSkills({ println }, arg) {
             );
             const newPaths = [...new Set([...current.paths, rest])];
             await handleSetSkills({ paths: newPaths });
-            println(`  ✓ Adicionado: ${rest}`);
-            println(`  Total de skills: ${newPaths.length}`);
+            println(terminalThemeRow('Adicionado', rest, { role: 'success' }));
+            println(terminalThemeRow('Total', String(newPaths.length), { role: 'info' }));
             break;
         }
 
@@ -76,20 +77,20 @@ export async function cmdSkills({ println }, arg) {
             );
             const filtered = current.paths.filter((/** @type {string} */ p) => p !== rest);
             if (filtered.length === current.paths.length) {
-                println(`  ⚠ Caminho não encontrado: ${rest}`);
+                println(terminalThemeRow('Aviso', `caminho não encontrado: ${rest}`, { role: 'warn' }));
                 break;
             }
             await handleSetSkills({ paths: filtered });
-            println(`  ✓ Removido: ${rest}`);
-            println(`  Total de skills: ${filtered.length}`);
+            println(terminalThemeRow('Removido', rest, { role: 'success' }));
+            println(terminalThemeRow('Total', String(filtered.length), { role: 'info' }));
             break;
         }
 
         case 'reload': {
             // RF-055: PinnedFilesLoader não expõe método reload() público.
             // Para recarregar, reiniciar o processo ou redefinir os paths via /skills add|remove.
-            println('  ⟳ Reload manual não disponível via REPL.');
-            println('  Use /skills add|remove para atualizar os paths, ou reinicie o processo.');
+            println(terminalThemeRow('Reload', 'manual não disponível via REPL', { role: 'warn' }));
+            println(terminalThemeText('muted', '  Use /skills add|remove para atualizar os paths, ou reinicie o processo.'));
             break;
         }
 

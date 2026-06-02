@@ -107,7 +107,8 @@ describe('terminal commands config/errors com frontend canônico', () => {
 
         expect(ctx.output()).toContain('Modelo ativo');
         expect(ctx.output()).toContain('gpt-5');
-        expect(ctx.output()).toContain('capacidades: raciocínio sim');
+        expect(ctx.output()).toContain('Recursos');
+        expect(ctx.output()).toContain('raciocínio sim');
         expect(readTerminalConfigProjection).toHaveBeenCalled();
     });
 
@@ -133,7 +134,8 @@ describe('terminal commands config/errors com frontend canônico', () => {
         await cmdModel({ println: ctx.println });
 
         expect(ctx.output()).toContain('preferência local gpt-5.4/high');
-        expect(ctx.output()).toContain('último efetivo claude-haiku-4.5');
+        expect(ctx.output()).toContain('Efetivo');
+        expect(ctx.output()).toContain('claude-haiku-4.5');
         expect(ctx.output()).not.toContain('preferência local=');
         expect(ctx.output()).not.toContain('último efetivo=');
     });
@@ -198,10 +200,12 @@ describe('terminal commands config/errors com frontend canônico', () => {
         await cmdModel({ println: ctx.println }, 'gpt-4.1');
 
         expect(setTerminalModelProjection).toHaveBeenCalledWith('gpt-4.1');
-        expect(ctx.output()).toContain('Raciocínio ajustado');
+        expect(ctx.output()).toContain('Raciocínio');
+        expect(ctx.output()).toContain('high -> off');
         expect(ctx.output()).not.toContain('Reasoning ajustado');
         expect(ctx.output()).toContain('raciocínio não');
-        expect(ctx.output()).toContain('Último modelo efetivo observado na sessão: claude-haiku-4.5');
+        expect(ctx.output()).toContain('Efetivo');
+        expect(ctx.output()).toContain('claude-haiku-4.5');
     });
 
     it('cmdModel auto preserva roteamento nativo e explica preferência advisory', async () => {
@@ -210,7 +214,8 @@ describe('terminal commands config/errors com frontend canônico', () => {
         await cmdModel({ println: ctx.println }, 'auto');
 
         expect(setTerminalModelProjection).toHaveBeenCalledWith('auto');
-        expect(ctx.output()).toContain('Auto usa roteamento nativo do Copilot');
+        expect(ctx.output()).toContain('Auto');
+        expect(ctx.output()).toContain('roteamento nativo do Copilot');
         expect(ctx.output()).toContain('gpt-5.4/high');
     });
 

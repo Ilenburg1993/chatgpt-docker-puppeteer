@@ -120,6 +120,20 @@ function formatLiveDuration(ms) {
 }
 
 /**
+ * @param {string} model
+ * @param {string} effort
+ * @returns {string}
+ */
+function renderLiveModelEffort(model, effort) {
+    return [
+        model && model !== '-' ? `modelo ${compactLiveStatusText(model, 24)}` : null,
+        effort && effort !== '-' ? `raciocínio ${compactLiveStatusText(effort, 12)}` : null,
+    ]
+        .filter((part) => typeof part === 'string' && part.length > 0)
+        .join(' · ');
+}
+
+/**
  * @param {string} label
  * @returns {boolean}
  */
@@ -151,13 +165,14 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const stream = input.stream ?? readTerminalDialogStreamMeta();
     const model = stream?.model || runtime.model || '-';
     const effort = stream?.reasoningEffort || runtime.reasoningEffort || '-';
+    const modelEffort = renderLiveModelEffort(model, effort);
     if (hasHumanPendingQuestion(runtime)) {
         const questionText = compactLiveStatusText(runtime.pendingQuestion.question ?? 'pergunta pendente', LIVE_QUESTION_MAX_CHARS);
         const choices = Array.isArray(runtime.pendingQuestion.choices) ? runtime.pendingQuestion.choices : [];
         const choiceText = choices.length > 0 ? ` · opções ${choices.join('|')}` : '';
         const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila ${runtime.queueSize}` : '';
         return (
-            `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
+            `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText('question', 'PERGUNTA')}` +
             `${terminalThemeText('muted', ` · ${questionText}${choiceText} · ${runtime.dialogLoopActive ? 'conversa ativa' : 'standby'}${queue}`)}` +
             '\x1b[K'
@@ -174,7 +189,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
         const choiceText = choices.length > 0 ? ` · opções ${choices.join('|')}` : '';
         const queue = structuredInputs.length > 1 ? ` · fila ${structuredInputs.length}` : '';
         return (
-            `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
+            `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText('question', 'PERGUNTA')}` +
             `${terminalThemeText('muted', ` · ${questionText}${choiceText}${queue}`)}` +
             '\x1b[K'
@@ -194,18 +209,18 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const noDeltaStatus = activity.phase === 'thinking' ? extractNoDeltaStatus(activity.detail ?? '') : null;
     if (noDeltaStatus) {
         return (
-            `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
+            `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText(severityRole, 'pensando')}` +
-            `${terminalThemeText('muted', ` · ${noDeltaStatus} · ${model}/${effort} · ${runtimeTail}${queue}`)}` +
+            `${terminalThemeText('muted', ` · ${noDeltaStatus}${modelEffort ? ` · ${modelEffort}` : ''} · ${runtimeTail}${queue}`)}` +
             '\x1b[K'
         );
     }
     const label = compactLiveStatusText(activity.label, LIVE_LABEL_MAX_CHARS);
     if (activity.phase === 'turn') {
         return (
-            `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
+            `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText(severityRole, `turno · ${label}`)}` +
-            `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)} · ${model}/${effort} · ${runtimeTail}${queue}`)}` +
+            `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)} · ${runtimeTail}${queue}`)}` +
             '\x1b[K'
         );
     }
@@ -213,10 +228,10 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const targetText = target ? ` · ${target}` : '';
     const detailText = detail ? ` · ${detail}` : '';
     return (
-        `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
+        `  ${terminalThemeText('assistant', 'LLM-B')} ` +
         `${terminalThemeText(severityRole, `${renderLivePhaseLabel(activity.phase)} · ${label}`)}` +
         `${terminalThemeText('tool', targetText)}` +
-        `${terminalThemeText('muted', `${detailText}${progress} · ${formatLiveDuration(ageMs)} · ${model}/${effort} · ${runtimeTail}${queue}`)}` +
+        `${terminalThemeText('muted', `${detailText}${progress} · ${formatLiveDuration(ageMs)}${modelEffort ? ` · ${modelEffort}` : ''} · ${runtimeTail}${queue}`)}` +
         '\x1b[K'
     );
 }

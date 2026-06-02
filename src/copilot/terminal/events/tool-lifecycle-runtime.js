@@ -26,6 +26,7 @@ import {
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
     terminalThemeBadge,
+    terminalThemeStatus,
     terminalThemeText,
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
@@ -431,8 +432,8 @@ function printToolProgress(presentation, progress, progressMessage, options = {}
 function printToolComplete(presentation, success, durationLabel, fallbackToolCallId = null) {
     if (!getShowToolActivity()) return;
     const compactDetail = getTerminalDetailLevel() === 'compact';
-    const icon = success ? terminalThemeText('success', '✅') : terminalThemeText('error', '❌');
     const statusBadge = success ? terminalThemeBadge('success', 'OK') : terminalThemeBadge('error', 'FALHA');
+    const statusText = terminalThemeStatus(success);
     const operationRole = mapTerminalToolOperationRole(presentation.operation);
     if (compactDetail) clearInlineStatus();
     const hasOnlyCallIdTarget =
@@ -456,8 +457,8 @@ function printToolComplete(presentation, success, durationLabel, fallbackToolCal
             : presentation.displayToolName;
     println(
         compactDetail
-            ? `  ${icon} ${statusBadge} ${terminalThemeText('tool', compactTerminalToolText(renderedName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(completionDetail, 88))}`
-            : `  ${icon} ${statusBadge} ${terminalThemeText('tool', renderedName)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, completionDetail)}`,
+            ? `  ${statusBadge} ${statusText} ${terminalThemeText('tool', compactTerminalToolText(renderedName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(completionDetail, 88))}`
+            : `  ${statusBadge} ${statusText} ${terminalThemeText('tool', renderedName)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, completionDetail)}`,
     );
 }
 

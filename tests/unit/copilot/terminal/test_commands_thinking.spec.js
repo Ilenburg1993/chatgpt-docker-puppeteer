@@ -34,6 +34,11 @@ vi.mock('../../../../src/copilot/presentation/state/index.js', () => ({
 
 vi.mock('../../../../src/copilot/terminal/state/events/index.js', () => ({
     formatTerminalThinkingRef: (id) => String(id).slice(0, 12),
+    terminalThemeDivider: (width = 70) => `  ${'-'.repeat(width)}`,
+    terminalThemeHeadline: (_role, title, details = []) =>
+        `  ${title}${details.length > 0 ? ` · ${details.filter(Boolean).join(' · ')}` : ''}`,
+    terminalThemeRow: (label, value) => `  ${label} ${value}`,
+    terminalThemeText: (_role, text) => text,
 }));
 
 const { cmdThinking } = await import('../../../../src/copilot/terminal/commands/thinking.js');
@@ -57,7 +62,7 @@ describe('terminal/commands/thinking', () => {
         const showCtx = mockCtx();
         cmdThinking(showCtx, 'latest');
 
-        expect(showCtx.output()).toContain('raciocínio thinking-en');
+        expect(showCtx.output()).toContain('Raciocínio thinking-en');
         expect(showCtx.output()).toContain('fonte sdk/assistant.reasoning_delta');
         expect(showCtx.output()).toContain('estado concluído');
         expect(showCtx.output()).toContain('42 caracteres');
@@ -71,7 +76,7 @@ describe('terminal/commands/thinking', () => {
         cmdThinking(ctx, 'on');
 
         expect(setShowThinking).toHaveBeenCalledWith(true);
-        expect(ctx.output()).toContain('Exibição expandida de raciocínio');
+        expect(ctx.output()).toContain('exibição expandida');
         expect(ctx.output()).toContain('ativa');
     });
 });

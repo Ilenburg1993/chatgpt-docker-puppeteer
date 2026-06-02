@@ -22,6 +22,9 @@ import {
     readTerminalActivitySnapshot,
     formatTerminalIsoTimestamp,
     readTerminalPromptDisplayPolicy,
+    terminalThemeDivider,
+    terminalThemeDuration,
+    terminalThemeHeadline,
     terminalThemeText,
 } from '../state/dialog/index.js';
 
@@ -504,11 +507,11 @@ export function buildWaitingPrompt() {
     if (!promptPolicy.showWaitingActivity || compactDetail) {
         return `${terminalThemeText('thinking', 'LLM-B pensando')}${tagsStr} ${modelEffort} `;
     }
-    return `${terminalThemeText(sevRole, `LLM-B pensando · ${phase}:${label}`)}${tagsStr} ${modelEffort} `;
+    return `${terminalThemeText(sevRole, `LLM-B pensando · ${phase.toLowerCase()} · ${label}`)}${tagsStr} ${modelEffort} `;
 }
 
 /** Separador visual entre turnos — 72 colunas. */
-export const SEPARATOR = '\x1b[90m  ' + '─'.repeat(70) + '\x1b[0m';
+export const SEPARATOR = terminalThemeDivider(70);
 
 /**
  * @returns {void}
@@ -838,30 +841,24 @@ export function resetStatusRowState() {
  */
 export function printExchange(actor, message, reply, durationMs) {
     const ts = formatTerminalIsoTimestamp(Date.now());
-    const secs = (durationMs / 1000).toFixed(1);
     const { model, reasoningEffort } = readTerminalDialogStreamMeta();
     const effort = reasoningEffort;
 
-    const secsNum = durationMs / 1000;
-    const secsColor =
-        secsNum < 5 ? `\x1b[32m${secs}s\x1b[0m` : secsNum < 15 ? `\x1b[33m${secs}s\x1b[0m` : `\x1b[31m${secs}s\x1b[0m`;
     /** @type {string[]} */
     const lines = [];
 
     if (actor === 'llm-a') {
         lines.push(SEPARATOR);
-        lines.push(`  \x1b[90m[${ts}]\x1b[0m  🤖  \x1b[34mLLM-A\x1b[0m`);
+        lines.push(terminalThemeHeadline('system', 'LLM-A', [`[${ts}]`]));
         lines.push('');
         for (const line of message.split('\n')) {
-            lines.push(`  \x1b[34m│\x1b[0m  ${line}`);
+            lines.push(`  ${terminalThemeText('system', '│')}  ${line}`);
         }
         lines.push('');
     }
 
     lines.push(SEPARATOR);
-    lines.push(
-        `  \x1b[90m[${ts}]\x1b[0m  🧠  \x1b[32mLLM-B\x1b[0m  \x1b[90m·\x1b[0m  \x1b[36m${model}\x1b[0m  \x1b[90m·\x1b[0m  \x1b[35m${effort}\x1b[0m  \x1b[90m·\x1b[0m  ${secsColor}`,
-    );
+    lines.push(terminalThemeHeadline('assistant', 'LLM-B', [`[${ts}]`, model, effort, terminalThemeDuration(durationMs)]));
     lines.push('');
     const replyLines = reply.split('\n');
     let inCodeBlock = false;
@@ -869,13 +866,13 @@ export function printExchange(actor, message, reply, durationMs) {
     for (const line of visibleReplyLines) {
         if (line.trimStart().startsWith('```')) {
             inCodeBlock = !inCodeBlock;
-            lines.push(`  \x1b[32m│\x1b[0m  \x1b[2m${line}\x1b[0m`);
+            lines.push(`  ${terminalThemeText('assistant', '│')}  \x1b[2m${line}\x1b[0m`);
         } else if (inCodeBlock) {
-            lines.push(`  \x1b[32m│\x1b[0m  \x1b[48;5;236m\x1b[36m${line}\x1b[0m`);
+            lines.push(`  ${terminalThemeText('assistant', '│')}  \x1b[48;5;236m${terminalThemeText('info', line)}`);
         } else if (reply.trim().length === 0) {
-            lines.push(`  \x1b[33m│\x1b[0m  \x1b[33m${line}\x1b[0m`);
+            lines.push(`  ${terminalThemeText('warn', '│')}  ${terminalThemeText('warn', line)}`);
         } else {
-            lines.push(`  \x1b[32m│\x1b[0m  ${line}`);
+            lines.push(`  ${terminalThemeText('assistant', '│')}  ${line}`);
         }
     }
     lines.push('');

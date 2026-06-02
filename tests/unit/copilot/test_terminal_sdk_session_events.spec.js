@@ -316,7 +316,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         });
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Modelo SDK alterado',
+            'Modelo confirmado',
             expect.objectContaining({ detail: 'de auto para gpt-5.4 · raciocínio high' }),
         );
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Modelo SDK: auto → gpt-5.4'));
@@ -480,7 +480,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
-            'ask_user SDK solicitado',
+            'Pergunta ao operador',
             expect.objectContaining({ detail: expect.stringContaining('Escolha?'), severity: 'warn' }),
         );
         expect(mocks.recordTerminalUserInputRequested).toHaveBeenCalledWith(
@@ -488,12 +488,12 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
-            'ask_user SDK respondido',
-            expect.objectContaining({ detail: 'pedido ui-1 · escolha estruturada' }),
+            'Resposta do operador',
+            expect.objectContaining({ detail: 'escolha estruturada' }),
         );
         expect(mocks.recordTerminalActivity).not.toHaveBeenCalledWith(
             'question',
-            'ask_user SDK respondido',
+            'Resposta do operador',
             expect.objectContaining({ detail: expect.stringContaining('choice/protocolo') }),
         );
         expect(mocks.recordTerminalUserInputCompleted).toHaveBeenCalledWith(

@@ -195,3 +195,63 @@ export function terminalThemeBadge(role, label) {
 export function terminalActionChip(label) {
     return terminalThemeText('muted', `[ ${label} ]`);
 }
+
+/**
+ * @param {number} [width=70] Default is `70`
+ * @returns {string}
+ */
+export function terminalThemeDivider(width = 70) {
+    return terminalThemeText('muted', `  ${'─'.repeat(Math.max(12, Math.floor(width)))}`);
+}
+
+/**
+ * @param {Array<string | null | undefined | false>} parts
+ * @param {string} [separator=' · '] Default is `' · '`
+ * @returns {string}
+ */
+export function terminalThemeJoin(parts, separator = ' · ') {
+    return parts.filter((part) => typeof part === 'string' && part.length > 0).join(terminalThemeText('muted', separator));
+}
+
+/**
+ * @param {TerminalThemeRole} role
+ * @param {string} title
+ * @param {Array<string | null | undefined | false>} [details=[]] Default is `[]`
+ * @returns {string}
+ */
+export function terminalThemeHeadline(role, title, details = []) {
+    const suffix = terminalThemeJoin(details);
+    return `  ${terminalThemeText(role, title)}${suffix ? `  ${terminalThemeText('muted', '·')}  ${suffix}` : ''}`;
+}
+
+/**
+ * @param {string} label
+ * @param {string} value
+ * @param {{ width?: number; role?: TerminalThemeRole }} [options]
+ * @returns {string}
+ */
+export function terminalThemeRow(label, value, options = {}) {
+    const width = Math.max(4, Math.floor(options.width ?? 12));
+    const role = options.role ?? 'muted';
+    return `  ${terminalThemeText('muted', label.padEnd(width))} ${terminalThemeText(role, value)}`;
+}
+
+/**
+ * @param {boolean} success
+ * @returns {string}
+ */
+export function terminalThemeStatus(success) {
+    return terminalThemeText(success ? 'success' : 'error', success ? 'ok' : 'falhou');
+}
+
+/**
+ * @param {number} durationMs
+ * @returns {string}
+ */
+export function terminalThemeDuration(durationMs) {
+    const seconds = Math.max(0, durationMs / 1000);
+    const text = `${seconds.toFixed(1)}s`;
+    if (seconds < 5) return terminalThemeText('success', text);
+    if (seconds < 15) return terminalThemeText('warn', text);
+    return terminalThemeText('error', text);
+}

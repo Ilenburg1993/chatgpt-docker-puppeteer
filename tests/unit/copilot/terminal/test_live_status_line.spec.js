@@ -116,7 +116,8 @@ describe('terminal/live-status-line', () => {
         expect(line).not.toContain('read_file_content');
         expect(line).toContain('lendo arquivo');
         expect(line).toContain('12s');
-        expect(line).toContain('claude-sonnet-4.6/xhigh');
+        expect(line).toContain('modelo claude-sonnet-4.6');
+        expect(line).toContain('raciocínio xhigh');
     });
 
     it('prioriza request_user_input pendente como espera humana estruturada', async () => {
@@ -248,7 +249,8 @@ describe('terminal/live-status-line', () => {
 
         expect(line).toContain('pensando');
         expect(line).toContain('20s sem delta');
-        expect(line).toContain('auto/high');
+        expect(line).toContain('modelo auto');
+        expect(line).toContain('raciocínio high');
         expect(line).not.toContain('thinking');
         expect(line).not.toContain('LLM-B trabalhando');
         expect(line.length).toBeLessThan(90);
@@ -341,7 +343,7 @@ describe('terminal/live-status-line', () => {
         expect(line).toContain('Qual cor devo usar');
         expect(line).toContain('opções azul|verde');
         expect(line).not.toContain('opções=');
-        expect(line).not.toContain('auto/xhigh');
+        expect(line).not.toContain('modelo auto');
         expect(line).not.toContain('LLM-B trabalhando');
         expect(line.length).toBeLessThan(100);
     });

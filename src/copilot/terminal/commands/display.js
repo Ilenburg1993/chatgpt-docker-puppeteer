@@ -27,6 +27,11 @@ import {
     setTerminalDetailLevel,
     setTerminalThemeName,
     TERMINAL_DISPLAY_TOGGLE_KEYS,
+    terminalThemeDivider,
+    terminalThemeHeadline,
+    terminalThemeRow,
+    terminalThemeStatus,
+    terminalThemeText,
     writeTerminalDisplayState,
     writeTerminalDisplayToggle,
 } from '../state/ui/index.js';
@@ -62,6 +67,14 @@ function detailUsageLabel() {
 }
 
 /**
+ * @param {boolean} value
+ * @returns {string}
+ */
+function renderToggleStatus(value) {
+    return value ? `${terminalThemeStatus(true)} on` : `${terminalThemeText('error', 'off')}`;
+}
+
+/**
  * Comando `/display [toggle] [on|off]`.
  *
  * - Sem args: mostra status de todos os toggles.
@@ -83,64 +96,64 @@ export function cmdDisplay({ println }, arg, rest) {
         const promptPolicy = readTerminalPromptDisplayPolicy(state);
         const themeName = getTerminalThemeName();
         const detailLevel = getTerminalDetailLevel();
-        println('\n  \x1b[36mDisplay Toggles:\x1b[0m');
-        println(`  \x1b[90mpreset atual: ${promptPolicy.density}\x1b[0m`);
-        println(`  \x1b[90mtema atual: ${themeName}\x1b[0m`);
-        println(`  \x1b[90mnível de detalhe: ${detailLevel}\x1b[0m`);
-        println('  ─────────────────────────────────────');
+        println('');
+        println(terminalThemeHeadline('assistant', 'Exibição do terminal', [`preset ${promptPolicy.density}`, `tema ${themeName}`, `detalhe ${detailLevel}`]));
+        println(terminalThemeDivider(52));
         for (const toggleDef of listTerminalDisplayToggles()) {
-            const status = state[toggleDef.key] ? '\x1b[32m● on\x1b[0m' : '\x1b[31m○ off\x1b[0m';
-            println(`  ${toggleDef.label.padEnd(36)} ${status}    \x1b[90m${toggleDef.command}\x1b[0m`);
+            println(
+                `  ${terminalThemeText('muted', toggleDef.label.padEnd(34))} ${renderToggleStatus(state[toggleDef.key])}  ${terminalThemeText('command', toggleDef.command)}`,
+            );
         }
-        println('  ─────────────────────────────────────');
-        println('  \x1b[90m/display all on  ·  /display all off\x1b[0m');
-        println(`  \x1b[90m/display preset <${presetUsageLabel()}>\x1b[0m\n`);
-        println(`  \x1b[90m/display theme <${themeUsageLabel()}>\x1b[0m\n`);
-        println(`  \x1b[90m/display detail <${detailUsageLabel()}>\x1b[0m\n`);
+        println(terminalThemeDivider(52));
+        println(terminalThemeRow('Ações', '/display all on  ·  /display all off', { role: 'command' }));
+        println(terminalThemeRow('Preset', `/display preset <${presetUsageLabel()}>`, { role: 'command' }));
+        println(terminalThemeRow('Tema', `/display theme <${themeUsageLabel()}>`, { role: 'command' }));
+        println(terminalThemeRow('Detalhe', `/display detail <${detailUsageLabel()}>`, { role: 'command' }));
+        println('');
         return;
     }
 
     if (toggle === 'detail') {
         if (!value) {
-            println(`  Nível de detalhe atual: \x1b[36m${getTerminalDetailLevel()}\x1b[0m`);
-            println(`  \x1b[90mUso: /display detail <${detailUsageLabel()}>\x1b[0m`);
+            println(terminalThemeRow('Detalhe', getTerminalDetailLevel(), { role: 'assistant' }));
+            println(terminalThemeRow('Uso', `/display detail <${detailUsageLabel()}>`, { role: 'command' }));
             return;
         }
         if (!isTerminalDetailLevel(value)) {
-            println(`  \x1b[33mUso: /display detail <${detailUsageLabel()}>\x1b[0m`);
+            println(terminalThemeRow('Uso', `/display detail <${detailUsageLabel()}>`, { role: 'warn' }));
             return;
         }
         setTerminalDetailLevel(value);
         println(
-            `  ✅ Detalhe aplicado: \x1b[36m${value}\x1b[0m — ${value === 'compact' ? 'menos ruído, mais síntese' : 'máximo contexto operacional'}`,
+            terminalThemeRow('Detalhe', `${value} · ${value === 'compact' ? 'menos ruído, mais síntese' : 'máximo contexto operacional'}`, { role: 'success' }),
         );
         return;
     }
 
     if (toggle === 'theme') {
         if (!value) {
-            println(`  Tema atual: \x1b[36m${getTerminalThemeName()}\x1b[0m`);
-            println(`  \x1b[90mUso: /display theme <${themeUsageLabel()}>\x1b[0m`);
+            println(terminalThemeRow('Tema', getTerminalThemeName(), { role: 'assistant' }));
+            println(terminalThemeRow('Uso', `/display theme <${themeUsageLabel()}>`, { role: 'command' }));
             return;
         }
         if (!isTerminalThemeName(value)) {
-            println(`  \x1b[33mUso: /display theme <${themeUsageLabel()}>\x1b[0m`);
+            println(terminalThemeRow('Uso', `/display theme <${themeUsageLabel()}>`, { role: 'warn' }));
             return;
         }
         setTerminalThemeName(value);
         const selected = listTerminalThemeProfiles().find((theme) => theme.name === value);
-        println(`  ✅ Tema aplicado: \x1b[36m${value}\x1b[0m — ${selected?.description ?? 'paleta visual atualizada'}`);
+        println(terminalThemeRow('Tema', `${value} · ${selected?.description ?? 'paleta visual atualizada'}`, { role: 'success' }));
         return;
     }
 
     if (toggle === 'preset') {
         const presetName = value;
         if (!isTerminalDisplayPresetName(presetName)) {
-            println(`  \x1b[33mUso: /display preset <${presetUsageLabel()}>\x1b[0m`);
+            println(terminalThemeRow('Uso', `/display preset <${presetUsageLabel()}>`, { role: 'warn' }));
             return;
         }
         const preset = applyTerminalDisplayPreset(presetName);
-        println(`  ✅ Preset aplicado: \x1b[36m${preset.name}\x1b[0m — ${preset.description}`);
+        println(terminalThemeRow('Preset', `${preset.name} · ${preset.description}`, { role: 'success' }));
         return;
     }
 
@@ -156,17 +169,17 @@ export function cmdDisplay({ println }, arg, rest) {
                 intent: newVal,
                 session: newVal,
             });
-            println(`  ✅ Todos os toggles: \x1b[${newVal ? '32m● on' : '31m○ off'}\x1b[0m`);
+            println(terminalThemeRow('Todos', renderToggleStatus(newVal)));
             return;
         }
-        println('  \x1b[33mUso: /display all on  |  /display all off\x1b[0m');
+        println(terminalThemeRow('Uso', '/display all on  |  /display all off', { role: 'warn' }));
         return;
     }
 
     // Toggle específico
     if (!isTerminalDisplayToggle(toggle)) {
         const valid = TERMINAL_DISPLAY_TOGGLE_KEYS.join(', ');
-        println(`  \x1b[31mToggle desconhecido: "${toggle}". Válidos: ${valid}, all\x1b[0m`);
+        println(terminalThemeRow('Erro', `toggle desconhecido "${toggle}". Válidos: ${valid}, all`, { role: 'error' }));
         return;
     }
     const entry = listTerminalDisplayToggles().find((candidate) => candidate.key === toggle);
@@ -174,12 +187,11 @@ export function cmdDisplay({ println }, arg, rest) {
     if (value === 'on' || value === 'off') {
         const newVal = value === 'on';
         writeTerminalDisplayToggle(toggle, newVal);
-        println(`  ✅ ${entry?.label ?? toggle}: \x1b[${newVal ? '32m● on' : '31m○ off'}\x1b[0m`);
+        println(terminalThemeRow(entry?.label ?? toggle, renderToggleStatus(newVal)));
     } else if (!value) {
         const state = readTerminalDisplayState();
-        const status = state[toggle] ? '\x1b[32m● on\x1b[0m' : '\x1b[31m○ off\x1b[0m';
-        println(`  ${entry?.label ?? toggle}: ${status}`);
+        println(terminalThemeRow(entry?.label ?? toggle, renderToggleStatus(state[toggle])));
     } else {
-        println(`  \x1b[33mUso: /display ${toggle} on  |  /display ${toggle} off\x1b[0m`);
+        println(terminalThemeRow('Uso', `/display ${toggle} on  |  /display ${toggle} off`, { role: 'warn' }));
     }
 }

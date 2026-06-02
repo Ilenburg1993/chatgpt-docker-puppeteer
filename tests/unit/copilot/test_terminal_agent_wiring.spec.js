@@ -28,7 +28,7 @@ describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
 
         const policy = mod.describeDialogStoppedRestartPolicy('reconnect_restart');
 
-        expect(policy.activityTitle).toBe('Dialog loop preservado após reconexão');
+        expect(policy.activityTitle).toBe('Conversa preservada após reconexão');
         expect(policy.activityDetail).toContain('reenvio automático de prompt bloqueado');
         expect(policy.terminalMessage).toContain('reenvio automático do prompt foi bloqueado');
         expect(policy.sse).toEqual(

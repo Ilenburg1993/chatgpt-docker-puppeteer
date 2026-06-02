@@ -19,7 +19,13 @@
  */
 
 import { readTerminalConfigProjection, readTerminalDiagnoseProjection } from '../frontend/index.js';
-import { formatTerminalIsoTimestamp, terminalPermissionModeSkipsSdkPrompts, terminalThemeText } from '../state/index.js';
+import {
+    formatTerminalIsoTimestamp,
+    terminalPermissionModeSkipsSdkPrompts,
+    terminalThemeDivider,
+    terminalThemeHeadline,
+    terminalThemeText,
+} from '../state/index.js';
 import {
     compactTerminalDiagnosticId,
     compactTerminalToolText,
@@ -101,18 +107,18 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         snap['status'] === 'waiting_for_input' ? C.green : snap['status'] === 'idle' ? C.yellow : C.red;
     const mcpLine =
         mcp.available && !mcp.circuitOpen && mcp.toolCount > 0
-            ? `${C.green}✅ ${mcp.toolCount} tools (lat: ${mcp.latencyMs ?? '?'}ms)${C.reset}`
+            ? `${C.green}ok · ${mcp.toolCount} tools (lat: ${mcp.latencyMs ?? '?'}ms)${C.reset}`
             : mcp.circuitOpen
-              ? `${C.red}❌ circuit aberto${C.reset}`
-              : `${C.yellow}⚠️  indisponível${C.reset}`;
+              ? `${C.red}falha · circuito aberto${C.reset}`
+              : `${C.yellow}aviso · indisponível${C.reset}`;
     const hubLine =
         hub.summary === 'sem storage'
             ? `${C.grey}${hub.summary}${C.reset}`
             : hub.summary.includes('não inicializado')
-              ? `${C.yellow}⚠️  ${hub.summary}${C.reset}`
+              ? `${C.yellow}aviso · ${hub.summary}${C.reset}`
               : hub.summary.includes('erro')
-                ? `${C.red}❌ ${hub.summary}${C.reset}`
-                : `${C.green}✅ ${hub.summary}${C.reset}`;
+                ? `${C.red}falha · ${hub.summary}${C.reset}`
+                : `${C.green}ok · ${hub.summary}${C.reset}`;
     const todoLines =
         todos.length === 0
             ? `${C.green}nenhum pendente${C.reset}`
@@ -226,7 +232,8 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
 
     if (!wantsFull) {
         println(`
-${terminalThemeText('assistant', 'Saúde do Terminal LLM-B')}
+${terminalThemeHeadline('assistant', 'Saúde do Terminal LLM-B')}
+${terminalThemeDivider(36)}
   Conversa     ${agentStatusColor}${renderHumanRuntimeStatus(String(snap['status'] ?? 'unknown'))}${C.reset} ${dialogLoopActive ? `${C.grey}· ativa${C.reset}` : `${C.yellow}· inativa${C.reset}`}
   Modelo       ${C.magenta}${snap['model']}${C.reset} ${C.grey}· raciocínio ${configProjection.currentReasoningEffort}${C.reset}
   Acesso       ${renderCompactByokLine(byok)}
@@ -237,6 +244,7 @@ ${terminalThemeText('assistant', 'Saúde do Terminal LLM-B')}
   Infra        ${renderHumanHealthStatus(String(health?.['status'] ?? 'unknown'))} ${C.grey}· memória ${memMB}MB · uptime ${Math.floor(uptimeSec / 60)}m${C.reset}
   Próximo      ${renderCompactActionLine(health?.['recommendedAction'])}
   Detalhe      ${renderCommandList(['/health full', '/diagnose', '/tools diag', '/activity detail'])}
+${terminalThemeDivider(36)}
 `);
         if (configProjection.runtimeFallbackWarning) {
             println(

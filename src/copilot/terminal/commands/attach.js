@@ -17,6 +17,7 @@
 import { access, stat } from 'node:fs/promises';
 import { MAX_EMBED_BYTES } from '../../presentation/files/index.js';
 import { addAttachment, clearAttachments, getAttachmentQueue } from '../../presentation/state/index.js';
+import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 
 /**
  * @param {string | Record<string, unknown>} entry
@@ -78,17 +79,16 @@ export async function cmdAttach({ println }, arg) {
     if (!trimmed) {
         const queue = getAttachmentQueue();
         if (queue.length === 0) {
-            println(
-                '\x1b[90m  Fila de attachments vazia. Use /attach <caminho> ou /attach blob <mime> <base64>.\x1b[0m',
-            );
+            println(terminalThemeRow('Fila', 'vazia', { role: 'muted' }));
+            println(terminalThemeText('muted', '  Use /attach <caminho> ou /attach blob <mime> <base64>.'));
         } else {
-            println(`\x1b[36m  📎 Fila de attachments (${queue.length} item(ns)):\x1b[0m`);
+            println(terminalThemeHeadline('fileRead', 'Fila de anexos', [`${queue.length} item(ns)`]));
             for (let i = 0; i < queue.length; i++) {
                 const entry = queue[i];
                 if (entry === undefined) continue;
-                println(`    \x1b[33m${i + 1}.\x1b[0m ${describeAttachmentEntry(entry)}`);
+                println(terminalThemeRow(`${i + 1}.`, describeAttachmentEntry(entry), { role: 'fileRead', width: 5 }));
             }
-            println('\x1b[90m  Serão embutidos no próximo turno. Use /attach clear para limpar.\x1b[0m');
+            println(terminalThemeText('muted', '  Serão embutidos no próximo turno. Use /attach clear para limpar.'));
         }
         return;
     }
@@ -96,14 +96,14 @@ export async function cmdAttach({ println }, arg) {
     // clear
     if (trimmed.toLowerCase() === 'clear') {
         clearAttachments();
-        println('\x1b[90m  Fila de attachments limpa.\x1b[0m');
+        println(terminalThemeRow('Fila', 'limpa', { role: 'success' }));
         return;
     }
 
     const blobArgs = parseBlobAttachArgs(trimmed);
     if (blobArgs) {
         if ('error' in blobArgs) {
-            println(`\x1b[31m  ✗ ${blobArgs.error}\x1b[0m`);
+            println(terminalThemeRow('Erro', blobArgs.error, { role: 'error' }));
             return;
         }
         addAttachment({
@@ -114,9 +114,11 @@ export async function cmdAttach({ println }, arg) {
         });
         const queue = getAttachmentQueue();
         println(
-            `\x1b[32m  ✓ Blob adicionado à fila:\x1b[0m ${blobArgs.displayName ?? 'blob'} \x1b[90m(${blobArgs.mimeType})\x1b[0m`,
+            terminalThemeRow('Adicionado', `${blobArgs.displayName ?? 'blob'} (${blobArgs.mimeType})`, {
+                role: 'success',
+            }),
         );
-        println(`\x1b[90m  Fila: ${queue.length} item(ns) — serão embutidos no próximo turno.\x1b[0m`);
+        println(terminalThemeText('muted', `  Fila: ${queue.length} item(ns) — serão embutidos no próximo turno.`));
         return;
     }
 
@@ -127,18 +129,20 @@ export async function cmdAttach({ println }, arg) {
         const info = await stat(filePath);
         if (info.size > MAX_EMBED_BYTES) {
             println(
-                `\x1b[33m  ⚠️  Arquivo muito grande: ${filePath} (${(info.size / 1024).toFixed(1)} KB > 64 KB)\x1b[0m`,
+                terminalThemeRow('Aviso', `arquivo muito grande: ${filePath} (${(info.size / 1024).toFixed(1)} KB > 64 KB)`, {
+                    role: 'warn',
+                }),
             );
-            println('\x1b[90m  Limite por envio é 64 KB total. Arquivo não adicionado.\x1b[0m');
+            println(terminalThemeText('muted', '  Limite por envio é 64 KB total. Arquivo não adicionado.'));
             return;
         }
         addAttachment(filePath);
         const queue = getAttachmentQueue();
         println(
-            `\x1b[32m  ✓ Adicionado à fila:\x1b[0m ${filePath} \x1b[90m(${(info.size / 1024).toFixed(1)} KB)\x1b[0m`,
+            terminalThemeRow('Adicionado', `${filePath} (${(info.size / 1024).toFixed(1)} KB)`, { role: 'success' }),
         );
-        println(`\x1b[90m  Fila: ${queue.length} item(ns) — serão embutidos no próximo turno.\x1b[0m`);
+        println(terminalThemeText('muted', `  Fila: ${queue.length} item(ns) — serão embutidos no próximo turno.`));
     } catch {
-        println(`\x1b[31m  ✗ Arquivo não encontrado ou sem permissão: ${filePath}\x1b[0m`);
+        println(terminalThemeRow('Erro', `arquivo não encontrado ou sem permissão: ${filePath}`, { role: 'error' }));
     }
 }

@@ -59,6 +59,7 @@ import {
     recordTerminalActivity,
     terminalActionChip,
     terminalThemeBadge,
+    terminalThemeRow,
     terminalThemeText,
     withTerminalTurnCorrelation,
     reviseRecentTerminalTurnTraceStatus,
@@ -599,8 +600,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
 
         rl?.pause();
         println(
-            `\n${terminalThemeBadge('question', compactDetail ? 'PERGUNTA' : 'PERGUNTA AO OPERADOR')} ${terminalThemeText('question', `LLM-B perguntou: "${questionText}"`)}`,
+            `\n  ${terminalThemeBadge('question', compactDetail ? 'PERGUNTA' : 'PERGUNTA AO OPERADOR')} ${terminalThemeText('question', 'decisão pendente')}`,
         );
+        println(terminalThemeRow('Pergunta', questionText || 'Aguardando resposta do operador', { role: 'question' }));
         if (choices.length > 0) {
             const maxInlineChoices = 6;
             const visibleChoices = choices.slice(0, maxInlineChoices);
@@ -608,26 +610,27 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                 .map((choice, idx) => `[${idx + 1}] ${compactDetail ? compactTerminalToolText(choice, 20) : choice}`)
                 .join('   ');
             const overflow = choices.length > maxInlineChoices ? `   … +${choices.length - maxInlineChoices}` : '';
-            if (!compactDetail) {
-                println(`   ${terminalThemeBadge('info', 'OPTIONS')} ${choices.join(' | ')}`);
-            }
-            println(`   ${terminalThemeBadge('info', compactDetail ? 'PICK' : 'SELECT')} ${indexed}${overflow}`);
+            println(terminalThemeRow('Opções', `${indexed}${overflow}`, { role: 'info' }));
         }
         if (rl) {
             println(
                 compactDetail
-                    ? `   ${terminalThemeText('muted', '→')} ${terminalActionChip('/answer')} ${terminalActionChip('/status')} ${terminalActionChip('/clear-shadow')}`
-                    : `   ${terminalThemeText('muted', '→ Responda digitando normalmente. Sua próxima mensagem será usada como resposta.')}`,
+                    ? terminalThemeRow(
+                          'Ação',
+                          `${terminalActionChip('/answer')} ${terminalActionChip('/status')} ${terminalActionChip('/clear-shadow')}`,
+                      )
+                    : terminalThemeRow('Ação', 'Responda digitando normalmente. Sua próxima mensagem será usada como resposta.'),
             );
             if (!compactDetail) {
                 println(
-                    `   ${terminalThemeText('muted', '→ Ações rápidas:')} ${terminalActionChip('/status')} ${terminalActionChip('/answer <texto>')} ${terminalActionChip('/clear-shadow')}`,
+                    terminalThemeRow(
+                        'Atalhos',
+                        `${terminalActionChip('/status')} ${terminalActionChip('/answer <texto>')} ${terminalActionChip('/clear-shadow')}`,
+                    ),
                 );
             }
         } else {
-            println(
-                `   ${terminalThemeText('muted', '→ Modo headless: responda via POST /inject ou pelo cliente conectado.')}`,
-            );
+            println(terminalThemeRow('Ação', 'Modo headless: responda via POST /inject ou pelo cliente conectado.'));
         }
         rl?.resume();
         if (rl) {
@@ -647,7 +650,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             severity: 'warn',
             source: 'agent',
         });
-        println('[llm-b] ⚠️  Agente parado. Use /restart para reiniciar.');
+        println(`${terminalThemeBadge('warn', 'LLM-B')} ${terminalThemeText('warn', 'Agente parado. Use /restart para reiniciar.')}`);
         if (rl) {
             scheduleTerminalPromptRedraw(rl, buildUserPrompt());
         }
@@ -831,7 +834,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             detail: 'Reduzindo uso de contexto da sessão',
             source: 'agent',
         });
-        println(`  ${terminalThemeText('warn', '🗜️  Compactando context window…')}`);
+        println(`  ${terminalThemeBadge('warn', 'COMPACTAR')} ${terminalThemeText('warn', 'Compactando contexto da sessão')}`);
         broadcastSse('compaction.start', withAgentSseEnvelope({}, 'agent/compaction.start'));
     };
 
@@ -850,10 +853,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         if (success && pre !== undefined && post !== undefined) {
             const pct = ((1 - post / pre) * 100).toFixed(0);
             println(
-                `  ${terminalThemeText('success', `🗜️  Compactação concluída: ${pre.toLocaleString('pt-BR')} → ${post.toLocaleString('pt-BR')} tokens (-${pct}%)`)}`,
+                `  ${terminalThemeBadge('success', 'OK')} ${terminalThemeText('success', `Compactação concluída: ${pre.toLocaleString('pt-BR')} -> ${post.toLocaleString('pt-BR')} tokens (-${pct}%)`)}`,
             );
         } else if (!success) {
-            println(`  ${terminalThemeText('error', '🗜️  Compactação falhou')}`);
+            println(`  ${terminalThemeBadge('error', 'FALHA')} ${terminalThemeText('error', 'Compactação falhou')}`);
         }
         broadcastSse('compaction.complete', withAgentSseEnvelope({ success, pre, post }, 'agent/compaction.complete'));
     };
@@ -876,7 +879,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             detail: name,
             source: 'agent',
         });
-        println(`  \x1b[36m🤖 Sub-agente iniciado: ${name}\x1b[0m`);
+        println(`  ${terminalThemeBadge('info', 'SUBAGENTE')} ${terminalThemeText('info', `iniciado: ${name}`)}`);
     };
 
     const onSubagentCompleted = (/** @type {Record<string, unknown>} */ evt) => {
@@ -885,7 +888,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             detail: name,
             source: 'agent',
         });
-        println(`  \x1b[32m🤖 Sub-agente concluído: ${name}\x1b[0m`);
+        println(`  ${terminalThemeBadge('success', 'SUBAGENTE')} ${terminalThemeText('success', `concluído: ${name}`)}`);
     };
 
     const onSubagentFailed = (/** @type {Record<string, unknown>} */ evt) => {
@@ -896,7 +899,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             severity: 'error',
             source: 'agent',
         });
-        printlnWhenRenderUnlocked(`  \x1b[31m🤖 Sub-agente falhou: ${name} — ${error}\x1b[0m`);
+        printlnWhenRenderUnlocked(`  ${terminalThemeBadge('error', 'SUBAGENTE')} ${terminalThemeText('error', `falhou: ${name} — ${error}`)}`);
     };
 
     const onBackgroundCompleted = (/** @type {Record<string, unknown>} */ evt) => {

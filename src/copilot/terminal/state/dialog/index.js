@@ -9,4 +9,11 @@ export { readTerminalTurnCorrelation, withTerminalTurnCorrelation } from '../tur
 export { readTerminalTurnMaterialization } from '../turn-materialization-state.js';
 export { formatTerminalIsoTimestamp } from '../time-format.js';
 export { getTerminalDetailLevel } from '../ui-preferences.js';
-export { terminalThemeText } from '../ui-theme.js';
+export {
+    terminalThemeDivider,
+    terminalThemeDuration,
+    terminalThemeHeadline,
+    terminalThemeJoin,
+    terminalThemeRow,
+    terminalThemeText,
+} from '../ui-theme.js';

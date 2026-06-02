@@ -11,7 +11,12 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit';
-import { formatTerminalIsoTimestamp } from '../state/index.js';
+import {
+    formatTerminalIsoTimestamp,
+    terminalThemeHeadline,
+    terminalThemeRow,
+    terminalThemeText,
+} from '../state/index.js';
 
 /**
  * @typedef {object} AuditContext
@@ -31,10 +36,13 @@ export async function cmdAudit({ println }, arg) {
     const limit = Number(arg) || 10;
     const entries = await defaultAuditLog.getAuditSummary(null, limit);
 
-    println(`\n  \x1b[36m📋 Audit Log — últimas ${limit} entradas\x1b[0m\n`);
+    println('');
+    println(terminalThemeHeadline('command', 'Audit Log', [`últimas ${limit} entradas`]));
+    println('');
 
     if (!entries || entries.length === 0) {
-        println('  \x1b[33m⚠️  Nenhum dado de auditoria disponível.\x1b[0m\n');
+        println(terminalThemeRow('Aviso', 'nenhum dado de auditoria disponível', { role: 'warn' }));
+        println('');
         return;
     }
 
@@ -47,12 +55,13 @@ export async function cmdAudit({ println }, arg) {
         categories[type] = (categories[type] ?? 0) + 1;
         const ts = typeof e['ts'] === 'number' ? formatTerminalIsoTimestamp(e['ts']) : 'sem horário';
         const desc = typeof e['description'] === 'string' ? e['description'] : type;
-        println(`    \x1b[90m${ts}\x1b[0m  \x1b[33m${type}\x1b[0m  ${desc}`);
+        println(`  ${terminalThemeText('muted', ts.padEnd(20))} ${terminalThemeText('command', type.padEnd(18))} ${desc}`);
     }
 
-    println(`\n  \x1b[36mSumário por tipo:\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('command', 'Sumário por tipo'));
     for (const [cat, count] of Object.entries(categories)) {
-        println(`    \x1b[33m${cat}\x1b[0m: ${count}`);
+        println(terminalThemeRow(cat, String(count), { role: 'info', width: 18 }));
     }
     println('');
 }

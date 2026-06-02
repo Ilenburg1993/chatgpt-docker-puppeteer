@@ -44,7 +44,8 @@ import {
     stopTerminalDialogMode,
     writeTerminalHubSystemTurn,
 } from '../frontend/gateways/index.js';
-import { markTerminalActivityIdle, recordTerminalActivity } from '../state/dialog/index.js';
+import { markTerminalActivityIdle, recordTerminalActivity, terminalThemeText } from '../state/dialog/index.js';
+import { terminalThemeBadge } from '../state/events/index.js';
 import { shouldSuppressTerminalAssistantMessageAsMaterializedTurn, withTerminalTurnCorrelation } from '../state/events/index.js';
 import { drainMailboxToTurnIfIdle } from './mailbox-drain.js';
 
@@ -302,7 +303,7 @@ export function registerAgentEventListeners(printBanner) {
 
         if (recovered) {
             // F52.3: ask_user reapareceu — a conversa continua sem custo de PR
-            println(`\n[watchdog] ✅  Conversa recuperada sem consumir PR (ask_user preservado).`);
+            println(`\n  ${terminalThemeBadge('success', 'WATCHDOG')} ${terminalThemeText('success', 'Conversa recuperada sem consumir PR; pergunta humana preservada.')}`);
             log('INFO', '[TerminalServer] F52: Watchdog recovery zero-PR — ask_user reapareceu após abort.');
             pingTerminalDialogWatchdog();
             broadcastSse(
@@ -316,7 +317,7 @@ export function registerAgentEventListeners(printBanner) {
         }
 
         // F52.4: ask_user NÃO reapareceu — fallback para restart completo (1 PR)
-        println(`\n[watchdog] ⚠️  Conversa inativa há ${secs}s — reiniciando (1 PR)…`);
+        println(`\n  ${terminalThemeBadge('warn', 'WATCHDOG')} ${terminalThemeText('warn', `Conversa inativa há ${secs}s; reiniciando (1 PR).`)}`);
         log('WARN', `[TerminalServer] F52: Watchdog recovery falhou — restart com boot prompt (1 PR).`);
 
         const _hubSessionId = getHubSessionId();
@@ -381,7 +382,7 @@ export function registerAgentEventListeners(printBanner) {
 
         // Conversa genuinamente inativa: aviso visual com tempo restante estimado
         println(
-            `\n\x1b[33m[watchdog] ⚠️  Pré-stall: conversa inativa há ${secs}s (~${remainingSecs}s para restart automático).\x1b[0m`,
+            `\n  ${terminalThemeBadge('warn', 'WATCHDOG')} ${terminalThemeText('warn', `Pré-stall: conversa inativa há ${secs}s (~${remainingSecs}s para restart automático).`)}`,
         );
         log('WARN', `[TerminalServer] Pré-stall: conversa inativa há ${secs}s (~${remainingSecs}s restantes).`);
         recordTerminalActivity('system', 'Pré-stall watchdog', {

@@ -15,6 +15,7 @@ import { printlnBlock } from '../dialog/index.js';
 import { readTerminalByokProjection, readTerminalStatusProjection } from '../frontend/index.js';
 import { buildTerminalOperationalGuidance } from '../frontend/operational-guidance/index.js';
 import { readTerminalDisplayState, resolveTerminalBootDisplayPreset } from '../state/repl-runtime/index.js';
+import { terminalThemeText } from '../state/repl/index.js';
 
 /** @typedef {'boot' | 'ready' | 'manual'} TerminalAutoBriefPhase */
 
@@ -257,7 +258,7 @@ export function renderTerminalAutoBrief(input = {}) {
             return brief;
         }
         _lastAutoBriefFingerprintByPhase.set(dedupeKey, brief.fingerprint);
-        printlnBlockFn(brief.lines.map((line) => `\x1b[90m  ${line}\x1b[0m`));
+        printlnBlockFn(brief.lines.map((line) => terminalThemeText('muted', `  ${line}`)));
         return brief;
     } catch (error) {
         log('WARN', `[TerminalServer] Auto-briefing indisponível: ${toError(error).message}`);

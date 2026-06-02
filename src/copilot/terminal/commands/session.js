@@ -51,6 +51,9 @@ import {
     readTerminalSseEventArchiveTail,
     formatTerminalIsoTimestamp,
     terminalPermissionModeSkipsSdkPrompts,
+    terminalThemeDivider,
+    terminalThemeHeadline,
+    terminalThemeRow,
     terminalThemeText,
 } from '../state/index.js';
 
@@ -79,6 +82,19 @@ function renderHumanTerminalStatus(value) {
     if (status === 'starting') return 'iniciando';
     if (status === 'stopped') return 'parado';
     return status;
+}
+
+/**
+ * @param {string | null | undefined} role
+ * @param {string | null | undefined} rawRole
+ * @returns {{ label: string; role: 'user' | 'assistant' | 'system' | 'question' | 'muted' }}
+ */
+function renderTerminalActorLabel(role, rawRole = null) {
+    if (role === 'user') return { label: 'Você', role: 'user' };
+    if (role === 'system' || rawRole === 'ask_user') return { label: 'Sistema', role: 'system' };
+    if (rawRole === 'llm_a' || role === 'llm_a') return { label: 'LLM-A', role: 'system' };
+    if (role === 'llm_b' || rawRole === 'llm_b') return { label: 'LLM-B', role: 'assistant' };
+    return { label: String(role ?? rawRole ?? 'Turno'), role: 'muted' };
 }
 
 /**
@@ -1051,39 +1067,32 @@ export function cmdHistory({ println }, n = 10) {
     const timeline = readTerminalTimelineProjection({ limitPairs: requestedLimit, runtimeId });
     const hist = timeline.turns;
     if (hist.length === 0) {
-        println('[history] Histórico vazio.');
+        println(terminalThemeRow('Histórico', 'vazio'));
         return;
     }
-    println(
-        `\n── Histórico (${timeline.timelineSource} · ${timeline.timelineAuthority} · ${timeline.reconciliationStatus}) ──`,
-    );
+    println('');
+    println(terminalThemeHeadline('assistant', 'Histórico', [timeline.timelineSource, timeline.timelineAuthority, timeline.reconciliationStatus]));
+    println(terminalThemeDivider(64));
     for (const turn of hist) {
         const ts = formatTerminalIsoTimestamp(turn.timestamp);
-        const roleLabel =
-            turn.role === 'user'
-                ? '👤'
-                : turn.role === 'system' || turn.rawRole === 'ask_user'
-                  ? '🧭'
-                  : turn.rawRole === 'llm_a'
-                    ? '🤖'
-                    : '🧠';
-        const sourceLabel = turn.persisted ? '' : ' \x1b[33m[live]\x1b[0m';
+        const actor = renderTerminalActorLabel(turn.role, turn.rawRole);
+        const sourceLabel = turn.persisted ? '' : ` ${terminalThemeText('warn', '[live]')}`;
         const preview = turn.content.slice(0, 160) + (turn.content.length > 160 ? '…' : '');
-        println(`  [${ts}] ${roleLabel}${sourceLabel} ${preview}`);
+        println(`  ${terminalThemeText('muted', `[${ts}]`)} ${terminalThemeText(actor.role, actor.label.padEnd(7))}${sourceLabel} ${preview}`);
     }
     if (timeline.reconciliationStatus === 'diverged') {
         println(
-            `  \x1b[33mNota: histórico do bridge divergiu; live-tail preservado=${timeline.liveBridgeTailCount} e sync bloqueado${timeline.syncBlockedReason ? ` (${timeline.syncBlockedReason})` : ''}.\x1b[0m`,
+            terminalThemeRow('Nota', `histórico do bridge divergiu; live-tail preservado=${timeline.liveBridgeTailCount} e sync bloqueado${timeline.syncBlockedReason ? ` (${timeline.syncBlockedReason})` : ''}.`, { role: 'warn' }),
         );
     }
     if (timeline.sync.status === 'scheduled' || timeline.sync.status === 'inflight') {
         println(
-            `  \x1b[90mSync Hub: ${timeline.sync.status} (${timeline.sync.pendingCount} turnos live aguardando persistência).\x1b[0m`,
+            terminalThemeRow('Sync Hub', `${timeline.sync.status} (${timeline.sync.pendingCount} turnos live aguardando persistência).`),
         );
     } else if (timeline.sync.status === 'failed') {
-        println(`  \x1b[33mSync Hub falhou: ${timeline.sync.lastError ?? 'erro desconhecido'}.\x1b[0m`);
+        println(terminalThemeRow('Sync Hub', `falhou: ${timeline.sync.lastError ?? 'erro desconhecido'}.`, { role: 'warn' }));
     }
-    println('─────────────────────────────────');
+    println(terminalThemeDivider(64));
 }
 
 /**
@@ -1097,32 +1106,34 @@ export function cmdHistory({ println }, n = 10) {
 export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
     const projection = readTerminalDbHistoryProjection({ hubSessionId: hubSessionId ?? null, limit: n, offset });
     if (!projection.available) {
-        println('\x1b[90m  /db-history: Hub session não disponível (sem persistência).\x1b[0m');
+        println(terminalThemeRow('/db-history', 'Hub session não disponível (sem persistência).'));
         return;
     }
     try {
         const turns = projection.turns;
         if (turns.length === 0) {
-            println('\x1b[90m  /db-history: Nenhum turno persistido ainda.\x1b[0m');
+            println(terminalThemeRow('/db-history', 'Nenhum turno persistido ainda.'));
             return;
         }
         const offsetLabel = offset > 0 ? ` (offset recente ${offset})` : '';
-        println(`\n  \x1b[36mÚltimos ${turns.length} turnos da sessão atual${offsetLabel}\x1b[0m`);
-        println('  ─────────────────────────────────────────────────');
+        println('');
+        println(terminalThemeHeadline('assistant', `Últimos ${turns.length} turnos da sessão atual${offsetLabel}`));
+        println(terminalThemeDivider(52));
         for (const t of turns) {
             const ts = formatTerminalIsoTimestamp(String(t['created_at'] ?? ''));
             const role = String(t['role'] ?? 'user');
             const content = String(t['content'] ?? '');
-            const emoji = role === 'llm_b' ? '🧠' : role === 'llm_a' ? '🤖' : '👤';
+            const actor = renderTerminalActorLabel(role, role);
             const preview = content.slice(0, 160) + (content.length > 160 ? '…' : '');
-            println(`  \x1b[90m[${ts}]\x1b[0m ${emoji}  ${preview}`);
+            println(`  ${terminalThemeText('muted', `[${ts}]`)} ${terminalThemeText(actor.role, actor.label.padEnd(7))} ${preview}`);
         }
         println(
-            `  \x1b[90mwindow=${projection.effectiveOffset}..${projection.effectiveOffset + turns.length - 1} de ${projection.totalTurns} turnos persistidos\x1b[0m`,
+            terminalThemeRow('Janela', `${projection.effectiveOffset}..${projection.effectiveOffset + turns.length - 1} de ${projection.totalTurns} turnos persistidos`),
         );
-        println('  ─────────────────────────────────────────────────\n');
+        println(terminalThemeDivider(52));
+        println('');
     } catch (e) {
-        println(`\x1b[31m  /db-history erro: ${toError(e).message}\x1b[0m`);
+        println(terminalThemeRow('/db-history', `erro: ${toError(e).message}`, { role: 'error' }));
     }
 }
 
@@ -1140,26 +1151,28 @@ export function cmdDbSessions({ hubSessionId, println }, n = 10) {
             limit: n,
         });
         if (sessions.length === 0) {
-            println('\x1b[90m  /db-sessions: Nenhuma sessão persistida ainda.\x1b[0m');
+            println(terminalThemeRow('/db-sessions', 'Nenhuma sessão persistida ainda.'));
             return;
         }
-        println(`\n  \x1b[36mÚltimas ${sessions.length} hub sessions\x1b[0m`);
-        println('  ──────────────────────────────────────────────────────────────');
+        println('');
+        println(terminalThemeHeadline('assistant', `Últimas ${sessions.length} hub sessions`));
+        println(terminalThemeDivider(62));
         for (const s of sessions) {
             const createdAt = formatTerminalIsoTimestamp(String(s['created_at'] ?? ''));
             const sessionId = String(s['id'] ?? '');
             const sessionStatus = String(s['status'] ?? 'unknown');
             const title = String(s['title'] ?? '(sem título)');
             const isCurrent = sessionId === currentHubSessionId;
-            const statusColor = sessionStatus === 'active' ? '\x1b[32m' : '\x1b[90m';
-            const marker = isCurrent ? ' \x1b[33m← atual\x1b[0m' : '';
+            const statusRole = sessionStatus === 'active' ? 'success' : 'muted';
+            const marker = isCurrent ? ` ${terminalThemeText('warn', 'atual')}` : '';
             println(
-                `  ${statusColor}${sessionStatus}\x1b[0m  \x1b[90m${createdAt}\x1b[0m  \x1b[2m${sessionId.slice(0, 8)}\x1b[0m  ${title}${marker}`,
+                `  ${terminalThemeText(statusRole, sessionStatus.padEnd(8))} ${terminalThemeText('muted', createdAt)}  ${terminalThemeText('muted', sessionId.slice(0, 8))}  ${title}${marker}`,
             );
         }
-        println('  ──────────────────────────────────────────────────────────────\n');
+        println(terminalThemeDivider(62));
+        println('');
     } catch (e) {
-        println(`\x1b[31m  /db-sessions erro: ${toError(e).message}\x1b[0m`);
+        println(terminalThemeRow('/db-sessions', `erro: ${toError(e).message}`, { role: 'error' }));
     }
 }
 
@@ -1172,13 +1185,13 @@ export function cmdDbSessions({ hubSessionId, println }, n = 10) {
 export function cmdWho({ injectPort, println }, arg = '') {
     const { runtimeId } = extractRuntimeTarget(arg);
     const { currentModel, currentReasoningEffort } = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
-    println(`
-  \x1b[36mAtores ativos nesta sessão:\x1b[0m
-  👤  \x1b[32mVocê\x1b[0m          — stdin (digitar diretamente aqui)
-  🤖  \x1b[34mLLM-A\x1b[0m         — POST http://localhost:${injectPort}/inject
-    🧠  \x1b[35mLLM-B\x1b[0m         — AlwaysAliveAgent (Copilot SDK · ${currentModel} · ${currentReasoningEffort})
-  📡  \x1b[90mSSE stream\x1b[0m    — GET  http://localhost:${injectPort}/events
-`);
+    println('');
+    println(terminalThemeHeadline('assistant', 'Atores ativos nesta sessão'));
+    println(terminalThemeRow('Você', 'stdin (digitar diretamente aqui)', { role: 'user' }));
+    println(terminalThemeRow('LLM-A', `POST http://localhost:${injectPort}/inject`, { role: 'system' }));
+    println(terminalThemeRow('LLM-B', `AlwaysAliveAgent (Copilot SDK · ${currentModel} · ${currentReasoningEffort})`, { role: 'assistant' }));
+    println(terminalThemeRow('SSE', `GET http://localhost:${injectPort}/events`));
+    println('');
 }
 
 /**

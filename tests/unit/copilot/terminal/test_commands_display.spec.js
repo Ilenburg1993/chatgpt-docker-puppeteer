@@ -63,9 +63,9 @@ describe('terminal/commands/display', () => {
     it('mostra ajuda com presets quando chamado sem argumentos', () => {
         const c = ctx();
         cmdDisplay({ println: c.println });
-        expect(c.output()).toContain('Display Toggles');
-        expect(c.output()).toContain('preset atual');
-        expect(c.output()).toContain('tema atual');
+        expect(c.output()).toContain('Exibição do terminal');
+        expect(c.output()).toContain('preset default');
+        expect(c.output()).toContain('tema elegant');
         expect(c.output()).toContain('/display preset <default|minimal|verbose|debug|full|focus>');
         expect(c.output()).toContain('/display theme <elegant|vivid|mono>');
         expect(c.output()).toContain('/display detail <compact|detailed>');
@@ -105,7 +105,8 @@ describe('terminal/commands/display', () => {
         expect(stateStore.setShowToolActivity).toHaveBeenCalledWith(false);
         expect(stateStore.setShowIntentActivity).toHaveBeenCalledWith(false);
         expect(stateStore.setShowSessionActivity).toHaveBeenCalledWith(false);
-        expect(c.output()).toContain('Preset aplicado');
+        expect(c.output()).toContain('Preset');
+        expect(c.output()).toContain('minimal');
     });
 
     it('aplica preset debug', () => {
@@ -135,7 +136,8 @@ describe('terminal/commands/display', () => {
     it('valida uso de preset inválido', () => {
         const c = ctx();
         cmdDisplay({ println: c.println }, 'preset', ['xpto']);
-        expect(c.output()).toContain('Uso: /display preset');
+        expect(c.output()).toContain('Uso');
+        expect(c.output()).toContain('/display preset');
     });
 
     it('aplica tema de cor elegante/vivid/mono', () => {
@@ -143,7 +145,8 @@ describe('terminal/commands/display', () => {
 
         cmdDisplay({ println: c.println }, 'theme', ['vivid']);
         expect(getTerminalThemeName()).toBe('vivid');
-        expect(c.output()).toContain('Tema aplicado');
+        expect(c.output()).toContain('Tema');
+        expect(c.output()).toContain('vivid');
 
         cmdDisplay({ println: c.println }, 'theme', ['mono']);
         expect(getTerminalThemeName()).toBe('mono');
@@ -152,7 +155,8 @@ describe('terminal/commands/display', () => {
     it('valida uso de tema inválido', () => {
         const c = ctx();
         cmdDisplay({ println: c.println }, 'theme', ['neon']);
-        expect(c.output()).toContain('Uso: /display theme');
+        expect(c.output()).toContain('Uso');
+        expect(c.output()).toContain('/display theme');
     });
 
     it('aplica nível de detalhe compact/detailed', () => {
@@ -160,12 +164,14 @@ describe('terminal/commands/display', () => {
 
         cmdDisplay({ println: c.println }, 'detail', ['compact']);
         expect(getTerminalDetailLevel()).toBe('compact');
-        expect(c.output()).toContain('Detalhe aplicado');
+        expect(c.output()).toContain('Detalhe');
+        expect(c.output()).toContain('compact');
     });
 
     it('valida uso de detalhe inválido', () => {
         const c = ctx();
         cmdDisplay({ println: c.println }, 'detail', ['verbose']);
-        expect(c.output()).toContain('Uso: /display detail');
+        expect(c.output()).toContain('Uso');
+        expect(c.output()).toContain('/display detail');
     });
 });

@@ -2481,12 +2481,57 @@
 
 ### 11.29 Paleta, alinhamento e fluxo visual canônico
 
-- [ ] Auditar a paleta ANSI atual por família semântica: comando do operador, resposta da LLM-B, raciocínio, pergunta humana, ferramenta, arquivo, erro, aviso, sucesso, espera viva, bloco técnico e raw/detail.
-- [ ] Definir uma tabela canônica de cores e estilos com poucos papéis estáveis, sem carnaval cromático, preservando contraste em terminal escuro e legibilidade em VS Code.
-- [ ] Revisar `ui-theme`, `turn-display`, `live-status-line`, `tool-lifecycle-runtime`, `intent-renderer`, `task-stream-events`, `io-activity-events`, `repl-banner` e `terminal-output` para que todos usem a mesma semântica visual.
-- [ ] Separar visualmente pergunta humana de tool: pergunta como bloqueio de decisão do operador, não como tool em execução.
-- [ ] Reduzir a repetição de esperas duráveis quando a linha viva já está informando progresso; deixar histórico durável apenas em transições reais.
-- [ ] Alinhar colunas, badges e blocos com largura previsível, mantendo compatibilidade com terminais estreitos.
-- [ ] Eliminar ids e hashes da superfície default quando eles não são a ação principal do operador.
-- [ ] Criar snapshots ou testes de texto para os blocos centrais: banner, `/health`, `/now`, `/activity`, pergunta humana, tool file, tool inspect, erro BYOK e final de turno.
-- [ ] Rodar live PTY LLM-B focada em estética quando a paleta e os blocos centrais estiverem consolidados, capturando artefatos para comparação visual.
+- [x] Auditoria inicial da paleta ANSI atual por família semântica: comando do operador, resposta da LLM-B, raciocínio, pergunta humana, ferramenta, arquivo, erro, aviso, sucesso, espera viva, bloco técnico e raw/detail.
+- [x] Achado: já existe `ui-theme.js`, mas os módulos mais visíveis ainda inventam seus próprios blocos com ANSI literal, emoji e largura fixa.
+- [x] Achado: `repl-banner.js` tem dois mundos visuais; o banner compacto é aceitável, enquanto o full é uma parede de comandos com ANSI hardcoded, desalinhada em terminais estreitos e com baixa hierarquia visual.
+- [x] Achado: `turn-display.js` mistura timestamp, emoji, papel, modelo e effort sem componente comum; o footer usa cor de duração hardcoded.
+- [x] Achado: `live-status-line.js` já resolve parte do spam, mas ainda usa um formato único `modelo/effort` que pesa no rodapé e não comunica a fase como badge/papel estável.
+- [x] Achado: `agent-runtime-events.js` renderiza pergunta humana como bloco próprio, mas o texto `LLM-B perguntou: "..."`
+      ainda parece diálogo técnico; o bloco precisa parecer decisão pendente do operador, com pergunta e ações em linhas alinhadas.
+- [x] Achado: `tool-lifecycle-runtime.js` já centraliza operação, mas conclusão usa emojis `✅`/`❌`, e isso quebra a estética sóbria em VS Code e logs.
+- [x] Decisão canônica: criar primitivas pequenas em `ui-theme.js`, reaproveitáveis por barrel, para `divider`, `headline`, `row`, `status`, `duration`, `frame` e `join`.
+- [x] Decisão canônica: manter ANSI e cor por papel semântico, não por módulo; blocos humanos detalhados usam os mesmos papéis que a linha viva.
+- [x] Decisão canônica: retirar emojis estruturais da superfície default do terminal LLM-B. Conteúdo vindo do modelo pode conter emoji; chrome do terminal não deve depender disso.
+- [x] Decisão canônica: pergunta humana é uma caixa de decisão, não uma ferramenta; tool lifecycle de pergunta continua suprimido como tool comum.
+- [x] Decisão canônica: `raw`, `detail`, SSE, archive e export continuam podendo carregar nomes canônicos e ids, mas a tela default usa título humano primeiro.
+- [x] Decisão canônica: o banner full opt-in deve virar índice organizado por famílias, não lista linear gigantesca.
+- [x] Implementar primitivas visuais comuns em `ui-theme.js`.
+- [x] Migrar banner compacto/full para as primitivas, com grupos curtos e alinhamento previsível.
+- [x] Migrar cabeçalho de raciocínio, cabeçalho de resposta e footer de streaming para as primitivas.
+- [x] Migrar pergunta pendente restaurada para caixa humana de decisão com linhas `Pergunta`, `Opções`, `Ação`.
+- [x] Migrar conclusão de tool para status textual `ok`/`falhou`, sem emoji estrutural.
+- [x] Refinar linha viva para `LLM-B · fase · detalhe · tempo · modelo`, reduzindo densidade quando não há pergunta.
+- [x] Segunda leva: `/display`, `/model`, `/reasoning`, `/search`, `/errors`, compactação e subagentes passaram a usar a gramática visual comum, removendo emojis/ANSI literais da superfície default tocada.
+- [x] Terceira leva: `/history`, `/db-history`, `/db-sessions`, `/who`, `/thinking`, `/export`, resumo compacto de `/diagnose`, bloco LLM-A do engine, watchdog e mensagem SDK de saída de plan mode passaram a usar rótulos humanos e status textual.
+- [x] Busca residual por emoji/ANSI estrutural em `src/copilot/terminal` ficou limpa nas superfícies default; ocorrência BYOK restante é falso positivo textual por `SELECTION`.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_repl_banner.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_turn_display.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/test_terminal_sdk_session_events_registry.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_display.spec.js tests/unit/copilot/terminal/test_commands_config_errors.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
+- [x] Testes escopados ampliados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_export.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_thinking.spec.js tests/unit/copilot/terminal/test_commands_display.spec.js tests/unit/copilot/terminal/test_commands_config_errors.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_repl_banner.spec.js tests/unit/copilot/terminal/test_turn_display.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/test_terminal_agent_wiring.spec.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/test_terminal_sdk_session_events_registry.spec.js tests/unit/copilot/test_terminal_dialog_engine.spec.js`.
+- [x] Criar snapshots ou testes de texto para os blocos centrais: banner, pergunta humana, linha viva, tool file e final de turno.
+- [x] Typecheck strict e lint passaram:
+  - `npm run typecheck:strict:src.copilot`;
+  - `npm run lint:copilot`.
+- [x] Live PTY LLM-B focada em estética executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=60000 --transport=pty --out-dir=artifacts/terminal-live/ux-visual-grammar-cycle-20260602-1750`.
+- [x] Resultado: PASS; banner compacto, `/status`, `/now`, `/live`, `/activity`, `/sdk waits` e linha viva ficaram mais legíveis, sem `request_user_input`, `report_intent` ou ids crus na superfície observada.
+- [x] Achado da live corrigido: auto-brief/boot migrados para `ui-theme`, removendo ANSI literal e marcador visual solto da inicialização.
+- [x] Achado da live corrigido: `/health` default passou a alinhar título/separador à gramática visual usada por `/status`, `/live` e banners.
+- [x] Quarta leva: `/attach`, `/audit`, `/context`, `/usage`, `/tools`, `/metrics`, `/skills`, warnings SDK, watchdog, anexos inline e orçamento BYOK passaram para `headline`/`row`/`text`, removendo emojis estruturais e ANSI hardcoded da superfície operacional.
+- [x] `/tools diag` preserva nomes técnicos apenas como detalhe discreto (`nome técnico:`), com nome humano em primeiro plano.
+- [x] `/metrics` deixou de ser um template monolítico com blocos coloridos próprios e virou painel por seções (`Métricas da sessão`, `Uso`, `Ferramentas`, `Erros`, `Atividade`, `Streaming público`, `Archive SSE`, `Inject`).
+- [x] Busca residual por emoji/ANSI estrutural em `src/copilot/terminal` ficou limpa para código UX real; remanescentes são comentários em `dev-watch` e falsos positivos de constantes BYOK (`SELECTION`).
+- [x] Testes escopados pós-quarta-leva passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/test_terminal_dialog_engine.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_config_errors.spec.js tests/unit/copilot/terminal/test_commands_display.spec.js tests/unit/copilot/terminal/test_commands_thinking.spec.js tests/unit/copilot/terminal/test_commands_export.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_repl_banner.spec.js tests/unit/copilot/terminal/test_turn_display.spec.js tests/unit/copilot/test_terminal_dialog_engine.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/test_terminal_agent_wiring.spec.js tests/unit/copilot/test_terminal_sdk_session_events_registry.spec.js`.
+- [x] Repetir typecheck strict e lint após a quarta leva.
+  - `npm run typecheck:strict:src.copilot`;
+  - `npm run lint:copilot`.
+- [x] Live PTY estética curta repetida após a quarta leva:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=60000 --transport=pty --out-dir=artifacts/terminal-live/ux-visual-grammar-cycle-20260602-1810`.
+  - Resultado: PASS; banner, boot, `/status`, `/now`, `/health`, `/live`, `/activity`, `/sdk waits` e linha viva renderizaram com gramática visual comum.
+- [x] Achado da live corrigido: `/tools` vazio trocou rótulo `Tools` por `Ferramentas`.
+- [x] Teste escopado pós-achado passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js`.
+- [ ] Committar/pushar esta grande leva visual e continuar para a próxima camada de UX.

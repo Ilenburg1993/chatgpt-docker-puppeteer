@@ -20,6 +20,7 @@ import {
     setTerminalModelProjection,
     setTerminalReasoningProjection,
 } from '../frontend/index.js';
+import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /** @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort */
@@ -114,10 +115,14 @@ export async function cmdModel({ println }, arg) {
     const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
 
     if (!cleanArg || cleanArg.trim() === '') {
-        println(`\n  🤖  Modelo ativo: \x1b[36m${current}\x1b[0m`);
+        println('');
+        println(terminalThemeHeadline('assistant', 'Modelo ativo', [current]));
         if (current === 'auto' && autoModelPolicy) {
             println(
-                `  \x1b[90m    auto: autoridade GitHub Copilot · preferência local ${autoModelPolicy.preferredModel}/${autoModelPolicy.preferredReasoningEffort} (${autoModelPolicy.canForcePreference ? 'forçável' : 'observável'})\x1b[0m`,
+                terminalThemeRow(
+                    'Auto',
+                    `autoridade GitHub Copilot · preferência local ${autoModelPolicy.preferredModel}/${autoModelPolicy.preferredReasoningEffort} (${autoModelPolicy.canForcePreference ? 'forçável' : 'observável'})`,
+                ),
             );
             if (autoModelPolicy.observedModel) {
                 const satisfied =
@@ -126,28 +131,23 @@ export async function cmdModel({ println }, arg) {
                         : autoModelPolicy.preferenceSatisfied === false
                           ? 'roteamento diferente'
                           : 'sem conclusão';
-                println(`  \x1b[90m    último efetivo ${autoModelPolicy.observedModel} · ${satisfied}\x1b[0m`);
+                println(terminalThemeRow('Efetivo', `${autoModelPolicy.observedModel} · ${satisfied}`));
             }
         }
         if (meta) {
             const contextWindowLabel =
                 typeof meta.contextWindow === 'number' ? meta.contextWindow.toLocaleString() : 'n/a';
-            println(
-                `  \x1b[90m    custo ${meta.costTier} · velocidade ${meta.speedTier} · contexto ${contextWindowLabel}\x1b[0m`,
-            );
-            println(
-                `  \x1b[90m    capacidades: raciocínio ${yesNoPt(meta.supportsReasoning)} · visão ${yesNoPt(meta.supportsVision)}\x1b[0m`,
-            );
+            println(terminalThemeRow('Perfil', `custo ${meta.costTier} · velocidade ${meta.speedTier} · contexto ${contextWindowLabel}`));
+            println(terminalThemeRow('Recursos', `raciocínio ${yesNoPt(meta.supportsReasoning)} · visão ${yesNoPt(meta.supportsVision)}`));
         }
         if (byok.enabled) {
-            const ready = byok.ready ? '\x1b[32mpronto\x1b[0m' : '\x1b[31mincompleto\x1b[0m';
-            println(
-                `  \x1b[90m    BYOK ${ready} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · /byok\x1b[0m`,
-            );
+            const ready = byok.ready ? terminalThemeText('success', 'pronto') : terminalThemeText('error', 'incompleto');
+            println(terminalThemeRow('BYOK', `${ready} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · /byok`));
         }
         println(
-            `  \x1b[90mUso: ${byok.enabled ? '/model list | stats  (/model <id> é governado por COPILOT_BYOK_MODEL)' : '/model list | stats | <id>'}\x1b[0m\n`,
+            terminalThemeRow('Uso', byok.enabled ? '/model list | stats  (/model <id> é governado por COPILOT_BYOK_MODEL)' : '/model list | stats | <id>', { role: 'command' }),
         );
+        println('');
         return;
     }
 
@@ -156,15 +156,17 @@ export async function cmdModel({ println }, arg) {
     if (trimmed === 'stats') {
         const { stats } = callWithRuntimeTarget(readTerminalModelStatsProjection, runtimeId);
         if (stats.length === 0) {
-            println('  \x1b[33mSem estatísticas coletadas ainda.\x1b[0m\n');
+            println(`  ${terminalThemeText('warn', 'Sem estatísticas coletadas ainda.')}\n`);
             return;
         }
-        println(`\n  \x1b[36mEstatísticas por modelo:\x1b[0m\n`);
+        println('');
+        println(terminalThemeHeadline('assistant', 'Estatísticas por modelo'));
+        println('');
         for (const s of stats) {
             const isActive = s.modelId === current;
-            const marker = isActive ? ' \x1b[32m← ativo\x1b[0m' : '';
+            const marker = isActive ? ` ${terminalThemeText('success', 'ativo')}` : '';
             const rate = (s.successRate * 100).toFixed(0);
-            println(`    \x1b[33m${s.modelId}\x1b[0m${marker}`);
+            println(`    ${terminalThemeText('command', s.modelId)}${marker}`);
             println(
                 `      chamadas ${s.totalCalls} · latência média ${s.avgLatencyMs}ms · sucesso ${rate}% · tokens ${s.totalTokens}`,
             );
@@ -175,44 +177,42 @@ export async function cmdModel({ println }, arg) {
 
     if (trimmed === 'list') {
         if (byok.enabled) {
-            const ready = byok.ready ? 'ready' : 'incompleto';
+            const ready = byok.ready ? 'pronto' : 'incompleto';
             println(
-                `\x1b[90m  BYOK ${ready}: catálogo vem de onListModels/configuração BYOK quando a sessão SDK usa provider customizado.\x1b[0m`,
+                terminalThemeRow('BYOK', `${ready}: catálogo vem de onListModels/configuração BYOK quando a sessão SDK usa provedor customizado.`),
             );
         }
-        println('\x1b[90m  Consultando modelos disponíveis…\x1b[0m');
+        println(`  ${terminalThemeText('muted', 'Consultando modelos disponíveis...')}`);
         try {
             const { models } = await callWithRuntimeTarget(listTerminalAvailableModelsProjection, runtimeId);
             if (models.length === 0) {
-                println('  \x1b[33mNenhum modelo retornado pelo SDK.\x1b[0m\n');
+                println(`  ${terminalThemeText('warn', 'Nenhum modelo retornado pelo SDK.')}\n`);
                 return;
             }
-            println(`\n  \x1b[36m${models.length} modelo(s) disponível(is):\x1b[0m\n`);
+            println('');
+            println(terminalThemeHeadline('assistant', `${models.length} modelo(s) disponível(is)`));
+            println('');
             for (const m of models) {
                 const isActive = m.id === current;
-                const activeMarker = isActive ? ' \x1b[32m← ativo\x1b[0m' : '';
-                const reasoning = m.capabilities?.supports?.reasoningEffort ? ' \x1b[90m[reasoning]\x1b[0m' : '';
-                const vision = m.capabilities?.supports?.vision ? ' \x1b[90m[vision]\x1b[0m' : '';
-                println(`    \x1b[33m${m.id}\x1b[0m${activeMarker}${reasoning}${vision}`);
+                const activeMarker = isActive ? ` ${terminalThemeText('success', 'ativo')}` : '';
+                const reasoning = m.capabilities?.supports?.reasoningEffort ? ` ${terminalThemeText('muted', '[raciocínio]')}` : '';
+                const vision = m.capabilities?.supports?.vision ? ` ${terminalThemeText('muted', '[visão]')}` : '';
+                println(`    ${terminalThemeText('command', m.id)}${activeMarker}${reasoning}${vision}`);
             }
             println('');
         } catch (e) {
-            println(`  \x1b[31m[erro] Não foi possível listar modelos: ${toError(e).message}\x1b[0m\n`);
+            println(`  ${terminalThemeText('error', `Erro ao listar modelos: ${toError(e).message}`)}\n`);
         }
         return;
     }
 
     // Troca de modelo
     if (byok.enabled) {
-        println(
-            `\n  \x1b[33mBYOK está ativo: /model <id> não troca provider customizado em runtime.\x1b[0m`,
-        );
-        println(
-            `  \x1b[90mModelo BYOK canônico: ${byok.model ?? '(ausente)'} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'}.\x1b[0m`,
-        );
-        println(
-            '  \x1b[90mUse /byok model <id> para trocar modelo no mesmo provider quando a sessão viva já estiver bound; troca de provider/perfil continua em /byok + /session sdk next new no próximo boot.\x1b[0m\n',
-        );
+        println('');
+        println(terminalThemeRow('BYOK', '/model <id> não troca provedor customizado em runtime.', { role: 'warn' }));
+        println(terminalThemeRow('Modelo', `${byok.model ?? '(ausente)'} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'}`));
+        println(terminalThemeRow('Ação', 'Use /byok model <id> no mesmo provedor; troca de provedor/perfil continua em /byok + /session sdk next new no próximo boot.', { role: 'command' }));
+        println('');
         return;
     }
 
@@ -226,39 +226,37 @@ export async function cmdModel({ println }, arg) {
     const runtimeState = callWithRuntimeTarget(readTerminalRuntimeState, runtimeId);
     const observed = resolveObservedModelState(runtimeState);
 
-    println(`\n  🔄  Modelo configurado: \x1b[90m${previous}\x1b[0m → \x1b[36m${trimmed}\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('assistant', 'Modelo configurado', [`${previous} -> ${trimmed}`]));
     if (trimmed === 'auto') {
         println(
-            '  \x1b[90mAuto usa roteamento nativo do Copilot; gpt-5.4/high é preferência local observável, não parâmetro oficial forçado.\x1b[0m',
+            terminalThemeRow('Auto', 'roteamento nativo do Copilot; gpt-5.4/high é preferência local observável, não parâmetro oficial forçado.'),
         );
     }
     if (modelMeta) {
         const ctxLabel = typeof modelMeta.contextWindow === 'number' ? modelMeta.contextWindow.toLocaleString() : 'n/a';
-        println(
-            `  \x1b[90mCapacidades: raciocínio ${yesNoPt(modelMeta.supportsReasoning)} · visão ${yesNoPt(modelMeta.supportsVision)} · contexto ${ctxLabel}\x1b[0m`,
-        );
+        println(terminalThemeRow('Recursos', `raciocínio ${yesNoPt(modelMeta.supportsReasoning)} · visão ${yesNoPt(modelMeta.supportsVision)} · contexto ${ctxLabel}`));
     }
     if (reasoningAdjusted) {
         println(
-            `  \x1b[33mRaciocínio ajustado: ${previousReasoningEffort} → ${currentReasoningEffort} (modelo sem suporte explícito a controle de raciocínio).\x1b[0m`,
+            terminalThemeRow('Raciocínio', `${previousReasoningEffort} -> ${currentReasoningEffort} (modelo sem suporte explícito a controle de raciocínio).`, { role: 'warn' }),
         );
     }
     if (observed.observedModel && observed.observedModel !== trimmed) {
         println(
-            `  \x1b[33mÚltimo modelo efetivo observado na sessão: ${observed.observedModel}. A troca para ${trimmed} ainda precisa ser confirmada pelo SDK ou por uso registrado.\x1b[0m`,
+            terminalThemeRow('Efetivo', `${observed.observedModel}. A troca para ${trimmed} ainda precisa ser confirmada pelo SDK ou por uso registrado.`, { role: 'warn' }),
         );
     } else if (observed.modelMismatch && observed.configuredModel === trimmed) {
         println(
-            `  \x1b[33mHá divergência entre o modelo configurado e o efetivo observado. Use /status, /sdk status ou um turno curto para revalidar a sessão.\x1b[0m`,
+            terminalThemeRow('Aviso', 'Há divergência entre o modelo configurado e o efetivo observado. Use /status, /sdk status ou um turno curto para revalidar a sessão.', { role: 'warn' }),
         );
     } else {
         println(
-            '  \x1b[90mA sessão SDK será revalidada no próximo turno. Use /status ou /sdk status para conferir o modelo efetivo.\x1b[0m',
+            terminalThemeRow('Próximo', 'A sessão SDK será revalidada no próximo turno. Use /status ou /sdk status para conferir o modelo efetivo.'),
         );
     }
-    println(
-        '  \x1b[90mUse /restart apenas se quiser reiniciar a conversa; não é mais a confirmação primária de modelo.\x1b[0m\n',
-    );
+    println(terminalThemeRow('Nota', 'Use /restart apenas se quiser reiniciar a conversa; não é mais a confirmação primária de modelo.'));
+    println('');
 }
 
 // ─── /reasoning ──────────────────────────────────────────────────────────────
@@ -279,8 +277,10 @@ export function cmdReasoning({ println }, arg) {
     const { currentReasoningEffort: current } = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
 
     if (!cleanArg || cleanArg.trim() === '') {
-        println(`\n  🧠  Nível de raciocínio: \x1b[36m${current}\x1b[0m`);
-        println(`  \x1b[90mUso: /reasoning low | medium | high | xhigh | off\x1b[0m\n`);
+        println('');
+        println(terminalThemeHeadline('thinking', 'Nível de raciocínio', [current]));
+        println(terminalThemeRow('Uso', '/reasoning low | medium | high | xhigh | off', { role: 'command' }));
+        println('');
         return;
     }
 
@@ -288,12 +288,16 @@ export function cmdReasoning({ println }, arg) {
 
     if (trimmed === 'off' || trimmed === 'none') {
         callWithRuntimeTarget(setTerminalReasoningProjection, runtimeId, undefined);
-        println(`\n  🧠  Raciocínio estendido \x1b[33mdesativado\x1b[0m (modelo decide autonomamente)\n`);
+        println('');
+        println(terminalThemeRow('Raciocínio', 'desativado · modelo decide autonomamente', { role: 'warn' }));
+        println('');
         return;
     }
 
     if (!VALID_EFFORTS.includes(/** @type {ReasoningEffort} */ (trimmed))) {
-        println(`\n  \x1b[31m[erro]\x1b[0m Nível de raciocínio inválido: "${trimmed}". Use: ${VALID_EFFORTS.join(' | ')} | off\n`);
+        println('');
+        println(terminalThemeRow('Erro', `nível de raciocínio inválido "${trimmed}". Use: ${VALID_EFFORTS.join(' | ')} | off`, { role: 'error' }));
+        println('');
         return;
     }
 
@@ -302,6 +306,8 @@ export function cmdReasoning({ println }, arg) {
         runtimeId,
         /** @type {ReasoningEffort} */ (trimmed),
     );
-    println(`\n  🧠  Raciocínio alterado: \x1b[90m${previous}\x1b[0m → \x1b[36m${trimmed}\x1b[0m`);
-    println('  \x1b[90mEfetivo no próximo turno.\x1b[0m\n');
+    println('');
+    println(terminalThemeHeadline('thinking', 'Raciocínio alterado', [`${previous} -> ${trimmed}`]));
+    println(terminalThemeRow('Próximo', 'Efetivo no próximo turno.'));
+    println('');
 }

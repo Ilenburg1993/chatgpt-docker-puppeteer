@@ -105,6 +105,7 @@ import {
     recordTerminalUserInputRequested,
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
     terminalThemeBadge,
+    terminalThemeRow,
     terminalThemeText,
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
@@ -998,8 +999,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             severity: 'warn',
             source: 'sdk',
         });
-        println(`  \x1b[33m⚠️  [${warningType}] ${message}\x1b[0m`);
-        if (evt?.url) println(`  \x1b[90m    ${evt.url}\x1b[0m`);
+        println(terminalThemeRow('Warning SDK', `[${warningType}] ${message}`, { role: 'warn' }));
+        if (evt?.url) println(terminalThemeText('muted', `  ${evt.url}`));
         broadcastSse(
             'session.warning',
             withTerminalTurnCorrelation({
@@ -1145,7 +1146,9 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         if (shouldPrintSessionNarration('verbose')) {
             const sdkLabel = sdkCount === null ? 'contagem SDK n/d' : `${sdkCount} SDK`;
             const localLabel = localCount > 0 ? `ferramentas locais ativas: ${localCount} (/tools)` : 'sem ferramentas locais ativas';
-            println(`  \x1b[90m🧰 Ferramentas dinâmicas do SDK atualizadas: ${sdkLabel} · ${localLabel}\x1b[0m`);
+            println(terminalThemeRow('Tools SDK', `Ferramentas dinâmicas do SDK atualizadas: ${sdkLabel} · ${localLabel}`, {
+                role: 'muted',
+            }));
         }
         broadcastSse(
             'session.tools_updated',
@@ -1170,7 +1173,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             recordHistory: false,
         });
         if (shouldPrintSessionNarration('verbose'))
-            println(`  \x1b[90m🎛️  Skills SDK: ${enabled}/${count} habilitadas\x1b[0m`);
+            println(terminalThemeRow('Skills SDK', `Skills SDK: ${enabled}/${count} habilitadas`, { role: 'muted' }));
         broadcastSse(
             'session.skills_loaded',
             withSdkSessionSseEnvelope({ count, enabled }, 'sdk/session.skills_loaded'),
@@ -1758,7 +1761,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
         if (shouldPrintSessionNarration('important')) {
             println(
-                `  \x1b[32m✅ SDK concluiu saída do plan mode${requestId ? ` · ${renderSdkRequestLabel(requestId)}` : ''}\x1b[0m`,
+                `  ${terminalThemeBadge('success', 'SDK')} ${terminalThemeText('success', `Saída do plan mode concluída${requestId ? ` · ${renderSdkRequestLabel(requestId)}` : ''}`)}`,
             );
         }
         broadcastSse(

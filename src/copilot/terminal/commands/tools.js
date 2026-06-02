@@ -13,6 +13,7 @@
 import { readTerminalStatusProjection, readTerminalToolStatsProjection } from '../frontend/index.js';
 import { readTerminalToolRegistrySnapshot } from '../frontend/gateways/index.js';
 import { compactTerminalDiagnosticId, getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
+import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 
 /**
  * @typedef {object} ToolsContext
@@ -39,7 +40,7 @@ function renderLifecycleDiagnosticLine(entry) {
     const targetLabel = target ? `alvo ${target}` : null;
     const status = renderLifecycleStatusLabel(entry.status);
     const suffix = [operation, targetLabel, technicalName, rawName, ids.join(' · ')].filter(Boolean).join(' · ');
-    return `    \x1b[33m${visualName}\x1b[0m  ${status}${progress}${duration}${suffix ? `  \x1b[90m${suffix}\x1b[0m` : ''}`;
+    return `  ${terminalThemeText('command', visualName.padEnd(22))} ${status}${progress}${duration}${suffix ? `  ${terminalThemeText('muted', suffix)}` : ''}`;
 }
 
 /**
@@ -76,18 +77,22 @@ export function cmdTools({ println }, arg = '') {
     const entries = wantsRaw ? projection.entries : projection.canonicalEntries;
 
     if (entries.length === 0) {
-        println('\n  \x1b[33mNenhuma ferramenta observada ainda.\x1b[0m');
-        println('  \x1b[90mQuando a LLM-B usar arquivos, terminal ou SDK, o resumo aparece aqui.\x1b[0m\n');
+        println('');
+        println(terminalThemeRow('Ferramentas', 'Nenhuma ferramenta observada ainda', { role: 'warn' }));
+        println(terminalThemeText('muted', '  Quando a LLM-B usar arquivos, terminal ou SDK, o resumo aparece aqui.'));
+        println('');
         return;
     }
 
     if (wantsRaw || wantsDiag) {
-        println(
-            `\n  \x1b[36m🔧 ${entries.length} ${entries.length === 1 ? 'ferramenta' : 'ferramentas'} ${wantsRaw ? 'observada(s) · nomes crus' : 'agregada(s)'}:\x1b[0m\n`,
-        );
+        println('');
+        println(terminalThemeHeadline('tool', 'Ferramentas', [`${entries.length} ${entries.length === 1 ? 'ferramenta' : 'ferramentas'}`, wantsRaw ? 'nomes crus' : 'agregadas']));
+        println('');
     } else {
-        println(`\n  \x1b[36mFerramentas observadas\x1b[0m`);
-        println(`  \x1b[90m${entries.length} grupo(s) de ação já apareceram nesta sessão.\x1b[0m\n`);
+        println('');
+        println(terminalThemeHeadline('tool', 'Ferramentas observadas'));
+        println(terminalThemeText('muted', `  ${entries.length} grupo(s) de ação já apareceram nesta sessão.`));
+        println('');
     }
 
     for (const [name, data] of entries) {
@@ -103,29 +108,28 @@ export function cmdTools({ println }, arg = '') {
         const errors = d.errors ?? 0;
         const blocked = d.blocked ?? 0;
         const latency = typeof d.avgLatencyMs === 'number' ? `${d.avgLatencyMs.toFixed(0)}ms` : '?';
-        const errorColor = errors > 0 ? '\x1b[31m' : '\x1b[32m';
-        const blockedColor = blocked > 0 ? '\x1b[33m' : '\x1b[90m';
         const visualName = wantsRaw ? name : getTerminalHumanToolName(name);
         if (wantsRaw || wantsDiag) {
             println(
-                `    \x1b[33m${visualName}\x1b[0m  chamadas \x1b[36m${calls}\x1b[0m · bloqueios ${blockedColor}${blocked}\x1b[0m · falhas ${errorColor}${errors}\x1b[0m · latência ${latency}`,
+                `  ${terminalThemeText('command', visualName.padEnd(22))} chamadas ${terminalThemeText('info', String(calls))} · bloqueios ${terminalThemeText(blocked > 0 ? 'warn' : 'muted', String(blocked))} · falhas ${terminalThemeText(errors > 0 ? 'error' : 'success', String(errors))} · latência ${latency}`,
             );
         } else {
-            const healthLabel = errors > 0 ? `${errorColor}${errors} falha(s)${C_RESET}` : `${errorColor}sem falhas${C_RESET}`;
+            const healthLabel =
+                errors > 0 ? terminalThemeText('error', `${errors} falha(s)`) : terminalThemeText('success', 'sem falhas');
             const blockedLabel =
-                blocked > 0 ? `${blockedColor}${blocked} bloqueio(s)${C_RESET}` : `${blockedColor}sem bloqueios${C_RESET}`;
+                blocked > 0 ? terminalThemeText('warn', `${blocked} bloqueio(s)`) : terminalThemeText('muted', 'sem bloqueios');
             println(
-                `    \x1b[33m${visualName}\x1b[0m  uso \x1b[36m${calls}\x1b[0m · ${blockedLabel} · ${healthLabel} · ${latency}`,
+                `  ${terminalThemeText('command', visualName.padEnd(22))} uso ${terminalThemeText('info', String(calls))} · ${blockedLabel} · ${healthLabel} · ${latency}`,
             );
         }
         if (!wantsRaw && wantsDiag && visualName !== name) {
-            println(`      \x1b[90mnome técnico: ${name}\x1b[0m`);
+            println(terminalThemeRow('nome técnico:', name, { role: 'muted' }));
         }
         if (!wantsRaw && wantsDiag && Array.isArray(d.aliases) && d.aliases.length > 1) {
-            println(`      \x1b[90maliases: ${d.aliases.join(', ')}\x1b[0m`);
+            println(terminalThemeRow('Aliases', d.aliases.join(', '), { role: 'muted' }));
         }
         if (wantsDiag && typeof d.kind === 'string' && d.kind.length > 0) {
-            println(`      \x1b[90mtipo ${d.kind}\x1b[0m`);
+            println(terminalThemeRow('tipo', d.kind, { role: 'muted', width: 4 }));
         }
     }
 
@@ -136,7 +140,8 @@ export function cmdTools({ println }, arg = '') {
             const callsB = Number(/** @type {Record<string, unknown>} */ (b[1])['totalCalls'] ?? 0);
             return callsB - callsA;
         });
-        println('\n  \x1b[36mCategorias de telemetria\x1b[0m');
+        println('');
+        println(terminalThemeHeadline('tool', 'Categorias de telemetria'));
         for (const [cat, agg] of categoryEntries) {
             const info = /** @type {{
     totalCalls?: number;
@@ -145,56 +150,63 @@ export function cmdTools({ println }, arg = '') {
     avgLatencyMs?: number;
 }} */ (agg);
             println(
-                `    \x1b[33m${cat}\x1b[0m  chamadas \x1b[36m${info.totalCalls ?? 0}\x1b[0m · bloqueios ${info.totalBlocked ?? 0} · falhas ${info.totalErrors ?? 0} · latência ${info.avgLatencyMs ?? 0}ms`,
+                `  ${terminalThemeText('command', cat.padEnd(22))} chamadas ${terminalThemeText('info', String(info.totalCalls ?? 0))} · bloqueios ${info.totalBlocked ?? 0} · falhas ${info.totalErrors ?? 0} · latência ${info.avgLatencyMs ?? 0}ms`,
             );
         }
 
         const toolLoad = status.toolLoad;
-        println('\n  \x1b[36mSuperfícies de tools\x1b[0m');
+        println('');
+        println(terminalThemeHeadline('tool', 'Superfícies de tools'));
         println(
-            `    \x1b[90marquivos locais ${toolLoad.hasCanonicalLocalFsTools ? 'ativos' : 'ausentes'} · terminal local ${toolLoad.hasCanonicalLocalExecTools ? 'ativo' : 'ausente'} · workspace SDK ${toolLoad.hasSdkWorkspaceTooling ? 'ativo' : 'ausente'} · shell legado ${toolLoad.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado'} · desabilitadas ${toolLoad.disabled.length}\x1b[0m`,
+            terminalThemeRow('Superfícies', `arquivos locais ${toolLoad.hasCanonicalLocalFsTools ? 'ativos' : 'ausentes'} · terminal local ${toolLoad.hasCanonicalLocalExecTools ? 'ativo' : 'ausente'} · workspace SDK ${toolLoad.hasSdkWorkspaceTooling ? 'ativo' : 'ausente'} · shell legado ${toolLoad.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado'} · desabilitadas ${toolLoad.disabled.length}`, {
+                role: 'muted',
+            }),
         );
         if (toolLoad.disabled.length > 0) {
-            println(`    \x1b[90mdesabilitadas: ${toolLoad.disabled.join(', ')}\x1b[0m`);
+            println(terminalThemeRow('Desabilitadas', toolLoad.disabled.join(', '), { role: 'muted' }));
         }
 
         const contract = toolLoad.toolContract;
-        const contractColor =
-            contract.errorCount > 0 ? '\x1b[31m' : contract.warningCount > 0 ? '\x1b[33m' : '\x1b[32m';
-        println('\n  \x1b[36mContrato das ferramentas\x1b[0m');
+        const contractRole = contract.errorCount > 0 ? 'error' : contract.warningCount > 0 ? 'warn' : 'success';
+        println('');
+        println(terminalThemeHeadline('tool', 'Contrato das ferramentas'));
+        println(terminalThemeRow('Status', `${contract.ok ? 'ok' : 'atenção'} · falhas ${contract.errorCount} · avisos ${contract.warningCount}`, {
+            role: contractRole,
+        }));
         println(
-            `    ${contractColor}${contract.ok ? 'ok' : 'atenção'}\x1b[0m \x1b[90mfalhas ${contract.errorCount} · avisos ${contract.warningCount}\x1b[0m`,
-        );
-        println(
-            `    \x1b[90mcobertura: descrição ${contract.metadataCoverage.descriptionPct}% · schema ${contract.metadataCoverage.parametersPct}% · categoria ${contract.metadataCoverage.categoryPct}% · tags ${contract.metadataCoverage.tagsPct}% · instruções ${contract.metadataCoverage.instructionsPct}%\x1b[0m`,
+            terminalThemeRow('Cobertura', `descrição ${contract.metadataCoverage.descriptionPct}% · schema ${contract.metadataCoverage.parametersPct}% · categoria ${contract.metadataCoverage.categoryPct}% · tags ${contract.metadataCoverage.tagsPct}% · instruções ${contract.metadataCoverage.instructionsPct}%`, {
+                role: 'muted',
+            }),
         );
         const detailedContract = readTerminalToolRegistrySnapshot().toolContract;
         if (detailedContract.issues.length > 0) {
-            println('    \x1b[90mtop issues:\x1b[0m');
+            println(terminalThemeRow('Top issues', `${Math.min(10, detailedContract.issues.length)} exibida(s)`, { role: 'muted' }));
             for (const issue of detailedContract.issues.slice(0, 10)) {
-                const color = issue.severity === 'error' ? '\x1b[31m' : '\x1b[33m';
                 println(
-                    `      ${color}${issue.severity.toUpperCase()}\x1b[0m \x1b[90m${issue.code}\x1b[0m ${issue.toolName} — ${issue.message}`,
+                    `  ${terminalThemeText(issue.severity === 'error' ? 'error' : 'warn', issue.severity.toUpperCase().padEnd(7))} ${terminalThemeText('muted', issue.code)} ${issue.toolName} — ${issue.message}`,
                 );
             }
             if (detailedContract.issues.length > 10) {
-                println(`      \x1b[90m... ${detailedContract.issues.length - 10} issues adicionais\x1b[0m`);
+                println(terminalThemeText('muted', `  ... ${detailedContract.issues.length - 10} issues adicionais`));
             }
         }
 
         const lifecycle = projection.lifecycle;
         if (lifecycle) {
-            println('\n  \x1b[36mLifecycle recente\x1b[0m');
+            println('');
+            println(terminalThemeHeadline('tool', 'Lifecycle recente'));
             println(
-                `    \x1b[90mativas ${lifecycle.summary.active} · aguardando operador ${lifecycle.summary.waitingUser} · recentes ${lifecycle.summary.recent} · falhas recentes ${lifecycle.summary.failedRecent}\x1b[0m`,
+                terminalThemeRow('Resumo', `ativas ${lifecycle.summary.active} · aguardando operador ${lifecycle.summary.waitingUser} · recentes ${lifecycle.summary.recent} · falhas recentes ${lifecycle.summary.failedRecent}`, {
+                    role: 'muted',
+                }),
             );
             const active = lifecycle.active.slice(0, 8);
             if (active.length > 0) {
-                println('    \x1b[90mem voo:\x1b[0m');
+                println(terminalThemeText('muted', '  em voo:'));
                 for (const entry of active) println(renderLifecycleDiagnosticLine(entry));
             }
             if (lifecycle.recent.length > 0) {
-                println('    \x1b[90mrecentes:\x1b[0m');
+                println(terminalThemeText('muted', '  recentes:'));
                 for (const entry of lifecycle.recent.slice(0, 8)) println(renderLifecycleDiagnosticLine(entry));
             }
         }
@@ -202,10 +214,8 @@ export function cmdTools({ println }, arg = '') {
 
     println(
         wantsRaw || wantsDiag
-            ? '  \x1b[90mComandos: /tools diag · /tools all · /tools raw\x1b[0m'
-            : '  \x1b[90mDetalhes técnicos: /tools diag · nomes crus: /tools raw\x1b[0m',
+            ? terminalThemeText('muted', '  Comandos: /tools diag · /tools all · /tools raw')
+            : terminalThemeText('muted', '  Detalhes técnicos: /tools diag · nomes crus: /tools raw'),
     );
     println('');
 }
-
-const C_RESET = '\x1b[0m';

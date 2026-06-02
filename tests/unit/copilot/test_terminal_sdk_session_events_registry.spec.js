@@ -90,6 +90,7 @@ vi.mock('../../../src/copilot/terminal/state/ui-preferences.js', () => ({
 }));
 vi.mock('../../../src/copilot/terminal/state/ui-theme.js', () => ({
     terminalThemeBadge: vi.fn((_, label) => `[${label}]`),
+    terminalThemeStatus: vi.fn((success) => (success ? 'ok' : 'falhou')),
     terminalThemeText: vi.fn((_, text) => text),
 }));
 vi.mock('../../../src/copilot/terminal/state/sdk-interactions.js', async () => {

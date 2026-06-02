@@ -1434,7 +1434,7 @@ async function renderSdkSystemPrompt({ println }, runtimeId) {
     );
 
     if (freshness['reason']) {
-        println(`  \x1b[90m${String(freshness['reason'])}[0m`);
+        println(`  ${terminalThemeText('muted', String(freshness['reason']))}`);
     }
 
     if (limitations.length > 0) {

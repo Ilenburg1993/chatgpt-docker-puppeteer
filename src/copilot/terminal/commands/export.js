@@ -14,7 +14,7 @@ import { join, resolve } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { redactSecretText } from '../../core/security/redaction.js';
 import { readTerminalTimelineProjection } from '../frontend/index.js';
-import { formatTerminalIsoTimestamp } from '../state/index.js';
+import { formatTerminalIsoTimestamp, terminalThemeRow } from '../state/index.js';
 
 /**
  * @typedef {object} ExportContext
@@ -31,7 +31,7 @@ import { formatTerminalIsoTimestamp } from '../state/index.js';
 export async function cmdExport({ println }, arg) {
     const projection = readTerminalTimelineProjection({ limitPairs: 500 });
     if (projection.turns.length === 0) {
-        println('  \x1b[33mHistórico vazio — nada para exportar.\x1b[0m');
+        println(terminalThemeRow('Exportar', 'Histórico vazio; nada para exportar.', { role: 'warn' }));
         return;
     }
 
@@ -54,12 +54,12 @@ export async function cmdExport({ println }, arg) {
         const time = formatTerminalIsoTimestamp(turn.timestamp ?? Date.now());
         const role =
             turn.role === 'user'
-                ? '👤 Usuário'
+                ? 'Usuário'
                 : turn.rawRole === 'llm_a'
-                  ? '🤖 LLM-A'
+                  ? 'LLM-A'
                   : turn.role === 'system' || turn.rawRole === 'ask_user'
-                    ? '🧭 Sistema'
-                    : '🧠 LLM-B';
+                    ? 'Sistema'
+                    : 'LLM-B';
         const metadata = turn.metadata && typeof turn.metadata === 'object' ? turn.metadata : null;
         const streamingDiagnostics =
             metadata?.['terminalStreamingDiagnostics'] && typeof metadata['terminalStreamingDiagnostics'] === 'object'
@@ -99,10 +99,10 @@ export async function cmdExport({ println }, arg) {
 
     try {
         await writeFile(filePath, lines.join('\n'), 'utf-8');
-        println(`  \x1b[32m✅ Exportado: ${filePath}\x1b[0m`);
-        println(`  \x1b[90m${projection.turns.length} mensagens salvas como Markdown.\x1b[0m`);
+        println(terminalThemeRow('Exportado', filePath, { role: 'success' }));
+        println(terminalThemeRow('Mensagens', `${projection.turns.length} salvas como Markdown.`));
     } catch (e) {
-        println(`  \x1b[31m❌ Erro ao exportar: ${toError(e).message ?? e}\x1b[0m`);
+        println(terminalThemeRow('Erro', `erro ao exportar: ${toError(e).message ?? e}`, { role: 'error' }));
     }
 }
 

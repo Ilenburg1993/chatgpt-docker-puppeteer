@@ -11,7 +11,7 @@
  */
 
 import { readTerminalErrorsProjection } from '../frontend/index.js';
-import { formatTerminalIsoTimestamp } from '../state/index.js';
+import { formatTerminalIsoTimestamp, terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/index.js';
 
 /**
  * @typedef {object} ErrorsContext
@@ -32,19 +32,21 @@ export function cmdErrors({ println }, arg) {
     const limit = Number(arg) || 10;
     const { stats, recent } = readTerminalErrorsProjection(limit);
 
-    println(`\n  \x1b[36m❌ Erros rastreados: ${stats.total} total (${stats.buffered} no buffer)\x1b[0m\n`);
+    println('');
+    println(terminalThemeHeadline('error', 'Erros rastreados', [`${stats.total} total`, `${stats.buffered} no buffer`]));
+    println('');
 
     if (recent.length === 0) {
-        println('  \x1b[32m✅ Nenhum erro recente.\x1b[0m\n');
+        println(terminalThemeRow('Estado', 'nenhum erro recente', { role: 'success' }));
+        println('');
         return;
     }
 
     for (const err of recent) {
         const ts = formatTerminalIsoTimestamp(err.timestamp);
-        const sevColor = '\x1b[31m';
         const type = err.errorType ?? 'Error';
-        const src = err.source ? `\x1b[90m[${err.source}]\x1b[0m ` : '';
-        println(`    ${sevColor}${type}\x1b[0m  \x1b[90m${ts}\x1b[0m  ${src}${err.message}`);
+        const src = err.source ? `${terminalThemeText('muted', `[${err.source}]`)} ` : '';
+        println(`    ${terminalThemeText('error', type)}  ${terminalThemeText('muted', ts)}  ${src}${err.message}`);
     }
     println('');
 }

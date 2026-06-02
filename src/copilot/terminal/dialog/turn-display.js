@@ -15,6 +15,8 @@ import {
     recordTerminalActivity,
     recordTerminalStreamDeltaDiagnostic,
     readTerminalTurnCorrelation,
+    terminalThemeDuration,
+    terminalThemeHeadline,
     terminalThemeText,
     withTerminalTurnCorrelation,
 } from '../state/dialog/index.js';
@@ -228,12 +230,12 @@ export function createReasoningCallback(state) {
                 source: 'dialog',
             });
             if (state.showThinking) {
-                const tsNow = formatTerminalIsoTimestamp(Date.now());
-                println(SEPARATOR);
-                println(
-                    `  ${terminalThemeText('muted', `[${tsNow}]`)}  💭  ${terminalThemeText('thinking', 'Raciocínio capturado')}  ${terminalThemeText('muted', `· ${state.model} · ${state.effort}`)}`,
-                );
-                println('');
+        const tsNow = formatTerminalIsoTimestamp(Date.now());
+        println(SEPARATOR);
+        println(
+            terminalThemeHeadline('thinking', 'Raciocínio capturado', [`[${tsNow}]`, state.model, state.effort]),
+        );
+        println('');
             }
         }
         state.reasoningChars += chunk.length;
@@ -379,7 +381,7 @@ export function createDeltaCallback(state) {
             const tsNow = formatTerminalIsoTimestamp(now);
             println(SEPARATOR);
             println(
-                `  ${terminalThemeText('muted', `[${tsNow}]`)}  🧠  ${terminalThemeText('assistant', 'LLM-B')}  ${terminalThemeText('muted', '·')}  ${terminalThemeText('assistant', state.model)}  ${terminalThemeText('muted', '·')}  ${terminalThemeText('thinking', state.effort)}`,
+                terminalThemeHeadline('assistant', 'LLM-B', [`[${tsNow}]`, state.model, state.effort]),
             );
             println('');
         }
@@ -405,18 +407,12 @@ export function renderStreamingFooter(state, durationMs) {
     }
     if (state.streamingStarted) {
         flushStreamingBuffer(state, { force: true });
-        const secs = (durationMs / 1000).toFixed(1);
-        const secsNum = durationMs / 1000;
-        const secsColor =
-            secsNum < 5
-                ? `\x1b[32m${secs}s\x1b[0m`
-                : secsNum < 15
-                  ? `\x1b[33m${secs}s\x1b[0m`
-                  : `\x1b[31m${secs}s\x1b[0m`;
         const ttft =
             state.firstChunkTime > 0 ? ((state.firstChunkTime - state.turnStartTime) / 1000).toFixed(1) + 's TTFT' : '';
         writeTerminalRaw('\n');
-        println(`  \x1b[90m└── ${secsColor}${ttft ? `  \x1b[90m·\x1b[0m  \x1b[90m${ttft}\x1b[0m` : ''}\x1b[0m`);
+        println(
+            `  ${terminalThemeText('muted', '└──')} ${terminalThemeDuration(durationMs)}${ttft ? `  ${terminalThemeText('muted', '·')}  ${terminalThemeText('muted', ttft)}` : ''}`,
+        );
         println('');
     }
 

@@ -12,7 +12,12 @@
  */
 
 import { readTerminalContextProjection, requestTerminalCompactionProjection } from '../frontend/index.js';
-import { formatTerminalIsoTimestamp } from '../state/index.js';
+import {
+    formatTerminalIsoTimestamp,
+    terminalThemeHeadline,
+    terminalThemeRow,
+    terminalThemeText,
+} from '../state/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -27,8 +32,8 @@ function progressBar(used, total, width = 20) {
     const pct = Math.min(used / total, 1);
     const filled = Math.round(pct * width);
     const empty = width - filled;
-    const color = pct > 0.85 ? '\x1b[31m' : pct > 0.65 ? '\x1b[33m' : '\x1b[32m';
-    return `${color}${'█'.repeat(filled)}${'░'.repeat(empty)}\x1b[0m`;
+    const role = pct > 0.85 ? 'error' : pct > 0.65 ? 'warn' : 'success';
+    return terminalThemeText(role, `${'█'.repeat(filled)}${'░'.repeat(empty)}`);
 }
 
 // ─── /context ─────────────────────────────────────────────────────────────────
@@ -45,7 +50,7 @@ export function cmdContext({ println }, arg = '') {
     const projection = callWithRuntimeTarget(readTerminalContextProjection, runtimeId);
 
     if (!projection.isRealData && !projection.hasHistory) {
-        println('\x1b[90m  Nenhum histórico em memória ainda. Envie um turno primeiro.\x1b[0m');
+        println(terminalThemeRow('Contexto', 'nenhum histórico em memória ainda; envie um turno primeiro', { role: 'muted' }));
         return;
     }
 
@@ -58,47 +63,59 @@ export function cmdContext({ println }, arg = '') {
     const bar = progressBar(usedTokens, maxTokens);
 
     println('');
-    println(`\x1b[36m  ─── Uso do Contexto ────────────────────────────────────────────\x1b[0m`);
-    println(`  ${bar} \x1b[1m${pctStr}%\x1b[0m`);
+    println(terminalThemeHeadline('command', 'Uso do contexto'));
+    println(`  ${bar} ${terminalThemeText('info', `${pctStr}%`)}`);
     println(
-        `  Tokens${isRealData ? ' (real SDK)' : ' estimados'}: \x1b[33m${usedTokens.toLocaleString('pt-BR')}\x1b[0m / \x1b[90m${maxTokens.toLocaleString('pt-BR')}\x1b[0m`,
+        terminalThemeRow(
+            `Tokens${isRealData ? ' SDK' : ' estimados'}`,
+            `${usedTokens.toLocaleString('pt-BR')} / ${maxTokens.toLocaleString('pt-BR')}`,
+            { role: 'info', width: 17 },
+        ),
     );
     if (projection.turnCount > 0) {
-        println(`  Chars totais     : \x1b[33m${projection.totalChars.toLocaleString('pt-BR')}\x1b[0m`);
-        println(`  Turnos na memória: \x1b[33m${projection.turnCount}\x1b[0m`);
+        println(terminalThemeRow('Chars totais', projection.totalChars.toLocaleString('pt-BR'), { role: 'info', width: 17 }));
+        println(terminalThemeRow('Turnos memória', String(projection.turnCount), { role: 'info', width: 17 }));
     }
 
     if (pct > 0.85) {
         println('');
-        println(`\x1b[31m  ⚠️  Context window acima de 85% — considere usar /compact para compactar.\x1b[0m`);
+        println(terminalThemeRow('Atenção', 'context window acima de 85%; considere usar /compact', { role: 'error' }));
     } else if (pct > 0.65) {
         println('');
-        println(`\x1b[33m  ℹ️  Context window acima de 65% — monitore se a conversa for longa.\x1b[0m`);
+        println(terminalThemeRow('Atenção', 'context window acima de 65%; monitore conversas longas', { role: 'warn' }));
     }
 
     if (!isRealData) {
-        println(`\x1b[90m  (estimativa heurística: 4 chars ≈ 1 token; limite real depende do modelo)\x1b[0m`);
+        println(terminalThemeText('muted', '  (estimativa heurística: 4 chars ~= 1 token; limite real depende do modelo)'));
     }
 
     // AG.5 — workspace SessionContext
     const ws = projection.workspace;
-    println(`\x1b[36m  ─── Workspace ──────────────────────────────────────────────────\x1b[0m`);
-    println(`  cwd    \x1b[90m${ws.cwd}\x1b[0m`);
-    if (ws.gitRoot) println(`  git    \x1b[90m${ws.gitRoot}\x1b[0m  branch: \x1b[32m${ws.currentBranch ?? '?'}\x1b[0m`);
+    println(terminalThemeHeadline('command', 'Workspace'));
+    println(terminalThemeRow('cwd', ws.cwd, { role: 'muted' }));
+    if (ws.gitRoot) println(terminalThemeRow('git', `${ws.gitRoot} · branch ${ws.currentBranch ?? '?'}`, { role: 'muted' }));
 
-    println(`\x1b[36m  ─── Timeline canônica ───────────────────────────────────────────\x1b[0m`);
+    println(terminalThemeHeadline('command', 'Timeline canônica'));
     println(
-        `  source/autoridade: \x1b[90m${projection.timelineSource} · ${projection.timelineAuthority} · ${projection.reconciliationStatus}\x1b[0m`,
+        terminalThemeRow('Autoridade', `${projection.timelineSource} · ${projection.timelineAuthority} · ${projection.reconciliationStatus}`, {
+            role: 'muted',
+        }),
     );
     println(
-        `  persistidos/live : \x1b[90m${projection.persistedTurnCount} persistidos · ${projection.bridgeTurnCount} bridge · ${projection.liveBridgeTailCount} live-tail\x1b[0m`,
+        terminalThemeRow('Persistência', `${projection.persistedTurnCount} persistidos · ${projection.bridgeTurnCount} bridge · ${projection.liveBridgeTailCount} live-tail`, {
+            role: 'muted',
+        }),
     );
     println(
-        `  sync Hub         : \x1b[90m${projection.syncStatus}${projection.syncPendingCount > 0 ? ` · pendentes=${projection.syncPendingCount}` : ''}${projection.syncSyncedCount > 0 ? ` · gravados=${projection.syncSyncedCount}` : ''}${projection.syncFailedCount > 0 ? ` · falhas=${projection.syncFailedCount}` : ''}\x1b[0m`,
+        terminalThemeRow('Sync Hub', `${projection.syncStatus}${projection.syncPendingCount > 0 ? ` · pendentes=${projection.syncPendingCount}` : ''}${projection.syncSyncedCount > 0 ? ` · gravados=${projection.syncSyncedCount}` : ''}${projection.syncFailedCount > 0 ? ` · falhas=${projection.syncFailedCount}` : ''}`, {
+            role: 'muted',
+        }),
     );
     if (projection.reconciliationStatus === 'diverged') {
         println(
-            `\x1b[33m  Nota: bridge e persistência divergiram; sync bloqueado${projection.syncBlockedReason ? ` (${projection.syncBlockedReason})` : ''}, mas o live-tail visível foi preservado sem persistir.\x1b[0m`,
+            terminalThemeRow('Nota', `bridge e persistência divergiram; sync bloqueado${projection.syncBlockedReason ? ` (${projection.syncBlockedReason})` : ''}; live-tail preservado`, {
+                role: 'warn',
+            }),
         );
     }
     if (projection.syncStatus === 'failed') {
@@ -106,7 +123,7 @@ export function cmdContext({ println }, arg = '') {
             typeof projection.syncNextRetryAt === 'number'
                 ? ` próxima tentativa ${formatTerminalIsoTimestamp(projection.syncNextRetryAt)}`
                 : '';
-        println(`\x1b[33m  Sync Hub falhou: ${projection.syncLastError ?? 'erro desconhecido'}${retryLabel}.\x1b[0m`);
+        println(terminalThemeRow('Sync Hub', `falhou: ${projection.syncLastError ?? 'erro desconhecido'}${retryLabel}`, { role: 'warn' }));
     }
 
     println('');
@@ -127,7 +144,7 @@ export function cmdContext({ println }, arg = '') {
  */
 export async function cmdCompact({ println }, arg = '') {
     const { runtimeId } = extractRuntimeTarget(arg);
-    println('\x1b[90m  ⚙️  Solicitando compactação à LLM-B… aguarde.\x1b[0m');
+    println(terminalThemeRow('Compactação', 'solicitada à LLM-B; aguarde', { role: 'muted' }));
 
     const result = await callWithRuntimeTarget(requestTerminalCompactionProjection, runtimeId);
     if (!result.ok || !result.reply) {

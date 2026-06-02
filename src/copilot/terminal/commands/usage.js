@@ -13,6 +13,7 @@
 import { getShowUsage, setShowUsage } from '../../presentation/state/index.js';
 import { compactTerminalDiagnosticId } from '../events/tool-activity-presenter.js';
 import { readTerminalConfigProjection, readTerminalUsageNowProjection } from '../frontend/index.js';
+import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -61,10 +62,14 @@ export function cmdUsage({ println }, arg) {
         if (ctx) {
             const pct = (ctx.utilization * 100).toFixed(0);
             const bar = _renderBar(ctx.utilization);
-            println(`\n  📊  Context window: ${bar} ${pct}%`);
-            println(`      Tokens: ${ctx.tokens.toLocaleString('pt-BR')} / ${ctx.tokenLimit.toLocaleString('pt-BR')}`);
+            println('');
+            println(terminalThemeHeadline('command', 'Context window', [`${bar} ${pct}%`]));
+            println(terminalThemeRow('Tokens', `${ctx.tokens.toLocaleString('pt-BR')} / ${ctx.tokenLimit.toLocaleString('pt-BR')}`, {
+                role: 'info',
+            }));
         } else {
-            println('\n  \x1b[33m⚠️  Dados de context window não disponíveis.\x1b[0m');
+            println('');
+            println(terminalThemeRow('Atenção', 'dados de context window não disponíveis', { role: 'warn' }));
         }
 
         const modelBilling = projection.modelBilling;
@@ -151,9 +156,11 @@ export function cmdUsage({ println }, arg) {
     }
 
     setShowUsage(next);
-    const status = next ? '\x1b[32mon\x1b[0m' : '\x1b[31moff\x1b[0m';
-    println(`\n  📊  Exibição de telemetria pós-turno: ${status}`);
-    println('  \x1b[90mUso: /usage [on|off|now] [detail]\x1b[0m\n');
+    const status = next ? terminalThemeText('success', 'on') : terminalThemeText('error', 'off');
+    println('');
+    println(terminalThemeRow('Telemetria', `pós-turno ${status}`, { role: next ? 'success' : 'error' }));
+    println(terminalThemeText('muted', '  Uso: /usage [on|off|now] [detail]'));
+    println('');
 }
 
 /**
@@ -191,6 +198,6 @@ function _renderBar(ratio) {
     const total = 20;
     const filled = Math.round(ratio * total);
     const empty = total - filled;
-    const color = ratio > 0.8 ? '\x1b[31m' : ratio > 0.5 ? '\x1b[33m' : '\x1b[32m';
-    return `${color}${'█'.repeat(filled)}${'░'.repeat(empty)}\x1b[0m`;
+    const role = ratio > 0.8 ? 'error' : ratio > 0.5 ? 'warn' : 'success';
+    return terminalThemeText(role, `${'█'.repeat(filled)}${'░'.repeat(empty)}`);
 }

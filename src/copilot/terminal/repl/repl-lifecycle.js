@@ -38,6 +38,7 @@ import {
     shouldConsumeTerminalPendingAnswerInput,
     tryAnswerTerminalPendingQuestionInput,
 } from '../state/repl-runtime/index.js';
+import { terminalThemeRow, terminalThemeText } from '../state/repl/index.js';
 import { resolve } from '../stores/index.js';
 import { renderTerminalAutoBrief } from './auto-brief.js';
 import { resolveFreeTextDelivery } from './free-text-delivery.js';
@@ -98,7 +99,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
     const cleanupLiveStatusLine = setupTerminalLiveStatusLine();
 
     println(buildTerminalReplBanner(injectPort));
-    println('\x1b[90m  Iniciando sessão com LLM-B…\x1b[0m');
+    println(terminalThemeText('muted', '  Iniciando sessão com LLM-B...'));
     renderTerminalAutoBrief({ injectPort, phase: 'boot', force: true });
 
     if (onReady) void onReady();
@@ -208,7 +209,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         const isModelIdle = !getBusy() && getTurnQueueDepth() === 0;
         if (isModelIdle && interventionPolicy.allowQueueFallback) {
             println(
-                '\x1b[90m  [intervene→turn] Modelo ocioso — mailbox não seria consumido. Encaminhando como turno.\x1b[0m',
+                terminalThemeText('muted', '  [intervene->turn] Modelo ocioso; mailbox não seria consumido. Encaminhando como turno.'),
             );
             await queueUserTurn(finalMessage);
             return;
@@ -226,14 +227,21 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             `[TerminalServer] immediate intervention mailbox enqueue runtime=${queued.runtimeId} merged=${queued.merged} queue=${queued.queueSize} dropped=${queued.dropped}`,
         );
         println(
-            `\x1b[36m  [immediate] intervenção registrada para aplicação prioritária na próxima pergunta humana (${summary.queueSize} na fila${summary.dropped > 0 ? ` · ${summary.dropped} descartada(s)` : ''}).\x1b[0m`,
+            terminalThemeRow(
+                'Intervenção',
+                `registrada para aplicação prioritária na próxima pergunta humana (${summary.queueSize} na fila${summary.dropped > 0 ? ` · ${summary.dropped} descartada(s)` : ''})`,
+                { role: 'info' },
+            ),
         );
         println(
-            '\x1b[90m  Este caminho preserva zero-PR. Use /steer apenas quando quiser intervenção SDK immediate explícita.\x1b[0m',
+            terminalThemeText('muted', '  Este caminho preserva zero-PR. Use /steer apenas quando quiser intervenção SDK immediate explícita.'),
         );
         if (isModelIdle) {
             println(
-                '\x1b[33m  ⚠ Modelo ocioso e allowQueueFallback=false — entrada no mailbox pode não ser consumida até próximo turno ativo.\x1b[0m',
+                terminalThemeText(
+                    'warn',
+                    '  Modelo ocioso e allowQueueFallback=false; entrada no mailbox pode não ser consumida até próximo turno ativo.',
+                ),
             );
         }
         refreshPrompt();
@@ -246,7 +254,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
     async function routeFreeTextMessage(finalMessage) {
         const resolved = resolveFreeTextDelivery(finalMessage);
         if (!resolved.message) {
-            println('\x1b[33m  Mensagem vazia após diretiva; nada foi enviado.\x1b[0m');
+            println(terminalThemeText('warn', '  Mensagem vazia após diretiva; nada foi enviado.'));
             refreshPrompt();
             return;
         }
@@ -320,11 +328,11 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         const { paths: atPaths, strippedMessage } = extractAtReferences(trimmed);
         for (const p of atPaths) {
             addAttachment(p);
-            println(`\x1b[90m  📎 @${p} adicionado à fila de attachments\x1b[0m`);
+            println(terminalThemeRow('Anexo', `@${p} adicionado à fila`, { role: 'muted' }));
         }
         const finalMessage = atPaths.length > 0 ? strippedMessage : trimmed;
         if (!finalMessage.trim()) {
-            println('\x1b[33m  [attach] Arquivo(s) anexados. Escreva uma mensagem para enviar o turno.\x1b[0m');
+            println(terminalThemeRow('Anexos', 'arquivo(s) anexados. Escreva uma mensagem para enviar o turno', { role: 'warn' }));
             if (isReadlineOpen(rl)) {
                 scheduleTerminalPromptRedraw(rl, buildUserPrompt());
             }

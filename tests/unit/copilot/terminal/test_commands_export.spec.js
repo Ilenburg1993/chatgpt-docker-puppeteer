@@ -204,11 +204,11 @@ describe('terminal/commands/export', () => {
         const [, content] = writeFile.mock.calls[0];
         const markdown = String(content);
         expect(markdown).toContain('timeline=mixed/diverged · sync=blocked:diverged-no-overlap');
-        expect(markdown).toContain('## 🧭 Sistema');
+        expect(markdown).toContain('## Sistema');
         expect(markdown).toContain('ASK-CANONICAL: responda SIM para fechar o teste');
-        expect(markdown).toContain('## 👤 Usuário');
+        expect(markdown).toContain('## Usuário');
         expect(markdown).toContain('Resposta ao ask_user:\nSIM');
-        expect(markdown).toContain('## 🧠 LLM-B');
+        expect(markdown).toContain('## LLM-B');
         expect(markdown).toContain('POST-ASK-CANONICAL-FINAL: usuário confirmou SIM');
         expect(markdown).toContain('envelope=sdk/user_input.requested');
         expect(markdown).toContain('envelope=sdk/user_input.completed');

@@ -12,7 +12,7 @@
 
 import { toError } from '#copilot/core';
 import { searchTerminalTurnsProjection } from '../frontend/index.js';
-import { formatTerminalIsoTimestamp } from '../state/index.js';
+import { formatTerminalIsoTimestamp, terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/index.js';
 
 /**
  * @typedef {object} SearchContext
@@ -30,14 +30,18 @@ import { formatTerminalIsoTimestamp } from '../state/index.js';
 export function cmdSearch({ println, hubSessionId }, arg) {
     const query = (arg ?? '').trim();
     if (!query) {
-        println('\n  \x1b[33m⚠️  Uso: /search <query>\x1b[0m');
-        println('  \x1b[90mBusca full-text nos turnos anteriores.\x1b[0m\n');
+        println('');
+        println(terminalThemeRow('Uso', '/search <query>', { role: 'warn' }));
+        println(terminalThemeRow('Busca', 'full-text nos turnos anteriores.'));
+        println('');
         return;
     }
 
     const projection = searchTerminalTurnsProjection({ query, hubSessionId: hubSessionId ?? null, limit: 10 });
     if (!projection.available) {
-        println('\n  \x1b[31m❌  ConversationHub não está disponível.\x1b[0m\n');
+        println('');
+        println(terminalThemeRow('Erro', 'ConversationHub não está disponível.', { role: 'error' }));
+        println('');
         return;
     }
 
@@ -45,20 +49,26 @@ export function cmdSearch({ println, hubSessionId }, arg) {
         const results = projection.results;
 
         if (!results || results.length === 0) {
-            println(`\n  \x1b[33m🔍 Nenhum resultado para "${projection.query}"\x1b[0m\n`);
+            println('');
+            println(terminalThemeRow('Busca', `nenhum resultado para "${projection.query}"`, { role: 'warn' }));
+            println('');
             return;
         }
 
-        println(`\n  \x1b[36m🔍 ${results.length} resultado(s) para "${projection.query}":\x1b[0m\n`);
+        println('');
+        println(terminalThemeHeadline('assistant', 'Resultados da busca', [`${results.length}`, `"${projection.query}"`]));
+        println('');
         for (const r of results) {
             const role = r['role'] ?? '?';
             const content = typeof r['content'] === 'string' ? r['content'] : String(r['content'] ?? '');
             const preview = content.length > 120 ? content.slice(0, 120) + '…' : content;
             const ts = r['created_at'] ? formatTerminalIsoTimestamp(String(r['created_at'])) : 'sem horário';
-            println(`  \x1b[90m[${ts}]\x1b[0m \x1b[33m${role}\x1b[0m: ${preview}`);
+            println(`  ${terminalThemeText('muted', `[${ts}]`)} ${terminalThemeText('command', String(role))}: ${preview}`);
         }
         println('');
     } catch (e) {
-        println(`\n  \x1b[31m❌ Erro na busca: ${toError(e).message}\x1b[0m\n`);
+        println('');
+        println(terminalThemeRow('Erro', `erro na busca: ${toError(e).message}`, { role: 'error' }));
+        println('');
     }
 }

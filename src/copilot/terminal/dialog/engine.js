@@ -42,7 +42,14 @@ import {
     startTerminalDialogMode,
 } from '../frontend/gateways/index.js';
 import { normalizeTerminalModelBillingProjection } from '../frontend/projections/index.js';
-import { formatTerminalIsoTimestamp, markTerminalActivityIdle, recordTerminalActivity } from '../state/dialog/index.js';
+import {
+    formatTerminalIsoTimestamp,
+    markTerminalActivityIdle,
+    recordTerminalActivity,
+    terminalThemeHeadline,
+    terminalThemeRow,
+    terminalThemeText,
+} from '../state/dialog/index.js';
 import {
     beginTerminalTurnMaterialization,
     clearTerminalTurnMaterialization,
@@ -631,7 +638,7 @@ async function _tryStartDialogLoop() {
             detail: 'Inicializando ambiente da conversa',
             source: 'dialog',
         });
-        println('\x1b[90m  Preparando agente…\x1b[0m');
+        println(terminalThemeText('muted', '  Preparando agente...'));
         await startTerminalAgentRuntime();
         const deadline = Date.now() + IDLE_TRANSITION_TIMEOUT_MS;
         while (Date.now() < deadline) {
@@ -648,7 +655,7 @@ async function _tryStartDialogLoop() {
             detail: 'Há trabalho em andamento antes da conversa',
             source: 'dialog',
         });
-        println('\x1b[90m  Aguardando agente concluir tarefa em andamento…\x1b[0m');
+        println(terminalThemeText('muted', '  Aguardando agente concluir tarefa em andamento...'));
         const deadline = Date.now() + IDLE_TRANSITION_TIMEOUT_MS;
         while (Date.now() < deadline) {
             const s = readTerminalRuntimeControlState().status;
@@ -673,13 +680,13 @@ async function _tryStartDialogLoop() {
         detail: 'Iniciando protocolo READY/REPLY do terminal',
         source: 'dialog',
     });
-    println('\x1b[90m  Conectando conversa…\x1b[0m');
+    println(terminalThemeText('muted', '  Conectando conversa...'));
     const resumeSessionAttach = true;
     log('INFO', '[dialog] reanexando terminal sem boot prompt automático.');
-    println('\x1b[90m  Retomando sessão sem prompt inicial…\x1b[0m');
+    println(terminalThemeText('muted', '  Retomando sessão sem prompt inicial...'));
     await startTerminalDialogMode(resumeSessionAttach ? undefined : (BOOT_PROMPT ?? undefined), {
         resumeSessionAttach,
-        onReady: () => println('\n  \x1b[32m●\x1b[0m  LLM-B pronta — pode começar\n'),
+        onReady: () => println(`\n  ${terminalThemeText('success', 'LLM-B pronta')} — pode começar\n`),
     });
     if (resumeSessionAttach) {
         markTerminalActivityIdle('Sessão retomada; aguardando próxima mensagem');
@@ -743,11 +750,15 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         const u = ctxState.utilization;
         if (u >= 0.95) {
             println(
-                `\x1b[31m  ⛔ Context window em ${(u * 100).toFixed(0)}% — risco de perda de contexto. Use /compact antes de continuar.\x1b[0m`,
+                terminalThemeRow('Atenção', `context window em ${(u * 100).toFixed(0)}%; risco de perda de contexto. Use /compact antes de continuar`, {
+                    role: 'error',
+                }),
             );
         } else if (u >= 0.85) {
             println(
-                `\x1b[33m  ⚠️  Context window em ${(u * 100).toFixed(0)}% — considere usar /compact em breve.\x1b[0m`,
+                terminalThemeRow('Atenção', `context window em ${(u * 100).toFixed(0)}%; considere usar /compact em breve`, {
+                    role: 'warn',
+                }),
             );
         }
     }
@@ -761,10 +772,13 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             source: 'dialog',
             severity: byokBudget.severity === 'block' && admissionMode === 'block' ? 'error' : 'warn',
         });
-        const budgetColor = byokBudget.severity === 'block' && admissionMode === 'block' ? '\x1b[31m' : '\x1b[33m';
-        println(`${budgetColor}  ⚠️  BYOK budget: ${byokBudget.label}.\x1b[0m`);
+        const budgetRole = byokBudget.severity === 'block' && admissionMode === 'block' ? 'error' : 'warn';
+        println(terminalThemeRow('BYOK budget', byokBudget.label, { role: budgetRole }));
         println(
-            `\x1b[90m     Dica: /byok recommend reasoning safe · /compact · /byok use <perfil> · /byok model <id> · ${TERMINAL_BYOK_ADMISSION_MODE_ENV}=warn para permitir mesmo assim\x1b[0m`,
+            terminalThemeText(
+                'muted',
+                `  Dica: /byok recommend reasoning safe · /compact · /byok use <perfil> · /byok model <id> · ${TERMINAL_BYOK_ADMISSION_MODE_ENV}=warn para permitir mesmo assim`,
+            ),
         );
         if (shouldBlockTerminalByokTurnBudget(byokBudget, admissionMode)) {
             recordTerminalActivity('system', 'Turno BYOK bloqueado por admission control', {
@@ -785,7 +799,9 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 }),
             );
             println(
-                '\x1b[31m  ⛔ Turno não enviado ao provider BYOK: a estimativa excede o limite declarado antes do streaming.\x1b[0m',
+                terminalThemeRow('Bloqueado', 'turno não enviado ao provider BYOK; estimativa excede o limite declarado antes do streaming', {
+                    role: 'error',
+                }),
             );
             return null;
         }
@@ -820,7 +836,9 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             severity: 'warn',
         });
         println(
-            `\x1b[90m  ↳ requestHeaders por turno detectados (${Object.keys(requestHeaders).join(', ')}); usando dispatch SDK direto com reanexo da conversa.\x1b[0m`,
+            terminalThemeRow('Headers', `requestHeaders por turno detectados (${Object.keys(requestHeaders).join(', ')}); usando dispatch SDK direto com reanexo`, {
+                role: 'muted',
+            }),
         );
     }
     broadcastSse(
@@ -871,7 +889,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 recordHistory: false,
             });
             if (process.env['COPILOT_TERMINAL_DURABLE_WAITING_NARRATION'] === 'true') {
-                println(`  \x1b[90m↳ LLM-B pensando · ${elapsedSeconds}s sem resposta visível\x1b[0m`);
+                println(terminalThemeRow('LLM-B', `pensando · ${elapsedSeconds}s sem resposta visível`, { role: 'muted' }));
             }
         };
         renderWaitingStatus();
@@ -908,12 +926,14 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 if (limitedParts.length > 0) {
                     enrichedMessage = limitedParts.join('\n\n') + '\n\n' + enrichedMessage;
                     println(
-                        `\x1b[90m  📎 ${limitedParts.length} attachment(s) embutido(s): ${attachments.map(describeQueuedAttachment).join(', ')}\x1b[0m`,
+                        terminalThemeRow('Anexos', `${limitedParts.length} embutido(s): ${attachments.map(describeQueuedAttachment).join(', ')}`, {
+                            role: 'muted',
+                        }),
                     );
                 }
             }
         } catch (embedErr) {
-            println(`\x1b[33m  ⚠️  Falha ao embutir arquivo(s): ${toError(embedErr).message}\x1b[0m`);
+            println(terminalThemeRow('Anexos', `falha ao embutir arquivo(s): ${toError(embedErr).message}`, { role: 'warn' }));
         }
     }
 
@@ -926,10 +946,10 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         if (actor === 'llm-a') {
             const tsNow = formatTerminalIsoTimestamp(Date.now());
             println(SEPARATOR);
-            println(`  \x1b[90m[${tsNow}]\x1b[0m  🤖  \x1b[34mLLM-A\x1b[0m`);
+            println(terminalThemeHeadline('system', 'LLM-A', [`[${tsNow}]`]));
             println('');
             for (const line of message.split('\n')) {
-                println(`  \x1b[34m│\x1b[0m  ${line}`);
+                println(`  ${terminalThemeText('system', '│')}  ${line}`);
             }
             println('');
         }
@@ -1198,7 +1218,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                         `${ctxWin.tokens.toLocaleString('pt-BR')}/${ctxWin.tokenLimit.toLocaleString('pt-BR')} tokens`,
                     );
                 }
-                println(`  \x1b[90m📊 ${parts.join(' · ')}\x1b[0m`);
+                println(terminalThemeRow('Uso', parts.join(' · '), { role: 'muted' }));
             }
         }
 

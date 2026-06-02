@@ -48,7 +48,7 @@ export function buildTerminalStandaloneBannerView(opts, deps = {}) {
         lines.push('');
     }
     if (warnings.length > 0) {
-        lines.push(`  ⚠  Preflight SDK: ${warnings[0]}`);
+        lines.push(`  Atenção  Preflight SDK: ${warnings[0]}`);
         lines.push('');
     }
 

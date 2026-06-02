@@ -71,4 +71,14 @@ export {
 } from '../turn-trace-state.js';
 export { readTerminalTurnCorrelation, withTerminalTurnCorrelation } from '../turn-correlation-state.js';
 export { getTerminalDetailLevel } from '../ui-preferences.js';
-export { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../ui-theme.js';
+export {
+    terminalActionChip,
+    terminalThemeBadge,
+    terminalThemeDivider,
+    terminalThemeDuration,
+    terminalThemeHeadline,
+    terminalThemeJoin,
+    terminalThemeRow,
+    terminalThemeStatus,
+    terminalThemeText,
+} from '../ui-theme.js';

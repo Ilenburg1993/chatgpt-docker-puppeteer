@@ -129,5 +129,11 @@ export {
     setTerminalThemeName,
     terminalActionChip,
     terminalThemeBadge,
+    terminalThemeDivider,
+    terminalThemeDuration,
+    terminalThemeHeadline,
+    terminalThemeJoin,
+    terminalThemeRow,
+    terminalThemeStatus,
     terminalThemeText,
 } from './ui-theme.js';

@@ -5,7 +5,7 @@
  * Comando `/thinking [on|off|toggle]` do REPL terminal LLM-B.
  *
  * Controla a exibição em tempo real do extended thinking (reasoning) da LLM-B no stdout. Quando ativo, chunks de
- * `assistant.reasoning_delta` são renderizados inline com prefixo 💭.
+ * `assistant.reasoning_delta` são renderizados inline com rótulo humano de raciocínio.
  *
  * @module copilot/terminal/commands/thinking
  * @see EventBus
@@ -19,7 +19,13 @@ import {
     getThinkingHistoryEntry,
     setShowThinking,
 } from '../../presentation/state/index.js';
-import { formatTerminalThinkingRef } from '../state/events/index.js';
+import {
+    formatTerminalThinkingRef,
+    terminalThemeDivider,
+    terminalThemeHeadline,
+    terminalThemeRow,
+    terminalThemeText,
+} from '../state/events/index.js';
 
 /**
  * @typedef {object} ThinkingContext
@@ -72,20 +78,22 @@ export function cmdThinking(ctx, arg) {
         const requested = Number.parseInt(extra || '10', 10);
         const entries = getThinkingHistory(Number.isFinite(requested) ? requested : 10);
         if (entries.length === 0) {
-            println('\n  \x1b[90mNenhum raciocínio capturado ainda.\x1b[0m\n');
+            println('');
+            println(terminalThemeRow('Raciocínio', 'nenhum raciocínio capturado ainda.'));
+            println('');
             return;
         }
         /** @type {string[]} */
-        const lines = [`\n  \x1b[35mRaciocínio capturado (${entries.length})\x1b[0m`];
+        const lines = ['', terminalThemeHeadline('thinking', 'Raciocínio capturado', [`${entries.length}`])];
         for (const entry of entries) {
             const shortId = formatTerminalThinkingRef(entry.id);
             const preview = entry.content.replace(/\s+/g, ' ').trim().slice(0, 72);
             lines.push(
-                `  \x1b[33m${shortId}\x1b[0m  \x1b[90m${entry.source}\x1b[0m  \x1b[90m·\x1b[0m  ${entry.title}  \x1b[90m·\x1b[0m  ${entry.chars} caracteres`,
+                `  ${terminalThemeText('command', shortId)}  ${terminalThemeText('muted', entry.source)}  ${terminalThemeText('muted', '·')}  ${entry.title}  ${terminalThemeText('muted', '·')}  ${entry.chars} caracteres`,
             );
-            if (preview) lines.push(`    \x1b[90m${preview}${entry.content.length > preview.length ? '…' : ''}\x1b[0m`);
+            if (preview) lines.push(`    ${terminalThemeText('muted', `${preview}${entry.content.length > preview.length ? '…' : ''}`)}`);
         }
-        lines.push('\n  \x1b[90mUse /thinking show <id> ou /thinking latest para abrir.\x1b[0m\n');
+        lines.push('', terminalThemeRow('Uso', '/thinking show <id> ou /thinking latest', { role: 'command' }), '');
         printBlock(ctx, lines);
         return;
     }
@@ -101,27 +109,31 @@ export function cmdThinking(ctx, arg) {
                       .reverse()
                       .find((item) => item.id === rawId || item.id.endsWith(rawId)));
         if (!entry) {
-            println(`\n  \x1b[31mRaciocínio não encontrado: ${rawId || '(vazio)'}\x1b[0m\n`);
+            println('');
+            println(terminalThemeRow('Erro', `raciocínio não encontrado: ${rawId || '(vazio)'}`, { role: 'error' }));
+            println('');
             return;
         }
         const shortId = formatTerminalThinkingRef(entry.id);
         /** @type {string[]} */
-        const lines = [`\n  \x1b[35m╭─ raciocínio ${shortId}\x1b[0m  \x1b[90m${entry.title}\x1b[0m`];
+        const lines = ['', terminalThemeHeadline('thinking', `Raciocínio ${shortId}`, [entry.title])];
         lines.push(
-            `  \x1b[35m│\x1b[0m  \x1b[90mfonte ${entry.source} · estado ${humanThinkingStatus(entry.status)} · ${entry.chars} caracteres · duração ${(Number(entry.durationMs ?? 0) / 1000).toFixed(1)}s\x1b[0m`,
+            terminalThemeRow('Metadados', `fonte ${entry.source} · estado ${humanThinkingStatus(entry.status)} · ${entry.chars} caracteres · duração ${(Number(entry.durationMs ?? 0) / 1000).toFixed(1)}s`),
         );
-        lines.push('  \x1b[35m│\x1b[0m');
+        lines.push(terminalThemeDivider(60));
         for (const line of entry.content.split('\n')) {
-            lines.push(`  \x1b[35m│\x1b[0m  ${line}`);
+            lines.push(`  ${terminalThemeText('thinking', '│')}  ${line}`);
         }
-        lines.push('  \x1b[35m╰────────────────────────────────────────────────────────────\x1b[0m\n');
+        lines.push(terminalThemeDivider(60), '');
         printBlock(ctx, lines);
         return;
     }
 
     if (command === 'clear') {
         clearThinkingHistory();
-        println('\n  \x1b[90mHistórico de thinking limpo.\x1b[0m\n');
+        println('');
+        println(terminalThemeRow('Raciocínio', 'histórico limpo.'));
+        println('');
         return;
     }
 
@@ -137,7 +149,9 @@ export function cmdThinking(ctx, arg) {
     }
 
     setShowThinking(next);
-    const status = next ? '\x1b[32mativa\x1b[0m' : '\x1b[31minativa\x1b[0m';
-    println(`\n  💭  Exibição expandida de raciocínio: ${status}`);
-    println('  \x1b[90mUso: /thinking [on|off|toggle|list [n]|show <id>|latest|clear]\x1b[0m\n');
+    const status = next ? terminalThemeText('success', 'ativa') : terminalThemeText('error', 'inativa');
+    println('');
+    println(terminalThemeRow('Raciocínio', `exibição expandida ${status}`, { role: next ? 'success' : 'error' }));
+    println(terminalThemeRow('Uso', '/thinking [on|off|toggle|list [n]|show <id>|latest|clear]', { role: 'command' }));
+    println('');
 }
