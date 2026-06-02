@@ -203,8 +203,9 @@ describe('terminal/live-status-line', () => {
         mocks.runtime = { ...mocks.runtime, status: 'processing', queueSize: 0 };
 
         expect(shouldRenderTerminalLiveStatusLine()).toBe(false);
-        expect(formatTerminalLiveStatusLine()).toContain('idle:loop');
+        expect(formatTerminalLiveStatusLine()).toContain('conversa ativa');
         expect(formatTerminalLiveStatusLine()).not.toContain('processing:loop');
+        expect(formatTerminalLiveStatusLine()).not.toContain('idle:loop');
     });
 
     it('não mantém heartbeat para atividade concluída quando runtime aguarda input', async () => {
@@ -245,6 +246,25 @@ describe('terminal/live-status-line', () => {
         expect(line).toContain('auto/high');
         expect(line).not.toContain('LLM-B trabalhando');
         expect(line.length).toBeLessThan(90);
+    });
+
+    it('humaniza estado de boot sem stopped:noloop ou starting:noloop', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'boot',
+            label: 'Preparando terminal',
+            detail: '',
+            toolName: null,
+        };
+        mocks.runtime = { ...mocks.runtime, status: 'starting', dialogLoopActive: false };
+
+        const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:12.000-03:00') });
+
+        expect(line).toContain('iniciando');
+        expect(line).not.toContain('starting:noloop');
+        expect(line).not.toContain('stopped:noloop');
     });
 
     it('compacta estado turn sem repetir detalhe longo', async () => {

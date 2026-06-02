@@ -65,6 +65,7 @@ Common options:
   --live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error|file-write-roundtrip>
   --structured-input-cycle
   --menu-cycle
+  --ux-cycle
   --reuse-sdk-session
   --timeout-ms=<ms>
   --transport=<pty|stdio>
@@ -1577,6 +1578,8 @@ async function runStructuredInputCycleLiveTest({ outDir, requestedTransport, tim
 
 function menuCycleCriteria(boot) {
     const plain = String(boot?.plain ?? '');
+    const menuStartIndex = plain.indexOf('Painel de ações');
+    const menuPlain = menuStartIndex >= 0 ? plain.slice(menuStartIndex) : plain;
     return [
         {
             id: 'menu-cycle-ready',
@@ -1585,14 +1588,16 @@ function menuCycleCriteria(boot) {
         },
         {
             id: 'menu-cycle-compact-table',
-            pass: /Command Palette/u.test(plain) && /\[01\]\s+Status completo\s+\/status/iu.test(plain),
+            pass: /Painel de ações/u.test(plain) && /\[01\]\s+Status completo\s+\/status/iu.test(plain),
             detail: '/menu rendered a compact one-line-per-action table',
         },
         {
             id: 'menu-cycle-human-copy',
             pass:
-                /pergunta pendente/iu.test(plain) &&
-                !/pending question|troubleshooting|Command Palette \(Terminal Smart UX\)|╔|╚/iu.test(plain),
+                /pergunta pendente/iu.test(menuPlain) &&
+                !/pending question|troubleshooting|Command Palette|Health|binding|prompt freshness|billing|╔|╚/iu.test(
+                    menuPlain,
+                ),
             detail: '/menu default copy avoided old technical English and decorative box chrome',
         },
         {
@@ -1654,6 +1659,126 @@ async function runMenuCycleLiveTest({ outDir, requestedTransport, timeoutMs, ter
             '',
             `- raw: ${path.relative(ROOT, path.join(outDir, 'menu-cycle.raw.log'))}`,
             `- plain: ${path.relative(ROOT, path.join(outDir, 'menu-cycle.plain.log'))}`,
+            '',
+        ].join('\n'),
+        'utf8',
+    );
+    return summary;
+}
+
+function defaultUxCycleCriteria(boot) {
+    const plain = String(boot?.plain ?? '');
+    const helpStart = plain.indexOf('Ajuda rápida');
+    const statusStart = plain.indexOf('Status do Terminal LLM-B');
+    const nowStart = plain.indexOf('[agora]');
+    const waitsStart = plain.indexOf('Esperas humanas');
+    const defaultSurface = [helpStart, statusStart, nowStart, waitsStart]
+        .filter((index) => index >= 0)
+        .sort((a, b) => a - b)
+        .map((index, position, indexes) => plain.slice(index, indexes[position + 1] ?? plain.length))
+        .join('\n');
+    return [
+        {
+            id: 'ux-cycle-ready',
+            pass: /LLM-B pronta/u.test(plain),
+            detail: 'terminal reached ready state before opening default UX surfaces',
+        },
+        {
+            id: 'ux-cycle-help-compact',
+            pass:
+                /Ajuda rápida[\s\S]*Situação agora[\s\S]*Catálogo completo\s+\/help full/iu.test(plain) &&
+                !/╔|╚|binding\/frescor|CommandDefinition/iu.test(defaultSurface),
+            detail: '/help default rendered the compact human guide and kept the old catalog behind /help full',
+        },
+        {
+            id: 'ux-cycle-boot-human-copy',
+            pass:
+                /Preparando terminal/iu.test(plain) &&
+                /ferramentas locais ativas/iu.test(plain) &&
+                !/Subindo servidor copilot|runtime do agente|stopped:noloop|starting:noloop|\bTools\s+locais|\b0 tools\b/iu.test(
+                    plain,
+                ),
+            detail: 'default boot copy avoided raw server/runtime/tools labels and raw loop tails',
+        },
+        {
+            id: 'ux-cycle-status-compact',
+            pass:
+                /Status do Terminal LLM-B[\s\S]*Conversa[\s\S]*Entrada[\s\S]*Detalhe\s+\/status full/iu.test(plain) &&
+                !/prompt digest|tools load|runtime id|billing\/modelo/iu.test(defaultSurface),
+            detail: '/status default rendered a human decision panel instead of the full diagnostic dump',
+        },
+        {
+            id: 'ux-cycle-now-human',
+            pass: /\[agora\][\s\S]*conversa[\s\S]*sem pendências humanas/iu.test(plain) && !/\[now\]\s+runtime=/iu.test(defaultSurface),
+            detail: '/now default rendered human labels instead of runtime key-value telemetry',
+        },
+        {
+            id: 'ux-cycle-waits-human',
+            pass:
+                /Esperas humanas[\s\S]*nenhuma pendência[\s\S]*Sem bloqueios de input humano do SDK/iu.test(plain) &&
+                !/SDK Waits|ask_user=|request_user_input=/u.test(defaultSurface),
+            detail: '/sdk waits default rendered human waits without raw SDK tool names',
+        },
+        {
+            id: 'ux-cycle-clean-close',
+            pass: boot.exitCode === 0 && /readline fechado/u.test(plain),
+            detail: 'terminal closed cleanly after default UX cycle',
+        },
+    ];
+}
+
+async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+    const boot = await runSessionCycleBoot({
+        id: 'default-ux-cycle',
+        label: 'default human UX surfaces',
+        outDir,
+        commands: [
+            { line: '/help', advanceAfterMs: 1_000 },
+            { line: '/status', advanceAfterMs: 1_000 },
+            { line: '/now', advanceAfterMs: 1_000 },
+            { line: '/sdk waits', advanceAfterMs: 1_000 },
+            '/quit',
+        ],
+        terminalPort,
+        requestedTransport,
+        timeoutMs,
+    });
+    const criteria = defaultUxCycleCriteria(boot);
+    const durationMs = Date.now() - Date.parse(startedAt);
+    const ok = criteria.every((criterion) => criterion.pass);
+    const summary = {
+        ok,
+        startedAt,
+        durationMs,
+        terminalPort,
+        boot: {
+            id: boot.id,
+            label: boot.label,
+            exitCode: boot.exitCode,
+            sessionId: boot.sessionId || null,
+            transport: boot.transport,
+        },
+        criteria,
+    };
+    await writeFile(path.join(outDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    await writeFile(
+        path.join(outDir, 'summary.md'),
+        [
+            '# Terminal LLM-B Default UX Live Test',
+            '',
+            `Started: ${startedAt}`,
+            `Duration: ${durationMs}ms`,
+            `Status: ${ok ? 'PASS' : 'FAIL'}`,
+            `Terminal port: ${terminalPort}`,
+            '',
+            '## Criteria',
+            '',
+            ...criteria.map((criterion) => `- ${criterion.pass ? '[x]' : '[ ]'} ${criterion.id}: ${criterion.detail}`),
+            '',
+            '## Logs',
+            '',
+            `- raw: ${path.relative(ROOT, path.join(outDir, 'default-ux-cycle.raw.log'))}`,
+            `- plain: ${path.relative(ROOT, path.join(outDir, 'default-ux-cycle.plain.log'))}`,
             '',
         ].join('\n'),
         'utf8',
@@ -1751,11 +1876,13 @@ function liveScenarioKind({
     sessionCycle,
     structuredInputCycle,
     menuCycle,
+    uxCycle,
     liveScenario,
 }) {
     if (sessionCycle) return 'session_cycle';
     if (structuredInputCycle) return 'structured_input_cycle';
     if (menuCycle) return 'menu_cycle';
+    if (uxCycle) return 'default_ux_cycle';
     if (autoControlProbe) return 'auto_probe';
     if (byokFixture) return 'byok_fixture_no_pr';
     if (byokControlProbe) return 'byok_control_no_pr';
@@ -3826,6 +3953,7 @@ async function main() {
     const sessionCycle = hasFlag('--session-cycle');
     const structuredInputCycle = hasFlag('--structured-input-cycle');
     const menuCycle = hasFlag('--menu-cycle');
+    const uxCycle = hasFlag('--ux-cycle');
     const reuseSdkSession = hasFlag('--reuse-sdk-session');
     const byokProbe = hasFlag('--byok-probe');
     const byokFixture = hasFlag('--byok-fixture');
@@ -3844,6 +3972,7 @@ async function main() {
         sessionCycle,
         structuredInputCycle,
         menuCycle,
+        uxCycle,
         liveScenario,
     });
     const byokRealProfile = readArg('--byok-real-profile', '');
@@ -3980,6 +4109,20 @@ async function main() {
             startedAt,
         });
         console.log(`[terminal-live] menu summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`);
+        if (!summary.ok) process.exitCode = 1;
+        await byokFixtureProvider?.close();
+        return;
+    }
+
+    if (uxCycle) {
+        const summary = await runDefaultUxCycleLiveTest({
+            outDir,
+            requestedTransport,
+            timeoutMs,
+            terminalPort,
+            startedAt,
+        });
+        console.log(`[terminal-live] default ux summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`);
         if (!summary.ok) process.exitCode = 1;
         await byokFixtureProvider?.close();
         return;

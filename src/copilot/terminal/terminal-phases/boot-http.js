@@ -69,7 +69,7 @@ export async function runTerminalHttpServerPhase(ctx) {
         serverOpts.orchestrator = readTerminalHubOrchestrator();
         serverOpts.store = readTerminalHubStore();
     }
-    recordTerminalActivity('boot', 'Subindo servidor copilot', { source: 'terminal', recordHistory: false });
+    recordTerminalActivity('boot', 'Preparando terminal', { source: 'terminal', recordHistory: false });
     ctx.copilotServer = await startTerminalCopilotServerWithPortPolicy(ctx, serverOpts);
     if (ctx.copilotServer.port !== serverOpts.port) {
         recordTerminalActivity('boot', 'Inject server realocado', {

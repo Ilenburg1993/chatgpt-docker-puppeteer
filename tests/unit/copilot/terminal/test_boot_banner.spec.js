@@ -24,7 +24,7 @@ describe('terminal/terminal-phases/boot-banner', () => {
             true,
         );
         assert.equal(
-            view.lines.some((line) => line.includes('Tools') && line.includes('locais ativas')),
+            view.lines.some((line) => line.includes('Ações') && line.includes('ferramentas locais ativas')),
             true,
         );
         assert.equal(

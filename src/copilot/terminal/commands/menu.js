@@ -49,19 +49,19 @@ export function buildTerminalSmartMenuEntries() {
             id: 'status',
             label: 'Status completo',
             commandLine: '/status',
-            description: 'Health, loop, sessão, modelo efetivo e binding',
+            description: 'Saúde, conversa, sessão e modelo efetivo',
         },
         {
             id: 'now',
             label: 'Snapshot operacional',
             commandLine: '/now',
-            description: 'Fila, pergunta pendente e estado curto do runtime',
+            description: 'Fila, pergunta pendente e estado curto',
         },
         {
             id: 'activity',
             label: 'Atividade recente',
             commandLine: '/activity 15',
-            description: 'Últimos sinais úteis da conversa e das tools',
+            description: 'Últimos sinais úteis da conversa e das ferramentas',
         },
         {
             id: 'intent',
@@ -76,7 +76,7 @@ export function buildTerminalSmartMenuEntries() {
             id: 'metrics',
             label: 'Métricas da sessão',
             commandLine: '/metrics',
-            description: 'Latência, inject, prompt freshness e billing',
+            description: 'Latência, entrada HTTP, prompt e custo',
         },
     );
 
@@ -85,7 +85,7 @@ export function buildTerminalSmartMenuEntries() {
             id: 'restart',
             label: 'Reiniciar conversa',
             commandLine: '/restart',
-            description: 'Recupera loop inativo/parado',
+            description: 'Recupera conversa inativa ou parada',
             hot: true,
         });
     }
@@ -103,7 +103,7 @@ export function buildTerminalSmartMenuEntries() {
             id: 'pause-loop',
             label: 'Pausar conversa',
             commandLine: '/pause',
-            description: 'Pausa intake sem perder contexto',
+            description: 'Pausa entrada sem perder contexto',
         });
     }
 
@@ -190,7 +190,7 @@ export function buildTerminalSmartMenuEntries() {
         },
         {
             id: 'display-debug',
-            label: 'Preset de debug',
+            label: 'Preset de diagnóstico',
             commandLine: '/display preset debug',
             description: 'Ativa todos os sinais para diagnóstico',
         },
@@ -198,7 +198,7 @@ export function buildTerminalSmartMenuEntries() {
             id: 'errors',
             label: 'Erros recentes',
             commandLine: '/errors 20',
-            description: 'Últimas falhas observadas no terminal/runtime',
+            description: 'Últimas falhas observadas no terminal',
         },
         {
             id: 'help',
@@ -255,14 +255,14 @@ function padMenuCell(text, width) {
  * @returns {void}
  */
 function renderTerminalSmartMenu(println, entries) {
-    println(`\n  ${terminalThemeText('info', 'Command Palette')}`);
+    println(`\n  ${terminalThemeText('info', 'Painel de ações')}`);
     println(
         `  ${terminalThemeText('muted', `${entries.length} ações contextuais · execute com /menu <n> ou /menu <id>`)}\n`,
     );
     for (let i = 0; i < entries.length; i += 1) {
         const entry = /** @type {TerminalSmartMenuEntry} */ (entries[i]);
         const index = terminalThemeText('index', `[${String(i + 1).padStart(2, '0')}]`);
-        const hot = entry.hot ? `${terminalThemeBadge('hot', 'HOT')} ` : '    ';
+        const hot = entry.hot ? `${terminalThemeBadge('hot', 'AGIR')} ` : '     ';
         const label = padMenuCell(entry.label, 28);
         const command = padMenuCell(entry.commandLine, 24);
         const description = compactMenuCell(entry.description, 64);

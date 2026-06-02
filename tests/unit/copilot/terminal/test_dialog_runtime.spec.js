@@ -37,7 +37,7 @@ describe('terminal/dialog/dialog-runtime', () => {
         expect(src).toContain('Preparando agente');
         expect(src).toContain('Conectando conversa');
         expect(src).toContain('Retomando sessão sem prompt inicial');
-        expect(src).toContain('Inicializando runtime do agente');
+        expect(src).toContain('Inicializando ambiente da conversa');
         expect(src).not.toContain('println(\'\\x1b[90m  Iniciando AlwaysAliveAgent');
         expect(src).not.toContain('println(\'\\x1b[90m  Conectando ao agente');
         expect(src).not.toContain('println(\'\\x1b[90m  Reanexando sessão SDK');

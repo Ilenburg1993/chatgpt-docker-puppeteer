@@ -688,14 +688,14 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
         pendingElicitations.pending + permissionSummary.pending + userInputSummary.pending + structuredInputPending;
     const headlineColor = totalPending > 0 ? '\x1b[33m' : '\x1b[32m';
 
-    println(`\n  \x1b[36mSDK Waits\x1b[0m`);
+    println(`\n  \x1b[36mEsperas humanas\x1b[0m`);
     println(
-        `  status   ${headlineColor}${totalPending > 0 ? `${totalPending} pendencia(s)` : 'nenhuma pendencia'}\x1b[0m`,
+        `  estado   ${headlineColor}${totalPending > 0 ? `${totalPending} pendência(s)` : 'nenhuma pendência'}\x1b[0m`,
     );
     println(
         detail
             ? `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · request_user_input=${structuredInputPending}\x1b[0m`
-            : `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · pergunta=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · input=${structuredInputPending}\x1b[0m`,
+            : `  resumo   \x1b[90mformulários=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permissões=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · perguntas=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · inputs=${structuredInputPending}\x1b[0m`,
     );
 
     if (pendingElicitations.pending > 0) {
@@ -710,9 +710,7 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
         if (latest) {
             const choices = latest.choices.length > 0 ? ` choices=${latest.choices.join(' | ')}` : '';
             const freeform = latest.allowFreeform ? 'livre' : 'selecao obrigatoria';
-            println(
-                `  ask      \x1b[90m${formatAge(latest.createdAt)} - ${latest.kind} - ${freeform}${choices}\x1b[0m`,
-            );
+            println(`  pergunta \x1b[90m${formatAge(latest.createdAt)} - ${latest.kind} - ${freeform}${choices}\x1b[0m`);
             if (detail) println(`  id       \x1b[90m${latest.id}\x1b[0m`);
             println(`           ${compactText(latest.question, 220)}`);
         }
@@ -723,13 +721,13 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
             const choices = entry.choices.length > 0 ? ` choices=${entry.choices.join(' | ')}` : '';
             const freeform = entry.allowFreeform ? 'livre' : 'selecao obrigatoria';
             println(
-                `  input    \x1b[90m${formatAge(entry.createdAt)} - ${freeform}${choices}\x1b[0m`,
+                `  entrada  \x1b[90m${formatAge(entry.createdAt)} - ${freeform}${choices}\x1b[0m`,
             );
             if (detail) println(`  id       \x1b[90m${entry.requestId}\x1b[0m`);
             println(`           ${compactText(entry.question, 220)}`);
         }
         if (structuredInputs.length > 3) {
-            println(`  input    \x1b[90m+${structuredInputs.length - 3} input(s) estruturado(s) pendente(s)\x1b[0m`);
+            println(`  entrada  \x1b[90m+${structuredInputs.length - 3} input(s) estruturado(s) pendente(s)\x1b[0m`);
         }
     }
     if (totalPending === 0) {

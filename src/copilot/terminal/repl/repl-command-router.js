@@ -616,7 +616,7 @@ export const CMD_ROUTES = [
     [['gh'], (_, _2, rest) => _cmdGh({ println }, rest)],
     [['git'], (_, _2, rest) => _cmdGit({ println }, rest)],
     [['alias'], (_, _2, rest) => _cmdAlias({ println }, rest)],
-    [['help'], (ctx) => _cmdHelp({ println, injectPort: ctx.injectPort })],
+    [['help'], (ctx, arg) => _cmdHelp({ println, injectPort: ctx.injectPort }, arg)],
 ];
 
 /**

@@ -58,6 +58,20 @@ const DISABLED_BYOK_SUMMARY = Object.freeze({
 });
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderHumanTerminalStatus(value) {
+    const status = String(value ?? 'unknown');
+    if (status === 'waiting_for_input') return 'aguardando você';
+    if (status === 'idle') return 'ocioso';
+    if (status === 'processing') return 'trabalhando';
+    if (status === 'starting') return 'iniciando';
+    if (status === 'stopped') return 'parado';
+    return status;
+}
+
+/**
  * Referência ao _hubSessionId gerenciado pelo terminal server. É passado como parâmetro pois não pode ser importado
  * estaticamente (é mutável).
  *
@@ -75,7 +89,8 @@ const DISABLED_BYOK_SUMMARY = Object.freeze({
  * @returns {void}
  */
 export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
-    const { runtimeId } = extractRuntimeTarget(arg);
+    const { runtimeId, arg: restArg } = extractRuntimeTarget(arg);
+    const detailMode = /\b(full|detail|detalhe|debug|--full|--detail)\b/iu.test(restArg);
     const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
     const activityProjection = readTerminalActivityProjection(3);
     const projection = readTerminalStatusProjection(
@@ -91,6 +106,51 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const active = projection.dialogLoopActive;
     const statusColor =
         snap['status'] === 'waiting_for_input' ? '\x1b[32m' : snap['status'] === 'idle' ? '\x1b[33m' : '\x1b[31m';
+    if (!detailMode) {
+        const healthColor =
+            health?.['status'] === 'healthy' ? '\x1b[32m' : health?.['status'] === 'degraded' ? '\x1b[33m' : '\x1b[31m';
+        const waitCount =
+            projection.pendingElicitations +
+            projection.pendingPermissions +
+            projection.pendingUserInputs +
+            projection.pendingStructuredUserInputs;
+        const waitLine =
+            waitCount > 0
+                ? `\x1b[33m${waitCount} pendência(s)\x1b[0m \x1b[90m/sdk waits\x1b[0m`
+                : '\x1b[32mnenhuma pendência\x1b[0m';
+        const queue = Number(snap['queueSize'] ?? 0);
+        const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
+        const byokLabel = byok.enabled
+            ? `${byok.ready ? '\x1b[32mpronto\x1b[0m' : '\x1b[33mincompleto\x1b[0m'} \x1b[90m${byok.providerType ?? '-'} · ${byok.model ?? '-'}\x1b[0m`
+            : '\x1b[90mSDK Copilot\x1b[0m';
+        const modelBilling = projection.modelBilling;
+        const modelLabel = modelBilling.mismatch
+            ? `\x1b[33m${modelBilling.displayModel}\x1b[0m \x1b[90m(ver /status full)\x1b[0m`
+            : `\x1b[36m${modelBilling.displayModel}\x1b[0m`;
+        const gatewayProjection = configProjection.modelGatewayProjection ?? {
+            providerCount: 0,
+            modelCount: 0,
+            enabledModelCount: 0,
+        };
+        const rawAction = projection.recommendedAction === 'none' ? null : projection.recommendedAction;
+        const action = rawAction ?? (waitCount > 0 ? '/sdk waits' : '/menu');
+
+        println(`
+  \x1b[36mStatus do Terminal LLM-B\x1b[0m
+  ─────────────────────────────────────
+  Conversa     ${statusColor}${renderHumanTerminalStatus(snap['status'])}\x1b[0m · ${active ? '\x1b[32mativa\x1b[0m' : '\x1b[31minativa\x1b[0m'} · fila ${queue}
+  Saúde        ${health ? `${healthColor}${health['status']}\x1b[0m` : '\x1b[90msem leitura\x1b[0m'}
+  Entrada      ${waitLine}
+  Modelo       ${modelLabel} \x1b[90m· raciocínio ${configProjection.currentReasoningEffort}\x1b[0m
+  Acesso       ${byokLabel}
+  Catálogo     \x1b[90m${gatewayProjection.providerCount} provedores · ${gatewayProjection.modelCount} modelos · ${gatewayProjection.enabledModelCount} habilitados\x1b[0m
+  Atividade    \x1b[90m${projection.activity.label}${projection.activity.detail ? ` · ${projection.activity.detail}` : ''}\x1b[0m
+  Próximo      \x1b[33m${action}\x1b[0m
+  Detalhe      \x1b[90m/status full · /now · /health · /menu\x1b[0m
+  ─────────────────────────────────────
+`);
+        return;
+    }
     const effort = configProjection.currentReasoningEffort;
     const sdkMode = projection.sdkSessionMode ?? 'interactive';
     const sdkModeColor = sdkMode === 'plan' ? '\x1b[35m' : sdkMode === 'autopilot' ? '\x1b[36m' : '\x1b[90m';
@@ -430,7 +490,8 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
  * @returns {void}
  */
 export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
-    const { runtimeId } = extractRuntimeTarget(arg);
+    const { runtimeId, arg: restArg } = extractRuntimeTarget(arg);
+    const detailMode = /\b(full|detail|detalhe|debug|--full|--detail)\b/iu.test(restArg);
     const projection = readTerminalStatusProjection(
         withRuntimeTarget(
             {
@@ -480,6 +541,43 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
     };
     const gatewayActive =
         gatewayProjection.active && typeof gatewayProjection.active === 'object' ? gatewayProjection.active : null;
+
+    if (!detailMode) {
+        const waitCount =
+            projection.pendingElicitations +
+            projection.pendingPermissions +
+            projection.pendingUserInputs +
+            projection.pendingStructuredUserInputs;
+        const askLine = projection.pendingQuestion
+            ? `pergunta pendente (${projection.pendingQuestionKind ?? 'geral'})`
+            : projection.pendingQuestionShadowState
+              ? `pergunta salva (${projection.pendingQuestionShadowState})`
+              : 'sem pergunta pendente';
+        const waitLine =
+            waitCount > 0 ? `${waitCount} pendência(s) humanas · /sdk waits` : 'sem pendências humanas';
+        const modelLine = modelBilling.mismatch
+            ? `${modelBilling.displayModel} · revisar /status full`
+            : modelBilling.displayModel;
+        println(
+            `\x1b[36m[agora]\x1b[0m ${renderHumanTerminalStatus(state)} · conversa ${projection.dialogLoopActive ? 'ativa' : 'inativa'} · fila ${queue} · ${askLine}`,
+        );
+        println(
+            `\x1b[90m[agora]\x1b[0m entrada=${channel.label} · ${waitLine} · sse=${live.sse.clients}/${live.sse.criticalClients} · modelo=${modelLine}`,
+        );
+        if (gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0) {
+            println(
+                `\x1b[90m[agora]\x1b[0m catálogo=${gatewayProjection.providerCount} provedores · ${gatewayProjection.modelCount} modelos · ativo=${gatewayActive?.['modelId'] ?? '-'}`,
+            );
+        }
+        if (projection.activity?.label) {
+            const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';
+            println(`\x1b[90m[agora]\x1b[0m atividade=${projection.activity.label}${detail}`);
+        }
+        if (projection.recommendedAction && projection.recommendedAction !== 'none') {
+            println(`\x1b[90m[agora]\x1b[0m próximo=${projection.recommendedAction}`);
+        }
+        return;
+    }
 
     println(
         `\x1b[36m[now]\x1b[0m runtime=${projection.runtimeId} live=${live.state} status=${state} loop=${projection.dialogLoopActive ? 'on' : 'off'} channel=${channel.state} mode=${mode} queue=${queue} ${ask}${sdkWait ? ` ${sdkWait}` : ''} timeline=${projection.timelineSource}:${projection.timelineReconciliationStatus}:sync=${projection.timelineSyncStatus} sse=${live.sse.clients}/${live.sse.criticalClients} ${mismatchLabel}`,

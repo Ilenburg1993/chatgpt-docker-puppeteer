@@ -15,12 +15,40 @@
  */
 
 /**
- * Exibe ajuda completa dos comandos do terminal.
+ * Exibe ajuda curta dos comandos do terminal por padrão; `/help full` preserva o catálogo completo.
  *
+ * @param {SessionContext} ctx
+ * @param {string} [arg]
+ * @returns {void}
+ */
+export function cmdHelp({ injectPort, println }, arg = '') {
+    const mode = arg.trim().toLowerCase();
+    if (mode === 'full' || mode === 'all' || mode === 'detail' || mode === 'detalhe') {
+        renderFullHelp({ injectPort, println });
+        return;
+    }
+
+    println(`
+  \x1b[36mAjuda rápida — Terminal LLM-B\x1b[0m
+  ─────────────────────────────────────
+  Situação agora        \x1b[33m/status\x1b[0m · \x1b[33m/now\x1b[0m · \x1b[33m/activity 10\x1b[0m
+  Conversa              texto livre · \x1b[33m/turn <msg>\x1b[0m · \x1b[33m/answer <texto>\x1b[0m
+  Ações guiadas         \x1b[33m/menu\x1b[0m · \x1b[33m/menu 1\x1b[0m · \x1b[33m/menu status\x1b[0m
+  Arquivos              \x1b[33m@caminho\x1b[0m · \x1b[33m/fs list\x1b[0m · \x1b[33m/fs read <path>\x1b[0m · \x1b[33m/search <termo>\x1b[0m
+  Modelo e acesso       \x1b[33m/byok status\x1b[0m · \x1b[33m/byok recommend\x1b[0m · \x1b[33m/sdk quota\x1b[0m
+  Esperas humanas       \x1b[33m/sdk waits\x1b[0m · \x1b[33m/elicitation show latest\x1b[0m · \x1b[33m/permission show latest\x1b[0m
+  Diagnóstico           \x1b[33m/health\x1b[0m · \x1b[33m/errors 20\x1b[0m · \x1b[33m/display preset focus\x1b[0m
+  Catálogo completo     \x1b[90m/help full\x1b[0m
+  HTTP local            \x1b[90mporta ${injectPort}: /inject · /events · /sessions\x1b[0m
+  ─────────────────────────────────────
+`);
+}
+
+/**
  * @param {SessionContext} ctx
  * @returns {void}
  */
-export function cmdHelp({ injectPort, println }) {
+function renderFullHelp({ injectPort, println }) {
     println(`
   \x1b[36m╔═══════════════════════ Terminal LLM-B — Ajuda ═══════════════════════╗\x1b[0m
 

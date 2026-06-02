@@ -73,11 +73,12 @@ describe('terminal/commands/menu', () => {
 
         await cmdMenu({ println: ctx.println });
 
-        expect(ctx.output()).toContain('Command Palette');
+        expect(ctx.output()).toContain('Painel de ações');
         expect(ctx.output()).toContain('[01]');
         expect(ctx.output()).toContain('/status');
         expect(ctx.output()).toContain('pergunta pendente');
         expect(ctx.output()).not.toContain('pending question');
+        expect(ctx.output()).not.toContain('Command Palette');
     });
 
     it('inclui ações HOT para pending question/contexto alto/loop inativo', () => {

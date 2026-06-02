@@ -628,7 +628,7 @@ async function _tryStartDialogLoop() {
 
     if (status === 'stopped') {
         recordTerminalActivity('boot', 'Iniciando agente', {
-            detail: 'Inicializando runtime do agente',
+            detail: 'Inicializando ambiente da conversa',
             source: 'dialog',
         });
         println('\x1b[90m  Preparando agente…\x1b[0m');

@@ -148,13 +148,13 @@ export function buildTerminalAutoBrief(input = {}) {
     const visibleWarnings = filterAutoBriefWarnings(guidance.warnings, { phase, ready });
     if (process.env['COPILOT_TERMINAL_AUTO_BRIEF'] !== AUTO_BRIEF_MODE_FULL) {
         const toolBits = [
-            `${projection.toolLoad.total} tools`,
+            `${projection.toolLoad.total} ferramentas`,
             projection.toolLoad.hasCanonicalLocalFsTools ? 'fs' : null,
             projection.toolLoad.hasCanonicalLocalExecTools ? 'exec' : null,
             projection.toolLoad.toolContract.ok ? null : `${projection.toolLoad.toolContract.errorCount} contrato`,
         ].filter(Boolean);
         lines.push(
-            briefLine('Sessão', `${model}/${reasoning} · ${sessionTag} · ${displayPreset} · ${toolBits.join(' · ') || 'tools subindo'}`),
+            briefLine('Sessão', `${model}/${reasoning} · ${sessionTag} · ${displayPreset} · ${toolBits.join(' · ') || 'ferramentas subindo'}`),
         );
         if (byok.enabled) {
             lines.push(
@@ -165,7 +165,7 @@ export function buildTerminalAutoBrief(input = {}) {
             );
         }
         lines.push(briefLine('Fluxo', `${guidance.mode} · próximo ${guidance.nextCommand ?? '/status'}`));
-        if (!ready) lines.push(briefLine('Boot', 'parcial · aguardando registry/dialog'));
+        if (!ready) lines.push(briefLine('Boot', 'parcial · preparando ferramentas/conversa'));
         if (visibleWarnings.length > 0) lines.push(briefLine('Atenção', visibleWarnings.join(' | ')));
         return { phase, ready, fingerprint: buildAutoBriefFingerprint(projection), lines };
     }

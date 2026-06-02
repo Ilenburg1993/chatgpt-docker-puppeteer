@@ -32,8 +32,8 @@ export function buildTerminalStandaloneBannerView(opts, deps = {}) {
     const warnings = Array.isArray(bootPreflight?.warnings) ? bootPreflight.warnings : [];
 
     const modeLine = isStandalone
-        ? 'local · MCP remoto ausente · tools locais ativas'
-        : `MCP conectado · ${Number(mcp.toolCount ?? 0)} tools remotas`;
+        ? 'local · MCP remoto ausente · ferramentas locais ativas'
+        : `MCP conectado · ${Number(mcp.toolCount ?? 0)} ferramentas remotas`;
     /** @type {string[]} */
     const lines = [
         '',
@@ -44,7 +44,7 @@ export function buildTerminalStandaloneBannerView(opts, deps = {}) {
     ];
 
     if (isStandalone) {
-        lines.push('  Tools     locais ativas · detalhes em /tools ou /health');
+        lines.push('  Ações     ferramentas locais ativas · detalhes em /tools ou /health');
         lines.push('');
     }
     if (warnings.length > 0) {

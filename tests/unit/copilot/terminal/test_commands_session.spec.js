@@ -416,9 +416,26 @@ describe('commands/session — sync commands', () => {
         altRuntime.pendingQuestionKind = null;
     });
 
-    it('cmdStatus imprime status do agente', () => {
+    it('cmdStatus imprime painel humano compacto por padrão', () => {
         const ctx = mockCtx();
         cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
+        expect(ctx.println).toHaveBeenCalled();
+        expect(ctx.output()).toContain('Status do Terminal LLM-B');
+        expect(ctx.output()).toContain('Conversa');
+        expect(ctx.output()).toContain('Entrada');
+        expect(ctx.output()).toContain('Detalhe');
+        expect(ctx.output()).toContain('/status full');
+        expect(ctx.output()).toContain('gpt-5-mini');
+        expect(ctx.output()).toContain('healthy');
+        expect(ctx.output()).not.toContain('Próximo      \x1b[33mnone');
+        expect(ctx.output()).not.toContain('prompt digest');
+        expect(ctx.output()).not.toContain('tools load');
+        expect(ctx.output()).not.toContain('runtime id');
+    });
+
+    it('cmdStatus full preserva diagnóstico completo do agente', () => {
+        const ctx = mockCtx();
+        cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, 'full');
         expect(ctx.println).toHaveBeenCalled();
         expect(ctx.output()).toContain('gpt-5-mini');
         expect(ctx.output()).toContain('healthy');
@@ -455,13 +472,14 @@ describe('commands/session — sync commands', () => {
         const statusCtx = mockCtx();
         const nowCtx = mockCtx();
 
-        cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: statusCtx.println });
+        cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: statusCtx.println }, 'full');
         cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: nowCtx.println });
 
         expect(statusCtx.output()).toContain('standby sem READY vivo');
         expect(statusCtx.output()).toContain('recovery sob demanda');
-        expect(nowCtx.output()).toContain('live=ready');
-        expect(nowCtx.output()).toContain('channel=standby');
+        expect(nowCtx.output()).toContain('[agora]');
+        expect(nowCtx.output()).toContain('conversa ativa');
+        expect(nowCtx.output()).toContain('standby sem READY vivo');
     });
 
     it('cmdStatus destaca mismatch de modelo cobrado/configurado', () => {
@@ -474,13 +492,25 @@ describe('commands/session — sync commands', () => {
             cost: 0.33,
         };
         const ctx = mockCtx();
-        cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
+        cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, 'full');
         expect(ctx.output()).toContain('mismatch');
         expect(ctx.output()).toContain('cobrado=claude-haiku-4.5');
         defaultRuntime.lastPrInfo = prev ?? null;
     });
 
-    it('cmdNow imprime snapshot operacional compacto', () => {
+    it('cmdNow imprime snapshot operacional humano por padrão', () => {
+        const ctx = mockCtx();
+        cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
+        expect(ctx.output()).toContain('[agora]');
+        expect(ctx.output()).toContain('conversa');
+        expect(ctx.output()).toContain('sem pendências humanas');
+        expect(ctx.output()).not.toContain('próximo=none');
+        expect(ctx.output()).not.toContain('runtime=');
+        expect(ctx.output()).not.toContain('ASK:none');
+        expect(ctx.output()).not.toContain('PM:approve_all');
+    });
+
+    it('cmdNow full preserva snapshot operacional técnico', () => {
         const previousEnv = {
             COPILOT_BYOK_ENABLED: process.env.COPILOT_BYOK_ENABLED,
             COPILOT_BYOK_PROVIDER_PRESET: process.env.COPILOT_BYOK_PROVIDER_PRESET,
@@ -493,7 +523,7 @@ describe('commands/session — sync commands', () => {
         process.env.COPILOT_BYOK_API_KEY = 'test-byok-key-that-must-not-render';
         const ctx = mockCtx();
         try {
-            cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
+            cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, 'full');
             expect(ctx.output()).toContain('[now]');
             expect(ctx.output()).toContain('runtime=default');
             expect(ctx.output()).toContain('live=');
@@ -526,7 +556,7 @@ describe('commands/session — sync commands', () => {
 
     it('cmdStatus aceita runtimeId explícito na sintaxe do REPL', () => {
         const ctx = mockCtx();
-        cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, '--runtime alt');
+        cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, '--runtime alt full');
         expect(ctx.output()).toContain('runtime id');
         expect(ctx.output()).toContain('alt');
         expect(ctx.output()).toContain('gpt-4.1-mini');
@@ -535,7 +565,7 @@ describe('commands/session — sync commands', () => {
 
     it('cmdStatus avisa quando o runtime solicitado cai em fallback para o default', () => {
         const ctx = mockCtx();
-        cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, '--runtime missing');
+        cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, '--runtime missing full');
         expect(ctx.output()).toContain('runtime default (default)');
     });
 

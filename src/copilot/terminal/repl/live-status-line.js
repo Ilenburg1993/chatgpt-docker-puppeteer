@@ -65,7 +65,11 @@ function extractNoDeltaStatus(detail) {
  * @returns {string}
  */
 function compactRuntimeStatus(status, loop) {
-    if (!status || status === 'processing') return loop;
+    if (status === 'starting') return 'iniciando';
+    if (status === 'stopped') return 'conversa parada';
+    if (status === 'idle' && loop === 'loop') return 'conversa ativa';
+    if (status === 'processing' && loop === 'loop') return 'conversa ativa';
+    if (!status || status === 'processing') return loop === 'loop' ? 'conversa ativa' : 'trabalhando';
     return `${status}:${loop}`;
 }
 

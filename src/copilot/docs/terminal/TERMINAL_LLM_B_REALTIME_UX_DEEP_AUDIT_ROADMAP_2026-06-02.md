@@ -984,13 +984,18 @@
   - `/menu` agora renderiza uma tabela compacta de uma linha por ação;
   - indices passaram para `[01]`, `[02]`, ... para alinhamento estavel;
   - label, comando e descricao sao aparados por coluna;
-  - `HOT` permanece visivel sem criar linha extra;
-  - descricoes foram humanizadas para `pergunta pendente`, `conversa`, `tools` e `diagnostico`;
+  - o marcador de acao passou de `HOT` para `AGIR`, sem criar linha extra;
+  - o titulo passou de `Command Palette` para `Painel de ações`;
+  - descricoes foram humanizadas para `pergunta pendente`, `conversa`, `ferramentas` e `diagnostico`;
+  - termos de engenharia como `Health`, `binding`, `prompt freshness`, `billing`, `pending question` e `troubleshooting` foram removidos da superficie padrao do menu;
   - footer mostra atalhos `/menu 1`, `/menu status` e `/menu help`.
 - Testes escopados executados:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_menu.spec.js`
   - status PASS;
   - 1 arquivo, 5 testes.
+- Validadores adicionais:
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`
+  - status PASS.
 - Evidencia live executada:
   - comando:
     - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --menu-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/menu-compact-cycle-20260602-0817`
@@ -1002,6 +1007,100 @@
   - status PASS;
   - duracao 5677ms;
   - criterios `menu-cycle-compact-table`, `menu-cycle-human-copy`, `menu-cycle-quick-actions` e `menu-cycle-clean-close` passaram.
+- Evidencia live PT-BR executada:
+  - comando:
+    - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --menu-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/menu-compact-ptbr-cycle-20260602-0827`
+  - artefatos:
+    - `artifacts/terminal-live/menu-compact-ptbr-cycle-20260602-0827/summary.md`
+    - `artifacts/terminal-live/menu-compact-ptbr-cycle-20260602-0827/summary.json`
+    - `artifacts/terminal-live/menu-compact-ptbr-cycle-20260602-0827/menu-cycle.raw.log`
+    - `artifacts/terminal-live/menu-compact-ptbr-cycle-20260602-0827/menu-cycle.plain.log`
+  - status PASS;
+  - duracao 5130ms;
+  - criterio `menu-cycle-human-copy` agora mede a secao do `/menu` em vez de reprovar por rotulos tecnicos de boot que pertencem a outro alvo de UX.
+
+## 02.35 Superficies padrao compactas
+
+- Problema observado:
+  - `/help` abria uma caixa enorme com todos os comandos e misturava termos como `binding`, `runtime`, `health`, `billing` e `CommandDefinition`;
+  - `/status` despejava diagnostico completo por padrao, incluindo ids, prompt digest, contrato de tools, billing e detalhes internos;
+  - `/now` usava pares tecnico-operacionais como `runtime=`, `live=`, `ASK:none`, `PM:approve_all`;
+  - `/sdk waits` ainda era renderizado como `SDK Waits` e misturava `elicitation`, `permission`, `ask_user` e `request_user_input` no modo padrao;
+  - esses quatro comandos apareciam nas capturas como uma superficie visual pesada e pouco alinhada com o operador humano.
+- Situacao ideal definida:
+  - comandos padrao devem responder a pergunta humana "o que eu preciso saber agora?";
+  - diagnostico tecnico deve continuar disponivel, mas atras de `full`, `detail` ou comandos explicitamente diagnosticos;
+  - comandos de espera humana devem parecer uma fila de decisao humana, nao um dump de tools;
+  - o terminal deve evitar rótulos crus quando existe tradução operacional clara.
+- Mudancas aplicadas:
+  - `/help` passou a exibir `Ajuda rápida — Terminal LLM-B` por padrao;
+  - `/help full`, `/help all`, `/help detail` e `/help detalhe` preservam o catalogo completo antigo;
+  - o roteador REPL passou a encaminhar argumentos para `/help`;
+  - `/status` passou a exibir painel compacto por padrao com `Conversa`, `Saúde`, `Entrada`, `Modelo`, `Acesso`, `Catálogo`, `Atividade`, `Próximo` e `Detalhe`;
+  - `/status full`, `/status detail`, `/status detalhe` e `/status --detail` preservam o diagnostico completo anterior;
+  - `/status` evita expor `Próximo none`; sem acao obrigatoria, sugere `/menu`;
+  - `/now` passou a renderizar `[agora]` com linguagem humana por padrao;
+  - `/now full` preserva a linha tecnica antiga com `runtime=`, `live=`, `ASK`, `PM`, `timeline` e `sse`;
+  - `/now` deixou de emitir `próximo=none`;
+  - `/sdk waits` passou de `SDK Waits` para `Esperas humanas`;
+  - `/sdk waits` default usa `formulários`, `permissões`, `perguntas` e `inputs`;
+  - `/sdk waits detail` continua expondo `ask_user` e `request_user_input` para diagnostico.
+- Testes escopados executados:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_help.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js`
+  - status PASS;
+  - 4 arquivos, 87 testes.
+- Validadores de sintaxe executados:
+  - `node --check src/copilot/terminal/commands/help.js`
+  - `node --check src/copilot/terminal/commands/session.js`
+  - `node --check src/copilot/terminal/commands/sdk.js`
+  - `node --check src/copilot/terminal/repl/repl-command-router.js`
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`
+  - status PASS.
+- Evidencia live executada:
+  - comando:
+    - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/default-ux-cycle-human-boot-criteria-20260602-0850`
+  - artefatos:
+    - `artifacts/terminal-live/default-ux-cycle-human-boot-criteria-20260602-0850/summary.md`
+    - `artifacts/terminal-live/default-ux-cycle-human-boot-criteria-20260602-0850/summary.json`
+    - `artifacts/terminal-live/default-ux-cycle-human-boot-criteria-20260602-0850/default-ux-cycle.raw.log`
+    - `artifacts/terminal-live/default-ux-cycle-human-boot-criteria-20260602-0850/default-ux-cycle.plain.log`
+  - status PASS;
+  - duracao 7617ms;
+  - criterios `ux-cycle-help-compact`, `ux-cycle-boot-human-copy`, `ux-cycle-status-compact`, `ux-cycle-now-human`, `ux-cycle-waits-human` e `ux-cycle-clean-close` passaram.
+  - a tela final mostra `Próximo /menu` em vez de `Próximo none` e omite `próximo=none` em `/now`.
+
+## 02.36 Boot humano e linha viva sem cauda crua
+
+- Problema observado:
+  - a primeira linha viva mostrava `Subindo servidor copilot` e `stopped:noloop`;
+  - o segundo pulso mostrava `Inicializando runtime do agente` e `starting:noloop`;
+  - o banner de modo local mostrava `Tools locais ativas`;
+  - o auto-brief inicial mostrava `0 tools` e `aguardando registry/dialog`.
+- Mudancas aplicadas:
+  - a fase HTTP passou a registrar `Preparando terminal`;
+  - o lifecycle do agente passou a detalhar `Inicializando ambiente da conversa`;
+  - `compactRuntimeStatus()` passou a humanizar `stopped:noloop` como `conversa parada` e `starting:noloop` como `iniciando`;
+  - o banner de ambiente passou a usar `ferramentas locais ativas`;
+  - a linha `Tools` do boot passou para `Ações`;
+  - o auto-brief passou a usar `ferramentas`, `ferramentas subindo` e `preparando ferramentas/conversa`.
+- Testes escopados executados:
+  - `npx vitest run tests/unit/copilot/terminal/test_boot_banner.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js tests/unit/copilot/terminal/test_auto_brief.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js`
+  - status PASS;
+  - 4 arquivos, 19 testes.
+- Validadores de sintaxe executados:
+  - `node --check src/copilot/terminal/terminal-phases/boot-banner.js`
+  - `node --check src/copilot/terminal/terminal-phases/boot-http.js`
+  - `node --check src/copilot/terminal/dialog/engine.js`
+  - `node --check src/copilot/terminal/repl/auto-brief.js`
+  - `node --check src/copilot/terminal/repl/live-status-line.js`
+  - status PASS.
+- Evidencia live:
+  - incluida no ciclo `default-ux-cycle-human-boot-criteria-20260602-0850`;
+  - o criterio `ux-cycle-boot-human-copy` bloqueia regressao de `Subindo servidor copilot`, `runtime do agente`, `stopped:noloop`, `starting:noloop`, `Tools locais` e `0 tools`.
+- Gap residual:
+  - boot ainda mostra `tools locais`, `runtime do agente` e alguns termos tecnicos;
+  - o status compacto ainda pode ganhar badges visuais melhores para `Saúde`, `Entrada` e `Acesso`;
+  - a superficie `/live` segue diagnostica demais e deve ganhar modo humano padrao depois.
 
 ## 03. Achados principais
 
