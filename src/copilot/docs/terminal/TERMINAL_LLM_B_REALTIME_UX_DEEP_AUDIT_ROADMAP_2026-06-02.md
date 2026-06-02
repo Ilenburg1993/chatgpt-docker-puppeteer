@@ -2617,3 +2617,12 @@
 - [x] Teste escopado passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
 - [ ] Próxima lacuna: revisar se `/status` compacto deve migrar totalmente para tema, removendo os ANSI locais remanescentes sem perder contraste rápido.
+
+### 11.34 Barrel estreito de tema e polimento BYOK residual
+
+- [x] Achado: a tentativa de importar tema via `state/index.js`/`state/ui` em comandos isolados pode puxar estado amplo e quebrar mocks escopados.
+- [x] Criado `src/copilot/terminal/state/theme/index.js` como barrel estreito apenas para primitivas visuais.
+- [x] `/byok gateway catalog refresh plan` removeu uma linha residual com ANSI local e passou a renderizar `Importers`, `Executar`, `Adiar` e `Comando` com `terminalThemeRow`.
+- [x] Teste escopado BYOK passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js`.
+- [ ] Próxima lacuna: migrar outros comandos que só precisam de tema para o barrel estreito, reduzindo acoplamento acidental em testes e cold start.

@@ -125,6 +125,7 @@ import {
     persistTerminalByokGatewayAutoEffectApplications,
     runTerminalByokGatewayPostTurnAutomation,
 } from '../byok/index.js';
+import { terminalThemeRow } from '../state/theme/index.js';
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
 const DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT = 8;
@@ -2830,19 +2831,31 @@ async function renderByokGatewayCatalogRefreshPlan(println, selector = null) {
         sources: snapshot.sources,
     });
     println(
-        `    \x1b[90mImporters avaliados ${plan.importerCount} · executar agora ${plan.selected.length} · adiar ${plan.skipped.length} · fontes conhecidas ${plan.sourceCount}\x1b[0m`,
+        terminalThemeRow(
+            'Importers',
+            `avaliados ${plan.importerCount} · executar agora ${plan.selected.length} · adiar ${plan.skipped.length} · fontes conhecidas ${plan.sourceCount}`,
+        ),
     );
     for (const item of plan.selected.slice(0, 16)) {
         println(
-            `      \x1b[32mexecutar\x1b[0m ${item.sourceId} \x1b[90mprovider ${item.providerId} · motivo ${item.reason} · TTL ${formatTerminalDurationSeconds(item.ttlSeconds)} · idade ${formatTerminalDurationSeconds(item.ageSeconds)}\x1b[0m`,
+            terminalThemeRow(
+                'Executar',
+                `${item.sourceId} · provedor ${item.providerId} · motivo ${item.reason} · TTL ${formatTerminalDurationSeconds(item.ttlSeconds)} · idade ${formatTerminalDurationSeconds(item.ageSeconds)}`,
+                { role: 'success' },
+            ),
         );
     }
     for (const item of plan.skipped.slice(0, 16)) {
         println(
-            `      \x1b[90madiar ${item.sourceId} · provider ${item.providerId} · motivo ${item.reason} · TTL ${formatTerminalDurationSeconds(item.ttlSeconds)} · idade ${formatTerminalDurationSeconds(item.ageSeconds)}\x1b[0m`,
+            terminalThemeRow(
+                'Adiar',
+                `${item.sourceId} · provedor ${item.providerId} · motivo ${item.reason} · TTL ${formatTerminalDurationSeconds(item.ttlSeconds)} · idade ${formatTerminalDurationSeconds(item.ageSeconds)}`,
+            ),
         );
     }
-    println('\n  \x1b[90mUse npm run model-gateway:refresh -- --provider=<provider> --force para executar somente o provider desejado.\x1b[0m\n');
+    println('');
+    println(terminalThemeRow('Comando', 'npm run model-gateway:refresh -- --provider=<provider> --force'));
+    println('');
 }
 
 /**

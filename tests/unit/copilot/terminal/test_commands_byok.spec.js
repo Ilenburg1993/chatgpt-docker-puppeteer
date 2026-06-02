@@ -4071,7 +4071,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('executar');
         expect(ctx.output()).toContain('openrouter-models');
         expect(ctx.output()).toContain('source_ttl_expired');
-        expect(ctx.output()).toContain('adiar openai-models');
+        expect(ctx.output()).toContain('Adiar');
+        expect(ctx.output()).toContain('openai-models');
         expect(ctx.output()).not.toContain('selected=1');
     });
 
