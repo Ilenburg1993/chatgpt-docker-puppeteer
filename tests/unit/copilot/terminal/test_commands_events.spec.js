@@ -146,6 +146,81 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('req=req-123');
     });
 
+    it('mostra vínculo compacto entre eventos canônicos e transcript/export', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 3,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 20,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 187,
+                    event: 'assistant.message',
+                    source: 'sdk/assistant.message',
+                    eventSource: null,
+                    traceId: 'turn:1',
+                    turnId: '1',
+                    hubSessionId: null,
+                    payload: {
+                        content: 'DELTA-CANONICAL-8',
+                    },
+                },
+                {
+                    timestamp: 1710000001000,
+                    eventId: 204,
+                    event: 'user_input.requested',
+                    source: 'sdk/user_input.requested',
+                    eventSource: null,
+                    traceId: 'turn:1',
+                    turnId: '1',
+                    hubSessionId: null,
+                    payload: {
+                        requestId: 'ask-1',
+                        question: 'ASK-CANONICAL: responda SIM para fechar o teste',
+                    },
+                },
+                {
+                    timestamp: 1710000002000,
+                    eventId: 213,
+                    event: 'user_input.completed',
+                    source: 'sdk/user_input.completed',
+                    eventSource: null,
+                    traceId: 'turn:1',
+                    turnId: '1',
+                    hubSessionId: null,
+                    payload: {
+                        requestId: 'ask-1',
+                        content: 'SIM',
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '20');
+
+        expect(ctx.output()).toContain('transcript=LLM-B · export=envelope:sdk/assistant.message trace=turn:1 turn=1');
+        expect(ctx.output()).toContain(
+            'transcript=Sistema/ask_user · export=envelope:sdk/user_input.requested trace=turn:1 turn=1',
+        );
+        expect(ctx.output()).toContain(
+            'transcript=Usuário/ask_user · export=envelope:sdk/user_input.completed trace=turn:1 turn=1',
+        );
+    });
+
     it('emite JSON estruturado para automacao', async () => {
         const ctx = mockCtx();
 

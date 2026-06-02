@@ -31,6 +31,16 @@ const LIVE_PROTOCOL_PROBE_KINDS = Object.freeze(['live_tool_protocol', 'live_ask
 const LIVE_TURN_PROBE_KIND = 'live_turn';
 const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([...LIVE_PROTOCOL_PROBE_KINDS, LIVE_TURN_PROBE_KIND]);
 
+/**
+ * @typedef {{
+ *   event: string;
+ *   source: string | null;
+ *   traceId: string | null;
+ *   turnId: string | null;
+ *   eventId: number | null;
+ * }} CanonicalEventSummaryItem
+ */
+
 if (hasFlag('--help') || hasFlag('-h')) {
     console.log(`Usage: node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs [options]
 
@@ -1730,6 +1740,116 @@ function summarizeCanonicalToolLifecycle(events) {
     return summary;
 }
 
+/**
+ * @param {unknown} evt
+ * @param {Record<string, unknown>} payload
+ * @returns {CanonicalEventSummaryItem}
+ */
+function canonicalEventSummaryItem(evt, payload) {
+    return {
+        event: typeof evt?.event === 'string' ? evt.event : '',
+        source:
+            typeof payload?.source === 'string'
+                ? payload.source
+                : typeof payload?.eventSource === 'string'
+                  ? payload.eventSource
+                  : null,
+        traceId: typeof payload?.traceId === 'string' ? payload.traceId : null,
+        turnId:
+            typeof payload?.turnId === 'string'
+                ? payload.turnId
+                : typeof payload?.turnId === 'number'
+                  ? String(payload.turnId)
+                  : null,
+        eventId: eventPublicId(evt),
+    };
+}
+
+/**
+ * @param {unknown[]} events
+ * @returns {{
+ *   deltaAssistant: CanonicalEventSummaryItem | null;
+ *   askRequested: CanonicalEventSummaryItem | null;
+ *   askCompleted: CanonicalEventSummaryItem | null;
+ *   postAskAssistant: CanonicalEventSummaryItem | null;
+ * }}
+ */
+function summarizeCanonicalTranscriptEvents(events) {
+    /** @type {{
+     *   deltaAssistant: CanonicalEventSummaryItem | null;
+     *   askRequested: CanonicalEventSummaryItem | null;
+     *   askCompleted: CanonicalEventSummaryItem | null;
+     *   postAskAssistant: CanonicalEventSummaryItem | null;
+     * }}
+     */
+    const summary = {
+        deltaAssistant: null,
+        askRequested: null,
+        askCompleted: null,
+        postAskAssistant: null,
+    };
+    for (const evt of events) {
+        const payload = eventPayload(evt);
+        if (!payload) continue;
+        if (evt?.event === 'assistant.message') {
+            const content = typeof payload.content === 'string' ? payload.content : '';
+            if (!summary.deltaAssistant && /DELTA-CANONICAL-8/u.test(content)) {
+                summary.deltaAssistant = canonicalEventSummaryItem(evt, payload);
+            }
+            if (!summary.postAskAssistant && POST_ASK_FINAL_RE.test(content)) {
+                summary.postAskAssistant = canonicalEventSummaryItem(evt, payload);
+            }
+            continue;
+        }
+        if (evt?.event === 'user_input.requested') {
+            const question = typeof payload.question === 'string' ? payload.question : '';
+            if (!summary.askRequested && /ASK-CANONICAL:\s*responda SIM para fechar o teste/iu.test(question)) {
+                summary.askRequested = canonicalEventSummaryItem(evt, payload);
+            }
+            continue;
+        }
+        if (evt?.event === 'user_input.completed') {
+            const answer = typeof payload.answer === 'string' ? payload.answer : '';
+            if (!summary.askCompleted && /\bSIM\b/iu.test(answer)) {
+                summary.askCompleted = canonicalEventSummaryItem(evt, payload);
+            }
+        }
+    }
+    return summary;
+}
+
+/**
+ * @param {CanonicalEventSummaryItem | null} item
+ * @returns {string}
+ */
+function formatCanonicalEventSummary(item) {
+    if (!item) return '-';
+    return [
+        item.event || '-',
+        item.source ? `source=${item.source}` : null,
+        item.traceId ? `trace=${item.traceId}` : null,
+        item.turnId ? `turn=${item.turnId}` : null,
+        Number.isFinite(item.eventId) ? `#${item.eventId}` : null,
+    ]
+        .filter(Boolean)
+        .join(' ');
+}
+
+/**
+ * @param {null | { envelopes?: Array<{ source: string; traceId: string | null; turnId: string | null; eventId: string | null }> }} exportSummary
+ * @param {CanonicalEventSummaryItem | null} event
+ * @returns {boolean}
+ */
+function exportEnvelopeMatchesEvent(exportSummary, event) {
+    if (!event || !Array.isArray(exportSummary?.envelopes)) return false;
+    return exportSummary.envelopes.some((envelope) => {
+        if (event.source && envelope.source !== event.source) return false;
+        const traceMatches = event.traceId && envelope.traceId === event.traceId;
+        const turnMatches = event.turnId && envelope.turnId === event.turnId;
+        return Boolean(traceMatches || turnMatches);
+    });
+}
+
 function extractArchiveRawEvents(plain) {
     const entries = [];
     for (const line of plain.split('\n')) {
@@ -1922,7 +2042,12 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
     const markerCount = (plain.match(/DELTA-CANONICAL-\d/g) ?? []).length;
     const preEventsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b/i)[0] ?? plain;
     const archiveRawEvents = extractArchiveRawEvents(plain);
-    const canonicalToolLifecycle = summarizeCanonicalToolLifecycle([...sseSummary.events, ...archiveRawEvents]);
+    const canonicalEvents = [...sseSummary.events, ...archiveRawEvents];
+    const canonicalToolLifecycle = summarizeCanonicalToolLifecycle(canonicalEvents);
+    const canonicalTranscriptEvents = summarizeCanonicalTranscriptEvents(canonicalEvents);
+    const exportSseAskRequested = exportEnvelopeMatchesEvent(exportSummary, canonicalTranscriptEvents.askRequested);
+    const exportSseAskCompleted = exportEnvelopeMatchesEvent(exportSummary, canonicalTranscriptEvents.askCompleted);
+    const exportSsePostAsk = exportEnvelopeMatchesEvent(exportSummary, canonicalTranscriptEvents.postAskAssistant);
     const sseIds = summarizeSseEvents(sseSummary.events).ids;
     const archiveIds = archiveRawEvents.map((evt) => evt.eventId).filter((id) => Number.isFinite(id));
     const archiveSseOverlap = archiveIds.filter((id) => sseIds.includes(id));
@@ -2027,6 +2152,28 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
             id: 'post-ask-final-visible',
             pass: finalRenderedByLiveTurn || finalRenderedByAssistantMessage,
             detail: `post-ask final visible live=${finalRenderedByLiveTurn ? 'yes' : 'no'} assistant.message=${finalRenderedByAssistantMessage ? 'yes' : 'no'}`,
+        },
+        {
+            id: 'sse-canonical-transcript-events',
+            pass:
+                Boolean(canonicalTranscriptEvents.deltaAssistant) &&
+                Boolean(canonicalTranscriptEvents.askRequested) &&
+                Boolean(canonicalTranscriptEvents.askCompleted) &&
+                Boolean(canonicalTranscriptEvents.postAskAssistant),
+            detail:
+                `delta=${formatCanonicalEventSummary(canonicalTranscriptEvents.deltaAssistant)} · ` +
+                `ask=${formatCanonicalEventSummary(canonicalTranscriptEvents.askRequested)} · ` +
+                `answer=${formatCanonicalEventSummary(canonicalTranscriptEvents.askCompleted)} · ` +
+                `postAsk=${formatCanonicalEventSummary(canonicalTranscriptEvents.postAskAssistant)}`,
+        },
+        {
+            id: 'export-sse-correlation',
+            pass: Boolean(exportSummary?.ok) && exportSseAskRequested && exportSseAskCompleted && exportSsePostAsk,
+            detail:
+                `ask=${exportSseAskRequested ? 'matched' : 'missing'} · ` +
+                `answer=${exportSseAskCompleted ? 'matched' : 'missing'} · ` +
+                `postAsk=${exportSsePostAsk ? 'matched' : 'missing'} · ` +
+                `exportEnvelopes=${Array.isArray(exportSummary?.envelopes) ? exportSummary.envelopes.length : 0}`,
         },
         {
             id: 'llm-usage-visible',
@@ -2771,6 +2918,14 @@ function evaluateBlockedOutput(plain, sseSummary, blocker) {
 async function inspectExportedMarkdown(exportPath) {
     try {
         const content = await readFile(exportPath, 'utf8');
+        const envelopes = [...content.matchAll(/^>\s+envelope=([^·\n]+)\s+·\s+trace=([^·\n]+)\s+·\s+turn=([^·\n]+)\s+·\s+evento=([^\n]+)$/gmu)].map(
+            (match) => ({
+                source: match[1]?.trim() ?? '',
+                traceId: match[2]?.trim() && match[2]?.trim() !== '-' ? match[2].trim() : null,
+                turnId: match[3]?.trim() && match[3]?.trim() !== '-' ? match[3].trim() : null,
+                eventId: match[4]?.trim() && match[4]?.trim() !== '-' ? match[4].trim() : null,
+            }),
+        );
         return {
             ok: true,
             detail: `${content.length} chars`,
@@ -2782,6 +2937,7 @@ async function inspectExportedMarkdown(exportPath) {
             ),
             hasAskUserAnswer: /##\s+👤\s+Usu[aá]rio[\s\S]*Resposta ao ask_user:[\s\S]*\bSIM\b/iu.test(content),
             hasPostAskFinal: POST_ASK_FINAL_RE.test(content),
+            envelopes,
             content,
         };
     } catch (error) {
@@ -2794,6 +2950,7 @@ async function inspectExportedMarkdown(exportPath) {
             hasAskUser: false,
             hasAskUserAnswer: false,
             hasPostAskFinal: false,
+            envelopes: [],
             content: '',
         };
     }

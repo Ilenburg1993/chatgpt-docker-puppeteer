@@ -194,6 +194,33 @@ describe('terminal/state/turn-materialization-state', () => {
         ).toBe(false);
     });
 
+    it('renderiza assistant.message pós-ask de outro turno mesmo após deltas canônicos anteriores', () => {
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'pre-ask', timestamp: 1000 });
+        recordTerminalTurnDelta({ chunk: 'DELTA-CANONICAL-1\n', timestamp: 1001 });
+        recordTerminalTurnDelta({ chunk: 'DELTA-CANONICAL-8\n', timestamp: 1002 });
+        completeTerminalTurnMaterialization({
+            directReply: null,
+            directSource: 'ask_user_pending',
+            timestamp: 1003,
+        });
+
+        const decision = getTerminalAssistantMessageMaterializationDecision({
+            content: 'POST-ASK-CANONICAL-FINAL: usuário confirmou SIM',
+            turnId: 'post-ask',
+            now: 1004,
+        });
+
+        expect(decision).toEqual(
+            expect.objectContaining({
+                action: 'render_full',
+                reason: 'no_materialization',
+                suffix: '',
+                matchedTurnKey: null,
+            }),
+        );
+    });
+
     it('suprime turn_end truncado quando a resposta final completa já foi materializada', () => {
         clearTerminalTurnMaterialization();
         beginTerminalTurnMaterialization({ turnId: 'done-full', timestamp: 1000 });

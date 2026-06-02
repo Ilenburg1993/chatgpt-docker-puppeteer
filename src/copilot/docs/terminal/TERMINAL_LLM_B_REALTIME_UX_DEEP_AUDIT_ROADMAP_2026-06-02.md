@@ -102,6 +102,8 @@
 - `/tools diag` agora mostra lifecycle ativo/recente com `toolCallId`, `requestId`, trace, status, progresso e duracao em formato compacto.
 - `/export` agora aplica redaction explicita em conteudo de turno e campos textuais de envelope/streaming antes de gravar Markdown.
 - O runner live agora exige `tool.lifecycle` estruturado para `report_intent` e `read_file_content`; texto simulado em stdout nao satisfaz mais a prova de tool real.
+- O runner live agora compara eventos canonicos de SSE/archive contra envelopes do export por `source + trace/turn` para ask_user, resposta humana e final pos-ask.
+- `/events` agora mostra hint compacto de `transcript` e `export=envelope:<source> trace=<trace> turn=<turn>` para eventos canonicos de transcript.
 
 ## 03. Achados principais
 
@@ -367,23 +369,23 @@
 - [x] Validar que `user_input.requested` sempre tem source.
 - [x] Validar que `user_input.completed` sempre tem source.
 - [x] Validar que `question.answered` nao duplica transcript.
-- [ ] Adicionar correlacao mais clara entre stdout e SSE para pos-ask.
-- [ ] Atualizar live runner para comparar export contra SSE.
+- [x] Adicionar correlacao mais clara entre stdout e SSE para pos-ask.
+- [x] Atualizar live runner para comparar export contra SSE.
 
 ### Faixa H - Reconciliacao e materializacao
 
-- [ ] Revisar `turn-materialization-state` para turnos pos-ask.
+- [x] Revisar `turn-materialization-state` para turnos pos-ask.
 - [x] Garantir que `assistant.message` pos-ask nao seja suprimido por engano.
 - [x] Garantir que `dialog.turn_end` truncado nao duplica assistant.message.
 - [x] Preservar diagnostico de materializacao em metadata.
-- [ ] Adicionar teste para turnos separados por ask_user.
+- [x] Adicionar teste para turnos separados por ask_user.
 
 ### Faixa I - Comandos operacionais
 
-- [ ] Revisar `/activity` para mostrar transcript humano recente.
-- [ ] Revisar `/history` para representar ask_user.
-- [ ] Revisar `/context` para contar turnos humanos corretamente.
-- [ ] Revisar `/events` para linkar evento bruto ao transcript.
+- [x] Revisar `/activity` para mostrar transcript humano recente.
+- [x] Revisar `/history` para representar ask_user.
+- [x] Revisar `/context` para contar turnos humanos corretamente.
+- [x] Revisar `/events` para linkar evento bruto ao transcript.
 - [ ] Revisar `/usage now` para contexto pos-ask.
 - [ ] Revisar `/health` para indicar inline status mode.
 
@@ -430,12 +432,12 @@
 - [x] Exibir `toolCallId` e `requestId` de forma compacta em tools operacionais, nao apenas no envelope do export.
 - [x] Separar start/progress/done visualmente em tool diagnostics.
 - [x] Garantir que texto simulando tool nunca satisfaça criterio de tool real.
-- [ ] Adicionar correlacao mais clara entre stdout e SSE para pos-ask.
-- [ ] Atualizar live runner para comparar export contra SSE em termos de eventos correlacionados, nao apenas texto.
-- [ ] Revisar `turn-materialization-state` para cenarios pos-ask alternativos.
-- [ ] Adicionar teste para turnos separados por ask_user.
-- [ ] Revisar `/activity` para mostrar transcript humano recente com envelope compacto.
-- [ ] Revisar `/events` para linkar evento bruto ao transcript/export.
+- [x] Adicionar correlacao mais clara entre stdout e SSE para pos-ask.
+- [x] Atualizar live runner para comparar export contra SSE em termos de eventos correlacionados, nao apenas texto.
+- [x] Revisar `turn-materialization-state` para cenarios pos-ask alternativos.
+- [x] Adicionar teste para turnos separados por ask_user.
+- [x] Revisar `/activity` para mostrar transcript humano recente com envelope compacto.
+- [x] Revisar `/events` para linkar evento bruto ao transcript/export.
 - [ ] Revisar `/usage now` para contexto pos-ask e BYOK sem Premium Request.
 - [ ] Revisar `/health` para indicar inline status mode.
 - [ ] Rodar live test com resposta freeform.

@@ -151,6 +151,23 @@ function summarizePayload(payload) {
 }
 
 /**
+ * @param {{ event: string; source: string | null; eventSource: string | null; traceId: string | null; turnId: string | null }} entry
+ * @returns {string | null}
+ */
+function buildTranscriptExportHint(entry) {
+    /** @type {string | null} */
+    let transcript = null;
+    if (entry.event === 'assistant.message') transcript = 'LLM-B';
+    if (entry.event === 'user_input.requested') transcript = 'Sistema/ask_user';
+    if (entry.event === 'user_input.completed') transcript = 'Usuário/ask_user';
+    if (!transcript) return null;
+    const source = entry.eventSource ?? entry.source ?? entry.event;
+    const trace = entry.traceId ? ` trace=${entry.traceId}` : '';
+    const turn = entry.turnId ? ` turn=${entry.turnId}` : '';
+    return `transcript=${transcript} · export=envelope:${source}${trace}${turn}`;
+}
+
+/**
  * @param {EventsContext} ctx
  * @param {string} [arg]
  * @returns {Promise<void>}
@@ -234,8 +251,10 @@ export async function cmdEvents({ println }, arg = '') {
         const turn = entry.turnId ? ` · turn=${entry.turnId}` : '';
         const hub = entry.hubSessionId ? ` · hub=${entry.hubSessionId}` : '';
         const summary = summarizePayload(entry.payload ?? {});
+        const transcriptHint = buildTranscriptExportHint(entry);
+        const detail = [summary, transcriptHint].filter(Boolean).join(' · ');
         println(
-            `    \x1b[90m${time}\x1b[0m  #${entry.eventId} \x1b[33m${entry.event}\x1b[0m  \x1b[90m${origin}${trace}${turn}${hub}\x1b[0m${summary ? ` — ${summary}` : ''}`,
+            `    \x1b[90m${time}\x1b[0m  #${entry.eventId} \x1b[33m${entry.event}\x1b[0m  \x1b[90m${origin}${trace}${turn}${hub}\x1b[0m${detail ? ` — ${detail}` : ''}`,
         );
     }
     println('');
