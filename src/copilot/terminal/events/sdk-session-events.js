@@ -1025,15 +1025,21 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
               : null;
         const registrySnapshot = readTerminalToolRegistrySnapshot();
         const localCount = Number(registrySnapshot.total ?? 0);
-        const countLabel = sdkCount === null ? 'SDK sinalizou atualização sem contagem materializada' : `${sdkCount} tool(s) SDK`;
+        const localToolsLabel =
+            localCount > 0 ? `${localCount} tool(s) locais ativas em /tools` : 'registry local sem tools ativas';
+        const countLabel =
+            sdkCount === null
+                ? `SDK sinalizou atualização sem contagem materializada; ${localToolsLabel}`
+                : `${sdkCount} tool(s) SDK dinâmicas; ${localToolsLabel}`;
         recordTerminalActivity('system', 'Tools dinâmicas SDK atualizadas', {
-            detail: `${countLabel}; registry local /tools=${localCount}`,
+            detail: countLabel,
             source: 'sdk',
             recordHistory: false,
         });
         if (shouldPrintSessionNarration('verbose')) {
             const sdkLabel = sdkCount === null ? 'contagem SDK n/d' : `${sdkCount} SDK`;
-            println(`  \x1b[90m🧰 Tools dinâmicas SDK atualizadas: ${sdkLabel} · registry local: ${localCount} (/tools)\x1b[0m`);
+            const localLabel = localCount > 0 ? `tools locais ativas: ${localCount} (/tools)` : 'registry local sem tools';
+            println(`  \x1b[90m🧰 Tools dinâmicas SDK atualizadas: ${sdkLabel} · ${localLabel}\x1b[0m`);
         }
         broadcastSse(
             'session.tools_updated',
@@ -1042,6 +1048,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                     count: sdkCount ?? localCount,
                     sdkCount,
                     localCount,
+                    localToolsActive: localCount > 0,
                 },
                 'sdk/session.tools_updated',
             ),

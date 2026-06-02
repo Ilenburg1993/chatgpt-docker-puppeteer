@@ -703,7 +703,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             'system',
             'Tools dinâmicas SDK atualizadas',
             expect.objectContaining({
-                detail: expect.stringContaining('92 tool(s) SDK; registry local /tools='),
+                detail: expect.stringContaining('92 tool(s) SDK dinâmicas;'),
                 recordHistory: false,
             }),
         );
@@ -736,6 +736,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
 
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Skills SDK: 2/3 habilitadas'));
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Tools dinâmicas SDK atualizadas: 92 SDK'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('registry local'));
     });
 
     it('não apresenta count 0 como lista SDK real quando o evento não materializou tools', async () => {
@@ -759,7 +760,39 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'session.tools_updated',
-            expect.objectContaining({ sdkCount: null }),
+            expect.objectContaining({ sdkCount: null, localToolsActive: false }),
+        );
+    });
+
+    it('distingue lista SDK vazia materializada da contagem do registry local', async () => {
+        mocks.getShowSessionActivity.mockReturnValue(true);
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
+        agent.emit('session.tools_updated', { tools: [] });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Tools dinâmicas SDK atualizadas',
+            expect.objectContaining({
+                detail: expect.stringContaining('0 tool(s) SDK dinâmicas;'),
+            }),
+        );
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Tools dinâmicas SDK atualizadas',
+            expect.objectContaining({
+                detail: expect.stringContaining('registry local sem tools ativas'),
+            }),
+        );
+        expect(mocks.println).toHaveBeenCalledWith(
+            expect.stringContaining('Tools dinâmicas SDK atualizadas: 0 SDK · registry local sem tools'),
+        );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'session.tools_updated',
+            expect.objectContaining({ sdkCount: 0, localToolsActive: false }),
         );
     });
 

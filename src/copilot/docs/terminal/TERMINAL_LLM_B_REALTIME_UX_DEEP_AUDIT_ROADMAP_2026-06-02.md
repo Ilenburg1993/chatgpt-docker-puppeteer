@@ -270,6 +270,18 @@
   - `tests/unit/copilot/terminal/test_auto_brief.spec.js` cobre a supressao do warning transitorio;
   - o mesmo teste confirma que warning de instrucoes ausentes permanece visivel.
 
+## 02.09 Clareza em `session.tools_updated`
+
+- Problema observado:
+  - no live SDK/Copilot, o terminal podia imprimir `Tools dinamicas SDK atualizadas: 0 SDK · registry local: 105 (/tools)`;
+  - a mensagem era tecnicamente correta, mas misturava duas superficies diferentes e podia sugerir ausencia de tools, apesar de o registry local estar ativo.
+- Correcao aplicada:
+  - `src/copilot/terminal/events/sdk-session-events.js` separa `tool(s) SDK dinamicas` de `tool(s) locais ativas em /tools`;
+  - quando o SDK nao materializa contagem, a mensagem diz explicitamente `SDK sinalizou atualizacao sem contagem materializada`;
+  - o SSE `session.tools_updated` agora expoe `localToolsActive` junto de `sdkCount` e `localCount`.
+- Validacao:
+  - `tests/unit/copilot/test_terminal_sdk_session_events.spec.js` cobre contagem SDK materializada, contagem ausente e lista SDK materializada vazia.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -557,6 +569,7 @@
 - [x] Revisar `/usage now` para contexto pos-ask.
 - [x] Revisar `/health` para indicar inline status mode.
 - [x] Remover falso alerta de file-tools ausentes no `auto-brief:boot` parcial mantendo warnings reais.
+- [x] Separar contagem de tools SDK dinamicas da contagem de registry local em `session.tools_updated`.
 
 ### Faixa J - Teste live LLM-B
 
