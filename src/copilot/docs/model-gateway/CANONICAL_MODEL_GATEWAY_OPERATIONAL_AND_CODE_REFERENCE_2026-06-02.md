@@ -288,6 +288,17 @@ runs recentes. Deve ser o primeiro comando para operador humano ou LLM. O JSON s
 `liveCommands`, porque alguns comandos live podem consumir provider/quota. O caminho package evita chamar `ops` por
 dentro para nao duplicar readiness e automacao.
 
+Campos criticos para LLM operadora:
+
+- `operatorDecision.requiresHumanDecision`
+- `operatorDecision.canApplyAutomatically`
+- `operatorDecision.applyCommand`
+- `operatorDecision.fullHandoffCommand`
+- `candidateActions[].commands.probeAgent`
+- `candidateActions[].commands.liveModel`
+- `candidateActions[].commands.newSessionProvider`
+- `candidateActions[].commands.clearHealth` e `clearHealthApply`
+
 ### 7.3 Auto Doctor
 
 ```bash

@@ -48,6 +48,8 @@ de comandos sem buscar providers, rodar modelos ou mutar a sessão terminal.
 `model-gateway:operator-ready` agrega SQLite diagnostics, auto-ready, runtime-selector, standby, runtime-health diff,
 live artifacts e comandos separados entre `nextSafeCommands` read-only e `liveCommands` para humano/LLM. Ele evita
 chamar `ops` internamente para nao duplicar readiness e automacao.
+O JSON tambem expoe `operatorDecision` e `candidateActions` com probe, clear, live model e new-session/provider por
+candidato de standby.
 `model-gateway:auto:scenarios` monta a escada operador/LLM e roda gates read-only independentes em paralelo para manter
 o cockpit abaixo do limite pratico de espera.
 

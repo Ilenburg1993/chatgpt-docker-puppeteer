@@ -101,6 +101,44 @@ const readyChecks = Array.isArray(autoReadyJson?.['checks']) ? autoReadyJson['ch
 const runtimeRoutes = Array.isArray(runtimePlan?.['routes']) ? runtimePlan['routes'].filter(optionalRecord) : [];
 const selectedRuntimeRoute = runtimeRoutes.find((route) => route['profileId'] === profile) ?? null;
 const standbyRoutes = Array.isArray(standbyJson?.['routes']) ? standbyJson['routes'].filter(optionalRecord) : [];
+function buildCandidateAction(route) {
+    const providerId = optionalString(route['providerId']);
+    const providerModel = optionalString(route['providerModel']);
+    const profileId = optionalString(route['profileId']) ?? profile;
+    const commands = optionalRecord(route['commands']) ?? {};
+    const clearHealth =
+        providerId && providerModel
+            ? `npm run model-gateway:runtime-health:clear -- --provider=${providerId} --model=${providerModel} --profile=${profileId}`
+            : null;
+    const clearHealthTerminal =
+        providerId && providerModel
+            ? `/byok health clear provider:${providerId} model:${providerModel} profile:${profileId}`
+            : null;
+    const newSession = optionalString(commands['newSession']);
+    const provider = optionalString(commands['provider']);
+    return {
+        rank: optionalNumber(route['rank']),
+        source: optionalString(route['source']),
+        profileId,
+        providerId,
+        providerModel,
+        hasRuntimeProof: route['hasRuntimeProof'] === true,
+        runtimeEnvStatus: optionalString(route['runtimeEnvStatus']),
+        commands: {
+            probeAgent: optionalString(commands['probeAgent']),
+            probeChat: optionalString(commands['probeChat']),
+            liveModel: optionalString(commands['liveModel']),
+            provider,
+            persistProvider: optionalString(commands['persistProvider']),
+            newSession,
+            newSessionProvider: newSession && provider ? `${newSession} && ${provider}` : null,
+            clearHealth,
+            clearHealthTerminal,
+            clearHealthApply: clearHealth ? `${clearHealth} --apply` : null,
+        },
+    };
+}
+const candidateActions = standbyRoutes.slice(0, limit).map(buildCandidateAction);
 const nextSafeCommands = [
     ...commandList(standbyJson?.['nextCommands']),
     'npm run model-gateway:runtime-health:diff -- --write-snapshot --fail-on-regression',
@@ -185,6 +223,17 @@ const output = {
         runtimeProfiles: runtimeSelectorJson?.['selection']?.['profiles'] ?? null,
         nextSafeCommands: uniqueNextSafeCommands.length,
         liveCommands: liveCommands.length,
+        candidateActions: candidateActions.length,
+    },
+    operatorDecision: {
+        requiresHumanDecision: true,
+        canApplyAutomatically: false,
+        reason: 'operator_ready_is_read_only',
+        safeReadOnly: true,
+        applyCommand: `/byok auto apply profile:${profile} allow-live-set-model`,
+        fullHandoffCommand: `/byok auto apply profile:${profile} allow-live-set-model allow-new-session`,
+        standbyCommand: `npm run model-gateway:auto:standby -- --profile=${profile} --limit=${limit}`,
+        liveWarning: 'liveCommands may consume provider quota or start terminal live tests; do not run them implicitly.',
     },
     checks,
     blockers,
@@ -252,6 +301,7 @@ const output = {
         runtimeEnvStatus: optionalString(route['runtimeEnvStatus']),
         commands: optionalRecord(route['commands']) ?? {},
     })),
+    candidateActions,
     nextSafeCommands: uniqueNextSafeCommands,
     liveCommands,
     raw: {

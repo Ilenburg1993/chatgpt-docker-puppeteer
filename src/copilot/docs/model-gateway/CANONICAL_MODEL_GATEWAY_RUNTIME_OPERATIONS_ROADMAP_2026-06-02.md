@@ -343,11 +343,11 @@ metadata importers
 
 - [ ] L.1 JSON de `operator-ready` deve ser estavel.
 - [x] L.2 JSON deve conter `nextSafeCommands`.
-- [ ] L.3 JSON deve conter `requiresHumanDecision`.
-- [ ] L.4 JSON deve conter `canApplyAutomatically`.
+- [x] L.3 JSON deve conter `requiresHumanDecision`.
+- [x] L.4 JSON deve conter `canApplyAutomatically`.
 - [x] L.5 JSON deve conter standby list.
-- [ ] L.6 JSON deve conter blockers por candidato.
-- [ ] L.7 JSON deve conter clear/probe commands.
+- [x] L.6 JSON deve conter comandos e flags operacionais por candidato.
+- [x] L.7 JSON deve conter clear/probe commands.
 - [x] L.8 JSON deve conter live test commands.
 - [x] L.9 JSON deve conter artifact paths relevantes.
 - [ ] L.10 LLM operadora nao deve precisar ler segredos.
