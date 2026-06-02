@@ -20,6 +20,7 @@
 
 import { readTerminalConfigProjection, readTerminalDiagnoseProjection } from '../frontend/index.js';
 import { terminalPermissionModeSkipsSdkPrompts } from '../state/index.js';
+import { compactTerminalToolText, getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -110,7 +111,8 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
                       const errors = Number(stat['errors'] ?? 0);
                       const rate = calls > 0 ? Math.round(((calls - errors) / calls) * 100) : 0;
                       const col = rate >= 90 ? C.green : rate >= 70 ? C.yellow : C.red;
-                      return `  ${C.grey}•${C.reset} ${name.padEnd(30)} ${col}${rate}%${C.reset} avg ${stat['avgLatencyMs'] ?? 0}ms (${calls} calls)`;
+                      const visualName = compactTerminalToolText(getTerminalHumanToolName(name), 28).padEnd(28);
+                      return `  ${C.grey}•${C.reset} ${visualName} ${col}${rate}%${C.reset} avg ${stat['avgLatencyMs'] ?? 0}ms (${calls} calls)`;
                   })
                   .join('\n');
     const activityColor = activity.severity === 'error' ? C.red : activity.severity === 'warn' ? C.yellow : C.green;

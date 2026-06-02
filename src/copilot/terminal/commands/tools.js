@@ -12,6 +12,7 @@
 
 import { readTerminalStatusProjection, readTerminalToolStatsProjection } from '../frontend/index.js';
 import { readTerminalToolRegistrySnapshot } from '../frontend/gateways/index.js';
+import { compactTerminalDiagnosticId, getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
 
 /**
  * @typedef {object} ToolsContext
@@ -19,31 +20,23 @@ import { readTerminalToolRegistrySnapshot } from '../frontend/gateways/index.js'
  */
 
 /**
- * @param {string | null | undefined} value
- * @param {number} [size=12]
- * @returns {string | null}
- */
-function compactId(value, size = 12) {
-    if (!value) return null;
-    const text = String(value);
-    return text.length <= size ? text : `${text.slice(0, size)}…`;
-}
-
-/**
  * @param {import('../state/tool-lifecycle-state.js').TerminalToolLifecycleDiagnostic} entry
  * @returns {string}
  */
 function renderLifecycleDiagnosticLine(entry) {
     const ids = [
-        entry.toolCallId ? `call=${compactId(entry.toolCallId)}` : null,
-        entry.requestId ? `req=${compactId(entry.requestId)}` : null,
-        entry.traceId ? `trace=${compactId(entry.traceId, 16)}` : null,
+        entry.toolCallId ? `call=${compactTerminalDiagnosticId(entry.toolCallId)}` : null,
+        entry.requestId ? `req=${compactTerminalDiagnosticId(entry.requestId)}` : null,
+        entry.traceId ? `trace=${compactTerminalDiagnosticId(entry.traceId, 16)}` : null,
     ].filter(Boolean);
     const target = entry.path ?? entry.target;
     const progress = entry.progress !== null ? ` · ${entry.progress}%` : '';
     const duration = entry.durationMs !== null ? ` · ${Math.max(0, Math.round(entry.durationMs))}ms` : '';
-    const suffix = [entry.operation, target, ids.join(' · ')].filter(Boolean).join(' · ');
-    return `    \x1b[33m${entry.toolName}\x1b[0m  ${entry.status}${progress}${duration}${suffix ? `  \x1b[90m${suffix}\x1b[0m` : ''}`;
+    const visualName = getTerminalHumanToolName(entry.toolName);
+    const technicalName = visualName === entry.toolName ? null : `tool=${entry.toolName}`;
+    const rawName = entry.rawToolName && entry.rawToolName !== entry.toolName ? `raw=${entry.rawToolName}` : null;
+    const suffix = [entry.operation, target, technicalName, rawName, ids.join(' · ')].filter(Boolean).join(' · ');
+    return `    \x1b[33m${visualName}\x1b[0m  ${entry.status}${progress}${duration}${suffix ? `  \x1b[90m${suffix}\x1b[0m` : ''}`;
 }
 
 /**
@@ -72,9 +65,7 @@ export function cmdTools({ println }, arg = '') {
         return;
     }
 
-    println(
-        `\n  \x1b[36m🔧 ${entries.length} tool(s) ${wantsRaw ? 'observada(s) [raw]' : 'agregada(s) [canônico]'}:\x1b[0m\n`,
-    );
+    println(`\n  \x1b[36m🔧 ${entries.length} tool(s) ${wantsRaw ? 'observada(s) [raw]' : 'agregada(s)'}:\x1b[0m\n`);
 
     for (const [name, data] of entries) {
         const d = /** @type {{
@@ -91,9 +82,13 @@ export function cmdTools({ println }, arg = '') {
         const latency = typeof d.avgLatencyMs === 'number' ? `${d.avgLatencyMs.toFixed(0)}ms` : '?';
         const errorColor = errors > 0 ? '\x1b[31m' : '\x1b[32m';
         const blockedColor = blocked > 0 ? '\x1b[33m' : '\x1b[90m';
+        const visualName = wantsRaw ? name : getTerminalHumanToolName(name);
         println(
-            `    \x1b[33m${name}\x1b[0m  calls=\x1b[36m${calls}\x1b[0m  blocked=${blockedColor}${blocked}\x1b[0m  errors=${errorColor}${errors}\x1b[0m  avg=${latency}`,
+            `    \x1b[33m${visualName}\x1b[0m  calls=\x1b[36m${calls}\x1b[0m  blocked=${blockedColor}${blocked}\x1b[0m  errors=${errorColor}${errors}\x1b[0m  avg=${latency}`,
         );
+        if (!wantsRaw && wantsDiag && visualName !== name) {
+            println(`      \x1b[90mtool técnico: ${name}\x1b[0m`);
+        }
         if (!wantsRaw && wantsDiag && Array.isArray(d.aliases) && d.aliases.length > 1) {
             println(`      \x1b[90maliases: ${d.aliases.join(', ')}\x1b[0m`);
         }

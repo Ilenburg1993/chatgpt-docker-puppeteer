@@ -113,6 +113,65 @@ describe('commands/tools', () => {
         expect(ctx.output()).toContain('Nenhuma tool observada');
     });
 
+    it('usa nomes humanos no modo default e preserva nomes técnicos em diag', () => {
+        readTerminalToolStatsProjection.mockReturnValueOnce({
+            stats: {
+                read_file_content: { calls: 2, errors: 0, avgLatencyMs: 18 },
+                report_intent_local: { calls: 1, errors: 0, avgLatencyMs: 7 },
+            },
+            canonicalEntries: /** @type {[string, Record<string, any>][]} */ ([
+                ['read_file_content', { calls: 2, errors: 0, avgLatencyMs: 18 }],
+                ['report_intent_local', { calls: 1, errors: 0, avgLatencyMs: 7 }],
+            ]),
+            entries: /** @type {[string, Record<string, any>][]} */ ([
+                ['read_file_content', { calls: 2, errors: 0, avgLatencyMs: 18 }],
+                ['report_intent_local', { calls: 1, errors: 0, avgLatencyMs: 7 }],
+            ]),
+            tools: [],
+            byCategory: {},
+            toolCount: 2,
+            lifecycle: {
+                active: [],
+                recent: [],
+                summary: { active: 0, recent: 0, waitingUser: 0, failedRecent: 0 },
+            },
+        });
+        const defaultCtx = mockCtx();
+
+        cmdTools({ println: defaultCtx.println });
+
+        expect(defaultCtx.output()).toContain('Ler arquivo');
+        expect(defaultCtx.output()).toContain('Intent capturado');
+        expect(defaultCtx.output()).not.toContain('read_file_content');
+        expect(defaultCtx.output()).not.toContain('report_intent_local');
+
+        readTerminalToolStatsProjection.mockReturnValueOnce({
+            stats: {
+                read_file_content: { calls: 2, errors: 0, avgLatencyMs: 18 },
+            },
+            canonicalEntries: /** @type {[string, Record<string, any>][]} */ ([
+                ['read_file_content', { calls: 2, errors: 0, avgLatencyMs: 18, kind: 'file' }],
+            ]),
+            entries: /** @type {[string, Record<string, any>][]} */ ([
+                ['read_file_content', { calls: 2, errors: 0, avgLatencyMs: 18, kind: 'file' }],
+            ]),
+            tools: [],
+            byCategory: {},
+            toolCount: 1,
+            lifecycle: {
+                active: [],
+                recent: [],
+                summary: { active: 0, recent: 0, waitingUser: 0, failedRecent: 0 },
+            },
+        });
+        const diagCtx = mockCtx();
+
+        cmdTools({ println: diagCtx.println }, 'diag');
+
+        expect(diagCtx.output()).toContain('Ler arquivo');
+        expect(diagCtx.output()).toContain('tool técnico: read_file_content');
+    });
+
     it('renderiza lifecycle compacto em modo diag', () => {
         readTerminalToolStatsProjection.mockReturnValueOnce({
             stats: {
@@ -188,10 +247,12 @@ describe('commands/tools', () => {
         const output = ctx.output();
         expect(output).toContain('Lifecycle recente');
         expect(output).toContain('active=1');
-        expect(output).toContain('read_file_content');
+        expect(output).toContain('Ler arquivo');
+        expect(output).toContain('tool=read_file_content');
         expect(output).toContain('call=call-1234567…');
         expect(output).toContain('req=req-12345678…');
-        expect(output).toContain('report_intent_local');
+        expect(output).toContain('Intent capturado');
+        expect(output).toContain('tool=report_intent_local');
         expect(output).toContain('completed');
     });
 });

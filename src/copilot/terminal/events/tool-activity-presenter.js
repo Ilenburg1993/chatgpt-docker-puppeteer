@@ -397,6 +397,34 @@ export function compactTerminalToolText(text, max = 140) {
 }
 
 /**
+ * @param {string | null | undefined} value
+ * @param {number} [size=12]
+ * @returns {string | null}
+ */
+export function compactTerminalDiagnosticId(value, size = 12) {
+    if (!value) return null;
+    const text = String(value).trim();
+    if (!text) return null;
+    return text.length <= size ? text : `${text.slice(0, Math.max(0, size))}…`;
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {boolean}
+ */
+export function isTerminalInternalCallIdentifier(value) {
+    return isInternalCallIdentifier(value);
+}
+
+/**
+ * @param {string} toolName
+ * @returns {string}
+ */
+export function getTerminalHumanToolName(toolName) {
+    return resolveHumanToolName(toolName, resolveToolName(toolName));
+}
+
+/**
  * @param {TerminalToolOperation} operation
  * @returns {'fileRead' | 'fileWrite' | 'fileEdit' | 'fileDelete' | 'question' | 'thinking' | 'tool'}
  */

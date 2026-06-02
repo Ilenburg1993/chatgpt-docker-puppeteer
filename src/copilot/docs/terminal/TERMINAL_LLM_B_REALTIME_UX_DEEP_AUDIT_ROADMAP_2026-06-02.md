@@ -543,6 +543,48 @@
   - a resposta `SIM` ainda pode aparecer muito perto da area reservada da linha viva em PTY;
   - `/events --raw` e SSE bruto continuam corretamente tecnicos, mas comandos de diagnostico precisam de headers mais claros.
 
+## 02.18 Segunda rodada UX: diagnosticos humanos e resposta menos tecnica
+
+- Escopo implementado apos o commit `feat(terminal): improve llm-b realtime ux`:
+  - presenter passou a exportar helpers canonicos para nome humano, ID diagnostico compacto e deteccao de ID interno;
+  - `/health` passou a renderizar `TOOL STATS` com nomes humanos, sem `read_file_content`/`report_intent_local` no modo default;
+  - `/tools` default passou a renderizar nomes humanos;
+  - `/tools diag` manteve nomes tecnicos sob label explicito `tool técnico`;
+  - lifecycle recente de `/tools diag` passou a usar nome humano como titulo e nome tecnico no detalhe;
+  - confirmacao de resposta humana deixou de imprimir `(default)` no fluxo normal;
+  - `/answer --runtime alt ...` continua mostrando `runtime=alt`, pois ali o detalhe e acao explicita do operador.
+- Testes focados executados:
+  - `npx vitest run tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js`
+  - Resultado: 4 arquivos, 58 testes, PASS.
+- Gaps ainda em aberto:
+  - live PTY confirmou a melhoria no terminal real em `terminal-ux-revolution-pass4-sdk-20260602-0630`;
+  - `/events --raw` continua bruto por contrato, mas precisa de header mais didatico;
+  - `/activity` ainda pode mostrar IDs compactos sem explicar suficientemente que sao diagnosticos;
+  - o card duravel da pergunta humana ainda deve ser refinado para escolhas alinhadas e resposta visualmente separada.
+
+## 02.19 Evidencia live PTY da segunda rodada UX
+
+- Comando executado:
+  - `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --transport=pty --live-scenario=canonical --out-dir=data/copilot-terminal/live-runs/terminal-ux-revolution-pass4-sdk-20260602-0630`
+- Artefatos:
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass4-sdk-20260602-0630/summary.md`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass4-sdk-20260602-0630/terminal.raw.log`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass4-sdk-20260602-0630/terminal.plain.log`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass4-sdk-20260602-0630/terminal.sse.jsonl`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass4-sdk-20260602-0630/conversation-export.md`
+- Resultado:
+  - status PASS;
+  - 318 eventos SSE;
+  - 0 erros;
+  - criterios funcionais preservados;
+  - `ux-health-human-tool-stats` passou;
+  - `ux-human-answer-confirmation` passou;
+  - `/tools diag` mostrou nomes humanos como titulo e nomes tecnicos apenas em linhas `tool técnico: ...`;
+  - `/health` mostrou `Ler arquivo` e `Intent capturado` no top-5, sem `read_file_content`/`report_intent_local` no modo default.
+- Observacao:
+  - o modelo respondeu em multiplos turnos internos e adicionou texto publico extra antes dos marcadores, mas o contrato testado continuou consistente: tool lifecycle real, deltas, ask_user, resposta humana, pos-ask, export e SSE.
+  - a linha viva em turnos longos ainda ocupa tres linhas fisicas em PTY estreito; isso permanece como item de polimento da Faixa P/O.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -882,6 +924,7 @@
 - [x] Registrar auditoria visual das screenshots do operador.
 - [x] Registrar evidencia PTY da rodada `terminal-ux-revolution-baseline-sdk-20260602-0557`.
 - [x] Registrar evidencia PTY da rodada `terminal-ux-revolution-pass3-sdk-20260602-0621`.
+- [x] Registrar evidencia PTY da rodada `terminal-ux-revolution-pass4-sdk-20260602-0630`.
 
 ### Faixa M - Glossario visual e nomes humanos
 
@@ -938,11 +981,11 @@
 ### Faixa R - Comandos de diagnostico com dois niveis
 
 - [ ] Revisar `/activity` para modo default sem IDs longos.
-- [ ] Revisar `/tools diag` para IDs compactos e drill-down claro.
+- [x] Revisar `/tools diag` para IDs compactos e drill-down claro.
 - [ ] Revisar `/events` para continuar bruto, mas com header explicito de debug.
-- [ ] Revisar `/health` para reduzir ruido visual default.
+- [x] Revisar `/health` para reduzir ruido visual default.
 - [ ] Adicionar flags ou subcomandos `detail`, `raw` ou `debug` onde fizer sentido.
-- [ ] Testar que dados tecnicos continuam acessiveis.
+- [x] Testar que dados tecnicos continuam acessiveis.
 
 ### Faixa S - Lives esteticos com LLM-B
 

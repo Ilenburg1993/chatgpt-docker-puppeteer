@@ -797,7 +797,8 @@ export function cmdAnswer({ println }, arg) {
     const { runtimeId, arg: answer } = extractRuntimeTarget(arg);
     const result = tryAnswerTerminalPendingQuestionInput(answer, runtimeId);
     if (result.ok) {
-        println(`[answer] Resposta enviada: "${result.answer}"`);
+        const runtimeSuffix = result.runtimeId && result.runtimeId !== 'default' ? ` · runtime=${result.runtimeId}` : '';
+        println(`Resposta enviada para pergunta pendente${runtimeSuffix}: "${result.answer}"`);
         return;
     }
     if (result.reason === 'empty') {

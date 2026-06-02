@@ -2,9 +2,22 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { buildTerminalToolActivityPresentation } from '../../../../src/copilot/terminal/events/tool-activity-presenter.js';
+import {
+    buildTerminalToolActivityPresentation,
+    compactTerminalDiagnosticId,
+    getTerminalHumanToolName,
+    isTerminalInternalCallIdentifier,
+} from '../../../../src/copilot/terminal/events/tool-activity-presenter.js';
 
 describe('terminal/tool-activity-presenter', () => {
+    it('expõe helpers canônicos para diagnósticos humanos sem duplicar glossário', () => {
+        expect(getTerminalHumanToolName('read_file_content')).toBe('Ler arquivo');
+        expect(getTerminalHumanToolName('report_intent_local')).toBe('Intent capturado');
+        expect(getTerminalHumanToolName('tool.fast')).toBe('tool.fast');
+        expect(isTerminalInternalCallIdentifier('chatcmpl-tool-80d5a00b25801fef')).toBe(true);
+        expect(compactTerminalDiagnosticId('chatcmpl-tool-80d5a00b25801fef')).toBe('chatcmpl-too…');
+    });
+
     it('usa nome humano para alias legado e mantém operação canônica inferida', () => {
         const presentation = buildTerminalToolActivityPresentation({
             toolName: 'view',

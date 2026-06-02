@@ -137,10 +137,14 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             );
             return;
         }
+        const runtimeSuffix =
+            pendingAnswer.runtimeId && pendingAnswer.runtimeId !== 'default'
+                ? ` · runtime=${pendingAnswer.runtimeId}`
+                : '';
         println(
             pendingAnswer.ok
-                ? `\x1b[90m  [answer] Resposta enviada para pergunta pendente (${pendingAnswer.runtimeId}).\x1b[0m`
-                : `\x1b[31m  [answer] Falha ao responder pergunta pendente (${pendingAnswer.runtimeId}).\x1b[0m`,
+                ? `\n\x1b[90m  Resposta enviada para pergunta pendente${runtimeSuffix}.\x1b[0m`
+                : `\n\x1b[31m  Falha ao responder pergunta pendente${runtimeSuffix}.\x1b[0m`,
         );
     }
 

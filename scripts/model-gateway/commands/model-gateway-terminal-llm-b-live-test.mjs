@@ -857,6 +857,18 @@ function hasRawInternalIdInDefaultToolNarration(plain) {
     return defaultToolNarrationLines(plain).some((line) => /(?:chatcmpl-tool-|toolu_|report_intent_local \(alias:)/iu.test(line));
 }
 
+function extractHealthToolStatsSection(plain) {
+    const match = String(plain ?? '').match(/TOOL STATS[^\n]*\n(?<body>[\s\S]*?)(?:╚|você\[|$)/u);
+    return match?.groups?.body?.trim() ?? '';
+}
+
+function healthToolStatsUseHumanNames(plain) {
+    const section = extractHealthToolStatsSection(plain);
+    if (!section) return false;
+    if (/\b(?:read_file_content|report_intent_local)\b/u.test(section)) return false;
+    return /(?:Ler arquivo|Intent capturado)/u.test(section);
+}
+
 function byokLiveMaterializationState(plain, criteria = [], scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
     const passed = new Set(criteria.filter((criterion) => criterion?.pass === true).map((criterion) => criterion.id));
     return {
@@ -2654,6 +2666,20 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'ux-single-live-status-source',
             pass: !/[⏳⌛] aguardando .*watchdog\//.test(plain),
             detail: 'dialog watchdog did not render a second live-status line when permanent live status is enabled',
+        },
+        {
+            id: 'ux-health-human-tool-stats',
+            pass: healthToolStatsUseHumanNames(plain),
+            detail: healthToolStatsUseHumanNames(plain)
+                ? 'health tool stats used human names in default output'
+                : 'health tool stats leaked technical names or was not rendered',
+        },
+        {
+            id: 'ux-human-answer-confirmation',
+            pass:
+                /Resposta enviada para pergunta pendente\./u.test(plain) &&
+                !/\[answer\] Resposta enviada para pergunta pendente \(default\)/u.test(plain),
+            detail: 'human answer confirmation avoided default runtime noise',
         },
         {
             id: 'no-prompt-double-render',

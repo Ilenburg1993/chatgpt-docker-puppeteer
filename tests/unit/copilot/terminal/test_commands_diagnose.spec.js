@@ -199,8 +199,8 @@ vi.mock('#copilot/conversation-hub', () => ({
 
 vi.mock('#copilot/observability', () => ({
     getToolStats: () => ({
-        'tool.a': { calls: 4, errors: 1, avgLatencyMs: 120 },
-        'tool.b': { calls: 2, errors: 0, avgLatencyMs: 40 },
+        read_file_content: { calls: 4, errors: 1, avgLatencyMs: 120 },
+        report_intent_local: { calls: 2, errors: 0, avgLatencyMs: 40 },
     }),
 }));
 
@@ -302,6 +302,10 @@ describe('commands/diagnose', () => {
             expect(ctx.output()).toContain('Lifecycle mx');
             expect(ctx.output()).toContain('sdk↔fs route');
             expect(ctx.output()).toContain('degraded');
+            expect(ctx.output()).toContain('Ler arquivo');
+            expect(ctx.output()).toContain('Intent capturado');
+            expect(ctx.output()).not.toContain('read_file_content');
+            expect(ctx.output()).not.toContain('report_intent_local');
         } finally {
             for (const [key, value] of Object.entries(previousEnv)) {
                 if (value === undefined) {

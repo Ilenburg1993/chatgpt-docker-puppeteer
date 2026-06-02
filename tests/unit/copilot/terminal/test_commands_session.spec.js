@@ -583,6 +583,7 @@ describe('commands/session — sync commands', () => {
         const ctx = mockCtx();
         cmdAnswer({ println: ctx.println }, 'sim');
         expect(ctx.output()).toContain('Resposta enviada');
+        expect(ctx.output()).not.toContain('(default)');
     });
 
     it('cmdAnswer aceita runtimeId explícito e usa o runtime alvo', () => {
@@ -598,6 +599,7 @@ describe('commands/session — sync commands', () => {
         cmdAnswer({ println: ctx.println }, '--runtime alt resposta-alt');
         expect(altAnswerPendingQuestion).toHaveBeenCalledWith('resposta-alt');
         expect(ctx.output()).toContain('resposta-alt');
+        expect(ctx.output()).toContain('runtime=alt');
     });
 
     it('cmdAnswer explica quando só resta shadow expirada', () => {
