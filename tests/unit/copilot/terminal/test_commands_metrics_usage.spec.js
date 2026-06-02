@@ -90,6 +90,7 @@ function readMockRuntimePrBudgetSnapshot(runtime) {
         sessionId: runtime.sessionId ?? null,
         prMetrics: runtime.dialogPrMetrics ?? null,
         lastPrInfo: runtime.lastPrInfo ?? null,
+        lastLlmUsage: runtime.lastLlmUsage ?? null,
     };
 }
 
@@ -363,6 +364,32 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('Binding: runtime=');
         expect(ctx.output()).toContain('Modo: sdk=');
         expect(ctx.output()).toContain('gpt-4.1-mini');
+    });
+
+    it('cmdUsage now destaca continuação pós ask_user quando a telemetria LLM indica user_input', () => {
+        const previous = defaultRuntime.lastLlmUsage;
+        defaultRuntime.lastLlmUsage = {
+            model: 'kilo-auto/free',
+            effectiveModel: 'kilo-auto/free',
+            cost: 0,
+            classification: 'ask_user_continuation',
+            premiumRequest: false,
+            premiumRequestReason: 'user_input_completed_continuation',
+            ts: Date.now(),
+        };
+        try {
+            const ctx = mockCtx();
+
+            cmdUsage({ println: ctx.println }, 'now');
+
+            expect(ctx.output()).toContain('Última telemetria LLM');
+            expect(ctx.output()).toContain('classe=');
+            expect(ctx.output()).toContain('ask_user_continuation');
+            expect(ctx.output()).toContain('Continuação ask_user');
+            expect(ctx.output()).toContain('/events event=assistant.message');
+        } finally {
+            defaultRuntime.lastLlmUsage = previous;
+        }
     });
 
     it('cmdMetrics e cmdUsage usam projection comum para mismatch de billing', () => {

@@ -23,6 +23,7 @@ export {
     listTerminalDisplayToggles,
     readTerminalDisplayPreset,
     readTerminalDisplayState,
+    readTerminalInlineStatusPolicy,
     readTerminalPromptDisplayPolicy,
     resolveTerminalBootDisplayPreset,
     resolveTerminalDisplayPresetName,

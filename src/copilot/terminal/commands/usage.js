@@ -90,6 +90,11 @@ export function cmdUsage({ println }, arg) {
             println(
                 `      Última telemetria LLM: modelo=\x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · classe=\x1b[90m${llmClass}\x1b[0m · motivo=\x1b[90m${llmReason}\x1b[0m · custo=\x1b[33m${llmCost}\x1b[0m`,
             );
+            if (/ask_user|user_input/iu.test(llmClass) || /ask_user|user_input/iu.test(llmReason)) {
+                println(
+                    '      Continuação ask_user: \x1b[32mtelemetria pós-resposta humana separada da fala inicial\x1b[0m \x1b[90m(use /events event=assistant.message e /export para correlacionar source+trace)\x1b[0m',
+                );
+            }
         }
         if (projection.runtimeSessionId || projection.binding.sdkSessionId || projection.binding.hubSessionId) {
             println(

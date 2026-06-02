@@ -104,6 +104,8 @@
 - O runner live agora exige `tool.lifecycle` estruturado para `report_intent` e `read_file_content`; texto simulado em stdout nao satisfaz mais a prova de tool real.
 - O runner live agora compara eventos canonicos de SSE/archive contra envelopes do export por `source + trace/turn` para ask_user, resposta humana e final pos-ask.
 - `/events` agora mostra hint compacto de `transcript` e `export=envelope:<source> trace=<trace> turn=<turn>` para eventos canonicos de transcript.
+- `/usage now` agora destaca telemetria de continuacao `ask_user` separada da fala inicial e aponta para correlacao por `/events` + `/export`.
+- `/health` agora mostra o modo efetivo de inline status (`reserved`, `overlay` ou `off`) e a origem da policy.
 
 ## 03. Achados principais
 
@@ -386,8 +388,8 @@
 - [x] Revisar `/history` para representar ask_user.
 - [x] Revisar `/context` para contar turnos humanos corretamente.
 - [x] Revisar `/events` para linkar evento bruto ao transcript.
-- [ ] Revisar `/usage now` para contexto pos-ask.
-- [ ] Revisar `/health` para indicar inline status mode.
+- [x] Revisar `/usage now` para contexto pos-ask.
+- [x] Revisar `/health` para indicar inline status mode.
 
 ### Faixa J - Teste live LLM-B
 
@@ -438,8 +440,8 @@
 - [x] Adicionar teste para turnos separados por ask_user.
 - [x] Revisar `/activity` para mostrar transcript humano recente com envelope compacto.
 - [x] Revisar `/events` para linkar evento bruto ao transcript/export.
-- [ ] Revisar `/usage now` para contexto pos-ask e BYOK sem Premium Request.
-- [ ] Revisar `/health` para indicar inline status mode.
+- [x] Revisar `/usage now` para contexto pos-ask e BYOK sem Premium Request.
+- [x] Revisar `/health` para indicar inline status mode.
 - [ ] Rodar live test com resposta freeform.
 - [ ] Rodar live test com choice invalida.
 - [ ] Rodar live test com tool longa e heartbeat.

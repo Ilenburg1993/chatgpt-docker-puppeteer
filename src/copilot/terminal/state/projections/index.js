@@ -1,7 +1,7 @@
 // @ts-check
 
 export { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../activity-state.js';
-export { readTerminalDisplayState } from '../display-policy.js';
+export { readTerminalDisplayState, readTerminalInlineStatusPolicy } from '../display-policy.js';
 export {
     readTerminalElicitationSummary,
     readTerminalPermissionSummary,

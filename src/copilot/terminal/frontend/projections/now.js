@@ -20,6 +20,7 @@ import {
     readTerminalActivityHistory,
     readTerminalActivitySnapshot,
     readTerminalDisplayState,
+    readTerminalInlineStatusPolicy,
     readTerminalStreamDiagnosticsProjection,
     readTerminalTurnTraceProjection,
 } from '../../state/projections/index.js';
@@ -69,10 +70,13 @@ export function readTerminalActivityProjection(limit = 10) {
 }
 
 /**
- * @returns {{ thinking: boolean; streaming: boolean; usage: boolean; tools: boolean; intent: boolean }}
+ * @returns {ReturnType<typeof readTerminalDisplayState> & { inlineStatus: ReturnType<typeof readTerminalInlineStatusPolicy> }}
  */
 export function readTerminalDisplayProjection() {
-    return readTerminalDisplayState();
+    return {
+        ...readTerminalDisplayState(),
+        inlineStatus: readTerminalInlineStatusPolicy(),
+    };
 }
 
 // ---------------------------------------------------------------------------

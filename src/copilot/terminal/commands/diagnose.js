@@ -230,6 +230,7 @@ ${C.cyan}  AGENTE${C.reset}
     atividade     ${activityColor}${activity.label}${C.reset}${typeof activity.progress === 'number' ? ` ${C.grey}(${activity.progress}%)${C.reset}` : ''}
     detalhe       ${activityDetail}
     display       ${C.grey}thinking=${display.thinking ? 'on' : 'off'} · streaming=${display.streaming ? 'on' : 'off'} · usage=${display.usage ? 'on' : 'off'} · tools=${display.tools ? 'on' : 'off'} · intent=${display.intent ? 'on' : 'off'}${C.reset}
+    inline status ${display.inlineStatus.enabled ? C.green : C.yellow}${display.inlineStatus.mode}${C.reset} ${C.grey}source=${display.inlineStatus.source}${display.inlineStatus.overlay ? ' · overlay' : ''}${C.reset}
 
 ${C.cyan}  INFRAESTRUTURA${C.reset}
     MCP bridge    ${mcpLine}

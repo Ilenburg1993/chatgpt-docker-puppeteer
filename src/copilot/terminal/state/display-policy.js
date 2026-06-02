@@ -28,6 +28,15 @@ import {
  *
  * @typedef {Record<TerminalDisplayToggle, boolean>} TerminalDisplayState
  *
+ * @typedef {'off' | 'overlay' | 'reserved'} TerminalInlineStatusMode
+ *
+ * @typedef {{
+ *     mode: TerminalInlineStatusMode;
+ *     enabled: boolean;
+ *     overlay: boolean;
+ *     source: 'env' | 'default';
+ * }} TerminalInlineStatusPolicy
+ *
  * @typedef {'default' | 'minimal' | 'verbose' | 'debug' | 'focus' | 'full'} TerminalDisplayPresetName
  *
  * @typedef {{
@@ -170,6 +179,21 @@ const TOGGLE_ACCESSORS = Object.freeze({
     intent: { get: getShowIntentActivity, set: setShowIntentActivity },
     session: { get: getShowSessionActivity, set: setShowSessionActivity },
 });
+
+/**
+ * @returns {TerminalInlineStatusPolicy}
+ */
+export function readTerminalInlineStatusPolicy() {
+    const raw = process.env['COPILOT_TERMINAL_INLINE_STATUS'];
+    /** @type {TerminalInlineStatusMode} */
+    const mode = raw === 'off' ? 'off' : raw === 'overlay' ? 'overlay' : 'reserved';
+    return {
+        mode,
+        enabled: mode !== 'off',
+        overlay: mode === 'overlay',
+        source: raw === 'off' || raw === 'overlay' || raw === 'reserved' ? 'env' : 'default',
+    };
+}
 
 /**
  * @param {unknown} value
