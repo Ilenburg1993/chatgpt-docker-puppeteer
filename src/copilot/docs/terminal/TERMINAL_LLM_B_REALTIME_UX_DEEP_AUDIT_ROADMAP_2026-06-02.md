@@ -131,6 +131,64 @@
   - `/usage now` exibiu continuacao `ask_user` sem Premium Request.
   - `/health` exibiu `inline status reserved source=default`.
 
+## 02.04 Runner de cenarios alternativos
+
+- O runner `scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs` agora aceita `--live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error>`.
+- `canonical` preserva o baseline anterior: pergunta `ASK-CANONICAL`, resposta `SIM`, final `POST-ASK-CANONICAL-FINAL`.
+- `freeform` gera prompt de `ask_user` sem choices obrigatorias e valida resposta humana livre no SSE/export.
+- `invalid-choice` gera prompt choice-only, envia primeiro `TALVEZ`, exige feedback local de escolha invalida e envia `SIM` em seguida.
+- `long-tool-heartbeat` exige `exec_command` controlado com marker `LONG-TOOL-HEARTBEAT-DONE`, lifecycle real e progresso antes de `ask_user`.
+- `recoverable-tool-error` exige falha controlada de `exec_command`, detectada em `postToolUse` por JSON `success:false`/`exitCode=7`, seguida de recuperacao por `read_file_content`, `ask_user` e final.
+- O tipo persistido em SQLite continua `canonical_full_turn` para o baseline e usa `canonical_full_turn_<cenario>` para variantes.
+- Validacao seca executada:
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`
+  - `node scripts/model-gateway/run.mjs llmBLiveTest --dry-run --live-scenario=canonical --out-dir=artifacts/terminal-live-dry/canonical`
+  - `node scripts/model-gateway/run.mjs llmBLiveTest --dry-run --live-scenario=freeform --out-dir=artifacts/terminal-live-dry/freeform`
+  - `node scripts/model-gateway/run.mjs llmBLiveTest --dry-run --live-scenario=invalid-choice --out-dir=artifacts/terminal-live-dry/invalid-choice`
+  - `node scripts/model-gateway/run.mjs llmBLiveTest --dry-run --live-scenario=long-tool-heartbeat --out-dir=artifacts/terminal-live-dry/long-tool-heartbeat`
+  - `node scripts/model-gateway/run.mjs llmBLiveTest --dry-run --live-scenario=recoverable-tool-error --out-dir=artifacts/terminal-live-dry/recoverable-tool-error`
+  - `npx vitest run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- Observacao:
+  - estes dry-runs validam prompt, contrato e parsing do runner;
+  - markers de output de cenario agora precisam aparecer em resultado real de tool ou lifecycle, nao apenas no prompt inicial;
+  - falha recuperavel esperada nao satisfaz criterio por texto em portugues/ingles; precisa de dado estruturado de lifecycle ou `postToolUse`.
+
+## 02.05 Evidencia live dos cenarios alternativos
+
+- Resposta freeform:
+  - comando: `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=240000 --transport=pty --live-scenario=freeform --out-dir=data/copilot-terminal/live-runs/terminal-ux-freeform-20260602-0421`
+  - status: PASS.
+  - criterios: 41/41 obrigatorios.
+  - SSE: 194 eventos, 192 com id/source, 132 com traceId, zero erros.
+  - SQLite: `terminal-live:2026-06-02T07-22-08-553Z:canonical_full_turn_freeform`.
+  - artefato: `data/copilot-terminal/live-runs/terminal-ux-freeform-20260602-0421/summary.md`.
+- Choice invalida:
+  - comando: `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=240000 --transport=pty --live-scenario=invalid-choice --out-dir=data/copilot-terminal/live-runs/terminal-ux-invalid-choice-20260602-0423`
+  - status: PASS.
+  - criterios: 42/42 obrigatorios.
+  - SSE: 178 eventos, 176 com id/source, 120 com traceId, zero erros.
+  - Validou rejeicao local de `TALVEZ`, preservacao da pergunta e resposta valida posterior `SIM`.
+  - SQLite: `terminal-live:2026-06-02T07-22-59-121Z:canonical_full_turn_invalid-choice`.
+  - artefato: `data/copilot-terminal/live-runs/terminal-ux-invalid-choice-20260602-0423/summary.md`.
+- Tool longa com heartbeat:
+  - comando: `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=240000 --transport=pty --live-scenario=long-tool-heartbeat --out-dir=data/copilot-terminal/live-runs/terminal-ux-long-tool-20260602-0427`
+  - status: PASS.
+  - criterios: 43/43 obrigatorios.
+  - SSE: 311 eventos, 309 com id/source, 243 com traceId, zero erros.
+  - Validou `exec_command` real com lifecycle completo e marker `LONG-TOOL-HEARTBEAT-DONE`.
+  - SQLite: `terminal-live:2026-06-02T07-26-45-818Z:canonical_full_turn_long-tool-heartbeat`.
+  - artefato: `data/copilot-terminal/live-runs/terminal-ux-long-tool-20260602-0427/summary.md`.
+- Erro de tool recuperavel:
+  - comando final: `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=240000 --transport=pty --live-scenario=recoverable-tool-error --out-dir=data/copilot-terminal/live-runs/terminal-ux-recoverable-tool-error-20260602-0439`
+  - status: PASS.
+  - criterios: 43/43 obrigatorios.
+  - SSE: 231 eventos, 229 com id/source, 157 com traceId, zero erros.
+  - Validou `exec_command` real com `postToolUse` contendo `success:false`, `exitCode=7` e stderr `RECOVERABLE-TOOL-ERROR`.
+  - Validou recuperacao por `read_file_content`, deltas canonicos, `ask_user`, resposta humana e final pos-ask.
+  - SQLite: `terminal-live:2026-06-02T07-35-13-548Z:canonical_full_turn_recoverable-tool-error`.
+  - artefato: `data/copilot-terminal/live-runs/terminal-ux-recoverable-tool-error-20260602-0439/summary.md`.
+  - nota de auditoria: um run anterior com arquivo ausente (`terminal-ux-recoverable-tool-error-20260602-0428`) tinha criterio falso positivo por texto; isso foi corrigido para exigir dado estruturado.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -425,11 +483,13 @@
 - [x] Atualizar runner para forcar sessao SDK nova nos cenarios full-turn.
 - [x] Atualizar runner para nao classificar nao conformidade DELTA como bloqueio de infraestrutura.
 - [x] Atualizar runner para detectar linha viva no TTY quando habilitada.
+- [x] Parametrizar runner para cenarios `canonical`, `freeform`, `invalid-choice`, `long-tool-heartbeat` e `recoverable-tool-error`.
+- [x] Adicionar dry-run/teste de contrato para prompts dos cenarios alternativos.
 - [x] Rodar live test com caso canonico atual.
-- [ ] Rodar live test com resposta freeform.
-- [ ] Rodar live test com choice invalida.
-- [ ] Rodar live test com tool longa e heartbeat.
-- [ ] Rodar live test com erro de tool recuperavel.
+- [x] Rodar live test com resposta freeform.
+- [x] Rodar live test com choice invalida.
+- [x] Rodar live test com tool longa e heartbeat.
+- [x] Rodar live test com erro de tool recuperavel.
 
 ### Faixa K - Validadores
 
@@ -466,10 +526,12 @@
 - [x] Revisar `/events` para linkar evento bruto ao transcript/export.
 - [x] Revisar `/usage now` para contexto pos-ask e BYOK sem Premium Request.
 - [x] Revisar `/health` para indicar inline status mode.
-- [ ] Rodar live test com resposta freeform.
-- [ ] Rodar live test com choice invalida.
-- [ ] Rodar live test com tool longa e heartbeat.
-- [ ] Rodar live test com erro de tool recuperavel.
+- [x] Parametrizar runner para resposta freeform, choice invalida, tool longa e erro recuperavel sem alterar o baseline canonico.
+- [x] Cobrir dry-run dos cenarios alternativos por teste unitario de contrato.
+- [x] Rodar live test com resposta freeform.
+- [x] Rodar live test com choice invalida.
+- [x] Rodar live test com tool longa e heartbeat.
+- [x] Rodar live test com erro de tool recuperavel.
 - [x] Atualizar runner para detectar linha viva no TTY quando habilitada.
 
 ## 07. Plano de implementacao imediato

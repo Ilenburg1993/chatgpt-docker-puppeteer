@@ -23,7 +23,6 @@ const DEFAULT_POST_ANSWER_DELAY_MS = 6_000;
 const DEFAULT_POST_ASK_CONTINUATION_WAIT_MS = 45_000;
 const ANSI_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 const SECRET_ENV_RE = /(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|BEARER)/iu;
-const POST_ASK_FINAL_RE = /POST-ASK-CANONICAL-FINAL:\s*usu[aá]rio confirmou SIM/iu;
 const TURN_SETTLED_AFTER_ASK_RE =
     /(?:Resposta concluída|Turno concluído; aguardando próxima mensagem|Turno do assistente concluído)/iu;
 const REPL_PROMPT_TAIL_RE = /(?:^|\n)voc[eê]\[[^\n]*?›\s*$/iu;
@@ -63,6 +62,7 @@ Common options:
   --byok-real-route-timeout-ms=<ms>
   --byok-real-require-vision-probe
   --auto-probe
+  --live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error>
   --reuse-sdk-session
   --timeout-ms=<ms>
   --transport=<pty|stdio>
@@ -131,20 +131,174 @@ function escapeRegExp(value) {
     return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
-function buildScenarioPrompt() {
+const DEFAULT_LIVE_SCENARIO_ID = 'canonical';
+
+function buildExactLineRegex(value) {
+    return new RegExp(escapeRegExp(value), 'iu');
+}
+
+function buildAskRenderedRegex(question) {
+    return new RegExp(`\\[ASK\\]\\s+${escapeRegExp(question)}`, 'u');
+}
+
+function buildQuestionPendingRegex(question) {
+    return new RegExp(`\\[(?:QUESTION|ASK:[^\\]]+)\\]\\s+LLM-B perguntou:\\s*"${escapeRegExp(question)}"`, 'u');
+}
+
+function buildAnswerRegex(answer) {
+    return new RegExp(escapeRegExp(answer), 'iu');
+}
+
+function createLiveScenario({
+    id,
+    description,
+    askQuestion,
+    finalMarker,
+    answerSteps,
+    askToolInstruction,
+    finalInstruction,
+    beforeDeltaInstructions = [],
+    allowedTools = ['report_intent', 'read_file_content', 'ask_user'],
+    expectedLifecycleTools = [],
+    expectedOutputMarkers = [],
+    invalidChoiceExpected = false,
+    recoverableToolErrorExpected = false,
+}) {
+    return Object.freeze({
+        id,
+        description,
+        askQuestion,
+        finalMarker,
+        answerSteps: Object.freeze(answerSteps.map((step) => Object.freeze({ ...step }))),
+        askToolInstruction,
+        finalInstruction,
+        beforeDeltaInstructions: Object.freeze(beforeDeltaInstructions),
+        allowedTools: Object.freeze(allowedTools),
+        expectedLifecycleTools: Object.freeze(expectedLifecycleTools.map((tool) => Object.freeze({ ...tool }))),
+        expectedOutputMarkers: Object.freeze(expectedOutputMarkers),
+        invalidChoiceExpected,
+        recoverableToolErrorExpected,
+        askRenderedRe: buildAskRenderedRegex(askQuestion),
+        askQuestionRe: buildExactLineRegex(askQuestion),
+        questionPendingRe: buildQuestionPendingRegex(askQuestion),
+        postAskFinalRe: buildExactLineRegex(finalMarker),
+        finalAnswerRe: buildAnswerRegex(answerSteps.at(-1)?.answer ?? ''),
+    });
+}
+
+const LIVE_SCENARIOS = Object.freeze({
+    canonical: createLiveScenario({
+        id: 'canonical',
+        description: 'baseline: choice simples SIM e fechamento canônico',
+        askQuestion: 'ASK-CANONICAL: responda SIM para fechar o teste',
+        finalMarker: 'POST-ASK-CANONICAL-FINAL: usuário confirmou SIM',
+        answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
+        askToolInstruction:
+            'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-CANONICAL: responda SIM para fechar o teste". Use a opção SIM se o schema da tool expuser choices.',
+        finalInstruction:
+            'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-CANONICAL-FINAL: usuário confirmou SIM".',
+    }),
+    freeform: createLiveScenario({
+        id: 'freeform',
+        description: 'ask_user com resposta livre aceita pelo terminal e pelo SDK',
+        askQuestion: 'ASK-FREEFORM: responda livremente para fechar o teste',
+        finalMarker: 'POST-ASK-FREEFORM-FINAL: usuário respondeu livremente',
+        answerSteps: [{ answer: 'SIM LIVRE - observacao humana', trigger: 'ask', delayMs: 500 }],
+        askToolInstruction:
+            'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-FREEFORM: responda livremente para fechar o teste". Não forneça choices obrigatórias; permita resposta livre se o schema da tool expuser allowFreeform.',
+        finalInstruction:
+            'Depois que o usuário responder livremente, escreva uma última mensagem pública contendo exatamente "POST-ASK-FREEFORM-FINAL: usuário respondeu livremente".',
+    }),
+    'invalid-choice': createLiveScenario({
+        id: 'invalid-choice',
+        description: 'choice-only: resposta inválida local, pergunta preservada e resposta válida posterior',
+        askQuestion: 'ASK-CHOICE: escolha SIM para fechar o teste',
+        finalMarker: 'POST-ASK-CHOICE-FINAL: usuário escolheu SIM após tentativa inválida',
+        answerSteps: [
+            { answer: 'TALVEZ', trigger: 'ask', delayMs: 500 },
+            { answer: 'SIM', trigger: 'invalid-feedback', delayMs: 800 },
+        ],
+        askToolInstruction:
+            'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-CHOICE: escolha SIM para fechar o teste", com choices contendo apenas SIM e allowFreeform=false se esses campos existirem no schema da tool.',
+        finalInstruction:
+            'Depois que o usuário primeiro responder algo inválido e depois responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-CHOICE-FINAL: usuário escolheu SIM após tentativa inválida".',
+        invalidChoiceExpected: true,
+    }),
+    'long-tool-heartbeat': createLiveScenario({
+        id: 'long-tool-heartbeat',
+        description: 'tool demorada controlada com status/heartbeat visivel antes de ask_user',
+        askQuestion: 'ASK-LONGTOOL: responda SIM depois da tool longa',
+        finalMarker: 'POST-ASK-LONGTOOL-FINAL: tool longa concluída e usuário confirmou SIM',
+        answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
+        beforeDeltaInstructions: [
+            'Depois do read_file_content, invoque a ferramenta real exec_command com command exatamente "node -e \\"setTimeout(() => console.log(\'LONG-TOOL-HEARTBEAT-DONE\'), 4000)\\"" e timeoutSeconds=10.',
+            'Aguarde a tool exec_command concluir e só então escreva as oito linhas DELTA-CANONICAL.',
+        ],
+        askToolInstruction:
+            'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-LONGTOOL: responda SIM depois da tool longa". Use a opção SIM se o schema da tool expuser choices.',
+        finalInstruction:
+            'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-LONGTOOL-FINAL: tool longa concluída e usuário confirmou SIM".',
+        allowedTools: ['report_intent', 'read_file_content', 'exec_command', 'ask_user'],
+        expectedLifecycleTools: [{ name: 'exec_command', renderedName: 'exec_command' }],
+        expectedOutputMarkers: ['LONG-TOOL-HEARTBEAT-DONE'],
+    }),
+    'recoverable-tool-error': createLiveScenario({
+        id: 'recoverable-tool-error',
+        description: 'erro de tool contido antes de recuperacao por tool valida e ask_user',
+        askQuestion: 'ASK-RECOVERABLE: responda SIM depois da recuperação',
+        finalMarker: 'POST-ASK-RECOVERABLE-FINAL: erro de tool foi recuperado e usuário confirmou SIM',
+        answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
+        beforeDeltaInstructions: [
+            'Ainda no primeiro lote de tool calls, junto com report_intent e read_file_content e antes de qualquer texto público, invoque também a ferramenta real exec_command com command exatamente "node -e \\"console.error(\'RECOVERABLE-TOOL-ERROR\'); process.exit(7)\\"" e timeoutSeconds=10. Esta tool deve falhar de forma controlada.',
+            'Depois desse erro recuperável de exec_command, invoque read_file_content novamente para ler as primeiras 3 linhas de package.json e continue normalmente.',
+            'Não trate o erro recuperável como falha do teste; ele deve ser contido e seguido por recuperação explícita.',
+        ],
+        askToolInstruction:
+            'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-RECOVERABLE: responda SIM depois da recuperação". Use a opção SIM se o schema da tool expuser choices.',
+        finalInstruction:
+            'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-RECOVERABLE-FINAL: erro de tool foi recuperado e usuário confirmou SIM".',
+        allowedTools: ['report_intent', 'read_file_content', 'exec_command', 'ask_user'],
+        expectedLifecycleTools: [{ name: 'exec_command', renderedName: 'exec_command', expectedOutcome: 'failure' }],
+        expectedOutputMarkers: ['RECOVERABLE-TOOL-ERROR'],
+        recoverableToolErrorExpected: true,
+    }),
+});
+
+function normalizeLiveScenarioId(value) {
+    const normalized = String(value ?? DEFAULT_LIVE_SCENARIO_ID)
+        .trim()
+        .toLowerCase()
+        .replaceAll('_', '-');
+    if (normalized === 'choice-invalid') return 'invalid-choice';
+    return normalized || DEFAULT_LIVE_SCENARIO_ID;
+}
+
+function readLiveScenario() {
+    const id = normalizeLiveScenarioId(readArg('--live-scenario', readArg('--scenario', DEFAULT_LIVE_SCENARIO_ID)));
+    const scenario = LIVE_SCENARIOS[id];
+    if (!scenario) {
+        const supported = Object.keys(LIVE_SCENARIOS).sort().join(', ');
+        console.error(`[terminal-live] cenário live inválido: ${id}. Suportados: ${supported}`);
+        process.exit(2);
+    }
+    return scenario;
+}
+
+function buildScenarioPrompt(scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
     return [
         'Faça um teste integrado canônico do terminal.',
         'Use chamadas de ferramenta reais do SDK; texto, Markdown, JSON, pseudo-tool e exemplos de tool_calls não contam.',
         'Primeiro invoque a ferramenta real report_intent com o intent "terminal live canonical deltas tools ask_user usage".',
         'Depois invoque a ferramenta real read_file_content para ler as primeiras 3 linhas de package.json.',
+        ...scenario.beforeDeltaInstructions,
         'Em seguida escreva obrigatoriamente uma resposta pública antes de qualquer ask_user, com exatamente 8 linhas separadas: DELTA-CANONICAL-1, DELTA-CANONICAL-2, DELTA-CANONICAL-3, DELTA-CANONICAL-4, DELTA-CANONICAL-5, DELTA-CANONICAL-6, DELTA-CANONICAL-7 e DELTA-CANONICAL-8.',
         'Não invoque ask_user antes dessas 8 linhas públicas aparecerem no transcript.',
-        'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-CANONICAL: responda SIM para fechar o teste".',
-        'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-CANONICAL-FINAL: usuário confirmou SIM".',
-        'Antes da resposta SIM, não escreva, cite nem antecipe o marcador POST-ASK-CANONICAL-FINAL.',
-        'A pergunta ASK-CANONICAL deve ser feita pela tool ask_user real; não a simule como texto, Markdown, JSON ou pseudo-tool no transcript público.',
+        scenario.askToolInstruction,
+        scenario.finalInstruction,
+        `Antes da resposta humana final, não escreva, cite nem antecipe o marcador ${scenario.finalMarker}.`,
+        `A pergunta ${scenario.askQuestion.split(':')[0]} deve ser feita pela tool ask_user real; não a simule como texto, Markdown, JSON ou pseudo-tool no transcript público.`,
         'Nunca escreva um objeto tool_calls, uma chave function/args, nem diga que ações foram executadas sem a tool real aparecer no terminal.',
-        'Não use outras tools além de report_intent, read_file_content e ask_user.',
+        `Não use outras tools além de ${scenario.allowedTools.join(', ')}.`,
     ].join(' ');
 }
 
@@ -662,7 +816,7 @@ function byokLiveRouteIdentity(realByok) {
     return { routeProfile, providerId, providerModel };
 }
 
-function byokLiveMaterializationState(plain, criteria = []) {
+function byokLiveMaterializationState(plain, criteria = [], scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
     const passed = new Set(criteria.filter((criterion) => criterion?.pass === true).map((criterion) => criterion.id));
     return {
         toolProtocolOk:
@@ -673,8 +827,8 @@ function byokLiveMaterializationState(plain, criteria = []) {
             passed.has('ask-user-visible') &&
             passed.has('ask-user-answer') &&
             passed.has('post-ask-final-visible') &&
-            /\[ASK\] ASK-CANONICAL: responda SIM para fechar o teste/u.test(plain) &&
-            POST_ASK_FINAL_RE.test(plain),
+            scenario.askRenderedRe.test(plain) &&
+            scenario.postAskFinalRe.test(plain),
     };
 }
 
@@ -1239,6 +1393,7 @@ function buildReport({
     liveHealthRecord,
     liveScenarioRunRecord,
     sdkSessionBootSelection,
+    liveScenario,
 }) {
     const ok = allRequiredCriteriaPassed(criteria);
     const status = blocker ? 'BLOCKED' : ok ? 'PASS' : 'FAIL';
@@ -1250,6 +1405,9 @@ function buildReport({
         `Exit code: ${String(exitCode)}`,
         `Transport: ${transport}`,
         `Status: ${status}`,
+        ...(liveScenario
+            ? [`Live scenario: ${liveScenario.id} · ${liveScenario.description}`, `Ask question: ${liveScenario.askQuestion}`]
+            : []),
         ...(blocker ? [`Blocker: ${blocker.id} · ${blocker.detail}`] : []),
         '',
         '## Artifacts',
@@ -1282,7 +1440,15 @@ function buildReport({
     return `${lines.join('\n')}\n`;
 }
 
-function liveScenarioKind({ autoControlProbe, byokControlProbe, byokFixture, byokReal, noPr, sessionCycle }) {
+function liveScenarioKind({
+    autoControlProbe,
+    byokControlProbe,
+    byokFixture,
+    byokReal,
+    noPr,
+    sessionCycle,
+    liveScenario,
+}) {
     if (sessionCycle) return 'session_cycle';
     if (autoControlProbe) return 'auto_probe';
     if (byokFixture) return 'byok_fixture_no_pr';
@@ -1290,6 +1456,7 @@ function liveScenarioKind({ autoControlProbe, byokControlProbe, byokFixture, byo
     if (byokReal && noPr) return 'byok_real_no_pr';
     if (byokReal) return 'byok_real_full';
     if (noPr) return 'control_no_pr';
+    if (liveScenario?.id && liveScenario.id !== DEFAULT_LIVE_SCENARIO_ID) return `canonical_full_turn_${liveScenario.id}`;
     return 'canonical_full_turn';
 }
 
@@ -1401,6 +1568,7 @@ async function writeEarlyBlockedSummary({
     transport,
     realByok,
     sdkSessionBootSelection,
+    liveScenario,
 }) {
     const durationMs = Date.now() - Date.parse(startedAt);
     const raw = `[terminal-live] blocked before terminal start: ${blocker.id} · ${blocker.detail}\n`;
@@ -1465,6 +1633,7 @@ async function writeEarlyBlockedSummary({
             transport,
             liveHealthRecord,
             sdkSessionBootSelection,
+            liveScenario,
         }),
         'utf8',
     );
@@ -1516,7 +1685,10 @@ function detectLiveBlocker(plain, runtime = {}) {
                 `${byokPreflight.model ? ` · model=${byokPreflight.model}` : ''}`,
         };
     }
-    const byokLiveToolProtocolMiss = findByokRealLiveToolProtocolMiss(plain);
+    const byokLiveToolProtocolMiss = findByokRealLiveToolProtocolMiss(
+        plain,
+        runtime.liveScenario ?? LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID],
+    );
     if (byokLiveToolProtocolMiss) {
         return {
             id: 'byok-live-tool-protocol-missed',
@@ -1579,10 +1751,10 @@ function findByokProbeResultStatus(plain, mode) {
     return match?.[1]?.toLowerCase() ?? null;
 }
 
-function findByokRealLiveToolProtocolMiss(plain) {
+function findByokRealLiveToolProtocolMiss(plain, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
     // The live transcript intentionally preserves assistant Markdown; the
     // public delta marker may therefore arrive as `DELTA-*` or `**DELTA-* **`.
-    if (/\[ASK\]\s+ASK-CANONICAL/u.test(plain)) return null;
+    if (scenario.askRenderedRe.test(plain)) return null;
     const markers = [
         /(?:^|\n)\s*│\s+"tool_calls"\s*:/mu.test(plain) ? 'tool_calls' : null,
         /(?:^|\n)\s*│\s+"function"\s*:\s*"report_intent"/mu.test(plain) ? 'function:report_intent' : null,
@@ -1592,7 +1764,11 @@ function findByokRealLiveToolProtocolMiss(plain) {
         /(?:^|\n)\s*│\s+"tool":\s*"read_file_content"/mu.test(plain) ? 'read_file_content' : null,
         /(?:^|\n)\s*│\s+"tool":\s*"ask_user"/mu.test(plain) ? 'ask_user' : null,
         /(?:^|\n)\s*│\s+\*\*Pergunta ao usu[aá]rio:\*\*/mu.test(plain) ? 'ask_user_text' : null,
-        /(?:^|\n)\s*│\s+"question":\s*"ASK-CANONICAL:/mu.test(plain) ? 'ask_user_question_json' : null,
+        new RegExp(`(?:^|\\n)\\s*│\\s+"question":\\s*"${escapeRegExp(scenario.askQuestion.split(':')[0])}:`, 'mu').test(
+            plain,
+        )
+            ? 'ask_user_question_json'
+            : null,
         /(?:^|\n)\s*│\s+The requested actions have been executed\b/mu.test(plain) ? 'claimed_execution' : null,
     ].filter(Boolean);
     if (
@@ -1706,6 +1882,39 @@ function isLifecycleCompletionType(type) {
     return type === 'complete' || type === 'external_completed' || type === 'io_op';
 }
 
+function parseToolResultPayload(toolResult) {
+    if (!isObjectPayload(toolResult)) return null;
+    const text = typeof toolResult.textResultForLlm === 'string' ? toolResult.textResultForLlm.trim() : '';
+    if (!text.startsWith('{')) return null;
+    try {
+        const parsed = JSON.parse(text);
+        return isObjectPayload(parsed) ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+function summarizePostToolUseResult(payload, expectedName) {
+    if (payload?.hookType !== 'postToolUse') return null;
+    const input = isObjectPayload(payload.input) ? payload.input : null;
+    if (!input || !isLifecycleTool({ toolName: input.toolName }, expectedName)) return null;
+    const toolResult = isObjectPayload(input.toolResult) ? input.toolResult : null;
+    const parsed = parseToolResultPayload(toolResult);
+    const resultType = typeof toolResult?.resultType === 'string' ? toolResult.resultType : '';
+    const parsedSuccess = typeof parsed?.success === 'boolean' ? parsed.success : null;
+    const exitCode = typeof parsed?.exitCode === 'number' ? parsed.exitCode : null;
+    const success = resultType === 'success' && parsedSuccess !== false && (exitCode === null || exitCode === 0);
+    const failure = resultType.length > 0 && !success;
+    return {
+        success,
+        failure,
+        resultType,
+        parsedSuccess,
+        exitCode,
+        text: typeof toolResult?.textResultForLlm === 'string' ? toolResult.textResultForLlm : '',
+    };
+}
+
 function summarizeCanonicalToolLifecycle(events) {
     const summary = {
         reportIntentStart: false,
@@ -1738,6 +1947,66 @@ function summarizeCanonicalToolLifecycle(events) {
     }
     summary.matchedEventIds = [...new Set(summary.matchedEventIds)].sort((a, b) => a - b);
     return summary;
+}
+
+function summarizeNamedToolLifecycle(events, expectedName) {
+    const summary = {
+        start: false,
+        done: false,
+        io: false,
+        failed: false,
+        postToolSuccess: false,
+        postToolFailure: false,
+        resultTypes: [],
+        exitCodes: [],
+        matchedEventIds: [],
+    };
+    for (const evt of events) {
+        const payload = eventPayload(evt);
+        if (!payload) continue;
+        if (evt?.event === 'hook.start') {
+            const postToolUse = summarizePostToolUseResult(payload, expectedName);
+            if (!postToolUse) continue;
+            if (postToolUse.success) summary.postToolSuccess = true;
+            if (postToolUse.failure) summary.postToolFailure = true;
+            if (postToolUse.resultType) summary.resultTypes.push(postToolUse.resultType);
+            if (Number.isFinite(postToolUse.exitCode)) summary.exitCodes.push(postToolUse.exitCode);
+            const eventId = eventPublicId(evt);
+            if (Number.isFinite(eventId)) summary.matchedEventIds.push(eventId);
+            continue;
+        }
+        if (evt?.event !== 'tool.lifecycle' || !isLifecycleTool(payload, expectedName)) continue;
+        const type = typeof payload.type === 'string' ? payload.type : '';
+        const success = payload.success !== false;
+        const eventId = eventPublicId(evt);
+        if (isLifecycleStartType(type)) summary.start = true;
+        if (isLifecycleCompletionType(type) && success) summary.done = true;
+        if (isLifecycleCompletionType(type) && !success) summary.failed = true;
+        if (type === 'io_op' && success) summary.io = true;
+        if (Number.isFinite(eventId)) summary.matchedEventIds.push(eventId);
+    }
+    summary.resultTypes = [...new Set(summary.resultTypes)].sort();
+    summary.exitCodes = [...new Set(summary.exitCodes)].sort((a, b) => a - b);
+    summary.matchedEventIds = [...new Set(summary.matchedEventIds)].sort((a, b) => a - b);
+    return summary;
+}
+
+function scenarioMarkerObservedInToolResults(events, marker) {
+    if (typeof marker !== 'string' || marker.length === 0) return false;
+    return events.some((evt) => {
+        const payload = eventPayload(evt);
+        if (!payload) return false;
+        if (evt?.event === 'hook.start' && payload.hookType === 'postToolUse') {
+            const input = isObjectPayload(payload.input) ? payload.input : null;
+            const toolResult = isObjectPayload(input?.toolResult) ? input.toolResult : null;
+            return typeof toolResult?.textResultForLlm === 'string' && toolResult.textResultForLlm.includes(marker);
+        }
+        if (evt?.event !== 'tool.lifecycle') return false;
+        return (
+            (typeof payload.partialOutput === 'string' && payload.partialOutput.includes(marker)) ||
+            (typeof payload.progressMessage === 'string' && payload.progressMessage.includes(marker))
+        );
+    });
 }
 
 /**
@@ -1774,7 +2043,7 @@ function canonicalEventSummaryItem(evt, payload) {
  *   postAskAssistant: CanonicalEventSummaryItem | null;
  * }}
  */
-function summarizeCanonicalTranscriptEvents(events) {
+function summarizeCanonicalTranscriptEvents(events, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
     /** @type {{
      *   deltaAssistant: CanonicalEventSummaryItem | null;
      *   askRequested: CanonicalEventSummaryItem | null;
@@ -1796,21 +2065,21 @@ function summarizeCanonicalTranscriptEvents(events) {
             if (!summary.deltaAssistant && /DELTA-CANONICAL-8/u.test(content)) {
                 summary.deltaAssistant = canonicalEventSummaryItem(evt, payload);
             }
-            if (!summary.postAskAssistant && POST_ASK_FINAL_RE.test(content)) {
+            if (!summary.postAskAssistant && scenario.postAskFinalRe.test(content)) {
                 summary.postAskAssistant = canonicalEventSummaryItem(evt, payload);
             }
             continue;
         }
         if (evt?.event === 'user_input.requested') {
             const question = typeof payload.question === 'string' ? payload.question : '';
-            if (!summary.askRequested && /ASK-CANONICAL:\s*responda SIM para fechar o teste/iu.test(question)) {
+            if (!summary.askRequested && scenario.askQuestionRe.test(question)) {
                 summary.askRequested = canonicalEventSummaryItem(evt, payload);
             }
             continue;
         }
         if (evt?.event === 'user_input.completed') {
             const answer = typeof payload.answer === 'string' ? payload.answer : '';
-            if (!summary.askCompleted && /\bSIM\b/iu.test(answer)) {
+            if (!summary.askCompleted && scenario.finalAnswerRe.test(answer)) {
                 summary.askCompleted = canonicalEventSummaryItem(evt, payload);
             }
         }
@@ -2038,13 +2307,23 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
     ];
 }
 
-function evaluateOutput(plain, sseSummary, exportSummary) {
+function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
     const markerCount = (plain.match(/DELTA-CANONICAL-\d/g) ?? []).length;
     const preEventsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b/i)[0] ?? plain;
     const archiveRawEvents = extractArchiveRawEvents(plain);
     const canonicalEvents = [...sseSummary.events, ...archiveRawEvents];
     const canonicalToolLifecycle = summarizeCanonicalToolLifecycle(canonicalEvents);
-    const canonicalTranscriptEvents = summarizeCanonicalTranscriptEvents(canonicalEvents);
+    const scenarioToolLifecycle = scenario.expectedLifecycleTools.map((tool) => ({
+        ...tool,
+        lifecycle: summarizeNamedToolLifecycle(canonicalEvents, tool.name),
+        renderedRe: new RegExp(`\\[TOOL\\].*${escapeRegExp(tool.renderedName ?? tool.name)}`, 's'),
+        doneRe: new RegExp(`✅ \\[DONE\\].*${escapeRegExp(tool.renderedName ?? tool.name)}`, 's'),
+    }));
+    const scenarioOutputMarkers = scenario.expectedOutputMarkers.map((marker) => ({
+        marker,
+        observedInToolResult: scenarioMarkerObservedInToolResults(canonicalEvents, marker),
+    }));
+    const canonicalTranscriptEvents = summarizeCanonicalTranscriptEvents(canonicalEvents, scenario);
     const exportSseAskRequested = exportEnvelopeMatchesEvent(exportSummary, canonicalTranscriptEvents.askRequested);
     const exportSseAskCompleted = exportEnvelopeMatchesEvent(exportSummary, canonicalTranscriptEvents.askCompleted);
     const exportSsePostAsk = exportEnvelopeMatchesEvent(exportSummary, canonicalTranscriptEvents.postAskAssistant);
@@ -2052,10 +2331,8 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
     const archiveIds = archiveRawEvents.map((evt) => evt.eventId).filter((id) => Number.isFinite(id));
     const archiveSseOverlap = archiveIds.filter((id) => sseIds.includes(id));
     const truncatedTurnEndDuplicate = findTruncatedTurnEndDuplicate([...sseSummary.events, ...archiveRawEvents]);
-    const askRenderedByQuestionPending = /\[(?:QUESTION|ASK:[^\]]+)\]\s+LLM-B perguntou:\s*"ASK-CANONICAL: responda SIM para fechar o teste"/.test(
-        preEventsPlain,
-    );
-    const askRenderedBySdk = /\[ASK\]\s+ASK-CANONICAL: responda SIM para fechar o teste/.test(preEventsPlain);
+    const askRenderedByQuestionPending = scenario.questionPendingRe.test(preEventsPlain);
+    const askRenderedBySdk = scenario.askRenderedRe.test(preEventsPlain);
     const liveDeltaBlockVisible = terminalBlockContains(
         preEventsPlain,
         /^\s*\[[^\]\n]*\]\s+🧠\s+LLM-B/u,
@@ -2066,8 +2343,7 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
         /^\s*\[LLM-B\]\s+Mensagem/u,
         /DELTA-CANONICAL-8/u,
     );
-    const postAskFinalMarker = String.raw`POST-ASK-CANONICAL-FINAL:\s*usu[aá]rio confirmou SIM`;
-    const postAskFinalRe = new RegExp(postAskFinalMarker, 'iu');
+    const postAskFinalRe = scenario.postAskFinalRe;
     const finalRenderedByLiveTurn = terminalBlockContains(
         preEventsPlain,
         /^\s*\[[^\]\n]*\]\s+🧠\s+LLM-B/u,
@@ -2087,6 +2363,10 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
         /__anonymous__/,
         /hook:error_occurred/,
     ];
+    const plainWithoutExpectedScenarioMarkers = scenario.expectedOutputMarkers.reduce(
+        (text, marker) => text.replaceAll(marker, 'EXPECTED_SCENARIO_MARKER'),
+        plain,
+    );
     return [
         {
             id: 'ready',
@@ -2126,10 +2406,34 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
                 `report_intent lifecycle start=${canonicalToolLifecycle.reportIntentStart ? 'yes' : 'no'} done=${canonicalToolLifecycle.reportIntentDone ? 'yes' : 'no'} ` +
                 `toolLifecycleEvents=${canonicalToolLifecycle.toolLifecycleEvents}`,
         },
+        ...scenarioToolLifecycle.map((tool) => {
+            const rendered = tool.renderedRe.test(plain) && tool.doneRe.test(plain);
+            const expectedOutcome = tool.expectedOutcome === 'failure' ? 'failure' : 'success';
+            const structuredFailure = tool.lifecycle.failed || tool.lifecycle.postToolFailure;
+            const structuredSuccess = tool.lifecycle.done || tool.lifecycle.postToolSuccess;
+            return {
+                id: `scenario-tool-${tool.name}-lifecycle`,
+                pass:
+                    tool.lifecycle.start &&
+                    (expectedOutcome === 'failure'
+                        ? structuredFailure && !tool.lifecycle.postToolSuccess
+                        : structuredSuccess && rendered),
+                detail:
+                    `${tool.name} lifecycle expected=${expectedOutcome} start=${tool.lifecycle.start ? 'yes' : 'no'} done=${tool.lifecycle.done ? 'yes' : 'no'} ` +
+                    `failed=${tool.lifecycle.failed ? 'yes' : 'no'} postSuccess=${tool.lifecycle.postToolSuccess ? 'yes' : 'no'} postFailure=${tool.lifecycle.postToolFailure ? 'yes' : 'no'} ` +
+                    `resultTypes=${tool.lifecycle.resultTypes.join(',') || '-'} exitCodes=${tool.lifecycle.exitCodes.join(',') || '-'} ` +
+                    `rendered=${rendered ? 'yes' : 'no'} events=${tool.lifecycle.matchedEventIds.slice(0, 8).join(',') || '-'}`,
+            };
+        }),
+        ...scenarioOutputMarkers.map(({ marker, observedInToolResult }) => ({
+            id: `scenario-marker-${marker.toLowerCase().replace(/[^a-z0-9]+/gu, '-')}`,
+            pass: observedInToolResult,
+            detail: `scenario output marker ${marker} ${observedInToolResult ? 'observed in tool result' : 'missing from tool results'}`,
+        })),
         {
             id: 'ask-user-visible',
-            pass: /\[ASK\] ASK-CANONICAL: responda SIM para fechar o teste/.test(plain),
-            detail: 'ask_user prompt rendered persistently',
+            pass: scenario.askRenderedRe.test(plain),
+            detail: `ask_user prompt rendered persistently for scenario=${scenario.id}`,
         },
         {
             id: 'ask-user-single-source',
@@ -2138,16 +2442,51 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
         },
         {
             id: 'ask-user-answer',
-            pass: /Resposta enviada para pergunta pendente/.test(plain) || /resposta=SIM/.test(plain),
-            detail: 'human answer was registered',
+            pass:
+                /Resposta enviada para pergunta pendente/.test(plain) ||
+                new RegExp(`resposta=${escapeRegExp(scenario.answerSteps.at(-1)?.answer ?? '')}`, 'iu').test(plain) ||
+                scenario.finalAnswerRe.test(plain),
+            detail: `human answer was registered for scenario=${scenario.id}`,
         },
         {
             id: 'ask-user-answer-not-assistant-echo',
             pass:
-                !/\[LLM-B\] Mensagem[\s\S]{0,240}\n\s*│\s+SIM(?:\s|$)/.test(plain) &&
-                !/\]\s+🧠\s+LLM-B[\s\S]{0,240}\n\s*│\s+SIM(?:\s|$)/.test(plain),
+                !new RegExp(
+                    `\\[LLM-B\\] Mensagem[\\s\\S]{0,240}\\n\\s*│\\s+${escapeRegExp(scenario.answerSteps.at(-1)?.answer ?? '')}(?:\\s|$)`,
+                    'u',
+                ).test(plain) &&
+                !new RegExp(
+                    `\\]\\s+🧠\\s+LLM-B[\\s\\S]{0,240}\\n\\s*│\\s+${escapeRegExp(scenario.answerSteps.at(-1)?.answer ?? '')}(?:\\s|$)`,
+                    'u',
+                ).test(plain),
             detail: 'human answer was not rendered as an LLM-B authored transcript or live delta',
         },
+        ...(scenario.invalidChoiceExpected
+            ? [
+                  {
+                      id: 'ask-user-invalid-choice-feedback',
+                      pass:
+                          /Resposta não corresponde às opções da pergunta pendente/i.test(plain) ||
+                          /Resposta inválida para a pergunta pendente/i.test(plain) ||
+                          /invalid_choice/i.test(plain),
+                      detail: 'choice-only scenario rejected invalid answer before accepting the valid choice',
+                  },
+              ]
+            : []),
+        ...(scenario.recoverableToolErrorExpected
+            ? [
+                  {
+                      id: 'scenario-recoverable-tool-error-observed',
+                      pass: scenarioToolLifecycle.some(
+                          (tool) =>
+                              tool.name === 'exec_command' &&
+                              tool.expectedOutcome === 'failure' &&
+                              (tool.lifecycle.failed || tool.lifecycle.postToolFailure),
+                      ),
+                      detail: 'recoverable tool error was observed in structured lifecycle/postToolUse data before successful continuation',
+                  },
+              ]
+            : []),
         {
             id: 'post-ask-final-visible',
             pass: finalRenderedByLiveTurn || finalRenderedByAssistantMessage,
@@ -2236,7 +2575,7 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
         },
         {
             id: 'no-terminal-errors',
-            pass: /Nenhum erro recente/.test(plain) && !/\bERROR\b/.test(plain),
+            pass: /Nenhum erro recente/.test(plain) && !/\bERROR\b/.test(plainWithoutExpectedScenarioMarkers),
             detail: 'terminal error tracker stayed clean',
         },
         {
@@ -2643,7 +2982,17 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
 function evaluateByokRealOutput(
     plain,
     secretValues,
-    { profile, altProfile, model, altModel, noPr = false, runtimeSelector, runtimeRoute, requireVisionProbe = false } = {},
+    {
+        profile,
+        altProfile,
+        model,
+        altModel,
+        noPr = false,
+        runtimeSelector,
+        runtimeRoute,
+        requireVisionProbe = false,
+        liveScenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID],
+    } = {},
 ) {
     const byokModels = [...new Set([model, altModel].filter((value) => typeof value === 'string' && value.length > 0))];
     const byokModelPrLines = byokModels.flatMap((candidate) => {
@@ -2654,7 +3003,7 @@ function evaluateByokRealOutput(
         !noPr &&
         (/\[intervene→turn\]/u.test(plain) ||
             /(?:^|\n)\s*│\s+DELTA-CANONICAL-\d/u.test(plain) ||
-            /\[ASK\]\s+ASK-CANONICAL/u.test(plain));
+            liveScenario.askRenderedRe.test(plain));
     const byokUsageClassified =
         /\bclasse=byok_user_message\b/u.test(plain) ||
         /"classification"\s*:\s*"byok_user_message"/u.test(plain);
@@ -2915,7 +3264,7 @@ function evaluateBlockedOutput(plain, sseSummary, blocker) {
     ];
 }
 
-async function inspectExportedMarkdown(exportPath) {
+async function inspectExportedMarkdown(exportPath, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
     try {
         const content = await readFile(exportPath, 'utf8');
         const envelopes = [...content.matchAll(/^>\s+envelope=([^·\n]+)\s+·\s+trace=([^·\n]+)\s+·\s+turn=([^·\n]+)\s+·\s+evento=([^\n]+)$/gmu)].map(
@@ -2929,14 +3278,15 @@ async function inspectExportedMarkdown(exportPath) {
         return {
             ok: true,
             detail: `${content.length} chars`,
-            hasTranscript: /DELTA-CANONICAL-8/.test(content) || /ASK-CANONICAL/.test(content),
+            hasTranscript: /DELTA-CANONICAL-8/.test(content) || scenario.askQuestionRe.test(content),
             hasStreamingDiagnostics: /streaming=/.test(content),
             hasEnvelope: /envelope=/.test(content),
-            hasAskUser: /ask_user solicitou resposta humana:[\s\S]*ASK-CANONICAL: responda SIM para fechar o teste/iu.test(
-                content,
-            ),
-            hasAskUserAnswer: /##\s+👤\s+Usu[aá]rio[\s\S]*Resposta ao ask_user:[\s\S]*\bSIM\b/iu.test(content),
-            hasPostAskFinal: POST_ASK_FINAL_RE.test(content),
+            hasAskUser:
+                /ask_user solicitou resposta humana:/iu.test(content) && scenario.askQuestionRe.test(content),
+            hasAskUserAnswer:
+                /##\s+👤\s+Usu[aá]rio[\s\S]*Resposta ao ask_user:/iu.test(content) &&
+                scenario.finalAnswerRe.test(content),
+            hasPostAskFinal: scenario.postAskFinalRe.test(content),
             envelopes,
             content,
         };
@@ -3066,7 +3416,16 @@ async function main() {
     const byokReal = hasFlag('--byok-real');
     const byokControlProbe = !byokReal && (byokProbe || byokFixture);
     const autoControlProbe = autoProbe && !byokReal && !byokControlProbe;
-    const scenarioKind = liveScenarioKind({ autoControlProbe, byokControlProbe, byokFixture, byokReal, noPr, sessionCycle });
+    const liveScenario = readLiveScenario();
+    const scenarioKind = liveScenarioKind({
+        autoControlProbe,
+        byokControlProbe,
+        byokFixture,
+        byokReal,
+        noPr,
+        sessionCycle,
+        liveScenario,
+    });
     const byokRealProfile = readArg('--byok-real-profile', '');
     const byokRealAltProfile = readArg('--byok-real-alt-profile', '');
     const byokRealModel = readArg('--byok-real-model', '');
@@ -3155,6 +3514,7 @@ async function main() {
             mdPath,
             transport: requestedTransport,
             realByok,
+            liveScenario,
         });
         console.log(`[terminal-live] summary: ${path.relative(ROOT, mdPath)}`);
         console.error(`[terminal-live] BLOCKED: ${blocker.id}`);
@@ -3185,13 +3545,13 @@ async function main() {
             : byokReal
               ? [
                     ...buildByokRealPreflightCommands(realByok ?? {}),
-                    ...(noPr ? buildByokRealNoPrDiagnosticCommands() : [buildScenarioPrompt()]),
+                    ...(noPr ? buildByokRealNoPrDiagnosticCommands() : [buildScenarioPrompt(liveScenario)]),
                 ]
                     .filter(Boolean)
                     .join('\n')
             : noPr
               ? buildNoPrProbeCommands().join('\n')
-              : buildScenarioPrompt();
+              : buildScenarioPrompt(liveScenario);
         await writeFile(path.join(outDir, 'prompt.txt'), `${prompt}\n`, 'utf8');
         console.log(`[terminal-live] dry-run prompt written to ${path.relative(ROOT, path.join(outDir, 'prompt.txt'))}`);
         await byokFixtureProvider?.close();
@@ -3224,6 +3584,7 @@ async function main() {
             transport: requestedTransport,
             realByok,
             sdkSessionBootSelection,
+            liveScenario,
         });
         console.log(`[terminal-live] summary: ${path.relative(ROOT, mdPath)}`);
         console.error(`[terminal-live] BLOCKED: ${blocker.id}`);
@@ -3241,6 +3602,8 @@ async function main() {
     let raw = '';
     let readySent = false;
     let answerSent = false;
+    let answerSequenceStarted = false;
+    let answerStepIndex = 0;
     let postCommandsSent = false;
     let quitSent = false;
     let scenarioSent = false;
@@ -3369,6 +3732,19 @@ async function main() {
             }
         }, diagnostics.length * 450 + 1_500).unref();
     };
+    const invalidChoiceFeedbackRe =
+        /Resposta não corresponde às opções da pergunta pendente|Resposta inválida para a pergunta pendente|invalid_choice/iu;
+    const sendScenarioAnswerStep = (plain, step) => {
+        if (!step) return;
+        answerSequenceStarted = true;
+        answerStepIndex += 1;
+        const isFinalAnswer = answerStepIndex >= liveScenario.answerSteps.length;
+        if (isFinalAnswer) {
+            answerSent = true;
+            answerPlainOffset = plain.length;
+        }
+        setTimeout(() => write(step.answer), Math.max(0, Number(step.delayMs ?? 500))).unref();
+    };
     const timeout = setTimeout(() => {
         timedOut = true;
         byokNoPrCanQuit = true;
@@ -3434,7 +3810,7 @@ async function main() {
                         }
                         scenarioPlainOffset = stripAnsi(raw).length;
                         scenarioSent = true;
-                        write(buildScenarioPrompt());
+                        write(buildScenarioPrompt(liveScenario));
                     }
                 });
                 return;
@@ -3443,15 +3819,21 @@ async function main() {
             write('/activity 12');
             scenarioPlainOffset = stripAnsi(raw).length;
             scenarioSent = true;
-            write(buildScenarioPrompt());
+            write(buildScenarioPrompt(liveScenario));
         }
-        if (!answerSent && /\[ASK\] ASK-CANONICAL: responda SIM para fechar o teste/.test(plain)) {
-            answerSent = true;
-            answerPlainOffset = plain.length;
-            setTimeout(() => write('SIM'), 500).unref();
+        if (!answerSent && answerStepIndex === 0 && liveScenario.askRenderedRe.test(plain)) {
+            sendScenarioAnswerStep(plain, liveScenario.answerSteps[0]);
+        }
+        if (
+            answerSequenceStarted &&
+            !answerSent &&
+            answerStepIndex < liveScenario.answerSteps.length &&
+            invalidChoiceFeedbackRe.test(plain)
+        ) {
+            sendScenarioAnswerStep(plain, liveScenario.answerSteps[answerStepIndex]);
         }
         const afterAnswerPlain = answerSent ? plain.slice(answerPlainOffset) : '';
-        if (answerSent && !postAskContinuationObserved && POST_ASK_FINAL_RE.test(afterAnswerPlain)) {
+        if (answerSent && !postAskContinuationObserved && liveScenario.postAskFinalRe.test(afterAnswerPlain)) {
             postAskContinuationObserved = true;
         }
         if (postAskContinuationObserved && !postCommandsSent && TURN_SETTLED_AFTER_ASK_RE.test(afterAnswerPlain)) {
@@ -3467,7 +3849,7 @@ async function main() {
             byokReal &&
             !answerSent &&
             !postCommandsSent &&
-            findByokRealLiveToolProtocolMiss(scenarioTailPlain)
+            findByokRealLiveToolProtocolMiss(scenarioTailPlain, liveScenario)
         ) {
             pendingByokLiveProtocolDiagnostics = true;
         }
@@ -3559,8 +3941,10 @@ async function main() {
               postAskContinuationObserved,
               postCommandsSent,
               sseEvents: sseSummary.events,
+              liveScenario,
           });
-    const exportSummary = noPr || byokControlProbe || autoControlProbe || blocker ? null : await inspectExportedMarkdown(exportPath);
+    const exportSummary =
+        noPr || byokControlProbe || autoControlProbe || blocker ? null : await inspectExportedMarkdown(exportPath, liveScenario);
     const baseCriteria = blocker
         ? evaluateBlockedOutput(plain, sseSummary, blocker)
         : autoControlProbe
@@ -3569,7 +3953,7 @@ async function main() {
           ? evaluateByokProbeOutput(plain, sseSummary, { fixture: byokFixture })
           : noPr
             ? evaluateNoPrOutput(plain, sseSummary)
-            : evaluateOutput(plain, sseSummary, exportSummary);
+            : evaluateOutput(plain, sseSummary, exportSummary, liveScenario);
     const criteria = [
         ...baseCriteria,
         ...(byokReal
@@ -3577,6 +3961,7 @@ async function main() {
                   ...(realByok ?? {}),
                   noPr,
                   requireVisionProbe: byokRealRequireVisionProbe,
+                  liveScenario,
               })
             : []),
     ];
@@ -3663,6 +4048,13 @@ async function main() {
                 durationMs,
                 exitCode,
                 scenarioKind,
+                liveScenario: {
+                    id: liveScenario.id,
+                    description: liveScenario.description,
+                    askQuestion: liveScenario.askQuestion,
+                    finalMarker: liveScenario.finalMarker,
+                    invalidChoiceExpected: liveScenario.invalidChoiceExpected,
+                },
                 criteria: finalCriteria,
                 sse: sseSummary,
                 byokReal: realByok?.redacted ?? null,
@@ -3707,6 +4099,7 @@ async function main() {
             liveHealthRecord,
             liveScenarioRunRecord,
             sdkSessionBootSelection,
+            liveScenario,
         }),
         'utf8',
     );

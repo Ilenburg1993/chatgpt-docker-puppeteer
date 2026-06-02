@@ -6,6 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -4520,6 +4521,66 @@ describe('model-gateway foundation', () => {
         assert.equal(scripts['model-gateway:scripts'], 'node scripts/model-gateway/run.mjs --list-json');
         assert.equal(scripts['model-gateway:live:llm-b'], 'node scripts/model-gateway/run.mjs llmBLiveTest');
         assert.deepEqual(directlyCoupledScripts, []);
+    });
+
+    it('renders terminal LLM-B live scenario prompts through the canonical runner', async () => {
+        const tempDir = await mkdtemp(join(tmpdir(), 'terminal-llm-b-live-scenarios-'));
+        try {
+            const scenarios = [
+                {
+                    id: 'canonical',
+                    ask: 'ASK-CANONICAL: responda SIM para fechar o teste',
+                    final: 'POST-ASK-CANONICAL-FINAL: usuário confirmou SIM',
+                },
+                {
+                    id: 'freeform',
+                    ask: 'ASK-FREEFORM: responda livremente para fechar o teste',
+                    final: 'POST-ASK-FREEFORM-FINAL: usuário respondeu livremente',
+                },
+                {
+                    id: 'invalid-choice',
+                    ask: 'ASK-CHOICE: escolha SIM para fechar o teste',
+                    final: 'POST-ASK-CHOICE-FINAL: usuário escolheu SIM após tentativa inválida',
+                },
+                {
+                    id: 'long-tool-heartbeat',
+                    ask: 'ASK-LONGTOOL: responda SIM depois da tool longa',
+                    final: 'POST-ASK-LONGTOOL-FINAL: tool longa concluída e usuário confirmou SIM',
+                    extra: 'LONG-TOOL-HEARTBEAT-DONE',
+                },
+                {
+                    id: 'recoverable-tool-error',
+                    ask: 'ASK-RECOVERABLE: responda SIM depois da recuperação',
+                    final: 'POST-ASK-RECOVERABLE-FINAL: erro de tool foi recuperado e usuário confirmou SIM',
+                    extra: 'RECOVERABLE-TOOL-ERROR',
+                },
+            ];
+
+            for (const scenario of scenarios) {
+                const outDir = join(tempDir, scenario.id);
+                const result = spawnSync(
+                    process.execPath,
+                    [
+                        'scripts/model-gateway/run.mjs',
+                        'llmBLiveTest',
+                        '--dry-run',
+                        `--live-scenario=${scenario.id}`,
+                        `--out-dir=${outDir}`,
+                    ],
+                    { encoding: 'utf8', maxBuffer: 1024 * 1024 },
+                );
+
+                assert.equal(result.status, 0, result.stderr || result.stdout);
+                const prompt = await readFile(join(outDir, 'prompt.txt'), 'utf8');
+                assert.ok(prompt.includes('report_intent'));
+                assert.ok(prompt.includes('read_file_content'));
+                assert.ok(prompt.includes(scenario.ask));
+                assert.ok(prompt.includes(scenario.final));
+                if (scenario.extra) assert.ok(prompt.includes(scenario.extra));
+            }
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
     });
 
     it('creates secret-safe universal catalog evidence contracts', () => {
