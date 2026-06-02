@@ -168,6 +168,9 @@ function humanEventLabel(event) {
     if (event === 'terminal.started') return 'Terminal iniciado';
     if (event === 'dialog.loop.changed') return 'Conversa alterada';
     if (event === 'quota.warning') return 'Aviso de quota';
+    if (event === 'session.model_changed') return 'Modelo alterado';
+    if (event === 'session.skills_loaded') return 'Skills carregadas';
+    if (event === 'session.info') return 'Info da sessão';
     if (event === 'agent.background.completed') return 'Tarefa em background concluída';
     if (event === 'agent.background.idle') return 'Background ocioso';
     if (event === 'dialog.turn_start' || event === 'assistant.turn_start') return 'Turno iniciado';

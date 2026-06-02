@@ -2343,7 +2343,15 @@
 - [x] Live PTY `--auto-probe` repetida após correção da timeline/event labels:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --auto-probe --timeout-ms=110000 --transport=pty --out-dir=artifacts/terminal-live/ux-auto-model-selection-cycle-20260602-1558`.
 - [x] Resultado: PASS completo; `/activity` mostrou `Conectando conversa`, `/events` resumido mostrou `Runtime pronto`, `Terminal iniciado`, `Conversa alterada` e `Aviso de quota`. O único `dialog loop` restante apareceu apenas no JSON bruto de `/events --raw`.
-- [ ] Criar/rodar live PTY dedicada a `/model auto`, `/model <id>` e confirmação `session.model_changed`, separada do ciclo BYOK auto.
+- [x] Criar/rodar live PTY dedicada a `/model auto`, `/model <id>` e confirmação `session.model_changed`, separada do ciclo BYOK auto.
+- [x] Runner live ganhou `--model-probe`, que desliga BYOK no ambiente do cenário, não abre turno LLM e exercita `/model`, `/model stats`, `/model auto`, `/model gpt-4.1-mini`, `/activity`, `/events`, `/events --raw` e `/errors`.
+- [x] Live PTY dedicada a model switching executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --model-probe --timeout-ms=90000 --transport=pty --out-dir=artifacts/terminal-live/ux-model-switch-cycle-20260602-1616`.
+- [x] Achado da live corrigido: `/events` resumido trocou `session model changed`, `session skills loaded` e `session info` por `Modelo alterado`, `Skills carregadas` e `Info da sessão`.
+- [x] Achado da live corrigido: activity/status line de confirmação SDK trocou `Modelo SDK alterado` por `Modelo confirmado`.
+- [x] Live PTY `--model-probe` repetida após correção:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --model-probe --timeout-ms=90000 --transport=pty --out-dir=artifacts/terminal-live/ux-model-switch-cycle-20260602-1620`.
+- [x] Resultado: PASS completo; `/model auto`, `/model gpt-4.1-mini`, `SDK confirmou ...`, `/activity` e `/events` ficaram humanos, com `session.model_changed` preservado apenas no SSE/JSON bruto.
 - [ ] Avaliar se o operador precisa de um painel único “Modelo solicitado x modelo efetivo” em `/now` ou `/status`, para reduzir ambiguidade entre pedido local, seleção BYOK e confirmação SDK.
 - [x] `/usage now` default reduziu densidade de vínculo: `runtime ... · SDK ... · hub ...` virou `runtime, SDK e hub conectados`; IDs ficaram em `/usage now detail`.
 - [x] `/usage now` trocou `GitHub Copilot quota/PR side-channel` por `Quota Copilot observada`, preservando a distinção de BYOK como não-cobrança BYOK.

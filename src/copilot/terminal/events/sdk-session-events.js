@@ -1027,7 +1027,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 recordHistory: false,
             });
         });
-        recordTerminalActivity('system', 'Modelo SDK alterado', {
+        recordTerminalActivity('system', 'Modelo confirmado', {
             detail: `de ${previousModel} para ${newModel}${reasoningEffort ? ` · raciocínio ${reasoningEffort}` : ''}`,
             source: 'sdk',
         });

@@ -50,5 +50,12 @@ describe('terminal/dialog/dialog-runtime', () => {
         const repl = await readFile(new URL('../../../../src/copilot/terminal/repl/repl.js', import.meta.url), 'utf8');
         expect(repl).toContain("'Inicializando conversa'");
         expect(repl).not.toContain("'Inicializando dialog loop'");
+
+        const sdkEvents = await readFile(
+            new URL('../../../../src/copilot/terminal/events/sdk-session-events.js', import.meta.url),
+            'utf8',
+        );
+        expect(sdkEvents).toContain("'Modelo confirmado'");
+        expect(sdkEvents).not.toContain("'Modelo SDK alterado'");
     });
 });

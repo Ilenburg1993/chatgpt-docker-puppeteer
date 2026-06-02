@@ -164,6 +164,17 @@ describe('terminal/commands/events', () => {
                     hubSessionId: null,
                     payload: { quotaId: 'premium_interactions' },
                 },
+                {
+                    timestamp: 1710000003000,
+                    eventId: 4,
+                    event: 'session.model_changed',
+                    source: 'sdk/session.model_changed',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { previousModel: 'auto', newModel: 'gpt-4.1-mini' },
+                },
             ],
         });
         const ctx = mockCtx();
@@ -173,9 +184,11 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('Conversa alterada');
         expect(ctx.output()).toContain('Runtime pronto');
         expect(ctx.output()).toContain('Aviso de quota');
+        expect(ctx.output()).toContain('Modelo alterado');
         expect(ctx.output()).not.toContain('dialog loop changed');
         expect(ctx.output()).not.toContain('terminal runtime wired');
         expect(ctx.output()).not.toContain('quota warning');
+        expect(ctx.output()).not.toContain('session model changed');
     });
 
     it('consulta por tool call, request e hub session', async () => {

@@ -62,6 +62,7 @@ Common options:
   --byok-real-route-timeout-ms=<ms>
   --byok-real-require-vision-probe
   --auto-probe
+  --model-probe
   --live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error|file-write-roundtrip>
   --structured-input-cycle
   --menu-cycle
@@ -406,6 +407,24 @@ function buildAutoProbeCommands({ profile = 'repo_agent' } = {}) {
         `/byok auto recovery-fixture profile:${routeProfile} provider:zai model:glm-4.5-flash failure:rate-limit`,
         '/byok auto recoveries 10',
         '/events 40',
+        '/events 80 --raw',
+        '/errors 10',
+        '/quit',
+    ];
+}
+
+function buildModelProbeCommands() {
+    return [
+        '/usage now',
+        '/activity 20',
+        '/model',
+        '/model stats',
+        '/model auto',
+        '/model',
+        '/model gpt-4.1-mini',
+        '/model',
+        '/activity 30',
+        '/events 50',
         '/events 80 --raw',
         '/errors 10',
         '/quit',
@@ -1939,12 +1958,14 @@ function liveScenarioKind({
     structuredInputCycle,
     menuCycle,
     uxCycle,
+    modelControlProbe,
     liveScenario,
 }) {
     if (sessionCycle) return 'session_cycle';
     if (structuredInputCycle) return 'structured_input_cycle';
     if (menuCycle) return 'menu_cycle';
     if (uxCycle) return 'default_ux_cycle';
+    if (modelControlProbe) return 'model_probe';
     if (autoControlProbe) return 'auto_probe';
     if (byokFixture) return 'byok_fixture_no_pr';
     if (byokControlProbe) return 'byok_control_no_pr';
@@ -3623,6 +3644,80 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
     ];
 }
 
+function evaluateModelProbeOutput(plain, sseSummary) {
+    const archiveRawEvents = extractArchiveRawEvents(plain);
+    const defaultSurface = plain.split(/\/events\s+80\s+--raw/iu)[0] ?? plain;
+    return [
+        {
+            id: 'ready',
+            pass: /LLM-B pronta/.test(plain),
+            detail: 'terminal reached ready state',
+        },
+        {
+            id: 'interactive-repl',
+            pass: !/Modo headless detectado/.test(plain),
+            detail: 'terminal ran with an interactive REPL/TTY surface',
+        },
+        {
+            id: 'no-explicit-turn',
+            pass: !/\[intervene→turn\]/.test(plain) && !/Processando mensagem/.test(plain),
+            detail: 'model probe did not open an explicit LLM turn',
+        },
+        {
+            id: 'model-current-visible',
+            pass: /Modelo ativo:\s+auto/u.test(plain) && /autoridade GitHub Copilot/u.test(plain),
+            detail: '/model rendered the current native auto model policy in human language',
+        },
+        {
+            id: 'model-auto-visible',
+            pass:
+                /Modelo configurado:[\s\S]{0,220}auto/u.test(plain) &&
+                /Auto usa roteamento nativo do Copilot/u.test(plain),
+            detail: '/model auto rendered native routing guidance without BYOK/provider jargon',
+        },
+        {
+            id: 'model-explicit-visible',
+            pass:
+                /Modelo configurado:[\s\S]{0,260}gpt-4\.1-mini/u.test(plain) &&
+                /Raciocínio ajustado|raciocínio/u.test(plain),
+            detail: '/model <id> rendered a local model change and reasoning guidance',
+        },
+        {
+            id: 'model-no-byok-blocker',
+            pass: !/BYOK está ativo: \/model <id> não troca provider customizado/u.test(plain),
+            detail: 'native model probe disabled BYOK so /model could exercise SDK-native switching copy',
+        },
+        {
+            id: 'model-human-default-copy',
+            pass: !/\b(?:preferência local=|autoridade=|último efetivo=|Modelo SDK:|model_changed|providerCall=nao|liveSetModel=)\b/iu.test(
+                defaultSurface,
+            ),
+            detail: 'model control surfaces avoided raw key-value and SDK event jargon in default copy',
+        },
+        {
+            id: 'model-sse-archive-query-visible',
+            pass: /Eventos SSE/.test(plain) && /arquivo(?:=|\s)/.test(plain),
+            detail: '/events rendered the durable public SSE archive tail during model probe',
+        },
+        {
+            id: 'model-sse-archive-raw-visible',
+            pass: archiveRawEvents.length > 0,
+            detail: `/events --raw exposed ${archiveRawEvents.length} archived control event(s)`,
+        },
+        {
+            id: 'no-terminal-errors',
+            pass: /Nenhum erro recente/.test(plain) && !/\bERROR\b/.test(plain),
+            detail: 'terminal error tracker stayed clean',
+        },
+        {
+            id: 'clean-quit',
+            pass: /readline fechado/.test(plain),
+            detail: 'terminal exited through /quit',
+        },
+        ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false, plain }),
+    ];
+}
+
 function evaluateByokRealOutput(
     plain,
     secretValues,
@@ -4058,13 +4153,16 @@ async function main() {
     const byokProbe = hasFlag('--byok-probe');
     const byokFixture = hasFlag('--byok-fixture');
     const autoProbe = hasFlag('--auto-probe');
+    const modelProbe = hasFlag('--model-probe');
     const autoProbeProfile = readArg('--auto-probe-profile', 'repo_agent');
     const byokReal = hasFlag('--byok-real');
     const byokControlProbe = !byokReal && (byokProbe || byokFixture);
     const autoControlProbe = autoProbe && !byokReal && !byokControlProbe;
+    const modelControlProbe = modelProbe && !byokReal && !byokControlProbe && !autoControlProbe;
     const liveScenario = readLiveScenario();
     const scenarioKind = liveScenarioKind({
         autoControlProbe,
+        modelControlProbe,
         byokControlProbe,
         byokFixture,
         byokReal,
@@ -4231,6 +4329,8 @@ async function main() {
     if (dryRun) {
         const prompt = autoControlProbe
             ? buildAutoProbeCommands({ profile: autoProbeProfile }).join('\n')
+            : modelControlProbe
+            ? buildModelProbeCommands().join('\n')
             : byokControlProbe
             ? buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl }).join('\n')
             : byokReal
@@ -4250,7 +4350,7 @@ async function main() {
     }
 
     const shouldForceFreshSdkSession =
-        !reuseSdkSession && !noPr && !sessionCycle && !byokControlProbe && !autoControlProbe;
+        !reuseSdkSession && !noPr && !sessionCycle && !byokControlProbe && !autoControlProbe && !modelControlProbe;
     const sdkSessionBootSelection = await scheduleFreshSdkSessionForCanonicalScenario({
         enabled: shouldForceFreshSdkSession,
     });
@@ -4326,6 +4426,7 @@ async function main() {
             ...process.env,
             ...dotenvEnv,
             ...(byokFixture ? buildByokFixtureEnv({ baseUrl: byokFixtureBaseUrl }) : {}),
+            ...(modelControlProbe ? { COPILOT_BYOK_ENABLED: 'false' } : {}),
             ...(realByok?.env ?? {}),
             COPILOT_MODEL: 'auto',
             COPILOT_REASONING_EFFORT: 'high',
@@ -4484,6 +4585,10 @@ async function main() {
                 sendCommandSequence(write, buildAutoProbeCommands({ profile: autoProbeProfile }), { delayMs: 900 });
                 return;
             }
+            if (modelControlProbe) {
+                sendCommandSequence(write, buildModelProbeCommands(), { delayMs: 900 });
+                return;
+            }
             if (byokControlProbe || noPr || byokReal) {
                 const commands = byokReal
                     ? [
@@ -4634,7 +4739,7 @@ async function main() {
         raw: '',
         disabled: !collectSse,
     };
-    const blocker = noPr || byokControlProbe || autoControlProbe
+    const blocker = noPr || byokControlProbe || autoControlProbe || modelControlProbe
         ? null
         : detectLiveBlocker(plain, {
               timedOut,
@@ -4645,11 +4750,15 @@ async function main() {
               liveScenario,
           });
     const exportSummary =
-        noPr || byokControlProbe || autoControlProbe || blocker ? null : await inspectExportedMarkdown(exportPath, liveScenario);
+        noPr || byokControlProbe || autoControlProbe || modelControlProbe || blocker
+            ? null
+            : await inspectExportedMarkdown(exportPath, liveScenario);
     const baseCriteria = blocker
         ? evaluateBlockedOutput(plain, sseSummary, blocker)
         : autoControlProbe
           ? evaluateAutoProbeOutput(plain, sseSummary, { profile: autoProbeProfile })
+          : modelControlProbe
+          ? evaluateModelProbeOutput(plain, sseSummary)
           : byokControlProbe
           ? evaluateByokProbeOutput(plain, sseSummary, { fixture: byokFixture })
           : noPr
