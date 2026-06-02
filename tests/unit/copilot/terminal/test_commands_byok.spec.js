@@ -705,6 +705,8 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                     upstreamProvider: null,
                     score: 91,
                     hasRuntimeProof: true,
+                    needsProbe: false,
+                    standbyClass: 'new_provider',
                     runtimeEnvStatus: 'ready',
                     reasons: ['runtime_selector_fallback:alternate1'],
                     commands: {

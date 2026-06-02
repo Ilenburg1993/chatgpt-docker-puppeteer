@@ -710,6 +710,8 @@ function runtimeSelectorStandbyCommands(selected, timeoutMs) {
  *   upstreamProvider: string | null;
  *   score: number | null;
  *   hasRuntimeProof: boolean;
+ *   needsProbe: boolean;
+ *   standbyClass: 'selected_route' | 'new_model_same_provider' | 'new_provider';
  *   runtimeEnvStatus: string | null;
  *   reasons: string[];
  *   commands: ReturnType<typeof runtimeSelectorStandbyCommands>;
@@ -724,6 +726,7 @@ export function buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, optio
     const includeSelected = options.includeSelected !== false;
     const rows = [];
     for (const route of runtimeSelectorPlan.routes) {
+        const selectedProviderId = optionalString(optionalRecord(route.selected)['providerId']);
         const candidates = [
             ...(includeSelected && route.selected
                 ? [
@@ -750,20 +753,29 @@ export function buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, optio
         for (const candidate of candidates) {
             const selected = optionalRecord(candidate.selected);
             if (!selected) continue;
+            const providerId = optionalString(selected['providerId']);
+            const hasRuntimeProof = candidate.hasRuntimeProof === true;
             rank += 1;
             rows.push({
                 profileId: route.profileId,
                 rank,
                 source: candidate.source,
                 selectedRouteKey: optionalString(candidate.selectedRouteKey) ?? routeKey(selected),
-                providerId: optionalString(selected['providerId']),
+                providerId,
                 providerModel: optionalString(selected['providerModel']),
                 selectorSyntax: runtimeSelectorRouteModel(selected),
                 routeLayer: routeMetadataString(selected, 'routeLayer'),
                 wireApi: routeMetadataString(selected, 'wireApi'),
                 upstreamProvider: routeMetadataString(selected, 'upstreamProvider'),
                 score: optionalNumber(selected['score']),
-                hasRuntimeProof: candidate.hasRuntimeProof === true,
+                hasRuntimeProof,
+                needsProbe: !hasRuntimeProof,
+                standbyClass:
+                    candidate.source === 'selected'
+                        ? 'selected_route'
+                        : providerId && selectedProviderId && providerId === selectedProviderId
+                            ? 'new_model_same_provider'
+                            : 'new_provider',
                 runtimeEnvStatus: optionalString(optionalRecord(candidate.runtimeEnv)?.['status']),
                 reasons: candidate.reasons,
                 commands: runtimeSelectorStandbyCommands(selected, timeoutMs),
@@ -789,7 +801,11 @@ export function buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, optio
  *     selectedCount: number;
  *     alternateCount: number;
  *     runtimeProofCount: number;
+ *     needsProbeCount: number;
  *     providerCount: number;
+ *     selectedRouteCount: number;
+ *     newModelSameProviderCount: number;
+ *     newProviderCount: number;
  *     sameBoundaryCommandCount: number;
  *     newProviderCommandCount: number;
  *     probeCommandCount: number;
@@ -832,7 +848,11 @@ export function buildModelGatewayRuntimeStandbyPlan(runtimeSelectorPlan, options
             selectedCount: routes.filter((row) => row.source === 'selected').length,
             alternateCount: routes.filter((row) => row.source === 'candidate_alternative').length,
             runtimeProofCount: routes.filter((row) => row.hasRuntimeProof).length,
+            needsProbeCount: routes.filter((row) => row.needsProbe).length,
             providerCount: new Set(routes.map((row) => row.providerId).filter(Boolean)).size,
+            selectedRouteCount: routes.filter((row) => row.standbyClass === 'selected_route').length,
+            newModelSameProviderCount: routes.filter((row) => row.standbyClass === 'new_model_same_provider').length,
+            newProviderCount: routes.filter((row) => row.standbyClass === 'new_provider').length,
             sameBoundaryCommandCount: routes.filter((row) => row.commands.liveModel).length,
             newProviderCommandCount: routes.filter((row) => row.commands.provider).length,
             probeCommandCount: routes.filter((row) => row.commands.probeAgent || row.commands.probeChat).length,

@@ -172,7 +172,7 @@ Os effects do controller agora carregam `authorization`, `policyGate` e `blocked
 - [x] D.5 Persistir ultimo standby plan por profile no SQLite.
 - [x] D.6 Expor leitura read-only do standby persistido.
 - [x] D.7 Expor standby plan no cockpit terminal.
-- [ ] D.8 Separar `same_boundary`, `new_model_same_provider`, `new_provider`, `needs_probe`.
+- [x] D.8 Separar `selected_route`, `new_model_same_provider`, `new_provider`, `needs_probe`.
 - [ ] D.9 Registrar origem da exclusao quando standby estiver vazio.
 - [ ] D.10 Criar fixture de standby com falha da rota primaria.
 

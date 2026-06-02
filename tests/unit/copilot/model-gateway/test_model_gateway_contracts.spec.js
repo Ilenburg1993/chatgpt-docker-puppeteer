@@ -1274,6 +1274,8 @@ describe('model-gateway foundation', () => {
         assert.equal(standbyRoutes[0].commands.liveModel, '/byok model openai/gpt-oss-120b:groq');
         assert.equal(standbyRoutes[0].commands.provider, '/byok provider openrouter openai/gpt-oss-120b:groq');
         assert.equal(standbyRoutes[0].commands.persistProvider, '/byok persist provider openrouter openai/gpt-oss-120b:groq');
+        assert.equal(standbyRoutes[0].standbyClass, 'selected_route');
+        assert.equal(standbyRoutes[0].needsProbe, false);
         const standbyPlan = buildModelGatewayRuntimeStandbyPlan(runtimeSelectorPlan, {
             limit: 4,
             timeoutMs: 15_000,
@@ -1284,6 +1286,9 @@ describe('model-gateway foundation', () => {
         assert.equal(standbyPlan.profileId, 'repo_agent');
         assert.equal(standbyPlan.summary.routeCount, standbyPlan.routes.length);
         assert.equal(standbyPlan.summary.providerCount > 0, true);
+        assert.equal(standbyPlan.summary.selectedRouteCount > 0, true);
+        assert.equal(standbyPlan.summary.newProviderCount >= 0, true);
+        assert.equal(standbyPlan.summary.needsProbeCount >= 0, true);
         assert.equal(standbyPlan.nextCommands.includes('/byok probe agent provider:openrouter model:openai/gpt-oss-120b timeout:15000'), true);
 
         const strictRuntimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(requireRuntimeProof, {

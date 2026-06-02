@@ -2490,7 +2490,7 @@ async function renderByokGatewayOperatorReady(println, rest) {
     }
     for (const [index, row] of standbyRows.slice(0, Math.min(limit, 5)).entries()) {
         println(
-            `    standby ${index + 1}:  \x1b[33m${row.providerId}:${row.providerModel}\x1b[0m \x1b[90m${row.source} · proof=${row.hasRuntimeProof ? 'sim' : 'nao'} · env=${row.runtimeEnvStatus ?? '-'}\x1b[0m`,
+            `    standby ${index + 1}:  \x1b[33m${row.providerId}:${row.providerModel}\x1b[0m \x1b[90m${row.source} · class=${row.standbyClass ?? '-'} · probe=${row.needsProbe ? 'sim' : 'nao'} · proof=${row.hasRuntimeProof ? 'sim' : 'nao'} · env=${row.runtimeEnvStatus ?? '-'}\x1b[0m`,
         );
         println(`      \x1b[90mprovar: ${row.commands.probeAgent ?? '-'}\x1b[0m`);
         println(`      \x1b[90musar: ${row.commands.liveModel ?? '-'}\x1b[0m`);
@@ -3643,7 +3643,7 @@ async function renderByokGatewayAutoStandby(println, rest) {
     for (const [index, row] of visibleRows.entries()) {
         const source = row.source === 'selected' ? 'selecionada' : 'alternativa';
         println(
-            `    ${index + 1}. \x1b[33m${row.providerId}:${row.providerModel}\x1b[0m  \x1b[90m${source} · profile=${row.profileId} · proof=${row.hasRuntimeProof ? 'sim' : 'nao'} · env=${row.runtimeEnvStatus ?? '-'} · score=${row.score ?? '-'}\x1b[0m`,
+            `    ${index + 1}. \x1b[33m${row.providerId}:${row.providerModel}\x1b[0m  \x1b[90m${source} · class=${row.standbyClass ?? '-'} · probe=${row.needsProbe ? 'sim' : 'nao'} · profile=${row.profileId} · proof=${row.hasRuntimeProof ? 'sim' : 'nao'} · env=${row.runtimeEnvStatus ?? '-'} · score=${row.score ?? '-'}\x1b[0m`,
         );
         println(`       \x1b[90mprovar: ${row.commands.probeAgent ?? '-'}\x1b[0m`);
         println(`       \x1b[90mmesmo provider: ${row.commands.liveModel ?? '-'}\x1b[0m`);

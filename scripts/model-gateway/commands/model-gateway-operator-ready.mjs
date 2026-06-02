@@ -127,6 +127,8 @@ function buildCandidateAction(route) {
         profileId,
         providerId,
         providerModel,
+        standbyClass: optionalString(route['standbyClass']),
+        needsProbe: route['needsProbe'] === true,
         hasRuntimeProof: route['hasRuntimeProof'] === true,
         runtimeEnvStatus: optionalString(route['runtimeEnvStatus']),
         commands: {
@@ -356,6 +358,8 @@ const output = {
         providerId: optionalString(route['providerId']),
         providerModel: optionalString(route['providerModel']),
         hasRuntimeProof: route['hasRuntimeProof'] === true,
+        needsProbe: route['needsProbe'] === true,
+        standbyClass: optionalString(route['standbyClass']),
         runtimeEnvStatus: optionalString(route['runtimeEnvStatus']),
         commands: optionalRecord(route['commands']) ?? {},
     })),

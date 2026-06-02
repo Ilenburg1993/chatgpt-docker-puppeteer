@@ -243,11 +243,11 @@ metadata importers
 - [x] D.3 Separar standby por mesma boundary e por novo provider.
 - [x] D.4 Marcar candidatos ja provados para agent.
 - [x] D.5 Expor leitura read-only da standby list persistida.
-- [ ] D.6 Marcar candidatos que precisam de probe.
+- [x] D.6 Marcar candidatos que precisam de probe.
 - [ ] D.7 Marcar candidatos bloqueados por quota/reset.
 - [ ] D.8 Marcar candidatos bloqueados por auth/key.
-- [ ] D.8 Gerar comandos de troca para cada candidato.
-- [ ] D.9 Gerar comandos de probe para cada candidato.
+- [x] D.8 Gerar comandos de troca para cada candidato.
+- [x] D.9 Gerar comandos de probe para cada candidato.
 - [x] D.10 Usar standby no post-turn recovery.
 
 ### Faixa E - Quota, Rate Limit E Conta/Key
