@@ -136,7 +136,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         : `${C.grey}(sem detalhe)${C.reset}`;
     const actionLine = health?.['recommendedAction']
         ? `${C.yellow}${health['recommendedAction']}${C.reset}`
-        : `${C.grey}none${C.reset}`;
+        : `${C.grey}nenhuma${C.reset}`;
     const askUserLine = health?.['pendingQuestion']
         ? `${C.green}vivo${C.reset}${health?.['pendingQuestionKind'] ? ` [${health['pendingQuestionKind']}]` : ''}`
         : health?.['pendingQuestionShadow']
@@ -157,7 +157,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         configProjection.permissionMode === 'audit_only' || configProjection.permissionMode === 'selective'
             ? configProjection.permissionMode
             : 'approve_all';
-    const permissionLine = `${C.magenta}${permissionMode}${C.reset} ${C.grey}· prompts SDK ${terminalPermissionModeSkipsSdkPrompts(permissionMode) ? 'skip' : 'selective'}${C.reset}`;
+    const permissionLine = `${C.magenta}${permissionMode}${C.reset} ${C.grey}· prompts SDK ${terminalPermissionModeSkipsSdkPrompts(permissionMode) ? 'ignorados' : 'seletivos'}${C.reset}`;
     const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
     const byokLine = byok.enabled
         ? `${byok.ready ? `${C.green}pronto${C.reset}` : `${C.red}incompleto${C.reset}`} ${C.grey}preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · auth ${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'api key' : byok.auth.headersConfigured ? 'headers' : 'none'}${C.reset}`
@@ -212,10 +212,10 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     const keepaliveRunning = Boolean(health?.['checks']?.['io']?.['keepaliveRunning']);
     const keepaliveOk = Boolean(health?.['checks']?.['io']?.['ok']);
     const keepaliveLine = keepaliveRunning
-        ? `${C.green}running${C.reset}`
+        ? `${C.green}rodando${C.reset}`
         : keepaliveOk
-          ? `${C.green}standby(dialog)${C.reset}`
-          : `${C.yellow}stopped${C.reset}`;
+          ? `${C.green}standby da conversa${C.reset}`
+          : `${C.yellow}parado${C.reset}`;
     const sdkFsRouteModeColor =
         sdkFsRouting.mode === 'local-fs-primary'
             ? C.green
@@ -259,18 +259,18 @@ ${C.cyan}  AGENTE${C.reset}
     modelo        ${C.magenta}${snap['model']}${C.reset}
     byok          ${byokLine}
     gateway       ${gatewayLine}
-    reasoning     ${C.magenta}${configProjection.currentReasoningEffort}${C.reset}
-    modo sdk      ${sdkModeLine}
-    permission    ${permissionLine}
+    raciocínio    ${C.magenta}${configProjection.currentReasoningEffort}${C.reset}
+    modo SDK      ${sdkModeLine}
+    permissão     ${permissionLine}
     plan arquivo  ${planOpLine}
-    runtime id    ${C.grey}${configProjection.runtimeId}${C.reset}
-    runtimes      ${C.grey}${runtimesLine}${C.reset}
-    runtime       ${C.grey}${runtimeSessionLabel}${C.reset}
-    sdk session   ${C.grey}${sdkSessionLabel}${C.reset}
-    hub session   ${C.grey}${hubSessionLabel}${C.reset}
-    bg tasks      ${C.grey}${health?.['backgroundPendingCount'] ?? 0}${C.reset}
-    keepalive     ${keepaliveLine}
-    quota monitor ${health?.['checks']?.['quota']?.['running'] ? `${C.green}running${C.reset}` : `${C.yellow}stopped${C.reset}`}
+    runtime alvo  ${C.grey}${configProjection.runtimeId}${C.reset}
+    mapa runtime  ${C.grey}${runtimesLine}${C.reset}
+    sessão runtime ${C.grey}${runtimeSessionLabel}${C.reset}
+    sessão SDK    ${C.grey}${sdkSessionLabel}${C.reset}
+    sessão hub    ${C.grey}${hubSessionLabel}${C.reset}
+    tarefas       ${C.grey}${health?.['backgroundPendingCount'] ?? 0}${C.reset}
+    pulso         ${keepaliveLine}
+    quota         ${health?.['checks']?.['quota']?.['running'] ? `${C.green}rodando${C.reset}` : `${C.yellow}parada${C.reset}`}
     issues        ${health ? (Array.isArray(health['issues']) && health['issues'].length === 0 ? `${C.green}nenhuma${C.reset}` : `${C.yellow}${Array.isArray(health['issues']) ? health['issues'].slice(0, 3).join(', ') : ''}${Array.isArray(health['issues']) && health['issues'].length > 3 ? '…' : ''}${C.reset}`) : `${C.grey}n/d${C.reset}`}
     ação          ${actionLine}
     pergunta      ${askUserLine}

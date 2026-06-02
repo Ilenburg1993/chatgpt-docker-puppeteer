@@ -2411,4 +2411,10 @@
   - `/sdk waits`: `Esperas humanas`, `pergunta estruturada`, `perguntas`;
   - `/usage now`: `Continuação da pergunta humana`;
   - linha viva: `PERGUNTA`.
-- [ ] Próxima lacuna estética observada em live: `/health full` ainda usa alguns termos técnicos (`runtime id`, `bg tasks`, `keepalive standby(dialog)`, `ação none`) por ser modo detalhado; decidir se `full` deve continuar técnico ou se só `detail/raw` deve preservar essa taxonomia.
+- [x] Próxima lacuna estética observada em live: `/health full` ainda usava alguns termos técnicos (`runtime id`, `bg tasks`, `keepalive standby(dialog)`, `ação none`) por ser modo detalhado; decisão: `full` também é painel humano detalhado, enquanto `detail/raw` preservam taxonomia copiável.
+- [x] `/health full` trocou `runtime id`, `bg tasks`, `keepalive`, `quota monitor`, `permission`, `prompts SDK skip`, `reasoning`, `modo sdk`, `sdk session`, `hub session`, `ação none` por `runtime alvo`, `tarefas`, `pulso`, `quota`, `permissão`, `prompts SDK ignorados`, `raciocínio`, `modo SDK`, `sessão SDK`, `sessão hub`, `ação nenhuma`.
+- [x] Teste escopado passou após o polish de `/health full`:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_diagnose.spec.js`.
+- [x] `/tools diag` trocou `tool(s)`, `tool técnico:`, `tipo:`, `disabled:` e `Uso:` por `ferramenta(s)`, `nome técnico:`, `tipo`, `desabilitadas:` e `Comandos:`.
+- [x] Teste escopado passou após o polish de `/tools diag`:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js`.

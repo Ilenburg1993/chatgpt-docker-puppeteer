@@ -82,7 +82,9 @@ export function cmdTools({ println }, arg = '') {
     }
 
     if (wantsRaw || wantsDiag) {
-        println(`\n  \x1b[36m🔧 ${entries.length} tool(s) ${wantsRaw ? 'observada(s) [raw]' : 'agregada(s)'}:\x1b[0m\n`);
+        println(
+            `\n  \x1b[36m🔧 ${entries.length} ${entries.length === 1 ? 'ferramenta' : 'ferramentas'} ${wantsRaw ? 'observada(s) · nomes crus' : 'agregada(s)'}:\x1b[0m\n`,
+        );
     } else {
         println(`\n  \x1b[36mFerramentas observadas\x1b[0m`);
         println(`  \x1b[90m${entries.length} grupo(s) de ação já apareceram nesta sessão.\x1b[0m\n`);
@@ -117,13 +119,13 @@ export function cmdTools({ println }, arg = '') {
             );
         }
         if (!wantsRaw && wantsDiag && visualName !== name) {
-            println(`      \x1b[90mtool técnico: ${name}\x1b[0m`);
+            println(`      \x1b[90mnome técnico: ${name}\x1b[0m`);
         }
         if (!wantsRaw && wantsDiag && Array.isArray(d.aliases) && d.aliases.length > 1) {
             println(`      \x1b[90maliases: ${d.aliases.join(', ')}\x1b[0m`);
         }
         if (wantsDiag && typeof d.kind === 'string' && d.kind.length > 0) {
-            println(`      \x1b[90mtipo: ${d.kind}\x1b[0m`);
+            println(`      \x1b[90mtipo ${d.kind}\x1b[0m`);
         }
     }
 
@@ -153,7 +155,7 @@ export function cmdTools({ println }, arg = '') {
             `    \x1b[90marquivos locais ${toolLoad.hasCanonicalLocalFsTools ? 'ativos' : 'ausentes'} · terminal local ${toolLoad.hasCanonicalLocalExecTools ? 'ativo' : 'ausente'} · workspace SDK ${toolLoad.hasSdkWorkspaceTooling ? 'ativo' : 'ausente'} · shell legado ${toolLoad.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado'} · desabilitadas ${toolLoad.disabled.length}\x1b[0m`,
         );
         if (toolLoad.disabled.length > 0) {
-            println(`    \x1b[90mdisabled: ${toolLoad.disabled.join(', ')}\x1b[0m`);
+            println(`    \x1b[90mdesabilitadas: ${toolLoad.disabled.join(', ')}\x1b[0m`);
         }
 
         const contract = toolLoad.toolContract;
@@ -200,7 +202,7 @@ export function cmdTools({ println }, arg = '') {
 
     println(
         wantsRaw || wantsDiag
-            ? '  \x1b[90mUso: /tools [diag|all|raw]\x1b[0m'
+            ? '  \x1b[90mComandos: /tools diag · /tools all · /tools raw\x1b[0m'
             : '  \x1b[90mDetalhes técnicos: /tools diag · nomes crus: /tools raw\x1b[0m',
     );
     println('');

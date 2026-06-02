@@ -280,21 +280,27 @@ describe('commands/diagnose', () => {
 
             expect(ctx.output()).toContain('Diagnóstico do Terminal LLM-B');
             expect(ctx.output()).toContain('degraded');
-            expect(ctx.output()).toContain('bg tasks');
-            expect(ctx.output()).toContain('keepalive');
-            expect(ctx.output()).toContain('quota monitor');
+            expect(ctx.output()).toContain('tarefas');
+            expect(ctx.output()).toContain('pulso');
+            expect(ctx.output()).toContain('quota');
+            expect(ctx.output()).not.toContain('bg tasks');
+            expect(ctx.output()).not.toContain('keepalive');
+            expect(ctx.output()).not.toContain('quota monitor');
             expect(ctx.output()).toContain('background.backlog_high');
             expect(ctx.output()).toContain('Executando tool');
             expect(ctx.output()).toContain('inspect_boot_report');
             expect(ctx.output()).toContain('streaming on');
             expect(ctx.output()).toContain('inline status');
             expect(ctx.output()).toContain('reserved');
-            expect(ctx.output()).toContain('permission');
-            expect(ctx.output()).toContain('prompts SDK skip');
+            expect(ctx.output()).toContain('permissão');
+            expect(ctx.output()).toContain('prompts SDK ignorados');
+            expect(ctx.output()).not.toContain('permission');
+            expect(ctx.output()).not.toContain('prompts SDK skip');
             expect(ctx.output()).not.toContain('sdk prompts=');
             expect(ctx.output()).toContain('pergunta');
             expect(ctx.output()).toContain('pergunta restaurada expirando');
-            expect(ctx.output()).toContain('runtime id');
+            expect(ctx.output()).toContain('runtime alvo');
+            expect(ctx.output()).not.toContain('runtime id');
             expect(ctx.output()).toContain('sdk-diagnose-1…');
             expect(ctx.output()).toContain('hub-1');
             expect(ctx.output()).not.toContain('sdk-diagnose-123456789012345');
@@ -364,7 +370,8 @@ describe('commands/diagnose', () => {
 
         await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println }, '--runtime alt full');
 
-        expect(ctx.output()).toContain('runtime id');
+        expect(ctx.output()).toContain('runtime alvo');
+        expect(ctx.output()).not.toContain('runtime id');
         expect(ctx.output()).toContain('alt');
         expect(ctx.output()).toContain('gpt-4.1-mini');
     });

@@ -172,7 +172,10 @@ describe('commands/tools', () => {
         cmdTools({ println: diagCtx.println }, 'diag');
 
         expect(diagCtx.output()).toContain('Ler arquivo');
-        expect(diagCtx.output()).toContain('tool técnico: read_file_content');
+        expect(diagCtx.output()).toContain('nome técnico: read_file_content');
+        expect(diagCtx.output()).not.toContain('tool técnico: read_file_content');
+        expect(diagCtx.output()).toContain('tipo file');
+        expect(diagCtx.output()).not.toContain('tipo: file');
     });
 
     it('humaniza agregados de I/O no modo default', () => {
