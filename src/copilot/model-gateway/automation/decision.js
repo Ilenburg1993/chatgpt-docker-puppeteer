@@ -278,6 +278,35 @@ function chooseRoute(plan, profileId) {
 }
 
 /**
+ * @param {Record<string, unknown>} route
+ * @param {Record<string, unknown> | null | undefined} turnFailure
+ * @returns {Record<string, unknown>}
+ */
+function routeWithPostTurnFallback(route, turnFailure) {
+    if (!routeMatchesTurnFailure(route, turnFailure)) return route;
+    const candidates = Array.isArray(route['candidateAlternatives']) ? route['candidateAlternatives'].map(record).filter((item) => item !== null) : [];
+    const fallback = candidates.find((candidate) => {
+        const selected = record(candidate['selected']);
+        if (!selected) return false;
+        return !routeMatchesTurnFailure({ ...route, selected }, turnFailure);
+    });
+    if (!fallback) return route;
+    const selected = record(fallback['selected']);
+    if (!selected) return route;
+    const originalSelectedRouteKey = routeKey(route);
+    return {
+        ...route,
+        selected,
+        selectedRouteKey: text(fallback['selectedRouteKey']) ?? routeKey({ ...route, selected }),
+        hasRuntimeProof: fallback['hasRuntimeProof'] === true,
+        runtimeEnv: record(fallback['runtimeEnv']),
+        reasons: ['post_turn_fallback_candidate', ...textList(fallback['reasons'])],
+        fallbackFromSelectedRouteKey: originalSelectedRouteKey,
+        fallbackReason: text(record(turnFailure)?.['failureKind']) ?? text(record(record(turnFailure)?.['failure'])?.['kind']) ?? 'turn_failure',
+    };
+}
+
+/**
  * @param {Record<string, unknown> | null | undefined} runtimeSelectorPlan
  * @param {string | null | undefined} [profileId]
  * @returns {{
@@ -320,6 +349,8 @@ export function selectModelGatewayRuntimeAutomationRoute(runtimeSelectorPlan, pr
  *   action: 'keep_current' | 'apply_live_model' | 'prepare_new_session' | 'wait_for_reset' | 'manual_intervention';
  *   selectedRouteKey: string | null;
  *   routeProfile: string | null;
+ *   fallbackFromSelectedRouteKey: string | null;
+ *   fallbackReason: string | null;
  *   canApplyLiveModel: boolean;
  *   requiresNewSession: boolean;
  *   blockers: string[];
@@ -334,7 +365,7 @@ export function selectModelGatewayRuntimeAutomationRoute(runtimeSelectorPlan, pr
  */
 export function buildModelGatewayRuntimeAutomationDecision(input) {
     const automationRoute = selectModelGatewayRuntimeAutomationRoute(input.runtimeSelectorPlan, input.profileId);
-    const route = automationRoute.route;
+    const route = automationRoute.route ? routeWithPostTurnFallback(automationRoute.route, input.turnFailure) : automationRoute.route;
     const target = targetBoundary(route);
     const current = liveBoundary(input.liveByokBinding);
     const cooldown = routeCooldown(route);
@@ -344,8 +375,12 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
         ...turnFailureBlockers(route, input.turnFailure),
     ];
     const currentBlockerClass = blockerClass(blockers);
-    const selectedKey = automationRoute.selectedRouteKey;
+    const selectedKey = routeKey(route) ?? automationRoute.selectedRouteKey;
     const routeProfile = automationRoute.routeProfile;
+    const fallbackDecisionFields = {
+        fallbackFromSelectedRouteKey: text(route?.['fallbackFromSelectedRouteKey']),
+        fallbackReason: text(route?.['fallbackReason']),
+    };
     if (blockers.length > 0) {
         const sameRouteFailure = blockers.find((blocker) => blocker.startsWith('same_route_failed_this_turn:')) ?? null;
         const wait =
@@ -358,6 +393,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             action: wait ? 'wait_for_reset' : 'manual_intervention',
             selectedRouteKey: selectedKey,
             routeProfile,
+            ...fallbackDecisionFields,
             canApplyLiveModel: false,
             requiresNewSession: false,
             blockers,
@@ -384,6 +420,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             action: 'prepare_new_session',
             selectedRouteKey: selectedKey,
             routeProfile,
+            ...fallbackDecisionFields,
             canApplyLiveModel: false,
             requiresNewSession: true,
             blockers: [],
@@ -404,6 +441,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             action: 'keep_current',
             selectedRouteKey: selectedKey,
             routeProfile,
+            ...fallbackDecisionFields,
             canApplyLiveModel: false,
             requiresNewSession: false,
             blockers: [],
@@ -424,6 +462,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             action: 'apply_live_model',
             selectedRouteKey: selectedKey,
             routeProfile,
+            ...fallbackDecisionFields,
             canApplyLiveModel: true,
             requiresNewSession: false,
             blockers: [],
@@ -444,6 +483,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
         action: requiresNewSession ? (input.policy?.allowNewSession === true ? 'prepare_new_session' : 'manual_intervention') : 'manual_intervention',
         selectedRouteKey: selectedKey,
         routeProfile,
+        ...fallbackDecisionFields,
         canApplyLiveModel: false,
         requiresNewSession,
         blockers: requiresNewSession && input.policy?.allowNewSession !== true ? ['new_session_requires_explicit_policy'] : [],

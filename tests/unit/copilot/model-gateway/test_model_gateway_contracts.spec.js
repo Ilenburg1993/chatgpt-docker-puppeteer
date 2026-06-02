@@ -1408,6 +1408,63 @@ describe('model-gateway foundation', () => {
         assert.equal(liveSwitchDecision.action, 'apply_live_model');
         assert.equal(liveSwitchDecision.canApplyLiveModel, true);
         assert.equal(liveSwitchDecision.requiresNewSession, false);
+
+        const postTurnFallbackDecision = buildModelGatewayRuntimeAutomationDecision({
+            runtimeSelectorPlan: {
+                routes: [
+                    {
+                        profileId: 'repo_agent',
+                        status: 'selected',
+                        selectedRouteKey: 'openrouter:primary-model',
+                        selected: {
+                            id: 'openrouter:primary-model',
+                            routeProfile: 'repo_agent',
+                            providerId: 'openrouter',
+                            providerModel: 'primary-model',
+                            selectorSyntax: 'primary-model',
+                        },
+                        candidateAlternatives: [
+                            {
+                                selectedRouteKey: 'groq:fallback-model',
+                                hasRuntimeProof: true,
+                                runtimeEnv: { status: 'ready' },
+                                reasons: ['runtime_proof:present'],
+                                selected: {
+                                    id: 'groq:fallback-model',
+                                    routeProfile: 'repo_agent',
+                                    providerId: 'groq',
+                                    providerModel: 'fallback-model',
+                                    selectorSyntax: 'fallback-model',
+                                },
+                            },
+                        ],
+                    },
+                ],
+            },
+            profileId: 'repo_agent',
+            currentSessionId: 'sdk-live',
+            liveByokBinding: {
+                enabled: true,
+                profile: 'repo_agent',
+                preset: 'openrouter',
+                providerType: 'openai_compatible_aggregator',
+                model: 'primary-model',
+            },
+            policy: { allowNewSession: true },
+            turnFailure: {
+                routeProfile: 'repo_agent',
+                providerId: 'openrouter',
+                providerModel: 'primary-model',
+                failureKind: 'rate-limit',
+            },
+        });
+        assert.equal(postTurnFallbackDecision.ok, true);
+        assert.equal(postTurnFallbackDecision.action, 'prepare_new_session');
+        assert.equal(postTurnFallbackDecision.selectedRouteKey, 'groq:fallback-model');
+        assert.equal(postTurnFallbackDecision.fallbackFromSelectedRouteKey, 'openrouter:primary-model');
+        assert.equal(postTurnFallbackDecision.fallbackReason, 'rate-limit');
+        assert.equal(postTurnFallbackDecision.targetBoundary.preset, 'groq');
+
         const liveControllerStep = buildModelGatewayRuntimeAutomationControllerStep({
             phase: 'pre_turn',
             decision: liveSwitchDecision,

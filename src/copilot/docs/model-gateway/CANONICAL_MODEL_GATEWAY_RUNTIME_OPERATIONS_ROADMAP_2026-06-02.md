@@ -224,7 +224,7 @@ metadata importers
 - [ ] D.7 Marcar candidatos bloqueados por auth/key.
 - [ ] D.8 Gerar comandos de troca para cada candidato.
 - [ ] D.9 Gerar comandos de probe para cada candidato.
-- [ ] D.10 Usar standby no post-turn recovery.
+- [x] D.10 Usar standby no post-turn recovery.
 
 ### Faixa E - Quota, Rate Limit E Conta/Key
 
@@ -347,7 +347,7 @@ metadata importers
 
 1. [x] Criar `operator-ready` read-only.
 2. [ ] Consolidar standby como contrato reutilizavel.
-3. [ ] Ligar standby ao post-turn recovery.
+3. [x] Ligar standby ao post-turn recovery.
 4. [ ] Melhorar cockpit terminal de boundary/prepared/live.
 5. [ ] Criar live fixtures de fallback/recovery.
 6. [ ] Rodar live tests LLM-B em escada.
