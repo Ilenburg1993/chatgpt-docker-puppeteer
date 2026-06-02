@@ -974,6 +974,26 @@
 - Gap residual:
   - avaliar se o bloco `Ambiente` deve fundir com auto-brief ready para reduzir ainda mais a altura inicial.
 
+## 02.34 Command palette compacto
+
+- Problema observado:
+  - `/menu` ainda usava uma caixa grande e três linhas por item;
+  - a densidade parecia uma lista de logs, nao uma palette;
+  - descricoes ainda continham `pending question`, `dialog loop` e `troubleshooting`.
+- Mudancas aplicadas:
+  - `/menu` agora renderiza uma tabela compacta de uma linha por ação;
+  - indices passaram para `[01]`, `[02]`, ... para alinhamento estavel;
+  - label, comando e descricao sao aparados por coluna;
+  - `HOT` permanece visivel sem criar linha extra;
+  - descricoes foram humanizadas para `pergunta pendente`, `conversa`, `tools` e `diagnostico`;
+  - footer mostra atalhos `/menu 1`, `/menu status` e `/menu help`.
+- Testes escopados executados:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_menu.spec.js`
+  - status PASS;
+  - 1 arquivo, 5 testes.
+- Gap residual:
+  - criar cenario live dedicado para `/menu` em PTY, em vez de tentar pipe/headless.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -1381,6 +1401,9 @@
 - [x] Humanizar lifecycle `AlwaysAliveAgent`, `Conectando ao agente` e `Reanexando sessão SDK`.
 - [x] Adicionar criterio live `structured-input-calm-boot-copy`.
 - [ ] Avaliar fusao do bloco `Ambiente` com auto-brief ready para reduzir altura inicial.
+- [x] Compactar `/menu` em uma linha por ação.
+- [x] Humanizar descrições do `/menu` (`pending question`, `dialog loop`, `troubleshooting`).
+- [ ] Criar live PTY dedicado para `/menu`.
 
 ### Faixa R - Comandos de diagnostico com dois niveis
 

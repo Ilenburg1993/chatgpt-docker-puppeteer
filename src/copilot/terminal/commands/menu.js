@@ -55,17 +55,17 @@ export function buildTerminalSmartMenuEntries() {
             id: 'now',
             label: 'Snapshot operacional',
             commandLine: '/now',
-            description: 'Fila, pending question e estado curto do runtime',
+            description: 'Fila, pergunta pendente e estado curto do runtime',
         },
         {
             id: 'activity',
             label: 'Atividade recente',
             commandLine: '/activity 15',
-            description: 'Últimos sinais úteis do loop/dialog/tools',
+            description: 'Últimos sinais úteis da conversa e das tools',
         },
         {
             id: 'intent',
-            label: 'Intents da LLM-B',
+            label: 'Intenções da LLM-B',
             commandLine: '/intent 20',
             description:
                 intentStats.entries > 0
@@ -83,7 +83,7 @@ export function buildTerminalSmartMenuEntries() {
     if (!control.dialogLoopActive || control.status === 'stopped') {
         entries.push({
             id: 'restart',
-            label: 'Reiniciar dialog loop',
+            label: 'Reiniciar conversa',
             commandLine: '/restart',
             description: 'Recupera loop inativo/parado',
             hot: true,
@@ -93,7 +93,7 @@ export function buildTerminalSmartMenuEntries() {
     if (control.dialogPaused) {
         entries.push({
             id: 'resume-loop',
-            label: 'Retomar dialog loop',
+            label: 'Retomar conversa',
             commandLine: '/dialog-resume',
             description: 'Retoma execução após pausa manual',
             hot: true,
@@ -101,7 +101,7 @@ export function buildTerminalSmartMenuEntries() {
     } else {
         entries.push({
             id: 'pause-loop',
-            label: 'Pausar dialog loop',
+            label: 'Pausar conversa',
             commandLine: '/pause',
             description: 'Pausa intake sem perder contexto',
         });
@@ -192,7 +192,7 @@ export function buildTerminalSmartMenuEntries() {
             id: 'display-debug',
             label: 'Preset de debug',
             commandLine: '/display preset debug',
-            description: 'Ativa todos os sinais para troubleshooting',
+            description: 'Ativa todos os sinais para diagnóstico',
         },
         {
             id: 'errors',
@@ -229,23 +229,49 @@ export function resolveTerminalSmartMenuSelection(entries, token) {
 }
 
 /**
+ * @param {string} text
+ * @param {number} max
+ * @returns {string}
+ */
+function compactMenuCell(text, max) {
+    const clean = text.replace(/\s+/gu, ' ').trim();
+    if (clean.length <= max) return clean;
+    return `${clean.slice(0, Math.max(0, max - 1))}…`;
+}
+
+/**
+ * @param {string} text
+ * @param {number} width
+ * @returns {string}
+ */
+function padMenuCell(text, width) {
+    const clean = compactMenuCell(text, width);
+    return clean.padEnd(width);
+}
+
+/**
  * @param {(text: string) => void} println
  * @param {TerminalSmartMenuEntry[]} entries
  * @returns {void}
  */
 function renderTerminalSmartMenu(println, entries) {
-    println(`\n  ${terminalThemeText('info', '╔══════════════ Command Palette (Terminal Smart UX) ══════════════╗')}`);
+    println(`\n  ${terminalThemeText('info', 'Command Palette')}`);
+    println(
+        `  ${terminalThemeText('muted', `${entries.length} ações contextuais · execute com /menu <n> ou /menu <id>`)}\n`,
+    );
     for (let i = 0; i < entries.length; i += 1) {
         const entry = /** @type {TerminalSmartMenuEntry} */ (entries[i]);
-        const hot = entry.hot ? ` ${terminalThemeBadge('hot', 'HOT')}` : '';
-        println(`  ${terminalThemeText('index', `[${i + 1}]`)} ${entry.label}${hot}`);
-        println(`      ${terminalThemeText('muted', entry.description)}`);
-        println(`      ${terminalThemeText('command', entry.commandLine)}`);
+        const index = terminalThemeText('index', `[${String(i + 1).padStart(2, '0')}]`);
+        const hot = entry.hot ? `${terminalThemeBadge('hot', 'HOT')} ` : '    ';
+        const label = padMenuCell(entry.label, 28);
+        const command = padMenuCell(entry.commandLine, 24);
+        const description = compactMenuCell(entry.description, 64);
+        println(
+            `  ${index} ${hot}${terminalThemeText('info', label)} ${terminalThemeText('command', command)} ${terminalThemeText('muted', description)}`,
+        );
     }
-    println(`  ${terminalThemeText('info', '╚══════════════════════════════════════════════════════════════════╝')}`);
-    println(`  ${terminalThemeText('muted', `Use /menu <n> para executar, /menu run <n> ou /menu <id>. Ex: /menu 1`)}`);
     println(
-        `  ${terminalThemeText('muted', 'Ações rápidas:')} ${terminalActionChip('/menu 1')} ${terminalActionChip('/menu status')}\n`,
+        `\n  ${terminalThemeText('muted', 'Ações rápidas:')} ${terminalActionChip('/menu 1')} ${terminalActionChip('/menu status')} ${terminalActionChip('/menu help')}\n`,
     );
 }
 

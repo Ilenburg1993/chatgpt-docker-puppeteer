@@ -73,9 +73,11 @@ describe('terminal/commands/menu', () => {
 
         await cmdMenu({ println: ctx.println });
 
-        expect(ctx.output()).toContain('Command Palette (Terminal Smart UX)');
-        expect(ctx.output()).toContain('[1]');
+        expect(ctx.output()).toContain('Command Palette');
+        expect(ctx.output()).toContain('[01]');
         expect(ctx.output()).toContain('/status');
+        expect(ctx.output()).toContain('pergunta pendente');
+        expect(ctx.output()).not.toContain('pending question');
     });
 
     it('inclui ações HOT para pending question/contexto alto/loop inativo', () => {
