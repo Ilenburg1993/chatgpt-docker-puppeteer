@@ -268,6 +268,11 @@ function resolveHumanToolName(toolName, canonicalToolName) {
     const canonical = canonicalToolName?.trim();
     if (canonical && HUMAN_TOOL_NAMES[canonical]) return HUMAN_TOOL_NAMES[canonical];
     const raw = toolName.trim();
+    if (/^io\.read(?:\.|$)/iu.test(raw)) return 'Leitura local';
+    if (/^io\.(?:write|append|mkdir)(?:\.|$)/iu.test(raw)) return 'Escrita local';
+    if (/^io\.(?:move|copy|patch)(?:\.|$)/iu.test(raw)) return 'Alteração local';
+    if (/^io\.(?:delete|remove)(?:\.|$)/iu.test(raw)) return 'Exclusão local';
+    if (/^io\.(?:scan|search|stat|fetch)(?:\.|$)/iu.test(raw)) return 'Inspeção local';
     return HUMAN_TOOL_NAMES[raw] ?? raw;
 }
 

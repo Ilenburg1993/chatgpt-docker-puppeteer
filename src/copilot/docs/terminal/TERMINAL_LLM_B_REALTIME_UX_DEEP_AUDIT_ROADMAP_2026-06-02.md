@@ -793,6 +793,26 @@
   - IDs de sessao pertencem ao nivel diagnostico;
   - comandos default podem mostrar IDs compactos quando ajudam a correlacionar, mas nao devem despejar UUIDs inteiros.
 
+## 02.29 Oitava rodada UX: I/O humano por padrao
+
+- Problema:
+  - linhas duraveis `[IO]`, `[DONE]`, `/tools` e timeline podiam mostrar `io-engine.fs.readFile.text`;
+  - esse valor e evidencia tecnica do motor de I/O, nao informacao primaria para o operador;
+  - quando ele aparece junto de arquivo, bytes e duracao, piora alinhamento e leitura.
+- Ajustes:
+  - stdout default de I/O remove engine e conserva alvo, status, bytes e duracao;
+  - `activity.detail` de I/O tambem remove engine;
+  - `[DONE]` com I/O correlacionado remove engine do label de duracao;
+  - entry/SSE continuam preservando `ioEngine`;
+  - presenter de tools humaniza agregados `io.read.*`, `io.write.*`, `io.move.*`, `io.delete.*`, `io.scan/search/stat/fetch.*`.
+- Testes:
+  - `npx vitest run tests/unit/copilot/terminal/test_io_activity_events.spec.js tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js`
+  - Resultado: 3 arquivos, 12 testes, PASS.
+- Decisao:
+  - engine de I/O e atributo diagnostico;
+  - default deve exibir acao humana, alvo, bytes e duracao;
+  - raw/SSE/lifecycle continuam contendo a evidencia tecnica para auditoria.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -1197,6 +1217,8 @@
 - [x] Revisar `/health` para reduzir ruido visual default.
 - [x] Compactar runtime/sdk/hub em `/usage now` default.
 - [x] Compactar runtime/sdk/hub em `/health` default.
+- [x] Remover `io-engine.*` da narrativa default de I/O.
+- [x] Humanizar agregados `io.*` no `/tools` default.
 - [x] Adicionar `detail`/`--detail` ao `/activity`.
 - [x] Adicionar `detail` ao `/usage now` e `/health`.
 - [ ] Adicionar flags ou subcomandos `detail`, `raw` ou `debug` nas demais superficies onde fizer sentido.

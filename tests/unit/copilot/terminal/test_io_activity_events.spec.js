@@ -81,6 +81,7 @@ describe('terminal/io-activity-events', () => {
             }),
         );
         expect(println).toHaveBeenCalledWith(expect.stringContaining('[IO]'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('io-engine.fs.readFile.text'));
         expect(broadcastSse).toHaveBeenCalledWith(
             'tool.lifecycle',
             expect.objectContaining({

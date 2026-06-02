@@ -210,8 +210,8 @@ function handleIoOperation(message, registry = null) {
     }
     const byteLabel = formatBytes(io.bytesRead ?? io.bytesWritten);
     const durationLabel = typeof io.durationMs === 'number' ? `${Math.max(0, Math.round(io.durationMs))}ms` : null;
-    const extra = [byteLabel, durationLabel, io.engine].filter(Boolean).join(' · ');
-    const detail = `${io.operation} · ${primaryTarget}${extra ? ` · ${extra}` : ''}`;
+    const humanExtra = [byteLabel, durationLabel].filter(Boolean).join(' · ');
+    const detail = `${io.operation} · ${primaryTarget}${humanExtra ? ` · ${humanExtra}` : ''}`;
     const label = success ? `I/O ${io.operation} concluído` : `I/O ${io.operation} falhou`;
     const entry = {
         timestamp: message.ts ?? Date.now(),
@@ -253,7 +253,7 @@ function handleIoOperation(message, registry = null) {
             : terminalThemeBadge('error', 'IO');
         const status = success ? terminalThemeText('success', 'ok') : terminalThemeText('error', 'falhou');
         println(
-            `  ${terminalThemeBadge('tool', 'IO')} ${badge} ${terminalThemeText(role, compactText(primaryTarget, 92))} ${terminalThemeText('muted', `· ${status}${extra ? ` · ${extra}` : ''}`)}`,
+            `  ${terminalThemeBadge('tool', 'IO')} ${badge} ${terminalThemeText(role, compactText(primaryTarget, 92))} ${terminalThemeText('muted', `· ${status}${humanExtra ? ` · ${humanExtra}` : ''}`)}`,
         );
     }
 

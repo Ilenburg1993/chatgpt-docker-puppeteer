@@ -141,7 +141,6 @@ function buildToolCompletionDurationLabel(entry, sdkDurationMs) {
         `io ${io.count} op${io.count === 1 ? '' : 's'}`,
         ioDurationLabel,
         bytesLabel,
-        io.engines.length === 1 ? io.engines[0] : io.engines.length > 1 ? `${io.engines.length} engines` : null,
     ].filter(Boolean);
     return [sdkLabel ?? null, ioParts.join(' · ')].filter(Boolean).join(' · ') || 'n/d';
 }

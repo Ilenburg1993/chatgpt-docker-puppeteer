@@ -172,6 +172,35 @@ describe('commands/tools', () => {
         expect(diagCtx.output()).toContain('tool técnico: read_file_content');
     });
 
+    it('humaniza agregados de I/O no modo default', () => {
+        readTerminalToolStatsProjection.mockReturnValueOnce({
+            stats: {
+                'io.read.io-engine.fs.readFile.text': { calls: 1, errors: 0, avgLatencyMs: 3 },
+            },
+            canonicalEntries: /** @type {[string, Record<string, any>][]} */ ([
+                ['io.read.io-engine.fs.readFile.text', { calls: 1, errors: 0, avgLatencyMs: 3, kind: 'io' }],
+            ]),
+            entries: /** @type {[string, Record<string, any>][]} */ ([
+                ['io.read.io-engine.fs.readFile.text', { calls: 1, errors: 0, avgLatencyMs: 3, kind: 'io' }],
+            ]),
+            tools: [],
+            byCategory: {},
+            toolCount: 1,
+            lifecycle: {
+                active: [],
+                recent: [],
+                summary: { active: 0, recent: 0, waitingUser: 0, failedRecent: 0 },
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdTools({ println: ctx.println });
+
+        expect(ctx.output()).toContain('Leitura local');
+        expect(ctx.output()).not.toContain('io-engine.fs.readFile.text');
+    });
+
+
     it('renderiza lifecycle compacto em modo diag', () => {
         readTerminalToolStatsProjection.mockReturnValueOnce({
             stats: {
