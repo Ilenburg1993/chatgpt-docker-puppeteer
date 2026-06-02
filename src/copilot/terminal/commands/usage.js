@@ -73,7 +73,7 @@ export function cmdUsage({ println }, arg) {
         if (projection.pr) {
             const cost = modelBilling.cost === null ? '?' : modelBilling.cost.toFixed(4);
             const modelLabel = modelBilling.mismatch
-                ? `cfg=\x1b[35m${modelBilling.configuredModel ?? '-'}\x1b[0m · cobrado=\x1b[36m${modelBilling.billedModel ?? '-'}\x1b[0m`
+                ? `configurado \x1b[35m${modelBilling.configuredModel ?? '-'}\x1b[0m · cobrado \x1b[36m${modelBilling.billedModel ?? '-'}\x1b[0m`
                 : `modelo \x1b[36m${modelBilling.displayModel}\x1b[0m`;
             if (byokActive) {
                 println(
@@ -109,7 +109,7 @@ export function cmdUsage({ println }, arg) {
             const llmUsageKind = humanLlmUsageKind(llmClass, llmReason);
             println(
                 detail
-                    ? `      Última telemetria LLM: modelo=\x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · tipo=\x1b[90m${llmUsageKind}\x1b[0m · classe=\x1b[90m${llmClass}\x1b[0m · motivo=\x1b[90m${llmReason}\x1b[0m · custo=\x1b[33m${llmCost}\x1b[0m`
+                    ? `      Última telemetria LLM: modelo \x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · tipo \x1b[90m${llmUsageKind}\x1b[0m · classe \x1b[90m${llmClass}\x1b[0m · motivo \x1b[90m${llmReason}\x1b[0m · custo \x1b[33m${llmCost}\x1b[0m`
                     : `      Última telemetria LLM: modelo \x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · tipo \x1b[90m${llmUsageKind}\x1b[0m · custo \x1b[33m${llmCost}\x1b[0m \x1b[90m(/usage now detail para classe técnica)\x1b[0m`,
             );
             if (/ask_user|user_input/iu.test(llmClass) || /ask_user|user_input/iu.test(llmReason)) {
@@ -124,13 +124,13 @@ export function cmdUsage({ println }, arg) {
             const hubLabel = renderUsageBindingId(projection.binding.hubSessionId, detail);
             println(
                 detail
-                    ? `      Binding: runtime=\x1b[90m${runtimeLabel}\x1b[0m · sdk=\x1b[90m${sdkLabel}\x1b[0m · hub=\x1b[90m${hubLabel}\x1b[0m`
+                    ? `      Vínculo: runtime \x1b[90m${runtimeLabel}\x1b[0m · SDK \x1b[90m${sdkLabel}\x1b[0m · hub \x1b[90m${hubLabel}\x1b[0m`
                     : `      Vínculo: runtime \x1b[90m${runtimeLabel}\x1b[0m · SDK \x1b[90m${sdkLabel}\x1b[0m · hub \x1b[90m${hubLabel}\x1b[0m \x1b[90m(/usage now detail para IDs completos)\x1b[0m`,
             );
         }
         println(
             detail
-                ? `      Modo: sdk=\x1b[90m${configProjection.sdkSessionMode ?? 'interactive'}\x1b[0m · planFile=\x1b[90m${configProjection.sdkPlanOperation ?? '(sem alterações)'}\x1b[0m`
+                ? `      Modo: SDK \x1b[90m${configProjection.sdkSessionMode ?? 'interactive'}\x1b[0m · plano \x1b[90m${configProjection.sdkPlanOperation ?? '(sem alterações)'}\x1b[0m`
                 : `      Modo: SDK \x1b[90m${configProjection.sdkSessionMode ?? 'interactive'}\x1b[0m · plano \x1b[90m${configProjection.sdkPlanOperation ?? '(sem alterações)'}\x1b[0m`,
         );
         println('');

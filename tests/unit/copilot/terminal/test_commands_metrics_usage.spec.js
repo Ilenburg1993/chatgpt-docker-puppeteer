@@ -430,8 +430,12 @@ describe('commands/metrics + usage', () => {
             expect(metricsCtx.output()).toContain('divergente');
             expect(metricsCtx.output()).toContain('configurado gpt-5');
             expect(metricsCtx.output()).toContain('cobrado gpt-5-mini');
-            expect(usageCtx.output()).toContain('cfg=');
-            expect(usageCtx.output()).toContain('cobrado=');
+            expect(usageCtx.output()).toContain('configurado');
+            expect(usageCtx.output()).toContain('gpt-5');
+            expect(usageCtx.output()).toContain('cobrado');
+            expect(usageCtx.output()).toContain('gpt-5-mini');
+            expect(usageCtx.output()).not.toContain('cfg=');
+            expect(usageCtx.output()).not.toContain('cobrado=');
         } finally {
             defaultRuntime.lastPrInfo = previous;
         }

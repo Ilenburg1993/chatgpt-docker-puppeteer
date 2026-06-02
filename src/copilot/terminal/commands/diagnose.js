@@ -157,10 +157,10 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         configProjection.permissionMode === 'audit_only' || configProjection.permissionMode === 'selective'
             ? configProjection.permissionMode
             : 'approve_all';
-    const permissionLine = `${C.magenta}${permissionMode}${C.reset} ${C.grey}· sdk prompts=${terminalPermissionModeSkipsSdkPrompts(permissionMode) ? 'skip' : 'selective'}${C.reset}`;
+    const permissionLine = `${C.magenta}${permissionMode}${C.reset} ${C.grey}· prompts SDK ${terminalPermissionModeSkipsSdkPrompts(permissionMode) ? 'skip' : 'selective'}${C.reset}`;
     const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
     const byokLine = byok.enabled
-        ? `${byok.ready ? `${C.green}ready${C.reset}` : `${C.red}incompleto${C.reset}`} ${C.grey}preset=${byok.preset ?? '-'} · provider=${byok.providerType ?? '-'} · model=${byok.model ?? '-'} · auth=${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'none'}${C.reset}`
+        ? `${byok.ready ? `${C.green}pronto${C.reset}` : `${C.red}incompleto${C.reset}`} ${C.grey}preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · auth ${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'api key' : byok.auth.headersConfigured ? 'headers' : 'none'}${C.reset}`
         : `${C.grey}off${C.reset}`;
     const gatewayProjection = configProjection.modelGatewayProjection ?? {
         providerCount: 0,
@@ -172,7 +172,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         gatewayProjection.active && typeof gatewayProjection.active === 'object' ? gatewayProjection.active : null;
     const gatewayLine =
         gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0
-            ? `${C.grey}providers=${gatewayProjection.providerCount} · models=${gatewayProjection.modelCount} · enabled=${gatewayProjection.enabledModelCount} · active=${gatewayActive?.['modelId'] ?? '-'}${gatewayActive?.['providerId'] ? `@${gatewayActive['providerId']}` : ''}${C.reset}`
+            ? `${C.grey}${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados · ativo ${gatewayActive?.['modelId'] ?? '-'}${gatewayActive?.['providerId'] ? ` @ ${gatewayActive['providerId']}` : ''}${C.reset}`
             : `${C.grey}off${C.reset}`;
     const planOpLine = configProjection.sdkPlanOperation
         ? `${C.yellow}${configProjection.sdkPlanOperation}${C.reset}${configProjection.sdkPlanChangedAt ? ` ${C.grey}@ ${formatTerminalIsoTimestamp(configProjection.sdkPlanChangedAt)}${C.reset}` : ''}`
@@ -200,14 +200,14 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     const timerLine =
         activeTimers.length === 0
             ? `${C.green}0 ativos${C.reset}`
-            : `${C.yellow}${activeTimers.length} ativos${C.reset}${activeTimers[0] ? ` ${C.grey}· oldest=${activeTimers[0].id} ${Math.round(activeTimers[0].ageMs / 1000)}s${C.reset}` : ''}`;
+            : `${C.yellow}${activeTimers.length} ativos${C.reset}${activeTimers[0] ? ` ${C.grey}· mais antigo ${activeTimers[0].id} há ${Math.round(activeTimers[0].ageMs / 1000)}s${C.reset}` : ''}`;
     const bootMetrics = lifecycle.bootMetrics ?? [];
     const slowestBootPhase = bootMetrics[0] ?? null;
     const shutdownMetrics = lifecycle.shutdownMetrics ?? [];
     const slowestShutdownHandler = shutdownMetrics[0] ?? null;
     const lifecycleMetricsLine =
         slowestBootPhase || slowestShutdownHandler
-            ? `${slowestBootPhase ? `boot=${slowestBootPhase.id}/${slowestBootPhase.avgDurationMs}ms avg` : 'boot=n/d'} ${C.grey}·${C.reset} ${slowestShutdownHandler ? `shutdown=${slowestShutdownHandler.name}/${slowestShutdownHandler.avgDurationMs}ms avg` : 'shutdown=n/d'}`
+            ? `${slowestBootPhase ? `boot ${slowestBootPhase.id} · média ${slowestBootPhase.avgDurationMs}ms` : 'boot n/d'} ${C.grey}·${C.reset} ${slowestShutdownHandler ? `shutdown ${slowestShutdownHandler.name} · média ${slowestShutdownHandler.avgDurationMs}ms` : 'shutdown n/d'}`
             : `${C.grey}n/d${C.reset}`;
     const keepaliveRunning = Boolean(health?.['checks']?.['io']?.['keepaliveRunning']);
     const keepaliveOk = Boolean(health?.['checks']?.['io']?.['ok']);
@@ -278,8 +278,8 @@ ${C.cyan}  AGENTE${C.reset}
     salva rest.   ${askUserRemainingLine}
     atividade     ${activityColor}${activity.label}${C.reset}${typeof activity.progress === 'number' ? ` ${C.grey}(${activity.progress}%)${C.reset}` : ''}
     detalhe       ${activityDetail}
-    display       ${C.grey}thinking=${display.thinking ? 'on' : 'off'} · streaming=${display.streaming ? 'on' : 'off'} · usage=${display.usage ? 'on' : 'off'} · tools=${display.tools ? 'on' : 'off'} · intent=${display.intent ? 'on' : 'off'}${C.reset}
-    inline status ${display.inlineStatus.enabled ? C.green : C.yellow}${display.inlineStatus.mode}${C.reset} ${C.grey}source=${display.inlineStatus.source}${display.inlineStatus.overlay ? ' · overlay' : ''}${C.reset}
+    display       ${C.grey}raciocínio ${display.thinking ? 'on' : 'off'} · streaming ${display.streaming ? 'on' : 'off'} · uso ${display.usage ? 'on' : 'off'} · tools ${display.tools ? 'on' : 'off'} · intenção ${display.intent ? 'on' : 'off'}${C.reset}
+    inline status ${display.inlineStatus.enabled ? C.green : C.yellow}${display.inlineStatus.mode}${C.reset} ${C.grey}origem ${display.inlineStatus.source}${display.inlineStatus.overlay ? ' · overlay' : ''}${C.reset}
 
 ${C.cyan}  INFRAESTRUTURA${C.reset}
     MCP bridge    ${mcpLine}

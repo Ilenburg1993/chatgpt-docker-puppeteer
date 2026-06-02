@@ -47,7 +47,13 @@ describe('terminal/commands/index', () => {
 
         await cmdIndex(ctx, `build ${tmpRel} --ext js --ext md --concurrency 2`);
         expect(ctx.output()).toContain('/index build');
-        expect(ctx.output()).toContain('indexed=2');
+        expect(ctx.output()).toContain('gitignore on');
+        expect(ctx.output()).toContain('Resultado');
+        expect(ctx.output()).toContain('indexados 2');
+        expect(ctx.output()).toContain('Workspace');
+        expect(ctx.output()).not.toContain('indexed=');
+        expect(ctx.output()).not.toContain('workspaceRoot=');
+        expect(ctx.output()).not.toContain('gitignore=');
 
         await cmdIndex(ctx, 'status');
         expect(ctx.output()).toContain('Índice L2 local');

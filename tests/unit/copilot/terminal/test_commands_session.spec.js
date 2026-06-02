@@ -447,8 +447,10 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).not.toContain('plan local');
         expect(ctx.output()).toContain('bg tasks');
         expect(ctx.output()).toContain('display');
-        expect(ctx.output()).toContain('permission mode');
-        expect(ctx.output()).toContain('sdk prompts=skip');
+        expect(ctx.output()).toContain('modo permissões');
+        expect(ctx.output()).toContain('prompts SDK skip');
+        expect(ctx.output()).not.toContain('permission mode');
+        expect(ctx.output()).not.toContain('sdk prompts=');
         expect(ctx.output()).toContain('pergunta restaurada expirada');
         expect(ctx.output()).toContain('perfil modelo');
         expect(ctx.output()).toContain('runtime id');
@@ -519,7 +521,7 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).not.toContain('PM:approve_all');
     });
 
-    it('cmdNow full preserva snapshot operacional técnico', () => {
+    it('cmdNow full preserva detalhe operacional em painel humano', () => {
         const previousEnv = {
             COPILOT_BYOK_ENABLED: process.env.COPILOT_BYOK_ENABLED,
             COPILOT_BYOK_PROVIDER_PRESET: process.env.COPILOT_BYOK_PROVIDER_PRESET,
@@ -533,14 +535,19 @@ describe('commands/session — sync commands', () => {
         const ctx = mockCtx();
         try {
             cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, 'full');
-            expect(ctx.output()).toContain('[now]');
-            expect(ctx.output()).toContain('runtime=default');
-            expect(ctx.output()).toContain('live=');
-            expect(ctx.output()).toContain('sse=');
-            expect(ctx.output()).toContain('loop=off');
-            expect(ctx.output()).toContain('PM:approve_all');
-            expect(ctx.output()).toContain('gateway=providers:1 models:3 enabled:3');
-            expect(ctx.output()).toContain('active=openrouter:deepseek/deepseek-v4-flash:free@openrouter');
+            expect(ctx.output()).toContain('Agora - Detalhe');
+            expect(ctx.output()).toContain('Runtime');
+            expect(ctx.output()).toContain('default');
+            expect(ctx.output()).toContain('Conversa');
+            expect(ctx.output()).toContain('loop inativo');
+            expect(ctx.output()).toContain('SSE');
+            expect(ctx.output()).toContain('prompts approve_all');
+            expect(ctx.output()).toContain('1 provedor');
+            expect(ctx.output()).toContain('3 modelos');
+            expect(ctx.output()).toContain('ativo openrouter:deepseek/deepseek-v4-flash:free @ openrouter');
+            expect(ctx.output()).not.toContain('runtime=');
+            expect(ctx.output()).not.toContain('gateway=providers');
+            expect(ctx.output()).not.toContain('PM:approve_all');
             expect(ctx.output()).not.toContain('test-byok-key-that-must-not-render');
         } finally {
             for (const [key, value] of Object.entries(previousEnv)) {

@@ -253,10 +253,10 @@ async function runDeclare(ctx, parts) {
     const source =
         target.paths.length > 0
             ? `${target.paths.length} paths explícitos`
-            : `dir=${compactPath(String(target.directory ?? '.'))}`;
+            : `diretório ${compactPath(String(target.directory ?? '.'))}`;
     ctx.println(`\n  \x1b[36m/scope declare\x1b[0m ${handle.sessionId} · ${source}`);
     ctx.println(
-        `  \x1b[90mparseSymbols=${args.parseSymbols} · recursive=${args.recursive} · maxFiles=${numberLabel(args.maxFiles)} informativo · concurrency=${numberLabel(args.concurrency)} informativo\x1b[0m`,
+        `  \x1b[90msímbolos ${args.parseSymbols ? 'sim' : 'não'} · recursivo ${args.recursive ? 'sim' : 'não'} · limite ${numberLabel(args.maxFiles)} informativo · concorrência ${numberLabel(args.concurrency)} informativo\x1b[0m`,
     );
 
     if (args.awaitReady) {

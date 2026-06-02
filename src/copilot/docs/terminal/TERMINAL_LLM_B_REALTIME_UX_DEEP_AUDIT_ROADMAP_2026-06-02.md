@@ -2253,5 +2253,20 @@
 - [x] Live PTY curta executada após o polish BYOK/SDK:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/ux-byok-polish-cycle-20260602-1440`.
 - [x] Resultado: PASS completo em help, status, now, health, tools, live, activity, waits e close limpo; evidência em `artifacts/terminal-live/ux-byok-polish-cycle-20260602-1440/summary.md`.
+- [x] `/status full` limpou `ok=`, `skipped=`, `failed=`, `timeout=`, `pref=`, `disabled=`, `sdk prompts=`, `fsCanônico=`, `execCanônico=`, `sdkWorkspace=`, `legacyShellLoaded=`, `errors=`, `warnings=`, `sections=`, `missingSectionFile=` e `persistidos=` em favor de rótulos humanos.
+- [x] `/now full` deixou de ser uma linha bruta `[now] runtime=... live=... PM:... gateway=...` e passou a renderizar painel `Agora - Detalhe` com `Runtime`, `Conversa`, `Entrada`, `Timeline`, `SSE`, `Modelo`, `Catálogo`, `Atividade` e `Próximo`.
+- [x] `/usage now` e `/usage now detail` trocaram `cfg=`, `cobrado=`, `modelo=`, `tipo=`, `classe=`, `motivo=`, `custo=`, `Binding: runtime=`, `sdk=` e `planFile=` por `configurado`, `cobrado`, `modelo`, `tipo`, `classe`, `motivo`, `custo`, `Vínculo`, `SDK` e `plano`.
+- [x] Testes escopados passaram após esse lote: `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`.
+- [x] `/diagnose full` passou a usar `prompts SDK`, `preset`, `provedor`, `modelo`, `auth`, `habilitados`, `ativo`, `mais antigo`, `média`, `raciocínio`, `uso`, `intenção` e `origem`, removendo `sdk prompts=`, `provider=`, `model=`, `providers=`, `enabled=`, `active=`, `oldest=`, `boot=`, `shutdown=`, `thinking=`, `usage=`, `intent=` e `source=` do painel visual.
+- [x] Teste escopado passou após esse lote: `npx vitest run tests/unit/copilot/terminal/test_commands_diagnose.spec.js`.
+- [x] `/index build` passou a mostrar `Resultado`, `Limpeza` e `Workspace`, removendo `gitignore=`, `prune=`, `scanned=`, `candidates=`, `indexed=`, `unchanged=`, `skipped=`, `pruned=`, `failed=`, `workspaceRoot=` e `duration=` da saída humana.
+- [x] `/index status` passou a renderizar disponibilidade como `sim`/`não`, sem boolean cru `true`/`false`.
+- [x] Teste escopado passou após esse lote: `npx vitest run tests/unit/copilot/terminal/test_commands_index.spec.js`.
+- [x] `/scope declare` passou a usar `diretório`, `símbolos`, `recursivo`, `limite` e `concorrência`, removendo `dir=`, `parseSymbols=`, `recursive=`, `maxFiles=` e `concurrency=` da saída humana.
+- [x] Teste escopado passou após esse lote: `npx vitest run tests/unit/copilot/terminal/test_commands_scope.spec.js`.
+- [x] `/sdk prompt` passou a usar `modo`, `live`, `reload`, `auto reload`, `customize`, `sources RPC`, `seções`, `anexos`, `fontes`, `defasado` e `ação`, removendo `live=`, `autoReload=`, `customize=`, `sourcesRpc=`, `sections=`, `appendFiles=`, `sources=`, `stale=` e `action=` do status visual.
+- [x] Teste escopado passou após esse lote: `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
+- [x] `/permission mode` passou a renderizar `Modo de permissões` e `prompts SDK`, removendo `Permission mode` e `sdk prompts=` da superfície humana.
+- [x] Teste escopado passou novamente após esse lote: `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
 - [ ] Auditar `/byok operational health` detalhado, `/byok confirmations/recoveries`, `/byok persist`, `/byok models grouped` e helpers de health tags para separar default humano de detalhe técnico.
 - [ ] Separar explicitamente “tela default humana” de “detail/raw diagnóstico” nos comandos BYOK, sem perder automação e rastreabilidade.

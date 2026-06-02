@@ -433,7 +433,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const bootDetail =
         lifecycle.boot &&
         (lifecycle.boot.skippedCount > 0 || lifecycle.boot.failedCount > 0 || lifecycle.boot.timeoutCount > 0)
-            ? ` · ok=${lifecycle.boot.okCount} skipped=${lifecycle.boot.skippedCount} failed=${lifecycle.boot.failedCount} timeout=${lifecycle.boot.timeoutCount}`
+            ? ` · ok ${lifecycle.boot.okCount} · pulados ${lifecycle.boot.skippedCount} · falhas ${lifecycle.boot.failedCount} · timeouts ${lifecycle.boot.timeoutCount}`
             : '';
     const bootLine = lifecycle.boot
         ? `${lifecycle.boot.status === 'ok' ? '\x1b[32m' : '\x1b[31m'}${lifecycle.boot.status}\x1b[0m \x1b[90m${lifecycle.boot.phases} fases · ${lifecycle.boot.durationMs}ms${bootDetail}${lifecycle.boot.failedPhase ? ` · falha=${lifecycle.boot.failedPhase}` : ''}\x1b[0m`
@@ -448,7 +448,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
     const autoPolicyLine =
         configProjection.currentModel === 'auto'
-            ? `        auto policy      \x1b[90mpref=${autoPolicy.preferredModel}/${autoPolicy.preferredReasoningEffort} · autoridade=GitHub Copilot · último=${autoPolicy.observedModel ?? 'n/d'}\x1b[0m`
+            ? `        auto policy      \x1b[90mpreferido ${autoPolicy.preferredModel}/${autoPolicy.preferredReasoningEffort} · autoridade GitHub Copilot · último ${autoPolicy.observedModel ?? 'n/d'}\x1b[0m`
             : '';
     const byokLine = byok.enabled
         ? `    BYOK provider    ${byok.ready ? '\x1b[32mpronto\x1b[0m' : '\x1b[31mincompleto\x1b[0m'} \x1b[90mpreset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · auth ${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'none'} · /byok\x1b[0m`
@@ -479,12 +479,12 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const uiElicitationFlag = sdkCapabilitiesUi ? sdkCapabilitiesUi['elicitation'] === true : null;
     const timelineSyncLabel =
         projection.timelineSyncStatus === 'scheduled' || projection.timelineSyncStatus === 'inflight'
-            ? ` · sync=${projection.timelineSyncStatus}:${projection.timelineSyncPendingCount}`
+            ? ` · sync ${projection.timelineSyncStatus}:${projection.timelineSyncPendingCount}`
             : projection.timelineSyncStatus === 'synced'
-              ? ` · sync=synced:${projection.timelineSyncSyncedCount}`
+              ? ` · sync synced:${projection.timelineSyncSyncedCount}`
               : projection.timelineSyncStatus === 'failed'
-                ? ` · sync=failed:${projection.timelineSyncFailedCount}`
-                : ` · sync=${projection.timelineSyncStatus}`;
+                ? ` · sync failed:${projection.timelineSyncFailedCount}`
+                : ` · sync ${projection.timelineSyncStatus}`;
     const promptBindingDigest =
         typeof projection.systemPromptBinding?.['digest'] === 'string'
             ? projection.systemPromptBinding['digest']
@@ -537,10 +537,10 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const ioScopeLine = `escopos ${ioRuntime.scopes.active} · parser ${ioRuntime.parser.size}/${ioRuntime.parser.maxSize} · índice ${ioIndex['available'] ? 'ativo' : 'vazio'}:${ioIndex['files'] ?? 0}`;
     const agentSelection = getEffectiveSdkAgentSelection();
     const customAgentsLine = agentSelection.enabled.length
-        ? `${agentSelection.enabled.join(', ')}${agentSelection.disabled.length ? ` · disabled=${agentSelection.disabled.join(', ')}` : ''}`
+        ? `${agentSelection.enabled.join(', ')}${agentSelection.disabled.length ? ` · desativados ${agentSelection.disabled.join(', ')}` : ''}`
         : '(none)';
     const permissionModeSkipsSdkPrompts = terminalPermissionModeSkipsSdkPrompts(projection.permissionMode);
-    const permissionModeDetail = `${projection.permissionMode} · sdk prompts=${permissionModeSkipsSdkPrompts ? 'skip' : 'selective'}`;
+    const permissionModeDetail = `${projection.permissionMode} · prompts SDK ${permissionModeSkipsSdkPrompts ? 'skip' : 'selective'}`;
     println(`
   \x1b[36mStatus do Terminal LLM-B\x1b[0m
   ─────────────────────────────────────
@@ -554,7 +554,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
   modelo           \x1b[36m${snap['model']}\x1b[0m
 ${byokLine ? `${byokLine}\n` : ''}  reasoning        \x1b[35m${effort}\x1b[0m
     modo SDK         ${sdkModeColor}${sdkMode}\x1b[0m
-        permission mode  \x1b[33m${permissionModeDetail}\x1b[0m
+        modo permissões  \x1b[33m${permissionModeDetail}\x1b[0m
     plan arquivo     ${sdkPlanOpLabel}
         bg tasks         ${health?.['backgroundPendingCount'] ?? 0}
         issues           ${Array.isArray(health?.['issues']) ? health['issues'].length : 0}
@@ -566,16 +566,16 @@ ${byokLine ? `${byokLine}\n` : ''}  reasoning        \x1b[35m${effort}\x1b[0m
     timeline         \x1b[90m${projection.timelineSource} · ${projection.timelineAuthority} · ${projection.timelineReconciliationStatus} · ${projection.timelineTurnCount} turns${timelineSyncLabel}\x1b[0m
     prompt digest    \x1b[90m${promptBindingDigest ?? '(sem binding)'}\x1b[0m
     prompt frescor   ${promptFreshnessLabel} \x1b[90m(${promptRecommendedAction})\x1b[0m
-    tools load       ${toolLoadColor}${toolLoad.total} registradas\x1b[0m \x1b[90m(fsCanônico=${toolLoad.hasCanonicalLocalFsTools} · execCanônico=${toolLoad.hasCanonicalLocalExecTools} · sdkWorkspace=${toolLoad.hasSdkWorkspaceTooling} · legacyShellLoaded=${toolLoad.hasLegacySdkShellToolsLoaded} · disabled=${toolLoad.disabled.length})\x1b[0m
-    tool contract   ${toolContractColor}${toolContract.ok ? 'ok' : 'attention'}\x1b[0m \x1b[90m(errors=${toolContract.errorCount} · warnings=${toolContract.warningCount} · desc=${toolContract.metadataCoverage.descriptionPct}% · schema=${toolContract.metadataCoverage.parametersPct}% · category=${toolContract.metadataCoverage.categoryPct}% · tags=${toolContract.metadataCoverage.tagsPct}% · instructions=${toolContract.metadataCoverage.instructionsPct}%)\x1b[0m
-    instr. load      ${instructionLoadColor}${instructionLoad.liveReloadMechanism}\x1b[0m \x1b[90m(sections=${instructionLoad.sectionCount} · missingSectionFile=${instructionLoad.sectionsMissingFileCount} · missingAppendFile=${instructionLoad.appendFileMissingCount} · sourcesRpc=${instructionLoad.sdkSupportsInstructionSourcesRpc})\x1b[0m
+    tools load       ${toolLoadColor}${toolLoad.total} registradas\x1b[0m \x1b[90m(fs canônico ${toolLoad.hasCanonicalLocalFsTools} · exec canônico ${toolLoad.hasCanonicalLocalExecTools} · workspace SDK ${toolLoad.hasSdkWorkspaceTooling} · shell legado ${toolLoad.hasLegacySdkShellToolsLoaded} · desativadas ${toolLoad.disabled.length})\x1b[0m
+    tool contract   ${toolContractColor}${toolContract.ok ? 'ok' : 'attention'}\x1b[0m \x1b[90m(falhas ${toolContract.errorCount} · avisos ${toolContract.warningCount} · descrições ${toolContract.metadataCoverage.descriptionPct}% · schema ${toolContract.metadataCoverage.parametersPct}% · categoria ${toolContract.metadataCoverage.categoryPct}% · tags ${toolContract.metadataCoverage.tagsPct}% · instruções ${toolContract.metadataCoverage.instructionsPct}%)\x1b[0m
+    instr. load      ${instructionLoadColor}${instructionLoad.liveReloadMechanism}\x1b[0m \x1b[90m(seções ${instructionLoad.sectionCount} · seções ausentes ${instructionLoad.sectionsMissingFileCount} · anexos ausentes ${instructionLoad.appendFileMissingCount} · sources RPC ${instructionLoad.sdkSupportsInstructionSourcesRpc})\x1b[0m
     sdk↔fs route     ${sdkFsRoutingColor}${sdkFsRouting.mode}\x1b[0m \x1b[90m${sdkFsRouting.reason}\x1b[0m
     custom agents   \x1b[90mperfil ${COPILOT_OPERATIONAL_PROFILE} · ${customAgentsLine}\x1b[0m
     io cache         \x1b[90m${ioCacheLine}\x1b[0m
     io scope         \x1b[90m${ioScopeLine}\x1b[0m
     sdk session      \x1b[90m${projection.sdkSessionId ?? '(sem sdk)'}\x1b[0m
     hub session      \x1b[90m${projection.hubSessionId ?? '(sem hub)'}\x1b[0m
-    turnos canon     ${projection.turnCount} \x1b[90m(persistidos=${projection.persistedTimelineTurnCount} · bridge=${projection.bridgeTurnCount} · live-tail=${projection.liveBridgeTailCount})\x1b[0m
+    turnos canon     ${projection.turnCount} \x1b[90m(persistidos ${projection.persistedTimelineTurnCount} · bridge ${projection.bridgeTurnCount} · live-tail ${projection.liveBridgeTailCount})\x1b[0m
     inject port      ${projection.injectPort}
         atividade atual  ${activitySeverityColor}${activity.label}\x1b[0m${activityProgress}
         fase/source      \x1b[90m${activity.phase} · ${activity.source}\x1b[0m
@@ -734,22 +734,8 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         ),
     );
     const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, projection.runtimeId);
-    const mode = projection.sdkSessionMode ?? 'interactive';
     const state = String(projection.snap['status'] ?? 'unknown');
-    const ask = projection.pendingQuestion
-        ? `ASK:${projection.pendingQuestionKind ?? 'question'}`
-        : projection.pendingQuestionShadowState
-          ? `SHADOW:${projection.pendingQuestionShadowState}`
-          : 'ASK:none';
     const channel = projection.dialogInputChannel;
-    const sdkWait = [
-        projection.pendingElicitations > 0 ? `ELICIT:${projection.pendingElicitations}` : null,
-        projection.pendingPermissions > 0 ? `PERM:${projection.pendingPermissions}` : null,
-        projection.pendingUserInputs > 0 ? `ASK:${projection.pendingUserInputs}` : null,
-        `PM:${projection.permissionMode}`,
-    ]
-        .filter(Boolean)
-        .join(' ');
     const queue = Number(projection.snap['queueSize'] ?? 0);
     const modelBilling = projection.modelBilling;
     const live = readTerminalLiveFlowProjection(
@@ -762,9 +748,6 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
             runtimeId,
         ),
     );
-    const mismatchLabel = modelBilling.mismatch
-        ? `mismatch(cfg=${modelBilling.configuredModel ?? '-'}|bill=${modelBilling.billedModel ?? '-'})`
-        : `model=${modelBilling.displayModel}`;
     const gatewayProjection = configProjection.modelGatewayProjection ?? {
         providerCount: 0,
         modelCount: 0,
@@ -813,21 +796,53 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         return;
     }
 
+    const waitSummary = [
+        projection.pendingElicitations > 0 ? `elicitações ${projection.pendingElicitations}` : null,
+        projection.pendingPermissions > 0 ? `permissões ${projection.pendingPermissions}` : null,
+        projection.pendingUserInputs > 0 ? `perguntas ${projection.pendingUserInputs}` : null,
+        projection.pendingStructuredUserInputs > 0 ? `formulários ${projection.pendingStructuredUserInputs}` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+    const askLine = projection.pendingQuestion
+        ? `pergunta pendente (${projection.pendingQuestionKind ?? 'geral'})`
+        : projection.pendingQuestionShadowState
+          ? `pergunta salva (${projection.pendingQuestionShadowState})`
+          : 'sem pergunta pendente';
+    const modelLine = modelBilling.mismatch
+        ? `configurado ${modelBilling.configuredModel ?? '-'} · cobrado ${modelBilling.billedModel ?? '-'} · divergente`
+        : modelBilling.displayModel;
+    println(`\n  ${terminalThemeText('assistant', 'Agora - Detalhe')}`);
+    println('  ─────────────────────────────────────');
     println(
-        `\x1b[36m[now]\x1b[0m runtime=${projection.runtimeId} live=${live.state} status=${state} loop=${projection.dialogLoopActive ? 'on' : 'off'} channel=${channel.state} mode=${mode} queue=${queue} ${ask}${sdkWait ? ` ${sdkWait}` : ''} timeline=${projection.timelineSource}:${projection.timelineReconciliationStatus}:sync=${projection.timelineSyncStatus} sse=${live.sse.clients}/${live.sse.criticalClients} ${mismatchLabel}`,
+        `  Runtime      \x1b[90m${projection.runtimeId} · sessão ${projection.runtimeSessionId ?? '(sem sessão)'}\x1b[0m`,
     );
+    println(
+        `  Conversa     \x1b[90m${renderHumanTerminalStatus(state)} · loop ${projection.dialogLoopActive ? 'ativo' : 'inativo'} · fila ${queue} · ${askLine}\x1b[0m`,
+    );
+    println(
+        `  Entrada      \x1b[90m${channel.label} · modo SDK ${projection.sdkSessionMode ?? 'interactive'} · prompts ${projection.permissionMode} · ${waitSummary || 'sem pendências humanas'}\x1b[0m`,
+    );
+    println(
+        `  Timeline     \x1b[90m${projection.timelineSource} · ${projection.timelineReconciliationStatus} · sync ${projection.timelineSyncStatus}\x1b[0m`,
+    );
+    println(
+        `  SSE          \x1b[90m${pluralPt(live.sse.clients, 'cliente', 'clientes')} · ${pluralPt(live.sse.criticalClients, 'cliente crítico', 'clientes críticos')} · estado ${live.state}\x1b[0m`,
+    );
+    println(`  Modelo       \x1b[90m${modelLine}\x1b[0m`);
     if (gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0) {
         println(
-            `\x1b[90m[now]\x1b[0m gateway=providers:${gatewayProjection.providerCount} models:${gatewayProjection.modelCount} enabled:${gatewayProjection.enabledModelCount} active=${gatewayActive?.['modelId'] ?? '-'}${gatewayActive?.['providerId'] ? `@${gatewayActive['providerId']}` : ''}`,
+            `  Catálogo     \x1b[90m${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados · ativo ${gatewayActive?.['modelId'] ?? '-'}${gatewayActive?.['providerId'] ? ` @ ${gatewayActive['providerId']}` : ''}\x1b[0m`,
         );
     }
     if (projection.activity?.label) {
         const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';
-        println(`\x1b[90m[now]\x1b[0m atividade=${projection.activity.phase}:${projection.activity.label}${detail}`);
+        println(`  Atividade    \x1b[90m${projection.activity.phase} · ${projection.activity.label}${detail}\x1b[0m`);
     }
     if (projection.recommendedAction) {
-        println(`\x1b[90m[now]\x1b[0m recommended=${projection.recommendedAction}`);
+        println(`  Próximo      ${terminalThemeText('command', projection.recommendedAction)}`);
     }
+    println('  ─────────────────────────────────────');
 }
 
 /**

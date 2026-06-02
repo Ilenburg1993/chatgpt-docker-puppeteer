@@ -67,6 +67,14 @@ function bytesLabel(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function boolLabel(value) {
+    return value === true ? 'sim' : value === false ? 'não' : '-';
+}
+
+/**
  * @param {string | undefined} value
  * @returns {number | undefined}
  */
@@ -170,7 +178,7 @@ function printStats(ctx) {
         typeof stats['latestIndexedAtMs'] === 'number' ? formatTerminalIsoTimestamp(stats['latestIndexedAtMs']) : '-';
     ctx.println('\n  \x1b[36mÍndice L2 local\x1b[0m');
     ctx.println(
-        `  disponibilidade ${String(stats['available'])} · arquivos ${numberLabel(stats['files'])} · frescos ${numberLabel(stats['freshFiles'])} · falhas ${numberLabel(stats['failedFiles'])}`,
+        `  disponibilidade ${boolLabel(stats['available'])} · arquivos ${numberLabel(stats['files'])} · frescos ${numberLabel(stats['freshFiles'])} · falhas ${numberLabel(stats['failedFiles'])}`,
     );
     ctx.println(
         `  símbolos ${numberLabel(stats['symbols'])} · imports ${numberLabel(stats['imports'])} · chunks ${numberLabel(stats['chunks'])} · bytes ${bytesLabel(stats['bytesIndexed'])}`,
@@ -201,7 +209,7 @@ async function runBuild(ctx, parts) {
     if (parsed.pruneMissing !== undefined) options.pruneMissing = parsed.pruneMissing;
 
     ctx.println(
-        `\n  \x1b[36m/index build\x1b[0m ${directory} \x1b[90m(gitignore=${parsed.respectGitignore ? 'on' : 'off'}, prune=${parsed.pruneMissing === false ? 'off' : 'auto'})\x1b[0m`,
+        `\n  \x1b[36m/index build\x1b[0m ${directory} \x1b[90m(gitignore ${parsed.respectGitignore ? 'on' : 'off'} · prune ${parsed.pruneMissing === false ? 'off' : 'auto'})\x1b[0m`,
     );
     const result = /** @type {Record<string, unknown>} */ (await buildIoIndexForDirectory(directory, options));
     if (result['available'] === false) {
@@ -209,10 +217,13 @@ async function runBuild(ctx, parts) {
         return;
     }
     ctx.println(
-        `  scanned=${numberLabel(result['scannedEntries'])} · candidates=${numberLabel(result['candidateFiles'])} · indexed=${numberLabel(result['indexed'])} · unchanged=${numberLabel(result['unchanged'])} · skipped=${numberLabel(result['skipped'])} · pruned=${numberLabel(result['pruned'])} · failed=${numberLabel(result['failed'])}`,
+        `  Resultado   \x1b[90mvarridos ${numberLabel(result['scannedEntries'])} · candidatos ${numberLabel(result['candidateFiles'])} · indexados ${numberLabel(result['indexed'])} · inalterados ${numberLabel(result['unchanged'])}\x1b[0m`,
     );
     ctx.println(
-        `  workspaceRoot=${compactPath(String(result['workspaceRoot'] ?? directory))} · duration=${numberLabel(result['durationMs'])}ms\n`,
+        `  Limpeza     \x1b[90mignorados ${numberLabel(result['skipped'])} · podados ${numberLabel(result['pruned'])} · falhas ${numberLabel(result['failed'])}\x1b[0m`,
+    );
+    ctx.println(
+        `  Workspace   \x1b[90m${compactPath(String(result['workspaceRoot'] ?? directory))} · duração ${numberLabel(result['durationMs'])}ms\x1b[0m\n`,
     );
 }
 

@@ -422,7 +422,19 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('System Prompt SDK');
         expect(ctx.output()).toContain('sdk-transform');
         expect(ctx.output()).toContain('abcd1234efgh5678');
+        expect(ctx.output()).toContain('modo');
+        expect(ctx.output()).toContain('auto reload');
+        expect(ctx.output()).toContain('sources RPC');
+        expect(ctx.output()).toContain('seções');
+        expect(ctx.output()).toContain('fontes');
+        expect(ctx.output()).toContain('defasado');
         expect(ctx.output()).toContain('Instruction sources');
+        expect(ctx.output()).not.toContain('live=');
+        expect(ctx.output()).not.toContain('autoReload=');
+        expect(ctx.output()).not.toContain('customize=');
+        expect(ctx.output()).not.toContain('sections=');
+        expect(ctx.output()).not.toContain('sources=');
+        expect(ctx.output()).not.toContain('stale=');
     });
 
     it('/sdk models e /sdk tools consultam o Agent SDK facade', async () => {
@@ -963,13 +975,17 @@ describe('terminal/commands/sdk', () => {
         await cmdPermission({ println: show.println }, 'mode');
         expect(agentRuntimeMocks.readTerminalRuntimePermissionMode).toHaveBeenCalled();
         expect(show.output()).toContain('approve_all');
-        expect(show.output()).toContain('sdk prompts=skip');
+        expect(show.output()).toContain('Modo de permissões');
+        expect(show.output()).toContain('prompts SDK skip');
+        expect(show.output()).not.toContain('Permission mode');
+        expect(show.output()).not.toContain('sdk prompts=');
 
         const set = mockCtx();
         await cmdPermission({ println: set.println }, 'mode audit_only');
         expect(agentRuntimeMocks.setTerminalRuntimePermissionMode).toHaveBeenCalledWith('audit_only', null);
-        expect(set.output()).toContain('Permission mode atualizado');
-        expect(set.output()).toContain('sdk prompts=skip');
+        expect(set.output()).toContain('Modo de permissões atualizado');
+        expect(set.output()).toContain('prompts SDK skip');
+        expect(set.output()).not.toContain('sdk prompts=');
     });
 
     it('/permission show/respond latest respeita runtimeId e evita bleed entre runtimes', async () => {

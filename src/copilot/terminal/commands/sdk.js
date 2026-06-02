@@ -1399,25 +1399,26 @@ async function renderSdkSystemPrompt({ println }, runtimeId) {
     const sessionId = typeof session['id'] === 'string' ? session['id'] : projection['sessionId'];
     const sessionAvailable =
         typeof session['available'] === 'boolean' ? session['available'] : Boolean(projection['sessionAvailable']);
+    const yesNo = (/** @type {unknown} */ value) => (value ? 'sim' : 'não');
 
     println('\n  \x1b[36mSystem Prompt SDK\x1b[0m');
     println(
-        `  mode     \x1b[33m${String(status['effectiveMode'] ?? '?')}\x1b[0m  live=\x1b[33m${String(status['effectiveLiveMode'] ?? '?')}\x1b[0m  reload=\x1b[33m${String(status['liveReloadMechanism'] ?? '?')}\x1b[0m`,
+        `  modo     \x1b[33m${String(status['effectiveMode'] ?? '?')}\x1b[0m  live \x1b[33m${String(status['effectiveLiveMode'] ?? '?')}\x1b[0m  reload \x1b[33m${String(status['liveReloadMechanism'] ?? '?')}\x1b[0m`,
     );
     println(
-        `  config   \x1b[90m${String(status['configPath'] ?? '-')}\x1b[0m  autoReload=\x1b[33m${String(status['autoReload'] ?? false)}\x1b[0m`,
+        `  config   \x1b[90m${String(status['configPath'] ?? '-')}\x1b[0m  auto reload \x1b[33m${yesNo(Boolean(status['autoReload']))}\x1b[0m`,
     );
     println(
-        `  sdk      \x1b[90mcustomize=${String(sdkCompatibility['supportsCustomizeMode'] ?? false)} · sourcesRpc=${String(sdkCompatibility['supportsInstructionSourcesRpc'] ?? false)}\x1b[0m`,
+        `  sdk      \x1b[90mcustomize ${yesNo(Boolean(sdkCompatibility['supportsCustomizeMode']))} · sources RPC ${yesNo(Boolean(sdkCompatibility['supportsInstructionSourcesRpc']))}\x1b[0m`,
     );
     println(
-        `  digest   \x1b[90m${String(revision['digest'] ?? '-')}\x1b[0m  sections=\x1b[33m${sections.length}\x1b[0m  appendFiles=\x1b[33m${appendFiles.length}\x1b[0m`,
+        `  digest   \x1b[90m${String(revision['digest'] ?? '-')}\x1b[0m  seções \x1b[33m${sections.length}\x1b[0m  anexos \x1b[33m${appendFiles.length}\x1b[0m`,
     );
     println(
-        `  session  \x1b[90m${String(sessionId ?? '-')}\x1b[0m  sources=\x1b[33m${sessionAvailable ? 'available' : 'none'}\x1b[0m`,
+        `  sessão   \x1b[90m${String(sessionId ?? '-')}\x1b[0m  fontes \x1b[33m${sessionAvailable ? 'disponíveis' : 'nenhuma'}\x1b[0m`,
     );
     println(
-        `  binding  \x1b[90m${String(binding['digest'] ?? '-')}\x1b[0m  stale=\x1b[33m${String(Boolean(freshness['isStale']))}\x1b[0m  action=\x1b[33m${String(freshness['recommendedAction'] ?? 'none')}\x1b[0m`,
+        `  binding  \x1b[90m${String(binding['digest'] ?? '-')}\x1b[0m  defasado \x1b[33m${yesNo(Boolean(freshness['isStale']))}\x1b[0m  ação \x1b[33m${String(freshness['recommendedAction'] ?? 'none')}\x1b[0m`,
     );
 
     if (freshness['reason']) {
@@ -1758,9 +1759,9 @@ export async function cmdPermission({ println }, arg = '') {
         if (!next) {
             const current = readTerminalRuntimePermissionMode(runtimeId);
             const sdkPromptsSkipped = terminalPermissionModeSkipsSdkPrompts(current);
-            println(`\n  \x1b[36mPermission mode\x1b[0m  \x1b[33m${current}\x1b[0m`);
+            println(`\n  \x1b[36mModo de permissões\x1b[0m  \x1b[33m${current}\x1b[0m`);
             println(
-                `  \x1b[90msdk prompts=${sdkPromptsSkipped ? 'skip' : 'selective'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme policy'}\x1b[0m`,
+                `  \x1b[90mprompts SDK ${sdkPromptsSkipped ? 'skip' : 'selective'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme policy'}\x1b[0m`,
             );
             println('  \x1b[90mUso: /permission mode <approve_all|audit_only|selective>\x1b[0m\n');
             return;
@@ -1771,9 +1772,9 @@ export async function cmdPermission({ println }, arg = '') {
         }
         const updated = setTerminalRuntimePermissionMode(next, runtimeId);
         const sdkPromptsSkipped = terminalPermissionModeSkipsSdkPrompts(updated);
-        println(`\n  \x1b[32m? Permission mode atualizado:\x1b[0m \x1b[33m${updated}\x1b[0m\n`);
+        println(`\n  \x1b[32m? Modo de permissões atualizado:\x1b[0m \x1b[33m${updated}\x1b[0m\n`);
         println(
-            `  \x1b[90msdk prompts=${sdkPromptsSkipped ? 'skip' : 'selective'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme policy'}\x1b[0m\n`,
+            `  \x1b[90mprompts SDK ${sdkPromptsSkipped ? 'skip' : 'selective'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme policy'}\x1b[0m\n`,
         );
         return;
     }

@@ -57,6 +57,9 @@ describe('terminal/commands/scope', () => {
         );
         expect(ctx.output()).toContain('/scope declare');
         expect(ctx.output()).toContain('scope-terminal-test');
+        expect(ctx.output()).toContain('diretório');
+        expect(ctx.output()).toContain('símbolos sim');
+        expect(ctx.output()).toContain('recursivo sim');
         expect(ctx.output()).toContain('informativo');
         expect(ctx.output()).toContain('ready');
 
@@ -77,6 +80,9 @@ describe('terminal/commands/scope', () => {
         expect(ctx.output()).toContain('Escopo fechado');
         expect(ctx.output()).not.toContain('files=');
         expect(ctx.output()).not.toContain('parsed=');
+        expect(ctx.output()).not.toContain('dir=');
+        expect(ctx.output()).not.toContain('parseSymbols=');
+        expect(ctx.output()).not.toContain('recursive=');
     });
 
     it('/scope list mostra escopos ativos e filtros advisory não cortam a declaração', async () => {
