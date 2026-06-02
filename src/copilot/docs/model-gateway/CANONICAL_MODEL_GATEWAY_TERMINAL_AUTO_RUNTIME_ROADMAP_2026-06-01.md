@@ -450,6 +450,10 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-02T00-36-27-258Z:auto_probe` no run mais recente.
 - [x] `npm run model-gateway:live:auto-probe` validou 30 criterios, incluindo `auto-standby-visible`, recovery fixture
       sintetica e ausencia de erros rastreados.
+- [x] `npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000` gravou
+      `terminal-live:2026-06-02T00-50-34-962Z:control_no_pr`, 0 erros.
+- [x] `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000` gravou
+      `terminal-live:2026-06-02T00-50-34-994Z:byok_fixture_no_pr`, 0 erros.
 - [x] `npm run model-gateway:auto:scenarios` separa `live_plan_command` de `live_plan_ready`; apos excluir fixture
       sintetica dos blockers reais, `live_plan_ready=true`.
 - [x] `npm run model-gateway:live:plan -- --json --no-write` passa com `blockingActive=0`, `active=1`,

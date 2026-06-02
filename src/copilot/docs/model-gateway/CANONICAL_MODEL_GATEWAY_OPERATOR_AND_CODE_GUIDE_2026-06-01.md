@@ -389,6 +389,12 @@ Validado nesta linha:
 - `npm run model-gateway:live:auto-probe`: PASS, incluindo `/byok auto standby`, recovery fixture sintetica e health clear disponivel.
 - Artefato live: `artifacts/terminal-live/2026-06-02T00-36-27-248Z/summary.md`.
 - `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-02T00-36-27-258Z:auto_probe`, `criteriaTotal=30`, `criteriaFailed=0`.
+- `npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000`: PASS, run
+  `terminal-live:2026-06-02T00-50-34-962Z:control_no_pr`, 0 erros, artefato
+  `artifacts/terminal-live/2026-06-02T00-50-34-955Z/summary.md`.
+- `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`: PASS, run
+  `terminal-live:2026-06-02T00-50-34-994Z:byok_fixture_no_pr`, 0 erros, artefato
+  `artifacts/terminal-live/2026-06-02T00-50-34-986Z/summary.md`.
 - `/byok auto status` e `/byok auto doctor` agora mostram resumo de alternativas: usable/evaluated, quantidade de providers e principais blockers.
 - `/byok auto status` e `/byok auto doctor` agora sugerem comandos `provar:` para promover candidatos bloqueados por agent probe ausente/nao verificado.
 - `/byok auto recovery-fixture ... provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery, runtime health sintetica e espelho SQLite sem chamada ao provider.

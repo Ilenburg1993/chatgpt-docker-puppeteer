@@ -557,8 +557,8 @@ Isso cria overlay temporario com reset/cooldown.
 - [x] `npm run model-gateway:auto:scenarios` passa sem blockers de readiness e com `live_plan_ready=true`.
 - [x] `npm run model-gateway:live:readiness` passa.
 - [x] `npm run model-gateway:live:plan -- --json --no-write` passa; health sintetica de fixture nao bloqueia live real.
-- [ ] `npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000` passa.
-- [ ] `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000` passa.
+- [x] `npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000` passa.
+- [x] `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000` passa.
 - [x] `npm run model-gateway:live:auto-probe` passa.
 - [x] `npm run model-gateway:live:runs` mostra o ultimo auto-probe persistido.
 - [x] `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` persiste recovery, runtime health sintetica e SQLite sem provider call; health real exige `real-health`.
