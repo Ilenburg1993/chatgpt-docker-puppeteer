@@ -3529,7 +3529,7 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
     }
     if (controllerStep.effects.length > 0) {
         println(
-            `    efeitos:       \x1b[90m${controllerStep.effects.map((effect) => `${effect['kind']}:${effect['execute'] === true ? 'exec' : 'dry'}`).join(', ')}\x1b[0m`,
+            `    efeitos:       \x1b[90m${controllerStep.effects.map((effect) => `${effect['kind']}:${effect['execute'] === true ? 'exec' : optionalScalarString(effect['authorization']) ?? 'dry'}${effect['blockedReason'] ? `:${effect['blockedReason']}` : ''}`).join(', ')}\x1b[0m`,
         );
     }
     println(`    resumo:        \x1b[90m${decision.operatorSummary}\x1b[0m`);
@@ -4061,11 +4061,14 @@ async function renderByokGatewayAutoOff(println) {
  */
 async function applyByokGatewayAutoEffects(println, controllerStep) {
     const application = await applyTerminalByokGatewayAutoEffects(controllerStep);
-    if (
-        application.applied.length === 0 &&
-        application.skipped.every((effect) => effect['skippedReason'] === 'effect_not_authorized')
-    ) {
-        println('  \x1b[33mNenhum efeito auto autorizado pela policy atual. Use /byok auto status para revisar blockers e flags.\x1b[0m\n');
+    if (application.applied.length === 0 && application.skipped.length > 0) {
+        const reasons = application.skipped
+            .map((effect) => describeTerminalByokGatewayAutoEffect(effect))
+            .slice(0, 4)
+            .join('; ');
+        println(
+            `  \x1b[33mNenhum efeito auto foi aplicado. ${reasons || 'Use /byok auto status para revisar blockers e flags'}.\x1b[0m\n`,
+        );
         return application;
     }
     for (const effect of application.applied) {

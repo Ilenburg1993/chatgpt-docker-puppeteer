@@ -3605,6 +3605,7 @@ describe('terminal /byok command', () => {
                 { kind: 'set_live_model', model: 'anthropic/claude-sonnet-4.5', execute: true },
                 { kind: 'prepare_new_sdk_session', model: 'anthropic/claude-sonnet-4.5', execute: true },
                 { kind: 'set_live_model', model: 'dry-model', execute: false },
+                { kind: 'set_live_model', model: 'blocked-model', execute: false, blockedReason: 'live_set_model_not_allowed' },
             ],
         });
 
@@ -3620,6 +3621,7 @@ describe('terminal /byok command', () => {
         expect(result.skipped).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({ kind: 'set_live_model', skippedReason: 'effect_not_authorized' }),
+                expect.objectContaining({ kind: 'set_live_model', skippedReason: 'live_set_model_not_allowed' }),
             ]),
         );
         const records = createTerminalByokGatewayAutoEffectApplicationRecords(

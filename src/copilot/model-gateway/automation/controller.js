@@ -50,6 +50,39 @@ function selectedRouteKey(decision) {
 
 /**
  * @param {object} input
+ * @param {boolean} input.allowEffects
+ * @param {boolean} input.allowedByPolicy
+ * @param {string} input.policyGate
+ * @param {string} input.policyDeniedReason
+ * @returns {{ execute: boolean; authorization: 'authorized' | 'dry_run' | 'policy_denied'; policyGate: string; blockedReason: string | null }}
+ */
+function effectAuthorization(input) {
+    if (!input.allowEffects) {
+        return {
+            execute: false,
+            authorization: 'dry_run',
+            policyGate: input.policyGate,
+            blockedReason: 'effects_not_enabled',
+        };
+    }
+    if (!input.allowedByPolicy) {
+        return {
+            execute: false,
+            authorization: 'policy_denied',
+            policyGate: input.policyGate,
+            blockedReason: input.policyDeniedReason,
+        };
+    }
+    return {
+        execute: true,
+        authorization: 'authorized',
+        policyGate: input.policyGate,
+        blockedReason: null,
+    };
+}
+
+/**
+ * @param {object} input
  * @param {'pre_turn' | 'post_turn' | 'manual'} [input.phase]
  * @param {Record<string, unknown>} input.decision
  * @param {{ allowEffects?: boolean; allowLiveSetModel?: boolean; allowNewSession?: boolean; accountWideFailureKinds?: string[] }} [input.policy]
@@ -89,7 +122,12 @@ export function buildModelGatewayRuntimeAutomationControllerStep(input) {
             errorMessage: input.turnOutcome.errorMessage ?? null,
             accountWideFailure,
             recoveryScope: accountWideFailure ? 'account' : 'route',
-            execute: allowEffects,
+            ...effectAuthorization({
+                allowEffects,
+                allowedByPolicy: true,
+                policyGate: 'allowEffects',
+                policyDeniedReason: 'effects_not_enabled',
+            }),
         });
     }
 
@@ -98,20 +136,33 @@ export function buildModelGatewayRuntimeAutomationControllerStep(input) {
             kind: 'set_live_model',
             model,
             routeKey,
-            execute: allowEffects && policy.allowLiveSetModel === true,
+            ...effectAuthorization({
+                allowEffects,
+                allowedByPolicy: policy.allowLiveSetModel === true,
+                policyGate: 'allowLiveSetModel',
+                policyDeniedReason: 'live_set_model_not_allowed',
+            }),
         });
     } else if (action === 'prepare_new_session' || decision['requiresNewSession'] === true) {
         effects.push({
             kind: 'prepare_new_sdk_session',
             model,
             routeKey,
-            execute: allowEffects && policy.allowNewSession === true,
+            ...effectAuthorization({
+                allowEffects,
+                allowedByPolicy: policy.allowNewSession === true,
+                policyGate: 'allowNewSession',
+                policyDeniedReason: 'new_session_not_allowed',
+            }),
         });
     } else if (action === 'wait_for_reset') {
         effects.push({
             kind: 'wait_for_provider_reset',
             routeKey,
             execute: false,
+            authorization: 'policy_denied',
+            policyGate: 'providerReset',
+            blockedReason: 'wait_for_reset_not_executable',
         });
     }
 

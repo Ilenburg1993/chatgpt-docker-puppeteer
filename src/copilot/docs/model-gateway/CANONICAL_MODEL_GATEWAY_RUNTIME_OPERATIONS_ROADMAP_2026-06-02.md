@@ -231,7 +231,7 @@ metadata importers
 - [x] C.5 Criar preset `auto_prepare_new_session`.
 - [x] C.6 Expor diferenca entre aplicar agora e preparar proximo boot.
 - [x] C.7 Persistir policy snapshot sempre que auto roda.
-- [ ] C.8 Mostrar por que auto aplicou ou nao aplicou.
+- [x] C.8 Mostrar por que auto aplicou ou nao aplicou.
 - [x] C.9 Garantir que local/Ollama continua opt-in.
 - [x] C.10 Expor presets no JSON do cockpit unificado.
 

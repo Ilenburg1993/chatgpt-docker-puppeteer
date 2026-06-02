@@ -1515,6 +1515,9 @@ describe('model-gateway foundation', () => {
         assert.equal(liveControllerStep.effectMode, 'allowed');
         assert.equal(liveControllerStep.effects[0]['kind'], 'set_live_model');
         assert.equal(liveControllerStep.effects[0]['execute'], true);
+        assert.equal(liveControllerStep.effects[0]['authorization'], 'authorized');
+        assert.equal(liveControllerStep.effects[0]['policyGate'], 'allowLiveSetModel');
+        assert.equal(liveControllerStep.effects[0]['blockedReason'], null);
 
         const newSessionDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan,
@@ -1541,6 +1544,16 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(newSessionControllerStep.effects[0]['kind'], 'prepare_new_sdk_session');
         assert.equal(newSessionControllerStep.effects[0]['execute'], false);
+        assert.equal(newSessionControllerStep.effects[0]['authorization'], 'dry_run');
+        assert.equal(newSessionControllerStep.effects[0]['policyGate'], 'allowNewSession');
+        assert.equal(newSessionControllerStep.effects[0]['blockedReason'], 'effects_not_enabled');
+        const newSessionDeniedControllerStep = buildModelGatewayRuntimeAutomationControllerStep({
+            phase: 'pre_turn',
+            decision: newSessionDecision,
+            policy: { allowEffects: true, allowNewSession: false },
+        });
+        assert.equal(newSessionDeniedControllerStep.effects[0]['authorization'], 'policy_denied');
+        assert.equal(newSessionDeniedControllerStep.effects[0]['blockedReason'], 'new_session_not_allowed');
 
         const localPrivateDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan: {

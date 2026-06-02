@@ -295,7 +295,7 @@ export async function applyTerminalByokGatewayAutoEffects(controllerStep) {
     const skipped = [];
     for (const effect of effects) {
         if (effect['execute'] !== true) {
-            skipped.push({ ...effect, skippedReason: 'effect_not_authorized' });
+            skipped.push({ ...effect, skippedReason: optionalScalarString(effect['blockedReason']) ?? 'effect_not_authorized' });
             continue;
         }
         if (effect['kind'] === 'replan_after_turn_failure') {

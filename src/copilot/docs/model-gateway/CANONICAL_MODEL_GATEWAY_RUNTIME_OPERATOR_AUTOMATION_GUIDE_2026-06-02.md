@@ -159,6 +159,8 @@ Todos os presets mantem provider probes e local/Ollama desligados por default. L
 
 `npm run model-gateway:operator-ready -- --json` expoe `policyPresets[]`, com comando terminal, env sugerido e efeitos permitidos por preset. O cockpit terminal mostra tambem o `preset` efetivo na linha de policy.
 
+Os effects do controller agora carregam `authorization`, `policyGate` e `blockedReason`. `/byok auto status` e `/byok auto apply` mostram esses motivos quando um efeito fica em dry-run ou e negado pela policy.
+
 ### Faixa D - Standby Contract
 
 - [x] D.1 Gerar standby routes a partir do runtime selector.
