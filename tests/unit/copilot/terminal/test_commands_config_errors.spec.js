@@ -107,7 +107,7 @@ describe('terminal commands config/errors com frontend canônico', () => {
 
         expect(ctx.output()).toContain('Modelo ativo');
         expect(ctx.output()).toContain('gpt-5');
-        expect(ctx.output()).toContain('caps: reasoning=yes');
+        expect(ctx.output()).toContain('capacidades: raciocínio sim');
         expect(readTerminalConfigProjection).toHaveBeenCalled();
     });
 
@@ -142,7 +142,7 @@ describe('terminal commands config/errors com frontend canônico', () => {
         await cmdModel({ println: ctx.println }, 'stats');
 
         expect(ctx.output()).toContain('Estatísticas por modelo');
-        expect(ctx.output()).toContain('avg_latency=120ms');
+        expect(ctx.output()).toContain('latência média 120ms');
         expect(readTerminalModelStatsProjection).toHaveBeenCalled();
     });
 
@@ -188,7 +188,7 @@ describe('terminal commands config/errors com frontend canônico', () => {
 
         expect(setTerminalModelProjection).toHaveBeenCalledWith('gpt-4.1');
         expect(ctx.output()).toContain('Reasoning ajustado');
-        expect(ctx.output()).toContain('reasoning=no');
+        expect(ctx.output()).toContain('raciocínio não');
         expect(ctx.output()).toContain('Último modelo efetivo observado na sessão: claude-haiku-4.5');
     });
 

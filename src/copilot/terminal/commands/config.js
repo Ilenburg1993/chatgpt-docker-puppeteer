@@ -55,6 +55,15 @@ const DISABLED_BYOK_SUMMARY = Object.freeze({
 });
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function yesNoPt(value) {
+    if (typeof value !== 'boolean') return 'n/d';
+    return value ? 'sim' : 'não';
+}
+
+/**
  * @param {ReturnType<typeof readTerminalRuntimeState>} state
  * @returns {{ observedModel: string | null; configuredModel: string | null; modelMismatch: boolean }}
  */
@@ -123,15 +132,17 @@ export async function cmdModel({ println }, arg) {
         if (meta) {
             const contextWindowLabel =
                 typeof meta.contextWindow === 'number' ? meta.contextWindow.toLocaleString() : 'n/a';
-            println(`  \x1b[90m    cost=${meta.costTier}  speed=${meta.speedTier}  ctx=${contextWindowLabel}\x1b[0m`);
             println(
-                `  \x1b[90m    caps: reasoning=${meta.supportsReasoning ? 'yes' : 'no'}  vision=${meta.supportsVision ? 'yes' : 'no'}\x1b[0m`,
+                `  \x1b[90m    custo ${meta.costTier} · velocidade ${meta.speedTier} · contexto ${contextWindowLabel}\x1b[0m`,
+            );
+            println(
+                `  \x1b[90m    capacidades: raciocínio ${yesNoPt(meta.supportsReasoning)} · visão ${yesNoPt(meta.supportsVision)}\x1b[0m`,
             );
         }
         if (byok.enabled) {
-            const ready = byok.ready ? '\x1b[32mready\x1b[0m' : '\x1b[31mincompleto\x1b[0m';
+            const ready = byok.ready ? '\x1b[32mpronto\x1b[0m' : '\x1b[31mincompleto\x1b[0m';
             println(
-                `  \x1b[90m    byok: ${ready} · preset=${byok.preset ?? '-'} · provider=${byok.providerType ?? '-'} · model=${byok.model ?? '-'} · /byok\x1b[0m`,
+                `  \x1b[90m    BYOK ${ready} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · /byok\x1b[0m`,
             );
         }
         println(
@@ -155,7 +166,7 @@ export async function cmdModel({ println }, arg) {
             const rate = (s.successRate * 100).toFixed(0);
             println(`    \x1b[33m${s.modelId}\x1b[0m${marker}`);
             println(
-                `      calls=${s.totalCalls}  avg_latency=${s.avgLatencyMs}ms  success=${rate}%  tokens=${s.totalTokens}`,
+                `      chamadas ${s.totalCalls} · latência média ${s.avgLatencyMs}ms · sucesso ${rate}% · tokens ${s.totalTokens}`,
             );
         }
         println('');
@@ -197,7 +208,7 @@ export async function cmdModel({ println }, arg) {
             `\n  \x1b[33mBYOK está ativo: /model <id> não troca provider customizado em runtime.\x1b[0m`,
         );
         println(
-            `  \x1b[90mModelo BYOK canônico: ${byok.model ?? '(ausente)'} · preset=${byok.preset ?? '-'} · provider=${byok.providerType ?? '-'}.\x1b[0m`,
+            `  \x1b[90mModelo BYOK canônico: ${byok.model ?? '(ausente)'} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'}.\x1b[0m`,
         );
         println(
             '  \x1b[90mUse /byok model <id> para trocar modelo no mesmo provider quando a sessão viva já estiver bound; troca de provider/perfil continua em /byok + /session sdk next new no próximo boot.\x1b[0m\n',
@@ -224,7 +235,7 @@ export async function cmdModel({ println }, arg) {
     if (modelMeta) {
         const ctxLabel = typeof modelMeta.contextWindow === 'number' ? modelMeta.contextWindow.toLocaleString() : 'n/a';
         println(
-            `  \x1b[90mCapabilities: reasoning=${modelMeta.supportsReasoning ? 'yes' : 'no'} · vision=${modelMeta.supportsVision ? 'yes' : 'no'} · ctx=${ctxLabel}\x1b[0m`,
+            `  \x1b[90mCapacidades: raciocínio ${yesNoPt(modelMeta.supportsReasoning)} · visão ${yesNoPt(modelMeta.supportsVision)} · contexto ${ctxLabel}\x1b[0m`,
         );
     }
     if (reasoningAdjusted) {

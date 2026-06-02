@@ -2060,3 +2060,40 @@
   - `ASK` mostra `1 opção(ões)`;
   - `/activity` mostra `opções SIM`;
   - `/events` mostra `arquivo ... · N evento(s) · fila 0 · filtro nenhum`.
+
+### 11.15 `/session sdk`, waits e snapshots com vocabulário humano
+
+- [x] Auditoria pós-commit identificou que `/session sdk`, `/session sdk waits`, `/session sdk events`, `/answer --runtime`, snapshots e `/status full` ainda renderizavam `profile=`, `provider=`, `model=`, `session fs:`, `metadata local: model=`, `choices=`, `perguntas=`, `permission=`, `elicitation=`, `start=` e `modified=`.
+- [x] `renderTerminalPreparedByokSelection` e `renderTerminalSdkProviderBinding` foram corrigidos na origem para `perfil`, `preset`, `provedor` e `modelo`, evitando duplicação de formatação BYOK.
+- [x] Decisão de boot SDK passou de `request=<mode>` para `pedido <modo>` com `criada/retomada`.
+- [x] Inventário de sessão SDK passou a mostrar:
+  - `arquivos` em vez de `session fs`;
+  - `metadados locais: modelo ... · provedor ... · limite ...`;
+  - `início ... · alterada ...`;
+  - `filtro ... · deslocamento ... · limite ...`.
+- [x] `/session sdk waits` passou a mostrar `perguntas`, `formulários`, `permissões`, `pedido`, `mensagem`, `resposta` e `N opção(ões)` sem `key=value`.
+- [x] `/session sdk events` passou a mostrar `Ciclo de vida SDK` e `Comando SDK executado`, com `tipo`, `sessão`, `comando` e `local` em texto humano.
+- [x] `/answer --runtime alt` passou a confirmar `runtime alt`, não `runtime=alt`.
+- [x] Snapshots passaram a usar `modelo`, `Sessão`, `Envios`, `Conversa`, `Pergunta pendente` e `Pergunta restaurada`.
+- [x] `/status full` passou a humanizar esperas SDK, display, perfil do modelo, billing divergente e agentes customizados.
+- [x] Teste focado `test_commands_session.spec.js` passou com 43 testes.
+- [ ] Rodar uma live curta de UX para observar `/session sdk`, `/session sdk waits`, `/status full` e `/answer` em PTY real.
+
+### 11.16 `/events sources` sem cabeçalho mecânico
+
+- [x] Auditoria pós-11.15 identificou que o mapa de fontes canônicas ainda exibia `janela=`, `archive=`, `recentes=`, `owner` e `emitter`.
+- [x] Cabeçalho passou para `janela últimos ... eventos · arquivo ...`.
+- [x] Rótulos passaram de `owner`/`emitter` para `dono`/`emissor`.
+- [x] Contagem passou de `recentes=N` para `recentes N`.
+- [x] Hint de evento passou de `/events event=<id> 50` para `/events <id> 50`, mantendo `source=` apenas onde a sintaxe do parser ainda exige source explícito.
+- [ ] Investigar parser futuro para aceitar `/events source <id>` e `/events trace <id>` sem quebrar compatibilidade com `source=<id>`.
+
+### 11.17 `/model` e `/model stats` como painel cotidiano
+
+- [x] Auditoria identificou que `/model` e `/model stats` ainda renderizavam `cost=`, `speed=`, `ctx=`, `reasoning=yes`, `vision=yes`, `preset=`, `provider=`, `model=`, `calls=`, `avg_latency=` e `success=`.
+- [x] `/model` sem argumentos passou a mostrar `custo`, `velocidade`, `contexto`, `capacidades: raciocínio ... · visão ...`.
+- [x] Estado BYOK dentro de `/model` passou a mostrar `BYOK pronto/incompleto · preset ... · provedor ... · modelo ...`.
+- [x] `/model stats` passou a mostrar `chamadas`, `latência média`, `sucesso` e `tokens`.
+- [x] Mensagem de BYOK ativo passou a mostrar `preset` e `provedor` sem key-value.
+- [x] Mensagem pós-troca de modelo passou a mostrar `Capacidades: raciocínio ... · visão ... · contexto ...`.
+- [ ] Avaliar se `/reasoning` deve trocar `Reasoning effort`/`Reasoning trocado` por rótulos 100% em português.

@@ -116,7 +116,7 @@ function parseSourcesLimit(arg) {
  */
 function buildPolicyQueryHints(policy) {
     const event = policy.publicEvents[0] ?? '';
-    const eventHint = event ? `/events event=${event} 50` : null;
+    const eventHint = event ? `/events ${event} 50` : null;
     const sourceHint = policy.canonicalEmitter ? `/events source=${policy.canonicalEmitter} 50` : null;
     return [eventHint, sourceHint].filter(Boolean).join(' · ');
 }
@@ -266,14 +266,14 @@ export async function cmdEvents({ println }, arg = '') {
         }
         println('\n  \x1b[36m🧭 Fontes canônicas do terminal\x1b[0m');
         println(
-            `  \x1b[90mjanela=últimos ${projection.filters.limit} eventos · archive=${projection.state.path ?? '(sem arquivo)'}\x1b[0m`,
+            `  \x1b[90mjanela últimos ${projection.filters.limit} eventos · arquivo ${projection.state.path ?? '(sem arquivo)'}\x1b[0m`,
         );
         for (const policy of policies) {
             const policyCount = policy.publicEvents.reduce((sum, event) => sum + (counts.get(event) ?? 0), 0);
             println(`  \x1b[33m${policy.id}\x1b[0m \x1b[90m(${policy.class})\x1b[0m`);
-            println(`    owner       \x1b[90m${policy.owner}\x1b[0m`);
-            println(`    emitter     \x1b[90m${policy.canonicalEmitter}\x1b[0m`);
-            println(`    eventos     \x1b[90m${policy.publicEvents.join(', ')} · recentes=${policyCount}\x1b[0m`);
+            println(`    dono        \x1b[90m${policy.owner}\x1b[0m`);
+            println(`    emissor     \x1b[90m${policy.canonicalEmitter}\x1b[0m`);
+            println(`    eventos     \x1b[90m${policy.publicEvents.join(', ')} · recentes ${policyCount}\x1b[0m`);
             println(`    investigar  \x1b[90m${buildPolicyQueryHints(policy)}\x1b[0m`);
             println(`    aceita      \x1b[90m${policy.accepts.join(', ')}\x1b[0m`);
             println(`    suprime     \x1b[90m${policy.suppresses.join(', ')}\x1b[0m`);

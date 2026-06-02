@@ -63,10 +63,10 @@ describe('terminal/commands/events', () => {
             expect.objectContaining({ limit: 50, event: null, source: null }),
         );
         expect(ctx.output()).toContain('Fontes canônicas do terminal');
-        expect(ctx.output()).toContain('janela=últimos 5 eventos');
+        expect(ctx.output()).toContain('janela últimos 5 eventos');
         expect(ctx.output()).toContain('assistant.text.delta');
-        expect(ctx.output()).toContain('recentes=1');
-        expect(ctx.output()).toContain('/events event=delta 50');
+        expect(ctx.output()).toContain('recentes 1');
+        expect(ctx.output()).toContain('/events delta 50');
         expect(ctx.output()).toContain('/events source=terminal/dialog/turn-display.createDeltaCallback 50');
         expect(ctx.output()).toContain('task.delta only when dialog loop is inactive');
         expect(ctx.output()).toContain('ask_user.visible-question');

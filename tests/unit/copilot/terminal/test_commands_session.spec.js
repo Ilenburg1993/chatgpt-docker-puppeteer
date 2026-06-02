@@ -495,8 +495,8 @@ describe('commands/session — sync commands', () => {
         };
         const ctx = mockCtx();
         cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, 'full');
-        expect(ctx.output()).toContain('mismatch');
-        expect(ctx.output()).toContain('cobrado=claude-haiku-4.5');
+        expect(ctx.output()).toContain('divergente');
+        expect(ctx.output()).toContain('cobrado claude-haiku-4.5');
         defaultRuntime.lastPrInfo = prev ?? null;
     });
 
@@ -650,7 +650,7 @@ describe('commands/session — sync commands', () => {
         cmdAnswer({ println: ctx.println }, '--runtime alt resposta-alt');
         expect(altAnswerPendingQuestion).toHaveBeenCalledWith('resposta-alt');
         expect(ctx.output()).toContain('resposta-alt');
-        expect(ctx.output()).toContain('runtime=alt');
+        expect(ctx.output()).toContain('runtime alt');
     });
 
     it('cmdAnswer explica quando só resta shadow expirada', () => {
@@ -849,12 +849,12 @@ describe('commands/session — async commands', () => {
             enrichLimit: 1,
             enrichOffset: 1,
         });
-        expect(ctx.output()).toContain('filtro=branch=main');
-        expect(ctx.output()).toContain('offset=1');
-        expect(ctx.output()).toContain('session fs:');
+        expect(ctx.output()).toContain('filtro branch main');
+        expect(ctx.output()).toContain('deslocamento 1');
+        expect(ctx.output()).toContain('arquivos da sessão:');
         expect(ctx.output()).toContain('workspace:.copilot/sdk-session-fs');
-        expect(ctx.output()).toContain('metadata local: model=kilo-auto/free');
-        expect(ctx.output()).toContain('boundary=provider-boundary');
+        expect(ctx.output()).toContain('metadados locais: modelo kilo-auto/free');
+        expect(ctx.output()).toContain('limite provider-boundary');
         expect(ctx.output()).not.toContain('sdk-first');
     });
 
@@ -950,10 +950,10 @@ describe('commands/session — async commands', () => {
         });
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '');
-        expect(ctx.output()).toContain('provider bound');
-        expect(ctx.output()).toContain('BYOK profile=groq-free');
-        expect(ctx.output()).toContain('BYOK prepared');
-        expect(ctx.output()).toContain('BYOK boundary');
+        expect(ctx.output()).toContain('vínculo BYOK');
+        expect(ctx.output()).toContain('BYOK · perfil groq-free');
+        expect(ctx.output()).toContain('BYOK pronto');
+        expect(ctx.output()).toContain('limite BYOK');
         expect(ctx.output()).toContain('último boot');
         expect(ctx.output()).toContain('provider-boundary');
     });
@@ -1194,9 +1194,9 @@ describe('commands/session — async commands', () => {
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'elicitation.pending', limit: 6 });
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'permission.requested', limit: 6 });
         expect(ctx.output()).toContain('Waits SDK da sessão');
-        expect(ctx.output()).toContain('perguntas=2');
-        expect(ctx.output()).toContain('elicitation=1');
-        expect(ctx.output()).toContain('permission=1');
+        expect(ctx.output()).toContain('perguntas 2');
+        expect(ctx.output()).toContain('formulários 1');
+        expect(ctx.output()).toContain('permissões 1');
         expect(ctx.output()).toContain('Continuar?');
         expect(ctx.output()).toContain('Escolha ambiente');
         expect(ctx.output()).toContain('fs.write');
@@ -1231,7 +1231,7 @@ describe('commands/session — async commands', () => {
         await cmdSessionRestore({ println: ctx.println }, 'snap-001');
         expect(ctx.output()).toContain('snap-001');
         expect(ctx.output()).toContain('gpt-5-mini');
-        expect(ctx.output()).toContain('Pending shadow');
+        expect(ctx.output()).toContain('Pergunta restaurada');
     });
 
     it('cmdSessionRestore com id inválido mostra erro', async () => {

@@ -363,7 +363,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
   Modelo       ${modelLabel} \x1b[90m· raciocínio ${configProjection.currentReasoningEffort}\x1b[0m
   Acesso       ${byokLabel}
   Catálogo     \x1b[90m${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados\x1b[0m
-  Atividade    \x1b[90m${projection.activity.label}${projection.activity.detail ? ` · ${projection.activity.detail}` : ''}\x1b[0m
+  Atividade    \x1b[90m${renderLiveActivitySummary(projection.activity)}\x1b[0m
   Próximo      \x1b[33m${action}\x1b[0m
   Detalhe      \x1b[90m/status full · /now · /health · /menu\x1b[0m
   ─────────────────────────────────────
@@ -438,7 +438,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             ? `        auto policy      \x1b[90mpref=${autoPolicy.preferredModel}/${autoPolicy.preferredReasoningEffort} · autoridade=GitHub Copilot · último=${autoPolicy.observedModel ?? 'n/d'}\x1b[0m`
             : '';
     const byokLine = byok.enabled
-        ? `    byok provider    ${byok.ready ? '\x1b[32mready\x1b[0m' : '\x1b[31mincompleto\x1b[0m'} \x1b[90mpreset=${byok.preset ?? '-'} · provider=${byok.providerType ?? '-'} · model=${byok.model ?? '-'} · auth=${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'none'} · /byok\x1b[0m`
+        ? `    BYOK provider    ${byok.ready ? '\x1b[32mpronto\x1b[0m' : '\x1b[31mincompleto\x1b[0m'} \x1b[90mpreset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · auth ${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'none'} · /byok\x1b[0m`
         : '';
     const modelBilling = projection.modelBilling;
     const display = readTerminalDisplayProjection();
@@ -447,16 +447,16 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const activityProgress = typeof activity.progress === 'number' ? ` (${activity.progress}%)` : '';
     const sdkInterruptions = [
         projection.pendingElicitations > 0
-            ? `elicitation=${projection.pendingElicitations}${projection.latestElicitationMode ? ` (${projection.latestElicitationMode})` : ''}`
+            ? `${projection.pendingElicitations} formulário(s)${projection.latestElicitationMode ? ` (${projection.latestElicitationMode})` : ''}`
             : null,
         projection.pendingPermissions > 0
-            ? `permission=${projection.pendingPermissions}${projection.latestPermissionType ? ` (${projection.latestPermissionType})` : ''}`
+            ? `${projection.pendingPermissions} permissão(ões)${projection.latestPermissionType ? ` (${projection.latestPermissionType})` : ''}`
             : null,
         projection.pendingUserInputs > 0
-            ? `pergunta=${projection.pendingUserInputs}${projection.latestUserInputKind ? ` (${projection.latestUserInputKind})` : ''}`
+            ? `${projection.pendingUserInputs} pergunta(s)${projection.latestUserInputKind ? ` (${projection.latestUserInputKind})` : ''}`
             : null,
         projection.pendingStructuredUserInputs > 0
-            ? `input=${projection.pendingStructuredUserInputs}`
+            ? `${projection.pendingStructuredUserInputs} input(s) estruturado(s)`
             : null,
     ].filter(Boolean);
     const sdkCapabilitiesUi =
@@ -536,8 +536,8 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
   dialog loop      ${active ? '\x1b[32m● ativo\x1b[0m' : '\x1b[31m○ inativo\x1b[0m'}
   pergunta humana ${askUserStatus}
   canal input      ${inputChannelColor}${inputChannel.label}\x1b[0m \x1b[90m(${inputChannel.state}${inputChannel.recoveryExpected ? ' · recovery sob demanda' : ''})\x1b[0m
-  sdk interrupts   ${sdkInterruptions.length > 0 ? `\x1b[33m${sdkInterruptions.join(' · ')}\x1b[0m` : '\x1b[90m(nenhum)\x1b[0m'}
-    sdk ui           \x1b[90melicitation=${uiElicitationFlag == null ? 'n/a' : uiElicitationFlag ? 'available' : 'unavailable'}\x1b[0m
+  esperas SDK      ${sdkInterruptions.length > 0 ? `\x1b[33m${sdkInterruptions.join(' · ')}\x1b[0m` : '\x1b[90m(nenhuma)\x1b[0m'}
+    UI SDK           \x1b[90mformulários ${uiElicitationFlag == null ? 'n/d' : uiElicitationFlag ? 'disponíveis' : 'indisponíveis'}\x1b[0m
   modelo           \x1b[36m${snap['model']}\x1b[0m
 ${byokLine ? `${byokLine}\n` : ''}  reasoning        \x1b[35m${effort}\x1b[0m
     modo SDK         ${sdkModeColor}${sdkMode}\x1b[0m
@@ -557,7 +557,7 @@ ${byokLine ? `${byokLine}\n` : ''}  reasoning        \x1b[35m${effort}\x1b[0m
     tool contract   ${toolContractColor}${toolContract.ok ? 'ok' : 'attention'}\x1b[0m \x1b[90m(errors=${toolContract.errorCount} · warnings=${toolContract.warningCount} · desc=${toolContract.metadataCoverage.descriptionPct}% · schema=${toolContract.metadataCoverage.parametersPct}% · category=${toolContract.metadataCoverage.categoryPct}% · tags=${toolContract.metadataCoverage.tagsPct}% · instructions=${toolContract.metadataCoverage.instructionsPct}%)\x1b[0m
     instr. load      ${instructionLoadColor}${instructionLoad.liveReloadMechanism}\x1b[0m \x1b[90m(sections=${instructionLoad.sectionCount} · missingSectionFile=${instructionLoad.sectionsMissingFileCount} · missingAppendFile=${instructionLoad.appendFileMissingCount} · sourcesRpc=${instructionLoad.sdkSupportsInstructionSourcesRpc})\x1b[0m
     sdk↔fs route     ${sdkFsRoutingColor}${sdkFsRouting.mode}\x1b[0m \x1b[90m${sdkFsRouting.reason}\x1b[0m
-    custom agents   \x1b[90mprofile=${COPILOT_OPERATIONAL_PROFILE} · ${customAgentsLine}\x1b[0m
+    custom agents   \x1b[90mperfil ${COPILOT_OPERATIONAL_PROFILE} · ${customAgentsLine}\x1b[0m
     io cache         \x1b[90m${ioCacheLine}\x1b[0m
     io scope         \x1b[90m${ioScopeLine}\x1b[0m
     sdk session      \x1b[90m${projection.sdkSessionId ?? '(sem sdk)'}\x1b[0m
@@ -568,11 +568,11 @@ ${byokLine ? `${byokLine}\n` : ''}  reasoning        \x1b[35m${effort}\x1b[0m
         fase/source      \x1b[90m${activity.phase} · ${activity.source}\x1b[0m
         boot             ${bootLine}
         shutdown         ${shutdownLine}
-        display          \x1b[90mthinking=${display.thinking ? 'on' : 'off'} · streaming=${display.streaming ? 'on' : 'off'} · usage=${display.usage ? 'on' : 'off'} · tools=${display.tools ? 'on' : 'off'} · intent=${display.intent ? 'on' : 'off'}\x1b[0m
+        display          \x1b[90mraciocínio ${display.thinking ? 'ativo' : 'inativo'} · streaming ${display.streaming ? 'ativo' : 'inativo'} · uso ${display.usage ? 'ativo' : 'inativo'} · ferramentas ${display.tools ? 'ativo' : 'inativo'} · intenção ${display.intent ? 'ativo' : 'inativo'}\x1b[0m
           último PR         \x1b[90m${modelBilling.at ?? '(sem consumo ainda)'}\x1b[0m
-          billing/modelo    ${modelBilling.mismatch ? `\x1b[31mmismatch\x1b[0m \x1b[90m(cfg=${modelBilling.configuredModel ?? '-'} · cobrado=${modelBilling.billedModel ?? '-'})\x1b[0m` : `\x1b[32mok\x1b[0m \x1b[90m(${modelBilling.displayModel})\x1b[0m`}
+          billing/modelo    ${modelBilling.mismatch ? `\x1b[31mdivergente\x1b[0m \x1b[90m(configurado ${modelBilling.configuredModel ?? '-'} · cobrado ${modelBilling.billedModel ?? '-'})\x1b[0m` : `\x1b[32mok\x1b[0m \x1b[90m(${modelBilling.displayModel})\x1b[0m`}
           custo último PR   \x1b[90m${modelBilling.cost == null ? '(n/d)' : modelBilling.cost.toFixed(4)}\x1b[0m
-        perfil modelo    \x1b[90m${modelMeta ? `cost=${modelMeta.costTier ?? 'n/a'} · speed=${modelMeta.speedTier ?? 'n/a'} · ctx=${typeof modelMeta.contextWindow === 'number' ? modelMeta.contextWindow.toLocaleString('pt-BR') : 'n/a'}` : '(sem metadata local)'}\x1b[0m
+        perfil modelo    \x1b[90m${modelMeta ? `custo ${modelMeta.costTier ?? 'n/a'} · velocidade ${modelMeta.speedTier ?? 'n/a'} · contexto ${typeof modelMeta.contextWindow === 'number' ? modelMeta.contextWindow.toLocaleString('pt-BR') : 'n/a'}` : '(sem metadados locais)'}\x1b[0m
 ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ─────────────────────────────────────
   workspace        \x1b[90m${ws.cwd}\x1b[0m
   git root         \x1b[90m${ws.gitRoot ?? '(não é git repo)'}\x1b[0m
@@ -650,7 +650,7 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
                 typeof latest.question === 'string' ? latest.question.replace(/\s+/g, ' ').trim().slice(0, 180) : '';
             const choices =
                 Array.isArray(latest.choices) && latest.choices.length > 0
-                    ? ` choices=${latest.choices.join(' | ')}`
+                    ? ` opções ${latest.choices.join(' | ')}`
                     : '';
             println(`  \x1b[90mUltima pergunta SDK:${choices} ${question}\x1b[0m`);
         }
@@ -665,7 +665,7 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
                 typeof latest.question === 'string' ? latest.question.replace(/\s+/g, ' ').trim().slice(0, 180) : '';
             const choices =
                 Array.isArray(latest.choices) && latest.choices.length > 0
-                    ? ` choices=${latest.choices.join(' | ')}`
+                    ? ` opções ${latest.choices.join(' | ')}`
                     : '';
             println(`  \x1b[90mUltimo input estruturado:${choices} ${question}\x1b[0m`);
         }
@@ -1142,7 +1142,7 @@ export function cmdAnswer({ println }, arg) {
     const { runtimeId, arg: answer } = extractRuntimeTarget(arg);
     const result = tryAnswerTerminalPendingQuestionInput(answer, runtimeId);
     if (result.ok) {
-        const runtimeSuffix = result.runtimeId && result.runtimeId !== 'default' ? ` · runtime=${result.runtimeId}` : '';
+        const runtimeSuffix = result.runtimeId && result.runtimeId !== 'default' ? ` · runtime ${result.runtimeId}` : '';
         println(`Resposta enviada para pergunta pendente${runtimeSuffix}: "${result.answer}"`);
         return;
     }
@@ -1247,9 +1247,11 @@ function renderSdkSessionBootDecision(decision) {
     if (!outcome || !requestedMode || !selectedSessionId || !reason) return null;
     const candidate =
         typeof decision['resumeCandidateSessionId'] === 'string' && decision['resumeCandidateSessionId']
-            ? ` · candidato=${decision['resumeCandidateSessionId']}`
+            ? ` · candidato ${decision['resumeCandidateSessionId']}`
             : '';
-    return `${outcome} · request=${requestedMode} · sessão=${selectedSessionId}${candidate} · motivo=${reason}`;
+    const outcomeLabel = outcome === 'created' ? 'criada' : 'retomada';
+    const requestedLabel = requestedMode === 'new' ? 'nova' : requestedMode === 'resume' ? 'retomar' : 'automática';
+    return `${outcomeLabel} · pedido ${requestedLabel} · sessão ${selectedSessionId}${candidate} · motivo ${reason}`;
 }
 
 /**
@@ -1300,7 +1302,7 @@ function parseSdkSessionInventoryArgs(action, rawAction, rest) {
         limit,
         offset,
         filter: filterEntries.length > 0 ? filter : undefined,
-        filterLabel: filterEntries.length > 0 ? filterEntries.map(([key, value]) => `${key}=${value}`).join(' · ') : 'none',
+        filterLabel: filterEntries.length > 0 ? filterEntries.map(([key, value]) => `${key} ${value}`).join(' · ') : 'nenhum',
     };
 }
 
@@ -1311,7 +1313,7 @@ function parseSdkSessionInventoryArgs(action, rawAction, rest) {
 function renderSdkSessionFsState(state) {
     if (!state || typeof state !== 'object') return 'n/d';
     const record = /** @type {Record<string, unknown>} */ (state);
-    if (record['enabled'] !== true) return 'disabled';
+    if (record['enabled'] !== true) return 'desativado';
     const root = record['storageRoot'] && typeof record['storageRoot'] === 'object'
         ? /** @type {Record<string, unknown>} */ (record['storageRoot'])
         : null;
@@ -1319,13 +1321,13 @@ function renderSdkSessionFsState(state) {
         ? /** @type {Record<string, unknown>} */ (record['session'])
         : null;
     const rootDisplay = typeof root?.['display'] === 'string' ? root['display'] : '(root n/d)';
-    const rootExists = root?.['exists'] === true ? 'exists' : root?.['exists'] === false ? 'missing' : 'unknown';
+    const rootExists = root?.['exists'] === true ? 'existe' : root?.['exists'] === false ? 'ausente' : 'desconhecido';
     const sessionDisplay = typeof session?.['display'] === 'string' ? session['display'] : null;
     const sessionExists =
-        session?.['exists'] === true ? 'exists' : session?.['exists'] === false ? 'missing' : session ? 'unknown' : null;
+        session?.['exists'] === true ? 'existe' : session?.['exists'] === false ? 'ausente' : session ? 'desconhecido' : null;
     const statePath = typeof record['sessionStatePath'] === 'string' ? record['sessionStatePath'] : '(state n/d)';
-    return `on · root=${rootDisplay}(${rootExists}) · state=${statePath}${
-        sessionDisplay ? ` · session=${sessionDisplay}(${sessionExists ?? 'unknown'})` : ''
+    return `ativo · raiz ${rootDisplay} (${rootExists}) · estado ${statePath}${
+        sessionDisplay ? ` · sessão ${sessionDisplay} (${sessionExists ?? 'desconhecido'})` : ''
     }`;
 }
 
@@ -1346,11 +1348,28 @@ function renderSdkSessionLocalMetadata(metadata) {
     const providerModel = typeof provider?.['model'] === 'string' ? provider['model'] : null;
     const reason = typeof boundary?.['reason'] === 'string' ? boundary['reason'] : null;
     const parts = [
-        model ? `model=${model}` : null,
-        providerKind ? `provider=${providerKind}${providerModel && providerModel !== model ? `:${providerModel}` : ''}` : null,
-        reason ? `boundary=${reason}` : null,
+        model ? `modelo ${model}` : null,
+        providerKind ? `provedor ${providerKind}${providerModel && providerModel !== model ? `:${providerModel}` : ''}` : null,
+        reason ? `limite ${reason}` : null,
     ].filter(Boolean);
     return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/**
+ * @param {string} event
+ * @returns {string}
+ */
+function renderSdkArchiveEventLabel(event) {
+    if (event === 'sdk.lifecycle') return 'Ciclo de vida SDK';
+    if (event === 'sdk.command.executed') return 'Comando SDK executado';
+    if (event === 'user_input.requested') return 'Pergunta ao operador';
+    if (event === 'user_input.completed') return 'Resposta do operador';
+    if (event === 'elicitation.pending') return 'Formulário pendente';
+    if (event === 'elicitation.completed') return 'Formulário concluído';
+    if (event === 'permission.requested') return 'Permissão solicitada';
+    if (event === 'permission.completed') return 'Permissão concluída';
+    if (event === 'permission.mode_changed') return 'Modo de permissão alterado';
+    return event.replace(/[._-]+/gu, ' ');
 }
 
 /**
@@ -1392,14 +1411,14 @@ function summarizeSdkSessionArchiveEntry(entry) {
     const localCommand = readPayloadString(payload, ['localCommand']);
     const source = compactSdkSessionEventValue(entry.eventSource ?? entry.source ?? '-', 48);
     const detailParts = [
-        `tipo=${compactSdkSessionEventValue(type, 42)}`,
-        sessionId ? `sessão=${compactSdkSessionEventValue(sessionId, 54)}` : null,
-        commandName ? `cmd=${compactSdkSessionEventValue(commandName, 42)}` : null,
-        localCommand ? `local=${compactSdkSessionEventValue(localCommand, 42)}` : null,
+        `tipo ${compactSdkSessionEventValue(type, 42)}`,
+        sessionId ? `sessão ${compactSdkSessionEventValue(sessionId, 54)}` : null,
+        commandName ? `comando ${compactSdkSessionEventValue(commandName, 42)}` : null,
+        localCommand ? `local ${compactSdkSessionEventValue(localCommand, 42)}` : null,
     ].filter(Boolean);
     return {
         key: [event, type, sessionId ?? '', commandName ?? '', localCommand ?? '', source].join('\u001f'),
-        line: `#${entry.eventId ?? '-'} ${event} · ${source} · ${detailParts.join(' · ')}`,
+        line: `#${entry.eventId ?? '-'} ${renderSdkArchiveEventLabel(event)} · ${source} · ${detailParts.join(' · ')}`,
     };
 }
 
@@ -1448,17 +1467,17 @@ function summarizeSdkWaitArchiveEntry(entry) {
             ? Object.keys(/** @type {Record<string, unknown>} */ (content)).slice(0, 4).join(',')
             : '';
     const detailParts = [
-        `tipo=${compactSdkSessionEventValue(type, 42)}`,
-        requestId ? `req=${compactSdkSessionEventValue(requestId, 54)}` : null,
-        sessionId ? `sessão=${compactSdkSessionEventValue(sessionId, 42)}` : null,
-        choiceCount != null ? `opções=${choiceCount}` : null,
-        message ? `msg=${compactSdkSessionEventValue(message, 70)}` : null,
-        answer ? `resp=${compactSdkSessionEventValue(answer, 52)}` : null,
-        contentKeys ? `content=${compactSdkSessionEventValue(contentKeys, 40)}` : null,
+        `tipo ${compactSdkSessionEventValue(type, 42)}`,
+        requestId ? `pedido ${compactSdkSessionEventValue(requestId, 54)}` : null,
+        sessionId ? `sessão ${compactSdkSessionEventValue(sessionId, 42)}` : null,
+        choiceCount != null ? `${choiceCount} opção(ões)` : null,
+        message ? `mensagem ${compactSdkSessionEventValue(message, 70)}` : null,
+        answer ? `resposta ${compactSdkSessionEventValue(answer, 52)}` : null,
+        contentKeys ? `campos ${compactSdkSessionEventValue(contentKeys, 40)}` : null,
     ].filter(Boolean);
     return {
         key: [entry.event, type, requestId ?? '', sessionId ?? '', message ?? '', answer ?? '', source].join('\u001f'),
-        line: `#${entry.eventId ?? '-'} ${entry.event} · ${source} · ${detailParts.join(' · ')}`,
+        line: `#${entry.eventId ?? '-'} ${renderSdkArchiveEventLabel(entry.event)} · ${source} · ${detailParts.join(' · ')}`,
     };
 }
 
@@ -1498,10 +1517,10 @@ async function cmdSessionSdkEvents({ println }, tokens) {
     const state = lifecycle.state.path || commands.state.path ? lifecycle.state : commands.state;
     println('\n  \x1b[36mEventos SDK da sessão\x1b[0m');
     println(
-        `  \x1b[90mfonte=archive SSE canônico · arquivo=${state.path ?? '(sem arquivo)'} · janela=${limit} · lifecycle=${lifecycle.entries.length} · commands=${commands.entries.length}\x1b[0m`,
+        `  \x1b[90mfonte archive SSE canônico · arquivo ${state.path ?? '(sem arquivo)'} · janela ${limit} · ciclo de vida ${lifecycle.entries.length} · comandos ${commands.entries.length}\x1b[0m`,
     );
     if (lifecycle.state.error || commands.state.error) {
-        println(`  \x1b[31merro=${lifecycle.state.error ?? commands.state.error}\x1b[0m`);
+        println(`  \x1b[31merro ${lifecycle.state.error ?? commands.state.error}\x1b[0m`);
     }
     if (merged.length === 0) {
         println('  \x1b[33mNenhum sdk.lifecycle ou sdk.command.executed arquivado ainda.\x1b[0m');
@@ -1556,10 +1575,10 @@ async function cmdSessionSdkWaits({ println }, tokens) {
     for (const entry of merged) counts.set(entry.event, (counts.get(entry.event) ?? 0) + 1);
     println('\n  \x1b[36mWaits SDK da sessão\x1b[0m');
     println(
-        `  \x1b[90mfonte=archive SSE canônico · arquivo=${state?.path ?? '(sem arquivo)'} · janela=${limit} · perguntas=${(counts.get('user_input.requested') ?? 0) + (counts.get('user_input.completed') ?? 0)} · elicitation=${(counts.get('elicitation.pending') ?? 0) + (counts.get('elicitation.completed') ?? 0)} · permission=${(counts.get('permission.requested') ?? 0) + (counts.get('permission.completed') ?? 0) + (counts.get('permission.mode_changed') ?? 0)}\x1b[0m`,
+        `  \x1b[90mfonte archive SSE canônico · arquivo ${state?.path ?? '(sem arquivo)'} · janela ${limit} · perguntas ${(counts.get('user_input.requested') ?? 0) + (counts.get('user_input.completed') ?? 0)} · formulários ${(counts.get('elicitation.pending') ?? 0) + (counts.get('elicitation.completed') ?? 0)} · permissões ${(counts.get('permission.requested') ?? 0) + (counts.get('permission.completed') ?? 0) + (counts.get('permission.mode_changed') ?? 0)}\x1b[0m`,
     );
     const error = projections.find((projection) => projection.state.error)?.state.error;
-    if (error) println(`  \x1b[31merro=${error}\x1b[0m`);
+    if (error) println(`  \x1b[31merro ${error}\x1b[0m`);
     if (merged.length === 0) {
         println('  \x1b[33mNenhum wait SDK arquivado ainda.\x1b[0m');
         println('  \x1b[90mUse /sdk waits para pendências vivas e /events event=user_input.requested 20 para bruto.\x1b[0m\n');
@@ -1599,7 +1618,7 @@ function cmdSessionSdkCommands({ println }) {
     const specs = listTerminalSdkCommandSpecs();
     println('\n  \x1b[36mComandos SDK expostos ao Copilot\x1b[0m');
     println(
-        `  \x1b[90mfonte=agent/session/commands · total=${specs.length} · modo=safelist observável; execução local continua no REPL\x1b[0m`,
+        `  \x1b[90mfonte agent/session/commands · ${specs.length} comando(s) · safelist observável; execução local continua no REPL\x1b[0m`,
     );
     for (const spec of specs) {
         println(`    \x1b[33m${spec.name}\x1b[0m → \x1b[90m${spec.localCommand}${spec.safe ? ' · safe' : ''}\x1b[0m`);
@@ -1743,24 +1762,24 @@ export async function cmdSessionSdk({ println }, arg = '') {
 
     const nextLabel =
         bootSelection?.mode === 'resume'
-            ? `resume ${bootSelection.sessionId}`
+            ? `retomar ${bootSelection.sessionId}`
             : bootSelection?.mode === 'new'
-              ? 'new'
-              : 'auto';
+              ? 'criar nova sessão'
+              : 'automático';
     println('\n  \x1b[36mSessão SDK\x1b[0m');
     println(`    atual:          \x1b[33m${inventory.currentSessionId ?? '(sem sessão viva)'}\x1b[0m`);
-    println(`    last SDK:       \x1b[33m${inventory.lastSessionId ?? '-'}\x1b[0m`);
-    println(`    foreground SDK: \x1b[33m${inventory.foregroundSessionId ?? '-'}\x1b[0m`);
+    println(`    última SDK:     \x1b[33m${inventory.lastSessionId ?? '-'}\x1b[0m`);
+    println(`    foreground:     \x1b[33m${inventory.foregroundSessionId ?? '-'}\x1b[0m`);
     println(`    próximo boot:   \x1b[33m${nextLabel}\x1b[0m`);
-    println(`    session fs:     \x1b[90m${renderSdkSessionFsState(inventory.sessionFs)}\x1b[0m`);
+    println(`    arquivos:       \x1b[90m${renderSdkSessionFsState(inventory.sessionFs)}\x1b[0m`);
     const byokBinding = classifyTerminalByokSdkBinding(
         readTerminalByokProjection().summary,
         inventory.persistedByokBinding,
         inventory.currentSessionId,
     );
-    println(`    provider bound: \x1b[33m${renderTerminalSdkProviderBinding(inventory.persistedByokBinding)}\x1b[0m`);
-    println(`    BYOK prepared:  \x1b[33m${byokBinding.preparedLabel}\x1b[0m`);
-    println(`    BYOK boundary:  \x1b[90m${byokBinding.headline}\x1b[0m`);
+    println(`    vínculo BYOK:   \x1b[33m${renderTerminalSdkProviderBinding(inventory.persistedByokBinding)}\x1b[0m`);
+    println(`    BYOK pronto:    \x1b[33m${byokBinding.preparedLabel}\x1b[0m`);
+    println(`    limite BYOK:    \x1b[90m${byokBinding.headline}\x1b[0m`);
     if (byokBinding.action) {
         println(`      \x1b[90m${byokBinding.action}\x1b[0m`);
     }
@@ -1776,7 +1795,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
         return;
     }
     println(
-        `\n  \x1b[36mSessões SDK listadas\x1b[0m (${inventory.sessions.length}) \x1b[90mfiltro=${inventoryArgs.filterLabel} · offset=${inventoryArgs.offset} · limit=${inventoryArgs.limit}\x1b[0m`,
+        `\n  \x1b[36mSessões SDK listadas\x1b[0m (${inventory.sessions.length}) \x1b[90mfiltro ${inventoryArgs.filterLabel} · deslocamento ${inventoryArgs.offset} · limite ${inventoryArgs.limit}\x1b[0m`,
     );
     const visibleSessions = inventory.sessions.slice(inventoryArgs.offset, inventoryArgs.offset + inventoryArgs.limit);
     for (const [index, entry] of visibleSessions.entries()) {
@@ -1800,12 +1819,12 @@ export async function cmdSessionSdk({ println }, arg = '') {
                 : null,
         );
         println(`    \x1b[90m#${absoluteIndex + 1}\x1b[0m \x1b[33m${entry.sessionId}\x1b[0m  \x1b[90m${flags || '-'}\x1b[0m`);
-        println(`      \x1b[90mstart=${start} · modified=${modified}${summary ? ` · ${summary}` : ''}\x1b[0m`);
+        println(`      \x1b[90minício ${start} · alterada ${modified}${summary ? ` · ${summary}` : ''}\x1b[0m`);
         if (localMetadata) {
-            println(`      \x1b[90mmetadata local: ${localMetadata}\x1b[0m`);
+            println(`      \x1b[90mmetadados locais: ${localMetadata}\x1b[0m`);
         }
         if (entry.sessionFs) {
-            println(`      \x1b[90msession fs: ${renderSdkSessionFsState(entry.sessionFs)}\x1b[0m`);
+            println(`      \x1b[90marquivos da sessão: ${renderSdkSessionFsState(entry.sessionFs)}\x1b[0m`);
         }
     }
     if (inventory.sessions.length > inventoryArgs.offset + visibleSessions.length) {
@@ -1859,7 +1878,7 @@ export async function cmdSessionList({ println }) {
                 ? new Date(createdAt).toISOString().replace('T', ' ').slice(0, 19)
                 : 'invalid-date';
         println(
-            `    ${String(s['snapshotId'] ?? '')}  ${date}  model=${String(s['model'] ?? '')}  ${String(s['reason'] ?? '')}`,
+            `    ${String(s['snapshotId'] ?? '')}  ${date}  modelo ${String(s['model'] ?? '')}  ${String(s['reason'] ?? '')}`,
         );
     }
 }
@@ -1891,11 +1910,11 @@ export async function cmdSessionRestore({ println }, snapshotId) {
             ? new Date(createdAt).toISOString()
             : 'invalid-date';
     println(`    Criado: ${createdAtIso}`);
-    println(`    Session: ${String(snap['sessionId'] ?? '(none)')}`);
-    println(`    Model: ${String(snap['model'] ?? 'unknown')}  Status: ${String(snap['status'] ?? 'unknown')}`);
-    println(`    Send count: ${Number(snap['sendCount'] ?? 0)}`);
+    println(`    Sessão: ${String(snap['sessionId'] ?? '(nenhuma)')}`);
+    println(`    Modelo: ${String(snap['model'] ?? 'desconhecido')}  Status: ${String(snap['status'] ?? 'desconhecido')}`);
+    println(`    Envios: ${Number(snap['sendCount'] ?? 0)}`);
     println(
-        `    Dialog loop: ${snap['dialogLoopActive'] ? 'active' : 'inactive'}${snap['dialogPaused'] ? ' (paused)' : ''}`,
+        `    Conversa: ${snap['dialogLoopActive'] ? 'ativa' : 'inativa'}${snap['dialogPaused'] ? ' (pausada)' : ''}`,
     );
     if (snap['pendingQuestion']) {
         const pendingMeta =
@@ -1903,7 +1922,7 @@ export async function cmdSessionRestore({ println }, snapshotId) {
                 ? /** @type {{ kind?: string }} */ (snap['pendingQuestionMeta'])
                 : null;
         const pendingKind = pendingMeta?.kind ? ` [${pendingMeta.kind}]` : '';
-        println(`    Pending question${pendingKind}: ${String(snap['pendingQuestion'])}`);
+        println(`    Pergunta pendente${pendingKind}: ${String(snap['pendingQuestion'])}`);
     }
     if (snap['pendingQuestionShadow'] && typeof snap['pendingQuestionShadow'] === 'object') {
         const shadow =
@@ -1911,7 +1930,7 @@ export async function cmdSessionRestore({ println }, snapshotId) {
                 snap['pendingQuestionShadow']
             );
         const shadowKind = typeof shadow.meta?.kind === 'string' ? ` [${shadow.meta.kind}]` : '';
-        println(`    Pending shadow${shadowKind}: ${String(shadow.question ?? '(sem texto)')}`);
+        println(`    Pergunta restaurada${shadowKind}: ${String(shadow.question ?? '(sem texto)')}`);
         if (typeof shadow.restoredAt === 'number') {
             println(`    Shadow restoredAt: ${new Date(shadow.restoredAt).toISOString()}`);
         }

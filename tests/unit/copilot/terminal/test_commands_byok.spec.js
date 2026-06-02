@@ -2004,8 +2004,8 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'status');
 
-        expect(ctx.output()).toContain('BYOK profile=ollama-cloud');
-        expect(ctx.output()).toContain('BYOK profile=kilo');
+        expect(ctx.output()).toContain('BYOK · perfil ollama-cloud');
+        expect(ctx.output()).toContain('BYOK · perfil kilo');
         expect(ctx.output()).toContain('cruzam provider/perfil');
         expect(ctx.output()).toContain('/session sdk next new');
     });

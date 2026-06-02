@@ -35,7 +35,7 @@ function valueOrDash(value) {
 export function renderTerminalPreparedByokSelection(summary) {
     if (!summary.enabled) return 'SDK Copilot';
     const readiness = summary.ready ? 'BYOK' : 'BYOK incompleto';
-    return `${readiness} profile=${valueOrDash(summary.profile)} · preset=${valueOrDash(summary.preset)} · provider=${valueOrDash(summary.providerType)} · model=${valueOrDash(summary.model)}`;
+    return `${readiness} · perfil ${valueOrDash(summary.profile)} · preset ${valueOrDash(summary.preset)} · provedor ${valueOrDash(summary.providerType)} · modelo ${valueOrDash(summary.model)}`;
 }
 
 /**
@@ -44,7 +44,7 @@ export function renderTerminalPreparedByokSelection(summary) {
  */
 export function renderTerminalSdkProviderBinding(binding) {
     if (!binding || binding['enabled'] !== true) return 'SDK Copilot';
-    return `BYOK profile=${valueOrDash(readBindingText(binding['profile']))} · preset=${valueOrDash(readBindingText(binding['preset']))} · provider=${valueOrDash(readBindingText(binding['providerType']))} · model=${valueOrDash(readBindingText(binding['model']))}`;
+    return `BYOK · perfil ${valueOrDash(readBindingText(binding['profile']))} · preset ${valueOrDash(readBindingText(binding['preset']))} · provedor ${valueOrDash(readBindingText(binding['providerType']))} · modelo ${valueOrDash(readBindingText(binding['model']))}`;
 }
 
 /**
