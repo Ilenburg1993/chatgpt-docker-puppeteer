@@ -4192,7 +4192,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'health');
 
-        expect(ctx.output()).toContain('BYOK operational health');
+        expect(ctx.output()).toContain('Saúde operacional BYOK');
         expect(ctx.output()).toContain('byok-provider-health.json');
         expect(ctx.output()).toContain('provider kilo-code');
         expect(ctx.output()).toContain('chat ok');
@@ -4203,6 +4203,7 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('providerId=');
         expect(ctx.output()).not.toContain('chat=');
         expect(ctx.output()).not.toContain('capabilities=');
+        expect(ctx.output()).not.toContain('BYOK operational health');
     });
 
     it('filtra health operacional BYOK por provider/model/profile', async () => {
@@ -4251,7 +4252,7 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'health provider:openrouter model:openai/gpt-oss-120b profile:repo_agent');
 
         expect(ctx.output()).toContain('filtro provider openrouter');
-        expect(ctx.output()).toContain('BYOK operational health');
+        expect(ctx.output()).toContain('Saúde operacional BYOK');
         expect(ctx.output()).toContain('(1)');
         expect(ctx.output()).toContain('provider openrouter');
         expect(ctx.output()).not.toContain('provider groq');
@@ -4266,7 +4267,8 @@ describe('terminal /byok command', () => {
 
         expect(clearByokProviderModelHealth).toHaveBeenCalledWith({});
         expect(flushByokProviderHealth).toHaveBeenCalledOnce();
-        expect(ctx.output()).toContain('BYOK operational health limpo');
+        expect(ctx.output()).toContain('Saúde operacional BYOK limpa');
+        expect(ctx.output()).not.toContain('operational health');
     });
 
     it('limpa health operacional BYOK por escopo quando solicitado', async () => {
@@ -4284,6 +4286,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('provider openrouter');
         expect(ctx.output()).toContain('modelo openai/gpt-oss-120b');
         expect(ctx.output()).toContain('perfil repo_agent');
+        expect(ctx.output()).toContain('Saúde operacional BYOK limpa');
+        expect(ctx.output()).not.toContain('operational health');
     });
 
     it('ativa perfil no processo atual', async () => {
@@ -4453,6 +4457,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('contexto 200000');
         expect(ctx.output()).toContain('max req 6000');
         expect(ctx.output()).toContain('TPM 6000');
+        expect(ctx.output()).toContain('entrada text+image');
+        expect(ctx.output()).not.toContain('in=text+image');
     });
 
     it('roteia modelos por perfil usando catálogo normalizado antes das probes runtime', async () => {

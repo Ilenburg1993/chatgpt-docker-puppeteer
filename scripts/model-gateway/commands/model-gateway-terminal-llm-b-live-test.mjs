@@ -3380,8 +3380,8 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
         },
         {
             id: 'byok-health-visible',
-            pass: /BYOK operational health/.test(plain),
-            detail: '/byok health rendered persisted BYOK operational health',
+            pass: /Saúde operacional BYOK/.test(plain),
+            detail: '/byok health rendered persisted BYOK operational health with human title',
         },
         {
             id: 'byok-models-visible',
@@ -3506,7 +3506,7 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
             id: 'gateway-operator-ready-visible',
             pass:
                 /BYOK model-gateway operator-ready/.test(plain) &&
-                /providerCall=nao/.test(plain) &&
+                /sem chamada provider/.test(plain) &&
                 /standby/.test(plain),
             detail: '/byok gateway operator-ready rendered the read-only terminal cockpit',
         },
@@ -3515,31 +3515,31 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
             pass:
                 /BYOK model-gateway auto policy/.test(plain) &&
                 /efetivo:/.test(plain) &&
-                /liveSetModel=/.test(plain) &&
-                /newSession=/.test(plain),
+                /troca viva/.test(plain) &&
+                /nova sessão/.test(plain),
             detail: '/byok auto policy rendered effective policy and source-independent flags',
         },
         {
             id: 'auto-status-visible',
             pass:
                 /BYOK model-gateway auto/i.test(plain) &&
-                /runtimeSelector=/.test(plain) &&
-                /action=/.test(plain) &&
-                new RegExp(`profile[:=]${escapeRegExp(routeProfile)}|profile=${escapeRegExp(routeProfile)}`, 'iu').test(plain),
+                /seletor runtime/.test(plain) &&
+                /ação/.test(plain) &&
+                new RegExp(`perfil\\s+${escapeRegExp(routeProfile)}\\b`, 'iu').test(plain),
             detail: '/byok auto status rendered the selected profile decision',
         },
         {
             id: 'auto-alternatives-visible',
-            pass: /alternativas:\s+usable=/u.test(plain),
+            pass: /alternativas:\s+usáveis/u.test(plain),
             detail: '/byok auto status/doctor rendered usable fallback candidate summary',
         },
         {
             id: 'auto-doctor-visible',
             pass:
                 /BYOK model-gateway auto doctor/.test(plain) &&
-                /policy:/.test(plain) &&
-                /decision:/.test(plain) &&
-                /ledgers:/.test(plain),
+                /política:/.test(plain) &&
+                /decisão:/.test(plain) &&
+                /registros:/.test(plain),
             detail: '/byok auto doctor rendered policy, decision and ledger cockpit',
         },
         {
@@ -3576,7 +3576,7 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
             id: 'auto-standby-visible',
             pass:
                 /BYOK model-gateway auto standby/.test(plain) &&
-                /providerCall=nao/.test(plain) &&
+                /sem chamada provider/.test(plain) &&
                 /(?:provar|prove):\s+\/byok probe/u.test(plain) &&
                 /novo boot:\s+\/session sdk next new/u.test(plain),
             detail: '/byok auto standby rendered ready replacement commands without provider calls',
@@ -3585,14 +3585,19 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
             id: 'auto-recovery-fixture-visible',
             pass:
                 /BYOK model-gateway auto recovery fixture/.test(plain) &&
-                /providerCall=nao/.test(plain) &&
-                /health:\s+recorded=sim/.test(plain),
+                /sem chamada provider/.test(plain) &&
+                /health:\s+registrado sim/.test(plain),
             detail: '/byok auto recovery-fixture ran synthetic post-turn recovery and persisted health without provider call',
         },
         {
             id: 'auto-recoveries-visible',
             pass: /BYOK model-gateway auto recoveries/.test(plain) && /rate-limit/.test(plain),
             detail: '/byok auto recoveries rendered post-turn recovery ledger or empty state',
+        },
+        {
+            id: 'auto-human-default-copy',
+            pass: !/\b(?:providerCall=nao|liveSetModel=|runtimeSelector=|action=|ledgers:|from=|reason=|live setModel|Modelo SDK:)\b/iu.test(plain),
+            detail: 'auto/BYOK control surfaces avoided raw key-value and setModel jargon in default copy',
         },
         {
             id: 'auto-sse-archive-query-visible',
@@ -3708,16 +3713,15 @@ function evaluateByokRealOutput(
         },
         {
             id: 'byok-real-sdk-session-cockpit',
-            pass: /Sessão SDK/.test(plain) && /\/restart reinicia só dialog loop/.test(plain),
-            detail: 'operator can distinguish SDK session cockpit from dialog loop, hub resume and snapshots',
+            pass: /Sessão SDK/.test(plain) && /\/restart reinicia só a conversa/.test(plain),
+            detail: 'operator can distinguish SDK session cockpit from conversation restart, hub resume and snapshots',
         },
         {
             id: 'byok-real-binding-cockpit',
             pass:
-                /\bprepared:\s+BYOK/u.test(plain) &&
-                /\blive binding:\s+/u.test(plain) &&
-                /\bBYOK prepared:\s+/u.test(plain) &&
-                /\bBYOK boundary:\s+/u.test(plain),
+                /vínculo BYOK:/u.test(plain) &&
+                /BYOK pronto:/u.test(plain) &&
+                /limite BYOK:/u.test(plain),
             detail: 'BYOK and SDK session cockpits separated prepared selection from live provider binding',
         },
         {
@@ -3866,7 +3870,7 @@ function evaluateByokRealOutput(
         },
         {
             id: 'byok-real-health-command',
-            pass: /BYOK operational health/.test(plain),
+            pass: /Saúde operacional BYOK/.test(plain),
             detail: '/byok health was available in the real BYOK diagnostic path',
         },
     ];
@@ -4476,7 +4480,11 @@ async function main() {
             if (collectSse) {
                 sseCollector = startSseCollector({ port: Number.isFinite(ssePort) ? ssePort : terminalPort });
             }
-            if (autoControlProbe || byokControlProbe || noPr || byokReal) {
+            if (autoControlProbe) {
+                sendCommandSequence(write, buildAutoProbeCommands({ profile: autoProbeProfile }), { delayMs: 900 });
+                return;
+            }
+            if (byokControlProbe || noPr || byokReal) {
                 const commands = byokReal
                     ? [
                           '/usage now',
@@ -4484,9 +4492,7 @@ async function main() {
                           ...buildByokRealPreflightCommands(realByok ?? {}),
                           ...(noPr ? buildByokRealNoPrDiagnosticCommands() : []),
                       ]
-                    : autoControlProbe
-                      ? buildAutoProbeCommands({ profile: autoProbeProfile })
-                      : byokControlProbe
+                    : byokControlProbe
                       ? ['/usage now', '/activity 12', ...buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl })]
                       : ['/usage now', '/activity 12', ...buildNoPrProbeCommands()];
                 startPromptSynchronizedCommandSequence(commands, () => {

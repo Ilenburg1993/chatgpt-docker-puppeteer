@@ -119,7 +119,7 @@ export function createDialogTurnEndSseEnvelope(evt) {
 
 /**
  * Política local de UX: restart automático é exceção. O Agent continua sendo dono do lifecycle, mas o terminal só
- * reabre o loop sozinho quando a razão representa falha operacional clara.
+ * reabre a conversa sozinho quando a razão representa falha operacional clara.
  *
  * @param {string} reason
  * @returns {boolean}
@@ -129,7 +129,7 @@ export function shouldAutoRestartStoppedDialog(reason) {
 }
 
 /**
- * Descreve a política operacional aplicada a uma parada do dialog loop.
+ * Descreve a política operacional aplicada a uma parada da conversa.
  *
  * @param {string} reason
  * @returns {{
@@ -144,10 +144,10 @@ export function describeDialogStoppedRestartPolicy(reason) {
     if (reason === 'reconnect_restart') {
         return {
             label: 'reconexão SDK',
-            activityTitle: 'Dialog loop preservado após reconexão',
+            activityTitle: 'Conversa preservada após reconexão',
             activityDetail: 'reconexão SDK concluída; reenvio automático de prompt bloqueado',
             terminalMessage:
-                'Loop reconectado; reenvio automático do prompt foi bloqueado para evitar duplicação. Use /dialog-resume ou reenvie a mensagem se quiser continuar.',
+                'Conversa reconectada; reenvio automático do prompt foi bloqueado para evitar duplicação. Use /dialog-resume ou reenvie a mensagem se quiser continuar.',
             sse: {
                 reason,
                 restarting: false,
@@ -162,9 +162,9 @@ export function describeDialogStoppedRestartPolicy(reason) {
     const label = isWatchdog ? 'reinício por watchdog' : `reason: ${reason}`;
     return {
         label,
-        activityTitle: 'Dialog loop encerrado sem restart automático',
+        activityTitle: 'Conversa encerrada sem restart automático',
         activityDetail: label,
-        terminalMessage: `Loop encerrado (${label}). Restart automático bloqueado; use /dialog-resume se precisar.`,
+        terminalMessage: `Conversa encerrada (${label}). Restart automático bloqueado; use /dialog-resume se precisar.`,
         sse: { reason, restarting: false },
     };
 }
@@ -216,7 +216,7 @@ export function registerAgentEventListeners(printBanner) {
             const duration = typeof evt.durationMs === 'number' ? `${evt.durationMs}ms` : 'duração n/d';
             recordTerminalActivity(
                 success && recovered ? 'system' : 'error',
-                recovered ? 'Dialog loop recuperado' : 'Dialog loop recovery sem reanexo',
+                recovered ? 'Conversa recuperada' : 'Recovery da conversa sem reanexo',
                 {
                     detail: `${reason} · ${strategy} · ${prConsumed ? '1 PR' : 'zero-PR'} · ${duration}`,
                     severity,
@@ -224,8 +224,8 @@ export function registerAgentEventListeners(printBanner) {
                 },
             );
             if (!success || prConsumed) {
-                const label = success ? 'recuperado com restart' : 'falha no recovery';
-                println(`\n\x1b[33m  [dialog] ${label}: ${strategy} · ${reason} · ${duration}\x1b[0m`);
+                const label = success ? 'conversa recuperada com restart' : 'falha no recovery da conversa';
+                println(`\n\x1b[33m  [conversa] ${label}: ${strategy} · ${reason} · ${duration}\x1b[0m`);
             }
             broadcastSse(
                 'dialog.recovery',
@@ -301,8 +301,8 @@ export function registerAgentEventListeners(printBanner) {
         }
 
         if (recovered) {
-            // F52.3: ask_user reapareceu — dialog loop continua sem custo de PR
-            println(`\n[watchdog] ✅  Dialog loop recuperado sem consumir PR (ask_user preservado).`);
+            // F52.3: ask_user reapareceu — a conversa continua sem custo de PR
+            println(`\n[watchdog] ✅  Conversa recuperada sem consumir PR (ask_user preservado).`);
             log('INFO', '[TerminalServer] F52: Watchdog recovery zero-PR — ask_user reapareceu após abort.');
             pingTerminalDialogWatchdog();
             broadcastSse(
@@ -316,7 +316,7 @@ export function registerAgentEventListeners(printBanner) {
         }
 
         // F52.4: ask_user NÃO reapareceu — fallback para restart completo (1 PR)
-        println(`\n[watchdog] ⚠️  Dialog loop inativo há ${secs}s — reiniciando (1 PR)…`);
+        println(`\n[watchdog] ⚠️  Conversa inativa há ${secs}s — reiniciando (1 PR)…`);
         log('WARN', `[TerminalServer] F52: Watchdog recovery falhou — restart com boot prompt (1 PR).`);
 
         const _hubSessionId = getHubSessionId();
@@ -324,7 +324,7 @@ export function registerAgentEventListeners(printBanner) {
             try {
                 await writeTerminalHubSystemTurn(
                     _hubSessionId,
-                    `[SISTEMA] Watchdog: dialog loop inativo por ${secs}s — reinício automático.`,
+                    `[SISTEMA] Watchdog: conversa inativa por ${secs}s — reinício automático.`,
                 );
             } catch (e) {
                 logSwallowed(e, 'terminal.index.watchdogWriteTurn');
@@ -379,11 +379,11 @@ export function registerAgentEventListeners(printBanner) {
             return;
         }
 
-        // Loop genuinamente inativo: aviso visual com tempo restante estimado
+        // Conversa genuinamente inativa: aviso visual com tempo restante estimado
         println(
-            `\n\x1b[33m[watchdog] ⚠️  Pré-stall: loop inativo há ${secs}s (~${remainingSecs}s para restart automático).\x1b[0m`,
+            `\n\x1b[33m[watchdog] ⚠️  Pré-stall: conversa inativa há ${secs}s (~${remainingSecs}s para restart automático).\x1b[0m`,
         );
-        log('WARN', `[TerminalServer] Pré-stall: loop inativo há ${secs}s (~${remainingSecs}s restantes).`);
+        log('WARN', `[TerminalServer] Pré-stall: conversa inativa há ${secs}s (~${remainingSecs}s restantes).`);
         recordTerminalActivity('system', 'Pré-stall watchdog', {
             detail: `${secs}s inativo, restart em ~${remainingSecs}s`,
             severity: 'warn',
@@ -439,7 +439,7 @@ export function registerAgentEventListeners(printBanner) {
                 });
                 return;
             }
-            recordTerminalActivity('turn', 'Mensagem final do dialog loop recebida', {
+            recordTerminalActivity('turn', 'Mensagem final da conversa recebida', {
                 detail: turnId ? `turn=${turnId}` : 'turno sem id',
                 source: 'dialog.turn_end',
                 recordHistory: false,
@@ -529,16 +529,16 @@ export function registerAgentEventListeners(printBanner) {
         );
     });
 
-    // DL-PERM: dialog loop permanente — reinicia automaticamente se o modelo encerrar o loop.
+    // DL-PERM: conversa permanente — reinicia automaticamente se o modelo encerrar o loop.
     agentEvents.on(EMITTER_DIALOG_STOPPED, (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
         const reason = evt.reason ?? 'desconhecido';
 
         if (reason === 'recovery_restart') {
-            recordTerminalActivity('system', 'Dialog loop em recuperação', {
+            recordTerminalActivity('system', 'Conversa em recuperação', {
                 detail: 'Reinício semântico coordenado pelo Agent',
                 source: 'dialog',
             });
-            log('INFO', '[TerminalServer] Dialog loop encerrado para recovery semântico coordenado pelo Agent.');
+            log('INFO', '[TerminalServer] Conversa encerrada para recovery semântico coordenado pelo Agent.');
             broadcastSse(
                 'dialog.stopped',
                 withTerminalAgentSseEnvelope(
@@ -550,12 +550,12 @@ export function registerAgentEventListeners(printBanner) {
         }
 
         if (reason === 'authorized_stop') {
-            recordTerminalActivity('system', 'Dialog loop encerrado', {
+            recordTerminalActivity('system', 'Conversa encerrada', {
                 detail: 'Parado por autorização explícita do usuário',
                 source: 'dialog',
             });
-            println(`\n\x1b[33m  [dialog] Loop encerrado por autorização explícita do usuário.\x1b[0m`);
-            log('INFO', '[TerminalServer] Dialog loop encerrado com autorização do usuário.');
+            println(`\n\x1b[33m  [conversa] Encerrada por autorização explícita do usuário.\x1b[0m`);
+            log('INFO', '[TerminalServer] Conversa encerrada com autorização do usuário.');
             broadcastSse(
                 'dialog.stopped',
                 withTerminalAgentSseEnvelope({ authorized: true, reason }, 'terminal-agent-wiring/dialog.stopped'),
@@ -565,12 +565,12 @@ export function registerAgentEventListeners(printBanner) {
 
         // T-15: respeitar pausa intencional do usuário — não reiniciar se dialogPaused
         if (readTerminalRuntimeState().dialogPaused) {
-            recordTerminalActivity('system', 'Dialog loop pausado', {
+            recordTerminalActivity('system', 'Conversa pausada', {
                 detail: `Encerrado enquanto pausado (${reason})`,
                 source: 'dialog',
             });
-            println(`\n\x1b[33m  [dialog] Loop encerrado enquanto pausado pelo usuário — não reiniciando.\x1b[0m`);
-            log('INFO', '[TerminalServer] Dialog loop encerrado com dialogPaused=true. Não reiniciando.');
+            println(`\n\x1b[33m  [conversa] Encerrada enquanto pausada pelo usuário — não reiniciando.\x1b[0m`);
+            log('INFO', '[TerminalServer] Conversa encerrada com dialogPaused=true. Não reiniciando.');
             broadcastSse(
                 'dialog.stopped',
                 withTerminalAgentSseEnvelope({ reason, paused: true }, 'terminal-agent-wiring/dialog.stopped'),
@@ -588,7 +588,7 @@ export function registerAgentEventListeners(printBanner) {
             println(`\n\x1b[33m  [dialog] ${stopPolicy.terminalMessage}\x1b[0m`);
             log(
                 'WARN',
-                `[TerminalServer] Dialog loop encerrado (${stopPolicy.label}). Restart automático bloqueado por política.`,
+                `[TerminalServer] Conversa encerrada (${stopPolicy.label}). Restart automático bloqueado por política.`,
             );
             broadcastSse(
                 'dialog.stopped',
@@ -598,13 +598,13 @@ export function registerAgentEventListeners(printBanner) {
         }
         const isWatchdog = reason === 'watchdog_restart';
         const label = isWatchdog ? 'reinício por watchdog' : `reason: ${reason}`;
-        recordTerminalActivity('system', 'Reiniciando dialog loop', {
+        recordTerminalActivity('system', 'Reiniciando conversa', {
             detail: label,
             severity: 'warn',
             source: 'dialog',
         });
-        println(`\n\x1b[33m  [dialog] Loop encerrado (${label}) — reiniciando automaticamente…\x1b[0m`);
-        log('WARN', `[TerminalServer] Dialog loop encerrado (${label}). Reiniciando.`);
+        println(`\n\x1b[33m  [conversa] Encerrada (${label}) — reiniciando automaticamente…\x1b[0m`);
+        log('WARN', `[TerminalServer] Conversa encerrada (${label}). Reiniciando.`);
         broadcastSse(
             'dialog.stopped',
             withTerminalAgentSseEnvelope({ reason, restarting: true }, 'terminal-agent-wiring/dialog.stopped'),

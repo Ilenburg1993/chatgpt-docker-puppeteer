@@ -229,7 +229,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     if (!wantsFull) {
         println(`
 ${terminalThemeText('assistant', 'Saúde do Terminal LLM-B')}
-  Conversa     ${agentStatusColor}${renderHumanRuntimeStatus(String(snap['status'] ?? 'unknown'))}${C.reset} ${dialogLoopActive ? `${C.grey}· loop ativo${C.reset}` : `${C.yellow}· loop parado${C.reset}`}
+  Conversa     ${agentStatusColor}${renderHumanRuntimeStatus(String(snap['status'] ?? 'unknown'))}${C.reset} ${dialogLoopActive ? `${C.grey}· ativa${C.reset}` : `${C.yellow}· inativa${C.reset}`}
   Modelo       ${C.magenta}${snap['model']}${C.reset} ${C.grey}· raciocínio ${configProjection.currentReasoningEffort}${C.reset}
   Acesso       ${renderCompactByokLine(byok)}
   Gateway      ${renderCompactGatewayLine(gatewayProjection, gatewayActive)}
@@ -255,7 +255,7 @@ ${C.bold}${C.cyan}╠═══════════════════�
 ${C.cyan}  AGENTE${C.reset}
     status        ${agentStatusColor}${snap['status']}${C.reset}
     health        ${health ? `${health['status'] === 'healthy' ? C.green : health['status'] === 'degraded' ? C.yellow : C.red}${health['status']}${C.reset}` : `${C.grey}n/d${C.reset}`}
-    dialog loop   ${dialogLoopActive ? `${C.green}● ativo${C.reset}` : `${C.red}○ inativo${C.reset}`}
+    conversa      ${dialogLoopActive ? `${C.green}● ativa${C.reset}` : `${C.red}○ inativa${C.reset}`}
     modelo        ${C.magenta}${snap['model']}${C.reset}
     byok          ${byokLine}
     gateway       ${gatewayLine}

@@ -567,7 +567,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
   ─────────────────────────────────────
   agente           ${statusColor}${snap['status']}\x1b[0m
         health           ${health ? `${healthColor}${health['status']}\x1b[0m` : '\x1b[90m(n/d)\x1b[0m'}
-  dialog loop      ${active ? '\x1b[32m● ativo\x1b[0m' : '\x1b[31m○ inativo\x1b[0m'}
+  conversa viva   ${active ? '\x1b[32m● ativa\x1b[0m' : '\x1b[31m○ inativa\x1b[0m'}
   pergunta humana ${askUserStatus}
   canal input      ${inputChannelColor}${inputChannel.label}\x1b[0m \x1b[90m(${inputChannel.state}${inputChannel.recoveryExpected ? ' · recovery sob demanda' : ''})\x1b[0m
   esperas SDK      ${sdkInterruptions.length > 0 ? `\x1b[33m${sdkInterruptions.join(' · ')}\x1b[0m` : '\x1b[90m(nenhuma)\x1b[0m'}
@@ -839,7 +839,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         `  Runtime      \x1b[90m${projection.runtimeId} · sessão ${projection.runtimeSessionId ?? '(sem sessão)'}\x1b[0m`,
     );
     println(
-        `  Conversa     \x1b[90m${renderHumanTerminalStatus(state)} · loop ${projection.dialogLoopActive ? 'ativo' : 'inativo'} · fila ${queue} · ${askLine}\x1b[0m`,
+        `  Conversa     \x1b[90m${renderHumanTerminalStatus(state)} · ${projection.dialogLoopActive ? 'ativa' : 'inativa'} · fila ${queue} · ${askLine}\x1b[0m`,
     );
     println(
         `  Entrada      \x1b[90m${channel.label} · modo SDK ${projection.sdkSessionMode ?? 'interactive'} · prompts ${projection.permissionMode} · ${waitSummary || 'sem pendências humanas'}\x1b[0m`,
@@ -1749,7 +1749,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
             println('  \x1b[33mUso: /session sdk next <new|resume <sessionId|#n|current|last|foreground>|auto>\x1b[0m');
             return;
         }
-        println('  \x1b[90mA diretiva é consumida pelo initializer no próximo boot; /restart reinicia só o dialog loop.\x1b[0m');
+        println('  \x1b[90mA diretiva é consumida pelo initializer no próximo boot; /restart reinicia só a conversa.\x1b[0m');
         return;
     }
     if (action === 'delete' || action === 'remove') {
@@ -1831,7 +1831,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
         println(`    último boot:    \x1b[90m${bootDecision}\x1b[0m`);
     }
     println(
-        '    \x1b[90m/session sdk controla sessão SDK; /restart reinicia só dialog loop; /resume injeta histórico do hub; /session save|list|restore são snapshots locais.\x1b[0m',
+        '    \x1b[90m/session sdk controla sessão SDK; /restart reinicia só a conversa; /resume injeta histórico do hub; /session save|list|restore são snapshots locais.\x1b[0m',
     );
     if (inventory.sessions.length === 0) {
         println('    \x1b[90mNenhuma sessão SDK listada pelo client atual.\x1b[0m\n');

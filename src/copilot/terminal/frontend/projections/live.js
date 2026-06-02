@@ -48,11 +48,11 @@ function resolveLiveFlowState(status) {
  * @returns {string}
  */
 function describeLiveFlowState(state) {
-    if (state === 'ready') return 'loop vivo e apto a receber a proxima mensagem';
+    if (state === 'ready') return 'conversa viva e apta a receber a próxima mensagem';
     if (state === 'active-turn') return 'turno em andamento com eventos live';
     if (state === 'waiting-human') return 'aguardando resposta humana/SDK';
-    if (state === 'paused') return 'dialog loop pausado pelo operador';
-    if (state === 'offline') return 'dialog loop inativo';
+    if (state === 'paused') return 'conversa pausada pelo operador';
+    if (state === 'offline') return 'conversa inativa';
     return 'runtime em recuperacao ou transicao';
 }
 

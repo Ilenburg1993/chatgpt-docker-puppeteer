@@ -52,7 +52,7 @@ export function launchTerminalDialogLoopBootstrap(deps = {}) {
     const logFn = deps.logFn ?? log;
     const injectPort = deps.injectPort ?? DEFAULT_INJECT_PORT;
 
-    recordTerminalActivity('boot', 'Inicializando dialog loop', {
+    recordTerminalActivity('boot', 'Inicializando conversa', {
         detail: 'Bootstrap assíncrono do protocolo READY/REPLY',
         source: 'terminal',
         recordHistory: false,
@@ -70,7 +70,7 @@ export function launchTerminalDialogLoopBootstrap(deps = {}) {
         })
         .catch((e) => {
             const error = toError(e);
-            recordTerminalActivity('error', 'Falha no bootstrap do dialog loop', {
+            recordTerminalActivity('error', 'Falha no bootstrap da conversa', {
                 detail: error.message,
                 source: 'terminal',
                 severity: 'error',

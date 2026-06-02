@@ -467,7 +467,7 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('/sdk doctor');
     });
 
-    it('cmdStatus e cmdNow distinguem loop ativo em standby sem ask_user vivo', () => {
+    it('cmdStatus e cmdNow distinguem conversa ativa em standby sem ask_user vivo', () => {
         defaultRuntime.dialogLoopActive = true;
         defaultRuntime.pendingQuestion = null;
         defaultRuntime.pendingQuestionKind = null;
@@ -539,7 +539,8 @@ describe('commands/session — sync commands', () => {
             expect(ctx.output()).toContain('Runtime');
             expect(ctx.output()).toContain('default');
             expect(ctx.output()).toContain('Conversa');
-            expect(ctx.output()).toContain('loop inativo');
+            expect(ctx.output()).toContain('inativa');
+            expect(ctx.output()).not.toContain('loop inativo');
             expect(ctx.output()).toContain('SSE');
             expect(ctx.output()).toContain('prompts approve_all');
             expect(ctx.output()).toContain('1 provedor');
@@ -781,7 +782,8 @@ describe('commands/session — async commands', () => {
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '2');
         expect(ctx.output()).toContain('Sessão SDK');
-        expect(ctx.output()).toContain('/restart reinicia só dialog loop');
+        expect(ctx.output()).toContain('/restart reinicia só a conversa');
+        expect(ctx.output()).not.toContain('dialog loop');
         expect(ctx.output()).toContain('/resume injeta histórico do hub');
         expect(ctx.output()).toContain('#1');
     });

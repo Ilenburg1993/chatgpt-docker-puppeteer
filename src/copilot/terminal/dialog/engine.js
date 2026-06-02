@@ -563,7 +563,7 @@ async function _doEnsureDialogLoop() {
                     'WARN',
                     `[dialog] ensureDialogLoop pausado por policy SDK (kind=${sdkRecoveryPolicy.kind}): ${message}`,
                 );
-                recordTerminalActivity('error', 'Boot do dialog loop bloqueado pela policy SDK', {
+                recordTerminalActivity('error', 'Boot da conversa bloqueado pela policy SDK', {
                     detail: message,
                     severity: 'warn',
                     source: 'sdk',
@@ -610,7 +610,7 @@ async function _tryStartDialogLoop() {
     let status = readTerminalRuntimeControlState().status;
     if (status === 'starting') {
         recordTerminalActivity('boot', 'Aguardando boot do agente', {
-            detail: 'Status=starting antes de iniciar dialog loop',
+            detail: 'Status=starting antes de iniciar conversa',
             source: 'dialog',
         });
         println('\x1b[90m  Aguardando boot do agente concluir…\x1b[0m');
@@ -645,7 +645,7 @@ async function _tryStartDialogLoop() {
 
     if (readTerminalRuntimeControlState().status === 'processing') {
         recordTerminalActivity('boot', 'Aguardando agente ficar idle', {
-            detail: 'Há trabalho em andamento antes do dialog loop',
+            detail: 'Há trabalho em andamento antes da conversa',
             source: 'dialog',
         });
         println('\x1b[90m  Aguardando agente concluir tarefa em andamento…\x1b[0m');
@@ -654,7 +654,7 @@ async function _tryStartDialogLoop() {
             const s = readTerminalRuntimeControlState().status;
             if (s === 'idle') break;
             if (s === 'stopped') {
-                throw new Error(`Agente parado inesperadamente antes de dialog loop`);
+                throw new Error(`Agente parado inesperadamente antes da conversa`);
             }
             await sleepMs(500, { id: 'terminal.dialog.wait-idle.after-processing', unref: true });
         }
@@ -669,7 +669,7 @@ async function _tryStartDialogLoop() {
         return;
     }
 
-    recordTerminalActivity('boot', 'Conectando ao dialog loop', {
+    recordTerminalActivity('boot', 'Conectando conversa', {
         detail: 'Iniciando protocolo READY/REPLY do terminal',
         source: 'dialog',
     });
@@ -820,7 +820,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             severity: 'warn',
         });
         println(
-            `\x1b[90m  ↳ requestHeaders por turno detectados (${Object.keys(requestHeaders).join(', ')}); usando dispatch SDK direto com reanexo do dialog loop.\x1b[0m`,
+            `\x1b[90m  ↳ requestHeaders por turno detectados (${Object.keys(requestHeaders).join(', ')}); usando dispatch SDK direto com reanexo da conversa.\x1b[0m`,
         );
     }
     broadcastSse(

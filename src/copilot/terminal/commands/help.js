@@ -65,8 +65,8 @@ function renderFullHelp({ injectPort, println }) {
   \x1b[1mComandos de Sessão\x1b[0m
   \x1b[33m/status\x1b[0m                              — status do agente + modelo + reasoning + binding/frescor do prompt
   \x1b[33m/health\x1b[0m                              — diagnóstico/health completo do runtime, infra, IO e lifecycle
-  \x1b[33m/now\x1b[0m                                 — snapshot operacional curto (loop/ask/model mismatch)
-  \x1b[33m/live [n]\x1b[0m                             — fluxo live: loop, streaming, SSE, tools, arquivos e I/O real
+  \x1b[33m/now\x1b[0m                                 — snapshot operacional curto (conversa/pergunta/modelo)
+  \x1b[33m/live [n]\x1b[0m                             — fluxo live: conversa, streaming, SSE, tools, arquivos e I/O real
   \x1b[33m/activity [n]\x1b[0m                        — atividade atual da LLM-B + timeline recente
   \x1b[33m/history [n]\x1b[0m                         — últimos N turnos em memória
   \x1b[33m/db-history [n]\x1b[0m                      — últimos N turnos (SQLite)
@@ -87,8 +87,8 @@ function renderFullHelp({ injectPort, println }) {
   \x1b[33m/session sdk waits [n]\x1b[0m               — perguntas, formulários e permissões publicados pelo fanout canônico
   \x1b[33m/session sdk next <new|resume <id|#n|current|last|foreground>|auto>\x1b[0m — agenda seleção de sessão SDK para o próximo boot
   \x1b[33m/session sdk delete <id|#n>\x1b[0m        — apaga estado persistido SDK fora da sessão viva
-  \x1b[33m/restart\x1b[0m                             — reinicia dialog loop
-  \x1b[33m/emergency-reset\x1b[0m (\x1b[33m/ereset\x1b[0m)            — limpa rate limiters + reinicia loop
+  \x1b[33m/restart\x1b[0m                             — reinicia a conversa
+  \x1b[33m/emergency-reset\x1b[0m (\x1b[33m/ereset\x1b[0m)            — limpa limitadores + reinicia a conversa
   \x1b[33m/quit\x1b[0m / \x1b[33m/exit\x1b[0m                         — encerra terminal
 
   \x1b[1mConfiguração do Modelo\x1b[0m

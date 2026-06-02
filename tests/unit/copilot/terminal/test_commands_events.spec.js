@@ -112,6 +112,72 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).not.toContain('req=req-123');
     });
 
+    it('humaniza eventos de conversa e boot no resumo default', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 3,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 10,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 1,
+                    event: 'dialog.loop.changed',
+                    source: 'terminal-agent-wiring/dialog.loop.changed',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: { active: true },
+                },
+                {
+                    timestamp: 1710000001000,
+                    eventId: 2,
+                    event: 'terminal.runtime.wired',
+                    source: 'terminal/runtime-root.runtime-config',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { phase: 'runtime-config' },
+                },
+                {
+                    timestamp: 1710000002000,
+                    eventId: 3,
+                    event: 'quota.warning',
+                    source: 'agent/passthrough/quota.warning',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { quotaId: 'premium_interactions' },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '10');
+
+        expect(ctx.output()).toContain('Conversa alterada');
+        expect(ctx.output()).toContain('Runtime pronto');
+        expect(ctx.output()).toContain('Aviso de quota');
+        expect(ctx.output()).not.toContain('dialog loop changed');
+        expect(ctx.output()).not.toContain('terminal runtime wired');
+        expect(ctx.output()).not.toContain('quota warning');
+    });
+
     it('consulta por tool call, request e hub session', async () => {
         readTerminalSseEventArchiveTail.mockResolvedValueOnce({
             state: {

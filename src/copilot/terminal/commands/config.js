@@ -257,7 +257,7 @@ export async function cmdModel({ println }, arg) {
         );
     }
     println(
-        '  \x1b[90mUse /restart apenas se quiser rebalancear o loop; não é mais a confirmação primária de modelo.\x1b[0m\n',
+        '  \x1b[90mUse /restart apenas se quiser reiniciar a conversa; não é mais a confirmação primária de modelo.\x1b[0m\n',
     );
 }
 

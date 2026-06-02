@@ -1011,7 +1011,7 @@ function renderSdkRequestHeadersSummary({ println }, rest) {
             }
         }
         println(
-            '  \x1b[90mObservação: turnos com requestHeaders usam dispatch SDK direto e reanexam o dialog loop depois da resposta.\x1b[0m\n',
+            '  \x1b[90mObservação: turnos com requestHeaders usam dispatch SDK direto e reanexam a conversa depois da resposta.\x1b[0m\n',
         );
         return;
     }
@@ -1033,7 +1033,7 @@ function renderSdkRequestHeadersSummary({ println }, rest) {
         println(`  \x1b[33m${key}\x1b[0m=\x1b[90m${value}\x1b[0m`);
     }
     println(
-        '  \x1b[90mEsse próximo turno usará dispatch SDK direto (consome PR) e depois reanexará o dialog loop.\x1b[0m\n',
+        '  \x1b[90mEsse próximo turno usará dispatch SDK direto (consome PR) e depois reanexará a conversa.\x1b[0m\n',
     );
 }
 

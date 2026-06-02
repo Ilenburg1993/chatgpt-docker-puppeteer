@@ -396,7 +396,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         // propagar AbortController de sendTurn → sendMessage (infra AbortSignal já existe
         // em message-queue.js). Candidato a upgrade P4 futuro.
         multilineInput.reset();
-        println('\n[terminal] Ctrl+C detectado. Dialog loop mantido ativo. Use /quit para encerrar.');
+        println('\n[terminal] Ctrl+C detectado. Conversa mantida ativa. Use /quit para encerrar.');
         scheduleTerminalPromptRedraw(rl, buildUserPrompt());
     });
 }

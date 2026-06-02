@@ -129,17 +129,17 @@ export function isReadlineOpen(rl) {
     return Boolean(rl) && state.closed !== true;
 }
 
-/** F16.2 — Limpa rate limiters e reinicia dialog loop (útil após throttling acidental). */
+/** F16.2 — Limpa rate limiters e reinicia a conversa (útil após throttling acidental). */
 async function _cmdEmergencyReset() {
     println('\x1b[33m  [emergency-reset] Limpando rate limiters…\x1b[0m');
     clearRateLimiters();
-    println('\x1b[33m  [emergency-reset] Reiniciando dialog loop…\x1b[0m');
+    println('\x1b[33m  [emergency-reset] Reiniciando conversa…\x1b[0m');
     await _cmdRestart();
-    println('\x1b[32m  [emergency-reset] OK — rate limiters limpos e loop reiniciado.\x1b[0m');
+    println('\x1b[32m  [emergency-reset] OK — limitadores limpos e conversa reiniciada.\x1b[0m');
 }
 
 async function _cmdRestart() {
-    println('\x1b[90m  Reiniciando dialog loop…\x1b[0m');
+    println('\x1b[90m  Reiniciando conversa…\x1b[0m');
     try {
         // Registrar 'dialog.ready' ANTES de stopDialogMode() para evitar race condition.
         const { promise: readyPromise, resolve: resolveReady, reject: rejectReady } = Promise.withResolvers();
@@ -177,13 +177,13 @@ async function _cmdRestart() {
         println(`\x1b[31m  Falha no restart: ${toError(e).message}\x1b[0m`);
         await ensureDialogLoop().catch((e) => logSwallowed(e, 'terminal.repl.ensureDialogLoop'));
     }
-    println('\x1b[32m  Dialog loop reiniciado.\x1b[0m');
+    println('\x1b[32m  Conversa reiniciada.\x1b[0m');
 }
 
 async function _cmdPauseDialogLoop() {
     try {
         await pauseTerminalDialogLoop();
-        println('\x1b[33m  Dialog loop pausado. Use /dialog-resume para retomar sem consumir PR.\x1b[0m');
+        println('\x1b[33m  Conversa pausada. Use /dialog-resume para retomar sem consumir PR.\x1b[0m');
     } catch (e) {
         println(`\x1b[31m  Erro ao pausar: ${toError(e).message}\x1b[0m`);
     }
@@ -192,7 +192,7 @@ async function _cmdPauseDialogLoop() {
 async function _cmdDialogResume() {
     try {
         await resumeTerminalDialogLoop();
-        println('\x1b[32m  Dialog loop retomado.\x1b[0m');
+        println('\x1b[32m  Conversa retomada.\x1b[0m');
     } catch (e) {
         println(`\x1b[31m  Erro ao retomar: ${toError(e).message}\x1b[0m`);
     }

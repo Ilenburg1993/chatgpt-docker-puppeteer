@@ -2322,10 +2322,42 @@
 - [x] `/byok auto on`, `auto policy`, `auto doctor` e `gateway operator-ready` passaram a usar `troca viva`, `nova sessão`, `perfis`, `conta`, `registros`, `sessão viva`, `bloqueios`, `avisos` e `próximo`.
 - [x] `/byok gateway selection audit` passou a chamar o arquivo canônico de `catálogo`, e traces passaram a dizer `mais recente`.
 - [x] `/byok probe shortlist` passou a encerrar como `aprovados N/N · providers tentados N/N`, sem `ok=N/N` ou `providerTentado=`.
+- [x] `/byok status` passou a usar `Modelo gateway`, `Fronteira` e `Vínculo vivo`, removendo labels visuais `gatewayModel:`, `boundary:` e `live binding:`.
+- [x] Mensagens de health passaram de `BYOK operational health` para `Saúde operacional BYOK`, inclusive no clear global e escopado.
+- [x] Probes e shortlist passaram a falar `conversa viva`, sem `dialog loop` na tela default.
+- [x] Tags de modalidades passaram de `in=text+image` para `entrada text+image`.
 - [x] Testes escopados passaram:
   - `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/terminal/test_commands_config_errors.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js` (137 testes).
-- [ ] Criar/rodar live PTY dedicada a seleção/troca de modelo, cobrindo `/model auto`, `/model <id>`, `/byok auto status`, `/byok auto policy`, `/byok auto doctor`, fallback standby e confirmação `session.model_changed`.
-- [ ] Revisar o runner live para capturar explicitamente se a tela default contém `from=`, `reason=`, `live setModel`, `Modelo SDK:`, `preferência local=` ou IDs longos de tool/model switch.
+- [x] Teste BYOK completo passou após a limpeza residual:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js` (105 testes).
+- [x] Runner live `--auto-probe` foi corrigido para usar uma lista real de comandos e sequência temporizada no PTY, evitando travar em comandos que não redesenham prompt de modo detectável.
+- [x] Runner live `--auto-probe` passou a validar a nova linguagem humana de auto/BYOK e reprovar `providerCall=nao`, `liveSetModel=`, `runtimeSelector=`, `action=`, `ledgers:`, `from=`, `reason=`, `live setModel` e `Modelo SDK:`.
+- [x] Live PTY dedicada a seleção/automação de modelo executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --auto-probe --timeout-ms=110000 --transport=pty --out-dir=artifacts/terminal-live/ux-auto-model-selection-cycle-20260602-1554`.
+- [x] Resultado: PASS completo; `/byok auto policy/status/doctor/explain/history/handoffs/confirmations/proof-plan/standby/recovery-fixture/recoveries` renderizaram sem turno LLM, sem chamada provider e sem key-value bruto na superfície default.
+- [x] Achado da live corrigido: `/activity` de boot trocou `Inicializando dialog loop`/`Conectando ao dialog loop` por `Inicializando conversa`/`Conectando conversa`.
+- [x] Achado da live corrigido: `/session sdk` trocou `/restart reinicia só dialog loop` por `/restart reinicia só a conversa`.
+- [x] Achado da live corrigido: `/events` resumido passou a renderizar `dialog.loop.changed`, `terminal.runtime.wired`, `terminal.started` e `quota.warning` como `Conversa alterada`, `Runtime pronto`, `Terminal iniciado` e `Aviso de quota`.
+- [x] Testes escopados passaram após esses achados:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js` (161 testes).
+- [x] Live PTY `--auto-probe` repetida após correção da timeline/event labels:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --auto-probe --timeout-ms=110000 --transport=pty --out-dir=artifacts/terminal-live/ux-auto-model-selection-cycle-20260602-1558`.
+- [x] Resultado: PASS completo; `/activity` mostrou `Conectando conversa`, `/events` resumido mostrou `Runtime pronto`, `Terminal iniciado`, `Conversa alterada` e `Aviso de quota`. O único `dialog loop` restante apareceu apenas no JSON bruto de `/events --raw`.
+- [ ] Criar/rodar live PTY dedicada a `/model auto`, `/model <id>` e confirmação `session.model_changed`, separada do ciclo BYOK auto.
 - [ ] Avaliar se o operador precisa de um painel único “Modelo solicitado x modelo efetivo” em `/now` ou `/status`, para reduzir ambiguidade entre pedido local, seleção BYOK e confirmação SDK.
+- [x] `/usage now` default reduziu densidade de vínculo: `runtime ... · SDK ... · hub ...` virou `runtime, SDK e hub conectados`; IDs ficaram em `/usage now detail`.
+- [x] `/usage now` trocou `GitHub Copilot quota/PR side-channel` por `Quota Copilot observada`, preservando a distinção de BYOK como não-cobrança BYOK.
+- [x] Teste escopado passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js` (8 testes).
+- [x] Live PTY `--auto-probe` repetida após limpeza de `/usage now`:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --auto-probe --timeout-ms=110000 --transport=pty --out-dir=artifacts/terminal-live/ux-auto-model-selection-cycle-20260602-1600`.
+- [x] Resultado: PASS completo; `/usage now` mostrou `Vínculo: runtime, SDK e hub conectados · IDs em /usage now detail`, sem `side-channel` e sem IDs compactos no default.
+- [x] Achado da live corrigido: evento bruto inicial `Inicializando conversation hub` passou a registrar `Inicializando hub da conversa`.
+- [x] `/help full`, `/status full`, `/now full`, `/health`, `/diagnose`, `/restart`, `/emergency-reset`, `/dialog-pause`, `/dialog-resume`, `requestHeaders`, watchdog e recovery passaram a falar `conversa`/`conversa viva`, removendo `dialog loop`/`loop ativo` da superfície humana.
+- [x] Testes foram reforçados para reprovar `loop inativo`, `loop ativo`, `loop parado`, `dialog loop` e `Boot do dialog loop...` nos painéis humanos tocados.
+- [x] Live PTY `--auto-probe` repetida após a limpeza de vocabulário:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --auto-probe --timeout-ms=110000 --transport=pty --out-dir=artifacts/terminal-live/ux-auto-model-selection-cycle-20260602-1608`.
+- [x] Resultado: PASS completo; `/activity` e `/events` mostraram `Inicializando hub da conversa`, `Conectando conversa`, `Conversa alterada`, `Aviso de quota` e `/usage now` humano. Os únicos `dialog loop` restantes na live ficaram em JSON bruto/internal background descriptions.
+- [x] `/byok auto policy` passou a renderizar nomes humanos de preset (`auto: mesma fronteira`, `auto: preparar nova sessão`) antes do identificador técnico copiável, removendo a linha visual `auto_same_boundary: ...`.
 - [ ] Auditar `/byok persist` e os helpers de health tags restantes para separar default humano de detalhe técnico.
 - [ ] Separar explicitamente “tela default humana” de “detail/raw diagnóstico” nos comandos BYOK, sem perder automação e rastreabilidade.

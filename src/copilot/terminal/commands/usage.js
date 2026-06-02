@@ -77,7 +77,7 @@ export function cmdUsage({ println }, arg) {
                 : `modelo \x1b[36m${modelBilling.displayModel}\x1b[0m`;
             if (byokActive) {
                 println(
-                    `      GitHub Copilot quota/PR side-channel: ${modelLabel} · custo \x1b[33m${cost}\x1b[0m \x1b[90m(histórica; BYOK ativo usa provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}; não é cobrança BYOK)\x1b[0m`,
+                    `      Quota Copilot observada: ${modelLabel} · custo \x1b[33m${cost}\x1b[0m \x1b[90m(histórica; BYOK ativo usa provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}; não é cobrança BYOK)\x1b[0m`,
                 );
             } else {
                 println(
@@ -86,7 +86,7 @@ export function cmdUsage({ println }, arg) {
             }
         } else if (byokActive) {
             println(
-                `      GitHub Copilot quota/PR side-channel: \x1b[90msem snapshot histórico; BYOK ativo usa provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}\x1b[0m`,
+                `      Quota Copilot observada: \x1b[90msem snapshot histórico; BYOK ativo usa provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}\x1b[0m`,
             );
         } else {
             println('      Premium Request: \x1b[90msem snapshot histórico classificado\x1b[0m');
@@ -125,7 +125,11 @@ export function cmdUsage({ println }, arg) {
             println(
                 detail
                     ? `      Vínculo: runtime \x1b[90m${runtimeLabel}\x1b[0m · SDK \x1b[90m${sdkLabel}\x1b[0m · hub \x1b[90m${hubLabel}\x1b[0m`
-                    : `      Vínculo: runtime \x1b[90m${runtimeLabel}\x1b[0m · SDK \x1b[90m${sdkLabel}\x1b[0m · hub \x1b[90m${hubLabel}\x1b[0m \x1b[90m(/usage now detail para IDs completos)\x1b[0m`,
+                    : `      Vínculo: \x1b[90m${renderUsageBindingSummary({
+                          runtimeSessionId: projection.runtimeSessionId,
+                          sdkSessionId: projection.binding.sdkSessionId,
+                          hubSessionId: projection.binding.hubSessionId,
+                      })} · IDs em /usage now detail\x1b[0m`,
             );
         }
         println(
@@ -160,6 +164,21 @@ export function cmdUsage({ println }, arg) {
 function renderUsageBindingId(value, detail) {
     if (!value) return '-';
     return detail ? value : (compactTerminalDiagnosticId(value, 14) ?? value);
+}
+
+/**
+ * @param {{ runtimeSessionId?: string | null; sdkSessionId?: string | null; hubSessionId?: string | null }} binding
+ * @returns {string}
+ */
+function renderUsageBindingSummary(binding) {
+    const present = [
+        binding.runtimeSessionId ? 'runtime' : null,
+        binding.sdkSessionId ? 'SDK' : null,
+        binding.hubSessionId ? 'hub' : null,
+    ].filter(Boolean);
+    if (present.length === 3) return 'runtime, SDK e hub conectados';
+    if (present.length > 0) return `vínculo parcial: ${present.join(', ')}`;
+    return 'sem vínculo registrado';
 }
 
 /**

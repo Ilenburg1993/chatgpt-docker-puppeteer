@@ -339,6 +339,9 @@ describe('commands/diagnose', () => {
         expect(output).toContain('Saúde do Terminal LLM-B');
         expect(output).not.toContain('\x1b[36mSaúde do Terminal LLM-B');
         expect(output).toContain('Conversa');
+        expect(output).not.toContain('loop ativo');
+        expect(output).not.toContain('loop parado');
+        expect(output).not.toContain('dialog loop');
         expect(output).toContain('Entrada');
         expect(output).toContain('Gateway');
         expect(output).toContain('Ferramentas');

@@ -36,11 +36,19 @@ describe('terminal/dialog/dialog-runtime', () => {
 
         expect(src).toContain('Preparando agente');
         expect(src).toContain('Conectando conversa');
+        expect(src).toContain('Boot da conversa bloqueado pela policy SDK');
         expect(src).toContain('Retomando sessão sem prompt inicial');
         expect(src).toContain('Inicializando ambiente da conversa');
+        expect(src).toContain("'Conectando conversa'");
+        expect(src).not.toContain("'Conectando ao dialog loop'");
+        expect(src).not.toContain("'Boot do dialog loop bloqueado pela policy SDK'");
         expect(src).not.toContain('println(\'\\x1b[90m  Iniciando AlwaysAliveAgent');
         expect(src).not.toContain('println(\'\\x1b[90m  Conectando ao agente');
         expect(src).not.toContain('println(\'\\x1b[90m  Reanexando sessão SDK');
         expect(src).not.toContain("detail: 'AlwaysAliveAgent start()'");
+
+        const repl = await readFile(new URL('../../../../src/copilot/terminal/repl/repl.js', import.meta.url), 'utf8');
+        expect(repl).toContain("'Inicializando conversa'");
+        expect(repl).not.toContain("'Inicializando dialog loop'");
     });
 });

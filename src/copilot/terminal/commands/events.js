@@ -164,6 +164,10 @@ function humanEventLabel(event) {
     if (event === 'user_input.completed') return 'Resposta do operador';
     if (event === 'tool.lifecycle') return 'Ferramenta';
     if (event === 'terminal.activity' || event === 'activity.changed') return 'Atividade';
+    if (event === 'terminal.runtime.wired') return 'Runtime pronto';
+    if (event === 'terminal.started') return 'Terminal iniciado';
+    if (event === 'dialog.loop.changed') return 'Conversa alterada';
+    if (event === 'quota.warning') return 'Aviso de quota';
     if (event === 'agent.background.completed') return 'Tarefa em background concluída';
     if (event === 'agent.background.idle') return 'Background ocioso';
     if (event === 'dialog.turn_start' || event === 'assistant.turn_start') return 'Turno iniciado';

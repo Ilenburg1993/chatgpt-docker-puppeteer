@@ -117,7 +117,7 @@ export function classifyTerminalByokSdkBinding(summary, binding, currentSessionI
                 preparedLabel,
                 liveLabel,
                 headline: 'provider BYOK vivo coincide; modelo preparado diverge do binding de nascimento',
-                action: '/byok model <id> pode pedir setModel vivo; usage/session.model_changed confirma o efetivo',
+                action: '/byok model <id> pode pedir troca viva; uso registrado ou evento de modelo confirma o efetivo',
                 sameProviderBoundary,
             };
         }
@@ -135,7 +135,7 @@ export function classifyTerminalByokSdkBinding(summary, binding, currentSessionI
         preparedLabel,
         liveLabel,
         headline: 'seleção preparada e binding da sessão viva cruzam provider/perfil',
-        action: '/session sdk next new e reinício da task aplicam o novo binding; /restart só reinicia dialog loop',
+        action: '/session sdk next new e reinício da task aplicam o novo vínculo; /restart só reinicia a conversa',
         sameProviderBoundary,
     };
 }

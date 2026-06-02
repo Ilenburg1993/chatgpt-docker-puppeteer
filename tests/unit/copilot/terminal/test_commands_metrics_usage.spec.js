@@ -352,13 +352,15 @@ describe('commands/metrics + usage', () => {
         cmdUsage({ println: ctx.println }, 'now');
 
         expect(ctx.output()).toContain('Context window');
-        expect(ctx.output()).toContain('Vínculo: runtime ');
-        expect(ctx.output()).toContain('runtime-456789…');
+        expect(ctx.output()).toContain('Vínculo:');
+        expect(ctx.output()).toContain('runtime, SDK e hub conectados');
+        expect(ctx.output()).not.toContain('runtime-456789…');
         expect(ctx.output()).not.toContain('runtime-4567890123456789012345');
         expect(ctx.output()).toContain('/usage now detail');
         expect(ctx.output()).toContain('Modo: SDK ');
         expect(ctx.output()).toContain('gpt-5-mini');
-        expect(ctx.output()).toMatch(/Última telemetria PR classificada|GitHub Copilot quota\/PR side-channel/);
+        expect(ctx.output()).toMatch(/Última telemetria PR classificada|Quota Copilot observada/);
+        expect(ctx.output()).not.toContain('side-channel');
         expect(ctx.output()).toMatch(/não implica consumo neste boot\/probe|não é cobrança BYOK/);
     });
 
@@ -367,7 +369,8 @@ describe('commands/metrics + usage', () => {
 
         cmdUsage({ println: ctx.println }, 'now --runtime alt');
 
-        expect(ctx.output()).toContain('Vínculo: runtime ');
+        expect(ctx.output()).toContain('Vínculo:');
+        expect(ctx.output()).toContain('runtime, SDK e hub conectados');
         expect(ctx.output()).toContain('Modo: SDK ');
         expect(ctx.output()).toContain('gpt-4.1-mini');
     });

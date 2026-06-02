@@ -295,9 +295,9 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
 }
 
 /**
- * Projeta a diferença entre a sessão SDK viva, o dialog loop ativo e o canal `ask_user` materializado.
+ * Projeta a diferença entre a sessão SDK viva, a conversa ativa e o canal `ask_user` materializado.
  *
- * Um loop ativo e idle sem READY vivo não é necessariamente falha: no modo de sessão retomada, o próximo turno pode
+ * Uma conversa ativa e idle sem READY vivo não é necessariamente falha: no modo de sessão retomada, o próximo turno pode
  * usar recovery/direct dispatch sob demanda. O estado `missing` fica reservado para o caso mais suspeito: runtime
  * `waiting_for_input` sem pergunta viva.
  *
@@ -324,7 +324,7 @@ function buildDialogInputChannelProjection(input) {
         return {
             state: 'paused',
             label: 'pausado',
-            detail: 'dialog loop pausado; input humano não será entregue ao modelo até resume',
+            detail: 'conversa pausada; input humano não será entregue ao modelo até resume',
             canAcceptTurn: false,
             recoveryExpected: false,
         };
@@ -333,7 +333,7 @@ function buildDialogInputChannelProjection(input) {
         return {
             state: 'offline',
             label: 'offline',
-            detail: 'dialog loop inativo; próximo turno precisa iniciar ou retomar o loop',
+            detail: 'conversa inativa; próximo turno precisa iniciar ou retomar a sessão',
             canAcceptTurn: false,
             recoveryExpected: true,
         };
@@ -360,7 +360,7 @@ function buildDialogInputChannelProjection(input) {
         return {
             state: 'processing',
             label: `protocolo ${input.pendingQuestionKind}`,
-            detail: 'mensagem protocolar transitória do dialog loop está em processamento',
+            detail: 'mensagem protocolar transitória da conversa está em processamento',
             canAcceptTurn: false,
             recoveryExpected: false,
         };
@@ -378,7 +378,7 @@ function buildDialogInputChannelProjection(input) {
         return {
             state: 'standby',
             label: 'standby sem READY vivo',
-            detail: 'session e loop estão ativos; próximo turno usa recovery/direct dispatch sob demanda',
+            detail: 'sessão e conversa estão ativas; próximo turno usa recovery/direct dispatch sob demanda',
             canAcceptTurn: true,
             recoveryExpected: true,
         };

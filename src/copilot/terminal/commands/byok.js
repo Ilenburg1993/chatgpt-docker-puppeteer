@@ -213,7 +213,7 @@ function yesNoPlain(value) {
 
 /**
  * Explica a fronteira entre seletor BYOK e sessão SDK viva. Provider/profile vivem no contrato de criação/retomada de
- * sessão; `/restart` reinicia apenas o dialog loop e não pode ser narrado como rebind de provider.
+ * sessão; `/restart` reinicia apenas a conversa e não pode ser narrado como troca de provider.
  *
  * @param {(text: string) => void} println
  * @param {{ persisted?: boolean }} [options]
@@ -248,7 +248,7 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         println(
-            `  \x1b[33mSessão viva não inspecionada para setModel BYOK: ${message}. A seleção do processo continua pronta para o próximo boot.\x1b[0m`,
+            `  \x1b[33mSessão viva não inspecionada para troca BYOK: ${message}. A seleção do processo continua pronta para o próximo boot.\x1b[0m`,
         );
         return;
     }
@@ -1753,7 +1753,7 @@ function renderModelTags(model) {
     const health = readHealthForByokModel(model);
     if (health) tags.push(renderByokHealthTag(health), renderByokAgentProbeHealthTag(health));
     const inputs = meta?.inputModalities?.length ? meta.inputModalities.join('+') : '';
-    if (inputs && inputs !== 'text') tags.push(`in=${inputs}`);
+    if (inputs && inputs !== 'text') tags.push(`entrada ${inputs}`);
     return tags.join(' · ');
 }
 
@@ -1976,7 +1976,7 @@ async function renderStatus(projection, println) {
     );
     const gatewayActive = /** @type {{ modelId?: string | null }} */ (gateway.active);
     if (gatewayActive.modelId) {
-        println(`    gatewayModel:  \x1b[33m${gatewayActive.modelId}\x1b[0m`);
+        println(`    Modelo gateway \x1b[33m${gatewayActive.modelId}\x1b[0m`);
     }
     try {
         const inventory = await listTerminalSdkSessionInventory();
@@ -1990,11 +1990,11 @@ async function renderStatus(projection, println) {
             `    Sessão viva    \x1b[33m${inventory.currentSessionId ?? '(sem sessão viva)'}\x1b[0m \x1b[90m· ${binding.liveLabel}\x1b[0m`,
         );
         const color = binding.state === 'next-boot-required' || binding.state === 'selection-incomplete' ? '\x1b[33m' : '\x1b[90m';
-        println(`    boundary:      ${color}${binding.headline}\x1b[0m`);
+        println(`    Fronteira      ${color}${binding.headline}\x1b[0m`);
         if (binding.action) println(`      \x1b[90m${binding.action}\x1b[0m`);
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        println(`    live binding:  \x1b[33mindisponível\x1b[0m \x1b[90m(${message})\x1b[0m`);
+        println(`    Vínculo vivo   \x1b[33mindisponível\x1b[0m \x1b[90m(${message})\x1b[0m`);
     }
     for (const warning of summary.warnings) {
         println(`  \x1b[33m  aviso: ${warning}\x1b[0m`);
@@ -2021,7 +2021,7 @@ function renderByokHealth(println, scope = {}) {
         if (scope.providerModel && record.providerModel !== scope.providerModel) return false;
         return true;
     });
-    println(`\n  \x1b[36mBYOK operational health\x1b[0m (${records.length})`);
+    println(`\n  \x1b[36mSaúde operacional BYOK\x1b[0m (${records.length})`);
     println(
         `  \x1b[90mpersistência ${state.enabled ? 'on' : 'off'} · arquivo ${state.path ?? '-'} · carregado ${state.loaded ? 'sim' : 'nao'} · alterações pendentes ${state.dirty ? 'sim' : 'nao'}\x1b[0m`,
     );
@@ -3960,6 +3960,18 @@ function enabledDisabled(value) {
 }
 
 /**
+ * @param {string | null | undefined} preset
+ * @returns {string}
+ */
+function renderByokAutoPresetLabel(preset) {
+    if (preset === 'operator_manual') return 'manual do operador';
+    if (preset === 'llm_operator_guarded') return 'LLM guiada pelo operador';
+    if (preset === 'auto_same_boundary') return 'auto: mesma fronteira';
+    if (preset === 'auto_prepare_new_session') return 'auto: preparar nova sessão';
+    return preset || '-';
+}
+
+/**
  * @param {(text: string) => void} println
  * @returns {Promise<void>}
  */
@@ -3981,7 +3993,9 @@ async function renderByokGatewayAutoPolicy(println) {
     println(`    arquivo cfg:   \x1b[33m${fileConfigured ? 'sim' : 'nao'}\x1b[0m`);
     println(`    env cfg:       \x1b[33m${envConfigured ? 'sim' : 'nao'}\x1b[0m`);
     println(`    efetivo:       \x1b[33m${enabledDisabled(effectivePolicy.enabled)}\x1b[0m`);
-    println(`    preset:        \x1b[33m${effectivePolicy.preset}\x1b[0m  \x1b[90mfonte ${policySources['preset']?.source ?? '-'}\x1b[0m`);
+    println(
+        `    política:      \x1b[33m${renderByokAutoPresetLabel(effectivePolicy.preset)}\x1b[0m  \x1b[90mfonte ${policySources['preset']?.source ?? '-'} · preset ${effectivePolicy.preset}\x1b[0m`,
+    );
     println(`    regra:         \x1b[33m${effectivePolicy.policy}\x1b[0m`);
     println(`    perfis:        \x1b[33m${effectivePolicy.profiles.join(', ') || '-'}\x1b[0m`);
     println(
@@ -3993,7 +4007,7 @@ async function renderByokGatewayAutoPolicy(println) {
     println('    presets:');
     for (const preset of presets) {
         println(
-            `      \x1b[90m${preset['preset']}: regra ${preset['policy']} · troca viva ${preset['allowLiveSetModel'] ? 'sim' : 'nao'} · nova sessão ${preset['allowNewSession'] ? 'sim' : 'nao'} · local privado ${preset['allowLocalPrivate'] ? 'sim' : 'nao'}\x1b[0m`,
+            `      \x1b[90m${renderByokAutoPresetLabel(String(preset['preset']))} (${preset['preset']}) · regra ${preset['policy']} · troca viva ${preset['allowLiveSetModel'] ? 'sim' : 'nao'} · nova sessão ${preset['allowNewSession'] ? 'sim' : 'nao'} · local privado ${preset['allowLocalPrivate'] ? 'sim' : 'nao'}\x1b[0m`,
         );
     }
     if (envConfigured && envPolicy.enabled !== effectivePolicy.enabled) {
@@ -5030,8 +5044,8 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             const scoped = scope.providerId || scope.providerModel || scope.routeProfile;
             println(
                 scoped
-                    ? `  \x1b[32mBYOK operational health limpo para provider ${scope.providerId ?? '*'} · modelo ${scope.providerModel ?? '*'} · perfil ${scope.routeProfile ?? '*'}.\x1b[0m\n`
-                    : '  \x1b[32mBYOK operational health limpo no processo atual e no store persistente.\x1b[0m\n',
+                    ? `  \x1b[32mSaúde operacional BYOK limpa para provider ${scope.providerId ?? '*'} · modelo ${scope.providerModel ?? '*'} · perfil ${scope.routeProfile ?? '*'}.\x1b[0m\n`
+                    : '  \x1b[32mSaúde operacional BYOK limpa no processo atual e no arquivo persistente.\x1b[0m\n',
             );
             return;
         }
@@ -5332,7 +5346,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             const candidates = eligibleModels.slice(0, filters.limit);
             println(`\n  \x1b[36mBYOK shortlist agent probe\x1b[0m (${candidates.length}/${modelList.length})`);
             println(
-                `  \x1b[90mEscopo: ${filters.allProviders ? 'todos os perfis selecionados' : 'provider/perfil ativo'} + ranking do catalogo + filtros ${renderByokFilterLabel(filters) || 'safe'}; cada candidato roda a mesma sessão SDK descartável de /byok probe agent, sem trocar o dialog loop vivo.${timeoutMs ? ` timeout ${timeoutMs}ms` : ''}\x1b[0m\n`,
+                `  \x1b[90mEscopo: ${filters.allProviders ? 'todos os perfis selecionados' : 'provider/perfil ativo'} + ranking do catalogo + filtros ${renderByokFilterLabel(filters) || 'safe'}; cada candidato roda a mesma sessão SDK descartável de /byok probe agent, sem trocar a conversa viva.${timeoutMs ? ` timeout ${timeoutMs}ms` : ''}\x1b[0m\n`,
             );
             for (const error of discovered.errors.slice(0, 6)) {
                 println(`  \x1b[33m  aviso: descoberta remota indisponível (${error}); usando catálogo disponível.\x1b[0m`);
@@ -5387,7 +5401,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         const selection = buildByokProbeSelection(explicitMode ? rest.slice(1) : rest);
         println(`\n  \x1b[36mBYOK ${mode} probe\x1b[0m`);
         println(
-            `  \x1b[90mEscopo: sessão SDK descartável; não troca o dialog loop nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : mode === 'agent' ? ' Agent exige tools representativas do terminal + ask_user com resposta sintética.' : mode === 'streaming' ? ' Streaming exige assistant.message_delta real; não degrada health de chat.' : mode === 'json' ? ' JSON exige payload parseável; não degrada health de chat.' : ' Vision anexa fixture PNG hermética e exige identificação visual; não degrada health de chat.'}${selection.profile ? ` perfil ${selection.profile}` : ''}${selection.provider ? ` provider ${selection.provider}` : ''}${selection.model ? ` modelo ${selection.model}` : ''}${selection.baseUrl ? ` base URL ${selection.baseUrl}` : ''}${selection.wireApi ? ` wire ${selection.wireApi}` : ''}\x1b[0m`,
+            `  \x1b[90mEscopo: sessão SDK descartável; não troca a conversa viva nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : mode === 'agent' ? ' Agent exige tools representativas do terminal + ask_user com resposta sintética.' : mode === 'streaming' ? ' Streaming exige assistant.message_delta real; não degrada health de chat.' : mode === 'json' ? ' JSON exige payload parseável; não degrada health de chat.' : ' Vision anexa fixture PNG hermética e exige identificação visual; não degrada health de chat.'}${selection.profile ? ` perfil ${selection.profile}` : ''}${selection.provider ? ` provider ${selection.provider}` : ''}${selection.model ? ` modelo ${selection.model}` : ''}${selection.baseUrl ? ` base URL ${selection.baseUrl}` : ''}${selection.wireApi ? ` wire ${selection.wireApi}` : ''}\x1b[0m`,
         );
         const { probe, providerAttempted } = await runByokProbe(mode, selection, eventBus);
         renderByokProbeResult(println, mode, probe, { providerAttempted });

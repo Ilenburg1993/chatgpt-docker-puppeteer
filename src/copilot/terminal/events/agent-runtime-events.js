@@ -1061,7 +1061,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         ]
             .filter(Boolean)
             .join(' · ');
-        recordTerminalActivity('system', skippedPrFallback ? 'Boot recovery preservou zero-PR' : 'Boot recovery do dialog loop', {
+        recordTerminalActivity('system', skippedPrFallback ? 'Boot recovery preservou zero-PR' : 'Boot recovery da conversa', {
             detail,
             source: 'dialog',
             severity: skippedPrFallback || prFallback ? 'warn' : 'info',

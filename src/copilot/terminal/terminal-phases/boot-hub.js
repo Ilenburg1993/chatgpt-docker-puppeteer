@@ -19,7 +19,7 @@ import { recordTerminalActivity } from '../state/boot/index.js';
  */
 export async function runTerminalConversationHubPhase(ctx) {
     try {
-        recordTerminalActivity('boot', 'Inicializando conversation hub', { source: 'terminal', recordHistory: false });
+        recordTerminalActivity('boot', 'Inicializando hub da conversa', { source: 'terminal', recordHistory: false });
         await initTerminalConversationHub();
         const sdkSessionId = getSharedSdkSessionId();
         const hubSessionId = createTerminalHubSession({
