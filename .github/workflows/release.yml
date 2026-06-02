@@ -78,7 +78,7 @@ jobs:
         run: npm run dashboard:build
 
       - name: Create GitHub Release
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           DASHBOARD_BUILD_OUTCOME: ${{ steps.dashboard_build.outcome }}
         with:

@@ -101,7 +101,7 @@ jobs:
 
       - name: CI Summary
         if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           NODE_OUTCOME: ${{ steps.node_check.outcome }}
           YAML_OUTCOME: ${{ steps.yaml_check.outcome }}
@@ -277,7 +277,7 @@ jobs:
 
       - name: Comment PR with audit summary
         if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |

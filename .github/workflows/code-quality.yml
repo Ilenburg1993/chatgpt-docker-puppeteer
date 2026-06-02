@@ -136,7 +136,7 @@ jobs:
 
       - name: Comment PR with code quality results
         if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           CIRCULAR_OUTCOME: ${{ steps.circular.outcome }}
           ORPHANS_OUTCOME: ${{ steps.orphans.outcome }}

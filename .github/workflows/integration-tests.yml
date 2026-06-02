@@ -97,7 +97,7 @@ jobs:
 
       - name: Comment PR with integration test results
         if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           INT_OUTCOME: ${{ steps.integration_tests.outcome }}
         with:

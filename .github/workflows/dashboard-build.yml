@@ -143,7 +143,7 @@ jobs:
 
       - name: Comment PR with dashboard build result
         if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           BUILD_OUTCOME: ${{ steps.build.outcome }}
         with:

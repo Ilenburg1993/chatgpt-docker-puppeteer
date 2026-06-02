@@ -97,7 +97,7 @@ jobs:
 
       - name: Comment PR with regression test results
         if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           REG_OUTCOME: ${{ steps.regression_tests.outcome }}
         with:

@@ -112,7 +112,7 @@ jobs:
 
       - name: Comment PR with lint results
         if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           ESLINT_OUTCOME: ${{ steps.eslint.outcome }}
           PRETTIER_OUTCOME: ${{ steps.prettier.outcome }}
