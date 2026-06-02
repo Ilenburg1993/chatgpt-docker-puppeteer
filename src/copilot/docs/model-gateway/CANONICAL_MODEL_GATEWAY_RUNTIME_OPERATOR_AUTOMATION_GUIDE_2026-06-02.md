@@ -58,8 +58,8 @@ Referencia canonica transversal atual:
 - [x] O standby virou contrato de dados reutilizavel por `model-gateway-runtime-standby-plan`.
 - [x] O standby virou contrato persistivel com snapshot por perfil em `copilot_model_gateway_standby_plans`.
 - [ ] O terminal ainda nao mostra `fallbackFromSelectedRouteKey` e `fallbackReason` em auto status.
-- [ ] A policy default ainda esta conservadora demais para o modo operador/LLM guardado.
-- [ ] Falta preset claro para `operator_manual`, `llm_operator_guarded`, `auto_same_boundary` e `auto_prepare_new_session`.
+- [x] A policy default continua conservadora em repouso, mas `/byok auto on` agora tem preset operacional claro.
+- [x] Presets `operator_manual`, `llm_operator_guarded`, `auto_same_boundary` e `auto_prepare_new_session` existem como contrato do gateway.
 - [ ] Falta um comando terminal unico que diga: modelo vivo, modelo preparado, melhor rota, standby e proximo passo.
 - [ ] Falta live fixture especifica para post-turn fallback real sem provider call.
 - [ ] Falta live test LLM-B em escada apos consolidar o cockpit.
@@ -134,14 +134,28 @@ Referencia canonica transversal atual:
 ### Faixa C - Policy Default E Presets
 
 - [x] C.1 Default atual e conservador e nao aplica efeitos sem opt-in.
-- [ ] C.2 Definir preset `operator_manual`.
-- [ ] C.3 Definir preset `llm_operator_guarded`.
-- [ ] C.4 Definir preset `auto_same_boundary`.
-- [ ] C.5 Definir preset `auto_prepare_new_session`.
-- [ ] C.6 Expor preset em `/byok auto on preset:<id>`.
-- [ ] C.7 Persistir snapshot da policy em cada decisao automatica.
-- [ ] C.8 Explicar divergencia entre policy file e env.
-- [ ] C.9 Garantir que local/Ollama continua opt-in em todos os presets.
+- [x] C.2 Definir preset `operator_manual`.
+- [x] C.3 Definir preset `llm_operator_guarded`.
+- [x] C.4 Definir preset `auto_same_boundary`.
+- [x] C.5 Definir preset `auto_prepare_new_session`.
+- [x] C.6 Expor preset em `/byok auto on preset:<id>`.
+- [x] C.7 Persistir snapshot da policy em cada decisao automatica.
+- [x] C.8 Explicar divergencia entre policy file e env.
+- [x] C.9 Garantir que local/Ollama continua opt-in em todos os presets.
+- [ ] C.10 Criar fixture terminal para preset invalido e overrides negativos `no-new-session`.
+- [ ] C.11 Expor presets tambem no JSON do cockpit unificado.
+
+#### Presets Implementados Em 2026-06-02
+
+`operator_manual` deixa a automacao ligada apenas para orientar e registrar decisoes, sem trocar modelo vivo e sem preparar novo boot.
+
+`llm_operator_guarded` exige prova runtime antes de recomendar rota e tambem nao aplica efeitos automaticamente.
+
+`auto_same_boundary` e o default de `/byok auto on`: autoriza troca de modelo vivo apenas quando a fronteira SDK/provider continua compativel, sem iniciar nova sessao.
+
+`auto_prepare_new_session` autoriza troca dentro da mesma fronteira e preparacao de novo boot SDK quando a rota exige outro provider/boundary.
+
+Todos os presets mantem provider probes e local/Ollama desligados por default. Local/private continua exigindo opt-in explicito do operador.
 
 ### Faixa D - Standby Contract
 

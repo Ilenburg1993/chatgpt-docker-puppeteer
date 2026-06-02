@@ -23,6 +23,7 @@ import {
     readModelGatewayRuntimeAutomationEffectivePolicy,
     readModelGatewayRuntimeAutomationPolicy,
     recordByokProviderModelCallFailure,
+    resolveModelGatewayRuntimeAutomationPolicyPreset,
     resolveModelGatewaySelectionPolicy,
     SqliteModelGatewayCatalogStore,
 } from '#copilot/model-gateway';
@@ -142,22 +143,42 @@ export function describeTerminalByokGatewayAutoEffect(effect) {
 /**
  * @param {string[]} rest
  * @param {{ env?: NodeJS.ProcessEnv; policy?: ReturnType<typeof readModelGatewayRuntimeAutomationPolicy> }} [options]
- * @returns {{ profileId: string; allowLiveSetModel: boolean; allowNewSession: boolean; allowLocalPrivate: boolean }}
+ * @returns {{ profileId: string; presetId: string; allowLiveSetModel: boolean; allowNewSession: boolean; allowLocalPrivate: boolean }}
  */
 export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
-    const policy = options.policy ?? readModelGatewayRuntimeAutomationPolicy(options.env);
+    const envPolicy = options.policy ?? readModelGatewayRuntimeAutomationPolicy(options.env);
+    const presetToken = rest.find((item) => /^(?:preset|policyPreset|policy-preset|autoPreset|auto-preset)[:=]/iu.test(item));
+    const requestedPresetId = optionalScalarString(
+        presetToken?.replace(/^(?:preset|policyPreset|policy-preset|autoPreset|auto-preset)[:=]/iu, ''),
+    );
+    const policy = requestedPresetId
+        ? resolveModelGatewayRuntimeAutomationPolicyPreset(requestedPresetId, envPolicy)
+        : envPolicy;
     const profileToken = rest.find((item) => /^(?:profile|perfil|routeProfile|route-profile)[:=]/iu.test(item));
     const profileId =
         optionalScalarString(profileToken?.replace(/^(?:profile|perfil|routeProfile|route-profile)[:=]/iu, '')) ??
         policy.profiles[0] ??
-        optionalScalarString(rest.find((item) => !/^(auto|status|plan|apply|on|off|history|--|allow-|live-|new-session|local)/iu.test(item))) ??
+        optionalScalarString(
+            rest.find(
+                (item) =>
+                    !/^(auto|status|plan|apply|on|off|history|policy|doctor|standby|record|preset|policyPreset|policy-preset|autoPreset|auto-preset|--|allow-|deny-|no-|live-|new-session|local)/iu.test(
+                        item,
+                    ),
+            ),
+        ) ??
         'repo_agent';
+    const allowLiveSetModel = rest.some((item) => /^(?:--)?allow-live-set-model|live-set-model|set-model$/iu.test(item));
+    const denyLiveSetModel = rest.some((item) => /^(?:--)?(?:deny|no)-live-set-model|no-set-model$/iu.test(item));
+    const allowNewSession = rest.some((item) => /^(?:--)?allow-new-session|new-session$/iu.test(item));
+    const denyNewSession = rest.some((item) => /^(?:--)?(?:deny|no)-new-session$/iu.test(item));
+    const allowLocalPrivate = rest.some((item) => /^(?:--)?allow-local-private|local-private|ollama$/iu.test(item));
+    const denyLocalPrivate = rest.some((item) => /^(?:--)?(?:deny|no)-local-private|no-local|no-ollama$/iu.test(item));
     return {
         profileId,
-        allowLiveSetModel:
-            policy.allowLiveSetModel || rest.some((item) => /^(?:--)?allow-live-set-model|live-set-model|set-model$/iu.test(item)),
-        allowNewSession: policy.allowNewSession || rest.some((item) => /^(?:--)?allow-new-session|new-session$/iu.test(item)),
-        allowLocalPrivate: policy.allowLocalPrivate || rest.some((item) => /^(?:--)?allow-local-private|local-private|ollama$/iu.test(item)),
+        presetId: policy.preset,
+        allowLiveSetModel: denyLiveSetModel ? false : policy.allowLiveSetModel || allowLiveSetModel,
+        allowNewSession: denyNewSession ? false : policy.allowNewSession || allowNewSession,
+        allowLocalPrivate: denyLocalPrivate ? false : policy.allowLocalPrivate || allowLocalPrivate,
     };
 }
 
@@ -238,6 +259,7 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
                 decisionId: automationDecisionRecord.decisionId,
                 routeProfile: decision.routeProfile ?? args.profileId,
                 enabled: policy.enabled,
+                preset: policy.preset,
                 policy: policy.policy,
                 profiles: policy.profiles,
                 allowLiveSetModel: args.allowLiveSetModel,

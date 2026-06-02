@@ -4,7 +4,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeProofCommands, buildModelGatewayRuntimeStandbyPlan, buildModelGatewayRuntimeStandbyRoutes, buildModelGatewayRuntimeSelectorPlan, buildModelGatewayRuntimeAutomationDecision, buildModelGatewayRuntimeAutomationControllerStep, DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH, explainModelGatewayRuntimeAutomationPolicySources, validateModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationEffectivePolicy, readModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationPolicyFile, writeModelGatewayRuntimeAutomationPolicyFile, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayAccountLimitOverlays, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, explainModelGatewaySelectionComparison, flushAndMirrorByokProviderHealthToSqlite, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayProbeBackoff, planModelGatewayCatalogRefresh, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, scheduleTerminalSdkSessionBootSelection, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayEligibilityDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayProviderQuotaCapabilities, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeProofCommands, buildModelGatewayRuntimeStandbyPlan, buildModelGatewayRuntimeStandbyRoutes, buildModelGatewayRuntimeSelectorPlan, buildModelGatewayRuntimeAutomationDecision, buildModelGatewayRuntimeAutomationControllerStep, DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH, explainModelGatewayRuntimeAutomationPolicySources, listModelGatewayRuntimeAutomationPolicyPresets, resolveModelGatewayRuntimeAutomationPolicyPreset, validateModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationEffectivePolicy, readModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationPolicyFile, writeModelGatewayRuntimeAutomationPolicyFile, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayAccountLimitOverlays, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, explainModelGatewaySelectionComparison, flushAndMirrorByokProviderHealthToSqlite, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayProbeBackoff, planModelGatewayCatalogRefresh, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, scheduleTerminalSdkSessionBootSelection, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayEligibilityDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayProviderQuotaCapabilities, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -545,8 +545,47 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
         })),
         DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH:
             'data/copilot/model-gateway/runtime-automation-policy.json',
+        listModelGatewayRuntimeAutomationPolicyPresets: vi.fn(() => [
+            {
+                preset: 'operator_manual',
+                policy: 'prefer_runtime_proved',
+                allowLiveSetModel: false,
+                allowNewSession: false,
+                allowLocalPrivate: false,
+            },
+            {
+                preset: 'auto_same_boundary',
+                policy: 'prefer_runtime_proved',
+                allowLiveSetModel: true,
+                allowNewSession: false,
+                allowLocalPrivate: false,
+            },
+            {
+                preset: 'auto_prepare_new_session',
+                policy: 'prefer_runtime_proved',
+                allowLiveSetModel: true,
+                allowNewSession: true,
+                allowLocalPrivate: false,
+            },
+        ]),
+        resolveModelGatewayRuntimeAutomationPolicyPreset: vi.fn((preset, overrides = {}) => {
+            const presetId = String(preset ?? 'operator_manual').replace(/-/g, '_');
+            return {
+                enabled: true,
+                policy: presetId === 'llm_operator_guarded' ? 'require_runtime_proof' : 'prefer_runtime_proved',
+                profiles: [],
+                allowLiveSetModel: presetId === 'auto_same_boundary' || presetId === 'auto_prepare_new_session',
+                allowNewSession: presetId === 'auto_prepare_new_session',
+                allowProviderProbes: false,
+                allowLocalPrivate: false,
+                accountWideFailureKinds: ['rate-limit', 'quota', 'credits'],
+                ...overrides,
+                preset: presetId,
+            };
+        }),
         readModelGatewayRuntimeAutomationPolicy: vi.fn(() => ({
             enabled: false,
+            preset: 'operator_manual',
             policy: 'prefer_runtime_proved',
             profiles: [],
             allowLiveSetModel: false,
@@ -558,6 +597,7 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
         readModelGatewayRuntimeAutomationPolicyFile: vi.fn(() => Promise.resolve({})),
         explainModelGatewayRuntimeAutomationPolicySources: vi.fn(() => ({
             enabled: { source: 'default' },
+            preset: { source: 'default' },
             policy: { source: 'default' },
             profiles: { source: 'default' },
             allowLiveSetModel: { source: 'default' },
@@ -566,10 +606,16 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             allowLocalPrivate: { source: 'default' },
             accountWideFailureKinds: { source: 'default' },
         })),
-        validateModelGatewayRuntimeAutomationPolicy: vi.fn(() => ({ ok: true, issues: [], allowedModes: ['prefer_runtime_proved'] })),
+        validateModelGatewayRuntimeAutomationPolicy: vi.fn(() => ({
+            ok: true,
+            issues: [],
+            allowedModes: ['prefer_runtime_proved'],
+            allowedPresets: ['operator_manual', 'llm_operator_guarded', 'auto_same_boundary', 'auto_prepare_new_session'],
+        })),
         readModelGatewayRuntimeAutomationEffectivePolicy: vi.fn(() =>
             Promise.resolve({
                 enabled: false,
+                preset: 'operator_manual',
                 policy: 'prefer_runtime_proved',
                 profiles: [],
                 allowLiveSetModel: false,
@@ -1360,6 +1406,8 @@ vi.mock('#copilot/model-gateway', () => ({
     buildModelGatewayRuntimeAutomationControllerStep,
     DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH,
     explainModelGatewayRuntimeAutomationPolicySources,
+    listModelGatewayRuntimeAutomationPolicyPresets,
+    resolveModelGatewayRuntimeAutomationPolicyPreset,
     validateModelGatewayRuntimeAutomationPolicy,
     readModelGatewayRuntimeAutomationEffectivePolicy,
     readModelGatewayRuntimeAutomationPolicy,
@@ -3390,11 +3438,13 @@ describe('terminal /byok command', () => {
 
         expect(ctx.output()).toContain('BYOK model-gateway auto on');
         expect(ctx.output()).toContain('COPILOT_BYOK_GATEWAY_AUTO=true');
+        expect(ctx.output()).toContain('COPILOT_BYOK_GATEWAY_AUTO_PRESET=auto_same_boundary');
         expect(ctx.output()).toContain('COPILOT_BYOK_GATEWAY_AUTO_PROFILES=repo_agent');
         expect(ctx.output()).toContain('COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LIVE_SET_MODEL=true');
         expect(writeModelGatewayRuntimeAutomationPolicyFile).toHaveBeenCalledWith(
             expect.objectContaining({
                 enabled: true,
+                preset: 'auto_same_boundary',
                 profiles: ['repo_agent'],
                 allowLiveSetModel: true,
             }),
@@ -3406,11 +3456,13 @@ describe('terminal /byok command', () => {
         mockProjection();
         readModelGatewayRuntimeAutomationPolicyFile.mockResolvedValueOnce({
             enabled: true,
+            preset: 'auto_same_boundary',
             profiles: ['repo_agent'],
             allowLiveSetModel: true,
         });
         readModelGatewayRuntimeAutomationEffectivePolicy.mockResolvedValueOnce({
             enabled: true,
+            preset: 'auto_same_boundary',
             policy: 'prefer_runtime_proved',
             profiles: ['repo_agent'],
             allowLiveSetModel: true,
@@ -3426,10 +3478,13 @@ describe('terminal /byok command', () => {
         expect(policyCtx.output()).toContain('BYOK model-gateway auto policy');
         expect(policyCtx.output()).toContain(DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH);
         expect(policyCtx.output()).toContain('enabled');
+        expect(policyCtx.output()).toContain('auto_same_boundary');
+        expect(policyCtx.output()).toContain('auto_prepare_new_session');
         expect(policyCtx.output()).toContain('repo_agent');
 
         readModelGatewayRuntimeAutomationEffectivePolicy.mockResolvedValueOnce({
             enabled: true,
+            preset: 'auto_prepare_new_session',
             policy: 'prefer_runtime_proved',
             profiles: ['repo_agent'],
             allowLiveSetModel: true,

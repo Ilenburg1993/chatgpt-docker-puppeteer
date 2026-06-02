@@ -56,12 +56,14 @@ import {
     buildModelGatewayRuntimeStandbyPlan,
     buildModelGatewayRuntimeStandbyRoutes,
     explainModelGatewayRuntimeAutomationPolicySources,
+    listModelGatewayRuntimeAutomationPolicyPresets,
     validateModelGatewayRuntimeAutomationPolicy,
     buildModelGatewayRuntimeSelectorPlan,
     mergeModelGatewayRuntimeAutomationPolicy,
     readModelGatewayRuntimeAutomationEffectivePolicy,
     readModelGatewayRuntimeAutomationPolicy,
     readModelGatewayRuntimeAutomationPolicyFile,
+    resolveModelGatewayRuntimeAutomationPolicyPreset,
     buildModelGatewaySelectionDecisionTrace,
     createGatewayRuntimeHealthIndex,
     compareModelGatewaySelectionDecisionTraces,
@@ -1322,6 +1324,7 @@ describe('model-gateway foundation', () => {
         assert.equal(keepDecision.nonActionReason, 'already_aligned');
         const autoPolicy = readModelGatewayRuntimeAutomationPolicy({
             COPILOT_BYOK_GATEWAY_AUTO: 'true',
+            COPILOT_BYOK_GATEWAY_AUTO_PRESET: 'auto-prepare-new-session',
             COPILOT_BYOK_GATEWAY_AUTO_POLICY: 'prefer_runtime_proved',
             COPILOT_BYOK_GATEWAY_AUTO_PROFILES: 'repo_agent,code',
             COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LIVE_SET_MODEL: 'yes',
@@ -1332,6 +1335,7 @@ describe('model-gateway foundation', () => {
         });
         assert.deepEqual(autoPolicy, {
             enabled: true,
+            preset: 'auto_prepare_new_session',
             policy: 'prefer_runtime_proved',
             profiles: ['repo_agent', 'code'],
             allowLiveSetModel: true,
@@ -1345,9 +1349,24 @@ describe('model-gateway foundation', () => {
             { allowNewSession: true },
         );
         assert.deepEqual(mergedPolicy.profiles, ['repo_agent']);
+        assert.equal(mergedPolicy.preset, 'operator_manual');
         assert.equal(mergedPolicy.enabled, true);
         assert.equal(mergedPolicy.allowLiveSetModel, true);
         assert.equal(mergedPolicy.allowNewSession, true);
+        const presetIds = listModelGatewayRuntimeAutomationPolicyPresets().map((preset) => preset['preset']);
+        assert.deepEqual(presetIds, [
+            'operator_manual',
+            'llm_operator_guarded',
+            'auto_same_boundary',
+            'auto_prepare_new_session',
+        ]);
+        const sameBoundaryPreset = resolveModelGatewayRuntimeAutomationPolicyPreset('auto-same-boundary', {
+            profiles: ['repo_agent'],
+        });
+        assert.equal(sameBoundaryPreset.preset, 'auto_same_boundary');
+        assert.equal(sameBoundaryPreset.allowLiveSetModel, true);
+        assert.equal(sameBoundaryPreset.allowNewSession, false);
+        assert.deepEqual(sameBoundaryPreset.profiles, ['repo_agent']);
 
         const policyDir = await mkdtemp(join(tmpdir(), 'model-gateway-auto-policy-'));
         const policyPath = join(policyDir, 'policy.json');
@@ -1362,31 +1381,37 @@ describe('model-gateway foundation', () => {
         const filePolicy = await readModelGatewayRuntimeAutomationPolicyFile({ filePath: policyPath });
         assert.deepEqual(filePolicy, {
             enabled: true,
+            preset: 'operator_manual',
             policy: 'prefer_runtime_proved',
             profiles: ['tool_agent'],
             allowLiveSetModel: true,
             allowNewSession: false,
             allowProviderProbes: false,
             allowLocalPrivate: false,
+            accountWideFailureKinds: [],
         });
         const effectivePolicy = await readModelGatewayRuntimeAutomationEffectivePolicy({
             filePath: policyPath,
             env: {
+                COPILOT_BYOK_GATEWAY_AUTO_PRESET: 'auto_same_boundary',
                 COPILOT_BYOK_GATEWAY_AUTO_PROFILES: 'repo_agent',
                 COPILOT_BYOK_GATEWAY_AUTO_ALLOW_NEW_SESSION: 'true',
             },
         });
         assert.deepEqual(effectivePolicy.profiles, ['repo_agent']);
+        assert.equal(effectivePolicy.preset, 'auto_same_boundary');
         assert.equal(effectivePolicy.allowLiveSetModel, true);
         assert.equal(effectivePolicy.allowNewSession, true);
         const policySources = explainModelGatewayRuntimeAutomationPolicySources({
-            filePolicy: { enabled: true, allowLiveSetModel: true },
+            filePolicy: { enabled: true, preset: 'operator_manual', allowLiveSetModel: true },
             env: {
+                COPILOT_BYOK_GATEWAY_AUTO_PRESET: 'auto_same_boundary',
                 COPILOT_BYOK_GATEWAY_AUTO_PROFILES: 'repo_agent',
                 COPILOT_BYOK_GATEWAY_AUTO_ALLOW_NEW_SESSION: 'true',
             },
         });
         assert.equal(policySources.enabled.source, 'file');
+        assert.equal(policySources.preset.source, 'env');
         assert.equal(policySources.allowLiveSetModel.source, 'file');
         assert.equal(policySources.profiles.source, 'env');
         assert.equal(policySources.allowNewSession.source, 'env');
@@ -1395,6 +1420,9 @@ describe('model-gateway foundation', () => {
         const invalidPolicy = validateModelGatewayRuntimeAutomationPolicy({ policy: 'definitely_wrong' });
         assert.equal(invalidPolicy.ok, false);
         assert.equal(invalidPolicy.issues.includes('invalid_policy_mode:definitely_wrong'), true);
+        const invalidPreset = validateModelGatewayRuntimeAutomationPolicy({ preset: 'mystery_preset' });
+        assert.equal(invalidPreset.ok, false);
+        assert.equal(invalidPreset.issues.includes('invalid_policy_preset:mystery_preset'), true);
         await rm(policyDir, { recursive: true, force: true });
 
         const noLiveSessionDecision = buildModelGatewayRuntimeAutomationDecision({

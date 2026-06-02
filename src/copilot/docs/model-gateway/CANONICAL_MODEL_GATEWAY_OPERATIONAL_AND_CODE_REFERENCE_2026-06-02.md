@@ -341,14 +341,23 @@ Variaveis e arquivo de policy sao lidos por:
 - `readModelGatewayRuntimeAutomationEffectivePolicy`
 - `explainModelGatewayRuntimeAutomationPolicySources`
 - `validateModelGatewayRuntimeAutomationPolicy`
+- `listModelGatewayRuntimeAutomationPolicyPresets`
+- `resolveModelGatewayRuntimeAutomationPolicyPreset`
 
 Terminal:
 
 ```text
-/byok auto on profile:repo_agent allow-live-set-model
-/byok auto on profile:repo_agent allow-live-set-model allow-new-session
+/byok auto policy
+/byok auto on profile:repo_agent
+/byok auto on profile:repo_agent preset:operator_manual
+/byok auto on profile:repo_agent preset:llm_operator_guarded
+/byok auto on profile:repo_agent preset:auto_same_boundary
+/byok auto on profile:repo_agent preset:auto_prepare_new_session
+/byok auto on profile:repo_agent preset:auto_prepare_new_session no-new-session
 /byok auto off
 ```
+
+`/byok auto on` sem preset explicito usa `auto_same_boundary`: troca modelo vivo apenas quando a boundary SDK/provider continua compativel. Novo boot SDK exige `preset:auto_prepare_new_session` ou `allow-new-session`.
 
 ## 9. Fluxo Operacional Recomendado
 

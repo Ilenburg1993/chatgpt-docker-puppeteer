@@ -16,6 +16,7 @@ export const DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH =
 
 export const MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV = Object.freeze({
     enabled: 'COPILOT_BYOK_GATEWAY_AUTO',
+    preset: 'COPILOT_BYOK_GATEWAY_AUTO_PRESET',
     policy: 'COPILOT_BYOK_GATEWAY_AUTO_POLICY',
     profiles: 'COPILOT_BYOK_GATEWAY_AUTO_PROFILES',
     allowLiveSetModel: 'COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LIVE_SET_MODEL',
@@ -27,6 +28,7 @@ export const MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV = Object.freeze({
 
 const MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_FIELDS = Object.freeze([
     'enabled',
+    'preset',
     'policy',
     'profiles',
     'allowLiveSetModel',
@@ -41,6 +43,60 @@ const MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_MODES = Object.freeze([
     'prefer_runtime_proved',
     'require_runtime_proof',
 ]);
+
+export const MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESET_IDS = Object.freeze([
+    'operator_manual',
+    'llm_operator_guarded',
+    'auto_same_boundary',
+    'auto_prepare_new_session',
+]);
+
+export const MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESETS = Object.freeze({
+    operator_manual: Object.freeze({
+        preset: 'operator_manual',
+        enabled: true,
+        policy: 'prefer_runtime_proved',
+        profiles: [],
+        allowLiveSetModel: false,
+        allowNewSession: false,
+        allowProviderProbes: false,
+        allowLocalPrivate: false,
+        accountWideFailureKinds: ['rate-limit', 'quota', 'credits'],
+    }),
+    llm_operator_guarded: Object.freeze({
+        preset: 'llm_operator_guarded',
+        enabled: true,
+        policy: 'require_runtime_proof',
+        profiles: [],
+        allowLiveSetModel: false,
+        allowNewSession: false,
+        allowProviderProbes: false,
+        allowLocalPrivate: false,
+        accountWideFailureKinds: ['rate-limit', 'quota', 'credits'],
+    }),
+    auto_same_boundary: Object.freeze({
+        preset: 'auto_same_boundary',
+        enabled: true,
+        policy: 'prefer_runtime_proved',
+        profiles: [],
+        allowLiveSetModel: true,
+        allowNewSession: false,
+        allowProviderProbes: false,
+        allowLocalPrivate: false,
+        accountWideFailureKinds: ['rate-limit', 'quota', 'credits'],
+    }),
+    auto_prepare_new_session: Object.freeze({
+        preset: 'auto_prepare_new_session',
+        enabled: true,
+        policy: 'prefer_runtime_proved',
+        profiles: [],
+        allowLiveSetModel: true,
+        allowNewSession: true,
+        allowProviderProbes: false,
+        allowLocalPrivate: false,
+        accountWideFailureKinds: ['rate-limit', 'quota', 'credits'],
+    }),
+});
 
 /**
  * @param {unknown} value
@@ -71,6 +127,15 @@ function optionalString(value) {
 
 /**
  * @param {unknown} value
+ * @returns {string | null}
+ */
+function optionalPresetId(value) {
+    const preset = optionalString(value);
+    return preset ? preset.toLowerCase().replace(/[\s-]+/gu, '_') : null;
+}
+
+/**
+ * @param {unknown} value
  * @returns {boolean | null}
  */
 function optionalBoolean(value) {
@@ -86,7 +151,7 @@ function optionalBoolean(value) {
 function optionalStringList(value) {
     if (Array.isArray(value)) {
         const list = value.map(optionalString).filter((item) => item !== null);
-        return list.length > 0 ? list : null;
+        return list;
     }
     const list = csv(value);
     return list.length > 0 ? list : null;
@@ -117,6 +182,7 @@ function normalizePolicyPatch(patch) {
     /** @type {Record<string, unknown>} */
     const normalized = {};
     const enabled = optionalBoolean(patch['enabled']);
+    const preset = optionalPresetId(patch['preset']);
     const policy = optionalString(patch['policy']);
     const profiles = optionalStringList(patch['profiles']);
     const allowLiveSetModel = optionalBoolean(patch['allowLiveSetModel']);
@@ -125,6 +191,7 @@ function normalizePolicyPatch(patch) {
     const allowLocalPrivate = optionalBoolean(patch['allowLocalPrivate']);
     const accountWideFailureKinds = optionalStringList(patch['accountWideFailureKinds']);
     if (enabled !== null) normalized['enabled'] = enabled;
+    if (preset !== null) normalized['preset'] = preset;
     if (policy !== null) normalized['policy'] = policy;
     if (profiles !== null) normalized['profiles'] = profiles;
     if (allowLiveSetModel !== null) normalized['allowLiveSetModel'] = allowLiveSetModel;
@@ -146,7 +213,7 @@ function envPolicyPatch(env) {
         if (env[envName] === undefined) continue;
         if (field === 'profiles' || field === 'accountWideFailureKinds') {
             patch[field] = csv(env[envName]);
-        } else if (field === 'policy') {
+        } else if (field === 'policy' || field === 'preset') {
             patch[field] = env[envName];
         } else {
             patch[field] = truthy(env[envName]);
@@ -156,12 +223,56 @@ function envPolicyPatch(env) {
 }
 
 /**
+ * @param {unknown} presetId
+ * @returns {Record<string, unknown> | null}
+ */
+function policyPresetPatch(presetId) {
+    const normalizedPresetId = optionalPresetId(presetId);
+    if (!normalizedPresetId) return null;
+    return (
+        /** @type {Record<string, unknown> | undefined} */ (
+            Reflect.get(MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESETS, normalizedPresetId)
+        ) ?? null
+    );
+}
+
+/**
+ * @param {Record<string, unknown>} patch
+ * @returns {Record<string, unknown>}
+ */
+function expandPolicyPatchPreset(patch) {
+    const normalized = normalizePolicyPatch(patch);
+    const preset = policyPresetPatch(normalized['preset']);
+    return preset ? { ...preset, ...normalized } : normalized;
+}
+
+/**
+ * @returns {Array<Record<string, unknown>>}
+ */
+export function listModelGatewayRuntimeAutomationPolicyPresets() {
+    return MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESET_IDS.map((presetId) => ({
+        .../** @type {Record<string, unknown>} */ (Reflect.get(MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESETS, presetId)),
+    }));
+}
+
+/**
+ * @param {unknown} presetId
+ * @param {Record<string, unknown>} [overrides]
+ * @returns {ReturnType<typeof readModelGatewayRuntimeAutomationPolicy>}
+ */
+export function resolveModelGatewayRuntimeAutomationPolicyPreset(presetId, overrides = {}) {
+    const normalizedPresetId = optionalPresetId(presetId) ?? 'operator_manual';
+    return mergeModelGatewayRuntimeAutomationPolicy({ preset: normalizedPresetId }, { ...overrides, preset: normalizedPresetId });
+}
+
+/**
  * @param {...Record<string, unknown>} patches
  * @returns {ReturnType<typeof readModelGatewayRuntimeAutomationPolicy>}
  */
 export function mergeModelGatewayRuntimeAutomationPolicy(...patches) {
     return /** @type {ReturnType<typeof readModelGatewayRuntimeAutomationPolicy>} */ ({
         enabled: false,
+        preset: 'operator_manual',
         policy: 'prefer_runtime_proved',
         profiles: [],
         allowLiveSetModel: false,
@@ -169,7 +280,7 @@ export function mergeModelGatewayRuntimeAutomationPolicy(...patches) {
         allowProviderProbes: false,
         allowLocalPrivate: false,
         accountWideFailureKinds: [],
-        ...patches.map(normalizePolicyPatch).reduce((merged, patch) => ({ ...merged, ...patch }), {}),
+        ...patches.map(expandPolicyPatchPreset).reduce((merged, patch) => ({ ...merged, ...patch }), {}),
     });
 }
 
@@ -177,6 +288,7 @@ export function mergeModelGatewayRuntimeAutomationPolicy(...patches) {
  * @param {Record<string, string | undefined>} [env]
  * @returns {{
  *   enabled: boolean;
+ *   preset: string;
  *   policy: string;
  *   profiles: string[];
  *   allowLiveSetModel: boolean;
@@ -237,11 +349,14 @@ export function explainModelGatewayRuntimeAutomationPolicySources(options = {}) 
 
 /**
  * @param {Record<string, unknown>} policy
- * @returns {{ ok: boolean; issues: string[]; allowedModes: string[] }}
+ * @returns {{ ok: boolean; issues: string[]; allowedModes: string[]; allowedPresets: string[] }}
  */
 export function validateModelGatewayRuntimeAutomationPolicy(policy) {
     const normalized = mergeModelGatewayRuntimeAutomationPolicy(policy);
     const issues = [];
+    if (!MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESET_IDS.includes(normalized.preset)) {
+        issues.push(`invalid_policy_preset:${normalized.preset}`);
+    }
     if (!MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_MODES.includes(normalized.policy)) {
         issues.push(`invalid_policy_mode:${normalized.policy}`);
     }
@@ -258,6 +373,7 @@ export function validateModelGatewayRuntimeAutomationPolicy(policy) {
         ok: issues.length === 0,
         issues,
         allowedModes: [...MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_MODES],
+        allowedPresets: [...MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESET_IDS],
     };
 }
 

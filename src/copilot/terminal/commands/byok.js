@@ -93,9 +93,11 @@ import {
     summarizeModelGatewayEligibilityDiff,
     toOpenAIModelCatalogList,
     DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH,
+    listModelGatewayRuntimeAutomationPolicyPresets,
     readModelGatewayRuntimeAutomationEffectivePolicy,
     readModelGatewayRuntimeAutomationPolicy,
     readModelGatewayRuntimeAutomationPolicyFile,
+    resolveModelGatewayRuntimeAutomationPolicyPreset,
     validateModelGatewayRuntimeAutomationPolicy,
     writeModelGatewayRuntimeAutomationPolicyFile,
 } from '#copilot/model-gateway';
@@ -2503,11 +2505,11 @@ async function renderByokGatewayOperatorReady(println, rest) {
         `    standby db:   \x1b[33mrows=${persistedStandbyRows} · latest=${latestPersistedStandby.standbyPlanId ?? '-'} · profile=${latestPersistedStandby.routeProfile ?? '-'} · routes=${latestPersistedStandby.routeCount ?? '-'}\x1b[0m`,
     );
     println(
-        `    live db:      \x1b[33mrows=${liveRunRows} · latest=${optionalScalarString(latestLiveRun.scenarioKind) ?? '-'} · status=${optionalScalarString(latestLiveRun.status) ?? '-'} · summary=${optionalScalarString(latestLiveRun.summaryPath) ?? '-'}\x1b[0m`,
+        `    live db:      \x1b[33mrows=${liveRunRows} · latest=${optionalScalarString(latestLiveRun['scenarioKind']) ?? '-'} · status=${optionalScalarString(latestLiveRun['status']) ?? '-'} · summary=${optionalScalarString(latestLiveRun['summaryPath']) ?? '-'}\x1b[0m`,
     );
     for (const [index, run] of liveRuns.slice(0, 3).entries()) {
         println(
-            `    live ${index + 1}:     \x1b[33m${optionalScalarString(run.scenarioKind) ?? optionalScalarString(run.kind) ?? '-'}\x1b[0m \x1b[90mstatus=${optionalScalarString(run.status) ?? '-'} · ok=${run.ok === true ? 'sim' : run.ok === false ? 'nao' : '-'} · summary=${optionalScalarString(run.summaryPath) ?? '-'}\x1b[0m`,
+            `    live ${index + 1}:     \x1b[33m${optionalScalarString(run['scenarioKind']) ?? optionalScalarString(run['kind']) ?? '-'}\x1b[0m \x1b[90mstatus=${optionalScalarString(run['status']) ?? '-'} · ok=${run['ok'] === true ? 'sim' : run['ok'] === false ? 'nao' : '-'} · summary=${optionalScalarString(run['summaryPath']) ?? '-'}\x1b[0m`,
         );
     }
     if (status.decision.blockers.length > 0) println(`    blockers:      \x1b[33m${status.decision.blockers.join(', ')}\x1b[0m`);
@@ -3652,26 +3654,51 @@ async function renderByokGatewayAutoStandby(println, rest) {
 }
 
 /**
+ * @param {string[]} rest
+ * @returns {string}
+ */
+function resolveByokGatewayAutoOnPresetId(rest) {
+    const presetToken = rest.find((item) => /^(?:preset|policyPreset|policy-preset|autoPreset|auto-preset)[:=]/iu.test(item));
+    return (
+        optionalScalarString(
+            presetToken?.replace(/^(?:preset|policyPreset|policy-preset|autoPreset|auto-preset)[:=]/iu, ''),
+        ) ?? 'auto_same_boundary'
+    );
+}
+
+/**
  * @param {(text: string) => void} println
  * @param {string[]} rest
  * @returns {Promise<void>}
  */
 async function renderByokGatewayAutoOn(println, rest) {
-    const args = parseTerminalByokGatewayAutoArgs(rest);
-    const status = await buildTerminalByokGatewayAutoStatus(rest);
+    const presetId = resolveByokGatewayAutoOnPresetId(rest);
+    const autoOnRest = rest.some((item) => /^(?:preset|policyPreset|policy-preset|autoPreset|auto-preset)[:=]/iu.test(item))
+        ? rest
+        : [...rest, `preset:${presetId}`];
+    const args = parseTerminalByokGatewayAutoArgs(autoOnRest);
+    const status = await buildTerminalByokGatewayAutoStatus(autoOnRest);
     const { decision } = status;
-    const written = await writeModelGatewayRuntimeAutomationPolicyFile({
+    const policyPatch = resolveModelGatewayRuntimeAutomationPolicyPreset(args.presetId, {
         enabled: true,
-        policy: 'prefer_runtime_proved',
         profiles: [args.profileId],
         allowLiveSetModel: args.allowLiveSetModel,
         allowNewSession: args.allowNewSession,
-        allowProviderProbes: false,
         allowLocalPrivate: args.allowLocalPrivate,
     });
+    const policyValidation = validateModelGatewayRuntimeAutomationPolicy(policyPatch);
+    if (policyValidation.ok !== true) {
+        println('\n  \x1b[36mBYOK model-gateway auto on\x1b[0m');
+        println(`    preset:        \x1b[33m${args.presetId}\x1b[0m`);
+        println(`    validacao:     \x1b[33m${policyValidation.issues.join(', ')}\x1b[0m`);
+        println(`    presets:       \x1b[90m${policyValidation.allowedPresets.join(', ')}\x1b[0m\n`);
+        return;
+    }
+    const written = await writeModelGatewayRuntimeAutomationPolicyFile(policyPatch);
     const exports = [
         'COPILOT_BYOK_GATEWAY_AUTO=true',
-        'COPILOT_BYOK_GATEWAY_AUTO_POLICY=prefer_runtime_proved',
+        `COPILOT_BYOK_GATEWAY_AUTO_PRESET=${written.policy.preset}`,
+        `COPILOT_BYOK_GATEWAY_AUTO_POLICY=${written.policy.policy}`,
         `COPILOT_BYOK_GATEWAY_AUTO_PROFILES=${args.profileId}`,
         `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LIVE_SET_MODEL=${args.allowLiveSetModel ? 'true' : 'false'}`,
         `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_NEW_SESSION=${args.allowNewSession ? 'true' : 'false'}`,
@@ -3681,6 +3708,8 @@ async function renderByokGatewayAutoOn(println, rest) {
     println('  \x1b[90mPolicy segura persistida para o proximo boot; segredos nao sao gravados nesse arquivo.\x1b[0m');
     println(`    arquivo:       \x1b[33m${written.filePath}\x1b[0m`);
     println(`    profile:       \x1b[33m${args.profileId}\x1b[0m`);
+    println(`    preset:        \x1b[33m${written.policy.preset}\x1b[0m`);
+    println(`    policy:        \x1b[33m${written.policy.policy}\x1b[0m`);
     println(
         `    flags:         \x1b[33mliveSetModel=${args.allowLiveSetModel ? 'sim' : 'nao'} · newSession=${args.allowNewSession ? 'sim' : 'nao'} · localPrivate=${args.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
     );
@@ -3889,6 +3918,11 @@ async function renderByokGatewayAutoPolicy(println) {
         readModelGatewayRuntimeAutomationEffectivePolicy(),
     ]);
     const envPolicy = readModelGatewayRuntimeAutomationPolicy();
+    const policySources = explainModelGatewayRuntimeAutomationPolicySources({
+        filePolicy,
+        env: process.env,
+    });
+    const presets = listModelGatewayRuntimeAutomationPolicyPresets();
     const fileConfigured = Object.keys(filePolicy).length > 0;
     const envConfigured = Object.keys(process.env).some((key) => key.startsWith('COPILOT_BYOK_GATEWAY_AUTO'));
     println('\n  \x1b[36mBYOK model-gateway auto policy\x1b[0m');
@@ -3896,6 +3930,7 @@ async function renderByokGatewayAutoPolicy(println) {
     println(`    arquivo cfg:   \x1b[33m${fileConfigured ? 'sim' : 'nao'}\x1b[0m`);
     println(`    env cfg:       \x1b[33m${envConfigured ? 'sim' : 'nao'}\x1b[0m`);
     println(`    efetivo:       \x1b[33m${enabledDisabled(effectivePolicy.enabled)}\x1b[0m`);
+    println(`    preset:        \x1b[33m${effectivePolicy.preset}\x1b[0m  \x1b[90mfonte=${policySources['preset']?.source ?? '-'}\x1b[0m`);
     println(`    policy:        \x1b[33m${effectivePolicy.policy}\x1b[0m`);
     println(`    profiles:      \x1b[33m${effectivePolicy.profiles.join(', ') || '-'}\x1b[0m`);
     println(
@@ -3904,6 +3939,12 @@ async function renderByokGatewayAutoPolicy(println) {
     println(
         `    account-wide:  \x1b[33m${effectivePolicy.accountWideFailureKinds.join(', ') || '-'}\x1b[0m`,
     );
+    println('    presets:');
+    for (const preset of presets) {
+        println(
+            `      \x1b[90m${preset['preset']}: policy=${preset['policy']} liveSetModel=${preset['allowLiveSetModel'] ? 'sim' : 'nao'} newSession=${preset['allowNewSession'] ? 'sim' : 'nao'} localPrivate=${preset['allowLocalPrivate'] ? 'sim' : 'nao'}\x1b[0m`,
+        );
+    }
     if (envConfigured && envPolicy.enabled !== effectivePolicy.enabled) {
         println('    \x1b[33mobs: env explicito pode sobrescrever o arquivo persistente no proximo boot.\x1b[0m');
     }

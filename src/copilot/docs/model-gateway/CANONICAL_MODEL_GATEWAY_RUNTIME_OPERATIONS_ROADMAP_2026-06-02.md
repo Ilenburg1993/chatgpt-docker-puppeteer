@@ -107,7 +107,7 @@ O sistema ideal deve permitir:
 - [x] A lista de standby aparece no cockpit com gerado agora vs persistido.
 - [ ] A lista de standby ainda precisa ganhar fluxo manual de troca por item/rank.
 - [x] O terminal expõe "modelo vivo", "modelo preparado", rota selecionada, proximos substitutos e comandos por standby.
-- [ ] A policy deve ter presets claros para humano, LLM operadora e modo conservador.
+- [x] A policy deve ter presets claros para humano, LLM operadora e modo conservador.
 - [ ] A troca automatica por quota esgotada precisa diferenciar quota temporaria, creditos, auth, modelo inexistente e timeout.
 - [ ] O sistema precisa saber quando nao tentar de novo antes do reset.
 - [ ] O sistema precisa mostrar quando deve rodar probe descartavel antes de promover candidato.
@@ -224,15 +224,16 @@ metadata importers
 
 ### Faixa C - Default Auto
 
-- [ ] C.1 Definir policy default: off, advise-only ou guarded-auto.
-- [ ] C.2 Criar preset `operator_manual`.
-- [ ] C.3 Criar preset `llm_operator_guarded`.
-- [ ] C.4 Criar preset `auto_same_boundary`.
-- [ ] C.5 Criar preset `auto_prepare_new_session`.
-- [ ] C.6 Expor diferenca entre aplicar agora e preparar proximo boot.
-- [ ] C.7 Persistir policy snapshot sempre que auto roda.
+- [x] C.1 Definir policy default: off em repouso, `auto_same_boundary` para `/byok auto on` sem preset.
+- [x] C.2 Criar preset `operator_manual`.
+- [x] C.3 Criar preset `llm_operator_guarded`.
+- [x] C.4 Criar preset `auto_same_boundary`.
+- [x] C.5 Criar preset `auto_prepare_new_session`.
+- [x] C.6 Expor diferenca entre aplicar agora e preparar proximo boot.
+- [x] C.7 Persistir policy snapshot sempre que auto roda.
 - [ ] C.8 Mostrar por que auto aplicou ou nao aplicou.
-- [ ] C.9 Garantir que local/Ollama continua opt-in.
+- [x] C.9 Garantir que local/Ollama continua opt-in.
+- [ ] C.10 Expor presets no JSON do cockpit unificado.
 
 ### Faixa D - Standby E Substituicao
 
