@@ -813,6 +813,33 @@
   - default deve exibir acao humana, alvo, bytes e duracao;
   - raw/SSE/lifecycle continuam contendo a evidencia tecnica para auditoria.
 
+## 02.30 Evidencia live PTY freeform apos polimento de I/O
+
+- Comando executado:
+  - `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --transport=pty --live-scenario=freeform --out-dir=data/copilot-terminal/live-runs/terminal-ux-freeform-post-polish-20260602-0712`
+- Artefatos:
+  - `data/copilot-terminal/live-runs/terminal-ux-freeform-post-polish-20260602-0712/summary.md`
+  - `data/copilot-terminal/live-runs/terminal-ux-freeform-post-polish-20260602-0712/terminal.raw.log`
+  - `data/copilot-terminal/live-runs/terminal-ux-freeform-post-polish-20260602-0712/terminal.plain.log`
+  - `data/copilot-terminal/live-runs/terminal-ux-freeform-post-polish-20260602-0712/terminal.sse.jsonl`
+  - `data/copilot-terminal/live-runs/terminal-ux-freeform-post-polish-20260602-0712/conversation-export.md`
+- Resultado:
+  - status PASS;
+  - 296 eventos SSE;
+  - 0 erros;
+  - ask_user freeform, resposta humana livre, final pos-ask, export e SSE continuaram verdes;
+  - criterios esteticos M-S continuaram verdes.
+- Evidencia visual nova:
+  - `/usage now` mostrou runtime/sdk/hub compactos com hint para `detail`;
+  - `[IO] [READ] package.json` mostrou status, bytes e duracao sem `io-engine.*`;
+  - `[DONE] Ler arquivo` mostrou `io 1 op · 2ms · 83.2 KB` sem engine;
+  - `/activity` mostrou I/O recente sem engine;
+  - `/tools diag` mostrou `Leitura local` como titulo e manteve `tool técnico: io.read.io-engine.fs.readFile.text` no detalhe;
+  - `/health` mostrou `Leitura local` em `TOOL STATS`.
+- Decisao:
+  - a politica "humano primeiro, diagnostico sob demanda" esta validada tambem no cenario de resposta livre;
+  - `request_user_input`/`ask_user` freeform nao precisa de janela externa nem de surface duplicada para funcionar no terminal.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -1183,7 +1210,8 @@
 - [x] Garantir que resposta humana nao fique colada na linha viva.
 - [ ] Tratar timeout durante espera humana como `aguardando operador`, nao erro de modelo.
 - [x] Adicionar teste unitario de `request_user_input` sem `[TOOL] [RUN]`.
-- [ ] Adicionar live scenario especifico para `request_user_input` local, alem de `ask_user` SDK.
+- [x] Revalidar live scenario freeform de `ask_user` apos polimento visual.
+- [ ] Adicionar live scenario especifico para `request_user_input` local sintetico, alem de `ask_user` SDK.
 
 ### Faixa P - Linha viva unificada
 
@@ -1236,7 +1264,8 @@
 - [x] Atualizar runner para detectar prompt de espera bruto `⏳ [modelo/esforco]`.
 - [x] Rodar live SDK/Copilot apos Faixas M-P.
 - [ ] Rodar live BYOK quando a superficie estiver estabilizada.
-- [ ] Rodar live com `request_user_input` local real.
+- [x] Rodar live SDK/Copilot freeform apos polimento de I/O e diagnosticos.
+- [ ] Rodar live com `request_user_input` local sintetico.
 - [x] Registrar artefatos e decisao no roadmap.
 
 ## 06.01 Gaps residuais apos PASS live
