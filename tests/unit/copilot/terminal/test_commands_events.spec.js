@@ -67,12 +67,30 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('assistant.text.delta');
         expect(ctx.output()).toContain('recentes 1');
         expect(ctx.output()).toContain('/events delta 50');
-        expect(ctx.output()).toContain('/events source=terminal/dialog/turn-display.createDeltaCallback 50');
+        expect(ctx.output()).toContain('/events source terminal/dialog/turn-display.createDeltaCallback 50');
         expect(ctx.output()).toContain('task.delta only when dialog loop is inactive');
         expect(ctx.output()).toContain('ask_user.visible-question');
         expect(ctx.output()).toContain('byok.provider.config');
         expect(ctx.output()).toContain('COPILOT_BYOK_* resolved into SDK provider');
         expect(ctx.output()).toContain('/byok env · /byok profiles · /byok models refresh · /status');
+    });
+
+    it('aceita filtros humanos sem sinal de igual', async () => {
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '12 source sdk tool call_123 request req-123 hub hub-1 trace turn:abc');
+
+        expect(readTerminalSseEventArchiveTail).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                limit: 12,
+                source: 'sdk',
+                toolCallId: 'call_123',
+                requestId: 'req-123',
+                hubSessionId: 'hub-1',
+                traceId: 'turn:abc',
+            }),
+        );
+        expect(ctx.output()).not.toContain('source=sdk');
     });
 
     it('consulta archive SSE com filtros de evento e trace', async () => {

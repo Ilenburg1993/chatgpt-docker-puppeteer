@@ -2085,8 +2085,8 @@
 - [x] Cabeçalho passou para `janela últimos ... eventos · arquivo ...`.
 - [x] Rótulos passaram de `owner`/`emitter` para `dono`/`emissor`.
 - [x] Contagem passou de `recentes=N` para `recentes N`.
-- [x] Hint de evento passou de `/events event=<id> 50` para `/events <id> 50`, mantendo `source=` apenas onde a sintaxe do parser ainda exige source explícito.
-- [ ] Investigar parser futuro para aceitar `/events source <id>` e `/events trace <id>` sem quebrar compatibilidade com `source=<id>`.
+- [x] Hint de evento passou de `/events event=<id> 50` para `/events <id> 50`.
+- [x] Parser passou a aceitar `/events source <id>`, `/events trace <id>`, `/events tool <id>`, `/events request <id>`, `/events req <id>`, `/events hub <id>` e `/events event <id>` sem quebrar compatibilidade com `source=<id>`.
 
 ### 11.17 `/model` e `/model stats` como painel cotidiano
 

@@ -37,25 +37,43 @@ function parseEventsArg(arg) {
     let hubSessionId = null;
     /** @type {'text' | 'json' | 'raw'} */
     let format = 'text';
-    for (const token of tokens) {
+    for (let index = 0; index < tokens.length; index += 1) {
+        const token = tokens[index] ?? '';
+        if (!token) continue;
+        const next = tokens[index + 1] ?? '';
         if (/^\d+$/u.test(token)) {
             limit = Math.min(500, Math.max(1, Number(token)));
         } else if (token === '--json' || token === 'json' || token === 'format=json') {
             format = 'json';
         } else if (token === '--raw' || token === 'raw' || token === 'format=raw') {
             format = 'raw';
+        } else if (token === 'event' && next) {
+            event = next;
+            index += 1;
         } else if (token.startsWith('event=')) {
             event = token.slice('event='.length) || null;
+        } else if (token === 'trace' && next) {
+            traceId = next;
+            index += 1;
         } else if (token.startsWith('trace=')) {
             traceId = token.slice('trace='.length) || null;
         } else if (token.startsWith('traceId=')) {
             traceId = token.slice('traceId='.length) || null;
+        } else if (token === 'turn' && next) {
+            turnId = next;
+            index += 1;
         } else if (token.startsWith('turn=')) {
             turnId = token.slice('turn='.length) || null;
         } else if (token.startsWith('turnId=')) {
             turnId = token.slice('turnId='.length) || null;
+        } else if (token === 'source' && next) {
+            source = next;
+            index += 1;
         } else if (token.startsWith('source=')) {
             source = token.slice('source='.length) || null;
+        } else if ((token === 'tool' || token === 'call') && next) {
+            toolCallId = next;
+            index += 1;
         } else if (token.startsWith('tool=')) {
             toolCallId = token.slice('tool='.length) || null;
         } else if (token.startsWith('toolCall=')) {
@@ -64,12 +82,18 @@ function parseEventsArg(arg) {
             toolCallId = token.slice('toolCallId='.length) || null;
         } else if (token.startsWith('call=')) {
             toolCallId = token.slice('call='.length) || null;
+        } else if ((token === 'request' || token === 'req') && next) {
+            requestId = next;
+            index += 1;
         } else if (token.startsWith('request=')) {
             requestId = token.slice('request='.length) || null;
         } else if (token.startsWith('requestId=')) {
             requestId = token.slice('requestId='.length) || null;
         } else if (token.startsWith('req=')) {
             requestId = token.slice('req='.length) || null;
+        } else if (token === 'hub' && next) {
+            hubSessionId = next;
+            index += 1;
         } else if (token.startsWith('hub=')) {
             hubSessionId = token.slice('hub='.length) || null;
         } else if (token.startsWith('hubSession=')) {
@@ -117,7 +141,7 @@ function parseSourcesLimit(arg) {
 function buildPolicyQueryHints(policy) {
     const event = policy.publicEvents[0] ?? '';
     const eventHint = event ? `/events ${event} 50` : null;
-    const sourceHint = policy.canonicalEmitter ? `/events source=${policy.canonicalEmitter} 50` : null;
+    const sourceHint = policy.canonicalEmitter ? `/events source ${policy.canonicalEmitter} 50` : null;
     return [eventHint, sourceHint].filter(Boolean).join(' · ');
 }
 
