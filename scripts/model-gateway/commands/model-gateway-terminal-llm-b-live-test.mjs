@@ -1468,6 +1468,11 @@ function structuredInputCycleCriteria(boot) {
             detail: '/sdk simulate request-user-input rendered a human-facing diagnostic request',
         },
         {
+            id: 'structured-input-calm-boot-copy',
+            pass: !/\bAlwaysAliveAgent\b|\bSTANDALONE\b|Registry local ativo|\[brief:(?:boot|ready)\]/iu.test(plain),
+            detail: 'default boot/lifecycle copy avoided raw agent names, standalone jargon, and bracketed brief prefixes',
+        },
+        {
             id: 'structured-input-prompt-tag',
             pass: /você\[[^\]\n]+\/[^\]\n]+\]\[INPUT\]›/iu.test(plain),
             detail: 'REPL prompt marked the pending structured input as [INPUT]',

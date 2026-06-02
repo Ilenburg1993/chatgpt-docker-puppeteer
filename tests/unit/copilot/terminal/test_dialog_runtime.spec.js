@@ -27,4 +27,20 @@ describe('terminal/dialog/dialog-runtime', () => {
         expect(src).toContain('_engineModulePromise = null;');
         expect(src).toContain('_engineModule = null;');
     });
+
+    it('mantém lifecycle do dialog loop com stdout humano por padrão', async () => {
+        const src = await readFile(
+            new URL('../../../../src/copilot/terminal/dialog/engine.js', import.meta.url),
+            'utf8',
+        );
+
+        expect(src).toContain('Preparando agente');
+        expect(src).toContain('Conectando conversa');
+        expect(src).toContain('Retomando sessão sem prompt inicial');
+        expect(src).toContain('Inicializando runtime do agente');
+        expect(src).not.toContain('println(\'\\x1b[90m  Iniciando AlwaysAliveAgent');
+        expect(src).not.toContain('println(\'\\x1b[90m  Conectando ao agente');
+        expect(src).not.toContain('println(\'\\x1b[90m  Reanexando sessão SDK');
+        expect(src).not.toContain("detail: 'AlwaysAliveAgent start()'");
+    });
 });

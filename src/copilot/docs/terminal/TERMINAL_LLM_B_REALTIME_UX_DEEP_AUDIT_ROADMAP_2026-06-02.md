@@ -959,8 +959,20 @@
   - status PASS;
   - duracao 8065ms;
   - a primeira tela mostrou banner compacto, auto-brief alinhado e bloco de ambiente sem `STANDALONE`.
+- Evidencia live final apos humanizar lifecycle:
+  - comando:
+    - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/terminal-boot-human-lifecycle-criteria-20260602-0813`
+  - artefatos:
+    - `artifacts/terminal-live/terminal-boot-human-lifecycle-criteria-20260602-0813/summary.md`
+    - `artifacts/terminal-live/terminal-boot-human-lifecycle-criteria-20260602-0813/summary.json`
+    - `artifacts/terminal-live/terminal-boot-human-lifecycle-criteria-20260602-0813/structured-input-cycle.raw.log`
+    - `artifacts/terminal-live/terminal-boot-human-lifecycle-criteria-20260602-0813/structured-input-cycle.plain.log`
+  - status PASS;
+  - duracao 8111ms;
+  - criterio novo `structured-input-calm-boot-copy` passou;
+  - a tela default evitou `AlwaysAliveAgent`, `STANDALONE`, `Registry local ativo` e prefixos `[brief:boot]`/`[brief:ready]`.
 - Gap residual:
-  - a live ainda mostra `Iniciando AlwaysAliveAgent...`; proxima etapa deve humanizar mensagens de lifecycle do agente sem esconder diagnostico tecnico em logs.
+  - avaliar se o bloco `Ambiente` deve fundir com auto-brief ready para reduzir ainda mais a altura inicial.
 
 ## 03. Achados principais
 
@@ -1366,7 +1378,8 @@
 - [x] Adicionar teste snapshot/regex do boot compacto.
 - [x] Adicionar live criterion de primeiro viewport sem overflow obvio.
 - [x] Rodar live PTY `terminal-boot-calm-structured-input-20260602-0808`.
-- [ ] Humanizar lifecycle `AlwaysAliveAgent`, `Conectando ao agente` e `Reanexando sessão SDK`.
+- [x] Humanizar lifecycle `AlwaysAliveAgent`, `Conectando ao agente` e `Reanexando sessão SDK`.
+- [x] Adicionar criterio live `structured-input-calm-boot-copy`.
 - [ ] Avaliar fusao do bloco `Ambiente` com auto-brief ready para reduzir altura inicial.
 
 ### Faixa R - Comandos de diagnostico com dois niveis

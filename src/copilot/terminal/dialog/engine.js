@@ -628,10 +628,10 @@ async function _tryStartDialogLoop() {
 
     if (status === 'stopped') {
         recordTerminalActivity('boot', 'Iniciando agente', {
-            detail: 'AlwaysAliveAgent start()',
+            detail: 'Inicializando runtime do agente',
             source: 'dialog',
         });
-        println('\x1b[90m  Iniciando AlwaysAliveAgent…\x1b[0m');
+        println('\x1b[90m  Preparando agente…\x1b[0m');
         await startTerminalAgentRuntime();
         const deadline = Date.now() + IDLE_TRANSITION_TIMEOUT_MS;
         while (Date.now() < deadline) {
@@ -673,10 +673,10 @@ async function _tryStartDialogLoop() {
         detail: 'Iniciando protocolo READY/REPLY do terminal',
         source: 'dialog',
     });
-    println('\x1b[90m  Conectando ao agente…\x1b[0m');
+    println('\x1b[90m  Conectando conversa…\x1b[0m');
     const resumeSessionAttach = true;
     log('INFO', '[dialog] reanexando terminal sem boot prompt automático.');
-    println('\x1b[90m  Reanexando sessão SDK sem boot prompt…\x1b[0m');
+    println('\x1b[90m  Retomando sessão sem prompt inicial…\x1b[0m');
     await startTerminalDialogMode(resumeSessionAttach ? undefined : (BOOT_PROMPT ?? undefined), {
         resumeSessionAttach,
         onReady: () => println('\n  \x1b[32m●\x1b[0m  LLM-B pronta — pode começar\n'),
