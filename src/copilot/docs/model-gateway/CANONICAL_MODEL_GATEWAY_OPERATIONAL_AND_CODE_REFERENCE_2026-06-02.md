@@ -283,8 +283,10 @@ npm run model-gateway:operator-ready
 /byok gateway operator-ready profile:repo_agent
 ```
 
-Agrega ops, auto-ready, runtime selector, standby, standby persistido e runtime health diff. Deve ser o primeiro comando
-para operador humano ou LLM.
+Agrega SQLite diagnostics, auto-ready, runtime selector, standby, standby persistido, runtime health diff e live scenario
+runs recentes. Deve ser o primeiro comando para operador humano ou LLM. O JSON separa `nextSafeCommands` de
+`liveCommands`, porque alguns comandos live podem consumir provider/quota. O caminho package evita chamar `ops` por
+dentro para nao duplicar readiness e automacao.
 
 ### 7.3 Auto Doctor
 
@@ -411,6 +413,9 @@ npm run model-gateway:live:plan
 npm run model-gateway:auto:scenarios -- --profile=repo_agent --json
 ```
 
+`model-gateway:auto:scenarios` executa gates read-only independentes em paralelo e deve permanecer abaixo de 60s no
+ambiente de operador para continuar utilizavel por LLMs. Em 2026-06-02, apos a paralelizacao, rodou em cerca de 34s.
+
 Cenarios:
 
 ```bash
@@ -468,6 +473,14 @@ npm run model-gateway:live:runs
 ```
 
 O cockpit deve, progressivamente, apontar artifact paths relevantes para operador e LLM.
+
+`model-gateway:ops`, `model-gateway:operator-ready` e `/byok gateway operator-ready` devem mostrar:
+
+- total de live runs persistidos;
+- ultimo scenario kind/status;
+- artifact `summary.md` recente;
+- lista curta dos lives mais recentes;
+- comandos live canonicos separados dos comandos read-only seguros.
 
 Evidencias recentes desta sessao:
 

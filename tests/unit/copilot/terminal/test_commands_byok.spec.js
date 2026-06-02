@@ -1118,6 +1118,14 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                         runtimeRows: 0,
                         routeDecisionRows: 0,
                         recoveryAttemptRows: 0,
+                        liveScenarioRunRows: 1,
+                        latestLiveScenarioRun: {
+                            runId: 'live-scenario-1',
+                            scenarioKind: 'byok_real_no_pr',
+                            status: 'passed',
+                            ok: true,
+                            summaryPath: 'artifacts/terminal-live/unit/summary.md',
+                        },
                         activeSnapshot: { exists: true, source: 'test' },
                         tableCounts: {},
                     }),
@@ -1185,6 +1193,17 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                                 { providerId: 'groq', providerModel: 'llama', routeKey: 'groq:llama' },
                                 { providerId: 'zai', providerModel: 'glm', routeKey: 'zai:glm' },
                             ],
+                        },
+                    ]),
+                ),
+                readLiveScenarioRunRecords: vi.fn(() =>
+                    Promise.resolve([
+                        {
+                            runId: 'live-scenario-1',
+                            scenarioKind: 'byok_real_no_pr',
+                            status: 'passed',
+                            ok: true,
+                            summaryPath: 'artifacts/terminal-live/unit/summary.md',
                         },
                     ]),
                 ),
@@ -3090,6 +3109,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('runtime_selector');
         expect(ctx.output()).toContain('standby 1:');
         expect(ctx.output()).toContain('standby db:');
+        expect(ctx.output()).toContain('live db:');
+        expect(ctx.output()).toContain('artifacts/terminal-live/unit/summary.md');
         expect(ctx.output()).toContain('kilo-code:kilo-auto/free');
         expect(ctx.output()).toContain('--write-sqlite');
         expect(ctx.output()).toContain('/byok auto standby profile:repo_agent 5');

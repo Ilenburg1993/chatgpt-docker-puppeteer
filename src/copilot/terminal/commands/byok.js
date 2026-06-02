@@ -2406,12 +2406,13 @@ function renderByokGatewayCanonicalCommands(println, rest) {
  */
 async function renderByokGatewayOperatorReady(println, rest) {
     const limit = parseByokGatewayAutoHistoryLimit(rest);
-    const [status, diagnostics] = await Promise.all([
+    const [status, diagnostics, liveRuns] = await Promise.all([
         buildTerminalByokGatewayAutoStatus(rest, {
             allowEffects: false,
             persistAutomationDecision: false,
         }),
         new SqliteModelGatewayCatalogStore().readStorageDiagnostics(),
+        new SqliteModelGatewayCatalogStore().readLiveScenarioRunRecords({ limit: 5 }),
     ]);
     const standbyPlan = buildModelGatewayRuntimeStandbyPlan(status.runtimeSelectorPlan, {
         limit,
@@ -2421,6 +2422,9 @@ async function renderByokGatewayOperatorReady(println, rest) {
     const standbyProviderCount = standbyPlan.summary.providerCount;
     const persistedStandbyRows = finitePositiveNumber(diagnostics.standbyPlanRows) ?? 0;
     const latestPersistedStandby = diagnostics.latestStandbyPlan ?? {};
+    const liveRunRows = Math.max(finitePositiveNumber(diagnostics.liveScenarioRunRows) ?? 0, liveRuns.length);
+    const diagnosticLatestLiveRun = diagnostics.latestLiveScenarioRun ?? {};
+    const latestLiveRun = optionalScalarString(diagnosticLatestLiveRun.summaryPath) ? diagnosticLatestLiveRun : (liveRuns[0] ?? {});
     const activeSnapshot = diagnostics.activeSnapshot?.exists === true;
     const policy = await readModelGatewayRuntimeAutomationEffectivePolicy();
     const checks = [
@@ -2490,6 +2494,14 @@ async function renderByokGatewayOperatorReady(println, rest) {
     println(
         `    standby db:   \x1b[33mrows=${persistedStandbyRows} · latest=${latestPersistedStandby.standbyPlanId ?? '-'} · profile=${latestPersistedStandby.routeProfile ?? '-'} · routes=${latestPersistedStandby.routeCount ?? '-'}\x1b[0m`,
     );
+    println(
+        `    live db:      \x1b[33mrows=${liveRunRows} · latest=${optionalScalarString(latestLiveRun.scenarioKind) ?? '-'} · status=${optionalScalarString(latestLiveRun.status) ?? '-'} · summary=${optionalScalarString(latestLiveRun.summaryPath) ?? '-'}\x1b[0m`,
+    );
+    for (const [index, run] of liveRuns.slice(0, 3).entries()) {
+        println(
+            `    live ${index + 1}:     \x1b[33m${optionalScalarString(run.scenarioKind) ?? optionalScalarString(run.kind) ?? '-'}\x1b[0m \x1b[90mstatus=${optionalScalarString(run.status) ?? '-'} · ok=${run.ok === true ? 'sim' : run.ok === false ? 'nao' : '-'} · summary=${optionalScalarString(run.summaryPath) ?? '-'}\x1b[0m`,
+        );
+    }
     if (status.decision.blockers.length > 0) println(`    blockers:      \x1b[33m${status.decision.blockers.join(', ')}\x1b[0m`);
     println(`    resumo:        \x1b[90m${status.decision.operatorSummary}\x1b[0m`);
     println(`    proximo:       \x1b[90m${[...new Set(nextCommands)].slice(0, 5).join(' && ')}\x1b[0m\n`);

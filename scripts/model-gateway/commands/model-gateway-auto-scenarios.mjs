@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
 
@@ -34,30 +34,40 @@ function optionalArray(value) {
 }
 
 function runJson(scriptId, scriptArgs = []) {
-    const result = spawnSync(process.execPath, [MODEL_GATEWAY_SCRIPT_PATHS[scriptId], ...scriptArgs], {
-        cwd: REPO_ROOT,
-        encoding: 'utf8',
-        maxBuffer: 64 * 1024 * 1024,
+    return new Promise((resolve) => {
+        execFile(
+            process.execPath,
+            [MODEL_GATEWAY_SCRIPT_PATHS[scriptId], ...scriptArgs],
+            {
+                cwd: REPO_ROOT,
+                encoding: 'utf8',
+                maxBuffer: 64 * 1024 * 1024,
+            },
+            (error, stdout, stderr) => {
+                const status = typeof error?.code === 'number' ? error.code : 0;
+                const output = stdout?.trim() ?? '';
+                if (error) {
+                    resolve({
+                        ok: false,
+                        status,
+                        error: stderr || stdout || error.message || `command failed with status ${status}`,
+                        json: null,
+                    });
+                    return;
+                }
+                try {
+                    resolve({ ok: true, status, error: null, json: JSON.parse(output) });
+                } catch (parseError) {
+                    resolve({
+                        ok: false,
+                        status,
+                        error: parseError instanceof Error ? parseError.message : String(parseError),
+                        json: null,
+                    });
+                }
+            },
+        );
     });
-    const output = result.stdout?.trim() ?? '';
-    if (result.status !== 0) {
-        return {
-            ok: false,
-            status: result.status,
-            error: result.stderr || result.stdout || `command failed with status ${result.status}`,
-            json: null,
-        };
-    }
-    try {
-        return { ok: true, status: result.status, error: null, json: JSON.parse(output) };
-    } catch (error) {
-        return {
-            ok: false,
-            status: result.status,
-            error: error instanceof Error ? error.message : String(error),
-            json: null,
-        };
-    }
 }
 
 function checkFromRun(id, run, detail) {
@@ -350,17 +360,31 @@ const json = argSet.has('--json');
 const fail = argSet.has('--fail');
 const includeGates = argSet.has('--include-gates');
 const profile = readArg('--profile', 'repo_agent');
-const operatorReady = runJson('operatorReady', ['--json', `--profile=${profile}`]);
-const ready = runJson('autoReady', ['--json', `--profile=${profile}`]);
-const doctor = runJson('autoDoctor', ['--json', `--profile=${profile}`]);
-const explain = runJson('autoExplain', ['--json', `--profile=${profile}`]);
-const handoffs = runJson('autoHandoffs', ['--json', '--limit=5']);
-const confirmations = runJson('autoConfirmations', ['--json', '--limit=5']);
-const recoveries = runJson('autoRecoveries', ['--json', '--limit=5']);
-const proofPlan = runJson('autoProofPlan', ['--json', `--profile=${profile}`, '--limit=12']);
-const standby = runJson('autoStandby', ['--json', `--profile=${profile}`, '--limit=12']);
-const standbyPersisted = runJson('autoStandby', ['--json', `--profile=${profile}`, '--read-sqlite']);
-const livePlan = runJson('livePlan', ['--json', '--no-write']);
+const gateEntries = await Promise.all([
+    ['operatorReady', runJson('operatorReady', ['--json', `--profile=${profile}`])],
+    ['ready', runJson('autoReady', ['--json', `--profile=${profile}`])],
+    ['doctor', runJson('autoDoctor', ['--json', `--profile=${profile}`])],
+    ['explain', runJson('autoExplain', ['--json', `--profile=${profile}`])],
+    ['handoffs', runJson('autoHandoffs', ['--json', '--limit=5'])],
+    ['confirmations', runJson('autoConfirmations', ['--json', '--limit=5'])],
+    ['recoveries', runJson('autoRecoveries', ['--json', '--limit=5'])],
+    ['proofPlan', runJson('autoProofPlan', ['--json', `--profile=${profile}`, '--limit=12'])],
+    ['standby', runJson('autoStandby', ['--json', `--profile=${profile}`, '--limit=12'])],
+    ['standbyPersisted', runJson('autoStandby', ['--json', `--profile=${profile}`, '--read-sqlite'])],
+    ['livePlan', runJson('livePlan', ['--json', '--no-write'])],
+].map(async ([key, run]) => [key, await run]));
+const gateRuns = Object.fromEntries(gateEntries);
+const operatorReady = gateRuns.operatorReady;
+const ready = gateRuns.ready;
+const doctor = gateRuns.doctor;
+const explain = gateRuns.explain;
+const handoffs = gateRuns.handoffs;
+const confirmations = gateRuns.confirmations;
+const recoveries = gateRuns.recoveries;
+const proofPlan = gateRuns.proofPlan;
+const standby = gateRuns.standby;
+const standbyPersisted = gateRuns.standbyPersisted;
+const livePlan = gateRuns.livePlan;
 
 const operatorReadyJson = optionalRecord(operatorReady.json);
 const readyJson = optionalRecord(ready.json);

@@ -9,8 +9,8 @@ const argSet = new Set(args);
 if (argSet.has('--help') || argSet.has('-h')) {
     process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-operator-ready.mjs [--json] [--fail] [--profile ID] [--limit N]
 
-Read-only operator/LLM readiness cockpit. It aggregates ops, auto-ready, runtime selector, standby and runtime-health
-diff without calling providers, running models or mutating terminal state.
+Read-only operator/LLM readiness cockpit. It aggregates SQLite diagnostics, auto-ready, runtime selector, standby,
+live runs and runtime-health diff without calling providers, running models or mutating terminal state.
 `);
     process.exit(0);
 }
@@ -75,30 +75,33 @@ const json = argSet.has('--json');
 const profile = readArg('--profile', 'repo_agent');
 const limit = readPositiveInt('--limit', 12);
 
-const ops = runJson('ops', ['--json', `--profile=${profile}`]);
+const diagnostics = runJson('sqliteDiagnostics', ['--json']);
 const autoReady = runJson('autoReady', ['--json', `--profile=${profile}`]);
 const runtimeSelector = runJson('runtimeSelector', ['--json', '--fail', `--profile=${profile}`]);
 const standby = runJson('autoStandby', ['--json', `--profile=${profile}`, `--limit=${limit}`]);
 const healthDiff = runJson('runtimeHealthDiff', ['--json']);
+const liveRuns = runJson('liveRuns', ['--json', '--limit=8']);
 
-const opsJson = optionalRecord(ops.json);
-const opsDatabase = optionalRecord(opsJson?.['database']);
-const opsReadiness = optionalRecord(opsJson?.['readiness']);
-const opsAutomation = optionalRecord(opsJson?.['automation']);
+const diagnosticsJson = optionalRecord(diagnostics.json);
+const opsDatabase = diagnosticsJson;
 const autoReadyJson = optionalRecord(autoReady.json);
 const runtimeSelectorJson = optionalRecord(runtimeSelector.json);
 const runtimePlan = optionalRecord(runtimeSelectorJson?.['runtimeSelectorPlan']);
 const standbyJson = optionalRecord(standby.json);
 const standbySummary = optionalRecord(standbyJson?.['summary']);
 const latestPersistedStandby = optionalRecord(opsDatabase?.['latestStandbyPlan']);
+const latestLiveScenarioRun = optionalRecord(opsDatabase?.['latestLiveScenarioRun']);
 const healthDiffJson = optionalRecord(healthDiff.json);
 const healthSummary = optionalRecord(optionalRecord(healthDiffJson?.['diff'])?.['summary']);
+const liveRunsJson = optionalRecord(liveRuns.json);
+const liveRunRows = Array.isArray(liveRunsJson?.['rows']) ? liveRunsJson['rows'].filter(optionalRecord) : [];
+const liveScenarioRunRowCount = Math.max(optionalNumber(opsDatabase?.['liveScenarioRunRows']) ?? 0, liveRunRows.length);
+const latestLiveScenarioRunEffective = optionalString(latestLiveScenarioRun?.['summaryPath']) ? latestLiveScenarioRun : (liveRunRows[0] ?? {});
 const readyChecks = Array.isArray(autoReadyJson?.['checks']) ? autoReadyJson['checks'].filter(optionalRecord) : [];
 const runtimeRoutes = Array.isArray(runtimePlan?.['routes']) ? runtimePlan['routes'].filter(optionalRecord) : [];
 const selectedRuntimeRoute = runtimeRoutes.find((route) => route['profileId'] === profile) ?? null;
 const standbyRoutes = Array.isArray(standbyJson?.['routes']) ? standbyJson['routes'].filter(optionalRecord) : [];
 const nextSafeCommands = [
-    ...commandList(opsAutomation?.['nextCommands']),
     ...commandList(standbyJson?.['nextCommands']),
     'npm run model-gateway:runtime-health:diff -- --write-snapshot --fail-on-regression',
     `npm run model-gateway:runtime-selector -- --fail --profile=${profile}`,
@@ -106,14 +109,26 @@ const nextSafeCommands = [
     `npm run model-gateway:auto:standby -- --profile=${profile} --limit=${limit} --write-sqlite`,
 ];
 const uniqueNextSafeCommands = [...new Set(nextSafeCommands)];
+const liveCommands = [
+    'npm run model-gateway:live:readiness -- --fail',
+    'npm run model-gateway:live:runs -- --limit=8',
+    'npm run model-gateway:live:auto-probe',
+    'npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000',
+    'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
+    `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=${profile} --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=900000 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000`,
+];
 
 const checks = [
-    check('ops_ok', ops.ok && opsJson?.['ok'] === true, ops.error ?? 'ops read-only cockpit returned ok'),
+    check(
+        'database_ok',
+        diagnostics.ok && optionalRecord(diagnosticsJson?.['activeSnapshot'])?.['exists'] === true,
+        diagnostics.error ?? `snapshot=${optionalRecord(diagnosticsJson?.['activeSnapshot'])?.['source'] ?? '-'}`,
+    ),
     check('auto_ready_ok', autoReady.ok && autoReadyJson?.['ok'] === true, autoReady.error ?? `failed=${autoReadyJson?.['blockers']?.length ?? 0}`),
     check(
         'live_readiness_ok',
-        opsReadiness?.['ok'] === true,
-        `terminalSelected=${opsReadiness?.['terminalSelectedProfileCount'] ?? '-'} terminalBlocked=${opsReadiness?.['terminalBlockedProfileCount'] ?? '-'}`,
+        autoReady.ok && autoReadyJson?.['ok'] === true,
+        `blockers=${Array.isArray(autoReadyJson?.['blockers']) ? autoReadyJson['blockers'].length : 0} warnings=${Array.isArray(autoReadyJson?.['warnings']) ? autoReadyJson['warnings'].length : 0}`,
     ),
     check(
         'runtime_selector_ok',
@@ -142,6 +157,12 @@ const checks = [
         `commands=${uniqueNextSafeCommands.length}`,
         'warn',
     ),
+    check(
+        'live_runs_visible',
+        liveRuns.ok,
+        liveRuns.ok ? `runs=${liveRunRows.length} latest=${latestLiveScenarioRunEffective?.['summaryPath'] ?? '-'}` : (liveRuns.error ?? 'live runs unavailable'),
+        'warn',
+    ),
 ];
 const blockers = checks.filter((item) => !item.pass && item.severity === 'error');
 const warnings = checks.filter((item) => !item.pass && item.severity !== 'error');
@@ -159,9 +180,11 @@ const output = {
         standbyRoutes: optionalNumber(standbySummary?.['routeCount']) ?? 0,
         standbyProviders: optionalNumber(standbySummary?.['providerCount']) ?? 0,
         standbyPersistedRows: optionalNumber(opsDatabase?.['standbyPlanRows']) ?? 0,
+        liveScenarioRuns: liveScenarioRunRowCount,
         runtimeSelected: runtimeSelectorJson?.['selection']?.['selected'] ?? null,
         runtimeProfiles: runtimeSelectorJson?.['selection']?.['profiles'] ?? null,
         nextSafeCommands: uniqueNextSafeCommands.length,
+        liveCommands: liveCommands.length,
     },
     checks,
     blockers,
@@ -187,6 +210,29 @@ const output = {
         },
         persistCommand: `npm run model-gateway:auto:standby -- --profile=${profile} --limit=${limit} --write-sqlite`,
     },
+    liveScenarioRuns: {
+        rows: liveScenarioRunRowCount,
+        latest: {
+            runId: optionalString(latestLiveScenarioRunEffective?.['runId']),
+            scenarioKind: optionalString(latestLiveScenarioRunEffective?.['scenarioKind']) ?? optionalString(latestLiveScenarioRunEffective?.['kind']),
+            status: optionalString(latestLiveScenarioRunEffective?.['status']),
+            ok: latestLiveScenarioRunEffective?.['ok'] === true ? true : latestLiveScenarioRunEffective?.['ok'] === false ? false : null,
+            completedAtMs: optionalNumber(latestLiveScenarioRunEffective?.['completedAtMs']),
+            completedAt: optionalString(latestLiveScenarioRunEffective?.['completedAt']),
+            summaryPath: optionalString(latestLiveScenarioRunEffective?.['summaryPath']),
+        },
+        recent: liveRunRows.slice(0, 8).map((row) => ({
+            runId: optionalString(row['runId']),
+            scenarioKind: optionalString(row['scenarioKind']) ?? optionalString(row['kind']),
+            status: optionalString(row['status']),
+            ok: row['ok'] === true ? true : row['ok'] === false ? false : null,
+            completedAt: optionalString(row['completedAt']),
+            summaryPath: optionalString(row['summaryPath']),
+            criteriaTotal: optionalNumber(row['criteriaTotal']),
+            criteriaFailed: optionalNumber(row['criteriaFailed']),
+        })),
+        command: 'npm run model-gateway:live:runs -- --limit=8',
+    },
     selectedRuntimeRoute: selectedRuntimeRoute
         ? {
               profileId: optionalString(selectedRuntimeRoute['profileId']),
@@ -207,12 +253,14 @@ const output = {
         commands: optionalRecord(route['commands']) ?? {},
     })),
     nextSafeCommands: uniqueNextSafeCommands,
+    liveCommands,
     raw: {
-        ops: opsJson,
+        diagnostics: diagnosticsJson,
         autoReady: autoReadyJson,
         runtimeSelector: runtimeSelectorJson,
         standby: standbyJson,
         healthDiff: healthDiffJson,
+        liveRuns: liveRunsJson,
     },
 };
 
@@ -229,6 +277,15 @@ if (json) {
     process.stdout.write(
         `  standby-persisted: latest=${output.standbyPersistence.persisted.standbyPlanId ?? '-'} profile=${output.standbyPersistence.persisted.routeProfile ?? '-'} routes=${output.standbyPersistence.persisted.routeCount ?? '-'}\n`,
     );
+    process.stdout.write(
+        `  live-runs: rows=${output.liveScenarioRuns.rows} latest=${output.liveScenarioRuns.latest.scenarioKind ?? '-'} status=${output.liveScenarioRuns.latest.status ?? '-'} summary=${output.liveScenarioRuns.latest.summaryPath ?? '-'}\n`,
+    );
+    for (const run of output.liveScenarioRuns.recent.slice(0, 3)) {
+        process.stdout.write(
+            `  live: ${run.scenarioKind ?? '-'} status=${run.status ?? '-'} ok=${run.ok === true ? 'yes' : run.ok === false ? 'no' : '-'} summary=${run.summaryPath ?? '-'}\n`,
+        );
+    }
+    for (const command of liveCommands.slice(0, 3)) process.stdout.write(`  live-command: ${command}\n`);
     for (const command of uniqueNextSafeCommands.slice(0, 8)) process.stdout.write(`  next: ${command}\n`);
 }
 

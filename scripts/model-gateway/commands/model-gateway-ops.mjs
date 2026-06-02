@@ -74,6 +74,7 @@ function readDatabaseSummary(diagnostics) {
     const runtime = optionalRecord(json?.['runtime']);
     const latestAutomationDecision = optionalRecord(json?.['latestAutomationDecision']);
     const latestStandbyPlan = optionalRecord(json?.['latestStandbyPlan']);
+    const latestLiveScenarioRun = optionalRecord(json?.['latestLiveScenarioRun']);
     return {
         ok: diagnostics.ok && activeSnapshot?.['exists'] === true,
         schemaVersion: optionalNumber(json?.['schemaVersion']),
@@ -87,6 +88,7 @@ function readDatabaseSummary(diagnostics) {
         sdkSessionHandoffRows: optionalNumber(json?.['sdkSessionHandoffRows']),
         sdkSessionConfirmationRows: optionalNumber(json?.['sdkSessionConfirmationRows']),
         standbyPlanRows: optionalNumber(json?.['standbyPlanRows']),
+        liveScenarioRunRows: optionalNumber(json?.['liveScenarioRunRows']),
         latestStandbyPlan: {
             standbyPlanId: optionalString(latestStandbyPlan?.['standbyPlanId']),
             routeProfile: optionalString(latestStandbyPlan?.['routeProfile']),
@@ -97,6 +99,19 @@ function readDatabaseSummary(diagnostics) {
             selectedRouteKey: optionalString(latestStandbyPlan?.['selectedRouteKey']),
             source: optionalString(latestStandbyPlan?.['source']),
             generatedAtMs: optionalNumber(latestStandbyPlan?.['generatedAtMs']),
+        },
+        latestLiveScenarioRun: {
+            runId: optionalString(latestLiveScenarioRun?.['runId']),
+            scenarioKind: optionalString(latestLiveScenarioRun?.['scenarioKind']),
+            status: optionalString(latestLiveScenarioRun?.['status']),
+            ok:
+                latestLiveScenarioRun?.['ok'] === true
+                    ? true
+                    : latestLiveScenarioRun?.['ok'] === false
+                      ? false
+                      : null,
+            completedAtMs: optionalNumber(latestLiveScenarioRun?.['completedAtMs']),
+            summaryPath: optionalString(latestLiveScenarioRun?.['summaryPath']),
         },
         latestAutomationAction: optionalString(latestAutomationDecision?.['action']),
         runtimeHealthObservations: optionalNumber(runtime?.['healthObservations']),
@@ -189,12 +204,15 @@ if (json) {
 } else {
     process.stdout.write(`model-gateway ops: ok=${summary.ok ? 'yes' : 'no'} profile=${profile}\n`);
     process.stdout.write(
-        `  db: active=${summary.database.activeSnapshotExists ? 'yes' : 'no'} schema=${summary.database.schemaVersion ?? '-'} rows=${summary.database.catalogRows ?? '-'} routeDecisions=${summary.database.routeDecisionRows ?? '-'} automationDecisions=${summary.database.automationDecisionRows ?? '-'} policySnapshots=${summary.database.automationPolicySnapshotRows ?? '-'} effects=${summary.database.automationEffectApplicationRows ?? '-'} handoffs=${summary.database.sdkSessionHandoffRows ?? '-'} confirmations=${summary.database.sdkSessionConfirmationRows ?? '-'} standbyPlans=${summary.database.standbyPlanRows ?? '-'}\n`,
+        `  db: active=${summary.database.activeSnapshotExists ? 'yes' : 'no'} schema=${summary.database.schemaVersion ?? '-'} rows=${summary.database.catalogRows ?? '-'} routeDecisions=${summary.database.routeDecisionRows ?? '-'} automationDecisions=${summary.database.automationDecisionRows ?? '-'} policySnapshots=${summary.database.automationPolicySnapshotRows ?? '-'} effects=${summary.database.automationEffectApplicationRows ?? '-'} handoffs=${summary.database.sdkSessionHandoffRows ?? '-'} confirmations=${summary.database.sdkSessionConfirmationRows ?? '-'} standbyPlans=${summary.database.standbyPlanRows ?? '-'} liveRuns=${summary.database.liveScenarioRunRows ?? '-'}\n`,
     );
     process.stdout.write(
         `  db-standby: latest=${summary.database.latestStandbyPlan.standbyPlanId ?? '-'} profile=${summary.database.latestStandbyPlan.routeProfile ?? '-'} routes=${summary.database.latestStandbyPlan.routeCount ?? '-'} providers=${summary.database.latestStandbyPlan.providerCount ?? '-'}\n`,
     );
     process.stdout.write(`  db-auto: latestAction=${summary.database.latestAutomationAction ?? '-'}\n`);
+    process.stdout.write(
+        `  db-live: latest=${summary.database.latestLiveScenarioRun.scenarioKind ?? '-'} status=${summary.database.latestLiveScenarioRun.status ?? '-'} summary=${summary.database.latestLiveScenarioRun.summaryPath ?? '-'}\n`,
+    );
     process.stdout.write(
         `  readiness: ok=${summary.readiness.ok ? 'yes' : 'no'} selected=${summary.readiness.selectedProfileCount ?? '-'}/${summary.readiness.profileCount ?? '-'} blocked=${summary.readiness.blockedProfileCount ?? '-'} terminalSelected=${summary.readiness.terminalSelectedProfileCount ?? '-'} terminalBlocked=${summary.readiness.terminalBlockedProfileCount ?? '-'} livePlanCommands=${summary.readiness.livePlanCommandCount ?? '-'} warnings=${summary.readiness.warnings}\n`,
     );

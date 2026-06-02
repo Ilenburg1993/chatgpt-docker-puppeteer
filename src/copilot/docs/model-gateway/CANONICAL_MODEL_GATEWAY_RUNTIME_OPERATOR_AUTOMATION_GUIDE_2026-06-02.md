@@ -43,7 +43,7 @@ Referencia canonica transversal atual:
 - [x] Terminal possui `/byok auto status`, `apply`, `standby`, `proof-plan`, `doctor`, `recoveries`.
 - [x] Post-turn recovery grava falha em health operacional e SQLite.
 - [x] Falha da rota selecionada pode promover fallback standby no decision core.
-- [x] `operator-ready` agrega ops, auto-ready, selector, standby e health diff.
+- [x] `operator-ready` agrega SQLite diagnostics, auto-ready, selector, standby, health diff e live artifacts.
 - [x] Standby plans podem ser persistidos no SQLite operacional por perfil sem tocar no catalogo canonico.
 - [x] Standby persistido pode ser inspecionado sem recalcular selector por `--read-sqlite`/`persisted`.
 - [x] `auto:scenarios` inclui cockpit operator-ready, standby gerado, standby persistido e snapshot persistivel.
@@ -64,7 +64,7 @@ Referencia canonica transversal atual:
 - [ ] Falta live fixture especifica para post-turn fallback real sem provider call.
 - [ ] Falta live test LLM-B em escada apos consolidar o cockpit.
 - [ ] Falta acoplar confirmacao de novo boot SDK ao fluxo automatico de troca de provider.
-- [ ] Falta registrar artifact paths de todas as etapas live no cockpit.
+- [x] `operator-ready` registra live runs recentes e artifact paths no JSON e no cockpit terminal.
 
 ## 4. Arquitetura Ideal
 
@@ -205,7 +205,7 @@ Referencia canonica transversal atual:
 - [x] H.7 Rodar live real no-PR com runtime selector.
 - [ ] H.8 Rodar live fallback fixture com post-turn recovery.
 - [x] H.9 Registrar artifact paths no guia e no ledger.
-- [ ] H.10 Reduzir latencia de `auto:scenarios` se o caminho agregado passar de 60s no ambiente do operador.
+- [x] H.10 Reduzir latencia de `auto:scenarios` se o caminho agregado passar de 60s no ambiente do operador.
 - [ ] H.11 Corrigir bugs encontrados e repetir readiness.
 
 ### Faixa I - Integracao Ao Runtime Automatizado
@@ -233,7 +233,7 @@ Referencia canonica transversal atual:
 - [x] J.9 Retencao operacional inclui standby plans sem tocar no catalogo canonico.
 - [x] J.10 `operator-ready` diferencia standby gerado agora e standby persistido.
 - [ ] J.11 Registrar fallback selected after failure.
-- [ ] J.12 Registrar artifact path do operator-ready.
+- [x] J.12 Registrar artifact path do operator-ready.
 - [ ] J.13 Criar resumo final por sessao de testes live.
 
 ### Faixa K - Testes E Validadores

@@ -43,10 +43,13 @@ npm run model-gateway:commands
 npm run model-gateway:commands:json
 ```
 
-`model-gateway:ops` é o cockpit rápido: resume banco SQLite, readiness, decisão auto e inventário de comandos sem buscar
-providers, rodar modelos ou mutar a sessão terminal.
-`model-gateway:operator-ready` agrega ops, auto-ready, runtime-selector, standby e runtime-health diff em checks
-booleanos e comandos seguros para humano/LLM.
+`model-gateway:ops` é o cockpit rápido: resume banco SQLite, readiness, decisão auto, live runs recentes e inventário
+de comandos sem buscar providers, rodar modelos ou mutar a sessão terminal.
+`model-gateway:operator-ready` agrega SQLite diagnostics, auto-ready, runtime-selector, standby, runtime-health diff,
+live artifacts e comandos separados entre `nextSafeCommands` read-only e `liveCommands` para humano/LLM. Ele evita
+chamar `ops` internamente para nao duplicar readiness e automacao.
+`model-gateway:auto:scenarios` monta a escada operador/LLM e roda gates read-only independentes em paralelo para manter
+o cockpit abaixo do limite pratico de espera.
 
 ## Banco De Metadados
 
