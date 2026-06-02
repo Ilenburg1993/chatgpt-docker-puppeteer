@@ -9,7 +9,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
         current: {
             phase: 'tool',
             label: 'Executando tool',
-            detail: 'web_fetch · 50%',
+            detail: 'web_fetch · display=full · 50%',
             source: 'sdk',
             severity: 'info',
             progress: 50,
@@ -22,7 +22,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
             {
                 phase: 'tool',
                 label: 'Executando tool',
-                detail: 'web_fetch · 50%',
+                detail: 'web_fetch · display=full · 50%',
                 source: 'sdk',
                 severity: 'info',
                 progress: 50,
@@ -161,6 +161,8 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Atividade Atual da LLM-B');
         expect(ctx.output()).toContain('Executando tool');
         expect(ctx.output()).toContain('web_fetch');
+        expect(ctx.output()).toContain('tela full');
+        expect(ctx.output()).not.toContain('display=full');
         expect(ctx.output()).toContain('estado');
         expect(ctx.output()).toContain('evento');
         expect(ctx.output()).toContain('ferramentas');

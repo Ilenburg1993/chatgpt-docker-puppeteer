@@ -2010,3 +2010,16 @@
 - [x] Erro do archive passou de `erro=<texto>` para `erro <texto>`.
 - [x] `/events --raw` e `/events --json` seguem preservando dados brutos para automação.
 - [x] Teste `test_commands_events.spec.js` cobre o novo rodapé humano.
+
+### 11.13 Live PTY curta pós-polimento e ajuste de `/activity`
+
+- [x] Live PTY curta executada com `--ux-cycle`.
+- [x] Artefatos:
+  - `artifacts/terminal-live/default-ux-cycle-polished-copy-20260602-0950/summary.md`;
+  - `artifacts/terminal-live/default-ux-cycle-polished-copy-20260602-0950/default-ux-cycle.plain.log`;
+  - `artifacts/terminal-live/default-ux-cycle-polished-copy-20260602-0950/default-ux-cycle.raw.log`.
+- [x] Status PASS.
+- [x] Critérios passados: ready, help compacto, boot humano, status compacto, now humano, health compacto, tools humano, live compacto, activity humano, waits humano e close limpo.
+- [x] Achado visual residual: `/activity` timeline ainda podia mostrar `display=full`.
+- [x] `compactOperatorDetail` passou a traduzir `display=`, `reasoning=`, `source=` e `choices=`.
+- [x] Teste `test_commands_activity.spec.js` cobre `display=full` virando `tela full`.
