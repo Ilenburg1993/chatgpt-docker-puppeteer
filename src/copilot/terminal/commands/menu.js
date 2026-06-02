@@ -125,7 +125,7 @@ export function buildTerminalSmartMenuEntries() {
             id: 'sdk-ask-user',
             label: 'Inspecionar input humano SDK',
             commandLine: '/status',
-            description: `ask_user=${userInput.pending} · request_user_input=${structuredUserInputPending}`,
+            description: `pergunta=${userInput.pending} · input=${structuredUserInputPending}`,
             hot: true,
         });
     }

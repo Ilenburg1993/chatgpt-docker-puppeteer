@@ -1143,7 +1143,7 @@ describe('commands/session — async commands', () => {
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'elicitation.pending', limit: 6 });
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'permission.requested', limit: 6 });
         expect(ctx.output()).toContain('Waits SDK da sessão');
-        expect(ctx.output()).toContain('ask_user=2');
+        expect(ctx.output()).toContain('perguntas=2');
         expect(ctx.output()).toContain('elicitation=1');
         expect(ctx.output()).toContain('permission=1');
         expect(ctx.output()).toContain('Continuar?');

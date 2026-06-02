@@ -1479,7 +1479,7 @@ function structuredInputCycleCriteria(boot) {
         },
         {
             id: 'structured-input-waits-pending',
-            pass: /request_user_input=1/u.test(plain),
+            pass: /\binput=1\b/u.test(plain),
             detail: '/sdk waits saw one pending structured input before the answer',
         },
         {
@@ -1494,7 +1494,7 @@ function structuredInputCycleCriteria(boot) {
         },
         {
             id: 'structured-input-waits-cleared',
-            pass: /request_user_input=0/u.test(plain) && /Sem bloqueios de input humano do SDK/u.test(plain),
+            pass: /\binput=0\b/u.test(plain) && /Sem bloqueios de input humano do SDK/u.test(plain),
             detail: '/sdk waits confirmed that the structured input was cleared after answer',
         },
         {
@@ -2986,7 +2986,7 @@ function evaluateNoPrOutput(plain, sseSummary) {
         },
         {
             id: 'sdk-session-waits-cockpit-visible',
-            pass: /Waits SDK da sessão/.test(plain) && /ask_user=\d+/.test(plain) && /elicitation=\d+/.test(plain),
+            pass: /Waits SDK da sessão/.test(plain) && /perguntas=\d+/.test(plain) && /elicitation=\d+/.test(plain),
             detail: '/session sdk waits rendered ask_user/elicitation/permission diagnostics from the canonical archive',
         },
         {

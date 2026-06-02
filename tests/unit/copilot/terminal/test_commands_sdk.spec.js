@@ -246,7 +246,7 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('SDK Runtime');
         expect(ctx.output()).toContain('sdk-1');
         expect(ctx.output()).toContain('chat');
-        expect(ctx.output()).toContain('ask_user=0');
+        expect(ctx.output()).toContain('pergunta=0');
     });
 
     it('/sdk capabilities exibe capacidades consolidadas da sessão SDK', async () => {
@@ -318,7 +318,7 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('3 pendencia(s)');
         expect(ctx.output()).toContain('elicitation=1');
         expect(ctx.output()).toContain('permission=1');
-        expect(ctx.output()).toContain('ask_user=1');
+        expect(ctx.output()).toContain('pergunta=1');
         expect(ctx.output()).toContain('/elicitation show latest');
         expect(ctx.output()).toContain('/permission show latest');
     });
@@ -346,7 +346,7 @@ describe('terminal/commands/sdk', () => {
 
         expect(ctx.output()).toContain('elicitation=1');
         expect(ctx.output()).toContain('permission=1');
-        expect(ctx.output()).toContain('ask_user=1');
+        expect(ctx.output()).toContain('pergunta=1');
     });
 
     it('/sdk waits mostra request_user_input pendente sem vazar ID no default', async () => {
@@ -364,13 +364,14 @@ describe('terminal/commands/sdk', () => {
         const ctx = mockCtx();
         await cmdSdk({ println: ctx.println }, 'waits');
 
-        expect(ctx.output()).toContain('request_user_input=1');
+        expect(ctx.output()).toContain('input=1');
         expect(ctx.output()).not.toContain('request-user-input-test-1');
         expect(ctx.output()).toContain('choices=seguir | pausar');
         expect(ctx.output()).toContain('Escolha a estrategia');
 
         const detail = mockCtx();
         await cmdSdk({ println: detail.println }, 'waits detail');
+        expect(detail.output()).toContain('request_user_input=1');
         expect(detail.output()).toContain('request-user-input-test-1');
     });
 

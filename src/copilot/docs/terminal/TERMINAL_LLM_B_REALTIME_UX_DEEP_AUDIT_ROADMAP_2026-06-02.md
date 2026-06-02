@@ -849,16 +849,29 @@
   - `artifacts/terminal-live/structured-input-ux-no-ids-20260602-0748/summary.json`
   - `artifacts/terminal-live/structured-input-ux-no-ids-20260602-0748/structured-input-cycle.raw.log`
   - `artifacts/terminal-live/structured-input-ux-no-ids-20260602-0748/structured-input-cycle.plain.log`
+- Revalidacao de rotulos humanos:
+  - comando:
+    - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/structured-input-ux-human-labels-20260602-0753`
+  - artefatos:
+    - `artifacts/terminal-live/structured-input-ux-human-labels-20260602-0753/summary.md`
+    - `artifacts/terminal-live/structured-input-ux-human-labels-20260602-0753/summary.json`
+    - `artifacts/terminal-live/structured-input-ux-human-labels-20260602-0753/structured-input-cycle.raw.log`
+    - `artifacts/terminal-live/structured-input-ux-human-labels-20260602-0753/structured-input-cycle.plain.log`
+  - status PASS;
+  - duracao 8098ms;
+  - `/sdk waits` default mostrou `pergunta=0 · input=1` antes da resposta;
+  - `/sdk waits` default mostrou `pergunta=0 · input=0` depois da resposta;
+  - `request_user_input=...` e request IDs permanecem disponiveis apenas em `/sdk waits detail`.
 - Resultado:
   - status PASS;
   - duracao 8536ms;
   - `Input humano estruturado` criado por `/sdk simulate request-user-input`, com origem tecnica `request_user_input`;
   - prompt humano mostrou `[INPUT]`;
   - linha viva permanente mostrou `LLM-B INPUT` com pergunta e escolhas, em vez de tool crua;
-  - `/sdk waits` mostrou `request_user_input=1` antes da resposta;
+  - `/sdk waits` mostrou pendencia estruturada antes da resposta;
   - modo default ocultou `request-user-input-*` e deixou `/sdk waits detail` como drill-down;
   - resposta comum `SIM` foi roteada para a pendencia estruturada;
-  - `/sdk waits` mostrou `request_user_input=0` depois da resposta;
+  - `/sdk waits` mostrou pendencia estruturada zerada depois da resposta;
   - nao houve `request_user_input ainda executando` nem `LLM-B ainda trabalhando`;
   - encerramento limpo por `/quit`.
 - Bugs descobertos e corrigidos durante a live:

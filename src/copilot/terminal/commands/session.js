@@ -174,10 +174,10 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             ? `permission=${projection.pendingPermissions}${projection.latestPermissionType ? ` (${projection.latestPermissionType})` : ''}`
             : null,
         projection.pendingUserInputs > 0
-            ? `ask_user=${projection.pendingUserInputs}${projection.latestUserInputKind ? ` (${projection.latestUserInputKind})` : ''}`
+            ? `pergunta=${projection.pendingUserInputs}${projection.latestUserInputKind ? ` (${projection.latestUserInputKind})` : ''}`
             : null,
         projection.pendingStructuredUserInputs > 0
-            ? `request_user_input=${projection.pendingStructuredUserInputs}`
+            ? `input=${projection.pendingStructuredUserInputs}`
             : null,
     ].filter(Boolean);
     const sdkCapabilitiesUi =
@@ -363,7 +363,7 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
     }
     if (projection.pendingUserInputs > 0) {
         println(
-            '  \x1b[33mAção: há ask_user pendente do SDK; responda via conversa normal ou use /answer <texto>.\x1b[0m',
+            '  \x1b[33mAção: há pergunta humana pendente; responda via conversa normal ou use /answer <texto>.\x1b[0m',
         );
         if (projection.latestUserInput) {
             const latest = projection.latestUserInput;
@@ -373,12 +373,12 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
                 Array.isArray(latest.choices) && latest.choices.length > 0
                     ? ` choices=${latest.choices.join(' | ')}`
                     : '';
-            println(`  \x1b[90mUltimo ask_user: ${latest.id}${choices} - ${question}\x1b[0m`);
+            println(`  \x1b[90mUltima pergunta SDK:${choices} ${question}\x1b[0m`);
         }
     }
     if (projection.pendingStructuredUserInputs > 0) {
         println(
-            '  \x1b[33mAção: há request_user_input pendente; digite a resposta normalmente ou use /answer <texto>.\x1b[0m',
+            '  \x1b[33mAção: há input estruturado pendente; digite a resposta normalmente ou use /answer <texto>.\x1b[0m',
         );
         if (projection.latestStructuredUserInput) {
             const latest = projection.latestStructuredUserInput;
@@ -388,7 +388,7 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
                 Array.isArray(latest.choices) && latest.choices.length > 0
                     ? ` choices=${latest.choices.join(' | ')}`
                     : '';
-            println(`  \x1b[90mUltimo request_user_input: ${latest.requestId}${choices} - ${question}\x1b[0m`);
+            println(`  \x1b[90mUltimo input estruturado:${choices} ${question}\x1b[0m`);
         }
     }
     if (modelBilling.mismatch) {
@@ -452,7 +452,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
     const sdkWait = [
         projection.pendingElicitations > 0 ? `ELICIT:${projection.pendingElicitations}` : null,
         projection.pendingPermissions > 0 ? `PERM:${projection.pendingPermissions}` : null,
-        projection.pendingUserInputs > 0 ? `ASKSDK:${projection.pendingUserInputs}` : null,
+        projection.pendingUserInputs > 0 ? `ASK:${projection.pendingUserInputs}` : null,
         `PM:${projection.permissionMode}`,
     ]
         .filter(Boolean)
@@ -1211,7 +1211,7 @@ async function cmdSessionSdkWaits({ println }, tokens) {
     for (const entry of merged) counts.set(entry.event, (counts.get(entry.event) ?? 0) + 1);
     println('\n  \x1b[36mWaits SDK da sessão\x1b[0m');
     println(
-        `  \x1b[90mfonte=archive SSE canônico · arquivo=${state?.path ?? '(sem arquivo)'} · janela=${limit} · ask_user=${(counts.get('user_input.requested') ?? 0) + (counts.get('user_input.completed') ?? 0)} · elicitation=${(counts.get('elicitation.pending') ?? 0) + (counts.get('elicitation.completed') ?? 0)} · permission=${(counts.get('permission.requested') ?? 0) + (counts.get('permission.completed') ?? 0) + (counts.get('permission.mode_changed') ?? 0)}\x1b[0m`,
+        `  \x1b[90mfonte=archive SSE canônico · arquivo=${state?.path ?? '(sem arquivo)'} · janela=${limit} · perguntas=${(counts.get('user_input.requested') ?? 0) + (counts.get('user_input.completed') ?? 0)} · elicitation=${(counts.get('elicitation.pending') ?? 0) + (counts.get('elicitation.completed') ?? 0)} · permission=${(counts.get('permission.requested') ?? 0) + (counts.get('permission.completed') ?? 0) + (counts.get('permission.mode_changed') ?? 0)}\x1b[0m`,
     );
     const error = projections.find((projection) => projection.state.error)?.state.error;
     if (error) println(`  \x1b[31merro=${error}\x1b[0m`);

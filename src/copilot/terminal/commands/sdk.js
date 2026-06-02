@@ -693,7 +693,9 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
         `  status   ${headlineColor}${totalPending > 0 ? `${totalPending} pendencia(s)` : 'nenhuma pendencia'}\x1b[0m`,
     );
     println(
-        `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · request_user_input=${structuredInputPending}\x1b[0m`,
+        detail
+            ? `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · request_user_input=${structuredInputPending}\x1b[0m`
+            : `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · pergunta=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · input=${structuredInputPending}\x1b[0m`,
     );
 
     if (pendingElicitations.pending > 0) {
@@ -924,7 +926,7 @@ export async function cmdSdk({ println }, arg = '') {
             println(`  session  \x1b[90m${state.sessionId ?? '-'}\x1b[0m`);
             println(`  model    \x1b[33m${state.model}\x1b[0m  reasoning=\x1b[33m${state.reasoningEffort}\x1b[0m`);
             println(
-                `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · request_user_input=${structuredInputPending}\x1b[0m`,
+                `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · pergunta=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · input=${structuredInputPending}\x1b[0m`,
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             println(
