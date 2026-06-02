@@ -10,4 +10,5 @@ export {
 export { readTerminalStreamDiagnosticsProjection } from '../stream-diagnostics-state.js';
 export { readTerminalSseEventArchiveState } from '../sse-event-archive.js';
 export { readTerminalPromptHookSummary } from '../sdk-hook-events.js';
+export { readTerminalToolLifecycleProjection } from '../tool-lifecycle-state.js';
 export { readTerminalTurnTraceProjection } from '../turn-trace-state.js';

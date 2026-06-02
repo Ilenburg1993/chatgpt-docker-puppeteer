@@ -22,6 +22,7 @@ import {
     completeTerminalTurnToolCall,
     getTerminalDetailLevel,
     recordTerminalActivity,
+    recordTerminalToolLifecycleDiagnostic,
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
     terminalThemeBadge,
@@ -100,6 +101,7 @@ function recordTerminalDiagnosticToolStats(toolName, durationMs, success) {
  * @returns {void}
  */
 function broadcastToolLifecycle(event) {
+    recordTerminalToolLifecycleDiagnostic(event);
     broadcastSse('tool.lifecycle', withTerminalTurnCorrelation(event));
 }
 

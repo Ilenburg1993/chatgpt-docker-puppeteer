@@ -98,6 +98,8 @@
 - Nao conformidade textual do modelo com a serie DELTA-CANONICAL deixou de ser bloqueio de infraestrutura.
 - O prompt canonico foi reforcado para exigir as oito linhas publicas antes de `ask_user`.
 - O resumo de `sdkSessionBootSelection` no artefato foi reduzido para nao gravar o estado persistido inteiro.
+- `tool.lifecycle` agora alimenta um estado diagnostico bounded para `/tools diag`, sem substituir o registry operacional session-scoped.
+- `/tools diag` agora mostra lifecycle ativo/recente com `toolCallId`, `requestId`, trace, status, progresso e duracao em formato compacto.
 
 ## 03. Achados principais
 
@@ -348,13 +350,13 @@
 
 ### Faixa F - Tools e atividade
 
-- [ ] Revisar `tool-lifecycle-runtime` para status vivo sem excesso de writes.
-- [ ] Melhorar resumo de `/tools diag`.
-- [ ] Exibir `toolCallId` e `requestId` de forma compacta.
-- [ ] Separar start/progress/done visualmente.
+- [x] Revisar `tool-lifecycle-runtime` para status vivo sem excesso de writes.
+- [x] Melhorar resumo de `/tools diag`.
+- [x] Exibir `toolCallId` e `requestId` de forma compacta.
+- [x] Separar start/progress/done visualmente.
 - [x] Evitar que ask_user como tool duplique pergunta em transcript.
 - [ ] Garantir que tool real sempre vença texto simulado.
-- [ ] Adicionar teste de tool activity com ask_user.
+- [x] Adicionar teste de tool activity com ask_user.
 
 ### Faixa G - SSE e archive
 
@@ -391,7 +393,7 @@
 - [x] Atualizar runner para detectar `prompt prompt`.
 - [x] Atualizar runner para forcar sessao SDK nova nos cenarios full-turn.
 - [x] Atualizar runner para nao classificar nao conformidade DELTA como bloqueio de infraestrutura.
-- [ ] Atualizar runner para detectar linha viva no TTY quando habilitada.
+- [x] Atualizar runner para detectar linha viva no TTY quando habilitada.
 - [x] Rodar live test com caso canonico atual.
 - [ ] Rodar live test com resposta freeform.
 - [ ] Rodar live test com choice invalida.
@@ -420,10 +422,10 @@
 - [x] Definir metadata `syncBlockedReason` para timeline divergente.
 - [x] Revisar `/context` e `/history` com a semantica de `timeline=mixed/diverged`.
 - [ ] Garantir redaction de args sensiveis em export quando tool metadata entrar no Markdown.
-- [ ] Revisar `tool-lifecycle-runtime` para status vivo sem excesso de writes.
-- [ ] Melhorar resumo de `/tools diag`.
-- [ ] Exibir `toolCallId` e `requestId` de forma compacta em tools operacionais, nao apenas no envelope do export.
-- [ ] Separar start/progress/done visualmente em tool diagnostics.
+- [x] Revisar `tool-lifecycle-runtime` para status vivo sem excesso de writes.
+- [x] Melhorar resumo de `/tools diag`.
+- [x] Exibir `toolCallId` e `requestId` de forma compacta em tools operacionais, nao apenas no envelope do export.
+- [x] Separar start/progress/done visualmente em tool diagnostics.
 - [ ] Garantir que texto simulando tool nunca satisfaça criterio de tool real.
 - [ ] Adicionar correlacao mais clara entre stdout e SSE para pos-ask.
 - [ ] Atualizar live runner para comparar export contra SSE em termos de eventos correlacionados, nao apenas texto.
@@ -437,7 +439,7 @@
 - [ ] Rodar live test com choice invalida.
 - [ ] Rodar live test com tool longa e heartbeat.
 - [ ] Rodar live test com erro de tool recuperavel.
-- [ ] Atualizar runner para detectar linha viva no TTY quando habilitada.
+- [x] Atualizar runner para detectar linha viva no TTY quando habilitada.
 
 ## 07. Plano de implementacao imediato
 

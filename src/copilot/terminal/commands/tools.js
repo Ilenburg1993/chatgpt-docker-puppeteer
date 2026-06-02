@@ -19,6 +19,34 @@ import { readTerminalToolRegistrySnapshot } from '../frontend/gateways/index.js'
  */
 
 /**
+ * @param {string | null | undefined} value
+ * @param {number} [size=12]
+ * @returns {string | null}
+ */
+function compactId(value, size = 12) {
+    if (!value) return null;
+    const text = String(value);
+    return text.length <= size ? text : `${text.slice(0, size)}…`;
+}
+
+/**
+ * @param {import('../state/tool-lifecycle-state.js').TerminalToolLifecycleDiagnostic} entry
+ * @returns {string}
+ */
+function renderLifecycleDiagnosticLine(entry) {
+    const ids = [
+        entry.toolCallId ? `call=${compactId(entry.toolCallId)}` : null,
+        entry.requestId ? `req=${compactId(entry.requestId)}` : null,
+        entry.traceId ? `trace=${compactId(entry.traceId, 16)}` : null,
+    ].filter(Boolean);
+    const target = entry.path ?? entry.target;
+    const progress = entry.progress !== null ? ` · ${entry.progress}%` : '';
+    const duration = entry.durationMs !== null ? ` · ${Math.max(0, Math.round(entry.durationMs))}ms` : '';
+    const suffix = [entry.operation, target, ids.join(' · ')].filter(Boolean).join(' · ');
+    return `    \x1b[33m${entry.toolName}\x1b[0m  ${entry.status}${progress}${duration}${suffix ? `  \x1b[90m${suffix}\x1b[0m` : ''}`;
+}
+
+/**
  * Comando `/tools`.
  *
  * - Sem argumento: lista tools agregadas por nome canônico.
@@ -124,6 +152,23 @@ export function cmdTools({ println }, arg = '') {
             }
             if (detailedContract.issues.length > 10) {
                 println(`      \x1b[90m... ${detailedContract.issues.length - 10} issues adicionais\x1b[0m`);
+            }
+        }
+
+        const lifecycle = projection.lifecycle;
+        if (lifecycle) {
+            println('\n  \x1b[36mLifecycle recente\x1b[0m');
+            println(
+                `    \x1b[90mactive=${lifecycle.summary.active} · waitingUser=${lifecycle.summary.waitingUser} · recent=${lifecycle.summary.recent} · failedRecent=${lifecycle.summary.failedRecent}\x1b[0m`,
+            );
+            const active = lifecycle.active.slice(0, 8);
+            if (active.length > 0) {
+                println('    \x1b[90mem voo:\x1b[0m');
+                for (const entry of active) println(renderLifecycleDiagnosticLine(entry));
+            }
+            if (lifecycle.recent.length > 0) {
+                println('    \x1b[90mrecentes:\x1b[0m');
+                for (const entry of lifecycle.recent.slice(0, 8)) println(renderLifecycleDiagnosticLine(entry));
             }
         }
     }

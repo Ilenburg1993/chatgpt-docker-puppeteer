@@ -10,6 +10,7 @@ import {
     readTerminalActivitySnapshot,
     readTerminalSseEventArchiveState,
     readTerminalStreamDiagnosticsProjection,
+    readTerminalToolLifecycleProjection,
 } from '../../state/projections/index.js';
 import { normalizeTerminalModelBillingProjection, readTerminalRuntimeBase } from './shared.js';
 import { readTerminalTimelineProjection, readTerminalTimelineSyncTelemetry } from './timeline.js';
@@ -106,10 +107,14 @@ export function readTerminalMetricsProjection(runtimeId) {
 }
 
 /**
- * @returns {ReturnType<typeof readToolStatsProjection>}
+ * @returns {ReturnType<typeof readToolStatsProjection> & { lifecycle: ReturnType<typeof readTerminalToolLifecycleProjection> }}
  */
 export function readTerminalToolStatsProjection() {
-    return readToolStatsProjection();
+    const stats = readToolStatsProjection();
+    return {
+        ...stats,
+        lifecycle: readTerminalToolLifecycleProjection(8),
+    };
 }
 
 /**

@@ -1895,6 +1895,7 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
         /task\s+·\s+Executando tarefa interna\s+—\s+delta/.test(preEventsPlain) ||
         /"label":"Executando tarefa interna","detail":"delta/.test(preEventsPlain);
     const promptDoubleRender = /voc[eê]\[[^\r\n]*?›[ \t]+voc[eê]\[[^\r\n]*?›/iu.test(plain);
+    const inlineStatusRendered = /(?:⟲|⏳|⌛)\s+(?:LLM-B|aguardando)\b/iu.test(plain);
     const duplicatePathologies = [
         /__anonymous__/,
         /hook:error_occurred/,
@@ -1986,6 +1987,11 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
             id: 'no-prompt-double-render',
             pass: !promptDoubleRender,
             detail: promptDoubleRender ? 'adjacent prompt repaint detected' : 'no adjacent prompt repaint detected',
+        },
+        {
+            id: 'inline-status-rendered',
+            pass: inlineStatusRendered,
+            detail: inlineStatusRendered ? 'TTY inline/reserved status rendered' : 'TTY inline/reserved status not detected',
         },
         {
             id: 'no-final-delta-duplication',
