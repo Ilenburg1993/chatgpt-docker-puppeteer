@@ -20,19 +20,19 @@ describe('terminal/terminal-phases/boot-banner', () => {
         assert.equal(view.operationMode, 'standalone');
         assert.equal(view.mcpToolCount, 0);
         assert.equal(
-            view.lines.some((line) => line.includes('STANDALONE')),
+            view.lines.some((line) => line.includes('local · MCP remoto ausente')),
             true,
         );
         assert.equal(
-            view.lines.some((line) => line.includes('Registry local ativo')),
+            view.lines.some((line) => line.includes('Tools') && line.includes('locais ativas')),
             true,
         );
         assert.equal(
-            view.lines.some((line) => line.includes('Sessão SDK: auto-resume')),
+            view.lines.some((line) => line.includes('Sessão') && line.includes('SDK auto-resume')),
             true,
         );
         assert.equal(
-            view.lines.some((line) => line.includes('next new|resume|auto')),
+            view.lines.some((line) => line.includes('/session sdk')),
             true,
         );
         assert.equal(
@@ -56,7 +56,7 @@ describe('terminal/terminal-phases/boot-banner', () => {
         );
 
         const output = printlnFn.mock.calls.map((call) => String(call[0] ?? '')).join('\n');
-        assert.match(output, /CONECTADO/);
+        assert.match(output, /MCP conectado/);
         assert.match(output, /CLI indisponível/);
     });
 });

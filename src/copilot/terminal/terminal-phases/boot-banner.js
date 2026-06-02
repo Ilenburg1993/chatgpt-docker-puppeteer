@@ -32,19 +32,19 @@ export function buildTerminalStandaloneBannerView(opts, deps = {}) {
     const warnings = Array.isArray(bootPreflight?.warnings) ? bootPreflight.warnings : [];
 
     const modeLine = isStandalone
-        ? 'STANDALONE · MCP remoto ausente · tools locais ativas'
-        : `CONECTADO · MCP :3008 · ${Number(mcp.toolCount ?? 0)} tools`;
+        ? 'local · MCP remoto ausente · tools locais ativas'
+        : `MCP conectado · ${Number(mcp.toolCount ?? 0)} tools remotas`;
     /** @type {string[]} */
     const lines = [
         '',
-        `  Terminal LLM-B · ${modeLine}`,
-        `  inject ${opts.serverUrl} · /help · /status · /queue · /turn · /session sdk`,
-        '  Sessão SDK: auto-resume · next new|resume|auto',
+        `  Ambiente ${modeLine}`,
+        `  Acesso    ${opts.serverUrl} · /inject · /events · /sessions`,
+        '  Sessão    SDK auto-resume · /session sdk',
         '',
     ];
 
     if (isStandalone) {
-        lines.push('  Registry local ativo. Diagnóstico: /tools · /health.');
+        lines.push('  Tools     locais ativas · detalhes em /tools ou /health');
         lines.push('');
     }
     if (warnings.length > 0) {

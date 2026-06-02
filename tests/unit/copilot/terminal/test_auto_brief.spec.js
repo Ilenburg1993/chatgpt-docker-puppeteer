@@ -83,7 +83,7 @@ describe('terminal/repl/auto-brief', () => {
         const brief = buildTerminalAutoBrief({ phase: 'boot' });
         const text = brief.lines.join('\n');
 
-        expect(text).toContain('boot parcial');
+        expect(text).toContain('Boot      parcial');
         expect(text).not.toContain('file-tools canônicas locais não estão totalmente disponíveis');
     });
 
@@ -102,7 +102,7 @@ describe('terminal/repl/auto-brief', () => {
         const brief = buildTerminalAutoBrief({ phase: 'boot' });
         const text = brief.lines.join('\n');
 
-        expect(text).toContain('boot parcial');
+        expect(text).toContain('Boot      parcial');
         expect(text).toContain('há arquivos de instruções ausentes no reload do system prompt');
     });
 

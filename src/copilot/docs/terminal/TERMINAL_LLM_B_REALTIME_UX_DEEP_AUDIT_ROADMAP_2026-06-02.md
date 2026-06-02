@@ -925,6 +925,43 @@
 - Gap residual deliberado:
   - `/events`, `/tools diag`, `/intent detail`, export tecnico e runner live ainda podem mostrar nomes tecnicos, porque sao surfaces de diagnostico/protocolo.
 
+## 02.33 Primeira tela calma: banner, ambiente e auto-brief
+
+- Problema observado nas screenshots e lives:
+  - a primeira tela competia com o prompt e parecia uma colagem de logs;
+  - o banner default listava muitos comandos e misturava atalhos, HTTP e diagnostico;
+  - `boot-banner.js` imprimia `STANDALONE`, `Registry local ativo` e `Sessão SDK: auto-resume` como narrativa tecnica secundaria;
+  - `auto-brief.js` default repetia prefixos `[brief:boot]`/`[brief:ready]`, poluindo a tela antes mesmo do operador agir.
+- Situacao ideal desta camada:
+  - primeira tela deve ter poucos atalhos, explicar a rota de input humano e apontar para diagnostico sob demanda;
+  - ambiente deve ser uma ficha curta alinhada, nao uma segunda caixa;
+  - auto-brief default deve parecer cockpit operacional, nao log/debug;
+  - modo full/debug continua opt-in via `COPILOT_TERMINAL_BOOT_MENU=full` e `COPILOT_TERMINAL_AUTO_BRIEF=full`.
+- Mudancas aplicadas:
+  - `repl-banner.js` default foi reduzido para `/status`, `/now`, `/menu`, `/activity 10`, `/help`;
+  - a linha de input passou a dizer `texto livre -> fila zero-PR`, `/turn <msg>` e `@arquivo`;
+  - HTTP e diagnostico foram separados em uma linha curta;
+  - `terminal-phases/boot-banner.js` trocou `STANDALONE` por `Ambiente local`, `Acesso` e `Sessão` com labels alinhados;
+  - `auto-brief.js` default trocou `[brief:phase]` por `Sessão`, `BYOK`, `Fluxo`, `Boot` e `Atenção` alinhados;
+  - `COPILOT_TERMINAL_AUTO_BRIEF=full` preserva a saida tecnica anterior com `[auto-brief:phase]`.
+- Testes escopados executados:
+  - `npx vitest run tests/unit/copilot/terminal/test_repl_banner.spec.js tests/unit/copilot/terminal/test_auto_brief.spec.js tests/unit/copilot/terminal/test_boot_banner.spec.js`
+  - status PASS;
+  - 3 arquivos, 7 testes.
+- Evidencia live executada:
+  - comando:
+    - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/terminal-boot-calm-structured-input-20260602-0808`
+  - artefatos:
+    - `artifacts/terminal-live/terminal-boot-calm-structured-input-20260602-0808/summary.md`
+    - `artifacts/terminal-live/terminal-boot-calm-structured-input-20260602-0808/summary.json`
+    - `artifacts/terminal-live/terminal-boot-calm-structured-input-20260602-0808/structured-input-cycle.raw.log`
+    - `artifacts/terminal-live/terminal-boot-calm-structured-input-20260602-0808/structured-input-cycle.plain.log`
+  - status PASS;
+  - duracao 8065ms;
+  - a primeira tela mostrou banner compacto, auto-brief alinhado e bloco de ambiente sem `STANDALONE`.
+- Gap residual:
+  - a live ainda mostra `Iniciando AlwaysAliveAgent...`; proxima etapa deve humanizar mensagens de lifecycle do agente sem esconder diagnostico tecnico em logs.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -1319,11 +1356,18 @@
 - [x] Substituir menu inicial gigante por resumo compacto.
 - [x] Manter `/help` como superficie de comandos completos.
 - [x] Compactar auto-brief default em grupos humanos.
+- [x] Remover prefixos `[brief:boot]` e `[brief:ready]` do auto-brief default.
+- [x] Alinhar labels `Sessão`, `BYOK`, `Fluxo`, `Boot` e `Atenção`.
+- [x] Trocar `STANDALONE` por `Ambiente local` no bloco de boot.
+- [x] Separar `Acesso`, `Sessão` e `Tools` em linhas curtas no bloco de boot.
 - [x] Mover detalhes `parser/cache/index/scopes` para `/activity`, `/health` ou modo debug.
 - [x] Ajustar box standalone para largura responsiva.
 - [x] Rebaixar alerta MCP indisponivel quando tools locais estao ativas.
 - [x] Adicionar teste snapshot/regex do boot compacto.
 - [x] Adicionar live criterion de primeiro viewport sem overflow obvio.
+- [x] Rodar live PTY `terminal-boot-calm-structured-input-20260602-0808`.
+- [ ] Humanizar lifecycle `AlwaysAliveAgent`, `Conectando ao agente` e `Reanexando sessão SDK`.
+- [ ] Avaliar fusao do bloco `Ambiente` com auto-brief ready para reduzir altura inicial.
 
 ### Faixa R - Comandos de diagnostico com dois niveis
 

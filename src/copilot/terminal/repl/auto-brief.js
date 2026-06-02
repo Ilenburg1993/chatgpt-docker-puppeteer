@@ -59,6 +59,15 @@ function summarizeIoRuntime(ioRuntime) {
 }
 
 /**
+ * @param {string} label
+ * @param {string} detail
+ * @returns {string}
+ */
+function briefLine(label, detail) {
+    return `${label.padEnd(9)} ${detail}`;
+}
+
+/**
  * @param {string[]} warnings
  * @param {{ phase: TerminalAutoBriefPhase; ready: boolean }} context
  * @returns {string[]}
@@ -145,16 +154,19 @@ export function buildTerminalAutoBrief(input = {}) {
             projection.toolLoad.toolContract.ok ? null : `${projection.toolLoad.toolContract.errorCount} contrato`,
         ].filter(Boolean);
         lines.push(
-            `[brief:${phase}] ${model}/${reasoning} · sessão ${sessionTag} · ${displayPreset} · ${toolBits.join(' · ') || 'tools subindo'}`,
+            briefLine('Sessão', `${model}/${reasoning} · ${sessionTag} · ${displayPreset} · ${toolBits.join(' · ') || 'tools subindo'}`),
         );
         if (byok.enabled) {
             lines.push(
-                `[brief:${phase}] BYOK ${byok.ready ? 'pronto' : 'incompleto'} · ${byok.providerType ?? '-'} · ${byok.model ?? '-'} · auth=${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'none'}`,
+                briefLine(
+                    'BYOK',
+                    `${byok.ready ? 'pronto' : 'incompleto'} · ${byok.providerType ?? '-'} · ${byok.model ?? '-'} · ${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'sem auth'}`,
+                ),
             );
         }
-        lines.push(`[brief:${phase}] rota ${guidance.mode} · próximo ${guidance.nextCommand ?? '/status'}`);
-        if (!ready) lines.push(`[brief:${phase}] boot parcial · aguardando registry/dialog`);
-        if (visibleWarnings.length > 0) lines.push(`[brief:${phase}] atenção ${visibleWarnings.join(' | ')}`);
+        lines.push(briefLine('Fluxo', `${guidance.mode} · próximo ${guidance.nextCommand ?? '/status'}`));
+        if (!ready) lines.push(briefLine('Boot', 'parcial · aguardando registry/dialog'));
+        if (visibleWarnings.length > 0) lines.push(briefLine('Atenção', visibleWarnings.join(' | ')));
         return { phase, ready, fingerprint: buildAutoBriefFingerprint(projection), lines };
     }
     lines.push(

@@ -16,9 +16,9 @@ export function buildTerminalReplBanner(injectPort) {
 \x1b[36m┌──────────────────────────────────────────────────────────────┐\x1b[0m
 \x1b[36m│\x1b[0m  \x1b[1mTerminal LLM-B\x1b[0m  \x1b[90m· sessão permanente\x1b[0m                         \x1b[36m│\x1b[0m
 \x1b[36m└──────────────────────────────────────────────────────────────┘\x1b[0m
-  \x1b[33m/status\x1b[0m · \x1b[33m/health\x1b[0m · \x1b[33m/now\x1b[0m · \x1b[33m/activity 10\x1b[0m · \x1b[33m/tools\x1b[0m · \x1b[33m/events 20\x1b[0m · \x1b[33m/help\x1b[0m
-  \x1b[90mturno explícito: /turn <msg> · fila zero-PR: /queue <msg> · menu completo: /help\x1b[0m
-  \x1b[90mHTTP :${injectPort} · /inject · /events · /sessions · @caminho/arquivo para anexar\x1b[0m
+  \x1b[33m/status\x1b[0m · \x1b[33m/now\x1b[0m · \x1b[33m/menu\x1b[0m · \x1b[33m/activity 10\x1b[0m · \x1b[33m/help\x1b[0m
+  \x1b[90mtexto livre → fila zero-PR · /turn <msg> abre turno · @arquivo anexa contexto\x1b[0m
+  \x1b[90mHTTP :${injectPort} · /inject · /events · /sessions · diagnóstico: /health /tools\x1b[0m
 `;
 }
 
