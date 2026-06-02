@@ -72,6 +72,10 @@ function commandList(value) {
     return Array.isArray(value) ? value.map(optionalString).filter((item) => item !== null) : [];
 }
 
+function uniqueCommands(values) {
+    return [...new Set(values.map(optionalString).filter((item) => item !== null))];
+}
+
 const json = argSet.has('--json');
 const profile = readArg('--profile', 'repo_agent');
 const limit = readPositiveInt('--limit', 12);
@@ -184,6 +188,24 @@ function buildPolicyPresetAction(preset) {
     };
 }
 const policyPresets = listModelGatewayRuntimeAutomationPolicyPresets().map(buildPolicyPresetAction);
+const commandGroups = {
+    readOnly: uniqueCommands([
+        'npm run model-gateway:operator-ready',
+        'npm run model-gateway:operator-ready -- --json',
+        `/byok gateway operator-ready profile:${profile}`,
+        '/byok auto policy',
+        ...uniqueNextSafeCommands,
+    ]),
+    probeBeforePromotion: uniqueCommands(candidateActions.flatMap((action) => [action.commands.probeAgent, action.commands.probeChat])),
+    sameBoundarySwitch: uniqueCommands(candidateActions.map((action) => action.commands.liveModel)),
+    newSessionHandoff: uniqueCommands(candidateActions.map((action) => action.commands.newSessionProvider)),
+    persistence: uniqueCommands([
+        `npm run model-gateway:auto:standby -- --profile=${profile} --limit=${limit} --write-sqlite`,
+        ...candidateActions.map((action) => action.commands.persistProvider),
+    ]),
+    healthClear: uniqueCommands(candidateActions.flatMap((action) => [action.commands.clearHealthTerminal, action.commands.clearHealthApply])),
+    liveTests: liveCommands,
+};
 
 const checks = [
     check(
@@ -254,6 +276,7 @@ const output = {
         liveCommands: liveCommands.length,
         candidateActions: candidateActions.length,
         policyPresets: policyPresets.length,
+        commandGroups: Object.fromEntries(Object.entries(commandGroups).map(([group, commands]) => [group, commands.length])),
     },
     operatorDecision: {
         requiresHumanDecision: true,
@@ -269,6 +292,7 @@ const output = {
         liveWarning: 'liveCommands may consume provider quota or start terminal live tests; do not run them implicitly.',
     },
     policyPresets,
+    commandGroups,
     checks,
     blockers,
     warnings,
@@ -371,6 +395,9 @@ if (json) {
     }
     for (const command of liveCommands.slice(0, 3)) process.stdout.write(`  live-command: ${command}\n`);
     for (const preset of policyPresets) process.stdout.write(`  preset: ${preset.preset} command=${preset.command}\n`);
+    for (const [group, commands] of Object.entries(commandGroups)) {
+        process.stdout.write(`  command-group: ${group} commands=${commands.length}\n`);
+    }
     for (const command of uniqueNextSafeCommands.slice(0, 8)) process.stdout.write(`  next: ${command}\n`);
 }
 

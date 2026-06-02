@@ -213,14 +213,15 @@ metadata importers
 
 ### Faixa B - Cockpit Operacional Unico
 
-- [ ] B.1 Consolidar status de catalogo, SQLite, selector, auto policy e terminal boundary.
-- [ ] B.2 Mostrar modelo vivo, modelo preparado e rota selecionada em uma unica saida.
-- [ ] B.3 Mostrar standby top-N por perfil.
+- [x] B.1 Consolidar status de catalogo, SQLite, selector, auto policy e terminal boundary.
+- [x] B.2 Mostrar modelo vivo, modelo preparado e rota selecionada em uma unica saida.
+- [x] B.3 Mostrar standby top-N por perfil.
 - [ ] B.4 Mostrar blockers agrupados por action: probe, clear, wait, configure key, new boot.
-- [ ] B.5 Mostrar proximo comando seguro para humano.
-- [ ] B.6 Mostrar proximo comando seguro para LLM operadora.
-- [ ] B.7 Garantir JSON estavel para automacao.
+- [x] B.5 Mostrar proximo comando seguro para humano.
+- [x] B.6 Mostrar proximo comando seguro para LLM operadora.
+- [x] B.7 Garantir JSON estavel para automacao.
 - [x] B.8 Garantir texto curto e escaneavel para terminal.
+- [ ] B.9 Agrupar blockers reais por action quando houver falha ativa.
 
 ### Faixa C - Default Auto
 

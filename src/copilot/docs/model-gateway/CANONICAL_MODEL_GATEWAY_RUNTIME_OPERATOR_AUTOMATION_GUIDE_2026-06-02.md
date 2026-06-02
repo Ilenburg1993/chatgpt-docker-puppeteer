@@ -125,11 +125,13 @@ Referencia canonica transversal atual:
 - [x] B.3 Expor checks booleanos e blockers.
 - [x] B.4 Expor next safe commands.
 - [x] B.5 Renderizar cockpit no terminal.
-- [ ] B.6 Mostrar modelo vivo, preparado e alvo em uma unica tela.
-- [ ] B.7 Mostrar fallback reason e fallback origin.
-- [ ] B.8 Mostrar standby top-N por profile.
-- [ ] B.9 Mostrar comandos de troca agrupados por risco.
-- [ ] B.10 Garantir modo JSON estavel para LLM.
+- [x] B.6 Mostrar modelo vivo, preparado e alvo em uma unica tela.
+- [x] B.7 Mostrar fallback reason e fallback origin.
+- [x] B.8 Mostrar standby top-N por profile.
+- [x] B.9 Mostrar comandos de troca agrupados por risco.
+- [x] B.10 Garantir modo JSON estavel para LLM.
+- [ ] B.11 Agrupar blockers reais por action quando houver falha ativa.
+- [ ] B.12 Mostrar classificacao fina de standby `same_boundary`, `new_provider`, `needs_probe`.
 
 ### Faixa C - Policy Default E Presets
 
