@@ -233,7 +233,7 @@ metadata importers
 - [x] C.7 Persistir policy snapshot sempre que auto roda.
 - [ ] C.8 Mostrar por que auto aplicou ou nao aplicou.
 - [x] C.9 Garantir que local/Ollama continua opt-in.
-- [ ] C.10 Expor presets no JSON do cockpit unificado.
+- [x] C.10 Expor presets no JSON do cockpit unificado.
 
 ### Faixa D - Standby E Substituicao
 

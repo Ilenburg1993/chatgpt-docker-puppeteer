@@ -2,6 +2,7 @@
 import { spawnSync } from 'node:child_process';
 
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
+import { listModelGatewayRuntimeAutomationPolicyPresets } from '../../../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
 const argSet = new Set(args);
@@ -155,6 +156,34 @@ const liveCommands = [
     'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
     `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=${profile} --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=900000 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000`,
 ];
+function buildPolicyPresetAction(preset) {
+    const presetId = optionalString(preset['preset']) ?? 'operator_manual';
+    const profileArg = `profile:${profile}`;
+    return {
+        preset: presetId,
+        policy: optionalString(preset['policy']) ?? 'prefer_runtime_proved',
+        effects: {
+            liveSetModel: preset['allowLiveSetModel'] === true,
+            newSession: preset['allowNewSession'] === true,
+            providerProbes: preset['allowProviderProbes'] === true,
+            localPrivate: preset['allowLocalPrivate'] === true,
+        },
+        accountWideFailureKinds: commandList(preset['accountWideFailureKinds']),
+        command: `/byok auto on ${profileArg} preset:${presetId}`,
+        terminalPolicyCommand: '/byok auto policy',
+        env: [
+            'COPILOT_BYOK_GATEWAY_AUTO=true',
+            `COPILOT_BYOK_GATEWAY_AUTO_PRESET=${presetId}`,
+            `COPILOT_BYOK_GATEWAY_AUTO_POLICY=${optionalString(preset['policy']) ?? 'prefer_runtime_proved'}`,
+            `COPILOT_BYOK_GATEWAY_AUTO_PROFILES=${profile}`,
+            `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LIVE_SET_MODEL=${preset['allowLiveSetModel'] === true ? 'true' : 'false'}`,
+            `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_NEW_SESSION=${preset['allowNewSession'] === true ? 'true' : 'false'}`,
+            `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_PROVIDER_PROBES=${preset['allowProviderProbes'] === true ? 'true' : 'false'}`,
+            `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LOCAL_PRIVATE=${preset['allowLocalPrivate'] === true ? 'true' : 'false'}`,
+        ],
+    };
+}
+const policyPresets = listModelGatewayRuntimeAutomationPolicyPresets().map(buildPolicyPresetAction);
 
 const checks = [
     check(
@@ -224,6 +253,7 @@ const output = {
         nextSafeCommands: uniqueNextSafeCommands.length,
         liveCommands: liveCommands.length,
         candidateActions: candidateActions.length,
+        policyPresets: policyPresets.length,
     },
     operatorDecision: {
         requiresHumanDecision: true,
@@ -233,8 +263,12 @@ const output = {
         applyCommand: `/byok auto apply profile:${profile} allow-live-set-model`,
         fullHandoffCommand: `/byok auto apply profile:${profile} allow-live-set-model allow-new-session`,
         standbyCommand: `npm run model-gateway:auto:standby -- --profile=${profile} --limit=${limit}`,
+        defaultAutoOnCommand: `/byok auto on profile:${profile}`,
+        guardedLlmCommand: `/byok auto on profile:${profile} preset:llm_operator_guarded`,
+        prepareNewSessionCommand: `/byok auto on profile:${profile} preset:auto_prepare_new_session`,
         liveWarning: 'liveCommands may consume provider quota or start terminal live tests; do not run them implicitly.',
     },
+    policyPresets,
     checks,
     blockers,
     warnings,
@@ -336,6 +370,7 @@ if (json) {
         );
     }
     for (const command of liveCommands.slice(0, 3)) process.stdout.write(`  live-command: ${command}\n`);
+    for (const preset of policyPresets) process.stdout.write(`  preset: ${preset.preset} command=${preset.command}\n`);
     for (const command of uniqueNextSafeCommands.slice(0, 8)) process.stdout.write(`  next: ${command}\n`);
 }
 

@@ -143,7 +143,7 @@ Referencia canonica transversal atual:
 - [x] C.8 Explicar divergencia entre policy file e env.
 - [x] C.9 Garantir que local/Ollama continua opt-in em todos os presets.
 - [ ] C.10 Criar fixture terminal para preset invalido e overrides negativos `no-new-session`.
-- [ ] C.11 Expor presets tambem no JSON do cockpit unificado.
+- [x] C.11 Expor presets tambem no JSON do cockpit unificado.
 
 #### Presets Implementados Em 2026-06-02
 
@@ -156,6 +156,8 @@ Referencia canonica transversal atual:
 `auto_prepare_new_session` autoriza troca dentro da mesma fronteira e preparacao de novo boot SDK quando a rota exige outro provider/boundary.
 
 Todos os presets mantem provider probes e local/Ollama desligados por default. Local/private continua exigindo opt-in explicito do operador.
+
+`npm run model-gateway:operator-ready -- --json` expoe `policyPresets[]`, com comando terminal, env sugerido e efeitos permitidos por preset. O cockpit terminal mostra tambem o `preset` efetivo na linha de policy.
 
 ### Faixa D - Standby Contract
 
