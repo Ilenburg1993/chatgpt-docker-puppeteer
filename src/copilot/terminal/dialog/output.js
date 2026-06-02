@@ -207,7 +207,7 @@ function wrapPlainStatusLine(line, columns) {
 function fitInlineStatusRows(text) {
     const columns = resolveInlineStatusColumns();
     const maxRows = resolveInlineStatusMaxRows();
-    const sanitized = String(text).replaceAll(ANSI_CLEAR_TO_END_OF_LINE, '').replace(/\r/g, '');
+    const sanitized = normalizeInlineStatusText(text).replaceAll(ANSI_CLEAR_TO_END_OF_LINE, '').replace(/\r/g, '');
     const naturalRows = sanitized.split('\n');
     const alreadyFits =
         naturalRows.length <= maxRows && naturalRows.every((line) => visibleTextLength(line) <= columns);
@@ -225,6 +225,29 @@ function fitInlineStatusRows(text) {
     const lastIndex = rows.length - 1;
     rows[lastIndex] = truncateVisibleEnd(rows[lastIndex] ?? '', columns);
     return rows.map((line) => `${line}${ANSI_CLEAR_TO_END_OF_LINE}`);
+}
+
+/**
+ * Ultima barreira de apresentacao da linha viva. Os produtores modernos ja enviam texto humano; este fallback impede
+ * que rotas antigas reintroduzam taxonomia interna no rodape do operador.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function normalizeInlineStatusText(text) {
+    return String(text)
+        .replace(/\bLLM-B\s+tool\/Executando tool\b/giu, 'LLM-B ferramenta · Ferramenta em uso')
+        .replace(/\btool\/Executando tool\b/giu, 'ferramenta · Ferramenta em uso')
+        .replace(/\btool\/([^·\n]+)/giu, 'ferramenta · $1')
+        .replace(/\bturn\/([^·\n]+)/giu, 'turno · $1')
+        .replace(/\bthinking\/([^·\n]+)/giu, 'pensando · $1')
+        .replace(/\bstreaming\/([^·\n]+)/giu, 'respondendo · $1')
+        .replace(/\brequest_user_input ainda executando\b[^\n]*/giu, 'Pergunta ao operador aguardando resposta')
+        .replace(/\bchatcmpl-tool-[a-z0-9-]+\b/giu, 'id interno')
+        .replace(/\b(?:toolu|call)_[a-z0-9_-]+\b/giu, 'id interno')
+        .replace(/\bexec_command\b/giu, 'Executar comando')
+        .replace(/\bread_file_content\b/giu, 'Ler arquivo')
+        .replace(/\breport_intent(?:_local)?\b/giu, 'Intent capturado');
 }
 
 /**

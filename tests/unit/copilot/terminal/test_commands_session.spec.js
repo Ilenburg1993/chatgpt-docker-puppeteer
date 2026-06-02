@@ -566,11 +566,13 @@ describe('commands/session — sync commands', () => {
     it('cmdLive full preserva fluxo operacional live consolidado', () => {
         const ctx = mockCtx();
         cmdLive({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, 'full');
-        expect(ctx.output()).toContain('Terminal Live Flow');
+        expect(ctx.output()).toContain('Fluxo detalhado da conversa');
         expect(ctx.output()).toContain('estado');
-        expect(ctx.output()).toContain('streaming');
-        expect(ctx.output()).toContain('sse');
+        expect(ctx.output()).toContain('sinais');
+        expect(ctx.output()).toContain('SSE');
         expect(ctx.output()).toContain('trace');
+        expect(ctx.output()).not.toContain('streaming=');
+        expect(ctx.output()).not.toContain('phase:');
     });
 
     it('cmdStatus aceita runtimeId explícito na sintaxe do REPL', () => {

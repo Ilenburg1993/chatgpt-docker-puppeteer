@@ -243,10 +243,13 @@ describe('terminal/commands/sdk', () => {
     it('/sdk status exibe runtime, sessão e quota', async () => {
         const ctx = mockCtx();
         await cmdSdk({ println: ctx.println }, 'status');
-        expect(ctx.output()).toContain('SDK Runtime');
+        expect(ctx.output()).toContain('SDK do Terminal');
         expect(ctx.output()).toContain('sdk-1');
         expect(ctx.output()).toContain('chat');
-        expect(ctx.output()).toContain('pergunta=0');
+        expect(ctx.output()).toContain('0 perguntas');
+        expect(ctx.output()).not.toContain('pergunta=0');
+        expect(ctx.output()).not.toContain('reasoning=');
+        expect(ctx.output()).not.toContain('restante=');
     });
 
     it('/sdk capabilities exibe capacidades consolidadas da sessão SDK', async () => {
@@ -316,9 +319,10 @@ describe('terminal/commands/sdk', () => {
 
         expect(ctx.output()).toContain('Esperas humanas');
         expect(ctx.output()).toContain('3 pendência(s)');
-        expect(ctx.output()).toContain('formulários=1');
-        expect(ctx.output()).toContain('permissões=1');
-        expect(ctx.output()).toContain('perguntas=1');
+        expect(ctx.output()).toContain('1 formulário');
+        expect(ctx.output()).toContain('1 permissão');
+        expect(ctx.output()).toContain('1 pergunta');
+        expect(ctx.output()).not.toContain('formulários=1');
         expect(ctx.output()).toContain('/elicitation show latest');
         expect(ctx.output()).toContain('/permission show latest');
     });
@@ -344,9 +348,9 @@ describe('terminal/commands/sdk', () => {
         const ctx = mockCtx();
         await cmdSdk({ println: ctx.println }, 'waits --runtime audit');
 
-        expect(ctx.output()).toContain('formulários=1');
-        expect(ctx.output()).toContain('permissões=1');
-        expect(ctx.output()).toContain('perguntas=1');
+        expect(ctx.output()).toContain('1 formulário');
+        expect(ctx.output()).toContain('1 permissão');
+        expect(ctx.output()).toContain('1 pergunta');
     });
 
     it('/sdk waits mostra request_user_input pendente sem vazar ID no default', async () => {
@@ -364,9 +368,9 @@ describe('terminal/commands/sdk', () => {
         const ctx = mockCtx();
         await cmdSdk({ println: ctx.println }, 'waits');
 
-        expect(ctx.output()).toContain('inputs=1');
+        expect(ctx.output()).toContain('1 input estruturado');
         expect(ctx.output()).not.toContain('request-user-input-test-1');
-        expect(ctx.output()).toContain('choices=seguir | pausar');
+        expect(ctx.output()).toContain('opções seguir | pausar');
         expect(ctx.output()).toContain('Escolha a estrategia');
 
         const detail = mockCtx();

@@ -42,6 +42,11 @@ import {
     classifyTerminalByokSdkBinding,
     renderTerminalSdkProviderBinding,
 } from '../byok/index.js';
+import {
+    buildTerminalToolActivityPresentation,
+    compactTerminalToolText,
+    isTerminalInternalCallIdentifier,
+} from '../events/tool-activity-presenter.js';
 import { readTerminalSseEventArchiveTail, terminalPermissionModeSkipsSdkPrompts } from '../state/index.js';
 
 const DISABLED_BYOK_SUMMARY = Object.freeze({
@@ -91,6 +96,198 @@ function renderHumanTerminalHealth(value) {
  */
 function pluralPt(value, singular, plural) {
     return `${value} ${value === 1 ? singular : plural}`;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function compactHumanTerminalText(value) {
+    const text = typeof value === 'string' ? value : value == null ? '' : String(value);
+    return compactTerminalToolText(text.replace(/\s+/gu, ' ').trim(), 120);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderLiveFlowStateLabel(value) {
+    const state = String(value ?? '');
+    if (state === 'ready') return 'pronto';
+    if (state === 'active-turn') return 'turno ativo';
+    if (state === 'waiting-human') return 'aguardando você';
+    if (state === 'paused') return 'pausado';
+    if (state === 'offline') return 'fora do ar';
+    if (state === 'recovering') return 'recuperando';
+    return state || 'indefinido';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderLivePhaseLabel(value) {
+    const phase = String(value ?? '');
+    if (phase === 'idle') return 'pronto';
+    if (phase === 'turn') return 'turno';
+    if (phase === 'thinking') return 'pensando';
+    if (phase === 'streaming') return 'respondendo';
+    if (phase === 'tool') return 'ferramenta';
+    if (phase === 'ask' || phase === 'user-input') return 'pergunta';
+    if (phase === 'error') return 'erro';
+    return phase || 'atividade';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderLiveOperationLabel(value) {
+    const operation = String(value ?? '');
+    if (operation === 'ask') return 'pergunta';
+    if (operation === 'intent') return 'intenção';
+    if (operation === 'read') return 'leitura';
+    if (operation === 'write') return 'escrita';
+    if (operation === 'edit') return 'edição';
+    if (operation === 'copy') return 'cópia';
+    if (operation === 'move' || operation === 'rename') return 'movimento';
+    if (operation === 'delete' || operation === 'unlink') return 'exclusão';
+    if (operation === 'list') return 'listagem';
+    if (operation === 'run' || operation === 'exec') return 'execução';
+    if (operation === 'inspect' || operation === 'stat') return 'inspeção';
+    if (operation === 'mkdir') return 'criação de pasta';
+    return operation || 'operação';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderLiveStatusLabel(value) {
+    const status = String(value ?? '');
+    if (status === 'active' || status === 'running' || status === 'started') return 'em andamento';
+    if (status === 'completed' || status === 'done' || status === 'success' || status === 'ok') return 'concluída';
+    if (status === 'failed' || status === 'fail' || status === 'error') return 'falhou';
+    if (status === 'requested' || status === 'pending') return 'pendente';
+    if (status === 'answered') return 'respondida';
+    return status || 'registrada';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderLiveSourceLabel(value) {
+    const source = String(value ?? '').trim().toLowerCase();
+    if (!source) return 'terminal';
+    if (source === 'sdk' || source.startsWith('sdk/')) return 'SDK';
+    if (source === 'agent' || source.startsWith('agent/')) return 'agente';
+    if (source === 'dialog' || source.startsWith('dialog')) return 'diálogo';
+    if (source === 'io') return 'I/O real';
+    if (source.includes('terminal')) return 'terminal';
+    return compactHumanTerminalText(value);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function compactLiveLabel(value) {
+    return compactHumanTerminalText(value)
+        .replace(/^idle$/iu, 'pronto')
+        .replace(/^Pending messages alteradas$/iu, 'Contexto da conversa atualizado')
+        .replace(/^Tool concluída\b/iu, 'Ferramenta concluída')
+        .replace(/^Tool falhou\b/iu, 'Ferramenta falhou')
+        .replace(/^I\/O read concluído\b/iu, 'I/O leitura concluída')
+        .replace(/^I\/O write concluído\b/iu, 'I/O escrita concluída')
+        .replace(/^ask_user SDK solicitado\b/iu, 'Pergunta ao operador solicitada')
+        .replace(/^request_user_input\b/iu, 'Pergunta ao operador');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function compactLiveDetail(value) {
+    return compactHumanTerminalText(value)
+        .replace(/\bmodelo=/giu, 'modelo ')
+        .replace(/\bcusto=/giu, 'custo ')
+        .replace(/\bstatus=success\b/giu, 'concluída')
+        .replace(/\bstatus=completed\b/giu, 'concluída')
+        .replace(/\bstatus=failed\b/giu, 'falhou')
+        .replace(/\bchoices=/giu, 'opções=')
+        .replace(/\bread\s+·/giu, 'leitura ·')
+        .replace(/\bwrite\s+·/giu, 'escrita ·');
+}
+
+/**
+ * @param {number} bytes
+ * @returns {string}
+ */
+function renderLiveBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+    if (bytes < 1024) return `${Math.round(bytes)} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * @param {boolean} value
+ * @returns {string}
+ */
+function renderLiveToggle(value) {
+    return value ? 'ativo' : 'inativo';
+}
+
+/**
+ * @param {unknown} mode
+ * @returns {string}
+ */
+function renderLiveSdkMode(mode) {
+    const value = String(mode ?? 'interactive');
+    if (value === 'interactive') return 'interativo';
+    if (value === 'plan') return 'plano';
+    if (value === 'autopilot') return 'autopiloto';
+    return value;
+}
+
+/**
+ * @param {{ phase?: unknown; label?: unknown; detail?: unknown }} activity
+ * @param {{ includePhase?: boolean }} [options]
+ * @returns {string}
+ */
+function renderLiveActivitySummary(activity, options = {}) {
+    const label = compactLiveLabel(activity.label ?? activity.phase ?? 'sem atividade recente');
+    const detail = activity.detail ? ` · ${compactLiveDetail(activity.detail)}` : '';
+    return options.includePhase ? `${renderLivePhaseLabel(activity.phase)} · ${label}${detail}` : `${label}${detail}`;
+}
+
+/**
+ * @param {{ toolName?: string; operation?: string; path?: string | null; target?: string | null; status?: string | null; source?: string | null }} tool
+ * @param {{ detail: boolean }} options
+ * @returns {string}
+ */
+function renderLiveToolSummary(tool, options) {
+    const operation = renderLiveOperationLabel(tool.operation);
+    const targetCandidate = tool.path ?? tool.target ?? null;
+    const targetIsInternal = isTerminalInternalCallIdentifier(targetCandidate);
+    const presentation = buildTerminalToolActivityPresentation(
+        {
+            toolName: String(tool.toolName ?? ''),
+            operation: String(tool.operation ?? ''),
+            args: targetCandidate && !targetIsInternal ? { path: targetCandidate } : {},
+        },
+        String(tool.toolName ?? 'tool'),
+    );
+    const target =
+        targetCandidate && !targetIsInternal
+            ? ` · ${compactTerminalToolText(targetCandidate, 96)}`
+            : targetCandidate && options.detail
+              ? ` · id ${compactTerminalToolText(targetCandidate, 32)}`
+              : '';
+    const status = tool.status ? ` · ${renderLiveStatusLabel(tool.status)}` : '';
+    const source = options.detail ? ` · ${renderLiveSourceLabel(tool.source)}` : '';
+    return `${presentation.displayToolName} · ${operation}${target}${status}${source}`;
 }
 
 /**
@@ -652,11 +849,11 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
                 ? '\x1b[33m'
                 : '\x1b[31m';
     const streamFlags = [
-        `streaming=${projection.stream.streaming ? 'on' : 'off'}`,
-        `thinking=${projection.stream.thinking ? 'on' : 'off'}`,
-        `tools=${projection.stream.toolActivity ? 'on' : 'off'}`,
-        `intent=${projection.stream.intent ? 'on' : 'off'}`,
-        `usage=${projection.stream.usage ? 'on' : 'off'}`,
+        `resposta ${renderLiveToggle(projection.stream.streaming)}`,
+        `raciocínio ${renderLiveToggle(projection.stream.thinking)}`,
+        `ferramentas ${renderLiveToggle(projection.stream.toolActivity)}`,
+        `intenção ${renderLiveToggle(projection.stream.intent)}`,
+        `uso ${renderLiveToggle(projection.stream.usage)}`,
     ].join(' · ');
     const ioRuntime = status.ioRuntime;
     const cacheHitRatio = Number(ioRuntime.cache.aggregate.hitRatio || 0).toFixed(3);
@@ -674,23 +871,15 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
             projection.counters.fileCount > 0 ? `${projection.counters.fileCount} arquivo(s)` : null,
             projection.counters.recentIoCount > 0 ? `${projection.counters.recentIoCount} I/O recente` : null,
         ].filter(Boolean);
-        const stateLabel =
-            projection.state === 'ready'
-                ? 'pronto'
-                : projection.state === 'active-turn'
-                  ? 'turno ativo'
-                  : projection.state === 'waiting-human'
-                    ? 'aguardando você'
-                    : projection.state === 'paused'
-                      ? 'pausado'
-                      : projection.state;
+        const stateLabel = renderLiveFlowStateLabel(projection.state);
+        const activityLine = renderLiveActivitySummary(current);
         println(`
   \x1b[36mFluxo da conversa\x1b[0m
   ─────────────────────────────────────
   Estado       ${stateColor}${stateLabel}\x1b[0m \x1b[90m${projection.summary}\x1b[0m
   Conversa     \x1b[90m${status.dialogLoopActive ? 'ativa' : 'inativa'} · ${renderHumanTerminalStatus(status.snap['status'])}${status.snap['dialogPaused'] ? ' · pausada' : ''}\x1b[0m
   Sinais       \x1b[90m${streamBits.join(' · ') || 'sinais reduzidos'}\x1b[0m
-  Atividade    \x1b[90m${current.label}${current.detail ? ` · ${current.detail}` : ''}\x1b[0m
+  Atividade    \x1b[90m${activityLine}\x1b[0m
   Turno        \x1b[90m${traceSummary.join(' · ') || 'sem ações recentes'}\x1b[0m
   Conexões     \x1b[90mSSE ${projection.sse.clients}/${projection.sse.criticalClients} · timeline ${projection.counters.timelineTurns} turno(s)\x1b[0m
   Detalhe      \x1b[90m/live full · /activity ${requestedLimit} detail · /events ${requestedLimit}\x1b[0m
@@ -700,30 +889,27 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     }
 
     println(`
-  \x1b[36mTerminal Live Flow\x1b[0m
+  \x1b[36mFluxo detalhado da conversa\x1b[0m
   ─────────────────────────────────────
-  estado          ${stateColor}${projection.state}\x1b[0m \x1b[90m${projection.summary}\x1b[0m
-  runtime         \x1b[90m${status.runtimeId} · ${String(status.snap['status'] ?? 'unknown')} · loop=${status.dialogLoopActive ? 'on' : 'off'} · paused=${status.snap['dialogPaused'] ? 'yes' : 'no'}\x1b[0m
-  sdk/session     \x1b[90mmode=${status.sdkSessionMode ?? 'interactive'} · session=${status.sdkSessionId ?? '(sem sdk)'} · permission=${status.permissionMode}\x1b[0m
-  streaming       \x1b[90m${streamFlags}\x1b[0m
-  sse             \x1b[90mclients=${projection.sse.clients} · critical=${projection.sse.criticalClients} · replayLastId=${projection.sse.replayLastId}\x1b[0m
-  timeline        \x1b[90m${projection.timeline.timelineSource} · ${projection.timeline.reconciliationStatus} · sync=${projection.timeline.sync.status} · turns=${projection.counters.timelineTurns}\x1b[0m
-  cache/scope     \x1b[90ml1=${ioRuntime.cache.l1['enabled'] ? 'on' : 'off'}:${ioRuntime.cache.l1['size'] ?? 0} · l2=${ioRuntime.cache.l2['enabled'] ? 'on' : 'off'}:${ioRuntime.cache.l2['size'] ?? 0} · hitRatio=${cacheHitRatio} · index=${ioIndex['available'] ? 'on' : 'empty'}:${ioIndex['files'] ?? 0} · scopes=${ioRuntime.scopes.active} · parser=${ioRuntime.parser.size}/${ioRuntime.parser.maxSize}\x1b[0m
-  atividade       \x1b[90m${current.phase}:${current.label}${current.detail ? ` · ${current.detail}` : ''}\x1b[0m
-  trace           \x1b[90mtools=${projection.counters.toolCount} · arquivos=${projection.counters.fileCount} · ioRecent=${projection.counters.recentIoCount}\x1b[0m
+  estado          ${stateColor}${renderLiveFlowStateLabel(projection.state)}\x1b[0m \x1b[90m${projection.summary}\x1b[0m
+  runtime         \x1b[90m${status.runtimeId} · ${renderHumanTerminalStatus(status.snap['status'])} · conversa ${status.dialogLoopActive ? 'ativa' : 'inativa'} · ${status.snap['dialogPaused'] ? 'pausada' : 'não pausada'}\x1b[0m
+  sessão SDK      \x1b[90m${renderLiveSdkMode(status.sdkSessionMode)} · ${status.sdkSessionId ?? 'sem sessão SDK'} · permissões ${status.permissionMode}\x1b[0m
+  sinais          \x1b[90m${streamFlags}\x1b[0m
+  conexões        \x1b[90m${projection.sse.clients} cliente(s) SSE · ${projection.sse.criticalClients} crítico(s) · replay ${projection.sse.replayLastId}\x1b[0m
+  timeline        \x1b[90m${projection.timeline.timelineSource} · ${projection.timeline.reconciliationStatus} · sync ${projection.timeline.sync.status} · ${projection.counters.timelineTurns} turno(s)\x1b[0m
+  cache/escopo    \x1b[90mL1 ${renderLiveToggle(Boolean(ioRuntime.cache.l1['enabled']))}:${ioRuntime.cache.l1['size'] ?? 0} · L2 ${renderLiveToggle(Boolean(ioRuntime.cache.l2['enabled']))}:${ioRuntime.cache.l2['size'] ?? 0} · acerto ${cacheHitRatio} · índice ${ioIndex['available'] ? 'ativo' : 'vazio'}:${ioIndex['files'] ?? 0} · escopos ${ioRuntime.scopes.active} · parser ${ioRuntime.parser.size}/${ioRuntime.parser.maxSize}\x1b[0m
+  atividade       \x1b[90m${renderLiveActivitySummary(current, { includePhase: true })}\x1b[0m
+  trace           \x1b[90m${projection.counters.toolCount} ferramenta(s) · ${projection.counters.fileCount} arquivo(s) · ${projection.counters.recentIoCount} I/O recente\x1b[0m
   ─────────────────────────────────────`);
 
     if (activeTrace && (activeTrace.tools.length > 0 || activeTrace.files.length > 0)) {
         println('  turno observado');
         for (const tool of activeTrace.tools.slice(0, 5)) {
-            const target = tool.path ?? tool.target;
-            println(
-                `    - tool ${tool.toolName} · ${tool.operation}${target ? ` · ${target}` : ''} · ${tool.status} · ${tool.source}`,
-            );
+            println(`    - ${renderLiveToolSummary(tool, { detail: true })}`);
         }
         for (const file of activeTrace.files.slice(0, 5)) {
             println(
-                `    - file ${file.operation} · ${file.path} · ${file.source}${file.count > 1 ? ` x${file.count}` : ''}`,
+                `    - arquivo · ${renderLiveOperationLabel(file.operation)} · ${compactHumanTerminalText(file.path)} · ${renderLiveSourceLabel(file.source)}${file.count > 1 ? ` ×${file.count}` : ''}`,
             );
         }
     }
@@ -736,15 +922,17 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
                 minute: '2-digit',
                 second: '2-digit',
             });
-            const statusLabel = entry.success ? 'ok' : 'fail';
+            const statusLabel = entry.success ? 'concluída' : 'falhou';
             const bytes =
                 typeof entry.bytesRead === 'number'
-                    ? ` · read=${entry.bytesRead}B`
+                    ? ` · ${renderLiveBytes(entry.bytesRead)} lidos`
                     : typeof entry.bytesWritten === 'number'
-                      ? ` · write=${entry.bytesWritten}B`
+                      ? ` · ${renderLiveBytes(entry.bytesWritten)} escritos`
                       : '';
             const duration = typeof entry.durationMs === 'number' ? ` · ${entry.durationMs}ms` : '';
-            println(`    - [${ts}] ${statusLabel} · ${entry.operation} · ${entry.target}${bytes}${duration}`);
+            println(
+                `    - [${ts}] ${statusLabel} · ${renderLiveOperationLabel(entry.operation)} · ${compactHumanTerminalText(entry.target)}${bytes}${duration}`,
+            );
         }
     }
 
@@ -757,9 +945,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
                 second: '2-digit',
             });
             const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';
-            println(
-                `    - [${ts}] ${entry.phase}:${entry.label}${progress}${entry.detail ? ` · ${entry.detail}` : ''}`,
-            );
+            println(`    - [${ts}] ${renderLiveActivitySummary(entry, { includePhase: true })}${progress}`);
         }
     }
 

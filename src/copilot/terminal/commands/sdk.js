@@ -85,6 +85,34 @@ function objectOrNull(value) {
 }
 
 /**
+ * @param {number} value
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function pluralPt(value, singular, plural) {
+    return `${value} ${value === 1 ? singular : plural}`;
+}
+
+/**
+ * @param {{
+ *     forms: number;
+ *     permissions: number;
+ *     questions: number;
+ *     inputs: number;
+ * }} waits
+ * @returns {string}
+ */
+function renderHumanSdkWaitCounts(waits) {
+    return [
+        pluralPt(waits.forms, 'formulário', 'formulários'),
+        pluralPt(waits.permissions, 'permissão', 'permissões'),
+        pluralPt(waits.questions, 'pergunta', 'perguntas'),
+        pluralPt(waits.inputs, 'input estruturado', 'inputs estruturados'),
+    ].join(' · ');
+}
+
+/**
  * @param {unknown} value
  * @returns {unknown[]}
  */
@@ -695,7 +723,12 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
     println(
         detail
             ? `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · request_user_input=${structuredInputPending}\x1b[0m`
-            : `  resumo   \x1b[90mformulários=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permissões=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · perguntas=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · inputs=${structuredInputPending}\x1b[0m`,
+            : `  resumo   \x1b[90m${renderHumanSdkWaitCounts({
+                  forms: pendingElicitations.pending,
+                  permissions: permissionSummary.pending,
+                  questions: userInputSummary.pending,
+                  inputs: structuredInputPending,
+              })}\x1b[0m`,
     );
 
     if (pendingElicitations.pending > 0) {
@@ -708,7 +741,7 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
         println('  acao     \x1b[90m/answer <texto> ou responda na conversa ativa\x1b[0m');
         const latest = userInputSummary.latest;
         if (latest) {
-            const choices = latest.choices.length > 0 ? ` choices=${latest.choices.join(' | ')}` : '';
+            const choices = latest.choices.length > 0 ? ` · opções ${latest.choices.join(' | ')}` : '';
             const freeform = latest.allowFreeform ? 'livre' : 'selecao obrigatoria';
             println(`  pergunta \x1b[90m${formatAge(latest.createdAt)} - ${latest.kind} - ${freeform}${choices}\x1b[0m`);
             if (detail) println(`  id       \x1b[90m${latest.id}\x1b[0m`);
@@ -718,7 +751,7 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
     if (structuredInputPending > 0) {
         println('  acao     \x1b[90mdigite a resposta normalmente; o REPL destrava o input estruturado pendente\x1b[0m');
         for (const entry of structuredInputs.slice(0, 3)) {
-            const choices = entry.choices.length > 0 ? ` choices=${entry.choices.join(' | ')}` : '';
+            const choices = entry.choices.length > 0 ? ` · opções ${entry.choices.join(' | ')}` : '';
             const freeform = entry.allowFreeform ? 'livre' : 'selecao obrigatoria';
             println(
                 `  entrada  \x1b[90m${formatAge(entry.createdAt)} - ${freeform}${choices}\x1b[0m`,
@@ -919,12 +952,17 @@ export async function cmdSdk({ println }, arg = '') {
             const permissionSummary = readTerminalPermissionSummary({ runtimeId: state.runtimeId });
             const userInputSummary = readTerminalUserInputSummary({ runtimeId: state.runtimeId });
             const structuredInputPending = getTerminalPendingStructuredUserInputCount();
-            println('\n  \x1b[36mSDK Runtime\x1b[0m');
-            println(`  runtime  \x1b[90m${state.runtimeId}\x1b[0m`);
-            println(`  session  \x1b[90m${state.sessionId ?? '-'}\x1b[0m`);
-            println(`  model    \x1b[33m${state.model}\x1b[0m  reasoning=\x1b[33m${state.reasoningEffort}\x1b[0m`);
+            println('\n  \x1b[36mSDK do Terminal\x1b[0m');
+            println(`  Runtime  \x1b[90m${state.runtimeId}\x1b[0m`);
+            println(`  Sessão   \x1b[90m${state.sessionId ?? 'sem sessão SDK'}\x1b[0m`);
+            println(`  Modelo   \x1b[33m${state.model}\x1b[0m  \x1b[90mraciocínio ${state.reasoningEffort}\x1b[0m`);
             println(
-                `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · pergunta=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · input=${structuredInputPending}\x1b[0m`,
+                `  Esperas  \x1b[90m${renderHumanSdkWaitCounts({
+                    forms: pendingElicitations.pending,
+                    permissions: permissionSummary.pending,
+                    questions: userInputSummary.pending,
+                    inputs: structuredInputPending,
+                })}\x1b[0m`,
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             println(
@@ -1301,7 +1339,9 @@ async function renderSdkQuota({ println }, runtimeId, opts = {}) {
     for (const row of quotaSummary.rows) {
         const pct = row.remainingPercentage === null ? '?' : `${row.remainingPercentage.toFixed(1)}%`;
         println(
-            `  ${color}${row.quotaId}\x1b[0m  restante=\x1b[33m${pct}\x1b[0m  reset=\x1b[90m${row.resetAt ?? '-'}\x1b[0m  escopo=\x1b[90m${row.scope}\x1b[0m`,
+            opts.compact
+                ? `  Quota    ${color}${row.quotaId}\x1b[0m  \x1b[33m${pct}\x1b[0m restante · reset \x1b[90m${row.resetAt ?? '-'}\x1b[0m · escopo \x1b[90m${row.scope}\x1b[0m`
+                : `  ${color}${row.quotaId}\x1b[0m  restante=\x1b[33m${pct}\x1b[0m  reset=\x1b[90m${row.resetAt ?? '-'}\x1b[0m  escopo=\x1b[90m${row.scope}\x1b[0m`,
         );
     }
     if (Object.keys(snapshots).length === 0) println('  \x1b[90mSem snapshots de quota no retorno SDK.\x1b[0m');

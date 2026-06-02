@@ -124,7 +124,9 @@ describe('terminal/dialog/output inline status', () => {
         writeInlineStatus('LLM-B tool/Executando tool · lendo arquivo');
 
         const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
-        expect(output).toContain('LLM-B tool/Executando tool');
+        expect(output).toContain('LLM-B ferramenta');
+        expect(output).toContain('Ferramenta em uso');
+        expect(output).not.toContain('tool/Executando tool');
         expect(output).toContain('\x1b[s');
         expect(mocks.rl.setPrompt).toHaveBeenCalled();
         expect(mocks.rl.prompt).toHaveBeenCalled();

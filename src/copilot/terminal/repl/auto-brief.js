@@ -32,6 +32,14 @@ function yn(value) {
 }
 
 /**
+ * @param {boolean} value
+ * @returns {string}
+ */
+function enabledLabel(value) {
+    return value ? 'ativo' : 'inativo';
+}
+
+/**
  * @param {number | null | undefined} value
  * @returns {string}
  */
@@ -169,33 +177,50 @@ export function buildTerminalAutoBrief(input = {}) {
         if (visibleWarnings.length > 0) lines.push(briefLine('Atenção', visibleWarnings.join(' | ')));
         return { phase, ready, fingerprint: buildAutoBriefFingerprint(projection), lines };
     }
+    lines.push(`Briefing detalhado (${phase})`);
     lines.push(
-        `[auto-brief:${phase}] runtime=${projection.runtimeId} · modelo=${model}/${reasoning} · sessão=${sessionTag} · display=${displayPreset} · thinking=${displayState.thinking ? 'on' : 'off'} · streaming=${displayState.streaming ? 'on' : 'off'}`,
+        briefLine(
+            'Runtime',
+            `${projection.runtimeId} · modelo ${model}/${reasoning} · sessão ${sessionTag} · tela ${displayPreset}`,
+        ),
+    );
+    lines.push(
+        briefLine(
+            'Sinais',
+            `raciocínio ${enabledLabel(displayState.thinking)} · resposta ${enabledLabel(displayState.streaming)}`,
+        ),
     );
     if (byok.enabled) {
         lines.push(
-            `[auto-brief:${phase}] byok=${byok.ready ? 'ready' : 'incompleto'} · preset=${byok.preset ?? '-'} · provider=${byok.providerType ?? '-'} · model=${byok.model ?? '-'} · auth=${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'none'}`,
+            briefLine(
+                'BYOK',
+                `${byok.ready ? 'pronto' : 'incompleto'} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · auth ${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'ausente'}`,
+            ),
         );
     }
     lines.push(
-        `[auto-brief:${phase}] tools=${projection.toolLoad.total} · fs=${yn(projection.toolLoad.hasCanonicalLocalFsTools)} · exec=${yn(projection.toolLoad.hasCanonicalLocalExecTools)} · sdkWorkspace=${yn(projection.toolLoad.hasSdkWorkspaceTooling)} · contrato=${projection.toolLoad.toolContract.ok ? 'ok' : `${projection.toolLoad.toolContract.errorCount} erro(s)`}`,
+        briefLine(
+            'Ferram.',
+            `${projection.toolLoad.total} · arquivos ${yn(projection.toolLoad.hasCanonicalLocalFsTools)} · terminal ${yn(projection.toolLoad.hasCanonicalLocalExecTools)} · workspace SDK ${yn(projection.toolLoad.hasSdkWorkspaceTooling)} · contrato ${projection.toolLoad.toolContract.ok ? 'ok' : `${projection.toolLoad.toolContract.errorCount} erro(s)`}`,
+        ),
     );
     lines.push(
-        `[auto-brief:${phase}] route=${guidance.mode} · ${guidance.summary} · próximo=${guidance.nextCommand ?? '-'}`,
+        briefLine('Rota', `${guidance.mode} · ${guidance.summary} · próximo ${guidance.nextCommand ?? '-'}`),
     );
     lines.push(
-        `[auto-brief:${phase}] timeline=${projection.timelineSource}/${projection.timelineReconciliationStatus} · sync=${projection.timelineSyncStatus}${projection.timelineSyncReason ? `:${projection.timelineSyncReason}` : ''} · turnos=${projection.timelineTurnCount}/${projection.persistedTimelineTurnCount}`,
+        briefLine(
+            'Timeline',
+            `${projection.timelineSource}/${projection.timelineReconciliationStatus} · sync ${projection.timelineSyncStatus}${projection.timelineSyncReason ? `:${projection.timelineSyncReason}` : ''} · turnos ${projection.timelineTurnCount}/${projection.persistedTimelineTurnCount}`,
+        ),
     );
     lines.push(
-        `[auto-brief:${phase}] io=${io.io} · cache=${io.cache} · index=${io.index} · ctx=${pct(utilization)}`,
+        briefLine('I/O', `${io.io} · cache ${io.cache} · índice ${io.index} · contexto ${pct(utilization)}`),
     );
     if (!ready) {
-        lines.push(
-            `[auto-brief:${phase}] estado=parcial · registry/dialog ainda subindo; um brief pós-bootstrap será emitido quando houver dados reais.`,
-        );
+        lines.push(briefLine('Estado', 'parcial · registry/dialog ainda subindo; novo brief virá com dados reais.'));
     }
     if (visibleWarnings.length > 0) {
-        lines.push(`[auto-brief:${phase}] atenção=${visibleWarnings.join(' | ')}`);
+        lines.push(briefLine('Atenção', visibleWarnings.join(' | ')));
     }
     return { phase, ready, fingerprint: buildAutoBriefFingerprint(projection), lines };
 }

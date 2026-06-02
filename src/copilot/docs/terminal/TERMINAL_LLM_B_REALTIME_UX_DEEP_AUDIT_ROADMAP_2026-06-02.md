@@ -1914,7 +1914,7 @@
 
 - [x] Revisar `/events` padrao para nao parecer despejo JSON quando o operador pede apenas contexto recente.
 - [x] Revisar `/events` para traduzir status resumido (`status=success`) sem prejudicar `/events --raw`.
-- [ ] Revisar `/live` e `/live full` para separar modo humano, modo diagnostico e modo raw.
+- [x] Revisar `/live` e `/live full` para separar modo humano, modo diagnostico e modo raw.
 - [ ] Revisar `/session`, `/now` e `/status` buscando restos de `source=`, `modelo=`, `classe=`, `motivo=` fora de modo detail.
 - [ ] Revisar banner e auto-brief para reduzir linhas densas quando o terminal ja esta pronto.
 - [ ] Fazer nova live `long-tool-heartbeat` apos criterios endurecidos.
@@ -1929,3 +1929,55 @@
 - [x] Modo texto de `/events` passou a trocar `transcript=`/`export=` por `transcript ...`/`export envelope...`.
 - [x] `/events --raw` e `/events --json` continuam preservando o envelope bruto para auditoria e automacao.
 - [x] `test_commands_events.spec.js` cobre o novo contrato humano e preserva raw/json.
+
+### 11.06 `/live full` detalhado, mas humano
+
+- [x] `/live` compacto preserva a tela cotidiana `Fluxo da conversa`, sem `runtime`, `streaming=`, `cache/scope` ou `phase:label`.
+- [x] `/live full` passou de `Terminal Live Flow` para `Fluxo detalhado da conversa`.
+- [x] O modo detalhado continua exibindo runtime, sessão SDK, sinais, conexões, timeline, cache, escopo, atividade e trace.
+- [x] O modo detalhado deixou de renderizar `streaming=on`, `thinking=off`, `tools=on`, `loop=on`, `paused=yes`, `clients=`, `critical=`, `read=123B` e `phase:label`.
+- [x] Atividade atual e histórico recente usam rótulos humanos: `pronto`, `turno`, `pensando`, `respondendo`, `ferramenta`, `pergunta` e `erro`.
+- [x] `Pending messages alteradas` virou `Contexto da conversa atualizado` na camada visual.
+- [x] I/O recente passou a usar `concluída/falhou`, operações traduzidas e bytes humanos como `1.2 KB lidos`.
+- [x] Ferramentas no turno observado usam o apresentador canônico de tool, evitando `tool exec_command · run · completed · sdk`.
+- [x] Teste escopado `test_commands_session.spec.js` cobre o novo título e bloqueia `streaming=`/`phase:` no detalhado.
+- [ ] Consolidar helper compartilhado para labels humanos quando `/session`, `/now`, `/status`, `/activity` e `/live` tiverem repetição suficiente.
+- [ ] Avaliar se `/live raw` deve existir como rota explícita separada, em vez de sobrecarregar `full`.
+
+### 11.07 Auto-brief detalhado sem despejo `key=value`
+
+- [x] O auto-brief default já estava compacto, mas o modo `COPILOT_TERMINAL_AUTO_BRIEF=full` ainda renderizava `[auto-brief:boot] runtime=... display=... streaming=...`.
+- [x] O modo detalhado agora abre com `Briefing detalhado (boot|ready|manual)`.
+- [x] Runtime, sinais, BYOK, ferramentas, rota, timeline, I/O, estado e atenção são linhas alinhadas por `briefLine`.
+- [x] `thinking=on`/`streaming=on` viraram `raciocínio ativo`/`resposta ativo`.
+- [x] `byok=ready`, `provider=`, `model=`, `auth=none` viraram frase humana de BYOK.
+- [x] `tools=`, `fs=`, `exec=`, `sdkWorkspace=` e `contrato=` viraram `Ferram.`, `arquivos`, `terminal`, `workspace SDK` e `contrato`.
+- [x] `estado=parcial` virou `Estado parcial`.
+- [x] Teste escopado `test_auto_brief.spec.js` bloqueia `runtime=` e `streaming=` no modo detalhado.
+- [ ] Avaliar no live se o auto-brief ainda aparece redundante quando o banner inicial e a linha viva já cobrem a mesma informação.
+
+### 11.08 Linha viva com sanitizador defensivo final
+
+- [x] `writeInlineStatus` agora normaliza o texto antes de calcular quebras e pintar no TTY.
+- [x] Essa normalização é uma última barreira; produtores modernos continuam responsáveis por emitir texto humano na origem.
+- [x] `LLM-B tool/Executando tool` vira `LLM-B ferramenta · Ferramenta em uso`.
+- [x] Prefixos antigos `tool/`, `turn/`, `thinking/` e `streaming/` viram `ferramenta`, `turno`, `pensando` e `respondendo`.
+- [x] Heartbeat antigo `request_user_input ainda executando` vira `Pergunta ao operador aguardando resposta`.
+- [x] IDs `chatcmpl-tool-*`, `toolu_*` e `call_*` viram `id interno`.
+- [x] Nomes técnicos comuns `exec_command`, `read_file_content` e `report_intent` viram `Executar comando`, `Ler arquivo` e `Intent capturado`.
+- [x] Teste `test_dialog_output_inline_status.spec.js` deixou de aceitar `tool/Executando tool` como saída visual.
+- [ ] Fazer live PTY longa para confirmar que a proteção não introduz wrapping ruim em terminais estreitos.
+
+### 11.09 `/sdk waits` e `/sdk status` sem resumo interno no padrão
+
+- [x] `/sdk waits` default deixou de renderizar `formulários=`, `permissões=`, `perguntas=` e `inputs=`.
+- [x] O resumo padrão agora usa frase operacional: `1 formulário · 1 permissão · 1 pergunta · 1 input estruturado`.
+- [x] `/sdk waits detail` preserva `elicitation=`, `permission=`, `ask_user=` e `request_user_input=` para diagnóstico.
+- [x] Perguntas pendentes trocaram `choices=` por `opções`.
+- [x] `/sdk status` default usa o mesmo resumo humano de esperas, sem `pergunta=0`.
+- [x] Teste `test_commands_sdk.spec.js` cobre o padrão humano e preserva detalhe técnico.
+- [x] Revisar `/sdk status` para trocar `runtime`, `session`, `model`, `reasoning=` e o bloco de quota por um painel compacto humano.
+- [x] `/sdk status` agora usa `SDK do Terminal`, `Runtime`, `Sessão`, `Modelo`, `Esperas` e `Quota`.
+- [x] A quota compacta troca `restante=`, `reset=` e `escopo=` por `91.0% restante · reset ... · escopo ...`.
+- [x] Teste bloqueia `reasoning=` e `restante=` na tela compacta.
+- [ ] Avaliar se precisamos de `/sdk status detail` explícito ou se `/sdk doctor`, `/sdk quota` e `/events --raw` já cobrem a necessidade técnica.

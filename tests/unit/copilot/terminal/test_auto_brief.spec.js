@@ -114,8 +114,11 @@ describe('terminal/repl/auto-brief', () => {
         const brief = buildTerminalAutoBrief({ phase: 'boot' });
         const text = brief.lines.join('\n');
 
-        expect(text).toContain('[auto-brief:boot]');
-        expect(text).toContain('estado=parcial');
+        expect(text).toContain('Briefing detalhado (boot)');
+        expect(text).toContain('Runtime');
+        expect(text).toContain('Estado    parcial');
+        expect(text).not.toContain('runtime=');
+        expect(text).not.toContain('streaming=');
         vi.unstubAllEnvs();
     });
 });
