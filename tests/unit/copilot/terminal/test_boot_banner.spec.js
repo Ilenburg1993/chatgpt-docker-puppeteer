@@ -24,16 +24,20 @@ describe('terminal/terminal-phases/boot-banner', () => {
             true,
         );
         assert.equal(
-            view.lines.some((line) => line.includes('registry local continua ativo')),
+            view.lines.some((line) => line.includes('Registry local ativo')),
             true,
         );
         assert.equal(
-            view.lines.some((line) => line.includes('Sessão SDK: auto-resume padrão')),
+            view.lines.some((line) => line.includes('Sessão SDK: auto-resume')),
             true,
         );
         assert.equal(
             view.lines.some((line) => line.includes('next new|resume|auto')),
             true,
+        );
+        assert.equal(
+            view.lines.some((line) => line.includes('┌─ Terminal Permanente')),
+            false,
         );
     });
 

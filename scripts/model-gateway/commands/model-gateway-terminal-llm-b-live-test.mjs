@@ -2643,6 +2643,11 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             detail: 'boot rendered compact banner/brief instead of the full command catalog',
         },
         {
+            id: 'ux-no-standalone-boot-box',
+            pass: !/┌─ Terminal Permanente LLM-B/u.test(plain),
+            detail: 'standalone boot surface avoided the old second box',
+        },
+        {
             id: 'ux-human-tool-names',
             pass:
                 /\[INTENT\] Intent capturado/.test(plain) &&
@@ -2671,6 +2676,16 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'ux-compact-no-delta-live-status',
             pass: !/thinking\/LLM-B trabalhando[\s\S]{0,160}sem delta visível/iu.test(plain),
             detail: 'no-delta live status stayed semantic/compact instead of repeating the full working label',
+        },
+        {
+            id: 'ux-compact-turn-live-status',
+            pass: !/turn\/Intenção da LLM-B[\s\S]{0,160}terminal live canonical/iu.test(plain),
+            detail: 'turn live status avoided repeating long intent details',
+        },
+        {
+            id: 'ux-compact-ask-live-status',
+            pass: !/ASK\/aguardando operador/u.test(plain),
+            detail: 'ask live status stayed compact and did not include the old verbose label',
         },
         {
             id: 'ux-health-human-tool-stats',

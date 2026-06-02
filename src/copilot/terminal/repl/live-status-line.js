@@ -20,7 +20,7 @@ const MIN_LIVE_STATUS_HEARTBEAT_MS = 1_000;
 const DEFAULT_LIVE_STATUS_HEARTBEAT_MS = 5_000;
 const LIVE_LABEL_MAX_CHARS = 28;
 const LIVE_DETAIL_MAX_CHARS = 48;
-const LIVE_QUESTION_MAX_CHARS = 64;
+const LIVE_QUESTION_MAX_CHARS = 56;
 
 /**
  * @param {ReturnType<typeof readTerminalRuntimeState>} runtime
@@ -118,8 +118,8 @@ export function formatTerminalLiveStatusLine(input = {}) {
         const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila=${runtime.queueSize}` : '';
         return (
             `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
-            `${terminalThemeText('question', 'ASK/aguardando operador')}` +
-            `${terminalThemeText('muted', ` · ${questionText}${choiceText} · ${model}/${effort} · ${runtime.dialogLoopActive ? 'loop' : 'noloop'}${queue}`)}` +
+            `${terminalThemeText('question', 'ASK')}` +
+            `${terminalThemeText('muted', ` · ${questionText}${choiceText} · ${runtime.dialogLoopActive ? 'loop' : 'noloop'}${queue}`)}` +
             '\x1b[K'
         );
     }
@@ -144,6 +144,14 @@ export function formatTerminalLiveStatusLine(input = {}) {
         );
     }
     const label = compactLiveStatusText(activity.label, LIVE_LABEL_MAX_CHARS);
+    if (activity.phase === 'turn') {
+        return (
+            `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
+            `${terminalThemeText(severityRole, `turn · ${label}`)}` +
+            `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)} · ${model}/${effort} · ${runtimeTail}${queue}`)}` +
+            '\x1b[K'
+        );
+    }
     const target = activity.toolName ? ` · ${compactLiveStatusText(activity.toolName, 24)}` : '';
     const detailText = detail ? ` · ${detail}` : '';
     return (

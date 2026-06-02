@@ -650,6 +650,63 @@
   - ASK ainda ocupa tres linhas no prompt estreito quando pergunta + opcoes + modelo entram juntos;
   - isso deve ir para a proxima rodada de layout de status/prompt, nao para a camada de eventos.
 
+## 02.23 Quarta rodada UX: ASK compacto e boot sem segundo box
+
+- Problema:
+  - o status vivo de ASK ainda trazia pergunta, opcoes, modelo, esforco e loop na mesma linha logica;
+  - no PTY estreito, isso quebrava em tres linhas;
+  - o boot exibia o banner REPL compacto e depois outro box standalone, criando duplicacao visual.
+- Ajustes:
+  - status vivo de ASK passou a renderizar `ASK · pergunta · opções=... · loop`;
+  - modelo/esforco foi removido desse estado porque a prioridade visual e a resposta humana;
+  - pergunta pendente ganhou budget menor;
+  - banner standalone virou bloco compacto de tres linhas, sem borda/box;
+  - mensagem de MCP remoto ausente foi rebaixada para `Registry local ativo. Diagnóstico: /tools · /health.`
+- Testes:
+  - `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_boot_banner.spec.js`
+  - Resultado: 2 arquivos, 10 testes, PASS.
+- Status:
+  - [x] ASK sem modelo/esforco no status vivo.
+  - [x] Box standalone antigo removido.
+  - [x] Live PTY posterior verificou o primeiro viewport real.
+
+## 02.24 Evidencia live PTY da quarta rodada UX
+
+- Primeira tentativa:
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass6-sdk-20260602-0643/summary.md`
+  - status BLOCKED;
+  - o bloqueio ocorreu porque o modelo executou tools e produziu deltas, mas nao chamou `ask_user` antes do timeout;
+  - esse resultado nao foi tratado como regressao da camada visual, pois a superficie de boot compacta ja apareceu corretamente e o contrato funcional do cenario dependia de uma decisao do modelo.
+- Segunda tentativa:
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass7-sdk-20260602-0650/summary.md`
+  - status PASS;
+  - 318 eventos SSE;
+  - 0 erros;
+  - 24 marcadores `DELTA-CANONICAL`;
+  - export Markdown com transcript, envelope, ask_user, resposta humana e final pos-ask.
+- Criterios UX novos que passaram no PTY real:
+  - `ux-no-standalone-boot-box`;
+  - `ux-compact-turn-live-status`;
+  - `ux-compact-ask-live-status`.
+- Criterios UX preservados:
+  - `ux-compact-boot-banner`;
+  - `ux-human-tool-names`;
+  - `ux-no-raw-tool-ids-in-default-tool-lines`;
+  - `ux-no-durable-waiting-spam`;
+  - `ux-single-live-status-source`;
+  - `ux-compact-no-delta-live-status`;
+  - `ux-health-human-tool-stats`;
+  - `ux-human-answer-confirmation`.
+- Decisao:
+  - o primeiro viewport real deixou de exibir o catalogo gigante e deixou de exibir o segundo box `Terminal Permanente LLM-B`;
+  - a linha viva de turno deixou de repetir detalhes longos de intencao;
+  - a linha viva de pergunta humana deixou de mostrar modelo/esforco e passou a priorizar pergunta, opcoes e loop;
+  - a UX default do terminal agora possui uma camada operacional humana muito mais limpa, com IDs crus reservados a diagnostico.
+- Residual:
+  - `/events` default ainda pode quebrar conteudo de mensagem em multiplas linhas quando o evento contem newlines internos;
+  - `/activity` ainda merece revisao para separar melhor transcript humano e envelope diagnostico;
+  - o prompt `⏳ [auto/high]` ainda pode parecer um artefato tecnico em telas estreitas e deve ser avaliado na proxima rodada.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -1017,7 +1074,7 @@
 - [x] Renderizar `ask_user` e `request_user_input` sob a mesma semantica visual.
 - [x] Suprimir heartbeat duravel de pergunta humana pendente.
 - [ ] Manter pergunta humana em card duravel unico.
-- [ ] Garantir que resposta humana nao fique colada na linha viva.
+- [x] Garantir que resposta humana nao fique colada na linha viva.
 - [ ] Tratar timeout durante espera humana como `aguardando operador`, nao erro de modelo.
 - [x] Adicionar teste unitario de `request_user_input` sem `[TOOL] [RUN]`.
 - [ ] Adicionar live scenario especifico para `request_user_input` local, alem de `ask_user` SDK.
@@ -1040,7 +1097,7 @@
 - [x] Manter `/help` como superficie de comandos completos.
 - [x] Compactar auto-brief default em grupos humanos.
 - [x] Mover detalhes `parser/cache/index/scopes` para `/activity`, `/health` ou modo debug.
-- [ ] Ajustar box standalone para largura responsiva.
+- [x] Ajustar box standalone para largura responsiva.
 - [x] Rebaixar alerta MCP indisponivel quando tools locais estao ativas.
 - [x] Adicionar teste snapshot/regex do boot compacto.
 - [x] Adicionar live criterion de primeiro viewport sem overflow obvio.
@@ -1060,6 +1117,9 @@
 - [x] Atualizar runner para detectar status vivo duplicado.
 - [x] Atualizar runner para detectar `request_user_input` como `[RUN]`.
 - [x] Atualizar runner para detectar menu inicial excessivamente longo.
+- [x] Atualizar runner para detectar segundo box standalone antigo.
+- [x] Atualizar runner para detectar ASK vivo verboso.
+- [x] Atualizar runner para detectar turno vivo com detalhe longo repetido.
 - [x] Rodar live SDK/Copilot apos Faixas M-P.
 - [ ] Rodar live BYOK quando a superficie estiver estabilizada.
 - [ ] Rodar live com `request_user_input` local real.

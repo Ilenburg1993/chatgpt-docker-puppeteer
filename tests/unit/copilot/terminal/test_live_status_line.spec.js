@@ -213,6 +213,26 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(90);
     });
 
+    it('compacta estado turn sem repetir detalhe longo', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'turn',
+            label: 'Intenção da LLM-B',
+            detail: 'terminal live canonical deltas tools ask_user usage',
+            toolName: null,
+        };
+        mocks.stream = { model: 'auto', reasoningEffort: 'high' };
+
+        const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:12.000-03:00') });
+
+        expect(line).toContain('turn · Intenção da LLM-B');
+        expect(line).toContain('12s');
+        expect(line).not.toContain('terminal live canonical');
+        expect(line.length).toBeLessThan(88);
+    });
+
     it('prioriza ask_user humano sobre atividade antiga na linha viva', async () => {
         const { shouldRenderTerminalLiveStatusLine, formatTerminalLiveStatusLine } = await import(
             '../../../../src/copilot/terminal/repl/live-status-line.js'
@@ -240,9 +260,11 @@ describe('terminal/live-status-line', () => {
 
         expect(shouldRenderTerminalLiveStatusLine()).toBe(true);
         const line = formatTerminalLiveStatusLine();
-        expect(line).toContain('ASK/aguardando operador');
+        expect(line).toContain('ASK');
         expect(line).toContain('Qual cor devo usar');
         expect(line).toContain('opções=azul|verde');
+        expect(line).not.toContain('auto/xhigh');
         expect(line).not.toContain('LLM-B trabalhando');
+        expect(line.length).toBeLessThan(100);
     });
 });

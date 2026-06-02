@@ -31,22 +31,20 @@ export function buildTerminalStandaloneBannerView(opts, deps = {}) {
     const bootPreflight = opts.bootPreflight ?? null;
     const warnings = Array.isArray(bootPreflight?.warnings) ? bootPreflight.warnings : [];
 
+    const modeLine = isStandalone
+        ? 'STANDALONE · MCP remoto ausente · tools locais ativas'
+        : `CONECTADO · MCP :3008 · ${Number(mcp.toolCount ?? 0)} tools`;
     /** @type {string[]} */
     const lines = [
         '',
-        '┌─ Terminal Permanente LLM-B ─────────────────────────────────┐',
-        isStandalone
-            ? '│  STANDALONE · MCP server :3008 ausente · tools locais ativas │'
-            : `│  CONECTADO · MCP :3008 · ${String(mcp.toolCount).padStart(2)} tools                         │`,
-        `│  inject ${opts.serverUrl.padEnd(48).slice(0, 48)} │`,
-        '│  /help · /status · /queue · /turn · /mailbox · /session sdk  │',
-        '│  Sessão SDK: auto-resume padrão · next new|resume|auto       │',
-        '└──────────────────────────────────────────────────────────────┘',
+        `  Terminal LLM-B · ${modeLine}`,
+        `  inject ${opts.serverUrl} · /help · /status · /queue · /turn · /session sdk`,
+        '  Sessão SDK: auto-resume · next new|resume|auto',
         '',
     ];
 
     if (isStandalone) {
-        lines.push('  MCP remoto indisponível; registry local continua ativo. Use /tools e /health.');
+        lines.push('  Registry local ativo. Diagnóstico: /tools · /health.');
         lines.push('');
     }
     if (warnings.length > 0) {
