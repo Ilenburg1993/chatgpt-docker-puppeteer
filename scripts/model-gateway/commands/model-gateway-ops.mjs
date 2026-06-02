@@ -73,6 +73,7 @@ function readDatabaseSummary(diagnostics) {
     const activeSnapshot = optionalRecord(json?.['activeSnapshot']);
     const runtime = optionalRecord(json?.['runtime']);
     const latestAutomationDecision = optionalRecord(json?.['latestAutomationDecision']);
+    const latestStandbyPlan = optionalRecord(json?.['latestStandbyPlan']);
     return {
         ok: diagnostics.ok && activeSnapshot?.['exists'] === true,
         schemaVersion: optionalNumber(json?.['schemaVersion']),
@@ -85,6 +86,18 @@ function readDatabaseSummary(diagnostics) {
         automationEffectApplicationRows: optionalNumber(json?.['automationEffectApplicationRows']),
         sdkSessionHandoffRows: optionalNumber(json?.['sdkSessionHandoffRows']),
         sdkSessionConfirmationRows: optionalNumber(json?.['sdkSessionConfirmationRows']),
+        standbyPlanRows: optionalNumber(json?.['standbyPlanRows']),
+        latestStandbyPlan: {
+            standbyPlanId: optionalString(latestStandbyPlan?.['standbyPlanId']),
+            routeProfile: optionalString(latestStandbyPlan?.['routeProfile']),
+            status: optionalString(latestStandbyPlan?.['status']),
+            routeCount: optionalNumber(latestStandbyPlan?.['routeCount']),
+            providerCount: optionalNumber(latestStandbyPlan?.['providerCount']),
+            runtimeProofCount: optionalNumber(latestStandbyPlan?.['runtimeProofCount']),
+            selectedRouteKey: optionalString(latestStandbyPlan?.['selectedRouteKey']),
+            source: optionalString(latestStandbyPlan?.['source']),
+            generatedAtMs: optionalNumber(latestStandbyPlan?.['generatedAtMs']),
+        },
         latestAutomationAction: optionalString(latestAutomationDecision?.['action']),
         runtimeHealthObservations: optionalNumber(runtime?.['healthObservations']),
         latestRuntimeHealthObservedAtMs: optionalNumber(runtime?.['latestHealthObservedAtMs']),
@@ -176,7 +189,10 @@ if (json) {
 } else {
     process.stdout.write(`model-gateway ops: ok=${summary.ok ? 'yes' : 'no'} profile=${profile}\n`);
     process.stdout.write(
-        `  db: active=${summary.database.activeSnapshotExists ? 'yes' : 'no'} schema=${summary.database.schemaVersion ?? '-'} rows=${summary.database.catalogRows ?? '-'} routeDecisions=${summary.database.routeDecisionRows ?? '-'} automationDecisions=${summary.database.automationDecisionRows ?? '-'} policySnapshots=${summary.database.automationPolicySnapshotRows ?? '-'} effects=${summary.database.automationEffectApplicationRows ?? '-'} handoffs=${summary.database.sdkSessionHandoffRows ?? '-'} confirmations=${summary.database.sdkSessionConfirmationRows ?? '-'}\n`,
+        `  db: active=${summary.database.activeSnapshotExists ? 'yes' : 'no'} schema=${summary.database.schemaVersion ?? '-'} rows=${summary.database.catalogRows ?? '-'} routeDecisions=${summary.database.routeDecisionRows ?? '-'} automationDecisions=${summary.database.automationDecisionRows ?? '-'} policySnapshots=${summary.database.automationPolicySnapshotRows ?? '-'} effects=${summary.database.automationEffectApplicationRows ?? '-'} handoffs=${summary.database.sdkSessionHandoffRows ?? '-'} confirmations=${summary.database.sdkSessionConfirmationRows ?? '-'} standbyPlans=${summary.database.standbyPlanRows ?? '-'}\n`,
+    );
+    process.stdout.write(
+        `  db-standby: latest=${summary.database.latestStandbyPlan.standbyPlanId ?? '-'} profile=${summary.database.latestStandbyPlan.routeProfile ?? '-'} routes=${summary.database.latestStandbyPlan.routeCount ?? '-'} providers=${summary.database.latestStandbyPlan.providerCount ?? '-'}\n`,
     );
     process.stdout.write(`  db-auto: latestAction=${summary.database.latestAutomationAction ?? '-'}\n`);
     process.stdout.write(

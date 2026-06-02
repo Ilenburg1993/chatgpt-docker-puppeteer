@@ -90,13 +90,15 @@ O sistema ideal deve permitir:
 - [x] `model-gateway:auto:ready` roda pelo runner.
 - [x] `model-gateway:operator-ready` existe como cockpit read-only para humano/LLM.
 - [x] Standby plans podem ser persistidos no SQLite operacional por perfil.
+- [x] Standby persistido pode ser lido sem recalcular selector por `--read-sqlite`/`persisted`.
 
 ### 2.2 Lacunas De Base Ainda Abertas
 
 - [ ] O default auto ainda precisa de uma definicao operacional final: quando ligar, quando aplicar, quando apenas sugerir.
 - [ ] O fallback real em turno ainda precisa ser fechado para falha durante runtime.
 - [x] A lista de standby virou artefato persistivel de primeira classe.
-- [ ] A lista de standby ainda precisa virar cockpit visual de primeira classe para troca rapida.
+- [x] A lista de standby aparece no cockpit com gerado agora vs persistido.
+- [ ] A lista de standby ainda precisa ganhar fluxo manual de troca por item/rank.
 - [ ] O terminal precisa expor com mais clareza "modelo vivo", "modelo preparado", "rota selecionada" e "proximos substitutos".
 - [ ] A policy deve ter presets claros para humano, LLM operadora e modo conservador.
 - [ ] A troca automatica por quota esgotada precisa diferenciar quota temporaria, creditos, auth, modelo inexistente e timeout.
@@ -229,9 +231,10 @@ metadata importers
 - [x] D.2 Persistir ultima standby list por perfil.
 - [x] D.3 Separar standby por mesma boundary e por novo provider.
 - [x] D.4 Marcar candidatos ja provados para agent.
-- [ ] D.5 Marcar candidatos que precisam de probe.
-- [ ] D.6 Marcar candidatos bloqueados por quota/reset.
-- [ ] D.7 Marcar candidatos bloqueados por auth/key.
+- [x] D.5 Expor leitura read-only da standby list persistida.
+- [ ] D.6 Marcar candidatos que precisam de probe.
+- [ ] D.7 Marcar candidatos bloqueados por quota/reset.
+- [ ] D.8 Marcar candidatos bloqueados por auth/key.
 - [ ] D.8 Gerar comandos de troca para cada candidato.
 - [ ] D.9 Gerar comandos de probe para cada candidato.
 - [x] D.10 Usar standby no post-turn recovery.
@@ -375,6 +378,7 @@ npm run model-gateway:auto:ready
 npm run model-gateway:auto:doctor
 npm run model-gateway:auto:standby -- --profile=repo_agent --limit=12
 npm run model-gateway:auto:standby -- --profile=repo_agent --limit=12 --write-sqlite
+npm run model-gateway:auto:standby -- --profile=repo_agent --read-sqlite --json
 npm run model-gateway:runtime-selector -- --fail
 npm run model-gateway:runtime-health:diff -- --write-snapshot --fail-on-regression
 npm run model-gateway:live:readiness -- --fail

@@ -4359,6 +4359,8 @@ describe('model-gateway foundation', () => {
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:explain'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:handoffs'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:confirmations'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:standby -- --profile=repo_agent --limit=12 --write-sqlite'));
+        assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:standby -- --profile=repo_agent --read-sqlite --json'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:auto:scenarios'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:plan'));
         assert.ok(packageCommands.some((entry) => entry.command === 'npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000'));
@@ -4414,6 +4416,7 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === '/byok auto handoffs 10'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto confirmations 10'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto standby profile:repo_agent 12'));
+        assert.ok(commands.some((entry) => entry.command === '/byok auto standby persisted profile:repo_agent 12'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto off'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway prebuild'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway selection audit runtime-proof'));

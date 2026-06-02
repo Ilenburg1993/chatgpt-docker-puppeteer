@@ -349,6 +349,20 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'List selected and alternate standby routes with explicit operator commands without calling providers.',
     },
     {
+        id: 'automation.standby-write-sqlite',
+        phase: 'automation',
+        surface: 'package',
+        command: 'npm run model-gateway:auto:standby -- --profile=repo_agent --limit=12 --write-sqlite',
+        summary: 'Persist the generated standby route plan as SQLite operational history without calling providers.',
+    },
+    {
+        id: 'automation.standby-read-sqlite',
+        phase: 'automation',
+        surface: 'package',
+        command: 'npm run model-gateway:auto:standby -- --profile=repo_agent --read-sqlite --json',
+        summary: 'Read persisted standby plans from SQLite without recalculating selector state or calling providers.',
+    },
+    {
         id: 'automation.scenarios',
         phase: 'automation',
         surface: 'package',
@@ -863,6 +877,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok auto standby profile:repo_agent 12',
         summary: 'Render selected and alternate standby routes with safe proof, live model and next-session commands.',
+    },
+    {
+        id: 'terminal.auto-standby-persisted',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto standby persisted profile:repo_agent 12',
+        summary: 'Render persisted standby snapshots from SQLite without recalculating selector state.',
     },
     {
         id: 'terminal.auto-recovery-fixture',

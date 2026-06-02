@@ -82,6 +82,7 @@ const standby = runJson('autoStandby', ['--json', `--profile=${profile}`, `--lim
 const healthDiff = runJson('runtimeHealthDiff', ['--json']);
 
 const opsJson = optionalRecord(ops.json);
+const opsDatabase = optionalRecord(opsJson?.['database']);
 const opsReadiness = optionalRecord(opsJson?.['readiness']);
 const opsAutomation = optionalRecord(opsJson?.['automation']);
 const autoReadyJson = optionalRecord(autoReady.json);
@@ -89,6 +90,7 @@ const runtimeSelectorJson = optionalRecord(runtimeSelector.json);
 const runtimePlan = optionalRecord(runtimeSelectorJson?.['runtimeSelectorPlan']);
 const standbyJson = optionalRecord(standby.json);
 const standbySummary = optionalRecord(standbyJson?.['summary']);
+const latestPersistedStandby = optionalRecord(opsDatabase?.['latestStandbyPlan']);
 const healthDiffJson = optionalRecord(healthDiff.json);
 const healthSummary = optionalRecord(optionalRecord(healthDiffJson?.['diff'])?.['summary']);
 const readyChecks = Array.isArray(autoReadyJson?.['checks']) ? autoReadyJson['checks'].filter(optionalRecord) : [];
@@ -101,6 +103,7 @@ const nextSafeCommands = [
     'npm run model-gateway:runtime-health:diff -- --write-snapshot --fail-on-regression',
     `npm run model-gateway:runtime-selector -- --fail --profile=${profile}`,
     `npm run model-gateway:auto:standby -- --profile=${profile} --limit=${limit}`,
+    `npm run model-gateway:auto:standby -- --profile=${profile} --limit=${limit} --write-sqlite`,
 ];
 const uniqueNextSafeCommands = [...new Set(nextSafeCommands)];
 
@@ -121,6 +124,12 @@ const checks = [
         'standby_available',
         standby.ok && (optionalNumber(standbySummary?.['routeCount']) ?? 0) > 0,
         standby.error ?? `routes=${standbySummary?.['routeCount'] ?? 0} providers=${standbySummary?.['providerCount'] ?? 0}`,
+    ),
+    check(
+        'standby_persistence_visible',
+        (optionalNumber(opsDatabase?.['standbyPlanRows']) ?? 0) > 0,
+        `persisted=${opsDatabase?.['standbyPlanRows'] ?? 0} latest=${latestPersistedStandby?.['standbyPlanId'] ?? '-'}`,
+        'warn',
     ),
     check(
         'runtime_health_no_regression',
@@ -149,6 +158,7 @@ const output = {
         warnings: warnings.length,
         standbyRoutes: optionalNumber(standbySummary?.['routeCount']) ?? 0,
         standbyProviders: optionalNumber(standbySummary?.['providerCount']) ?? 0,
+        standbyPersistedRows: optionalNumber(opsDatabase?.['standbyPlanRows']) ?? 0,
         runtimeSelected: runtimeSelectorJson?.['selection']?.['selected'] ?? null,
         runtimeProfiles: runtimeSelectorJson?.['selection']?.['profiles'] ?? null,
         nextSafeCommands: uniqueNextSafeCommands.length,
@@ -156,6 +166,27 @@ const output = {
     checks,
     blockers,
     warnings,
+    standbyPersistence: {
+        generatedNow: {
+            routeCount: optionalNumber(standbySummary?.['routeCount']) ?? 0,
+            providerCount: optionalNumber(standbySummary?.['providerCount']) ?? 0,
+            runtimeProofCount: optionalNumber(standbySummary?.['runtimeProofCount']) ?? 0,
+            generatedAt: optionalString(standbyJson?.['generatedAt']),
+        },
+        persisted: {
+            rows: optionalNumber(opsDatabase?.['standbyPlanRows']) ?? 0,
+            standbyPlanId: optionalString(latestPersistedStandby?.['standbyPlanId']),
+            routeProfile: optionalString(latestPersistedStandby?.['routeProfile']),
+            status: optionalString(latestPersistedStandby?.['status']),
+            routeCount: optionalNumber(latestPersistedStandby?.['routeCount']),
+            providerCount: optionalNumber(latestPersistedStandby?.['providerCount']),
+            runtimeProofCount: optionalNumber(latestPersistedStandby?.['runtimeProofCount']),
+            selectedRouteKey: optionalString(latestPersistedStandby?.['selectedRouteKey']),
+            source: optionalString(latestPersistedStandby?.['source']),
+            generatedAtMs: optionalNumber(latestPersistedStandby?.['generatedAtMs']),
+        },
+        persistCommand: `npm run model-gateway:auto:standby -- --profile=${profile} --limit=${limit} --write-sqlite`,
+    },
     selectedRuntimeRoute: selectedRuntimeRoute
         ? {
               profileId: optionalString(selectedRuntimeRoute['profileId']),
@@ -193,7 +224,10 @@ if (json) {
         process.stdout.write(`  ${item.pass ? 'PASS' : item.severity.toUpperCase()} ${item.id}: ${item.detail}\n`);
     }
     process.stdout.write(
-        `  standby: routes=${output.summary.standbyRoutes} providers=${output.summary.standbyProviders} nextCommands=${output.summary.nextSafeCommands}\n`,
+        `  standby: generated=${output.summary.standbyRoutes} providers=${output.summary.standbyProviders} persisted=${output.summary.standbyPersistedRows} nextCommands=${output.summary.nextSafeCommands}\n`,
+    );
+    process.stdout.write(
+        `  standby-persisted: latest=${output.standbyPersistence.persisted.standbyPlanId ?? '-'} profile=${output.standbyPersistence.persisted.routeProfile ?? '-'} routes=${output.standbyPersistence.persisted.routeCount ?? '-'}\n`,
     );
     for (const command of uniqueNextSafeCommands.slice(0, 8)) process.stdout.write(`  next: ${command}\n`);
 }

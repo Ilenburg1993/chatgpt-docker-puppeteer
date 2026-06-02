@@ -41,6 +41,7 @@ pre-runtime, selecao runtime e testes live LLM-B.
 - [x] Falha da rota selecionada pode promover fallback standby no decision core.
 - [x] `operator-ready` agrega ops, auto-ready, selector, standby e health diff.
 - [x] Standby plans podem ser persistidos no SQLite operacional por perfil sem tocar no catalogo canonico.
+- [x] Standby persistido pode ser inspecionado sem recalcular selector por `--read-sqlite`/`persisted`.
 - [x] Scripts foram movidos para `scripts/model-gateway/commands/`.
 - [x] Runner/barrel vive em `scripts/model-gateway/run.mjs` e `scripts/model-gateway/index.mjs`.
 - [x] Manifesto JSON do runner existe em `npm run model-gateway:scripts`.
@@ -144,10 +145,11 @@ pre-runtime, selecao runtime e testes live LLM-B.
 - [x] D.3 Usar standby no post-turn fallback decision.
 - [x] D.4 Criar objeto `model-gateway-runtime-standby-plan`.
 - [x] D.5 Persistir ultimo standby plan por profile no SQLite.
-- [ ] D.6 Separar `same_boundary`, `new_model_same_provider`, `new_provider`, `needs_probe`.
-- [ ] D.7 Registrar origem da exclusao quando standby estiver vazio.
-- [ ] D.8 Expor standby plan no cockpit terminal.
-- [ ] D.9 Criar fixture de standby com falha da rota primaria.
+- [x] D.6 Expor leitura read-only do standby persistido.
+- [x] D.7 Expor standby plan no cockpit terminal.
+- [ ] D.8 Separar `same_boundary`, `new_model_same_provider`, `new_provider`, `needs_probe`.
+- [ ] D.9 Registrar origem da exclusao quando standby estiver vazio.
+- [ ] D.10 Criar fixture de standby com falha da rota primaria.
 
 ### Faixa E - Runtime Automation Core
 
@@ -223,9 +225,10 @@ pre-runtime, selecao runtime e testes live LLM-B.
 - [x] J.7 Registrar selected standby snapshot.
 - [x] J.8 Diagnostico SQLite expoe `standbyPlanRows` e ultimo standby plan.
 - [x] J.9 Retencao operacional inclui standby plans sem tocar no catalogo canonico.
-- [ ] J.10 Registrar fallback selected after failure.
-- [ ] J.11 Registrar artifact path do operator-ready.
-- [ ] J.12 Criar resumo final por sessao de testes live.
+- [x] J.10 `operator-ready` diferencia standby gerado agora e standby persistido.
+- [ ] J.11 Registrar fallback selected after failure.
+- [ ] J.12 Registrar artifact path do operator-ready.
+- [ ] J.13 Criar resumo final por sessao de testes live.
 
 ### Faixa K - Testes E Validadores
 
@@ -264,6 +267,7 @@ npm run model-gateway:operator-ready
 npm run model-gateway:runtime-selector -- --fail
 npm run model-gateway:auto:standby -- --profile=repo_agent --limit=12
 npm run model-gateway:auto:standby -- --profile=repo_agent --limit=12 --write-sqlite
+npm run model-gateway:auto:standby -- --profile=repo_agent --read-sqlite --json
 npm run model-gateway:auto:status -- --profile=repo_agent
 npm run model-gateway:live:readiness -- --fail
 npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000

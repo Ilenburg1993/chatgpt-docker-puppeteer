@@ -1174,6 +1174,20 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                         },
                     ]),
                 ),
+                readStandbyPlanRecords: vi.fn(() =>
+                    Promise.resolve([
+                        {
+                            standbyPlanId: 'standby-1',
+                            status: 'ready',
+                            generatedAt: '2026-06-01T00:00:04.000Z',
+                            summary: { routeCount: 2, providerCount: 2, runtimeProofCount: 1 },
+                            routes: [
+                                { providerId: 'groq', providerModel: 'llama', routeKey: 'groq:llama' },
+                                { providerId: 'zai', providerModel: 'glm', routeKey: 'zai:glm' },
+                            ],
+                        },
+                    ]),
+                ),
                 readOpenAIModelCatalogList: vi.fn(() => Promise.resolve({ object: 'list', data: [] })),
                 readRuntimeHealthForModel: vi.fn(() => Promise.resolve({ health: null, probes: [] })),
             };
@@ -3075,8 +3089,23 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('providerCall=nao');
         expect(ctx.output()).toContain('runtime_selector');
         expect(ctx.output()).toContain('standby 1:');
+        expect(ctx.output()).toContain('standby db:');
         expect(ctx.output()).toContain('kilo-code:kilo-auto/free');
+        expect(ctx.output()).toContain('--write-sqlite');
         expect(ctx.output()).toContain('/byok auto standby profile:repo_agent 5');
+    });
+
+    it('renderiza standby persistido sem recalcular selector no terminal', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'auto standby persisted profile:repo_agent 5');
+
+        expect(ctx.output()).toContain('BYOK model-gateway auto standby persistido');
+        expect(ctx.output()).toContain('standby-1');
+        expect(ctx.output()).toContain('routes=2');
+        expect(ctx.output()).toContain('providerCall=nao');
+        expect(buildModelGatewayRuntimeStandbyPlan).not.toHaveBeenCalled();
     });
 
     it('mostra auditoria de seleção pré-runtime do model-gateway sem executar probes', async () => {
