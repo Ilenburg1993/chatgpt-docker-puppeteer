@@ -276,7 +276,7 @@ describe('commands/diagnose', () => {
         const ctx = mockCtx();
 
         try {
-            await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println });
+            await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println }, 'full');
 
             expect(ctx.output()).toContain('Diagnóstico do Terminal LLM-B');
             expect(ctx.output()).toContain('degraded');
@@ -324,10 +324,30 @@ describe('commands/diagnose', () => {
         }
     });
 
+    it('renderiza /health compacto por padrão sem despejar IDs e rótulos técnicos', async () => {
+        const ctx = mockCtx();
+
+        await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println });
+
+        const output = ctx.output();
+        expect(output).toContain('Saúde do Terminal LLM-B');
+        expect(output).toContain('Conversa');
+        expect(output).toContain('Entrada');
+        expect(output).toContain('Ferramentas');
+        expect(output).toContain('/health full');
+        expect(output).not.toContain('Diagnóstico do Terminal LLM-B');
+        expect(output).not.toContain('runtime id');
+        expect(output).not.toContain('sdk prompts=');
+        expect(output).not.toContain('streaming=');
+        expect(output).not.toContain('read_file_content');
+        expect(output).not.toContain('report_intent_local');
+        expect(output).not.toContain('sdk-diagnose-123456789012345');
+    });
+
     it('aceita runtimeId explícito no comando', async () => {
         const ctx = mockCtx();
 
-        await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println }, '--runtime alt');
+        await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println }, '--runtime alt full');
 
         expect(ctx.output()).toContain('runtime id');
         expect(ctx.output()).toContain('alt');
@@ -346,7 +366,7 @@ describe('commands/diagnose', () => {
     it('explica explicitamente quando o runtime solicitado não existe', async () => {
         const ctx = mockCtx();
 
-        await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println }, '--runtime missing');
+        await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println }, '--runtime missing full');
 
         expect(ctx.output()).toContain('runtime default (default)');
     });

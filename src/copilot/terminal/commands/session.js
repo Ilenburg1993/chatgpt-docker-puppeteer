@@ -72,6 +72,28 @@ function renderHumanTerminalStatus(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderHumanTerminalHealth(value) {
+    const status = String(value ?? 'unknown');
+    if (status === 'healthy') return 'ok';
+    if (status === 'degraded') return 'atenção';
+    if (status === 'unhealthy' || status === 'error') return 'problema';
+    return status;
+}
+
+/**
+ * @param {number} value
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function pluralPt(value, singular, plural) {
+    return `${value} ${value === 1 ? singular : plural}`;
+}
+
+/**
  * Referência ao _hubSessionId gerenciado pelo terminal server. É passado como parâmetro pois não pode ser importado
  * estaticamente (é mutável).
  *
@@ -139,11 +161,11 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
   \x1b[36mStatus do Terminal LLM-B\x1b[0m
   ─────────────────────────────────────
   Conversa     ${statusColor}${renderHumanTerminalStatus(snap['status'])}\x1b[0m · ${active ? '\x1b[32mativa\x1b[0m' : '\x1b[31minativa\x1b[0m'} · fila ${queue}
-  Saúde        ${health ? `${healthColor}${health['status']}\x1b[0m` : '\x1b[90msem leitura\x1b[0m'}
+  Saúde        ${health ? `${healthColor}${renderHumanTerminalHealth(health['status'])}\x1b[0m` : '\x1b[90msem leitura\x1b[0m'}
   Entrada      ${waitLine}
   Modelo       ${modelLabel} \x1b[90m· raciocínio ${configProjection.currentReasoningEffort}\x1b[0m
   Acesso       ${byokLabel}
-  Catálogo     \x1b[90m${gatewayProjection.providerCount} provedores · ${gatewayProjection.modelCount} modelos · ${gatewayProjection.enabledModelCount} habilitados\x1b[0m
+  Catálogo     \x1b[90m${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados\x1b[0m
   Atividade    \x1b[90m${projection.activity.label}${projection.activity.detail ? ` · ${projection.activity.detail}` : ''}\x1b[0m
   Próximo      \x1b[33m${action}\x1b[0m
   Detalhe      \x1b[90m/status full · /now · /health · /menu\x1b[0m
@@ -562,19 +584,19 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
             `\x1b[36m[agora]\x1b[0m ${renderHumanTerminalStatus(state)} · conversa ${projection.dialogLoopActive ? 'ativa' : 'inativa'} · fila ${queue} · ${askLine}`,
         );
         println(
-            `\x1b[90m[agora]\x1b[0m entrada=${channel.label} · ${waitLine} · sse=${live.sse.clients}/${live.sse.criticalClients} · modelo=${modelLine}`,
+            `\x1b[90m[agora]\x1b[0m entrada ${channel.label} · ${waitLine} · modelo ${modelLine}`,
         );
         if (gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0) {
             println(
-                `\x1b[90m[agora]\x1b[0m catálogo=${gatewayProjection.providerCount} provedores · ${gatewayProjection.modelCount} modelos · ativo=${gatewayActive?.['modelId'] ?? '-'}`,
+                `\x1b[90m[agora]\x1b[0m catálogo ${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ativo ${gatewayActive?.['modelId'] ?? '-'}`,
             );
         }
         if (projection.activity?.label) {
             const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';
-            println(`\x1b[90m[agora]\x1b[0m atividade=${projection.activity.label}${detail}`);
+            println(`\x1b[90m[agora]\x1b[0m atividade ${projection.activity.label}${detail}`);
         }
         if (projection.recommendedAction && projection.recommendedAction !== 'none') {
-            println(`\x1b[90m[agora]\x1b[0m próximo=${projection.recommendedAction}`);
+            println(`\x1b[90m[agora]\x1b[0m próximo ${projection.recommendedAction}`);
         }
         return;
     }

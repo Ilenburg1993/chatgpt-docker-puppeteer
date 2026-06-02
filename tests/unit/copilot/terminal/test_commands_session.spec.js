@@ -426,7 +426,8 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('Detalhe');
         expect(ctx.output()).toContain('/status full');
         expect(ctx.output()).toContain('gpt-5-mini');
-        expect(ctx.output()).toContain('healthy');
+        expect(ctx.output()).toContain('ok');
+        expect(ctx.output()).not.toContain('healthy');
         expect(ctx.output()).not.toContain('Próximo      \x1b[33mnone');
         expect(ctx.output()).not.toContain('prompt digest');
         expect(ctx.output()).not.toContain('tools load');
@@ -480,6 +481,7 @@ describe('commands/session — sync commands', () => {
         expect(nowCtx.output()).toContain('[agora]');
         expect(nowCtx.output()).toContain('conversa ativa');
         expect(nowCtx.output()).toContain('standby sem READY vivo');
+        expect(nowCtx.output()).not.toContain('entrada=');
     });
 
     it('cmdStatus destaca mismatch de modelo cobrado/configurado', () => {
@@ -506,6 +508,9 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('sem pendências humanas');
         expect(ctx.output()).not.toContain('próximo=none');
         expect(ctx.output()).not.toContain('runtime=');
+        expect(ctx.output()).not.toContain('entrada=');
+        expect(ctx.output()).not.toContain('catálogo=');
+        expect(ctx.output()).not.toContain('sse=');
         expect(ctx.output()).not.toContain('ASK:none');
         expect(ctx.output()).not.toContain('PM:approve_all');
     });

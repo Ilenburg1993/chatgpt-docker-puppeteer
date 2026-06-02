@@ -85,10 +85,12 @@ describe('commands/tools', () => {
         cmdTools({ println: ctx.println });
 
         expect(readTerminalToolStatsProjection).toHaveBeenCalledTimes(1);
-        expect(ctx.output()).toContain('2 tool(s)');
+        expect(ctx.output()).toContain('Ferramentas observadas');
         expect(ctx.output()).toContain('tool.fast');
-        expect(ctx.output()).toContain('calls=');
-        expect(ctx.output()).toContain('errors=');
+        expect(ctx.output()).toContain('uso');
+        expect(ctx.output()).toContain('sem falhas');
+        expect(ctx.output()).not.toContain('calls=');
+        expect(ctx.output()).not.toContain('errors=');
         expect(ctx.output()).toContain('140ms');
     });
 
@@ -110,7 +112,7 @@ describe('commands/tools', () => {
 
         cmdTools({ println: ctx.println });
 
-        expect(ctx.output()).toContain('Nenhuma tool observada');
+        expect(ctx.output()).toContain('Nenhuma ferramenta observada');
     });
 
     it('usa nomes humanos no modo default e preserva nomes técnicos em diag', () => {
@@ -144,6 +146,7 @@ describe('commands/tools', () => {
         expect(defaultCtx.output()).toContain('Intent capturado');
         expect(defaultCtx.output()).not.toContain('read_file_content');
         expect(defaultCtx.output()).not.toContain('report_intent_local');
+        expect(defaultCtx.output()).toContain('Detalhes técnicos: /tools diag');
 
         readTerminalToolStatsProjection.mockReturnValueOnce({
             stats: {

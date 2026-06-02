@@ -1165,6 +1165,74 @@
   - criterio `ux-cycle-activity-human` passou;
   - o criterio bloqueia `source`, `tools`, `trace`, `Streaming público`, `deltas` e `cumulativo` na superficie padrao.
 
+## 02.39 `/health` como painel operacional compacto
+
+- Problema observado:
+  - `/health` ainda renderizava o mesmo painel profundo de `/diagnose`;
+  - a primeira tela continha `runtime id`, `sdk prompts=`, `streaming=`, `inline status`, `Lifecycle mx` e outras chaves internas;
+  - isso resolvia auditoria, mas nao resolvia a necessidade cotidiana do operador: saber se pode continuar, o que esta bloqueando e onde abrir detalhe.
+- Situacao ideal:
+  - `/health` deve ser leitura de 5 a 10 linhas, com rótulos humanos, alinhados e sem IDs longos;
+  - `/health full` e `/diagnose` devem preservar o painel completo;
+  - `/diag` e `/diagnose` continuam sendo entradas tecnicas deliberadas, nao superficies padrao.
+- Mudancas aplicadas:
+  - `cmdDiagnose` ganhou modo compacto default;
+  - `full`, `detail`, `debug`, `diag`, `diagnose`, `all`, `raw` preservam o painel profundo;
+  - o roteador separou `/health` de `/diagnose` e `/diag`;
+  - `/diagnose` e `/diag` sem argumentos passam a chamar o modo `full`;
+  - `/health` mostra `Conversa`, `Modelo`, `Acesso`, `Gateway`, `Entrada`, `Ferramentas`, `Atividade`, `Infra`, `Próximo` e `Detalhe`;
+  - estados crus como `processing`, `idle` e `waiting_for_input` passam a ser `trabalhando`, `ocioso` e `aguardando você`;
+  - `inspect_boot_report` passa a ser `verificar relatório de inicialização`.
+- Garantias:
+  - IDs de sessão continuam compactados ou ocultos por padrão;
+  - credenciais BYOK continuam não renderizadas;
+  - o painel profundo continua disponível para investigação.
+
+## 02.40 `/tools` como placar humano de ferramentas
+
+- Problema observado:
+  - `/tools` ainda imprimia `tool(s)`, `calls=`, `blocked=`, `errors=` e `avg=`;
+  - esses rótulos eram corretos para telemetria, mas ruins para a tela cotidiana;
+  - quando não havia dados, a mensagem ainda dizia `Nenhuma tool observada`.
+- Situacao ideal:
+  - `/tools` default deve dizer quais grupos de ação a LLM-B já usou;
+  - o operador deve ver uso, bloqueios, falhas e latência sem ler nomes de campos;
+  - `/tools diag`, `/tools all` e `/tools raw` continuam canônicos para auditoria.
+- Mudancas aplicadas:
+  - estado vazio virou `Nenhuma ferramenta observada ainda`;
+  - o cabeçalho default virou `Ferramentas observadas`;
+  - linhas default usam `uso`, `sem bloqueios`, `sem falhas` e latência simples;
+  - `calls=`, `blocked=`, `errors=` e `avg=` ficaram restritos aos modos técnicos;
+  - o rodapé aponta para `/tools diag` e `/tools raw`.
+- Prova live planejada:
+  - o ciclo `--ux-cycle` agora abre `/health` e `/tools`;
+  - novos critérios `ux-cycle-health-compact` e `ux-cycle-tools-human` bloqueiam vazamento de rótulos crus.
+
+## 02.41 `/status` e `/now` sem mini key-values no padrão
+
+- Problema observado no PTY:
+  - depois da compactação de `/health` e `/tools`, `/status` ainda mostrava `healthy`;
+  - `/now` ainda renderizava `entrada=standby`, `sse=0/0`, `catálogo=` e `atividade=`;
+  - isso mantinha a estética de log técnico na superfície de orientação rápida.
+- Mudanças aplicadas:
+  - `/status` default traduz `healthy` para `ok`;
+  - pluralização de catálogo ficou humana: `1 provedor`, `3 modelos`;
+  - `/now` default removeu `entrada=`, `catálogo=`, `atividade=`, `próximo=` e `sse=`;
+  - `/now full` continua preservando o snapshot técnico com `runtime=`, `sse=`, `gateway=...` e demais campos.
+- Evidência live executada:
+  - comando:
+    - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/default-ux-cycle-health-tools-now-20260602-0855`
+  - status PASS;
+  - critérios novos/preservados que passaram:
+    - `ux-cycle-health-compact`;
+    - `ux-cycle-tools-human`;
+    - `ux-cycle-now-human` com bloqueio reforçado contra `entrada=`, `catálogo=`, `atividade=`, `próximo=` e `sse=`.
+- Artefatos:
+  - `artifacts/terminal-live/default-ux-cycle-health-tools-now-20260602-0855/summary.md`;
+  - `artifacts/terminal-live/default-ux-cycle-health-tools-now-20260602-0855/summary.json`;
+  - `artifacts/terminal-live/default-ux-cycle-health-tools-now-20260602-0855/default-ux-cycle.raw.log`;
+  - `artifacts/terminal-live/default-ux-cycle-health-tools-now-20260602-0855/default-ux-cycle.plain.log`.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict

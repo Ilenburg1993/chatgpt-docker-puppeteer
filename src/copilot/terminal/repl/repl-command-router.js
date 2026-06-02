@@ -543,7 +543,11 @@ export const CMD_ROUTES = [
     [['now'], (ctx, arg) => _cmdNow({ hubSessionId: ctx.hubSessionId, injectPort: ctx.injectPort, println }, arg)],
     [['live'], (ctx, arg) => _cmdLive({ hubSessionId: ctx.hubSessionId, injectPort: ctx.injectPort, println }, arg)],
     [['activity'], (_, arg) => _cmdActivity({ println }, arg)],
-    [['diagnose', 'diag', 'health'], (ctx, arg) => _cmdDiagnose({ hubSessionId: ctx.hubSessionId, println }, arg)],
+    [['health'], (ctx, arg) => _cmdDiagnose({ hubSessionId: ctx.hubSessionId, println }, arg)],
+    [
+        ['diagnose', 'diag'],
+        (ctx, arg) => _cmdDiagnose({ hubSessionId: ctx.hubSessionId, println }, arg?.trim() ? arg : 'full'),
+    ],
     [['history'], (_, arg) => _cmdHistory({ println }, Number(arg) || 10)],
     [
         ['db-history'],

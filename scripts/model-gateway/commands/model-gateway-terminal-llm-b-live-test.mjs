@@ -1671,14 +1671,27 @@ function defaultUxCycleCriteria(boot) {
     const helpStart = plain.indexOf('Ajuda rápida');
     const statusStart = plain.indexOf('Status do Terminal LLM-B');
     const nowStart = plain.indexOf('[agora]');
+    const healthStart = plain.indexOf('Saúde do Terminal LLM-B');
+    const toolsStart = (() => {
+        const populated = plain.indexOf('Ferramentas observadas');
+        return populated >= 0 ? populated : plain.indexOf('Nenhuma ferramenta observada');
+    })();
     const liveStart = plain.indexOf('Fluxo da conversa');
     const activityStart = plain.indexOf('Atividade Atual da LLM-B');
-    const waitsStart = plain.indexOf('Esperas humanas');
-    const defaultSurface = [helpStart, statusStart, nowStart, liveStart, activityStart, waitsStart]
+    const waitsStart = plain.lastIndexOf('Esperas humanas');
+    const surfaceStarts = [helpStart, statusStart, nowStart, healthStart, toolsStart, liveStart, activityStart, waitsStart]
         .filter((index) => index >= 0)
-        .sort((a, b) => a - b)
-        .map((index, position, indexes) => plain.slice(index, indexes[position + 1] ?? plain.length))
-        .join('\n');
+        .sort((a, b) => a - b);
+    const surfaceAt = (start) => {
+        if (start < 0) return '';
+        const position = surfaceStarts.indexOf(start);
+        return plain.slice(start, surfaceStarts[position + 1] ?? plain.length);
+    };
+    const defaultSurface = surfaceStarts.map((index) => surfaceAt(index)).join('\n');
+    const healthSurface = surfaceAt(healthStart);
+    const toolsSurface = surfaceAt(toolsStart);
+    const liveSurface = surfaceAt(liveStart);
+    const activitySurface = surfaceAt(activityStart);
     return [
         {
             id: 'ux-cycle-ready',
@@ -1711,22 +1724,40 @@ function defaultUxCycleCriteria(boot) {
         },
         {
             id: 'ux-cycle-now-human',
-            pass: /\[agora\][\s\S]*conversa[\s\S]*sem pendências humanas/iu.test(plain) && !/\[now\]\s+runtime=/iu.test(defaultSurface),
+            pass:
+                /\[agora\][\s\S]*conversa[\s\S]*sem pendências humanas/iu.test(plain) &&
+                !/\[now\]\s+runtime=|entrada=|catálogo=|atividade=|próximo=|sse=/iu.test(defaultSurface),
             detail: '/now default rendered human labels instead of runtime key-value telemetry',
+        },
+        {
+            id: 'ux-cycle-health-compact',
+            pass:
+                /Saúde do Terminal LLM-B[\s\S]*Conversa[\s\S]*Entrada[\s\S]*Ferramentas[\s\S]*Detalhe\s+\/health full/iu.test(
+                    healthSurface,
+                ) && !/Diagnóstico do Terminal LLM-B|runtime id|sdk prompts=|streaming=/iu.test(healthSurface),
+            detail: '/health default rendered a compact operations panel and kept the full diagnostic behind /health full',
+        },
+        {
+            id: 'ux-cycle-tools-human',
+            pass:
+                (/Ferramentas observadas[\s\S]*uso[\s\S]*Detalhes técnicos:\s+\/tools diag/iu.test(toolsSurface) ||
+                    /Nenhuma ferramenta observada[\s\S]*Quando a LLM-B usar arquivos/iu.test(toolsSurface)) &&
+                !/\btool\(s\)\b|calls=|errors=|blocked=|avg=/iu.test(toolsSurface),
+            detail: '/tools default rendered human action stats instead of raw telemetry counters',
         },
         {
             id: 'ux-cycle-live-compact',
             pass:
                 /Fluxo da conversa[\s\S]*Estado[\s\S]*Sinais[\s\S]*Detalhe\s+\/live full/iu.test(plain) &&
-                !/Terminal Live Flow|cache\/scope|streaming=|sdk\/session|runtime\s+|·\s+idle/iu.test(defaultSurface),
+                !/Terminal Live Flow|cache\/scope|streaming=|sdk\/session|runtime\s+|·\s+idle/iu.test(liveSurface),
             detail: '/live default rendered compact conversation flow instead of telemetry grid',
         },
         {
             id: 'ux-cycle-activity-human',
             pass:
                 /Atividade Atual da LLM-B[\s\S]*estado[\s\S]*evento[\s\S]*Detalhes técnicos ficam em \/activity detail/iu.test(
-                    plain,
-                ) && !/\bsource\b|\btools\b|\btrace\b|Streaming público|\bdeltas\b|cumulativo/iu.test(defaultSurface),
+                    activitySurface,
+                ) && !/\bsource\b|\btools\b|\btrace\b|Streaming público|\bdeltas\b|cumulativo/iu.test(activitySurface),
             detail: '/activity default rendered human labels and moved technical identifiers behind detail mode',
         },
         {
@@ -1753,6 +1784,8 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
             { line: '/help', advanceAfterMs: 1_000 },
             { line: '/status', advanceAfterMs: 1_000 },
             { line: '/now', advanceAfterMs: 1_000 },
+            { line: '/health', advanceAfterMs: 1_000 },
+            { line: '/tools', advanceAfterMs: 1_000 },
             { line: '/live', advanceAfterMs: 1_000 },
             { line: '/activity 5', advanceAfterMs: 1_000 },
             { line: '/sdk waits', advanceAfterMs: 1_000 },

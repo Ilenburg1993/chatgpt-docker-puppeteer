@@ -61,11 +61,17 @@ export function cmdTools({ println }, arg = '') {
     const entries = wantsRaw ? projection.entries : projection.canonicalEntries;
 
     if (entries.length === 0) {
-        println('\n  \x1b[33m⚠️  Nenhuma tool observada ainda.\x1b[0m\n');
+        println('\n  \x1b[33mNenhuma ferramenta observada ainda.\x1b[0m');
+        println('  \x1b[90mQuando a LLM-B usar arquivos, terminal ou SDK, o resumo aparece aqui.\x1b[0m\n');
         return;
     }
 
-    println(`\n  \x1b[36m🔧 ${entries.length} tool(s) ${wantsRaw ? 'observada(s) [raw]' : 'agregada(s)'}:\x1b[0m\n`);
+    if (wantsRaw || wantsDiag) {
+        println(`\n  \x1b[36m🔧 ${entries.length} tool(s) ${wantsRaw ? 'observada(s) [raw]' : 'agregada(s)'}:\x1b[0m\n`);
+    } else {
+        println(`\n  \x1b[36mFerramentas observadas\x1b[0m`);
+        println(`  \x1b[90m${entries.length} grupo(s) de ação já apareceram nesta sessão.\x1b[0m\n`);
+    }
 
     for (const [name, data] of entries) {
         const d = /** @type {{
@@ -83,9 +89,18 @@ export function cmdTools({ println }, arg = '') {
         const errorColor = errors > 0 ? '\x1b[31m' : '\x1b[32m';
         const blockedColor = blocked > 0 ? '\x1b[33m' : '\x1b[90m';
         const visualName = wantsRaw ? name : getTerminalHumanToolName(name);
-        println(
-            `    \x1b[33m${visualName}\x1b[0m  calls=\x1b[36m${calls}\x1b[0m  blocked=${blockedColor}${blocked}\x1b[0m  errors=${errorColor}${errors}\x1b[0m  avg=${latency}`,
-        );
+        if (wantsRaw || wantsDiag) {
+            println(
+                `    \x1b[33m${visualName}\x1b[0m  calls=\x1b[36m${calls}\x1b[0m  blocked=${blockedColor}${blocked}\x1b[0m  errors=${errorColor}${errors}\x1b[0m  avg=${latency}`,
+            );
+        } else {
+            const healthLabel = errors > 0 ? `${errorColor}${errors} falha(s)${C_RESET}` : `${errorColor}sem falhas${C_RESET}`;
+            const blockedLabel =
+                blocked > 0 ? `${blockedColor}${blocked} bloqueio(s)${C_RESET}` : `${blockedColor}sem bloqueios${C_RESET}`;
+            println(
+                `    \x1b[33m${visualName}\x1b[0m  uso \x1b[36m${calls}\x1b[0m · ${blockedLabel} · ${healthLabel} · ${latency}`,
+            );
+        }
         if (!wantsRaw && wantsDiag && visualName !== name) {
             println(`      \x1b[90mtool técnico: ${name}\x1b[0m`);
         }
@@ -168,6 +183,12 @@ export function cmdTools({ println }, arg = '') {
         }
     }
 
-    println('  \x1b[90mUso: /tools [diag|all|raw]\x1b[0m');
+    println(
+        wantsRaw || wantsDiag
+            ? '  \x1b[90mUso: /tools [diag|all|raw]\x1b[0m'
+            : '  \x1b[90mDetalhes técnicos: /tools diag · nomes crus: /tools raw\x1b[0m',
+    );
     println('');
 }
+
+const C_RESET = '\x1b[0m';
