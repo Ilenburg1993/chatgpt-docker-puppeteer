@@ -64,6 +64,7 @@ export {
     classifyTerminalUserInputQuestionKind,
     compactTerminalSdkSession,
     confirmTerminalSdkSessionUi,
+    createTerminalPendingStructuredUserInput,
     createTerminalSdkWorkspaceFile,
     deleteTerminalSdkSession,
     deleteTerminalSdkPlan,

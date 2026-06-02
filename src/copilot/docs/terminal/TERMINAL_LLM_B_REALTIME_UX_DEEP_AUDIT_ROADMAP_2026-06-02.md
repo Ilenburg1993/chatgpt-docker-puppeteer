@@ -840,6 +840,36 @@
   - a politica "humano primeiro, diagnostico sob demanda" esta validada tambem no cenario de resposta livre;
   - `request_user_input`/`ask_user` freeform nao precisa de janela externa nem de surface duplicada para funcionar no terminal.
 
+## 02.31 Evidencia live PTY de request_user_input local sintetico
+
+- Comando executado:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/structured-input-ux-20260602-0745`
+- Artefatos:
+  - `artifacts/terminal-live/structured-input-ux-20260602-0745/summary.md`
+  - `artifacts/terminal-live/structured-input-ux-20260602-0745/summary.json`
+  - `artifacts/terminal-live/structured-input-ux-20260602-0745/structured-input-cycle.raw.log`
+  - `artifacts/terminal-live/structured-input-ux-20260602-0745/structured-input-cycle.plain.log`
+- Resultado:
+  - status PASS;
+  - duracao 8755ms;
+  - `Input humano estruturado` criado por `/sdk simulate request-user-input`, com origem tecnica `request_user_input`;
+  - prompt humano mostrou `[INPUT]`;
+  - linha viva permanente mostrou `LLM-B INPUT` com pergunta e escolhas, em vez de tool crua;
+  - `/sdk waits` mostrou `request_user_input=1` antes da resposta;
+  - resposta comum `SIM` foi roteada para a pendencia estruturada;
+  - `/sdk waits` mostrou `request_user_input=0` depois da resposta;
+  - nao houve `request_user_input ainda executando` nem `LLM-B ainda trabalhando`;
+  - encerramento limpo por `/quit`.
+- Bugs descobertos e corrigidos durante a live:
+  - `shouldRenderTerminalLiveStatusLine()` formatava `INPUT`, mas nao renderizava quando o modelo estava ocioso; agora pendencia estruturada tambem ativa a linha viva.
+  - o listener imediato do REPL consumia comandos slash como resposta invalida quando havia `request_user_input` pendente; agora slash commands continuam no dispatcher e texto livre continua indo para a resposta humana.
+  - o runner live nao dava tempo para a linha viva renderizar e aguardava prompt final inexistente em telas diagnosticas; agora `--structured-input-cycle` suporta pausa antes de comando e fallback de avancar apos tela diagnostica.
+- Decisao:
+  - `request_user_input` local/sintetico passa pelo registro SDK canonico via gateway, nao por lista paralela;
+  - a UX padrao trata `request_user_input` como bloqueio humano estruturado, nao como tool comum;
+  - comandos diagnosticos continuam acessiveis durante a espera humana;
+  - a resposta humana simples continua sendo o caminho ergonomico principal.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -1211,7 +1241,7 @@
 - [ ] Tratar timeout durante espera humana como `aguardando operador`, nao erro de modelo.
 - [x] Adicionar teste unitario de `request_user_input` sem `[TOOL] [RUN]`.
 - [x] Revalidar live scenario freeform de `ask_user` apos polimento visual.
-- [ ] Adicionar live scenario especifico para `request_user_input` local sintetico, alem de `ask_user` SDK.
+- [x] Adicionar live scenario especifico para `request_user_input` local sintetico, alem de `ask_user` SDK.
 
 ### Faixa P - Linha viva unificada
 
@@ -1265,7 +1295,7 @@
 - [x] Rodar live SDK/Copilot apos Faixas M-P.
 - [ ] Rodar live BYOK quando a superficie estiver estabilizada.
 - [x] Rodar live SDK/Copilot freeform apos polimento de I/O e diagnosticos.
-- [ ] Rodar live com `request_user_input` local sintetico.
+- [x] Rodar live com `request_user_input` local sintetico.
 - [x] Registrar artefatos e decisao no roadmap.
 
 ## 06.01 Gaps residuais apos PASS live

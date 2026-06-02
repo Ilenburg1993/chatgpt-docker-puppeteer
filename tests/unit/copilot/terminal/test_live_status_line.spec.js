@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
         model: 'claude-sonnet-4.6',
         reasoningEffort: 'xhigh',
     },
+    structuredInputs: /** @type {Record<string, unknown>[]} */ ([]),
     busy: false,
     clearInlineStatus: vi.fn(),
     writeInlineStatus: vi.fn(),
@@ -52,6 +53,13 @@ vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', (
     readTerminalDialogStreamMeta: vi.fn(() => mocks.stream),
     readTerminalRuntimeState: vi.fn(() => mocks.runtime),
 }));
+vi.mock('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        listTerminalPendingStructuredUserInputs: vi.fn(() => mocks.structuredInputs),
+    };
+});
 vi.mock('../../../../src/copilot/presentation/state/index.js', () => ({
     getBusy: vi.fn(() => mocks.busy),
 }));
@@ -88,6 +96,7 @@ describe('terminal/live-status-line', () => {
             model: 'claude-sonnet-4.6',
             reasoningEffort: 'xhigh',
         };
+        mocks.structuredInputs = [];
     });
 
     afterEach(() => {
@@ -106,6 +115,31 @@ describe('terminal/live-status-line', () => {
         expect(line).toContain('lendo arquivo');
         expect(line).toContain('12s');
         expect(line).toContain('claude-sonnet-4.6/xhigh');
+    });
+
+    it('prioriza request_user_input pendente como espera humana estruturada', async () => {
+        mocks.structuredInputs = [
+            {
+                requestId: 'request-user-input-test',
+                question: 'Escolha como continuar o teste visual',
+                choices: ['seguir', 'pausar'],
+                allowFreeform: false,
+                createdAt: Date.now(),
+                sessionId: 'sdk-1',
+                toolCallId: null,
+                data: {},
+            },
+        ];
+        const { formatTerminalLiveStatusLine, shouldRenderTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+
+        const line = formatTerminalLiveStatusLine();
+
+        expect(shouldRenderTerminalLiveStatusLine()).toBe(true);
+        expect(line).toContain('INPUT');
+        expect(line).toContain('Escolha como continuar');
+        expect(line).toContain('opções=seguir|pausar');
+        expect(line).not.toContain('read_file_content');
     });
 
     it('renderiza continuamente enquanto há operação ativa', async () => {

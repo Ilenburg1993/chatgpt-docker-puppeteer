@@ -349,8 +349,10 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
                 return;
             }
         }
-        const immediatePendingAnswer = tryAnswerTerminalPendingQuestionInput(trimmedForEscape);
-        if (shouldConsumeTerminalPendingAnswerInput(immediatePendingAnswer)) {
+        const immediatePendingAnswer = trimmedForEscape.startsWith('/')
+            ? null
+            : tryAnswerTerminalPendingQuestionInput(trimmedForEscape);
+        if (immediatePendingAnswer && shouldConsumeTerminalPendingAnswerInput(immediatePendingAnswer)) {
             beginTerminalRenderLock();
             try {
                 printPendingAnswerResult(immediatePendingAnswer);

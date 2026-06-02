@@ -9,6 +9,20 @@ const runtimeMocks = vi.hoisted(() => {
         pendingStructuredInputs,
         compactTerminalSdkSession: vi.fn(async () => ({ success: true })),
         confirmTerminalSdkSessionUi: vi.fn(async () => true),
+        createTerminalPendingStructuredUserInput: vi.fn((input) => {
+            const entry = {
+                requestId: 'request-user-input-sim-1',
+                question: input.question,
+                choices: input.choices ?? [],
+                allowFreeform: input.allowFreeform !== false,
+                createdAt: Date.now(),
+                sessionId: 'sdk-1',
+                toolCallId: null,
+                data: input.data ?? {},
+            };
+            pendingStructuredInputs.push(entry);
+            return { requestId: entry.requestId, promise: Promise.resolve('ok') };
+        }),
         createTerminalSdkWorkspaceFile: vi.fn(async (path, content) => ({ path, content })),
         getTerminalPendingStructuredUserInputCount: vi.fn(() => pendingStructuredInputs.length),
         getTerminalSdkQuota: vi.fn(async () => ({
@@ -354,6 +368,24 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('request-user-input-test-1');
         expect(ctx.output()).toContain('choices=seguir | pausar');
         expect(ctx.output()).toContain('Escolha a estrategia');
+    });
+
+    it('/sdk simulate request-user-input cria pendência estruturada diagnóstica', async () => {
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'simulate request-user-input --choices sim|nao --required Continuar teste visual?');
+
+        expect(runtimeMocks.createTerminalPendingStructuredUserInput).toHaveBeenCalledWith(
+            expect.objectContaining({
+                question: 'Continuar teste visual?',
+                choices: ['sim', 'nao'],
+                allowFreeform: false,
+            }),
+        );
+        expect(ctx.output()).toContain('Input humano estruturado');
+        expect(ctx.output()).toContain('request_user_input diagnóstico');
+        expect(ctx.output()).toContain('aguardando operador');
+        expect(ctx.output()).toContain('Continuar teste visual?');
+        expect(ctx.output()).toContain('request-user-input-sim-1');
     });
 
     it('/sdk prompt exibe status canônico do system prompt e instruction sources', async () => {

@@ -12,7 +12,11 @@ import { TERMINAL_LIVE_STATUS_ENABLED, TERMINAL_LIVE_STATUS_INTERVAL_MS } from '
 import { cancelTimer, registerInterval } from '#copilot/core';
 import { getBusy } from '../../presentation/state/index.js';
 import { clearInlineStatus, writeInlineStatus } from '../dialog/index.js';
-import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/gateways/index.js';
+import {
+    listTerminalPendingStructuredUserInputs,
+    readTerminalDialogStreamMeta,
+    readTerminalRuntimeState,
+} from '../frontend/gateways/index.js';
 import { readTerminalActivitySnapshot, terminalThemeText } from '../state/repl/index.js';
 
 const MIN_LIVE_STATUS_INTERVAL_MS = 250;
@@ -123,6 +127,23 @@ export function formatTerminalLiveStatusLine(input = {}) {
             '\x1b[K'
         );
     }
+    const structuredInputs = listTerminalPendingStructuredUserInputs();
+    const structuredInput = structuredInputs.at(0) ?? null;
+    if (structuredInput) {
+        const questionText = compactLiveStatusText(
+            structuredInput.question ?? 'request_user_input pendente',
+            LIVE_QUESTION_MAX_CHARS,
+        );
+        const choices = Array.isArray(structuredInput.choices) ? structuredInput.choices : [];
+        const choiceText = choices.length > 0 ? ` · opções=${choices.join('|')}` : '';
+        const queue = structuredInputs.length > 1 ? ` · fila=${structuredInputs.length}` : '';
+        return (
+            `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
+            `${terminalThemeText('question', 'INPUT')}` +
+            `${terminalThemeText('muted', ` · ${questionText}${choiceText}${queue}`)}` +
+            '\x1b[K'
+        );
+    }
     const ageMs = Math.max(0, now - activity.startedAt);
     const detail = compactLiveStatusText(activity.detail ?? activity.toolName ?? '', LIVE_DETAIL_MAX_CHARS);
     const progress = activity.progress !== null ? ` · ${activity.progress}%` : '';
@@ -176,6 +197,7 @@ export function shouldRenderTerminalLiveStatusLine(input = {}) {
     const runtime = input.runtime ?? readTerminalRuntimeState();
     const busy = input.busy ?? getBusy();
     if (hasHumanPendingQuestion(runtime)) return true;
+    if (listTerminalPendingStructuredUserInputs().length > 0) return true;
     const queueActive = Number(runtime.queueSize ?? 0) > 0;
     const runtimeActive =
         busy ||

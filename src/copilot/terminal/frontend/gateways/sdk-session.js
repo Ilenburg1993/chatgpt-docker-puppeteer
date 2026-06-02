@@ -12,12 +12,14 @@ import {
     getPendingStructuredUserInputCount,
     getPendingStructuredUserInputRequests,
     hasPendingStructuredUserInputRequests,
+    nextStructuredUserInputRequestId,
     normalizeElicitationCompletedEvent,
     normalizeElicitationPendingEvent,
     normalizePermissionCompletedEvent,
     normalizePermissionRequestedEvent,
     normalizeUserInputCompletedEvent,
     normalizeUserInputRequestedEvent,
+    registerPendingStructuredUserInputResolver,
 } from '#copilot/sdk/session';
 import {
     compactAgentSdkSession,
@@ -79,6 +81,52 @@ export function listTerminalPendingStructuredUserInputs() {
  */
 export function hasTerminalPendingStructuredUserInputRequests() {
     return hasPendingStructuredUserInputRequests();
+}
+
+/**
+ * Registra um `request_user_input` pendente pelo mesmo núcleo SDK usado pela tool real.
+ *
+ * Esta porta é intencionalmente pequena: comandos/testes do terminal podem criar uma pendência diagnóstica local sem
+ * reabrir o estado interno do SDK ou do agente, e a resposta continua passando por `answerPendingQuestion()`.
+ *
+ * @param {{
+ *     question: string;
+ *     choices?: string[] | undefined;
+ *     allowFreeform?: boolean | undefined;
+ *     toolCallId?: string | null | undefined;
+ *     data?: Record<string, unknown> | undefined;
+ *     requestId?: string | undefined;
+ * }} input
+ * @returns {{ requestId: string; promise: Promise<string> }}
+ */
+export function createTerminalPendingStructuredUserInput(input) {
+    const requestId =
+        typeof input.requestId === 'string' && input.requestId.trim().length > 0
+            ? input.requestId.trim()
+            : nextStructuredUserInputRequestId();
+    const question = input.question.trim() || 'Pergunta de diagnostico request_user_input';
+    const choices = Array.isArray(input.choices)
+        ? input.choices.map((choice) => choice.trim()).filter((choice) => choice.length > 0)
+        : [];
+    const allowFreeform = input.allowFreeform !== false;
+    /** @type {(answer: string) => void} */
+    let resolveAnswer = () => {};
+    const promise = new Promise((resolve) => {
+        resolveAnswer = resolve;
+    });
+    registerPendingStructuredUserInputResolver(requestId, resolveAnswer, {
+        question,
+        choices,
+        allowFreeform,
+        createdAt: Date.now(),
+        toolCallId: input.toolCallId ?? null,
+        data: {
+            source: 'terminal-sdk-simulate',
+            synthetic: true,
+            ...(input.data ?? {}),
+        },
+    });
+    return { requestId, promise };
 }
 
 /**

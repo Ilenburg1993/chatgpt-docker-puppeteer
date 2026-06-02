@@ -63,6 +63,7 @@ Common options:
   --byok-real-require-vision-probe
   --auto-probe
   --live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error|file-write-roundtrip>
+  --structured-input-cycle
   --reuse-sdk-session
   --timeout-ms=<ms>
   --transport=<pty|stdio>
@@ -1155,6 +1156,16 @@ function sendCommandSequence(write, commands, { delayMs = 250 } = {}) {
     });
 }
 
+function normalizeLiveCommandEntry(entry) {
+    if (typeof entry === 'string') return { line: entry, waitBeforeMs: 0, advanceAfterMs: 0 };
+    if (!entry || typeof entry !== 'object') return { line: '', waitBeforeMs: 0, advanceAfterMs: 0 };
+    return {
+        line: typeof entry.line === 'string' ? entry.line : '',
+        waitBeforeMs: Number.isFinite(entry.waitBeforeMs) ? Math.max(0, Number(entry.waitBeforeMs)) : 0,
+        advanceAfterMs: Number.isFinite(entry.advanceAfterMs) ? Math.max(0, Number(entry.advanceAfterMs)) : 0,
+    };
+}
+
 function extractSdkSessionCockpitId(plain, label) {
     const match = String(plain ?? '').match(new RegExp(`\\b${escapeRegExp(label)}:\\s+([^\\s]+)`, 'iu'));
     const sessionId = match?.[1]?.trim();
@@ -1222,6 +1233,8 @@ async function runSessionCycleBoot({
     let childClosed = false;
     let waitingForPrompt = false;
     let commandOutputOffset = 0;
+    /** @type {NodeJS.Timeout | null} */
+    let promptFallbackTimer = null;
     const remainingCommands = [...commands];
     const child = spawn(command.cmd, command.args, {
         cwd: ROOT,
@@ -1249,11 +1262,34 @@ async function runSessionCycleBoot({
         }
     };
     const sendNextCommand = () => {
+        if (promptFallbackTimer) {
+            clearTimeout(promptFallbackTimer);
+            promptFallbackTimer = null;
+        }
         const next = remainingCommands.shift();
         if (!next) return;
-        waitingForPrompt = next.trim() !== '/quit';
-        commandOutputOffset = stripAnsi(raw).length;
-        write(next);
+        const entry = normalizeLiveCommandEntry(next);
+        if (!entry.line.trim()) return sendNextCommand();
+        const send = () => {
+            waitingForPrompt = entry.line.trim() !== '/quit';
+            commandOutputOffset = stripAnsi(raw).length;
+            write(entry.line);
+            if (waitingForPrompt && entry.advanceAfterMs > 0) {
+                promptFallbackTimer = setTimeout(() => {
+                    promptFallbackTimer = null;
+                    if (!waitingForPrompt || childClosed) return;
+                    waitingForPrompt = false;
+                    sendNextCommand();
+                }, entry.advanceAfterMs);
+                promptFallbackTimer.unref();
+            }
+        };
+        if (entry.waitBeforeMs > 0) {
+            const timer = setTimeout(send, entry.waitBeforeMs);
+            timer.unref();
+        } else {
+            send();
+        }
     };
     child.stdin.on('error', (error) => {
         if (error?.code !== 'EPIPE') {
@@ -1272,6 +1308,10 @@ async function runSessionCycleBoot({
         }
         if (waitingForPrompt && hasReturnedToReplPrompt(plain, commandOutputOffset)) {
             waitingForPrompt = false;
+            if (promptFallbackTimer) {
+                clearTimeout(promptFallbackTimer);
+                promptFallbackTimer = null;
+            }
             sendNextCommand();
         }
     };
@@ -1411,6 +1451,119 @@ async function runSessionCycleLiveTest({ outDir, requestedTransport, timeoutMs, 
     return summary;
 }
 
+function structuredInputCycleCriteria(boot) {
+    const plain = String(boot?.plain ?? '');
+    return [
+        {
+            id: 'structured-input-ready',
+            pass: /LLM-B pronta/u.test(plain),
+            detail: 'terminal reached ready state before synthetic request_user_input cycle',
+        },
+        {
+            id: 'structured-input-simulated',
+            pass:
+                /Input humano estruturado/iu.test(plain) &&
+                /request_user_input diagnóstico/iu.test(plain) &&
+                /REQUEST_USER_INPUT-SIM:\s+responda para fechar o teste/iu.test(plain),
+            detail: '/sdk simulate request-user-input rendered a human-facing diagnostic request',
+        },
+        {
+            id: 'structured-input-prompt-tag',
+            pass: /você\[[^\]\n]+\/[^\]\n]+\]\[INPUT\]›/iu.test(plain),
+            detail: 'REPL prompt marked the pending structured input as [INPUT]',
+        },
+        {
+            id: 'structured-input-live-status',
+            pass: /⟲\s+LLM-B\s+INPUT\s+·\s+REQUEST_USER_INPUT-SIM/iu.test(plain),
+            detail: 'permanent live status rendered request_user_input as INPUT instead of raw tool execution',
+        },
+        {
+            id: 'structured-input-waits-pending',
+            pass: /request_user_input=1/u.test(plain),
+            detail: '/sdk waits saw one pending structured input before the answer',
+        },
+        {
+            id: 'structured-input-answer-routed',
+            pass: /Resposta enviada para pergunta pendente/u.test(plain),
+            detail: 'plain human answer was routed to the pending structured input',
+        },
+        {
+            id: 'structured-input-waits-cleared',
+            pass: /request_user_input=0/u.test(plain) && /Sem bloqueios de input humano do SDK/u.test(plain),
+            detail: '/sdk waits confirmed that the structured input was cleared after answer',
+        },
+        {
+            id: 'structured-input-no-durable-spam',
+            pass: !/request_user_input ainda executando|LLM-B ainda trabalhando/iu.test(plain),
+            detail: 'structured input cycle did not print old durable waiting spam',
+        },
+        {
+            id: 'structured-input-clean-close',
+            pass: boot.exitCode === 0 && /readline fechado/u.test(plain),
+            detail: 'terminal closed cleanly after structured input cycle',
+        },
+    ];
+}
+
+async function runStructuredInputCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+    const boot = await runSessionCycleBoot({
+        id: 'structured-input-cycle',
+        label: 'structured request_user_input',
+        outDir,
+        commands: [
+            '/sdk simulate request-user-input --choices SIM|NAO --required REQUEST_USER_INPUT-SIM: responda para fechar o teste',
+            { line: '/sdk waits', waitBeforeMs: 1_500, advanceAfterMs: 1_500 },
+            'SIM',
+            { line: '/sdk waits', advanceAfterMs: 1_500 },
+            '/quit',
+        ],
+        terminalPort,
+        requestedTransport,
+        timeoutMs,
+    });
+    const criteria = structuredInputCycleCriteria(boot);
+    const durationMs = Date.now() - Date.parse(startedAt);
+    const ok = criteria.every((criterion) => criterion.pass);
+    const summary = {
+        ok,
+        startedAt,
+        durationMs,
+        terminalPort,
+        boot: {
+            id: boot.id,
+            label: boot.label,
+            exitCode: boot.exitCode,
+            sessionId: boot.sessionId || null,
+            transport: boot.transport,
+        },
+        criteria,
+    };
+    await writeFile(path.join(outDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    await writeFile(
+        path.join(outDir, 'summary.md'),
+        [
+            '# Terminal LLM-B Structured Input Live Test',
+            '',
+            `Started: ${startedAt}`,
+            `Duration: ${durationMs}ms`,
+            `Status: ${ok ? 'PASS' : 'FAIL'}`,
+            `Terminal port: ${terminalPort}`,
+            '',
+            '## Criteria',
+            '',
+            ...criteria.map((criterion) => `- ${criterion.pass ? '[x]' : '[ ]'} ${criterion.id}: ${criterion.detail}`),
+            '',
+            '## Logs',
+            '',
+            `- raw: ${path.relative(ROOT, path.join(outDir, 'structured-input-cycle.raw.log'))}`,
+            `- plain: ${path.relative(ROOT, path.join(outDir, 'structured-input-cycle.plain.log'))}`,
+            '',
+        ].join('\n'),
+        'utf8',
+    );
+    return summary;
+}
+
 function hasReturnedToReplPrompt(plain, outputOffset) {
     return REPL_PROMPT_TAIL_RE.test(String(plain ?? '').slice(outputOffset));
 }
@@ -1499,9 +1652,11 @@ function liveScenarioKind({
     byokReal,
     noPr,
     sessionCycle,
+    structuredInputCycle,
     liveScenario,
 }) {
     if (sessionCycle) return 'session_cycle';
+    if (structuredInputCycle) return 'structured_input_cycle';
     if (autoControlProbe) return 'auto_probe';
     if (byokFixture) return 'byok_fixture_no_pr';
     if (byokControlProbe) return 'byok_control_no_pr';
@@ -3570,6 +3725,7 @@ async function main() {
     const dryRun = hasFlag('--dry-run');
     const noPr = hasFlag('--no-pr');
     const sessionCycle = hasFlag('--session-cycle');
+    const structuredInputCycle = hasFlag('--structured-input-cycle');
     const reuseSdkSession = hasFlag('--reuse-sdk-session');
     const byokProbe = hasFlag('--byok-probe');
     const byokFixture = hasFlag('--byok-fixture');
@@ -3586,6 +3742,7 @@ async function main() {
         byokReal,
         noPr,
         sessionCycle,
+        structuredInputCycle,
         liveScenario,
     });
     const byokRealProfile = readArg('--byok-real-profile', '');
@@ -3694,6 +3851,20 @@ async function main() {
             startedAt,
         });
         console.log(`[terminal-live] session cycle summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`);
+        if (!summary.ok) process.exitCode = 1;
+        await byokFixtureProvider?.close();
+        return;
+    }
+
+    if (structuredInputCycle) {
+        const summary = await runStructuredInputCycleLiveTest({
+            outDir,
+            requestedTransport,
+            timeoutMs,
+            terminalPort,
+            startedAt,
+        });
+        console.log(`[terminal-live] structured input summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`);
         if (!summary.ok) process.exitCode = 1;
         await byokFixtureProvider?.close();
         return;

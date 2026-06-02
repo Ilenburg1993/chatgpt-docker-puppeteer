@@ -12,7 +12,11 @@ import { LLM_B_BOOT_PROMPT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { resolveModelSelectionMismatch } from '#copilot/core';
 import readline from 'node:readline';
 import { getBusy, getRl, getSdkSessionMode } from '../../presentation/state/index.js';
-import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/gateways/index.js';
+import {
+    getTerminalPendingStructuredUserInputCount,
+    readTerminalDialogStreamMeta,
+    readTerminalRuntimeState,
+} from '../frontend/gateways/index.js';
 import {
     getTerminalDetailLevel,
     readTerminalActivitySnapshot,
@@ -399,6 +403,11 @@ export function buildUserPrompt() {
             terminalThemeText('question', compactDetail ? '[ASK]' : `[ASK:${state.pendingQuestionKind.toUpperCase()}]`),
             terminalThemeText('question', '[ASK]'),
         );
+    } else if (getTerminalPendingStructuredUserInputCount() > 0) {
+        pushPromptTag(
+            terminalThemeText('question', compactDetail ? '[INPUT]' : '[REQUEST_USER_INPUT]'),
+            terminalThemeText('question', '[INPUT]'),
+        );
     } else if (state.pendingQuestionShadowState) {
         const shadowTag =
             state.pendingQuestionShadowState === 'expired'
@@ -456,6 +465,8 @@ export function buildWaitingPrompt() {
     if (promptPolicy.showQueueTag && runtime.queueSize > 0) tags.push(`Q:${runtime.queueSize}`);
     if (runtime.pendingQuestion && runtime.pendingQuestionKind && runtime.pendingQuestionKind !== 'ready') {
         tags.push(`ASK:${runtime.pendingQuestionKind.toUpperCase()}`);
+    } else if (getTerminalPendingStructuredUserInputCount() > 0) {
+        tags.push('INPUT');
     }
     if (promptPolicy.showNonCriticalShadowTag && runtime.pendingQuestionShadowState === 'expiring_soon') {
         tags.push('SHDW:SOON');

@@ -9,6 +9,7 @@ const getShowUsage = vi.fn(() => true);
 const getShowToolActivity = vi.fn(() => true);
 const getShowIntentActivity = vi.fn(() => true);
 const getShowSessionActivity = vi.fn(() => false);
+const getTerminalPendingStructuredUserInputCount = vi.fn(() => 0);
 const readTerminalActivitySnapshot = vi.fn(() => ({
     phase: 'turn',
     label: 'Processando mensagem',
@@ -45,6 +46,14 @@ vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', (
     readTerminalDialogStreamMeta: vi.fn(() => ({ model: 'gpt-5-mini', reasoningEffort: 'high' })),
 }));
 
+vi.mock('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        getTerminalPendingStructuredUserInputCount,
+    };
+});
+
 vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
     readTerminalActivitySnapshot,
 }));
@@ -75,6 +84,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         getShowToolActivity.mockReturnValue(true);
         getShowIntentActivity.mockReturnValue(true);
         getShowSessionActivity.mockReturnValue(false);
+        getTerminalPendingStructuredUserInputCount.mockReturnValue(0);
     });
 
     it('inclui modelo e reasoning no prompt', async () => {
@@ -121,6 +131,16 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         expect(prompt).not.toContain('[ASK:READY]');
         expect(prompt).toContain('gpt-5-mini');
         expect(prompt).toContain('high');
+    });
+
+    it('inclui marcador INPUT quando há request_user_input pendente sem ask_user vivo', async () => {
+        getTerminalPendingStructuredUserInputCount.mockReturnValue(1);
+        const { buildUserPrompt, buildWaitingPrompt } = await import(
+            '../../../../src/copilot/terminal/dialog/output.js'
+        );
+
+        expect(buildUserPrompt()).toContain('[REQUEST_USER_INPUT]');
+        expect(buildWaitingPrompt()).toContain('[INPUT]');
     });
 
     it('mantém o modelo ativo como identidade do prompt e sinaliza mismatch observado', async () => {

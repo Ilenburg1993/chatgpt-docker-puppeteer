@@ -20,6 +20,7 @@ import { readTerminalIoActivityProjection } from '../events/index.js';
 import {
     compactTerminalSdkSession,
     confirmTerminalSdkSessionUi,
+    createTerminalPendingStructuredUserInput,
     createTerminalSdkWorkspaceFile,
     getTerminalPendingStructuredUserInputCount,
     getTerminalSdkQuota,
@@ -732,6 +733,90 @@ function renderSdkWaitsSummary({ println }, runtimeId) {
 }
 
 /**
+ * @param {string} value
+ * @returns {string[]}
+ */
+function parseChoiceList(value) {
+    return value
+        .replace(/^['"]|['"]$/gu, '')
+        .split('|')
+        .map((choice) => choice.trim())
+        .filter((choice) => choice.length > 0);
+}
+
+/**
+ * @param {string[]} rest
+ * @returns {{
+ *     question: string;
+ *     choices: string[];
+ *     allowFreeform: boolean;
+ * }}
+ */
+function parseSdkSimulateRequestUserInputArgs(rest) {
+    let allowFreeform = true;
+    /** @type {string[]} */
+    let choices = [];
+    /** @type {string[]} */
+    const questionParts = [];
+    for (let i = 0; i < rest.length; i++) {
+        const token = rest[i] ?? '';
+        if (!token) continue;
+        if (token === '--required' || token === '--no-freeform') {
+            allowFreeform = false;
+            continue;
+        }
+        if (token === '--freeform') {
+            allowFreeform = true;
+            continue;
+        }
+        if (token === '--choices') {
+            const candidate = rest[i + 1] ?? '';
+            choices = parseChoiceList(candidate);
+            i += 1;
+            continue;
+        }
+        questionParts.push(token);
+    }
+    return {
+        question: questionParts.join(' ').trim() || 'REQUEST_USER_INPUT-SIM: responda para fechar o teste',
+        choices,
+        allowFreeform,
+    };
+}
+
+/**
+ * @param {CommandContext} ctx
+ * @param {string[]} rest
+ * @returns {void}
+ */
+function renderSdkSimulate({ println }, rest) {
+    const [kind = '', ...tail] = rest;
+    if (kind !== 'request-user-input' && kind !== 'request_user_input') {
+        println(
+            '\n  \x1b[33mUso: /sdk simulate request-user-input [--choices "sim|nao"] [--required] [pergunta]\x1b[0m\n',
+        );
+        return;
+    }
+    const parsed = parseSdkSimulateRequestUserInputArgs(tail);
+    const created = createTerminalPendingStructuredUserInput({
+        question: parsed.question,
+        choices: parsed.choices,
+        allowFreeform: parsed.allowFreeform,
+        data: { command: '/sdk simulate request-user-input' },
+    });
+    const mode = parsed.allowFreeform ? 'resposta livre' : 'seleção obrigatória';
+    const choices = parsed.choices.length > 0 ? ` · opções=${parsed.choices.join(' | ')}` : '';
+    println('\n  \x1b[36mInput humano estruturado\x1b[0m');
+    println(`  status   \x1b[33maguardando operador\x1b[0m`);
+    println('  origem   \x1b[90mrequest_user_input diagnóstico\x1b[0m');
+    println(`  modo     \x1b[90m${mode}${choices}\x1b[0m`);
+    println(`  pergunta ${compactText(parsed.question, 220)}`);
+    println('  ação     \x1b[90mdigite a resposta normalmente ou use /answer <texto>\x1b[0m');
+    println(`  id       \x1b[90m${created.requestId}\x1b[0m\n`);
+    void created.promise;
+}
+
+/**
  * @param {CommandContext} ctx
  * @param {string | null | undefined} runtimeId
  * @returns {void}
@@ -817,6 +902,8 @@ export async function cmdSdk({ println }, arg = '') {
             renderSdkRequestHeadersSummary({ println }, rest);
         } else if (sub === 'waits') {
             renderSdkWaitsSummary({ println }, runtimeId);
+        } else if (sub === 'simulate') {
+            renderSdkSimulate({ println }, rest);
         } else if (sub === 'compact') {
             const result = await callWithRuntimeTarget(compactTerminalSdkSession, runtimeId);
             println(`\n  \x1b[32m[OK] SDK compaction solicitada.\x1b[0m\n  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
@@ -835,7 +922,7 @@ export async function cmdSdk({ println }, arg = '') {
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             println(
-                '  \x1b[90mUso: /sdk models | /sdk skills [--project <path>] [--dir <path>] | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk capabilities | /sdk headers [k=v ...|clear] | /sdk waits | /sdk doctor | /sdk compact\x1b[0m\n',
+                '  \x1b[90mUso: /sdk models | /sdk skills [--project <path>] [--dir <path>] | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk capabilities | /sdk headers [k=v ...|clear] | /sdk waits | /sdk simulate request-user-input | /sdk doctor | /sdk compact\x1b[0m\n',
             );
         }
     } catch (e) {
