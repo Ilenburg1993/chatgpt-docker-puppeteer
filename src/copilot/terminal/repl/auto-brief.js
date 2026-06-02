@@ -40,6 +40,17 @@ function enabledLabel(value) {
 }
 
 /**
+ * @param {{ bearerTokenConfigured?: boolean; apiKeyConfigured?: boolean; headersConfigured?: boolean }} auth
+ * @returns {string}
+ */
+function renderAutoBriefAuthLabel(auth) {
+    if (auth.bearerTokenConfigured) return 'token bearer';
+    if (auth.apiKeyConfigured) return 'chave API';
+    if (auth.headersConfigured) return 'headers';
+    return 'sem autenticação';
+}
+
+/**
  * @param {number | null | undefined} value
  * @returns {string}
  */
@@ -168,7 +179,7 @@ export function buildTerminalAutoBrief(input = {}) {
             lines.push(
                 briefLine(
                     'BYOK',
-                    `${byok.ready ? 'pronto' : 'incompleto'} · ${byok.providerType ?? '-'} · ${byok.model ?? '-'} · ${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'sem auth'}`,
+                    `${byok.ready ? 'pronto' : 'incompleto'} · ${byok.providerType ?? '-'} · ${byok.model ?? '-'} · ${renderAutoBriefAuthLabel(byok.auth)}`,
                 ),
             );
         }
@@ -194,7 +205,7 @@ export function buildTerminalAutoBrief(input = {}) {
         lines.push(
             briefLine(
                 'BYOK',
-                `${byok.ready ? 'pronto' : 'incompleto'} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · auth ${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'ausente'}`,
+                `${byok.ready ? 'pronto' : 'incompleto'} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · autenticação ${renderAutoBriefAuthLabel(byok.auth)}`,
             ),
         );
     }

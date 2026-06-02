@@ -106,6 +106,33 @@ describe('terminal/repl/auto-brief', () => {
         expect(text).toContain('há arquivos de instruções ausentes no reload do system prompt');
     });
 
+    it('humaniza autenticação BYOK no briefing automático', async () => {
+        readTerminalStatusProjection.mockReturnValue(createProjection());
+        readTerminalByokProjection.mockReturnValueOnce({
+            summary: {
+                enabled: true,
+                ready: true,
+                preset: 'openrouter',
+                providerType: 'openrouter',
+                model: 'openrouter/free',
+                auth: {
+                    bearerTokenConfigured: false,
+                    apiKeyConfigured: true,
+                    headersConfigured: false,
+                },
+            },
+        });
+        const { buildTerminalAutoBrief } = await import('../../../../src/copilot/terminal/repl/auto-brief.js');
+
+        const brief = buildTerminalAutoBrief({ phase: 'ready' });
+        const text = brief.lines.join('\n');
+
+        expect(text).toContain('chave API');
+        expect(text).not.toContain('apiKey');
+        expect(text).not.toContain('auth ');
+        expect(text).not.toContain('sem auth');
+    });
+
     it('preserva modo detalhado por env explícita', async () => {
         readTerminalStatusProjection.mockReturnValue(createProjection());
         vi.stubEnv('COPILOT_TERMINAL_AUTO_BRIEF', 'full');

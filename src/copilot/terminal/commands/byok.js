@@ -227,12 +227,12 @@ function printByokSdkSessionBoundaryHint(println, options = {}) {
         `  \x1b[90m${prefix} Para entrar/sair de BYOK ou trocar provider/perfil, agende /session sdk next new e reinicie a task do terminal; /restart reinicia só a conversa.\x1b[0m`,
     );
     println(
-        '  \x1b[90m/byok model <id> tenta trocar o modelo na sessão viva apenas quando ela já nasceu com o mesmo provider BYOK.\x1b[0m',
+        '  \x1b[90m/byok model <id> tenta trocar o modelo na sessão viva apenas quando ela já nasceu com o mesmo provedor BYOK.\x1b[0m',
     );
 }
 
 /**
- * Troca modelo no runtime vivo apenas quando o handle SDK atual já nasceu com o mesmo provider BYOK.
+ * Troca modelo no runtime vivo apenas quando o handle SDK atual já nasceu com o mesmo provedor BYOK.
  *
  * @param {ReturnType<typeof readTerminalByokProjection>['summary']} summary
  * @param {string} model
@@ -254,7 +254,7 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
     }
     if (!inventory.currentSessionId || !isSameTerminalByokProviderBoundary(summary, inventory.persistedByokBinding)) {
         println(
-            '  \x1b[33mSessão viva não usa o mesmo provider BYOK; modelo preparado para o próximo boot, sem troca cruzando provider.\x1b[0m',
+            '  \x1b[33mSessão viva não usa o mesmo provedor BYOK; modelo preparado para o próximo boot, sem troca cruzando provedor.\x1b[0m',
         );
         return;
     }
@@ -1834,12 +1834,12 @@ function renderActiveByokHealthGuidance(projection, activeHealth, println) {
  */
 function renderProfileAuth(profile) {
     return profile.auth.bearerTokenConfigured
-        ? 'bearer'
+        ? 'token bearer'
         : profile.auth.apiKeyConfigured
-          ? 'apiKey'
+          ? 'chave API'
           : profile.auth.headersConfigured
             ? 'headers'
-            : 'none';
+            : 'ausente';
 }
 
 /**
@@ -1924,10 +1924,10 @@ async function renderStatus(projection, println) {
     println('\n  \x1b[36mBYOK status\x1b[0m');
     println(`    Estado         ativo ${yesNo(summary.enabled)} · pronto ${yesNo(summary.ready)}`);
     println(`    Perfil         \x1b[33m${valueOrDash(summary.profile)}\x1b[0m · preset ${valueOrDash(summary.preset)}`);
-    println(`    Provider       \x1b[33m${valueOrDash(summary.providerType)}\x1b[0m · base ${valueOrDash(summary.baseUrl)}`);
+    println(`    Provedor       \x1b[33m${valueOrDash(summary.providerType)}\x1b[0m · base ${valueOrDash(summary.baseUrl)}`);
     println(`    Modelo         \x1b[33m${valueOrDash(summary.model)}\x1b[0m · wire ${valueOrDash(summary.wireApi)} · Azure ${valueOrDash(summary.azureApiVersion)}`);
     println(
-        `    Autenticação   api key ${yesNo(summary.auth.apiKeyConfigured)} · bearer ${yesNo(summary.auth.bearerTokenConfigured)} · headers ${yesNo(summary.auth.headersConfigured)}`,
+        `    Autenticação   chave API ${yesNo(summary.auth.apiKeyConfigured)} · token bearer ${yesNo(summary.auth.bearerTokenConfigured)} · headers ${yesNo(summary.auth.headersConfigured)}`,
     );
     println(
         `    Capacidades    raciocínio ${yesNo(statusCapabilities.reasoningEffort)} · SDK ${yesNo(statusCapabilities.sdkReasoningEffort)} · visão ${yesNo(statusCapabilities.vision)} · contexto ${statusCapabilities.contextWindowTokens}`,
@@ -2027,7 +2027,7 @@ function renderByokHealth(println, scope = {}) {
     );
     if (scope.providerId || scope.providerModel || scope.routeProfile) {
         println(
-            `  \x1b[90mfiltro provider ${scope.providerId ?? '*'} · modelo ${scope.providerModel ?? '*'} · perfil ${scope.routeProfile ?? '*'}\x1b[0m`,
+            `  \x1b[90mfiltro provedor ${scope.providerId ?? '*'} · modelo ${scope.providerModel ?? '*'} · perfil ${scope.routeProfile ?? '*'}\x1b[0m`,
         );
     }
     if (state.error) println(`  \x1b[31merro ${state.error}\x1b[0m`);
@@ -2101,7 +2101,7 @@ function renderByokProviderEndpointInventory(println, rest) {
     println('  \x1b[90mInventário estático de coleta; não prova acesso nem capability. Use probes para promover confiança runtime.\x1b[0m\n');
 
     if (inventories.length === 0) {
-        println(`    \x1b[33mProvider não encontrado no inventário: ${selector ?? '-'}.\x1b[0m\n`);
+        println(`    \x1b[33mProvedor não encontrado no inventário: ${selector ?? '-'}.\x1b[0m\n`);
         return;
     }
 
@@ -2160,7 +2160,7 @@ function renderByokGatewayImporterAudit(println, rest) {
     println('  \x1b[90mAuditoria local e pré-runtime; não chama fetchRaw, não usa rede, não executa provider/modelo e não imprime segredos.\x1b[0m\n');
 
     if (selector && inventories.length === 0) {
-        println(`    \x1b[33mProvider não encontrado no inventário: ${selector}.\x1b[0m\n`);
+        println(`    \x1b[33mProvedor não encontrado no inventário: ${selector}.\x1b[0m\n`);
         return;
     }
 
@@ -2174,7 +2174,7 @@ function renderByokGatewayImporterAudit(println, rest) {
                 .join(',');
             const envRequirements = descriptor.envRequirements.length > 0 ? descriptor.envRequirements.join(',') : '-';
             println(
-                `    \x1b[33m${descriptor.id}\x1b[0m  \x1b[90mprovider ${descriptor.providerId} · fonte ${descriptor.sourceKind} · auth ${descriptor.requiresAuth ? 'sim' : 'nao'} · TTL ${formatTerminalDurationSeconds(descriptor.ttlSeconds)}\x1b[0m`,
+                `    \x1b[33m${descriptor.id}\x1b[0m  \x1b[90mprovedor ${descriptor.providerId} · fonte ${descriptor.sourceKind} · autenticação ${descriptor.requiresAuth ? 'sim' : 'nao'} · TTL ${formatTerminalDurationSeconds(descriptor.ttlSeconds)}\x1b[0m`,
             );
             println(`      \x1b[90mhooks ${hookTags || '-'} · env ${envRequirements}\x1b[0m`);
         }
@@ -2205,7 +2205,7 @@ function renderByokProviderGatewayTraits(println, rest) {
     println('  \x1b[90mMetadados pré-runtime derivados de specs/endpoints; não provam acesso, saúde ou execução do modelo.\x1b[0m\n');
 
     if (traits.length === 0) {
-        println(`    \x1b[33mProvider não encontrado para traits: ${selector ?? '-'}.\x1b[0m\n`);
+        println(`    \x1b[33mProvedor não encontrado para traits: ${selector ?? '-'}.\x1b[0m\n`);
         return;
     }
 
@@ -2354,7 +2354,7 @@ function renderByokGatewayEnvRequirements(println, rest) {
     );
 
     if (rows.length === 0) {
-        println(`    \x1b[33mNenhum provider encontrado para requisitos: ${selector ?? '-'}.\x1b[0m\n`);
+        println(`    \x1b[33mNenhum provedor encontrado para requisitos: ${selector ?? '-'}.\x1b[0m\n`);
         return;
     }
 
@@ -3314,7 +3314,7 @@ async function renderByokGatewayCatalogOpenAISchema(println, options = {}) {
         const eligibilityStatus = optionalScalarString(eligibility['status']) ?? '-';
         const routeOptionCount = Array.isArray(gateway['route_options']) ? gateway['route_options'].length : 0;
         println(
-            `    \x1b[33m${model.id}\x1b[0m  \x1b[90mprovider ${providerId} · modelo provider ${providerModel} · rotas ${routeOptionCount} · elegibilidade ${eligibilityStatus}\x1b[0m`,
+            `    \x1b[33m${model.id}\x1b[0m  \x1b[90mprovedor ${providerId} · modelo do provedor ${providerModel} · rotas ${routeOptionCount} · elegibilidade ${eligibilityStatus}\x1b[0m`,
         );
     }
     if (openaiList.data.length > 12) {
@@ -3412,24 +3412,24 @@ async function renderByokGatewayProviderExplain(println, selector) {
     }
     const explanation = explainModelGatewayProviderEntry(await store.readSnapshot(), normalizedSelector);
     if (!explanation.found) {
-        println(`    \x1b[33mProvider não encontrado.\x1b[0m  \x1b[90mpróxima ação ${explanation.nextActions.join(',')}\x1b[0m\n`);
+        println(`    \x1b[33mProvedor não encontrado.\x1b[0m  \x1b[90mpróxima ação ${explanation.nextActions.join(',')}\x1b[0m\n`);
         return;
     }
     println(`    \x1b[33m${explanation.providerId}\x1b[0m`);
     println(
-        `      \x1b[90mfontes ${explanation.sources.length} · evidências de provider ${explanation.providerEvidences.length} · modelos ${explanation.projections.length} · rotas ${explanation.routeOptions.length} · overlays ${explanation.accountOverlays.length} · conflitos ${explanation.conflicts.length}\x1b[0m`,
+        `      \x1b[90mfontes ${explanation.sources.length} · evidências de provedor ${explanation.providerEvidences.length} · modelos ${explanation.projections.length} · rotas ${explanation.routeOptions.length} · overlays ${explanation.accountOverlays.length} · conflitos ${explanation.conflicts.length}\x1b[0m`,
     );
     println(
         `      \x1b[90mfrescor mais novo ${explanation.freshness.newestSourceAt ?? '-'} · mais antigo ${explanation.freshness.oldestSourceAt ?? '-'}\x1b[0m`,
     );
     if (explanation.providerProjection) {
         println(
-            `      \x1b[90mnome ${optionalScalarString(explanation.providerProjection['displayName']) ?? '-'} · provider assunto ${optionalScalarString(explanation.providerProjection['subjectProviderId']) ?? '-'}\x1b[0m`,
+            `      \x1b[90mnome ${optionalScalarString(explanation.providerProjection['displayName']) ?? '-'} · provedor assunto ${optionalScalarString(explanation.providerProjection['subjectProviderId']) ?? '-'}\x1b[0m`,
         );
     }
     for (const source of explanation.sources.slice(0, 4)) {
         println(
-            `      \x1b[90mfonte ${optionalScalarString(source['id']) ?? '-'} · tipo ${optionalScalarString(source['kind']) ?? '-'} · auth ${optionalScalarString(source['authMode']) ?? '-'} · refresh ${optionalScalarString(source['refreshPolicy']) ?? '-'}\x1b[0m`,
+            `      \x1b[90mfonte ${optionalScalarString(source['id']) ?? '-'} · tipo ${optionalScalarString(source['kind']) ?? '-'} · autenticação ${optionalScalarString(source['authMode']) ?? '-'} · refresh ${optionalScalarString(source['refreshPolicy']) ?? '-'}\x1b[0m`,
         );
     }
     const firstConflict = explanation.conflicts[0] ?? null;
@@ -4354,7 +4354,7 @@ function renderByokGatewayQuotaMatrix(println, rest) {
     );
     println(`  \x1b[90mTipos de quota: ${renderGatewayCountMap(matrix.summary.byQuotaSnapshot)}\x1b[0m\n`);
     if (matrix.rows.length === 0) {
-        println('    \x1b[33mNenhum provider encontrado para o filtro informado.\x1b[0m\n');
+        println('    \x1b[33mNenhum provedor encontrado para o filtro informado.\x1b[0m\n');
         return;
     }
     for (const row of matrix.rows.slice(0, args.limit)) {
@@ -4426,7 +4426,7 @@ async function renderByokGatewayCatalogFreshness(println, rest) {
     for (const item of sources.slice(0, args.limit)) {
         const source = item.source;
         println(
-            `    \x1b[33m${optionalScalarString(source['id']) ?? '-'}\x1b[0m  \x1b[90mprovider ${optionalScalarString(source['providerId']) ?? '-'} · tipo ${optionalScalarString(source['kind']) ?? '-'} · auth ${optionalScalarString(source['authMode']) ?? '-'} · refresh ${optionalScalarString(source['refreshPolicy']) ?? '-'} · atualizado ${item.at}\x1b[0m`,
+            `    \x1b[33m${optionalScalarString(source['id']) ?? '-'}\x1b[0m  \x1b[90mprovedor ${optionalScalarString(source['providerId']) ?? '-'} · tipo ${optionalScalarString(source['kind']) ?? '-'} · autenticação ${optionalScalarString(source['authMode']) ?? '-'} · refresh ${optionalScalarString(source['refreshPolicy']) ?? '-'} · atualizado ${item.at}\x1b[0m`,
         );
     }
     if (sources.length > args.limit) println(`\n  \x1b[90mexibindo ${args.limit}/${sources.length}; use filtro ou limite numerico.\x1b[0m`);
@@ -4758,10 +4758,10 @@ function renderByokProbeResult(println, mode, probe, options = {}) {
     const indent = options.indent ?? '    ';
     const color = probe.ok ? '\x1b[32m' : '\x1b[31m';
     println(
-        `${indent}resultado: ${color}${probe.status}\x1b[0m · perfil ${valueOrDash(probe.profile)} · preset ${valueOrDash(probe.preset)} · provider ${valueOrDash(probe.providerType)} · modelo ${valueOrDash(probe.model)}`,
+        `${indent}resultado: ${color}${probe.status}\x1b[0m · perfil ${valueOrDash(probe.profile)} · preset ${valueOrDash(probe.preset)} · provedor ${valueOrDash(probe.providerType)} · modelo ${valueOrDash(probe.model)}`,
     );
     println(
-        `${indent}sinal:     deltas ${probe.deltaCount}/${probe.deltaChars} chars · final ${probe.finalChars} chars · evento final ${yesNo(probe.observedFinalEvent)} · ${probe.elapsedMs}ms`,
+        `${indent}sinal:     ${probe.deltaCount} fragmentos · ${probe.deltaChars} ${probe.deltaChars === 1 ? 'caractere' : 'caracteres'} parciais · final ${probe.finalChars} ${probe.finalChars === 1 ? 'caractere' : 'caracteres'} · evento final ${yesNo(probe.observedFinalEvent)} · ${probe.elapsedMs}ms`,
     );
     if (mode === 'agent') {
         println(
@@ -4793,7 +4793,7 @@ function renderByokProbeResult(println, mode, probe, options = {}) {
     }
     if (options.providerAttempted === false) {
         println(
-            `${indent}\x1b[90mA probe foi barrada antes do provider porque o limite declarado não comporta o envelope SDK do terminal; health real do modelo não foi degradado por essa admissão.\x1b[0m`,
+            `${indent}\x1b[90mA probe foi barrada antes do provedor porque o limite declarado não comporta o envelope SDK do terminal; health real do modelo não foi degradado por essa admissão.\x1b[0m`,
         );
     }
 }
@@ -4993,7 +4993,7 @@ async function persistByokSelection(rest, projection) {
         process.env['COPILOT_BYOK_PROVIDER_PRESET'] = preset;
         if (model) process.env['COPILOT_BYOK_MODEL'] = model;
         if (baseUrl) process.env['COPILOT_BYOK_BASE_URL'] = baseUrl;
-        return `Provider BYOK persistido: ${preset}${model ? ` · modelo ${model}` : ''}.`;
+        return `Provedor BYOK persistido: ${preset}${model ? ` · modelo ${model}` : ''}.`;
     }
 
     return `Subcomando persist desconhecido: ${kind}. Use /byok persist help.`;
@@ -5044,7 +5044,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             const scoped = scope.providerId || scope.providerModel || scope.routeProfile;
             println(
                 scoped
-                    ? `  \x1b[32mSaúde operacional BYOK limpa para provider ${scope.providerId ?? '*'} · modelo ${scope.providerModel ?? '*'} · perfil ${scope.routeProfile ?? '*'}.\x1b[0m\n`
+                    ? `  \x1b[32mSaúde operacional BYOK limpa para provedor ${scope.providerId ?? '*'} · modelo ${scope.providerModel ?? '*'} · perfil ${scope.routeProfile ?? '*'}.\x1b[0m\n`
                     : '  \x1b[32mSaúde operacional BYOK limpa no processo atual e no arquivo persistente.\x1b[0m\n',
             );
             return;
@@ -5401,7 +5401,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         const selection = buildByokProbeSelection(explicitMode ? rest.slice(1) : rest);
         println(`\n  \x1b[36mBYOK ${mode} probe\x1b[0m`);
         println(
-            `  \x1b[90mEscopo: sessão SDK descartável; não troca a conversa viva nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : mode === 'agent' ? ' Agent exige tools representativas do terminal + ask_user com resposta sintética.' : mode === 'streaming' ? ' Streaming exige assistant.message_delta real; não degrada health de chat.' : mode === 'json' ? ' JSON exige payload parseável; não degrada health de chat.' : ' Vision anexa fixture PNG hermética e exige identificação visual; não degrada health de chat.'}${selection.profile ? ` perfil ${selection.profile}` : ''}${selection.provider ? ` provider ${selection.provider}` : ''}${selection.model ? ` modelo ${selection.model}` : ''}${selection.baseUrl ? ` base URL ${selection.baseUrl}` : ''}${selection.wireApi ? ` wire ${selection.wireApi}` : ''}\x1b[0m`,
+            `  \x1b[90mEscopo: sessão SDK descartável; não troca a conversa viva nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : mode === 'agent' ? ' Agent exige tools representativas do terminal + ask_user com resposta sintética.' : mode === 'streaming' ? ' Streaming exige assistant.message_delta real; não degrada health de chat.' : mode === 'json' ? ' JSON exige payload parseável; não degrada health de chat.' : ' Vision anexa fixture PNG hermética e exige identificação visual; não degrada health de chat.'}${selection.profile ? ` perfil ${selection.profile}` : ''}${selection.provider ? ` provedor ${selection.provider}` : ''}${selection.model ? ` modelo ${selection.model}` : ''}${selection.baseUrl ? ` base URL ${selection.baseUrl}` : ''}${selection.wireApi ? ` wire ${selection.wireApi}` : ''}\x1b[0m`,
         );
         const { probe, providerAttempted } = await runByokProbe(mode, selection, eventBus);
         renderByokProbeResult(println, mode, probe, { providerAttempted });
@@ -5456,10 +5456,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
             .map(([preset, count]) => `${preset} ${count}`)
             .join(' · ');
-        println(`\n  \x1b[36mBYOK providers\x1b[0m (${profiles.length} perfil(is))`);
+        println(`\n  \x1b[36mBYOK provedores\x1b[0m (${profiles.length} perfil(is))`);
         println(`  \x1b[90mativo ${summary.profile ?? summary.preset ?? 'sdk'} · prontos ${profiles.length} · presets ${configuredPresets || '-'}\x1b[0m\n`);
         if (profiles.length === 0) {
-            println('    \x1b[33mNenhum provider BYOK configurado. Adicione perfis em COPILOT_BYOK_PROFILES_JSON no .env.local.\x1b[0m\n');
+            println('    \x1b[33mNenhum provedor BYOK configurado. Adicione perfis em COPILOT_BYOK_PROFILES_JSON no .env.local.\x1b[0m\n');
             return;
         }
         for (const profile of profiles) {
@@ -5474,7 +5474,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                     : '\x1b[33msem credencial\x1b[0m';
             println(`    \x1b[33m${profile.name}\x1b[0m${active} · ${readiness}`);
             println(
-                `      \x1b[90mpreset ${profile.preset ?? '-'} · provider ${profile.providerType ?? '-'} · modelo ${profile.model ?? '-'} · auth ${renderProfileAuth(profile)}${metadata}${cost}${healthLabel}\x1b[0m`,
+                `      \x1b[90mpreset ${profile.preset ?? '-'} · provedor ${profile.providerType ?? '-'} · modelo ${profile.model ?? '-'} · autenticação ${renderProfileAuth(profile)}${metadata}${cost}${healthLabel}\x1b[0m`,
             );
             println(
                 `      \x1b[90mcomandos: /byok use ${profile.name} · /byok models refresh provider:${profile.preset ?? profile.providerType ?? profile.name} · /byok recommend provider:${profile.preset ?? profile.providerType ?? profile.name} free reasoning safe\x1b[0m`,
@@ -5496,7 +5496,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             const cost = renderByokProfileCostTag(profile.name);
             println(`    \x1b[33m${profile.name}\x1b[0m${active}`);
             println(
-                `      \x1b[90mpreset ${profile.preset ?? '-'} · provider ${profile.providerType ?? '-'} · modelo ${profile.model ?? '-'} · auth ${renderProfileAuth(profile)}${metadata}${cost}\x1b[0m`,
+                `      \x1b[90mpreset ${profile.preset ?? '-'} · provedor ${profile.providerType ?? '-'} · modelo ${profile.model ?? '-'} · autenticação ${renderProfileAuth(profile)}${metadata}${cost}\x1b[0m`,
             );
         }
         println('\n  \x1b[90mUso: /byok use <perfil> prepara o seletor no processo atual.\x1b[0m');
@@ -5622,7 +5622,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             println(`       \x1b[90m${renderByokRecommendationActionHint(entry.model)}\x1b[0m`);
             index += 1;
         }
-        println('\n  \x1b[90mA probe agent é a live fake descartável do terminal: valida streaming/tool/ask_user antes de trocar a sessão viva. Use /byok use <perfil> para mudar provider e /byok model <id> para mudar só o modelo ativo.\x1b[0m\n');
+        println('\n  \x1b[90mA probe agent é a live fake descartável do terminal: valida streaming/tool/ask_user antes de trocar a sessão viva. Use /byok use <perfil> para mudar provedor e /byok model <id> para mudar só o modelo ativo.\x1b[0m\n');
         return;
     }
 

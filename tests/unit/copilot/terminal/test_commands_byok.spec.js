@@ -1927,7 +1927,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('BYOK status');
         expect(ctx.output()).toContain('.env.local');
         expect(ctx.output()).toContain('Autenticação');
-        expect(ctx.output()).toContain('bearer');
+        expect(ctx.output()).toContain('token bearer');
+        expect(ctx.output()).not.toContain('apiKey');
         expect(ctx.output()).not.toContain('bearer=');
         expect(ctx.output()).toContain('Preparada');
         expect(ctx.output()).toContain('Sessão viva');
@@ -2208,7 +2209,9 @@ describe('terminal /byok command', () => {
         );
         expect(flushByokProviderHealth).toHaveBeenCalled();
         expect(ctx.output()).toContain('sessão SDK descartável');
-        expect(ctx.output()).toContain('deltas 2/13 chars');
+        expect(ctx.output()).toContain('2 fragmentos');
+        expect(ctx.output()).toContain('13 caracteres parciais');
+        expect(ctx.output()).not.toContain('deltas 2/13 chars');
         expect(ctx.output()).not.toContain('token');
     });
 
@@ -2255,7 +2258,7 @@ describe('terminal /byok command', () => {
             providerId: 'zai',
             providerModel: 'glm-4.5-flash',
         });
-        expect(ctx.output()).toContain('provider zai');
+        expect(ctx.output()).toContain('provedor zai');
         expect(ctx.output()).toContain('modelo glm-4.5-flash');
     });
 
@@ -2909,7 +2912,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'providers');
 
-        expect(ctx.output()).toContain('BYOK providers');
+        expect(ctx.output()).toContain('BYOK provedores');
         expect(ctx.output()).toContain('openrouter-free');
         expect(ctx.output()).toContain('groq-free');
         expect(ctx.output()).toContain('← ativo');
@@ -4251,10 +4254,10 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'health provider:openrouter model:openai/gpt-oss-120b profile:repo_agent');
 
-        expect(ctx.output()).toContain('filtro provider openrouter');
+        expect(ctx.output()).toContain('filtro provedor openrouter');
         expect(ctx.output()).toContain('Saúde operacional BYOK');
         expect(ctx.output()).toContain('(1)');
-        expect(ctx.output()).toContain('provider openrouter');
+        expect(ctx.output()).toContain('provedor openrouter');
         expect(ctx.output()).not.toContain('provider groq');
         expect(ctx.output()).not.toContain('providerId=');
     });
@@ -4283,7 +4286,7 @@ describe('terminal /byok command', () => {
             routeProfile: 'repo_agent',
         });
         expect(flushByokProviderHealth).toHaveBeenCalledOnce();
-        expect(ctx.output()).toContain('provider openrouter');
+        expect(ctx.output()).toContain('provedor openrouter');
         expect(ctx.output()).toContain('modelo openai/gpt-oss-120b');
         expect(ctx.output()).toContain('perfil repo_agent');
         expect(ctx.output()).toContain('Saúde operacional BYOK limpa');
@@ -4417,8 +4420,8 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'model anthropic/claude-sonnet-4.5');
 
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
-        expect(ctx.output()).toContain('Sessão viva não usa o mesmo provider BYOK');
-        expect(ctx.output()).toContain('sem troca cruzando provider');
+        expect(ctx.output()).toContain('Sessão viva não usa o mesmo provedor BYOK');
+        expect(ctx.output()).toContain('sem troca cruzando provedor');
         expect(ctx.output()).not.toContain('bound ao mesmo provider');
     });
 

@@ -2461,4 +2461,11 @@
 - [x] Repetir live PTY após correção de `/events` para confirmar visualmente que o resumo default também está limpo.
   - `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=240000 --transport=pty --live-scenario=freeform --out-dir=artifacts/terminal-live/ux-events-humanized-repeat-20260602-1651`.
   - Resultado: PASS completo; `/events` mostrou `Raciocínio concluído`, `Pergunta ao operador`, `Resposta do operador`, `Tarefa em segundo plano concluída/ociosa` e fonte `tarefa em segundo plano`, sem os rótulos antigos observados na live anterior.
-- [ ] Próxima lacuna: alguns comandos BYOK ainda carregam enum values em modo default (`apiKey`, `deltas ... chars`). Auditar se cada caso deve ser humano default ou detalhe técnico copiável.
+- [x] Próxima lacuna: alguns comandos BYOK ainda carregam enum values em modo default (`apiKey`, `deltas ... chars`). Auditar se cada caso deve ser humano default ou detalhe técnico copiável.
+- [x] `auto-brief` passou a renderizar autenticação BYOK como `chave API`, `token bearer` ou `sem autenticação`, removendo `apiKey`, `auth` e `sem auth` do briefing default/detalhado.
+- [x] `/byok status` passou a usar `Provedor` e `Autenticação chave API/token bearer/headers`.
+- [x] `/byok probe` passou a renderizar sinal como `fragmentos` e `caracteres`, removendo `deltas N/M chars` do output humano.
+- [x] `/byok providers`, health e telas de gateway associadas passaram a usar `provedor` e `autenticação` em vez de `provider`/`auth`, preservando `provider:<id>` apenas como sintaxe copiável.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js tests/unit/copilot/terminal/test_auto_brief.spec.js`.
+- [ ] Próxima lacuna: revisar as palavras `Chat`, `Agent`, `Vision`, `health`, `eligibility`, `wire`, `refresh` em `/byok gateway*`, decidindo quais são termos técnicos aceitáveis e quais devem virar rótulos humanos default.
