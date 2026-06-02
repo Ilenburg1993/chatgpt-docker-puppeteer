@@ -199,6 +199,9 @@ separando comandos de prova, troca live no mesmo provider, provider/persist e no
 
 Regra de limpeza: `model-gateway:runtime-health:clear` e `/byok health clear` removem apenas health operacional, nao
 metadados canônicos. O script package e dry-run por padrao; `--apply` e obrigatorio para mutar.
+Quando aplicado, o clear deve remover a identidade escopada tanto do ledger JSON quanto das tabelas SQLite de
+health/probe atuais. `runtime_probe_runs` segue como trilha historica; `health_observations` e `runtime_probe_results`
+nao podem ressuscitar residuos que ja foram limpos do ledger operacional.
 Regra de decisao: quando `auto:status`, `auto:doctor` ou o cockpit terminal produzirem `wait_for_reset`, os
 `nextCommands` devem listar `runtime-health:diff`, o preview escopado de `runtime-health:clear`, o equivalente
 `/byok health clear ...` e entao o selector. Isso torna reset de quota/cooldown uma acao visivel, nao uma suposicao.
@@ -396,6 +399,10 @@ Evidencia em 2026-06-01:
 - ledger de live scenarios gravou `terminal-live:2026-06-02T00-21-42-091Z:auto_probe`;
 - `npm run model-gateway:live:runs` confirmou `criteriaTotal=30` no ultimo auto-probe;
 - achado estrutural: depois dos overlays de health, `repo_agent` pode mostrar `usable=0/78` porque exige agent-probe verificado; isso e bloqueio correto, nao falha do cockpit.
+- BYOK real no-PR de 2026-06-02 gravou `artifacts/terminal-live/2026-06-02T01-11-14-561Z/summary.md`, status PASS,
+  sem erro de `COPILOT_BYOK_PROFILE`; shortlist/probe passou a preservar `profile=-` e `preset=kilo-code`.
+- A limpeza `provider=kilo-code/profile=kilo-code` removeu residuos SQLite do bug provider-as-profile; o diff seguinte
+  confirmou `invalidKiloProfile=[]` e nenhuma regressao.
 
 ### 5.6 BYOK real no-PR
 

@@ -2312,6 +2312,73 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('tmp-kilo-shortlist');
     });
 
+    it('sonda shortlist filtrada por provider sem transformar provider em profile inexistente', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'kilo-auto/free',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 256000 } },
+                    byok: {
+                        freeTier: true,
+                        provider: 'kilo-code',
+                        rateLimits: { maxRequestTokens: 64000 },
+                    },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://api.kilo.ai/api/gateway/models',
+            fromCache: false,
+            error: null,
+        });
+        runConfiguredByokAgentProbe.mockResolvedValue({
+            ok: true,
+            status: 'ok',
+            elapsedMs: 123,
+            model: 'kilo-auto/free',
+            profile: null,
+            preset: 'kilo-code',
+            providerType: 'openai',
+            deltaCount: 2,
+            deltaChars: 20,
+            finalChars: 30,
+            observedFinalEvent: true,
+            toolCallCount: 2,
+            markerToolCallCount: 1,
+            readToolCallCount: 1,
+            userInputRequestCount: 1,
+            userInputAnswerCount: 1,
+            sessionId: 'tmp-provider-shortlist',
+            errors: [],
+            warnings: [],
+        });
+        mockProjection({
+            summary: {
+                enabled: true,
+                ready: true,
+                profile: null,
+                preset: 'kilo-code',
+                providerType: 'openai',
+                model: 'kilo-auto/free',
+            },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'probe shortlist free reasoning safe 1 timeout:15000 provider:kilo-code');
+
+        const env = runConfiguredByokAgentProbe.mock.calls[0]?.[0]?.env;
+        expect(env).toEqual(expect.objectContaining({ COPILOT_BYOK_PROVIDER_PRESET: 'kilo-code' }));
+        expect(env?.COPILOT_BYOK_PROFILE).toBeUndefined();
+        expect(recordByokProviderModelAgentProbeSuccess).toHaveBeenCalledWith(
+            expect.objectContaining({
+                routeProfile: null,
+                providerId: 'kilo-code',
+                providerModel: 'kilo-auto/free',
+            }),
+        );
+        expect(ctx.output()).toContain('Shortlist encerrada: ok=1/1');
+        expect(ctx.output()).not.toContain("COPILOT_BYOK_PROFILE 'kilo-code'");
+    });
+
     it('explica cobertura por perfil na shortlist agregada antes de sondar o top-N', async () => {
         discoverConfiguredByokModelsFromEnv
             .mockResolvedValueOnce({

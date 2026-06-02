@@ -104,6 +104,8 @@ Playbook operacional ativo para humano/LLM:
 
 - [x] Falha BYOK e classificada.
 - [x] Runtime health e gravado em memoria e pode ser espelhado no SQLite.
+- [x] `runtime-health:clear` limpa a identidade escopada no ledger JSON e nas tabelas SQLite de health/probes atuais,
+      sem mutar metadados canonicos.
 - [x] Cooldown e reset window entram na selecao.
 - [x] O erro BYOK nao deve consumir Premium Request do SDK.
 - [x] Pos-falha executa controller automatico quando a policy esta ligada.
@@ -463,4 +465,11 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] `/byok auto status` e `/byok auto doctor` sugerem `/byok probe agent provider:<provider> model:<provider-model> timeout:20000` para candidatos bloqueados por agent probe ausente/nao verificado.
 - [x] `npm run model-gateway:auto:proof-plan` e `/byok auto proof-plan profile:repo_agent 12` materializam uma fila read-only de provas runtime.
 - [x] `npm run model-gateway:auto:standby` e `/byok auto standby profile:repo_agent 12` materializam uma fila read-only de rotas de prontidao.
+- [x] BYOK real no-PR gravou `terminal-live:2026-06-02T01-11-14-567Z:byok_real_no_pr`, artefato
+      `artifacts/terminal-live/2026-06-02T01-11-14-561Z/summary.md`, sem turno explicito e sem erro de
+      `COPILOT_BYOK_PROFILE`.
+- [x] Shortlist/probe separa provider/preset de profile: `kilo-code` sem profile ativo gera `provider:kilo-code`, nao
+      `profile:kilo-code`.
+- [x] Residuo SQLite `routeProfile=kilo-code/provider=kilo-code` foi limpo; `runtime-health:diff` confirmou
+      `invalidKiloProfile=[]`.
 - [ ] Resolver a lacuna de fallback real para `repo_agent`: quando todas as rotas exigem agent-probe verificado, o cockpit pode ficar correto porem bloqueado com `usable=0/78`.

@@ -1639,6 +1639,60 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(routeEnvReadyPlan.summary.runtimeEnvReadyCount, 2);
         assert.equal(routeEnvReadyPlan.summary.blockedProfileCount, 0);
+        const repoAgentChatOnlyRuntimePolicy = {
+            schema: 'model-gateway-selection-policy-resolution',
+            ok: true,
+            mode: 'prefer_runtime_proved',
+            rows: [
+                {
+                    profileId: 'repo_agent',
+                    source: 'post_runtime_proved',
+                    hasRuntimeProof: true,
+                    selected: {
+                        providerId: 'groq',
+                        providerModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                        selectorKind: 'exact_model',
+                        selectorSyntax: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                        routeProfile: 'default',
+                        taskProfile: 'default',
+                        hasRuntimeProof: true,
+                        accountAccess: { canAttempt: true },
+                    },
+                },
+            ],
+        };
+        const repoAgentChatOnlyHealth = [
+            {
+                routeProfile: 'repo_agent',
+                providerId: 'groq',
+                providerModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                lastStatus: 'ok',
+                lastSuccessAt: 120,
+                probes: {
+                    chat: {
+                        kind: 'chat',
+                        status: 'ok',
+                        ok: true,
+                        providerAttempted: true,
+                        lastAt: 120,
+                    },
+                },
+            },
+        ];
+        const conservativeRepoAgentPlan = buildModelGatewayRuntimeSelectorPlan(repoAgentChatOnlyRuntimePolicy, {
+            runtimeHealthRecords: repoAgentChatOnlyHealth,
+        });
+        assert.equal(conservativeRepoAgentPlan.ok, false);
+        assert.equal(conservativeRepoAgentPlan.summary.runtimeHealthBlockedCount, 1);
+        assert.ok(conservativeRepoAgentPlan.routes[0].reasons.includes('blocked:runtime_health:agent_probe_not_verified'));
+        const terminalBootstrapRepoAgentPlan = buildModelGatewayRuntimeSelectorPlan(repoAgentChatOnlyRuntimePolicy, {
+            runtimeHealthRecords: repoAgentChatOnlyHealth,
+            requireAgentProbeProfiles: [],
+            blockFailedProbeKinds: ['live_tool_protocol', 'live_ask_user', 'live_turn'],
+        });
+        assert.equal(terminalBootstrapRepoAgentPlan.ok, true);
+        assert.equal(terminalBootstrapRepoAgentPlan.routes[0].status, 'selected');
+        assert.equal(terminalBootstrapRepoAgentPlan.routes[0].selected?.['providerId'], 'groq');
         const liveProtocolBlockedPlan = buildModelGatewayRuntimeSelectorPlan(preferRuntimeProved, {
             runtimeHealthRecords: [
                 {
@@ -6684,6 +6738,61 @@ describe('model-gateway foundation', () => {
             assert.equal(runtime.health?.['lastStatus'], 'ok');
             assert.equal(runtime.probes.length, 1);
             assert.equal(runtime.probes[0]?.['status'], 'ok');
+        } finally {
+            db.close();
+        }
+    });
+
+    it('clears SQLite runtime health facts by canonical identity without deleting probe run audit history', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const store = new SqliteModelGatewayCatalogStore({ db });
+            await store.writeRuntimeHealthRecords(
+                [
+                    {
+                        key: 'kilo-code|kilo-code|openrouter/free',
+                        routeProfile: 'kilo-code',
+                        providerId: 'kilo-code',
+                        providerModel: 'openrouter/free',
+                        lastStatus: 'failed',
+                        lastFailureAt: 1_000,
+                        probes: {
+                            agent: {
+                                kind: 'agent',
+                                status: 'failed',
+                                ok: false,
+                                providerAttempted: true,
+                                lastAt: 1_000,
+                            },
+                        },
+                    },
+                    {
+                        key: 'repo_agent|kilo-code|kilo-auto/free',
+                        routeProfile: 'repo_agent',
+                        providerId: 'kilo-code',
+                        providerModel: 'kilo-auto/free',
+                        lastStatus: 'ok',
+                        lastSuccessAt: 2_000,
+                    },
+                ],
+                { runId: 'runtime-health-clear-scope', observedAt: 2_000 },
+            );
+
+            const deleted = await store.deleteRuntimeHealthRecords({
+                routeProfile: 'kilo-code',
+                providerId: 'kilo-code',
+            });
+            const records = await store.listLatestRuntimeHealthRecords();
+            const diagnostics = await store.readStorageDiagnostics();
+
+            assert.deepEqual(deleted, { healthObservations: 1, probeResults: 1 });
+            assert.equal(records.length, 1);
+            assert.equal(records[0]?.['routeProfile'], 'repo_agent');
+            assert.equal(records[0]?.['providerModel'], 'kilo-auto/free');
+            assert.equal(diagnostics.runtime.probeRuns, 1);
+            assert.equal(diagnostics.runtime.healthObservations, 1);
+            assert.equal(diagnostics.runtime.probeResults, 0);
         } finally {
             db.close();
         }

@@ -1436,7 +1436,7 @@ function withByokCatalogSource(model, source) {
             ...meta,
             provider,
             providerOwner: shouldUseOperationalProvider ? meta.provider ?? null : meta.providerOwner ?? null,
-            profile: meta.profile ?? source.profileName ?? source.preset ?? null,
+            profile: meta.profile ?? source.profileName ?? null,
             source: meta.source ?? source.preset ?? source.providerType ?? source.profileName ?? undefined,
             profileFreeTier: meta.profileFreeTier ?? profileCostHint.profileFreeTier,
             profileCostSource: meta.profileCostSource ?? profileCostHint.profileCostSource,
@@ -4596,6 +4596,7 @@ function buildByokModelProbeSelection(model, timeoutMs) {
     const meta = getByokModelMetadata(model);
     return buildByokProbeSelection([
         ...(meta?.profile ? [`profile:${meta.profile}`] : []),
+        ...(!meta?.profile && meta?.provider ? [`provider:${meta.provider}`] : []),
         `model:${model.id}`,
         ...(timeoutMs ? [`timeout:${timeoutMs}`] : []),
     ]);

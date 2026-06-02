@@ -33,7 +33,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-runtime-selector.mjs [--json] [--execute] [--fail] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--require-runtime-proof] [--runtime-proof-weights key=value,...] [--allow-probe] [--allow-env-missing] [--prefer-provider-diversity] [--preferred-probes a,b] [--block-failed-probes a,b] [--temporary-failure-cooldown-ms N] [--max-attempts N] [--max-attempts-per-provider N] [--attempts-per-route N] [--retry-delay-ms N] [--max-retry-delay-ms N] [--timeout-ms N]
+    process.stdout.write(`Usage: node scripts/model-gateway/model-gateway-runtime-selector.mjs [--json] [--execute] [--fail] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--require-runtime-proof] [--runtime-proof-weights key=value,...] [--allow-probe] [--allow-env-missing] [--prefer-provider-diversity] [--preferred-probes a,b] [--block-failed-probes a,b] [--require-agent-probe-profiles a,b] [--temporary-failure-cooldown-ms N] [--max-attempts N] [--max-attempts-per-provider N] [--attempts-per-route N] [--retry-delay-ms N] [--max-retry-delay-ms N] [--timeout-ms N]
 
 Build the final model-gateway runtime selector plan. By default this is dry-run only: it reads metadata plus already
 observed health, validates route-aware BYOK env readiness, and does not execute providers. Provider calls require the
@@ -151,6 +151,7 @@ async function buildRuntimeSelectorContext({
     runtimeSource,
     preferredProbeKinds = [],
     blockFailedProbeKinds = [],
+    requireAgentProbeProfiles = [],
     temporaryFailureCooldownMs = null,
     preferProviderDiversity = false,
     runtimeProofWeights = null,
@@ -261,6 +262,7 @@ async function buildRuntimeSelectorContext({
             env: process.env,
             runtimeHealthRecords: healthRecords,
             runtimeHealthIndex,
+            requireAgentProbeProfiles,
             preferProviderDiversity,
             ...(blockFailedProbeKinds.length > 0 ? { blockFailedProbeKinds } : {}),
             ...(temporaryFailureCooldownMs !== null ? { temporaryFailureCooldownMs } : {}),
@@ -296,6 +298,7 @@ const runtimeSource = runtimeSourceArg();
 const selectionPolicy = selectionPolicyArg(requireRuntimeProof);
 const preferredProbeKinds = readStringList('--preferred-probes');
 const blockFailedProbeKinds = readStringList('--block-failed-probes');
+const requireAgentProbeProfiles = readStringList('--require-agent-probe-profiles');
 const temporaryFailureCooldownMs = readInteger('--temporary-failure-cooldown-ms', 0);
 const runtimeProofWeights = readRuntimeProofWeights();
 const requestedExecutionProfile = readArg('--profile') || null;
@@ -320,6 +323,7 @@ const context = await buildRuntimeSelectorContext({
     runtimeSource,
     preferredProbeKinds,
     blockFailedProbeKinds,
+    requireAgentProbeProfiles,
     temporaryFailureCooldownMs: temporaryFailureCooldownMs > 0 ? temporaryFailureCooldownMs : null,
     preferProviderDiversity: argSet.has('--prefer-provider-diversity'),
     runtimeProofWeights,
@@ -507,6 +511,7 @@ const summary = {
     runtimeProofWeights,
     preferredProbeKinds,
     blockFailedProbeKinds,
+    requireAgentProbeProfiles,
     liveProtocolProbeKinds: MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS,
     requireRuntimeProof,
     requireRuntimeEnvReady,

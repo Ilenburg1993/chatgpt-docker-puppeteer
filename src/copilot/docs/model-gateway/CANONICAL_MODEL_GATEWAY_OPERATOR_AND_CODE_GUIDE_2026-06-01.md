@@ -209,6 +209,9 @@ Regras:
 - payloads passam por redaction operacional;
 - diagnostics deve expor contagens e ultimo registro relevante;
 - live test run deve ser persistido com `criteriaTotal`, `criteriaFailed`, artefatos e status final.
+- limpeza escopada de runtime health deve remover a identidade operacional tanto do ledger JSON quanto das tabelas
+  SQLite `copilot_model_gateway_health_observations` e `copilot_model_gateway_runtime_probe_results`; runs continuam
+  como trilha historica append-only quando nao fazem parte do estado atual.
 
 ## 5. Comandos Canonicos
 
@@ -260,6 +263,10 @@ Quando uma quota/cooldown resetar, ou quando uma fixture antiga tiver contaminad
 Quando a propria decisao auto estiver em `wait_for_reset` por health/cooldown, os `nextCommands` devem incluir o
 preview escopado de `runtime-health:clear` e o comando terminal equivalente, sempre usando `providerModel` da rota de
 health e nao necessariamente o `selectorSyntax` usado para aplicar o modelo vivo.
+
+Regra de identidade: provider/preset nao deve virar profile implicito. Quando o catalogo ativo vem de `preset=kilo-code`
+e `profile=-`, comandos de shortlist/probe devem emitir `provider:kilo-code`, nao `profile:kilo-code`; caso contrario
+o probe cria health sob uma identidade inexistente e pode poluir SQLite/selector.
 
 Comandos de ledgers:
 
@@ -399,6 +406,13 @@ Validado nesta linha:
 - `/byok auto status` e `/byok auto doctor` agora sugerem comandos `provar:` para promover candidatos bloqueados por agent probe ausente/nao verificado.
 - `/byok auto recovery-fixture ... provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery, runtime health sintetica e espelho SQLite sem chamada ao provider.
 - `/byok probe agent provider:<provider> model:<provider-model> timeout:20000` prova rota explicita do selector e alimenta o runtime health usado por `repo_agent`/`tool_agent`.
+- `npm run model-gateway:live:llm-b -- --byok-real ... --no-pr --timeout-ms=240000`: PASS em
+  `artifacts/terminal-live/2026-06-02T01-11-14-561Z/summary.md`; confirmou chat/streaming/json/agent para
+  `kilo-code/kilo-auto/free`, vision como falha nao bloqueante, shortlist sem erro de `COPILOT_BYOK_PROFILE`, e
+  `live-scenario-run-recorded=terminal-live:2026-06-02T01-11-14-567Z:byok_real_no_pr`.
+- `model-gateway:runtime-health:clear -- --provider=kilo-code --profile=kilo-code --apply` removeu residuos
+  operacionais criados pelo bug provider-as-profile; `runtime-health:diff` posterior ficou `ok=true` e
+  `invalidKiloProfile=[]`.
 - `npm run model-gateway:lint`: PASS.
 
 ## 10. Proximas Lacunas De Alto Retorno

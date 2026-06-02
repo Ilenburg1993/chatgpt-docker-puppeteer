@@ -60,13 +60,16 @@ const before = listByokProviderModelHealth();
 const matched = before.filter((record) => matchesScope(record, scope, all));
 let after = before;
 let mirror = null;
+let sqliteClear = null;
 let error = null;
 if (!hasScope) {
     error = 'scope_required: pass --provider/--model/--profile or --all';
 } else if (apply) {
     clearByokProviderModelHealth(all ? {} : scope);
     await flushByokProviderHealth();
-    mirror = await flushAndMirrorByokProviderHealthToSqlite({ sqliteStore: new SqliteModelGatewayCatalogStore() });
+    const sqliteStore = new SqliteModelGatewayCatalogStore();
+    sqliteClear = await sqliteStore.deleteRuntimeHealthRecords(all ? { all: true } : scope);
+    mirror = await flushAndMirrorByokProviderHealthToSqlite({ sqliteStore });
     after = listByokProviderModelHealth();
 }
 
@@ -101,6 +104,7 @@ const output = {
               probeResults: mirror.probeResults,
           }
         : null,
+    sqliteClear,
     nextCommands: apply
         ? ['npm run model-gateway:runtime-health:diff', 'npm run model-gateway:auto:ready -- --profile=repo_agent']
         : [

@@ -1751,6 +1751,55 @@ export class SqliteModelGatewayCatalogStore {
     }
 
     /**
+     * Delete already-observed operational runtime health facts by canonical identity.
+     *
+     * Probe runs remain as append-only audit history. Health observations and per-probe result rows are the current
+     * operational facts read by selectors, so scoped clears must remove them from SQLite as well as from the JSON
+     * provider-health ledger.
+     *
+     * @param {{ providerId?: string | null; providerModel?: string | null; routeProfile?: string | null; all?: boolean }} scope
+     * @returns {Promise<{ healthObservations: number; probeResults: number }>}
+     */
+    async deleteRuntimeHealthRecords(scope) {
+        const all = scope.all === true;
+        const provider = optionalString(scope.providerId);
+        const model = optionalString(scope.providerModel);
+        const route = optionalString(scope.routeProfile);
+        if (!all && !provider && !model && !route) return { healthObservations: 0, probeResults: 0 };
+        /** @type {string[]} */
+        const clauses = [];
+        /** @type {string[]} */
+        const params = [];
+        if (!all) {
+            if (provider) {
+                clauses.push('provider_id = ?');
+                params.push(provider);
+            }
+            if (model) {
+                clauses.push('provider_model = ?');
+                params.push(model);
+            }
+            if (route) {
+                clauses.push('route_profile = ?');
+                params.push(route);
+            }
+        }
+        const where = all ? '1 = 1' : clauses.join(' AND ');
+        /** @type {{ healthObservations: number; probeResults: number }} */
+        const deleted = { healthObservations: 0, probeResults: 0 };
+        const tx = this.#db.transaction(() => {
+            deleted.healthObservations = optionalInteger(
+                this.#db.prepare(`DELETE FROM copilot_model_gateway_health_observations WHERE ${where}`).run(...params).changes,
+            ) ?? 0;
+            deleted.probeResults = optionalInteger(
+                this.#db.prepare(`DELETE FROM copilot_model_gateway_runtime_probe_results WHERE ${where}`).run(...params).changes,
+            ) ?? 0;
+        });
+        tx();
+        return deleted;
+    }
+
+    /**
      * Persist a direct runtime probe run without relying on the operational health mirror.
      *
      * This is the append-only runtime proof lane for explicit probe executors. It intentionally writes only the

@@ -299,9 +299,13 @@ function orderRuntimeSelectorAttemptProfileIds(profileIds, routeByProfileId, pre
 
 /**
  * @param {string} profileId
+ * @param {{ requireAgentProbeProfiles?: string[] }} [options]
  * @returns {boolean}
  */
-function runtimeSelectorProfileRequiresAgentProbe(profileId) {
+function runtimeSelectorProfileRequiresAgentProbe(profileId, options = {}) {
+    if (Array.isArray(options.requireAgentProbeProfiles)) {
+        return options.requireAgentProbeProfiles.map(optionalString).filter((item) => item !== null).includes(profileId);
+    }
     return profileId === 'repo_agent' || profileId === 'tool_agent';
 }
 
@@ -911,7 +915,7 @@ function runtimeSelectorPlanForRouteAttempt(plan, route) {
 
 /**
  * @param {Record<string, unknown>} selectionPolicyOrTrace
- * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; preferProviderDiversity?: boolean; avoidDuplicateRoutes?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; blockFailedProbeKinds?: string[]; temporaryFailureCooldownMs?: number; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
+ * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; requireAgentProbeProfiles?: string[]; preferProviderDiversity?: boolean; avoidDuplicateRoutes?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; blockFailedProbeKinds?: string[]; temporaryFailureCooldownMs?: number; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
  * @returns {{
  *   schema: 'model-gateway-runtime-selector-plan';
  *   ok: boolean;
@@ -977,7 +981,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                           ...(typeof options.temporaryFailureCooldownMs === 'number'
                               ? { temporaryFailureCooldownMs: options.temporaryFailureCooldownMs }
                               : {}),
-                          requireAgentProbeOk: runtimeSelectorProfileRequiresAgentProbe(profileId),
+                          requireAgentProbeOk: runtimeSelectorProfileRequiresAgentProbe(profileId, options),
                       })
                     : null;
             const providerCooldown =

@@ -40,6 +40,7 @@ const TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS = Object.freeze([
     ...TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
     'live_turn',
 ]);
+const TERMINAL_LIVE_REQUIRE_AGENT_PROBE_PROFILES = Object.freeze([]);
 const TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS = 900_000;
 const args = process.argv.slice(2);
 const argSet = new Set(args);
@@ -305,6 +306,7 @@ const terminalLiveRuntimeSelectionPolicy = resolveModelGatewaySelectionPolicy(te
 const terminalLiveRuntimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(terminalLiveRuntimeSelectionPolicy, {
     source: 'model-gateway-live-readiness:terminal-live',
     requireRuntimeEnvReady: true,
+    requireAgentProbeProfiles: [...TERMINAL_LIVE_REQUIRE_AGENT_PROBE_PROFILES],
     env: process.env,
     runtimeHealthRecords: healthRecords,
     preferredProbeKinds: TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
@@ -528,6 +530,7 @@ const summary = {
             profiles: TERMINAL_LIVE_ROUTE_PROFILES,
             preferredProbeKinds: TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
             blockFailedProbeKinds: TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS,
+            requireAgentProbeProfiles: [...TERMINAL_LIVE_REQUIRE_AGENT_PROBE_PROFILES],
             temporaryFailureCooldownMs: TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS,
             selected: terminalLiveRuntimeSelectorPlan.summary.selectedProfileCount,
             blocked: terminalLiveRuntimeSelectorPlan.summary.blockedProfileCount,
