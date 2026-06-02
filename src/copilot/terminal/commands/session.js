@@ -790,26 +790,26 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         const modelLine = modelBilling.mismatch
             ? `${modelBilling.displayModel} · revisar /status full`
             : modelBilling.displayModel;
-        const nowBadge = terminalThemeText('assistant', '[agora]');
-        const mutedNowBadge = terminalThemeText('muted', '[agora]');
+        println(`\n  ${terminalThemeText('assistant', 'Agora')}`);
+        println('  ─────────────────────────────────────');
         println(
-            `${nowBadge} ${renderHumanTerminalStatus(state)} · conversa ${projection.dialogLoopActive ? 'ativa' : 'inativa'} · fila ${queue} · ${askLine}`,
+            `  Conversa     \x1b[90m${renderHumanTerminalStatus(state)} · ${projection.dialogLoopActive ? 'ativa' : 'inativa'} · fila ${queue} · ${askLine}\x1b[0m`,
         );
-        println(
-            `${mutedNowBadge} entrada ${channel.label} · ${waitLine} · modelo ${modelLine}`,
-        );
+        println(`  Entrada      \x1b[90m${channel.label} · ${waitLine}\x1b[0m`);
+        println(`  Modelo       \x1b[90m${modelLine}\x1b[0m`);
         if (gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0) {
             println(
-                `${mutedNowBadge} catálogo ${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ativo ${gatewayActive?.['modelId'] ?? '-'}`,
+                `  Catálogo     \x1b[90m${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ativo ${gatewayActive?.['modelId'] ?? '-'}\x1b[0m`,
             );
         }
         if (projection.activity?.label) {
             const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';
-            println(`${mutedNowBadge} atividade ${projection.activity.label}${detail}`);
+            println(`  Atividade    \x1b[90m${projection.activity.label}${detail}\x1b[0m`);
         }
         if (projection.recommendedAction && projection.recommendedAction !== 'none') {
-            println(`${mutedNowBadge} próximo ${projection.recommendedAction}`);
+            println(`  Próximo      ${terminalThemeText('command', projection.recommendedAction)}`);
         }
+        println('  ─────────────────────────────────────');
         return;
     }
 

@@ -480,8 +480,9 @@ describe('commands/session — sync commands', () => {
 
         expect(statusCtx.output()).toContain('standby sem READY vivo');
         expect(statusCtx.output()).toContain('recovery sob demanda');
-        expect(nowCtx.output()).toContain('[agora]');
-        expect(nowCtx.output()).toContain('conversa ativa');
+        expect(nowCtx.output()).toContain('Agora');
+        expect(nowCtx.output()).toContain('Conversa');
+        expect(nowCtx.output()).toContain('ativa');
         expect(nowCtx.output()).toContain('standby sem READY vivo');
         expect(nowCtx.output()).not.toContain('entrada=');
     });
@@ -505,9 +506,9 @@ describe('commands/session — sync commands', () => {
     it('cmdNow imprime snapshot operacional humano por padrão', () => {
         const ctx = mockCtx();
         cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
-        expect(ctx.output()).toContain('[agora]');
-        expect(ctx.output()).not.toContain('\x1b[36m[agora]');
-        expect(ctx.output()).toContain('conversa');
+        expect(ctx.output()).toContain('Agora');
+        expect(ctx.output()).not.toContain('[agora]');
+        expect(ctx.output()).toContain('Conversa');
         expect(ctx.output()).toContain('sem pendências humanas');
         expect(ctx.output()).not.toContain('próximo=none');
         expect(ctx.output()).not.toContain('runtime=');

@@ -1926,9 +1926,11 @@ describe('terminal /byok command', () => {
 
         expect(ctx.output()).toContain('BYOK status');
         expect(ctx.output()).toContain('.env.local');
-        expect(ctx.output()).toContain('bearer=');
-        expect(ctx.output()).toContain('prepared:');
-        expect(ctx.output()).toContain('live binding:');
+        expect(ctx.output()).toContain('Autenticação');
+        expect(ctx.output()).toContain('bearer');
+        expect(ctx.output()).not.toContain('bearer=');
+        expect(ctx.output()).toContain('Preparada');
+        expect(ctx.output()).toContain('Sessão viva');
         expect(ctx.output()).toContain('/session sdk next new');
         expect(ctx.output()).toContain('/restart reinicia só o dialog loop');
         expect(ctx.output()).not.toContain('secret');
@@ -1969,8 +1971,9 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'status');
 
-        expect(ctx.output()).toMatch(/vision=.*nao.*ctx=256000/su);
-        expect(ctx.output()).toContain('source=provider-cache:model · overrides provider defaults');
+        expect(ctx.output()).toMatch(/visão.*nao.*contexto 256000/su);
+        expect(ctx.output()).toContain('origem provider-cache:model · sobrescreve defaults do provider');
+        expect(ctx.output()).not.toContain('source=provider-cache:model');
     });
 
     it('distingue seleção BYOK preparada do provider vivo que ainda precisa de novo boot', async () => {
@@ -3155,11 +3158,11 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'gateway operator-ready profile:repo_agent 5');
 
         expect(ctx.output()).toContain('BYOK model-gateway operator-ready');
-        expect(ctx.output()).toContain('providerCall=nao');
+        expect(ctx.output()).toContain('sem chamada provider');
         expect(ctx.output()).toContain('runtime_selector');
         expect(ctx.output()).toContain('standby 1:');
-        expect(ctx.output()).toContain('standby db:');
-        expect(ctx.output()).toContain('live db:');
+        expect(ctx.output()).toContain('banco standby:');
+        expect(ctx.output()).toContain('banco live:');
         expect(ctx.output()).toContain('provar:');
         expect(ctx.output()).toContain('novo boot:');
         expect(ctx.output()).toContain('clear: /byok health clear provider:');
@@ -3198,7 +3201,7 @@ describe('terminal /byok command', () => {
             }),
         );
         expect(ctx.output()).toContain('BYOK model-gateway selection audit');
-        expect(ctx.output()).toContain('runtime=nao');
+        expect(ctx.output()).toContain('sem runtime');
         expect(ctx.output()).toContain('repo_agent');
         expect(ctx.output()).toContain('provider_explicit');
     });
@@ -3577,12 +3580,12 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'auto doctor profile:repo_agent');
 
         expect(ctx.output()).toContain('BYOK model-gateway auto doctor');
-        expect(ctx.output()).toContain('profile=repo_agent');
-        expect(ctx.output()).toContain('activeSnapshot=sim');
-        expect(ctx.output()).toContain('decision:');
-        expect(ctx.output()).toContain('policy source:');
+        expect(ctx.output()).toContain('perfil repo_agent');
+        expect(ctx.output()).toContain('snapshot ativo sim');
+        expect(ctx.output()).toContain('decisão:');
+        expect(ctx.output()).toContain('origem policy:');
         expect(ctx.output()).toContain('cooldown:');
-        expect(ctx.output()).toContain('reset=2026-06-01T10:00:00.000Z');
+        expect(ctx.output()).toContain('reset 2026-06-01T10:00:00.000Z');
         expect(ctx.output()).toContain('ledgers:');
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
     });
@@ -3845,27 +3848,27 @@ describe('terminal /byok command', () => {
             source: 'terminal-byok-selection-audit',
             requireRuntimeProof: false,
         });
-        expect(ctx.output()).toContain('mode=allow_probe_unknown+effective');
-        expect(ctx.output()).toContain('persisted=nao');
-        expect(ctx.output()).toContain('observedHealth=');
-        expect(ctx.output()).toContain('postRuntimeProfiles=1/1');
-        expect(ctx.output()).toContain('compare changed=1/1');
-        expect(ctx.output()).toContain('compare reasons=post_runtime_proved_better_route:1');
+        expect(ctx.output()).toContain('modo allow_probe_unknown+effective');
+        expect(ctx.output()).toContain('persistido nao');
+        expect(ctx.output()).toContain('health observado');
+        expect(ctx.output()).toContain('pós-runtime perfis 1/1');
+        expect(ctx.output()).toContain('comparação mudou 1/1');
+        expect(ctx.output()).toContain('razões da comparação post_runtime_proved_better_route:1');
         expect(ctx.output()).toContain('compare=post_runtime_proved_better_route');
-        expect(ctx.output()).toContain('policy=metadata_first');
-        expect(ctx.output()).toContain('finalSelected=1/1');
-        expect(ctx.output()).toContain('runtimeSelector=ready');
-        expect(ctx.output()).toContain('blocked=0');
-        expect(ctx.output()).toContain('envReady=1');
-        expect(ctx.output()).toContain('envBlocked=0');
+        expect(ctx.output()).toContain('policy metadata_first');
+        expect(ctx.output()).toContain('selecionados finais 1/1');
+        expect(ctx.output()).toContain('seletor runtime pronto');
+        expect(ctx.output()).toContain('bloqueados 0');
+        expect(ctx.output()).toContain('env pronto 1');
+        expect(ctx.output()).toContain('env bloqueado 0');
         expect(ctx.output()).toContain('post-runtime mudou -> groq:openai/gpt-oss-120b');
-        expect(ctx.output()).toContain('healthProofs=1');
-        expect(ctx.output()).toContain('probeProofs=1');
-        expect(ctx.output()).toContain('runtimeOverlays=1');
-        expect(ctx.output()).toContain('active=1');
-        expect(ctx.output()).toContain('expired=0');
-        expect(ctx.output()).toContain('failures=rate-limit:1');
-        expect(ctx.output()).toContain('providers=groq:1');
+        expect(ctx.output()).toContain('provas health 1');
+        expect(ctx.output()).toContain('provas probe 1');
+        expect(ctx.output()).toContain('overlays runtime 1');
+        expect(ctx.output()).toContain('ativos 1');
+        expect(ctx.output()).toContain('expirados 0');
+        expect(ctx.output()).toContain('falhas rate-limit:1');
+        expect(ctx.output()).toContain('provedores groq:1');
     });
 
     it('permite exigir prova runtime na auditoria efetiva do terminal', async () => {
@@ -3890,8 +3893,8 @@ describe('terminal /byok command', () => {
             source: 'terminal-byok-selection-audit',
             requireRuntimeProof: true,
         });
-        expect(ctx.output()).toContain('mode=allow_probe_unknown+effective+require-proof');
-        expect(ctx.output()).toContain('policy=require_runtime_proof');
+        expect(ctx.output()).toContain('modo allow_probe_unknown+effective+require-proof');
+        expect(ctx.output()).toContain('policy require_runtime_proof');
     });
 
     it('grava trace de decisão da auditoria efetiva do terminal sem mutar catálogo', async () => {
@@ -3924,8 +3927,8 @@ describe('terminal /byok command', () => {
             }),
             { directory: DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR },
         );
-        expect(ctx.output()).toContain('tracePersisted=sim');
-        expect(ctx.output()).toContain('persisted=sim');
+        expect(ctx.output()).toContain('trace persistido sim');
+        expect(ctx.output()).toContain('persistido sim');
         expect(ctx.output()).toContain('/tmp/model-gateway-selection-trace.json');
     });
 

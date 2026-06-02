@@ -1678,7 +1678,8 @@ function defaultUxCycleCriteria(boot) {
     const plain = String(boot?.plain ?? '');
     const helpStart = plain.indexOf('Ajuda rápida');
     const statusStart = plain.indexOf('Status do Terminal LLM-B');
-    const nowStart = plain.indexOf('[agora]');
+    const nowPanelStart = plain.indexOf('\n  Agora');
+    const nowStart = nowPanelStart >= 0 ? nowPanelStart + 1 : plain.indexOf('[agora]');
     const healthStart = plain.indexOf('Saúde do Terminal LLM-B');
     const toolsStart = (() => {
         const populated = plain.indexOf('Ferramentas observadas');
@@ -1733,8 +1734,9 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-now-human',
             pass:
-                /\[agora\][\s\S]*conversa[\s\S]*sem pendências humanas/iu.test(plain) &&
-                !/\[now\]\s+runtime=|entrada=|catálogo=|atividade=|próximo=|sse=/iu.test(defaultSurface),
+                /Agora[\s\S]*Conversa[\s\S]*Entrada[\s\S]*sem pendências humanas[\s\S]*Modelo/iu.test(
+                    surfaceAt(nowStart),
+                ) && !/\[agora\]|\[now\]\s+runtime=|entrada=|catálogo=|atividade=|próximo=|sse=/iu.test(defaultSurface),
             detail: '/now default rendered human labels instead of runtime key-value telemetry',
         },
         {

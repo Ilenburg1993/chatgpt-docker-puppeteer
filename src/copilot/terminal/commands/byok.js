@@ -1887,34 +1887,29 @@ async function renderStatus(projection, println) {
     const { summary } = projection;
     const statusCapabilities = resolveByokStatusCapabilities(projection);
     println('\n  \x1b[36mBYOK status\x1b[0m');
-    println(`    enabled:       ${yesNo(summary.enabled)}`);
-    println(`    ready:         ${yesNo(summary.ready)}`);
-    println(`    profile:       \x1b[33m${valueOrDash(summary.profile)}\x1b[0m`);
-    println(`    preset:        \x1b[33m${valueOrDash(summary.preset)}\x1b[0m`);
-    println(`    provider:      \x1b[33m${valueOrDash(summary.providerType)}\x1b[0m`);
-    println(`    baseUrl:       \x1b[33m${valueOrDash(summary.baseUrl)}\x1b[0m`);
-    println(`    model:         \x1b[33m${valueOrDash(summary.model)}\x1b[0m`);
-    println(`    wireApi:       \x1b[33m${valueOrDash(summary.wireApi)}\x1b[0m`);
-    println(`    azureVersion:  \x1b[33m${valueOrDash(summary.azureApiVersion)}\x1b[0m`);
+    println(`    Estado         ativo ${yesNo(summary.enabled)} · pronto ${yesNo(summary.ready)}`);
+    println(`    Perfil         \x1b[33m${valueOrDash(summary.profile)}\x1b[0m · preset ${valueOrDash(summary.preset)}`);
+    println(`    Provider       \x1b[33m${valueOrDash(summary.providerType)}\x1b[0m · base ${valueOrDash(summary.baseUrl)}`);
+    println(`    Modelo         \x1b[33m${valueOrDash(summary.model)}\x1b[0m · wire ${valueOrDash(summary.wireApi)} · Azure ${valueOrDash(summary.azureApiVersion)}`);
     println(
-        `    auth:          apiKey=${yesNo(summary.auth.apiKeyConfigured)} · bearer=${yesNo(summary.auth.bearerTokenConfigured)} · headers=${yesNo(summary.auth.headersConfigured)}`,
+        `    Autenticação   api key ${yesNo(summary.auth.apiKeyConfigured)} · bearer ${yesNo(summary.auth.bearerTokenConfigured)} · headers ${yesNo(summary.auth.headersConfigured)}`,
     );
     println(
-        `    capabilities:  reasoning=${yesNo(statusCapabilities.reasoningEffort)} · sdkReasoning=${yesNo(statusCapabilities.sdkReasoningEffort)} · vision=${yesNo(statusCapabilities.vision)} · ctx=${statusCapabilities.contextWindowTokens}`,
+        `    Capacidades    raciocínio ${yesNo(statusCapabilities.reasoningEffort)} · SDK ${yesNo(statusCapabilities.sdkReasoningEffort)} · visão ${yesNo(statusCapabilities.vision)} · contexto ${statusCapabilities.contextWindowTokens}`,
     );
     if (statusCapabilities.modelId) {
         println(
-            `    modelCaps:     \x1b[33m${statusCapabilities.modelId} · source=${statusCapabilities.source}${statusCapabilities.differsFromProviderDefault ? ' · overrides provider defaults' : ''}\x1b[0m`,
+            `    Modelo fonte   \x1b[33m${statusCapabilities.modelId} · origem ${statusCapabilities.source}${statusCapabilities.differsFromProviderDefault ? ' · sobrescreve defaults do provider' : ''}\x1b[0m`,
         );
     }
     const limitParts = [
-        summary.limits?.maxRequestTokens ? `maxReq=${summary.limits.maxRequestTokens}` : null,
-        summary.limits?.tokensPerMinute ? `TPM=${summary.limits.tokensPerMinute}` : null,
-        summary.limits?.requestsPerMinute ? `RPM=${summary.limits.requestsPerMinute}` : null,
-        summary.limits?.dailyRequests ? `RPD=${summary.limits.dailyRequests}` : null,
+        summary.limits?.maxRequestTokens ? `máximo/request ${summary.limits.maxRequestTokens}` : null,
+        summary.limits?.tokensPerMinute ? `TPM ${summary.limits.tokensPerMinute}` : null,
+        summary.limits?.requestsPerMinute ? `RPM ${summary.limits.requestsPerMinute}` : null,
+        summary.limits?.dailyRequests ? `RPD ${summary.limits.dailyRequests}` : null,
     ].filter(Boolean);
     if (limitParts.length > 0) {
-        println(`    limits:        \x1b[33m${limitParts.join(' · ')}\x1b[0m`);
+        println(`    Limites        \x1b[33m${limitParts.join(' · ')}\x1b[0m`);
     }
     const activeHealth = readHealthForByokProfile({
         name: summary.profile ?? summary.preset ?? 'runtime',
@@ -1923,14 +1918,14 @@ async function renderStatus(projection, println) {
         model: summary.model,
     });
     if (activeHealth) {
-        println(`    chatHealth:    \x1b[33m${renderByokHealthTag(activeHealth)}\x1b[0m`);
-        println(`    agentHealth:   \x1b[33m${renderByokAgentProbeHealthTag(activeHealth)}\x1b[0m`);
+        println(`    Health chat    \x1b[33m${renderByokHealthTag(activeHealth)}\x1b[0m`);
+        println(`    Health agente  \x1b[33m${renderByokAgentProbeHealthTag(activeHealth)}\x1b[0m`);
     }
     const costTag = renderByokProfileCostTag(summary.profile);
     if (costTag) {
-        println(`    cost:          \x1b[33m${costTag.replace(/^ · /u, '')}\x1b[0m`);
+        println(`    Custo          \x1b[33m${costTag.replace(/^ · /u, '')}\x1b[0m`);
     }
-    println(`    modelList:     ${summary.modelList.count} modelo(s)`);
+    println(`    Catálogo       ${summary.modelList.count} modelo(s)`);
     const gateway =
         projection.modelGateway ?? {
             source: 'unavailable',
@@ -1942,7 +1937,7 @@ async function renderStatus(projection, println) {
             },
         };
     println(
-        `    gateway:       \x1b[33mproviders=${gateway.diagnostics.providerCount} · models=${gateway.diagnostics.modelCount} · enabled=${gateway.diagnostics.enabledModelCount} · source=${gateway.source}\x1b[0m`,
+        `    Gateway        \x1b[33m${gateway.diagnostics.providerCount} provedores · ${gateway.diagnostics.modelCount} modelos · ${gateway.diagnostics.enabledModelCount} habilitados · origem ${gateway.source}\x1b[0m`,
     );
     const gatewayActive = /** @type {{ modelId?: string | null }} */ (gateway.active);
     if (gatewayActive.modelId) {
@@ -1955,9 +1950,9 @@ async function renderStatus(projection, println) {
             inventory.persistedByokBinding,
             inventory.currentSessionId,
         );
-        println(`    prepared:      \x1b[33m${binding.preparedLabel}\x1b[0m`);
+        println(`    Preparada      \x1b[33m${binding.preparedLabel}\x1b[0m`);
         println(
-            `    live binding:  \x1b[33m${inventory.currentSessionId ?? '(sem sessão viva)'}\x1b[0m \x1b[90m· ${binding.liveLabel}\x1b[0m`,
+            `    Sessão viva    \x1b[33m${inventory.currentSessionId ?? '(sem sessão viva)'}\x1b[0m \x1b[90m· ${binding.liveLabel}\x1b[0m`,
         );
         const color = binding.state === 'next-boot-required' || binding.state === 'selection-incomplete' ? '\x1b[33m' : '\x1b[90m';
         println(`    boundary:      ${color}${binding.headline}\x1b[0m`);
@@ -2467,20 +2462,20 @@ async function renderByokGatewayOperatorReady(println, rest) {
     ];
     println('\n  \x1b[36mBYOK model-gateway operator-ready\x1b[0m');
     println(
-        `  \x1b[90mprofile=${status.args.profileId} · ok=${blockers.length === 0 ? 'sim' : 'nao'} · checks=${checks.length - blockers.length}/${checks.length} · standby=${standbyRows.length} · persisted=${persistedStandbyRows} · providers=${standbyProviderCount} · providerCall=nao\x1b[0m`,
+        `  \x1b[90mperfil ${status.args.profileId} · ok ${blockers.length === 0 ? 'sim' : 'nao'} · checagens ${checks.length - blockers.length}/${checks.length} · standby ${standbyRows.length} · persistidos ${persistedStandbyRows} · provedores ${standbyProviderCount} · sem chamada provider\x1b[0m`,
     );
     println(
-        `    policy:        \x1b[33menabled=${policy.enabled ? 'sim' : 'nao'} · preset=${policy.preset} · mode=${policy.policy} · liveSetModel=${policy.allowLiveSetModel ? 'sim' : 'nao'} · newSession=${policy.allowNewSession ? 'sim' : 'nao'} · localPrivate=${policy.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
+        `    política:      \x1b[33mativa ${policy.enabled ? 'sim' : 'nao'} · preset ${policy.preset} · modo ${policy.policy} · set model vivo ${policy.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${policy.allowNewSession ? 'sim' : 'nao'} · local privado ${policy.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
     );
     println(
         `    vivo:          \x1b[33m${status.decision.currentBoundary.preset ?? '-'} · ${status.decision.currentBoundary.model ?? '-'}\x1b[0m`,
     );
     println(
-        `    alvo:          \x1b[33m${status.decision.targetBoundary.preset ?? '-'} · ${status.decision.targetBoundary.model ?? '-'} · action=${status.decision.action}\x1b[0m`,
+        `    alvo:          \x1b[33m${status.decision.targetBoundary.preset ?? '-'} · ${status.decision.targetBoundary.model ?? '-'} · ação ${status.decision.action}\x1b[0m`,
     );
     if (status.decision.fallbackFromSelectedRouteKey || status.decision.fallbackReason) {
         println(
-            `    fallback:      \x1b[33mfrom=${status.decision.fallbackFromSelectedRouteKey ?? '-'} · reason=${status.decision.fallbackReason ?? '-'}\x1b[0m`,
+            `    fallback:      \x1b[33mde ${status.decision.fallbackFromSelectedRouteKey ?? '-'} · motivo ${status.decision.fallbackReason ?? '-'}\x1b[0m`,
         );
     }
     for (const check of checks) {
@@ -2490,7 +2485,7 @@ async function renderByokGatewayOperatorReady(println, rest) {
     }
     for (const [index, row] of standbyRows.slice(0, Math.min(limit, 5)).entries()) {
         println(
-            `    standby ${index + 1}:  \x1b[33m${row.providerId}:${row.providerModel}\x1b[0m \x1b[90m${row.source} · class=${row.standbyClass ?? '-'} · probe=${row.needsProbe ? 'sim' : 'nao'} · proof=${row.hasRuntimeProof ? 'sim' : 'nao'} · env=${row.runtimeEnvStatus ?? '-'}\x1b[0m`,
+            `    standby ${index + 1}:  \x1b[33m${row.providerId}:${row.providerModel}\x1b[0m \x1b[90m${row.source} · classe ${row.standbyClass ?? '-'} · probe ${row.needsProbe ? 'sim' : 'nao'} · prova ${row.hasRuntimeProof ? 'sim' : 'nao'} · env ${row.runtimeEnvStatus ?? '-'}\x1b[0m`,
         );
         println(`      \x1b[90mprovar: ${row.commands.probeAgent ?? '-'}\x1b[0m`);
         println(`      \x1b[90musar: ${row.commands.liveModel ?? '-'}\x1b[0m`);
@@ -2502,14 +2497,14 @@ async function renderByokGatewayOperatorReady(println, rest) {
         }
     }
     println(
-        `    standby db:   \x1b[33mrows=${persistedStandbyRows} · latest=${latestPersistedStandby.standbyPlanId ?? '-'} · profile=${latestPersistedStandby.routeProfile ?? '-'} · routes=${latestPersistedStandby.routeCount ?? '-'}\x1b[0m`,
+        `    banco standby: \x1b[33mlinhas ${persistedStandbyRows} · mais recente ${latestPersistedStandby.standbyPlanId ?? '-'} · perfil ${latestPersistedStandby.routeProfile ?? '-'} · rotas ${latestPersistedStandby.routeCount ?? '-'}\x1b[0m`,
     );
     println(
-        `    live db:      \x1b[33mrows=${liveRunRows} · latest=${optionalScalarString(latestLiveRun['scenarioKind']) ?? '-'} · status=${optionalScalarString(latestLiveRun['status']) ?? '-'} · summary=${optionalScalarString(latestLiveRun['summaryPath']) ?? '-'}\x1b[0m`,
+        `    banco live:    \x1b[33mlinhas ${liveRunRows} · mais recente ${optionalScalarString(latestLiveRun['scenarioKind']) ?? '-'} · estado ${optionalScalarString(latestLiveRun['status']) ?? '-'} · resumo ${optionalScalarString(latestLiveRun['summaryPath']) ?? '-'}\x1b[0m`,
     );
     for (const [index, run] of liveRuns.slice(0, 3).entries()) {
         println(
-            `    live ${index + 1}:     \x1b[33m${optionalScalarString(run['scenarioKind']) ?? optionalScalarString(run['kind']) ?? '-'}\x1b[0m \x1b[90mstatus=${optionalScalarString(run['status']) ?? '-'} · ok=${run['ok'] === true ? 'sim' : run['ok'] === false ? 'nao' : '-'} · summary=${optionalScalarString(run['summaryPath']) ?? '-'}\x1b[0m`,
+            `    live ${index + 1}:     \x1b[33m${optionalScalarString(run['scenarioKind']) ?? optionalScalarString(run['kind']) ?? '-'}\x1b[0m \x1b[90mestado ${optionalScalarString(run['status']) ?? '-'} · ok ${run['ok'] === true ? 'sim' : run['ok'] === false ? 'nao' : '-'} · resumo ${optionalScalarString(run['summaryPath']) ?? '-'}\x1b[0m`,
         );
     }
     if (status.decision.blockers.length > 0) println(`    blockers:      \x1b[33m${status.decision.blockers.join(', ')}\x1b[0m`);
@@ -3108,33 +3103,33 @@ async function renderByokGatewaySelectionAudit(println, rest) {
     const persistedStatus = tracePersistence?.written === true ? 'sim' : args.writeTrace ? 'falha' : 'nao';
     println(`\n  \x1b[36mBYOK model-gateway selection audit\x1b[0m`);
     println(
-        `  \x1b[90mstore=${store.filePath} · integrity=${integrity.ok ? 'ok' : 'falha'} · mode=${selection.mode}${args.effective ? '+effective' : ''}${args.requireRuntimeProof ? '+require-proof' : ''} · runtime=nao · persisted=${persistedStatus} · profiles=${selection.summary.selectedProfileCount}/${selection.summary.profileCount}\x1b[0m`,
+        `  \x1b[90mstore ${store.filePath} · integridade ${integrity.ok ? 'ok' : 'falha'} · modo ${selection.mode}${args.effective ? '+effective' : ''}${args.requireRuntimeProof ? '+require-proof' : ''} · sem runtime · persistido ${persistedStatus} · perfis ${selection.summary.selectedProfileCount}/${selection.summary.profileCount}\x1b[0m`,
     );
     println(
-        `  \x1b[90mprojections=${selection.snapshotContext['projectionCount']} · routes=${selection.snapshotContext['routeOptionCount']} · overlays=${selection.snapshotContext['accountOverlayCount']} · eligibility=${selection.snapshotContext['eligibilityDecisionCount']} · candidates=${selection.snapshotContext['candidateCount']}\x1b[0m\n`,
+        `  \x1b[90mprojeções ${selection.snapshotContext['projectionCount']} · rotas ${selection.snapshotContext['routeOptionCount']} · overlays ${selection.snapshotContext['accountOverlayCount']} · eligibility ${selection.snapshotContext['eligibilityDecisionCount']} · candidatos ${selection.snapshotContext['candidateCount']}\x1b[0m\n`,
     );
     if (args.effective) {
         println(
-            `  \x1b[90mobservedHealth=${healthRecords.length} · runtimeOverlays=${runtimeOverlays.length} · active=${runtimeOverlaySummary?.activeCount ?? 0} · expired=${runtimeOverlaySummary?.expiredCount ?? 0} · failures=${formatCountMap(runtimeOverlaySummary?.byFailureKind ?? {})} · providers=${formatCountMap(runtimeOverlaySummary?.byProvider ?? {})} · effectiveEligibility=${effectiveEligibility?.decisions.length ?? 0}\x1b[0m\n`,
+            `  \x1b[90mhealth observado ${healthRecords.length} · overlays runtime ${runtimeOverlays.length} · ativos ${runtimeOverlaySummary?.activeCount ?? 0} · expirados ${runtimeOverlaySummary?.expiredCount ?? 0} · falhas ${formatCountMap(runtimeOverlaySummary?.byFailureKind ?? {})} · provedores ${formatCountMap(runtimeOverlaySummary?.byProvider ?? {})} · eligibility efetiva ${effectiveEligibility?.decisions.length ?? 0}\x1b[0m\n`,
         );
         println(
-            `  \x1b[90mpostRuntimeProfiles=${postRuntimeSelection?.summary.selectedProfileCount ?? 0}/${postRuntimeSelection?.summary.profileCount ?? 0} · healthMatches=${postRuntimeSelection?.summary.healthRecordCount ?? 0} · healthProofs=${postRuntimeSelection?.summary.runtimeHealthProofCount ?? 0} · agentProofs=${postRuntimeSelection?.summary.runtimeAgentProbeProofCount ?? 0} · probeProofs=${postRuntimeSelection?.summary.runtimeProbeProofCount ?? 0} · postProviders=${formatCountMap(postRuntimeSelection?.summary.selectedProviders ?? {})}\x1b[0m\n`,
+            `  \x1b[90mpós-runtime perfis ${postRuntimeSelection?.summary.selectedProfileCount ?? 0}/${postRuntimeSelection?.summary.profileCount ?? 0} · health casado ${postRuntimeSelection?.summary.healthRecordCount ?? 0} · provas health ${postRuntimeSelection?.summary.runtimeHealthProofCount ?? 0} · provas agente ${postRuntimeSelection?.summary.runtimeAgentProbeProofCount ?? 0} · provas probe ${postRuntimeSelection?.summary.runtimeProbeProofCount ?? 0} · provedores ${formatCountMap(postRuntimeSelection?.summary.selectedProviders ?? {})}\x1b[0m\n`,
         );
         println(
-            `  \x1b[90mcompare changed=${selectionComparison?.summary.changedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0} · postProofSelected=${selectionComparison?.summary.postRuntimeProofSelectedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0}\x1b[0m\n`,
+            `  \x1b[90mcomparação mudou ${selectionComparison?.summary.changedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0} · prova pós-runtime selecionada ${selectionComparison?.summary.postRuntimeProofSelectedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0}\x1b[0m\n`,
         );
         println(
-            `  \x1b[90mcompare reasons=${formatCountMap(selectionComparisonExplanation?.summary.reasonCounts ?? {})} · next=${selectionComparisonExplanation?.summary.nextActions.slice(0, 4).join(',') || '-'}\x1b[0m\n`,
+            `  \x1b[90mrazões da comparação ${formatCountMap(selectionComparisonExplanation?.summary.reasonCounts ?? {})} · próximos ${selectionComparisonExplanation?.summary.nextActions.slice(0, 4).join(',') || '-'}\x1b[0m\n`,
         );
         println(
-            `  \x1b[90mpolicy=${policyResolution?.mode ?? args.selectionPolicy} · finalSelected=${policyResolution?.summary.selectedCount ?? 0}/${policyResolution?.summary.profileCount ?? 0} · postWinners=${policyResolution?.summary.postRuntimeWinnerCount ?? 0} · finalChanged=${policyResolution?.summary.changedFromPreRuntimeCount ?? 0}\x1b[0m\n`,
+            `  \x1b[90mpolicy ${policyResolution?.mode ?? args.selectionPolicy} · selecionados finais ${policyResolution?.summary.selectedCount ?? 0}/${policyResolution?.summary.profileCount ?? 0} · vencedores pós-runtime ${policyResolution?.summary.postRuntimeWinnerCount ?? 0} · mudou do pré-runtime ${policyResolution?.summary.changedFromPreRuntimeCount ?? 0}\x1b[0m\n`,
         );
         println(
-            `  \x1b[90mruntimeSelector=${runtimeSelectorPlan?.ready ? 'ready' : 'blocked'} · selected=${runtimeSelectorPlan?.summary.selectedProfileCount ?? 0}/${runtimeSelectorPlan?.summary.profileCount ?? 0} · blocked=${runtimeSelectorPlan?.summary.blockedProfileCount ?? 0} · envReady=${runtimeSelectorPlan?.summary.runtimeEnvReadyCount ?? 0} · envBlocked=${runtimeSelectorPlan?.summary.runtimeEnvBlockedCount ?? 0} · proofSelected=${runtimeSelectorPlan?.summary.runtimeProofSelectedCount ?? 0}\x1b[0m\n`,
+            `  \x1b[90mseletor runtime ${runtimeSelectorPlan?.ready ? 'pronto' : 'bloqueado'} · selecionados ${runtimeSelectorPlan?.summary.selectedProfileCount ?? 0}/${runtimeSelectorPlan?.summary.profileCount ?? 0} · bloqueados ${runtimeSelectorPlan?.summary.blockedProfileCount ?? 0} · env pronto ${runtimeSelectorPlan?.summary.runtimeEnvReadyCount ?? 0} · env bloqueado ${runtimeSelectorPlan?.summary.runtimeEnvBlockedCount ?? 0} · prova selecionada ${runtimeSelectorPlan?.summary.runtimeProofSelectedCount ?? 0}\x1b[0m\n`,
         );
         if (args.writeTrace) {
             println(
-                `  \x1b[90mtracePersisted=${tracePersistence?.written ? 'sim' : 'nao'} · trace=${tracePersistence?.filePath ?? '-'} · latest=${tracePersistence?.latestPath ?? '-'} · error=${tracePersistence?.error ?? '-'}\x1b[0m\n`,
+                `  \x1b[90mtrace persistido ${tracePersistence?.written ? 'sim' : 'nao'} · arquivo ${tracePersistence?.filePath ?? '-'} · latest ${tracePersistence?.latestPath ?? '-'} · erro ${tracePersistence?.error ?? '-'}\x1b[0m\n`,
             );
         }
     }
@@ -3989,23 +3984,23 @@ async function renderByokGatewayAutoDoctor(println, rest) {
     if (policyValidation.ok !== true) warnings.push(...policyValidation.issues);
     println('\n  \x1b[36mBYOK model-gateway auto doctor\x1b[0m');
     println(
-        `  \x1b[90mprofile=${status.args.profileId} · activeSnapshot=${activeSnapshot ? 'sim' : 'nao'} · commands=${commandCount} · warnings=${warnings.length}\x1b[0m`,
+        `  \x1b[90mperfil ${status.args.profileId} · snapshot ativo ${activeSnapshot ? 'sim' : 'nao'} · comandos ${commandCount} · avisos ${warnings.length}\x1b[0m`,
     );
     println(
-        `    policy:        \x1b[33menabled=${effectivePolicy.enabled ? 'sim' : 'nao'} · file=${fileConfigured ? 'sim' : 'nao'} · liveSetModel=${effectivePolicy.allowLiveSetModel ? 'sim' : 'nao'} · newSession=${effectivePolicy.allowNewSession ? 'sim' : 'nao'}\x1b[0m`,
+        `    política:      \x1b[33mativa ${effectivePolicy.enabled ? 'sim' : 'nao'} · arquivo ${fileConfigured ? 'sim' : 'nao'} · set model vivo ${effectivePolicy.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${effectivePolicy.allowNewSession ? 'sim' : 'nao'}\x1b[0m`,
     );
     println(
-        `    policy source: \x1b[33menabled=${policySources['enabled']?.source ?? '-'} · profiles=${policySources['profiles']?.source ?? '-'} · liveSetModel=${policySources['allowLiveSetModel']?.source ?? '-'} · newSession=${policySources['allowNewSession']?.source ?? '-'}\x1b[0m`,
+        `    origem policy: \x1b[33mativa ${policySources['enabled']?.source ?? '-'} · perfis ${policySources['profiles']?.source ?? '-'} · set model vivo ${policySources['allowLiveSetModel']?.source ?? '-'} · nova sessão ${policySources['allowNewSession']?.source ?? '-'}\x1b[0m`,
     );
     println(
-        `    decision:      \x1b[33mok=${decision.ok ? 'sim' : 'nao'} · action=${decision.action} · route=${decision.selectedRouteKey ?? '-'}\x1b[0m`,
+        `    decisão:       \x1b[33mok ${decision.ok ? 'sim' : 'nao'} · ação ${decision.action} · rota ${decision.selectedRouteKey ?? '-'}\x1b[0m`,
     );
     println(
         `    target:        \x1b[33m${decision.targetBoundary.preset ?? '-'} · ${decision.targetBoundary.model ?? '-'}\x1b[0m`,
     );
     if (decision.cooldown?.active === true) {
         println(
-            `    cooldown:      \x1b[33m${decision.cooldown.reason ?? 'ativo'} · reset=${decision.cooldown.resetAt ?? '-'} · retryAfter=${decision.cooldown.retryAfterSeconds ?? '-'}s\x1b[0m`,
+            `    cooldown:      \x1b[33m${decision.cooldown.reason ?? 'ativo'} · reset ${decision.cooldown.resetAt ?? '-'} · nova tentativa ${decision.cooldown.retryAfterSeconds ?? '-'}s\x1b[0m`,
         );
     }
     if (alternativeSummary) {

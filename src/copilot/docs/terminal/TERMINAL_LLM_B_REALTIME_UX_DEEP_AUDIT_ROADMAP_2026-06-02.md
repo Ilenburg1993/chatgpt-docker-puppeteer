@@ -2229,6 +2229,16 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/ux-iso-humanized-base-surfaces-20260602-1357`.
 - [x] Resultado: PASS completo em help, status, now, health, tools, live, activity, waits e close limpo.
 - [x] Evidência visual: `/activity` no PTY real passou a renderizar `2026-06-02T13:57:43.907-03:00` com offset local explícito.
-- [ ] Reduzir densidade visual de `/now`: a live mostrou `[agora]` repetido em todas as linhas; a informação é correta, mas o marcador deve virar cabeçalho único.
-- [ ] Auditar `/byok` default, que ainda contém blocos diagnósticos extensos com `rows=`, `latest=`, `store=`, `postRuntimeProfiles=`, `tracePersisted=`, `source=`, `freshness=` e afins.
+- [x] Reduzir densidade visual de `/now`: a live mostrou `[agora]` repetido em todas as linhas; a informação virou painel com cabeçalho único `Agora`.
+- [x] Runner `--ux-cycle` atualizado para reconhecer o novo painel `/now`, sem depender de `[agora]`.
+- [x] Live PTY curta executada após o ajuste:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=45000 --transport=pty --out-dir=artifacts/terminal-live/ux-now-panel-pass-20260602-1402`.
+- [x] Resultado: PASS completo, com `/now` renderizando `Agora`, `Conversa`, `Entrada`, `Modelo`, `Catálogo` e `Atividade` sem `key=value`.
+- [x] Auditar `/byok` default, que ainda contém blocos diagnósticos extensos com `rows=`, `latest=`, `store=`, `postRuntimeProfiles=`, `tracePersisted=`, `source=`, `freshness=` e afins.
+- [x] `/byok status` passou a renderizar `Estado`, `Perfil`, `Provider`, `Modelo`, `Autenticação`, `Capacidades`, `Limites`, `Gateway`, `Preparada` e `Sessão viva`, removendo `enabled:`, `apiKey=`, `bearer=`, `reasoning=`, `source=` e `providers=` da superfície default.
+- [x] `/byok gateway operator-ready` passou a usar `perfil`, `checagens`, `sem chamada provider`, `política`, `ação`, `banco standby`, `banco live`, `estado` e `resumo`.
+- [x] `/byok auto doctor` passou a usar `perfil`, `snapshot ativo`, `política`, `origem policy`, `decisão`, `ação`, `rota`, `reset` e `nova tentativa`, sem `profile=`, `activeSnapshot=`, `policy source:` ou `reset=`.
+- [x] `/byok gateway selection audit effective` passou a usar `modo`, `sem runtime`, `persistido`, `perfis`, `health observado`, `pós-runtime perfis`, `comparação mudou`, `policy`, `seletor runtime` e `trace persistido`.
+- [x] Teste BYOK completo passou com 105 testes após as mudanças de UX.
+- [ ] Auditar `/byok gateway catalog/build/refresh/importer/sqlite/accounts/limits/sources/eligibility/routes`, que ainda têm muitos blocos default de diagnóstico bruto.
 - [ ] Separar explicitamente “tela default humana” de “detail/raw diagnóstico” nos comandos BYOK, sem perder automação e rastreabilidade.
