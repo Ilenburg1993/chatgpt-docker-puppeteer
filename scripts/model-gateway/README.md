@@ -10,7 +10,8 @@ Guia canonico transversal:
 
 - `model-gateway:ops`, `model-gateway:commands`, `model-gateway:sqlite:diagnostics`, `model-gateway:live:readiness`,
   `model-gateway:live:plan`, `model-gateway:auto:status`, `model-gateway:auto:plan`,
-  `model-gateway:auto:ready`, `model-gateway:auto:doctor` e `model-gateway:auto:scenarios` são caminhos read-only por padrão.
+  `model-gateway:auto:ready`, `model-gateway:auto:doctor`, `model-gateway:auto:standby` e
+  `model-gateway:auto:scenarios` são caminhos read-only por padrão.
 - Provider/model runtime só deve ser executado por comandos que exigem flag explícita, como runtime selector com execução
   ou live test real.
 - Metadados canônicos não são mutados por runtime health, route decisions ou automation decisions.
@@ -64,20 +65,23 @@ npm run model-gateway:auto:handoffs
 npm run model-gateway:auto:confirmations
 npm run model-gateway:auto:recoveries
 npm run model-gateway:auto:proof-plan
+npm run model-gateway:auto:standby
 npm run model-gateway:auto:scenarios
 npm run model-gateway:auto:status -- --write-sqlite
 ```
 
 `auto:status` monta uma decisão pura. `--write-sqlite` grava a decisão como trilha operacional, sem aplicar efeitos e sem
-chamar provider.
+chamar provider. `auto:standby` lista rotas selecionadas e alternativas ja utilizaveis como fila de prontidao, com
+comandos explicitos para prova, troca de modelo, provider/persistencia e novo boot SDK.
 
 `auto:ready` é o gate operacional objetivo para saber se catálogo, SQLite, readiness, decisão auto e superfícies canônicas
 estão visíveis. `auto:doctor` explica a policy efetiva, ledgers de efeitos/recoveries/handoffs/confirmations e o que
 ainda impede automação total. `auto:handoffs`, `auto:confirmations` e `auto:recoveries` leem os ledgers SDK/recovery sem
 SQL manual. `auto:proof-plan` transforma alternativas bloqueadas por runtime health em comandos explícitos de
-`/byok probe` por provider/model, sem chamar provider.
+`/byok probe` por provider/model, sem chamar provider. `auto:standby` lista rotas selecionadas e alternativas ja
+utilizaveis com comandos de prova, troca live no mesmo provider, provider/persist e novo boot SDK.
 
-`auto:scenarios` agrega readiness, doctor, explain, ledgers, proof-plan e live-plan em uma escada canônica de cenários
+`auto:scenarios` agrega readiness, doctor, explain, ledgers, proof-plan, standby e live-plan em uma escada canônica de cenários
 para humano ou LLM: leitura, policy stateful, troca terminal, fixture e real provider. Ele não chama provider nem inicia
 o terminal.
 
@@ -88,6 +92,7 @@ No terminal:
 /byok auto record profile:repo_agent
 /byok auto apply profile:repo_agent allow-live-set-model
 /byok auto proof-plan profile:repo_agent 12
+/byok auto standby profile:repo_agent 12
 /byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
 /byok probe agent provider:zai model:glm-4.5-flash timeout:20000
 /byok auto off

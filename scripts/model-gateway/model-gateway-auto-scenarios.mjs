@@ -111,7 +111,7 @@ function countRowsOrItems(value) {
     return countArray(record?.['rows']) || countArray(record?.['items']);
 }
 
-function summarizeGateSummaries({ ready, doctor, explain, handoffs, confirmations, recoveries, proofPlan, livePlan }) {
+function summarizeGateSummaries({ ready, doctor, explain, handoffs, confirmations, recoveries, proofPlan, standby, livePlan }) {
     const readyJson = optionalRecord(ready);
     const doctorJson = optionalRecord(doctor);
     const explainJson = optionalRecord(explain);
@@ -119,6 +119,7 @@ function summarizeGateSummaries({ ready, doctor, explain, handoffs, confirmation
     const confirmationsJson = optionalRecord(confirmations);
     const recoveriesJson = optionalRecord(recoveries);
     const proofPlanJson = optionalRecord(proofPlan);
+    const standbyJson = optionalRecord(standby);
     const livePlanJson = optionalRecord(livePlan);
     return {
         ready: {
@@ -158,6 +159,12 @@ function summarizeGateSummaries({ ready, doctor, explain, handoffs, confirmation
             ok: proofPlanJson?.['ok'] === true,
             commands: optionalRecord(proofPlanJson?.['summary'])?.['commandCount'] ?? 0,
             alternatives: `${optionalRecord(proofPlanJson?.['summary'])?.['usableAlternativeCount'] ?? 0}/${optionalRecord(proofPlanJson?.['summary'])?.['evaluatedAlternativeCount'] ?? 0}`,
+        },
+        standby: {
+            ok: standbyJson?.['ok'] === true,
+            routes: optionalRecord(standbyJson?.['summary'])?.['routeCount'] ?? 0,
+            alternates: optionalRecord(standbyJson?.['summary'])?.['alternateCount'] ?? 0,
+            runtimeProofs: optionalRecord(standbyJson?.['summary'])?.['runtimeProofCount'] ?? 0,
         },
         livePlan: {
             ok: livePlanJson?.['ok'] === true,
@@ -209,8 +216,17 @@ function buildScenarios(profile) {
             gateIds: ['auto_proof_plan'],
         }),
         createScenario({
-            id: 'terminal_auto_enable_live_set_model',
+            id: 'terminal_auto_standby_routes',
             order: 5,
+            phase: 'read-only',
+            command: `npm run model-gateway:auto:standby -- --profile=${profile} --limit=12`,
+            terminalCommand: `/byok auto standby profile:${profile} 12`,
+            purpose: 'List selected and alternate standby routes with explicit proof, same-provider model, provider/persist and new-session commands.',
+            gateIds: ['auto_standby'],
+        }),
+        createScenario({
+            id: 'terminal_auto_enable_live_set_model',
+            order: 6,
             phase: 'stateful-policy',
             command: `Terminal: /byok auto on profile:${profile} allow-live-set-model`,
             terminalCommand: `/byok auto on profile:${profile} allow-live-set-model`,
@@ -221,7 +237,7 @@ function buildScenarios(profile) {
         }),
         createScenario({
             id: 'terminal_auto_enable_full_handoff',
-            order: 6,
+            order: 7,
             phase: 'stateful-policy',
             command: `Terminal: /byok auto on profile:${profile} allow-live-set-model allow-new-session`,
             terminalCommand: `/byok auto on profile:${profile} allow-live-set-model allow-new-session`,
@@ -232,7 +248,7 @@ function buildScenarios(profile) {
         }),
         createScenario({
             id: 'terminal_auto_switch_now',
-            order: 7,
+            order: 8,
             phase: 'stateful-terminal',
             command: `Terminal: /byok auto switch profile:${profile}`,
             terminalCommand: `/byok auto switch profile:${profile}`,
@@ -243,7 +259,7 @@ function buildScenarios(profile) {
         }),
         createScenario({
             id: 'terminal_live_control_no_pr',
-            order: 8,
+            order: 9,
             phase: 'terminal-live-control',
             command: 'npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000',
             purpose: 'Boot the terminal live harness without an LLM turn to validate command surface, event stream and redaction.',
@@ -251,7 +267,7 @@ function buildScenarios(profile) {
         }),
         createScenario({
             id: 'terminal_live_byok_fixture',
-            order: 9,
+            order: 10,
             phase: 'terminal-live-fixture',
             command: 'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
             purpose: 'Exercise BYOK control-plane commands against the local OpenAI-compatible fixture before any real provider call.',
@@ -260,7 +276,7 @@ function buildScenarios(profile) {
         }),
         createScenario({
             id: 'terminal_live_real_no_pr_probes',
-            order: 10,
+            order: 11,
             phase: 'terminal-live-real-probes',
             command:
                 `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=${profile} --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=900000 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000`,
@@ -272,7 +288,7 @@ function buildScenarios(profile) {
         }),
         createScenario({
             id: 'terminal_live_real_full_turn',
-            order: 11,
+            order: 12,
             phase: 'terminal-live-real-turn',
             command:
                 `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=${profile} --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=900000 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --timeout-ms=900000`,
@@ -297,6 +313,7 @@ const handoffs = runJson('autoHandoffs', ['--json', '--limit=5']);
 const confirmations = runJson('autoConfirmations', ['--json', '--limit=5']);
 const recoveries = runJson('autoRecoveries', ['--json', '--limit=5']);
 const proofPlan = runJson('autoProofPlan', ['--json', `--profile=${profile}`, '--limit=12']);
+const standby = runJson('autoStandby', ['--json', `--profile=${profile}`, '--limit=12']);
 const livePlan = runJson('livePlan', ['--json', '--no-write']);
 
 const readyJson = optionalRecord(ready.json);
@@ -316,6 +333,7 @@ const checks = [
     checkFromRun('auto_confirmations', confirmations, (result) => `rows=${countRowsOrItems(result)}`),
     checkFromRun('auto_recoveries', recoveries, (result) => `rows=${countRowsOrItems(result)}`),
     checkFromRun('auto_proof_plan', proofPlan, (result) => `commands=${optionalRecord(optionalRecord(result)?.['summary'])?.['commandCount'] ?? 0}`),
+    checkFromRun('auto_standby', standby, (result) => `routes=${optionalRecord(optionalRecord(result)?.['summary'])?.['routeCount'] ?? 0}`),
     checkFromRun('live_plan', livePlan, (result) => `ok=${optionalRecord(result)?.['ok'] === true}`),
 ];
 const blockers = checks.filter((check) => !check.pass && check.severity === 'error');
@@ -340,6 +358,7 @@ const summary = {
         confirmations: optionalRecord(confirmations.json),
         recoveries: optionalRecord(recoveries.json),
         proofPlan: optionalRecord(proofPlan.json),
+        standby: optionalRecord(standby.json),
         livePlan: livePlanJson,
     }),
     rawGateSummaries: includeGates ? {
@@ -350,6 +369,7 @@ const summary = {
         confirmations: optionalRecord(confirmations.json),
         recoveries: optionalRecord(recoveries.json),
         proofPlan: optionalRecord(proofPlan.json),
+        standby: optionalRecord(standby.json),
         livePlan: livePlanJson,
     } : null,
     nextScenario: scenarios[0] ?? null,

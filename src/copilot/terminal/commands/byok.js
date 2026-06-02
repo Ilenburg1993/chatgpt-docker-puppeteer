@@ -17,6 +17,7 @@ import {
     buildCatalogRefreshStartedEvent,
     buildModelGatewaySelectionDecisionTrace,
     buildModelGatewayRuntimeProofCommands,
+    buildModelGatewayRuntimeStandbyRoutes,
     buildModelGatewayRuntimeSelectorPlan,
     compareModelGatewaySelectionAudits,
     buildEligibilityEvaluatedEvent,
@@ -1972,7 +1973,7 @@ async function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok auto [on|policy|doctor|explain|switch|status|plan|record|history|handoffs|confirmations|apply|off] [profile:<id>] [allow-live-set-model] | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway auto [profile:<id>] | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway local | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict|runs|diff] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] [wire:<completions|responses>] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok auto [on|policy|doctor|explain|standby|proof-plan|switch|status|plan|record|history|handoffs|confirmations|apply|off] [profile:<id>] [allow-live-set-model] | /byok providers | /byok profiles | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway auto [profile:<id>|standby|proof-plan] | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway local | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict|runs|diff] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] [wire:<completions|responses>] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -3466,6 +3467,42 @@ async function renderByokGatewayAutoProofPlan(println, rest) {
  * @param {string[]} rest
  * @returns {Promise<void>}
  */
+async function renderByokGatewayAutoStandby(println, rest) {
+    const limit = parseByokGatewayAutoHistoryLimit(rest);
+    const status = await buildTerminalByokGatewayAutoStatus(rest, {
+        allowEffects: false,
+        persistAutomationDecision: false,
+    });
+    const rows = buildModelGatewayRuntimeStandbyRoutes(status.runtimeSelectorPlan, { limit });
+    const visibleRows = rows.slice(0, limit);
+    const proofCount = rows.filter((row) => row.hasRuntimeProof).length;
+    const providerCount = new Set(rows.map((row) => row.providerId).filter(Boolean)).size;
+    println('\n  \x1b[36mBYOK model-gateway auto standby\x1b[0m');
+    println(
+        `  \x1b[90mprofile=${status.args.profileId} · runtimeSelector=${status.runtimeSelectorPlan.ok ? 'ok' : 'blocked'} · routes=${rows.length} · proof=${proofCount} · providers=${providerCount} · providerCall=nao\x1b[0m`,
+    );
+    if (visibleRows.length === 0) {
+        println('  \x1b[90mNenhuma rota de prontidao foi derivada do selector atual.\x1b[0m\n');
+        return;
+    }
+    for (const [index, row] of visibleRows.entries()) {
+        const source = row.source === 'selected' ? 'selecionada' : 'alternativa';
+        println(
+            `    ${index + 1}. \x1b[33m${row.providerId}:${row.providerModel}\x1b[0m  \x1b[90m${source} · profile=${row.profileId} · proof=${row.hasRuntimeProof ? 'sim' : 'nao'} · env=${row.runtimeEnvStatus ?? '-'} · score=${row.score ?? '-'}\x1b[0m`,
+        );
+        println(`       \x1b[90mprovar: ${row.commands.probeAgent ?? '-'}\x1b[0m`);
+        println(`       \x1b[90mmesmo provider: ${row.commands.liveModel ?? '-'}\x1b[0m`);
+        println(`       \x1b[90mnovo boot: ${row.commands.newSession} && ${row.commands.provider ?? '-'}\x1b[0m`);
+        println(`       \x1b[90mpersistir: ${row.commands.persistProvider ?? '-'}\x1b[0m`);
+    }
+    println('  \x1b[90mStandby nao aplica efeitos; ele mostra substitutos prontos e comandos explicitos para o operador escolher.\x1b[0m\n');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {Promise<void>}
+ */
 async function renderByokGatewayAutoOn(println, rest) {
     const args = parseTerminalByokGatewayAutoArgs(rest);
     const status = await buildTerminalByokGatewayAutoStatus(rest);
@@ -3759,7 +3796,7 @@ async function renderByokGatewayAutoDoctor(println, rest) {
         `    policy:        \x1b[33menabled=${effectivePolicy.enabled ? 'sim' : 'nao'} · file=${fileConfigured ? 'sim' : 'nao'} · liveSetModel=${effectivePolicy.allowLiveSetModel ? 'sim' : 'nao'} · newSession=${effectivePolicy.allowNewSession ? 'sim' : 'nao'}\x1b[0m`,
     );
     println(
-        `    policy source: \x1b[33menabled=${policySources.enabled.source} · profiles=${policySources.profiles.source} · liveSetModel=${policySources.allowLiveSetModel.source} · newSession=${policySources.allowNewSession.source}\x1b[0m`,
+        `    policy source: \x1b[33menabled=${policySources['enabled']?.source ?? '-'} · profiles=${policySources['profiles']?.source ?? '-'} · liveSetModel=${policySources['allowLiveSetModel']?.source ?? '-'} · newSession=${policySources['allowNewSession']?.source ?? '-'}\x1b[0m`,
     );
     println(
         `    decision:      \x1b[33mok=${decision.ok ? 'sim' : 'nao'} · action=${decision.action} · route=${decision.selectedRouteKey ?? '-'}\x1b[0m`,
@@ -4304,6 +4341,12 @@ function buildByokProbeSelection(rest) {
     let wireApi = null;
     /** @type {number | undefined} */
     let timeoutMs;
+    /**
+     * @param {string} item
+     * @param {string} colonPrefix
+     * @param {string} [equalsPrefix]
+     * @returns {string | null}
+     */
     const readTokenValue = (item, colonPrefix, equalsPrefix = colonPrefix.replace(/:$/u, '=')) =>
         item.toLowerCase().startsWith(colonPrefix)
             ? item.slice(colonPrefix.length).trim() || null
@@ -4768,6 +4811,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayAutoProofPlan(println, rest);
             return;
         }
+        if (rest.some((item) => /^(standby|alternatives|alternativas|substitutes|substitutos|prontidao|prontidão)$/iu.test(item))) {
+            await renderByokGatewayAutoStandby(println, rest);
+            return;
+        }
         if (rest.some((item) => /^(switch|fallback|trocar|mudar|change|apply-best)$/iu.test(item))) {
             await renderByokGatewayAutoStatus(println, rest, { apply: true, persist: true });
             return;
@@ -4825,6 +4872,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             }
             if (autoRest.some((item) => /^(proof-plan|proofs|runtime-proofs|provas|plano-provas)$/iu.test(item))) {
                 await renderByokGatewayAutoProofPlan(println, autoRest);
+                return;
+            }
+            if (autoRest.some((item) => /^(standby|alternatives|alternativas|substitutes|substitutos|prontidao|prontidão)$/iu.test(item))) {
+                await renderByokGatewayAutoStandby(println, autoRest);
                 return;
             }
             if (autoRest.some((item) => /^(switch|fallback|trocar|mudar|change|apply-best)$/iu.test(item))) {

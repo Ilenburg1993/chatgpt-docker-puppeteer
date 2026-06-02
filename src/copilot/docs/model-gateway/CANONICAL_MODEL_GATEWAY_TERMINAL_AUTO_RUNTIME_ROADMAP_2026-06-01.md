@@ -58,6 +58,7 @@ Playbook operacional ativo para humano/LLM:
 - [x] `model-gateway:auto:confirmations`.
 - [x] `model-gateway:auto:recoveries`.
 - [x] `model-gateway:auto:proof-plan`.
+- [x] `model-gateway:auto:standby`.
 - [x] `model-gateway:live:runs`.
 - [x] Inventario canonico registra a fase `runtime-probes`.
 
@@ -71,6 +72,7 @@ Playbook operacional ativo para humano/LLM:
 - [x] `/byok auto off` desliga policy persistente.
 - [x] `/byok auto policy` mostra policy efetiva.
 - [x] `/byok auto proof-plan` lista comandos explicitos de prova runtime por provider/model.
+- [x] `/byok auto standby` lista rotas de prontidao e comandos seguros de prova/troca/persistencia/novo boot.
 - [x] Decisao auto bloqueada por prova runtime/health/rota ausente aponta para `auto:proof-plan` antes de qualquer chamada real de provider.
 - [x] Pre-turn auto roda quando policy esta ligada.
 - [x] Pre-turn persiste decision, effect applications e handoffs.
@@ -218,7 +220,8 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] A.9 `model-gateway:auto:confirmations`.
 - [x] A.10 `model-gateway:auto:recoveries`.
 - [x] A.11 `model-gateway:auto:proof-plan`.
-- [x] A.12 `model-gateway:auto:scenarios`.
+- [x] A.12 `model-gateway:auto:standby`.
+- [x] A.13 `model-gateway:auto:scenarios`.
 
 ### Faixa B - Policy Explicavel
 
@@ -428,20 +431,22 @@ Todos os checkboxes sao booleanos. Nao usar estado parcial.
 - [x] Artefato inicial: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`.
 - [x] Artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-57-46-528Z/summary.md`.
 - [x] Artefato com recovery fixture final: `artifacts/terminal-live/2026-06-01T23-49-06-502Z/summary.md`.
+- [x] Artefato com standby final: `artifacts/terminal-live/2026-06-02T00-13-15-205Z/summary.md`.
 - [x] Resultado: PASS.
 - [x] Terminal error tracker: 0.
 - [x] Sem turno explicito de modelo.
-- [x] `/byok gateway commands` mostrou inventario canonico com 137 comandos apos incluir recovery fixture, proof-plan e prova explicita por provider/model.
+- [x] `/byok gateway commands` mostrou inventario canonico com 141 comandos apos incluir recovery fixture, proof-plan, standby e prova explicita por provider/model.
 - [x] `/byok auto policy` mostrou policy efetiva.
 - [x] `/byok auto status profile:repo_agent` mostrou decision sem aplicar efeito.
 - [x] `/byok auto doctor profile:repo_agent` mostrou policy, decision, ledgers e blockers.
 - [x] `/byok auto explain profile:repo_agent` explicou action/blockers/next commands.
 - [x] `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` persistiu recovery account-wide, runtime health e espelho SQLite sem provider call.
 - [x] `/byok auto history`, `/byok auto handoffs`, `/byok auto confirmations` e `/byok auto recoveries` renderizaram ledger/empty state.
-- [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-01T23-49-06-512Z:auto_probe`.
-- [x] `npm run model-gateway:live:runs` leu 10 registros persistidos e o ultimo com `criteriaTotal=29`.
-- [x] `npm run model-gateway:auto:doctor` mostrou `schema=10`, `commands=137`, `recoveries=7` e `liveRuns=10`.
+- [x] `live-scenario-run-recorded` gravou `terminal-live:2026-06-02T00-13-15-212Z:auto_probe`.
+- [x] `npm run model-gateway:live:auto-probe` validou 30 criterios, incluindo `auto-standby-visible`.
+- [x] `npm run model-gateway:auto:doctor` mostrou inventario canonico de 141 comandos antes da fixture; apos recovery fixture, health/cooldown pode bloquear como esperado.
 - [x] `/byok auto status` e `/byok auto doctor` mostram resumo de alternativas usaveis/bloqueadas.
 - [x] `/byok auto status` e `/byok auto doctor` sugerem `/byok probe agent provider:<provider> model:<provider-model> timeout:20000` para candidatos bloqueados por agent probe ausente/nao verificado.
 - [x] `npm run model-gateway:auto:proof-plan` e `/byok auto proof-plan profile:repo_agent 12` materializam uma fila read-only de provas runtime.
+- [x] `npm run model-gateway:auto:standby` e `/byok auto standby profile:repo_agent 12` materializam uma fila read-only de rotas de prontidao.
 - [ ] Resolver a lacuna de fallback real para `repo_agent`: quando todas as rotas exigem agent-probe verificado, o cockpit pode ficar correto porem bloqueado com `usable=0/78`.

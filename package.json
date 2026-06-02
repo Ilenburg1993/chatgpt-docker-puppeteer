@@ -691,6 +691,7 @@
     "model-gateway:auto:confirmations": "node scripts/model-gateway/model-gateway-auto-confirmations.mjs --json",
     "model-gateway:auto:recoveries": "node scripts/model-gateway/model-gateway-auto-recoveries.mjs --json",
     "model-gateway:auto:proof-plan": "node scripts/model-gateway/model-gateway-auto-proof-plan.mjs --json",
+    "model-gateway:auto:standby": "node scripts/model-gateway/model-gateway-auto-standby.mjs --json",
     "model-gateway:auto:scenarios": "node scripts/model-gateway/model-gateway-auto-scenarios.mjs --json"
   },
   "overrides": {

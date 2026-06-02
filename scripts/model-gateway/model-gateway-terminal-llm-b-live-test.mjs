@@ -195,6 +195,7 @@ function buildAutoProbeCommands({ profile = 'repo_agent' } = {}) {
         '/byok auto handoffs 10',
         '/byok auto confirmations 10',
         `/byok auto proof-plan profile:${routeProfile} 5`,
+        `/byok auto standby profile:${routeProfile} 5`,
         `/byok auto recovery-fixture profile:${routeProfile} provider:zai model:glm-4.5-flash failure:rate-limit`,
         '/byok auto recoveries 10',
         '/events 40',
@@ -2329,6 +2330,15 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
             id: 'auto-proof-plan-visible',
             pass: /BYOK model-gateway auto proof plan/.test(plain) && /\/byok probe (?:agent|chat) provider:/u.test(plain),
             detail: '/byok auto proof-plan rendered explicit provider/model runtime proof commands without provider calls',
+        },
+        {
+            id: 'auto-standby-visible',
+            pass:
+                /BYOK model-gateway auto standby/.test(plain) &&
+                /providerCall=nao/.test(plain) &&
+                /(?:provar|prove):\s+\/byok probe/u.test(plain) &&
+                /novo boot:\s+\/session sdk next new/u.test(plain),
+            detail: '/byok auto standby rendered ready replacement commands without provider calls',
         },
         {
             id: 'auto-recovery-fixture-visible',

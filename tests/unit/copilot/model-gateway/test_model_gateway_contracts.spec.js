@@ -52,6 +52,7 @@ import {
     buildModelGatewayRuntimeSelectorProbeRun,
     buildModelGatewayRuntimeAutomationControllerStep,
     buildModelGatewayRuntimeAutomationDecision,
+    buildModelGatewayRuntimeStandbyRoutes,
     explainModelGatewayRuntimeAutomationPolicySources,
     validateModelGatewayRuntimeAutomationPolicy,
     buildModelGatewayRuntimeSelectorPlan,
@@ -1262,6 +1263,13 @@ describe('model-gateway foundation', () => {
         assert.equal(automationRoute.schema, 'model-gateway-runtime-automation-route');
         assert.equal(automationRoute.selectedRouteKey, 'openrouter:openai/gpt-oss-120b');
         assert.deepEqual(automationRoute.blockers, []);
+        const standbyRoutes = buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, { limit: 4, timeoutMs: 15_000 });
+        assert.equal(standbyRoutes.length > 0, true);
+        assert.equal(standbyRoutes[0].profileId, 'repo_agent');
+        assert.equal(standbyRoutes[0].commands.probeAgent, '/byok probe agent provider:openrouter model:openai/gpt-oss-120b timeout:15000');
+        assert.equal(standbyRoutes[0].commands.liveModel, '/byok model openai/gpt-oss-120b:groq');
+        assert.equal(standbyRoutes[0].commands.provider, '/byok provider openrouter openai/gpt-oss-120b:groq');
+        assert.equal(standbyRoutes[0].commands.persistProvider, '/byok persist provider openrouter openai/gpt-oss-120b:groq');
 
         const strictRuntimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(requireRuntimeProof, {
             requireRuntimeProof: true,
@@ -4254,6 +4262,7 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === '/byok auto history 10'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto handoffs 10'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto confirmations 10'));
+        assert.ok(commands.some((entry) => entry.command === '/byok auto standby profile:repo_agent 12'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto off'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway prebuild'));
         assert.ok(commands.some((entry) => entry.command === '/byok gateway selection audit runtime-proof'));
@@ -4272,6 +4281,8 @@ describe('model-gateway foundation', () => {
         assert.ok(
             modelGatewayScriptPath('autoConfirmations').endsWith('scripts/model-gateway/model-gateway-auto-confirmations.mjs'),
         );
+        assert.ok(modelGatewayScriptPath('autoProofPlan').endsWith('scripts/model-gateway/model-gateway-auto-proof-plan.mjs'));
+        assert.ok(modelGatewayScriptPath('autoStandby').endsWith('scripts/model-gateway/model-gateway-auto-standby.mjs'));
         assert.ok(modelGatewayScriptPath('autoScenarios').endsWith('scripts/model-gateway/model-gateway-auto-scenarios.mjs'));
         assert.ok(COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH.endsWith('scripts/model-gateway/model-gateway-terminal-llm-b-live-test.mjs'));
         assert.ok(Object.values(MODEL_GATEWAY_SCRIPT_PATHS).every((scriptPath) => scriptPath.includes('/scripts/model-gateway/')));

@@ -328,6 +328,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Build a read-only queue of explicit provider/model runtime proof commands for blocked auto fallback candidates.',
     },
     {
+        id: 'automation.standby',
+        phase: 'automation',
+        surface: 'package',
+        command: 'npm run model-gateway:auto:standby',
+        summary: 'List selected and alternate standby routes with explicit operator commands without calling providers.',
+    },
+    {
         id: 'automation.scenarios',
         phase: 'automation',
         surface: 'package',
@@ -641,6 +648,20 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Makefile alias for persisted post-turn recovery attempts.',
     },
     {
+        id: 'make.auto-proof-plan',
+        phase: 'automation',
+        surface: 'make',
+        command: 'make model-gateway-auto-proof-plan',
+        summary: 'Makefile alias for explicit runtime proof planning.',
+    },
+    {
+        id: 'make.auto-standby',
+        phase: 'automation',
+        surface: 'make',
+        command: 'make model-gateway-auto-standby',
+        summary: 'Makefile alias for read-only standby route listing.',
+    },
+    {
         id: 'make.auto-scenarios',
         phase: 'automation',
         surface: 'make',
@@ -786,6 +807,13 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'terminal',
         command: '/byok auto proof-plan profile:repo_agent 12',
         summary: 'Render explicit provider/model probe commands for blocked runtime-selector fallback candidates without calling providers.',
+    },
+    {
+        id: 'terminal.auto-standby',
+        phase: 'automation',
+        surface: 'terminal',
+        command: '/byok auto standby profile:repo_agent 12',
+        summary: 'Render selected and alternate standby routes with safe proof, live model and next-session commands.',
     },
     {
         id: 'terminal.auto-recovery-fixture',

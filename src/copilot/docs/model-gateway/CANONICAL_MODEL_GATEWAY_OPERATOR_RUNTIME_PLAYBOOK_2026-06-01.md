@@ -181,16 +181,20 @@ npm run model-gateway:auto:handoffs
 npm run model-gateway:auto:confirmations
 npm run model-gateway:auto:recoveries
 npm run model-gateway:auto:proof-plan
+npm run model-gateway:auto:standby
 npm run model-gateway:auto:scenarios
 npm run model-gateway:live:runs
 ```
 
 Regra: `auto:status`, `auto:ready`, `auto:doctor`, `auto:explain`, `auto:handoffs`, `auto:confirmations`,
-`auto:recoveries`, `auto:proof-plan` e `auto:scenarios` nao devem chamar provider nem mutar terminal.
+`auto:recoveries`, `auto:proof-plan`, `auto:standby` e `auto:scenarios` nao devem chamar provider nem mutar terminal.
 
 Regra de bloqueio: quando a decisao auto encontra `runtime_proof_required`, rota bloqueada, health runtime falha
 ou candidato sem selecao, os `nextCommands` devem apontar primeiro para `model-gateway:auto:proof-plan` e para
 `/byok auto proof-plan`, antes de qualquer prova live explicita.
+
+Regra de prontidao: `model-gateway:auto:standby` e `/byok auto standby` mostram substitutos ja derivados do selector,
+separando comandos de prova, troca live no mesmo provider, provider/persist e novo boot SDK.
 
 ### 3.6 Terminal
 
@@ -208,6 +212,7 @@ Responsavel pela experiencia viva do operador:
 /byok auto handoffs 10
 /byok auto confirmations 10
 /byok auto proof-plan profile:repo_agent 12
+/byok auto standby profile:repo_agent 12
 /byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
 /byok probe agent provider:zai model:glm-4.5-flash timeout:20000
 /byok auto recoveries 10
@@ -366,20 +371,22 @@ Evidencia em 2026-06-01:
 - artefato inicial: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`;
 - artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-57-46-528Z/summary.md`;
 - artefato com recovery fixture final: `artifacts/terminal-live/2026-06-01T23-49-06-502Z/summary.md`;
-- duracao mais recente: 19447ms;
+- artefato com standby final: `artifacts/terminal-live/2026-06-02T00-13-15-205Z/summary.md`;
+- duracao mais recente: 20826ms;
 - erros rastreados: 0;
-- criterios PASS mais recentes: 28;
-- inventario canonico exibiu 137 comandos apos recovery fixture e proof-plan;
+- criterios PASS mais recentes: 30;
+- inventario canonico exibiu 141 comandos apos recovery fixture, proof-plan, standby e prova explicita por provider/model;
 - `/byok auto policy` funcionou;
 - `/byok auto status profile:repo_agent` funcionou e mostrou resumo de alternativas usaveis/bloqueadas;
 - `/byok auto doctor profile:repo_agent` funcionou e mostrou resumo de alternativas usaveis/bloqueadas;
 - `/byok auto proof-plan profile:repo_agent 12` agora existe como fila read-only de probes por provider/model;
+- `/byok auto standby profile:repo_agent 12` agora existe como fila read-only de substitutos e comandos de troca/prova;
 - o cockpit passou a sugerir `/byok probe agent provider:<provider> model:<provider-model> timeout:20000` quando alternativas carecem de agent probe;
 - `/byok auto explain profile:repo_agent` funcionou;
 - `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery account-wide, runtime health e espelho SQLite sem chamada ao provider;
 - ledgers history/handoffs/confirmations/recoveries renderizaram corretamente;
-- ledger de live scenarios gravou `terminal-live:2026-06-01T23-49-06-512Z:auto_probe`;
-- `npm run model-gateway:live:runs` leu 10 runs persistidos e confirmou `criteriaTotal=29` no ultimo;
+- ledger de live scenarios gravou `terminal-live:2026-06-02T00-13-15-212Z:auto_probe`;
+- `npm run model-gateway:live:runs` confirmou `criteriaTotal=30` no ultimo auto-probe;
 - achado estrutural: depois dos overlays de health, `repo_agent` pode mostrar `usable=0/78` porque exige agent-probe verificado; isso e bloqueio correto, nao falha do cockpit.
 
 ### 5.6 BYOK real no-PR
@@ -538,6 +545,7 @@ Isso cria overlay temporario com reset/cooldown.
 - [ ] `npm run model-gateway:auto:ready` passa.
 - [ ] `npm run model-gateway:auto:doctor` passa.
 - [x] `npm run model-gateway:auto:proof-plan` passa e gera fila read-only de comandos de prova.
+- [x] `npm run model-gateway:auto:standby` passa e lista rotas de prontidao sem chamar provider.
 - [ ] `npm run model-gateway:auto:scenarios` passa sem blockers de readiness.
 - [ ] `npm run model-gateway:live:readiness` passa.
 - [ ] `npm run model-gateway:live:plan` passa.
@@ -597,7 +605,8 @@ Resultado:
 
 - `auto:ready`: ok;
 - `auto:proof-plan`: ok, gerou 12 comandos para alternativas bloqueadas.
-- `auto:scenarios`: comandos ok, 11 cenarios, 1 blocker esperado enquanto `repo_agent` permanece sem rota runtime-proved utilizavel;
+- `auto:standby`: ok, listou rotas de prontidao sem provider call.
+- `auto:scenarios`: comandos ok, 12 cenarios, standby ok; apos recovery fixture, o doctor pode voltar a bloquear por health/cooldown registrado;
 - `live control no-PR`: PASS;
 - `BYOK fixture no-PR`: PASS;
 - `auto cockpit no-PR`: PASS;

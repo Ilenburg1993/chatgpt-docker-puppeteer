@@ -13,6 +13,7 @@ export const MODEL_GATEWAY_SCRIPT_PATHS = Object.freeze({
     autoConfirmations: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-confirmations.mjs'),
     autoRecoveries: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-recoveries.mjs'),
     autoProofPlan: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-proof-plan.mjs'),
+    autoStandby: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-standby.mjs'),
     autoScenarios: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-auto-scenarios.mjs'),
     canonicalCommands: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-canonical-commands.mjs'),
     catalogIntegrity: path.join(MODEL_GATEWAY_SCRIPT_DIR, 'model-gateway-catalog-integrity.mjs'),

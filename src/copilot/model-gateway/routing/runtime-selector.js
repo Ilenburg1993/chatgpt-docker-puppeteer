@@ -633,6 +633,7 @@ export function buildModelGatewayRuntimeProofCommands(alternativeSummary, option
         );
         const needsChatProbe = reasons.some((reason) => /chat_health_failed|health_unknown/iu.test(reason));
         if (!needsAgentProbe && !needsChatProbe) continue;
+        /** @type {'agent' | 'chat'} */
         const mode = needsAgentProbe ? 'agent' : 'chat';
         const command = `/byok probe ${mode} provider:${providerId} model:${providerModel} timeout:${timeoutMs}`;
         if (seen.has(command)) continue;
@@ -641,6 +642,124 @@ export function buildModelGatewayRuntimeProofCommands(alternativeSummary, option
         if (commands.length >= limit) break;
     }
     return commands;
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} selected
+ * @returns {string | null}
+ */
+function runtimeSelectorRouteModel(selected) {
+    return (
+        optionalString(selected?.['selectorSyntax']) ??
+        optionalString(selected?.['providerModel']) ??
+        optionalString(selected?.['id'])
+    );
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} selected
+ * @param {number} timeoutMs
+ * @returns {{
+ *   probeAgent: string | null;
+ *   probeChat: string | null;
+ *   liveModel: string | null;
+ *   provider: string | null;
+ *   persistProvider: string | null;
+ *   newSession: string;
+ * }}
+ */
+function runtimeSelectorStandbyCommands(selected, timeoutMs) {
+    const providerId = optionalString(selected?.['providerId']);
+    const providerModel = optionalString(selected?.['providerModel']);
+    const model = runtimeSelectorRouteModel(selected);
+    return {
+        probeAgent: providerId && providerModel ? `/byok probe agent provider:${providerId} model:${providerModel} timeout:${timeoutMs}` : null,
+        probeChat: providerId && providerModel ? `/byok probe chat provider:${providerId} model:${providerModel} timeout:${timeoutMs}` : null,
+        liveModel: model ? `/byok model ${model}` : null,
+        provider: providerId && model ? `/byok provider ${providerId} ${model}` : null,
+        persistProvider: providerId && model ? `/byok persist provider ${providerId} ${model}` : null,
+        newSession: '/session sdk next new',
+    };
+}
+
+/**
+ * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>} runtimeSelectorPlan
+ * @param {{ limit?: number; timeoutMs?: number; includeSelected?: boolean }} [options]
+ * @returns {Array<{
+ *   profileId: string;
+ *   rank: number;
+ *   source: 'selected' | 'candidate_alternative';
+ *   selectedRouteKey: string | null;
+ *   providerId: string | null;
+ *   providerModel: string | null;
+ *   selectorSyntax: string | null;
+ *   routeLayer: string | null;
+ *   wireApi: string | null;
+ *   upstreamProvider: string | null;
+ *   score: number | null;
+ *   hasRuntimeProof: boolean;
+ *   runtimeEnvStatus: string | null;
+ *   reasons: string[];
+ *   commands: ReturnType<typeof runtimeSelectorStandbyCommands>;
+ * }>}
+ */
+export function buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, options = {}) {
+    const limit = typeof options.limit === 'number' && Number.isFinite(options.limit) ? Math.max(1, Math.floor(options.limit)) : 12;
+    const timeoutMs =
+        typeof options.timeoutMs === 'number' && Number.isFinite(options.timeoutMs)
+            ? Math.max(5_000, Math.floor(options.timeoutMs))
+            : 20_000;
+    const includeSelected = options.includeSelected !== false;
+    const rows = [];
+    for (const route of runtimeSelectorPlan.routes) {
+        const candidates = [
+            ...(includeSelected && route.selected
+                ? [
+                      {
+                          source: /** @type {'selected'} */ ('selected'),
+                          selected: route.selected,
+                          selectedRouteKey: route.selectedRouteKey,
+                          hasRuntimeProof: route.hasRuntimeProof,
+                          runtimeEnv: route.runtimeEnv,
+                          reasons: route.reasons,
+                      },
+                  ]
+                : []),
+            ...route.candidateAlternatives.map((candidate) => ({
+                source: /** @type {'candidate_alternative'} */ ('candidate_alternative'),
+                selected: optionalRecord(candidate['selected']),
+                selectedRouteKey: optionalString(candidate['selectedRouteKey']),
+                hasRuntimeProof: candidate['hasRuntimeProof'] === true,
+                runtimeEnv: optionalRecord(candidate['runtimeEnv']),
+                reasons: stringList(candidate['reasons']),
+            })),
+        ];
+        let rank = 0;
+        for (const candidate of candidates) {
+            const selected = optionalRecord(candidate.selected);
+            if (!selected) continue;
+            rank += 1;
+            rows.push({
+                profileId: route.profileId,
+                rank,
+                source: candidate.source,
+                selectedRouteKey: optionalString(candidate.selectedRouteKey) ?? routeKey(selected),
+                providerId: optionalString(selected['providerId']),
+                providerModel: optionalString(selected['providerModel']),
+                selectorSyntax: runtimeSelectorRouteModel(selected),
+                routeLayer: routeMetadataString(selected, 'routeLayer'),
+                wireApi: routeMetadataString(selected, 'wireApi'),
+                upstreamProvider: routeMetadataString(selected, 'upstreamProvider'),
+                score: optionalNumber(selected['score']),
+                hasRuntimeProof: candidate.hasRuntimeProof === true,
+                runtimeEnvStatus: optionalString(optionalRecord(candidate.runtimeEnv)?.['status']),
+                reasons: candidate.reasons,
+                commands: runtimeSelectorStandbyCommands(selected, timeoutMs),
+            });
+            if (rows.length >= limit) return rows;
+        }
+    }
+    return rows;
 }
 
 /**

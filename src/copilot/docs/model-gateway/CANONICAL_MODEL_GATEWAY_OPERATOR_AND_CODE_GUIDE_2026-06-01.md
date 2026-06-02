@@ -212,7 +212,7 @@ Regras:
 
 ## 5. Comandos Canonicos
 
-Inventario atual: 137 comandos.
+Inventario atual: 141 comandos.
 
 Distribuicao por fase:
 
@@ -223,7 +223,7 @@ Distribuicao por fase:
 - pre-runtime: 13
 - selection: 17
 - live-readiness: 17
-- automation: 35
+- automation: 39
 - runtime-probes: 1
 
 Comandos de orientacao:
@@ -240,6 +240,7 @@ Comandos de saude read-only:
 npm run model-gateway:auto:ready
 npm run model-gateway:auto:doctor
 npm run model-gateway:auto:proof-plan
+npm run model-gateway:auto:standby
 npm run model-gateway:auto:scenarios
 npm run model-gateway:sqlite:diagnostics
 ```
@@ -248,6 +249,10 @@ Quando `auto:ready` ou a decisao de automacao bloquear uma rota por falta de pro
 rota ausente ou prova falha, o primeiro proximo passo canonico deve ser `model-gateway:auto:proof-plan` ou
 `/byok auto proof-plan`. Isso preserva a separacao entre selecao por metadados, prova runtime planejada e chamada
 real de provider.
+
+Quando a pergunta for "quais modelos ficam de prontidao para substituir o atual?", o caminho canonico e
+`model-gateway:auto:standby` ou `/byok auto standby`. Essa saida lista rota selecionada e alternativas utilizaveis
+com comandos separados para prova descartavel, troca live no mesmo provider, provider/persist e novo boot SDK.
 
 Comandos de ledgers:
 
@@ -270,6 +275,7 @@ Comandos terminal equivalentes:
 /byok auto handoffs 10
 /byok auto confirmations 10
 /byok auto proof-plan profile:repo_agent 12
+/byok auto standby profile:repo_agent 12
 /byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
 /byok probe agent provider:zai model:glm-4.5-flash timeout:20000
 /byok auto recoveries 10
@@ -362,16 +368,17 @@ npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_a
 
 Validado nesta linha:
 
-- `npm run model-gateway:commands:json`: 137 comandos.
+- `npm run model-gateway:commands:json`: 141 comandos.
 - `npm run model-gateway:auto:recoveries`: PASS, read-only, rows=7, recovery fixture `rate-limit` aplicada.
-- `npm run model-gateway:auto:doctor`: PASS operacional de leitura, schema=10, commands=137, recoveries=7, liveRuns=10; gate auto pode ficar bloqueado quando nao houver alternativa runtime-proved utilizavel.
+- `npm run model-gateway:auto:doctor`: PASS operacional de leitura, schema=10, commands=141, recoveries=7, liveRuns=10; gate auto pode ficar bloqueado quando nao houver alternativa runtime-proved utilizavel.
 - `npm run model-gateway:auto:proof-plan`: PASS, read-only, gerou comandos explicitos `/byok probe ... provider:<id> model:<id>`.
-- `npm run model-gateway:auto:scenarios`: comandos PASS, 11 cenarios; gate global pode ficar `ok=false` enquanto `auto_ready_gate` tiver blocker por falta de rota utilizavel.
+- `npm run model-gateway:auto:standby`: PASS, read-only, lista rotas de prontidao e comandos de substituicao sem chamar provider.
+- `npm run model-gateway:auto:scenarios`: PASS, 12 cenarios, `auto_standby` ok, sem provider call.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`: 215 PASS.
-- `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js`: 100 PASS.
-- `npm run model-gateway:live:auto-probe`: PASS.
-- Artefato live: `artifacts/terminal-live/2026-06-01T23-49-06-502Z/summary.md`.
-- `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-01T23-49-06-512Z:auto_probe`, `criteriaTotal=29`, `criteriaFailed=0`.
+- `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js`: 101 PASS.
+- `npm run model-gateway:live:auto-probe`: PASS, incluindo `/byok auto standby`.
+- Artefato live: `artifacts/terminal-live/2026-06-02T00-13-15-205Z/summary.md`.
+- `npm run model-gateway:live:runs`: ultimo run `terminal-live:2026-06-02T00-13-15-212Z:auto_probe`, `criteriaTotal=30`, `criteriaFailed=0`.
 - `/byok auto status` e `/byok auto doctor` agora mostram resumo de alternativas: usable/evaluated, quantidade de providers e principais blockers.
 - `/byok auto status` e `/byok auto doctor` agora sugerem comandos `provar:` para promover candidatos bloqueados por agent probe ausente/nao verificado.
 - `/byok auto recovery-fixture ... provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery, runtime health e espelho SQLite sem chamada ao provider.
