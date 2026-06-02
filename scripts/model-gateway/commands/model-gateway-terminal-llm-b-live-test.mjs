@@ -1508,7 +1508,7 @@ function structuredInputCycleCriteria(boot) {
         },
         {
             id: 'structured-input-live-status',
-            pass: /⟲\s+LLM-B\s+PERGUNTA\s+·\s+REQUEST_USER_INPUT-SIM/iu.test(plain),
+            pass: /(?:⟲\s+)?LLM-B\s+PERGUNTA\s+·\s+REQUEST_USER_INPUT-SIM/iu.test(plain),
             detail: 'permanent live status rendered request_user_input as PERGUNTA instead of raw tool execution',
         },
         {

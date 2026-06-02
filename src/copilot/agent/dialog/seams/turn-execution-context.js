@@ -12,14 +12,32 @@ import {
     EMITTER_ASSISTANT_STREAMING_DELTA,
     EMITTER_ASSISTANT_TURN_END,
     EMITTER_DIALOG_DELTA,
+    EMITTER_ELICITATION_COMPLETED,
+    EMITTER_ELICITATION_PENDING,
+    EMITTER_PERMISSION_COMPLETED,
+    EMITTER_PERMISSION_REQUESTED,
     EMITTER_TASK_DELTA,
     EMITTER_TASK_REASONING,
     EMITTER_TOOL_EXECUTION_PROGRESS,
+    EMITTER_USER_INPUT_COMPLETED,
+    EMITTER_USER_INPUT_REQUESTED,
 } from '#copilot/events';
 import { log } from '../../ports/index.js';
 
 // Limite de fallback: máximo de caracteres aceitos do delta agregado para reply fallback.
 const MAX_DELTA_FALLBACK_CHARS = 50_000;
+
+const HUMAN_WAIT_START_EVENTS = Object.freeze([
+    { event: EMITTER_USER_INPUT_REQUESTED, bucket: 'user_input' },
+    { event: EMITTER_ELICITATION_PENDING, bucket: 'elicitation' },
+    { event: EMITTER_PERMISSION_REQUESTED, bucket: 'permission' },
+]);
+
+const HUMAN_WAIT_END_EVENTS = Object.freeze([
+    { event: EMITTER_USER_INPUT_COMPLETED, bucket: 'user_input' },
+    { event: EMITTER_ELICITATION_COMPLETED, bucket: 'elicitation' },
+    { event: EMITTER_PERMISSION_COMPLETED, bucket: 'permission' },
+]);
 
 /**
  * Cria um listener que aceita `unknown` e faz cast para o tipo esperado.
@@ -70,6 +88,8 @@ export function createInactivityTimeout(emitter, opts) {
     /** @type {ReturnType<typeof setTimeout> | null} */
     let handle = null;
     let disposed = false;
+    /** @type {Set<string>} */
+    const activeHumanWaits = new Set();
     /**
      * @type {{
      *     source: { off?: (event: string, listener: (...args: any[]) => void) => void };
@@ -89,6 +109,7 @@ export function createInactivityTimeout(emitter, opts) {
     const arm = () => {
         if (opts.timeout === null) return;
         if (disposed) return;
+        if (activeHumanWaits.size > 0) return;
         if (handle) clearTimeout(handle);
         handle = setTimeout(() => {
             if (disposed) return;
@@ -101,6 +122,54 @@ export function createInactivityTimeout(emitter, opts) {
 
     const onProgress = () => {
         if (disposed) return;
+        arm();
+    };
+
+    /**
+     * @param {string} bucket
+     * @param {unknown} evt
+     * @returns {string}
+     */
+    const humanWaitKey = (bucket, evt) => {
+        const record = evt && typeof evt === 'object' ? /** @type {Record<string, unknown>} */ (evt) : {};
+        const requestId =
+            typeof record['requestId'] === 'string'
+                ? record['requestId']
+                : typeof record['id'] === 'string'
+                  ? record['id']
+                  : null;
+        return requestId ? `${bucket}:${requestId}` : bucket;
+    };
+
+    /**
+     * @param {string} bucket
+     * @param {unknown} evt
+     * @returns {void}
+     */
+    const onHumanWaitStart = (bucket, evt) => {
+        if (disposed) return;
+        activeHumanWaits.add(humanWaitKey(bucket, evt));
+        if (handle) clearTimeout(handle);
+        handle = null;
+    };
+
+    /**
+     * @param {string} bucket
+     * @param {unknown} evt
+     * @returns {void}
+     */
+    const onHumanWaitEnd = (bucket, evt) => {
+        if (disposed) return;
+        const key = humanWaitKey(bucket, evt);
+        if (activeHumanWaits.has(key)) {
+            activeHumanWaits.delete(key);
+        } else {
+            for (const activeKey of [...activeHumanWaits]) {
+                if (activeKey === bucket || activeKey.startsWith(`${bucket}:`)) {
+                    activeHumanWaits.delete(activeKey);
+                }
+            }
+        }
         arm();
     };
 
@@ -121,6 +190,28 @@ export function createInactivityTimeout(emitter, opts) {
             }
             listeners.push({ source, event, listener: onProgress });
             source.on(event, onProgress);
+        }
+    }
+
+    for (const { event, bucket } of HUMAN_WAIT_START_EVENTS) {
+        for (const source of sources) {
+            if (typeof source?.on !== 'function' || typeof source?.off !== 'function') {
+                continue;
+            }
+            const listener = (/** @type {unknown} */ evt) => onHumanWaitStart(bucket, evt);
+            listeners.push({ source, event, listener });
+            source.on(event, listener);
+        }
+    }
+
+    for (const { event, bucket } of HUMAN_WAIT_END_EVENTS) {
+        for (const source of sources) {
+            if (typeof source?.on !== 'function' || typeof source?.off !== 'function') {
+                continue;
+            }
+            const listener = (/** @type {unknown} */ evt) => onHumanWaitEnd(bucket, evt);
+            listeners.push({ source, event, listener });
+            source.on(event, listener);
         }
     }
 

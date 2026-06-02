@@ -71,7 +71,7 @@ import {
     terminalPermissionModeSkipsSdkPrompts,
     formatTerminalIsoTimestamp,
 } from '../state/sdk/index.js';
-import { terminalThemeText } from '../state/ui/index.js';
+import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -1308,7 +1308,8 @@ async function renderSdkTools({ println }, model, runtimeId) {
     const tools = arrayFromSdkList(result);
     const registrySnapshot = readTerminalToolRegistrySnapshot();
     const contract = registrySnapshot.toolContract;
-    println(`\n  \x1b[36mTools SDK (built-in)${model ? ` para ${model}` : ''} (${tools.length})\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'Ferramentas SDK', [model ? `modelo ${model}` : null, `${tools.length} tool(s) nativa(s)`]));
     for (const tool of tools.slice(0, 50)) {
         const t = objectOrNull(tool) ?? {};
         const rawName = String(t['name'] ?? tool);
@@ -1323,25 +1324,33 @@ async function renderSdkTools({ println }, model, runtimeId) {
             .filter(Boolean)
             .join(' · ');
         println(
-            `  \x1b[33m${name}\x1b[0m${badges ? `  \x1b[90m[${badges}]\x1b[0m` : ''}${desc ? `  \x1b[90m${desc}\x1b[0m` : ''}`,
+            `  ${terminalThemeText('command', name)}${badges ? `  ${terminalThemeText('muted', `[${badges.replace('instructions', 'instruções')}]`)}` : ''}${desc ? `  ${terminalThemeText('muted', desc)}` : ''}`,
         );
         if (namespacedName && rawName && namespacedName !== rawName) {
-            println(`    \x1b[90mnome bruto ${rawName}\x1b[0m`);
+            println(terminalThemeRow('nome bruto', rawName, { role: 'muted' }));
         }
         if (hasInstructions) {
             const instructions = String(t['instructions']).replace(/\s+/g, ' ').slice(0, 140);
-            println(`    \x1b[90minstructions: ${instructions}\x1b[0m`);
+            println(terminalThemeRow('instruções', instructions, { role: 'muted' }));
         }
     }
-    if (tools.length > 50) println(`  \x1b[90m... ${tools.length - 50} tools omitidas\x1b[0m`);
-    println(
-        `\n  \x1b[36mRegistry local canonico\x1b[0m\n  total \x1b[33m${registrySnapshot.total}\x1b[0m  fs canônico \x1b[33m${String(registrySnapshot.hasCanonicalLocalFsTools)}\x1b[0m  exec canônico \x1b[33m${String(registrySnapshot.hasCanonicalLocalExecTools)}\x1b[0m  shell legado carregado \x1b[33m${String(registrySnapshot.hasLegacySdkShellToolsLoaded)}\x1b[0m  desativadas \x1b[33m${registrySnapshot.disabled.length}\x1b[0m`,
-    );
+    if (tools.length > 50) println(terminalThemeText('muted', `  ... ${tools.length - 50} tools omitidas`));
+    println('');
+    println(terminalThemeHeadline('tool', 'Registry local canônico'));
+    println(terminalThemeRow('Total', String(registrySnapshot.total), { role: 'info' }));
+    println(terminalThemeRow('Arquivos', activeLabel(registrySnapshot.hasCanonicalLocalFsTools), { role: registrySnapshot.hasCanonicalLocalFsTools ? 'success' : 'warn' }));
+    println(terminalThemeRow('Terminal', activeLabel(registrySnapshot.hasCanonicalLocalExecTools), { role: registrySnapshot.hasCanonicalLocalExecTools ? 'success' : 'warn' }));
+    println(terminalThemeRow('Shell legado', registrySnapshot.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado', { role: registrySnapshot.hasLegacySdkShellToolsLoaded ? 'warn' : 'muted' }));
+    println(terminalThemeRow('Desativadas', String(registrySnapshot.disabled.length), { role: registrySnapshot.disabled.length > 0 ? 'warn' : 'muted' }));
     if (registrySnapshot.disabled.length > 0) {
-        println(`  \x1b[90mdesativadas: ${registrySnapshot.disabled.join(', ')}\x1b[0m`);
+        println(terminalThemeRow('Lista', registrySnapshot.disabled.join(', '), { role: 'muted' }));
     }
     println(
-        `  \x1b[90mcontrato: ${contract.ok ? 'ok' : 'atenção'} · falhas ${contract.errorCount} · avisos ${contract.warningCount} · descrições ${contract.metadataCoverage.descriptionPct}% · schema ${contract.metadataCoverage.parametersPct}% · categoria ${contract.metadataCoverage.categoryPct}% · tags ${contract.metadataCoverage.tagsPct}% · instruções ${contract.metadataCoverage.instructionsPct}%\x1b[0m`,
+        terminalThemeRow(
+            'Contrato',
+            `${contract.ok ? 'ok' : 'atenção'} · falhas ${contract.errorCount} · avisos ${contract.warningCount} · descrições ${contract.metadataCoverage.descriptionPct}% · schema ${contract.metadataCoverage.parametersPct}% · categoria ${contract.metadataCoverage.categoryPct}% · tags ${contract.metadataCoverage.tagsPct}% · instruções ${contract.metadataCoverage.instructionsPct}%`,
+            { role: contract.ok ? 'success' : 'warn' },
+        ),
     );
     println('');
 }

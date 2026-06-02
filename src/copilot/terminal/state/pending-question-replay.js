@@ -16,7 +16,7 @@ import { DialogProtocol } from '../../dialog/protocol.js';
  * }} TerminalPendingQuestionRenderDecision
  */
 
-const DEFAULT_DEDUPE_TTL_MS = 2_000;
+const DEFAULT_DEDUPE_TTL_MS = 30 * 60_000;
 
 /**
  * @param {string} question

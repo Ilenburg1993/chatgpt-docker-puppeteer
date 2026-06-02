@@ -1146,7 +1146,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         if (shouldPrintSessionNarration('verbose')) {
             const sdkLabel = sdkCount === null ? 'contagem SDK n/d' : `${sdkCount} SDK`;
             const localLabel = localCount > 0 ? `ferramentas locais ativas: ${localCount} (/tools)` : 'sem ferramentas locais ativas';
-            println(terminalThemeRow('Tools SDK', `Ferramentas dinâmicas do SDK atualizadas: ${sdkLabel} · ${localLabel}`, {
+            println(terminalThemeRow('Ferramentas SDK', `Ferramentas dinâmicas do SDK atualizadas: ${sdkLabel} · ${localLabel}`, {
                 role: 'muted',
             }));
         }

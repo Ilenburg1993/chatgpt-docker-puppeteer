@@ -1687,9 +1687,16 @@
 - [x] Renderizar `request_user_input` como `[ASK]`, nao `[RUN]`.
 - [x] Renderizar `ask_user` e `request_user_input` sob a mesma semantica visual.
 - [x] Suprimir heartbeat duravel de pergunta humana pendente.
-- [ ] Manter pergunta humana em card duravel unico.
+- [x] Manter pergunta humana em card duravel unico.
+  - O dedupe local de perguntas pendentes passou de janela curta de 2s para janela durável de sessão de 30min, evitando reimpressões espaçadas enquanto a linha viva/prompt continuam indicando pendência.
+  - Teste: `npx vitest run tests/unit/copilot/terminal/test_pending_question_replay.spec.js`.
+  - Live PTY: `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=60000 --transport=pty --out-dir=artifacts/terminal-live/structured-input-durable-card-pass-20260602-1820`.
+  - Resultado: PASS; prompt `[PERG]`, linha viva `LLM-B PERGUNTA`, `/sdk waits` humano, resposta roteada e pendência limpa sem spam durável.
 - [x] Garantir que resposta humana nao fique colada na linha viva.
-- [ ] Tratar timeout durante espera humana como `aguardando operador`, nao erro de modelo.
+- [x] Tratar timeout durante espera humana como `aguardando operador`, nao erro de modelo.
+  - Decisão: eventos SDK de espera humana (`user_input.requested`, `elicitation.pending`, `permission.requested`) pausam o timeout de inatividade do turno; os respectivos `completed` retomam o relógio.
+  - Isso preserva timeout real para silêncio do modelo depois que a resposta humana é entregue, mas impede que ausência do operador seja classificada como falha do provider/modelo.
+  - Teste: `npx vitest run tests/unit/copilot/test_turn_executor.spec.js`.
 - [x] Adicionar teste unitario de `request_user_input` sem `[TOOL] [RUN]`.
 - [x] Revalidar live scenario freeform de `ask_user` apos polimento visual.
 - [x] Adicionar live scenario especifico para `request_user_input` local sintetico, alem de `ask_user` SDK.
