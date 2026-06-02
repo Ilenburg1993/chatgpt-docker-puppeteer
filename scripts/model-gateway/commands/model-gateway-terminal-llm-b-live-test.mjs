@@ -62,7 +62,7 @@ Common options:
   --byok-real-route-timeout-ms=<ms>
   --byok-real-require-vision-probe
   --auto-probe
-  --live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error>
+  --live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error|file-write-roundtrip>
   --reuse-sdk-session
   --timeout-ms=<ms>
   --transport=<pty|stdio>
@@ -261,6 +261,30 @@ const LIVE_SCENARIOS = Object.freeze({
         expectedLifecycleTools: [{ name: 'exec_command', renderedName: 'exec_command', expectedOutcome: 'failure' }],
         expectedOutputMarkers: ['RECOVERABLE-TOOL-ERROR'],
         recoverableToolErrorExpected: true,
+    }),
+    'file-write-roundtrip': createLiveScenario({
+        id: 'file-write-roundtrip',
+        description: 'create_file, move_file e delete_file reais sem prompt de permissao SDK',
+        askQuestion: 'ASK-FILEWRITE: responda SIM depois do roundtrip de arquivo',
+        finalMarker: 'POST-ASK-FILEWRITE-FINAL: arquivo criado, movido, deletado e usuário confirmou SIM',
+        answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
+        beforeDeltaInstructions: [
+            'Depois do read_file_content, invoque create_file com path exatamente "data/copilot-terminal/live-scratch/TERMINAL-PERMISSION-ROUNDTRIP-source.txt", content exatamente "TERMINAL-PERMISSION-ROUNDTRIP\\n", createParentDirs=true e overwrite=true.',
+            'Em seguida invoque move_file com source exatamente "data/copilot-terminal/live-scratch/TERMINAL-PERMISSION-ROUNDTRIP-source.txt", destination exatamente "data/copilot-terminal/live-scratch/TERMINAL-PERMISSION-ROUNDTRIP-moved.txt" e overwrite=true.',
+            'Em seguida invoque delete_file com path exatamente "data/copilot-terminal/live-scratch/TERMINAL-PERMISSION-ROUNDTRIP-moved.txt".',
+            'Aguarde create_file, move_file e delete_file concluírem e só então escreva as oito linhas DELTA-CANONICAL.',
+        ],
+        askToolInstruction:
+            'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-FILEWRITE: responda SIM depois do roundtrip de arquivo". Use a opção SIM se o schema da tool expuser choices.',
+        finalInstruction:
+            'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-FILEWRITE-FINAL: arquivo criado, movido, deletado e usuário confirmou SIM".',
+        allowedTools: ['report_intent', 'read_file_content', 'create_file', 'move_file', 'delete_file', 'ask_user'],
+        expectedLifecycleTools: [
+            { name: 'create_file', renderedName: 'create_file' },
+            { name: 'move_file', renderedName: 'move_file' },
+            { name: 'delete_file', renderedName: 'delete_file' },
+        ],
+        expectedOutputMarkers: ['TERMINAL-PERMISSION-ROUNDTRIP'],
     }),
 });
 

@@ -50,4 +50,22 @@ describe('tools bootstrap file capabilities', () => {
         ]);
         expect(applySessionToolPermissionPolicy(tools, 'selective')).toBe(tools);
     });
+
+    it('entrega create/move/delete de arquivos ao SDK sem prompt no default approve_all', () => {
+        const previous = process.env['AGENT_PERMISSION_MODE'];
+        delete process.env['AGENT_PERMISSION_MODE'];
+        try {
+            const tools = bootstrapTools(createRegistry(), []);
+            const byName = new Map(tools.map((tool) => [tool.name, tool]));
+            for (const name of ['create_file', 'move_file', 'delete_file']) {
+                expect(byName.get(name)?.skipPermission, `${name} deve evitar prompt SDK no default`).toBe(true);
+            }
+        } finally {
+            if (previous === undefined) {
+                delete process.env['AGENT_PERMISSION_MODE'];
+            } else {
+                process.env['AGENT_PERMISSION_MODE'] = previous;
+            }
+        }
+    });
 });

@@ -133,12 +133,13 @@
 
 ## 02.04 Runner de cenarios alternativos
 
-- O runner `scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs` agora aceita `--live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error>`.
+- O runner `scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs` agora aceita `--live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error|file-write-roundtrip>`.
 - `canonical` preserva o baseline anterior: pergunta `ASK-CANONICAL`, resposta `SIM`, final `POST-ASK-CANONICAL-FINAL`.
 - `freeform` gera prompt de `ask_user` sem choices obrigatorias e valida resposta humana livre no SSE/export.
 - `invalid-choice` gera prompt choice-only, envia primeiro `TALVEZ`, exige feedback local de escolha invalida e envia `SIM` em seguida.
 - `long-tool-heartbeat` exige `exec_command` controlado com marker `LONG-TOOL-HEARTBEAT-DONE`, lifecycle real e progresso antes de `ask_user`.
 - `recoverable-tool-error` exige falha controlada de `exec_command`, detectada em `postToolUse` por JSON `success:false`/`exitCode=7`, seguida de recuperacao por `read_file_content`, `ask_user` e final.
+- `file-write-roundtrip` exige `create_file`, `move_file` e `delete_file` reais em scratch controlado, com marker `TERMINAL-PERMISSION-ROUNDTRIP`, lifecycle estruturado e ausencia de prompt de permissao.
 - O tipo persistido em SQLite continua `canonical_full_turn` para o baseline e usa `canonical_full_turn_<cenario>` para variantes.
 - Validacao seca executada:
   - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`
@@ -147,6 +148,7 @@
   - `node scripts/model-gateway/run.mjs llmBLiveTest --dry-run --live-scenario=invalid-choice --out-dir=artifacts/terminal-live-dry/invalid-choice`
   - `node scripts/model-gateway/run.mjs llmBLiveTest --dry-run --live-scenario=long-tool-heartbeat --out-dir=artifacts/terminal-live-dry/long-tool-heartbeat`
   - `node scripts/model-gateway/run.mjs llmBLiveTest --dry-run --live-scenario=recoverable-tool-error --out-dir=artifacts/terminal-live-dry/recoverable-tool-error`
+  - `node scripts/model-gateway/run.mjs llmBLiveTest --dry-run --live-scenario=file-write-roundtrip --out-dir=artifacts/terminal-live-dry/file-write-roundtrip`
   - `npx vitest run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
 - Observacao:
   - estes dry-runs validam prompt, contrato e parsing do runner;
@@ -220,6 +222,17 @@
   - Validou `no-sdk-permission-prompt-in-approve-all`: nenhuma ocorrencia de `permission.requested` ou janela equivalente.
   - SQLite: `terminal-live:2026-06-02T07-47-31-174Z:canonical_full_turn_long-tool-heartbeat`.
   - artefato: `data/copilot-terminal/live-runs/terminal-ux-long-tool-no-permission-sdk-20260602-0450/summary.md`.
+- Prova SDK/Copilot de escrita/movimentacao/delecao:
+  - comando: `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --transport=pty --live-scenario=file-write-roundtrip --out-dir=data/copilot-terminal/live-runs/terminal-ux-file-write-no-permission-sdk-20260602-0454`
+  - status: PASS.
+  - SSE: 365 eventos, 361 com id/source, 261 com traceId, zero erros.
+  - Validou `create_file`, `move_file` e `delete_file` reais com lifecycle `start`, `external_completed` e `postToolUse` success.
+  - Validou marker `TERMINAL-PERMISSION-ROUNDTRIP` dentro do resultado real de tool.
+  - Validou `no-sdk-permission-prompt-in-approve-all`: nenhuma ocorrencia de `permission.requested`, `Permissao solicitada` ou texto equivalente.
+  - Validou `/tools diag`: `create_file calls=1 blocked=0 errors=0`, `move_file calls=1 blocked=0 errors=0`, `delete_file calls=1 blocked=0 errors=0`.
+  - Validou scratch limpo apos o roundtrip: nenhum `TERMINAL-PERMISSION-ROUNDTRIP-*` residual em `data/copilot-terminal/live-scratch`.
+  - SQLite: `terminal-live:2026-06-02T07-54-18-007Z:canonical_full_turn_file-write-roundtrip`.
+  - artefato: `data/copilot-terminal/live-runs/terminal-ux-file-write-no-permission-sdk-20260602-0454/summary.md`.
 
 ## 03. Achados principais
 
@@ -519,6 +532,7 @@
 - [x] Atualizar runner para nao classificar nao conformidade DELTA como bloqueio de infraestrutura.
 - [x] Atualizar runner para detectar linha viva no TTY quando habilitada.
 - [x] Parametrizar runner para cenarios `canonical`, `freeform`, `invalid-choice`, `long-tool-heartbeat` e `recoverable-tool-error`.
+- [x] Parametrizar runner para cenario `file-write-roundtrip` cobrindo create/move/delete.
 - [x] Adicionar dry-run/teste de contrato para prompts dos cenarios alternativos.
 - [x] Rodar live test com caso canonico atual.
 - [x] Rodar live test com resposta freeform.
@@ -527,6 +541,7 @@
 - [x] Rodar live test com erro de tool recuperavel.
 - [x] Adicionar criterio hard para ausencia de prompt de permissao em cenarios permissionados.
 - [x] Rodar live SDK/Copilot com `COPILOT_BYOK_ENABLED=false` para isolar permissao de instabilidade BYOK.
+- [x] Rodar live SDK/Copilot com `file-write-roundtrip` para provar create/move/delete sem prompt.
 
 ### Faixa K - Validadores
 

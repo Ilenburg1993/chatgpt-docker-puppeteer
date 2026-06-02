@@ -4554,6 +4554,12 @@ describe('model-gateway foundation', () => {
                     final: 'POST-ASK-RECOVERABLE-FINAL: erro de tool foi recuperado e usuário confirmou SIM',
                     extra: 'RECOVERABLE-TOOL-ERROR',
                 },
+                {
+                    id: 'file-write-roundtrip',
+                    ask: 'ASK-FILEWRITE: responda SIM depois do roundtrip de arquivo',
+                    final: 'POST-ASK-FILEWRITE-FINAL: arquivo criado, movido, deletado e usuário confirmou SIM',
+                    extra: 'TERMINAL-PERMISSION-ROUNDTRIP',
+                },
             ];
 
             for (const scenario of scenarios) {
