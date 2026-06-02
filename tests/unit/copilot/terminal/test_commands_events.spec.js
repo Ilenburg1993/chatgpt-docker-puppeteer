@@ -225,6 +225,48 @@ describe('terminal/commands/events', () => {
         );
     });
 
+    it('normaliza quebras internas no resumo humano sem afetar raw/json', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 1,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 20,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 301,
+                    event: 'assistant.message',
+                    source: 'sdk/assistant.message',
+                    eventSource: null,
+                    traceId: 'turn:1',
+                    turnId: '1',
+                    hubSessionId: null,
+                    payload: {
+                        content: 'linha 1\nlinha 2\r\nlinha 3',
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '20');
+
+        expect(ctx.output()).toContain('linha 1 linha 2 linha 3');
+        expect(ctx.output()).not.toContain('linha 1\nlinha 2');
+    });
+
     it('emite JSON estruturado para automacao', async () => {
         const ctx = mockCtx();
 

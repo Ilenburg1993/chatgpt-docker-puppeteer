@@ -462,10 +462,11 @@ export function buildWaitingPrompt() {
     }
     if (runtime.pendingQuestionShadowState === 'expired') tags.push('SHDW:EXP');
     const tagsStr = tags.length > 0 ? ` ${terminalThemeText('muted', `[${tags.join('|')}]`)}` : '';
+    const modelEffort = `${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}`;
     if (!promptPolicy.showWaitingActivity || compactDetail) {
-        return `${terminalThemeText('muted', '⏳')}${tagsStr} ${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')} `;
+        return `${terminalThemeText('thinking', 'LLM-B pensando')}${tagsStr} ${modelEffort} `;
     }
-    return `${terminalThemeText(sevRole, `⏳[${phase}:${label}]`)}${tagsStr} ${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')} `;
+    return `${terminalThemeText(sevRole, `LLM-B pensando · ${phase}:${label}`)}${tagsStr} ${modelEffort} `;
 }
 
 /** Separador visual entre turnos — 72 colunas. */

@@ -11,6 +11,7 @@
  */
 
 import { getShowUsage, setShowUsage } from '../../presentation/state/index.js';
+import { compactTerminalDiagnosticId } from '../events/tool-activity-presenter.js';
 import { readTerminalConfigProjection, readTerminalUsageNowProjection } from '../frontend/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
@@ -33,9 +34,12 @@ import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js
  */
 export function cmdUsage({ println }, arg) {
     const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
-    const trimmed = cleanArg.trim().toLowerCase();
+    const tokens = cleanArg.trim().toLowerCase().split(/\s+/u).filter(Boolean);
+    const trimmed = tokens.join(' ');
+    const showNow = tokens.includes('now');
+    const detail = tokens.includes('detail') || tokens.includes('--detail') || tokens.includes('debug') || tokens.includes('--debug');
 
-    if (trimmed === 'now') {
+    if (showNow) {
         const projection = callWithRuntimeTarget(readTerminalUsageNowProjection, runtimeId);
         const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
         const ctx = projection.contextWindow;
@@ -97,8 +101,11 @@ export function cmdUsage({ println }, arg) {
             }
         }
         if (projection.runtimeSessionId || projection.binding.sdkSessionId || projection.binding.hubSessionId) {
+            const runtimeLabel = renderUsageBindingId(projection.runtimeSessionId, detail);
+            const sdkLabel = renderUsageBindingId(projection.binding.sdkSessionId, detail);
+            const hubLabel = renderUsageBindingId(projection.binding.hubSessionId, detail);
             println(
-                `      Binding: runtime=\x1b[90m${projection.runtimeSessionId ?? '-'}\x1b[0m · sdk=\x1b[90m${projection.binding.sdkSessionId ?? '-'}\x1b[0m · hub=\x1b[90m${projection.binding.hubSessionId ?? '-'}\x1b[0m`,
+                `      Binding: runtime=\x1b[90m${runtimeLabel}\x1b[0m · sdk=\x1b[90m${sdkLabel}\x1b[0m · hub=\x1b[90m${hubLabel}\x1b[0m${detail ? '' : ' \x1b[90m(/usage now detail para IDs completos)\x1b[0m'}`,
             );
         }
         println(
@@ -120,7 +127,17 @@ export function cmdUsage({ println }, arg) {
     setShowUsage(next);
     const status = next ? '\x1b[32mon\x1b[0m' : '\x1b[31moff\x1b[0m';
     println(`\n  📊  Exibição de telemetria pós-turno: ${status}`);
-    println('  \x1b[90mUso: /usage [on|off|now]\x1b[0m\n');
+    println('  \x1b[90mUso: /usage [on|off|now] [detail]\x1b[0m\n');
+}
+
+/**
+ * @param {string | null} value
+ * @param {boolean} detail
+ * @returns {string}
+ */
+function renderUsageBindingId(value, detail) {
+    if (!value) return '-';
+    return detail ? value : (compactTerminalDiagnosticId(value, 14) ?? value);
 }
 
 /**

@@ -20,7 +20,11 @@
 
 import { readTerminalConfigProjection, readTerminalDiagnoseProjection } from '../frontend/index.js';
 import { terminalPermissionModeSkipsSdkPrompts } from '../state/index.js';
-import { compactTerminalToolText, getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
+import {
+    compactTerminalDiagnosticId,
+    compactTerminalToolText,
+    getTerminalHumanToolName,
+} from '../events/tool-activity-presenter.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -62,7 +66,8 @@ const DISABLED_BYOK_SUMMARY = Object.freeze({
  * @returns {Promise<void>}
  */
 export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
-    const { runtimeId } = extractRuntimeTarget(arg);
+    const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
+    const detail = /\b(?:detail|debug|--detail|--debug)\b/iu.test(cleanArg);
     const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
     const {
         snap,
@@ -207,6 +212,9 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
             : sdkFsRouting.mode === 'sdk-workspace-only'
               ? C.yellow
               : C.red;
+    const runtimeSessionLabel = renderDiagnoseSessionId(runtimeSessionId, detail, '(sem runtime)');
+    const sdkSessionLabel = renderDiagnoseSessionId(binding.sdkSessionId, detail, '(sem sdk)');
+    const hubSessionLabel = renderDiagnoseSessionId(hub.activeHubSessionId, detail, '(sem hub)');
 
     println(`
 ${C.bold}${C.cyan}╔══════════════════════════════════════════════════════════════╗${C.reset}
@@ -225,9 +233,9 @@ ${C.cyan}  AGENTE${C.reset}
     plan arquivo  ${planOpLine}
     runtime id    ${C.grey}${configProjection.runtimeId}${C.reset}
     runtimes      ${C.grey}${runtimesLine}${C.reset}
-    runtime       ${runtimeSessionId ? `${C.grey}${runtimeSessionId}${C.reset}` : `${C.grey}(sem runtime)${C.reset}`}
-    sdk session   ${binding.sdkSessionId ? `${C.grey}${binding.sdkSessionId}${C.reset}` : `${C.grey}(sem sdk)${C.reset}`}
-    hub session   ${hub.activeHubSessionId ? `${C.grey}${hub.activeHubSessionId}${C.reset}` : `${C.grey}(sem hub)${C.reset}`}
+    runtime       ${C.grey}${runtimeSessionLabel}${C.reset}
+    sdk session   ${C.grey}${sdkSessionLabel}${C.reset}
+    hub session   ${C.grey}${hubSessionLabel}${C.reset}
     bg tasks      ${C.grey}${health?.['backgroundPendingCount'] ?? 0}${C.reset}
     keepalive     ${keepaliveLine}
     quota monitor ${health?.['checks']?.['quota']?.['running'] ? `${C.green}running${C.reset}` : `${C.yellow}stopped${C.reset}`}
@@ -265,4 +273,15 @@ ${C.bold}${C.cyan}╚═══════════════════�
             `${C.yellow}  Nota: ${configProjection.runtimeFallbackWarning} Diagnóstico exibido para o runtime default (${configProjection.runtimeId}).${C.reset}`,
         );
     }
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @param {boolean} detail
+ * @param {string} emptyLabel
+ * @returns {string}
+ */
+function renderDiagnoseSessionId(value, detail, emptyLabel) {
+    if (!value) return emptyLabel;
+    return detail ? value : (compactTerminalDiagnosticId(value, 14) ?? value);
 }

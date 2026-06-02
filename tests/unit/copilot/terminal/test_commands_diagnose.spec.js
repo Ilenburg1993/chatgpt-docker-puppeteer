@@ -208,7 +208,10 @@ vi.mock('#copilot/core', async () => {
     const actual = await vi.importActual('#copilot/core');
     return {
         ...actual,
-        getSharedSessionBinding: () => ({ hubSessionId: 'hub-1', sdkSessionId: 'sdk-1' }),
+        getSharedSessionBinding: () => ({
+            hubSessionId: 'hub-diagnose-123456789012345',
+            sdkSessionId: 'sdk-diagnose-123456789012345',
+        }),
     };
 });
 
@@ -291,6 +294,10 @@ describe('commands/diagnose', () => {
             expect(ctx.output()).toContain('ask_user');
             expect(ctx.output()).toContain('shadow expirando');
             expect(ctx.output()).toContain('runtime id');
+            expect(ctx.output()).toContain('sdk-diagnose-1…');
+            expect(ctx.output()).toContain('hub-1');
+            expect(ctx.output()).not.toContain('sdk-diagnose-123456789012345');
+            expect(ctx.output()).not.toContain('hub-diagnose-123456789012345');
             expect(ctx.output()).toContain('*default:gpt-5/processing');
             expect(ctx.output()).toContain('gateway');
             expect(ctx.output()).toContain('providers=1 · models=3 · enabled=3');
@@ -325,6 +332,15 @@ describe('commands/diagnose', () => {
         expect(ctx.output()).toContain('runtime id');
         expect(ctx.output()).toContain('alt');
         expect(ctx.output()).toContain('gpt-4.1-mini');
+    });
+
+    it('mostra IDs completos quando detail é solicitado', async () => {
+        const ctx = mockCtx();
+
+        await cmdDiagnose({ hubSessionId: 'hub-detail-123456789012345', println: ctx.println }, 'detail');
+
+        expect(ctx.output()).toContain('sdk-diagnose-123456789012345');
+        expect(ctx.output()).toContain('hub-detail-123456789012345');
     });
 
     it('explica explicitamente quando o runtime solicitado não existe', async () => {

@@ -2688,6 +2688,11 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             detail: 'ask live status stayed compact and did not include the old verbose label',
         },
         {
+            id: 'ux-no-raw-hourglass-waiting-prompt',
+            pass: !/⏳\s+\[[^\]]+\]/u.test(plain),
+            detail: 'waiting prompt avoided the old raw hourglass model/effort tag',
+        },
+        {
             id: 'ux-health-human-tool-stats',
             pass: healthToolStatsUseHumanNames(plain),
             detail: healthToolStatsUseHumanNames(plain)

@@ -7,7 +7,7 @@ import {
 } from '../../../../src/copilot/presentation/state/index.js';
 
 const defaultRuntime = /** @type {any} */ ({
-    sessionId: 'runtime-456',
+    sessionId: 'runtime-4567890123456789012345',
     dialogLoopActive: true,
     dialogPrMetrics: null,
     lastPrInfo: { model: 'gpt-5-mini', cost: 0.0456 },
@@ -201,7 +201,10 @@ vi.mock('#copilot/conversation-hub', () => ({
 
 vi.mock('#copilot/core', async (importOriginal) => ({
     ...(await importOriginal()),
-    getSharedSessionBinding: () => ({ hubSessionId: 'hub-456', sdkSessionId: 'sdk-456' }),
+    getSharedSessionBinding: () => ({
+        hubSessionId: 'hub-4567890123456789012345',
+        sdkSessionId: 'sdk-4567890123456789012345',
+    }),
 }));
 
 vi.mock('#copilot/observability', () => ({
@@ -350,6 +353,9 @@ describe('commands/metrics + usage', () => {
 
         expect(ctx.output()).toContain('Context window');
         expect(ctx.output()).toContain('Binding: runtime=');
+        expect(ctx.output()).toContain('runtime-456789…');
+        expect(ctx.output()).not.toContain('runtime-4567890123456789012345');
+        expect(ctx.output()).toContain('/usage now detail');
         expect(ctx.output()).toContain('Modo: sdk=');
         expect(ctx.output()).toContain('gpt-5-mini');
         expect(ctx.output()).toMatch(/Última telemetria PR classificada|GitHub Copilot quota\/PR side-channel/);
@@ -364,6 +370,17 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('Binding: runtime=');
         expect(ctx.output()).toContain('Modo: sdk=');
         expect(ctx.output()).toContain('gpt-4.1-mini');
+    });
+
+    it('cmdUsage now detail preserva IDs completos', () => {
+        const ctx = mockCtx();
+
+        cmdUsage({ println: ctx.println }, 'now detail');
+
+        expect(ctx.output()).toContain('runtime-4567890123456789012345');
+        expect(ctx.output()).toContain('sdk-4567890123456789012345');
+        expect(ctx.output()).toContain('hub-4567890123456789012345');
+        expect(ctx.output()).not.toContain('/usage now detail para IDs completos');
     });
 
     it('cmdUsage now destaca continuação pós ask_user quando a telemetria LLM indica user_input', () => {

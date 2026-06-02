@@ -126,8 +126,17 @@ function buildPolicyQueryHints(policy) {
  * @returns {string}
  */
 function compact(value, max = 100) {
-    const text = typeof value === 'string' ? value : value == null ? '' : String(value);
+    const text = normalizeEventSummaryText(value);
     return text.length > max ? `${text.slice(0, Math.max(0, max - 3))}...` : text;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeEventSummaryText(value) {
+    const text = typeof value === 'string' ? value : value == null ? '' : String(value);
+    return text.replace(/\s+/gu, ' ').trim();
 }
 
 /**

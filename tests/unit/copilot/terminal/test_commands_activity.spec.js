@@ -169,8 +169,19 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('interações humanas');
         expect(ctx.output()).toContain('Qual ambiente devo usar?');
         expect(ctx.output()).toContain('I/O real recente');
+        expect(ctx.output()).toContain('IDs/trace completos ficam em /activity detail');
+        expect(ctx.output()).not.toContain('io-engine.fs.readFile.text');
+        expect(ctx.output()).not.toContain('turn:turn-1');
+    });
+
+    it('preserva ids e engine no modo detail', () => {
+        const ctx = mockCtx();
+
+        cmdActivity({ println: ctx.println }, '5 detail');
+
         expect(ctx.output()).toContain('io-engine.fs.readFile.text');
         expect(ctx.output()).toContain('turn:turn-1');
+        expect(ctx.output()).toContain('req=ui-1');
         expect(ctx.output()).toContain(
             '/workspaces/chatgpt-docker-puppeteer/src/copilot/terminal/commands/activity.js',
         );

@@ -224,10 +224,12 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         const { buildWaitingPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
         const prompt = buildWaitingPrompt();
 
+        expect(prompt).toContain('LLM-B pensando');
         expect(prompt).toContain('TURN');
         expect(prompt).toContain('Processando');
         expect(prompt).toContain('gpt-5-mini');
         expect(prompt).toContain('high');
+        expect(prompt).not.toContain('⏳');
     });
 
     it('reduz prompt de espera quando display está em densidade minimal', async () => {
@@ -239,10 +241,12 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         const { buildWaitingPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
         const prompt = buildWaitingPrompt();
 
+        expect(prompt).toContain('LLM-B pensando');
         expect(prompt).toContain('gpt-5-mini');
         expect(prompt).toContain('high');
         expect(prompt).not.toContain('TURN');
         expect(prompt).not.toContain('Processando');
+        expect(prompt).not.toContain('⏳');
     });
 
     it('compacta tags do prompt quando detalhe terminal está em modo compact', async () => {
@@ -284,10 +288,12 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         const { buildWaitingPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
         const prompt = buildWaitingPrompt();
 
+        expect(prompt).toContain('LLM-B pensando');
         expect(prompt).toContain('gpt-5-mini');
         expect(prompt).toContain('high');
         expect(prompt).not.toContain('TURN');
         expect(prompt).not.toContain('Processando');
+        expect(prompt).not.toContain('⏳');
 
         prefs.setTerminalDetailLevel('detailed');
     });

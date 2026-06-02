@@ -703,9 +703,95 @@
   - a linha viva de pergunta humana deixou de mostrar modelo/esforco e passou a priorizar pergunta, opcoes e loop;
   - a UX default do terminal agora possui uma camada operacional humana muito mais limpa, com IDs crus reservados a diagnostico.
 - Residual:
-  - `/events` default ainda pode quebrar conteudo de mensagem em multiplas linhas quando o evento contem newlines internos;
-  - `/activity` ainda merece revisao para separar melhor transcript humano e envelope diagnostico;
+  - `/events` default ainda podia quebrar conteudo de mensagem em multiplas linhas quando o evento contem newlines internos;
+  - `/activity` ainda merecia revisao para separar melhor transcript humano e envelope diagnostico;
   - o prompt `⏳ [auto/high]` ainda pode parecer um artefato tecnico em telas estreitas e deve ser avaliado na proxima rodada.
+
+## 02.25 Quinta rodada UX: diagnostico default sem dump tecnico
+
+- Problemas observados apos o pass7:
+  - `/events` default podia imprimir conteudo de `assistant.message` com quebras internas, destruindo o contrato visual de uma linha por evento;
+  - `/activity` ainda mostrava `traceId`, `requestId` e engine de I/O no modo default;
+  - isso confundia a superficie humana com a superficie de auditoria.
+- Ajustes:
+  - resumo textual de `/events` agora normaliza whitespace antes de compactar;
+  - `--raw` e `--json` continuam preservados para automacao e auditoria bruta;
+  - `/activity` ganhou parsing de `detail`/`--detail`/`debug`;
+  - modo default de `/activity` omite trace, requestId e engine de I/O;
+  - modo detail preserva trace compacto, requestId compacto e engine;
+  - caminhos e perguntas exibidos em `/activity` passam por compactacao humana de whitespace.
+- Testes:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js`
+  - Resultado: 2 arquivos, 12 testes, PASS.
+- Decisao:
+  - comandos operacionais default devem responder "o que aconteceu" antes de "qual foi o identificador interno";
+  - identificadores continuam disponiveis, mas sob pedido explicito de detalhe;
+  - essa regra passa a orientar `/activity`, `/events`, `/tools`, `/health`, `/usage` e proximos comandos de diagnostico.
+
+## 02.26 Sexta rodada UX: prompt de espera humano
+
+- Problema:
+  - o prompt de espera aparecia como `⏳ [auto/high]` ou `⏳[TURN:...] [modelo/esforco]`;
+  - esse formato parecia uma tag interna, nao uma superficie humana;
+  - em telas estreitas, ele ficava visualmente colado ao input e reforcava a sensacao de poluicao.
+- Ajuste:
+  - `buildWaitingPrompt()` agora usa `LLM-B pensando` como texto primario;
+  - modo normal preserva fase/label compactos quando a policy permite;
+  - modo minimal/compact mostra apenas `LLM-B pensando [modelo/esforco]`;
+  - tags de fila/ASK/shadow continuam disponiveis quando relevantes;
+  - runner live ganhou criterio `ux-no-raw-hourglass-waiting-prompt`.
+- Testes:
+  - `npx vitest run tests/unit/copilot/terminal/test_build_user_prompt.spec.js tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js`
+  - Resultado: 2 arquivos, 20 testes, PASS.
+- Decisao:
+  - o prompt pode ser tecnico o bastante para orientar modelo/esforco, mas sua primeira leitura deve ser humana;
+  - icones soltos e colchetes sem contexto nao devem ser a superficie default de espera.
+
+## 02.27 Evidencia live PTY do prompt humano e diagnosticos limpos
+
+- Comando executado:
+  - `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --transport=pty --live-scenario=canonical --out-dir=data/copilot-terminal/live-runs/terminal-ux-revolution-pass8-sdk-20260602-0701`
+- Artefatos:
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass8-sdk-20260602-0701/summary.md`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass8-sdk-20260602-0701/terminal.raw.log`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass8-sdk-20260602-0701/terminal.plain.log`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass8-sdk-20260602-0701/terminal.sse.jsonl`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass8-sdk-20260602-0701/conversation-export.md`
+- Resultado:
+  - status PASS;
+  - 270 eventos SSE;
+  - 0 erros;
+  - ask_user, resposta humana, final pos-ask, export e SSE continuaram verdes;
+  - criterio `ux-no-raw-hourglass-waiting-prompt` passou;
+  - criterios esteticos anteriores continuaram verdes.
+- Observacoes visuais confirmadas:
+  - prompt de espera apareceu como `LLM-B pensando [auto/high]`;
+  - `/activity` default mostrou `IDs/trace completos ficam em /activity detail`;
+  - `/activity` default ocultou trace e engine de I/O na secao de I/O recente;
+  - `/events` default manteve uma linha por evento e IDs compactos.
+- Residuos identificados pelo live:
+  - `/usage now` ainda mostrava runtime/sdk/hub completos no default;
+  - `/health` ainda mostrava runtime/sdk/hub completos no default;
+  - linhas duraveis `[IO]` e timeline historica ainda podem expor `io-engine.*` sem modo detail;
+  - `/tools diag` esta correto como diagnostico, mas nomes de I/O agregados ainda podem ser humanizados.
+
+## 02.28 Setima rodada UX: IDs compactos em usage/health default
+
+- Problema:
+  - `/usage now` e `/health` eram comandos usados em live e exibiam UUIDs completos no modo default;
+  - isso contrariava a regra ja aplicada a `/activity`, `/tools` e `/events`: default humano, detalhe sob pedido.
+- Ajustes:
+  - `/usage now` compacta runtime/sdk/hub por padrao;
+  - `/usage now detail` preserva IDs completos;
+  - `/health` compacta runtime/sdk/hub por padrao;
+  - `/health detail` preserva IDs completos;
+  - o texto de ajuda de `/usage` agora informa `[detail]`.
+- Testes:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js`
+  - Resultado: 2 arquivos, 12 testes, PASS.
+- Decisao:
+  - IDs de sessao pertencem ao nivel diagnostico;
+  - comandos default podem mostrar IDs compactos quando ajudam a correlacionar, mas nao devem despejar UUIDs inteiros.
 
 ## 03. Achados principais
 
@@ -1086,6 +1172,7 @@
 - [x] Compactar `waiting-human` em ate duas linhas fisicas no default.
 - [x] Compactar `thinking/sem delta` em uma linha sem repetir `LLM-B trabalhando`.
 - [x] Remover `turnId=` da linha viva default.
+- [x] Substituir prompt de espera `⏳ [modelo/esforco]` por texto humano.
 - [x] Evitar narracao duravel repetitiva `LLM-B ainda trabalhando` em modo normal.
 - [x] Manter watchdog visivel sem competir com `⟲ LLM-B`.
 - [x] Criar testes de formatacao com largura estreita.
@@ -1104,11 +1191,15 @@
 
 ### Faixa R - Comandos de diagnostico com dois niveis
 
-- [ ] Revisar `/activity` para modo default sem IDs longos.
+- [x] Revisar `/activity` para modo default sem IDs longos.
 - [x] Revisar `/tools diag` para IDs compactos e drill-down claro.
 - [x] Revisar `/events` para continuar bruto, mas com header explicito de debug.
 - [x] Revisar `/health` para reduzir ruido visual default.
-- [ ] Adicionar flags ou subcomandos `detail`, `raw` ou `debug` onde fizer sentido.
+- [x] Compactar runtime/sdk/hub em `/usage now` default.
+- [x] Compactar runtime/sdk/hub em `/health` default.
+- [x] Adicionar `detail`/`--detail` ao `/activity`.
+- [x] Adicionar `detail` ao `/usage now` e `/health`.
+- [ ] Adicionar flags ou subcomandos `detail`, `raw` ou `debug` nas demais superficies onde fizer sentido.
 - [x] Testar que dados tecnicos continuam acessiveis.
 
 ### Faixa S - Lives esteticos com LLM-B
@@ -1120,6 +1211,7 @@
 - [x] Atualizar runner para detectar segundo box standalone antigo.
 - [x] Atualizar runner para detectar ASK vivo verboso.
 - [x] Atualizar runner para detectar turno vivo com detalhe longo repetido.
+- [x] Atualizar runner para detectar prompt de espera bruto `⏳ [modelo/esforco]`.
 - [x] Rodar live SDK/Copilot apos Faixas M-P.
 - [ ] Rodar live BYOK quando a superficie estiver estabilizada.
 - [ ] Rodar live com `request_user_input` local real.
