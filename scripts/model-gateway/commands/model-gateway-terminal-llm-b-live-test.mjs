@@ -1472,8 +1472,8 @@ function structuredInputCycleCriteria(boot) {
         {
             id: 'structured-input-simulated',
             pass:
-                /Input humano estruturado/iu.test(plain) &&
-                /diagnóstico de input estruturado/iu.test(plain) &&
+                /Pergunta humana estruturada/iu.test(plain) &&
+                /diagnóstico de pergunta estruturada/iu.test(plain) &&
                 /REQUEST_USER_INPUT-SIM:\s+responda para fechar o teste/iu.test(plain),
             detail: '/sdk simulate request-user-input rendered a human-facing diagnostic request',
         },
@@ -1484,17 +1484,17 @@ function structuredInputCycleCriteria(boot) {
         },
         {
             id: 'structured-input-prompt-tag',
-            pass: /você\[[^\]\n]+\/[^\]\n]+\]\[INPUT\]›/iu.test(plain),
-            detail: 'REPL prompt marked the pending structured input as [INPUT]',
+            pass: /você\[[^\]\n]+\/[^\]\n]+\]\[PERG(?:UNTA)?\]›/iu.test(plain),
+            detail: 'REPL prompt marked the pending structured input as [PERGUNTA] or compact [PERG]',
         },
         {
             id: 'structured-input-live-status',
-            pass: /⟲\s+LLM-B\s+INPUT\s+·\s+REQUEST_USER_INPUT-SIM/iu.test(plain),
-            detail: 'permanent live status rendered request_user_input as INPUT instead of raw tool execution',
+            pass: /⟲\s+LLM-B\s+PERGUNTA\s+·\s+REQUEST_USER_INPUT-SIM/iu.test(plain),
+            detail: 'permanent live status rendered request_user_input as PERGUNTA instead of raw tool execution',
         },
         {
             id: 'structured-input-waits-pending',
-            pass: /\binput=1\b/u.test(plain),
+            pass: /1 pergunta estruturada/iu.test(plain),
             detail: '/sdk waits saw one pending structured input before the answer',
         },
         {
@@ -1509,7 +1509,7 @@ function structuredInputCycleCriteria(boot) {
         },
         {
             id: 'structured-input-waits-cleared',
-            pass: /\binput=0\b/u.test(plain) && /Sem bloqueios de input humano do SDK/u.test(plain),
+            pass: /0 perguntas estruturadas/iu.test(plain) && /Sem bloqueios de input humano do SDK/u.test(plain),
             detail: '/sdk waits confirmed that the structured input was cleared after answer',
         },
         {

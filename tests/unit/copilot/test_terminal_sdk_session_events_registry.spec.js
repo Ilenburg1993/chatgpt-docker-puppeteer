@@ -246,6 +246,28 @@ describe('sdk-session-events.js — integração com ToolCallRegistry', () => {
         expect(registry.isNameInFlight('read_file_content')).toBe(false);
     });
 
+    it('renderiza request_user_input como pergunta humana, não como tool genérica', async () => {
+        const { handleTerminalNativeToolStart } =
+            await import('../../../src/copilot/terminal/events/tool-lifecycle-runtime.js');
+        const registry = createToolCallRegistry();
+
+        handleTerminalNativeToolStart({
+            registry,
+            evt: {
+                toolCallId: 'chatcmpl-tool-question-1',
+                toolName: 'request_user_input',
+                args: { question: 'Como deseja continuar?', choices: ['seguir', 'pausar'] },
+            },
+        });
+
+        const output = mocks.println.mock.calls.map((call) => String(call[0])).join('\n');
+        expect(output).toContain('[PERGUNTA]');
+        expect(output).toContain('Como deseja continuar?');
+        expect(output).toContain('/answer <texto>');
+        expect(output).not.toContain('request_user_input');
+        expect(output).not.toContain('chatcmpl-tool-question-1');
+    });
+
     it('reconcilia tool nativa sem completion explícito no assistant.turn_end', async () => {
         const { setupTerminalSdkSessionEventListeners } =
             await import('../../../src/copilot/terminal/events/sdk-session-events.js');

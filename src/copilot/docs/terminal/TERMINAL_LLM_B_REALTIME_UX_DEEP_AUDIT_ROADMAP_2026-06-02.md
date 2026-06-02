@@ -2176,4 +2176,12 @@
 - [x] Linha viva de pergunta pendente deixou de exibir `loop`/`noloop` e passou a mostrar `conversa ativa`/`standby`.
 - [x] Fallback de status da linha viva deixou de renderizar `status:loop` e passou a usar `status · conversa ativa/standby`.
 - [x] Papel `command` deixou de ser apenas dim e passou a usar âmbar no tema `elegant`, para comandos ficarem escaneáveis sem competir com tools/perguntas.
-- [ ] Avaliar se precisamos de um renderer de “cartão de pergunta” com moldura discreta para impedir repetição visual quando a pergunta aguarda resposta por muito tempo.
+- [x] Renderer de lifecycle ganhou caminho especial para `operation === 'ask'`: imprime cartão simples `[PERGUNTA]`, texto da pergunta e ação `/answer <texto>`, sem nome de tool nem ID.
+- [x] Teste de lifecycle garante que `request_user_input` não aparece como tool genérica, não vaza `chatcmpl-tool-*` e mostra a ação de resposta.
+- [x] Runner `--structured-input-cycle` foi atualizado para o contrato novo `[PERGUNTA]`/`[PERG]`, `pergunta estruturada` e ausência de `input=`.
+- [x] Live PTY estruturada executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=60000 --transport=pty --out-dir=artifacts/terminal-live/structured-input-visual-card-pass-20260602-1331`.
+- [x] Resultado: PASS completo, sem ID interno, sem `request_user_input ainda executando`, com resposta humana roteada e `/sdk waits` limpando a pendência.
+- [x] `/sdk simulate request-user-input` passou a mostrar `Pergunta humana estruturada` e usar tema central em título/status/ação.
+- [x] `/sdk waits` passou a usar `Esperas humanas` temático, `ação` com acento e comandos coloridos por papel `command`.
+- [ ] Avaliar se o cartão de pergunta deve ganhar moldura discreta multi-linha; a live atual mostra formato limpo, mas ainda sem uma “caixa” visual dedicada.

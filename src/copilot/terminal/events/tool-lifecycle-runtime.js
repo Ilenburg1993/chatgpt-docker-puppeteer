@@ -316,6 +316,19 @@ function recordToolTurnProjection(presentation, status, toolCallId, success = nu
 function printToolStart(presentation) {
     if (!getShowToolActivity()) return;
     const compactDetail = getTerminalDetailLevel() === 'compact';
+    if (presentation.operation === 'ask') {
+        const question = presentation.target ?? presentation.startLine.replace(/^aguardando decisão humana:\s*/iu, '');
+        const questionText = compactDetail ? compactTerminalToolText(question, 96) : question;
+        println(
+            `  ${terminalThemeBadge('question', 'PERGUNTA')} ${terminalThemeText('question', questionText || 'Aguardando resposta do operador')}`,
+        );
+        if (!compactDetail) {
+            println(
+                `    ${terminalThemeText('muted', 'responda digitando normalmente ou use')} ${terminalThemeText('command', '/answer <texto>')}`,
+            );
+        }
+        return;
+    }
     const operationRole = mapTerminalToolOperationRole(presentation.operation);
     const primaryBadge = terminalThemeBadge(operationRole, renderToolOperationBadgeLabel(presentation.operation));
     println(

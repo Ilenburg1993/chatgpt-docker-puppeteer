@@ -70,6 +70,7 @@ import {
     recordTerminalPermissionRequested,
     terminalPermissionModeSkipsSdkPrompts,
 } from '../state/sdk/index.js';
+import { terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -730,11 +731,10 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
     const structuredInputPending = structuredInputs.length || getTerminalPendingStructuredUserInputCount();
     const totalPending =
         pendingElicitations.pending + permissionSummary.pending + userInputSummary.pending + structuredInputPending;
-    const headlineColor = totalPending > 0 ? '\x1b[33m' : '\x1b[32m';
 
-    println(`\n  \x1b[36mEsperas humanas\x1b[0m`);
+    println(`\n  ${terminalThemeText('question', 'Esperas humanas')}`);
     println(
-        `  estado   ${headlineColor}${totalPending > 0 ? `${totalPending} pendência(s)` : 'nenhuma pendência'}\x1b[0m`,
+        `  estado   ${terminalThemeText(totalPending > 0 ? 'question' : 'success', totalPending > 0 ? `${totalPending} pendência(s)` : 'nenhuma pendência')}`,
     );
     println(
         detail
@@ -748,13 +748,13 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
     );
 
     if (pendingElicitations.pending > 0) {
-        println('  acao     \x1b[90m/elicitation show latest · /elicitation list\x1b[0m');
+        println(`  ação     ${terminalThemeText('command', '/elicitation show latest')} ${terminalThemeText('muted', '·')} ${terminalThemeText('command', '/elicitation list')}`);
     }
     if (permissionSummary.pending > 0) {
-        println('  acao     \x1b[90m/permission show latest · /permission all\x1b[0m');
+        println(`  ação     ${terminalThemeText('command', '/permission show latest')} ${terminalThemeText('muted', '·')} ${terminalThemeText('command', '/permission all')}`);
     }
     if (userInputSummary.pending > 0) {
-        println('  acao     \x1b[90m/answer <texto> ou responda na conversa ativa\x1b[0m');
+        println(`  ação     ${terminalThemeText('command', '/answer <texto>')} ${terminalThemeText('muted', 'ou responda na conversa ativa')}`);
         const latest = userInputSummary.latest;
         if (latest) {
             const choices = latest.choices.length > 0 ? ` · opções ${latest.choices.join(' | ')}` : '';
@@ -765,7 +765,7 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
         }
     }
     if (structuredInputPending > 0) {
-        println('  acao     \x1b[90mdigite a resposta normalmente; o REPL destrava a pergunta estruturada pendente\x1b[0m');
+        println(`  ação     ${terminalThemeText('muted', 'digite a resposta normalmente; o REPL destrava a pergunta estruturada pendente')}`);
         for (const entry of structuredInputs.slice(0, 3)) {
             const choices = entry.choices.length > 0 ? ` · opções ${entry.choices.join(' | ')}` : '';
             const freeform = entry.allowFreeform ? 'livre' : 'seleção obrigatória';
@@ -859,13 +859,15 @@ function renderSdkSimulate({ println }, rest) {
     });
     const mode = parsed.allowFreeform ? 'resposta livre' : 'seleção obrigatória';
     const choices = parsed.choices.length > 0 ? ` · opções ${parsed.choices.join(' | ')}` : '';
-    println('\n  \x1b[36mInput humano estruturado\x1b[0m');
-    println(`  status   \x1b[33maguardando operador\x1b[0m`);
-    println('  origem   \x1b[90mdiagnóstico de pergunta estruturada\x1b[0m');
-    println(`  modo     \x1b[90m${mode}${choices}\x1b[0m`);
+    println(`\n  ${terminalThemeText('question', 'Pergunta humana estruturada')}`);
+    println(`  status   ${terminalThemeText('question', 'aguardando operador')}`);
+    println(`  origem   ${terminalThemeText('muted', 'diagnóstico de pergunta estruturada')}`);
+    println(`  modo     ${terminalThemeText('muted', `${mode}${choices}`)}`);
     println(`  pergunta ${compactText(parsed.question, 220)}`);
-    println('  ação     \x1b[90mdigite a resposta normalmente ou use /answer <texto>\x1b[0m');
-    println('  detalhe  \x1b[90m/sdk waits detail\x1b[0m\n');
+    println(
+        `  ação     ${terminalThemeText('muted', 'digite a resposta normalmente ou use')} ${terminalThemeText('command', '/answer <texto>')}`,
+    );
+    println(`  detalhe  ${terminalThemeText('command', '/sdk waits detail')}\n`);
     void created.promise;
 }
 

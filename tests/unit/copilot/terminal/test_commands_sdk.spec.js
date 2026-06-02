@@ -375,6 +375,7 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).not.toContain('request-user-input-test-1');
         expect(ctx.output()).toContain('opções seguir | pausar');
         expect(ctx.output()).toContain('Escolha a estrategia');
+        expect(ctx.output()).not.toContain('acao');
 
         const detail = mockCtx();
         await cmdSdk({ println: detail.println }, 'waits detail');
@@ -394,7 +395,7 @@ describe('terminal/commands/sdk', () => {
                 allowFreeform: false,
             }),
         );
-        expect(ctx.output()).toContain('Input humano estruturado');
+        expect(ctx.output()).toContain('Pergunta humana estruturada');
         expect(ctx.output()).toContain('diagnóstico de pergunta estruturada');
         expect(ctx.output()).toContain('aguardando operador');
         expect(ctx.output()).toContain('Continuar teste visual?');
