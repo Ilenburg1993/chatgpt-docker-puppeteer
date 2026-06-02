@@ -96,6 +96,17 @@ const INTERNAL_BACKGROUND_DESCRIPTION_PATTERNS = [
     /^always_alive$/i,
 ];
 
+const BACKGROUND_DESCRIPTION_LABELS = new Map([
+    ['Relay question.answered answers into hook tools resolver', 'Resposta humana entregue ao resolvedor da ferramenta'],
+    ['Clear persisted pendingQuestion', 'Pergunta pendente persistida limpa'],
+    ['Persist pendingQuestion + pendingQuestionMeta + lastAskUserAt', 'Pergunta pendente salva para retomada'],
+    ['Read persisted state', 'Estado persistido lido'],
+    ['Sync resumed session history', 'Histórico da sessão retomada sincronizado'],
+    ['Cleanup stale SDK sessions', 'Sessões SDK antigas limpas'],
+    ['Retry dialog loop recovery', 'Recuperação da conversa reprogramada'],
+    ['always_alive', 'Pulso da sessão permanente'],
+]);
+
 /**
  * Evita que eventos auxiliares de runtime atravessem blocos de streaming/reasoning. O conteúdo não é perdido: activity
  * e SSE continuam recebendo os eventos, e a UX live preserva a resposta do assistente como bloco coeso.
@@ -136,7 +147,7 @@ function isInternalBackgroundDescription(description) {
  */
 function classifyBackgroundNarration({ description, failed = false }) {
     if (failed) {
-        return { print: true, recordHistory: true, updateCurrent: true, labelPrefix: 'Agente em background' };
+        return { print: true, recordHistory: true, updateCurrent: true, labelPrefix: 'Tarefa em segundo plano' };
     }
     if (isInternalBackgroundDescription(description)) {
         return {
@@ -146,7 +157,27 @@ function classifyBackgroundNarration({ description, failed = false }) {
             labelPrefix: 'Tarefa interna',
         };
     }
-    return { print: true, recordHistory: true, updateCurrent: false, labelPrefix: 'Agente em background' };
+    return { print: true, recordHistory: true, updateCurrent: false, labelPrefix: 'Tarefa em segundo plano' };
+}
+
+/**
+ * @param {string} description
+ * @returns {string}
+ */
+function renderBackgroundDescriptionForOperator(description) {
+    const normalized = description.trim();
+    if (!normalized) return 'tarefa sem descrição';
+    const mapped = BACKGROUND_DESCRIPTION_LABELS.get(normalized);
+    if (mapped) return mapped;
+    return normalized
+        .replace(/\bbackground\b/giu, 'segundo plano')
+        .replace(/\bagent\b/giu, 'agente')
+        .replace(/\bidle\b/giu, 'ociosa')
+        .replace(/\bquestion\.answered\b/giu, 'resposta humana')
+        .replace(/\bpendingQuestionMeta\b/gu, 'metadados da pergunta')
+        .replace(/\bpendingQuestion\b/gu, 'pergunta pendente')
+        .replace(/\blastAskUserAt\b/gu, 'horário da última pergunta')
+        .replace(/\bSDK\b/g, 'SDK');
 }
 
 /**
@@ -875,13 +906,14 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const status = /** @type {'completed' | 'failed'} */ (evt?.['status'] ?? 'completed');
         const failed = status === 'failed';
         const narration = classifyBackgroundNarration({ description, failed });
+        const operatorDescription = renderBackgroundDescriptionForOperator(description);
         const activityLabel = failed
-            ? 'Agente em background falhou'
+            ? 'Tarefa em segundo plano falhou'
             : narration.labelPrefix === 'Tarefa interna'
               ? 'Tarefa interna concluída'
-              : 'Agente em background concluído';
+              : 'Tarefa em segundo plano concluída';
         recordTerminalActivity('task', activityLabel, {
-            detail: `${description} · ${renderRuntimeStatusLabel(status)}`,
+            detail: `${operatorDescription} · ${renderRuntimeStatusLabel(status)}`,
             severity: failed ? 'error' : 'info',
             source: 'agent',
             recordHistory: narration.recordHistory,
@@ -890,8 +922,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         if (narration.print) {
             printlnWhenRenderUnlocked(
                 failed
-                    ? `  \x1b[31m🤖 Background agent falhou: ${description}\x1b[0m`
-                    : `  \x1b[32m🤖 Background agent concluído: ${description}\x1b[0m`,
+                    ? `  \x1b[31mTarefa em segundo plano falhou: ${operatorDescription}\x1b[0m`
+                    : `  \x1b[32mTarefa em segundo plano concluída: ${operatorDescription}\x1b[0m`,
             );
         }
         broadcastSse(
@@ -911,15 +943,16 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const description = /** @type {string} */ (
             evt?.['description'] ?? evt?.['agentType'] ?? evt?.['agentId'] ?? 'agent'
         );
-        recordTerminalActivity('task', 'Agente em background ocioso', {
-            detail: description,
+        const operatorDescription = renderBackgroundDescriptionForOperator(description);
+        recordTerminalActivity('task', 'Tarefa em segundo plano ociosa', {
+            detail: operatorDescription,
             source: 'agent',
             recordHistory: false,
             updateCurrent: false,
         });
         const shouldPrint = getShowSessionActivity() && !isInternalBackgroundDescription(description);
         if (shouldPrint) {
-            printlnWhenRenderUnlocked(`  \x1b[90m🤖 Background agent ocioso: ${description}\x1b[0m`);
+            printlnWhenRenderUnlocked(`  \x1b[90mTarefa em segundo plano ociosa: ${operatorDescription}\x1b[0m`);
         }
         broadcastSse(
             'agent.background.idle',

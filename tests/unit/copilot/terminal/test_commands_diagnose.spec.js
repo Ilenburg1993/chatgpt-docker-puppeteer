@@ -288,7 +288,8 @@ describe('commands/diagnose', () => {
             expect(ctx.output()).not.toContain('quota monitor');
             expect(ctx.output()).toContain('background.backlog_high');
             expect(ctx.output()).toContain('Executando tool');
-            expect(ctx.output()).toContain('inspect_boot_report');
+            expect(ctx.output()).toContain('verificar relatório de inicialização');
+            expect(ctx.output()).not.toContain('inspect_boot_report');
             expect(ctx.output()).toContain('streaming on');
             expect(ctx.output()).toContain('inline status');
             expect(ctx.output()).toContain('reserved');
@@ -319,7 +320,8 @@ describe('commands/diagnose', () => {
             expect(ctx.output()).toContain('Shutdown');
             expect(ctx.output()).toContain('Timers');
             expect(ctx.output()).toContain('Lifecycle mx');
-            expect(ctx.output()).toContain('sdk↔fs route');
+            expect(ctx.output()).toContain('rota sdk↔fs');
+            expect(ctx.output()).not.toContain('sdk↔fs route');
             expect(ctx.output()).toContain('degraded');
             expect(ctx.output()).toContain('Ler arquivo');
             expect(ctx.output()).toContain('Intenção capturada');

@@ -2418,3 +2418,47 @@
 - [x] `/tools diag` trocou `tool(s)`, `tool técnico:`, `tipo:`, `disabled:` e `Uso:` por `ferramenta(s)`, `nome técnico:`, `tipo`, `desabilitadas:` e `Comandos:`.
 - [x] Teste escopado passou após o polish de `/tools diag`:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js`.
+
+### 11.28 Superfícies detalhadas sem inglês interno
+
+- [x] Auditoria pós-commit confirmou resíduos visíveis em três famílias:
+  - eventos de tarefa em segundo plano (`Background agent concluído/falhou/ocioso`);
+  - streaming/raciocínio interno (`task thinking`, `chunks`, `chars`);
+  - painéis detalhados (`runtime id`, `bg tasks`, `tools load`, `instr. load`, `sdk↔fs route`, `prompts SDK skip`, `resume-session`, `auth none`).
+- [x] Decisão canônica:
+  - stdout default, `/activity`, `/status full`, `/health full` e `/metrics` são telas humanas, ainda que detalhadas;
+  - nomes técnicos originais continuam permitidos em projeções internas, SSE/archive bruto, exports e modos raw/detail explícitos;
+  - IDs e enum values só aparecem quando são necessários para cópia/diagnóstico, e não como rótulos principais.
+- [x] `agent-runtime-events.js` passou a renderizar `Tarefa em segundo plano concluída/falhou/ociosa`, com descrições conhecidas traduzidas:
+  - `Relay question.answered answers into hook tools resolver` → `Resposta humana entregue ao resolvedor da ferramenta`;
+  - `Clear persisted pendingQuestion` → `Pergunta pendente persistida limpa`;
+  - `Persist pendingQuestion + pendingQuestionMeta + lastAskUserAt` → `Pergunta pendente salva para retomada`.
+- [x] `task-stream-events.js` passou a renderizar `raciocínio da tarefa`, `fragmentos` e `caracteres`, removendo `task thinking`, `chunks` e `chars` da superfície padrão.
+- [x] `turn-display.js` passou a renderizar `Raciocínio capturado` e `raciocínio #...`, sem `Thinking capturado`/`thinking #...`.
+- [x] `io-activity-events.js` passou a renderizar operações como `[ARQUIVO] [LER]`, `[MOVER]`, `Arquivo: leitura concluída`, preservando `io.read` apenas como toolName interno.
+- [x] `/status full` trocou:
+  - `bg tasks` → `tarefas fundo`;
+  - `issues` → `alertas`;
+  - `ação sugerida none` → `próximo passo nenhuma ação imediata`;
+  - `runtime id/session/profile/runtimes` → `runtime alvo`, `sessão runtime`, `perfil runtime`, `mapa runtime`;
+  - `tools load`, `instr. load`, `sdk↔fs route`, `custom agents` → `ferramentas`, `instruções`, `rota sdk↔fs`, `agentes extras`;
+  - `prompts SDK skip/selective` → `prompts SDK ignorados/seletivos`;
+  - `auth apiKey/none` → `autenticação chave API/ausente`.
+- [x] `/metrics` trocou `runtime id`, `sdk sessão`, `hub sessão`, `plan file` e `resume-session` por `runtime alvo`, `sessão SDK`, `sessão hub`, `plano` e `retomar sessão`.
+- [x] `/health full` removeu duplicações cruas remanescentes, incluindo `auth none`, `inspect_boot_report` e `sdk↔fs route` no bloco completo.
+- [x] Testes escopados passaram após esta família de mudanças:
+  - `npx vitest run tests/unit/copilot/terminal/test_io_activity_events.spec.js tests/unit/copilot/terminal/test_activity_state.spec.js tests/unit/copilot/terminal/test_turn_display.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_io_activity_events.spec.js tests/unit/copilot/terminal/test_activity_state.spec.js tests/unit/copilot/terminal/test_turn_display.spec.js`.
+- [x] Live PTY com cenário real executada após esta família:
+  - `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=240000 --transport=pty --live-scenario=freeform --out-dir=artifacts/terminal-live/ux-humanized-ops-taxonomy-20260602-1646`.
+- [x] Resultado da live: PASS completo; stdout principal mostrou `[ARQUIVO] [LER]`, `raciocínio da tarefa`, `Raciocínio capturado`, `Tarefa em segundo plano concluída`, `/activity` com `Arquivo: leitura concluída`, `/tools diag` humano e `/health full` sem `runtime id`/`bg tasks`.
+- [x] Achado da live corrigido: `/events` resumido ainda mostrava `assistant reasoning complete`, `question answered`, `Tarefa em background concluída`, `Background ocioso` e fonte `agente/background`.
+- [x] `/events` agora renderiza `Raciocínio concluído`, `Resposta do operador`, `Tarefa em segundo plano concluída`, `Tarefa em segundo plano ociosa` e fonte `tarefa em segundo plano`; `--raw`/`--json` preservam nomes canônicos.
+- [x] `/sdk prompt` e `/permission mode` passaram a renderizar `nenhuma ação imediata`, `retomar sessão`, `prompts SDK ignorados/seletivos` e `política`, removendo `none`, `resume-session`, `skip/selective` e `policy` do default humano.
+- [x] Testes escopados passaram após `/events` e `/sdk`:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
+- [x] Repetir live PTY após correção de `/events` para confirmar visualmente que o resumo default também está limpo.
+  - `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=240000 --transport=pty --live-scenario=freeform --out-dir=artifacts/terminal-live/ux-events-humanized-repeat-20260602-1651`.
+  - Resultado: PASS completo; `/events` mostrou `Raciocínio concluído`, `Pergunta ao operador`, `Resposta do operador`, `Tarefa em segundo plano concluída/ociosa` e fonte `tarefa em segundo plano`, sem os rótulos antigos observados na live anterior.
+- [ ] Próxima lacuna: alguns comandos BYOK ainda carregam enum values em modo default (`apiKey`, `deltas ... chars`). Auditar se cada caso deve ser humano default ou detalhe técnico copiável.

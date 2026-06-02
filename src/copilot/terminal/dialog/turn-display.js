@@ -188,7 +188,7 @@ function flushReasoningSummary(state) {
     if (state.showThinking) {
         writeTerminalRaw('\x1b[0m\n');
         println(
-            `  ${terminalThemeText('thinking', `└── thinking #${shortId}`)}  ${terminalThemeText('muted', `${(durationMs / 1000).toFixed(1)}s · ${state.reasoningChars} chars · ${state.model}/${state.effort}`)}`,
+            `  ${terminalThemeText('thinking', `└── raciocínio #${shortId}`)}  ${terminalThemeText('muted', `${(durationMs / 1000).toFixed(1)}s · ${state.reasoningChars} ${state.reasoningChars === 1 ? 'caractere' : 'caracteres'} · ${state.model}/${state.effort}`)}`,
         );
         println(
             `  ${terminalThemeText('muted', '    conteúdo de reasoning não é despejado automaticamente; acompanhe o estado pela linha viva.')}`,
@@ -231,7 +231,7 @@ export function createReasoningCallback(state) {
                 const tsNow = formatTerminalIsoTimestamp(Date.now());
                 println(SEPARATOR);
                 println(
-                    `  ${terminalThemeText('muted', `[${tsNow}]`)}  💭  ${terminalThemeText('thinking', 'Thinking capturado')}  ${terminalThemeText('muted', `· ${state.model} · ${state.effort}`)}`,
+                    `  ${terminalThemeText('muted', `[${tsNow}]`)}  💭  ${terminalThemeText('thinking', 'Raciocínio capturado')}  ${terminalThemeText('muted', `· ${state.model} · ${state.effort}`)}`,
                 );
                 println('');
             }
@@ -252,7 +252,7 @@ export function createReasoningCallback(state) {
             if (now - state.lastReasoningProgressAt >= 1_000) {
                 state.lastReasoningProgressAt = now;
                 recordTerminalActivity('thinking', 'Raciocinando', {
-                    detail: `${state.reasoningChars} chars capturados · ${state.model}/${state.effort}`,
+                    detail: `${state.reasoningChars} ${state.reasoningChars === 1 ? 'caractere' : 'caracteres'} capturados · ${state.model}/${state.effort}`,
                     source: 'dialog',
                     recordHistory: false,
                 });

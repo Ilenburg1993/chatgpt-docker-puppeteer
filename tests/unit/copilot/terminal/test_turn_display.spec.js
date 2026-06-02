@@ -220,6 +220,28 @@ describe('terminal/dialog/turn-display', () => {
         expect(writeSpy).not.toHaveBeenCalled();
     });
 
+    it('renderiza resumo de raciocínio com rótulos humanos', () => {
+        const state = createDisplayState({
+            model: 'gpt-5-mini',
+            effort: 'high',
+            turnStartTime: Date.now(),
+            showStreaming: false,
+            showThinking: true,
+        });
+
+        const onReasoning = createReasoningCallback(state);
+        onReasoning('pensando...', 'r-human');
+        renderStreamingFooter(state, 10);
+
+        const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(output).toContain('Raciocínio capturado');
+        expect(output).toContain('raciocínio #');
+        expect(output).toContain('11 caracteres');
+        expect(output).not.toContain('Thinking capturado');
+        expect(output).not.toContain('thinking #');
+        expect(output).not.toContain('11 chars');
+    });
+
     it('ativa lock durante reasoning e libera no footer', () => {
         const state = createDisplayState({
             model: 'gpt-5-mini',

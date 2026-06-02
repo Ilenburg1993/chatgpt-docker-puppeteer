@@ -976,7 +976,8 @@ describe('terminal/commands/sdk', () => {
         expect(agentRuntimeMocks.readTerminalRuntimePermissionMode).toHaveBeenCalled();
         expect(show.output()).toContain('approve_all');
         expect(show.output()).toContain('Modo de permissões');
-        expect(show.output()).toContain('prompts SDK skip');
+        expect(show.output()).toContain('prompts SDK ignorados');
+        expect(show.output()).not.toContain('prompts SDK skip');
         expect(show.output()).not.toContain('Permission mode');
         expect(show.output()).not.toContain('sdk prompts=');
 
@@ -984,7 +985,8 @@ describe('terminal/commands/sdk', () => {
         await cmdPermission({ println: set.println }, 'mode audit_only');
         expect(agentRuntimeMocks.setTerminalRuntimePermissionMode).toHaveBeenCalledWith('audit_only', null);
         expect(set.output()).toContain('Modo de permissões atualizado');
-        expect(set.output()).toContain('prompts SDK skip');
+        expect(set.output()).toContain('prompts SDK ignorados');
+        expect(set.output()).not.toContain('prompts SDK skip');
         expect(set.output()).not.toContain('sdk prompts=');
     });
 

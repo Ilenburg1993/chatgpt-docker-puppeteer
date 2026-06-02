@@ -307,7 +307,7 @@ describe('commands/metrics + usage', () => {
 
             expect(ctx.output()).toContain('transporte');
             expect(ctx.output()).toContain('digest-alt');
-            expect(ctx.output()).toContain('resume-session');
+            expect(ctx.output()).toContain('retomar sessão');
             expect(ctx.output()).toContain('preflight 5ms');
             expect(ctx.output()).toContain('diálogo 100ms');
             expect(ctx.output()).toContain('autostart sim');
@@ -323,8 +323,8 @@ describe('commands/metrics + usage', () => {
 
         cmdMetrics({ println: ctx.println });
 
-        expect(ctx.output()).toContain('sdk sessão');
-        expect(ctx.output()).toContain('hub sessão');
+        expect(ctx.output()).toContain('sessão SDK');
+        expect(ctx.output()).toContain('sessão hub');
         expect(ctx.output()).toContain('modo sdk');
         expect(ctx.output()).not.toContain('plan local');
         expect(ctx.output()).toContain('timeline canônica');
@@ -341,7 +341,8 @@ describe('commands/metrics + usage', () => {
 
         cmdMetrics({ println: ctx.println }, '--runtime alt');
 
-        expect(ctx.output()).toContain('runtime id');
+        expect(ctx.output()).toContain('runtime alvo');
+        expect(ctx.output()).not.toContain('runtime id');
         expect(ctx.output()).toContain('alt');
         expect(ctx.output()).toContain('gpt-4.1-mini');
     });

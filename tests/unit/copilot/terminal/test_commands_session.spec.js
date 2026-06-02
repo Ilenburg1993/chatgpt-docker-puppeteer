@@ -445,24 +445,29 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('modo SDK');
         expect(ctx.output()).toContain('canal input');
         expect(ctx.output()).not.toContain('plan local');
-        expect(ctx.output()).toContain('bg tasks');
+        expect(ctx.output()).toContain('tarefas fundo');
+        expect(ctx.output()).not.toContain('bg tasks');
         expect(ctx.output()).toContain('display');
         expect(ctx.output()).toContain('modo permissões');
-        expect(ctx.output()).toContain('prompts SDK skip');
+        expect(ctx.output()).toContain('prompts SDK ignorados');
         expect(ctx.output()).not.toContain('permission mode');
         expect(ctx.output()).not.toContain('sdk prompts=');
         expect(ctx.output()).toContain('pergunta restaurada expirada');
         expect(ctx.output()).toContain('perfil modelo');
-        expect(ctx.output()).toContain('runtime id');
+        expect(ctx.output()).toContain('runtime alvo');
+        expect(ctx.output()).not.toContain('runtime id');
         expect(ctx.output()).toContain('*default:gpt-5-mini/idle');
         expect(ctx.output()).toContain('billing/modelo');
         expect(ctx.output()).toContain('último PR');
         expect(ctx.output()).toContain('prompt digest');
         expect(ctx.output()).toContain('prompt frescor');
         expect(ctx.output()).toContain('binding ok');
-        expect(ctx.output()).toContain('tools load');
-        expect(ctx.output()).toContain('instr. load');
-        expect(ctx.output()).toContain('sdk↔fs route');
+        expect(ctx.output()).toContain('ferramentas');
+        expect(ctx.output()).not.toContain('tools load');
+        expect(ctx.output()).toContain('instruções');
+        expect(ctx.output()).not.toContain('instr. load');
+        expect(ctx.output()).toContain('rota sdk↔fs');
+        expect(ctx.output()).not.toContain('sdk↔fs route');
         expect(ctx.output()).toContain('coleta ctx');
         expect(ctx.output()).toContain('/sdk doctor');
     });
@@ -595,10 +600,11 @@ describe('commands/session — sync commands', () => {
     it('cmdStatus aceita runtimeId explícito na sintaxe do REPL', () => {
         const ctx = mockCtx();
         cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, '--runtime alt full');
-        expect(ctx.output()).toContain('runtime id');
+        expect(ctx.output()).toContain('runtime alvo');
+        expect(ctx.output()).not.toContain('runtime id');
         expect(ctx.output()).toContain('alt');
         expect(ctx.output()).toContain('gpt-4.1-mini');
-        expect(ctx.output()).toContain('resume-session');
+        expect(ctx.output()).toContain('retomar sessão');
     });
 
     it('cmdStatus avisa quando o runtime solicitado cai em fallback para o default', () => {

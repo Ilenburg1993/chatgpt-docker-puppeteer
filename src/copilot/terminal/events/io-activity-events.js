@@ -131,6 +131,52 @@ function mapTurnOperationToRole(operation) {
     return 'tool';
 }
 
+const IO_OPERATION_LABELS = new Map([
+    ['read', 'leitura'],
+    ['fetch', 'busca remota'],
+    ['write', 'escrita'],
+    ['append', 'acréscimo'],
+    ['mkdir', 'criação de pasta'],
+    ['copy', 'cópia'],
+    ['patch', 'edição'],
+    ['move', 'movimento'],
+    ['delete', 'remoção'],
+    ['scan', 'varredura'],
+    ['search', 'busca'],
+    ['stat', 'inspeção'],
+]);
+
+const IO_OPERATION_BADGES = new Map([
+    ['read', 'LER'],
+    ['fetch', 'BUSCAR'],
+    ['write', 'ESCREVER'],
+    ['append', 'ANEXAR'],
+    ['mkdir', 'PASTA'],
+    ['copy', 'COPIAR'],
+    ['patch', 'EDITAR'],
+    ['move', 'MOVER'],
+    ['delete', 'REMOVER'],
+    ['scan', 'LISTAR'],
+    ['search', 'BUSCAR'],
+    ['stat', 'INSPECIONAR'],
+]);
+
+/**
+ * @param {string} operation
+ * @returns {string}
+ */
+function renderIoOperationLabel(operation) {
+    return IO_OPERATION_LABELS.get(operation) ?? operation;
+}
+
+/**
+ * @param {string} operation
+ * @returns {string}
+ */
+function renderIoOperationBadge(operation) {
+    return IO_OPERATION_BADGES.get(operation) ?? operation.toUpperCase();
+}
+
 /**
  * @param {string} target
  * @returns {string}
@@ -211,8 +257,9 @@ function handleIoOperation(message, registry = null) {
     const byteLabel = formatBytes(io.bytesRead ?? io.bytesWritten);
     const durationLabel = typeof io.durationMs === 'number' ? `${Math.max(0, Math.round(io.durationMs))}ms` : null;
     const humanExtra = [byteLabel, durationLabel].filter(Boolean).join(' · ');
-    const detail = `${io.operation} · ${primaryTarget}${humanExtra ? ` · ${humanExtra}` : ''}`;
-    const label = success ? `I/O ${io.operation} concluído` : `I/O ${io.operation} falhou`;
+    const operationLabel = renderIoOperationLabel(io.operation);
+    const detail = `${operationLabel} · ${primaryTarget}${humanExtra ? ` · ${humanExtra}` : ''}`;
+    const label = success ? `Arquivo: ${operationLabel} concluída` : `Arquivo: ${operationLabel} falhou`;
     const entry = {
         timestamp: message.ts ?? Date.now(),
         success,
@@ -249,11 +296,11 @@ function handleIoOperation(message, registry = null) {
 
     if (getShowToolActivity()) {
         const badge = success
-            ? terminalThemeBadge(role, io.operation.toUpperCase())
-            : terminalThemeBadge('error', 'IO');
+            ? terminalThemeBadge(role, renderIoOperationBadge(io.operation))
+            : terminalThemeBadge('error', 'ARQUIVO');
         const status = success ? terminalThemeText('success', 'ok') : terminalThemeText('error', 'falhou');
         println(
-            `  ${terminalThemeBadge('tool', 'IO')} ${badge} ${terminalThemeText(role, compactText(primaryTarget, 92))} ${terminalThemeText('muted', `· ${status}${humanExtra ? ` · ${humanExtra}` : ''}`)}`,
+            `  ${terminalThemeBadge('tool', 'ARQUIVO')} ${badge} ${terminalThemeText(role, compactText(primaryTarget, 92))} ${terminalThemeText('muted', `· ${status}${humanExtra ? ` · ${humanExtra}` : ''}`)}`,
         );
     }
 
@@ -307,6 +354,8 @@ export const __test__ = {
     mapIoOperationToTurnOperation,
     handleIoOperation,
     isDuplicateIoOperation,
+    renderIoOperationBadge,
+    renderIoOperationLabel,
     get ioDedupWindow() {
         return _ioDedupWindow;
     },

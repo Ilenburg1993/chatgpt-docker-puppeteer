@@ -82,6 +82,48 @@ function renderHumanTerminalStatus(value) {
 }
 
 /**
+ * @param {unknown} action
+ * @returns {string}
+ */
+function renderTerminalActionLabel(action) {
+    const value = typeof action === 'string' ? action.trim() : '';
+    if (!value || value === 'none') return 'nenhuma ação imediata';
+    if (value === 'clear_pending_question_shadow') return 'limpar pergunta restaurada';
+    if (value === 'answer_pending_question') return 'responder pergunta pendente';
+    if (value === 'inspect_boot_report') return 'verificar relatório de inicialização';
+    if (value === 'try_model_alternative') return 'testar modelo alternativo';
+    if (value === 'check_quota') return 'verificar quota/limites';
+    if (value === 'observe-live-reload') return 'observar recarregamento vivo';
+    if (value === 'resume-session') return 'retomar sessão';
+    return value.replace(/_/gu, ' ');
+}
+
+/**
+ * @param {{ bearerTokenConfigured?: boolean; apiKeyConfigured?: boolean; headersConfigured?: boolean }} auth
+ * @returns {string}
+ */
+function renderTerminalAuthLabel(auth) {
+    if (auth.bearerTokenConfigured) return 'token bearer';
+    if (auth.apiKeyConfigured) return 'chave API';
+    if (auth.headersConfigured) return 'headers';
+    return 'ausente';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderTerminalSyncStatusLabel(value) {
+    const status = String(value ?? '');
+    if (status === 'scheduled') return 'agendada';
+    if (status === 'inflight') return 'em andamento';
+    if (status === 'synced') return 'sincronizada';
+    if (status === 'failed') return 'falhou';
+    if (status === 'idle') return 'ociosa';
+    return status || 'n/d';
+}
+
+/**
  * @param {unknown} value
  * @returns {string}
  */
@@ -469,10 +511,10 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
     const autoPolicyLine =
         configProjection.currentModel === 'auto'
-            ? `        auto policy      \x1b[90mpreferido ${autoPolicy.preferredModel}/${autoPolicy.preferredReasoningEffort} · autoridade GitHub Copilot · último ${autoPolicy.observedModel ?? 'n/d'}\x1b[0m`
+            ? `        política auto   \x1b[90mpreferido ${autoPolicy.preferredModel}/${autoPolicy.preferredReasoningEffort} · autoridade GitHub Copilot · último ${autoPolicy.observedModel ?? 'n/d'}\x1b[0m`
             : '';
     const byokLine = byok.enabled
-        ? `    BYOK provider    ${byok.ready ? '\x1b[32mpronto\x1b[0m' : '\x1b[31mincompleto\x1b[0m'} \x1b[90mpreset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · auth ${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'none'} · /byok\x1b[0m`
+        ? `    BYOK provedor    ${byok.ready ? '\x1b[32mpronto\x1b[0m' : '\x1b[31mincompleto\x1b[0m'} \x1b[90mpreset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · autenticação ${renderTerminalAuthLabel(byok.auth)} · /byok\x1b[0m`
         : '';
     const modelBilling = projection.modelBilling;
     const display = readTerminalDisplayProjection();
@@ -500,12 +542,12 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const uiElicitationFlag = sdkCapabilitiesUi ? sdkCapabilitiesUi['elicitation'] === true : null;
     const timelineSyncLabel =
         projection.timelineSyncStatus === 'scheduled' || projection.timelineSyncStatus === 'inflight'
-            ? ` · sync ${projection.timelineSyncStatus}:${projection.timelineSyncPendingCount}`
+            ? ` · sincronização ${renderTerminalSyncStatusLabel(projection.timelineSyncStatus)}:${projection.timelineSyncPendingCount}`
             : projection.timelineSyncStatus === 'synced'
-              ? ` · sync synced:${projection.timelineSyncSyncedCount}`
+              ? ` · sincronização sincronizada:${projection.timelineSyncSyncedCount}`
               : projection.timelineSyncStatus === 'failed'
-                ? ` · sync failed:${projection.timelineSyncFailedCount}`
-                : ` · sync ${projection.timelineSyncStatus}`;
+                ? ` · sincronização falhou:${projection.timelineSyncFailedCount}`
+                : ` · sincronização ${renderTerminalSyncStatusLabel(projection.timelineSyncStatus)}`;
     const promptBindingDigest =
         typeof projection.systemPromptBinding?.['digest'] === 'string'
             ? projection.systemPromptBinding['digest']
@@ -561,7 +603,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         ? `${agentSelection.enabled.join(', ')}${agentSelection.disabled.length ? ` · desativados ${agentSelection.disabled.join(', ')}` : ''}`
         : '(none)';
     const permissionModeSkipsSdkPrompts = terminalPermissionModeSkipsSdkPrompts(projection.permissionMode);
-    const permissionModeDetail = `${projection.permissionMode} · prompts SDK ${permissionModeSkipsSdkPrompts ? 'skip' : 'selective'}`;
+    const permissionModeDetail = `${projection.permissionMode} · prompts SDK ${permissionModeSkipsSdkPrompts ? 'ignorados' : 'seletivos'}`;
     println(`
   \x1b[36mStatus do Terminal LLM-B\x1b[0m
   ─────────────────────────────────────
@@ -577,25 +619,25 @@ ${byokLine ? `${byokLine}\n` : ''}  reasoning        \x1b[35m${effort}\x1b[0m
     modo SDK         ${sdkModeColor}${sdkMode}\x1b[0m
         modo permissões  \x1b[33m${permissionModeDetail}\x1b[0m
     plan arquivo     ${sdkPlanOpLabel}
-        bg tasks         ${health?.['backgroundPendingCount'] ?? 0}
-        issues           ${Array.isArray(health?.['issues']) ? health['issues'].length : 0}
-        ação sugerida    ${projection.recommendedAction ?? 'none'}
-    runtime session  \x1b[90m${projection.runtimeSessionId ?? '(sem runtime)'}\x1b[0m
-    runtime id       \x1b[90m${projection.runtimeId}\x1b[0m
-    runtime profile  \x1b[90m${projection.agentProfileId ?? '(sem profile)'}\x1b[0m
-    runtimes         \x1b[90m${projection.runtimeTopologyLabel}\x1b[0m
+        tarefas fundo    ${health?.['backgroundPendingCount'] ?? 0}
+        alertas          ${Array.isArray(health?.['issues']) ? health['issues'].length : 0}
+        próximo passo    ${renderTerminalActionLabel(projection.recommendedAction)}
+    sessão runtime   \x1b[90m${projection.runtimeSessionId ?? '(sem runtime)'}\x1b[0m
+    runtime alvo     \x1b[90m${projection.runtimeId}\x1b[0m
+    perfil runtime   \x1b[90m${projection.agentProfileId ?? '(sem perfil)'}\x1b[0m
+    mapa runtime     \x1b[90m${projection.runtimeTopologyLabel}\x1b[0m
     timeline         \x1b[90m${projection.timelineSource} · ${projection.timelineAuthority} · ${projection.timelineReconciliationStatus} · ${projection.timelineTurnCount} turns${timelineSyncLabel}\x1b[0m
     prompt digest    \x1b[90m${promptBindingDigest ?? '(sem binding)'}\x1b[0m
-    prompt frescor   ${promptFreshnessLabel} \x1b[90m(${promptRecommendedAction})\x1b[0m
-    tools load       ${toolLoadColor}${toolLoad.total} registradas\x1b[0m \x1b[90m(fs canônico ${toolLoad.hasCanonicalLocalFsTools} · exec canônico ${toolLoad.hasCanonicalLocalExecTools} · workspace SDK ${toolLoad.hasSdkWorkspaceTooling} · shell legado ${toolLoad.hasLegacySdkShellToolsLoaded} · desativadas ${toolLoad.disabled.length})\x1b[0m
-    tool contract   ${toolContractColor}${toolContract.ok ? 'ok' : 'attention'}\x1b[0m \x1b[90m(falhas ${toolContract.errorCount} · avisos ${toolContract.warningCount} · descrições ${toolContract.metadataCoverage.descriptionPct}% · schema ${toolContract.metadataCoverage.parametersPct}% · categoria ${toolContract.metadataCoverage.categoryPct}% · tags ${toolContract.metadataCoverage.tagsPct}% · instruções ${toolContract.metadataCoverage.instructionsPct}%)\x1b[0m
-    instr. load      ${instructionLoadColor}${instructionLoad.liveReloadMechanism}\x1b[0m \x1b[90m(seções ${instructionLoad.sectionCount} · seções ausentes ${instructionLoad.sectionsMissingFileCount} · anexos ausentes ${instructionLoad.appendFileMissingCount} · sources RPC ${instructionLoad.sdkSupportsInstructionSourcesRpc})\x1b[0m
-    sdk↔fs route     ${sdkFsRoutingColor}${sdkFsRouting.mode}\x1b[0m \x1b[90m${sdkFsRouting.reason}\x1b[0m
-    custom agents   \x1b[90mperfil ${COPILOT_OPERATIONAL_PROFILE} · ${customAgentsLine}\x1b[0m
+    prompt frescor   ${promptFreshnessLabel} \x1b[90m(${renderTerminalActionLabel(promptRecommendedAction)})\x1b[0m
+    ferramentas      ${toolLoadColor}${toolLoad.total} registradas\x1b[0m \x1b[90m(arquivos locais ${toolLoad.hasCanonicalLocalFsTools} · terminal local ${toolLoad.hasCanonicalLocalExecTools} · workspace SDK ${toolLoad.hasSdkWorkspaceTooling} · shell legado ${toolLoad.hasLegacySdkShellToolsLoaded} · desativadas ${toolLoad.disabled.length})\x1b[0m
+    contrato tools   ${toolContractColor}${toolContract.ok ? 'ok' : 'atenção'}\x1b[0m \x1b[90m(falhas ${toolContract.errorCount} · avisos ${toolContract.warningCount} · descrições ${toolContract.metadataCoverage.descriptionPct}% · schema ${toolContract.metadataCoverage.parametersPct}% · categoria ${toolContract.metadataCoverage.categoryPct}% · tags ${toolContract.metadataCoverage.tagsPct}% · instruções ${toolContract.metadataCoverage.instructionsPct}%)\x1b[0m
+    instruções       ${instructionLoadColor}${instructionLoad.liveReloadMechanism}\x1b[0m \x1b[90m(seções ${instructionLoad.sectionCount} · seções ausentes ${instructionLoad.sectionsMissingFileCount} · anexos ausentes ${instructionLoad.appendFileMissingCount} · fontes RPC ${instructionLoad.sdkSupportsInstructionSourcesRpc})\x1b[0m
+    rota sdk↔fs      ${sdkFsRoutingColor}${sdkFsRouting.mode}\x1b[0m \x1b[90m${sdkFsRouting.reason}\x1b[0m
+    agentes extras   \x1b[90mperfil ${COPILOT_OPERATIONAL_PROFILE} · ${customAgentsLine}\x1b[0m
     io cache         \x1b[90m${ioCacheLine}\x1b[0m
     io scope         \x1b[90m${ioScopeLine}\x1b[0m
-    sdk session      \x1b[90m${projection.sdkSessionId ?? '(sem sdk)'}\x1b[0m
-    hub session      \x1b[90m${projection.hubSessionId ?? '(sem hub)'}\x1b[0m
+    sessão SDK       \x1b[90m${projection.sdkSessionId ?? '(sem sdk)'}\x1b[0m
+    sessão hub       \x1b[90m${projection.hubSessionId ?? '(sem hub)'}\x1b[0m
     turnos canon     ${projection.turnCount} \x1b[90m(persistidos ${projection.persistedTimelineTurnCount} · bridge ${projection.bridgeTurnCount} · live-tail ${projection.liveBridgeTailCount})\x1b[0m
     inject port      ${projection.injectPort}
         atividade atual  ${activitySeverityColor}${activity.label}\x1b[0m${activityProgress}

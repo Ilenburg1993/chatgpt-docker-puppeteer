@@ -496,6 +496,18 @@ function pretty(value, max = 1000) {
 }
 
 /**
+ * @param {unknown} action
+ * @returns {string}
+ */
+function renderSdkPromptActionLabel(action) {
+    const value = typeof action === 'string' ? action.trim() : '';
+    if (!value || value === 'none') return 'nenhuma ação imediata';
+    if (value === 'observe-live-reload') return 'observar recarregamento vivo';
+    if (value === 'resume-session') return 'retomar sessão';
+    return value.replace(/_/gu, ' ');
+}
+
+/**
  * @param {number} ts
  * @returns {string}
  */
@@ -1418,7 +1430,7 @@ async function renderSdkSystemPrompt({ println }, runtimeId) {
         `  sessão   \x1b[90m${String(sessionId ?? '-')}\x1b[0m  fontes \x1b[33m${sessionAvailable ? 'disponíveis' : 'nenhuma'}\x1b[0m`,
     );
     println(
-        `  binding  \x1b[90m${String(binding['digest'] ?? '-')}\x1b[0m  defasado \x1b[33m${yesNo(Boolean(freshness['isStale']))}\x1b[0m  ação \x1b[33m${String(freshness['recommendedAction'] ?? 'none')}\x1b[0m`,
+        `  binding  \x1b[90m${String(binding['digest'] ?? '-')}\x1b[0m  defasado \x1b[33m${yesNo(Boolean(freshness['isStale']))}\x1b[0m  ação \x1b[33m${renderSdkPromptActionLabel(freshness['recommendedAction'])}\x1b[0m`,
     );
 
     if (freshness['reason']) {
@@ -1761,7 +1773,7 @@ export async function cmdPermission({ println }, arg = '') {
             const sdkPromptsSkipped = terminalPermissionModeSkipsSdkPrompts(current);
             println(`\n  \x1b[36mModo de permissões\x1b[0m  \x1b[33m${current}\x1b[0m`);
             println(
-                `  \x1b[90mprompts SDK ${sdkPromptsSkipped ? 'skip' : 'selective'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme policy'}\x1b[0m`,
+                `  \x1b[90mprompts SDK ${sdkPromptsSkipped ? 'ignorados' : 'seletivos'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme política'}\x1b[0m`,
             );
             println('  \x1b[90mUso: /permission mode <approve_all|audit_only|selective>\x1b[0m\n');
             return;
@@ -1774,7 +1786,7 @@ export async function cmdPermission({ println }, arg = '') {
         const sdkPromptsSkipped = terminalPermissionModeSkipsSdkPrompts(updated);
         println(`\n  \x1b[32m? Modo de permissões atualizado:\x1b[0m \x1b[33m${updated}\x1b[0m\n`);
         println(
-            `  \x1b[90mprompts SDK ${sdkPromptsSkipped ? 'skip' : 'selective'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme policy'}\x1b[0m\n`,
+            `  \x1b[90mprompts SDK ${sdkPromptsSkipped ? 'ignorados' : 'seletivos'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme política'}\x1b[0m\n`,
         );
         return;
     }

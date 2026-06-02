@@ -171,8 +171,10 @@ function humanEventLabel(event) {
     if (event === 'session.model_changed') return 'Modelo alterado';
     if (event === 'session.skills_loaded') return 'Skills carregadas';
     if (event === 'session.info') return 'Info da sessão';
-    if (event === 'agent.background.completed') return 'Tarefa em background concluída';
-    if (event === 'agent.background.idle') return 'Background ocioso';
+    if (event === 'agent.background.completed') return 'Tarefa em segundo plano concluída';
+    if (event === 'agent.background.idle') return 'Tarefa em segundo plano ociosa';
+    if (event === 'question.answered') return 'Resposta do operador';
+    if (event === 'assistant.reasoning_complete') return 'Raciocínio concluído';
     if (event === 'dialog.turn_start' || event === 'assistant.turn_start') return 'Turno iniciado';
     if (event === 'dialog.turn_end' || event === 'assistant.turn_end') return 'Turno concluído';
     if (event === 'sdk.lifecycle') return 'Sessão SDK';
@@ -210,7 +212,7 @@ function humanEventSource(source) {
     if (!text) return '-';
     if (lower.startsWith('sdk/user_input')) return 'SDK ask_user';
     if (lower.startsWith('sdk/assistant')) return 'SDK assistant';
-    if (lower.startsWith('agent/background')) return 'agente/background';
+    if (lower.startsWith('agent/background')) return 'tarefa em segundo plano';
     if (lower.startsWith('agent/llm')) return 'agente/usage';
     if (lower.startsWith('terminal-boot')) return 'terminal';
     if (lower.startsWith('terminal-dialog') || lower.startsWith('terminal-agent-wiring')) return 'diálogo';

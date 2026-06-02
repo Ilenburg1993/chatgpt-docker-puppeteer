@@ -72,15 +72,17 @@ describe('terminal/io-activity-events', () => {
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'tool',
-            'I/O read concluído',
+            'Arquivo: leitura concluída',
             expect.objectContaining({
-                detail: expect.stringContaining('src/copilot/terminal/events/io-activity-events.js'),
+                detail: expect.stringContaining('leitura · src/copilot/terminal/events/io-activity-events.js'),
                 toolName: 'io.read',
                 source: 'io',
                 progress: 100,
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('[IO]'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('[ARQUIVO]'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('[LER]'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('[IO]'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('io-engine.fs.readFile.text'));
         expect(broadcastSse).toHaveBeenCalledWith(
             'tool.lifecycle',
@@ -164,7 +166,7 @@ describe('terminal/io-activity-events', () => {
                 timestamp: 321,
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('[MOVE]'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('[MOVER]'));
         expect(broadcastSse).toHaveBeenCalledWith(
             'tool.lifecycle',
             expect.objectContaining({

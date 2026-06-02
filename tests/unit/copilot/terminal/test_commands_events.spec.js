@@ -191,6 +191,87 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).not.toContain('session model changed');
     });
 
+    it('humaniza perguntas, raciocínio e tarefas em segundo plano no resumo default', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 4,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 20,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 10,
+                    event: 'assistant.reasoning_complete',
+                    source: 'sdk/assistant.reasoning_complete',
+                    eventSource: null,
+                    traceId: 'turn:1',
+                    turnId: '1',
+                    hubSessionId: 'hub-1',
+                    payload: { contentLength: 840 },
+                },
+                {
+                    timestamp: 1710000001000,
+                    eventId: 11,
+                    event: 'question.answered',
+                    source: 'agent',
+                    eventSource: null,
+                    traceId: 'turn:1',
+                    turnId: '1',
+                    hubSessionId: 'hub-1',
+                    payload: { questionId: 'q-1' },
+                },
+                {
+                    timestamp: 1710000002000,
+                    eventId: 12,
+                    event: 'agent.background.completed',
+                    source: 'agent/background.completed',
+                    eventSource: null,
+                    traceId: 'turn:1',
+                    turnId: '1',
+                    hubSessionId: 'hub-1',
+                    payload: { status: 'completed' },
+                },
+                {
+                    timestamp: 1710000003000,
+                    eventId: 13,
+                    event: 'agent.background.idle',
+                    source: 'agent/background.idle',
+                    eventSource: null,
+                    traceId: 'turn:1',
+                    turnId: '1',
+                    hubSessionId: 'hub-1',
+                    payload: {},
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '20');
+
+        expect(ctx.output()).toContain('Raciocínio concluído');
+        expect(ctx.output()).toContain('Resposta do operador');
+        expect(ctx.output()).toContain('Tarefa em segundo plano concluída');
+        expect(ctx.output()).toContain('Tarefa em segundo plano ociosa');
+        expect(ctx.output()).toContain('tarefa em segundo plano');
+        expect(ctx.output()).not.toContain('assistant reasoning complete');
+        expect(ctx.output()).not.toContain('question answered');
+        expect(ctx.output()).not.toContain('Tarefa em background concluída');
+        expect(ctx.output()).not.toContain('Background ocioso');
+        expect(ctx.output()).not.toContain('agente/background');
+    });
+
     it('consulta por tool call, request e hub session', async () => {
         readTerminalSseEventArchiveTail.mockResolvedValueOnce({
             state: {

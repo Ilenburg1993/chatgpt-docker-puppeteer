@@ -134,9 +134,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     const activityDetail = activity.detail
         ? `${C.grey}${activity.detail}${C.reset}`
         : `${C.grey}(sem detalhe)${C.reset}`;
-    const actionLine = health?.['recommendedAction']
-        ? `${C.yellow}${health['recommendedAction']}${C.reset}`
-        : `${C.grey}nenhuma${C.reset}`;
+    const actionLine = renderCompactActionLine(health?.['recommendedAction']);
     const askUserLine = health?.['pendingQuestion']
         ? `${C.green}vivo${C.reset}${health?.['pendingQuestionKind'] ? ` [${health['pendingQuestionKind']}]` : ''}`
         : health?.['pendingQuestionShadow']
@@ -160,7 +158,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     const permissionLine = `${C.magenta}${permissionMode}${C.reset} ${C.grey}· prompts SDK ${terminalPermissionModeSkipsSdkPrompts(permissionMode) ? 'ignorados' : 'seletivos'}${C.reset}`;
     const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
     const byokLine = byok.enabled
-        ? `${byok.ready ? `${C.green}pronto${C.reset}` : `${C.red}incompleto${C.reset}`} ${C.grey}preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · auth ${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'api key' : byok.auth.headersConfigured ? 'headers' : 'none'}${C.reset}`
+        ? `${byok.ready ? `${C.green}pronto${C.reset}` : `${C.red}incompleto${C.reset}`} ${C.grey}preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · autenticação ${renderCompactAuthLabel(byok.auth)}${C.reset}`
         : `${C.grey}off${C.reset}`;
     const gatewayProjection = configProjection.modelGatewayProjection ?? {
         providerCount: 0,
@@ -290,7 +288,7 @@ ${C.cyan}  INFRAESTRUTURA${C.reset}
     Lifecycle mx  ${lifecycleMetricsLine}
     Uptime        ${C.grey}${Math.floor(uptimeSec / 60)}m ${uptimeSec % 60}s${C.reset}
     Memória RSS   ${memMB > 400 ? C.yellow : C.grey}${memMB}MB${C.reset}
-    sdk↔fs route  ${sdkFsRouteModeColor}${sdkFsRouting.mode}${C.reset} ${C.grey}(${sdkFsRouting.reason})${C.reset}
+    rota sdk↔fs   ${sdkFsRouteModeColor}${sdkFsRouting.mode}${C.reset} ${C.grey}(${sdkFsRouting.reason})${C.reset}
 
 ${C.cyan}  TODOs PENDENTES (top-5)${C.reset}
 ${todoLines}
@@ -355,15 +353,20 @@ function renderHumanHealthStatus(value) {
  */
 function renderCompactByokLine(byok) {
     if (!byok.enabled) return `${C.grey}BYOK desligado${C.reset}`;
-    const auth = byok.auth.bearerTokenConfigured
-        ? 'bearer'
-        : byok.auth.apiKeyConfigured
-          ? 'api key'
-          : byok.auth.headersConfigured
-            ? 'headers'
-            : 'sem credencial';
+    const auth = renderCompactAuthLabel(byok.auth);
     const color = byok.ready ? C.green : C.red;
     return `${color}${byok.ready ? 'pronto' : 'incompleto'}${C.reset} ${C.grey}· ${byok.providerType ?? byok.preset ?? 'provedor'} · ${byok.model ?? 'modelo'} · ${auth}${C.reset}`;
+}
+
+/**
+ * @param {{ apiKeyConfigured?: boolean; bearerTokenConfigured?: boolean; headersConfigured?: boolean }} auth
+ * @returns {string}
+ */
+function renderCompactAuthLabel(auth) {
+    if (auth.bearerTokenConfigured) return 'token bearer';
+    if (auth.apiKeyConfigured) return 'chave API';
+    if (auth.headersConfigured) return 'headers';
+    return 'sem credencial';
 }
 
 /**

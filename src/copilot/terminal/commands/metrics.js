@@ -111,6 +111,12 @@ export function cmdMetrics({ println }, arg = '') {
         systemPromptFreshness?.['recommendedAction'] === 'resume-session'
             ? systemPromptFreshness['recommendedAction']
             : 'none';
+    const promptActionLabel =
+        promptAction === 'observe-live-reload'
+            ? 'observar recarregamento vivo'
+            : promptAction === 'resume-session'
+              ? 'retomar sessão'
+              : 'nenhuma ação imediata';
     const promptLabel =
         promptIsStale === true
             ? '\x1b[31mstale\x1b[0m'
@@ -175,13 +181,13 @@ export function cmdMetrics({ println }, arg = '') {
   \x1b[36mMétricas da Sessão\x1b[0m
   ═════════════════════════════════════
   sessão      \x1b[90m${sessionId}\x1b[0m
-    runtime id   \x1b[90m${projection.runtimeId}\x1b[0m
-    sdk sessão  \x1b[90m${binding.sdkSessionId ?? '(sem sdk)'}\x1b[0m
-    hub sessão  \x1b[90m${binding.hubSessionId ?? '(sem hub)'}\x1b[0m
+    runtime alvo \x1b[90m${projection.runtimeId}\x1b[0m
+    sessão SDK   \x1b[90m${binding.sdkSessionId ?? '(sem sdk)'}\x1b[0m
+    sessão hub   \x1b[90m${binding.hubSessionId ?? '(sem hub)'}\x1b[0m
   status      ${status}
   modelo      \x1b[36m${model}\x1b[0m
   modo sdk    ${configProjection.sdkSessionMode ?? 'interactive'}
-  plan file   ${configProjection.sdkPlanOperation ?? '(sem alterações)'}
+  plano       ${configProjection.sdkPlanOperation ?? '(sem alterações)'}
 
   \x1b[35m📊 Uso\x1b[0m
   ─────────────────────────────────────
@@ -190,7 +196,7 @@ export function cmdMetrics({ println }, arg = '') {
   sync Hub    ${timelineSyncStatus} \x1b[90m(pendentes ${timelineSyncPendingCount} · agendados ${timelineSyncTelemetry.scheduledTotal} · gravados ${timelineSyncTelemetry.turnsSyncedTotal} · falhas ${timelineSyncTelemetry.failedTotal} · retentativas ${timelineSyncTelemetry.retryTotal} · cache ${timelineSyncTelemetry.completedCacheSize}/${timelineSyncTelemetry.failureCacheSize})\x1b[0m
   contexto    ${ctxStr}
   ${billingLine}
-  prompt      ${promptLabel} \x1b[90m(digest ${promptDigest ?? '-'} · ação ${promptAction})\x1b[0m
+  prompt      ${promptLabel} \x1b[90m(digest ${promptDigest ?? '-'} · ação ${promptActionLabel})\x1b[0m
 
   \x1b[35m🔧 Ferramentas\x1b[0m
   ─────────────────────────────────────

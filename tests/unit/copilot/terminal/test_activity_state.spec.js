@@ -101,7 +101,7 @@ describe('terminal/activity-state', () => {
         clearTerminalActivityHistory();
         markTerminalActivityIdle('Aguardando próxima mensagem');
         recordTerminalActivity('task', 'Tarefa interna concluída', {
-            detail: '0 chunks · 0 chars',
+            detail: '0 fragmentos · 0 caracteres',
             source: 'agent',
             recordHistory: true,
             updateCurrent: false,
