@@ -7,6 +7,7 @@
 
 import { listTerminalPublicStreamSourcePolicies } from '../events/index.js';
 import { readTerminalSseEventArchiveTail } from '../state/index.js';
+import { compactTerminalDiagnosticId, getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
 
 /**
  * @typedef {object} EventsContext
@@ -124,9 +125,9 @@ function buildPolicyQueryHints(policy) {
  * @param {unknown} value
  * @returns {string}
  */
-function compact(value) {
+function compact(value, max = 100) {
     const text = typeof value === 'string' ? value : value == null ? '' : String(value);
-    return text.length > 100 ? `${text.slice(0, 97)}...` : text;
+    return text.length > max ? `${text.slice(0, Math.max(0, max - 3))}...` : text;
 }
 
 /**
@@ -139,10 +140,11 @@ function summarizePayload(payload) {
     const requestId = payload['requestId'] ?? payload['pendingRequestId'];
     const content = payload['content'] ?? payload['chunk'] ?? payload['question'] ?? payload['message'] ?? null;
     const status = payload['status'] ?? payload['type'] ?? payload['classification'] ?? null;
+    const humanToolName = typeof toolName === 'string' ? getTerminalHumanToolName(toolName) : null;
     return [
-        toolName ? `tool=${compact(toolName)}` : null,
-        toolCallId ? `call=${compact(toolCallId)}` : null,
-        requestId ? `req=${compact(requestId)}` : null,
+        humanToolName ? `tool=${compact(humanToolName, 48)}` : null,
+        toolCallId ? `call=${compactTerminalDiagnosticId(String(toolCallId), 14)}` : null,
+        requestId ? `req=${compactTerminalDiagnosticId(String(requestId), 14)}` : null,
         status ? `status=${compact(status)}` : null,
         content ? compact(content) : null,
     ]
@@ -232,9 +234,12 @@ export async function cmdEvents({ println }, arg = '') {
         filters.hubSessionId ? `hub=${filters.hubSessionId}` : null,
     ].filter(Boolean);
 
-    println(`\n  \x1b[36m🧾 Eventos SSE — últimas ${filters.limit}\x1b[0m`);
+    println(`\n  \x1b[36m🧾 Eventos SSE — visão resumida · últimas ${filters.limit}\x1b[0m`);
     println(
-        `  \x1b[90marquivo=${state.path ?? '(sem arquivo)'} · eventos=${state.events} · fila=${state.queueDepth} · filtro=${filterParts.join(' ') || 'nenhum'}\x1b[0m`,
+        `  \x1b[90marquivo=${compact(state.path ?? '(sem arquivo)', 88)} · eventos=${state.events} · fila=${state.queueDepth} · filtro=${filterParts.join(' ') || 'nenhum'}\x1b[0m`,
+    );
+    println(
+        '  \x1b[90mUse /events --raw para JSONL bruto, /events --json para automação, /events sources para mapa de fontes.\x1b[0m',
     );
     if (state.error) {
         println(`  \x1b[31merro=${state.error}\x1b[0m`);
@@ -246,10 +251,10 @@ export async function cmdEvents({ println }, arg = '') {
 
     for (const entry of entries) {
         const time = new Date(entry.timestamp).toLocaleTimeString('pt-BR');
-        const origin = entry.eventSource ?? entry.source ?? '-';
+        const origin = compact(entry.eventSource ?? entry.source ?? '-', 52);
         const trace = entry.traceId ? ` · trace=${entry.traceId}` : '';
         const turn = entry.turnId ? ` · turn=${entry.turnId}` : '';
-        const hub = entry.hubSessionId ? ` · hub=${entry.hubSessionId}` : '';
+        const hub = entry.hubSessionId ? ` · hub=${compactTerminalDiagnosticId(entry.hubSessionId, 14)}` : '';
         const summary = summarizePayload(entry.payload ?? {});
         const transcriptHint = buildTranscriptExportHint(entry);
         const detail = [summary, transcriptHint].filter(Boolean).join(' · ');

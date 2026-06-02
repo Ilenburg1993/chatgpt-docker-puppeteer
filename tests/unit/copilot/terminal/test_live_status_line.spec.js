@@ -191,6 +191,28 @@ describe('terminal/live-status-line', () => {
         cleanup();
     });
 
+    it('compacta thinking longo sem delta em uma linha curta', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'thinking',
+            label: 'LLM-B trabalhando',
+            detail: 'auto · high · 20s sem delta visível',
+            toolName: null,
+            startedAt: Date.parse('2026-05-07T22:00:00.000-03:00'),
+        };
+        mocks.stream = { model: 'auto', reasoningEffort: 'high' };
+
+        const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:18.000-03:00') });
+
+        expect(line).toContain('thinking');
+        expect(line).toContain('20s sem delta');
+        expect(line).toContain('auto/high');
+        expect(line).not.toContain('LLM-B trabalhando');
+        expect(line.length).toBeLessThan(90);
+    });
+
     it('prioriza ask_user humano sobre atividade antiga na linha viva', async () => {
         const { shouldRenderTerminalLiveStatusLine, formatTerminalLiveStatusLine } = await import(
             '../../../../src/copilot/terminal/repl/live-status-line.js'

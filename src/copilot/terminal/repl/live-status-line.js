@@ -18,8 +18,9 @@ import { readTerminalActivitySnapshot, terminalThemeText } from '../state/repl/i
 const MIN_LIVE_STATUS_INTERVAL_MS = 250;
 const MIN_LIVE_STATUS_HEARTBEAT_MS = 1_000;
 const DEFAULT_LIVE_STATUS_HEARTBEAT_MS = 5_000;
-const LIVE_DETAIL_MAX_CHARS = 96;
-const LIVE_QUESTION_MAX_CHARS = 92;
+const LIVE_LABEL_MAX_CHARS = 28;
+const LIVE_DETAIL_MAX_CHARS = 48;
+const LIVE_QUESTION_MAX_CHARS = 64;
 
 /**
  * @param {ReturnType<typeof readTerminalRuntimeState>} runtime
@@ -42,6 +43,26 @@ function compactLiveStatusText(value, max) {
         .replace(/\s+/g, ' ')
         .trim();
     return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1))}…`;
+}
+
+/**
+ * @param {string} detail
+ * @returns {string | null}
+ */
+function extractNoDeltaStatus(detail) {
+    const match = detail.match(/(?<elapsed>\d+(?:s|m\d{2}s|h\d{2}m)?)\s+sem delta(?: visível)?/iu);
+    const elapsed = match?.groups?.['elapsed'] ?? null;
+    return elapsed ? `${elapsed} sem delta` : null;
+}
+
+/**
+ * @param {string} status
+ * @param {string} loop
+ * @returns {string}
+ */
+function compactRuntimeStatus(status, loop) {
+    if (!status || status === 'processing') return loop;
+    return `${status}:${loop}`;
 }
 
 /**
@@ -112,13 +133,24 @@ export function formatTerminalLiveStatusLine(input = {}) {
             ? 'idle'
             : (runtime.status ?? '-');
     const severityRole = activity.severity === 'error' ? 'error' : activity.severity === 'warn' ? 'warn' : 'muted';
-    const target = activity.toolName ? ` · ${activity.toolName}` : '';
+    const runtimeTail = compactRuntimeStatus(displayStatus, loop);
+    const noDeltaStatus = activity.phase === 'thinking' ? extractNoDeltaStatus(activity.detail ?? '') : null;
+    if (noDeltaStatus) {
+        return (
+            `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
+            `${terminalThemeText(severityRole, 'thinking')}` +
+            `${terminalThemeText('muted', ` · ${noDeltaStatus} · ${model}/${effort} · ${runtimeTail}${queue}`)}` +
+            '\x1b[K'
+        );
+    }
+    const label = compactLiveStatusText(activity.label, LIVE_LABEL_MAX_CHARS);
+    const target = activity.toolName ? ` · ${compactLiveStatusText(activity.toolName, 24)}` : '';
     const detailText = detail ? ` · ${detail}` : '';
     return (
         `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
-        `${terminalThemeText(severityRole, `${activity.phase}/${activity.label}`)}` +
+        `${terminalThemeText(severityRole, `${activity.phase}/${label}`)}` +
         `${terminalThemeText('tool', target)}` +
-        `${terminalThemeText('muted', `${detailText}${progress} · ${formatLiveDuration(ageMs)} · ${model}/${effort} · ${displayStatus}:${loop}${queue}`)}` +
+        `${terminalThemeText('muted', `${detailText}${progress} · ${formatLiveDuration(ageMs)} · ${model}/${effort} · ${runtimeTail}${queue}`)}` +
         '\x1b[K'
     );
 }

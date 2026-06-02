@@ -2668,6 +2668,11 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             detail: 'dialog watchdog did not render a second live-status line when permanent live status is enabled',
         },
         {
+            id: 'ux-compact-no-delta-live-status',
+            pass: !/thinking\/LLM-B trabalhando[\s\S]{0,160}sem delta visível/iu.test(plain),
+            detail: 'no-delta live status stayed semantic/compact instead of repeating the full working label',
+        },
+        {
             id: 'ux-health-human-tool-stats',
             pass: healthToolStatsUseHumanNames(plain),
             detail: healthToolStatsUseHumanNames(plain)

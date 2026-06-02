@@ -585,6 +585,71 @@
   - o modelo respondeu em multiplos turnos internos e adicionou texto publico extra antes dos marcadores, mas o contrato testado continuou consistente: tool lifecycle real, deltas, ask_user, resposta humana, pos-ask, export e SSE.
   - a linha viva em turnos longos ainda ocupa tres linhas fisicas em PTY estreito; isso permanece como item de polimento da Faixa P/O.
 
+## 02.20 Terceira rodada UX: linha viva compacta para `sem delta`
+
+- Problema observado em `terminal-ux-revolution-pass4-sdk-20260602-0630`:
+  - em turnos longos, a linha viva imprimia `thinking/LLM-B trabalhando · auto · high · 20s sem delta visível · ...`;
+  - esse texto competia com o prompt e quebrava em tres linhas fisicas no PTY do VS Code;
+  - a informacao util era apenas: estado thinking, tempo sem delta, modelo/esforco e loop.
+- Ajuste arquitetural:
+  - `formatTerminalLiveStatusLine()` ganhou compactacao semantica para detalhes `sem delta`;
+  - o status passa a renderizar `thinking · 20s sem delta · auto/high · loop`;
+  - `processing:` redundante foi omitido do tail default quando o estado operacional ja e implicito;
+  - label e detalhe comuns passaram a ter budgets menores e consistentes.
+- Contratos:
+  - teste unitario novo em `tests/unit/copilot/terminal/test_live_status_line.spec.js`;
+  - criterio live novo `ux-compact-no-delta-live-status`;
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs` passou.
+- Status:
+  - [x] Unit test focado passou.
+  - [x] Runner live recebeu criterio de regressao.
+  - [x] Live PTY posterior provou o criterio em terminal real.
+
+## 02.21 Terceira rodada UX: `/events` com modo resumido humano
+
+- Problema:
+  - `/events` em modo default parecia quase tao bruto quanto `--raw`;
+  - IDs de hub/call/request e nomes tecnicos de tool aumentavam a carga visual;
+  - o operador nao recebia uma pista clara de quando usar `--raw`, `--json` ou `sources`.
+- Ajuste:
+  - header default virou `Eventos SSE — visão resumida`;
+  - linha auxiliar explica `/events --raw`, `/events --json` e `/events sources`;
+  - `hubSessionId`, `toolCallId` e `requestId` sao compactados no modo texto;
+  - payload com `toolName` passa pelo glossario visual (`read_file_content` -> `Ler arquivo`);
+  - `--raw` e `--json` permanecem puros para automacao e auditoria.
+- Testes:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js`
+  - Resultado: 2 arquivos, 15 testes, PASS.
+- Status:
+  - [x] `/events` default resumido/humano.
+  - [x] `--raw` preservado como JSONL puro.
+  - [x] `--json` preservado para automacao.
+  - [x] Live PTY posterior verificou legibilidade no terminal real.
+
+## 02.22 Evidencia live PTY da terceira rodada UX
+
+- Comando executado:
+  - `COPILOT_BYOK_ENABLED=false node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --transport=pty --live-scenario=canonical --out-dir=data/copilot-terminal/live-runs/terminal-ux-revolution-pass5-sdk-20260602-0637`
+- Artefatos:
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass5-sdk-20260602-0637/summary.md`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass5-sdk-20260602-0637/terminal.raw.log`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass5-sdk-20260602-0637/terminal.plain.log`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass5-sdk-20260602-0637/terminal.sse.jsonl`
+  - `data/copilot-terminal/live-runs/terminal-ux-revolution-pass5-sdk-20260602-0637/conversation-export.md`
+- Resultado:
+  - status PASS;
+  - 260 eventos SSE;
+  - 0 erros;
+  - `ux-compact-no-delta-live-status` passou;
+  - `/events` default exibiu `Eventos SSE — visão resumida`;
+  - `/events` default mostrou `hub`, `call` e `req` compactos;
+  - `/events --raw` preservou JSONL bruto para automacao;
+  - todos os criterios funcionais e esteticos adicionados desde M-P/S continuaram verdes.
+- Residual observado:
+  - alguns estados `turn/...` ainda podem ocupar tres linhas em casos de detalhe longo;
+  - ASK ainda ocupa tres linhas no prompt estreito quando pergunta + opcoes + modelo entram juntos;
+  - isso deve ir para a proxima rodada de layout de status/prompt, nao para a camada de eventos.
+
 ## 03. Achados principais
 
 ### 03.01 Typecheck strict
@@ -925,6 +990,7 @@
 - [x] Registrar evidencia PTY da rodada `terminal-ux-revolution-baseline-sdk-20260602-0557`.
 - [x] Registrar evidencia PTY da rodada `terminal-ux-revolution-pass3-sdk-20260602-0621`.
 - [x] Registrar evidencia PTY da rodada `terminal-ux-revolution-pass4-sdk-20260602-0630`.
+- [x] Registrar evidencia PTY da rodada `terminal-ux-revolution-pass5-sdk-20260602-0637`.
 
 ### Faixa M - Glossario visual e nomes humanos
 
@@ -961,6 +1027,7 @@
 - [x] Escolher uma unica fonte de linha viva por estado.
 - [x] Reduzir `LIVE_DETAIL_CATASTROPHIC_CHARS` para budget visual real.
 - [x] Compactar `waiting-human` em ate duas linhas fisicas no default.
+- [x] Compactar `thinking/sem delta` em uma linha sem repetir `LLM-B trabalhando`.
 - [x] Remover `turnId=` da linha viva default.
 - [x] Evitar narracao duravel repetitiva `LLM-B ainda trabalhando` em modo normal.
 - [x] Manter watchdog visivel sem competir com `⟲ LLM-B`.
@@ -982,7 +1049,7 @@
 
 - [ ] Revisar `/activity` para modo default sem IDs longos.
 - [x] Revisar `/tools diag` para IDs compactos e drill-down claro.
-- [ ] Revisar `/events` para continuar bruto, mas com header explicito de debug.
+- [x] Revisar `/events` para continuar bruto, mas com header explicito de debug.
 - [x] Revisar `/health` para reduzir ruido visual default.
 - [ ] Adicionar flags ou subcomandos `detail`, `raw` ou `debug` onde fizer sentido.
 - [x] Testar que dados tecnicos continuam acessiveis.

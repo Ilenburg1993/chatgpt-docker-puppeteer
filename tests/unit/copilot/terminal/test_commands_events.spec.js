@@ -84,6 +84,8 @@ describe('terminal/commands/events', () => {
             expect.objectContaining({ limit: 5, event: 'delta', traceId: 'turn:abc' }),
         );
         expect(ctx.output()).toContain('Eventos SSE');
+        expect(ctx.output()).toContain('visão resumida');
+        expect(ctx.output()).toContain('/events --raw');
         expect(ctx.output()).toContain('#42');
         expect(ctx.output()).toContain('DELTA-CANONICAL-1');
         expect(ctx.output()).toContain('call=call_123');
@@ -144,6 +146,8 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('hub=hub-1');
         expect(ctx.output()).toContain('call=call_123');
         expect(ctx.output()).toContain('req=req-123');
+        expect(ctx.output()).toContain('tool=Ler arquivo');
+        expect(ctx.output()).not.toContain('tool=read_file_content');
     });
 
     it('mostra vínculo compacto entre eventos canônicos e transcript/export', async () => {
