@@ -547,7 +547,7 @@ describe('commands/session — sync commands', () => {
             expect(ctx.output()).toContain('inativa');
             expect(ctx.output()).not.toContain('loop inativo');
             expect(ctx.output()).toContain('SSE');
-            expect(ctx.output()).toContain('prompts approve_all');
+            expect(ctx.output()).toContain('permissões automáticas');
             expect(ctx.output()).toContain('1 provedor');
             expect(ctx.output()).toContain('3 modelos');
             expect(ctx.output()).toContain('ativo openrouter · deepseek/deepseek-v4-flash:free');
@@ -1092,10 +1092,13 @@ describe('commands/session — async commands', () => {
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'sdk.lifecycle', limit: 5 });
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'sdk.command.executed', limit: 5 });
         expect(ctx.output()).toContain('Eventos SDK da sessão');
-        expect(ctx.output()).toContain('sdk.lifecycle');
+        expect(ctx.output()).toContain('Ciclo de vida SDK');
+        expect(ctx.output()).toContain('sessão atualizada');
         expect(ctx.output()).toContain('×2');
         expect(ctx.output()).toContain('terminal_status');
         expect(ctx.output()).toContain('este comando não cria eventos');
+        expect(ctx.output()).not.toContain('#10');
+        expect(ctx.output()).not.toContain('agent/sdk.lifecycle');
     });
 
     it('cmdSessionSdk commands lista CommandDefinition[] expostos ao SDK', async () => {
@@ -1228,7 +1231,11 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('permissões 1');
         expect(ctx.output()).toContain('Continuar?');
         expect(ctx.output()).toContain('Escolha ambiente');
-        expect(ctx.output()).toContain('fs.write');
+        expect(ctx.output()).toContain('escrita de arquivo');
+        expect(ctx.output()).not.toContain('#20');
+        expect(ctx.output()).not.toContain('ask-1');
+        expect(ctx.output()).not.toContain('sdk/user_input.requested');
+        expect(ctx.output()).not.toContain('fs.write');
     });
 
     it('cmdSessionSave salva e imprime path', async () => {

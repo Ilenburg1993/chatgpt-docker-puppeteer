@@ -3798,5 +3798,64 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-tools-granular-20260603-1537`.
   - Resultado: PASS em 7/7; `/tools` mostrou `Pasta local`, `Leitura local`, `Busca local` e
         `Escrita local`.
-- [ ] Próxima lacuna: revisar `/live` e `/session` porque ainda há trechos com `Origem`,
+- [x] Próxima lacuna: revisar `/live` e `/session` porque ainda havia trechos com `Origem`,
       `phase/source`, timestamps ISO e detalhes técnicos em superfícies default.
+
+### 11.49 `/live full` e painéis de sessão sem constantes internas
+
+- [x] Achado live: `/live full` já era útil, mas ainda mostrava timestamp ISO em I/O/eventos,
+      `search` em inglês, UUID cru de sessão SDK, `approve_all`, `empty` e `not_needed`.
+- [x] Decisão: mesmo painéis detalhados devem ser operacionais e escaneáveis; IDs e estados crus
+      pertencem a `/events --raw`, `/events --json`, `/session sdk` ou diagnósticos explícitos.
+- [x] Implementação: `/live full` agora usa `formatTerminalRelativeAge` para I/O real e eventos
+      recentes.
+- [x] Implementação: `renderLiveOperationLabel` passou a traduzir `search` como `busca`.
+- [x] Implementação: `session.js` ganhou normalizadores para permissões, presença de sessão SDK,
+      origem/reconciliação da timeline e status de sync.
+- [x] Implementação: `/live full` agora mostra `sessão ativa`, `permissões automáticas`,
+      `sem histórico`, `sem divergência` e `sincronização dispensada`, em vez de UUID,
+      `approve_all`, `empty` e `not_needed`.
+- [x] Implementação: `/now full` e `/status full` passaram a reutilizar os mesmos rótulos humanos
+      para permissões, timeline, sync e ações recomendadas.
+- [x] Teste escopado passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-live-full-labels-20260603-1543`.
+  - Resultado observado: `/live full` exibiu `Sessão SDK interativo · sessão ativa · permissões
+        automáticas` e `Timeline sem histórico · sem divergência · sincronização dispensada`.
+- [x] Harness reforçado e live repetido:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-live-full-id-guard-20260603-1544`.
+  - Resultado: PASS em 8/8; o critério `diagnostic-ux-live-full-human` agora falha se
+        `/live full` voltar a mostrar ISO bracketado, `search`, `phase:`, `approve_all`,
+        `empty`, `not_needed` ou UUID cru.
+- [x] Próxima lacuna: revisar `/session sdk events` e `/session sdk waits`, porque ainda havia
+      superfícies com timestamps ISO, `#eventId`, fontes cruas e IDs de pedido.
+
+### 11.50 `/session sdk events/waits` como trilha agregada humana
+
+- [x] Achado: `/session sdk events` resumiam archive SSE com linhas `#eventId`, fonte
+      `agent/sdk.lifecycle`, tipos como `session.updated` e timestamp ISO como label da linha.
+- [x] Achado: `/session sdk waits` expunha `#eventId`, `sdk/user_input.requested`, request IDs
+      como `ask-1` e permissões como `fs.write`.
+- [x] Decisão: esses comandos são agregadores operacionais; detalhes crus devem ficar em
+      `/events --raw`/`--json`.
+- [x] Implementação: `summarizeSdkSessionArchiveEntry` removeu `#eventId` e fonte crua da linha
+      default, usando eventos humanos e tipos traduzidos como `sessão atualizada`.
+- [x] Implementação: `summarizeSdkWaitArchiveEntry` removeu request/session IDs da linha default
+      e traduz permissões como `fs.write` para `escrita de arquivo`.
+- [x] Implementação: ambos os comandos usam `formatTerminalRelativeAge` e `terminalThemeRow`
+      com labels fixos (`Evento`, `Espera`), evitando timestamps ISO como coluna primária.
+- [x] Implementação: estados vazios deixaram de sugerir filtros crus (`event=sdk.lifecycle`,
+      `event=user_input.requested`) e passaram a apontar para `/events sources` ou `/events --raw`.
+- [x] Harness live ampliado: `--diagnostic-ux-cycle` agora executa `/session sdk events 8` e
+      `/session sdk waits 8`, com critérios contra event IDs, fontes SDK cruas, permissões cruas,
+      ISO e UUIDs.
+- [x] Correção no harness: extração das superfícies agora usa a ordem real dos comandos do ciclo,
+      evitando capturar `/tools` ou `/events` citados no banner de boot.
+- [x] Teste escopado passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-session-sdk-surface-order-20260603-1549`.
+  - Resultado: PASS em 10/10 critérios.
+- [ ] Próxima lacuna: revisar `/history`, `/db-history` e `/db-sessions`, porque ainda há
+      timestamps ISO e linhas de histórico que parecem export/log, não painel de leitura.

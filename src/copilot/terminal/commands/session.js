@@ -50,6 +50,7 @@ import {
 import {
     readTerminalSseEventArchiveTail,
     formatTerminalIsoTimestamp,
+    formatTerminalRelativeAge,
     terminalPermissionModeSkipsSdkPrompts,
     terminalThemeDivider,
     terminalThemeHeadline,
@@ -164,7 +165,58 @@ function renderTerminalSyncStatusLabel(value) {
     if (status === 'synced') return 'sincronizada';
     if (status === 'failed') return 'falhou';
     if (status === 'idle') return 'ociosa';
+    if (status === 'not_needed') return 'dispensada';
+    if (status === 'blocked') return 'bloqueada';
     return status || 'n/d';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderTerminalTimelineSourceLabel(value) {
+    const source = String(value ?? '');
+    if (!source || source === 'empty') return 'sem histórico';
+    if (source === 'hub') return 'hub';
+    if (source === 'bridge') return 'bridge';
+    if (source === 'mixed') return 'misto';
+    if (source === 'live') return 'ao vivo';
+    return source.replace(/[_-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderTerminalTimelineReconciliationLabel(value) {
+    const status = String(value ?? '');
+    if (!status || status === 'empty') return 'sem divergência';
+    if (status === 'synced') return 'sincronizada';
+    if (status === 'diverged') return 'divergente';
+    if (status === 'pending') return 'pendente';
+    return status.replace(/[_-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderTerminalPermissionModeLabel(value) {
+    const mode = String(value ?? '');
+    if (mode === 'approve_all') return 'automáticas';
+    if (mode === 'default') return 'padrão';
+    if (mode === 'read_only') return 'somente leitura';
+    if (mode === 'ask') return 'pedir confirmação';
+    if (mode === 'deny_all') return 'bloqueadas';
+    return mode.replace(/[_-]+/gu, ' ') || 'n/d';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderTerminalSdkSessionPresence(value) {
+    return typeof value === 'string' && value.trim().length > 0 ? 'sessão ativa' : 'sem sessão SDK';
 }
 
 /**
@@ -252,6 +304,7 @@ function renderLiveOperationLabel(value) {
     if (operation === 'move' || operation === 'rename') return 'movimento';
     if (operation === 'delete' || operation === 'unlink') return 'exclusão';
     if (operation === 'list') return 'listagem';
+    if (operation === 'search') return 'busca';
     if (operation === 'run' || operation === 'exec') return 'execução';
     if (operation === 'inspect' || operation === 'stat') return 'inspeção';
     if (operation === 'mkdir') return 'criação de pasta';
@@ -635,7 +688,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         ? `${agentSelection.enabled.join(', ')}${agentSelection.disabled.length ? ` · desativados ${agentSelection.disabled.join(', ')}` : ''}`
         : 'nenhum';
     const permissionModeSkipsSdkPrompts = terminalPermissionModeSkipsSdkPrompts(projection.permissionMode);
-    const permissionModeDetail = `${projection.permissionMode} · prompts SDK ${permissionModeSkipsSdkPrompts ? 'ignorados' : 'seletivos'}`;
+    const permissionModeDetail = `${renderTerminalPermissionModeLabel(projection.permissionMode)} · prompts SDK ${permissionModeSkipsSdkPrompts ? 'ignorados' : 'seletivos'}`;
     println('');
     println(terminalThemeHeadline('assistant', 'Status do Terminal LLM-B', ['detalhado']));
     println(terminalThemeRow('Agente', `${renderHumanTerminalStatus(snap['status'])} · saúde ${health ? renderHumanTerminalHealth(health['status']) : 'sem leitura'}`));
@@ -664,7 +717,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     println(
         terminalThemeRow(
             'Timeline',
-            `${projection.timelineSource} · ${projection.timelineAuthority} · ${projection.timelineReconciliationStatus} · ${projection.timelineTurnCount} turnos${timelineSyncLabel}`,
+            `${renderTerminalTimelineSourceLabel(projection.timelineSource)} · ${projection.timelineAuthority} · ${renderTerminalTimelineReconciliationLabel(projection.timelineReconciliationStatus)} · ${projection.timelineTurnCount} turnos${timelineSyncLabel}`,
         ),
     );
     println(terminalThemeRow('Prompt digest', promptBindingDigest ?? 'sem binding'));
@@ -693,7 +746,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     println(terminalThemeRow('Agentes extras', `perfil ${COPILOT_OPERATIONAL_PROFILE} · ${customAgentsLine}`));
     println(terminalThemeRow('I/O cache', ioCacheLine));
     println(terminalThemeRow('I/O scope', ioScopeLine));
-    println(terminalThemeRow('Sessão SDK', projection.sdkSessionId ?? 'sem sdk'));
+    println(terminalThemeRow('Sessão SDK', renderTerminalSdkSessionPresence(projection.sdkSessionId)));
     println(terminalThemeRow('Sessão hub', projection.hubSessionId ?? 'sem hub'));
     println(
         terminalThemeRow(
@@ -974,7 +1027,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
             println(terminalThemeRow('Atividade', `${projection.activity.label}${detail}`));
         }
         if (projection.recommendedAction && projection.recommendedAction !== 'none') {
-            println(terminalThemeRow('Próximo', projection.recommendedAction, { role: 'command' }));
+            println(terminalThemeRow('Próximo', renderTerminalActionLabel(projection.recommendedAction), { role: 'command' }));
         }
         println(terminalThemeDivider(37));
         return;
@@ -1009,13 +1062,13 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
     println(
         terminalThemeRow(
             'Entrada',
-            `${renderHumanInputChannelText(channel.label)} · modo SDK ${renderLiveSdkMode(projection.sdkSessionMode)} · prompts ${projection.permissionMode} · ${waitSummary || 'sem pendências humanas'}`,
+            `${renderHumanInputChannelText(channel.label)} · modo SDK ${renderLiveSdkMode(projection.sdkSessionMode)} · permissões ${renderTerminalPermissionModeLabel(projection.permissionMode)} · ${waitSummary || 'sem pendências humanas'}`,
         ),
     );
     println(
         terminalThemeRow(
             'Timeline',
-            `${projection.timelineSource} · ${projection.timelineReconciliationStatus} · sync ${renderTerminalSyncStatusLabel(projection.timelineSyncStatus)}`,
+            `${renderTerminalTimelineSourceLabel(projection.timelineSource)} · ${renderTerminalTimelineReconciliationLabel(projection.timelineReconciliationStatus)} · sincronização ${renderTerminalSyncStatusLabel(projection.timelineSyncStatus)}`,
         ),
     );
     println(
@@ -1065,6 +1118,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
             runtimeId,
         ),
     );
+    const now = Date.now();
     const status = projection.status;
     const current = projection.activity.current;
     const activeTrace = projection.turnTrace.current ?? projection.turnTrace.recent[0] ?? null;
@@ -1133,7 +1187,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     println(
         terminalThemeRow(
             'Sessão SDK',
-            `${renderLiveSdkMode(status.sdkSessionMode)} · ${status.sdkSessionId ?? 'sem sessão SDK'} · permissões ${status.permissionMode}`,
+            `${renderLiveSdkMode(status.sdkSessionMode)} · ${renderTerminalSdkSessionPresence(status.sdkSessionId)} · permissões ${renderTerminalPermissionModeLabel(status.permissionMode)}`,
         ),
     );
     println(terminalThemeRow('Sinais', streamFlags));
@@ -1146,7 +1200,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     println(
         terminalThemeRow(
             'Timeline',
-            `${projection.timeline.timelineSource} · ${projection.timeline.reconciliationStatus} · sync ${renderTerminalSyncStatusLabel(projection.timeline.sync.status)} · ${projection.counters.timelineTurns} turno(s)`,
+            `${renderTerminalTimelineSourceLabel(projection.timeline.timelineSource)} · ${renderTerminalTimelineReconciliationLabel(projection.timeline.reconciliationStatus)} · sincronização ${renderTerminalSyncStatusLabel(projection.timeline.sync.status)} · ${projection.counters.timelineTurns} turno(s)`,
         ),
     );
     println(
@@ -1177,7 +1231,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     if (projection.recentIo.length > 0) {
         println(terminalThemeHeadline('assistant', 'I/O real recente'));
         for (const entry of projection.recentIo.slice(0, 6)) {
-            const ts = formatTerminalIsoTimestamp(entry.timestamp);
+            const time = formatTerminalRelativeAge(entry.timestamp, now);
             const statusLabel = entry.success ? 'concluída' : 'falhou';
             const bytes =
                 typeof entry.bytesRead === 'number'
@@ -1189,7 +1243,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
             println(
                 terminalThemeRow(
                     'Operação',
-                    `[${ts}] ${statusLabel} · ${renderLiveOperationLabel(entry.operation)} · ${compactHumanTerminalText(entry.target)}${bytes}${duration}`,
+                    `${time} · ${statusLabel} · ${renderLiveOperationLabel(entry.operation)} · ${compactHumanTerminalText(entry.target)}${bytes}${duration}`,
                     { role: entry.success ? 'muted' : 'warn' },
                 ),
             );
@@ -1199,12 +1253,12 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     if (projection.activity.history.length > 0) {
         println(terminalThemeHeadline('assistant', 'Eventos recentes'));
         for (const entry of projection.activity.history.slice(0, 6)) {
-            const ts = formatTerminalIsoTimestamp(entry.ts);
+            const time = formatTerminalRelativeAge(entry.ts, now);
             const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';
             println(
                 terminalThemeRow(
                     'Evento',
-                    `[${ts}] ${renderLiveActivitySummary(entry, { includePhase: true })}${progress}`,
+                    `${time} · ${renderLiveActivitySummary(entry, { includePhase: true })}${progress}`,
                 ),
             );
         }
@@ -1661,6 +1715,47 @@ function readPayloadString(payload, keys) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderSdkArchiveTypeLabel(value) {
+    const type = String(value ?? '').trim();
+    if (!type) return 'registrado';
+    if (type === 'session.updated') return 'sessão atualizada';
+    if (type === 'completed') return 'concluído';
+    if (type === 'requested') return 'solicitado';
+    if (type === 'pending') return 'pendente';
+    if (type === 'form') return 'formulário';
+    return type.replace(/[._-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderSdkPermissionTypeLabel(value) {
+    const type = String(value ?? '').trim();
+    if (type === 'fs.write') return 'escrita de arquivo';
+    if (type === 'fs.read') return 'leitura de arquivo';
+    if (type === 'fs.delete') return 'exclusão de arquivo';
+    if (type === 'fs.move') return 'movimento de arquivo';
+    if (type === 'terminal.exec') return 'execução no terminal';
+    return renderSdkArchiveTypeLabel(type);
+}
+
+/**
+ * @param {string | null} value
+ * @returns {string | null}
+ */
+function renderSdkSessionReference(value) {
+    if (!value) return null;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(value)) {
+        return 'sessão ativa';
+    }
+    return compactSdkSessionEventValue(value, 28);
+}
+
+/**
  * @param {import('../state/sse-event-archive.js').TerminalSseEventArchiveEntry} entry
  * @returns {{ key: string; line: string }}
  */
@@ -1672,15 +1767,16 @@ function summarizeSdkSessionArchiveEntry(entry) {
     const commandName = readPayloadString(payload, ['commandName', 'name', 'command']);
     const localCommand = readPayloadString(payload, ['localCommand']);
     const source = compactSdkSessionEventValue(entry.eventSource ?? entry.source ?? '-', 48);
+    const session = renderSdkSessionReference(sessionId);
     const detailParts = [
-        `tipo ${compactSdkSessionEventValue(type, 42)}`,
-        sessionId ? `sessão ${compactSdkSessionEventValue(sessionId, 54)}` : null,
+        renderSdkArchiveTypeLabel(type),
+        session ? `sessão ${session}` : null,
         commandName ? `comando ${compactSdkSessionEventValue(commandName, 42)}` : null,
         localCommand ? `local ${compactSdkSessionEventValue(localCommand, 42)}` : null,
     ].filter(Boolean);
     return {
         key: [event, type, sessionId ?? '', commandName ?? '', localCommand ?? '', source].join('\u001f'),
-        line: `#${entry.eventId ?? '-'} ${renderSdkArchiveEventLabel(event)} · ${source} · ${detailParts.join(' · ')}`,
+        line: `${renderSdkArchiveEventLabel(event)} · ${detailParts.join(' · ')}`,
     };
 }
 
@@ -1729,9 +1825,7 @@ function summarizeSdkWaitArchiveEntry(entry) {
             ? Object.keys(/** @type {Record<string, unknown>} */ (content)).slice(0, 4).join(',')
             : '';
     const detailParts = [
-        `tipo ${compactSdkSessionEventValue(type, 42)}`,
-        requestId ? `pedido ${compactSdkSessionEventValue(requestId, 54)}` : null,
-        sessionId ? `sessão ${compactSdkSessionEventValue(sessionId, 42)}` : null,
+        renderSdkPermissionTypeLabel(type),
         choiceCount != null ? `${choiceCount} opção(ões)` : null,
         message ? `mensagem ${compactSdkSessionEventValue(message, 70)}` : null,
         answer ? `resposta ${compactSdkSessionEventValue(answer, 52)}` : null,
@@ -1739,7 +1833,7 @@ function summarizeSdkWaitArchiveEntry(entry) {
     ].filter(Boolean);
     return {
         key: [entry.event, type, requestId ?? '', sessionId ?? '', message ?? '', answer ?? '', source].join('\u001f'),
-        line: `#${entry.eventId ?? '-'} ${renderSdkArchiveEventLabel(entry.event)} · ${source} · ${detailParts.join(' · ')}`,
+        line: `${renderSdkArchiveEventLabel(entry.event)} · ${detailParts.join(' · ')}`,
     };
 }
 
@@ -1782,7 +1876,7 @@ async function cmdSessionSdkEvents({ println }, tokens) {
     println(
         terminalThemeRow(
             'Archive',
-            `arquivo ${state.path ?? 'sem arquivo'} · janela ${limit} · ciclo de vida ${lifecycle.entries.length} · comandos ${commands.entries.length}`,
+            `arquivo ${compactHumanTerminalText(state.path ?? 'sem arquivo')} · janela ${limit} · ciclo de vida ${lifecycle.entries.length} · comandos ${commands.entries.length}`,
         ),
     );
     if (lifecycle.state.error || commands.state.error) {
@@ -1790,7 +1884,7 @@ async function cmdSessionSdkEvents({ println }, tokens) {
     }
     if (merged.length === 0) {
         println(terminalThemeRow('Resultado', 'nenhum ciclo de vida SDK ou comando SDK arquivado ainda', { role: 'warn' }));
-        println(terminalThemeRow('Detalhe', '/events event=sdk.lifecycle 20 · /events event=sdk.command.executed 20'));
+        println(terminalThemeRow('Detalhe', '/events sources · bruto em /events --raw'));
         println('');
         return;
     }
@@ -1810,10 +1904,11 @@ async function cmdSessionSdkEvents({ println }, tokens) {
             count: 1,
         });
     }
+    const now = Date.now();
     for (const entry of collapsed) {
-        const time = entry.firstTimestamp ? formatTerminalIsoTimestamp(entry.firstTimestamp) : 'sem horário';
+        const time = entry.firstTimestamp ? formatTerminalRelativeAge(entry.firstTimestamp, now) : 'sem horário';
         const repeats = entry.count > 1 ? ` ×${entry.count}` : '';
-        println(terminalThemeRow(time, `${entry.line}${repeats}`));
+        println(terminalThemeRow('Evento', `${time} · ${entry.line}${repeats}`));
     }
     println(terminalThemeRow('Nota', 'este comando não cria eventos; ele resume o mesmo JSONL usado por /events e pelos testes live'));
     println('');
@@ -1846,14 +1941,14 @@ async function cmdSessionSdkWaits({ println }, tokens) {
     println(
         terminalThemeRow(
             'Archive',
-            `arquivo ${state?.path ?? 'sem arquivo'} · janela ${limit} · perguntas ${(counts.get('user_input.requested') ?? 0) + (counts.get('user_input.completed') ?? 0)} · formulários ${(counts.get('elicitation.pending') ?? 0) + (counts.get('elicitation.completed') ?? 0)} · permissões ${(counts.get('permission.requested') ?? 0) + (counts.get('permission.completed') ?? 0) + (counts.get('permission.mode_changed') ?? 0)}`,
+            `arquivo ${compactHumanTerminalText(state?.path ?? 'sem arquivo')} · janela ${limit} · perguntas ${(counts.get('user_input.requested') ?? 0) + (counts.get('user_input.completed') ?? 0)} · formulários ${(counts.get('elicitation.pending') ?? 0) + (counts.get('elicitation.completed') ?? 0)} · permissões ${(counts.get('permission.requested') ?? 0) + (counts.get('permission.completed') ?? 0) + (counts.get('permission.mode_changed') ?? 0)}`,
         ),
     );
     const error = projections.find((projection) => projection.state.error)?.state.error;
     if (error) println(terminalThemeRow('Erro', error, { role: 'error' }));
     if (merged.length === 0) {
         println(terminalThemeRow('Resultado', 'nenhuma espera SDK arquivada ainda', { role: 'warn' }));
-        println(terminalThemeRow('Detalhe', '/sdk waits para pendências vivas · /events event=user_input.requested 20 para bruto'));
+        println(terminalThemeRow('Detalhe', '/sdk waits para pendências vivas · bruto em /events --raw'));
         println('');
         return;
     }
@@ -1873,10 +1968,11 @@ async function cmdSessionSdkWaits({ println }, tokens) {
             count: 1,
         });
     }
+    const now = Date.now();
     for (const entry of collapsed) {
-        const time = entry.firstTimestamp ? formatTerminalIsoTimestamp(entry.firstTimestamp) : 'sem horário';
+        const time = entry.firstTimestamp ? formatTerminalRelativeAge(entry.firstTimestamp, now) : 'sem horário';
         const repeats = entry.count > 1 ? ` ×${entry.count}` : '';
-        println(terminalThemeRow(time, `${entry.line}${repeats}`));
+        println(terminalThemeRow('Espera', `${time} · ${entry.line}${repeats}`));
     }
     println(terminalThemeRow('Nota', 'perguntas humanas, formulários e permissões continuam com comandos próprios; esta é só a trilha agregada'));
     println('');

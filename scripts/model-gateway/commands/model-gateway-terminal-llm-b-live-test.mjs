@@ -1732,18 +1732,24 @@ function diagnosticUxCycleCriteria(boot) {
     const fsReadStart = plain.indexOf('/fs read data/copilot-terminal/live-scratch/');
     const fsSearchStart = plain.indexOf('/fs search TERMINAL_DIAGNOSTIC_UX_');
     const activityStart = plain.indexOf('/activity 8');
-    const toolsStart = plain.indexOf('/tools');
-    const eventsStart = plain.indexOf('/events 12');
-    const quitStart = plain.indexOf('/quit');
+    const liveFullStart = plain.indexOf('/live full');
+    const toolsStart = plain.indexOf('/tools', Math.max(0, liveFullStart));
+    const eventsStart = plain.indexOf('/events 12', Math.max(0, toolsStart));
+    const sdkEventsStart = plain.indexOf('/session sdk events 8', Math.max(0, eventsStart));
+    const sdkWaitsStart = plain.indexOf('/session sdk waits 8', Math.max(0, sdkEventsStart));
+    const quitStart = plain.indexOf('/quit', Math.max(0, sdkWaitsStart));
     const surfaceBetween = (start, end) => {
         if (start < 0) return plain;
         const safeEnd = end > start ? end : plain.length;
         return plain.slice(start, safeEnd);
     };
     const fsReadSurface = surfaceBetween(fsReadStart, fsSearchStart);
-    const activitySurface = surfaceBetween(activityStart, toolsStart);
+    const activitySurface = surfaceBetween(activityStart, liveFullStart);
+    const liveFullSurface = surfaceBetween(liveFullStart, toolsStart);
     const toolsSurface = surfaceBetween(toolsStart, eventsStart);
-    const eventsSurface = surfaceBetween(eventsStart, quitStart);
+    const eventsSurface = surfaceBetween(eventsStart, sdkEventsStart);
+    const sdkEventsSurface = surfaceBetween(sdkEventsStart, sdkWaitsStart);
+    const sdkWaitsSurface = surfaceBetween(sdkWaitsStart, quitStart);
     return [
         {
             id: 'diagnostic-ux-ready',
@@ -1772,6 +1778,17 @@ function diagnosticUxCycleCriteria(boot) {
             detail: '/activity after local FS operations used human relative time and hid ISO timestamps in default mode',
         },
         {
+            id: 'diagnostic-ux-live-full-human',
+            pass:
+                /Fluxo detalhado da conversa[\s\S]*I\/O real recente[\s\S]*Eventos recentes/iu.test(liveFullSurface) &&
+                /há \d+[smhda]/iu.test(liveFullSurface) &&
+                !/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}\]/u.test(liveFullSurface) &&
+                !/\bsearch\b|phase:|approve_all|not_needed|\bempty\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
+                    liveFullSurface,
+                ),
+            detail: '/live full rendered detailed flow with relative time and without ISO brackets, raw phase/search labels, permission constants, empty/not_needed states, or UUIDs',
+        },
+        {
             id: 'diagnostic-ux-tools-human',
             pass:
                 (/Ferramentas observadas[\s\S]*uso[\s\S]*Detalhes\s+\/tools diag/iu.test(toolsSurface) ||
@@ -1793,6 +1810,24 @@ function diagnosticUxCycleCriteria(boot) {
             detail: '/events default rendered diagnostics with relative time and without raw tool ids, trace ids, event ids, hub ids, or ISO timestamps',
         },
         {
+            id: 'diagnostic-ux-session-sdk-events-human',
+            pass:
+                /Eventos SDK da sessão[\s\S]*(Evento|Resultado)/iu.test(sdkEventsSurface) &&
+                !/#\d+|agent\/sdk|sdk\.lifecycle|\d{4}-\d{2}-\d{2}T|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
+                    sdkEventsSurface,
+                ),
+            detail: '/session sdk events rendered aggregate SDK history without event ids, raw sdk sources, ISO timestamps, or UUIDs',
+        },
+        {
+            id: 'diagnostic-ux-session-sdk-waits-human',
+            pass:
+                /Esperas SDK da sessão/iu.test(sdkWaitsSurface) &&
+                !/#\d+|sdk\/user_input|request_user_input|chatcmpl-tool-|fs\.write|\d{4}-\d{2}-\d{2}T|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
+                    sdkWaitsSurface,
+                ),
+            detail: '/session sdk waits rendered aggregate waits without event ids, raw SDK names, permission constants, ISO timestamps, or UUIDs',
+        },
+        {
             id: 'diagnostic-ux-clean-close',
             pass: boot.exitCode === 0 && /readline fechado/u.test(plain),
             detail: 'terminal closed cleanly after diagnostic UX cycle',
@@ -1812,8 +1847,11 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
             { line: `/fs read ${scratchPath}`, advanceAfterMs: 1_000 },
             { line: `/fs search ${marker} data/copilot-terminal/live-scratch`, advanceAfterMs: 1_000 },
             { line: '/activity 8', advanceAfterMs: 1_000 },
+            { line: '/live full', advanceAfterMs: 1_000 },
             { line: '/tools', advanceAfterMs: 1_000 },
             { line: '/events 12', advanceAfterMs: 1_000 },
+            { line: '/session sdk events 8', advanceAfterMs: 1_000 },
+            { line: '/session sdk waits 8', advanceAfterMs: 1_000 },
             '/quit',
         ],
         terminalPort,
