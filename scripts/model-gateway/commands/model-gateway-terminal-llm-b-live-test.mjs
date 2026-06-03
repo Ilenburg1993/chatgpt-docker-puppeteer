@@ -66,6 +66,7 @@ Common options:
   --live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error|file-write-roundtrip>
   --structured-input-cycle
   --menu-cycle
+  --picker-interactive-cycle
   --ux-cycle
   --diagnostic-ux-cycle
   --reuse-sdk-session
@@ -1729,6 +1730,171 @@ async function runMenuCycleLiveTest({ outDir, requestedTransport, timeoutMs, ter
     return summary;
 }
 
+function pickerInteractiveCycleCriteria(boot) {
+    const plain = String(boot?.plain ?? '');
+    return [
+        {
+            id: 'picker-interactive-ready',
+            pass: /LLM-B pronta/u.test(plain),
+            detail: 'terminal reached ready state before opening the interactive picker',
+        },
+        {
+            id: 'picker-interactive-fzf-available',
+            pass: hasCommand('fzf'),
+            detail: 'fzf is available for the filtered picker handoff test',
+        },
+        {
+            id: 'picker-interactive-selected-status',
+            pass: /⏵\s+Status completo|Status completo[\s\S]{0,160}\/status/iu.test(plain),
+            detail: 'filtered picker selected the first menu action and routed it back through /status',
+        },
+        {
+            id: 'picker-interactive-no-false-render-lock',
+            pass: !/renderização terminal em andamento/iu.test(plain),
+            detail: 'interactive picker did not expose the dispatcher render lock as a user-facing blocker',
+        },
+        {
+            id: 'picker-interactive-clean-close',
+            pass: boot.exitCode === 0 && /readline fechado/u.test(plain),
+            detail: 'terminal closed cleanly after interactive picker cycle',
+        },
+    ];
+}
+
+async function runPickerInteractiveCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+    const canUsePty = requestedTransport === 'pty' && hasCommand('script');
+    const transport = canUsePty ? 'pty:script' : 'stdio:headless';
+    const command = canUsePty
+        ? {
+              cmd: 'script',
+              args: ['-qfec', 'npm run terminal:llm-b', '/dev/null'],
+          }
+        : { cmd: 'npm', args: ['run', 'terminal:llm-b'] };
+    let raw = '';
+    let childClosed = false;
+    let pickerSent = false;
+    let quitSent = false;
+    let pickerOffset = 0;
+    const child = spawn(command.cmd, command.args, {
+        cwd: ROOT,
+        env: {
+            ...process.env,
+            COPILOT_MODEL: 'auto',
+            COPILOT_REASONING_EFFORT: 'high',
+            TERMINAL_DISPLAY_PRESET: 'full',
+            COPILOT_SDK_ENABLED: 'true',
+            COPILOT_OPERATIONAL_PROFILE: 'production',
+            COPILOT_TERMINAL_PICKER_FILTER: 'Status',
+            LLM_B_TERMINAL_PORT: String(terminalPort),
+            TERMINAL_SSE_EVENT_ARCHIVE_DIR: path.join(outDir, 'picker-interactive-sse-events'),
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const writeRaw = (text) => {
+        if (childClosed || child.stdin.destroyed || child.stdin.writableEnded) return false;
+        try {
+            return child.stdin.write(text);
+        } catch (error) {
+            if (error?.code !== 'EPIPE') {
+                console.warn(`[terminal-live] picker interactive write failed: ${error?.message ?? String(error)}`);
+            }
+            return false;
+        }
+    };
+    const writeLine = (line) => writeRaw(ensureLine(line));
+    child.stdin.on('error', (error) => {
+        if (error?.code !== 'EPIPE') {
+            console.warn(`[terminal-live] picker interactive stdin error: ${error?.message ?? String(error)}`);
+        }
+    });
+    const timeout = setTimeout(
+        () => {
+            writeLine('/quit');
+            setTimeout(() => child.kill('SIGTERM'), 2_000).unref();
+        },
+        Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS,
+    );
+    const onData = (chunk) => {
+        const text = chunk.toString('utf8');
+        raw += text;
+        process.stdout.write(text);
+        const plain = stripAnsi(raw);
+        if (!pickerSent && /LLM-B pronta/u.test(plain)) {
+            pickerSent = true;
+            pickerOffset = plain.length;
+            writeLine('/menu picker --interactive');
+            return;
+        }
+        const afterPicker = plain.slice(pickerOffset);
+        if (!quitSent && /⏵\s+Status completo|Status completo[\s\S]{0,160}\/status/iu.test(afterPicker)) {
+            quitSent = true;
+            setTimeout(() => writeLine('/quit'), 1_000).unref();
+        }
+    };
+    child.stdout.on('data', onData);
+    child.stderr.on('data', onData);
+    const exitCode = await new Promise((resolve) => {
+        child.on('close', (code) => {
+            childClosed = true;
+            resolve(code);
+        });
+    });
+    clearTimeout(timeout);
+    const plain = stripAnsi(raw);
+    const boot = {
+        id: 'picker-interactive-cycle',
+        label: 'interactive menu picker',
+        exitCode,
+        sessionId: extractSdkSessionCockpitId(plain, 'Atual') || '',
+        transport,
+        raw,
+        plain,
+    };
+    await writeFile(path.join(outDir, 'picker-interactive-cycle.raw.log'), raw, 'utf8');
+    await writeFile(path.join(outDir, 'picker-interactive-cycle.plain.log'), plain, 'utf8');
+    const criteria = pickerInteractiveCycleCriteria(boot);
+    const durationMs = Date.now() - Date.parse(startedAt);
+    const ok = criteria.every((criterion) => criterion.pass);
+    const summary = {
+        ok,
+        startedAt,
+        durationMs,
+        terminalPort,
+        boot: {
+            id: boot.id,
+            label: boot.label,
+            exitCode: boot.exitCode,
+            sessionId: boot.sessionId || null,
+            transport: boot.transport,
+        },
+        criteria,
+    };
+    await writeFile(path.join(outDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    await writeFile(
+        path.join(outDir, 'summary.md'),
+        [
+            '# Terminal LLM-B Interactive Picker Live Test',
+            '',
+            `Started: ${startedAt}`,
+            `Duration: ${durationMs}ms`,
+            `Status: ${ok ? 'PASS' : 'FAIL'}`,
+            `Terminal port: ${terminalPort}`,
+            '',
+            '## Criteria',
+            '',
+            ...criteria.map((criterion) => `- ${criterion.pass ? '[x]' : '[ ]'} ${criterion.id}: ${criterion.detail}`),
+            '',
+            '## Logs',
+            '',
+            `- raw: ${path.relative(ROOT, path.join(outDir, 'picker-interactive-cycle.raw.log'))}`,
+            `- plain: ${path.relative(ROOT, path.join(outDir, 'picker-interactive-cycle.plain.log'))}`,
+            '',
+        ].join('\n'),
+        'utf8',
+    );
+    return summary;
+}
+
 function diagnosticUxCycleCriteria(boot) {
     const plain = String(boot?.plain ?? '');
     const findPromptCommandStart = (command, from = 0) => {
@@ -2540,6 +2706,7 @@ function liveScenarioKind({
     sessionCycle,
     structuredInputCycle,
     menuCycle,
+    pickerInteractiveCycle,
     uxCycle,
     diagnosticUxCycle,
     modelControlProbe,
@@ -2548,6 +2715,7 @@ function liveScenarioKind({
     if (sessionCycle) return 'session_cycle';
     if (structuredInputCycle) return 'structured_input_cycle';
     if (menuCycle) return 'menu_cycle';
+    if (pickerInteractiveCycle) return 'picker_interactive_cycle';
     if (uxCycle) return 'default_ux_cycle';
     if (diagnosticUxCycle) return 'diagnostic_ux_cycle';
     if (modelControlProbe) return 'model_probe';
@@ -4773,6 +4941,7 @@ async function main() {
     const sessionCycle = hasFlag('--session-cycle');
     const structuredInputCycle = hasFlag('--structured-input-cycle');
     const menuCycle = hasFlag('--menu-cycle');
+    const pickerInteractiveCycle = hasFlag('--picker-interactive-cycle');
     const uxCycle = hasFlag('--ux-cycle');
     const diagnosticUxCycle = hasFlag('--diagnostic-ux-cycle');
     const reuseSdkSession = hasFlag('--reuse-sdk-session');
@@ -4796,6 +4965,7 @@ async function main() {
         sessionCycle,
         structuredInputCycle,
         menuCycle,
+        pickerInteractiveCycle,
         uxCycle,
         diagnosticUxCycle,
         liveScenario,
@@ -4938,6 +5108,22 @@ async function main() {
             startedAt,
         });
         console.log(`[terminal-live] menu summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`);
+        if (!summary.ok) process.exitCode = 1;
+        await byokFixtureProvider?.close();
+        return;
+    }
+
+    if (pickerInteractiveCycle) {
+        const summary = await runPickerInteractiveCycleLiveTest({
+            outDir,
+            requestedTransport,
+            timeoutMs,
+            terminalPort,
+            startedAt,
+        });
+        console.log(
+            `[terminal-live] picker interactive summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`,
+        );
         if (!summary.ok) process.exitCode = 1;
         await byokFixtureProvider?.close();
         return;

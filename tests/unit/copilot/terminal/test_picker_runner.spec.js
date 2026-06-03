@@ -1,6 +1,6 @@
 // @ts-check
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { runTerminalExternalPicker } from '../../../../src/copilot/terminal/capabilities/index.js';
 
@@ -10,6 +10,10 @@ const ITEMS = [
 ];
 
 describe('terminal/capabilities/picker-runner', () => {
+    afterEach(() => {
+        delete process.env['COPILOT_TERMINAL_PICKER_FILTER'];
+    });
+
     it('mapeia seleção do fzf para item conhecido sem shell livre', () => {
         const execute = vi.fn(() => ({ status: 0, stdout: '01 Status · visão operacional\n' }));
 
@@ -39,6 +43,25 @@ describe('terminal/capabilities/picker-runner', () => {
         expect(result.item).toBeNull();
         expect(result.reason).toBe('seleção cancelada');
     });
+
+    it('permite modo filtrado para harness automatizado sem abrir TUI completa', () => {
+        process.env['COPILOT_TERMINAL_PICKER_FILTER'] = 'Status';
+        const execute = vi.fn(() => ({ status: 0, stdout: '01 Status · visão operacional\n' }));
+
+        const result = runTerminalExternalPicker(ITEMS, {
+            command: 'fzf',
+            renderer: 'fzf',
+            execute,
+        });
+
+        expect(result.status).toBe('selected');
+        expect(execute).toHaveBeenCalledWith(
+            'fzf',
+            expect.arrayContaining(['--filter', 'Status']),
+            expect.objectContaining({ input: expect.stringContaining('01 Status') }),
+        );
+    });
+
 
     it('falha fechado quando stdout não corresponde a item conhecido', () => {
         const result = runTerminalExternalPicker(ITEMS, {

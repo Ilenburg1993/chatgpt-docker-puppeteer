@@ -332,7 +332,11 @@ function buildTerminalMenuPickerItems(entries) {
  */
 export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
     const entries = buildTerminalSmartMenuEntries();
-    const primary = arg.trim();
+    const argTokens = arg.split(/\s+/u).filter(Boolean);
+    const restTokens = rest.filter(Boolean);
+    const tokens = restTokens.length > 0 && restTokens[0] === argTokens[0] ? restTokens : [...argTokens, ...restTokens];
+    const primary = tokens[0] ?? '';
+    const remaining = tokens.slice(1);
 
     if (primary.length === 0) {
         renderTerminalSmartMenu(println, entries);
@@ -340,7 +344,9 @@ export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
     }
 
     if (primary.toLowerCase() === 'picker' || primary.toLowerCase() === '--picker') {
-        const wantsInteractive = rest.some((token) => ['interactive', '--interactive', 'real', '--real'].includes(token.toLowerCase()));
+        const wantsInteractive = remaining.some((token) =>
+            ['interactive', '--interactive', 'real', '--real'].includes(token.toLowerCase()),
+        );
         const ttyReadiness = deps.readExclusiveTtyReadiness?.() ?? null;
         if (!wantsInteractive) {
             renderTerminalPickerPlan(println, entries, ttyReadiness);
@@ -389,7 +395,7 @@ export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
         return;
     }
 
-    const selectionToken = primary.toLowerCase() === 'run' ? (rest[0] ?? '') : primary;
+    const selectionToken = primary.toLowerCase() === 'run' ? (remaining[0] ?? '') : primary;
     const selected = resolveTerminalSmartMenuSelection(entries, selectionToken);
     if (!selected) {
         println(`  ${terminalThemeText('error', `Seleção inválida: ${selectionToken || '(vazio)'}`)}`);

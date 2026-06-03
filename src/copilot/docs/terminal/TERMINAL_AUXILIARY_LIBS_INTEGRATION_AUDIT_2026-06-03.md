@@ -450,6 +450,14 @@ Decisão:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-picker-runner-guard-20260603-2045`.
 - [x] Resultado live: PASS em 29/29 critérios com guarda textual default e sem falso bloqueio de
       renderização.
+- [x] Achado live Faixa G.8: `fzf` TUI completo abriu, mas o harness baseado em `script` nao
+      responde a `CSI 6n`, portanto nao é emulador de terminal suficiente para validar TUI visual completa.
+- [x] Decisão Faixa G.8: automação usa `COPILOT_TERMINAL_PICKER_FILTER=Status` para exercer
+      `fzf`/handoff/seleção sem TUI; validação visual completa permanece manual/assistida em terminal real.
+- [x] Live PTY Faixa G.8 filtrada passou:
+      `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --picker-interactive-cycle --timeout-ms=90000 --transport=pty --out-dir=artifacts/terminal-live/picker-interactive-filtered-fzf-20260603-2110`.
+- [x] Resultado live: PASS em 5/5 critérios; `fzf --filter` selecionou `Status completo`, restaurou
+      o prompt e roteou `/status`.
 
 ### Faixa D: preview read-only
 
@@ -484,8 +492,10 @@ Decisão:
       a uma operação e restaurar prompt vivo sem corromper input.
 - [x] Fase G.6: criar adapter executor de `fzf`/`gum` usando o contrato de TTY exclusivo.
 - [x] Fase G.7: tratar seleção, cancelamento, falha e retorno desconhecido sem shell livre.
-- [ ] Fase G.8: auditar picker real em PTY manual/assistido, validando restauração visual apos
-      seleção/cancelamento em `fzf` e, quando instalado, `gum`.
+- [x] Fase G.8: auditar executor real em PTY filtrado, validando restauração visual apos seleção
+      automatizada por `fzf --filter`.
+- [ ] Fase G.9: auditar TUI visual completa em terminal real/manual, validando seleção/cancelamento
+      em `fzf` e, quando instalado, `gum`.
 
 ### Faixa H: contratos estruturados
 

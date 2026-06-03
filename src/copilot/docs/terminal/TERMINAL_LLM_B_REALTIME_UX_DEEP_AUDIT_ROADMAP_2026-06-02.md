@@ -4353,8 +4353,16 @@
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-picker-runner-guard-20260603-2045`.
 - [x] Resultado live: PASS em 29/29 critérios com `/menu picker` textual e sem falso bloqueio de
       render lock.
-- [ ] Próxima implementação: live assistida do picker real com `fzf` em PTY, validando seleção,
-      cancelamento e restauração visual sem contaminar o ciclo diagnóstico automático.
+- [x] Achado live: `fzf` TUI completo em harness `script` fica bloqueado aguardando resposta
+      `CSI 6n`; isso é limitação do pseudo-terminal automatizado, não do terminal do operador.
+- [x] Implementação: `COPILOT_TERMINAL_PICKER_FILTER=Status` permite live automatizada do executor
+      `fzf` sem abrir TUI completa, exercendo handoff, seleção e retorno ao prompt.
+- [x] Live PTY filtrada do picker passou:
+      `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --picker-interactive-cycle --timeout-ms=90000 --transport=pty --out-dir=artifacts/terminal-live/picker-interactive-filtered-fzf-20260603-2110`.
+- [x] Resultado live: PASS em 5/5 critérios; `fzf --filter` selecionou `Status completo`, restaurou
+      o prompt e roteou `/status`.
+- [ ] Próxima implementação: teste manual/assistido de TUI visual completa em terminal real para
+      seleção/cancelamento de `fzf` e, quando instalado, `gum`.
 - [x] Live PTY estruturado passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=150000 --transport=pty --out-dir=artifacts/terminal-live/structured-question-card-20260603-1723`.
   - Resultado: PASS em 11/11 critérios, cobrindo prompt `[PERGUNTA]`, resposta roteada, waits

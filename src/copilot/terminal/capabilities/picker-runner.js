@@ -95,12 +95,24 @@ export function runTerminalExternalPicker(items, options) {
     const lineMap = buildPickerLineMap(items);
     const lines = [...lineMap.keys()];
     const prompt = options.prompt ?? 'menu> ';
+    const filter = String(process.env['COPILOT_TERMINAL_PICKER_FILTER'] ?? '').trim();
     const result =
         renderer === 'gum'
             ? execute(command, ['choose', '--header', prompt.trim(), ...lines], {})
-            : execute(command, ['--height=40%', '--layout=reverse', '--border', '--prompt', prompt], {
-                  input: `${lines.join('\n')}\n`,
-              });
+            : execute(
+                  command,
+                  [
+                      '--height=40%',
+                      '--layout=reverse',
+                      '--border',
+                      '--prompt',
+                      prompt,
+                      ...(filter ? ['--filter', filter] : []),
+                  ],
+                  {
+                      input: `${lines.join('\n')}\n`,
+                  },
+              );
 
     if (result.error) {
         return { status: 'failed', item: null, renderer, reason: result.error.message };

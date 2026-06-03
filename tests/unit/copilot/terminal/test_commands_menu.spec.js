@@ -222,4 +222,38 @@ describe('terminal/commands/menu', () => {
         expect(ctx.output()).toContain('turno em execução');
         expect(ctx.output()).toContain('Picker interativo indisponível');
     });
+
+    it('interpreta flags de picker quando o parser entrega arg agregado', async () => {
+        const ctx = mockCtx();
+        const withExclusiveTty = vi.fn();
+
+        await cmdMenu({ println: ctx.println }, 'picker --interactive', [], {
+            readExclusiveTtyReadiness: () => ({
+                ready: false,
+                reasons: ['turno em execução'],
+            }),
+            withExclusiveTty,
+        });
+
+        expect(withExclusiveTty).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('Picker interativo indisponível');
+        expect(ctx.output()).not.toContain('Seleção inválida');
+    });
+
+    it('prefere rest tokenizado quando o dispatcher fornece arg agregado e rest', async () => {
+        const ctx = mockCtx();
+        const withExclusiveTty = vi.fn();
+
+        await cmdMenu({ println: ctx.println }, 'picker --interactive', ['picker', '--interactive'], {
+            readExclusiveTtyReadiness: () => ({
+                ready: false,
+                reasons: ['turno em execução'],
+            }),
+            withExclusiveTty,
+        });
+
+        expect(withExclusiveTty).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('Picker interativo indisponível');
+        expect(ctx.output()).not.toContain('Seleção inválida');
+    });
 });
