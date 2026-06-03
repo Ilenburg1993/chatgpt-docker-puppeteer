@@ -201,6 +201,12 @@ export function buildTerminalSmartMenuEntries() {
             description: 'Últimas falhas observadas no terminal',
         },
         {
+            id: 'terminal-libs',
+            label: 'Libs auxiliares',
+            commandLine: '/terminal libs',
+            description: 'Ferramentas opcionais de preview, picker, diff e JSON',
+        },
+        {
             id: 'help',
             label: 'Ajuda completa',
             commandLine: '/help',

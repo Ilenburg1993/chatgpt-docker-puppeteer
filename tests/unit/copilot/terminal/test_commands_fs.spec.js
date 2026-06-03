@@ -108,6 +108,35 @@ describe('terminal/commands/fs', () => {
         await expect(readFile(join(WORKSPACE, fileRel), 'utf8')).resolves.toBe('second value');
     });
 
+    it('/fs preview usa preview read-only com fallback JS explícito', async () => {
+        expect(tmpRel).toBeTruthy();
+        const fileRel = `${tmpRel}/preview.js`;
+
+        await cmdFs(mockCtx(), `create ${fileRel} const value = 42;`);
+        const preview = mockCtx();
+        await cmdFs(preview, `preview ${fileRel} --plain --lines 3`);
+
+        expect(preview.output()).toContain('Preview');
+        expect(preview.output()).toContain('js · fallback: preview externo desativado');
+        expect(preview.output()).toContain('1 │ const value = 42;');
+        expect(preview.output()).toContain('Arquivo');
+        expectNoAnsi(preview.output());
+    });
+
+    it('/fs read --preview mantém leitura canônica e preview opcional', async () => {
+        expect(tmpRel).toBeTruthy();
+        const fileRel = `${tmpRel}/read-preview.md`;
+
+        await cmdFs(mockCtx(), `create ${fileRel} linha-alpha`);
+        const read = mockCtx();
+        await cmdFs(read, `read ${fileRel} --preview --plain`);
+
+        expect(read.output()).toContain('Preview');
+        expect(read.output()).toContain('linha-alpha');
+        expect(read.output()).toContain('I/O read');
+        expectNoAnsi(read.output());
+    });
+
     it('/fs read exibe guidance acionável quando tool falha', async () => {
         const ctx = mockCtx();
         await cmdFs(ctx, 'read tmp/inexistente.md');

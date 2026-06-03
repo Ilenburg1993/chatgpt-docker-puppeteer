@@ -98,6 +98,7 @@ export function cmdHelp({ injectPort, println }, arg = '') {
             role: 'muted',
         }),
     );
+    println(terminalThemeRow('Terminal', commandChain(['/terminal libs', '/libs detail']), { role: 'muted' }));
     println(terminalThemeRow('Completo', command('/help full'), { role: 'muted' }));
     println(terminalThemeRow('HTTP local', `porta ${injectPort}: /inject · /events · /sessions`));
     println(terminalThemeDivider(58));
@@ -123,6 +124,8 @@ function renderFullHelp({ injectPort, println }) {
         { command: '/db-sessions [n]', description: 'últimas sessões do hub' },
         { command: '/who', description: 'atores e canais ativos' },
         { command: '/count', description: 'estatísticas da sessão' },
+        { command: '/terminal libs', description: 'libs auxiliares opcionais, decisões de uso e fallbacks' },
+        { command: '/libs [detail|json|refresh]', description: 'atalho para inspecionar capacidades externas' },
     ]);
     renderHelpSection(println, 'Conversa e controle', [
         { command: '/queue <msg>', description: 'guarda intervenção para a próxima pergunta humana' },
@@ -167,7 +170,10 @@ function renderFullHelp({ injectPort, println }) {
         { command: '@<caminho>', description: 'embed automático de arquivo no texto da mensagem' },
         { command: '/context', description: 'estima uso atual de tokens da sessão' },
         { command: '/compact', description: 'compacta histórico em resumo técnico denso' },
-        { command: '/fs [list|read|search|create|write]', description: 'filesystem local canônico via file-tools' },
+        {
+            command: '/fs [list|read|preview|search|create|write]',
+            description: 'filesystem local canônico via file-tools e preview opcional',
+        },
         {
             command: '/workspace [list|read|write|sync|mirror|promote]',
             description: 'workspace SDK e convergência SDK/FS',

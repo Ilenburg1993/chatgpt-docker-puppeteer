@@ -4148,7 +4148,7 @@
 - [x] Fase 12.4.K: projetar painel próprio de pergunta humana para reduzir repetição e timeout sem
       resposta.
 - [ ] Fase 12.4.L: projetar faixa de modelo/BYOK na linha viva e nos eventos persistentes.
-- [ ] Fase 12.4.M: depois da estabilização UX/terminal/BYOK, iniciar investigação formal de libs
+- [x] Fase 12.4.M: depois da estabilização UX/terminal/BYOK, iniciar investigação formal de libs
       externas (`gum`, `fzf`, `bat`, `glow`, `delta`, `atuin`, `zoxide`, `jq`, `yq`) em documento
       separado antes de qualquer adoção.
 
@@ -4208,6 +4208,56 @@
       `toolCallId` como diagnóstico explícito.
 - [x] Testes escopados passaram:
   - `npx vitest run tests/unit/copilot/terminal/test_human_question_renderer.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_tool_lifecycle_state.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js tests/unit/copilot/terminal/test_pending_question_answer.spec.js`.
+
+### 12.18 Investigação formal de libs auxiliares
+
+- [x] Documento canônico complementar criado:
+      `src/copilot/docs/terminal/TERMINAL_AUXILIARY_LIBS_INTEGRATION_AUDIT_2026-06-03.md`.
+- [x] Fontes oficiais consultadas para `gum`, `fzf`, `bat`, `glow`, `delta`, `atuin`,
+      `zoxide`, `jq` e `yq`.
+- [x] Decisão arquitetural: adoção começa por detecção/capability registry, não por uso de TUI.
+- [x] Decisão arquitetural: nenhuma lib externa será obrigatória ou instalada automaticamente.
+- [x] Decisão arquitetural: `fzf`, `bat`, `glow`, `delta`, `jq` e `yq` são aceitos como
+      enriquecimentos opcionais; `gum` é aceito com guardas; `atuin` e `zoxide` ficam adiados por
+      alterarem estado de shell/histórico/navegação.
+- [x] Decisão UX: pickers/pagers externos só podem ocorrer por comando explícito ou preferência,
+      nunca durante streaming automático da LLM-B ou pergunta humana pendente.
+- [x] Próxima implementação: criar registry read-only de capacidades externas.
+- [x] Próxima implementação: criar comando humano/JSON para inspecionar libs disponíveis,
+      decisões e fallbacks.
+- [x] Implementação: `terminal/capabilities/external-tools.js` detecta `gum`, `fzf`, `bat`,
+      `batcat`, `glow`, `delta`, `atuin`, `zoxide`, `jq` e `yq` por `PATH`, com version probe,
+      cache e `defaultEnabled=false`.
+- [x] Implementação: `/terminal libs` e `/libs` mostram superfície humana compacta, `detail`,
+      `json` e `refresh`.
+- [x] Implementação: `/help` e `/menu` expõem a nova superfície canônica.
+- [x] Testes escopados passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_external_tool_capabilities.spec.js tests/unit/copilot/terminal/test_commands_terminal.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js tests/unit/copilot/terminal/test_commands_help.spec.js tests/unit/copilot/terminal/test_repl_command_router_routes.spec.js`.
+- [x] Resultado: 5 arquivos, 17 testes.
+- [x] Próxima implementação: adapter read-only de preview, começando por `bat`/`batcat` com
+      fallback JS.
+- [x] Implementação: `terminal/capabilities/file-preview.js` oferece preview read-only explícito
+      com `bat`/`batcat`, fallback JS, timeout, `maxBuffer` e limite de linhas.
+- [x] Implementação: `/fs preview <path>` e `/fs read <path> --preview` usam o adapter sem alterar
+      `/fs read` default.
+- [x] Achado de execução real: `read_file_content` imprimia log técnico cru antes da superfície
+      humana de `/fs preview`.
+- [x] Correção: `read_file_content` ganhou `quietLog` opcional e `/fs` o utiliza para não duplicar
+      I/O que já é apresentado pelo terminal.
+- [x] Testes escopados adicionais passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_external_tool_capabilities.spec.js tests/unit/copilot/terminal/test_commands_terminal.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js tests/unit/copilot/terminal/test_commands_help.spec.js`.
+- [x] Resultado: 4 arquivos, 17 testes.
+- [x] Testes escopados após `quietLog` passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_commands_fs.spec.js tests/unit/copilot/terminal/test_external_tool_capabilities.spec.js tests/unit/copilot/terminal/test_commands_terminal.spec.js`.
+- [x] Resultado: 3 arquivos, 15 testes.
+- [x] Lint escopado passou nos arquivos alterados de terminal/capabilities/commands e testes.
+- [x] Typecheck strict de `src/copilot` passou:
+      `npm run typecheck:strict:src.copilot`.
+- [x] Live PTY diagnóstico passou:
+      `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=190000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-aux-libs-20260603-1950`.
+- [x] Resultado live: PASS em 24/24 critérios, incluindo `diagnostic-ux-fs-preview` e
+      `diagnostic-ux-terminal-libs`.
+- [ ] Próxima implementação: detecção fina de arquivo binário antes de preview externo.
   - Resultado: 6 arquivos, 65 testes.
 - [x] Live PTY estruturado passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=150000 --transport=pty --out-dir=artifacts/terminal-live/structured-question-card-20260603-1723`.

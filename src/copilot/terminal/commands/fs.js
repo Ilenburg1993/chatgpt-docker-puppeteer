@@ -9,6 +9,7 @@
  */
 
 import { toError } from '../../core/error-handlers.js';
+import { renderTerminalFilePreview } from '../capabilities/index.js';
 import { readTerminalIoActivityProjection } from '../events/index.js';
 import { requireTerminalFileTool } from '../frontend/gateways/index.js';
 import { buildActivityAwareGuidance, buildFailureRecoveryLines } from '../frontend/operational-guidance/index.js';
@@ -141,6 +142,37 @@ function parseListFlags(parts) {
 }
 
 /**
+ * @param {string[]} parts
+ * @param {boolean} [previewDefault=false]
+ * @returns {{ preview: boolean; forceJs: boolean; lineLimit: number; rest: string[] }}
+ */
+function parseReadFlags(parts, previewDefault = false) {
+    let preview = previewDefault;
+    let forceJs = false;
+    let lineLimit = 220;
+    /** @type {string[]} */
+    const rest = [];
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (part === '--preview') {
+            preview = true;
+        } else if (part === '--plain' || part === '--no-external') {
+            forceJs = true;
+            preview = true;
+        } else if (part === '--lines') {
+            const next = parts[i + 1];
+            if (next && /^\d+$/u.test(next)) {
+                lineLimit = Number(next);
+                i += 1;
+            }
+        } else if (part) {
+            rest.push(part);
+        }
+    }
+    return { preview, forceJs, lineLimit, rest };
+}
+
+/**
  * @param {CommandContext} ctx
  * @param {string[]} parts
  */
@@ -180,20 +212,37 @@ async function runList(ctx, parts) {
  * @param {CommandContext} ctx
  * @param {string[]} parts
  */
-async function runRead(ctx, parts) {
-    const path = parts.join(' ').trim();
+async function runRead(ctx, parts, previewDefault = false) {
+    const flags = parseReadFlags(parts, previewDefault);
+    const path = flags.rest.join(' ').trim();
     if (!path) {
-        ctx.println(terminalThemeRow('Uso', '/fs read <path>', { role: 'warn' }));
+        ctx.println(terminalThemeRow('Uso', '/fs read <path> [--preview] [--lines n]', { role: 'warn' }));
         return;
     }
-    const result = await invokeFileTool(readFileContentTool, { path, encoding: 'utf8' });
+    const result = await invokeFileTool(readFileContentTool, { path, encoding: 'utf8', quietLog: true });
     if (!isSuccess(result)) {
         printFailure(ctx, result);
         return;
     }
+    const content = String(result['content'] ?? '');
     ctx.println('');
     ctx.println(terminalThemeRow('Arquivo', `${String(result['path'] ?? path)} · (FS local)`));
-    ctx.println(pretty(String(result['content'] ?? ''), 8000));
+    if (flags.preview) {
+        const rendered = renderTerminalFilePreview(String(result['path'] ?? path), content, {
+            lineLimit: flags.lineLimit,
+            forceJs: flags.forceJs,
+        });
+        ctx.println(
+            terminalThemeRow(
+                'Preview',
+                `${rendered.renderer}${rendered.fallbackReason ? ` · fallback: ${rendered.fallbackReason}` : ''}${rendered.truncated ? ' · truncado' : ''}`,
+                { role: rendered.renderer === 'bat' ? 'success' : 'muted' },
+            ),
+        );
+        ctx.println(rendered.output);
+    } else {
+        ctx.println(pretty(content, 8000));
+    }
     const io = ioSummary(result);
     if (io) ctx.println(io);
     ctx.println('');
@@ -273,6 +322,7 @@ export async function cmdFs(ctx, arg = '') {
     try {
         if (sub === 'list' || sub === 'ls' || sub === 'scan') await runList(ctx, parts);
         else if (sub === 'read' || sub === 'cat') await runRead(ctx, parts);
+        else if (sub === 'preview') await runRead(ctx, parts, true);
         else if (sub === 'search' || sub === 'grep') await runSearch(ctx, parts);
         else if (sub === 'create') await runWrite(ctx, parts, false);
         else if (sub === 'write') await runWrite(ctx, parts, true);
@@ -280,7 +330,7 @@ export async function cmdFs(ctx, arg = '') {
             ctx.println(
                 terminalThemeRow(
                     'Uso',
-                    '/fs list [path] [--recursive] [--hidden] | read <path> | search <pattern> [path] | create <path> <content> | write <path> <content>',
+                    '/fs list [path] [--recursive] [--hidden] | read <path> [--preview] | preview <path> | search <pattern> [path] | create <path> <content> | write <path> <content>',
                     { role: 'warn' },
                 ),
             );

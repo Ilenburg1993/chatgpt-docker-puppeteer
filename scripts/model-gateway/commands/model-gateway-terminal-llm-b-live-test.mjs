@@ -1739,8 +1739,10 @@ function diagnosticUxCycleCriteria(boot) {
         return plain.indexOf(command, Math.max(0, from));
     };
     const fsReadStart = plain.indexOf('/fs read data/copilot-terminal/live-scratch/');
-    const fsSearchStart = plain.indexOf('/fs search TERMINAL_DIAGNOSTIC_UX_');
-    const activityStart = plain.indexOf('/activity 8');
+    const fsPreviewStart = plain.indexOf('/fs preview data/copilot-terminal/live-scratch/', Math.max(0, fsReadStart));
+    const fsSearchStart = plain.indexOf('/fs search TERMINAL_DIAGNOSTIC_UX_', Math.max(0, fsPreviewStart));
+    const terminalLibsStart = plain.indexOf('/terminal libs', Math.max(0, fsSearchStart));
+    const activityStart = plain.indexOf('/activity 8', Math.max(0, terminalLibsStart));
     const liveFullStart = plain.indexOf('/live full');
     const healthFullStart = plain.indexOf('/health full', Math.max(0, liveFullStart));
     const toolsStart = plain.indexOf('/tools', Math.max(0, healthFullStart));
@@ -1771,7 +1773,9 @@ function diagnosticUxCycleCriteria(boot) {
         const safeEnd = end > start ? end : plain.length;
         return plain.slice(start, safeEnd);
     };
-    const fsReadSurface = surfaceBetween(fsReadStart, fsSearchStart);
+    const fsReadSurface = surfaceBetween(fsReadStart, fsPreviewStart);
+    const fsPreviewSurface = surfaceBetween(fsPreviewStart, fsSearchStart);
+    const terminalLibsSurface = surfaceBetween(terminalLibsStart, activityStart);
     const activitySurface = surfaceBetween(activityStart, liveFullStart);
     const liveFullSurface = surfaceBetween(liveFullStart, healthFullStart);
     const healthFullSurface = surfaceBetween(healthFullStart, toolsStart);
@@ -1808,6 +1812,26 @@ function diagnosticUxCycleCriteria(boot) {
                 /Arquivo[\s\S]*TERMINAL_DIAGNOSTIC_UX_\d+\.txt[\s\S]*\(FS local\)/iu.test(fsReadSurface) &&
                 /FS search[\s\S]*resultados[\s\S]*I\/O search/iu.test(plain),
             detail: '/fs create/read/search rendered themed local-FS output and I/O summaries',
+        },
+        {
+            id: 'diagnostic-ux-fs-preview',
+            pass:
+                /Arquivo[\s\S]*TERMINAL_DIAGNOSTIC_UX_\d+\.txt[\s\S]*\(FS local\)/iu.test(fsPreviewSurface) &&
+                /Preview\s+(?:bat|js)/iu.test(fsPreviewSurface) &&
+                !/\[copilot\/read_file_content\]|chatcmpl-tool-|toolu_|\\x1b\[/iu.test(fsPreviewSurface),
+            detail: '/fs preview rendered explicit read-only preview through bat/js without raw file-tool logs, tool ids or ANSI literals',
+        },
+        {
+            id: 'diagnostic-ux-terminal-libs',
+            pass:
+                /Libs auxiliares do terminal[\s\S]*(?:disponíveis|disponível)[\s\S]*Fallback[\s\S]*terminal JS canônico/iu.test(
+                    terminalLibsSurface,
+                ) &&
+                /fzf[\s\S]*(?:disponível|ausente)[\s\S]*bat[\s\S]*(?:disponível|ausente)[\s\S]*jq[\s\S]*(?:disponível|ausente)/iu.test(
+                    terminalLibsSurface,
+                ) &&
+                !/chatcmpl-tool-|toolu_|\\x1b\[|API[_-]?KEY|TOKEN|SECRET|PASSWORD/iu.test(terminalLibsSurface),
+            detail: '/terminal libs rendered optional-tool availability, decisions and fallback without secrets, raw ids or ANSI literals',
         },
         {
             id: 'diagnostic-ux-no-fs-ansi',
@@ -2020,7 +2044,9 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
         commands: [
             { line: `/fs create ${scratchPath} ${marker}`, advanceAfterMs: 1_000 },
             { line: `/fs read ${scratchPath}`, advanceAfterMs: 1_000 },
+            { line: `/fs preview ${scratchPath} --lines 20`, advanceAfterMs: 1_000 },
             { line: `/fs search ${marker} data/copilot-terminal/live-scratch`, advanceAfterMs: 1_000 },
+            { line: '/terminal libs', advanceAfterMs: 1_000 },
             { line: '/activity 8', advanceAfterMs: 1_000 },
             { line: '/live full', advanceAfterMs: 1_000 },
             { line: '/health full', advanceAfterMs: 1_000 },

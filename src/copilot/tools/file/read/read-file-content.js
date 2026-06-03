@@ -114,6 +114,11 @@ export const readFileContentTool = buildTool({
             .optional()
             .default(false)
             .describe('Inclui snapshot de stats L1 do cache de IO no metadata. Útil para auditoria/debug.'),
+        quietLog: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe('Suprime log informativo de leitura quando a superfície chamadora já renderiza a operação.'),
     }),
     handler: async ({
         path: filePath,
@@ -129,6 +134,7 @@ export const readFileContentTool = buildTool({
         includeHash,
         includeReadThrough,
         includeCacheStats,
+        quietLog,
     }) => {
         const receivedParameters = {
             path: filePath,
@@ -144,6 +150,7 @@ export const readFileContentTool = buildTool({
             includeHash,
             includeReadThrough,
             includeCacheStats,
+            quietLog,
         };
         const resolvedEncoding = encoding ?? 'utf8';
         const resolvedReadStrategy = readStrategy ?? 'cached';
@@ -214,7 +221,7 @@ export const readFileContentTool = buildTool({
             );
         }
 
-        log('INFO', `[copilot/read_file_content] ${resolved}`);
+        if (!quietLog) log('INFO', `[copilot/read_file_content] ${resolved}`);
 
         try {
             const stats = await fsStat(resolved);

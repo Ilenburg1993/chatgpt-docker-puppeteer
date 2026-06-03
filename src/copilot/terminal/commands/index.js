@@ -51,6 +51,7 @@ export {
     cmdWho,
 } from './session.js';
 export { cmdSkills } from './skills.js';
+export { cmdTerminal, cmdTerminalLibs } from './terminal.js';
 export { cmdThinking } from './thinking.js';
 export { cmdTools } from './tools.js';
 export { cmdUsage } from './usage.js';
