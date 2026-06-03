@@ -2668,4 +2668,15 @@
 - [x] Implementação: `cmdActivity` substituiu templates ANSI por painel temático completo, incluindo `Resumo do turno atual`, `Último turno concluído`, `Arquivos tocados`, `Ferramentas`, `Interações humanas`, `I/O real recente` e `Timeline recente`.
 - [x] Implementação: `cmdDiagnose` compacto substituiu o bloco único por linhas temáticas e helpers sem ANSI para BYOK, gateway, MCP, health, ação recomendada e status runtime.
 - [x] Resultado esperado: o operador passa a ver `/status`, `/now`, `/health`, `/live` e `/activity` como uma família visual única, não como cinco comandos de origens diferentes.
-- [ ] Próxima validação live: rodar ciclo PTY focado em largura e poluição visual, com inspeção dos logs plain/raw para regressões de `request_user_input`, `report_intent`, IDs crus e linhas desalinhadas.
+- [x] Live PTY inicial executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=90000 --transport=pty --out-dir=artifacts/terminal-live/default-ux-cycle-theme-consolidation-20260603-1343`
+  - Resultado automatizado: PASS.
+  - Achado manual: a limpeza de sessões SDK despejava dezenas de linhas `[SESSION] Sessão SDK removida` e tomava `Atividade`, `/status`, `/now`, `/health`, `/live` e `/activity`.
+- [x] Correção: `session.deleted` saiu de `SDK_LIFECYCLE_VISIBLE_TYPES`; o evento permanece no archive/SSE técnico, mas deixa de atualizar atividade atual, histórico visível e stdout humano.
+- [x] Correção: `/sdk waits` passou para painel temático com `Estado`, `Resumo`/`Detalhe`, `Ação`, `Pergunta`, `Texto` e `Status`, removendo `estado   `, `resumo   ` e ANSI local.
+- [x] O harness live ganhou critério `ux-cycle-no-session-cleanup-spam`, bloqueando regressão de `Sessão SDK removida`, `[SESSION]` e `session.deleted` na UX default.
+- [x] Live PTY pós-correção executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=90000 --transport=pty --out-dir=artifacts/terminal-live/default-ux-cycle-no-session-cleanup-spam-20260603-1347`
+  - Resultado: PASS, incluindo `ux-cycle-no-session-cleanup-spam`.
+  - Inspeção plain log: sem `Sessão SDK removida`, `[SESSION]`, `session.deleted`, `request_user_input`, `report_intent`, `chatcmpl-tool`, `estado   ` ou `resumo   `.
+- [ ] Próxima validação live: rodar cenário com pergunta humana estruturada para confirmar que `/sdk waits`, linha viva e prompt de resposta continuam elegantes quando há pendência real.

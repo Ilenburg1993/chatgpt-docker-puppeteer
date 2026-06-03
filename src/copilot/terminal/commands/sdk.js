@@ -71,7 +71,7 @@ import {
     terminalPermissionModeSkipsSdkPrompts,
     formatTerminalIsoTimestamp,
 } from '../state/sdk/index.js';
-import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
+import { terminalThemeDivider, terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -766,56 +766,64 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
     const totalPending =
         pendingElicitations.pending + permissionSummary.pending + userInputSummary.pending + structuredInputPending;
 
-    println(`\n  ${terminalThemeText('question', 'Esperas humanas')}`);
+    println('');
+    println(terminalThemeHeadline('question', 'Esperas humanas'));
+    println(terminalThemeDivider(37));
     println(
-        `  estado   ${terminalThemeText(totalPending > 0 ? 'question' : 'success', totalPending > 0 ? `${totalPending} pendência(s)` : 'nenhuma pendência')}`,
+        terminalThemeRow('Estado', totalPending > 0 ? `${totalPending} pendência(s)` : 'nenhuma pendência', {
+            role: totalPending > 0 ? 'question' : 'success',
+        }),
     );
     println(
         detail
-            ? `  detalhe  \x1b[90mformulários ${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permissões ${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · perguntas SDK ${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · perguntas estruturadas ${structuredInputPending}\x1b[0m`
-            : `  resumo   \x1b[90m${renderHumanSdkWaitCounts({
+            ? terminalThemeRow(
+                  'Detalhe',
+                  `formulários ${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permissões ${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · perguntas SDK ${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · perguntas estruturadas ${structuredInputPending}`,
+              )
+            : terminalThemeRow('Resumo', renderHumanSdkWaitCounts({
                   forms: pendingElicitations.pending,
                   permissions: permissionSummary.pending,
                   questions: userInputSummary.pending,
                   inputs: structuredInputPending,
-              })}\x1b[0m`,
+              })),
     );
 
     if (pendingElicitations.pending > 0) {
-        println(`  ação     ${terminalThemeText('command', '/elicitation show latest')} ${terminalThemeText('muted', '·')} ${terminalThemeText('command', '/elicitation list')}`);
+        println(terminalThemeRow('Ação', `${terminalThemeText('command', '/elicitation show latest')} ${terminalThemeText('muted', '·')} ${terminalThemeText('command', '/elicitation list')}`));
     }
     if (permissionSummary.pending > 0) {
-        println(`  ação     ${terminalThemeText('command', '/permission show latest')} ${terminalThemeText('muted', '·')} ${terminalThemeText('command', '/permission all')}`);
+        println(terminalThemeRow('Ação', `${terminalThemeText('command', '/permission show latest')} ${terminalThemeText('muted', '·')} ${terminalThemeText('command', '/permission all')}`));
     }
     if (userInputSummary.pending > 0) {
-        println(`  ação     ${terminalThemeText('command', '/answer <texto>')} ${terminalThemeText('muted', 'ou responda na conversa ativa')}`);
+        println(terminalThemeRow('Ação', `${terminalThemeText('command', '/answer <texto>')} ${terminalThemeText('muted', 'ou responda na conversa ativa')}`));
         const latest = userInputSummary.latest;
         if (latest) {
             const choices = latest.choices.length > 0 ? ` · opções ${latest.choices.join(' | ')}` : '';
             const freeform = latest.allowFreeform ? 'livre' : 'seleção obrigatória';
-            println(`  pergunta \x1b[90m${formatAge(latest.createdAt)} - ${latest.kind} - ${freeform}${choices}\x1b[0m`);
-            if (detail) println(`  id       \x1b[90m${latest.id}\x1b[0m`);
-            println(`           ${compactText(latest.question, 220)}`);
+            println(terminalThemeRow('Pergunta', `${formatAge(latest.createdAt)} · ${latest.kind} · ${freeform}${choices}`));
+            if (detail) println(terminalThemeRow('ID', latest.id));
+            println(terminalThemeRow('Texto', compactText(latest.question, 220), { role: 'question' }));
         }
     }
     if (structuredInputPending > 0) {
-        println(`  ação     ${terminalThemeText('muted', 'digite a resposta normalmente; o REPL destrava a pergunta estruturada pendente')}`);
+        println(terminalThemeRow('Ação', 'digite a resposta normalmente; o REPL destrava a pergunta estruturada pendente'));
         for (const entry of structuredInputs.slice(0, 3)) {
             const choices = entry.choices.length > 0 ? ` · opções ${entry.choices.join(' | ')}` : '';
             const freeform = entry.allowFreeform ? 'livre' : 'seleção obrigatória';
             println(
-                `  pergunta estruturada \x1b[90m${formatAge(entry.createdAt)} - ${freeform}${choices}\x1b[0m`,
+                terminalThemeRow('Pergunta', `${formatAge(entry.createdAt)} · ${freeform}${choices}`),
             );
-            if (detail) println(`  id       \x1b[90m${entry.requestId}\x1b[0m`);
-            println(`           ${compactText(entry.question, 220)}`);
+            if (detail) println(terminalThemeRow('ID', entry.requestId));
+            println(terminalThemeRow('Texto', compactText(entry.question, 220), { role: 'question' }));
         }
         if (structuredInputs.length > 3) {
-            println(`  pergunta estruturada \x1b[90m+${structuredInputs.length - 3} pendente(s)\x1b[0m`);
+            println(terminalThemeRow('Pergunta', `+${structuredInputs.length - 3} pendente(s)`));
         }
     }
     if (totalPending === 0) {
-        println('  \x1b[90mSem bloqueios de input humano do SDK no momento.\x1b[0m');
+        println(terminalThemeRow('Status', 'Sem bloqueios de input humano do SDK no momento.'));
     }
+    println(terminalThemeDivider(37));
     println('');
 }
 

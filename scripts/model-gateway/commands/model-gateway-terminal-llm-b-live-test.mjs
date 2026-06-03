@@ -1787,17 +1787,23 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-activity-human',
             pass:
-                /Atividade Atual da LLM-B[\s\S]*estado[\s\S]*evento[\s\S]*Detalhes técnicos ficam em \/activity detail/iu.test(
+                /Atividade Atual da LLM-B[\s\S]*Estado[\s\S]*Evento[\s\S]*Detalhes técnicos ficam em \/activity detail/iu.test(
                     activitySurface,
-                ) && !/\bsource\b|\btools\b|\btrace\b|Streaming público|\bdeltas\b|cumulativo/iu.test(activitySurface),
+                ) && !/\bsource\b|\btools\b|\btrace\b|Streaming público|\bdeltas\b|cumulativo|Sessão SDK removida|session\.deleted/iu.test(activitySurface),
             detail: '/activity default rendered human labels and moved technical identifiers behind detail mode',
         },
         {
             id: 'ux-cycle-waits-human',
             pass:
-                /Esperas humanas[\s\S]*nenhuma pendência[\s\S]*Sem bloqueios de input humano do SDK/iu.test(plain) &&
-                !/SDK Waits|ask_user=|request_user_input=/u.test(defaultSurface),
+                /Esperas humanas[\s\S]*Estado[\s\S]*nenhuma pendência[\s\S]*Status[\s\S]*Sem bloqueios de input humano do SDK/iu.test(
+                    surfaceAt(waitsStart),
+                ) && !/SDK Waits|ask_user=|request_user_input=|estado\s{2,}|resumo\s{2,}/u.test(defaultSurface),
             detail: '/sdk waits default rendered human waits without raw SDK tool names',
+        },
+        {
+            id: 'ux-cycle-no-session-cleanup-spam',
+            pass: !/Sessão SDK removida|\[SESSION\]|session\.deleted/iu.test(defaultSurface),
+            detail: 'default UX did not expose SDK session cleanup as operator-facing activity',
         },
         {
             id: 'ux-cycle-clean-close',

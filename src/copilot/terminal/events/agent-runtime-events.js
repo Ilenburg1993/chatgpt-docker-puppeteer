@@ -268,7 +268,7 @@ const SDK_LIFECYCLE_LABELS = Object.freeze({
     'session.background': 'Sessão SDK em background',
 });
 
-const SDK_LIFECYCLE_VISIBLE_TYPES = new Set(['session.created', 'session.deleted', 'session.foreground', 'session.background']);
+const SDK_LIFECYCLE_VISIBLE_TYPES = new Set(['session.created', 'session.foreground', 'session.background']);
 
 /**
  * @param {Record<string, unknown>} evt
