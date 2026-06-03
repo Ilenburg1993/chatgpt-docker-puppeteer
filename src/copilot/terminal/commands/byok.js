@@ -1891,6 +1891,33 @@ function renderByokRecommendationActionHint(model) {
 }
 
 /**
+ * @param {(text: string) => void} println
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
+ * @param {string} [variantLabel='']
+ * @returns {void}
+ */
+function renderByokModelCatalogRow(println, model, variantLabel = '') {
+    println(terminalThemeRow('Modelo', model.id, { role: 'accent', width: 12 }));
+    println(terminalThemeRow('Detalhes', `${renderModelTags(model)}${variantLabel}`, { width: 12 }));
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {number} index
+ * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
+ * @param {{ level: 'ok' | 'caution' | 'blocked'; label: string }} budget
+ * @param {string} [variantLabel='']
+ * @returns {void}
+ */
+function renderByokRecommendationRow(println, index, model, budget, variantLabel = '') {
+    const role = budget.level === 'ok' ? 'success' : budget.level === 'caution' ? 'warn' : 'error';
+    println(terminalThemeRow(`#${index}`, model.id, { role: 'accent', width: 8 }));
+    println(terminalThemeRow('Detalhes', `${renderModelTags(model)}${variantLabel}`, { width: 8 }));
+    println(terminalThemeRow('Orçamento', budget.label, { role, width: 8 }));
+    println(terminalThemeRow('Ação', renderByokRecommendationActionHint(model), { role: 'command', width: 8 }));
+}
+
+/**
  * O catálogo ativo e o health operacional são superfícies diferentes: o primeiro descreve oferta/configuração, o
  * segundo registra se chat/agente realmente funcionaram. Quando a seleção ativa já falhou, o cockpit deve transformar
  * essa diferença em ação explícita sem trocar o provider/modelo silenciosamente.
@@ -4934,17 +4961,25 @@ async function recordByokProbeHealth(mode, probe) {
  * @returns {void}
  */
 function renderByokProbeResult(println, mode, probe, options = {}) {
-    const indent = options.indent ?? '    ';
-    const color = probe.ok ? '\x1b[32m' : '\x1b[31m';
     println(
-        `${indent}resultado: ${color}${renderByokTokenLabel(probe.status)}\x1b[0m · perfil ${valueOrDash(probe.profile)} · preset ${valueOrDash(probe.preset)} · provedor ${valueOrDash(probe.providerType)} · modelo ${valueOrDash(probe.model)}`,
+        terminalThemeRow(
+            'Resultado',
+            `${renderByokTokenLabel(probe.status)} · perfil ${valueOrDash(probe.profile)} · preset ${valueOrDash(probe.preset)} · provedor ${valueOrDash(probe.providerType)} · modelo ${valueOrDash(probe.model)}`,
+            { role: probe.ok ? 'success' : 'error' },
+        ),
     );
     println(
-        `${indent}sinal:     ${probe.deltaCount} fragmentos · ${probe.deltaChars} ${probe.deltaChars === 1 ? 'caractere' : 'caracteres'} parciais · final ${probe.finalChars} ${probe.finalChars === 1 ? 'caractere' : 'caracteres'} · evento final ${yesNo(probe.observedFinalEvent)} · ${probe.elapsedMs}ms`,
+        terminalThemeRow(
+            'Sinal',
+            `${probe.deltaCount} fragmentos · ${probe.deltaChars} ${probe.deltaChars === 1 ? 'caractere' : 'caracteres'} parciais · final ${probe.finalChars} ${probe.finalChars === 1 ? 'caractere' : 'caracteres'} · evento final ${yesNo(probe.observedFinalEvent)} · ${probe.elapsedMs}ms`,
+        ),
     );
     if (mode === 'agent') {
         println(
-            `${indent}agente:    chamadas de ferramenta ${Number(Reflect.get(probe, 'toolCallCount') ?? 0)} · marcador ${Number(Reflect.get(probe, 'markerToolCallCount') ?? 0)} · leituras ${Number(Reflect.get(probe, 'readToolCallCount') ?? 0)} · perguntas ${Number(Reflect.get(probe, 'userInputRequestCount') ?? 0)} · respostas ${Number(Reflect.get(probe, 'userInputAnswerCount') ?? 0)}`,
+            terminalThemeRow(
+                'Agente',
+                `chamadas de ferramenta ${Number(Reflect.get(probe, 'toolCallCount') ?? 0)} · marcador ${Number(Reflect.get(probe, 'markerToolCallCount') ?? 0)} · leituras ${Number(Reflect.get(probe, 'readToolCallCount') ?? 0)} · perguntas ${Number(Reflect.get(probe, 'userInputRequestCount') ?? 0)} · respostas ${Number(Reflect.get(probe, 'userInputAnswerCount') ?? 0)}`,
+            ),
         );
     }
     if (mode === 'vision') {
@@ -4952,27 +4987,33 @@ function renderByokProbeResult(println, mode, probe, options = {}) {
         const attachmentMimeType = Reflect.get(probe, 'attachmentMimeType');
         const attachmentBytes = Reflect.get(probe, 'attachmentBytes');
         println(
-            `${indent}visão:     prova ${yesNo(Reflect.get(probe, 'visionProved') === true)} · cor ${valueOrDash(typeof dominantColor === 'string' ? dominantColor : null)} · fixture ${valueOrDash(typeof attachmentMimeType === 'string' ? attachmentMimeType : null)}${typeof attachmentBytes === 'number' ? `/${attachmentBytes} bytes` : ''}`,
+            terminalThemeRow(
+                'Visão',
+                `prova ${yesNo(Reflect.get(probe, 'visionProved') === true)} · cor ${valueOrDash(typeof dominantColor === 'string' ? dominantColor : null)} · fixture ${valueOrDash(typeof attachmentMimeType === 'string' ? attachmentMimeType : null)}${typeof attachmentBytes === 'number' ? `/${attachmentBytes} bytes` : ''}`,
+            ),
         );
     }
     if (options.showSession !== false && probe.sessionId) {
-        println(`${indent}\x1b[90msessão temporária ${probe.sessionId}\x1b[0m`);
+        println(terminalThemeRow('Sessão', `temporária ${probe.sessionId}`));
     }
     if (options.showWarnings !== false) {
         if (probe.providerFailure) {
-            println(`${indent}\x1b[33mdiagnóstico: ${probe.providerFailure.operatorLabel}\x1b[0m`);
-            println(`${indent}\x1b[90mação: ${probe.providerFailure.operatorAction}\x1b[0m`);
+            println(terminalThemeRow('Diagnóstico', probe.providerFailure.operatorLabel, { role: 'warn' }));
+            println(terminalThemeRow('Ação', probe.providerFailure.operatorAction, { role: 'command' }));
         }
         for (const warning of probe.warnings) {
-            println(`${indent}\x1b[33maviso: ${warning}\x1b[0m`);
+            println(terminalThemeRow('Aviso', warning, { role: 'warn' }));
         }
         for (const error of probe.errors.slice(0, 4)) {
-            println(`${indent}\x1b[31merro: ${error}\x1b[0m`);
+            println(terminalThemeRow('Erro', error, { role: 'error' }));
         }
     }
     if (options.providerAttempted === false) {
         println(
-            `${indent}\x1b[90mA probe foi barrada antes do provedor porque o limite declarado não comporta o envelope SDK do terminal; health real do modelo não foi degradado por essa admissão.\x1b[0m`,
+            terminalThemeRow(
+                'Admissão',
+                'probe barrada antes do provedor porque o limite declarado não comporta o envelope SDK; health real do modelo não foi degradado',
+            ),
         );
     }
 }
@@ -5817,11 +5858,16 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         }
         for (const entry of visibleEntries) {
             const variantLabel = filters.grouped ? ` · variantes ${renderByokVariantSummary(entry.variants)}` : '';
-            println(`    \x1b[33m${entry.model.id}\x1b[0m  \x1b[90m${renderModelTags(entry.model)}${variantLabel}\x1b[0m`);
+            renderByokModelCatalogRow(println, entry.model, variantLabel);
         }
         if (visibleEntries.length < modelEntries.length) {
+            println('');
             println(
-                `\n  \x1b[90mexibindo ${visibleEntries.length}/${modelEntries.length}${filters.grouped ? ` grupos (${modelList.length} variantes)` : ''}; use /byok models all ou /byok models <n> para ampliar.\x1b[0m`,
+                terminalThemeRow(
+                    'Exibindo',
+                    `${visibleEntries.length}/${modelEntries.length}${filters.grouped ? ` grupos (${modelList.length} variantes)` : ''}; use /byok models all ou /byok models <n> para ampliar`,
+                    { role: 'command' },
+                ),
             );
         }
         println('');
@@ -5887,12 +5933,8 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         let index = 1;
         for (const entry of recommendedEntries) {
             const budget = classifyByokModelBudget(entry.model, runtimeBudget);
-            const color = budget.level === 'ok' ? '\x1b[32m' : budget.level === 'caution' ? '\x1b[33m' : '\x1b[31m';
             const variantLabel = filters.grouped ? ` · variantes ${renderByokVariantSummary(entry.variants)}` : '';
-            println(`    ${index}. \x1b[33m${entry.model.id}\x1b[0m`);
-            println(`       \x1b[90m${renderModelTags(entry.model)}${variantLabel}\x1b[0m`);
-            println(`       ${color}${budget.label}\x1b[0m`);
-            println(`       \x1b[90m${renderByokRecommendationActionHint(entry.model)}\x1b[0m`);
+            renderByokRecommendationRow(println, index, entry.model, budget, variantLabel);
             index += 1;
         }
         println('');

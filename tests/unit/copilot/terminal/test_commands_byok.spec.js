@@ -2855,7 +2855,7 @@ describe('terminal /byok command', () => {
                 ok: false,
             }),
         );
-        expect(ctx.output()).toContain('resultado:');
+        expect(ctx.output()).toContain('Resultado');
         expect(ctx.output()).toContain('empty');
         expect(ctx.output()).toContain('resultado sem prova visual positiva');
         expect(ctx.output()).not.toContain('Sonda de visão confirma que o provider aceitou');

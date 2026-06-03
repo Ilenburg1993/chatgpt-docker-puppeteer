@@ -4545,5 +4545,17 @@
   - Resultado: envelopes `BYOK models` e `BYOK recommend` ficaram temáticos e legíveis.
   - Achado remanescente: linhas individuais de modelos ainda imprimem ANSI manual, IDs/tags muito
         densos e orçamento colorido diretamente.
-- [ ] Próxima etapa: migrar linhas de modelo/recomendação/probe individual, removendo ANSI manual
+- [x] Próxima etapa executada: linhas de modelo/recomendação/probe individual passaram para tema
+      central, removendo ANSI manual
       das linhas com `model.id`, tags, orçamento, cor de budget e resultado de probe.
+- [x] Implementação: `renderByokModelCatalogRow` e `renderByokRecommendationRow` concentram as
+      linhas de catálogo/recomendação com `Modelo`, `Detalhes`, `Orçamento` e `Ação`.
+- [x] Implementação: `renderByokProbeResult` passou a renderizar `Resultado`, `Sinal`, `Agente`,
+      `Visão`, `Sessão`, `Diagnóstico`, `Ação`, `Aviso`, `Erro` e `Admissão` via tema central.
+- [x] Validação escopada passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js --testNamePattern "models all-providers|BYOK models|recommend|probe shortlist|roda probe|streaming|json|vision|lista providers|lista perfis|mostra .env.local|usa metadados"`.
+  - `npm run typecheck:strict:src.copilot`.
+- [x] Live PTY repetido passou:
+  - Sequência: `/byok models 2`, `/byok recommend 2`, `/quit`.
+  - Resultado: linhas individuais apareceram como `Modelo`, `Detalhes`, `Orçamento` e `Ação`,
+        sem ANSI manual visível.
