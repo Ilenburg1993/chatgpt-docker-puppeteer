@@ -274,6 +274,18 @@ function renderLiveStatusLabel(value) {
 
 /**
  * @param {unknown} value
+ * @returns {'success' | 'assistant' | 'warn' | 'error'}
+ */
+function renderLiveFlowStateRole(value) {
+    const state = String(value ?? '');
+    if (state === 'ready') return 'success';
+    if (state === 'active-turn') return 'assistant';
+    if (state === 'waiting-human' || state === 'paused') return 'warn';
+    return 'error';
+}
+
+/**
+ * @param {unknown} value
  * @returns {string}
  */
 function renderLiveSourceLabel(value) {
@@ -938,26 +950,33 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         const modelLine = modelBilling.mismatch
             ? `${modelBilling.displayModel} · revisar /status full`
             : modelBilling.displayModel;
-        println(`\n  ${terminalThemeText('assistant', 'Agora')}`);
-        println('  ─────────────────────────────────────');
+        println('');
+        println(terminalThemeHeadline('assistant', 'Agora'));
+        println(terminalThemeDivider(37));
         println(
-            `  Conversa     \x1b[90m${renderHumanTerminalStatus(state)} · ${projection.dialogLoopActive ? 'ativa' : 'inativa'} · fila ${queue} · ${askLine}\x1b[0m`,
+            terminalThemeRow(
+                'Conversa',
+                `${renderHumanTerminalStatus(state)} · ${projection.dialogLoopActive ? 'ativa' : 'inativa'} · fila ${queue} · ${askLine}`,
+            ),
         );
-        println(`  Entrada      \x1b[90m${channel.label} · ${waitLine}\x1b[0m`);
-        println(`  Modelo       \x1b[90m${modelLine}\x1b[0m`);
+        println(terminalThemeRow('Entrada', `${renderHumanInputChannelText(channel.label)} · ${waitLine}`));
+        println(terminalThemeRow('Modelo', modelLine, { role: modelBilling.mismatch ? 'warn' : 'assistant' }));
         if (gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0) {
             println(
-                `  Catálogo     \x1b[90m${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ativo ${renderCompactGatewayActive(gatewayActive)}\x1b[0m`,
+                terminalThemeRow(
+                    'Catálogo',
+                    `${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ativo ${renderCompactGatewayActive(gatewayActive)}`,
+                ),
             );
         }
         if (projection.activity?.label) {
             const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';
-            println(`  Atividade    \x1b[90m${projection.activity.label}${detail}\x1b[0m`);
+            println(terminalThemeRow('Atividade', `${projection.activity.label}${detail}`));
         }
         if (projection.recommendedAction && projection.recommendedAction !== 'none') {
-            println(`  Próximo      ${terminalThemeText('command', projection.recommendedAction)}`);
+            println(terminalThemeRow('Próximo', projection.recommendedAction, { role: 'command' }));
         }
-        println('  ─────────────────────────────────────');
+        println(terminalThemeDivider(37));
         return;
     }
 
@@ -977,37 +996,51 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
     const modelLine = modelBilling.mismatch
         ? `configurado ${modelBilling.configuredModel ?? '-'} · cobrado ${modelBilling.billedModel ?? '-'} · divergente`
         : modelBilling.displayModel;
-    println(`\n  ${terminalThemeText('assistant', 'Agora - Detalhe')}`);
-    println('  ─────────────────────────────────────');
+    println('');
+    println(terminalThemeHeadline('assistant', 'Agora - Detalhe'));
+    println(terminalThemeDivider(37));
+    println(terminalThemeRow('Runtime', `${projection.runtimeId} · sessão ${projection.runtimeSessionId ?? 'sem sessão'}`));
     println(
-        `  Runtime      \x1b[90m${projection.runtimeId} · sessão ${projection.runtimeSessionId ?? '(sem sessão)'}\x1b[0m`,
+        terminalThemeRow(
+            'Conversa',
+            `${renderHumanTerminalStatus(state)} · ${projection.dialogLoopActive ? 'ativa' : 'inativa'} · fila ${queue} · ${askLine}`,
+        ),
     );
     println(
-        `  Conversa     \x1b[90m${renderHumanTerminalStatus(state)} · ${projection.dialogLoopActive ? 'ativa' : 'inativa'} · fila ${queue} · ${askLine}\x1b[0m`,
+        terminalThemeRow(
+            'Entrada',
+            `${renderHumanInputChannelText(channel.label)} · modo SDK ${renderLiveSdkMode(projection.sdkSessionMode)} · prompts ${projection.permissionMode} · ${waitSummary || 'sem pendências humanas'}`,
+        ),
     );
     println(
-        `  Entrada      \x1b[90m${channel.label} · modo SDK ${projection.sdkSessionMode ?? 'interactive'} · prompts ${projection.permissionMode} · ${waitSummary || 'sem pendências humanas'}\x1b[0m`,
+        terminalThemeRow(
+            'Timeline',
+            `${projection.timelineSource} · ${projection.timelineReconciliationStatus} · sync ${renderTerminalSyncStatusLabel(projection.timelineSyncStatus)}`,
+        ),
     );
     println(
-        `  Timeline     \x1b[90m${projection.timelineSource} · ${projection.timelineReconciliationStatus} · sync ${projection.timelineSyncStatus}\x1b[0m`,
+        terminalThemeRow(
+            'SSE',
+            `${pluralPt(live.sse.clients, 'cliente', 'clientes')} · ${pluralPt(live.sse.criticalClients, 'cliente crítico', 'clientes críticos')} · estado ${live.state}`,
+        ),
     );
-    println(
-        `  SSE          \x1b[90m${pluralPt(live.sse.clients, 'cliente', 'clientes')} · ${pluralPt(live.sse.criticalClients, 'cliente crítico', 'clientes críticos')} · estado ${live.state}\x1b[0m`,
-    );
-    println(`  Modelo       \x1b[90m${modelLine}\x1b[0m`);
+    println(terminalThemeRow('Modelo', modelLine, { role: modelBilling.mismatch ? 'warn' : 'assistant' }));
     if (gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0) {
         println(
-            `  Catálogo     \x1b[90m${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados · ativo ${renderCompactGatewayActive(gatewayActive)}\x1b[0m`,
+            terminalThemeRow(
+                'Catálogo',
+                `${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados · ativo ${renderCompactGatewayActive(gatewayActive)}`,
+            ),
         );
     }
     if (projection.activity?.label) {
         const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';
-        println(`  Atividade    \x1b[90m${projection.activity.phase} · ${projection.activity.label}${detail}\x1b[0m`);
+        println(terminalThemeRow('Atividade', `${projection.activity.phase} · ${projection.activity.label}${detail}`));
     }
     if (projection.recommendedAction) {
-        println(`  Próximo      ${terminalThemeText('command', projection.recommendedAction)}`);
+        println(terminalThemeRow('Próximo', projection.recommendedAction, { role: 'command' }));
     }
-    println('  ─────────────────────────────────────');
+    println(terminalThemeDivider(37));
 }
 
 /**
@@ -1035,14 +1068,6 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     const status = projection.status;
     const current = projection.activity.current;
     const activeTrace = projection.turnTrace.current ?? projection.turnTrace.recent[0] ?? null;
-    const stateColor =
-        projection.state === 'ready'
-            ? '\x1b[32m'
-            : projection.state === 'active-turn'
-              ? '\x1b[36m'
-              : projection.state === 'waiting-human' || projection.state === 'paused'
-                ? '\x1b[33m'
-                : '\x1b[31m';
     const streamFlags = [
         `resposta ${renderLiveToggle(projection.stream.streaming)}`,
         `raciocínio ${renderLiveToggle(projection.stream.thinking)}`,
@@ -1068,49 +1093,89 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
         ].filter(Boolean);
         const stateLabel = renderLiveFlowStateLabel(projection.state);
         const activityLine = renderLiveActivitySummary(current);
-        println(`
-  ${terminalThemeText('assistant', 'Fluxo da conversa')}
-  ─────────────────────────────────────
-  Estado       ${stateColor}${stateLabel}\x1b[0m \x1b[90m${projection.summary}\x1b[0m
-  Conversa     \x1b[90m${status.dialogLoopActive ? 'ativa' : 'inativa'} · ${renderHumanTerminalStatus(status.snap['status'])}${status.snap['dialogPaused'] ? ' · pausada' : ''}\x1b[0m
-  Sinais       \x1b[90m${streamBits.join(' · ') || 'sinais reduzidos'}\x1b[0m
-  Atividade    \x1b[90m${activityLine}\x1b[0m
-  Turno        \x1b[90m${traceSummary.join(' · ') || 'sem ações recentes'}\x1b[0m
-  Conexões     \x1b[90m${renderCompactSseLine(projection.sse)} · timeline ${projection.counters.timelineTurns} turno(s)\x1b[0m
-  Detalhe      ${renderCommandList(['/live full', `/activity ${requestedLimit} detail`, `/events ${requestedLimit}`])}
-  ─────────────────────────────────────
-`);
+        println('');
+        println(terminalThemeHeadline('assistant', 'Fluxo da conversa'));
+        println(terminalThemeDivider(37));
+        println(
+            terminalThemeRow('Estado', `${stateLabel} · ${projection.summary}`, {
+                role: renderLiveFlowStateRole(projection.state),
+            }),
+        );
+        println(
+            terminalThemeRow(
+                'Conversa',
+                `${status.dialogLoopActive ? 'ativa' : 'inativa'} · ${renderHumanTerminalStatus(status.snap['status'])}${status.snap['dialogPaused'] ? ' · pausada' : ''}`,
+            ),
+        );
+        println(terminalThemeRow('Sinais', streamBits.join(' · ') || 'sinais reduzidos'));
+        println(terminalThemeRow('Atividade', activityLine));
+        println(terminalThemeRow('Turno', traceSummary.join(' · ') || 'sem ações recentes'));
+        println(terminalThemeRow('Conexões', `${renderCompactSseLine(projection.sse)} · timeline ${projection.counters.timelineTurns} turno(s)`));
+        println(terminalThemeRow('Detalhe', renderCommandList(['/live full', `/activity ${requestedLimit} detail`, `/events ${requestedLimit}`])));
+        println(terminalThemeDivider(37));
         return;
     }
 
-    println(`
-  \x1b[36mFluxo detalhado da conversa\x1b[0m
-  ─────────────────────────────────────
-  estado          ${stateColor}${renderLiveFlowStateLabel(projection.state)}\x1b[0m \x1b[90m${projection.summary}\x1b[0m
-  runtime         \x1b[90m${status.runtimeId} · ${renderHumanTerminalStatus(status.snap['status'])} · conversa ${status.dialogLoopActive ? 'ativa' : 'inativa'} · ${status.snap['dialogPaused'] ? 'pausada' : 'não pausada'}\x1b[0m
-  sessão SDK      \x1b[90m${renderLiveSdkMode(status.sdkSessionMode)} · ${status.sdkSessionId ?? 'sem sessão SDK'} · permissões ${status.permissionMode}\x1b[0m
-  sinais          \x1b[90m${streamFlags}\x1b[0m
-  conexões        \x1b[90m${projection.sse.clients} cliente(s) SSE · ${projection.sse.criticalClients} crítico(s) · replay ${projection.sse.replayLastId}\x1b[0m
-  timeline        \x1b[90m${projection.timeline.timelineSource} · ${projection.timeline.reconciliationStatus} · sync ${projection.timeline.sync.status} · ${projection.counters.timelineTurns} turno(s)\x1b[0m
-  cache/escopo    \x1b[90mL1 ${renderLiveToggle(Boolean(ioRuntime.cache.l1['enabled']))}:${ioRuntime.cache.l1['size'] ?? 0} · L2 ${renderLiveToggle(Boolean(ioRuntime.cache.l2['enabled']))}:${ioRuntime.cache.l2['size'] ?? 0} · acerto ${cacheHitRatio} · índice ${ioIndex['available'] ? 'ativo' : 'vazio'}:${ioIndex['files'] ?? 0} · escopos ${ioRuntime.scopes.active} · parser ${ioRuntime.parser.size}/${ioRuntime.parser.maxSize}\x1b[0m
-  atividade       \x1b[90m${renderLiveActivitySummary(current, { includePhase: true })}\x1b[0m
-  trace           \x1b[90m${projection.counters.toolCount} ferramenta(s) · ${projection.counters.fileCount} arquivo(s) · ${projection.counters.recentIoCount} I/O recente\x1b[0m
-  ─────────────────────────────────────`);
+    println('');
+    println(terminalThemeHeadline('assistant', 'Fluxo detalhado da conversa'));
+    println(terminalThemeDivider(37));
+    println(
+        terminalThemeRow('Estado', `${renderLiveFlowStateLabel(projection.state)} · ${projection.summary}`, {
+            role: renderLiveFlowStateRole(projection.state),
+        }),
+    );
+    println(
+        terminalThemeRow(
+            'Runtime',
+            `${status.runtimeId} · ${renderHumanTerminalStatus(status.snap['status'])} · conversa ${status.dialogLoopActive ? 'ativa' : 'inativa'} · ${status.snap['dialogPaused'] ? 'pausada' : 'não pausada'}`,
+        ),
+    );
+    println(
+        terminalThemeRow(
+            'Sessão SDK',
+            `${renderLiveSdkMode(status.sdkSessionMode)} · ${status.sdkSessionId ?? 'sem sessão SDK'} · permissões ${status.permissionMode}`,
+        ),
+    );
+    println(terminalThemeRow('Sinais', streamFlags));
+    println(
+        terminalThemeRow(
+            'Conexões',
+            `${projection.sse.clients} cliente(s) SSE · ${projection.sse.criticalClients} crítico(s) · replay ${projection.sse.replayLastId}`,
+        ),
+    );
+    println(
+        terminalThemeRow(
+            'Timeline',
+            `${projection.timeline.timelineSource} · ${projection.timeline.reconciliationStatus} · sync ${renderTerminalSyncStatusLabel(projection.timeline.sync.status)} · ${projection.counters.timelineTurns} turno(s)`,
+        ),
+    );
+    println(
+        terminalThemeRow(
+            'Cache/escopo',
+            `L1 ${renderLiveToggle(Boolean(ioRuntime.cache.l1['enabled']))}:${ioRuntime.cache.l1['size'] ?? 0} · L2 ${renderLiveToggle(Boolean(ioRuntime.cache.l2['enabled']))}:${ioRuntime.cache.l2['size'] ?? 0} · acerto ${cacheHitRatio} · índice ${ioIndex['available'] ? 'ativo' : 'vazio'}:${ioIndex['files'] ?? 0} · escopos ${ioRuntime.scopes.active} · parser ${ioRuntime.parser.size}/${ioRuntime.parser.maxSize}`,
+        ),
+    );
+    println(terminalThemeRow('Atividade', renderLiveActivitySummary(current, { includePhase: true })));
+    println(terminalThemeRow('Trace', `${projection.counters.toolCount} ferramenta(s) · ${projection.counters.fileCount} arquivo(s) · ${projection.counters.recentIoCount} I/O recente`));
+    println(terminalThemeDivider(37));
 
     if (activeTrace && (activeTrace.tools.length > 0 || activeTrace.files.length > 0)) {
-        println('  turno observado');
+        println(terminalThemeHeadline('assistant', 'Turno observado'));
         for (const tool of activeTrace.tools.slice(0, 5)) {
-            println(`    - ${renderLiveToolSummary(tool, { detail: true })}`);
+            println(terminalThemeRow('Ferramenta', renderLiveToolSummary(tool, { detail: true })));
         }
         for (const file of activeTrace.files.slice(0, 5)) {
             println(
-                `    - arquivo · ${renderLiveOperationLabel(file.operation)} · ${compactHumanTerminalText(file.path)} · ${renderLiveSourceLabel(file.source)}${file.count > 1 ? ` ×${file.count}` : ''}`,
+                terminalThemeRow(
+                    'Arquivo',
+                    `${renderLiveOperationLabel(file.operation)} · ${compactHumanTerminalText(file.path)} · ${renderLiveSourceLabel(file.source)}${file.count > 1 ? ` ×${file.count}` : ''}`,
+                ),
             );
         }
     }
 
     if (projection.recentIo.length > 0) {
-        println('  I/O real');
+        println(terminalThemeHeadline('assistant', 'I/O real recente'));
         for (const entry of projection.recentIo.slice(0, 6)) {
             const ts = formatTerminalIsoTimestamp(entry.timestamp);
             const statusLabel = entry.success ? 'concluída' : 'falhou';
@@ -1122,17 +1187,26 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
                       : '';
             const duration = typeof entry.durationMs === 'number' ? ` · ${entry.durationMs}ms` : '';
             println(
-                `    - [${ts}] ${statusLabel} · ${renderLiveOperationLabel(entry.operation)} · ${compactHumanTerminalText(entry.target)}${bytes}${duration}`,
+                terminalThemeRow(
+                    'Operação',
+                    `[${ts}] ${statusLabel} · ${renderLiveOperationLabel(entry.operation)} · ${compactHumanTerminalText(entry.target)}${bytes}${duration}`,
+                    { role: entry.success ? 'muted' : 'warn' },
+                ),
             );
         }
     }
 
     if (projection.activity.history.length > 0) {
-        println('  eventos recentes');
+        println(terminalThemeHeadline('assistant', 'Eventos recentes'));
         for (const entry of projection.activity.history.slice(0, 6)) {
             const ts = formatTerminalIsoTimestamp(entry.ts);
             const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';
-            println(`    - [${ts}] ${renderLiveActivitySummary(entry, { includePhase: true })}${progress}`);
+            println(
+                terminalThemeRow(
+                    'Evento',
+                    `[${ts}] ${renderLiveActivitySummary(entry, { includePhase: true })}${progress}`,
+                ),
+            );
         }
     }
 

@@ -589,10 +589,10 @@ describe('commands/session — sync commands', () => {
         const ctx = mockCtx();
         cmdLive({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, 'full');
         expect(ctx.output()).toContain('Fluxo detalhado da conversa');
-        expect(ctx.output()).toContain('estado');
-        expect(ctx.output()).toContain('sinais');
+        expect(ctx.output()).toContain('Estado');
+        expect(ctx.output()).toContain('Sinais');
         expect(ctx.output()).toContain('SSE');
-        expect(ctx.output()).toContain('trace');
+        expect(ctx.output()).toContain('Trace');
         expect(ctx.output()).not.toContain('streaming=');
         expect(ctx.output()).not.toContain('phase:');
     });

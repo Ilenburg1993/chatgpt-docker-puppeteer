@@ -2639,4 +2639,17 @@
 - [x] Acesso, saúde, entrada, modelo, catálogo, atividade, próximo passo e detalhes agora são linhas temáticas, sem `\x1b[...]` local no bloco.
 - [x] Teste escopado passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
-- [ ] Próxima lacuna: migrar `/now`, `/health`, `/live` e `/activity` compactos para o barrel estreito de tema e remover suas cores locais herdadas, em lotes pequenos.
+- [x] `/now` default e `/now full` também migraram para `terminalThemeHeadline`, `terminalThemeDivider` e `terminalThemeRow`, substituindo o painel ANSI local por linhas humanas alinhadas.
+- [x] `/live` default e `/live full` passaram a usar o mesmo tema central, incluindo estado colorido por papel sem `\x1b[...]` hardcoded na tela.
+- [x] `/live full` deixou de misturar listas soltas para tools, arquivos, I/O real e eventos recentes; esses blocos agora aparecem como `Turno observado`, `I/O real recente` e `Eventos recentes`.
+- [ ] Próxima lacuna: migrar `/health` e `/activity` compactos para o barrel estreito de tema e remover suas cores locais herdadas, em lotes pequenos.
+
+### 11.36 `/now` e `/live` no tema central
+
+- [x] Achado: após `/status`, o operador ainda via a mesma sessão com três estilos simultâneos: `/now` em painel temático parcial, `/live` com restos de ANSI manual e listas detalhadas não alinhadas.
+- [x] Decisão: `/now`, `/now full`, `/live` e `/live full` devem compartilhar a gramática dos painéis compactos, porque são comandos de monitoramento cotidiano e aparecem juntos no ciclo live.
+- [x] Implementação: `cmdNow` passou a renderizar `Agora` e `Agora - Detalhe` com linhas `Conversa`, `Entrada`, `Modelo`, `Catálogo`, `Atividade`, `Runtime`, `Timeline` e `SSE` via tema central.
+- [x] Implementação: `cmdLive` passou a renderizar `Fluxo da conversa` e `Fluxo detalhado da conversa` com helpers de papel visual por estado, sem cor ANSI local.
+- [x] Implementação: blocos internos de `/live full` foram humanizados para `Ferramenta`, `Arquivo`, `Operação` e `Evento`, evitando bullets desalinhados e listas que pareciam logs crus.
+- [ ] Validar via PTY que `/status`, `/now`, `/live`, `/activity` e `/health` ainda cabem bem na largura visual do terminal do operador.
+- [ ] Próxima lacuna estética: consolidar `/activity` e `/health`, pois ainda aparecem no relatório de live como bons funcionalmente, mas com pequenas sobras de cor/estrutura herdada.
