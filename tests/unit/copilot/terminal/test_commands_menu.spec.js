@@ -205,4 +205,21 @@ describe('terminal/commands/menu', () => {
         expect(ctx.output()).toContain('input humano parcialmente digitado');
         expect(ctx.output()).toContain('picker textual seguro');
     });
+
+    it('não abre picker interativo quando prontidão TTY bloqueia a ação explícita', async () => {
+        const ctx = mockCtx();
+        const withExclusiveTty = vi.fn();
+
+        await cmdMenu({ println: ctx.println }, 'picker', ['--interactive'], {
+            readExclusiveTtyReadiness: () => ({
+                ready: false,
+                reasons: ['turno em execução'],
+            }),
+            withExclusiveTty,
+        });
+
+        expect(withExclusiveTty).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('turno em execução');
+        expect(ctx.output()).toContain('Picker interativo indisponível');
+    });
 });

@@ -1877,6 +1877,7 @@ function diagnosticUxCycleCriteria(boot) {
                 /picker textual seguro/iu.test(menuPickerSurface) &&
                 /runtime ainda não entregou controle exclusivo do TTY/iu.test(menuPickerSurface) &&
                 /\/menu <n> ou \/menu <id>/iu.test(menuPickerSurface) &&
+                !/renderização terminal em andamento/iu.test(menuPickerSurface) &&
                 !/chatcmpl-tool-|toolu_|\\x1b\[/iu.test(menuPickerSurface),
             detail: '/menu picker rendered safe textual guard instead of launching an external TUI over the live prompt',
         },

@@ -87,6 +87,7 @@ import {
     printlnBlock,
     readTerminalExclusiveTtyReadiness,
     sendTurn,
+    withTerminalExclusiveTty,
 } from '../dialog/index.js';
 import {
     abortTerminalCurrentMessage,
@@ -739,6 +740,7 @@ export const CMD_ROUTES = [
                     return true;
                 },
                 readExclusiveTtyReadiness: () => readTerminalExclusiveTtyReadiness(rl, { ignoreRenderLock: true }),
+                withExclusiveTty: (operation) => withTerminalExclusiveTty(rl, operation, { ignoreRenderLock: true }),
             }),
     ],
     [['search'], (ctx, arg) => _cmdSearch({ println, hubSessionId: ctx.hubSessionId }, arg)],

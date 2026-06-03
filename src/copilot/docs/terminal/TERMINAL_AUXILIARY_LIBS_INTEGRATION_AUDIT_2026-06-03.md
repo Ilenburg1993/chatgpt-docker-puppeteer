@@ -437,6 +437,19 @@ Decisão:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-exclusive-tty-20260603-2040`.
 - [x] Resultado live: PASS em 29/29 critérios; `/menu picker` mostrou apenas a guarda real de
       handoff ainda nao entregue, sem falso bloqueio de renderização.
+- [x] Faixa G.6: `picker-runner.js` executa `fzf`/`gum` como adapter opcional, com argumentos
+      tokenizados, stdin controlado e captura de seleção sem shell livre.
+- [x] Integração Faixa G.6: `/menu picker --interactive` usa `withTerminalExclusiveTty()` e só
+      tenta TUI real quando a prontidão do REPL aprova; `/menu picker` permanece textual por padrão.
+- [x] Harness Faixa G.6: `diagnostic-ux-menu-picker-guard` agora reprova se voltar a aparecer o
+      falso bloqueio `renderização terminal em andamento`.
+- [x] Testes Faixa G.6 passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_picker_runner.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js tests/unit/copilot/terminal/test_picker_plan.spec.js`.
+- [x] Resultado: 3 arquivos, 15 testes.
+- [x] Live PTY Faixa G.6 passou:
+      `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-picker-runner-guard-20260603-2045`.
+- [x] Resultado live: PASS em 29/29 critérios com guarda textual default e sem falso bloqueio de
+      renderização.
 
 ### Faixa D: preview read-only
 
@@ -469,8 +482,10 @@ Decisão:
 - [x] Fase G.4: impedir execução sem autorização interativa explícita ou com pergunta humana pendente.
 - [x] Fase G.5: criar contrato central para pausar linha viva/readline, entregar TTY exclusivo
       a uma operação e restaurar prompt vivo sem corromper input.
-- [ ] Fase G.6: criar adapter executor de `fzf`/`gum` usando o contrato de TTY exclusivo.
-- [ ] Fase G.7: auditar cancelamento/erro do picker real e registrar eventos humanos sem expor ids.
+- [x] Fase G.6: criar adapter executor de `fzf`/`gum` usando o contrato de TTY exclusivo.
+- [x] Fase G.7: tratar seleção, cancelamento, falha e retorno desconhecido sem shell livre.
+- [ ] Fase G.8: auditar picker real em PTY manual/assistido, validando restauração visual apos
+      seleção/cancelamento em `fzf` e, quando instalado, `gum`.
 
 ### Faixa H: contratos estruturados
 

@@ -4340,8 +4340,21 @@
 - [x] Live PTY Faixa G.5 base passou:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-exclusive-tty-20260603-2040`.
 - [x] Resultado live: PASS em 29/29 critérios, incluindo `diagnostic-ux-menu-picker-guard`.
-- [ ] Próxima implementação: adapter executor de `fzf`/`gum` usando `withTerminalExclusiveTty()`,
-      ainda opt-in e nunca durante pergunta pendente, turno ativo ou input parcial.
+- [x] Implementação: `picker-runner.js` adiciona executor opt-in para `fzf`/`gum`, sem shell livre,
+      com seleção, cancelamento, falha e retorno desconhecido tratados explicitamente.
+- [x] Implementação: `/menu picker --interactive` usa `withTerminalExclusiveTty()`; `/menu picker`
+      continua sendo guarda textual por padrão para nao sequestrar a linha viva.
+- [x] Harness reforçado: `diagnostic-ux-menu-picker-guard` reprova se `/menu picker` voltar a expor
+      o falso bloqueio `renderização terminal em andamento`.
+- [x] Testes Faixa G.6 passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_picker_runner.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js tests/unit/copilot/terminal/test_picker_plan.spec.js`.
+- [x] Resultado: 3 arquivos, 15 testes.
+- [x] Live PTY Faixa G.6 passou:
+      `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-picker-runner-guard-20260603-2045`.
+- [x] Resultado live: PASS em 29/29 critérios com `/menu picker` textual e sem falso bloqueio de
+      render lock.
+- [ ] Próxima implementação: live assistida do picker real com `fzf` em PTY, validando seleção,
+      cancelamento e restauração visual sem contaminar o ciclo diagnóstico automático.
 - [x] Live PTY estruturado passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=150000 --transport=pty --out-dir=artifacts/terminal-live/structured-question-card-20260603-1723`.
   - Resultado: PASS em 11/11 critérios, cobrindo prompt `[PERGUNTA]`, resposta roteada, waits

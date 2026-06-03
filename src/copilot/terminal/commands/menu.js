@@ -13,7 +13,7 @@ import {
     readTerminalRuntimeControlState,
     readTerminalRuntimeState,
 } from '../frontend/gateways/index.js';
-import { buildTerminalPickerPlan } from '../capabilities/index.js';
+import { buildTerminalPickerPlan, runTerminalExternalPicker } from '../capabilities/index.js';
 import { readTerminalIntentStats } from '../state/index.js';
 import {
     readTerminalElicitationSummary,
@@ -312,10 +312,22 @@ function renderTerminalPickerPlan(println, entries, ttyReadiness = null) {
 }
 
 /**
+ * @param {TerminalSmartMenuEntry[]} entries
+ * @returns {{ id: string; label: string; description: string }[]}
+ */
+function buildTerminalMenuPickerItems(entries) {
+    return entries.map((entry) => ({
+        id: entry.id,
+        label: entry.label,
+        description: `${entry.description} · ${entry.commandLine}`,
+    }));
+}
+
+/**
  * @param {{ println: (text: string) => void }} ctx
  * @param {string} [arg=''] Default is `''`
  * @param {string[]} [rest=[]] Default is `[]`
- * @param {{ executeCommandLine?: (commandLine: string) => Promise<boolean>; readExclusiveTtyReadiness?: () => { ready: boolean; reasons: string[] } }} [deps]
+ * @param {{ executeCommandLine?: (commandLine: string) => Promise<boolean>; readExclusiveTtyReadiness?: () => { ready: boolean; reasons: string[] }; withExclusiveTty?: <T>(operation: () => T | Promise<T>) => Promise<{ ok: true; value: T; reason: null; reasons: []; error: null } | { ok: false; value: null; reason: string; reasons: string[]; error: unknown }> }} [deps]
  * @returns {Promise<void>}
  */
 export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
@@ -328,7 +340,52 @@ export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
     }
 
     if (primary.toLowerCase() === 'picker' || primary.toLowerCase() === '--picker') {
-        renderTerminalPickerPlan(println, entries, deps.readExclusiveTtyReadiness?.() ?? null);
+        const wantsInteractive = rest.some((token) => ['interactive', '--interactive', 'real', '--real'].includes(token.toLowerCase()));
+        const ttyReadiness = deps.readExclusiveTtyReadiness?.() ?? null;
+        if (!wantsInteractive) {
+            renderTerminalPickerPlan(println, entries, ttyReadiness);
+            return;
+        }
+        const plan = buildTerminalPickerPlan({
+            allowInteractive: ttyReadiness?.ready === true,
+            blockReasons: ttyReadiness?.ready === false ? ttyReadiness.reasons : [],
+            pendingQuestion: false,
+            preferred: 'auto',
+        });
+        if (plan.mode !== 'external' || !plan.command || !plan.toolId || !deps.withExclusiveTty) {
+            renderTerminalPickerPlan(println, entries, ttyReadiness);
+            println(`  ${terminalThemeText('warn', 'Picker interativo indisponível; use /menu <n> ou /menu <id>.')}`);
+            return;
+        }
+        const pickerCommand = plan.command;
+        const pickerRenderer = plan.toolId;
+        const selected = await deps.withExclusiveTty(() =>
+            runTerminalExternalPicker(buildTerminalMenuPickerItems(entries), {
+                command: pickerCommand,
+                renderer: pickerRenderer,
+                prompt: 'menu> ',
+            }),
+        );
+        if (!selected.ok) {
+            println(`  ${terminalThemeText('warn', `Picker indisponível: ${selected.reason}`)}`);
+            return;
+        }
+        const result = selected.value;
+        if (result.status !== 'selected' || !result.item) {
+            const role = result.status === 'failed' ? 'error' : 'muted';
+            println(`  ${terminalThemeText(role, `Picker: ${result.reason ?? 'seleção cancelada'}`)}`);
+            return;
+        }
+        const entry = resolveTerminalSmartMenuSelection(entries, result.item.id);
+        if (!entry) {
+            println(`  ${terminalThemeText('error', 'Picker retornou uma ação desconhecida.')}`);
+            return;
+        }
+        println(`  ${terminalThemeText('info', `⏵ ${entry.label}`)}  ${terminalThemeText('muted', `→ ${entry.commandLine}`)}`);
+        if (typeof deps.executeCommandLine === 'function') {
+            const ok = await deps.executeCommandLine(entry.commandLine);
+            if (!ok) println(`  ${terminalThemeText('warn', 'Não foi possível executar a ação automaticamente; copie o comando acima.')}`);
+        }
         return;
     }
 
