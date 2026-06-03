@@ -1741,7 +1741,10 @@ function diagnosticUxCycleCriteria(boot) {
     const sdkStatusStart = plain.indexOf('/sdk status', Math.max(0, sdkInventoryStart));
     const permissionModeStart = plain.indexOf('/permission mode', Math.max(0, sdkStatusStart));
     const permissionCockpitStart = plain.indexOf('/permission cockpit', Math.max(0, permissionModeStart));
-    const historyStart = plain.indexOf('/history 6', Math.max(0, permissionCockpitStart));
+    const queueStart = plain.indexOf('/queue intervenção visual sem turno novo', Math.max(0, permissionCockpitStart));
+    const mailboxStatusStart = plain.indexOf('/mailbox status', Math.max(0, queueStart));
+    const mailboxClearStart = plain.indexOf('/mailbox clear', Math.max(0, mailboxStatusStart));
+    const historyStart = plain.indexOf('/history 6', Math.max(0, mailboxClearStart));
     const dbHistoryStart = plain.indexOf('/db-history 6', Math.max(0, historyStart));
     const dbSessionsStart = plain.indexOf('/db-sessions 6', Math.max(0, dbHistoryStart));
     const scopeDeclareStart = plain.indexOf('/scope declare terminal-ux-scope', Math.max(0, dbSessionsStart));
@@ -1767,7 +1770,8 @@ function diagnosticUxCycleCriteria(boot) {
     const sdkInventorySurface = surfaceBetween(sdkInventoryStart, sdkStatusStart);
     const sdkStatusSurface = surfaceBetween(sdkStatusStart, permissionModeStart);
     const permissionModeSurface = surfaceBetween(permissionModeStart, permissionCockpitStart);
-    const permissionCockpitSurface = surfaceBetween(permissionCockpitStart, historyStart);
+    const permissionCockpitSurface = surfaceBetween(permissionCockpitStart, queueStart);
+    const mailboxSurface = surfaceBetween(queueStart, historyStart);
     const historySurface = surfaceBetween(historyStart, dbHistoryStart);
     const dbHistorySurface = surfaceBetween(dbHistoryStart, dbSessionsStart);
     const dbSessionsSurface = surfaceBetween(dbSessionsStart, scopeDeclareStart);
@@ -1882,6 +1886,16 @@ function diagnosticUxCycleCriteria(boot) {
             detail: '/permission mode/cockpit rendered translated governance labels without raw mode constants, permission types, requestId labels, ANSI, or ISO timestamps',
         },
         {
+            id: 'diagnostic-ux-intervention-queue-human',
+            pass:
+                /Fila[\s\S]*intervenção guardada para a próxima pergunta humana/iu.test(mailboxSurface) &&
+                /Fila de intervenção[\s\S]*1 na fila[\s\S]*limpa/iu.test(mailboxSurface) &&
+                !/mailbox zero-PR|runtime default|runtime [a-z0-9_-]+|\[mailbox|modeHint|entryId|\\x1b\[/iu.test(
+                    mailboxSurface,
+                ),
+            detail: '/queue and /mailbox status/clear rendered human intervention queue copy without mailbox-zero-PR jargon, runtime ids, entry ids, modeHint, or ANSI',
+        },
+        {
             id: 'diagnostic-ux-history-human',
             pass:
                 /Histórico/iu.test(historySurface) &&
@@ -1951,6 +1965,9 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
             { line: '/sdk status', advanceAfterMs: 1_000 },
             { line: '/permission mode', advanceAfterMs: 1_000 },
             { line: '/permission cockpit', advanceAfterMs: 1_000 },
+            { line: '/queue intervenção visual sem turno novo', advanceAfterMs: 1_000 },
+            { line: '/mailbox status', advanceAfterMs: 1_000 },
+            { line: '/mailbox clear', advanceAfterMs: 1_000 },
             { line: '/history 6', advanceAfterMs: 1_000 },
             { line: '/db-history 6', advanceAfterMs: 1_000 },
             { line: '/db-sessions 6', advanceAfterMs: 1_000 },

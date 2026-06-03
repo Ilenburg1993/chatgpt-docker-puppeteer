@@ -4017,6 +4017,33 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=160000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-permission-human-20260603-1620`.
   - Resultado: PASS em 18/18 critérios; o painel mostrou `automáticas`, `sem janelas SDK por
         padrão` e nenhum `approve_all`, `file_write`, `requestId` ou timestamp ISO.
-- [ ] Próxima lacuna: revisar os fluxos de `/queue`, `/mailbox`, `/interrupt` e aplicação
+- [x] Próxima lacuna: revisar os fluxos de `/queue`, `/mailbox`, `/interrupt` e aplicação
       automática de intervenção humana, reduzindo termos `mailbox zero-PR`, IDs de entry e
       repetição visual quando uma pergunta estruturada aguarda resposta.
+
+### 11.56 Fila de intervenção sem jargão de mailbox
+
+- [x] Achado: `/queue`, `/mailbox`, `/interrupt`, `/steer` bloqueado e drain automático ainda
+      imprimiam `mailbox zero-PR`, `runtime default`, `source/modeHint`, `[mailbox→turn]` e ANSI
+      manual em alguns caminhos.
+- [x] Decisão: a UX deve falar em `fila de intervenção` e `próxima pergunta humana`; mailbox,
+      entryId e modeHint são detalhes internos de implementação.
+- [x] Implementação: `repl-command-router.js` ganhou renderizadores de origem e modo de
+      intervenção.
+- [x] Implementação: `/queue` agora confirma `intervenção guardada para a próxima pergunta
+      humana`.
+- [x] Implementação: `/mailbox status`, `/mailbox consume` e `/mailbox clear` agora renderizam
+      `Fila de intervenção`, sem runtime ID no default.
+- [x] Implementação: `/steer` bloqueado e `/interrupt` em política de preservação passaram a
+      falar em intervenção/substituição guardada, não em mailbox.
+- [x] Implementação: `deliverEntryAsTurnIfIdle` deixou de imprimir ANSI e `[mailbox→turn]`,
+      usando `terminalThemeRow('Fila de intervenção', ...)`.
+- [x] Harness live ampliado: `--diagnostic-ux-cycle` agora executa `/queue`, `/mailbox status` e
+      `/mailbox clear`, sem abrir novo turno de modelo.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-intervention-queue-20260603-1625`.
+  - Resultado: PASS em 19/19 critérios; a superfície mostrou `Fila de intervenção`, `origem
+        terminal`, `fila`, e não mostrou `mailbox zero-PR`, runtime ID, `modeHint`, `entryId` ou
+        ANSI.
+- [ ] Próxima lacuna: revisar textos do banner/help/menu que ainda ensinam `mailbox zero-PR`,
+      além de eventos de aplicação automática em `sdk-session-events.js` que ainda citam mailbox.

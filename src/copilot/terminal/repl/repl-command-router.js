@@ -116,6 +116,31 @@ const RESTART_WAIT_TIMEOUT_MS = resolveBoundedTimeoutMs(LLM_B_BOOT_TIMEOUT_MS, 6
 let _terminalInterventionQueue = Promise.resolve();
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderInterventionSourceLabel(value) {
+    const source = String(value ?? '').trim();
+    if (source === 'terminal') return 'terminal';
+    if (source === 'llm-a') return 'LLM-A';
+    if (source === 'user') return 'operador';
+    return source.replace(/[._-]+/gu, ' ') || 'origem n/d';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderInterventionModeLabel(value) {
+    const mode = String(value ?? '').trim();
+    if (mode === 'queue') return 'fila';
+    if (mode === 'steer') return 'intervenção imediata';
+    if (mode === 'interrupt') return 'substituição após interrupção';
+    if (mode === 'mailbox') return 'fila de intervenção';
+    return mode.replace(/[._-]+/gu, ' ') || 'modo n/d';
+}
+
+/**
  * @typedef {{
  *     hubSessionId: string | null;
  *     injectPort: number;
@@ -283,8 +308,8 @@ async function _cmdSteer(message) {
         });
         println(
             terminalThemeRow(
-                'Mailbox',
-                `intervenção registrada para próxima pergunta humana (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''})`,
+                'Intervenção',
+                `guardada para a próxima pergunta humana (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''})`,
                 { role: 'success' },
             ),
         );
@@ -354,14 +379,14 @@ async function _cmdInterrupt(message) {
             println(
                 terminalThemeRow(
                     '/interrupt',
-                    'política zero-PR ativa: substituição não foi enfileirada como turno para evitar consumo de PR',
+                    'substituição preservada fora de novo turno para evitar consumo implícito de PR',
                     { role: 'warn' },
                 ),
             );
             println(
                 terminalThemeRow(
-                    'Mailbox',
-                    `mensagem substituta registrada para próxima pergunta humana (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''})`,
+                    'Intervenção',
+                    `substituição guardada para a próxima pergunta humana (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''})`,
                     { role: 'success' },
                 ),
             );
@@ -405,19 +430,19 @@ function _cmdMailbox(arg) {
     const sub = (subRaw ?? 'status').toLowerCase();
     if (sub === 'clear') {
         const removed = clearRuntimeInterventionMailbox(null);
-        println(terminalThemeRow('Mailbox', `limpo (${removed} item(ns) removido(s))`, { role: 'success' }));
+        println(terminalThemeRow('Fila de intervenção', `limpa · ${removed} item(ns) removido(s)`, { role: 'success' }));
         return;
     }
     if (sub === 'consume' || sub === 'pop') {
         const entry = consumeRuntimeInterventionMailbox(null);
         if (!entry) {
-            println(terminalThemeRow('Mailbox', 'vazio', { role: 'warn' }));
+            println(terminalThemeRow('Fila de intervenção', 'vazia', { role: 'warn' }));
             return;
         }
         println(
             terminalThemeRow(
-                'Mailbox',
-                `intervenção consumida · origem ${entry.source} · modo ${entry.modeHint} · ${entry.message.slice(0, 140)}`,
+                'Fila de intervenção',
+                `consumida · origem ${renderInterventionSourceLabel(entry.source)} · ${renderInterventionModeLabel(entry.modeHint)} · ${entry.message.slice(0, 140)}`,
                 { role: 'success' },
             ),
         );
@@ -428,15 +453,15 @@ function _cmdMailbox(arg) {
     const latest = summary.latest;
     println(
         terminalThemeRow(
-            'Mailbox',
-            `${summary.queueSize} na fila · ${summary.dropped} descartada(s) · runtime ${summary.runtimeId}`,
+            'Fila de intervenção',
+            `${summary.queueSize} na fila · ${summary.dropped} descartada(s)`,
         ),
     );
     if (latest) {
         println(
             terminalThemeRow(
                 'Última',
-                `origem ${latest.source} · modo ${latest.modeHint} · mesclas ${latest.mergedCount} · ${latest.message.slice(0, 180)}`,
+                `origem ${renderInterventionSourceLabel(latest.source)} · ${renderInterventionModeLabel(latest.modeHint)} · mesclas ${latest.mergedCount} · ${latest.message.slice(0, 180)}`,
             ),
         );
     }
@@ -513,7 +538,7 @@ function _cmdQueueMailbox(message) {
     println(
         terminalThemeRow(
             'Fila',
-            `intervenção enfileirada no mailbox zero-PR (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''})`,
+            `intervenção guardada para a próxima pergunta humana (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''})`,
             { role: 'success' },
         ),
     );

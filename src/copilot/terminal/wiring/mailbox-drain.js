@@ -36,6 +36,7 @@ import {
     getBusy,
 } from '../../presentation/state/index.js';
 import { broadcastSse, getTurnQueueDepth, println, sendTurn } from '../dialog/index.js';
+import { terminalThemeRow } from '../state/repl/index.js';
 import { withTerminalTurnCorrelation } from '../state/events/index.js';
 
 /**
@@ -60,7 +61,12 @@ import { withTerminalTurnCorrelation } from '../state/events/index.js';
  */
 export function deliverEntryAsTurnIfIdle(entry, trigger) {
     if (!getBusy() && getTurnQueueDepth() === 0) {
-        println(`\x1b[90m  [mailbox→turn] Entrada drenada após ${trigger} (${entry.source}/${entry.modeHint}).\x1b[0m`);
+        println(
+            terminalThemeRow(
+                'Fila de intervenção',
+                `aplicada como turno · gatilho ${String(trigger).replace(/[._-]+/gu, ' ')} · origem ${String(entry.source).replace(/[._-]+/gu, ' ')} · ${String(entry.modeHint).replace(/[._-]+/gu, ' ')}`,
+            ),
+        );
         broadcastSse(
             'intervention.mailbox.drained',
             withTerminalTurnCorrelation({
