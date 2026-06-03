@@ -232,8 +232,9 @@ Decisão:
 - [x] O terminal já possui contrato central de tempo: `formatTerminalTimeLabel`.
 - [x] O terminal já possui comandos com estilo humano crescente: `/byok`, `/activity`, `/events`,
       `/session sdk`, `/status`, `/now`, `/gh`, `/fs`, `/model`.
-- [x] O terminal ainda não possui registry central de binários externos.
-- [x] O terminal ainda não possui adapters de preview/picker/pager/structured-data.
+- [x] O terminal já possui registry central de binários externos para as libs auditadas.
+- [x] O terminal já possui adapters read-only de preview, Markdown, diff e dados estruturados.
+- [x] O terminal já possui planner/guarda textual para pickers externos, sem lançar TUI ainda.
 - [x] Alguns comandos ainda fazem rendering local de snippets e listas, dificultando enriquecimento
       incremental por `bat`, `fzf`, `glow` ou `delta`.
 - [x] O terminal já deve continuar funcional sem qualquer lib externa.
@@ -252,15 +253,19 @@ Decisão:
 ### 5.2 Adapters sem dependência obrigatória
 
 - [x] Criar adapter de preview read-only.
-- [ ] Criar adapter de picker interativo.
+- [ ] Criar adapter de picker interativo com handoff real de TTY.
 - [x] Criar adapter de Markdown.
 - [x] Criar adapter de diff.
 - [x] Criar adapter de JSON/YAML query/format.
-- [ ] Garantir fallback JS para cada adapter.
+- [x] Garantir fallback JS para preview, Markdown, diff e dados estruturados.
+- [ ] Garantir fallback textual e handoff seguro para pickers interativos.
 
 ### 5.3 Integração UX
 
-- [ ] `/menu` pode oferecer picker opcional se `fzf`/`gum` estiverem disponíveis e o operador pedir.
+- [x] `/menu` pode oferecer picker textual seguro se o operador pedir e o terminal ainda nao
+      tiver controle exclusivo do TTY para `fzf`/`gum`.
+- [ ] `/menu` pode abrir picker externo real se `fzf`/`gum` estiverem disponíveis, o operador pedir
+      e o REPL entregar handoff exclusivo de TTY.
 - [ ] `/search` pode oferecer preview com `bat`/`glow` sem mudar resultado canônico.
 - [x] `/fs read` pode previewar com `bat` quando explicitamente solicitado.
 - [x] `/git diff` e `/gh pr diff` podem previewar com `delta` quando disponível.
@@ -271,7 +276,8 @@ Decisão:
 
 ## 6. Riscos
 
-- [ ] TUI externa sequestrar o prompt vivo.
+- [x] TUI externa nao deve sequestrar o prompt vivo sem handoff explícito; `/menu picker`
+      atualmente renderiza guarda textual.
 - [ ] Dependência ausente quebrar fluxo principal.
 - [ ] ANSI externo vazar para logs/testes.
 - [ ] Tool externa ler arquivo sensível em preview sem ação explícita.
@@ -404,6 +410,19 @@ Decisão:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=240000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-structured-preview-20260603-2040`.
 - [x] Resultado live: PASS em 28/28 critérios, incluindo `diagnostic-ux-fs-json-preview` e
       `diagnostic-ux-fs-yaml-preview`.
+- [x] Faixa G.0/G.3: `picker-plan.js` cria planner seguro para `fzf`/`gum`; `/menu picker`
+      renderiza guarda textual quando nao ha handoff explícito de TTY.
+- [x] Decisão Faixa G: antes de lançar qualquer TUI externa, o terminal deve provar controle
+      exclusivo de stdin/stdout, ausencia de pergunta humana pendente e restauração limpa da linha viva.
+- [x] Testes/lint Faixa G.0 passaram:
+      `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs && node --check src/copilot/terminal/capabilities/picker-plan.js && node --check src/copilot/terminal/commands/menu.js`.
+- [x] Lint escopado Faixa G.0 passou:
+      `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs src/copilot/terminal/capabilities/picker-plan.js src/copilot/terminal/commands/menu.js tests/unit/copilot/terminal/test_picker_plan.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js`.
+- [x] Testes Faixa G.0 passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_picker_plan.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js`.
+- [x] Live PTY Faixa G.0 passou:
+      `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-picker-guard-20260603-2050`.
+- [x] Resultado live: PASS em 29/29 critérios, incluindo `diagnostic-ux-menu-picker-guard`.
 
 ### Faixa D: preview read-only
 
@@ -429,10 +448,13 @@ Decisão:
 
 ### Faixa G: pickers interativos
 
-- [ ] Fase G.1: criar adapter `fzf` para listas.
-- [ ] Fase G.2: avaliar `gum filter`/`gum choose` como alternativa.
-- [ ] Fase G.3: plugar em `/menu` como opção explícita.
-- [ ] Fase G.4: impedir execução em modo não interativo, live streaming ativo ou pergunta pendente.
+- [x] Fase G.0: criar planner/guarda seguro para pickers externos.
+- [ ] Fase G.1: criar adapter `fzf` para listas com handoff real de TTY.
+- [ ] Fase G.2: avaliar `gum filter`/`gum choose` como alternativa com o mesmo handoff.
+- [x] Fase G.3: plugar `/menu picker` como opção explícita textual e segura.
+- [x] Fase G.4: impedir execução sem autorização interativa explícita ou com pergunta humana pendente.
+- [ ] Fase G.5: ensinar o REPL a pausar linha viva/readline, entregar TTY exclusivo ao picker,
+      restaurar prompt vivo e auditar cancelamento/erro sem corromper input.
 
 ### Faixa H: contratos estruturados
 
@@ -441,8 +463,8 @@ Decisão:
 - [x] Fase H.3: fallback JS/`js-yaml` para JSON/YAML quando renderer externo estiver ausente.
 - [x] Fase H.4: plugar em `/fs preview --json|--yaml` como operação explícita.
 - [x] Fase H.5: validar em live PTY com critérios dedicados.
-- [ ] Fase H.3: manter parsers JS como fonte canônica.
-- [ ] Fase H.4: documentar pipe seguro para LLM e operador.
+- [x] Fase H.6: manter parsers JS como fonte canônica.
+- [ ] Fase H.7: documentar pipe seguro para LLM e operador.
 
 ### Faixa I: lives e validação UX
 

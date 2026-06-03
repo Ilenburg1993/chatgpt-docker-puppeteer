@@ -1745,7 +1745,8 @@ function diagnosticUxCycleCriteria(boot) {
     const fsYamlStart = plain.indexOf('/fs preview data/copilot-terminal/live-scratch/', Math.max(0, fsJsonStart + 1));
     const fsSearchStart = plain.indexOf('/fs search TERMINAL_DIAGNOSTIC_UX_', Math.max(0, fsYamlStart));
     const terminalLibsStart = plain.indexOf('/terminal libs', Math.max(0, fsSearchStart));
-    const gitDiffStart = plain.indexOf('/git diff --plain src/copilot/terminal/README.md', Math.max(0, terminalLibsStart));
+    const menuPickerStart = plain.indexOf('/menu picker', Math.max(0, terminalLibsStart));
+    const gitDiffStart = plain.indexOf('/git diff --plain src/copilot/terminal/README.md', Math.max(0, menuPickerStart));
     const activityStart = plain.indexOf('/activity 8', Math.max(0, gitDiffStart));
     const liveFullStart = plain.indexOf('/live full');
     const healthFullStart = plain.indexOf('/health full', Math.max(0, liveFullStart));
@@ -1782,7 +1783,8 @@ function diagnosticUxCycleCriteria(boot) {
     const fsMarkdownSurface = surfaceBetween(fsMarkdownStart, fsJsonStart);
     const fsJsonSurface = surfaceBetween(fsJsonStart, fsYamlStart);
     const fsYamlSurface = surfaceBetween(fsYamlStart, fsSearchStart);
-    const terminalLibsSurface = surfaceBetween(terminalLibsStart, gitDiffStart);
+    const terminalLibsSurface = surfaceBetween(terminalLibsStart, menuPickerStart);
+    const menuPickerSurface = surfaceBetween(menuPickerStart, gitDiffStart);
     const gitDiffSurface = surfaceBetween(gitDiffStart, activityStart);
     const activitySurface = surfaceBetween(activityStart, liveFullStart);
     const liveFullSurface = surfaceBetween(liveFullStart, healthFullStart);
@@ -1867,6 +1869,16 @@ function diagnosticUxCycleCriteria(boot) {
                 ) &&
                 !/chatcmpl-tool-|toolu_|\\x1b\[|API[_-]?KEY|TOKEN|SECRET|PASSWORD/iu.test(terminalLibsSurface),
             detail: '/terminal libs rendered optional-tool availability, decisions and fallback without secrets, raw ids or ANSI literals',
+        },
+        {
+            id: 'diagnostic-ux-menu-picker-guard',
+            pass:
+                /Picker do menu/iu.test(menuPickerSurface) &&
+                /picker textual seguro/iu.test(menuPickerSurface) &&
+                /runtime ainda não entregou controle exclusivo do TTY/iu.test(menuPickerSurface) &&
+                /\/menu <n> ou \/menu <id>/iu.test(menuPickerSurface) &&
+                !/chatcmpl-tool-|toolu_|\\x1b\[/iu.test(menuPickerSurface),
+            detail: '/menu picker rendered safe textual guard instead of launching an external TUI over the live prompt',
         },
         {
             id: 'diagnostic-ux-git-diff-preview',
@@ -2110,6 +2122,7 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
                 { line: `/fs preview ${yamlPath} --yaml --plain`, advanceAfterMs: 1_000 },
                 { line: `/fs search ${marker} data/copilot-terminal/live-scratch`, advanceAfterMs: 1_000 },
                 { line: '/terminal libs', advanceAfterMs: 1_000 },
+                { line: '/menu picker', advanceAfterMs: 1_000 },
                 { line: '/git diff --plain src/copilot/terminal/README.md', advanceAfterMs: 1_000 },
                 { line: '/activity 8', advanceAfterMs: 1_000 },
                 { line: '/live full', advanceAfterMs: 1_000 },

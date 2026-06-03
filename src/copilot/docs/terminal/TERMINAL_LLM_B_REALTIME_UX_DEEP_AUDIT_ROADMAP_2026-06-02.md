@@ -4309,8 +4309,24 @@
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=240000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-structured-preview-20260603-2040`.
 - [x] Resultado live: PASS em 28/28 critérios, incluindo `diagnostic-ux-fs-json-preview` e
       `diagnostic-ux-fs-yaml-preview`.
-- [ ] Próxima implementação: picker explícito com `fzf`/`gum`, sem rodar em modo não interativo nem durante pergunta pendente.
-  - Resultado: 6 arquivos, 65 testes.
+- [x] Implementação: `terminal/capabilities/picker-plan.js` cria planner seguro para pickers
+      externos, separando modo textual, bloqueio por pergunta pendente e autorização interativa
+      explícita.
+- [x] Implementação: `/menu picker` usa o planner e renderiza uma opção textual segura quando o
+      terminal ainda nao possui handoff exclusivo de TTY para `fzf`/`gum`.
+- [x] Harness live ampliado: `--diagnostic-ux-cycle` executa `/menu picker` e adiciona o critério
+      `diagnostic-ux-menu-picker-guard`, que reprova lançamento indevido de TUI externa no prompt vivo.
+- [x] Testes/lint Faixa G.0 passaram:
+      `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs && node --check src/copilot/terminal/capabilities/picker-plan.js && node --check src/copilot/terminal/commands/menu.js`.
+- [x] Lint escopado Faixa G.0 passou:
+      `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs src/copilot/terminal/capabilities/picker-plan.js src/copilot/terminal/commands/menu.js tests/unit/copilot/terminal/test_picker_plan.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js`.
+- [x] Testes Faixa G.0 passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_picker_plan.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js`.
+- [x] Live PTY Faixa G.0 passou:
+      `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-picker-guard-20260603-2050`.
+- [x] Resultado live: PASS em 29/29 critérios, incluindo `diagnostic-ux-menu-picker-guard`.
+- [ ] Próxima implementação: handoff exclusivo de TTY no REPL para permitir `fzf`/`gum` reais sem
+      corromper linha viva, streaming, pergunta pendente ou scroll.
 - [x] Live PTY estruturado passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=150000 --transport=pty --out-dir=artifacts/terminal-live/structured-question-card-20260603-1723`.
   - Resultado: PASS em 11/11 critérios, cobrindo prompt `[PERGUNTA]`, resposta roteada, waits

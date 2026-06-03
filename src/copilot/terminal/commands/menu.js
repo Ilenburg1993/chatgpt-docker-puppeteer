@@ -13,6 +13,7 @@ import {
     readTerminalRuntimeControlState,
     readTerminalRuntimeState,
 } from '../frontend/gateways/index.js';
+import { buildTerminalPickerPlan } from '../capabilities/index.js';
 import { readTerminalIntentStats } from '../state/index.js';
 import {
     readTerminalElicitationSummary,
@@ -282,6 +283,33 @@ function renderTerminalSmartMenu(println, entries) {
 }
 
 /**
+ * @param {(text: string) => void} println
+ * @param {TerminalSmartMenuEntry[]} entries
+ * @returns {void}
+ */
+function renderTerminalPickerPlan(println, entries) {
+    const state = readTerminalRuntimeState();
+    const plan = buildTerminalPickerPlan({
+        allowInteractive: false,
+        pendingQuestion: Boolean(state.pendingQuestion && state.pendingQuestionKind !== 'ready'),
+        preferred: 'auto',
+    });
+    println(`\n  ${terminalThemeText('info', 'Picker do menu')}`);
+    println(`  ${terminalThemeText('muted', `${entries.length} ações contextuais · fallback ${plan.fallbackCommand}`)}\n`);
+    println(`  ${terminalThemeText('muted', 'Modo'.padEnd(12))} ${terminalThemeText(plan.mode === 'external' ? 'success' : 'warn', plan.label)}`);
+    if (plan.command) {
+        println(`  ${terminalThemeText('muted', 'Comando'.padEnd(12))} ${terminalThemeText('command', plan.command)}`);
+    }
+    if (plan.reasons.length > 0) {
+        for (const reason of plan.reasons) {
+            println(`  ${terminalThemeText('muted', 'Guarda'.padEnd(12))} ${terminalThemeText('warn', reason)}`);
+        }
+    }
+    println(`  ${terminalThemeText('muted', 'Seguro'.padEnd(12))} ${terminalThemeText('command', '/menu <n> ou /menu <id>')}`);
+    println('');
+}
+
+/**
  * @param {{ println: (text: string) => void }} ctx
  * @param {string} [arg=''] Default is `''`
  * @param {string[]} [rest=[]] Default is `[]`
@@ -294,6 +322,11 @@ export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
 
     if (primary.length === 0) {
         renderTerminalSmartMenu(println, entries);
+        return;
+    }
+
+    if (primary.toLowerCase() === 'picker' || primary.toLowerCase() === '--picker') {
+        renderTerminalPickerPlan(println, entries);
         return;
     }
 

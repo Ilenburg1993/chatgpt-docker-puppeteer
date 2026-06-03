@@ -178,4 +178,16 @@ describe('terminal/commands/menu', () => {
         expect(executeCommandLine).toHaveBeenCalledWith('/status');
         expect(ctx.output()).toContain('⏵');
     });
+
+    it('renderiza /menu picker como plano seguro sem iniciar TUI externa', async () => {
+        const ctx = mockCtx();
+
+        await cmdMenu({ println: ctx.println }, 'picker');
+
+        expect(ctx.output()).toContain('Picker do menu');
+        expect(ctx.output()).toContain('picker textual seguro');
+        expect(ctx.output()).toContain('runtime ainda não entregou controle exclusivo do TTY');
+        expect(ctx.output()).toContain('/menu <n> ou /menu <id>');
+        expect(ctx.output()).not.toContain('fzf --');
+    });
 });
