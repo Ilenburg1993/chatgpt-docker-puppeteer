@@ -889,15 +889,17 @@ function byokLiveRouteIdentity(realByok) {
 
 function renderedReadFileToolOk(plain) {
     return (
-        /\[LER\].*(?:read_file_content|Ler arquivo)/s.test(plain) &&
-        /✅ \[OK\].*(?:read_file_content|Ler arquivo)/s.test(plain)
+        (/\[LER\].*(?:read_file_content|Ler arquivo)/s.test(plain) ||
+            /Ferramenta\s+Ler arquivo\s+·\s+lendo arquivo/s.test(plain)) &&
+        (/✅ \[OK\].*(?:read_file_content|Ler arquivo)/s.test(plain) ||
+            /Conclu[ií]do\s+ok\s+Ler arquivo\s+·\s+lendo arquivo conclu[ií]do/s.test(plain))
     );
 }
 
 function defaultToolNarrationLines(plain) {
     return String(plain ?? '')
         .split(/\r?\n/u)
-        .filter((line) => /\[(?:TOOL|INTENT|DONE|TOOLS|ASK)\]/u.test(line));
+        .filter((line) => /\[(?:TOOL|INTENT|DONE|TOOLS|ASK)\]/u.test(line) || /^\s*(?:Ferramenta|Conclu[ií]do)\s/u.test(line));
 }
 
 function hasRawInternalIdInDefaultToolNarration(plain) {
@@ -3205,7 +3207,7 @@ function findTruncatedTurnEndDuplicate(events) {
 
 function extractPlainTraceIds(plain) {
     const ids = new Set();
-    for (const match of plain.matchAll(/\btrace(?:Id)?\s*[=:]?\s*(turn:[A-Za-z0-9_.:-]+)/giu)) {
+    for (const match of plain.matchAll(/\btrace(?:Id)?["']?\s*[=:]\s*["']?(turn:[A-Za-z0-9_.:-]+)/giu)) {
         ids.add(match[1]);
     }
     return [...ids].sort();
@@ -3282,6 +3284,7 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
 function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
     const markerCount = (plain.match(/DELTA-CANONICAL-\d/g) ?? []).length;
     const preEventsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b/i)[0] ?? plain;
+    const beforeRawDiagnosticsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b[^\n]*--raw/i)[0] ?? plain;
     const archiveRawEvents = extractArchiveRawEvents(plain);
     const canonicalEvents = [...sseSummary.events, ...archiveRawEvents];
     const canonicalToolLifecycle = summarizeCanonicalToolLifecycle(canonicalEvents);
@@ -3328,34 +3331,34 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const askRenderedBySdk = scenario.askRenderedRe.test(preEventsPlain);
     const liveDeltaBlockVisible = terminalBlockContains(
         preEventsPlain,
-        /^\s*\[[^\]\n]*\]\s+🧠\s+LLM-B/u,
+        /^\s*(?:\[[^\]\n]*\]\s+🧠\s+LLM-B|LLM-B\s+·)/u,
         /DELTA-CANONICAL-8/u,
     );
     const assistantMessageDeltaBlockVisible = terminalBlockContains(
         preEventsPlain,
-        /^\s*\[LLM-B\]\s+Mensagem/u,
+        /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message)/u,
         /DELTA-CANONICAL-8/u,
     );
     const postAskFinalRe = scenario.postAskFinalRe;
     const finalRenderedByLiveTurn = terminalBlockContains(
         preEventsPlain,
-        /^\s*\[[^\]\n]*\]\s+🧠\s+LLM-B/u,
+        /^\s*(?:\[[^\]\n]*\]\s+🧠\s+LLM-B|LLM-B\s+·)/u,
         postAskFinalRe,
     );
     const finalRenderedByAssistantMessage = terminalBlockContains(
         preEventsPlain,
-        /^\s*\[LLM-B\]\s+Mensagem/u,
+        /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message)/u,
         postAskFinalRe,
     );
     const taskDeltaActivityDuringDialog =
         /task\s+·\s+Executando tarefa interna\s+—\s+delta/.test(preEventsPlain) ||
         /"label":"Executando tarefa interna","detail":"delta/.test(preEventsPlain);
     const promptDoubleRender = /voc[eê]\[[^\r\n]*?›[ \t]+voc[eê]\[[^\r\n]*?›/iu.test(plain);
-    const inlineStatusRendered = /(?:⟲|⏳|⌛)\s+(?:LLM-B|aguardando)\b/iu.test(plain);
+    const inlineStatusRendered = /(?:⟲|⏳|⌛)\s+(?:LLM-B|aguardando)\b|LLM-B\s+(?:turno|pensando|iniciando)\s+·/iu.test(plain);
     const duplicatePathologies = [/__anonymous__/, /hook:error_occurred/];
-    const plainWithoutExpectedScenarioMarkers = scenario.expectedOutputMarkers.reduce(
+    const beforeRawWithoutExpectedScenarioMarkers = scenario.expectedOutputMarkers.reduce(
         (text, marker) => text.replaceAll(marker, 'EXPECTED_SCENARIO_MARKER'),
-        plain,
+        beforeRawDiagnosticsPlain,
     );
     const sdkPermissionPromptObserved =
         /permission\.requested/iu.test(plain) ||
@@ -3584,9 +3587,9 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'ux-human-tool-names',
             pass:
-                /\[INTENÇÃO\] Intenção capturada/.test(plain) &&
-                /\[LER\]\s+Ler arquivo/.test(plain) &&
-                /✅ \[OK\] Ler arquivo/.test(plain),
+                /Inten[cç][aã]o\s+capturada/u.test(plain) &&
+                /Ferramenta\s+Ler arquivo\s+·\s+lendo arquivo/u.test(plain) &&
+                /Conclu[ií]do\s+ok\s+Ler arquivo\s+·\s+lendo arquivo conclu[ií]do/u.test(plain),
             detail: 'default tool narration uses human tool names',
         },
         {
@@ -3599,7 +3602,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'ux-no-durable-waiting-spam',
             pass: !/LLM-B ainda trabalhando|request_user_input ainda executando|chatcmpl-tool-[a-z0-9-]+|ask_user SDK/iu.test(
-                plain,
+                beforeRawDiagnosticsPlain,
             ),
             detail: 'durable waiting/tool heartbeat spam, raw ids, and SDK ask_user labels were not printed',
         },
@@ -3633,7 +3636,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'ux-intent-label-portuguese',
-            pass: /\[INTENÇÃO\]/u.test(plain) && !/\[INTENT\]/u.test(plain),
+            pass: /Inten[cç][aã]o\s+capturada/u.test(plain) && !/\[INTENT\]/u.test(plain),
             detail: 'intent blocks use the Portuguese operator-facing label',
         },
         {
@@ -3693,7 +3696,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'no-terminal-errors',
-            pass: /Nenhum erro recente/.test(plain) && !/\bERROR\b/.test(plainWithoutExpectedScenarioMarkers),
+            pass: /nenhum erro recente/iu.test(plain) && !/\bERROR\b/.test(beforeRawWithoutExpectedScenarioMarkers),
             detail: 'terminal error tracker stayed clean',
         },
         {
@@ -4485,9 +4488,12 @@ async function inspectExportedMarkdown(exportPath, scenario = LIVE_SCENARIOS[DEF
             hasStreamingDiagnostics: /streaming=/.test(content),
             hasEnvelope: /envelope=/.test(content),
             hasAskUser: /ask_user solicitou resposta humana:/iu.test(content) && scenario.askQuestionRe.test(content),
-            hasAskUserAnswer:
-                /##\s+👤\s+Usu[aá]rio[\s\S]*Resposta ao ask_user:/iu.test(content) &&
-                scenario.finalAnswerRe.test(content),
+            hasAskUserAnswer: new RegExp(
+                `##\\s+(?:👤\\s+)?(?:Usu[aá]rio|Operador)[^\\n]*[\\s\\S]*Resposta ao ask_user:\\s*\\n?\\s*${escapeRegExp(
+                    scenario.answerSteps.at(-1)?.answer ?? '',
+                )}`,
+                'iu',
+            ).test(content),
             hasPostAskFinal: scenario.postAskFinalRe.test(content),
             envelopes,
             content,

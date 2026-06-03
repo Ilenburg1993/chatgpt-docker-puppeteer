@@ -63,12 +63,12 @@ import {
     getTerminalDetailLevel,
     recordTerminalActivity,
     reviseRecentTerminalTurnTraceStatus,
-    terminalActionChip,
     terminalThemeRow,
     terminalThemeText,
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
 import { formatTerminalIsoTimestamp } from '../state/ui/index.js';
+import { printTerminalHumanQuestionCard } from './human-question-renderer.js';
 import { renderTerminalIntent } from './intent-renderer.js';
 import {
     compactTerminalDiagnosticId,
@@ -606,7 +606,6 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             return;
         }
         const compactDetail = getTerminalDetailLevel() === 'compact';
-        const questionText = compactDetail ? compactTerminalToolText(question, 96) : question;
 
         recordTerminalActivity(
             'question',
@@ -618,39 +617,18 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         );
 
         rl?.pause();
-        println(
-            `\n${terminalThemeRow(compactDetail ? 'Pergunta' : 'Pergunta ao operador', 'decisão pendente', { role: 'question' })}`,
-        );
-        println(terminalThemeRow('Pergunta', questionText || 'Aguardando resposta do operador', { role: 'question' }));
-        if (choices.length > 0) {
-            const maxInlineChoices = 6;
-            const visibleChoices = choices.slice(0, maxInlineChoices);
-            const indexed = visibleChoices
-                .map((choice, idx) => `[${idx + 1}] ${compactDetail ? compactTerminalToolText(choice, 20) : choice}`)
-                .join('   ');
-            const overflow = choices.length > maxInlineChoices ? `   … +${choices.length - maxInlineChoices}` : '';
-            println(terminalThemeRow('Opções', `${indexed}${overflow}`, { role: 'info' }));
-        }
+        println('');
+        printTerminalHumanQuestionCard(println, {
+            question,
+            choices,
+            source,
+            state: source === 'replay' ? 'pergunta restaurada' : 'decisão pendente',
+            compact: compactDetail,
+            includeDivider: true,
+            includeShortcuts: !compactDetail,
+        });
         if (rl) {
-            println(
-                compactDetail
-                    ? terminalThemeRow(
-                          'Ação',
-                          `${terminalActionChip('/answer')} ${terminalActionChip('/status')} ${terminalActionChip('/clear-shadow')}`,
-                      )
-                    : terminalThemeRow(
-                          'Ação',
-                          'Responda digitando normalmente. Sua próxima mensagem será usada como resposta.',
-                      ),
-            );
-            if (!compactDetail) {
-                println(
-                    terminalThemeRow(
-                        'Atalhos',
-                        `${terminalActionChip('/status')} ${terminalActionChip('/answer <texto>')} ${terminalActionChip('/clear-shadow')}`,
-                    ),
-                );
-            }
+            println(terminalThemeRow('Entrada', 'a próxima linha digitada será roteada como resposta humana'));
         } else {
             println(terminalThemeRow('Ação', 'Modo headless: responda via POST /inject ou pelo cliente conectado.'));
         }

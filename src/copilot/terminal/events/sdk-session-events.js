@@ -110,6 +110,7 @@ import {
 } from '../state/events/index.js';
 import { drainMailboxToTurnIfIdle } from '../wiring/mailbox/index.js';
 import { renderTerminalAssistantTranscript } from './assistant-transcript-renderer.js';
+import { printTerminalHumanQuestionCard } from './human-question-renderer.js';
 import { buildTerminalToolActivityPresentation, compactTerminalDiagnosticId } from './tool-activity-presenter.js';
 import {
     handleTerminalExternalToolCompleted,
@@ -923,10 +924,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
         broadcastSse('user_input.requested', requestedEnvelope);
         if (shouldPrintSessionNarration('important')) {
-            const optionsLabel = choices.length > 0 ? ` · ${choices.length} opção(ões)` : '';
-            println(
-                terminalThemeRow('Pergunta', `${tracked.question.slice(0, 120)}${optionsLabel}`, { role: 'question' }),
-            );
+            printTerminalHumanQuestionCard(println, {
+                question: tracked.question,
+                choices,
+                allowFreeform,
+                source: 'sdk',
+                state: 'aguardando resposta',
+                includeDivider: true,
+            });
         }
 
         const runtimeId = typeof evt?.runtimeId === 'string' && evt.runtimeId.trim().length > 0 ? evt.runtimeId : null;

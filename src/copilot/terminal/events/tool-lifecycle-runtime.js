@@ -30,6 +30,7 @@ import {
     terminalThemeText,
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
+import { printTerminalHumanQuestionCard } from './human-question-renderer.js';
 import { renderTerminalIntent } from './intent-renderer.js';
 import {
     buildTerminalToolActivityPresentation,
@@ -334,17 +335,16 @@ function printToolStart(presentation) {
     const compactDetail = getTerminalDetailLevel() === 'compact';
     if (presentation.operation === 'ask') {
         const question = presentation.target ?? presentation.startLine.replace(/^aguardando decisão humana:\s*/iu, '');
-        const questionText = compactDetail ? compactTerminalToolText(question, 96) : question;
-        println(
-            terminalThemeRow('Pergunta ao operador', questionText || 'Aguardando resposta do operador', {
-                role: 'question',
-            }),
-        );
-        if (!compactDetail) {
-            println(
-                `    ${terminalThemeText('muted', 'responda digitando normalmente ou use')} ${terminalThemeText('command', '/answer <texto>')}`,
-            );
-        }
+        printTerminalHumanQuestionCard(println, {
+            question,
+            choices: [],
+            source: 'tool',
+            state: 'aguardando resposta',
+            compact: compactDetail,
+            includeDivider: false,
+            includeShortcuts: !compactDetail,
+            maxQuestionChars: compactDetail ? 96 : 160,
+        });
         return;
     }
     const operationRole = mapTerminalToolOperationRole(presentation.operation);

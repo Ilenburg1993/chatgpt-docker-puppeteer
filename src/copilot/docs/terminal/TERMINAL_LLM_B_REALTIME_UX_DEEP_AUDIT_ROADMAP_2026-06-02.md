@@ -4115,13 +4115,13 @@
       sucesso, arquivo leitura/escrita/edição/exclusão, modelo/BYOK.
 - [ ] Layout: comandos devem usar `terminalThemeHeadline`, `terminalThemeRow`,
       `terminalThemeDivider` e blocos atômicos; ANSI manual só pode existir em adaptadores centrais.
-- [ ] Perguntas humanas: `ask_user` e `request_user_input` devem ter painel próprio, sem parecer
+- [x] Perguntas humanas: `ask_user` e `request_user_input` devem ter painel próprio, sem parecer
       tool genérica, com resposta pendente única, escolhas claras e erro de timeout acionável.
 - [ ] Intenções: `report_intent`/`assistant.intent` devem renderizar uma única intenção deduplicada,
       com nome humano, risco, origem e sem `toolCallId` no default.
 - [ ] Modelos/BYOK: seleção automática, handoff, mismatch, fallback, quota e provider efetivo devem
       aparecer como narrativas breves e auditáveis no terminal.
-- [ ] Live tests: o harness PTY deve validar visualmente os contratos de tempo, nomes humanos,
+- [x] Live tests: o harness PTY deve validar visualmente os contratos de tempo, nomes humanos,
       ausência de IDs crus, ausência de spam e preservação do input.
 
 ### 12.4 Roadmap operacional UX v2
@@ -4140,13 +4140,12 @@
       agregador de eventos de sessão.
 - [x] Fase 12.4.F: remover `Mailbox zero-PR` do boot prompt e alinhar a linguagem interna à fila de
       intervenção.
-- [ ] Fase 12.4.G: atualizar harness live para exigir tempo dual em superfícies default.
 - [x] Fase 12.4.G: atualizar harness live para exigir tempo dual em superfícies default.
 - [x] Fase 12.4.H: adicionar testes unitários para a API de tempo e comandos migrados.
 - [x] Fase 12.4.I: rodar live PTY focada em tempo dual, lifecycle SDK e intervenção.
 - [ ] Fase 12.4.J: auditar `/status`, `/now`, `/health`, `/diagnose`, `/byok`, `/model` e
       `/reasoning` contra o novo contrato visual.
-- [ ] Fase 12.4.K: projetar painel próprio de pergunta humana para reduzir repetição e timeout sem
+- [x] Fase 12.4.K: projetar painel próprio de pergunta humana para reduzir repetição e timeout sem
       resposta.
 - [ ] Fase 12.4.L: projetar faixa de modelo/BYOK na linha viva e nos eventos persistentes.
 - [ ] Fase 12.4.M: depois da estabilização UX/terminal/BYOK, iniciar investigação formal de libs
@@ -4176,3 +4175,67 @@
   - Resultado: PASS em 20/20 critérios, exigindo ISO até segundos + tempo relativo e bloqueando
         regressões como `tempo inválido`, `session deleted`, `sessão sessão`, IDs crus e jargão
         antigo de mailbox.
+
+### 12.6 Próxima faixa: pergunta humana como card nobre
+
+- [x] Achado: há pelo menos três produtores visuais de pergunta humana: `sdk-session-events.js`,
+      `agent-runtime-events.js` e `tool-lifecycle-runtime.js`.
+- [x] Achado: esses produtores usam layouts diferentes (`Pergunta`, `Pergunta ao operador`,
+      linhas soltas de ação/atalho), o que aumenta a chance de duplicação visual e sensação de
+      tool genérica.
+- [x] Decisão: `ask_user` e `request_user_input` devem ter um card compartilhado, com título,
+      pergunta, opções, estado e ação, usando o mesmo tema e o mesmo contrato de tempo dual.
+- [x] Implementar `human-question-renderer.js` como renderer único de pergunta humana.
+- [x] Migrar `sdk-session-events.js` para usar o card quando uma pergunta real for solicitada.
+- [x] Migrar `agent-runtime-events.js` para usar o card em replay/restauração.
+- [x] Migrar `tool-lifecycle-runtime.js` para usar o mesmo card compacto quando a tool se
+      materializar como lifecycle.
+- [x] Reforçar testes para garantir ausência de `ask_user SDK`, `request_user_input`, IDs crus e
+      cards duplicados no ciclo de pergunta.
+- [x] Rodar live PTY específica com `--structured-input-cycle` e, quando pronto, cenários reais de
+      `ask_user` com a LLM-B.
+
+### 12.7 Evidência da faixa de pergunta humana
+
+- [x] Implementação: `human-question-renderer.js` passou a ser o renderer compartilhado para
+      perguntas humanas, com `Pergunta ao operador`, `[PERGUNTA]`, opções numeradas, ação clara,
+      atalhos úteis e tempo dual.
+- [x] Implementação: `sdk-session-events.js`, `agent-runtime-events.js`,
+      `tool-lifecycle-runtime.js` e `/sdk simulate request-user-input` passaram a usar o mesmo
+      card, reduzindo paralelismo visual entre pergunta real, replay, lifecycle e diagnóstico.
+- [x] Implementação: o harness live foi atualizado para separar superfície default, diagnóstico e
+      raw. IDs crus continuam proibidos na UX default, mas `/events --raw` pode expor JSON e
+      `toolCallId` como diagnóstico explícito.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_human_question_renderer.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_tool_lifecycle_state.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js tests/unit/copilot/terminal/test_pending_question_answer.spec.js`.
+  - Resultado: 6 arquivos, 65 testes.
+- [x] Live PTY estruturado passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=150000 --transport=pty --out-dir=artifacts/terminal-live/structured-question-card-20260603-1723`.
+  - Resultado: PASS em 11/11 critérios, cobrindo prompt `[PERGUNTA]`, resposta roteada, waits
+        limpos e ausência de `request_user_input`/IDs no default.
+- [x] Live PTY canônico com LLM-B real passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=210000 --transport=pty --out-dir=artifacts/terminal-live/canonical-human-question-card-20260603-1731`.
+  - Resultado: PASS em todos os critérios; a pergunta real foi renderizada por uma única fonte SDK,
+        a resposta humana não apareceu como fala da LLM-B, o export preservou autoria humana e o
+        SSE manteve correlação de `traceId`.
+
+### 12.8 Próxima faixa: diagnósticos densos e saúde visual
+
+- [x] Achado live: `/health full` ainda usa caixa pesada com borda dupla e ANSI manual; está correto
+      funcionalmente, mas destoante do tema minimalista das demais superfícies.
+- [x] Achado live: `/tools diag` ainda expõe `Nome técnico`, `chamada chatcmpl-too…` e
+      `requisição ...` por padrão dentro de diagnóstico explícito. Isso é aceitável para `diag`,
+      mas precisa de hierarquia visual mais clara e opção default menos verborrágica.
+- [x] Decisão: a próxima faixa deve preservar diagnósticos ricos, mas dividir claramente `default`,
+      `detail` e `raw`, usando alças humanas estáveis no default e IDs apenas quando o operador
+      pede detalhe.
+- [ ] Fase 12.8.A: auditar `/health`, `/status`, `/now`, `/diagnose`, `/tools diag` e `/model` como
+      superfícies de saúde/diagnóstico.
+- [ ] Fase 12.8.B: substituir caixa antiga de `/health full` por tema compartilhado ou painel
+      compatível com `terminalThemeHeadline`, `terminalThemeRow` e `terminalThemeDivider`.
+- [ ] Fase 12.8.C: criar glossário visual para `status`, `health`, `quota`, `BYOK`, `runtime alvo`,
+      `permissão`, `MCP bridge`, `timers` e `lifecycle`.
+- [ ] Fase 12.8.D: separar IDs técnicos em `/health detail`, `/tools raw` e `/events --raw`,
+      preservando alças curtas em `/health` e `/tools diag`.
+- [ ] Fase 12.8.E: ampliar live PTY para validar `/health full` sem caixa antiga, sem desalinhamento
+      e com nomes humanos nos blocos principais.

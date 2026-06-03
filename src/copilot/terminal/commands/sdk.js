@@ -17,6 +17,7 @@ import {
     setNextTurnRequestHeaders,
 } from '../../presentation/state/index.js';
 import { readTerminalIoActivityProjection } from '../events/index.js';
+import { printTerminalHumanQuestionCard } from '../events/human-question-renderer.js';
 import {
     compactTerminalSdkSession,
     confirmTerminalSdkSessionUi,
@@ -1003,21 +1004,17 @@ function renderSdkSimulate({ println }, rest) {
         allowFreeform: parsed.allowFreeform,
         data: { command: '/sdk simulate request-user-input' },
     });
-    const mode = parsed.allowFreeform ? 'resposta livre' : 'seleção obrigatória';
-    const choices = parsed.choices.length > 0 ? ` · opções ${parsed.choices.join(' | ')}` : '';
     println('');
-    println(terminalThemeHeadline('question', 'Pergunta humana estruturada'));
-    println(terminalThemeDivider(37));
-    println(terminalThemeRow('Status', 'aguardando operador', { role: 'question' }));
-    println(terminalThemeRow('Origem', 'diagnóstico de pergunta estruturada'));
-    println(terminalThemeRow('Modo', `${mode}${choices}`));
-    println(terminalThemeRow('Pergunta', compactText(parsed.question, 220), { role: 'question' }));
-    println(
-        terminalThemeRow(
-            'Ação',
-            `digite a resposta normalmente ou use ${terminalThemeText('command', '/answer <texto>')}`,
-        ),
-    );
+    printTerminalHumanQuestionCard(println, {
+        title: 'Pergunta humana estruturada',
+        question: compactText(parsed.question, 220),
+        choices: parsed.choices,
+        allowFreeform: parsed.allowFreeform,
+        source: 'diagnóstico de pergunta estruturada',
+        state: 'aguardando operador',
+        action: `digite a resposta normalmente ou use ${terminalThemeText('command', '/answer <texto>')}`,
+        includeDivider: true,
+    });
     println(terminalThemeRow('Detalhe', terminalThemeText('command', '/sdk waits detail')));
     println(terminalThemeDivider(37));
     println('');

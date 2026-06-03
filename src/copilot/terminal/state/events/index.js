@@ -42,6 +42,7 @@ export {
 } from '../sdk-interactions.js';
 export { recordTerminalPromptHookSubmitted } from '../sdk-hook-events.js';
 export { buildTerminalTaskThinkingId, formatTerminalThinkingRef } from '../thinking-labels.js';
+export { formatTerminalTimeLabel } from '../time-format.js';
 export { createToolCallRegistry } from '../tool-call-registry.js';
 export { recordTerminalToolLifecycleDiagnostic } from '../tool-lifecycle-state.js';
 export {
