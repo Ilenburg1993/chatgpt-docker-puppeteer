@@ -2679,4 +2679,15 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=90000 --transport=pty --out-dir=artifacts/terminal-live/default-ux-cycle-no-session-cleanup-spam-20260603-1347`
   - Resultado: PASS, incluindo `ux-cycle-no-session-cleanup-spam`.
   - Inspeção plain log: sem `Sessão SDK removida`, `[SESSION]`, `session.deleted`, `request_user_input`, `report_intent`, `chatcmpl-tool`, `estado   ` ou `resumo   `.
-- [ ] Próxima validação live: rodar cenário com pergunta humana estruturada para confirmar que `/sdk waits`, linha viva e prompt de resposta continuam elegantes quando há pendência real.
+- [x] Live PTY estruturada inicial executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/structured-input-cycle-theme-check-20260603-1349`
+  - Resultado funcional: PASS.
+  - Achado manual: `/sdk simulate request-user-input` ainda renderizava `status/origem/modo/pergunta/ação/detalhe` em formato antigo, e a confirmação da resposta ainda usava ANSI local.
+- [x] Correção: a tela `Pergunta humana estruturada` passou para `terminalThemeHeadline`, `terminalThemeDivider` e `terminalThemeRow`, com `Status`, `Origem`, `Modo`, `Pergunta`, `Ação` e `Detalhe`.
+- [x] Correção: resposta humana roteada para pergunta pendente e `/answer` passaram a renderizar linhas temáticas `Resposta`/`/answer`, sem `[answer]` nem `\x1b[...]` local.
+- [x] Harness estruturado atualizado para aceitar e exigir a confirmação temática `Resposta     enviada para pergunta pendente`.
+- [x] Live PTY estruturada pós-correção executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/structured-input-cycle-themed-request-pass-20260603-1353`
+  - Resultado: PASS.
+  - Inspeção plain log: sem `[answer]`, `request_user_input ainda executando`, `chatcmpl-tool`, `ask_user SDK` ou ID interno `request-user-input-sim`.
+- [ ] Próxima lacuna: revisar `/permission`, `/elicitation` e comandos zero-PR para remover respostas antigas como `[zero-pr]` e linhas ciano locais quando aparecem em fluxos humanos reais.

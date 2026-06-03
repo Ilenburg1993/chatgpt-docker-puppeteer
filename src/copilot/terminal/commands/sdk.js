@@ -901,15 +901,22 @@ function renderSdkSimulate({ println }, rest) {
     });
     const mode = parsed.allowFreeform ? 'resposta livre' : 'seleção obrigatória';
     const choices = parsed.choices.length > 0 ? ` · opções ${parsed.choices.join(' | ')}` : '';
-    println(`\n  ${terminalThemeText('question', 'Pergunta humana estruturada')}`);
-    println(`  status   ${terminalThemeText('question', 'aguardando operador')}`);
-    println(`  origem   ${terminalThemeText('muted', 'diagnóstico de pergunta estruturada')}`);
-    println(`  modo     ${terminalThemeText('muted', `${mode}${choices}`)}`);
-    println(`  pergunta ${compactText(parsed.question, 220)}`);
+    println('');
+    println(terminalThemeHeadline('question', 'Pergunta humana estruturada'));
+    println(terminalThemeDivider(37));
+    println(terminalThemeRow('Status', 'aguardando operador', { role: 'question' }));
+    println(terminalThemeRow('Origem', 'diagnóstico de pergunta estruturada'));
+    println(terminalThemeRow('Modo', `${mode}${choices}`));
+    println(terminalThemeRow('Pergunta', compactText(parsed.question, 220), { role: 'question' }));
     println(
-        `  ação     ${terminalThemeText('muted', 'digite a resposta normalmente ou use')} ${terminalThemeText('command', '/answer <texto>')}`,
+        terminalThemeRow(
+            'Ação',
+            `digite a resposta normalmente ou use ${terminalThemeText('command', '/answer <texto>')}`,
+        ),
     );
-    println(`  detalhe  ${terminalThemeText('command', '/sdk waits detail')}\n`);
+    println(terminalThemeRow('Detalhe', terminalThemeText('command', '/sdk waits detail')));
+    println(terminalThemeDivider(37));
+    println('');
     void created.promise;
 }
 

@@ -1482,6 +1482,7 @@ async function runSessionCycleLiveTest({ outDir, requestedTransport, timeoutMs, 
 
 function structuredInputCycleCriteria(boot) {
     const plain = String(boot?.plain ?? '');
+    const answerConfirmationRe = /Resposta\s+enviada para pergunta pendente/u;
     return [
         {
             id: 'structured-input-ready',
@@ -1523,7 +1524,7 @@ function structuredInputCycleCriteria(boot) {
         },
         {
             id: 'structured-input-answer-routed',
-            pass: /Resposta enviada para pergunta pendente/u.test(plain),
+            pass: answerConfirmationRe.test(plain),
             detail: 'plain human answer was routed to the pending structured input',
         },
         {
@@ -3024,7 +3025,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'ask-user-answer',
             pass:
-                /Resposta enviada para pergunta pendente/.test(plain) ||
+                /Resposta\s+enviada para pergunta pendente/.test(plain) ||
                 new RegExp(`resposta=${escapeRegExp(scenario.answerSteps.at(-1)?.answer ?? '')}`, 'iu').test(plain) ||
                 scenario.finalAnswerRe.test(plain),
             detail: `human answer was registered for scenario=${scenario.id}`,
@@ -3212,7 +3213,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'ux-human-answer-confirmation',
             pass:
-                /Resposta enviada para pergunta pendente\./u.test(plain) &&
+                /Resposta\s+enviada para pergunta pendente\./u.test(plain) &&
                 !/\[answer\] Resposta enviada para pergunta pendente \(default\)/u.test(plain),
             detail: 'human answer confirmation avoided default runtime noise',
         },
@@ -4657,7 +4658,7 @@ async function main() {
         if (postAskContinuationObserved && !postCommandsSent && TURN_SETTLED_AFTER_ASK_RE.test(afterAnswerPlain)) {
             schedulePostAnswerDiagnostics(500);
         }
-        if (answerSent && !postCommandsSent && /Resposta enviada para pergunta pendente/.test(plain)) {
+        if (answerSent && !postCommandsSent && /Resposta\s+enviada para pergunta pendente/.test(plain)) {
             postAnswerCommandTimer = setTimeout(() => {
                 schedulePostAnswerDiagnostics(0);
             }, Math.max(1_000, postAskContinuationWaitMs)).unref();

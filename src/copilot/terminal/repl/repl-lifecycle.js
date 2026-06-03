@@ -133,9 +133,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
                 pendingAnswer.pendingQuestionChoices.length > 0
                     ? ` Opções: ${pendingAnswer.pendingQuestionChoices.join(' | ')}.`
                     : '';
-            println(
-                `\x1b[33m  [answer] Resposta não corresponde às opções da pergunta pendente.${choices}\x1b[0m`,
-            );
+            println(terminalThemeRow('Resposta', `não corresponde às opções da pergunta pendente.${choices}`, { role: 'warn' }));
             return;
         }
         const runtimeSuffix =
@@ -144,8 +142,8 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
                 : '';
         println(
             pendingAnswer.ok
-                ? `\n\x1b[90m  Resposta enviada para pergunta pendente${runtimeSuffix}.\x1b[0m`
-                : `\n\x1b[31m  Falha ao responder pergunta pendente${runtimeSuffix}.\x1b[0m`,
+                ? `\n${terminalThemeRow('Resposta', `enviada para pergunta pendente${runtimeSuffix}.`, { role: 'success' })}`
+                : `\n${terminalThemeRow('Resposta', `falhou ao responder pergunta pendente${runtimeSuffix}.`, { role: 'error' })}`,
         );
     }
 

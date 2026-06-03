@@ -656,7 +656,8 @@ describe('commands/session — sync commands', () => {
         defaultRuntime.pendingQuestionShadowState = null;
         const ctx = mockCtx();
         cmdAnswer({ println: ctx.println }, 'sim');
-        expect(ctx.output()).toContain('Resposta enviada');
+        expect(ctx.output()).toContain('Resposta');
+        expect(ctx.output()).toContain('enviada para pergunta pendente');
         expect(ctx.output()).not.toContain('(default)');
     });
 

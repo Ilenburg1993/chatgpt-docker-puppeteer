@@ -1401,29 +1401,33 @@ export function cmdAnswer({ println }, arg) {
     const result = tryAnswerTerminalPendingQuestionInput(answer, runtimeId);
     if (result.ok) {
         const runtimeSuffix = result.runtimeId && result.runtimeId !== 'default' ? ` · runtime ${result.runtimeId}` : '';
-        println(`Resposta enviada para pergunta pendente${runtimeSuffix}: "${result.answer}"`);
+        println(
+            terminalThemeRow('Resposta', `enviada para pergunta pendente${runtimeSuffix}: "${result.answer}"`, {
+                role: 'success',
+            }),
+        );
         return;
     }
     if (result.reason === 'empty') {
-        println('[answer] Uso: /answer <texto>');
+        println(terminalThemeRow('/answer', 'Uso: /answer <texto>', { role: 'command' }));
         return;
     }
     if (result.reason === 'protocol_controlled') {
-        println('[answer] O runtime aguarda uma mensagem de diálogo. Digite o texto normalmente, sem /answer.');
+        println(terminalThemeRow('/answer', 'A conversa aguarda uma mensagem. Digite o texto normalmente, sem /answer.', { role: 'warn' }));
         return;
     }
     if (shouldConsumeTerminalPendingAnswerInput(result)) {
         const choices =
             result.pendingQuestionChoices.length > 0 ? ` Opções: ${result.pendingQuestionChoices.join(' | ')}.` : '';
-        println(`[answer] Resposta inválida para a pergunta pendente.${choices}`);
+        println(terminalThemeRow('/answer', `Resposta inválida para a pergunta pendente.${choices}`, { role: 'warn' }));
         return;
     }
     const projection = readTerminalStatusProjection(withRuntimeTarget({}, runtimeId));
     if (result.shadowExpired || projection.pendingQuestionShadowExpired) {
-        println('[answer] Nenhuma pergunta viva. Há uma pergunta restaurada expirada pendente de limpeza.');
+        println(terminalThemeRow('/answer', 'Nenhuma pergunta viva. Há uma pergunta restaurada expirada pendente de limpeza.', { role: 'warn' }));
         return;
     }
-    println('[answer] Nenhuma pergunta pendente.');
+    println(terminalThemeRow('/answer', 'Nenhuma pergunta pendente.'));
 }
 
 /**
