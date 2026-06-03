@@ -2730,5 +2730,14 @@
 - [x] Testes escopados passaram:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_help.spec.js tests/unit/copilot/terminal/test_commands_tools.spec.js`.
 - [x] Varredura local confirmou ausência de ANSI literal em `/help`, `/tools` e fallback do roteador.
-- [ ] Próxima lacuna: rodar live PTY visual cobrindo `/help`, `/help full`, `/tools`, `/tools diag`, `/sdk` e `/workspace` para capturar screenshots/logs iguais ao operador.
+- [x] Live PTY visual ampliada executada cobrindo `/help`, `/help full`, `/tools`, `/tools diag`, `/sdk`, `/sdk capabilities`, `/workspace list`, `/live`, `/activity` e `/sdk waits`:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/default-ux-cycle-help-tools-sdk-workspace-20260603-1425`.
+  - Resultado automatizado: PASS.
+  - Achado manual: `/workspace list` ainda imprimia uma linha duplicada legada com ANSI para `/workspace promote`.
+- [x] Correção: removida a linha residual de `/workspace promote` em `cmdWorkspace` list/default.
+- [x] Harness live reforçado: `ux-cycle-help-full-structured`, `ux-cycle-sdk-human`, `ux-cycle-sdk-capabilities-human` e `ux-cycle-workspace-human` agora cobrem as superfícies migradas; `ux-cycle-workspace-human` falha se voltar linha solta de `/workspace promote`.
+- [x] Live PTY pós-correção executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/default-ux-cycle-help-tools-sdk-workspace-clean-20260603-1427`.
+  - Resultado: PASS.
+  - Inspeção: `/workspace list` mostra apenas linhas `Uso` temáticas, sem ANSI residual.
 - [ ] Próxima lacuna: auditar `/events`, `/errors`, `/audit` e `/intent`, pois são superfícies diagnósticas onde nomes internos podem ser aceitáveis apenas em modo detail/raw.

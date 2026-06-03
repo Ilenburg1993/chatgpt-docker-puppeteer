@@ -1700,6 +1700,7 @@ async function runMenuCycleLiveTest({ outDir, requestedTransport, timeoutMs, ter
 function defaultUxCycleCriteria(boot) {
     const plain = String(boot?.plain ?? '');
     const helpStart = plain.indexOf('Ajuda rápida');
+    const helpFullStart = plain.indexOf('Terminal LLM-B - Ajuda completa');
     const statusStart = plain.indexOf('Status do Terminal LLM-B');
     const nowPanelStart = plain.indexOf('\n  Agora');
     const nowStart = nowPanelStart >= 0 ? nowPanelStart + 1 : plain.indexOf('[agora]');
@@ -1708,10 +1709,26 @@ function defaultUxCycleCriteria(boot) {
         const populated = plain.indexOf('Ferramentas observadas');
         return populated >= 0 ? populated : plain.indexOf('Nenhuma ferramenta observada');
     })();
+    const sdkStart = plain.indexOf('SDK do Terminal');
+    const sdkCapabilitiesStart = plain.indexOf('Capacidades SDK');
+    const workspaceStart = plain.indexOf('Workspace SDK virtual');
     const liveStart = plain.indexOf('Fluxo da conversa');
     const activityStart = plain.indexOf('Atividade Atual da LLM-B');
     const waitsStart = plain.lastIndexOf('Esperas humanas');
-    const surfaceStarts = [helpStart, statusStart, nowStart, healthStart, toolsStart, liveStart, activityStart, waitsStart]
+    const surfaceStarts = [
+        helpStart,
+        helpFullStart,
+        statusStart,
+        nowStart,
+        healthStart,
+        toolsStart,
+        sdkStart,
+        sdkCapabilitiesStart,
+        workspaceStart,
+        liveStart,
+        activityStart,
+        waitsStart,
+    ]
         .filter((index) => index >= 0)
         .sort((a, b) => a - b);
     const surfaceAt = (start) => {
@@ -1720,8 +1737,13 @@ function defaultUxCycleCriteria(boot) {
         return plain.slice(start, surfaceStarts[position + 1] ?? plain.length);
     };
     const defaultSurface = surfaceStarts.map((index) => surfaceAt(index)).join('\n');
+    const helpSurface = surfaceAt(helpStart);
+    const helpFullSurface = surfaceAt(helpFullStart);
     const healthSurface = surfaceAt(healthStart);
     const toolsSurface = surfaceAt(toolsStart);
+    const sdkSurface = surfaceAt(sdkStart);
+    const sdkCapabilitiesSurface = surfaceAt(sdkCapabilitiesStart);
+    const workspaceSurface = surfaceAt(workspaceStart);
     const liveSurface = surfaceAt(liveStart);
     const activitySurface = surfaceAt(activityStart);
     return [
@@ -1733,9 +1755,17 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-help-compact',
             pass:
-                /Ajuda rápida[\s\S]*Situação agora[\s\S]*Catálogo completo\s+\/help full/iu.test(plain) &&
-                !/╔|╚|binding\/frescor|CommandDefinition/iu.test(defaultSurface),
+                /Ajuda rápida[\s\S]*Situação[\s\S]*Completo\s+\/help full/iu.test(helpSurface) &&
+                !/╔|╚|binding\/frescor|CommandDefinition/iu.test(helpSurface),
             detail: '/help default rendered the compact human guide and kept the old catalog behind /help full',
+        },
+        {
+            id: 'ux-cycle-help-full-structured',
+            pass:
+                /Terminal LLM-B - Ajuda completa[\s\S]*Sessão e observação[\s\S]*Interações humanas e SDK[\s\S]*HTTP local/iu.test(
+                    helpFullSurface,
+                ) && !/╔|╚|\x1b\[/u.test(helpFullSurface),
+            detail: '/help full rendered a structured catalog without the legacy ANSI box',
         },
         {
             id: 'ux-cycle-boot-human-copy',
@@ -1773,10 +1803,34 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-tools-human',
             pass:
-                (/Ferramentas observadas[\s\S]*uso[\s\S]*Detalhes técnicos:\s+\/tools diag/iu.test(toolsSurface) ||
-                    /Nenhuma ferramenta observada[\s\S]*Quando a LLM-B usar arquivos/iu.test(toolsSurface)) &&
+                (/Ferramentas observadas[\s\S]*uso[\s\S]*Detalhes\s+\/tools diag/iu.test(toolsSurface) ||
+                    /Nenhuma ferramenta observada[\s\S]*Próximo\s+quando a LLM-B usar arquivos/iu.test(toolsSurface)) &&
                 !/\btool\(s\)\b|calls=|errors=|blocked=|avg=/iu.test(toolsSurface),
             detail: '/tools default rendered human action stats instead of raw telemetry counters',
+        },
+        {
+            id: 'ux-cycle-sdk-human',
+            pass:
+                /SDK do Terminal[\s\S]*Sessão[\s\S]*Modelo[\s\S]*Esperas[\s\S]*Uso\s+\/sdk models/iu.test(
+                    sdkSurface,
+                ) && !/SDK do Terminal[\s\S]*(reasoning=|restante=|\[OK\]|\[ERR\])/iu.test(sdkSurface),
+            detail: '/sdk default rendered a themed operations panel without raw key-value counters',
+        },
+        {
+            id: 'ux-cycle-sdk-capabilities-human',
+            pass:
+                /Capacidades SDK[\s\S]*UI[\s\S]*Tools[\s\S]*Plano[\s\S]*Retorno/iu.test(
+                    sdkCapabilitiesSurface,
+                ) && !/SDK Capabilities|\[OK\]|\[ERR\]/iu.test(sdkCapabilitiesSurface),
+            detail: '/sdk capabilities rendered a themed human panel instead of the legacy heading',
+        },
+        {
+            id: 'ux-cycle-workspace-human',
+            pass:
+                /Workspace SDK virtual[\s\S]*(Arquivo|Retorno)[\s\S]*Uso\s+\/workspace list/iu.test(
+                    workspaceSurface,
+                ) && !/\[OK\]|\[ERR\]|SDK→FS|FS→SDK|\n\s+\/workspace promote <localPath>/iu.test(workspaceSurface),
+            detail: '/workspace list rendered a themed SDK workspace panel',
         },
         {
             id: 'ux-cycle-live-compact',
@@ -1821,10 +1875,15 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
         outDir,
         commands: [
             { line: '/help', advanceAfterMs: 1_000 },
+            { line: '/help full', advanceAfterMs: 1_000 },
             { line: '/status', advanceAfterMs: 1_000 },
             { line: '/now', advanceAfterMs: 1_000 },
             { line: '/health', advanceAfterMs: 1_000 },
             { line: '/tools', advanceAfterMs: 1_000 },
+            { line: '/tools diag', advanceAfterMs: 1_000 },
+            { line: '/sdk', advanceAfterMs: 1_000 },
+            { line: '/sdk capabilities', advanceAfterMs: 1_000 },
+            { line: '/workspace list', advanceAfterMs: 1_000 },
             { line: '/live', advanceAfterMs: 1_000 },
             { line: '/activity 5', advanceAfterMs: 1_000 },
             { line: '/sdk waits', advanceAfterMs: 1_000 },

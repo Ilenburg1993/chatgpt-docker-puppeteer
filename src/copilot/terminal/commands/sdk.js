@@ -1883,7 +1883,6 @@ export async function cmdWorkspace({ println }, arg = '') {
             println(
                 terminalThemeRow('Uso', '/workspace list | read <path> | write <path> <content>', { role: 'command' }),
             );
-            println('  \x1b[90m     /workspace promote <localPath> [--to <sdkPath>] [--overwrite]\x1b[0m');
             println(
                 terminalThemeRow(
                     'Uso',
