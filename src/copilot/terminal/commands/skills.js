@@ -54,7 +54,7 @@ export async function cmdSkills({ println }, arg) {
 
         case 'add': {
             if (!rest) {
-                println('  Uso: /skills add <caminho>');
+                println(terminalThemeRow('Uso', '/skills add <caminho>', { role: 'warn' }));
                 break;
             }
             const current = /** @type {{ paths: string[] }} */ (
@@ -69,7 +69,7 @@ export async function cmdSkills({ println }, arg) {
 
         case 'remove': {
             if (!rest) {
-                println('  Uso: /skills remove <caminho>');
+                println(terminalThemeRow('Uso', '/skills remove <caminho>', { role: 'warn' }));
                 break;
             }
             const current = /** @type {{ paths: string[] }} */ (
@@ -95,7 +95,7 @@ export async function cmdSkills({ println }, arg) {
         }
 
         default:
-            println(`  Subcomando desconhecido: ${sub}`);
-            println('  Uso: /skills [list | add <path> | remove <path> | reload]');
+            println(terminalThemeRow('Subcomando', `desconhecido: ${sub}`, { role: 'warn' }));
+            println(terminalThemeRow('Uso', '/skills [list | add <path> | remove <path> | reload]', { role: 'command' }));
     }
 }

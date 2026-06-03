@@ -9,6 +9,7 @@
  */
 
 import { formatAliases, removeAlias, setAlias } from '../stores/index.js';
+import { terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
 
 /**
  * @typedef {object} SessionContext
@@ -26,7 +27,8 @@ export function cmdAlias({ println }, args) {
     const action = args[0]?.toLowerCase() ?? 'list';
 
     if (action === 'list' || action === '') {
-        println('\n  \x1b[36mAliases\x1b[0m');
+        println('');
+        println(terminalThemeHeadline('command', 'Aliases'));
         println(formatAliases());
         println('');
         return;
@@ -36,28 +38,28 @@ export function cmdAlias({ println }, args) {
         const name = args[1];
         const expansion = args.slice(2).join(' ');
         if (!name || !expansion) {
-            println('\x1b[90m  Uso: /alias set <nome> <comando>   ex: /alias set /myissues /gh issue list\x1b[0m');
+            println(terminalThemeRow('Uso', '/alias set <nome> <comando> · ex: /alias set /myissues /gh issue list', { role: 'warn' }));
             return;
         }
         const result = setAlias(name.startsWith('/') ? name : `/${name}`, expansion);
         if (!result.ok) {
-            println(`\x1b[31m  ✗ Erro ao definir alias: ${result.error}\x1b[0m`);
+            println(terminalThemeRow('Alias', `erro ao definir: ${result.error}`, { role: 'error' }));
             return;
         }
-        println(`\x1b[32m  ✓ Alias definido: ${name} → ${expansion}\x1b[0m`);
+        println(terminalThemeRow('Alias', `definido · ${name} -> ${expansion}`, { role: 'success' }));
         return;
     }
 
     if (action === 'remove' || action === 'rm' || action === 'delete') {
         const name = args[1];
         if (!name) {
-            println('\x1b[90m  Uso: /alias remove <nome>\x1b[0m');
+            println(terminalThemeRow('Uso', '/alias remove <nome>', { role: 'warn' }));
             return;
         }
         const ok = removeAlias(name.startsWith('/') ? name : `/${name}`);
-        println(ok ? `\x1b[32m  ✓ Alias removido: ${name}\x1b[0m` : `\x1b[33m  Alias não encontrado: ${name}\x1b[0m`);
+        println(ok ? terminalThemeRow('Alias', `removido · ${name}`, { role: 'success' }) : terminalThemeRow('Alias', `não encontrado · ${name}`, { role: 'warn' }));
         return;
     }
 
-    println('\x1b[90m  Uso: /alias [list|set <nome> <cmd>|remove <nome>]\x1b[0m');
+    println(terminalThemeRow('Uso', '/alias [list|set <nome> <cmd>|remove <nome>]', { role: 'command' }));
 }

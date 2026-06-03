@@ -118,6 +118,7 @@ describe('alias-store formatAliases', () => {
         const output = formatAliases();
         expect(typeof output).toBe('string');
         expect(output.length).toBeGreaterThan(0);
+        expect(output).not.toContain('\x1b[');
     });
 
     it('contém tags [builtin] para entries built-in', () => {

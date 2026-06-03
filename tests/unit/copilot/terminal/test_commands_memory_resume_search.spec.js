@@ -56,19 +56,24 @@ describe('commands/memory + resume + search', () => {
     it('cmdRemember salva memória via frontend', () => {
         const ctx = mockCtx();
         cmdRemember({ hubSessionId: 'hub-1', println: ctx.println }, 'arch: Node.js 24+');
-        expect(ctx.output()).toContain('Memória salva');
+        expect(ctx.output()).toContain('Memória');
+        expect(ctx.output()).toContain('salva');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('cmdRecall exibe memórias retornadas pela frontend layer', () => {
         const ctx = mockCtx();
         cmdRecall({ println: ctx.println }, 'arch');
         expect(ctx.output()).toContain('Node.js 24+');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('cmdForget reporta remoção', () => {
         const ctx = mockCtx();
         cmdForget({ println: ctx.println }, 'mem-12345678');
-        expect(ctx.output()).toContain('Memória removida');
+        expect(ctx.output()).toContain('Memória');
+        expect(ctx.output()).toContain('removida');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('cmdResume sem argumento lista sessões', async () => {

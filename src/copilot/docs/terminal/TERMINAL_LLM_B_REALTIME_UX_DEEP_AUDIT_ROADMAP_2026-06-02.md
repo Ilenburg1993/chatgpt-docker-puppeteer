@@ -4384,5 +4384,44 @@
   - `npm run lint:copilot`.
   - `npm run typecheck:strict:src.copilot`.
   - `npx vitest run tests/unit/copilot/terminal/test_repl_banner.spec.js tests/unit/copilot/terminal/test_boot_banner.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
-- [ ] Próxima lacuna: auditar comandos com ANSI cru ainda fora do tema central (`/gh`, `/skills`,
-      `/memory`, `/plan`, trechos de `/byok`) e decidir ordem de migração pelo impacto na live.
+- [x] Próxima lacuna em andamento: auditar comandos com ANSI cru ainda fora do tema central
+      (`/gh`, `/skills`, `/memory`, `/plan`, `/alias`, trechos de `/byok`) e decidir ordem de
+      migração pelo impacto na live.
+
+### 12.13 Comandos pequenos sem ANSI manual
+
+- [x] Achado: `/plan`, `/skills`, `/memory` e `/alias` ainda imprimiam ANSI manual (`\x1b[...]`),
+      checkmarks, `Uso:` solto e modos SDK crus como `interactive -> plan`.
+- [x] Decisão UX: comandos pequenos devem seguir o mesmo tema central do restante do terminal,
+      usando `terminalThemeRow`, `terminalThemeRows`, `terminalThemeHeadline` e divisores temáticos.
+- [x] Implementação: `/plan` passou a mostrar `Plano SDK`, `Modo SDK interativo`, comandos de uso
+      em blocos e mudanças como `interativo -> plano`, sem constantes cruas.
+- [x] Implementação: `/skills` passou a mostrar usos e subcomandos desconhecidos em linhas
+      temáticas, sem `  Uso:` manual.
+- [x] Implementação: `/memory` passou a renderizar salvar/listar/remover memórias com tema central,
+      sem checkmark ANSI nem blocos coloridos manuais.
+- [x] Implementação: `/alias` e `formatAliases` passaram a renderizar aliases sem ANSI manual,
+      com set/remove/uso em tema central e setas ASCII estáveis.
+- [x] Testes escopados atualizados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_plan.spec.js tests/unit/copilot/terminal/test_commands_memory_resume_search.spec.js tests/unit/copilot/terminal/test_commands_skills.spec.js tests/unit/copilot/terminal/test_commands_alias.spec.js tests/unit/copilot/terminal/test_alias_store.spec.js`.
+  - Resultado: 5 arquivos, 36 testes.
+- [x] Implementação: `/usage now` passou a renderizar contexto, quota/PR, telemetria LLM, vínculo
+      e modo SDK com tema central, sem ANSI manual e sem `interactive` cru.
+- [x] Teste escopado de `/usage` passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`.
+  - Resultado: 1 arquivo, 8 testes.
+- [x] Live focado identificou bug real: `/recall` era anunciado em help/banner e exportado pelo
+      barrel de comandos, mas não estava registrado em `repl-command-router.js`; o operador via
+      `Comando /recall não existe`.
+- [x] Correção: `/recall` entrou no cluster canônico `/remember` → `/recall` → `/forget` do
+      roteador, preservando `/memory` como fonte única de renderização.
+- [x] Guarda de regressão adicionada:
+  - `tests/unit/copilot/terminal/test_repl_command_router_routes.spec.js` garante que o cluster
+        anunciado de memória permanece roteado.
+- [x] Rodada escopada pós-correção passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_plan.spec.js tests/unit/copilot/terminal/test_commands_memory_resume_search.spec.js tests/unit/copilot/terminal/test_commands_skills.spec.js tests/unit/copilot/terminal/test_commands_alias.spec.js tests/unit/copilot/terminal/test_alias_store.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js tests/unit/copilot/terminal/test_repl_command_router_routes.spec.js`.
+  - Resultado: 7 arquivos, 45 testes.
+- [x] Live PTY focado do cluster `/memory` passou em `npm run terminal:llm-b`:
+  - Sequência: `/remember ux: terminal bonito`, `/recall ux`, `/forget mem-12345678`, `/quit`.
+  - Resultado: `/recall ux` listou memórias com ISO 8601 completo e não exibiu mais
+        `Comando /recall não existe`.

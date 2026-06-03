@@ -215,8 +215,8 @@ export function formatAliases() {
     return entries
         .map(([key, cmd]) => {
             const isBuiltin = BUILTIN_ALIASES[key] !== undefined;
-            const tag = isBuiltin ? '\x1b[90m[builtin]\x1b[0m' : '\x1b[32m[custom]\x1b[0m';
-            return `  \x1b[36m${key.padEnd(maxKey)}\x1b[0m  →  ${cmd}  ${tag}`;
+            const tag = isBuiltin ? '[builtin]' : '[custom]';
+            return `  ${key.padEnd(maxKey)}  ->  ${cmd}  ${tag}`;
         })
         .join('\n');
 }

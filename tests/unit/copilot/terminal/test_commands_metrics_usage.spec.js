@@ -353,16 +353,19 @@ describe('commands/metrics + usage', () => {
         cmdUsage({ println: ctx.println }, 'now');
 
         expect(ctx.output()).toContain('Context window');
-        expect(ctx.output()).toContain('Vínculo:');
+        expect(ctx.output()).toContain('Vínculo');
         expect(ctx.output()).toContain('runtime, SDK e hub conectados');
         expect(ctx.output()).not.toContain('runtime-456789…');
         expect(ctx.output()).not.toContain('runtime-4567890123456789012345');
         expect(ctx.output()).toContain('/usage now detail');
-        expect(ctx.output()).toContain('Modo: SDK ');
+        expect(ctx.output()).toContain('Modo');
+        expect(ctx.output()).toContain('SDK interativo');
+        expect(ctx.output()).not.toContain('interactive');
         expect(ctx.output()).toContain('gpt-5-mini');
-        expect(ctx.output()).toMatch(/Última telemetria PR classificada|Quota Copilot observada/);
+        expect(ctx.output()).toMatch(/Telemetria PR|Quota Copilot/);
         expect(ctx.output()).not.toContain('side-channel');
         expect(ctx.output()).toMatch(/não implica consumo neste boot\/probe|não é cobrança BYOK/);
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('cmdUsage now aceita runtimeId explícito', () => {
@@ -370,10 +373,11 @@ describe('commands/metrics + usage', () => {
 
         cmdUsage({ println: ctx.println }, 'now --runtime alt');
 
-        expect(ctx.output()).toContain('Vínculo:');
+        expect(ctx.output()).toContain('Vínculo');
         expect(ctx.output()).toContain('runtime, SDK e hub conectados');
-        expect(ctx.output()).toContain('Modo: SDK ');
+        expect(ctx.output()).toContain('SDK interativo');
         expect(ctx.output()).toContain('gpt-4.1-mini');
+        expect(ctx.output()).not.toContain('interactive');
     });
 
     it('cmdUsage now detail preserva IDs completos', () => {
@@ -403,13 +407,14 @@ describe('commands/metrics + usage', () => {
 
             cmdUsage({ println: ctx.println }, 'now');
 
-            expect(ctx.output()).toContain('Última telemetria LLM');
+            expect(ctx.output()).toContain('Telemetria LLM');
             expect(ctx.output()).toContain('tipo');
             expect(ctx.output()).not.toContain('tipo=');
             expect(ctx.output()).toContain('continuação da pergunta humana');
             expect(ctx.output()).not.toContain('ask_user_continuation');
-            expect(ctx.output()).toContain('Continuação da pergunta humana');
+            expect(ctx.output()).toContain('Pergunta humana');
             expect(ctx.output()).toContain('/events event=assistant.message');
+            expect(ctx.output()).not.toContain('\x1b[');
         } finally {
             defaultRuntime.lastLlmUsage = previous;
         }

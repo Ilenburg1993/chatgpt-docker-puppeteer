@@ -13,7 +13,7 @@
 import { getShowUsage, setShowUsage } from '../../presentation/state/index.js';
 import { compactTerminalDiagnosticId } from '../events/tool-activity-presenter.js';
 import { readTerminalConfigProjection, readTerminalUsageNowProjection } from '../frontend/index.js';
-import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
+import { terminalThemeHeadline, terminalThemeRow, terminalThemeRows, terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -34,6 +34,18 @@ function humanLlmUsageKind(llmClass, llmReason) {
     if (/stream|delta/iu.test(llmClass) || /stream|delta/iu.test(llmReason)) return 'streaming';
     if (llmClass === 'unknown' && llmReason === 'n/d') return 'n/d';
     return llmClass.replace(/[_-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderUsageSdkMode(value) {
+    const mode = String(value ?? '');
+    if (mode === 'interactive') return 'interativo';
+    if (mode === 'plan') return 'plano';
+    if (mode === 'autopilot') return 'autopiloto';
+    return mode.replace(/[._-]+/gu, ' ') || 'desconhecido';
 }
 
 /**
@@ -78,23 +90,32 @@ export function cmdUsage({ println }, arg) {
         if (projection.pr) {
             const cost = modelBilling.cost === null ? '?' : modelBilling.cost.toFixed(4);
             const modelLabel = modelBilling.mismatch
-                ? `configurado \x1b[35m${modelBilling.configuredModel ?? '-'}\x1b[0m · cobrado \x1b[36m${modelBilling.billedModel ?? '-'}\x1b[0m`
-                : `modelo \x1b[36m${modelBilling.displayModel}\x1b[0m`;
+                ? `configurado ${modelBilling.configuredModel ?? '-'} · cobrado ${modelBilling.billedModel ?? '-'}`
+                : `modelo ${modelBilling.displayModel}`;
             if (byokActive) {
                 println(
-                    `      Quota Copilot observada: ${modelLabel} · custo \x1b[33m${cost}\x1b[0m \x1b[90m(histórica; BYOK ativo usa provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}; não é cobrança BYOK)\x1b[0m`,
+                    terminalThemeRow(
+                        'Quota Copilot',
+                        `${modelLabel} · custo ${cost} · histórica; BYOK ativo usa provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}; não é cobrança BYOK`,
+                    ),
                 );
             } else {
                 println(
-                    `      Última telemetria PR classificada: ${modelLabel} · custo \x1b[33m${cost}\x1b[0m \x1b[90m(histórica; não implica consumo neste boot/probe)\x1b[0m`,
+                    terminalThemeRow(
+                        'Telemetria PR',
+                        `${modelLabel} · custo ${cost} · histórica; não implica consumo neste boot/probe`,
+                    ),
                 );
             }
         } else if (byokActive) {
             println(
-                `      Quota Copilot observada: \x1b[90msem snapshot histórico; BYOK ativo usa provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}\x1b[0m`,
+                terminalThemeRow(
+                    'Quota Copilot',
+                    `sem snapshot histórico; BYOK ativo usa provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}`,
+                ),
             );
         } else {
-            println('      Premium Request: \x1b[90msem snapshot histórico classificado\x1b[0m');
+            println(terminalThemeRow('Premium Request', 'sem snapshot histórico classificado'));
         }
         if (projection.llmUsage) {
             const llmCost =
@@ -114,12 +135,22 @@ export function cmdUsage({ println }, arg) {
             const llmUsageKind = humanLlmUsageKind(llmClass, llmReason);
             println(
                 detail
-                    ? `      Última telemetria LLM: modelo \x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · tipo \x1b[90m${llmUsageKind}\x1b[0m · classe \x1b[90m${llmClass}\x1b[0m · motivo \x1b[90m${llmReason}\x1b[0m · custo \x1b[33m${llmCost}\x1b[0m`
-                    : `      Última telemetria LLM: modelo \x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · tipo \x1b[90m${llmUsageKind}\x1b[0m · custo \x1b[33m${llmCost}\x1b[0m \x1b[90m(/usage now detail para classe técnica)\x1b[0m`,
+                    ? terminalThemeRow(
+                          'Telemetria LLM',
+                          `modelo ${projection.llmUsageBilling.displayModel} · ${premiumRequest} · tipo ${llmUsageKind} · classe ${llmClass} · motivo ${llmReason} · custo ${llmCost}`,
+                      )
+                    : terminalThemeRow(
+                          'Telemetria LLM',
+                          `modelo ${projection.llmUsageBilling.displayModel} · ${premiumRequest} · tipo ${llmUsageKind} · custo ${llmCost} · /usage now detail para classe técnica`,
+                      ),
             );
             if (/ask_user|user_input/iu.test(llmClass) || /ask_user|user_input/iu.test(llmReason)) {
                 println(
-                    '      Continuação da pergunta humana: \x1b[32mtelemetria pós-resposta humana separada da fala inicial\x1b[0m \x1b[90m(use /events event=assistant.message e /export para correlacionar source+trace)\x1b[0m',
+                    terminalThemeRow(
+                        'Pergunta humana',
+                        'telemetria pós-resposta humana separada da fala inicial · use /events event=assistant.message e /export para correlacionar source+trace',
+                        { role: 'success' },
+                    ),
                 );
             }
         }
@@ -129,19 +160,15 @@ export function cmdUsage({ println }, arg) {
             const hubLabel = renderUsageBindingId(projection.binding.hubSessionId, detail);
             println(
                 detail
-                    ? `      Vínculo: runtime \x1b[90m${runtimeLabel}\x1b[0m · SDK \x1b[90m${sdkLabel}\x1b[0m · hub \x1b[90m${hubLabel}\x1b[0m`
-                    : `      Vínculo: \x1b[90m${renderUsageBindingSummary({
+                    ? terminalThemeRow('Vínculo', `runtime ${runtimeLabel} · SDK ${sdkLabel} · hub ${hubLabel}`)
+                    : terminalThemeRow('Vínculo', `${renderUsageBindingSummary({
                           runtimeSessionId: projection.runtimeSessionId,
                           sdkSessionId: projection.binding.sdkSessionId,
                           hubSessionId: projection.binding.hubSessionId,
-                      })} · IDs em /usage now detail\x1b[0m`,
+                      })} · IDs em /usage now detail`),
             );
         }
-        println(
-            detail
-                ? `      Modo: SDK \x1b[90m${configProjection.sdkSessionMode ?? 'interactive'}\x1b[0m · plano \x1b[90m${configProjection.sdkPlanOperation ?? '(sem alterações)'}\x1b[0m`
-                : `      Modo: SDK \x1b[90m${configProjection.sdkSessionMode ?? 'interactive'}\x1b[0m · plano \x1b[90m${configProjection.sdkPlanOperation ?? '(sem alterações)'}\x1b[0m`,
-        );
+        println(terminalThemeRow('Modo', `SDK ${renderUsageSdkMode(configProjection.sdkSessionMode)} · plano ${configProjection.sdkPlanOperation ?? '(sem alterações)'}`));
         println('');
         return;
     }
@@ -159,7 +186,7 @@ export function cmdUsage({ println }, arg) {
     const status = next ? terminalThemeText('success', 'on') : terminalThemeText('error', 'off');
     println('');
     println(terminalThemeRow('Telemetria', `pós-turno ${status}`, { role: next ? 'success' : 'error' }));
-    println(terminalThemeText('muted', '  Uso: /usage [on|off|now] [detail]'));
+    println(terminalThemeRows('Uso', ['/usage [on|off|now] [detail]'], { role: 'command' }));
     println('');
 }
 

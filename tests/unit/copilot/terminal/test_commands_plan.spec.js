@@ -46,10 +46,13 @@ describe('terminal/commands/plan', () => {
         await cmdPlan({ println: ctx.println }, '');
 
         expect(readTerminalSdkSessionProjection).toHaveBeenCalled();
-        expect(ctx.output()).toContain('modo SDK atual');
-        expect(ctx.output()).toContain('INTERACTIVE');
+        expect(ctx.output()).toContain('Plano SDK');
+        expect(ctx.output()).toContain('Modo SDK');
+        expect(ctx.output()).toContain('interativo');
         expect(ctx.output()).toContain('plan.md');
         expect(ctx.output()).toContain('step 1');
+        expect(ctx.output()).not.toContain('INTERACTIVE');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('liga plan mode vanilla via SDK', async () => {
@@ -58,7 +61,10 @@ describe('terminal/commands/plan', () => {
         await cmdPlan({ println: ctx.println }, 'on');
 
         expect(setTerminalSdkModeProjection).toHaveBeenCalledWith('plan');
-        expect(ctx.output()).toContain('Modo SDK: interactive → plan');
+        expect(ctx.output()).toContain('Modo SDK');
+        expect(ctx.output()).toContain('interativo -> plano');
+        expect(ctx.output()).not.toContain('interactive');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('desliga plan mode vanilla via SDK', async () => {
@@ -67,7 +73,9 @@ describe('terminal/commands/plan', () => {
         await cmdPlan({ println: ctx.println }, 'off');
 
         expect(setTerminalSdkModeProjection).toHaveBeenCalledWith('interactive');
-        expect(ctx.output()).toContain('Modo SDK: interactive → interactive');
+        expect(ctx.output()).toContain('interativo -> interativo');
+        expect(ctx.output()).not.toContain('interactive');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('faz read do plan.md vanilla', async () => {
@@ -85,7 +93,8 @@ describe('terminal/commands/plan', () => {
         await cmdPlan({ println: ctx.println }, 'set # Novo plano');
 
         expect(updateTerminalSdkPlanProjection).toHaveBeenCalledWith('# Novo plano');
-        expect(ctx.output()).toContain('plan.md atualizado');
+        expect(ctx.output()).toContain('atualizado');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('faz append ao plan.md vanilla via read + update', async () => {
@@ -95,7 +104,8 @@ describe('terminal/commands/plan', () => {
 
         expect(readTerminalSdkSessionProjection).toHaveBeenCalled();
         expect(updateTerminalSdkPlanProjection).toHaveBeenCalledWith('# Plan\n- step 1\n- step 2');
-        expect(ctx.output()).toContain('plan.md expandido');
+        expect(ctx.output()).toContain('expandido');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('apaga o plan.md vanilla', async () => {
@@ -104,7 +114,8 @@ describe('terminal/commands/plan', () => {
         await cmdPlan({ println: ctx.println }, 'clear');
 
         expect(deleteTerminalSdkPlanProjection).toHaveBeenCalled();
-        expect(ctx.output()).toContain('plan.md removido');
+        expect(ctx.output()).toContain('removido');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('encaminha runtimeId explícito para o fluxo vanilla do SDK', async () => {

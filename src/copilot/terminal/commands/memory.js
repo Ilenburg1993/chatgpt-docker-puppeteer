@@ -13,7 +13,12 @@ import {
     recallTerminalMemoriesProjection,
     rememberTerminalMemoryProjection,
 } from '../frontend/index.js';
-import { formatTerminalIsoTimestamp } from '../state/index.js';
+import {
+    formatTerminalIsoTimestamp,
+    terminalThemeDivider,
+    terminalThemeHeadline,
+    terminalThemeRow,
+} from '../state/index.js';
 
 /**
  * @typedef {object} SessionContext
@@ -31,10 +36,10 @@ import { formatTerminalIsoTimestamp } from '../state/index.js';
 export function cmdRemember({ hubSessionId, println }, arg) {
     const result = rememberTerminalMemoryProjection({ hubSessionId: hubSessionId ?? null, input: arg });
     if (!result.ok || !result.id) {
-        println('\x1b[90m  Uso: /remember [tag:] conteúdo\x1b[0m');
+        println(terminalThemeRow('Uso', '/remember [tag:] conteúdo', { role: 'warn' }));
         return;
     }
-    println(`\x1b[32m  ✓ Memória salva\x1b[0m \x1b[90m[${result.tag}] ${result.id.slice(0, 8)}…\x1b[0m`);
+    println(terminalThemeRow('Memória', `salva · ${result.tag} · ${result.id.slice(0, 8)}…`, { role: 'success' }));
 }
 
 /**
@@ -47,16 +52,18 @@ export function cmdRemember({ hubSessionId, println }, arg) {
 export function cmdRecall({ println }, arg) {
     const { label, memories } = recallTerminalMemoriesProjection(arg);
     if (memories.length === 0) {
-        println('\x1b[90m  Nenhuma memória encontrada.\x1b[0m');
+        println(terminalThemeRow('Memórias', 'nenhuma encontrada', { role: 'muted' }));
         return;
     }
-    println(`\n  \x1b[36mMemórias\x1b[0m ${label ? `[${arg}]` : '(todas)'}`);
-    println('  ─────────────────────────────────────────────');
+    println('');
+    println(terminalThemeHeadline('assistant', 'Memórias', [label ? String(arg) : 'todas']));
+    println(terminalThemeDivider(45));
     for (const m of memories) {
         const ts = formatTerminalIsoTimestamp(String(m['created_at'] ?? ''));
-        println(`  \x1b[90m[${ts}]\x1b[0m \x1b[33m${m['tag'] ?? ''}\x1b[0m  ${m['content'] ?? ''}`);
+        println(terminalThemeRow(String(m['tag'] ?? 'memória'), `${ts} · ${m['content'] ?? ''}`));
     }
-    println('  ─────────────────────────────────────────────\n');
+    println(terminalThemeDivider(45));
+    println('');
 }
 
 /**
@@ -68,13 +75,13 @@ export function cmdRecall({ println }, arg) {
  */
 export function cmdForget({ println }, arg) {
     if (!arg) {
-        println('\x1b[90m  Uso: /forget <id>\x1b[0m');
+        println(terminalThemeRow('Uso', '/forget <id>', { role: 'warn' }));
         return;
     }
     const deleted = forgetTerminalMemoryProjection(arg);
     println(
         deleted
-            ? `\x1b[32m  ✓ Memória removida: ${arg.slice(0, 8)}…\x1b[0m`
-            : `\x1b[33m  Memória não encontrada: ${arg}\x1b[0m`,
+            ? terminalThemeRow('Memória', `removida · ${arg.slice(0, 8)}…`, { role: 'success' })
+            : terminalThemeRow('Memória', `não encontrada · ${arg}`, { role: 'warn' }),
     );
 }
