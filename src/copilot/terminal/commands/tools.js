@@ -25,26 +25,230 @@ import { terminalThemeHeadline, terminalThemeRow } from '../state/ui/index.js';
  * @returns {string}
  */
 function renderLifecycleDiagnosticLine(entry) {
-    const ids = [
-        entry.toolCallId ? `chamada ${compactTerminalDiagnosticId(entry.toolCallId)}` : null,
-        entry.requestId ? `requisição ${compactTerminalDiagnosticId(entry.requestId)}` : null,
-        entry.traceId ? `trace ${compactTerminalDiagnosticId(entry.traceId, 16)}` : null,
-    ].filter(Boolean);
+    const refs = renderToolReferenceList([
+        ['call', entry.toolCallId, 12],
+        ['req', entry.requestId, 12],
+        ['trace', entry.traceId, 16],
+    ]);
     const target = entry.path ?? entry.target;
     const progress = entry.progress !== null ? ` · ${entry.progress}%` : '';
     const duration = entry.durationMs !== null ? ` · ${Math.max(0, Math.round(entry.durationMs))}ms` : '';
     const visualName = getTerminalHumanToolName(entry.toolName);
-    const technicalName = visualName === entry.toolName ? null : `técnico ${entry.toolName}`;
+    const technicalName = visualName === entry.toolName ? null : entry.toolName;
     const rawName =
-        entry.rawToolName && entry.rawToolName !== entry.toolName ? `origem SDK ${entry.rawToolName}` : null;
-    const operation = entry.operation ? `ação ${entry.operation}` : null;
-    const targetLabel = target ? `alvo ${target}` : null;
+        entry.rawToolName && entry.rawToolName !== entry.toolName ? `SDK ${entry.rawToolName}` : null;
+    const operation = entry.operation ? renderLifecycleOperationLabel(entry.operation) : null;
     const status = renderLifecycleStatusLabel(entry.status);
-    const suffix = [status, operation, targetLabel, technicalName, rawName, ids.join(' · ')]
+    const summary = [status, operation].filter(Boolean).join(' · ');
+    const lines = [
+        terminalThemeRow(visualName, `${summary}${progress}${duration}`, {
+            role: entry.status === 'failed' ? 'error' : entry.status === 'waiting_user' ? 'question' : 'muted',
+            width: 22,
+        }),
+    ];
+    if (target) {
+        lines.push(terminalThemeRow('Alvo', compactTerminalDiagnosticText(target, 96), { role: 'fileRead' }));
+    }
+    if (technicalName || rawName) {
+        lines.push(terminalThemeRow('Técnico', [technicalName, rawName].filter(Boolean).join(' · '), { role: 'muted' }));
+    }
+    if (refs) {
+        lines.push(terminalThemeRow('Refs', refs, { role: 'muted' }));
+    }
+    return lines.join('\n');
+}
+
+/**
+ * @param {string} operation
+ * @returns {string}
+ */
+function renderLifecycleOperationLabel(operation) {
+    if (operation === 'io') return 'I/O local';
+    if (operation === 'read') return 'leitura';
+    if (operation === 'write') return 'escrita';
+    if (operation === 'search') return 'busca';
+    if (operation === 'mkdir') return 'criação de pasta';
+    if (operation === 'edit') return 'edição';
+    if (operation === 'move') return 'movimento';
+    if (operation === 'copy') return 'cópia';
+    if (operation === 'delete') return 'exclusão';
+    if (operation === 'ask') return 'pergunta';
+    if (operation === 'intent') return 'intenção';
+    if (operation === 'inspect') return 'inspeção';
+    return operation.replace(/[-_]/gu, ' ');
+}
+
+/**
+ * @param {[string, string | null | undefined, number][]} refs
+ * @returns {string}
+ */
+function renderToolReferenceList(refs) {
+    return refs
+        .map(([label, value, size]) => {
+            const compact = compactTerminalDiagnosticId(value, size);
+            return compact ? `${label} ${compact}` : null;
+        })
         .filter(Boolean)
         .join(' · ');
-    return terminalThemeRow(visualName, `${suffix}${progress}${duration}`, {
-        role: entry.status === 'failed' ? 'error' : entry.status === 'waiting_user' ? 'question' : 'muted',
+}
+
+/**
+ * @param {string} text
+ * @param {number} max
+ * @returns {string}
+ */
+function compactTerminalDiagnosticText(text, max) {
+    const clean = text.replace(/\s+/gu, ' ').trim();
+    return clean.length > max ? `${clean.slice(0, Math.max(0, max - 1))}…` : clean;
+}
+
+/**
+ * @param {number} calls
+ * @param {number} blocked
+ * @param {number} errors
+ * @param {string} latency
+ * @returns {string}
+ */
+function renderToolStatsSummary(calls, blocked, errors, latency) {
+    return `uso ${calls} · ${blocked > 0 ? `${blocked} bloqueio(s)` : 'sem bloqueios'} · ${
+        errors > 0 ? `${errors} falha(s)` : 'sem falhas'
+    } · latência ${latency}`;
+}
+
+/**
+ * @param {number | undefined} calls
+ * @param {number | undefined} blocked
+ * @param {number | undefined} errors
+ * @param {number | undefined} avgLatencyMs
+ * @returns {string}
+ */
+function renderAggregateStatsSummary(calls, blocked, errors, avgLatencyMs) {
+    return renderToolStatsSummary(calls ?? 0, blocked ?? 0, errors ?? 0, `${avgLatencyMs ?? 0}ms`);
+}
+
+/**
+ * @param {number} count
+ * @returns {string}
+ */
+function renderDisabledToolSummary(count) {
+    if (count === 0) return 'nenhuma desabilitada';
+    if (count === 1) return '1 desabilitada';
+    return `${count} desabilitadas`;
+}
+
+/**
+ * @param {boolean} active
+ * @returns {string}
+ */
+function renderActiveLabel(active) {
+    return active ? 'ativo' : 'ausente';
+}
+
+/**
+ * @param {boolean} active
+ * @returns {'success' | 'warn'}
+ */
+function renderActiveRole(active) {
+    return active ? 'success' : 'warn';
+}
+
+/**
+ * @param {string} severity
+ * @returns {string}
+ */
+function renderIssueSeverityLabel(severity) {
+    if (severity === 'error') return 'Falha';
+    if (severity === 'warning' || severity === 'warn') return 'Aviso';
+    return 'Nota';
+}
+
+/**
+ * @param {string} name
+ * @returns {string}
+ */
+function renderToolDiagnosticName(name) {
+    return getTerminalHumanToolName(name);
+}
+
+/**
+ * @param {string} name
+ * @returns {string}
+ */
+function renderTechnicalToolName(name) {
+    return name;
+}
+
+/**
+ * @param {string} kind
+ * @returns {string}
+ */
+function renderToolKindLabel(kind) {
+    if (kind === 'file') return 'arquivo';
+    if (kind === 'io') return 'I/O local';
+    if (kind === 'shell' || kind === 'exec') return 'terminal';
+    if (kind === 'diagnostic') return 'diagnóstico';
+    return kind.replace(/[-_]/gu, ' ');
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function renderCategoryLabel(value) {
+    if (value === 'file') return 'Arquivo';
+    if (value === 'io') return 'I/O local';
+    if (value === 'shell' || value === 'exec') return 'Terminal';
+    if (value === 'diagnostic') return 'Diagnóstico';
+    if (value === 'sdk') return 'SDK';
+    return value.replace(/[-_]/gu, ' ');
+}
+
+/**
+ * @param {string} visualName
+ * @param {string} technicalName
+ * @returns {string | null}
+ */
+function renderToolTechnicalDetail(visualName, technicalName) {
+    return visualName === technicalName ? null : renderTechnicalToolName(technicalName);
+}
+
+/**
+ * @param {boolean} wantsRaw
+ * @param {boolean} wantsDiag
+ * @param {number} errors
+ * @param {number} blocked
+ * @returns {'success' | 'warn' | 'error' | 'muted'}
+ */
+function renderStatsRole(wantsRaw, wantsDiag, errors, blocked) {
+    if (errors > 0) return 'error';
+    if (blocked > 0) return 'warn';
+    return wantsRaw || wantsDiag ? 'muted' : 'success';
+}
+
+/**
+ * @param {number} active
+ * @param {number} waitingUser
+ * @param {number} recent
+ * @param {number} failedRecent
+ * @returns {string}
+ */
+function renderLifecycleSummary(active, waitingUser, recent, failedRecent) {
+    return `ativas ${active} · aguardando operador ${waitingUser} · recentes ${recent} · falhas recentes ${failedRecent}`;
+}
+
+/**
+ * @param {boolean} wantsRaw
+ * @param {boolean} wantsDiag
+ * @param {string} visualName
+ * @param {number} calls
+ * @param {number} blocked
+ * @param {number} errors
+ * @param {string} latency
+ * @returns {string}
+ */
+function renderToolStatsRow(wantsRaw, wantsDiag, visualName, calls, blocked, errors, latency) {
+    return terminalThemeRow(visualName, renderToolStatsSummary(calls, blocked, errors, latency), {
+        role: renderStatsRole(wantsRaw, wantsDiag, errors, blocked),
         width: 22,
     });
 }
@@ -54,6 +258,7 @@ function renderLifecycleDiagnosticLine(entry) {
  * @returns {string}
  */
 function renderLifecycleStatusLabel(status) {
+    if (status === 'io') return 'I/O local';
     if (status === 'running' || status === 'active') return 'em execução';
     if (status === 'completed') return 'concluída';
     if (status === 'failed') return 'falhou';
@@ -121,32 +326,17 @@ export function cmdTools({ println }, arg = '') {
         const errors = d.errors ?? 0;
         const blocked = d.blocked ?? 0;
         const latency = typeof d.avgLatencyMs === 'number' ? `${d.avgLatencyMs.toFixed(0)}ms` : '?';
-        const visualName = wantsRaw ? name : getTerminalHumanToolName(name);
-        if (wantsRaw || wantsDiag) {
-            println(
-                terminalThemeRow(
-                    visualName,
-                    `chamadas ${calls} · bloqueios ${blocked} · falhas ${errors} · latência ${latency}`,
-                    { role: errors > 0 ? 'error' : blocked > 0 ? 'warn' : 'muted', width: 22 },
-                ),
-            );
-        } else {
-            println(
-                terminalThemeRow(
-                    visualName,
-                    `uso ${calls} · ${blocked > 0 ? `${blocked} bloqueio(s)` : 'sem bloqueios'} · ${errors > 0 ? `${errors} falha(s)` : 'sem falhas'} · latência ${latency}`,
-                    { role: errors > 0 ? 'error' : blocked > 0 ? 'warn' : 'success', width: 22 },
-                ),
-            );
-        }
-        if (!wantsRaw && wantsDiag && visualName !== name) {
-            println(terminalThemeRow('Nome técnico', name, { role: 'muted' }));
+        const visualName = wantsRaw ? name : renderToolDiagnosticName(name);
+        println(renderToolStatsRow(wantsRaw, wantsDiag, visualName, calls, blocked, errors, latency));
+        const technicalName = renderToolTechnicalDetail(visualName, name);
+        if (!wantsRaw && wantsDiag && technicalName) {
+            println(terminalThemeRow('Técnico', technicalName, { role: 'muted' }));
         }
         if (!wantsRaw && wantsDiag && Array.isArray(d.aliases) && d.aliases.length > 1) {
             println(terminalThemeRow('Aliases', d.aliases.join(', '), { role: 'muted' }));
         }
         if (wantsDiag && typeof d.kind === 'string' && d.kind.length > 0) {
-            println(terminalThemeRow('tipo', d.kind, { role: 'muted', width: 4 }));
+            println(terminalThemeRow('Classe', renderToolKindLabel(d.kind), { role: 'muted' }));
         }
     }
 
@@ -158,7 +348,7 @@ export function cmdTools({ println }, arg = '') {
             return callsB - callsA;
         });
         println('');
-        println(terminalThemeHeadline('tool', 'Categorias de telemetria'));
+        println(terminalThemeHeadline('tool', 'Categorias'));
         for (const [cat, agg] of categoryEntries) {
             const info = /**
              * @type {{
@@ -170,8 +360,13 @@ export function cmdTools({ println }, arg = '') {
              */ (agg);
             println(
                 terminalThemeRow(
-                    cat,
-                    `chamadas ${info.totalCalls ?? 0} · bloqueios ${info.totalBlocked ?? 0} · falhas ${info.totalErrors ?? 0} · latência ${info.avgLatencyMs ?? 0}ms`,
+                    renderCategoryLabel(cat),
+                    renderAggregateStatsSummary(
+                        info.totalCalls,
+                        info.totalBlocked,
+                        info.totalErrors,
+                        info.avgLatencyMs,
+                    ),
                     { role: Number(info.totalErrors ?? 0) > 0 ? 'error' : 'muted', width: 22 },
                 ),
             );
@@ -179,15 +374,14 @@ export function cmdTools({ println }, arg = '') {
 
         const toolLoad = status.toolLoad;
         println('');
-        println(terminalThemeHeadline('tool', 'Superfícies de tools'));
-        println(
-            terminalThemeRow(
-                'Superfícies',
-                `arquivos locais ${toolLoad.hasCanonicalLocalFsTools ? 'ativos' : 'ausentes'} · terminal local ${toolLoad.hasCanonicalLocalExecTools ? 'ativo' : 'ausente'} · workspace SDK ${toolLoad.hasSdkWorkspaceTooling ? 'ativo' : 'ausente'} · shell legado ${toolLoad.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado'} · desabilitadas ${toolLoad.disabled.length}`,
-            ),
-        );
+        println(terminalThemeHeadline('tool', 'Superfícies operacionais'));
+        println(terminalThemeRow('Arquivos locais', renderActiveLabel(toolLoad.hasCanonicalLocalFsTools), { role: renderActiveRole(toolLoad.hasCanonicalLocalFsTools) }));
+        println(terminalThemeRow('Terminal local', renderActiveLabel(toolLoad.hasCanonicalLocalExecTools), { role: renderActiveRole(toolLoad.hasCanonicalLocalExecTools) }));
+        println(terminalThemeRow('Workspace SDK', renderActiveLabel(toolLoad.hasSdkWorkspaceTooling), { role: renderActiveRole(toolLoad.hasSdkWorkspaceTooling) }));
+        println(terminalThemeRow('Shell legado', toolLoad.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado', { role: toolLoad.hasLegacySdkShellToolsLoaded ? 'warn' : 'muted' }));
+        println(terminalThemeRow('Desabilitadas', renderDisabledToolSummary(toolLoad.disabled.length), { role: toolLoad.disabled.length > 0 ? 'warn' : 'success' }));
         if (toolLoad.disabled.length > 0) {
-            println(terminalThemeRow('Desabilitadas', toolLoad.disabled.join(', '), { role: 'muted' }));
+            println(terminalThemeRow('Lista', toolLoad.disabled.join(', '), { role: 'muted' }));
         }
 
         const contract = toolLoad.toolContract;
@@ -212,14 +406,14 @@ export function cmdTools({ println }, arg = '') {
         const detailedContract = readTerminalToolRegistrySnapshot().toolContract;
         if (detailedContract.issues.length > 0) {
             println(
-                terminalThemeRow('Top issues', `${Math.min(10, detailedContract.issues.length)} exibida(s)`, {
+                terminalThemeRow('Achados', `${Math.min(10, detailedContract.issues.length)} exibido(s)`, {
                     role: 'muted',
                 }),
             );
             for (const issue of detailedContract.issues.slice(0, 10)) {
                 println(
                     terminalThemeRow(
-                        issue.severity.toUpperCase(),
+                        renderIssueSeverityLabel(issue.severity),
                         `${issue.code} · ${issue.toolName} · ${issue.message}`,
                         { role: issue.severity === 'error' ? 'error' : 'warn', width: 7 },
                     ),
@@ -237,7 +431,12 @@ export function cmdTools({ println }, arg = '') {
             println(
                 terminalThemeRow(
                     'Resumo',
-                    `ativas ${lifecycle.summary.active} · aguardando operador ${lifecycle.summary.waitingUser} · recentes ${lifecycle.summary.recent} · falhas recentes ${lifecycle.summary.failedRecent}`,
+                    renderLifecycleSummary(
+                        lifecycle.summary.active,
+                        lifecycle.summary.waitingUser,
+                        lifecycle.summary.recent,
+                        lifecycle.summary.failedRecent,
+                    ),
                     {
                         role: 'muted',
                     },
@@ -245,11 +444,12 @@ export function cmdTools({ println }, arg = '') {
             );
             const active = lifecycle.active.slice(0, 8);
             if (active.length > 0) {
-                println(terminalThemeRow('Em voo', `${active.length} tool(s)`));
+                println(terminalThemeRow('Em voo', `${active.length} ${active.length === 1 ? 'ferramenta' : 'ferramentas'}`));
                 for (const entry of active) println(renderLifecycleDiagnosticLine(entry));
             }
             if (lifecycle.recent.length > 0) {
-                println(terminalThemeRow('Recentes', `${Math.min(8, lifecycle.recent.length)} evento(s)`));
+                const recentCount = Math.min(8, lifecycle.recent.length);
+                println(terminalThemeRow('Recentes', `${recentCount} ${recentCount === 1 ? 'evento' : 'eventos'}`));
                 for (const entry of lifecycle.recent.slice(0, 8)) println(renderLifecycleDiagnosticLine(entry));
             }
         }

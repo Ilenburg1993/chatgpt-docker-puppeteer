@@ -132,7 +132,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
                       const rate = calls > 0 ? Math.round(((calls - errors) / calls) * 100) : 0;
                       const col = rate >= 90 ? C.green : rate >= 70 ? C.yellow : C.red;
                       const visualName = compactTerminalToolText(getTerminalHumanToolName(name), 28).padEnd(28);
-                      return `  ${C.grey}•${C.reset} ${visualName} ${col}${rate}%${C.reset} avg ${stat['avgLatencyMs'] ?? 0}ms (${calls} calls)`;
+                      return `  ${C.grey}•${C.reset} ${visualName} ${col}${rate}%${C.reset} média ${stat['avgLatencyMs'] ?? 0}ms (${pluralPt(calls, 'uso', 'usos')})`;
                   })
                   .join('\n');
     const activityDetail = activity.detail

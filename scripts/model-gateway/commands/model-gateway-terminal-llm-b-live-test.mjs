@@ -1731,13 +1731,21 @@ async function runMenuCycleLiveTest({ outDir, requestedTransport, timeoutMs, ter
 
 function diagnosticUxCycleCriteria(boot) {
     const plain = String(boot?.plain ?? '');
+    const findPromptCommandStart = (command, from = 0) => {
+        const promptStart = plain.indexOf(`› ${command}`, Math.max(0, from));
+        if (promptStart >= 0) return promptStart + 2;
+        const lineStart = plain.indexOf(`\n${command}`, Math.max(0, from));
+        if (lineStart >= 0) return lineStart + 1;
+        return plain.indexOf(command, Math.max(0, from));
+    };
     const fsReadStart = plain.indexOf('/fs read data/copilot-terminal/live-scratch/');
     const fsSearchStart = plain.indexOf('/fs search TERMINAL_DIAGNOSTIC_UX_');
     const activityStart = plain.indexOf('/activity 8');
     const liveFullStart = plain.indexOf('/live full');
     const healthFullStart = plain.indexOf('/health full', Math.max(0, liveFullStart));
     const toolsStart = plain.indexOf('/tools', Math.max(0, healthFullStart));
-    const eventsStart = plain.indexOf('/events 12', Math.max(0, toolsStart));
+    const toolsDiagStart = findPromptCommandStart('/tools diag', Math.max(0, toolsStart + 1));
+    const eventsStart = plain.indexOf('/events 12', Math.max(0, toolsDiagStart));
     const sdkEventsStart = plain.indexOf('/session sdk events 8', Math.max(0, eventsStart));
     const sdkWaitsStart = plain.indexOf('/session sdk waits 8', Math.max(0, sdkEventsStart));
     const sdkInventoryStart = plain.indexOf('/session sdk 6', Math.max(0, sdkWaitsStart));
@@ -1767,7 +1775,8 @@ function diagnosticUxCycleCriteria(boot) {
     const activitySurface = surfaceBetween(activityStart, liveFullStart);
     const liveFullSurface = surfaceBetween(liveFullStart, healthFullStart);
     const healthFullSurface = surfaceBetween(healthFullStart, toolsStart);
-    const toolsSurface = surfaceBetween(toolsStart, eventsStart);
+    const toolsSurface = surfaceBetween(toolsStart, toolsDiagStart);
+    const toolsDiagSurface = surfaceBetween(toolsDiagStart, eventsStart);
     const eventsSurface = surfaceBetween(eventsStart, sdkEventsStart);
     const sdkEventsSurface = surfaceBetween(sdkEventsStart, sdkWaitsStart);
     const sdkWaitsSurface = surfaceBetween(sdkWaitsStart, sdkInventoryStart);
@@ -1850,6 +1859,15 @@ function diagnosticUxCycleCriteria(boot) {
                 /Busca local/iu.test(toolsSurface) &&
                 !/calls=|errors=|avg=|tool=|chatcmpl-tool/iu.test(toolsSurface),
             detail: '/tools default remained human-readable and used granular local I/O names after diagnostic operations',
+        },
+        {
+            id: 'diagnostic-ux-tools-diag-hierarchy',
+            pass:
+                /Ferramentas[\s\S]*Técnico[\s\S]*Classe[\s\S]*Superfícies operacionais[\s\S]*Contrato das ferramentas[\s\S]*Lifecycle recente/iu.test(
+                    toolsDiagSurface,
+                ) &&
+                !/Nome técnico|tipo file|chamada |requisição |tool\(s\)|Superfícies de tools/iu.test(toolsDiagSurface),
+            detail: '/tools diag separated human summary, technical metadata and references without old implementation-first labels',
         },
         {
             id: 'diagnostic-ux-events-human',
@@ -1990,6 +2008,7 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
             { line: '/live full', advanceAfterMs: 1_000 },
             { line: '/health full', advanceAfterMs: 1_000 },
             { line: '/tools', advanceAfterMs: 1_000 },
+            { line: '/tools diag', advanceAfterMs: 1_000 },
             { line: '/events 12', advanceAfterMs: 1_000 },
             { line: '/session sdk events 8', advanceAfterMs: 1_000 },
             { line: '/session sdk waits 8', advanceAfterMs: 1_000 },

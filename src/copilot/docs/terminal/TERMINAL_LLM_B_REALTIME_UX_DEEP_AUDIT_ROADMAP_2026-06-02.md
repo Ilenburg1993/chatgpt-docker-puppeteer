@@ -4260,3 +4260,33 @@
       passá-los para `terminalThemeRow`; a próxima limpeza deve centralizar esses papéis no tema.
 - [ ] Lacuna remanescente: `/tools diag` ainda precisa de hierarquia mais humana para IDs e nomes
       técnicos, com alças compactas e linguagem de auditoria em vez de jargão de implementação.
+
+### 12.10 Evidência da hierarquia humana em `/tools diag`
+
+- [x] Implementação: `/tools diag` passou a separar a linha operacional humana da linha `Técnico`,
+      da `Classe`, das `Refs` compactas e do `Alvo`, evitando que IDs, nomes SDK e metadados
+      apareçam como a narrativa principal.
+- [x] Implementação: `Nome técnico`, `tipo file`, `chamada ...`, `requisição ...`,
+      `tool(s)` e `Superfícies de tools` deixaram de ser labels do diagnóstico humano.
+- [x] Implementação: `Superfícies de tools` virou `Superfícies operacionais`, com linhas
+      independentes para `Arquivos locais`, `Terminal local`, `Workspace SDK`, `Shell legado` e
+      `Desabilitadas`.
+- [x] Implementação: categorias e lifecycle de I/O local passaram a usar `I/O local`, `busca`,
+      `leitura`, `escrita` e `criação de pasta`, em vez de `io · search`/`io · mkdir`.
+- [x] Implementação: `/health full` traduziu o rodapé de latência de tools de `avg ... (calls)`
+      para `média ... (uso/usos)`.
+- [x] Harness live: o ciclo diagnóstico agora executa `/tools diag` logo após `/tools` e valida o
+      critério `diagnostic-ux-tools-diag-hierarchy`.
+- [x] Bug do harness corrigido: o recorte de `/tools diag` agora procura comando real após o prompt
+      `› /tools diag`, para não confundir menções como `Detalhes /tools diag`.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js`.
+  - Resultado: 2 arquivos, 10 testes.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/tools-diag-hierarchy-20260603-1751`.
+  - Resultado: PASS; 22/22 critérios, incluindo `/tools` default humano, `/tools diag` hierárquico,
+        `/health full` temático e ausência de labels antigos.
+- [ ] Lacuna remanescente: `/events` ainda mostra alguns estados compactos como `estado io op`;
+      isso é aceitável para a rodada atual, mas deve ser traduzido em uma próxima faixa de eventos.
+- [ ] Lacuna remanescente: o banner inicial e algumas sessões ainda repetem comandos longos em uma
+      única linha; isso deve entrar na faixa de compactação de primeiro viewport.

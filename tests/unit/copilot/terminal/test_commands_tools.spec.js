@@ -175,10 +175,13 @@ describe('commands/tools', () => {
         cmdTools({ println: diagCtx.println }, 'diag');
 
         expect(diagCtx.output()).toContain('Ler arquivo');
-        expect(diagCtx.output()).toContain('Nome técnico');
+        expect(diagCtx.output()).toContain('Técnico');
         expect(diagCtx.output()).toContain('read_file_content');
+        expect(diagCtx.output()).not.toContain('Nome técnico');
         expect(diagCtx.output()).not.toContain('tool técnico: read_file_content');
-        expect(diagCtx.output()).toContain('tipo file');
+        expect(diagCtx.output()).toContain('Classe');
+        expect(diagCtx.output()).toContain('arquivo');
+        expect(diagCtx.output()).not.toContain('tipo file');
         expect(diagCtx.output()).not.toContain('tipo: file');
     });
 
@@ -296,12 +299,18 @@ describe('commands/tools', () => {
         expect(output).toContain('Lifecycle recente');
         expect(output).toContain('ativas 1');
         expect(output).toContain('Ler arquivo');
-        expect(output).toContain('técnico read_file_content');
-        expect(output).toContain('chamada call-1234567…');
-        expect(output).toContain('requisição req-12345678…');
+        expect(output).toContain('Em voo');
+        expect(output).toContain('1 ferramenta');
+        expect(output).toContain('Técnico');
+        expect(output).toContain('read_file_content');
+        expect(output).toContain('Refs');
+        expect(output).toContain('call call-1234567…');
+        expect(output).toContain('req req-12345678…');
         expect(output).toContain('Intenção capturada');
-        expect(output).toContain('técnico report_intent_local');
+        expect(output).toContain('report_intent_local');
         expect(output).toContain('concluída');
+        expect(output).not.toContain('chamada call-1234567…');
+        expect(output).not.toContain('requisição req-12345678…');
         expect(output).not.toContain('active=');
         expect(output).not.toContain('tool=report_intent_local');
         expect(output).not.toContain('call=call-1234567');
