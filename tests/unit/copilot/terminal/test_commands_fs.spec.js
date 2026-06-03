@@ -23,6 +23,10 @@ function mockCtx() {
     };
 }
 
+function expectNoAnsi(output) {
+    expect(output).not.toContain('\x1b[');
+}
+
 beforeEach(() => {
     tmpDir = mkdtempSync(join(WORKSPACE, 'tmp', '.terminal-fs-'));
     tmpRel = relative(WORKSPACE, tmpDir).replace(/\\/gu, '/');
@@ -44,6 +48,7 @@ describe('terminal/commands/fs', () => {
         await cmdFs(create, `create ${fileRel} ${token} alpha beta`);
         expect(create.output()).toContain('FS local criado');
         expect(create.output()).toContain('I/O write');
+        expectNoAnsi(create.output());
         await expect(readFile(join(WORKSPACE, fileRel), 'utf8')).resolves.toContain(token);
 
         const read = mockCtx();
@@ -51,12 +56,14 @@ describe('terminal/commands/fs', () => {
         expect(read.output()).toContain('(FS local)');
         expect(read.output()).toContain(token);
         expect(read.output()).toContain('motor io-engine.fs.readFile.text');
+        expectNoAnsi(read.output());
 
         const list = mockCtx();
         await cmdFs(list, `list ${tmpRel}`);
         expect(list.output()).toContain('FS local');
         expect(list.output()).toContain('live.md');
         expect(list.output()).toContain('motor io-scanner.fs.readdir');
+        expectNoAnsi(list.output());
 
         const search = mockCtx();
         await cmdFs(search, `search ${token} ${tmpRel}`);
@@ -65,6 +72,7 @@ describe('terminal/commands/fs', () => {
         expect(search.output()).toContain('I/O search');
         expect(search.output()).toContain('resultados');
         expect(search.output()).not.toContain('matches=');
+        expectNoAnsi(search.output());
     });
 
     it('/fs list usa scanner recursivo e hidden quando solicitado', async () => {
@@ -107,5 +115,6 @@ describe('terminal/commands/fs', () => {
         expect(ctx.output()).toContain('FS local');
         expect(ctx.output()).toContain('Próximos passos:');
         expect(ctx.output()).toContain('/status');
+        expectNoAnsi(ctx.output());
     });
 });

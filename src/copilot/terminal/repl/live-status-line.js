@@ -12,13 +12,13 @@ import { TERMINAL_LIVE_STATUS_ENABLED, TERMINAL_LIVE_STATUS_INTERVAL_MS } from '
 import { cancelTimer, registerInterval } from '#copilot/core';
 import { getBusy } from '../../presentation/state/index.js';
 import { clearInlineStatus, writeInlineStatus } from '../dialog/index.js';
+import { getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
 import {
     listTerminalPendingStructuredUserInputs,
     readTerminalDialogStreamMeta,
     readTerminalRuntimeState,
 } from '../frontend/gateways/index.js';
 import { readTerminalActivitySnapshot, terminalThemeText } from '../state/repl/index.js';
-import { getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
 
 const MIN_LIVE_STATUS_INTERVAL_MS = 250;
 const MIN_LIVE_STATUS_HEARTBEAT_MS = 1_000;
@@ -50,7 +50,11 @@ function renderLivePhaseLabel(phase) {
  * @returns {runtime is ReturnType<typeof readTerminalRuntimeState> & { pendingQuestion: NonNullable<ReturnType<typeof readTerminalRuntimeState>['pendingQuestion']> }}
  */
 function hasHumanPendingQuestion(runtime) {
-    return runtime.status === 'waiting_for_input' && runtime.pendingQuestionKind === 'question' && Boolean(runtime.pendingQuestion);
+    return (
+        runtime.status === 'waiting_for_input' &&
+        runtime.pendingQuestionKind === 'question' &&
+        Boolean(runtime.pendingQuestion)
+    );
 }
 
 /**
@@ -167,13 +171,16 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const effort = stream?.reasoningEffort || runtime.reasoningEffort || '-';
     const modelEffort = renderLiveModelEffort(model, effort);
     if (hasHumanPendingQuestion(runtime)) {
-        const questionText = compactLiveStatusText(runtime.pendingQuestion.question ?? 'pergunta pendente', LIVE_QUESTION_MAX_CHARS);
+        const questionText = compactLiveStatusText(
+            runtime.pendingQuestion.question ?? 'pergunta pendente',
+            LIVE_QUESTION_MAX_CHARS,
+        );
         const choices = Array.isArray(runtime.pendingQuestion.choices) ? runtime.pendingQuestion.choices : [];
         const choiceText = choices.length > 0 ? ` · opções ${choices.join('|')}` : '';
         const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila ${runtime.queueSize}` : '';
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
-            `${terminalThemeText('question', 'PERGUNTA')}` +
+            `${terminalThemeText('question', 'Pergunta')}` +
             `${terminalThemeText('muted', ` · ${questionText}${choiceText} · ${runtime.dialogLoopActive ? 'conversa ativa' : 'standby'}${queue}`)}` +
             '\x1b[K'
         );
@@ -190,7 +197,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
         const queue = structuredInputs.length > 1 ? ` · fila ${structuredInputs.length}` : '';
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
-            `${terminalThemeText('question', 'PERGUNTA')}` +
+            `${terminalThemeText('question', 'Pergunta')}` +
             `${terminalThemeText('muted', ` · ${questionText}${choiceText}${queue}`)}` +
             '\x1b[K'
         );

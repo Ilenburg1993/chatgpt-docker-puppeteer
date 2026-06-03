@@ -3677,5 +3677,54 @@
         `/health`, `/tools`, `/sdk`, `/sdk capabilities`, `/workspace list`, `/live`,
         `/activity` e `/sdk waits`.
   - Logs: `artifacts/terminal-live/default-ux-cycle-terminal-ux-clean-20260603-1511/summary.md`.
-- [ ] Próxima lacuna: adicionar um ciclo diagnóstico curto para eventos de pergunta, tool, I/O e
+- [x] Próxima lacuna: adicionar um ciclo diagnóstico curto para eventos de pergunta, tool, I/O e
       intenção, comparando a renderização real com as screenshots originais.
+
+### 11.45 Linha viva de pergunta sem grito técnico
+
+- [x] Achado live: o ciclo estruturado de `request_user_input` já escondia IDs e renderizava
+      `/sdk waits` de forma humana, mas a linha viva ainda mostrava `LLM-B PERGUNTA`.
+- [x] Decisão: o prompt compacto pode manter `[PERG]` como estado operacional curto, mas a linha
+      viva deve usar frase humana em caixa normal.
+- [x] Implementação: `live-status-line.js` agora renderiza pending question e
+      `request_user_input` estruturado como `LLM-B Pergunta · ...`.
+- [x] Harness live atualizado: critério `structured-input-live-status` agora exige a frase humana
+      `Pergunta`, não o badge técnico `PERGUNTA`.
+- [x] Teste unitário passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js`.
+- [x] Live PTY estruturado passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/structured-input-terminal-ux-question-human-20260603-1520`.
+  - Resultado: PASS em 11/11 critérios, sem vazamento de `request_user_input`, IDs internos ou
+        spam durável.
+- [x] Próxima lacuna: construir ou ampliar um ciclo live para atividade real de tool/I/O/intent,
+      preferencialmente sem consumir PR quando possível; quando exigir LLM real, executar apenas
+      após o harness passivo e estruturado permanecerem verdes.
+
+### 11.46 `/fs` temático e ciclo diagnóstico sem PR
+
+- [x] Achado: `/fs` ainda usava ANSI literal direto em quase todas as superfícies (`Uso`,
+      sucesso, falha, listagem, leitura, busca e I/O), apesar de ser um comando central para
+      operações reais de arquivo.
+- [x] Decisão: `/fs` deve seguir a mesma gramática visual do restante do terminal:
+      `FS local`, `Arquivo`, `Item`, `FS search`, `resultados`, `I/O read/write/search`,
+      `Próximo` e `Guia`.
+- [x] Implementação: `src/copilot/terminal/commands/fs.js` foi migrado para `terminalThemeRow`,
+      removendo ANSI literal sem mudar a execução das file-tools.
+- [x] Implementação: os resumos de I/O preservam pistas operacionais úteis (`I/O write`,
+      `I/O read`, `I/O search`) sem retornar a key-value cru.
+- [x] Teste reforçado: `tests/unit/copilot/terminal/test_commands_fs.spec.js` agora valida ausência
+      de ANSI nos caminhos create/read/list/search/failure.
+- [x] Harness live ampliado: `model-gateway-terminal-llm-b-live-test.mjs` ganhou
+      `--diagnostic-ux-cycle`, que executa `/fs create`, `/fs read`, `/fs search`,
+      `/activity`, `/tools` e `/events` sem abrir turno LLM/PR.
+- [x] Primeiro live diagnóstico identificou critério de ordem ruim em `FS search`; o critério foi
+      corrigido de `I/O search -> resultados` para `resultados -> I/O search`.
+- [x] Segundo live diagnóstico passou, mas ler `package.json` produzia log excessivo; o ciclo foi
+      ajustado para ler o arquivo scratch pequeno criado no próprio teste.
+- [x] Live PTY final passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-fs-io-events-small-20260603-1525`.
+  - Resultado: PASS em 7/7 critérios.
+  - Logs: `artifacts/terminal-live/diagnostic-ux-fs-io-events-small-20260603-1525/summary.md`.
+- [ ] Próxima lacuna: revisar `/events` e `/activity detail` para reduzir densidade de
+      `rastreamento implicit`, `hub ...` e timestamps longos no default, mantendo tudo acessível
+      em detail/raw.

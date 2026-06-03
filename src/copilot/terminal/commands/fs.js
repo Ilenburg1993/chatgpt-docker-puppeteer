@@ -9,9 +9,10 @@
  */
 
 import { toError } from '../../core/error-handlers.js';
-import { buildActivityAwareGuidance, buildFailureRecoveryLines } from '../frontend/operational-guidance/index.js';
-import { requireTerminalFileTool } from '../frontend/gateways/index.js';
 import { readTerminalIoActivityProjection } from '../events/index.js';
+import { requireTerminalFileTool } from '../frontend/gateways/index.js';
+import { buildActivityAwareGuidance, buildFailureRecoveryLines } from '../frontend/operational-guidance/index.js';
+import { terminalThemeRow } from '../state/ui/index.js';
 
 /**
  * @typedef {{ println: (text: string) => void }} CommandContext
@@ -90,7 +91,7 @@ function ioSummary(result) {
     const engine = typeof io['engine'] === 'string' ? io['engine'] : null;
     const operation = typeof io['operation'] === 'string' ? io['operation'] : null;
     if (!engine && !operation) return '';
-    return `  \x1b[90mI/O ${operation ?? '-'} · motor ${engine ?? '-'}\x1b[0m`;
+    return terminalThemeRow(`I/O ${operation ?? '-'}`, `motor ${engine ?? '-'}`, { role: 'muted' });
 }
 
 /**
@@ -98,13 +99,14 @@ function ioSummary(result) {
  * @param {Record<string, unknown>} result
  */
 function printFailure({ println }, result) {
-    println(`\n  \x1b[31m✗ FS local: ${String(result['error'] ?? 'operação falhou')}\x1b[0m`);
+    println('');
+    println(terminalThemeRow('FS local', String(result['error'] ?? 'operação falhou'), { role: 'error' }));
     const guidance = buildFsDynamicGuidance();
     if (guidance.nextCommand) {
-        println(`  \x1b[33m→ ${guidance.nextCommand}\x1b[0m`);
+        println(terminalThemeRow('Próximo', guidance.nextCommand, { role: 'warn' }));
     }
     for (const line of buildFailureRecoveryLines(guidance)) {
-        println(`  \x1b[90m${line}\x1b[0m`);
+        println(terminalThemeRow('Guia', line, { role: 'muted' }));
     }
     println('');
 }
@@ -156,14 +158,19 @@ async function runList(ctx, parts) {
         return;
     }
     const entries = Array.isArray(result['entries']) ? result['entries'] : [];
-    ctx.println(`\n  \x1b[36mFS local (${entries.length})\x1b[0m  \x1b[90m${String(result['path'] ?? path)}\x1b[0m`);
+    ctx.println('');
+    ctx.println(terminalThemeRow('FS local', `${entries.length} entrada(s) · ${String(result['path'] ?? path)}`));
     for (const entry of entries.slice(0, 120)) {
         const item = entry && typeof entry === 'object' ? /** @type {Record<string, unknown>} */ (entry) : {};
         ctx.println(
-            `  \x1b[33m${String(item['type'] ?? '?')}\x1b[0m  ${String(item['name'] ?? item['path'] ?? entry)}`,
+            terminalThemeRow(
+                'Item',
+                `${String(item['type'] ?? '?')} · ${String(item['name'] ?? item['path'] ?? entry)}`,
+            ),
         );
     }
-    if (entries.length > 120) ctx.println(`  \x1b[90m… ${entries.length - 120} entradas omitidas\x1b[0m`);
+    if (entries.length > 120)
+        ctx.println(terminalThemeRow('Mais', `${entries.length - 120} entradas omitidas`, { role: 'muted' }));
     const io = ioSummary(result);
     if (io) ctx.println(io);
     ctx.println('');
@@ -176,7 +183,7 @@ async function runList(ctx, parts) {
 async function runRead(ctx, parts) {
     const path = parts.join(' ').trim();
     if (!path) {
-        ctx.println('\x1b[33m  Uso: /fs read <path>\x1b[0m');
+        ctx.println(terminalThemeRow('Uso', '/fs read <path>', { role: 'warn' }));
         return;
     }
     const result = await invokeFileTool(readFileContentTool, { path, encoding: 'utf8' });
@@ -184,7 +191,8 @@ async function runRead(ctx, parts) {
         printFailure(ctx, result);
         return;
     }
-    ctx.println(`\n  \x1b[36m${String(result['path'] ?? path)}\x1b[0m  \x1b[90m(FS local)\x1b[0m`);
+    ctx.println('');
+    ctx.println(terminalThemeRow('Arquivo', `${String(result['path'] ?? path)} · (FS local)`));
     ctx.println(pretty(String(result['content'] ?? ''), 8000));
     const io = ioSummary(result);
     if (io) ctx.println(io);
@@ -199,7 +207,7 @@ async function runSearch(ctx, parts) {
     const pattern = parts.shift();
     const path = parts.join(' ').trim() || '.';
     if (!pattern) {
-        ctx.println('\x1b[33m  Uso: /fs search <pattern> [path]\x1b[0m');
+        ctx.println(terminalThemeRow('Uso', '/fs search <pattern> [path]', { role: 'warn' }));
         return;
     }
     const result = await invokeFileTool(searchInFilesTool, {
@@ -213,9 +221,10 @@ async function runSearch(ctx, parts) {
         printFailure(ctx, result);
         return;
     }
-    ctx.println(`\n  \x1b[36mFS search\x1b[0m  \x1b[90m${String(result['searchPath'] ?? path)}\x1b[0m`);
+    ctx.println('');
+    ctx.println(terminalThemeRow('FS search', String(result['searchPath'] ?? path)));
     ctx.println(pretty(String(result['output'] ?? ''), 8000));
-    ctx.println(`  \x1b[90mresultados ${String(result['matchCount'] ?? 0)}\x1b[0m`);
+    ctx.println(terminalThemeRow('resultados', String(result['matchCount'] ?? 0), { role: 'muted' }));
     const io = ioSummary(result);
     if (io) ctx.println(io);
     ctx.println('');
@@ -230,7 +239,9 @@ async function runWrite(ctx, parts, overwrite) {
     const path = parts.shift();
     const content = parts.join(' ');
     if (!path) {
-        ctx.println(`\x1b[33m  Uso: /fs ${overwrite ? 'write' : 'create'} <path> <content>\x1b[0m`);
+        ctx.println(
+            terminalThemeRow('Uso', `/fs ${overwrite ? 'write' : 'create'} <path> <content>`, { role: 'warn' }),
+        );
         return;
     }
     const tool = overwrite ? writeFileContentTool : createFileTool;
@@ -242,8 +253,9 @@ async function runWrite(ctx, parts, overwrite) {
         printFailure(ctx, result);
         return;
     }
-    ctx.println(`\n  \x1b[32m✓ FS local ${overwrite ? 'escrito' : 'criado'}:\x1b[0m \x1b[33m${path}\x1b[0m`);
-    ctx.println(`  \x1b[90mbytes=${String(result['bytesWritten'] ?? 0)}\x1b[0m`);
+    ctx.println('');
+    ctx.println(terminalThemeRow(`FS local ${overwrite ? 'escrito' : 'criado'}`, path, { role: 'success' }));
+    ctx.println(terminalThemeRow('Bytes', String(result['bytesWritten'] ?? 0), { role: 'muted' }));
     const io = ioSummary(result);
     if (io) ctx.println(io);
     ctx.println('');
@@ -266,17 +278,22 @@ export async function cmdFs(ctx, arg = '') {
         else if (sub === 'write') await runWrite(ctx, parts, true);
         else {
             ctx.println(
-                '\x1b[33m  Uso: /fs list [path] [--recursive] [--hidden] | read <path> | search <pattern> [path] | create <path> <content> | write <path> <content>\x1b[0m',
+                terminalThemeRow(
+                    'Uso',
+                    '/fs list [path] [--recursive] [--hidden] | read <path> | search <pattern> [path] | create <path> <content> | write <path> <content>',
+                    { role: 'warn' },
+                ),
             );
         }
     } catch (e) {
-        ctx.println(`\n  \x1b[31m✗ FS local: ${toError(e).message}\x1b[0m`);
+        ctx.println('');
+        ctx.println(terminalThemeRow('FS local', toError(e).message, { role: 'error' }));
         const guidance = buildFsDynamicGuidance();
         if (guidance.nextCommand) {
-            ctx.println(`  \x1b[33m→ ${guidance.nextCommand}\x1b[0m`);
+            ctx.println(terminalThemeRow('Próximo', guidance.nextCommand, { role: 'warn' }));
         }
         for (const line of buildFailureRecoveryLines(guidance)) {
-            ctx.println(`  \x1b[90m${line}\x1b[0m`);
+            ctx.println(terminalThemeRow('Guia', line, { role: 'muted' }));
         }
         ctx.println('');
     }

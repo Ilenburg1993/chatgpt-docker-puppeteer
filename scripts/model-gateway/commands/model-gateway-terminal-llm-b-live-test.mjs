@@ -2,18 +2,18 @@
 /**
  * Canonical live runner for `terminal:llm-b`.
  *
- * This is intentionally opt-in and not part of default CI: the default scenario talks to the real SDK and can consume
- * a Premium Request for the explicit user turn. Use `--no-pr` for a boot/resume/control-only probe that validates UX
+ * This is intentionally opt-in and not part of default CI: the default scenario talks to the real SDK and can consume a
+ * Premium Request for the explicit user turn. Use `--no-pr` for a boot/resume/control-only probe that validates UX
  * telemetry without sending an LLM turn.
  */
 
+import { parse as parseDotenv } from 'dotenv';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse as parseDotenv } from 'dotenv';
 
 import { modelGatewayScriptPath } from '../index.mjs';
 
@@ -32,11 +32,11 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([...LIVE_PROTOCOL_PROBE_KINDS, L
 
 /**
  * @typedef {{
- *   event: string;
- *   source: string | null;
- *   traceId: string | null;
- *   turnId: string | null;
- *   eventId: number | null;
+ *     event: string;
+ *     source: string | null;
+ *     traceId: string | null;
+ *     turnId: string | null;
+ *     eventId: number | null;
  * }} CanonicalEventSummaryItem
  */
 
@@ -67,6 +67,7 @@ Common options:
   --structured-input-cycle
   --menu-cycle
   --ux-cycle
+  --diagnostic-ux-cycle
   --reuse-sdk-session
   --timeout-ms=<ms>
   --transport=<pty|stdio>
@@ -267,7 +268,9 @@ const LIVE_SCENARIOS = Object.freeze({
         finalInstruction:
             'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-RECOVERABLE-FINAL: erro de tool foi recuperado e usuário confirmou SIM".',
         allowedTools: ['report_intent', 'read_file_content', 'exec_command', 'ask_user'],
-        expectedLifecycleTools: [{ name: 'exec_command', renderedName: 'Executar comando', expectedOutcome: 'failure' }],
+        expectedLifecycleTools: [
+            { name: 'exec_command', renderedName: 'Executar comando', expectedOutcome: 'failure' },
+        ],
         expectedOutputMarkers: ['RECOVERABLE-TOOL-ERROR'],
         expectedTerminalRender: [
             { toolName: 'exec_command', renderedName: 'Executar comando', badge: 'EXEC', forbiddenBadge: 'VER' },
@@ -516,7 +519,8 @@ function runtimeRouteSdkWireApi(selected) {
     if (explicit) return explicit;
     const routeLayer = optionalRuntimeSelectorString(selected?.routeLayer) ?? '';
     const baseUrl =
-        optionalRuntimeSelectorString(selected?.openAICompatibleBaseUrl) || optionalRuntimeSelectorString(selected?.baseUrl);
+        optionalRuntimeSelectorString(selected?.openAICompatibleBaseUrl) ||
+        optionalRuntimeSelectorString(selected?.baseUrl);
     return baseUrl && routeLayer.includes('openai_compatible') ? 'completions' : '';
 }
 
@@ -541,16 +545,14 @@ function selectRuntimeSelectorRoute(summary, requestedProfile) {
     const routes = Array.isArray(summary?.runtimeSelectorPlan?.routes) ? summary.runtimeSelectorPlan.routes : [];
     const requested = optionalRuntimeSelectorString(requestedProfile);
     const selectedRoutes = routes.filter((route) => route?.status === 'selected' && route?.selected);
-    return (
-        selectedRoutes.find((route) => route.profileId === requested) ??
-        selectedRoutes[0] ??
-        null
-    );
+    return selectedRoutes.find((route) => route.profileId === requested) ?? selectedRoutes[0] ?? null;
 }
 
 function selectRuntimeSelectorEffectiveRoute(summary, requestedProfile) {
     if (summary?.runtimeExecuted === true) {
-        return summary.execution?.ok === true && summary.execution.final?.route?.selected ? summary.execution.final.route : null;
+        return summary.execution?.ok === true && summary.execution.final?.route?.selected
+            ? summary.execution.final.route
+            : null;
     }
     if (summary?.execution?.ok === true && summary.execution.final?.route?.selected) {
         return summary.execution.final.route;
@@ -585,12 +587,7 @@ function runRuntimeSelectorLiveRoute({
             error: null,
         };
     }
-    const args = [
-        modelGatewayScriptPath('runtimeSelector'),
-        '--json',
-        '--fail',
-        `--profile=${requestedProfile}`,
-    ];
+    const args = [modelGatewayScriptPath('runtimeSelector'), '--json', '--fail', `--profile=${requestedProfile}`];
     if (allowProbe) args.push('--allow-probe');
     const normalizedFallbacks = runtimeSelectorFallbackProfiles(fallbackProfiles.join(','));
     if (normalizedFallbacks.length > 0) args.push(`--fallback-profiles=${normalizedFallbacks.join(',')}`);
@@ -627,7 +624,9 @@ function runRuntimeSelectorLiveRoute({
         optionalRuntimeSelectorString(summary?.routeDecisionPersistence?.error) ||
         optionalRuntimeSelectorString(summary?.runtimeProbePersistence?.error) ||
         optionalRuntimeSelectorString(summary?.runtimeHealthPersistence?.error) ||
-        optionalRuntimeSelectorString(summary?.runtimeSelectorPlan?.routes?.find?.((route) => route?.status === 'blocked')?.reasons?.join(', '));
+        optionalRuntimeSelectorString(
+            summary?.runtimeSelectorPlan?.routes?.find?.((route) => route?.status === 'blocked')?.reasons?.join(', '),
+        );
     return {
         requested: true,
         ok: routeUsable,
@@ -639,10 +638,10 @@ function runRuntimeSelectorLiveRoute({
         fallbackProfiles: normalizedFallbacks,
         summary,
         selectedRoute,
-        error:
-            routeUsable
-                ? null
-                : summaryError || (result.stderr || result.stdout || `runtime selector exited with ${result.status}`).trim(),
+        error: routeUsable
+            ? null
+            : summaryError ||
+              (result.stderr || result.stdout || `runtime selector exited with ${result.status}`).trim(),
     };
 }
 
@@ -695,7 +694,8 @@ function profileProvider(env, profileName) {
 function runtimeSelectorRouteDetails(runtimeSelector) {
     const selected = runtimeSelector?.selectedRoute?.selected;
     if (!selected) return null;
-    const runtimeHealth = selected.runtimeHealth && typeof selected.runtimeHealth === 'object' ? selected.runtimeHealth : {};
+    const runtimeHealth =
+        selected.runtimeHealth && typeof selected.runtimeHealth === 'object' ? selected.runtimeHealth : {};
     return {
         routeProfile: optionalRuntimeSelectorString(runtimeSelector.selectedRoute.profileId) || null,
         selectedRouteProfile: optionalRuntimeSelectorString(selected.routeProfile) || null,
@@ -723,7 +723,9 @@ function runtimeSelectorRouteDetails(runtimeSelector) {
         candidateSource: optionalRuntimeSelectorString(selected.candidateSource) || null,
         runtimeObservedOnly: selected.runtimeObservedOnly === true,
         runtimeEvidence:
-            selected.runtimeEvidence && typeof selected.runtimeEvidence === 'object' && !Array.isArray(selected.runtimeEvidence)
+            selected.runtimeEvidence &&
+            typeof selected.runtimeEvidence === 'object' &&
+            !Array.isArray(selected.runtimeEvidence)
                 ? selected.runtimeEvidence
                 : null,
     };
@@ -760,8 +762,12 @@ function buildRealByokRuntime({
     });
     const runtimeRoute = runtimeSelectorRouteDetails(runtimeSelector);
     const profile = routeSelectorMandatory ? '' : chooseRealByokProfile(mergedEnv, requestedProfile);
-    const altProfile = routeSelectorMandatory ? '' : chooseAlternateByokProfile(mergedEnv, profile, requestedAltProfile);
-    const model = runtimeRoute?.providerModel || (!routeSelectorMandatory ? requestedModel || profileModel(mergedEnv, profile) : '');
+    const altProfile = routeSelectorMandatory
+        ? ''
+        : chooseAlternateByokProfile(mergedEnv, profile, requestedAltProfile);
+    const model =
+        runtimeRoute?.providerModel ||
+        (!routeSelectorMandatory ? requestedModel || profileModel(mergedEnv, profile) : '');
     const altModel = requestedAltModel || profileModel(mergedEnv, altProfile);
     const provider = runtimeRoute?.providerId || (!routeSelectorMandatory ? profileProvider(mergedEnv, profile) : '');
     const altProvider = profileProvider(mergedEnv, altProfile);
@@ -845,7 +851,9 @@ function buildRealByokRuntime({
                           ok: runtimeSelector.summary.runtimeHealthPersistence.ok === true,
                           runId: runtimeSelector.summary.runtimeHealthPersistence.runId ?? null,
                           records: Number(runtimeSelector.summary.runtimeHealthPersistence.records ?? 0),
-                          healthObservations: Number(runtimeSelector.summary.runtimeHealthPersistence.healthObservations ?? 0),
+                          healthObservations: Number(
+                              runtimeSelector.summary.runtimeHealthPersistence.healthObservations ?? 0,
+                          ),
                           probeResults: Number(runtimeSelector.summary.runtimeHealthPersistence.probeResults ?? 0),
                           skippedRecords: Number(runtimeSelector.summary.runtimeHealthPersistence.skippedRecords ?? 0),
                           error: runtimeSelector.summary.runtimeHealthPersistence.error ?? null,
@@ -854,7 +862,9 @@ function buildRealByokRuntime({
                 error: runtimeSelector.error ? runtimeSelector.error.slice(0, 800) : null,
             },
             dotenvLocalLoaded: Object.keys(dotenvEnv).length > 0,
-            secretKeysPresent: collectSecretValues(mergedEnv).map(({ key }) => key).sort(),
+            secretKeysPresent: collectSecretValues(mergedEnv)
+                .map(({ key }) => key)
+                .sort(),
         },
     };
 }
@@ -867,14 +877,21 @@ function byokLiveRouteIdentity(realByok) {
         optionalRuntimeSelectorString(realByok?.redacted?.profile) ||
         null;
     const providerId =
-        optionalRuntimeSelectorString(selected.providerId) || optionalRuntimeSelectorString(realByok?.redacted?.provider) || null;
+        optionalRuntimeSelectorString(selected.providerId) ||
+        optionalRuntimeSelectorString(realByok?.redacted?.provider) ||
+        null;
     const providerModel =
-        optionalRuntimeSelectorString(selected.providerModel) || optionalRuntimeSelectorString(realByok?.redacted?.model) || null;
+        optionalRuntimeSelectorString(selected.providerModel) ||
+        optionalRuntimeSelectorString(realByok?.redacted?.model) ||
+        null;
     return { routeProfile, providerId, providerModel };
 }
 
 function renderedReadFileToolOk(plain) {
-    return /\[LER\].*(?:read_file_content|Ler arquivo)/s.test(plain) && /✅ \[OK\].*(?:read_file_content|Ler arquivo)/s.test(plain);
+    return (
+        /\[LER\].*(?:read_file_content|Ler arquivo)/s.test(plain) &&
+        /✅ \[OK\].*(?:read_file_content|Ler arquivo)/s.test(plain)
+    );
 }
 
 function defaultToolNarrationLines(plain) {
@@ -884,7 +901,9 @@ function defaultToolNarrationLines(plain) {
 }
 
 function hasRawInternalIdInDefaultToolNarration(plain) {
-    return defaultToolNarrationLines(plain).some((line) => /(?:chatcmpl-tool-|toolu_|report_intent_local \(alias:)/iu.test(line));
+    return defaultToolNarrationLines(plain).some((line) =>
+        /(?:chatcmpl-tool-|toolu_|report_intent_local \(alias:)/iu.test(line),
+    );
 }
 
 function extractHealthToolStatsSection(plain) {
@@ -902,9 +921,7 @@ function healthToolStatsUseHumanNames(plain) {
 function byokLiveMaterializationState(plain, criteria = [], scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
     const passed = new Set(criteria.filter((criterion) => criterion?.pass === true).map((criterion) => criterion.id));
     return {
-        toolProtocolOk:
-            passed.has('tool-start-done') &&
-            renderedReadFileToolOk(plain),
+        toolProtocolOk: passed.has('tool-start-done') && renderedReadFileToolOk(plain),
         askUserOk:
             passed.has('ask-user-visible') &&
             passed.has('ask-user-answer') &&
@@ -914,8 +931,18 @@ function byokLiveMaterializationState(plain, criteria = [], scenario = LIVE_SCEN
     };
 }
 
-async function recordByokLiveProtocolHealth({ realByok, blocker, criteria, plain, startedAt, durationMs, noPr, byokControlProbe }) {
-    if (!realByok || noPr || byokControlProbe) return { attempted: false, recorded: false, reason: 'not_full_byok_live_turn' };
+async function recordByokLiveProtocolHealth({
+    realByok,
+    blocker,
+    criteria,
+    plain,
+    startedAt,
+    durationMs,
+    noPr,
+    byokControlProbe,
+}) {
+    if (!realByok || noPr || byokControlProbe)
+        return { attempted: false, recorded: false, reason: 'not_full_byok_live_turn' };
     const identity = byokLiveRouteIdentity(realByok);
     if (!identity.providerId || !identity.providerModel) {
         return { attempted: true, recorded: false, reason: 'missing_route_identity', identity };
@@ -1001,7 +1028,8 @@ async function recordByokLiveProtocolHealth({ realByok, blocker, criteria, plain
             message:
                 !blockedByProtocol && materialized.toolProtocolOk && materialized.askUserOk
                     ? 'terminal live turn completed canonical SDK tool and ask_user handshake'
-                    : blocker?.detail ?? 'terminal live turn did not complete the canonical SDK tool and ask_user handshake',
+                    : (blocker?.detail ??
+                      'terminal live turn did not complete the canonical SDK tool and ask_user handshake'),
             errorContext: blockedByProtocol ? 'terminal_live_turn_protocol' : 'terminal_live_turn_validation',
         },
         {
@@ -1011,7 +1039,7 @@ async function recordByokLiveProtocolHealth({ realByok, blocker, criteria, plain
             message:
                 !blockedByProtocol && materialized.toolProtocolOk
                     ? 'terminal live turn materialized required SDK tools'
-                    : blocker?.detail ?? 'terminal live turn did not materialize required SDK tool protocol',
+                    : (blocker?.detail ?? 'terminal live turn did not materialize required SDK tool protocol'),
             errorContext: blockedByProtocol ? 'terminal_live_tool_protocol' : 'terminal_live_tool_protocol_validation',
         },
         {
@@ -1021,14 +1049,13 @@ async function recordByokLiveProtocolHealth({ realByok, blocker, criteria, plain
             message:
                 !blockedByProtocol && materialized.askUserOk
                     ? 'terminal live turn materialized ask_user, answer, and post-ask final'
-                    : blocker?.detail ?? 'terminal live turn did not complete real ask_user handshake',
+                    : (blocker?.detail ?? 'terminal live turn did not complete real ask_user handshake'),
             errorContext: blockedByProtocol ? 'terminal_live_ask_user' : 'terminal_live_ask_user_validation',
         },
     ];
     try {
-        const { flushByokProviderHealth, recordByokProviderModelProbeResult } = await import(
-            '../../../src/copilot/model-gateway/index.js'
-        );
+        const { flushByokProviderHealth, recordByokProviderModelProbeResult } =
+            await import('../../../src/copilot/model-gateway/index.js');
         for (const probe of probeInputs) {
             recordByokProviderModelProbeResult({
                 ...identity,
@@ -1047,7 +1074,12 @@ async function recordByokLiveProtocolHealth({ realByok, blocker, criteria, plain
             attempted: true,
             recorded: true,
             identity,
-            probes: probeInputs.map(({ probeKind, status, ok, errorContext }) => ({ probeKind, status, ok, errorContext })),
+            probes: probeInputs.map(({ probeKind, status, ok, errorContext }) => ({
+                probeKind,
+                status,
+                ok,
+                errorContext,
+            })),
         };
     } catch (error) {
         return {
@@ -1115,7 +1147,13 @@ function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, 
         commands.push(`/byok model ${model}`, '/byok');
     }
     if (!runtimeRoute && altProfile) {
-        commands.push(`/byok use ${altProfile}`, '/byok', '/byok providers', '/byok health', ...buildByokCatalogCommands(altProvider));
+        commands.push(
+            `/byok use ${altProfile}`,
+            '/byok',
+            '/byok providers',
+            '/byok health',
+            ...buildByokCatalogCommands(altProvider),
+        );
         if (profile) {
             commands.push(`/byok use ${profile}`);
             if (model) commands.push(`/byok model ${model}`);
@@ -1240,15 +1278,7 @@ function sessionCycleBootCriteria(boot, { expectCreated = false, expectResumed =
     ];
 }
 
-async function runSessionCycleBoot({
-    id,
-    label,
-    outDir,
-    commands,
-    terminalPort,
-    requestedTransport,
-    timeoutMs,
-}) {
+async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, requestedTransport, timeoutMs }) {
     const canUsePty = requestedTransport === 'pty' && hasCommand('script');
     const transport = canUsePty ? 'pty:script' : 'stdio:headless';
     const command = canUsePty
@@ -1346,10 +1376,13 @@ async function runSessionCycleBoot({
     };
     child.stdout.on('data', onData);
     child.stderr.on('data', onData);
-    const timeout = setTimeout(() => {
-        write('/quit');
-        setTimeout(() => child.kill('SIGTERM'), 2_000).unref();
-    }, Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS);
+    const timeout = setTimeout(
+        () => {
+            write('/quit');
+            setTimeout(() => child.kill('SIGTERM'), 2_000).unref();
+        },
+        Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS,
+    );
     const exitCode = await new Promise((resolve) => {
         child.on('close', (code) => {
             childClosed = true;
@@ -1427,9 +1460,7 @@ async function runSessionCycleLiveTest({ outDir, requestedTransport, timeoutMs, 
         ...sessionCycleBootCriteria(boot3, { expectResumed: true }),
         {
             id: 'session-cycle-restore-auto',
-            pass:
-                /seleção automática restaurada/iu.test(boot3.plain) &&
-                /próximo boot:\s+auto/iu.test(boot3.plain),
+            pass: /seleção automática restaurada/iu.test(boot3.plain) && /próximo boot:\s+auto/iu.test(boot3.plain),
             detail: 'boot 3 cleared the explicit selector and rendered next boot as auto again',
         },
     ];
@@ -1509,8 +1540,8 @@ function structuredInputCycleCriteria(boot) {
         },
         {
             id: 'structured-input-live-status',
-            pass: /(?:⟲\s+)?LLM-B\s+PERGUNTA\s+·\s+REQUEST_USER_INPUT-SIM/iu.test(plain),
-            detail: 'permanent live status rendered request_user_input as PERGUNTA instead of raw tool execution',
+            pass: /(?:⟲\s+)?LLM-B\s+Pergunta\s+·\s+REQUEST_USER_INPUT-SIM/iu.test(plain),
+            detail: 'permanent live status rendered request_user_input as a human operator question',
         },
         {
             id: 'structured-input-waits-pending',
@@ -1534,10 +1565,9 @@ function structuredInputCycleCriteria(boot) {
         },
         {
             id: 'structured-input-no-durable-spam',
-            pass:
-                !/request_user_input ainda executando|LLM-B ainda trabalhando|chatcmpl-tool-[a-z0-9-]+|ask_user SDK/iu.test(
-                    plain,
-                ),
+            pass: !/request_user_input ainda executando|LLM-B ainda trabalhando|chatcmpl-tool-[a-z0-9-]+|ask_user SDK/iu.test(
+                plain,
+            ),
             detail: 'structured input cycle did not print old durable waiting spam, raw ids, or SDK ask_user labels',
         },
         {
@@ -1697,6 +1727,125 @@ async function runMenuCycleLiveTest({ outDir, requestedTransport, timeoutMs, ter
     return summary;
 }
 
+function diagnosticUxCycleCriteria(boot) {
+    const plain = String(boot?.plain ?? '');
+    const fsReadStart = plain.indexOf('/fs read package.json');
+    const fsReadSurface = fsReadStart >= 0 ? plain.slice(fsReadStart) : plain;
+    const activityStart = plain.indexOf('/activity 8');
+    const activitySurface = activityStart >= 0 ? plain.slice(activityStart) : plain;
+    const toolsStart = plain.indexOf('/tools');
+    const toolsSurface = toolsStart >= 0 ? plain.slice(toolsStart) : plain;
+    return [
+        {
+            id: 'diagnostic-ux-ready',
+            pass: /LLM-B pronta/u.test(plain),
+            detail: 'terminal reached ready state before diagnostic UX cycle',
+        },
+        {
+            id: 'diagnostic-ux-fs-themed',
+            pass:
+                /FS local criado[\s\S]*I\/O write/iu.test(plain) &&
+                /Arquivo[\s\S]*TERMINAL_DIAGNOSTIC_UX_\d+\.txt[\s\S]*\(FS local\)/iu.test(fsReadSurface) &&
+                /FS search[\s\S]*resultados[\s\S]*I\/O search/iu.test(plain),
+            detail: '/fs create/read/search rendered themed local-FS output and I/O summaries',
+        },
+        {
+            id: 'diagnostic-ux-no-fs-ansi',
+            pass: !/\\x1b\[|\[(?:LER|MOVER|ARQUIVO|OK|FALHA|TOOL|IO)\]/iu.test(plain),
+            detail: 'diagnostic cycle did not expose old ANSI literals or uppercase FS/tool badges',
+        },
+        {
+            id: 'diagnostic-ux-activity-human',
+            pass: /Atividade Atual da LLM-B[\s\S]*(Arquivo|Ferramenta|Evento)/iu.test(activitySurface),
+            detail: '/activity after local FS operations remained human-readable',
+        },
+        {
+            id: 'diagnostic-ux-tools-human',
+            pass:
+                (/Ferramentas observadas[\s\S]*uso[\s\S]*Detalhes\s+\/tools diag/iu.test(toolsSurface) ||
+                    /Nenhuma ferramenta observada[\s\S]*Próximo/iu.test(toolsSurface)) &&
+                !/calls=|errors=|avg=|tool=|chatcmpl-tool/iu.test(toolsSurface),
+            detail: '/tools default remained human-readable after diagnostic operations',
+        },
+        {
+            id: 'diagnostic-ux-events-human',
+            pass: /Eventos[\s\S]*(Arquivo|I\/O|Tool|terminal|copilot)/iu.test(plain) && !/chatcmpl-tool-[a-z0-9-]+/iu.test(plain),
+            detail: '/events rendered diagnostics without raw tool ids',
+        },
+        {
+            id: 'diagnostic-ux-clean-close',
+            pass: boot.exitCode === 0 && /readline fechado/u.test(plain),
+            detail: 'terminal closed cleanly after diagnostic UX cycle',
+        },
+    ];
+}
+
+async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+    const marker = `TERMINAL_DIAGNOSTIC_UX_${Date.now()}`;
+    const scratchPath = `data/copilot-terminal/live-scratch/${marker}.txt`;
+    const boot = await runSessionCycleBoot({
+        id: 'diagnostic-ux-cycle',
+        label: 'diagnostic UX with local FS activity',
+        outDir,
+        commands: [
+            { line: `/fs create ${scratchPath} ${marker}`, advanceAfterMs: 1_000 },
+            { line: `/fs read ${scratchPath}`, advanceAfterMs: 1_000 },
+            { line: `/fs search ${marker} data/copilot-terminal/live-scratch`, advanceAfterMs: 1_000 },
+            { line: '/activity 8', advanceAfterMs: 1_000 },
+            { line: '/tools', advanceAfterMs: 1_000 },
+            { line: '/events 12', advanceAfterMs: 1_000 },
+            '/quit',
+        ],
+        terminalPort,
+        requestedTransport,
+        timeoutMs,
+    });
+    const criteria = diagnosticUxCycleCriteria(boot);
+    const durationMs = Date.now() - Date.parse(startedAt);
+    const ok = criteria.every((criterion) => criterion.pass);
+    const summary = {
+        ok,
+        startedAt,
+        durationMs,
+        terminalPort,
+        marker,
+        scratchPath,
+        boot: {
+            id: boot.id,
+            label: boot.label,
+            exitCode: boot.exitCode,
+            sessionId: boot.sessionId || null,
+            transport: boot.transport,
+        },
+        criteria,
+    };
+    await writeFile(path.join(outDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    await writeFile(
+        path.join(outDir, 'summary.md'),
+        [
+            '# Terminal LLM-B Diagnostic UX Live Test',
+            '',
+            `Started: ${startedAt}`,
+            `Duration: ${durationMs}ms`,
+            `Status: ${ok ? 'PASS' : 'FAIL'}`,
+            `Terminal port: ${terminalPort}`,
+            `Marker: ${marker}`,
+            '',
+            '## Criteria',
+            '',
+            ...criteria.map((criterion) => `- ${criterion.pass ? '[x]' : '[ ]'} ${criterion.id}: ${criterion.detail}`),
+            '',
+            '## Logs',
+            '',
+            `- raw: ${path.relative(ROOT, path.join(outDir, 'diagnostic-ux-cycle.raw.log'))}`,
+            `- plain: ${path.relative(ROOT, path.join(outDir, 'diagnostic-ux-cycle.plain.log'))}`,
+            '',
+        ].join('\n'),
+        'utf8',
+    );
+    return summary;
+}
+
 function defaultUxCycleCriteria(boot) {
     const plain = String(boot?.plain ?? '');
     const helpStart = plain.indexOf('Ajuda rápida');
@@ -1811,25 +1960,22 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-sdk-human',
             pass:
-                /SDK do Terminal[\s\S]*Sessão[\s\S]*Modelo[\s\S]*Esperas[\s\S]*Uso\s+\/sdk models/iu.test(
-                    sdkSurface,
-                ) && !/SDK do Terminal[\s\S]*(reasoning=|restante=|\[OK\]|\[ERR\])/iu.test(sdkSurface),
+                /SDK do Terminal[\s\S]*Sessão[\s\S]*Modelo[\s\S]*Esperas[\s\S]*Uso\s+\/sdk models/iu.test(sdkSurface) &&
+                !/SDK do Terminal[\s\S]*(reasoning=|restante=|\[OK\]|\[ERR\])/iu.test(sdkSurface),
             detail: '/sdk default rendered a themed operations panel without raw key-value counters',
         },
         {
             id: 'ux-cycle-sdk-capabilities-human',
             pass:
-                /Capacidades SDK[\s\S]*UI[\s\S]*Tools[\s\S]*Plano[\s\S]*Retorno/iu.test(
-                    sdkCapabilitiesSurface,
-                ) && !/SDK Capabilities|\[OK\]|\[ERR\]/iu.test(sdkCapabilitiesSurface),
+                /Capacidades SDK[\s\S]*UI[\s\S]*Tools[\s\S]*Plano[\s\S]*Retorno/iu.test(sdkCapabilitiesSurface) &&
+                !/SDK Capabilities|\[OK\]|\[ERR\]/iu.test(sdkCapabilitiesSurface),
             detail: '/sdk capabilities rendered a themed human panel instead of the legacy heading',
         },
         {
             id: 'ux-cycle-workspace-human',
             pass:
-                /Workspace SDK virtual[\s\S]*(Arquivo|Retorno)[\s\S]*Uso\s+\/workspace list/iu.test(
-                    workspaceSurface,
-                ) && !/\[OK\]|\[ERR\]|SDK→FS|FS→SDK|\n\s+\/workspace promote <localPath>/iu.test(workspaceSurface),
+                /Workspace SDK virtual[\s\S]*(Arquivo|Retorno)[\s\S]*Uso\s+\/workspace list/iu.test(workspaceSurface) &&
+                !/\[OK\]|\[ERR\]|SDK→FS|FS→SDK|\n\s+\/workspace promote <localPath>/iu.test(workspaceSurface),
             detail: '/workspace list rendered a themed SDK workspace panel',
         },
         {
@@ -1844,7 +1990,10 @@ function defaultUxCycleCriteria(boot) {
             pass:
                 /Atividade Atual da LLM-B[\s\S]*Estado[\s\S]*Evento[\s\S]*Detalhes técnicos ficam em \/activity detail/iu.test(
                     activitySurface,
-                ) && !/\bsource\b|\btools\b|\btrace\b|Streaming público|\bdeltas\b|cumulativo|Sessão SDK removida|session\.deleted/iu.test(activitySurface),
+                ) &&
+                !/\bsource\b|\btools\b|\btrace\b|Streaming público|\bdeltas\b|cumulativo|Sessão SDK removida|session\.deleted/iu.test(
+                    activitySurface,
+                ),
             detail: '/activity default rendered human labels and moved technical identifiers behind detail mode',
         },
         {
@@ -1983,7 +2132,10 @@ function buildReport({
         `Transport: ${transport}`,
         `Status: ${status}`,
         ...(liveScenario
-            ? [`Live scenario: ${liveScenario.id} · ${liveScenario.description}`, `Ask question: ${liveScenario.askQuestion}`]
+            ? [
+                  `Live scenario: ${liveScenario.id} · ${liveScenario.description}`,
+                  `Ask question: ${liveScenario.askQuestion}`,
+              ]
             : []),
         ...(blocker ? [`Blocker: ${blocker.id} · ${blocker.detail}`] : []),
         '',
@@ -2027,6 +2179,7 @@ function liveScenarioKind({
     structuredInputCycle,
     menuCycle,
     uxCycle,
+    diagnosticUxCycle,
     modelControlProbe,
     liveScenario,
 }) {
@@ -2034,6 +2187,7 @@ function liveScenarioKind({
     if (structuredInputCycle) return 'structured_input_cycle';
     if (menuCycle) return 'menu_cycle';
     if (uxCycle) return 'default_ux_cycle';
+    if (diagnosticUxCycle) return 'diagnostic_ux_cycle';
     if (modelControlProbe) return 'model_probe';
     if (autoControlProbe) return 'auto_probe';
     if (byokFixture) return 'byok_fixture_no_pr';
@@ -2041,16 +2195,16 @@ function liveScenarioKind({
     if (byokReal && noPr) return 'byok_real_no_pr';
     if (byokReal) return 'byok_real_full';
     if (noPr) return 'control_no_pr';
-    if (liveScenario?.id && liveScenario.id !== DEFAULT_LIVE_SCENARIO_ID) return `canonical_full_turn_${liveScenario.id}`;
+    if (liveScenario?.id && liveScenario.id !== DEFAULT_LIVE_SCENARIO_ID)
+        return `canonical_full_turn_${liveScenario.id}`;
     return 'canonical_full_turn';
 }
 
 async function scheduleFreshSdkSessionForCanonicalScenario({ enabled }) {
     if (!enabled) return { attempted: false, ok: true, reason: 'disabled' };
     try {
-        const { scheduleAgentSdkSessionBootSelection } = await import(
-            '../../../src/copilot/presentation/runtime/sdk-session.js'
-        );
+        const { scheduleAgentSdkSessionBootSelection } =
+            await import('../../../src/copilot/presentation/runtime/sdk-session.js');
         const result = await scheduleAgentSdkSessionBootSelection({ mode: 'new' });
         const resultValue = result && typeof result === 'object' ? result.value : null;
         const persistedSelection =
@@ -2094,7 +2248,9 @@ async function recordLiveScenarioRunToSqlite({
     transport,
 }) {
     const failedCriteria = criteria.filter(isHardCriterionFailure);
-    const completedAt = new Date(Date.parse(startedAt) + Math.max(0, Number.isFinite(durationMs) ? durationMs : 0)).toISOString();
+    const completedAt = new Date(
+        Date.parse(startedAt) + Math.max(0, Number.isFinite(durationMs) ? durationMs : 0),
+    ).toISOString();
     const runId = `terminal-live:${String(startedAt).replace(/[:.]/gu, '-')}:${scenarioKind}`;
     try {
         const { SqliteModelGatewayCatalogStore } = await import('../../../src/copilot/model-gateway/index.js');
@@ -2171,7 +2327,11 @@ async function writeEarlyBlockedSummary({
     };
     const criteria = [
         { id: `blocked-by-${blocker.id}`, pass: false, detail: blocker.detail },
-        { id: 'terminal-not-started-after-blocker', pass: true, detail: 'runtime selector blocker prevented default BYOK fallback' },
+        {
+            id: 'terminal-not-started-after-blocker',
+            pass: true,
+            detail: 'runtime selector blocker prevented default BYOK fallback',
+        },
     ];
     const liveHealthRecord = { attempted: false, recorded: false, reason: `live_turn_not_attempted:${blocker.id}` };
     await writeFile(rawPath, raw, 'utf8');
@@ -2191,7 +2351,11 @@ async function writeEarlyBlockedSummary({
                 criteria,
                 sse: sseSummary,
                 byokReal: realByok?.redacted ?? null,
-                sdkSessionBootSelection: sdkSessionBootSelection ?? { attempted: false, ok: true, reason: 'not-applicable' },
+                sdkSessionBootSelection: sdkSessionBootSelection ?? {
+                    attempted: false,
+                    ok: true,
+                    reason: 'not-applicable',
+                },
                 liveHealthRecord,
                 export: null,
             },
@@ -2223,7 +2387,11 @@ async function writeEarlyBlockedSummary({
         'utf8',
     );
     if (realByok) {
-        await writeFile(path.join(outDir, 'byok.real.redacted.json'), `${JSON.stringify(realByok.redacted, null, 2)}\n`, 'utf8');
+        await writeFile(
+            path.join(outDir, 'byok.real.redacted.json'),
+            `${JSON.stringify(realByok.redacted, null, 2)}\n`,
+            'utf8',
+        );
     }
 }
 
@@ -2255,8 +2423,7 @@ function detectLiveBlocker(plain, runtime = {}) {
     if (byokAdmissionMatch) {
         return {
             id: 'byok-admission-blocked',
-            detail:
-                'BYOK admission control contained the turn before provider streaming because the declared request budget is too small',
+            detail: 'BYOK admission control contained the turn before provider streaming because the declared request budget is too small',
         };
     }
     const byokPreflight = findByokRealPreflightProbeFailure(plain);
@@ -2332,7 +2499,9 @@ function findByokRealPreflightProbeFailure(plain) {
 
 function findByokProbeResultStatus(plain, mode) {
     const escapedMode = escapeRegExp(mode);
-    const match = String(plain ?? '').match(new RegExp(`BYOK ${escapedMode} probe[\\s\\S]*?resultado:\\s+([\\w-]+)`, 'iu'));
+    const match = String(plain ?? '').match(
+        new RegExp(`BYOK ${escapedMode} probe[\\s\\S]*?resultado:\\s+([\\w-]+)`, 'iu'),
+    );
     return match?.[1]?.toLowerCase() ?? null;
 }
 
@@ -2360,7 +2529,8 @@ function findByokRealLiveToolProtocolMiss(plain, scenario = LIVE_SCENARIOS[DEFAU
         return { markers };
     }
     if (!/(?:^|\n)\s*│\s+(?:\*{1,2})?DELTA-CANONICAL-8\b/u.test(plain)) return null;
-    const hasTextifiedAsk = markers.includes('ask_user') || markers.includes('ask_user_text') || markers.includes('ask_user_question_json');
+    const hasTextifiedAsk =
+        markers.includes('ask_user') || markers.includes('ask_user_text') || markers.includes('ask_user_question_json');
     return hasTextifiedAsk || markers.length >= 2 ? { markers } : null;
 }
 
@@ -2404,7 +2574,9 @@ function summarizeSseEvents(events) {
     const ids = publicEvents.map((evt) => evt.id).filter((id) => Number.isFinite(id));
     const names = new Set(publicEvents.map((evt) => evt.event));
     const payloadObjects = publicEvents.filter((evt) => isObjectPayload(evt.data));
-    const sourceEvents = payloadObjects.filter((evt) => typeof evt.data.source === 'string' && evt.data.source.length > 0);
+    const sourceEvents = payloadObjects.filter(
+        (evt) => typeof evt.data.source === 'string' && evt.data.source.length > 0,
+    );
     const eventSourceEvents = payloadObjects.filter(
         (evt) => typeof evt.data.eventSource === 'string' && evt.data.eventSource.length > 0,
     );
@@ -2418,9 +2590,14 @@ function summarizeSseEvents(events) {
     );
     const traceIds = [...new Set(traceEvents.map((evt) => evt.data.traceId))].sort();
     const criticalEvents = payloadObjects.filter((evt) =>
-        ['delta', 'assistant.message', 'dialog.reply', 'tool.lifecycle', 'user_input.requested', 'user_input.completed'].includes(
-            evt.event,
-        ),
+        [
+            'delta',
+            'assistant.message',
+            'dialog.reply',
+            'tool.lifecycle',
+            'user_input.requested',
+            'user_input.completed',
+        ].includes(evt.event),
     );
     return {
         publicEvents,
@@ -2437,13 +2614,7 @@ function summarizeSseEvents(events) {
 }
 
 function normalizeLifecycleToolName(payload) {
-    const names = [
-        payload?.rawToolName,
-        payload?.toolName,
-        payload?.correlatedToolName,
-        payload?.name,
-        payload?.tool,
-    ];
+    const names = [payload?.rawToolName, payload?.toolName, payload?.correlatedToolName, payload?.name, payload?.tool];
     for (const value of names) {
         if (typeof value === 'string' && value.trim().length > 0) return value.trim().toLowerCase();
     }
@@ -2629,18 +2800,19 @@ function canonicalEventSummaryItem(evt, payload) {
 /**
  * @param {unknown[]} events
  * @returns {{
- *   deltaAssistant: CanonicalEventSummaryItem | null;
- *   askRequested: CanonicalEventSummaryItem | null;
- *   askCompleted: CanonicalEventSummaryItem | null;
- *   postAskAssistant: CanonicalEventSummaryItem | null;
+ *     deltaAssistant: CanonicalEventSummaryItem | null;
+ *     askRequested: CanonicalEventSummaryItem | null;
+ *     askCompleted: CanonicalEventSummaryItem | null;
+ *     postAskAssistant: CanonicalEventSummaryItem | null;
  * }}
  */
 function summarizeCanonicalTranscriptEvents(events, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
-    /** @type {{
-     *   deltaAssistant: CanonicalEventSummaryItem | null;
-     *   askRequested: CanonicalEventSummaryItem | null;
-     *   askCompleted: CanonicalEventSummaryItem | null;
-     *   postAskAssistant: CanonicalEventSummaryItem | null;
+    /**
+     * @type {{
+     *     deltaAssistant: CanonicalEventSummaryItem | null;
+     *     askRequested: CanonicalEventSummaryItem | null;
+     *     askCompleted: CanonicalEventSummaryItem | null;
+     *     postAskAssistant: CanonicalEventSummaryItem | null;
      * }}
      */
     const summary = {
@@ -2697,7 +2869,9 @@ function formatCanonicalEventSummary(item) {
 }
 
 /**
- * @param {null | { envelopes?: Array<{ source: string; traceId: string | null; turnId: string | null; eventId: string | null }> }} exportSummary
+ * @param {null | {
+ *     envelopes?: { source: string; traceId: string | null; turnId: string | null; eventId: string | null }[];
+ * }} exportSummary
  * @param {CanonicalEventSummaryItem | null} event
  * @returns {boolean}
  */
@@ -2843,7 +3017,8 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
         ];
     }
     const summary = summarizeSseEvents(sseSummary.events);
-    const { publicEvents, ids, names, payloadObjects, sourceEnvelopeEvents, traceEvents, traceIds, criticalEvents } = summary;
+    const { publicEvents, ids, names, payloadObjects, sourceEnvelopeEvents, traceEvents, traceIds, criticalEvents } =
+        summary;
     const monotonic = ids.every((id, index) => index === 0 || id > ids[index - 1]);
     const plainTraceIds = extractPlainTraceIds(plain);
     const traceOverlap = traceIds.filter((traceId) => plainTraceIds.includes(traceId));
@@ -2924,7 +3099,10 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             renderedName: String(item.renderedName ?? toolName),
             badge,
             forbiddenBadge,
-            expectedRe: new RegExp(`\\[${escapeRegExp(badge)}\\]\\s+${escapeRegExp(String(item.renderedName ?? toolName))}\\b`, 'u'),
+            expectedRe: new RegExp(
+                `\\[${escapeRegExp(badge)}\\]\\s+${escapeRegExp(String(item.renderedName ?? toolName))}\\b`,
+                'u',
+            ),
             forbiddenRe: forbiddenBadge
                 ? new RegExp(
                       `\\[${escapeRegExp(forbiddenBadge)}\\]\\s+${escapeRegExp(String(item.renderedName ?? toolName))}\\b`,
@@ -2969,10 +3147,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         /"label":"Executando tarefa interna","detail":"delta/.test(preEventsPlain);
     const promptDoubleRender = /voc[eê]\[[^\r\n]*?›[ \t]+voc[eê]\[[^\r\n]*?›/iu.test(plain);
     const inlineStatusRendered = /(?:⟲|⏳|⌛)\s+(?:LLM-B|aguardando)\b/iu.test(plain);
-    const duplicatePathologies = [
-        /__anonymous__/,
-        /hook:error_occurred/,
-    ];
+    const duplicatePathologies = [/__anonymous__/, /hook:error_occurred/];
     const plainWithoutExpectedScenarioMarkers = scenario.expectedOutputMarkers.reduce(
         (text, marker) => text.replaceAll(marker, 'EXPECTED_SCENARIO_MARKER'),
         plain,
@@ -3052,7 +3227,9 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                 pass: expectedObserved && !forbiddenObserved,
                 detail:
                     `${toolName} render expected=[${badge}] observed=${expectedObserved ? 'yes' : 'no'}` +
-                    (forbiddenBadge ? ` forbidden=[${forbiddenBadge}] observed=${forbiddenObserved ? 'yes' : 'no'}` : ''),
+                    (forbiddenBadge
+                        ? ` forbidden=[${forbiddenBadge}] observed=${forbiddenObserved ? 'yes' : 'no'}`
+                        : ''),
             };
         }),
         ...(scenarioUsesPermissionedTool
@@ -3216,10 +3393,9 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'ux-no-durable-waiting-spam',
-            pass:
-                !/LLM-B ainda trabalhando|request_user_input ainda executando|chatcmpl-tool-[a-z0-9-]+|ask_user SDK/iu.test(
-                    plain,
-                ),
+            pass: !/LLM-B ainda trabalhando|request_user_input ainda executando|chatcmpl-tool-[a-z0-9-]+|ask_user SDK/iu.test(
+                plain,
+            ),
             detail: 'durable waiting/tool heartbeat spam, raw ids, and SDK ask_user labels were not printed',
         },
         {
@@ -3229,12 +3405,15 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'ux-compact-no-delta-live-status',
-            pass: !/thinking\/LLM-B trabalhando[\s\S]{0,160}sem delta visível/iu.test(plain) && !/thinking\//iu.test(plain),
+            pass:
+                !/thinking\/LLM-B trabalhando[\s\S]{0,160}sem delta visível/iu.test(plain) &&
+                !/thinking\//iu.test(plain),
             detail: 'no-delta live status stayed semantic/compact instead of repeating the full working label',
         },
         {
             id: 'ux-compact-turn-live-status',
-            pass: !/turn\/Intenção da LLM-B[\s\S]{0,160}terminal live canonical/iu.test(plain) && !/turn\//iu.test(plain),
+            pass:
+                !/turn\/Intenção da LLM-B[\s\S]{0,160}terminal live canonical/iu.test(plain) && !/turn\//iu.test(plain),
             detail: 'turn live status avoided repeating long intent details',
         },
         {
@@ -3284,7 +3463,9 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'inline-status-rendered',
             pass: inlineStatusRendered,
-            detail: inlineStatusRendered ? 'TTY inline/reserved status rendered' : 'TTY inline/reserved status not detected',
+            detail: inlineStatusRendered
+                ? 'TTY inline/reserved status rendered'
+                : 'TTY inline/reserved status not detected',
         },
         {
             id: 'no-final-delta-duplication',
@@ -3375,8 +3556,9 @@ function evaluateNoPrOutput(plain, sseSummary) {
         {
             id: 'usage-visible',
             pass:
-                /Premium Request:|Última (?:Premium Request|telemetria PR) classificada:|GitHub Copilot quota\/PR side-channel:/.test(plain) &&
-                /Modo: sdk=/.test(plain),
+                /Premium Request:|Última (?:Premium Request|telemetria PR) classificada:|GitHub Copilot quota\/PR side-channel:/.test(
+                    plain,
+                ) && /Modo: sdk=/.test(plain),
             detail: '/usage now rendered context, PR and SDK mode telemetry',
         },
         {
@@ -3592,7 +3774,10 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         },
         {
             id: 'gateway-commands-visible',
-            pass: /model-gateway/i.test(plain) && /npm run model-gateway:/.test(plain) && /\/byok auto doctor/.test(plain),
+            pass:
+                /model-gateway/i.test(plain) &&
+                /npm run model-gateway:/.test(plain) &&
+                /\/byok auto doctor/.test(plain),
             detail: '/byok gateway commands rendered canonical package and terminal commands',
         },
         {
@@ -3662,7 +3847,9 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         },
         {
             id: 'auto-proof-plan-visible',
-            pass: /BYOK model-gateway auto proof plan/.test(plain) && /\/byok probe (?:agent|chat) provider:/u.test(plain),
+            pass:
+                /BYOK model-gateway auto proof plan/.test(plain) &&
+                /\/byok probe (?:agent|chat) provider:/u.test(plain),
             detail: '/byok auto proof-plan rendered explicit provider/model runtime proof commands without provider calls',
         },
         {
@@ -3689,7 +3876,9 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         },
         {
             id: 'auto-human-default-copy',
-            pass: !/\b(?:providerCall=nao|liveSetModel=|runtimeSelector=|action=|ledgers:|from=|reason=|live setModel|Modelo SDK:)\b/iu.test(plain),
+            pass: !/\b(?:providerCall=nao|liveSetModel=|runtimeSelector=|action=|ledgers:|from=|reason=|live setModel|Modelo SDK:)\b/iu.test(
+                plain,
+            ),
             detail: 'auto/BYOK control surfaces avoided raw key-value and setModel jargon in default copy',
         },
         {
@@ -3816,8 +4005,7 @@ function evaluateByokRealOutput(
             /(?:^|\n)\s*│\s+DELTA-CANONICAL-\d/u.test(plain) ||
             liveScenario.askRenderedRe.test(plain));
     const byokUsageClassified =
-        /\bclasse=byok_user_message\b/u.test(plain) ||
-        /"classification"\s*:\s*"byok_user_message"/u.test(plain);
+        /\bclasse=byok_user_message\b/u.test(plain) || /"classification"\s*:\s*"byok_user_message"/u.test(plain);
     const byokAdmissionBlocked =
         /Turno não enviado ao provider BYOK|terminal\.byok\.admission_blocked|resultado:\s+admission-blocked/i.test(
             plain,
@@ -3885,10 +4073,7 @@ function evaluateByokRealOutput(
         },
         {
             id: 'byok-real-binding-cockpit',
-            pass:
-                /vínculo BYOK:/u.test(plain) &&
-                /BYOK pronto:/u.test(plain) &&
-                /limite BYOK:/u.test(plain),
+            pass: /vínculo BYOK:/u.test(plain) && /BYOK pronto:/u.test(plain) && /limite BYOK:/u.test(plain),
             detail: 'BYOK and SDK session cockpits separated prepared selection from live provider binding',
         },
         {
@@ -3905,9 +4090,7 @@ function evaluateByokRealOutput(
         {
             id: 'byok-real-chat-probe',
             pass:
-                /BYOK chat probe/.test(plain) &&
-                /BYOK agent probe/.test(plain) &&
-                /sessão SDK descartável/.test(plain),
+                /BYOK chat probe/.test(plain) && /BYOK agent probe/.test(plain) && /sessão SDK descartável/.test(plain),
             detail: 'BYOK preflight exercised disposable chat and agent probes before the live operator turn',
         },
         {
@@ -3947,7 +4130,8 @@ function evaluateByokRealOutput(
             id: 'byok-real-shortlist-probe',
             pass:
                 /BYOK shortlist agent probe/.test(plain) &&
-                (/Shortlist encerrada: ok=\d+\/\d+/.test(plain) || /Nenhum candidato cabe na shortlist atual/.test(plain)),
+                (/Shortlist encerrada: ok=\d+\/\d+/.test(plain) ||
+                    /Nenhum candidato cabe na shortlist atual/.test(plain)),
             detail: 'BYOK preflight exercised a ranked disposable shortlist probe without mutating the live session',
         },
         {
@@ -3990,7 +4174,9 @@ function evaluateByokRealOutput(
             pass:
                 !altProfile ||
                 new RegExp(`profile:\\s+${altProfile.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`, 'u').test(plain),
-            detail: altProfile ? `alternate BYOK profile ${altProfile} was exercised` : 'no alternate usable profile configured',
+            detail: altProfile
+                ? `alternate BYOK profile ${altProfile} was exercised`
+                : 'no alternate usable profile configured',
         },
         {
             id: 'byok-real-alt-model-switch',
@@ -4019,12 +4205,12 @@ function evaluateByokRealOutput(
             detail: byokPreflightBlocked
                 ? 'Disposable BYOK probes blocked the live user turn before usage telemetry'
                 : byokAdmissionBlocked
-                ? 'BYOK turn never reached provider usage because admission blocked the request envelope'
-                : byokProviderBlocked
-                ? 'BYOK provider aborted before usage telemetry; no Premium Request was inferred'
-                : byokTurnOpened
-                  ? `BYOK user-message usage classification observed=${byokUsageClassified ? 'yes' : 'no'}`
-                  : 'no BYOK user turn opened in this probe',
+                  ? 'BYOK turn never reached provider usage because admission blocked the request envelope'
+                  : byokProviderBlocked
+                    ? 'BYOK provider aborted before usage telemetry; no Premium Request was inferred'
+                    : byokTurnOpened
+                      ? `BYOK user-message usage classification observed=${byokUsageClassified ? 'yes' : 'no'}`
+                      : 'no BYOK user turn opened in this probe',
         },
         {
             id: 'byok-real-operator-health',
@@ -4077,22 +4263,23 @@ function evaluateBlockedOutput(plain, sseSummary, blocker) {
 async function inspectExportedMarkdown(exportPath, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
     try {
         const content = await readFile(exportPath, 'utf8');
-        const envelopes = [...content.matchAll(/^>\s+envelope=([^·\n]+)\s+·\s+trace=([^·\n]+)\s+·\s+turn=([^·\n]+)\s+·\s+evento=([^\n]+)$/gmu)].map(
-            (match) => ({
-                source: match[1]?.trim() ?? '',
-                traceId: match[2]?.trim() && match[2]?.trim() !== '-' ? match[2].trim() : null,
-                turnId: match[3]?.trim() && match[3]?.trim() !== '-' ? match[3].trim() : null,
-                eventId: match[4]?.trim() && match[4]?.trim() !== '-' ? match[4].trim() : null,
-            }),
-        );
+        const envelopes = [
+            ...content.matchAll(
+                /^>\s+envelope=([^·\n]+)\s+·\s+trace=([^·\n]+)\s+·\s+turn=([^·\n]+)\s+·\s+evento=([^\n]+)$/gmu,
+            ),
+        ].map((match) => ({
+            source: match[1]?.trim() ?? '',
+            traceId: match[2]?.trim() && match[2]?.trim() !== '-' ? match[2].trim() : null,
+            turnId: match[3]?.trim() && match[3]?.trim() !== '-' ? match[3].trim() : null,
+            eventId: match[4]?.trim() && match[4]?.trim() !== '-' ? match[4].trim() : null,
+        }));
         return {
             ok: true,
             detail: `${content.length} chars`,
             hasTranscript: /DELTA-CANONICAL-8/.test(content) || scenario.askQuestionRe.test(content),
             hasStreamingDiagnostics: /streaming=/.test(content),
             hasEnvelope: /envelope=/.test(content),
-            hasAskUser:
-                /ask_user solicitou resposta humana:/iu.test(content) && scenario.askQuestionRe.test(content),
+            hasAskUser: /ask_user solicitou resposta humana:/iu.test(content) && scenario.askQuestionRe.test(content),
             hasAskUserAnswer:
                 /##\s+👤\s+Usu[aá]rio[\s\S]*Resposta ao ask_user:/iu.test(content) &&
                 scenario.finalAnswerRe.test(content),
@@ -4221,6 +4408,7 @@ async function main() {
     const structuredInputCycle = hasFlag('--structured-input-cycle');
     const menuCycle = hasFlag('--menu-cycle');
     const uxCycle = hasFlag('--ux-cycle');
+    const diagnosticUxCycle = hasFlag('--diagnostic-ux-cycle');
     const reuseSdkSession = hasFlag('--reuse-sdk-session');
     const byokProbe = hasFlag('--byok-probe');
     const byokFixture = hasFlag('--byok-fixture');
@@ -4243,6 +4431,7 @@ async function main() {
         structuredInputCycle,
         menuCycle,
         uxCycle,
+        diagnosticUxCycle,
         liveScenario,
     });
     const byokRealProfile = readArg('--byok-real-profile', '');
@@ -4314,7 +4503,9 @@ async function main() {
               runtimeSelectorSelectionPolicy: byokRealRuntimeSelectorSelectionPolicy,
           })
         : null;
-    const secretValues = byokReal ? collectSecretValues({ ...process.env, ...dotenvEnv, ...(realByok?.env ?? {}) }) : [];
+    const secretValues = byokReal
+        ? collectSecretValues({ ...process.env, ...dotenvEnv, ...(realByok?.env ?? {}) })
+        : [];
     if (byokReal && byokRealRuntimeSelectorProfile && !realByok?.runtimeRoute) {
         const blocker = {
             id: 'byok-runtime-selector-route-unavailable',
@@ -4364,7 +4555,9 @@ async function main() {
             terminalPort,
             startedAt,
         });
-        console.log(`[terminal-live] structured input summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`);
+        console.log(
+            `[terminal-live] structured input summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`,
+        );
         if (!summary.ok) process.exitCode = 1;
         await byokFixtureProvider?.close();
         return;
@@ -4398,25 +4591,41 @@ async function main() {
         return;
     }
 
+    if (diagnosticUxCycle) {
+        const summary = await runDiagnosticUxCycleLiveTest({
+            outDir,
+            requestedTransport,
+            timeoutMs,
+            terminalPort,
+            startedAt,
+        });
+        console.log(`[terminal-live] diagnostic ux summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`);
+        if (!summary.ok) process.exitCode = 1;
+        await byokFixtureProvider?.close();
+        return;
+    }
+
     if (dryRun) {
         const prompt = autoControlProbe
             ? buildAutoProbeCommands({ profile: autoProbeProfile }).join('\n')
             : modelControlProbe
-            ? buildModelProbeCommands().join('\n')
-            : byokControlProbe
-            ? buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl }).join('\n')
-            : byokReal
-              ? [
-                    ...buildByokRealPreflightCommands(realByok ?? {}),
-                    ...(noPr ? buildByokRealNoPrDiagnosticCommands() : [buildScenarioPrompt(liveScenario)]),
-                ]
-                    .filter(Boolean)
-                    .join('\n')
-            : noPr
-              ? buildNoPrProbeCommands().join('\n')
-              : buildScenarioPrompt(liveScenario);
+              ? buildModelProbeCommands().join('\n')
+              : byokControlProbe
+                ? buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl }).join('\n')
+                : byokReal
+                  ? [
+                        ...buildByokRealPreflightCommands(realByok ?? {}),
+                        ...(noPr ? buildByokRealNoPrDiagnosticCommands() : [buildScenarioPrompt(liveScenario)]),
+                    ]
+                        .filter(Boolean)
+                        .join('\n')
+                  : noPr
+                    ? buildNoPrProbeCommands().join('\n')
+                    : buildScenarioPrompt(liveScenario);
         await writeFile(path.join(outDir, 'prompt.txt'), `${prompt}\n`, 'utf8');
-        console.log(`[terminal-live] dry-run prompt written to ${path.relative(ROOT, path.join(outDir, 'prompt.txt'))}`);
+        console.log(
+            `[terminal-live] dry-run prompt written to ${path.relative(ROOT, path.join(outDir, 'prompt.txt'))}`,
+        );
         await byokFixtureProvider?.close();
         return;
     }
@@ -4554,55 +4763,82 @@ async function main() {
             clearTimeout(postAnswerCommandTimer);
             postAnswerCommandTimer = null;
         }
-        setTimeout(() => {
-            const diagnostics = [
-                '/usage now',
-                '/activity 40',
-                '/tools diag',
-                '/events 60',
-                '/events 100 --raw',
-                '/errors 10',
-                '/health full',
-            ];
-            if (byokReal) {
-                diagnostics.push('/byok providers', '/byok health', '/byok recommend reasoning safe 8');
-            }
-            diagnostics.push(`/export ${exportArg}`);
-            sendCommandSequence(write, diagnostics, { delayMs: 350 });
-            setTimeout(() => {
+        setTimeout(
+            () => {
+                const diagnostics = [
+                    '/usage now',
+                    '/activity 40',
+                    '/tools diag',
+                    '/events 60',
+                    '/events 100 --raw',
+                    '/errors 10',
+                    '/health full',
+                ];
+                if (byokReal) {
+                    diagnostics.push('/byok providers', '/byok health', '/byok recommend reasoning safe 8');
+                }
+                diagnostics.push(`/export ${exportArg}`);
+                sendCommandSequence(write, diagnostics, { delayMs: 350 });
+                setTimeout(
+                    () => {
+                        if (!quitSent) {
+                            quitSent = true;
+                            byokNoPrCanQuit = true;
+                            write('/quit');
+                        }
+                    },
+                    diagnostics.length * 350 + 2_000,
+                ).unref();
+            },
+            Math.max(0, delayMs),
+        ).unref();
+    };
+    const scheduleByokPreflightDiagnostics = () => {
+        if (postCommandsSent) return;
+        postCommandsSent = true;
+        const diagnostics = [
+            '/activity 40',
+            '/byok providers',
+            '/byok health',
+            '/byok recommend reasoning safe 8',
+            '/events 100 --raw',
+            '/errors 10',
+        ];
+        sendCommandSequence(write, diagnostics, { delayMs: 450 });
+        setTimeout(
+            () => {
                 if (!quitSent) {
                     quitSent = true;
                     byokNoPrCanQuit = true;
                     write('/quit');
                 }
-            }, diagnostics.length * 350 + 2_000).unref();
-        }, Math.max(0, delayMs)).unref();
-    };
-    const scheduleByokPreflightDiagnostics = () => {
-        if (postCommandsSent) return;
-        postCommandsSent = true;
-        const diagnostics = ['/activity 40', '/byok providers', '/byok health', '/byok recommend reasoning safe 8', '/events 100 --raw', '/errors 10'];
-        sendCommandSequence(write, diagnostics, { delayMs: 450 });
-        setTimeout(() => {
-            if (!quitSent) {
-                quitSent = true;
-                byokNoPrCanQuit = true;
-                write('/quit');
-            }
-        }, diagnostics.length * 450 + 1_500).unref();
+            },
+            diagnostics.length * 450 + 1_500,
+        ).unref();
     };
     const scheduleByokLiveProtocolDiagnostics = () => {
         if (postCommandsSent) return;
         postCommandsSent = true;
-        const diagnostics = ['/activity 40', '/tools diag', '/byok providers', '/byok health', '/byok recommend reasoning safe 8', '/events 100 --raw', '/errors 10'];
+        const diagnostics = [
+            '/activity 40',
+            '/tools diag',
+            '/byok providers',
+            '/byok health',
+            '/byok recommend reasoning safe 8',
+            '/events 100 --raw',
+            '/errors 10',
+        ];
         sendCommandSequence(write, diagnostics, { delayMs: 450 });
-        setTimeout(() => {
-            if (!quitSent) {
-                quitSent = true;
-                byokNoPrCanQuit = true;
-                write('/quit');
-            }
-        }, diagnostics.length * 450 + 1_500).unref();
+        setTimeout(
+            () => {
+                if (!quitSent) {
+                    quitSent = true;
+                    byokNoPrCanQuit = true;
+                    write('/quit');
+                }
+            },
+            diagnostics.length * 450 + 1_500,
+        ).unref();
     };
     const invalidChoiceFeedbackRe =
         /Resposta não corresponde às opções da pergunta pendente|Resposta inválida para a pergunta pendente|invalid_choice/iu;
@@ -4617,12 +4853,15 @@ async function main() {
         }
         setTimeout(() => write(step.answer), Math.max(0, Number(step.delayMs ?? 500))).unref();
     };
-    const timeout = setTimeout(() => {
-        timedOut = true;
-        byokNoPrCanQuit = true;
-        write('/quit');
-        setTimeout(() => child.kill('SIGTERM'), 2_000).unref();
-    }, Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS);
+    const timeout = setTimeout(
+        () => {
+            timedOut = true;
+            byokNoPrCanQuit = true;
+            write('/quit');
+            setTimeout(() => child.kill('SIGTERM'), 2_000).unref();
+        },
+        Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS,
+    );
 
     const onData = (chunk) => {
         const text = chunk.toString('utf8');
@@ -4670,7 +4909,11 @@ async function main() {
                           ...(noPr ? buildByokRealNoPrDiagnosticCommands() : []),
                       ]
                     : byokControlProbe
-                      ? ['/usage now', '/activity 12', ...buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl })]
+                      ? [
+                            '/usage now',
+                            '/activity 12',
+                            ...buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl }),
+                        ]
                       : ['/usage now', '/activity 12', ...buildNoPrProbeCommands()];
                 startPromptSynchronizedCommandSequence(commands, () => {
                     if (byokReal && noPr) {
@@ -4718,9 +4961,12 @@ async function main() {
             schedulePostAnswerDiagnostics(500);
         }
         if (answerSent && !postCommandsSent && /Resposta\s+enviada para pergunta pendente/.test(plain)) {
-            postAnswerCommandTimer = setTimeout(() => {
-                schedulePostAnswerDiagnostics(0);
-            }, Math.max(1_000, postAskContinuationWaitMs)).unref();
+            postAnswerCommandTimer = setTimeout(
+                () => {
+                    schedulePostAnswerDiagnostics(0);
+                },
+                Math.max(1_000, postAskContinuationWaitMs),
+            ).unref();
         }
         const scenarioTailPlain = scenarioSent ? plain.slice(scenarioPlainOffset) : '';
         if (
@@ -4755,13 +5001,16 @@ async function main() {
                 diagnostics.push('/events 100 --raw', '/errors 10');
                 sendCommandSequence(write, diagnostics, { delayMs: 450 });
                 if (!quitSent) {
-                    setTimeout(() => {
-                        if (!quitSent) {
-                            quitSent = true;
-                            byokNoPrCanQuit = true;
-                            write('/quit');
-                        }
-                    }, diagnostics.length * 450 + 1_500).unref();
+                    setTimeout(
+                        () => {
+                            if (!quitSent) {
+                                quitSent = true;
+                                byokNoPrCanQuit = true;
+                                write('/quit');
+                            }
+                        },
+                        diagnostics.length * 450 + 1_500,
+                    ).unref();
                 }
             }, 1_000).unref();
         }
@@ -4811,16 +5060,17 @@ async function main() {
         raw: '',
         disabled: !collectSse,
     };
-    const blocker = noPr || byokControlProbe || autoControlProbe || modelControlProbe
-        ? null
-        : detectLiveBlocker(plain, {
-              timedOut,
-              answerSent,
-              postAskContinuationObserved,
-              postCommandsSent,
-              sseEvents: sseSummary.events,
-              liveScenario,
-          });
+    const blocker =
+        noPr || byokControlProbe || autoControlProbe || modelControlProbe
+            ? null
+            : detectLiveBlocker(plain, {
+                  timedOut,
+                  answerSent,
+                  postAskContinuationObserved,
+                  postCommandsSent,
+                  sseEvents: sseSummary.events,
+                  liveScenario,
+              });
     const exportSummary =
         noPr || byokControlProbe || autoControlProbe || modelControlProbe || blocker
             ? null
@@ -4830,12 +5080,12 @@ async function main() {
         : autoControlProbe
           ? evaluateAutoProbeOutput(plain, sseSummary, { profile: autoProbeProfile })
           : modelControlProbe
-          ? evaluateModelProbeOutput(plain, sseSummary)
-          : byokControlProbe
-          ? evaluateByokProbeOutput(plain, sseSummary, { fixture: byokFixture })
-          : noPr
-            ? evaluateNoPrOutput(plain, sseSummary)
-            : evaluateOutput(plain, sseSummary, exportSummary, liveScenario);
+            ? evaluateModelProbeOutput(plain, sseSummary)
+            : byokControlProbe
+              ? evaluateByokProbeOutput(plain, sseSummary, { fixture: byokFixture })
+              : noPr
+                ? evaluateNoPrOutput(plain, sseSummary)
+                : evaluateOutput(plain, sseSummary, exportSummary, liveScenario);
     const criteria = [
         ...baseCriteria,
         ...(byokReal
@@ -4986,7 +5236,11 @@ async function main() {
         'utf8',
     );
     if (realByok) {
-        await writeFile(path.join(outDir, 'byok.real.redacted.json'), `${JSON.stringify(realByok.redacted, null, 2)}\n`, 'utf8');
+        await writeFile(
+            path.join(outDir, 'byok.real.redacted.json'),
+            `${JSON.stringify(realByok.redacted, null, 2)}\n`,
+            'utf8',
+        );
     }
     const failed = finalCriteria.filter(isHardCriterionFailure);
     console.log(`[terminal-live] summary: ${path.relative(ROOT, mdPath)}`);

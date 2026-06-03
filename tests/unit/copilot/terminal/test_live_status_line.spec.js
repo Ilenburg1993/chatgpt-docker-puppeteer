@@ -139,7 +139,7 @@ describe('terminal/live-status-line', () => {
         const line = formatTerminalLiveStatusLine();
 
         expect(shouldRenderTerminalLiveStatusLine()).toBe(true);
-        expect(line).toContain('PERGUNTA');
+        expect(line).toContain('Pergunta');
         expect(line).toContain('Escolha como continuar');
         expect(line).toContain('opções seguir|pausar');
         expect(line).not.toContain('opções=');
@@ -196,9 +196,8 @@ describe('terminal/live-status-line', () => {
     });
 
     it('não mantém linha viva para idle com status processing defasado', async () => {
-        const { shouldRenderTerminalLiveStatusLine, formatTerminalLiveStatusLine } = await import(
-            '../../../../src/copilot/terminal/repl/live-status-line.js'
-        );
+        const { shouldRenderTerminalLiveStatusLine, formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
         mocks.activity = {
             ...mocks.activity,
             phase: 'idle',
@@ -313,9 +312,8 @@ describe('terminal/live-status-line', () => {
     });
 
     it('prioriza ask_user humano sobre atividade antiga na linha viva', async () => {
-        const { shouldRenderTerminalLiveStatusLine, formatTerminalLiveStatusLine } = await import(
-            '../../../../src/copilot/terminal/repl/live-status-line.js'
-        );
+        const { shouldRenderTerminalLiveStatusLine, formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
         mocks.activity = {
             ...mocks.activity,
             phase: 'thinking',
@@ -339,7 +337,7 @@ describe('terminal/live-status-line', () => {
 
         expect(shouldRenderTerminalLiveStatusLine()).toBe(true);
         const line = formatTerminalLiveStatusLine();
-        expect(line).toContain('PERGUNTA');
+        expect(line).toContain('Pergunta');
         expect(line).toContain('Qual cor devo usar');
         expect(line).toContain('opções azul|verde');
         expect(line).not.toContain('opções=');
