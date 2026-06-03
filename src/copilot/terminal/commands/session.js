@@ -122,6 +122,7 @@ function renderTerminalActorLabel(role, rawRole = null) {
     if (role === 'user') return { label: 'Você', role: 'user' };
     if (role === 'system' || rawRole === 'ask_user') return { label: 'Sistema', role: 'system' };
     if (rawRole === 'llm_a' || role === 'llm_a') return { label: 'LLM-A', role: 'system' };
+    if (role === 'assistant' || rawRole === 'assistant') return { label: 'LLM-B', role: 'assistant' };
     if (role === 'llm_b' || rawRole === 'llm_b') return { label: 'LLM-B', role: 'assistant' };
     return { label: String(role ?? rawRole ?? 'Turno'), role: 'muted' };
 }
@@ -192,6 +193,7 @@ function renderTerminalTimelineReconciliationLabel(value) {
     const status = String(value ?? '');
     if (!status || status === 'empty') return 'sem divergência';
     if (status === 'synced') return 'sincronizada';
+    if (status === 'reconciled') return 'reconciliada';
     if (status === 'diverged') return 'divergente';
     if (status === 'pending') return 'pendente';
     return status.replace(/[_-]+/gu, ' ');
@@ -217,6 +219,19 @@ function renderTerminalPermissionModeLabel(value) {
  */
 function renderTerminalSdkSessionPresence(value) {
     return typeof value === 'string' && value.trim().length > 0 ? 'sessão ativa' : 'sem sessão SDK';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderDbSessionStatusLabel(value) {
+    const status = String(value ?? '');
+    if (status === 'active') return 'ativa';
+    if (status === 'closed' || status === 'completed') return 'concluída';
+    if (status === 'archived') return 'arquivada';
+    if (status === 'failed' || status === 'error') return 'falhou';
+    return status.replace(/[_-]+/gu, ' ') || 'n/d';
 }
 
 /**
@@ -1285,23 +1300,37 @@ export function cmdHistory({ println }, n = 10) {
         return;
     }
     println('');
-    println(terminalThemeHeadline('assistant', 'Histórico', [timeline.timelineSource, timeline.timelineAuthority, timeline.reconciliationStatus]));
+    println(
+        terminalThemeHeadline('assistant', 'Histórico', [
+            renderTerminalTimelineSourceLabel(timeline.timelineSource),
+            renderTerminalTimelineReconciliationLabel(timeline.timelineAuthority),
+            renderTerminalTimelineReconciliationLabel(timeline.reconciliationStatus),
+        ]),
+    );
     println(terminalThemeDivider(64));
+    const now = Date.now();
     for (const turn of hist) {
-        const ts = formatTerminalIsoTimestamp(turn.timestamp);
+        const time = formatTerminalRelativeAge(turn.timestamp, now);
         const actor = renderTerminalActorLabel(turn.role, turn.rawRole);
-        const sourceLabel = turn.persisted ? '' : ` ${terminalThemeText('warn', '[live]')}`;
+        const sourceLabel = turn.persisted ? '' : ' · ao vivo';
         const preview = turn.content.slice(0, 160) + (turn.content.length > 160 ? '…' : '');
-        println(`  ${terminalThemeText('muted', `[${ts}]`)} ${terminalThemeText(actor.role, actor.label.padEnd(7))}${sourceLabel} ${preview}`);
+        println(terminalThemeRow(actor.label, `${time}${sourceLabel} · ${preview}`, { role: actor.role }));
     }
     if (timeline.reconciliationStatus === 'diverged') {
         println(
-            terminalThemeRow('Nota', `histórico do bridge divergiu; live-tail preservado=${timeline.liveBridgeTailCount} e sync bloqueado${timeline.syncBlockedReason ? ` (${timeline.syncBlockedReason})` : ''}.`, { role: 'warn' }),
+            terminalThemeRow(
+                'Nota',
+                `histórico em memória divergiu da persistência; ${timeline.liveBridgeTailCount} turno(s) ao vivo preservado(s)${timeline.syncBlockedReason ? ` · motivo ${timeline.syncBlockedReason}` : ''}`,
+                { role: 'warn' },
+            ),
         );
     }
     if (timeline.sync.status === 'scheduled' || timeline.sync.status === 'inflight') {
         println(
-            terminalThemeRow('Sync Hub', `${timeline.sync.status} (${timeline.sync.pendingCount} turnos live aguardando persistência).`),
+            terminalThemeRow(
+                'Sync Hub',
+                `${renderTerminalSyncStatusLabel(timeline.sync.status)} · ${timeline.sync.pendingCount} turno(s) aguardando persistência`,
+            ),
         );
     } else if (timeline.sync.status === 'failed') {
         println(terminalThemeRow('Sync Hub', `falhou: ${timeline.sync.lastError ?? 'erro desconhecido'}.`, { role: 'warn' }));
@@ -1333,13 +1362,14 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
         println('');
         println(terminalThemeHeadline('assistant', `Últimos ${turns.length} turnos da sessão atual${offsetLabel}`));
         println(terminalThemeDivider(52));
+        const now = Date.now();
         for (const t of turns) {
-            const ts = formatTerminalIsoTimestamp(String(t['created_at'] ?? ''));
+            const time = formatTerminalRelativeAge(String(t['created_at'] ?? ''), now);
             const role = String(t['role'] ?? 'user');
             const content = String(t['content'] ?? '');
             const actor = renderTerminalActorLabel(role, role);
             const preview = content.slice(0, 160) + (content.length > 160 ? '…' : '');
-            println(`  ${terminalThemeText('muted', `[${ts}]`)} ${terminalThemeText(actor.role, actor.label.padEnd(7))} ${preview}`);
+            println(terminalThemeRow(actor.label, `${time} · ${preview}`, { role: actor.role }));
         }
         println(
             terminalThemeRow('Janela', `${projection.effectiveOffset}..${projection.effectiveOffset + turns.length - 1} de ${projection.totalTurns} turnos persistidos`),
@@ -1369,18 +1399,23 @@ export function cmdDbSessions({ hubSessionId, println }, n = 10) {
             return;
         }
         println('');
-        println(terminalThemeHeadline('assistant', `Últimas ${sessions.length} hub sessions`));
+        println(terminalThemeHeadline('assistant', `Últimas ${sessions.length} sessões persistidas`));
         println(terminalThemeDivider(62));
+        const now = Date.now();
         for (const s of sessions) {
-            const createdAt = formatTerminalIsoTimestamp(String(s['created_at'] ?? ''));
+            const createdAt = formatTerminalRelativeAge(String(s['created_at'] ?? ''), now);
             const sessionId = String(s['id'] ?? '');
             const sessionStatus = String(s['status'] ?? 'unknown');
             const title = String(s['title'] ?? '(sem título)');
             const isCurrent = sessionId === currentHubSessionId;
             const statusRole = sessionStatus === 'active' ? 'success' : 'muted';
-            const marker = isCurrent ? ` ${terminalThemeText('warn', 'atual')}` : '';
+            const marker = isCurrent ? ' · atual' : '';
             println(
-                `  ${terminalThemeText(statusRole, sessionStatus.padEnd(8))} ${terminalThemeText('muted', createdAt)}  ${terminalThemeText('muted', sessionId.slice(0, 8))}  ${title}${marker}`,
+                terminalThemeRow(
+                    'Sessão',
+                    `${createdAt} · ${renderDbSessionStatusLabel(sessionStatus)} · ${title}${marker}`,
+                    { role: statusRole },
+                ),
             );
         }
         println(terminalThemeDivider(62));

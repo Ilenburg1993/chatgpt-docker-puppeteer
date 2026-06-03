@@ -619,7 +619,10 @@ describe('commands/session — sync commands', () => {
         expect(ctx.println).toHaveBeenCalled();
         expect(ctx.output()).toContain('a');
         expect(ctx.output()).toContain('Histórico');
-        expect(ctx.output()).toContain('mixed');
+        expect(ctx.output()).toContain('misto');
+        expect(ctx.output()).toContain('reconciliada');
+        expect(ctx.output()).toContain('LLM-B');
+        expect(ctx.output()).not.toMatch(/\[\d{4}-\d{2}-\d{2}T/u);
     });
 
     it('cmdWho imprime atores com porta', () => {
@@ -727,12 +730,16 @@ describe('commands/session — sync commands', () => {
         const ctx = mockCtx();
         cmdDbHistory({ hubSessionId: 'hub-1', println: ctx.println });
         expect(ctx.println).toHaveBeenCalled();
+        expect(ctx.output()).toContain('Últimos');
+        expect(ctx.output()).not.toMatch(/\[\d{4}-\d{2}-\d{2}T/u);
     });
 
     it('cmdDbSessions lista sessions', () => {
         const ctx = mockCtx();
         cmdDbSessions({ hubSessionId: 'abc-123', println: ctx.println });
         expect(ctx.output()).toContain('Test Session');
+        expect(ctx.output()).toContain('sessões persistidas');
+        expect(ctx.output()).not.toMatch(/\d{4}-\d{2}-\d{2}T/u);
     });
 
     it('cmdCount sem hubSessionId avisa', () => {

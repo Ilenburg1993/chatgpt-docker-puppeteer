@@ -48,7 +48,12 @@ export function formatTerminalIsoTimestamp(value) {
  * @returns {string}
  */
 export function formatTerminalRelativeAge(value, now = Date.now()) {
-    const timestamp = value instanceof Date ? value.getTime() : Number(value ?? now);
+    const timestamp =
+        value instanceof Date
+            ? value.getTime()
+            : typeof value === 'string'
+              ? Date.parse(value)
+              : Number(value ?? now);
     const safeTimestamp = Number.isFinite(timestamp) ? timestamp : now;
     const ageMs = Math.max(0, now - safeTimestamp);
     const seconds = Math.floor(ageMs / 1000);

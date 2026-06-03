@@ -3857,5 +3857,29 @@
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-session-sdk-surface-order-20260603-1549`.
   - Resultado: PASS em 10/10 critérios.
-- [ ] Próxima lacuna: revisar `/history`, `/db-history` e `/db-sessions`, porque ainda há
-      timestamps ISO e linhas de histórico que parecem export/log, não painel de leitura.
+- [x] Próxima lacuna: revisar `/history`, `/db-history` e `/db-sessions`, porque ainda havia
+      timestamps ISO e linhas de histórico que pareciam export/log, não painel de leitura.
+
+### 11.51 Histórico e DB sem aparência de export/log
+
+- [x] Achado: `/history` imprimia linhas manuais com `[ISO]`, `[live]`, `mixed` e `reconciled`.
+- [x] Achado: `/db-history` imprimia `[ISO]` e atores em formato de log.
+- [x] Achado: `/db-sessions` imprimia `hub sessions`, timestamp ISO e prefixos de ID de sessão.
+- [x] Implementação: `formatTerminalRelativeAge` agora aceita ISO string, além de number/Date.
+- [x] Implementação: `renderTerminalActorLabel` trata `assistant` como `LLM-B`, evitando ator cru.
+- [x] Implementação: timeline source/authority/reconciliation agora usa rótulos humanos como
+      `misto`, `reconciliada`, `divergente`, `sem histórico` e `sem divergência`.
+- [x] Implementação: `/history` e `/db-history` passaram para `terminalThemeRow`, com tempo
+      relativo e sem badge `[live]`.
+- [x] Implementação: `/db-sessions` passou a `Últimas N sessões persistidas`, status `ativa` /
+      `concluída`, tempo relativo e sem IDs no default.
+- [x] Teste escopado reforçado:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
+  - Cobertura adicionada contra ISO em `/history`, `/db-history` e `/db-sessions`.
+- [x] Harness live ampliado: `--diagnostic-ux-cycle` agora executa `/history 6`,
+      `/db-history 6` e `/db-sessions 6`.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-db-sessions-no-ids-20260603-1555`.
+  - Resultado: PASS em 13/13 critérios.
+- [ ] Próxima lacuna: revisar `/count`, `/who`, `/clear` e comandos pequenos que ainda podem
+      usar ANSI literal ou IDs compactos desnecessários.

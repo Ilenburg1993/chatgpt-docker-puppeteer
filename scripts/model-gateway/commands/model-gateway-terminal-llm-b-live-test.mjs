@@ -1737,7 +1737,10 @@ function diagnosticUxCycleCriteria(boot) {
     const eventsStart = plain.indexOf('/events 12', Math.max(0, toolsStart));
     const sdkEventsStart = plain.indexOf('/session sdk events 8', Math.max(0, eventsStart));
     const sdkWaitsStart = plain.indexOf('/session sdk waits 8', Math.max(0, sdkEventsStart));
-    const quitStart = plain.indexOf('/quit', Math.max(0, sdkWaitsStart));
+    const historyStart = plain.indexOf('/history 6', Math.max(0, sdkWaitsStart));
+    const dbHistoryStart = plain.indexOf('/db-history 6', Math.max(0, historyStart));
+    const dbSessionsStart = plain.indexOf('/db-sessions 6', Math.max(0, dbHistoryStart));
+    const quitStart = plain.indexOf('/quit', Math.max(0, dbSessionsStart));
     const surfaceBetween = (start, end) => {
         if (start < 0) return plain;
         const safeEnd = end > start ? end : plain.length;
@@ -1749,7 +1752,10 @@ function diagnosticUxCycleCriteria(boot) {
     const toolsSurface = surfaceBetween(toolsStart, eventsStart);
     const eventsSurface = surfaceBetween(eventsStart, sdkEventsStart);
     const sdkEventsSurface = surfaceBetween(sdkEventsStart, sdkWaitsStart);
-    const sdkWaitsSurface = surfaceBetween(sdkWaitsStart, quitStart);
+    const sdkWaitsSurface = surfaceBetween(sdkWaitsStart, historyStart);
+    const historySurface = surfaceBetween(historyStart, dbHistoryStart);
+    const dbHistorySurface = surfaceBetween(dbHistoryStart, dbSessionsStart);
+    const dbSessionsSurface = surfaceBetween(dbSessionsStart, quitStart);
     return [
         {
             id: 'diagnostic-ux-ready',
@@ -1828,6 +1834,27 @@ function diagnosticUxCycleCriteria(boot) {
             detail: '/session sdk waits rendered aggregate waits without event ids, raw SDK names, permission constants, ISO timestamps, or UUIDs',
         },
         {
+            id: 'diagnostic-ux-history-human',
+            pass:
+                /Histórico/iu.test(historySurface) &&
+                !/\[\d{4}-\d{2}-\d{2}T|reconciled|\bmixed\b|\[live\]/iu.test(historySurface),
+            detail: '/history rendered conversation turns without ISO timestamps, raw timeline labels, or [live] badges',
+        },
+        {
+            id: 'diagnostic-ux-db-history-human',
+            pass:
+                /(Últimos|Nenhum turno|não disponível)/iu.test(dbHistorySurface) &&
+                !/\[\d{4}-\d{2}-\d{2}T|\d{4}-\d{2}-\d{2}T/iu.test(dbHistorySurface),
+            detail: '/db-history rendered persisted turns or empty state without ISO timestamps',
+        },
+        {
+            id: 'diagnostic-ux-db-sessions-human',
+            pass:
+                /(sessões persistidas|Nenhuma sessão persistida)/iu.test(dbSessionsSurface) &&
+                !/\d{4}-\d{2}-\d{2}T|hub sessions|id [0-9a-f]{8}/iu.test(dbSessionsSurface),
+            detail: '/db-sessions rendered persisted session list without ISO timestamps, English hub-sessions copy, or raw ids',
+        },
+        {
             id: 'diagnostic-ux-clean-close',
             pass: boot.exitCode === 0 && /readline fechado/u.test(plain),
             detail: 'terminal closed cleanly after diagnostic UX cycle',
@@ -1852,6 +1879,9 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
             { line: '/events 12', advanceAfterMs: 1_000 },
             { line: '/session sdk events 8', advanceAfterMs: 1_000 },
             { line: '/session sdk waits 8', advanceAfterMs: 1_000 },
+            { line: '/history 6', advanceAfterMs: 1_000 },
+            { line: '/db-history 6', advanceAfterMs: 1_000 },
+            { line: '/db-sessions 6', advanceAfterMs: 1_000 },
             '/quit',
         ],
         terminalPort,
