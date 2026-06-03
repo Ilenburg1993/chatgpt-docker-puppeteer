@@ -26,6 +26,7 @@ import {
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
     terminalThemeBadge,
+    terminalThemeRow,
     terminalThemeStatus,
     terminalThemeText,
     withTerminalTurnCorrelation,
@@ -770,8 +771,11 @@ export function handleTerminalToolUserRequested(evt) {
         source: 'sdk',
         severity: 'warn',
     });
+    println('');
     println(
-        `\n  \x1b[33m🧩 Tool aguarda usuário:\x1b[0m ${toolName}${requestId ? ` \x1b[90m· ${renderToolRequestLabel(requestId)}\x1b[0m` : ''}`,
+        terminalThemeRow('Tool', `${toolName} aguarda usuário${requestId ? ` · ${renderToolRequestLabel(requestId)}` : ''}`, {
+            role: 'question',
+        }),
     );
     broadcastToolLifecycle(buildToolLifecycleUserRequested({ toolName, requestId: requestId ?? null }));
 }
@@ -820,7 +824,11 @@ export function handleTerminalExternalToolRequested({ registry, evt, verboseNarr
         printToolStart({ ...presentation, displayToolName, startLine: presentation.startLine });
     } else if (verboseNarration) {
         const targetLabel = presentation.target || presentation.path || renderToolRequestLabel(requestId) || '';
-        println(`  \x1b[90m↗ integração externa: ${displayToolName}${targetLabel ? ` · ${targetLabel}` : ''}\x1b[0m`);
+        println(
+            terminalThemeRow('Integração', `${displayToolName}${targetLabel ? ` · ${targetLabel}` : ''}`, {
+                role: 'tool',
+            }),
+        );
     }
     broadcastToolLifecycle(
         buildToolLifecycleExternalRequested({
@@ -904,7 +912,11 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
         printToolComplete(presentation, success, durationLabel, resolvedToolCallId);
     } else if (verboseNarration) {
         println(
-            `  ${success ? '\x1b[32m✓' : '\x1b[31m✗'} integração externa:\x1b[0m ${displayToolName}${requestId ? ` \x1b[90m· ${renderToolRequestLabel(requestId)}\x1b[0m` : ''}`,
+            terminalThemeRow(
+                'Integração',
+                `${displayToolName}${requestId ? ` · ${renderToolRequestLabel(requestId)}` : ''}`,
+                { role: success ? 'success' : 'error' },
+            ),
         );
     }
     broadcastToolLifecycle(

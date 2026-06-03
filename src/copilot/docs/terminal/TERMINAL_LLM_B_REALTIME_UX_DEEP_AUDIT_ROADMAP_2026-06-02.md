@@ -3612,5 +3612,10 @@
       `src/copilot/terminal/events/sdk-session-events.js`.
 - [x] Testes escopados passaram:
   - `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js tests/unit/copilot/terminal/test_intent_renderer.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js`.
+- [x] Continuação: `tool-lifecycle-runtime.js` removeu ANSI literal de `Tool aguarda usuário`,
+      `integração externa solicitada` e `integração externa concluída`, trocando por linhas
+      `Tool`/`Integração`.
+- [x] Testes escopados adicionais passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js`.
 - [ ] Próxima lacuna: executar live com cenário que gere pergunta/permissão/sampling/OAuth quando
       viável, para confirmar a estética de eventos SDK raros no terminal real.
