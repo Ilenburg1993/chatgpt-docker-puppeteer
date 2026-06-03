@@ -834,10 +834,14 @@ describe('commands/session — async commands', () => {
         });
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '1');
-        expect(ctx.output()).toContain('sdk-current');
+        expect(ctx.output()).toContain('sessão #1');
+        expect(ctx.output()).not.toContain('sdk-current');
         expect(ctx.output()).not.toContain('sdk-second');
         expect(ctx.output()).toContain('/session sdk <n>');
         expect(ctx.output()).toContain('...');
+        expect(ctx.output()).not.toContain('2026-05-21T');
+        expect(ctx.output()).not.toContain('last');
+        expect(ctx.output()).not.toContain('foreground');
         expect(ctx.output()).not.toContain('delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta');
     });
 
@@ -895,7 +899,8 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('workspace:.copilot/sdk-session-fs');
         expect(ctx.output()).toContain('Metadados');
         expect(ctx.output()).toContain('modelo kilo-auto/free');
-        expect(ctx.output()).toContain('limite provider-boundary');
+        expect(ctx.output()).toContain('limite mudança de provider/modelo BYOK');
+        expect(ctx.output()).not.toContain('provider-boundary');
         expect(ctx.output()).not.toContain('sdk-first');
     });
 
@@ -914,7 +919,7 @@ describe('commands/session — async commands', () => {
             mode: 'resume',
             sessionId: 'sdk-current',
         });
-        expect(ctx.output()).toContain('(#1)');
+        expect(ctx.output()).toContain('sessão SDK #1');
     });
 
     it('cmdSessionSdk apaga sessão persistida por índice fora da sessão viva', async () => {
@@ -936,7 +941,7 @@ describe('commands/session — async commands', () => {
         await cmdSessionSdk({ println: ctx.println }, 'delete #1');
         expect(deleteTerminalSdkSession).toHaveBeenCalledWith('sdk-old', null);
         expect(ctx.output()).toContain('Sessão SDK');
-        expect(ctx.output()).toContain('apagada: sdk-old (#1)');
+        expect(ctx.output()).toContain('apagada via #1');
         expect(ctx.output()).toContain('deleteSession');
     });
 
@@ -966,8 +971,8 @@ describe('commands/session — async commands', () => {
         });
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '2');
-        expect(ctx.output()).toContain('sdk-probe');
-        expect(ctx.output()).toContain('probe-residue');
+        expect(ctx.output()).not.toContain('sdk-probe');
+        expect(ctx.output()).toContain('diagnóstico antigo');
         expect(ctx.output()).toContain('probes novos usam sessão efêmera');
     });
 
@@ -999,7 +1004,8 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('BYOK pronto');
         expect(ctx.output()).toContain('Limite BYOK');
         expect(ctx.output()).toContain('Último boot');
-        expect(ctx.output()).toContain('provider-boundary');
+        expect(ctx.output()).toContain('mudança de provider/modelo BYOK');
+        expect(ctx.output()).not.toContain('provider-boundary');
     });
 
     it('cmdSessionSdkEvents resume lifecycle e commands pelo archive SSE canônico', async () => {

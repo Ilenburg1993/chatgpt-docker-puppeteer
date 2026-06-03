@@ -1541,7 +1541,7 @@ export function cmdClearShadow({ println }, arg = '') {
 }
 
 const SDK_SESSION_PROBE_SUMMARY_RE =
-    /\bBYOK_(?:AGENT_)?PROBE\b|\bterminal_byok_probe_marker\b|\bBYOK_AGENT_PROBE_ASK\b/iu;
+    /\bBYOK_(?:AGENT_)?PROBE(?:_\w+)?\b|\bterminal_byok_probe_marker\b|\bBYOK_AGENT_PROBE_ASK\b/iu;
 
 /**
  * @param {import('../../presentation/contracts/index.js').RuntimeSessionMetadata} entry
@@ -1566,14 +1566,17 @@ function isTerminalProbeSdkSession(entry) {
 function resolveSdkSessionResumeTarget(target, inventory) {
     const clean = target.trim();
     const normalized = clean.toLowerCase();
-    if (normalized === 'current' && inventory.currentSessionId) {
-        return { sessionId: inventory.currentSessionId, source: 'current' };
+    if ((normalized === 'current' || normalized === 'atual') && inventory.currentSessionId) {
+        return { sessionId: inventory.currentSessionId, source: 'atual' };
     }
-    if (normalized === 'last' && inventory.lastSessionId) {
-        return { sessionId: inventory.lastSessionId, source: 'last' };
+    if ((normalized === 'last' || normalized === 'ultima' || normalized === 'última') && inventory.lastSessionId) {
+        return { sessionId: inventory.lastSessionId, source: 'última usada' };
     }
-    if (normalized === 'foreground' && inventory.foregroundSessionId) {
-        return { sessionId: inventory.foregroundSessionId, source: 'foreground' };
+    if (
+        (normalized === 'foreground' || normalized === 'primeiro-plano' || normalized === 'primeiro_plano') &&
+        inventory.foregroundSessionId
+    ) {
+        return { sessionId: inventory.foregroundSessionId, source: 'primeiro plano' };
     }
     const indexed = /^#(?<index>\d+)$/u.exec(clean);
     if (indexed?.groups?.['index']) {
@@ -1601,13 +1604,13 @@ function renderSdkSessionBootDecision(decision) {
             : null;
     const reason = typeof decision['reason'] === 'string' && decision['reason'] ? decision['reason'] : null;
     if (!outcome || !requestedMode || !selectedSessionId || !reason) return null;
-    const candidate =
-        typeof decision['resumeCandidateSessionId'] === 'string' && decision['resumeCandidateSessionId']
-            ? ` · candidato ${decision['resumeCandidateSessionId']}`
-            : '';
     const outcomeLabel = outcome === 'created' ? 'criada' : 'retomada';
     const requestedLabel = requestedMode === 'new' ? 'nova' : requestedMode === 'resume' ? 'retomar' : 'automática';
-    return `${outcomeLabel} · pedido ${requestedLabel} · sessão ${selectedSessionId}${candidate} · motivo ${reason}`;
+    const candidate =
+        typeof decision['resumeCandidateSessionId'] === 'string' && decision['resumeCandidateSessionId']
+            ? ' · candidato informado'
+            : '';
+    return `${outcomeLabel} · pedido ${requestedLabel}${candidate} · motivo ${renderSdkSessionReasonLabel(reason)}`;
 }
 
 /**
@@ -1618,7 +1621,7 @@ function renderSdkSessionSummaryPreview(summary) {
     if (typeof summary !== 'string') return '';
     const compact = summary.replace(/\s+/gu, ' ').trim();
     if (!compact) return '';
-    return compact.length > 180 ? `${compact.slice(0, 177)}...` : compact;
+    return compact.length > 120 ? `${compact.slice(0, 117)}...` : compact;
 }
 
 /**
@@ -1705,10 +1708,112 @@ function renderSdkSessionLocalMetadata(metadata) {
     const reason = typeof boundary?.['reason'] === 'string' ? boundary['reason'] : null;
     const parts = [
         model ? `modelo ${model}` : null,
-        providerKind ? `provedor ${providerKind}${providerModel && providerModel !== model ? `:${providerModel}` : ''}` : null,
-        reason ? `limite ${reason}` : null,
+        providerKind
+            ? `provedor ${renderSdkSessionProviderKindLabel(providerKind)}${
+                  providerModel && providerModel !== model ? `:${providerModel}` : ''
+              }`
+            : null,
+        reason ? `limite ${renderSdkSessionReasonLabel(reason)}` : null,
     ].filter(Boolean);
     return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderSdkSessionProviderKindLabel(value) {
+    const kind = String(value ?? '').trim();
+    if (kind === 'github-copilot') return 'GitHub Copilot';
+    if (kind === 'byok') return 'BYOK';
+    if (kind === 'openai') return 'OpenAI';
+    return kind.replace(/[._-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderSdkSessionReasonLabel(value) {
+    const reason = String(value ?? '').trim();
+    if (!reason) return 'n/d';
+    if (reason.includes('operator-next-boot-new-session')) return 'operador pediu nova sessão no próximo boot';
+    if (reason.includes('sdk-resume-fallback-created-new-session')) {
+        return 'retomada automática criou sessão nova quando a anterior não pôde ser retomada';
+    }
+    if (reason.includes('auto-resume-persisted-session')) return 'retomada automática da sessão persistida';
+    if (reason.includes('provider-boundary')) return 'mudança de provider/modelo BYOK';
+    if (reason.includes('byok')) return reason.replace(/[._-]+/gu, ' ');
+    return compactSdkSessionEventValue(reason.replace(/\bsdk[-_]/giu, '').replace(/[._-]+/gu, ' '), 96);
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} [now]
+ * @returns {string}
+ */
+function renderSdkSessionRelativeTime(value, now = Date.now()) {
+    if (value == null || value === '') return 'sem horário';
+    const rendered = formatTerminalRelativeAge(/** @type {Date | number | string} */ (value), now);
+    return rendered === 'agora' ? 'há 0s' : rendered;
+}
+
+/**
+ * @param {string | null | undefined} sessionId
+ * @param {import('../../presentation/contracts/index.js').RuntimeSessionMetadata[]} sessions
+ * @param {number} [offset]
+ * @returns {string | null}
+ */
+function findSdkSessionHandle(sessionId, sessions, offset = 0) {
+    if (!sessionId) return null;
+    const index = sessions.findIndex((entry) => entry.sessionId === sessionId);
+    return index >= 0 ? `#${offset + index + 1}` : null;
+}
+
+/**
+ * @param {string | null | undefined} sessionId
+ * @param {import('../../presentation/contracts/index.js').RuntimeSessionMetadata[]} sessions
+ * @param {number} [offset]
+ * @returns {string}
+ */
+function renderSdkSessionTopReference(sessionId, sessions, offset = 0) {
+    if (!sessionId) return 'ausente';
+    const handle = findSdkSessionHandle(sessionId, sessions, offset);
+    return handle ? `sessão ${handle}` : 'sessão não listada nesta página';
+}
+
+/**
+ * @param {import('../../presentation/contracts/index.js').RuntimeSessionMetadata} entry
+ * @param {{
+ *     currentSessionId: string | null;
+ *     lastSessionId: string | null;
+ *     foregroundSessionId: string | null;
+ * }} inventory
+ * @returns {string}
+ */
+function renderSdkSessionInventoryBadges(entry, inventory) {
+    const badges = [
+        entry.sessionId === inventory.currentSessionId ? 'atual' : null,
+        entry.sessionId === inventory.lastSessionId ? 'última usada' : null,
+        entry.sessionId === inventory.foregroundSessionId ? 'em primeiro plano' : null,
+        isTerminalProbeSdkSession(entry) ? 'diagnóstico antigo' : null,
+        entry.isRemote ? 'remota' : 'local',
+    ].filter(Boolean);
+    return badges.length > 0 ? badges.join(' · ') : 'sem marcações';
+}
+
+/**
+ * @param {{ mode?: unknown; sessionId?: unknown } | null | undefined} bootSelection
+ * @param {import('../../presentation/contracts/index.js').RuntimeSessionMetadata[]} sessions
+ * @returns {string}
+ */
+function renderSdkSessionNextBootLabel(bootSelection, sessions) {
+    if (bootSelection?.mode === 'resume') {
+        const handle = typeof bootSelection.sessionId === 'string' ? findSdkSessionHandle(bootSelection.sessionId, sessions) : null;
+        return handle ? `retomar sessão ${handle}` : 'retomar sessão informada';
+    }
+    if (bootSelection?.mode === 'new') return 'criar nova sessão';
+    return 'automático';
 }
 
 /**
@@ -2071,11 +2176,11 @@ export async function cmdSessionSdk({ println }, arg = '') {
         } else if (mode === 'resume') {
             const target = modeRest.join(' ').trim();
             if (!target) {
-                println(terminalThemeRow('Uso', '/session sdk next resume <sessionId|#n|current|last|foreground>', { role: 'warn' }));
+                println(terminalThemeRow('Uso', '/session sdk next resume <id|#n|atual|última|primeiro-plano>', { role: 'warn' }));
                 return;
             }
             let resolved;
-            if (/^(?:#\d+|current|last|foreground)$/iu.test(target)) {
+            if (/^(?:#\d+|current|last|foreground|atual|ultima|última|primeiro[-_]plano)$/iu.test(target)) {
                 let inventory;
                 try {
                     inventory = await listTerminalSdkSessionInventory(runtimeId);
@@ -2108,7 +2213,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
             println(
                 terminalThemeRow(
                     'Próximo boot',
-                    `tentar retomar sessão SDK ${resolved.sessionId}${resolved.source === 'id' ? '' : ` (${resolved.source})`}`,
+                    `tentar retomar sessão SDK${resolved.source === 'id' ? ' informada' : ` ${resolved.source}`}`,
                     { role: 'success' },
                 ),
             );
@@ -2117,7 +2222,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
             if (!result.ok) throw result.error;
             println(terminalThemeRow('Próximo boot', 'seleção automática restaurada; a sessão persistida anterior volta a ser o padrão', { role: 'success' }));
         } else {
-            println(terminalThemeRow('Uso', '/session sdk next <new|resume <sessionId|#n|current|last|foreground>|auto>', { role: 'warn' }));
+            println(terminalThemeRow('Uso', '/session sdk next <new|resume <id|#n|atual|última|primeiro-plano>|auto>', { role: 'warn' }));
             return;
         }
         println(terminalThemeRow('Nota', 'a diretiva é consumida pelo initializer no próximo boot; /restart reinicia só a conversa'));
@@ -2143,7 +2248,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
             return;
         }
         if (resolved.sessionId === inventory.currentSessionId) {
-            println(terminalThemeRow('Proteção', `sessão SDK viva não apagada: ${resolved.sessionId}`, { role: 'error' }));
+            println(terminalThemeRow('Proteção', 'sessão SDK viva não apagada', { role: 'error' }));
             println(terminalThemeRow('Ação', 'agende /session sdk next new ou retome outra sessão no próximo boot antes de apagar esta'));
             return;
         }
@@ -2156,7 +2261,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
         println(
             terminalThemeRow(
                 'Sessão SDK',
-                `apagada: ${resolved.sessionId}${resolved.source === 'id' ? '' : ` (${resolved.source})`}`,
+                `apagada${resolved.source === 'id' ? ' por ID informado' : ` via ${resolved.source}`}`,
                 { role: 'success' },
             ),
         );
@@ -2178,17 +2283,12 @@ export async function cmdSessionSdk({ println }, arg = '') {
         return;
     }
 
-    const nextLabel =
-        bootSelection?.mode === 'resume'
-            ? `retomar ${bootSelection.sessionId}`
-            : bootSelection?.mode === 'new'
-              ? 'criar nova sessão'
-              : 'automático';
+    const nextLabel = renderSdkSessionNextBootLabel(bootSelection, inventory.sessions);
     println('');
     println(terminalThemeHeadline('assistant', 'Sessão SDK'));
-    println(terminalThemeRow('Atual', inventory.currentSessionId ?? 'sem sessão viva'));
-    println(terminalThemeRow('Última SDK', inventory.lastSessionId ?? '-'));
-    println(terminalThemeRow('Foreground', inventory.foregroundSessionId ?? '-'));
+    println(terminalThemeRow('Atual', renderSdkSessionTopReference(inventory.currentSessionId, inventory.sessions)));
+    println(terminalThemeRow('Última usada', renderSdkSessionTopReference(inventory.lastSessionId, inventory.sessions)));
+    println(terminalThemeRow('Primeiro plano', renderSdkSessionTopReference(inventory.foregroundSessionId, inventory.sessions)));
     println(terminalThemeRow('Próximo boot', nextLabel));
     println(terminalThemeRow('Arquivos', renderSdkSessionFsState(inventory.sessionFs)));
     const byokBinding = classifyTerminalByokSdkBinding(
@@ -2227,28 +2327,26 @@ export async function cmdSessionSdk({ println }, arg = '') {
         ]),
     );
     const visibleSessions = inventory.sessions.slice(inventoryArgs.offset, inventoryArgs.offset + inventoryArgs.limit);
+    const now = Date.now();
     for (const [index, entry] of visibleSessions.entries()) {
         const absoluteIndex = inventoryArgs.offset + index;
-        const flags = [
-            entry.sessionId === inventory.currentSessionId ? 'atual' : null,
-            entry.sessionId === inventory.lastSessionId ? 'last' : null,
-            entry.sessionId === inventory.foregroundSessionId ? 'foreground' : null,
-            isTerminalProbeSdkSession(entry) ? 'probe-residue' : null,
-            entry.isRemote ? 'remote' : 'local',
-        ]
-            .filter(Boolean)
-            .join(',');
-        const start = entry.startTime instanceof Date ? entry.startTime.toISOString() : String(entry.startTime ?? '-');
-        const modified =
-            entry.modifiedTime instanceof Date ? entry.modifiedTime.toISOString() : String(entry.modifiedTime ?? '-');
+        const badges = renderSdkSessionInventoryBadges(entry, inventory);
+        const start = renderSdkSessionRelativeTime(entry.startTime ?? entry.createdAt ?? null, now);
+        const modified = renderSdkSessionRelativeTime(
+            entry.modifiedTime ?? entry.updatedAt ?? entry.lastActivityAt ?? null,
+            now,
+        );
         const summary = renderSdkSessionSummaryPreview(entry.summary);
         const localMetadata = renderSdkSessionLocalMetadata(
             entry.localMetadata && typeof entry.localMetadata === 'object'
                 ? /** @type {Record<string, unknown>} */ (entry.localMetadata)
                 : null,
         );
-        println(terminalThemeRow(`#${absoluteIndex + 1}`, `${entry.sessionId} · ${flags || '-'}`));
-        println(terminalThemeRow('Tempo', `início ${start} · alterada ${modified}${summary ? ` · ${summary}` : ''}`));
+        println(terminalThemeRow(`#${absoluteIndex + 1}`, badges));
+        println(terminalThemeRow('Tempo', `início ${start} · alterada ${modified}`));
+        if (summary) {
+            println(terminalThemeRow('Resumo', summary));
+        }
         if (localMetadata) {
             println(terminalThemeRow('Metadados', localMetadata));
         }
@@ -2265,10 +2363,10 @@ export async function cmdSessionSdk({ println }, arg = '') {
         );
     }
     println('');
-    println(terminalThemeRow('Próximo boot', '/session sdk next new | /session sdk next resume <id|#n|current|last|foreground> | /session sdk next auto'));
+    println(terminalThemeRow('Próximo boot', '/session sdk next new | /session sdk next resume <id|#n|atual|última|primeiro-plano> | /session sdk next auto'));
     println(terminalThemeRow('Filtros', '/session sdk <n> offset=<n> cwd=<path> gitRoot=<path> repo=<owner/repo> branch=<nome>'));
     println(terminalThemeRow('Limpeza', '/session sdk delete <id|#n>; sessão viva é protegida contra exclusão'));
-    println(terminalThemeRow('Probes', 'probe-residue marca canários persistidos por diagnósticos antigos; probes novos usam sessão efêmera'));
+    println(terminalThemeRow('Diagnósticos', 'sessões marcadas como diagnóstico antigo vieram de canários persistidos; probes novos usam sessão efêmera'));
     println('');
 }
 

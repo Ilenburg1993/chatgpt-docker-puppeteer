@@ -1737,7 +1737,8 @@ function diagnosticUxCycleCriteria(boot) {
     const eventsStart = plain.indexOf('/events 12', Math.max(0, toolsStart));
     const sdkEventsStart = plain.indexOf('/session sdk events 8', Math.max(0, eventsStart));
     const sdkWaitsStart = plain.indexOf('/session sdk waits 8', Math.max(0, sdkEventsStart));
-    const historyStart = plain.indexOf('/history 6', Math.max(0, sdkWaitsStart));
+    const sdkInventoryStart = plain.indexOf('/session sdk 6', Math.max(0, sdkWaitsStart));
+    const historyStart = plain.indexOf('/history 6', Math.max(0, sdkInventoryStart));
     const dbHistoryStart = plain.indexOf('/db-history 6', Math.max(0, historyStart));
     const dbSessionsStart = plain.indexOf('/db-sessions 6', Math.max(0, dbHistoryStart));
     const whoStart = plain.indexOf('/who', Math.max(0, dbSessionsStart));
@@ -1755,7 +1756,8 @@ function diagnosticUxCycleCriteria(boot) {
     const toolsSurface = surfaceBetween(toolsStart, eventsStart);
     const eventsSurface = surfaceBetween(eventsStart, sdkEventsStart);
     const sdkEventsSurface = surfaceBetween(sdkEventsStart, sdkWaitsStart);
-    const sdkWaitsSurface = surfaceBetween(sdkWaitsStart, historyStart);
+    const sdkWaitsSurface = surfaceBetween(sdkWaitsStart, sdkInventoryStart);
+    const sdkInventorySurface = surfaceBetween(sdkInventoryStart, historyStart);
     const historySurface = surfaceBetween(historyStart, dbHistoryStart);
     const dbHistorySurface = surfaceBetween(dbHistoryStart, dbSessionsStart);
     const dbSessionsSurface = surfaceBetween(dbSessionsStart, whoStart);
@@ -1840,6 +1842,16 @@ function diagnosticUxCycleCriteria(boot) {
             detail: '/session sdk waits rendered aggregate waits without event ids, raw SDK names, permission constants, ISO timestamps, or UUIDs',
         },
         {
+            id: 'diagnostic-ux-session-sdk-inventory-human',
+            pass:
+                /Sessão SDK[\s\S]*(Sessões SDK listadas|nenhuma sessão SDK listada)/iu.test(sdkInventorySurface) &&
+                /Última usada|Primeiro plano/iu.test(sdkInventorySurface) &&
+                !/\d{4}-\d{2}-\d{2}T|Foreground|probe-residue|\blast\b|\bforeground\b|operator-next-boot|sdk-resume-fallback|provider-boundary|\bsdk-(?:current|old|probe|new|last|second)\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
+                    sdkInventorySurface,
+                ),
+            detail: '/session sdk default rendered inventory with relative time, translated labels, and without raw ids, ISO timestamps, or English flags',
+        },
+        {
             id: 'diagnostic-ux-history-human',
             pass:
                 /Histórico/iu.test(historySurface) &&
@@ -1896,6 +1908,7 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
             { line: '/events 12', advanceAfterMs: 1_000 },
             { line: '/session sdk events 8', advanceAfterMs: 1_000 },
             { line: '/session sdk waits 8', advanceAfterMs: 1_000 },
+            { line: '/session sdk 6', advanceAfterMs: 1_000 },
             { line: '/history 6', advanceAfterMs: 1_000 },
             { line: '/db-history 6', advanceAfterMs: 1_000 },
             { line: '/db-sessions 6', advanceAfterMs: 1_000 },

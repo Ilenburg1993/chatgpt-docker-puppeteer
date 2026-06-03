@@ -3913,6 +3913,43 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-small-commands-20260603-1558`.
   - Resultado: PASS; `/who` mostrou atores humanos, `/count` mostrou estatísticas sem IDs e
         `/clear` confirmou memória local limpa sem ANSI cru.
-- [ ] Próxima lacuna: revisar `/session sdk` fora dos subcomandos `events/waits`, pois o
+- [x] Próxima lacuna: revisar `/session sdk` fora dos subcomandos `events/waits`, pois o
       inventário de sessões e ações de resume/next ainda pode expor índices, estados e
       metadados técnicos demais sem explicar o que o operador deve fazer.
+
+### 11.53 `/session sdk` default como inventário operacional
+
+- [x] Achado: o painel principal de `/session sdk` ainda imprimia `Foreground`, IDs de sessão,
+      flags como `last`, `foreground`, `remote/local`, `probe-residue` e timestamps ISO.
+- [x] Achado live: mesmo após remover IDs, o painel ainda vazava motivos técnicos como
+      `sdk-resume-fallback-created-new-session` e `operator-next-boot-new-session`.
+- [x] Decisão: `/session sdk` default deve ser uma lista acionável com alças `#n`, status em
+      português e tempo relativo; IDs crus e diagnósticos de baixo nível pertencem a comandos
+      explícitos.
+- [x] Implementação: `resolveSdkSessionResumeTarget` passou a aceitar atalhos em português
+      (`atual`, `última`, `primeiro-plano`) sem quebrar os atalhos antigos.
+- [x] Implementação: o topo do painel passou a mostrar `Atual`, `Última usada` e `Primeiro
+      plano` como `sessão #n`, `ausente` ou `sessão não listada nesta página`, em vez de IDs.
+- [x] Implementação: o inventário passou a renderizar badges como `atual`, `última usada`,
+      `em primeiro plano`, `diagnóstico antigo`, `local` e `remota`.
+- [x] Implementação: início/alteração de sessões passaram a usar tempo relativo.
+- [x] Implementação: o resumo de sessão saiu da linha `Tempo` e ganhou linha própria `Resumo`,
+      reduzindo quebra visual e linhas desalinhadas.
+- [x] Implementação: razões de boot/metadados passaram por normalizador humano, traduzindo
+      códigos como `provider-boundary`, `operator-next-boot-new-session` e
+      `sdk-resume-fallback-created-new-session`.
+- [x] Implementação: provedores em metadados passaram a aparecer como `GitHub Copilot`, `BYOK`
+      ou `OpenAI`, quando aplicável.
+- [x] Implementação: probes antigos agora reconhecem sufixos como `BYOK_PROBE_OK` e aparecem
+      como `diagnóstico antigo`.
+- [x] Teste escopado passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
+  - Cobertura reforçada contra IDs/ISO/flags cruas no default e contra códigos de motivo crus.
+- [x] Harness live ampliado: `--diagnostic-ux-cycle` agora executa `/session sdk 6` e adiciona o
+      critério `diagnostic-ux-session-sdk-inventory-human`.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-session-sdk-reasons-20260603-1608`.
+  - Resultado: PASS em 15/15 critérios; `/session sdk` mostrou alças `#n`, tempo relativo,
+        `Última usada`, `Primeiro plano`, motivo de boot traduzido e metadados sem códigos crus.
+- [ ] Próxima lacuna: auditar `/sdk` e `/scope`, pois buscas no código ainda indicam ANSI
+      literal, IDs de sessão em linhas default e nomes técnicos que podem reaparecer na UX.
