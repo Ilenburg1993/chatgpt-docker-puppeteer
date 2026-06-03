@@ -78,6 +78,7 @@ import {
     cmdWorkspace as _cmdWorkspace,
 } from '../commands/index.js';
 import { ensureDialogLoop, getTurnQueueDepth, println, printlnBlock, sendTurn } from '../dialog/index.js';
+import { terminalThemeRow } from '../state/repl/index.js';
 import {
     abortTerminalCurrentMessage,
     answerTerminalPendingQuestion,
@@ -254,16 +255,16 @@ function tryApplyImmediateTerminalZeroPr(message) {
 async function _cmdSteer(message) {
     const prompt = message.trim();
     if (!prompt) {
-        println('\x1b[33m  Uso: /steer <mensagem imediata para o turno ativo>\x1b[0m');
+        println(terminalThemeRow('/steer', 'Uso: /steer <mensagem imediata para o turno ativo>', { role: 'command' }));
         return;
     }
     const interventionPolicy = getTerminalInterventionPolicy();
     if (interventionPolicy.enabled && !interventionPolicy.allowSteer) {
         if (tryApplyImmediateTerminalZeroPr(prompt)) {
-            println('\x1b[36m  [zero-pr] intervenção aplicada imediatamente na pergunta pendente.\x1b[0m');
+            println(terminalThemeRow('Intervenção', 'aplicada imediatamente na pergunta pendente', { role: 'success' }));
             return;
         }
-        println('\x1b[33m  [steer] Bloqueado por política zero-PR para evitar consumo implícito de PR.\x1b[0m');
+        println(terminalThemeRow('/steer', 'bloqueado por política zero-PR para evitar consumo implícito de PR', { role: 'warn' }));
         const queued = enqueueRuntimeInterventionMailbox({
             runtimeId: null,
             source: 'terminal',
@@ -271,21 +272,27 @@ async function _cmdSteer(message) {
             message: prompt,
         });
         println(
-            `\x1b[36m  [mailbox] intervenção registrada para próxima pergunta humana (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''}).\x1b[0m`,
+            terminalThemeRow(
+                'Mailbox',
+                `intervenção registrada para próxima pergunta humana (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''})`,
+                { role: 'success' },
+            ),
         );
-        println(
-            '\x1b[90m  Use /abort para interromper sem PR, ou /turn <mensagem> para abrir novo turno explicitamente.\x1b[0m',
-        );
+        println(terminalThemeRow('Próximo', 'Use /abort para interromper sem PR, ou /turn <mensagem> para abrir novo turno explicitamente.'));
         return;
     }
     try {
         const messageId = await steerTerminalMessage(prompt);
         println(
-            `\x1b[36m  [steer] Intervenção immediate enviada ao SDK${messageId ? ` (mensagem ${messageId})` : ''}.\x1b[0m`,
+            terminalThemeRow(
+                '/steer',
+                `intervenção immediate enviada ao SDK${messageId ? ` (mensagem ${messageId})` : ''}`,
+                { role: 'success' },
+            ),
         );
-        println('\x1b[90m  Observação: /steer pode consumir PR via SDK immediate.\x1b[0m');
+        println(terminalThemeRow('Nota', '/steer pode consumir PR via SDK immediate.'));
     } catch (e) {
-        println(`\x1b[31m  [steer] Falha ao enviar intervenção imediata: ${toError(e).message}\x1b[0m`);
+        println(terminalThemeRow('/steer', `falha ao enviar intervenção imediata: ${toError(e).message}`, { role: 'error' }));
     }
 }
 
@@ -305,12 +312,12 @@ async function _cmdInterrupt(message) {
         const interventionPolicy = getTerminalInterventionPolicy();
         if (interventionPolicy.enabled && !interventionPolicy.allowQueueFallback) {
             if (tryApplyImmediateTerminalZeroPr(prompt)) {
-                println('\x1b[36m  [zero-pr] intervenção aplicada imediatamente na pergunta pendente.\x1b[0m');
+                println(terminalThemeRow('Intervenção', 'aplicada imediatamente na pergunta pendente', { role: 'success' }));
                 return;
             }
             const aborted = await _cmdAbortCurrentTurn();
             if (!aborted) {
-                println('\x1b[31m  [interrupt] Abort falhou; nenhuma substituição foi aplicada.\x1b[0m');
+                println(terminalThemeRow('/interrupt', 'abort falhou; nenhuma substituição foi aplicada', { role: 'error' }));
                 return;
             }
             const queued = enqueueRuntimeInterventionMailbox({
@@ -319,27 +326,33 @@ async function _cmdInterrupt(message) {
                 modeHint: 'interrupt',
                 message: prompt,
             });
+            println(terminalThemeRow('/interrupt', 'política zero-PR ativa: substituição não foi enfileirada como turno para evitar consumo de PR', { role: 'warn' }));
             println(
-                '\x1b[33m  [interrupt] Política zero-PR ativa: substituição não foi enfileirada como turno para evitar consumo de PR.\x1b[0m',
+                terminalThemeRow(
+                    'Mailbox',
+                    `mensagem substituta registrada para próxima pergunta humana (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''})`,
+                    { role: 'success' },
+                ),
             );
-            println(
-                `\x1b[36m  [mailbox] mensagem substituta registrada para próxima pergunta humana (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''}).\x1b[0m`,
-            );
-            println('\x1b[90m  Se precisar abrir novo turno manualmente, use /turn <mensagem>.\x1b[0m');
+            println(terminalThemeRow('Próximo', 'Se precisar abrir novo turno manualmente, use /turn <mensagem>.'));
             return;
         }
         const aborted = await _cmdAbortCurrentTurn();
         if (!aborted) {
-            println('\x1b[31m  [interrupt] Mensagem substituta não foi enviada porque o abort falhou.\x1b[0m');
+            println(terminalThemeRow('/interrupt', 'mensagem substituta não foi enviada porque o abort falhou', { role: 'error' }));
             return;
         }
         const queuedBefore = getTurnQueueDepth();
         const turn = sendTurn(prompt, 'user');
         println(
-            `\x1b[36m  [interrupt] Mensagem substituta enfileirada para a LLM-B (posição ${Math.max(1, queuedBefore + 1)}).\x1b[0m`,
+            terminalThemeRow(
+                '/interrupt',
+                `mensagem substituta enfileirada para a LLM-B (posição ${Math.max(1, queuedBefore + 1)})`,
+                { role: 'success' },
+            ),
         );
         void turn.catch((e) => {
-            println(`\x1b[31m  [interrupt] Turno substituto falhou: ${toError(e).message}\x1b[0m`);
+            println(terminalThemeRow('/interrupt', `turno substituto falhou: ${toError(e).message}`, { role: 'error' }));
         });
     });
 }
@@ -355,17 +368,21 @@ function _cmdMailbox(arg) {
     const sub = (subRaw ?? 'status').toLowerCase();
     if (sub === 'clear') {
         const removed = clearRuntimeInterventionMailbox(null);
-        println(`\x1b[32m  [mailbox] limpo (${removed} item(ns) removido(s)).\x1b[0m`);
+        println(terminalThemeRow('Mailbox', `limpo (${removed} item(ns) removido(s))`, { role: 'success' }));
         return;
     }
     if (sub === 'consume' || sub === 'pop') {
         const entry = consumeRuntimeInterventionMailbox(null);
         if (!entry) {
-            println('\x1b[33m  [mailbox] vazio.\x1b[0m');
+            println(terminalThemeRow('Mailbox', 'vazio', { role: 'warn' }));
             return;
         }
         println(
-            `\x1b[36m  [mailbox] intervenção consumida · origem ${entry.source} · modo ${entry.modeHint} · ${entry.message.slice(0, 140)}\x1b[0m`,
+            terminalThemeRow(
+                'Mailbox',
+                `intervenção consumida · origem ${entry.source} · modo ${entry.modeHint} · ${entry.message.slice(0, 140)}`,
+                { role: 'success' },
+            ),
         );
         deliverEntryAsTurnIfIdle(entry, 'manual_consume');
         return;
@@ -373,14 +390,17 @@ function _cmdMailbox(arg) {
     const summary = readRuntimeInterventionMailboxSummary(null);
     const latest = summary.latest;
     println(
-        `\x1b[36m  [mailbox] ${summary.queueSize} na fila · ${summary.dropped} descartada(s) · runtime ${summary.runtimeId}\x1b[0m`,
+        terminalThemeRow('Mailbox', `${summary.queueSize} na fila · ${summary.dropped} descartada(s) · runtime ${summary.runtimeId}`),
     );
     if (latest) {
         println(
-            `\x1b[90m  última intervenção · origem ${latest.source} · modo ${latest.modeHint} · mesclas ${latest.mergedCount} · ${latest.message.slice(0, 180)}\x1b[0m`,
+            terminalThemeRow(
+                'Última',
+                `origem ${latest.source} · modo ${latest.modeHint} · mesclas ${latest.mergedCount} · ${latest.message.slice(0, 180)}`,
+            ),
         );
     }
-    println('\x1b[90m  comandos: /mailbox status | /mailbox consume | /mailbox clear\x1b[0m');
+    println(terminalThemeRow('Comandos', '/mailbox status · /mailbox consume · /mailbox clear', { role: 'command' }));
 }
 
 /**
@@ -394,23 +414,29 @@ function _cmdMailbox(arg) {
 async function _cmdTurn(message) {
     const prompt = message.trim();
     if (!prompt) {
-        println('\x1b[33m  Uso: /turn <mensagem>\x1b[0m');
+        println(terminalThemeRow('/turn', 'Uso: /turn <mensagem>', { role: 'command' }));
         return;
     }
     const queuedBefore = getTurnQueueDepth();
     const wasBusy = readTerminalRuntimeControlState().status !== 'idle' || queuedBefore > 0;
     println(
         wasBusy
-            ? `\x1b[36m  [turn] Turno explícito aguardando posição ${Math.max(1, queuedBefore + 1)} na fila canônica. Este caminho pode consumir PR.\x1b[0m`
-            : '\x1b[36m  [turn] Turno explícito iniciado no foreground. Este caminho pode consumir PR.\x1b[0m',
+            ? terminalThemeRow(
+                  '/turn',
+                  `turno explícito aguardando posição ${Math.max(1, queuedBefore + 1)} na fila canônica. Este caminho pode consumir PR.`,
+                  { role: 'warn' },
+              )
+            : terminalThemeRow('/turn', 'turno explícito iniciado no foreground. Este caminho pode consumir PR.', {
+                  role: 'warn',
+              }),
     );
     try {
         const reply = await sendTurn(prompt, 'user');
         if (reply === null) {
-            println('\x1b[33m  [turn] Turno explícito concluído sem resposta textual. Veja /errors ou /status.\x1b[0m');
+            println(terminalThemeRow('/turn', 'turno explícito concluído sem resposta textual. Veja /errors ou /status.', { role: 'warn' }));
         }
     } catch (e) {
-        println(`\x1b[31m  [turn] Falha no turno explícito: ${toError(e).message}\x1b[0m`);
+        println(terminalThemeRow('/turn', `falha no turno explícito: ${toError(e).message}`, { role: 'error' }));
     }
 }
 
@@ -423,11 +449,11 @@ async function _cmdTurn(message) {
 function _cmdQueueMailbox(message) {
     const prompt = message.trim();
     if (!prompt) {
-        println('\x1b[33m  Uso: /queue <mensagem>\x1b[0m');
+        println(terminalThemeRow('/queue', 'Uso: /queue <mensagem>', { role: 'command' }));
         return;
     }
     if (tryApplyImmediateTerminalZeroPr(prompt)) {
-        println('\x1b[36m  [queue] intervenção aplicada imediatamente na pergunta pendente (zero-PR).\x1b[0m');
+        println(terminalThemeRow('Intervenção', 'aplicada imediatamente na pergunta pendente (zero-PR)', { role: 'success' }));
         return;
     }
     const queued = enqueueRuntimeInterventionMailbox({
@@ -437,7 +463,11 @@ function _cmdQueueMailbox(message) {
         message: prompt,
     });
     println(
-        `\x1b[36m  [queue] intervenção enfileirada no mailbox zero-PR (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''}).\x1b[0m`,
+        terminalThemeRow(
+            'Fila',
+            `intervenção enfileirada no mailbox zero-PR (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''})`,
+            { role: 'success' },
+        ),
     );
 }
 

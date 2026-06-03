@@ -1683,7 +1683,9 @@ export async function cmdElicitation({ println }, arg = '') {
         if (sub === 'confirm') {
             const message = rest.join(' ').trim() || 'Confirma?';
             const result = await callWithRuntimeTarget(confirmTerminalSdkSessionUi, runtimeId, message);
-            println(`\n  \x1b[32m✓ session.ui.confirm concluído.\x1b[0m\n  \x1b[90m${String(result)}\x1b[0m\n`);
+            println('');
+            println(terminalThemeRow('Confirm', `session.ui.confirm concluído · ${String(result)}`, { role: 'success' }));
+            println('');
         } else if (sub === 'select') {
             const { left, right } = splitAtDoubleDash(rest);
             const message = left.join(' ').trim() || 'Selecione uma opção';
@@ -1693,17 +1695,19 @@ export async function cmdElicitation({ println }, arg = '') {
                 .map((item) => item.trim())
                 .filter(Boolean);
             if (options.length === 0) {
-                println('\x1b[33m  Uso: /elicitation select <mensagem> -- opcao1|opcao2|opcao3\x1b[0m');
+                println(terminalThemeRow('/elicitation', 'Uso: /elicitation select <mensagem> -- opcao1|opcao2|opcao3', { role: 'command' }));
                 return;
             }
             const result = await callWithRuntimeTarget(selectTerminalSdkSessionUi, runtimeId, message, options);
-            println(`\n  \x1b[32m✓ session.ui.select concluído.\x1b[0m\n  \x1b[90m${String(result)}\x1b[0m\n`);
+            println('');
+            println(terminalThemeRow('Select', `session.ui.select concluído · ${String(result)}`, { role: 'success' }));
+            println('');
         } else if (sub === 'input') {
             const { left, right } = splitAtDoubleDash(rest);
             const message = left.join(' ').trim() || 'Informe um valor';
             const parsed = parseJsonObject(right);
             if (parsed.error) {
-                println(`\x1b[31m  JSON inválido: ${parsed.error}\x1b[0m`);
+                println(terminalThemeRow('JSON', `inválido: ${parsed.error}`, { role: 'error' }));
                 return;
             }
             const result = await callWithRuntimeTarget(
@@ -1714,32 +1718,33 @@ export async function cmdElicitation({ println }, arg = '') {
                     parsed.json ?? undefined
                 ),
             );
-            println(`\n  \x1b[32m✓ session.ui.input concluído.\x1b[0m\n  \x1b[90m${String(result)}\x1b[0m\n`);
+            println('');
+            println(terminalThemeRow('Input', `session.ui.input concluído · ${String(result)}`, { role: 'success' }));
+            println('');
         } else if (sub === 'capabilities') {
             const available = callWithRuntimeTarget(isTerminalSdkSessionUiElicitationAvailable, runtimeId);
             const ok = available;
-            println(`\n  \x1b[36mSession UI\x1b[0m`);
-            println(`  elicitation  ${ok ? '\x1b[32mavailable\x1b[0m' : '\x1b[33munavailable\x1b[0m'}`);
+            println('');
+            println(terminalThemeHeadline('question', 'Session UI'));
+            println(terminalThemeDivider(37));
+            println(terminalThemeRow('Elicitation', ok ? 'disponível' : 'indisponível', { role: ok ? 'success' : 'warn' }));
+            println(terminalThemeDivider(37));
             println('');
         } else if (sub === 'show') {
             renderElicitationEntry({ println }, getTerminalElicitation(rest[0] || 'latest', { runtimeId }));
         } else if (sub === 'clear') {
             const ok = clearTerminalElicitation(rest[0] || 'latest');
-            println(
-                ok
-                    ? '\x1b[32m  Elicitation removida da UX local.\x1b[0m'
-                    : '\x1b[33m  Elicitation não encontrada.\x1b[0m',
-            );
+            println(terminalThemeRow('Formulário', ok ? 'removido da UX local' : 'não encontrado', { role: ok ? 'success' : 'warn' }));
         } else if (sub === 'respond') {
             const [id = 'latest', action, ...jsonRest] = rest;
             const entry = getTerminalElicitation(id, { runtimeId });
             if (!entry) {
-                println('\x1b[33m  Elicitation não encontrada.\x1b[0m');
+                println(terminalThemeRow('Formulário', 'não encontrado', { role: 'warn' }));
                 return;
             }
             const parsedResult = parseElicitationResult(action, jsonRest, entry.requestedSchema);
             if (!parsedResult.ok) {
-                println(`\x1b[31m  Resposta inválida: ${parsedResult.error}\x1b[0m`);
+                println(terminalThemeRow('Resposta', `inválida: ${parsedResult.error}`, { role: 'error' }));
                 return;
             }
             const resolved = callWithRuntimeTarget(
@@ -1751,8 +1756,8 @@ export async function cmdElicitation({ println }, arg = '') {
             const ok = resolved;
             println(
                 ok
-                    ? `\n  \x1b[32m✓ Elicitation respondida.\x1b[0m \x1b[90m${entry.id}\x1b[0m\n`
-                    : `\n  \x1b[33mElicitation não está mais pendente.\x1b[0m \x1b[90m${entry.id}\x1b[0m\n`,
+                    ? `\n${terminalThemeRow('Formulário', `respondido · ${entry.id}`, { role: 'success' })}\n`
+                    : `\n${terminalThemeRow('Formulário', `não está mais pendente · ${entry.id}`, { role: 'warn' })}\n`,
             );
         } else if (sub === 'request') {
             const message = rest.join(' ').trim() || 'Informe os dados solicitados.';
@@ -1762,44 +1767,54 @@ export async function cmdElicitation({ println }, arg = '') {
                 message,
                 defaultElicitationSchema(),
             );
-            println(`\n  \x1b[32m✓ Elicitation SDK concluída.\x1b[0m\n  \x1b[90m${pretty(result, 1500)}\x1b[0m\n`);
+            println('');
+            println(terminalThemeRow('Formulário', 'Elicitation SDK concluída', { role: 'success' }));
+            println(terminalThemeRow('Resultado', pretty(result, 1500)));
+            println('');
         } else if (sub === 'request-json') {
             const { left, right } = splitAtDoubleDash(rest);
             const message =
                 (right.length > 0 ? left.join(' ').trim() : rest.shift()) ?? 'Informe os dados solicitados.';
             const parsed = parseJsonObject(right.length > 0 ? right : rest);
             if (parsed.error || !parsed.json) {
-                println(`\x1b[31m  JSON inválido: ${parsed.error ?? 'schema ausente'}\x1b[0m`);
+                println(terminalThemeRow('JSON', `inválido: ${parsed.error ?? 'schema ausente'}`, { role: 'error' }));
                 return;
             }
             if (!isRuntimeElicitationSchema(parsed.json)) {
-                println('\x1b[31m  Schema inválido: esperado { "type": "object", "properties": { ... } }.\x1b[0m');
+                println(terminalThemeRow('Schema', 'inválido: esperado { "type": "object", "properties": { ... } }.', { role: 'error' }));
                 return;
             }
             const result = await callWithRuntimeTarget(requestTerminalSdkElicitation, runtimeId, message, parsed.json);
-            println(`\n  \x1b[32m✓ Elicitation SDK concluída.\x1b[0m\n  \x1b[90m${pretty(result, 1500)}\x1b[0m\n`);
+            println('');
+            println(terminalThemeRow('Formulário', 'Elicitation SDK concluída', { role: 'success' }));
+            println(terminalThemeRow('Resultado', pretty(result, 1500)));
+            println('');
         } else {
             const entries = listTerminalElicitations({ includeCompleted: sub === 'all', runtimeId });
             if (entries.length === 0) {
-                println('\n  \x1b[90mNenhuma elicitation pendente na UX local.\x1b[0m');
+                println('');
+                println(terminalThemeRow('Formulários', 'nenhum pendente na UX local'));
             } else {
-                println(`\n  \x1b[36mElicitations SDK (${entries.length})\x1b[0m`);
+                println('');
+                println(terminalThemeHeadline('question', 'Formulários SDK', [String(entries.length)]));
+                println(terminalThemeDivider(37));
                 for (const entry of entries) {
-                    const statusColor = entry.status === 'pending' ? '\x1b[33m' : '\x1b[90m';
                     println(
-                        `  ${statusColor}${entry.id}\x1b[0m  ${entry.mode}${entry.actionable ? '  \x1b[32m[actionable]\x1b[0m' : ''}  ${entry.message.slice(0, 90)}${entry.source ? `  \x1b[90mvia ${entry.source}\x1b[0m` : ''}`,
+                        terminalThemeRow(
+                            'Formulário',
+                            `${entry.id} · ${entry.mode}${entry.actionable ? ' · respondível' : ''} · ${entry.message.slice(0, 90)}${entry.source ? ` · via ${entry.source}` : ''}`,
+                            { role: entry.status === 'pending' ? 'question' : 'muted' },
+                        ),
                     );
                 }
+                println(terminalThemeDivider(37));
             }
-            println(
-                '  \x1b[90mUso: /elicitation [list|all|capabilities|confirm <msg>|select <msg> -- a|b|c|input <msg> -- {json}|show latest|clear <id>|request <msg>|request-json <msg> -- <schemaJson>|respond <id> <accept|decline|cancel> [json]]\x1b[0m',
-            );
-            println(
-                '  \x1b[90mpergunta humana = conversa READY/REPLY; elicitation = formulário/URL estruturado do SDK; confirm/select/input = conveniências de session.ui.*.\x1b[0m\n',
-            );
+            println(terminalThemeRow('Uso', '/elicitation [list|all|capabilities|confirm|select|input|show|clear|request|request-json|respond]', { role: 'command' }));
+            println(terminalThemeRow('Nota', 'pergunta humana = conversa READY/REPLY; elicitation = formulário/URL estruturado do SDK.'));
+            println('');
         }
     } catch (e) {
-        println(`\n  \x1b[31m? Elicitation SDK: ${toError(e).message}\x1b[0m\n`);
+        println(`\n${terminalThemeRow('Elicitation SDK', toError(e).message, { role: 'error' })}\n`);
     }
 }
 
@@ -1816,23 +1831,36 @@ export async function cmdPermission({ println }, arg = '') {
         if (!next) {
             const current = readTerminalRuntimePermissionMode(runtimeId);
             const sdkPromptsSkipped = terminalPermissionModeSkipsSdkPrompts(current);
-            println(`\n  \x1b[36mModo de permissões\x1b[0m  \x1b[33m${current}\x1b[0m`);
+            println('');
+            println(terminalThemeHeadline('question', 'Modo de permissões'));
+            println(terminalThemeDivider(37));
+            println(terminalThemeRow('Modo', current, { role: 'warn' }));
             println(
-                `  \x1b[90mprompts SDK ${sdkPromptsSkipped ? 'ignorados' : 'seletivos'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme política'}\x1b[0m`,
+                terminalThemeRow(
+                    'Prompts SDK',
+                    `${sdkPromptsSkipped ? 'ignorados' : 'seletivos'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme política'}`,
+                ),
             );
-            println('  \x1b[90mUso: /permission mode <approve_all|audit_only|selective>\x1b[0m\n');
+            println(terminalThemeRow('Uso', '/permission mode <approve_all|audit_only|selective>', { role: 'command' }));
+            println(terminalThemeDivider(37));
+            println('');
             return;
         }
         if (next !== 'approve_all' && next !== 'audit_only' && next !== 'selective') {
-            println('  \x1b[33mUso: /permission mode <approve_all|audit_only|selective>\x1b[0m');
+            println(terminalThemeRow('/permission', 'Uso: /permission mode <approve_all|audit_only|selective>', { role: 'command' }));
             return;
         }
         const updated = setTerminalRuntimePermissionMode(next, runtimeId);
         const sdkPromptsSkipped = terminalPermissionModeSkipsSdkPrompts(updated);
-        println(`\n  \x1b[32m? Modo de permissões atualizado:\x1b[0m \x1b[33m${updated}\x1b[0m\n`);
+        println('');
+        println(terminalThemeRow('Modo', `permissões atualizadas: ${updated}`, { role: 'success' }));
         println(
-            `  \x1b[90mprompts SDK ${sdkPromptsSkipped ? 'ignorados' : 'seletivos'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme política'}\x1b[0m\n`,
+            terminalThemeRow(
+                'Prompts SDK',
+                `${sdkPromptsSkipped ? 'ignorados' : 'seletivos'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme política'}`,
+            ),
         );
+        println('');
         return;
     }
     if (sub === 'show') {
@@ -1845,13 +1873,17 @@ export async function cmdPermission({ println }, arg = '') {
         const payloadArg = rest.slice(2).join(' ').trim();
         const entry = getTerminalPermission(idArg || 'latest', { runtimeId });
         if (!entry || !entry.requestId) {
-            println('  \x1b[33mPermissão não encontrada ou sem requestId canônico para responder.\x1b[0m');
+            println(terminalThemeRow('Permissão', 'não encontrada ou sem requestId canônico para responder', { role: 'warn' }));
             return;
         }
         const decision = parsePermissionDecision(actionArg);
         if (!decision) {
             println(
-                '  \x1b[33mUso: /permission respond <id|latest> <approve-once|approve-for-session|approve-for-location|reject|user-not-available> [json]\x1b[0m',
+                terminalThemeRow(
+                    '/permission',
+                    'Uso: /permission respond <id|latest> <approve-once|approve-for-session|approve-for-location|reject|user-not-available> [json]',
+                    { role: 'command' },
+                ),
             );
             return;
         }
@@ -1861,12 +1893,12 @@ export async function cmdPermission({ println }, arg = '') {
             try {
                 const parsed = JSON.parse(payloadArg);
                 if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-                    println('  \x1b[33mPayload opcional deve ser um JSON object.\x1b[0m');
+                    println(terminalThemeRow('Payload', 'opcional deve ser um JSON object', { role: 'warn' }));
                     return;
                 }
                 payload = /** @type {Record<string, unknown>} */ (parsed);
             } catch (error) {
-                println(`  \x1b[31mJSON inválido:\x1b[0m ${toError(error).message}`);
+                println(terminalThemeRow('JSON', `inválido: ${toError(error).message}`, { role: 'error' }));
                 return;
             }
         }
@@ -1876,7 +1908,7 @@ export async function cmdPermission({ println }, arg = '') {
         });
         const validationError = validatePermissionDecisionResult(permissionResult);
         if (validationError) {
-            println(`  \x1b[33m${validationError}\x1b[0m`);
+            println(terminalThemeRow('Permissão', validationError, { role: 'warn' }));
             return;
         }
         const result = await handleTerminalSdkPendingPermission(entry.requestId, permissionResult, runtimeId);
@@ -1887,24 +1919,30 @@ export async function cmdPermission({ println }, arg = '') {
             granted: decision.kind !== 'reject' && decision.kind !== 'user-not-available',
             ts: Date.now(),
         });
-        println(
-            `\n  \x1b[32m✓ Resposta de permissão enviada:\x1b[0m \x1b[90m${entry.requestId}\x1b[0m · ${decision.kind}`,
-        );
-        println(`  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
+        println('');
+        println(terminalThemeRow('Permissão', `resposta enviada · ${entry.requestId} · ${decision.kind}`, { role: 'success' }));
+        println(terminalThemeRow('Resultado', pretty(result, 700)));
+        println('');
         return;
     }
     if (sub === 'pending') {
         const remote = await callWithRuntimeTarget(listTerminalSdkPendingPermissions, runtimeId);
         const resolvedRuntimeId = readTerminalRuntimeState(runtimeId).runtimeId;
         if (!remote.available) {
-            println('\n  \x1b[33mListagem ativa de permissões pendentes indisponível no SDK atual.\x1b[0m');
-            println('  \x1b[90mFallback operacional: usando estado observado local (/permission list).\x1b[0m\n');
+            println('');
+            println(terminalThemeRow('Permissões', 'listagem ativa indisponível no SDK atual', { role: 'warn' }));
+            println(terminalThemeRow('Fallback', 'usando estado observado local (/permission list).'));
+            println('');
         } else {
             const requests = Array.isArray(remote.requests) ? remote.requests : [];
-            println(`\n  \x1b[36mPermissões pendentes via RPC (${requests.length})\x1b[0m`);
-            println(`  \x1b[90msource: ${remote.source ?? 'unknown'}\x1b[0m`);
+            println('');
+            println(terminalThemeHeadline('question', 'Permissões pendentes via RPC', [String(requests.length)]));
+            println(terminalThemeDivider(37));
+            println(terminalThemeRow('Fonte', String(remote.source ?? 'unknown')));
             if (requests.length === 0) {
-                println('  \x1b[32mNenhuma permissão pendente reportada pela sessão SDK.\x1b[0m\n');
+                println(terminalThemeRow('Permissões', 'nenhuma pendente reportada pela sessão SDK', { role: 'success' }));
+                println(terminalThemeDivider(37));
+                println('');
                 return;
             }
             for (const item of requests) {
@@ -1928,16 +1966,19 @@ export async function cmdPermission({ println }, arg = '') {
                     runtimeId: resolvedRuntimeId,
                     ts: Date.now(),
                 });
-                println(`  \x1b[33m${requestId}\x1b[0m  ${permissionType}`);
+                println(terminalThemeRow('Permissão', `${requestId} · ${permissionType}`, { role: 'question' }));
             }
+            println(terminalThemeDivider(37));
             println('');
             return;
         }
     }
     if (sub === 'reset-approvals') {
         const result = await callWithRuntimeTarget(resetTerminalSdkSessionApprovals, runtimeId);
-        println(`\n  \x1b[32m✓ Aprovações da sessão resetadas.\x1b[0m`);
-        println(`  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
+        println('');
+        println(terminalThemeRow('Aprovações', 'sessão resetada', { role: 'success' }));
+        println(terminalThemeRow('Resultado', pretty(result, 700)));
+        println('');
         return;
     }
     if (sub === 'cockpit' || sub === 'panel') {
@@ -1946,26 +1987,33 @@ export async function cmdPermission({ println }, arg = '') {
     }
     if (sub === 'clear') {
         const ok = clearTerminalPermission(rest[0] || 'latest');
-        println(ok ? '\x1b[32m  Permissão removida da UX local.\x1b[0m' : '\x1b[33m  Permissão não encontrada.\x1b[0m');
+        println(terminalThemeRow('Permissão', ok ? 'removida da UX local' : 'não encontrada', { role: ok ? 'success' : 'warn' }));
         return;
     }
 
     const entries = listTerminalPermissions({ includeCompleted: sub === 'all', runtimeId });
     if (entries.length === 0) {
-        println('\n  \x1b[90mNenhuma permissão SDK pendente na UX local.\x1b[0m');
+        println('');
+        println(terminalThemeRow('Permissões', 'nenhuma pendente na UX local'));
     } else {
-        println(`\n  \x1b[36mPermissões SDK (${entries.length})\x1b[0m`);
+        println('');
+        println(terminalThemeHeadline('question', 'Permissões SDK', [String(entries.length)]));
+        println(terminalThemeDivider(37));
         for (const entry of entries) {
-            const statusColor =
-                entry.status === 'pending' ? '\x1b[33m' : entry.granted === false ? '\x1b[31m' : '\x1b[90m';
             const result = entry.granted == null ? entry.result : entry.granted ? 'approved' : 'not-approved';
             println(
-                `  ${statusColor}${entry.id}\x1b[0m  ${entry.permissionType}  \x1b[90m${entry.status}${result ? ` · ${result}` : ''}\x1b[0m`,
+                terminalThemeRow(
+                    'Permissão',
+                    `${entry.id} · ${entry.permissionType} · ${entry.status}${result ? ` · ${result}` : ''}`,
+                    { role: entry.status === 'pending' ? 'question' : entry.granted === false ? 'warn' : 'muted' },
+                ),
             );
         }
+        println(terminalThemeDivider(37));
     }
-    println('  \x1b[90mUso: /permission [list|pending|reset-approvals|cockpit|all|show latest|clear <id>|clear all|mode [approve_all|audit_only|selective]|respond <id> <decision> [json]]\x1b[0m');
-    println('  \x1b[90mPermissões são decididas pelo SDK/hook; este comando é observabilidade operacional.\x1b[0m\n');
+    println(terminalThemeRow('Uso', '/permission [list|pending|reset-approvals|cockpit|all|show|clear|mode|respond]', { role: 'command' }));
+    println(terminalThemeRow('Nota', 'Permissões são decididas pelo SDK/hook; este comando é observabilidade operacional.'));
+    println('');
 }
 
 /**
@@ -1975,24 +2023,27 @@ export async function cmdPermission({ println }, arg = '') {
  */
 function renderElicitationEntry({ println }, entry) {
     if (!entry) {
-        println('\x1b[33m  Elicitation não encontrada.\x1b[0m');
+        println(terminalThemeRow('Formulário', 'não encontrado', { role: 'warn' }));
         return;
     }
-    println(`\n  \x1b[36mFormulário SDK ${entry.id}\x1b[0m`);
-    println(`  estado  \x1b[33m${entry.status}\x1b[0m`);
-    println(`  modo    \x1b[33m${entry.mode}\x1b[0m`);
-    println(`  msg     ${entry.message}`);
-    if (entry.url) println(`  url     \x1b[36m${entry.url}\x1b[0m`);
-    if (entry.source) println(`  origem  \x1b[90m${entry.source}\x1b[0m`);
-    if (entry.toolCallId) println(`  tool    \x1b[90m${entry.toolCallId}\x1b[0m`);
-    if (entry.actionable) println('  ação    \x1b[32mrespondível pelo runtime\x1b[0m');
-    if (entry.resultAction) println(`  resultado \x1b[33m${entry.resultAction}\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('question', 'Formulário SDK', [entry.id]));
+    println(terminalThemeDivider(37));
+    println(terminalThemeRow('Estado', entry.status, { role: entry.status === 'pending' ? 'question' : 'muted' }));
+    println(terminalThemeRow('Modo', entry.mode));
+    println(terminalThemeRow('Mensagem', entry.message, { role: 'question' }));
+    if (entry.url) println(terminalThemeRow('URL', entry.url, { role: 'command' }));
+    if (entry.source) println(terminalThemeRow('Origem', entry.source));
+    if (entry.toolCallId) println(terminalThemeRow('Tool', entry.toolCallId));
+    if (entry.actionable) println(terminalThemeRow('Ação', 'respondível pelo runtime', { role: 'success' }));
+    if (entry.resultAction) println(terminalThemeRow('Resultado', entry.resultAction, { role: 'warn' }));
+    println(terminalThemeDivider(37));
     if (entry.resultContent) println(`\n  conteúdo da resposta:\n${pretty(entry.resultContent, 2500)}`);
     if (entry.requestedSchema) println(`\n  schema:\n${pretty(entry.requestedSchema, 2500)}`);
     if (entry.actionable) {
         const shorthand = describeElicitationShorthand(entry.requestedSchema);
-        println('\n  \x1b[90mResponda com /elicitation respond <id> <accept|decline|cancel> [json]\x1b[0m');
-        if (shorthand) println(`  \x1b[90mAtalho: ${shorthand}\x1b[0m`);
+        println(terminalThemeRow('Responder', '/elicitation respond <id> <accept|decline|cancel> [json]', { role: 'command' }));
+        if (shorthand) println(terminalThemeRow('Atalho', shorthand, { role: 'command' }));
         println('');
     }
 }
@@ -2004,22 +2055,29 @@ function renderElicitationEntry({ println }, entry) {
  */
 function renderPermissionEntry({ println }, entry) {
     if (!entry) {
-        println('\x1b[33m  Permissão não encontrada.\x1b[0m');
+        println(terminalThemeRow('Permissão', 'não encontrada', { role: 'warn' }));
         return;
     }
-    println(`\n  \x1b[36mPermissão ${entry.id}\x1b[0m`);
-    println(`  estado      \x1b[33m${entry.status}\x1b[0m`);
-    println(`  tipo        \x1b[33m${entry.permissionType}\x1b[0m`);
-    if (entry.requestId) println(`  requisição  \x1b[90m${entry.requestId}\x1b[0m`);
-    if (entry.granted !== null) println(`  aprovação   \x1b[33m${String(entry.granted)}\x1b[0m`);
-    if (entry.result) println(`  resultado   \x1b[33m${entry.result}\x1b[0m`);
-    println(`  criada      \x1b[90m${formatTerminalIsoTimestamp(entry.createdAt)}\x1b[0m`);
-    if (entry.completedAt) println(`  concluída   \x1b[90m${formatTerminalIsoTimestamp(entry.completedAt)}\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('question', 'Permissão SDK', [entry.id]));
+    println(terminalThemeDivider(37));
+    println(terminalThemeRow('Estado', entry.status, { role: entry.status === 'pending' ? 'question' : 'muted' }));
+    println(terminalThemeRow('Tipo', entry.permissionType, { role: 'warn' }));
+    if (entry.requestId) println(terminalThemeRow('Requisição', entry.requestId));
+    if (entry.granted !== null) println(terminalThemeRow('Aprovação', String(entry.granted), { role: entry.granted ? 'success' : 'warn' }));
+    if (entry.result) println(terminalThemeRow('Resultado', entry.result, { role: 'warn' }));
+    println(terminalThemeRow('Criada', formatTerminalIsoTimestamp(entry.createdAt)));
+    if (entry.completedAt) println(terminalThemeRow('Concluída', formatTerminalIsoTimestamp(entry.completedAt)));
     if (entry.status === 'pending' && entry.requestId) {
         println(
-            '  \x1b[90mAção: /permission respond <id> <approve-once|approve-for-session|approve-for-location|reject|user-not-available>\x1b[0m',
+            terminalThemeRow(
+                'Ação',
+                '/permission respond <id> <approve-once|approve-for-session|approve-for-location|reject|user-not-available>',
+                { role: 'command' },
+            ),
         );
     }
+    println(terminalThemeDivider(37));
     println(`\n  data:\n${pretty(entry.data, 2500)}\n`);
 }
 
@@ -2040,35 +2098,36 @@ function renderPermissionCockpit({ println }, runtimeId) {
     const latest = readTerminalPermissionSummary({ runtimeId: scopedRuntimeId }).latest;
     const modeChanges = listTerminalPermissionModeHistory({ limit: 4 });
 
-    println('\n  \x1b[36mPermissões SDK\x1b[0m');
-    println(`  pendentes  \x1b[33m${pending.length}\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('question', 'Permissões SDK'));
+    println(terminalThemeDivider(37));
+    println(terminalThemeRow('Pendentes', String(pending.length), { role: pending.length > 0 ? 'question' : 'success' }));
     if (latest) {
         const request = latest.requestId ? ` · requisição ${latest.requestId}` : '';
-        println(
-            `  recente    \x1b[90m${latest.id}\x1b[0m ${latest.permissionType}${request}`,
-        );
+        println(terminalThemeRow('Recente', `${latest.id} · ${latest.permissionType}${request}`));
     } else {
-        println('  recente    \x1b[90m(nenhuma permissão observada)\x1b[0m');
+        println(terminalThemeRow('Recente', '(nenhuma permissão observada)'));
     }
 
     if (typeRows.length > 0) {
-        println('  por tipo   \x1b[90m' + typeRows.map(([type, count]) => `${type} ${count}`).join(' · ') + '\x1b[0m');
+        println(terminalThemeRow('Por tipo', typeRows.map(([type, count]) => `${type} ${count}`).join(' · ')));
     } else {
-        println('  por tipo   \x1b[90m(nenhuma pendência)\x1b[0m');
+        println(terminalThemeRow('Por tipo', '(nenhuma pendência)'));
     }
 
     if (modeChanges.length > 0) {
-        println('  mudanças de modo');
+        println(terminalThemeHeadline('question', 'Mudanças de modo'));
         for (const item of modeChanges) {
-            println(`    \x1b[90m${formatTerminalIsoTimestamp(item.ts)}\x1b[0m  ${item.mode}`);
+            println(terminalThemeRow('Mudança', `${formatTerminalIsoTimestamp(item.ts)} · ${item.mode}`));
         }
     } else {
-        println('  mudanças de modo \x1b[90m(sem mudanças recentes no runtime local)\x1b[0m');
+        println(terminalThemeRow('Mudanças', '(sem mudanças recentes no runtime local)'));
     }
 
-    println('  atalhos    \x1b[90m/permission pending · /permission show latest · /permission mode selective\x1b[0m');
+    println(terminalThemeRow('Atalhos', '/permission pending · /permission show latest · /permission mode selective', { role: 'command' }));
     if (latest?.requestId && latest.status === 'pending') {
-        println(`  atalho     \x1b[90m/permission respond ${latest.id} approve-once\x1b[0m`);
+        println(terminalThemeRow('Atalho', `/permission respond ${latest.id} approve-once`, { role: 'command' }));
     }
+    println(terminalThemeDivider(37));
     println('');
 }

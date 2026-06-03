@@ -665,13 +665,13 @@ describe('terminal/commands/sdk', () => {
             action: 'accept',
             content: { env: 'dev' },
         });
-        expect(respond.output()).toContain('respondida');
+        expect(respond.output()).toContain('respondido');
     });
 
     it('/elicitation expõe confirm/select/input/capabilities via session.ui.*', async () => {
         const capabilities = mockCtx();
         await cmdElicitation({ println: capabilities.println }, 'capabilities');
-        expect(capabilities.output()).toContain('available');
+        expect(capabilities.output()).toContain('disponível');
 
         const confirm = mockCtx();
         await cmdElicitation({ println: confirm.println }, 'confirm Confirma deploy?');
@@ -885,7 +885,7 @@ describe('terminal/commands/sdk', () => {
             expect.objectContaining({ kind: 'approve-once', reason: 'manual' }),
             null,
         );
-        expect(respond.output()).toContain('Resposta de permiss');
+        expect(respond.output()).toContain('resposta enviada');
     });
 
     it('/permission integra request → respond → completed com correlação por requestId', async () => {
@@ -967,7 +967,7 @@ describe('terminal/commands/sdk', () => {
             { kind: 'approve-once' },
             null,
         );
-        expect(respond.output()).toContain('Resposta de permiss');
+        expect(respond.output()).toContain('resposta enviada');
     });
 
     it('/permission mode lê e altera o modo de governança do runtime', async () => {
@@ -976,7 +976,8 @@ describe('terminal/commands/sdk', () => {
         expect(agentRuntimeMocks.readTerminalRuntimePermissionMode).toHaveBeenCalled();
         expect(show.output()).toContain('approve_all');
         expect(show.output()).toContain('Modo de permissões');
-        expect(show.output()).toContain('prompts SDK ignorados');
+        expect(show.output()).toContain('Prompts SDK');
+        expect(show.output()).toContain('ignorados');
         expect(show.output()).not.toContain('prompts SDK skip');
         expect(show.output()).not.toContain('Permission mode');
         expect(show.output()).not.toContain('sdk prompts=');
@@ -984,8 +985,9 @@ describe('terminal/commands/sdk', () => {
         const set = mockCtx();
         await cmdPermission({ println: set.println }, 'mode audit_only');
         expect(agentRuntimeMocks.setTerminalRuntimePermissionMode).toHaveBeenCalledWith('audit_only', null);
-        expect(set.output()).toContain('Modo de permissões atualizado');
-        expect(set.output()).toContain('prompts SDK ignorados');
+        expect(set.output()).toContain('permissões atualizadas');
+        expect(set.output()).toContain('Prompts SDK');
+        expect(set.output()).toContain('ignorados');
         expect(set.output()).not.toContain('prompts SDK skip');
         expect(set.output()).not.toContain('sdk prompts=');
     });
@@ -1033,7 +1035,8 @@ describe('terminal/commands/sdk', () => {
 
         const showAudit = mockCtx();
         await cmdElicitation({ println: showAudit.println }, 'show latest --runtime audit');
-        expect(showAudit.output()).toContain('Formulário SDK el-audit-1');
+        expect(showAudit.output()).toContain('Formulário SDK');
+        expect(showAudit.output()).toContain('el-audit-1');
 
         const respondAudit = mockCtx();
         await cmdElicitation(
@@ -1061,10 +1064,10 @@ describe('terminal/commands/sdk', () => {
         await cmdPermission({ println: ctx.println }, 'cockpit');
 
         expect(ctx.output()).toContain('Permissões SDK');
-        expect(ctx.output()).toContain('pendentes');
+        expect(ctx.output()).toContain('Pendentes');
         expect(ctx.output()).toContain('file_write 2');
         expect(ctx.output()).toContain('shell 1');
-        expect(ctx.output()).toContain('mudanças de modo');
+        expect(ctx.output()).toContain('Mudanças de modo');
         expect(ctx.output()).toContain('selective');
         expect(ctx.output()).toContain('/permission pending');
         expect(ctx.output()).not.toContain('requestId=');

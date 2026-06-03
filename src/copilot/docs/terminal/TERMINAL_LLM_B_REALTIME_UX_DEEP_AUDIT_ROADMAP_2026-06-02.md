@@ -2690,4 +2690,10 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/structured-input-cycle-themed-request-pass-20260603-1353`
   - Resultado: PASS.
   - Inspeção plain log: sem `[answer]`, `request_user_input ainda executando`, `chatcmpl-tool`, `ask_user SDK` ou ID interno `request-user-input-sim`.
-- [ ] Próxima lacuna: revisar `/permission`, `/elicitation` e comandos zero-PR para remover respostas antigas como `[zero-pr]` e linhas ciano locais quando aparecem em fluxos humanos reais.
+- [x] Correção zero-PR: `/steer`, `/interrupt`, `/queue`, `/mailbox` e `/turn` no roteador do REPL passaram a usar `terminalThemeRow`, removendo `[zero-pr]`, `[queue]`, `[mailbox]`, `[turn]`, `[steer]`, `[interrupt]` e ANSI local dessa superfície.
+- [x] Resultado esperado: quando uma intervenção é aplicada diretamente a uma pergunta pendente, enfileirada no mailbox zero-PR ou enviada como turno explícito, a UX passa a usar `Intervenção`, `Mailbox`, `Fila`, `Próximo`, `/turn`, `/steer` e `/interrupt` como rótulos alinhados.
+- [x] Correção `/elicitation`: listagem, capabilities, confirm/select/input, clear, respond, request/request-json e `show` passaram a usar `terminalThemeHeadline`, `terminalThemeDivider` e `terminalThemeRow`.
+- [x] Correção `/permission`: mode, respond, pending, reset-approvals, clear, list, show e cockpit passaram a usar linhas temáticas, com `Permissão`, `Permissões`, `Modo`, `Prompts SDK`, `Pendentes`, `Atalhos` e `Ação`.
+- [x] Teste escopado passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
+- [ ] Próxima lacuna: revisar `/sdk capabilities`, `/sdk doctor`, `/sdk workspace` e demais painéis SDK que ainda têm blocos `\x1b[...]` locais fora de `/permission`/`/elicitation`.
