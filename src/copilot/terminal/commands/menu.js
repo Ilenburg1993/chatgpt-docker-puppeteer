@@ -285,13 +285,15 @@ function renderTerminalSmartMenu(println, entries) {
 /**
  * @param {(text: string) => void} println
  * @param {TerminalSmartMenuEntry[]} entries
+ * @param {{ ready: boolean; reasons: string[] } | null} [ttyReadiness]
  * @returns {void}
  */
-function renderTerminalPickerPlan(println, entries) {
+function renderTerminalPickerPlan(println, entries, ttyReadiness = null) {
     const state = readTerminalRuntimeState();
     const plan = buildTerminalPickerPlan({
         allowInteractive: false,
         pendingQuestion: Boolean(state.pendingQuestion && state.pendingQuestionKind !== 'ready'),
+        blockReasons: ttyReadiness?.ready === false ? ttyReadiness.reasons : [],
         preferred: 'auto',
     });
     println(`\n  ${terminalThemeText('info', 'Picker do menu')}`);
@@ -313,7 +315,7 @@ function renderTerminalPickerPlan(println, entries) {
  * @param {{ println: (text: string) => void }} ctx
  * @param {string} [arg=''] Default is `''`
  * @param {string[]} [rest=[]] Default is `[]`
- * @param {{ executeCommandLine?: (commandLine: string) => Promise<boolean> }} [deps]
+ * @param {{ executeCommandLine?: (commandLine: string) => Promise<boolean>; readExclusiveTtyReadiness?: () => { ready: boolean; reasons: string[] } }} [deps]
  * @returns {Promise<void>}
  */
 export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
@@ -326,7 +328,7 @@ export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
     }
 
     if (primary.toLowerCase() === 'picker' || primary.toLowerCase() === '--picker') {
-        renderTerminalPickerPlan(println, entries);
+        renderTerminalPickerPlan(println, entries, deps.readExclusiveTtyReadiness?.() ?? null);
         return;
     }
 

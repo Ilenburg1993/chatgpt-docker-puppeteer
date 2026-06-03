@@ -20,10 +20,12 @@ export {
     printlnBlock,
     PROMPT_USER,
     PROMPT_WAITING,
+    readTerminalExclusiveTtyReadiness,
     resetStatusRowState,
     scheduleTerminalPromptRedraw,
     SEPARATOR,
     TURN_TIMEOUT_MS,
+    withTerminalExclusiveTty,
     writeInlineStatus,
 } from './output.js';
 export { broadcastSse, CRITICAL_EVENTS, nextSseEventId } from './sse.js';

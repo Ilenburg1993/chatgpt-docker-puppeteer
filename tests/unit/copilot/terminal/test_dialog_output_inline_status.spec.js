@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
         line: '',
         setPrompt: vi.fn(),
         prompt: vi.fn(),
+        pause: vi.fn(),
+        resume: vi.fn(),
         getPrompt: vi.fn(() => 'você› '),
     },
     busy: false,
@@ -86,14 +88,18 @@ const {
     clearInlineStatus,
     endTerminalRenderLock,
     printlnBlock,
+    readTerminalExclusiveTtyReadiness,
     redrawTerminalPrompt,
     scheduleTerminalPromptRedraw,
+    withTerminalExclusiveTty,
     writeInlineStatus,
 } = await import('../../../../src/copilot/terminal/dialog/output.js');
 
 describe('terminal/dialog/output inline status', () => {
     /** @type {PropertyDescriptor | undefined} */
     let originalIsTTY;
+    /** @type {PropertyDescriptor | undefined} */
+    let originalStdinIsTTY;
     /** @type {PropertyDescriptor | undefined} */
     let originalColumns;
     /** @type {string | undefined} */
@@ -103,11 +109,14 @@ describe('terminal/dialog/output inline status', () => {
         vi.clearAllMocks();
         writeSpy.mockClear();
         originalIsTTY = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+        originalStdinIsTTY = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
         originalColumns = Object.getOwnPropertyDescriptor(process.stdout, 'columns');
         originalMode = process.env['COPILOT_TERMINAL_INLINE_STATUS'];
         Object.defineProperty(process.stdout, 'isTTY', { configurable: true, value: true });
+        Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: true });
         Object.defineProperty(process.stdout, 'columns', { configurable: true, value: 120 });
         delete process.env['COPILOT_TERMINAL_INLINE_STATUS'];
+        mocks.busy = false;
         mocks.rl.closed = false;
         mocks.rl.line = '';
     });
@@ -115,6 +124,7 @@ describe('terminal/dialog/output inline status', () => {
     afterEach(() => {
         clearInlineStatus();
         if (originalIsTTY) Object.defineProperty(process.stdout, 'isTTY', originalIsTTY);
+        if (originalStdinIsTTY) Object.defineProperty(process.stdin, 'isTTY', originalStdinIsTTY);
         if (originalColumns) Object.defineProperty(process.stdout, 'columns', originalColumns);
         if (originalMode === undefined) delete process.env['COPILOT_TERMINAL_INLINE_STATUS'];
         else process.env['COPILOT_TERMINAL_INLINE_STATUS'] = originalMode;
@@ -171,5 +181,48 @@ describe('terminal/dialog/output inline status', () => {
         expect(output).toContain('linha permanente durante streaming');
         expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
         expect(mocks.rl.prompt).not.toHaveBeenCalled();
+    });
+
+    it('bloqueia handoff TTY exclusivo quando há input humano parcialmente digitado', () => {
+        mocks.rl.line = '/status';
+
+        const readiness = readTerminalExclusiveTtyReadiness(mocks.rl);
+
+        expect(readiness.ready).toBe(false);
+        expect(readiness.reasons).toContain('input humano parcialmente digitado');
+    });
+
+    it('bloqueia handoff TTY exclusivo durante turno em execução', () => {
+        mocks.busy = true;
+
+        const readiness = readTerminalExclusiveTtyReadiness(mocks.rl);
+
+        expect(readiness.ready).toBe(false);
+        expect(readiness.reasons).toContain('turno em execução');
+    });
+
+    it('permite ignorar render lock externo ao consultar prontidão dentro de comando', () => {
+        beginTerminalRenderLock();
+        try {
+            const blocked = readTerminalExclusiveTtyReadiness(mocks.rl);
+            const allowed = readTerminalExclusiveTtyReadiness(mocks.rl, { ignoreRenderLock: true });
+
+            expect(blocked.reasons).toContain('renderização terminal em andamento');
+            expect(allowed.reasons).not.toContain('renderização terminal em andamento');
+            expect(allowed.ready).toBe(true);
+        } finally {
+            endTerminalRenderLock();
+        }
+    });
+
+    it('pausa readline, executa operação exclusiva e restaura prompt vivo', async () => {
+        const result = await withTerminalExclusiveTty(mocks.rl, async () => 'selecionado');
+
+        expect(result.ok).toBe(true);
+        expect(result.value).toBe('selecionado');
+        expect(mocks.rl.pause).toHaveBeenCalledTimes(1);
+        expect(mocks.rl.resume).toHaveBeenCalledTimes(1);
+        expect(mocks.rl.setPrompt).toHaveBeenCalledWith('você› ');
+        expect(mocks.rl.prompt).toHaveBeenCalled();
     });
 });

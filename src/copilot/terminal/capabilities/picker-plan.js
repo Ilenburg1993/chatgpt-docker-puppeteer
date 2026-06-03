@@ -26,7 +26,7 @@ import { readTerminalExternalToolCapabilities } from './external-tools.js';
  */
 
 /**
- * @param {{ allowInteractive?: boolean; pendingQuestion?: boolean; preferred?: 'auto' | 'fzf' | 'gum'; tools?: ReturnType<typeof readTerminalExternalToolCapabilities> }} [options]
+ * @param {{ allowInteractive?: boolean; pendingQuestion?: boolean; preferred?: 'auto' | 'fzf' | 'gum'; tools?: ReturnType<typeof readTerminalExternalToolCapabilities>; blockReasons?: string[] }} [options]
  * @returns {TerminalPickerPlan}
  */
 export function buildTerminalPickerPlan(options = {}) {
@@ -43,6 +43,9 @@ export function buildTerminalPickerPlan(options = {}) {
     /** @type {string[]} */
     const reasons = [];
     if (options.pendingQuestion) reasons.push('pergunta humana pendente');
+    for (const reason of options.blockReasons ?? []) {
+        if (reason && !reasons.includes(reason)) reasons.push(reason);
+    }
     if (!options.allowInteractive) reasons.push('runtime ainda não entregou controle exclusivo do TTY');
     if (!chosen?.command) reasons.push(preferred === 'auto' ? 'fzf/gum indisponíveis' : `${preferred} indisponível`);
 

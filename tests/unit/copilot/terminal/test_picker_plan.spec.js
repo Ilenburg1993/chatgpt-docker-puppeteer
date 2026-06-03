@@ -44,4 +44,16 @@ describe('terminal/capabilities/picker-plan', () => {
         expect(plan.mode).toBe('textual');
         expect(plan.reasons).toContain('pergunta humana pendente');
     });
+
+    it('preserva razões de bloqueio vindas do contrato de TTY exclusivo', () => {
+        const plan = buildTerminalPickerPlan({
+            allowInteractive: false,
+            blockReasons: ['turno em execução', 'input humano parcialmente digitado'],
+            tools: [FZF_TOOL],
+        });
+
+        expect(plan.mode).toBe('textual');
+        expect(plan.reasons).toContain('turno em execução');
+        expect(plan.reasons).toContain('input humano parcialmente digitado');
+    });
 });

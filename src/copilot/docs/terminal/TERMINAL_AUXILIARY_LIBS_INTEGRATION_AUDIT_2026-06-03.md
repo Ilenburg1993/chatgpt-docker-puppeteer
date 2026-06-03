@@ -235,6 +235,7 @@ Decisão:
 - [x] O terminal já possui registry central de binários externos para as libs auditadas.
 - [x] O terminal já possui adapters read-only de preview, Markdown, diff e dados estruturados.
 - [x] O terminal já possui planner/guarda textual para pickers externos, sem lançar TUI ainda.
+- [x] O terminal já possui contrato central de TTY exclusivo para futuras TUIs externas.
 - [x] Alguns comandos ainda fazem rendering local de snippets e listas, dificultando enriquecimento
       incremental por `bat`, `fzf`, `glow` ou `delta`.
 - [x] O terminal já deve continuar funcional sem qualquer lib externa.
@@ -412,8 +413,14 @@ Decisão:
       `diagnostic-ux-fs-yaml-preview`.
 - [x] Faixa G.0/G.3: `picker-plan.js` cria planner seguro para `fzf`/`gum`; `/menu picker`
       renderiza guarda textual quando nao ha handoff explícito de TTY.
+- [x] Faixa G.5 base: `readTerminalExclusiveTtyReadiness()` e `withTerminalExclusiveTty()`
+      centralizam pausas de readline, render lock, limpeza de linha viva e restauração forçada do prompt.
 - [x] Decisão Faixa G: antes de lançar qualquer TUI externa, o terminal deve provar controle
       exclusivo de stdin/stdout, ausencia de pergunta humana pendente e restauração limpa da linha viva.
+- [x] Decisão Faixa G: `/menu picker` consome as razões reais de prontidão do REPL, como TTY ausente,
+      turno em execução ou input humano parcialmente digitado.
+- [x] Achado live corrigido: a primeira integração de prontidão reportava o render lock do próprio
+      dispatcher como bloqueio; o router agora ignora esse lock externo ao consultar `/menu picker`.
 - [x] Testes/lint Faixa G.0 passaram:
       `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs && node --check src/copilot/terminal/capabilities/picker-plan.js && node --check src/copilot/terminal/commands/menu.js`.
 - [x] Lint escopado Faixa G.0 passou:
@@ -423,6 +430,13 @@ Decisão:
 - [x] Live PTY Faixa G.0 passou:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-picker-guard-20260603-2050`.
 - [x] Resultado live: PASS em 29/29 critérios, incluindo `diagnostic-ux-menu-picker-guard`.
+- [x] Testes Faixa G.5 base passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js tests/unit/copilot/terminal/test_picker_plan.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js`.
+- [x] Resultado: 3 arquivos, 20 testes.
+- [x] Live PTY Faixa G.5 base passou:
+      `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-exclusive-tty-20260603-2040`.
+- [x] Resultado live: PASS em 29/29 critérios; `/menu picker` mostrou apenas a guarda real de
+      handoff ainda nao entregue, sem falso bloqueio de renderização.
 
 ### Faixa D: preview read-only
 
@@ -453,8 +467,10 @@ Decisão:
 - [ ] Fase G.2: avaliar `gum filter`/`gum choose` como alternativa com o mesmo handoff.
 - [x] Fase G.3: plugar `/menu picker` como opção explícita textual e segura.
 - [x] Fase G.4: impedir execução sem autorização interativa explícita ou com pergunta humana pendente.
-- [ ] Fase G.5: ensinar o REPL a pausar linha viva/readline, entregar TTY exclusivo ao picker,
-      restaurar prompt vivo e auditar cancelamento/erro sem corromper input.
+- [x] Fase G.5: criar contrato central para pausar linha viva/readline, entregar TTY exclusivo
+      a uma operação e restaurar prompt vivo sem corromper input.
+- [ ] Fase G.6: criar adapter executor de `fzf`/`gum` usando o contrato de TTY exclusivo.
+- [ ] Fase G.7: auditar cancelamento/erro do picker real e registrar eventos humanos sem expor ids.
 
 ### Faixa H: contratos estruturados
 

@@ -190,4 +190,19 @@ describe('terminal/commands/menu', () => {
         expect(ctx.output()).toContain('/menu <n> ou /menu <id>');
         expect(ctx.output()).not.toContain('fzf --');
     });
+
+    it('inclui razões reais de prontidão TTY no plano do picker', async () => {
+        const ctx = mockCtx();
+
+        await cmdMenu({ println: ctx.println }, 'picker', [], {
+            readExclusiveTtyReadiness: () => ({
+                ready: false,
+                reasons: ['turno em execução', 'input humano parcialmente digitado'],
+            }),
+        });
+
+        expect(ctx.output()).toContain('turno em execução');
+        expect(ctx.output()).toContain('input humano parcialmente digitado');
+        expect(ctx.output()).toContain('picker textual seguro');
+    });
 });

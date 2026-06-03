@@ -80,7 +80,14 @@ import {
     cmdWho as _cmdWho,
     cmdWorkspace as _cmdWorkspace,
 } from '../commands/index.js';
-import { ensureDialogLoop, getTurnQueueDepth, println, printlnBlock, sendTurn } from '../dialog/index.js';
+import {
+    ensureDialogLoop,
+    getTurnQueueDepth,
+    println,
+    printlnBlock,
+    readTerminalExclusiveTtyReadiness,
+    sendTurn,
+} from '../dialog/index.js';
 import {
     abortTerminalCurrentMessage,
     answerTerminalPendingQuestion,
@@ -731,6 +738,7 @@ export const CMD_ROUTES = [
                     await dispatchCmd(parsed.command, parsed.arg, parsed.rest, rl, injectServer, cleanup);
                     return true;
                 },
+                readExclusiveTtyReadiness: () => readTerminalExclusiveTtyReadiness(rl, { ignoreRenderLock: true }),
             }),
     ],
     [['search'], (ctx, arg) => _cmdSearch({ println, hubSessionId: ctx.hubSessionId }, arg)],

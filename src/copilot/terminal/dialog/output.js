@@ -40,6 +40,30 @@ export const PROMPT_WAITING = '     ';
 let _terminalRenderLockDepth = 0;
 /** @typedef {string | (() => string)} ScheduledPrompt */
 
+/**
+ * @typedef {{
+ *     ready: boolean;
+ *     reasons: string[];
+ * }} TerminalExclusiveTtyReadiness
+ */
+
+/**
+ * @template T
+ * @typedef {{
+ *     ok: true;
+ *     value: T;
+ *     reason: null;
+ *     reasons: [];
+ *     error: null;
+ * } | {
+ *     ok: false;
+ *     value: null;
+ *     reason: string;
+ *     reasons: string[];
+ *     error: unknown;
+ * }} TerminalExclusiveTtyResult
+ */
+
 /** @type {WeakMap<object, { prompt: ScheduledPrompt; immediate: NodeJS.Immediate }>} */
 const _scheduledPromptRedraws = new WeakMap();
 /** @type {WeakMap<object, { prompt: string; at: number }>} */
@@ -645,6 +669,97 @@ export function endTerminalRenderLock() {
  */
 export function isTerminalRenderLocked() {
     return _terminalRenderLockDepth > 0;
+}
+
+/**
+ * Verifica se o terminal pode entregar controle exclusivo de stdin/stdout para uma TUI externa.
+ *
+ * Este contrato e intencionalmente mais estrito que `process.stdout.isTTY`: o prompt vivo tambem precisa estar
+ * ocioso, sem input humano parcialmente digitado e sem render lock ativo. Qualquer comando que venha a usar
+ * `fzf`, `gum` ou pager interativo deve passar por este gateway em vez de pausar readline localmente.
+ *
+ * @param {{ line?: string; closed?: boolean } | null | undefined} rl
+ * @param {{ requireTty?: boolean; allowBusy?: boolean; allowBufferedInput?: boolean; ignoreRenderLock?: boolean }} [options]
+ * @returns {TerminalExclusiveTtyReadiness}
+ */
+export function readTerminalExclusiveTtyReadiness(rl, options = {}) {
+    /** @type {string[]} */
+    const reasons = [];
+    if (!isTerminalReadlineOpen(rl)) reasons.push('readline indisponível');
+    if (options.requireTty !== false && (!process.stdin.isTTY || !process.stdout.isTTY)) {
+        reasons.push('TTY interativo indisponível');
+    }
+    if (getBusy() && options.allowBusy !== true) reasons.push('turno em execução');
+    if (isTerminalRenderLocked() && options.ignoreRenderLock !== true) {
+        reasons.push('renderização terminal em andamento');
+    }
+    const inputLine = typeof rl?.line === 'string' ? rl.line : '';
+    if (inputLine.length > 0 && options.allowBufferedInput !== true) {
+        reasons.push('input humano parcialmente digitado');
+    }
+    return {
+        ready: reasons.length === 0,
+        reasons,
+    };
+}
+
+/**
+ * Executa uma operação com controle exclusivo temporário do TTY e restaura prompt/linha viva no fim.
+ *
+ * A função nao executa nenhum binário por conta própria; ela só cria o envelope seguro para adapters interativos.
+ * Isso mantém a regra: tool externa opcional nunca compete diretamente com readline, streaming ou pergunta humana.
+ *
+ * @template T
+ * @param {{ pause?: () => void; resume?: () => void; getPrompt?: () => string; setPrompt: (prompt: string) => void; prompt: () => void; line?: string; closed?: boolean } | null | undefined} rl
+ * @param {() => T | Promise<T>} operation
+ * @param {{ requireTty?: boolean; allowBusy?: boolean; allowBufferedInput?: boolean; ignoreRenderLock?: boolean }} [options]
+ * @returns {Promise<TerminalExclusiveTtyResult<T>>}
+ */
+export async function withTerminalExclusiveTty(rl, operation, options = {}) {
+    const readiness = readTerminalExclusiveTtyReadiness(rl, options);
+    if (!readiness.ready) {
+        return {
+            ok: false,
+            value: null,
+            reason: readiness.reasons.join('; '),
+            reasons: readiness.reasons,
+            error: null,
+        };
+    }
+
+    const prompt = typeof rl?.getPrompt === 'function' ? rl.getPrompt() : buildUserPrompt();
+    try {
+        clearInlineStatus();
+        resetStatusRowState();
+        beginTerminalRenderLock();
+        clearTerminalLine();
+        rl?.pause?.();
+        const value = await operation();
+        return {
+            ok: true,
+            value,
+            reason: null,
+            reasons: [],
+            error: null,
+        };
+    } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        return {
+            ok: false,
+            value: null,
+            reason,
+            reasons: [reason],
+            error,
+        };
+    } finally {
+        rl?.resume?.();
+        endTerminalRenderLock();
+        resetStatusRowState();
+        if (rl && isTerminalReadlineOpen(rl)) {
+            clearTerminalLine();
+            paintTerminalPrompt(rl, prompt, { force: true });
+        }
+    }
 }
 
 /**
