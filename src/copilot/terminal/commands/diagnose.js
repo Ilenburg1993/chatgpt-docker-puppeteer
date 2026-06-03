@@ -104,8 +104,6 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         sdkFsRouting,
     } = await readTerminalDiagnoseProjection(withRuntimeTarget({ hubSessionId: hubSessionId ?? null }, runtimeId));
 
-    const agentStatusColor =
-        snap['status'] === 'waiting_for_input' ? C.green : snap['status'] === 'idle' ? C.yellow : C.red;
     const mcpLine =
         mcp.available && !mcp.circuitOpen && mcp.toolCount > 0
             ? `${C.green}ok · ${mcp.toolCount} tools (lat: ${mcp.latencyMs ?? '?'}ms)${C.reset}`
@@ -137,7 +135,6 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
                       return `  ${C.grey}•${C.reset} ${visualName} ${col}${rate}%${C.reset} avg ${stat['avgLatencyMs'] ?? 0}ms (${calls} calls)`;
                   })
                   .join('\n');
-    const activityColor = activity.severity === 'error' ? C.red : activity.severity === 'warn' ? C.yellow : C.green;
     const activityDetail = activity.detail
         ? `${C.grey}${activity.detail}${C.reset}`
         : `${C.grey}(sem detalhe)${C.reset}`;
@@ -221,12 +218,6 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         : keepaliveOk
           ? `${C.green}standby da conversa${C.reset}`
           : `${C.yellow}parado${C.reset}`;
-    const sdkFsRouteModeColor =
-        sdkFsRouting.mode === 'local-fs-primary'
-            ? C.green
-            : sdkFsRouting.mode === 'sdk-workspace-only'
-              ? C.yellow
-              : C.red;
     const runtimeSessionLabel = renderDiagnoseSessionId(runtimeSessionId, detail, '(sem runtime)');
     const sdkSessionLabel = renderDiagnoseSessionId(binding.sdkSessionId, detail, '(sem sdk)');
     const hubSessionLabel = renderDiagnoseSessionId(hub.activeHubSessionId, detail, '(sem hub)');
@@ -284,57 +275,83 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         return;
     }
 
-    println(`
-${C.bold}${C.cyan}╔══════════════════════════════════════════════════════════════╗${C.reset}
-${C.bold}${C.cyan}║             Diagnóstico do Terminal LLM-B (F13.1)            ║${C.reset}
-${C.bold}${C.cyan}╠══════════════════════════════════════════════════════════════╣${C.reset}
-${C.cyan}  AGENTE${C.reset}
-    status        ${agentStatusColor}${snap['status']}${C.reset}
-    health        ${health ? `${health['status'] === 'healthy' ? C.green : health['status'] === 'degraded' ? C.yellow : C.red}${health['status']}${C.reset}` : `${C.grey}n/d${C.reset}`}
-    conversa      ${dialogLoopActive ? `${C.green}● ativa${C.reset}` : `${C.red}○ inativa${C.reset}`}
-    modelo        ${C.magenta}${snap['model']}${C.reset}
-    byok          ${byokLine}
-    gateway       ${gatewayLine}
-    raciocínio    ${C.magenta}${configProjection.currentReasoningEffort}${C.reset}
-    modo SDK      ${sdkModeLine}
-    permissão     ${permissionLine}
-    plan arquivo  ${planOpLine}
-    runtime alvo  ${C.grey}${configProjection.runtimeId}${C.reset}
-    mapa runtime  ${C.grey}${runtimesLine}${C.reset}
-    sessão runtime ${C.grey}${runtimeSessionLabel}${C.reset}
-    sessão SDK    ${C.grey}${sdkSessionLabel}${C.reset}
-    sessão hub    ${C.grey}${hubSessionLabel}${C.reset}
-    tarefas       ${C.grey}${health?.['backgroundPendingCount'] ?? 0}${C.reset}
-    pulso         ${keepaliveLine}
-    quota         ${health?.['checks']?.['quota']?.['running'] ? `${C.green}rodando${C.reset}` : `${C.yellow}parada${C.reset}`}
-    issues        ${health ? (Array.isArray(health['issues']) && health['issues'].length === 0 ? `${C.green}nenhuma${C.reset}` : `${C.yellow}${Array.isArray(health['issues']) ? health['issues'].slice(0, 3).join(', ') : ''}${Array.isArray(health['issues']) && health['issues'].length > 3 ? '…' : ''}${C.reset}`) : `${C.grey}n/d${C.reset}`}
-    ação          ${actionLine}
-    pergunta      ${askUserLine}
-    salva idade   ${askUserAgeLine}
-    salva rest.   ${askUserRemainingLine}
-    atividade     ${activityColor}${activity.label}${C.reset}${typeof activity.progress === 'number' ? ` ${C.grey}(${activity.progress}%)${C.reset}` : ''}
-    detalhe       ${activityDetail}
-    display       ${C.grey}raciocínio ${display.thinking ? 'on' : 'off'} · streaming ${display.streaming ? 'on' : 'off'} · uso ${display.usage ? 'on' : 'off'} · tools ${display.tools ? 'on' : 'off'} · intenção ${display.intent ? 'on' : 'off'}${C.reset}
-    inline status ${display.inlineStatus.enabled ? C.green : C.yellow}${display.inlineStatus.mode}${C.reset} ${C.grey}origem ${display.inlineStatus.source}${display.inlineStatus.overlay ? ' · overlay' : ''}${C.reset}
+    println('');
+    println(terminalThemeHeadline('assistant', 'Diagnóstico do Terminal LLM-B', ['full']));
+    println(terminalThemeDivider(62));
 
-${C.cyan}  INFRAESTRUTURA${C.reset}
-    MCP bridge    ${mcpLine}
-    Hub storage   ${hubLine}
-    Boot report   ${bootLine}
-    Shutdown      ${shutdownLine}
-    Timers        ${timerLine}
-    Lifecycle mx  ${lifecycleMetricsLine}
-    Uptime        ${C.grey}${Math.floor(uptimeSec / 60)}m ${uptimeSec % 60}s${C.reset}
-    Memória RSS   ${memMB > 400 ? C.yellow : C.grey}${memMB}MB${C.reset}
-    rota sdk↔fs   ${sdkFsRouteModeColor}${sdkFsRouting.mode}${C.reset} ${C.grey}(${sdkFsRouting.reason})${C.reset}
+    println(terminalThemeHeadline('assistant', 'Agente', ['runtime', 'modelo', 'entrada']));
+    println(terminalThemeRow('Status', String(snap['status'] ?? 'desconhecido'), { role: renderRuntimeStatusRole(String(snap['status'] ?? 'unknown'), dialogLoopActive) }));
+    println(terminalThemeRow('Saúde', health ? renderHumanHealthStatus(String(health['status'] ?? 'unknown')) : 'sem leitura', { role: renderHealthRole(String(health?.['status'] ?? 'unknown')) }));
+    println(terminalThemeRow('Conversa', dialogLoopActive ? 'ativa' : 'inativa', { role: dialogLoopActive ? 'success' : 'warn' }));
+    println(terminalThemeRow('Modelo', `${snap['model']} · raciocínio ${configProjection.currentReasoningEffort}`, { role: 'assistant' }));
+    println(terminalThemeRow('BYOK', byokLine, { role: byok.ready ? 'success' : byok.enabled ? 'warn' : 'muted' }));
+    println(terminalThemeRow('Gateway', gatewayLine));
+    println(terminalThemeRow('Modo SDK', sdkModeLine));
+    println(terminalThemeRow('Permissões', permissionLine));
+    println(terminalThemeRow('Plan arquivo', planOpLine));
+    println(terminalThemeRow('Runtime alvo', configProjection.runtimeId));
+    println(terminalThemeRow('Mapa runtime', runtimesLine));
+    println(terminalThemeRow('Sessão runtime', runtimeSessionLabel));
+    println(terminalThemeRow('Sessão SDK', sdkSessionLabel));
+    println(terminalThemeRow('Sessão hub', hubSessionLabel));
+    println(terminalThemeRow('Pergunta', askUserLine, { role: askUserLine === 'nenhum' ? 'muted' : 'question' }));
+    println(terminalThemeRow('Shadow idade', askUserAgeLine));
+    println(terminalThemeRow('Shadow rest.', askUserRemainingLine));
+    println(terminalThemeRow('Ação', actionLine, { role: 'command' }));
 
-${C.cyan}  TODOs PENDENTES (top-5)${C.reset}
-${todoLines}
+    println('');
+    println(terminalThemeHeadline('thinking', 'Atividade', ['pulso', 'display']));
+    println(terminalThemeRow('Atual', `${activity.label}${typeof activity.progress === 'number' ? ` (${activity.progress}%)` : ''}`, { role: renderActivityRole(activity.severity) }));
+    println(terminalThemeRow('Detalhe', activityDetail));
+    println(terminalThemeRow('Tarefas', String(health?.['backgroundPendingCount'] ?? 0)));
+    println(terminalThemeRow('Pulso', keepaliveLine));
+    println(terminalThemeRow('Quota', health?.['checks']?.['quota']?.['running'] ? 'rodando' : 'parada', { role: health?.['checks']?.['quota']?.['running'] ? 'success' : 'warn' }));
+    println(
+        terminalThemeRow(
+            'Issues',
+            health
+                ? Array.isArray(health['issues']) && health['issues'].length === 0
+                    ? 'nenhuma'
+                    : `${Array.isArray(health['issues']) ? health['issues'].slice(0, 3).join(', ') : ''}${Array.isArray(health['issues']) && health['issues'].length > 3 ? '...' : ''}`
+                : 'n/d',
+            { role: Array.isArray(health?.['issues']) && health['issues'].length === 0 ? 'success' : 'warn' },
+        ),
+    );
+    println(
+        terminalThemeRow(
+            'Display',
+            `raciocínio ${display.thinking ? 'on' : 'off'} · streaming ${display.streaming ? 'on' : 'off'} · uso ${display.usage ? 'on' : 'off'} · tools ${display.tools ? 'on' : 'off'} · intenção ${display.intent ? 'on' : 'off'}`,
+        ),
+    );
+    println(
+        terminalThemeRow(
+            'Linha viva',
+            `${display.inlineStatus.mode} · origem ${display.inlineStatus.source}${display.inlineStatus.overlay ? ' · overlay' : ''}`,
+            { role: display.inlineStatus.enabled ? 'success' : 'warn' },
+        ),
+    );
 
-${C.cyan}  TOOL STATS — MAIOR LATÊNCIA (top-5)${C.reset}
-${statsLines}
-${C.bold}${C.cyan}╚══════════════════════════════════════════════════════════════╝${C.reset}
-`);
+    println('');
+    println(terminalThemeHeadline('system', 'Infraestrutura', ['MCP', 'hub', 'timers']));
+    println(terminalThemeRow('MCP bridge', mcpLine));
+    println(terminalThemeRow('Hub storage', hubLine));
+    println(terminalThemeRow('Boot report', bootLine));
+    println(terminalThemeRow('Shutdown', shutdownLine));
+    println(terminalThemeRow('Timers', timerLine));
+    println(terminalThemeRow('Lifecycle mx', lifecycleMetricsLine));
+    println(terminalThemeRow('Uptime', `${Math.floor(uptimeSec / 60)}m ${uptimeSec % 60}s`));
+    println(terminalThemeRow('Memória RSS', `${memMB}MB`, { role: memMB > 400 ? 'warn' : 'muted' }));
+    println(terminalThemeRow('Rota SDK/FS', `${sdkFsRouting.mode} · ${sdkFsRouting.reason}`, { role: sdkFsRouting.mode === 'local-fs-primary' ? 'success' : sdkFsRouting.mode === 'sdk-workspace-only' ? 'warn' : 'error' }));
+
+    println('');
+    println(terminalThemeHeadline('warn', 'Pendências', ['top-5']));
+    for (const line of todoLines.split('\n')) println(line);
+
+    println('');
+    println(terminalThemeHeadline('tool', 'Ferramentas por latência', ['top-5']));
+    for (const line of statsLines.split('\n')) println(line);
+    println(terminalThemeDivider(62));
+    println('');
 
     if (configProjection.runtimeFallbackWarning) {
         println(

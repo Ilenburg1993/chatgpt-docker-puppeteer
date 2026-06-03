@@ -1735,7 +1735,8 @@ function diagnosticUxCycleCriteria(boot) {
     const fsSearchStart = plain.indexOf('/fs search TERMINAL_DIAGNOSTIC_UX_');
     const activityStart = plain.indexOf('/activity 8');
     const liveFullStart = plain.indexOf('/live full');
-    const toolsStart = plain.indexOf('/tools', Math.max(0, liveFullStart));
+    const healthFullStart = plain.indexOf('/health full', Math.max(0, liveFullStart));
+    const toolsStart = plain.indexOf('/tools', Math.max(0, healthFullStart));
     const eventsStart = plain.indexOf('/events 12', Math.max(0, toolsStart));
     const sdkEventsStart = plain.indexOf('/session sdk events 8', Math.max(0, eventsStart));
     const sdkWaitsStart = plain.indexOf('/session sdk waits 8', Math.max(0, sdkEventsStart));
@@ -1764,7 +1765,8 @@ function diagnosticUxCycleCriteria(boot) {
     };
     const fsReadSurface = surfaceBetween(fsReadStart, fsSearchStart);
     const activitySurface = surfaceBetween(activityStart, liveFullStart);
-    const liveFullSurface = surfaceBetween(liveFullStart, toolsStart);
+    const liveFullSurface = surfaceBetween(liveFullStart, healthFullStart);
+    const healthFullSurface = surfaceBetween(healthFullStart, toolsStart);
     const toolsSurface = surfaceBetween(toolsStart, eventsStart);
     const eventsSurface = surfaceBetween(eventsStart, sdkEventsStart);
     const sdkEventsSurface = surfaceBetween(sdkEventsStart, sdkWaitsStart);
@@ -1828,6 +1830,15 @@ function diagnosticUxCycleCriteria(boot) {
                     liveFullSurface,
                 ),
             detail: '/live full rendered detailed flow with ISO seconds plus relative time and without raw labels, permission constants, empty/not_needed states, or UUIDs',
+        },
+        {
+            id: 'diagnostic-ux-health-full-themed',
+            pass:
+                /Diagnóstico do Terminal LLM-B[\s\S]*Agente[\s\S]*Atividade[\s\S]*Infraestrutura[\s\S]*Ferramentas por latência/iu.test(
+                    healthFullSurface,
+                ) &&
+                !/╔|╚|\bAGENTE\b|\bINFRAESTRUTURA\b|TOOL STATS|TODOs PENDENTES/u.test(healthFullSurface),
+            detail: '/health full rendered themed sections instead of the old decorative ANSI box',
         },
         {
             id: 'diagnostic-ux-tools-human',
@@ -1977,6 +1988,7 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
             { line: `/fs search ${marker} data/copilot-terminal/live-scratch`, advanceAfterMs: 1_000 },
             { line: '/activity 8', advanceAfterMs: 1_000 },
             { line: '/live full', advanceAfterMs: 1_000 },
+            { line: '/health full', advanceAfterMs: 1_000 },
             { line: '/tools', advanceAfterMs: 1_000 },
             { line: '/events 12', advanceAfterMs: 1_000 },
             { line: '/session sdk events 8', advanceAfterMs: 1_000 },

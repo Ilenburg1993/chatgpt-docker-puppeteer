@@ -4231,11 +4231,32 @@
       pede detalhe.
 - [ ] Fase 12.8.A: auditar `/health`, `/status`, `/now`, `/diagnose`, `/tools diag` e `/model` como
       superfícies de saúde/diagnóstico.
-- [ ] Fase 12.8.B: substituir caixa antiga de `/health full` por tema compartilhado ou painel
+- [x] Fase 12.8.B: substituir caixa antiga de `/health full` por tema compartilhado ou painel
       compatível com `terminalThemeHeadline`, `terminalThemeRow` e `terminalThemeDivider`.
 - [ ] Fase 12.8.C: criar glossário visual para `status`, `health`, `quota`, `BYOK`, `runtime alvo`,
       `permissão`, `MCP bridge`, `timers` e `lifecycle`.
 - [ ] Fase 12.8.D: separar IDs técnicos em `/health detail`, `/tools raw` e `/events --raw`,
       preservando alças curtas em `/health` e `/tools diag`.
-- [ ] Fase 12.8.E: ampliar live PTY para validar `/health full` sem caixa antiga, sem desalinhamento
+- [x] Fase 12.8.E: ampliar live PTY para validar `/health full` sem caixa antiga, sem desalinhamento
       e com nomes humanos nos blocos principais.
+
+### 12.9 Evidência da saúde visual em `/health full`
+
+- [x] Implementação: `/health full` passou a usar `terminalThemeHeadline`,
+      `terminalThemeRow` e `terminalThemeDivider`, com blocos humanos `Agente`, `Atividade`,
+      `Infraestrutura`, `Pendências` e `Ferramentas por latência`.
+- [x] Implementação: a caixa dupla antiga foi removida da superfície full, mantendo o diagnóstico
+      rico e preservando `/health` compacto como entrada operacional padrão.
+- [x] Implementação: labels crus como `runtime id`, `sdk prompts=`, `quota monitor`,
+      `keepalive`, `bg tasks` e `sdk↔fs route` continuam fora das superfícies humanas validadas.
+- [x] Teste escopado passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_diagnose.spec.js`.
+  - Resultado: 1 arquivo, 5 testes.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-health-full-themed-20260603-1741`.
+  - Resultado: PASS; o critério `diagnostic-ux-health-full-themed` confirmou ausência da caixa
+        decorativa antiga e presença das seções temáticas principais.
+- [ ] Lacuna remanescente: `diagnose.js` ainda usa ANSI manual em alguns valores internos antes de
+      passá-los para `terminalThemeRow`; a próxima limpeza deve centralizar esses papéis no tema.
+- [ ] Lacuna remanescente: `/tools diag` ainda precisa de hierarquia mais humana para IDs e nomes
+      técnicos, com alças compactas e linguagem de auditoria em vez de jargão de implementação.
