@@ -12,6 +12,7 @@ export {
     terminalThemeHeadline,
     terminalThemeJoin,
     terminalThemeRow,
+    terminalThemeRows,
     terminalThemeStatus,
     terminalThemeText,
 } from '../ui-theme.js';

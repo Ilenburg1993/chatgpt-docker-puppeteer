@@ -4306,5 +4306,83 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/events-io-human-20260603-1754`.
   - Resultado: PASS; `/events` mostrou `I/O local · ferramenta ... · tipo I/O local` e manteve
         ausência de IDs crus, `io_op`, timestamps com milissegundos e `chatcmpl-tool`.
-- [ ] Próxima lacuna: primeiro viewport ainda é verboso no banner e em linhas de ajuda, com comandos
-      longos demais para leitura rápida.
+- [x] Próxima lacuna tratada em 12.12: primeiro viewport deixou de carregar o bloco de comandos
+      gigante e passou a explicar entrada direta sem jargão antigo de intervenção.
+
+### 12.12 Primeiro viewport compacto e comandos operacionais em blocos
+
+- [x] Achado: a live PTY ainda mostrava muitas instruções horizontais no primeiro viewport, com
+      `texto livre -> fila de intervenção`, linhas de ambiente vagas e uma ajuda operacional que
+      competia visualmente com o prompt.
+- [x] Decisão UX: o primeiro viewport default deve responder somente a três perguntas:
+      como operar agora, como enviar entrada e onde ver estado do sistema. Catálogo completo fica
+      em `/help`, `/tools`, `/session sdk` e diagnósticos explícitos.
+- [x] Implementação: `renderReplBanner` trocou a lista longa por três linhas compactas:
+      `Operar`, `Entrada` e `Sistema`.
+- [x] Implementação: a linha de entrada passou a dizer `texto direto = próxima pergunta`,
+      removendo o vocabulário antigo de fila/intervenção do banner.
+- [x] Implementação: o boot standalone passou a mostrar `FS/terminal locais ativos`, deixando claro
+      que MCP remoto ausente não bloqueia as ferramentas locais.
+- [x] Harness live: `diagnostic-ux-no-old-intervention-jargon` agora exige o novo banner compacto e
+      reprova `mailbox zero-PR`, `texto livre -> fila zero-PR`, `texto livre -> fila de intervenção`
+      e `[mailbox]`.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_repl_banner.spec.js tests/unit/copilot/terminal/test_boot_banner.spec.js`.
+  - Resultado: 2 arquivos, 4 testes.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/first-viewport-compact-20260603-1759`.
+  - Resultado: PASS; 22 critérios, com o primeiro viewport mostrando `Operar`, `Entrada`,
+        `Sistema`, `texto direto = próxima pergunta` e `FS/terminal locais ativos`.
+- [x] Achado pós-live: `/session sdk 6` e `/sdk status` ainda eram corretos semanticamente, mas
+      continham linhas longas (`Comandos`, `Próximo boot`, `Filtros`, `Uso`) que excediam a leitura
+      confortável do terminal.
+- [x] Decisão técnica: ajuda operacional com mais de uma ação deve usar bloco multiline com rótulo
+      apenas na primeira linha e continuação alinhada, preservando comandos por categoria.
+- [x] Implementação: `terminalThemeRows` foi adicionado ao tema central e exportado pelos barrels
+      `state`, `state/ui` e `state/theme`.
+- [x] Implementação: `/session sdk` passou a renderizar `Comandos`, `Próximo boot`, `Filtros` e
+      `Diagnósticos` como blocos compactos.
+- [x] Implementação: `/sdk status`, `/sdk skills status` e `/sdk skills config` passaram a quebrar
+      suas linhas de `Uso`/`Observação` em comandos escaneáveis.
+- [x] Harness live ampliado: os critérios `diagnostic-ux-session-sdk-inventory-human` e
+      `diagnostic-ux-sdk-status-human` agora reprovam a forma antiga com pipes/semicolons gigantes.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_repl_banner.spec.js tests/unit/copilot/terminal/test_boot_banner.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
+  - Resultado: 4 arquivos, 86 testes.
+- [x] Live PTY pós-compactação passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/compact-help-blocks-20260603-1805`.
+  - Resultado: PASS; `/session sdk 6` e `/sdk status` renderizaram comandos em blocos multiline.
+- [x] Achado pós-live: `/health full` ainda vazava constantes visíveis em campos importantes:
+      `Status idle`, `Modo SDK interactive` e `Permissões approve_all`.
+- [x] Implementação: `/health full` passou a renderizar `ocioso`, `interativo` e `automáticas`,
+      mantendo `prompts SDK ignorados` para explicar a autonomia sem expor constante crua.
+- [x] Harness live ampliado: `diagnostic-ux-health-full-themed` agora reprova `Status idle`,
+      `Modo SDK interactive` e `Permissões approve_all`.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_repl_banner.spec.js tests/unit/copilot/terminal/test_boot_banner.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
+  - Resultado: 5 arquivos, 91 testes.
+- [x] Live PTY pós-humanização de `/health full` passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/health-human-compact-blocks-20260603-1808`.
+  - Resultado: PASS; `/health full` mostrou `Status ocioso`, `Modo SDK interativo` e
+        `Permissões automáticas`.
+- [x] Nova lacuna observada na live: `/history` e `/db-history` podiam renderizar várias linhas
+      `Você <timestamp>` sem conteúdo quando o ciclo tem comandos internos/entradas vazias. A UX
+      deve ocultar turnos vazios ou explicar que são comandos de terminal, sem poluir o histórico.
+- [x] Implementação: `/history` e `/db-history` passaram a normalizar conteúdo, filtrar turnos sem
+      mensagem visível e mostrar estados explícitos (`sem mensagens visíveis nesta janela` /
+      `A janela persistida não tem mensagens visíveis.`) quando a janela só contém vazios.
+- [x] Teste escopado passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
+  - Resultado: 1 arquivo, 45 testes.
+- [x] Harness live ampliado: `diagnostic-ux-history-human` e `diagnostic-ux-db-history-human` agora
+      reprovam linhas vazias de `Você`, `LLM-B` ou `Sistema`.
+- [x] Live PTY pós-correção de histórico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/history-no-empty-rows-20260603-1814`.
+  - Resultado: PASS; `/history` mostrou `sem mensagens visíveis nesta janela` e `/db-history`
+        mostrou `A janela persistida não tem mensagens visíveis.`, sem linhas fantasma.
+- [x] Validadores formais do pacote passaram:
+  - `npm run lint:copilot`.
+  - `npm run typecheck:strict:src.copilot`.
+  - `npx vitest run tests/unit/copilot/terminal/test_repl_banner.spec.js tests/unit/copilot/terminal/test_boot_banner.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
+- [ ] Próxima lacuna: auditar comandos com ANSI cru ainda fora do tema central (`/gh`, `/skills`,
+      `/memory`, `/plan`, trechos de `/byok`) e decidir ordem de migração pelo impacto na live.

@@ -386,6 +386,8 @@ const {
     cmdSessionSdk,
     cmdClearShadow,
 } = await import('../../../../src/copilot/terminal/commands/session.js');
+const { conversationStore } = await import('#copilot/conversation-hub');
+const { llmBridgeClient } = await import('#copilot/channel');
 
 /**
  * @returns {{ println: import('vitest').Mock; output: () => string }}
@@ -414,6 +416,15 @@ describe('commands/session — sync commands', () => {
         altRuntime.status = 'waiting_for_input';
         altRuntime.pendingQuestion = null;
         altRuntime.pendingQuestionKind = null;
+        conversationStore.readTurns.mockReturnValue([
+            { role: 'user', content: 'a', created_at: Date.now() },
+            { role: 'llm_b', content: 'b', created_at: Date.now() },
+        ]);
+        conversationStore.countTurns.mockReturnValue(2);
+        llmBridgeClient.history = [
+            { role: 'user', content: 'hello world', timestamp: Date.now() },
+            { role: 'assistant', content: 'hi', timestamp: Date.now() },
+        ];
     });
 
     it('cmdStatus imprime painel humano compacto por padrão', () => {
@@ -625,6 +636,21 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).not.toMatch(/\[\d{4}-\d{2}-\d{2}T/u);
     });
 
+    it('cmdHistory omite turnos sem mensagem visível', () => {
+        conversationStore.readTurns.mockReturnValueOnce([
+            { role: 'user', content: '   ', created_at: Date.now() - 2000 },
+            { role: 'assistant', content: '\n\t', created_at: Date.now() - 1000 },
+            { role: 'llm_b', content: 'mensagem real', created_at: Date.now() },
+        ]);
+        conversationStore.countTurns.mockReturnValueOnce(3);
+        const ctx = mockCtx();
+
+        cmdHistory({ println: ctx.println }, 5);
+
+        expect(ctx.output()).toContain('mensagem real');
+        expect(ctx.output()).not.toMatch(/Você\s+\d{4}-\d{2}-\d{2}T[^\n]*·\s*$/u);
+    });
+
     it('cmdWho imprime atores com porta', () => {
         const ctx = mockCtx();
         cmdWho({ injectPort: 3009, println: ctx.println });
@@ -738,6 +764,20 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).not.toMatch(/\[\d{4}-\d{2}-\d{2}T/u);
     });
 
+    it('cmdDbHistory omite turnos persistidos sem mensagem visível', () => {
+        conversationStore.readTurns.mockReturnValueOnce([
+            { role: 'user', content: '', created_at: Date.now() - 1000 },
+            { role: 'llm_b', content: 'resposta persistida', created_at: Date.now() },
+        ]);
+        conversationStore.countTurns.mockReturnValueOnce(2);
+        const ctx = mockCtx();
+
+        cmdDbHistory({ hubSessionId: 'hub-1', println: ctx.println });
+
+        expect(ctx.output()).toContain('resposta persistida');
+        expect(ctx.output()).not.toMatch(/Você\s+\d{4}-\d{2}-\d{2}T[^\n]*·\s*$/u);
+    });
+
     it('cmdDbSessions lista sessions', () => {
         const ctx = mockCtx();
         cmdDbSessions({ hubSessionId: 'abc-123', println: ctx.println });
@@ -839,6 +879,11 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).not.toContain('sdk-current');
         expect(ctx.output()).not.toContain('sdk-second');
         expect(ctx.output()).toContain('/session sdk <n>');
+        expect(ctx.output()).toContain('/session sdk controla sessões SDK');
+        expect(ctx.output()).toContain('/restart reinicia só a conversa');
+        expect(ctx.output()).toContain('/session sdk next new');
+        expect(ctx.output()).not.toContain('/session sdk controla sessão SDK;');
+        expect(ctx.output()).not.toContain('/session sdk next new |');
         expect(ctx.output()).toContain('...');
         expect(ctx.output()).not.toContain('2026-05-21T');
         expect(ctx.output()).not.toContain('last');

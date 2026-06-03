@@ -44,9 +44,9 @@ export function buildTerminalReplBanner(injectPort) {
 ${terminalThemeDivider(62)}
 ${terminalThemeHeadline('assistant', 'Terminal LLM-B', ['sessão permanente'])}
 ${terminalThemeDivider(62)}
-  ${commandList(['/status', '/now', '/menu', '/activity 10', '/help'])}
-  ${terminalThemeText('muted', 'texto livre → fila de intervenção · /turn <msg> abre turno · @arquivo anexa contexto')}
-  ${terminalThemeText('muted', `HTTP :${injectPort} · /inject · /events · /sessions · diagnóstico: /health /tools`)}
+  ${terminalThemeText('muted', 'Operar'.padEnd(9))} ${commandList(['/status', '/now', '/activity 10', '/help'])}
+  ${terminalThemeText('muted', 'Entrada'.padEnd(9))} texto direto = próxima pergunta · ${command('/turn <msg>')} envia agora · ${command('@arquivo')} anexa
+  ${terminalThemeText('muted', 'Sistema'.padEnd(9))} HTTP :${injectPort} · ${commandList(['/events', '/sessions', '/health', '/tools'])}
 `;
 }
 

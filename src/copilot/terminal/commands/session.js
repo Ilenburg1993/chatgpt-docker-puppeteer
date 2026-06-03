@@ -55,6 +55,7 @@ import {
     terminalThemeDivider,
     terminalThemeHeadline,
     terminalThemeRow,
+    terminalThemeRows,
     terminalThemeText,
 } from '../state/index.js';
 
@@ -232,6 +233,22 @@ function renderDbSessionStatusLabel(value) {
     if (status === 'archived') return 'arquivada';
     if (status === 'failed' || status === 'error') return 'falhou';
     return status.replace(/[_-]+/gu, ' ') || 'n/d';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeTerminalHistoryContent(value) {
+    return String(value ?? '').replace(/\s+/gu, ' ').trim();
+}
+
+/**
+ * @param {string} content
+ * @returns {string}
+ */
+function renderTerminalHistoryPreview(content) {
+    return content.slice(0, 160) + (content.length > 160 ? '…' : '');
 }
 
 /**
@@ -1294,9 +1311,10 @@ export function cmdHistory({ println }, n = 10) {
     const { runtimeId, arg } = extractRuntimeTarget(rawArg ?? '');
     const requestedLimit = typeof n === 'number' ? n : Number(arg) || 10;
     const timeline = readTerminalTimelineProjection({ limitPairs: requestedLimit, runtimeId });
-    const hist = timeline.turns;
+    const hist = timeline.turns.filter((turn) => normalizeTerminalHistoryContent(turn.content).length > 0);
     if (hist.length === 0) {
-        println(terminalThemeRow('Histórico', 'vazio'));
+        const label = timeline.turns.length > 0 ? 'sem mensagens visíveis nesta janela' : 'vazio';
+        println(terminalThemeRow('Histórico', label));
         return;
     }
     println('');
@@ -1313,7 +1331,7 @@ export function cmdHistory({ println }, n = 10) {
         const time = formatTerminalTimeLabel(turn.timestamp, { now, mode: 'dual' });
         const actor = renderTerminalActorLabel(turn.role, turn.rawRole);
         const sourceLabel = turn.persisted ? '' : ' · ao vivo';
-        const preview = turn.content.slice(0, 160) + (turn.content.length > 160 ? '…' : '');
+        const preview = renderTerminalHistoryPreview(normalizeTerminalHistoryContent(turn.content));
         println(terminalThemeRow(actor.label, `${time}${sourceLabel} · ${preview}`, { role: actor.role }));
     }
     if (timeline.reconciliationStatus === 'diverged') {
@@ -1353,9 +1371,13 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
         return;
     }
     try {
-        const turns = projection.turns;
+        const turns = projection.turns.filter((turn) => normalizeTerminalHistoryContent(turn['content']).length > 0);
         if (turns.length === 0) {
-            println(terminalThemeRow('/db-history', 'Nenhum turno persistido ainda.'));
+            const label =
+                projection.turns.length > 0
+                    ? 'A janela persistida não tem mensagens visíveis.'
+                    : 'Nenhum turno persistido ainda.';
+            println(terminalThemeRow('/db-history', label));
             return;
         }
         const offsetLabel = offset > 0 ? ` (offset recente ${offset})` : '';
@@ -1366,9 +1388,9 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
         for (const t of turns) {
             const time = formatTerminalTimeLabel(String(t['created_at'] ?? ''), { now, mode: 'dual' });
             const role = String(t['role'] ?? 'user');
-            const content = String(t['content'] ?? '');
+            const content = normalizeTerminalHistoryContent(t['content']);
             const actor = renderTerminalActorLabel(role, role);
-            const preview = content.slice(0, 160) + (content.length > 160 ? '…' : '');
+            const preview = renderTerminalHistoryPreview(content);
             println(terminalThemeRow(actor.label, `${time} · ${preview}`, { role: actor.role }));
         }
         println(
@@ -2312,10 +2334,12 @@ export async function cmdSessionSdk({ println }, arg = '') {
         println(terminalThemeRow('Último boot', bootDecision));
     }
     println(
-        terminalThemeRow(
-            'Comandos',
-            '/session sdk controla sessão SDK; /restart reinicia só a conversa; /resume injeta histórico do hub; /session save|list|restore são snapshots locais',
-        ),
+        terminalThemeRows('Comandos', [
+            '/session sdk controla sessões SDK',
+            '/restart reinicia só a conversa',
+            '/resume injeta histórico do hub',
+            '/session save|list|restore usa snapshots locais',
+        ], { role: 'command' }),
     );
     if (inventory.sessions.length === 0) {
         println(terminalThemeRow('Sessões', 'nenhuma sessão SDK listada pelo client atual'));
@@ -2368,10 +2392,25 @@ export async function cmdSessionSdk({ println }, arg = '') {
         );
     }
     println('');
-    println(terminalThemeRow('Próximo boot', '/session sdk next new | /session sdk next resume <id|#n|atual|última|primeiro-plano> | /session sdk next auto'));
-    println(terminalThemeRow('Filtros', '/session sdk <n> offset=<n> cwd=<path> gitRoot=<path> repo=<owner/repo> branch=<nome>'));
-    println(terminalThemeRow('Limpeza', '/session sdk delete <id|#n>; sessão viva é protegida contra exclusão'));
-    println(terminalThemeRow('Diagnósticos', 'sessões marcadas como diagnóstico antigo vieram de canários persistidos; probes novos usam sessão efêmera'));
+    println(
+        terminalThemeRows('Próximo boot', [
+            '/session sdk next new',
+            '/session sdk next resume <id|#n|atual|última|primeiro-plano>',
+            '/session sdk next auto',
+        ], { role: 'command' }),
+    );
+    println(
+        terminalThemeRows('Filtros', [
+            '/session sdk <n> offset=<n>',
+            'cwd=<path> · gitRoot=<path>',
+            'repo=<owner/repo> · branch=<nome>',
+        ], { role: 'command' }),
+    );
+    println(terminalThemeRow('Limpeza', '/session sdk delete <id|#n>; sessão viva é protegida', { role: 'command' }));
+    println(terminalThemeRows('Diagnósticos', [
+        'sessões marcadas como diagnóstico antigo vieram de canários persistidos',
+        'probes novos usam sessão efêmera',
+    ]));
     println('');
 }
 

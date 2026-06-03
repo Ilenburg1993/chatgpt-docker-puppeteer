@@ -248,6 +248,10 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).not.toContain('sdk-1');
         expect(ctx.output()).toContain('chat');
         expect(ctx.output()).toContain('0 perguntas');
+        expect(ctx.output()).toContain('/sdk models · /sdk tools');
+        expect(ctx.output()).toContain('/sdk skills [--project <path>] [--dir <path>]');
+        expect(ctx.output()).toContain('/sdk simulate request-user-input');
+        expect(ctx.output()).not.toContain('/sdk models | /sdk skills');
         expect(ctx.output()).not.toContain('pergunta=0');
         expect(ctx.output()).not.toContain('reasoning=');
         expect(ctx.output()).not.toContain('restante=');

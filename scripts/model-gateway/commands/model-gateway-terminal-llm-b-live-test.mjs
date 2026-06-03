@@ -1816,8 +1816,10 @@ function diagnosticUxCycleCriteria(boot) {
         },
         {
             id: 'diagnostic-ux-no-old-intervention-jargon',
-            pass: !/mailbox zero-PR|texto livre → fila zero-PR|\[mailbox/iu.test(plain),
-            detail: 'terminal banner/help/intervention cycle did not expose old mailbox-zero-PR jargon',
+            pass:
+                /Operar[\s\S]*Entrada[\s\S]*texto direto = próxima pergunta[\s\S]*Sistema/iu.test(plain) &&
+                !/mailbox zero-PR|texto livre → fila (?:zero-PR|de intervenção)|\[mailbox/iu.test(plain),
+            detail: 'terminal banner/help/intervention cycle used compact first-viewport copy without old mailbox/intervention jargon',
         },
         {
             id: 'diagnostic-ux-activity-human',
@@ -1846,8 +1848,10 @@ function diagnosticUxCycleCriteria(boot) {
                 /Diagnóstico do Terminal LLM-B[\s\S]*Agente[\s\S]*Atividade[\s\S]*Infraestrutura[\s\S]*Ferramentas por latência/iu.test(
                     healthFullSurface,
                 ) &&
-                !/╔|╚|\bAGENTE\b|\bINFRAESTRUTURA\b|TOOL STATS|TODOs PENDENTES/u.test(healthFullSurface),
-            detail: '/health full rendered themed sections instead of the old decorative ANSI box',
+                !/╔|╚|\bAGENTE\b|\bINFRAESTRUTURA\b|TOOL STATS|TODOs PENDENTES|Status\s+idle|Modo SDK\s+interactive|Permissões\s+approve_all/u.test(
+                    healthFullSurface,
+                ),
+            detail: '/health full rendered themed sections with human status/mode labels instead of the old decorative ANSI box or raw constants',
         },
         {
             id: 'diagnostic-ux-tools-human',
@@ -1907,20 +1911,26 @@ function diagnosticUxCycleCriteria(boot) {
             pass:
                 /Sessão SDK[\s\S]*(Sessões SDK listadas|nenhuma sessão SDK listada)/iu.test(sdkInventorySurface) &&
                 /Última usada|Primeiro plano/iu.test(sdkInventorySurface) &&
+                /Comandos[\s\S]*\/session sdk controla sessões SDK[\s\S]*\/restart reinicia só a conversa[\s\S]*Próximo boot[\s\S]*\/session sdk next new[\s\S]*Filtros[\s\S]*offset=<n>/iu.test(
+                    sdkInventorySurface,
+                ) &&
                 (!/Tempo/iu.test(sdkInventorySurface) || (hasIsoSeconds(sdkInventorySurface) && hasRelativeAge(sdkInventorySurface))) &&
-                !/Foreground|probe-residue|\blast\b|\bforeground\b|operator-next-boot|sdk-resume-fallback|provider-boundary|\bsdk-(?:current|old|probe|new|last|second)\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
+                !/\/session sdk controla sessão SDK;|\/session sdk next new \||Foreground|probe-residue|\blast\b|\bforeground\b|operator-next-boot|sdk-resume-fallback|provider-boundary|\bsdk-(?:current|old|probe|new|last|second)\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
                     sdkInventorySurface,
                 ),
-            detail: '/session sdk default rendered inventory with ISO seconds plus relative time, translated labels, and without raw ids or English flags',
+            detail: '/session sdk default rendered inventory and command help as compact multiline human blocks without raw ids or English flags',
         },
         {
             id: 'diagnostic-ux-sdk-status-human',
             pass:
                 /SDK do Terminal[\s\S]*Sessão\s+sessão ativa/iu.test(sdkStatusSurface) &&
-                !/\d{4}-\d{2}-\d{2}T|\bsdk-[a-z0-9_-]+\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|reasoning=|restante=/iu.test(
+                /Uso[\s\S]*\/sdk models · \/sdk tools[\s\S]*\/sdk skills[\s\S]*\/sdk quota · \/sdk waits[\s\S]*\/sdk headers[\s\S]*\/sdk simulate request-user-input/iu.test(
+                    sdkStatusSurface,
+                ) &&
+                !/\d{4}-\d{2}-\d{2}T|\bsdk-[a-z0-9_-]+\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|reasoning=|restante=|\/sdk models \| \/sdk skills/iu.test(
                     sdkStatusSurface,
                 ),
-            detail: '/sdk status rendered session presence and quota/status without raw session ids or key=value diagnostics',
+            detail: '/sdk status rendered session presence, quota/status and compact multiline command help without raw ids or key=value diagnostics',
         },
         {
             id: 'diagnostic-ux-permission-human',
@@ -1946,16 +1956,23 @@ function diagnosticUxCycleCriteria(boot) {
             id: 'diagnostic-ux-history-human',
             pass:
                 /Histórico/iu.test(historySurface) &&
-                (!/(LLM-B|Você|Sistema)/iu.test(historySurface) || (hasIsoSeconds(historySurface) && hasRelativeAge(historySurface))) &&
-                !/reconciled|\bmixed\b|\[live\]/iu.test(historySurface),
-            detail: '/history rendered conversation turns with ISO seconds plus relative time and without raw timeline labels or [live] badges',
+                (/Histórico\s+sem mensagens visíveis nesta janela/iu.test(historySurface) ||
+                    (!/(LLM-B|Você|Sistema)/iu.test(historySurface) ||
+                        (hasIsoSeconds(historySurface) && hasRelativeAge(historySurface)))) &&
+                !/reconciled|\bmixed\b|\[live\]|(?:Você|LLM-B|Sistema)\s+\d{4}-\d{2}-\d{2}T[^\n]*·\s*(?:\n|$)/iu.test(
+                    historySurface,
+                ),
+            detail: '/history rendered visible conversation turns with ISO seconds plus relative time and without empty rows, raw timeline labels or [live] badges',
         },
         {
             id: 'diagnostic-ux-db-history-human',
             pass:
-                /(Últimos|Nenhum turno|não disponível)/iu.test(dbHistorySurface) &&
-                (!/Últimos/iu.test(dbHistorySurface) || (hasIsoSeconds(dbHistorySurface) && hasRelativeAge(dbHistorySurface))),
-            detail: '/db-history rendered persisted turns or empty state with ISO seconds plus relative time when rows exist',
+                /(Últimos|Nenhum turno|janela persistida não tem mensagens visíveis|não disponível)/iu.test(
+                    dbHistorySurface,
+                ) &&
+                (!/Últimos/iu.test(dbHistorySurface) || (hasIsoSeconds(dbHistorySurface) && hasRelativeAge(dbHistorySurface))) &&
+                !/(?:Você|LLM-B|Sistema)\s+\d{4}-\d{2}-\d{2}T[^\n]*·\s*(?:\n|$)/iu.test(dbHistorySurface),
+            detail: '/db-history rendered visible persisted turns or empty state with ISO seconds plus relative time and without empty rows',
         },
         {
             id: 'diagnostic-ux-db-sessions-human',
@@ -2158,7 +2175,7 @@ function defaultUxCycleCriteria(boot) {
             id: 'ux-cycle-boot-human-copy',
             pass:
                 /Preparando terminal/iu.test(plain) &&
-                /ferramentas locais ativas/iu.test(plain) &&
+                /FS\/terminal locais ativos/iu.test(plain) &&
                 !/Subindo servidor copilot|runtime do agente|stopped:noloop|starting:noloop|\bTools\s+locais|\b0 tools\b/iu.test(
                     plain,
                 ),

@@ -32,13 +32,13 @@ export function buildTerminalStandaloneBannerView(opts, deps = {}) {
     const warnings = Array.isArray(bootPreflight?.warnings) ? bootPreflight.warnings : [];
 
     const modeLine = isStandalone
-        ? 'local · MCP remoto ausente · ferramentas locais ativas'
+        ? 'local · MCP remoto ausente · FS/terminal locais ativos'
         : `MCP conectado · ${Number(mcp.toolCount ?? 0)} ferramentas remotas`;
     /** @type {string[]} */
     const lines = [
         '',
-        `  Ambiente ${modeLine} · ${opts.serverUrl}`,
-        '  Ações     /tools · /health · /session sdk · /events',
+        `  Ambiente  ${modeLine}`,
+        `  Sistema   ${opts.serverUrl} · /tools · /health · /session sdk · /events`,
     ];
 
     if (warnings.length > 0) {

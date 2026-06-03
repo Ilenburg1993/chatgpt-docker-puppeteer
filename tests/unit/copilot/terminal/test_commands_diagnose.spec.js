@@ -296,7 +296,13 @@ describe('commands/diagnose', () => {
             expect(output).toContain('Linha viva');
             expect(output).toContain('reserved');
             expect(lowerOutput).toContain('permiss');
+            expect(output).toContain('Modo SDK');
+            expect(output).toContain('interativo');
+            expect(output).toContain('automáticas');
             expect(output).toContain('prompts SDK ignorados');
+            expect(output).not.toContain('Status       idle');
+            expect(output).not.toContain('Modo SDK     interactive');
+            expect(output).not.toContain('Permissões   approve_all');
             expect(output).not.toContain('permission');
             expect(output).not.toContain('prompts SDK skip');
             expect(output).not.toContain('sdk prompts=');

@@ -20,7 +20,7 @@ describe('terminal/terminal-phases/boot-banner', () => {
         assert.equal(view.operationMode, 'standalone');
         assert.equal(view.mcpToolCount, 0);
         assert.equal(
-            view.lines.some((line) => line.includes('local · MCP remoto ausente')),
+            view.lines.some((line) => line.includes('local · MCP remoto ausente · FS/terminal locais ativos')),
             true,
         );
         assert.equal(
@@ -32,7 +32,7 @@ describe('terminal/terminal-phases/boot-banner', () => {
             true,
         );
         assert.equal(
-            view.lines.some((line) => line.includes('Ações') && line.includes('/tools') && line.includes('/events')),
+            view.lines.some((line) => line.includes('Sistema') && line.includes('/tools') && line.includes('/events')),
             true,
         );
         assert.equal(

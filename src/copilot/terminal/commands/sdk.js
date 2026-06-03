@@ -76,6 +76,7 @@ import {
     terminalThemeDivider,
     terminalThemeHeadline,
     terminalThemeRow,
+    terminalThemeRows,
     terminalThemeText,
 } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
@@ -1159,9 +1160,15 @@ export async function cmdSdk({ println }, arg = '') {
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             println(
-                terminalThemeRow(
+                terminalThemeRows(
                     'Uso',
-                    '/sdk models | /sdk skills [--project <path>] [--dir <path>] | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk capabilities | /sdk headers [k=v ...|clear] | /sdk waits | /sdk simulate request-user-input | /sdk doctor | /sdk compact',
+                    [
+                        '/sdk models · /sdk tools [model]',
+                        '/sdk skills [--project <path>] [--dir <path>]',
+                        '/sdk quota · /sdk waits · /sdk prompt · /sdk capabilities',
+                        '/sdk headers [k=v ...|clear]',
+                        '/sdk simulate request-user-input · /sdk doctor · /sdk compact',
+                    ],
                     { role: 'command' },
                 ),
             );
@@ -1269,9 +1276,13 @@ async function renderSdkSkills({ println }, rest, runtimeId) {
         println(terminalThemeHeadline('accent', 'Status das Skills SDK'));
         println(terminalThemeRow('Runtime', state.runtimeId));
         println(
-            terminalThemeRow(
+            terminalThemeRows(
                 'Uso',
-                '/sdk skills para discovery · /sdk skills config para governança · /sdk skills agents para custom agents',
+                [
+                    '/sdk skills para discovery',
+                    '/sdk skills config para governança',
+                    '/sdk skills agents para custom agents',
+                ],
                 { role: 'command' },
             ),
         );
@@ -1396,15 +1407,23 @@ async function renderSdkSkillsConfig({ println }, runtimeId) {
     println(terminalThemeRow('Runtime', String(semantics['subagentRuntime'] ?? '-')));
     println(terminalThemeRow('Mutação', String(semantics['disabledSkillsMutationScope'] ?? '-')));
     println(
-        terminalThemeRow(
+        terminalThemeRows(
             'Observação',
-            'disable/enable ajusta disabledSkills no runtime/CLI atual; não reescreve automaticamente o env do processo',
+            [
+                'disable/enable ajusta disabledSkills no runtime/CLI atual',
+                'não reescreve automaticamente o env do processo',
+            ],
         ),
     );
     println(
-        terminalThemeRow(
+        terminalThemeRows(
             'Uso',
-            '/sdk skills agents | /sdk skills disable <skill...> | /sdk skills enable <skill...> | /sdk skills [--project <path>] [--dir <path>]',
+            [
+                '/sdk skills agents',
+                '/sdk skills disable <skill...>',
+                '/sdk skills enable <skill...>',
+                '/sdk skills [--project <path>] [--dir <path>]',
+            ],
             { role: 'command' },
         ),
     );

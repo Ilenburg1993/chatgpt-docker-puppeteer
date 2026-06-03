@@ -60,6 +60,54 @@ function renderCommandList(commands) {
     return commands.map((command) => terminalThemeText('command', command)).join(terminalThemeText('muted', ' · '));
 }
 
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderDiagnoseAgentStatus(value) {
+    const status = String(value ?? 'unknown');
+    if (status === 'idle') return 'ocioso';
+    if (status === 'processing') return 'trabalhando';
+    if (status === 'starting') return 'iniciando';
+    if (status === 'waiting_for_input') return 'aguardando você';
+    if (status === 'stopped') return 'parado';
+    return status.replace(/[._-]+/gu, ' ') || 'n/d';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderDiagnoseSdkMode(value) {
+    const mode = String(value ?? '');
+    if (mode === 'interactive') return 'interativo';
+    if (mode === 'plan') return 'plano';
+    if (mode === 'autopilot') return 'autopiloto';
+    if (mode === 'shell') return 'shell';
+    return mode.replace(/[._-]+/gu, ' ') || 'desconhecido';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {'approve_all' | 'audit_only' | 'selective'}
+ */
+function normalizeDiagnosePermissionMode(value) {
+    const mode = String(value ?? '');
+    if (mode === 'audit_only' || mode === 'selective') return mode;
+    return 'approve_all';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderDiagnosePermissionMode(value) {
+    const mode = normalizeDiagnosePermissionMode(value);
+    if (mode === 'approve_all') return 'automáticas';
+    if (mode === 'audit_only') return 'auditoria sem janelas';
+    return 'seletivas';
+}
+
 const DISABLED_BYOK_SUMMARY = Object.freeze({
     enabled: false,
     ready: false,
@@ -153,13 +201,10 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
             ? `${Math.round(Number(health['pendingQuestionShadowRemainingMs']) / 1000)}s`
             : `${C.grey}-${C.reset}`;
     const sdkModeLine = configProjection.sdkSessionMode
-        ? `${C.magenta}${configProjection.sdkSessionMode}${C.reset}`
+        ? `${C.magenta}${renderDiagnoseSdkMode(configProjection.sdkSessionMode)}${C.reset}`
         : `${C.grey}desconhecido${C.reset}`;
-    const permissionMode =
-        configProjection.permissionMode === 'audit_only' || configProjection.permissionMode === 'selective'
-            ? configProjection.permissionMode
-            : 'approve_all';
-    const permissionLine = `${C.magenta}${permissionMode}${C.reset} ${C.grey}· prompts SDK ${terminalPermissionModeSkipsSdkPrompts(permissionMode) ? 'ignorados' : 'seletivos'}${C.reset}`;
+    const permissionMode = normalizeDiagnosePermissionMode(configProjection.permissionMode);
+    const permissionLine = `${C.magenta}${renderDiagnosePermissionMode(permissionMode)}${C.reset} ${C.grey}· prompts SDK ${terminalPermissionModeSkipsSdkPrompts(permissionMode) ? 'ignorados' : 'seletivos'}${C.reset}`;
     const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
     const byokLine = byok.enabled
         ? `${byok.ready ? `${C.green}pronto${C.reset}` : `${C.red}incompleto${C.reset}`} ${C.grey}preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · autenticação ${renderCompactAuthLabel(byok.auth)}${C.reset}`
@@ -280,7 +325,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     println(terminalThemeDivider(62));
 
     println(terminalThemeHeadline('assistant', 'Agente', ['runtime', 'modelo', 'entrada']));
-    println(terminalThemeRow('Status', String(snap['status'] ?? 'desconhecido'), { role: renderRuntimeStatusRole(String(snap['status'] ?? 'unknown'), dialogLoopActive) }));
+    println(terminalThemeRow('Status', renderDiagnoseAgentStatus(snap['status']), { role: renderRuntimeStatusRole(String(snap['status'] ?? 'unknown'), dialogLoopActive) }));
     println(terminalThemeRow('Saúde', health ? renderHumanHealthStatus(String(health['status'] ?? 'unknown')) : 'sem leitura', { role: renderHealthRole(String(health?.['status'] ?? 'unknown')) }));
     println(terminalThemeRow('Conversa', dialogLoopActive ? 'ativa' : 'inativa', { role: dialogLoopActive ? 'success' : 'warn' }));
     println(terminalThemeRow('Modelo', `${snap['model']} · raciocínio ${configProjection.currentReasoningEffort}`, { role: 'assistant' }));

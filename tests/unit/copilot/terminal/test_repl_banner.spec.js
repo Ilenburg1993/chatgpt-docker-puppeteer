@@ -11,6 +11,11 @@ describe('terminal/repl-banner', () => {
         expect(banner).toContain('Terminal LLM-B');
         expect(banner).toContain('/help');
         expect(banner).toContain('HTTP :3010');
+        expect(banner).toContain('Operar');
+        expect(banner).toContain('Entrada');
+        expect(banner).toContain('Sistema');
+        expect(banner).toContain('texto direto = próxima pergunta');
+        expect(banner).not.toContain('texto livre → fila de intervenção');
         expect(banner).not.toContain('/workspace [list|read|write|sync|mirror|promote]');
         expect(banner).not.toContain('\x1b[36m┌');
         expect(banner).not.toContain('\x1b[33m/status');

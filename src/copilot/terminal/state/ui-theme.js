@@ -237,6 +237,30 @@ export function terminalThemeRow(label, value, options = {}) {
 }
 
 /**
+ * @param {string} label
+ * @param {Array<string | null | undefined | false>} values
+ * @param {{ width?: number; role?: TerminalThemeRole; empty?: string }} [options]
+ * @returns {string}
+ */
+export function terminalThemeRows(label, values, options = {}) {
+    const width = Math.max(4, Math.floor(options.width ?? 12));
+    const role = options.role ?? 'muted';
+    /** @type {string[]} */
+    const cleanValues = values
+        .filter((value) => typeof value === 'string' && value.length > 0)
+        .map((value) => String(value));
+    if (cleanValues.length === 0) {
+        return terminalThemeRow(label, options.empty ?? '-', { width, role });
+    }
+    return cleanValues
+        .map((value, index) => {
+            const rowLabel = index === 0 ? label : '';
+            return terminalThemeRow(rowLabel, value, { width, role });
+        })
+        .join('\n');
+}
+
+/**
  * @param {boolean} success
  * @returns {string}
  */
