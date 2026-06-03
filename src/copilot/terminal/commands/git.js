@@ -20,6 +20,8 @@ import {
     gitStashList,
     gitStatus,
 } from '#copilot/bridges';
+import { renderTerminalDiffPreview } from '../capabilities/index.js';
+import { terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
 
 /**
  * @typedef {object} SessionContext
@@ -61,21 +63,25 @@ export async function cmdGit({ println }, args) {
 
     if (sub === 'diff') {
         const staged = args.includes('--staged') || args.includes('--cached');
+        const plain = args.includes('--plain') || args.includes('--no-external');
         const file = args.find((a) => !a.startsWith('-') && a !== 'diff');
-        println('\x1b[90m  Gerando diff…\x1b[0m');
+        println(terminalThemeRow('Git', 'gerando diff', { role: 'muted' }));
         const diff = await gitDiff({ staged, file }).catch(() => '');
         if (!diff) {
-            println('\x1b[90m  Sem diferenças.\x1b[0m');
+            println(terminalThemeRow('Diff', 'sem diferenças', { role: 'muted' }));
             return;
         }
-        const lines = diff.split('\n').slice(0, 150);
-        for (const l of lines) {
-            if (l.startsWith('+') && !l.startsWith('+++')) println(`\x1b[32m  ${l}\x1b[0m`);
-            else if (l.startsWith('-') && !l.startsWith('---')) println(`\x1b[31m  ${l}\x1b[0m`);
-            else if (l.startsWith('@@')) println(`\x1b[36m  ${l}\x1b[0m`);
-            else println(`  ${l}`);
-        }
-        if (diff.split('\n').length > 150) println('\x1b[90m  …(truncado a 150 linhas)\x1b[0m');
+        const rendered = renderTerminalDiffPreview(diff, { forceJs: plain, lineLimit: 220 });
+        println('');
+        println(terminalThemeHeadline('tool', 'Git diff', [staged ? 'staged' : 'working tree', file || null]));
+        println(
+            terminalThemeRow(
+                'Preview',
+                `${rendered.renderer}${rendered.fallbackReason ? ` · fallback: ${rendered.fallbackReason}` : ''}${rendered.truncated ? ' · truncado' : ''}`,
+                { role: rendered.renderer === 'delta' ? 'success' : 'muted' },
+            ),
+        );
+        println(rendered.output);
         return;
     }
 
@@ -119,7 +125,7 @@ export async function cmdGit({ println }, args) {
   ─────────────────────────────────────────────────
   \x1b[33m/git status\x1b[0m                    — status do working tree
   \x1b[33m/git log [n] [--oneline]\x1b[0m       — log de commits
-  \x1b[33m/git diff [--staged] [file]\x1b[0m    — diff
+  \x1b[33m/git diff [--staged] [--plain] [file]\x1b[0m — diff
   \x1b[33m/git branch\x1b[0m                    — branches
   \x1b[33m/git pull\x1b[0m                      — git pull
   \x1b[33m/git stash [list|pop|drop]\x1b[0m     — stash

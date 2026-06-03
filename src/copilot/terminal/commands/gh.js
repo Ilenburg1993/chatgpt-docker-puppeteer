@@ -28,12 +28,12 @@ import {
     viewPr,
     viewRun,
 } from '#copilot/bridges';
+import { renderTerminalDiffPreview } from '../capabilities/index.js';
 import {
     terminalThemeDivider,
     terminalThemeHeadline,
     terminalThemeRow,
     terminalThemeRows,
-    terminalThemeText,
 } from '../state/index.js';
 
 /**
@@ -233,19 +233,22 @@ async function handlePr(println, args) {
             printGhUsage(println, '/gh pr diff <número>');
             return;
         }
+        const plain = args.includes('--plain') || args.includes('--no-external');
         printGhStatus(println, 'buscando diff');
         const diff = await diffPr(n).catch(() => '');
         if (!diff) {
             printGhRow(println, 'Diff', `sem alterações para PR #${n}`);
             return;
         }
-        const lines = diff.split('\n').slice(0, 120);
-        for (const l of lines) {
-            if (l.startsWith('+')) println(`  ${terminalThemeText('success', l)}`);
-            else if (l.startsWith('-')) println(`  ${terminalThemeText('error', l)}`);
-            else println(`  ${l}`);
-        }
-        if (diff.split('\n').length > 120) printGhRow(println, 'Diff', 'truncado em 120 linhas');
+        const rendered = renderTerminalDiffPreview(diff, { forceJs: plain, lineLimit: 220 });
+        printGhSection(println, `PR #${n} diff`, ['GitHub']);
+        printGhRow(
+            println,
+            'Preview',
+            `${rendered.renderer}${rendered.fallbackReason ? ` · fallback: ${rendered.fallbackReason}` : ''}${rendered.truncated ? ' · truncado' : ''}`,
+            rendered.renderer === 'delta' ? 'success' : 'muted',
+        );
+        println(rendered.output);
         return;
     }
 
@@ -420,7 +423,7 @@ function printHelp(println) {
     println(
         terminalThemeRows(
             'PRs',
-            ['/gh pr list [open|closed|merged] · lista PRs', '/gh pr <n> · detalhe', '/gh pr diff <n> · diff'],
+            ['/gh pr list [open|closed|merged] · lista PRs', '/gh pr <n> · detalhe', '/gh pr diff <n> [--plain] · diff'],
             { role: 'command' },
         ),
     );

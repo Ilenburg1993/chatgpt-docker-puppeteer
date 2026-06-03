@@ -1740,9 +1740,11 @@ function diagnosticUxCycleCriteria(boot) {
     };
     const fsReadStart = plain.indexOf('/fs read data/copilot-terminal/live-scratch/');
     const fsPreviewStart = plain.indexOf('/fs preview data/copilot-terminal/live-scratch/', Math.max(0, fsReadStart));
-    const fsSearchStart = plain.indexOf('/fs search TERMINAL_DIAGNOSTIC_UX_', Math.max(0, fsPreviewStart));
+    const fsMarkdownStart = plain.indexOf('/fs preview data/copilot-terminal/live-scratch/', Math.max(0, fsPreviewStart + 1));
+    const fsSearchStart = plain.indexOf('/fs search TERMINAL_DIAGNOSTIC_UX_', Math.max(0, fsMarkdownStart));
     const terminalLibsStart = plain.indexOf('/terminal libs', Math.max(0, fsSearchStart));
-    const activityStart = plain.indexOf('/activity 8', Math.max(0, terminalLibsStart));
+    const gitDiffStart = plain.indexOf('/git diff --plain src/copilot/terminal/README.md', Math.max(0, terminalLibsStart));
+    const activityStart = plain.indexOf('/activity 8', Math.max(0, gitDiffStart));
     const liveFullStart = plain.indexOf('/live full');
     const healthFullStart = plain.indexOf('/health full', Math.max(0, liveFullStart));
     const toolsStart = plain.indexOf('/tools', Math.max(0, healthFullStart));
@@ -1774,8 +1776,10 @@ function diagnosticUxCycleCriteria(boot) {
         return plain.slice(start, safeEnd);
     };
     const fsReadSurface = surfaceBetween(fsReadStart, fsPreviewStart);
-    const fsPreviewSurface = surfaceBetween(fsPreviewStart, fsSearchStart);
-    const terminalLibsSurface = surfaceBetween(terminalLibsStart, activityStart);
+    const fsPreviewSurface = surfaceBetween(fsPreviewStart, fsMarkdownStart);
+    const fsMarkdownSurface = surfaceBetween(fsMarkdownStart, fsSearchStart);
+    const terminalLibsSurface = surfaceBetween(terminalLibsStart, gitDiffStart);
+    const gitDiffSurface = surfaceBetween(gitDiffStart, activityStart);
     const activitySurface = surfaceBetween(activityStart, liveFullStart);
     const liveFullSurface = surfaceBetween(liveFullStart, healthFullStart);
     const healthFullSurface = surfaceBetween(healthFullStart, toolsStart);
@@ -1822,6 +1826,15 @@ function diagnosticUxCycleCriteria(boot) {
             detail: '/fs preview rendered explicit read-only preview through bat/js without raw file-tool logs, tool ids or ANSI literals',
         },
         {
+            id: 'diagnostic-ux-fs-markdown-preview',
+            pass:
+                /Arquivo[\s\S]*TERMINAL_DIAGNOSTIC_UX_\d+\.md[\s\S]*\(FS local\)/iu.test(fsMarkdownSurface) &&
+                /Preview\s+(?:glow|js)/iu.test(fsMarkdownSurface) &&
+                /Terminal UX Markdown|Item de diagnóstico/iu.test(fsMarkdownSurface) &&
+                !/\[copilot\/read_file_content\]|chatcmpl-tool-|toolu_|\\x1b\[/iu.test(fsMarkdownSurface),
+            detail: '/fs preview --markdown rendered explicit Markdown preview through glow/js without raw file-tool logs, tool ids or ANSI literals',
+        },
+        {
             id: 'diagnostic-ux-terminal-libs',
             pass:
                 /Libs auxiliares do terminal[\s\S]*(?:disponíveis|disponível)[\s\S]*Fallback[\s\S]*terminal JS canônico/iu.test(
@@ -1832,6 +1845,15 @@ function diagnosticUxCycleCriteria(boot) {
                 ) &&
                 !/chatcmpl-tool-|toolu_|\\x1b\[|API[_-]?KEY|TOKEN|SECRET|PASSWORD/iu.test(terminalLibsSurface),
             detail: '/terminal libs rendered optional-tool availability, decisions and fallback without secrets, raw ids or ANSI literals',
+        },
+        {
+            id: 'diagnostic-ux-git-diff-preview',
+            pass:
+                /Git diff/iu.test(gitDiffSurface) &&
+                /Preview\s+js\s+·\s+fallback:\s+diff externo desativado/iu.test(gitDiffSurface) &&
+                /src\/copilot\/terminal\/README\.md|TERMINAL_DIAGNOSTIC_UX_/iu.test(gitDiffSurface) &&
+                !/chatcmpl-tool-|toolu_|\\x1b\[/iu.test(gitDiffSurface),
+            detail: '/git diff --plain rendered canonical diff preview without old manual ANSI or raw tool ids',
         },
         {
             id: 'diagnostic-ux-no-fs-ansi',
@@ -2037,94 +2059,111 @@ function diagnosticUxCycleCriteria(boot) {
 async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
     const marker = `TERMINAL_DIAGNOSTIC_UX_${Date.now()}`;
     const scratchPath = `data/copilot-terminal/live-scratch/${marker}.txt`;
-    const boot = await runSessionCycleBoot({
-        id: 'diagnostic-ux-cycle',
-        label: 'diagnostic UX with local FS activity',
-        outDir,
-        commands: [
-            { line: `/fs create ${scratchPath} ${marker}`, advanceAfterMs: 1_000 },
-            { line: `/fs read ${scratchPath}`, advanceAfterMs: 1_000 },
-            { line: `/fs preview ${scratchPath} --lines 20`, advanceAfterMs: 1_000 },
-            { line: `/fs search ${marker} data/copilot-terminal/live-scratch`, advanceAfterMs: 1_000 },
-            { line: '/terminal libs', advanceAfterMs: 1_000 },
-            { line: '/activity 8', advanceAfterMs: 1_000 },
-            { line: '/live full', advanceAfterMs: 1_000 },
-            { line: '/health full', advanceAfterMs: 1_000 },
-            { line: '/tools', advanceAfterMs: 1_000 },
-            { line: '/tools diag', advanceAfterMs: 1_000 },
-            { line: '/events 12', advanceAfterMs: 1_000 },
-            { line: '/session sdk events 8', advanceAfterMs: 1_000 },
-            { line: '/session sdk waits 8', advanceAfterMs: 1_000 },
-            { line: '/session sdk 6', advanceAfterMs: 1_000 },
-            { line: '/sdk status', advanceAfterMs: 1_000 },
-            { line: '/permission mode', advanceAfterMs: 1_000 },
-            { line: '/permission cockpit', advanceAfterMs: 1_000 },
-            { line: '/queue intervenção visual sem turno novo', advanceAfterMs: 1_000 },
-            { line: '/mailbox status', advanceAfterMs: 1_000 },
-            { line: '/mailbox clear', advanceAfterMs: 1_000 },
-            { line: '/history 6', advanceAfterMs: 1_000 },
-            { line: '/db-history 6', advanceAfterMs: 1_000 },
-            { line: '/db-sessions 6', advanceAfterMs: 1_000 },
-            {
-                line: '/scope declare terminal-ux-scope src/copilot/terminal/commands --await --include scope.js --max-files 1',
-                advanceAfterMs: 1_000,
+    const markdownPath = `data/copilot-terminal/live-scratch/${marker}.md`;
+    const gitDiffFixturePath = path.join(ROOT, 'src/copilot/terminal/README.md');
+    const gitDiffFixtureOriginal = await readFile(gitDiffFixturePath, 'utf8').catch(() => null);
+    if (gitDiffFixtureOriginal !== null) {
+        await writeFile(
+            gitDiffFixturePath,
+            `${gitDiffFixtureOriginal.trimEnd()}\ncanonical=diagnostic-${marker}\n`,
+            'utf8',
+        );
+    }
+    try {
+        const boot = await runSessionCycleBoot({
+            id: 'diagnostic-ux-cycle',
+            label: 'diagnostic UX with local FS activity',
+            outDir,
+            commands: [
+                { line: `/fs create ${scratchPath} ${marker}`, advanceAfterMs: 1_000 },
+                { line: `/fs create ${markdownPath} # Terminal UX Markdown - Item de diagnóstico`, advanceAfterMs: 1_000 },
+                { line: `/fs read ${scratchPath}`, advanceAfterMs: 1_000 },
+                { line: `/fs preview ${scratchPath} --lines 20`, advanceAfterMs: 1_000 },
+                { line: `/fs preview ${markdownPath} --markdown`, advanceAfterMs: 1_000 },
+                { line: `/fs search ${marker} data/copilot-terminal/live-scratch`, advanceAfterMs: 1_000 },
+                { line: '/terminal libs', advanceAfterMs: 1_000 },
+                { line: '/git diff --plain src/copilot/terminal/README.md', advanceAfterMs: 1_000 },
+                { line: '/activity 8', advanceAfterMs: 1_000 },
+                { line: '/live full', advanceAfterMs: 1_000 },
+                { line: '/health full', advanceAfterMs: 1_000 },
+                { line: '/tools', advanceAfterMs: 1_000 },
+                { line: '/tools diag', advanceAfterMs: 1_000 },
+                { line: '/events 12', advanceAfterMs: 1_000 },
+                { line: '/session sdk events 8', advanceAfterMs: 1_000 },
+                { line: '/session sdk waits 8', advanceAfterMs: 1_000 },
+                { line: '/session sdk 6', advanceAfterMs: 1_000 },
+                { line: '/sdk status', advanceAfterMs: 1_000 },
+                { line: '/permission mode', advanceAfterMs: 1_000 },
+                { line: '/permission cockpit', advanceAfterMs: 1_000 },
+                { line: '/queue intervenção visual sem turno novo', advanceAfterMs: 1_000 },
+                { line: '/mailbox status', advanceAfterMs: 1_000 },
+                { line: '/mailbox clear', advanceAfterMs: 1_000 },
+                { line: '/history 6', advanceAfterMs: 1_000 },
+                { line: '/db-history 6', advanceAfterMs: 1_000 },
+                { line: '/db-sessions 6', advanceAfterMs: 1_000 },
+                {
+                    line: '/scope declare terminal-ux-scope src/copilot/terminal/commands --await --include scope.js --max-files 1',
+                    advanceAfterMs: 1_000,
+                },
+                { line: '/scope context terminal-ux-scope', advanceAfterMs: 1_000 },
+                { line: '/scope find terminal-ux-scope cmdScope --exact', advanceAfterMs: 1_000 },
+                { line: '/scope close terminal-ux-scope', advanceAfterMs: 1_000 },
+                { line: '/who', advanceAfterMs: 1_000 },
+                { line: '/count', advanceAfterMs: 1_000 },
+                { line: '/clear', advanceAfterMs: 1_000 },
+                '/quit',
+            ],
+            terminalPort,
+            requestedTransport,
+            timeoutMs,
+        });
+        const criteria = diagnosticUxCycleCriteria(boot);
+        const durationMs = Date.now() - Date.parse(startedAt);
+        const ok = criteria.every((criterion) => criterion.pass);
+        const summary = {
+            ok,
+            startedAt,
+            durationMs,
+            terminalPort,
+            marker,
+            scratchPath,
+            boot: {
+                id: boot.id,
+                label: boot.label,
+                exitCode: boot.exitCode,
+                sessionId: boot.sessionId || null,
+                transport: boot.transport,
             },
-            { line: '/scope context terminal-ux-scope', advanceAfterMs: 1_000 },
-            { line: '/scope find terminal-ux-scope cmdScope --exact', advanceAfterMs: 1_000 },
-            { line: '/scope close terminal-ux-scope', advanceAfterMs: 1_000 },
-            { line: '/who', advanceAfterMs: 1_000 },
-            { line: '/count', advanceAfterMs: 1_000 },
-            { line: '/clear', advanceAfterMs: 1_000 },
-            '/quit',
-        ],
-        terminalPort,
-        requestedTransport,
-        timeoutMs,
-    });
-    const criteria = diagnosticUxCycleCriteria(boot);
-    const durationMs = Date.now() - Date.parse(startedAt);
-    const ok = criteria.every((criterion) => criterion.pass);
-    const summary = {
-        ok,
-        startedAt,
-        durationMs,
-        terminalPort,
-        marker,
-        scratchPath,
-        boot: {
-            id: boot.id,
-            label: boot.label,
-            exitCode: boot.exitCode,
-            sessionId: boot.sessionId || null,
-            transport: boot.transport,
-        },
-        criteria,
-    };
-    await writeFile(path.join(outDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
-    await writeFile(
-        path.join(outDir, 'summary.md'),
-        [
-            '# Terminal LLM-B Diagnostic UX Live Test',
-            '',
-            `Started: ${startedAt}`,
-            `Duration: ${durationMs}ms`,
-            `Status: ${ok ? 'PASS' : 'FAIL'}`,
-            `Terminal port: ${terminalPort}`,
-            `Marker: ${marker}`,
-            '',
-            '## Criteria',
-            '',
-            ...criteria.map((criterion) => `- ${criterion.pass ? '[x]' : '[ ]'} ${criterion.id}: ${criterion.detail}`),
-            '',
-            '## Logs',
-            '',
-            `- raw: ${path.relative(ROOT, path.join(outDir, 'diagnostic-ux-cycle.raw.log'))}`,
-            `- plain: ${path.relative(ROOT, path.join(outDir, 'diagnostic-ux-cycle.plain.log'))}`,
-            '',
-        ].join('\n'),
-        'utf8',
-    );
-    return summary;
+            criteria,
+        };
+        await writeFile(path.join(outDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+        await writeFile(
+            path.join(outDir, 'summary.md'),
+            [
+                '# Terminal LLM-B Diagnostic UX Live Test',
+                '',
+                `Started: ${startedAt}`,
+                `Duration: ${durationMs}ms`,
+                `Status: ${ok ? 'PASS' : 'FAIL'}`,
+                `Terminal port: ${terminalPort}`,
+                `Marker: ${marker}`,
+                '',
+                '## Criteria',
+                '',
+                ...criteria.map((criterion) => `- ${criterion.pass ? '[x]' : '[ ]'} ${criterion.id}: ${criterion.detail}`),
+                '',
+                '## Logs',
+                '',
+                `- raw: ${path.relative(ROOT, path.join(outDir, 'diagnostic-ux-cycle.raw.log'))}`,
+                `- plain: ${path.relative(ROOT, path.join(outDir, 'diagnostic-ux-cycle.plain.log'))}`,
+                '',
+            ].join('\n'),
+            'utf8',
+        );
+        return summary;
+    } finally {
+        if (gitDiffFixtureOriginal !== null) await writeFile(gitDiffFixturePath, gitDiffFixtureOriginal, 'utf8');
+    }
 }
 
 function defaultUxCycleCriteria(boot) {

@@ -17,8 +17,8 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-/** Diretório raiz do projeto para executar git. */
-const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+/** Diretório raiz do repositório para executar git com paths iguais aos vistos pelo operador. */
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const ADVISORY_GIT_DEFAULT_TIMEOUT_MS = 10_000;
 const GIT_LONG_TIMEOUT_MS = 30_000;
 

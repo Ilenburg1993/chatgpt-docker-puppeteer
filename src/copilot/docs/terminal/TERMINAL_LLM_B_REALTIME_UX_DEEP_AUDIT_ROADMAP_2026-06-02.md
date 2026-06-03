@@ -4257,7 +4257,42 @@
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=190000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-aux-libs-20260603-1950`.
 - [x] Resultado live: PASS em 24/24 critérios, incluindo `diagnostic-ux-fs-preview` e
       `diagnostic-ux-terminal-libs`.
-- [ ] Próxima implementação: detecção fina de arquivo binário antes de preview externo.
+- [x] Próxima implementação: detecção fina de arquivo binário antes de preview externo.
+- [x] Implementação: `file-preview.js` omite conteúdo com NUL, bytes inválidos ou muitos
+      caracteres de controle antes de chamar `bat`/`batcat` ou fallback textual bruto.
+- [x] Testes/lint D.5 passaram:
+      `node --check src/copilot/terminal/capabilities/file-preview.js && npx eslint src/copilot/terminal/capabilities/file-preview.js tests/unit/copilot/terminal/test_file_preview.spec.js`.
+- [x] Testes D.5 passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_file_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
+- [x] Resultado: 2 arquivos, 9 testes.
+- [x] Próxima implementação: adapter Markdown explícito com `glow`, mantendo fallback texto.
+- [x] Implementação: `terminal/capabilities/markdown-preview.js` renderiza Markdown com `glow`
+      via stdin, sem pager/TUI automático, e fallback JS com truncamento.
+- [x] Implementação: `/fs preview <path> --markdown` e `/fs read <path> --preview --markdown`
+      ativam Markdown explicitamente.
+- [x] Testes/lint Faixa E passaram:
+      `node --check src/copilot/terminal/capabilities/markdown-preview.js && node --check src/copilot/terminal/commands/fs.js && npx eslint src/copilot/terminal/capabilities/markdown-preview.js src/copilot/terminal/commands/fs.js tests/unit/copilot/terminal/test_markdown_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
+- [x] Testes Faixa E passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_markdown_preview.spec.js tests/unit/copilot/terminal/test_file_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
+- [x] Resultado: 3 arquivos, 13 testes.
+- [x] Typecheck strict de `src/copilot` passou após Faixa E.
+- [x] Implementação: `terminal/capabilities/diff-preview.js` renderiza unified diff com `delta`
+      via stdin, sem pager, e fallback JS com truncamento.
+- [x] Implementação: `/git diff [--staged] [--plain] [file]` e `/gh pr diff <n> [--plain]`
+      usam o adapter comum, com cabeçalho humano e renderer explícito.
+- [x] Achado live corrigido: os bridges Git de leitura/escrita executavam a partir de `/src`,
+      mas o operador usa paths repo-relativos; ambos agora executam na raiz do repositório.
+- [x] Testes/lint Faixa F passaram:
+      `node --check src/copilot/bridges/git-bridge-read.js && node --check src/copilot/bridges/git-bridge-write.js && node --check src/copilot/terminal/capabilities/diff-preview.js && node --check src/copilot/terminal/commands/git.js && node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Lint escopado Faixa F passou:
+      `npx eslint src/copilot/bridges/git-bridge-read.js src/copilot/bridges/git-bridge-write.js src/copilot/terminal/capabilities/diff-preview.js src/copilot/terminal/commands/git.js src/copilot/terminal/commands/gh.js tests/unit/copilot/terminal/test_diff_preview.spec.js tests/unit/copilot/terminal/test_commands_git.spec.js tests/unit/copilot/terminal/test_commands_gh.spec.js`.
+- [x] Testes Faixa F passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_diff_preview.spec.js tests/unit/copilot/terminal/test_commands_git.spec.js tests/unit/copilot/terminal/test_commands_gh.spec.js`.
+- [x] Resultado: 3 arquivos, 8 testes.
+- [x] Live PTY Faixa F passou:
+      `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-diff-preview-20260603-2030`.
+- [x] Resultado live: PASS em 26/26 critérios, incluindo `diagnostic-ux-git-diff-preview`.
+- [ ] Próxima implementação: adapter JSON/YAML explícito com `jq`/`yq`, mantendo JS como fonte canônica.
   - Resultado: 6 arquivos, 65 testes.
 - [x] Live PTY estruturado passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=150000 --transport=pty --out-dir=artifacts/terminal-live/structured-question-card-20260603-1723`.

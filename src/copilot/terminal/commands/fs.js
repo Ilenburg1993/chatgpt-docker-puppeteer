@@ -9,7 +9,7 @@
  */
 
 import { toError } from '../../core/error-handlers.js';
-import { renderTerminalFilePreview } from '../capabilities/index.js';
+import { renderTerminalFilePreview, renderTerminalMarkdownPreview } from '../capabilities/index.js';
 import { readTerminalIoActivityProjection } from '../events/index.js';
 import { requireTerminalFileTool } from '../frontend/gateways/index.js';
 import { buildActivityAwareGuidance, buildFailureRecoveryLines } from '../frontend/operational-guidance/index.js';
@@ -144,11 +144,12 @@ function parseListFlags(parts) {
 /**
  * @param {string[]} parts
  * @param {boolean} [previewDefault=false]
- * @returns {{ preview: boolean; forceJs: boolean; lineLimit: number; rest: string[] }}
+ * @returns {{ preview: boolean; forceJs: boolean; markdown: boolean; lineLimit: number; rest: string[] }}
  */
 function parseReadFlags(parts, previewDefault = false) {
     let preview = previewDefault;
     let forceJs = false;
+    let markdown = false;
     let lineLimit = 220;
     /** @type {string[]} */
     const rest = [];
@@ -158,6 +159,9 @@ function parseReadFlags(parts, previewDefault = false) {
             preview = true;
         } else if (part === '--plain' || part === '--no-external') {
             forceJs = true;
+            preview = true;
+        } else if (part === '--markdown' || part === '--md') {
+            markdown = true;
             preview = true;
         } else if (part === '--lines') {
             const next = parts[i + 1];
@@ -169,7 +173,7 @@ function parseReadFlags(parts, previewDefault = false) {
             rest.push(part);
         }
     }
-    return { preview, forceJs, lineLimit, rest };
+    return { preview, forceJs, markdown, lineLimit, rest };
 }
 
 /**
@@ -228,15 +232,17 @@ async function runRead(ctx, parts, previewDefault = false) {
     ctx.println('');
     ctx.println(terminalThemeRow('Arquivo', `${String(result['path'] ?? path)} · (FS local)`));
     if (flags.preview) {
-        const rendered = renderTerminalFilePreview(String(result['path'] ?? path), content, {
-            lineLimit: flags.lineLimit,
-            forceJs: flags.forceJs,
-        });
+        const rendered = flags.markdown
+            ? renderTerminalMarkdownPreview(content, { forceJs: flags.forceJs, width: 100 })
+            : renderTerminalFilePreview(String(result['path'] ?? path), content, {
+                  lineLimit: flags.lineLimit,
+                  forceJs: flags.forceJs,
+              });
         ctx.println(
             terminalThemeRow(
                 'Preview',
                 `${rendered.renderer}${rendered.fallbackReason ? ` · fallback: ${rendered.fallbackReason}` : ''}${rendered.truncated ? ' · truncado' : ''}`,
-                { role: rendered.renderer === 'bat' ? 'success' : 'muted' },
+                { role: rendered.renderer === 'bat' || rendered.renderer === 'glow' ? 'success' : 'muted' },
             ),
         );
         ctx.println(rendered.output);
@@ -330,7 +336,7 @@ export async function cmdFs(ctx, arg = '') {
             ctx.println(
                 terminalThemeRow(
                     'Uso',
-                    '/fs list [path] [--recursive] [--hidden] | read <path> [--preview] | preview <path> | search <pattern> [path] | create <path> <content> | write <path> <content>',
+                    '/fs list [path] [--recursive] [--hidden] | read <path> [--preview] [--markdown] | preview <path> | search <pattern> [path] | create <path> <content> | write <path> <content>',
                     { role: 'warn' },
                 ),
             );

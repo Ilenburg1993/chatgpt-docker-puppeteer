@@ -137,6 +137,20 @@ describe('terminal/commands/fs', () => {
         expectNoAnsi(read.output());
     });
 
+    it('/fs preview --markdown usa renderer Markdown explícito com fallback seguro', async () => {
+        expect(tmpRel).toBeTruthy();
+        const fileRel = `${tmpRel}/doc.md`;
+
+        await cmdFs(mockCtx(), `create ${fileRel} # Titulo`);
+        const preview = mockCtx();
+        await cmdFs(preview, `preview ${fileRel} --markdown --plain`);
+
+        expect(preview.output()).toContain('Preview');
+        expect(preview.output()).toContain('js · fallback: markdown externo desativado');
+        expect(preview.output()).toContain('# Titulo');
+        expectNoAnsi(preview.output());
+    });
+
     it('/fs read exibe guidance acionável quando tool falha', async () => {
         const ctx = mockCtx();
         await cmdFs(ctx, 'read tmp/inexistente.md');

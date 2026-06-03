@@ -53,6 +53,36 @@ function renderJsPreview(text, lineLimit) {
 }
 
 /**
+ * @param {string} content
+ * @returns {string | null}
+ */
+function detectUnsafePreviewContent(content) {
+    if (content.includes('\u0000')) return 'conteúdo parece binário (NUL detectado)';
+    if (content.includes('\uFFFD')) return 'conteúdo contém bytes inválidos para texto';
+    const sample = content.slice(0, 8_000);
+    const controlChars = [...sample].filter((char) => {
+        const code = char.charCodeAt(0);
+        return (code >= 1 && code <= 8) || code === 11 || code === 12 || (code >= 14 && code <= 31) || code === 127;
+    }).length;
+    if (controlChars === 0) return null;
+    const ratio = controlChars / Math.max(1, sample.length);
+    return ratio > 0.005 ? 'conteúdo contém muitos caracteres de controle' : null;
+}
+
+/**
+ * @param {string} reason
+ * @returns {TerminalFilePreview}
+ */
+function renderUnsafePreview(reason) {
+    return {
+        output: `preview omitido: ${reason}. Use uma ferramenta binária explícita se precisar inspecionar bytes.`,
+        renderer: 'js',
+        fallbackReason: reason,
+        truncated: false,
+    };
+}
+
+/**
  * @param {string | null | undefined} path
  * @param {string} content
  * @param {{ lineLimit?: number; forceJs?: boolean; color?: 'auto' | 'always' | 'never' }} [options]
@@ -60,6 +90,8 @@ function renderJsPreview(text, lineLimit) {
  */
 export function renderTerminalFilePreview(path, content, options = {}) {
     const lineLimit = Math.max(1, Math.min(2_000, Math.trunc(options.lineLimit ?? DEFAULT_LINE_LIMIT)));
+    const unsafeReason = detectUnsafePreviewContent(content);
+    if (unsafeReason) return renderUnsafePreview(unsafeReason);
     const jsFallback = (/** @type {string | null} */ reason) => {
         const rendered = renderJsPreview(content, lineLimit);
         return {

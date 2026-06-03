@@ -242,19 +242,19 @@ Decisão:
 
 ### 5.1 Capability registry
 
-- [ ] Criar camada `src/copilot/terminal/capabilities` para descobrir binários externos.
-- [ ] Detectar versão, path, disponibilidade, risco e modo recomendado de cada ferramenta.
-- [ ] Cachear resultados por processo com TTL curto e comando para refresh.
-- [ ] Exportar pelos barrels do terminal.
-- [ ] Expor comando humano `/terminal libs`, `/terminal libs detail` ou equivalente.
-- [ ] Expor JSON diagnóstico para LLMs sem poluir UX default.
+- [x] Criar camada `src/copilot/terminal/capabilities` para descobrir binários externos.
+- [x] Detectar versão, path, disponibilidade, risco e modo recomendado de cada ferramenta.
+- [x] Cachear resultados por processo com comando para refresh.
+- [x] Exportar pelos barrels do terminal.
+- [x] Expor comando humano `/terminal libs`, `/terminal libs detail` ou equivalente.
+- [x] Expor JSON diagnóstico para LLMs sem poluir UX default.
 
 ### 5.2 Adapters sem dependência obrigatória
 
 - [x] Criar adapter de preview read-only.
 - [ ] Criar adapter de picker interativo.
-- [ ] Criar adapter de Markdown.
-- [ ] Criar adapter de diff.
+- [x] Criar adapter de Markdown.
+- [x] Criar adapter de diff.
 - [ ] Criar adapter de JSON/YAML query/format.
 - [ ] Garantir fallback JS para cada adapter.
 
@@ -263,7 +263,7 @@ Decisão:
 - [ ] `/menu` pode oferecer picker opcional se `fzf`/`gum` estiverem disponíveis e o operador pedir.
 - [ ] `/search` pode oferecer preview com `bat`/`glow` sem mudar resultado canônico.
 - [x] `/fs read` pode previewar com `bat` quando explicitamente solicitado.
-- [ ] `/git diff` e `/gh pr diff` podem previewar com `delta` quando disponível.
+- [x] `/git diff` e `/gh pr diff` podem previewar com `delta` quando disponível.
 - [ ] `/help full` e docs podem usar `glow` em modo explícito.
 - [ ] `/events`, `/activity`, `/byok`, `/status` podem oferecer filtros `--json` e documentação de
       pipe para `jq`, mantendo saída humana por padrão.
@@ -347,6 +347,43 @@ Decisão:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=190000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-aux-libs-20260603-1950`.
 - [x] Resultado live: PASS em 24/24 critérios, incluindo `diagnostic-ux-fs-preview` e
       `diagnostic-ux-terminal-libs`.
+- [x] Continuação D.5: `file-preview.js` passou a omitir conteúdo com NUL, bytes inválidos ou muitos
+      caracteres de controle antes de chamar preview externo ou fallback textual bruto.
+- [x] Testes/lint D.5 passaram:
+      `node --check src/copilot/terminal/capabilities/file-preview.js && npx eslint src/copilot/terminal/capabilities/file-preview.js tests/unit/copilot/terminal/test_file_preview.spec.js`.
+- [x] Testes D.5 passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_file_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
+- [x] Resultado: 2 arquivos, 9 testes.
+- [x] Faixa E: `markdown-preview.js` implementa Markdown explícito com `glow` via stdin,
+      sem pager/TUI automático, com fallback JS e truncamento.
+- [x] `/fs preview <path> --markdown` e `/fs read <path> --preview --markdown` ativam renderer
+      Markdown explicitamente.
+- [x] Testes/lint Faixa E passaram:
+      `node --check src/copilot/terminal/capabilities/markdown-preview.js && node --check src/copilot/terminal/commands/fs.js && npx eslint src/copilot/terminal/capabilities/markdown-preview.js src/copilot/terminal/commands/fs.js tests/unit/copilot/terminal/test_markdown_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
+- [x] Testes Faixa E passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_markdown_preview.spec.js tests/unit/copilot/terminal/test_file_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
+- [x] Resultado: 3 arquivos, 13 testes.
+- [x] Typecheck strict de `src/copilot` passou após Faixa E.
+- [x] Live PTY Faixa E passou:
+      `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=200000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-markdown-clean-20260603-2000`.
+- [x] Resultado: PASS em 25/25 critérios, incluindo `diagnostic-ux-fs-markdown-preview`.
+- [x] Faixa F: `diff-preview.js` implementa preview explícito de unified diff com `delta`
+      via stdin, `--paging=never`, fallback JS, truncamento, timeout e `maxBuffer`.
+- [x] `/git diff [--staged] [--plain] [file]` e `/gh pr diff <n> [--plain]` usam o adapter
+      comum, com cabeçalho humano e indicação de renderer/fallback.
+- [x] Achado live: o bridge Git executava a partir de `/src`, embora o operador use paths
+      repo-relativos; `/git diff src/copilot/...` podia retornar vazio sem erro.
+- [x] Correção: bridges Git de leitura e escrita agora executam a partir da raiz do repositório.
+- [x] Testes/lint Faixa F passaram:
+      `node --check src/copilot/bridges/git-bridge-read.js && node --check src/copilot/bridges/git-bridge-write.js && node --check src/copilot/terminal/capabilities/diff-preview.js && node --check src/copilot/terminal/commands/git.js && node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Lint escopado Faixa F passou:
+      `npx eslint src/copilot/bridges/git-bridge-read.js src/copilot/bridges/git-bridge-write.js src/copilot/terminal/capabilities/diff-preview.js src/copilot/terminal/commands/git.js src/copilot/terminal/commands/gh.js tests/unit/copilot/terminal/test_diff_preview.spec.js tests/unit/copilot/terminal/test_commands_git.spec.js tests/unit/copilot/terminal/test_commands_gh.spec.js`.
+- [x] Testes Faixa F passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_diff_preview.spec.js tests/unit/copilot/terminal/test_commands_git.spec.js tests/unit/copilot/terminal/test_commands_gh.spec.js`.
+- [x] Resultado: 3 arquivos, 8 testes.
+- [x] Live PTY Faixa F passou:
+      `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-diff-preview-20260603-2030`.
+- [x] Resultado live: PASS em 26/26 critérios, incluindo `diagnostic-ux-git-diff-preview`.
 
 ### Faixa D: preview read-only
 
@@ -354,19 +391,21 @@ Decisão:
 - [x] Fase D.2: fallback JS com largura, limite e linguagem opcional.
 - [x] Fase D.3: plugar primeiro em comando diagnóstico/explicitamente solicitado, não em fluxo automático.
 - [x] Fase D.4: validar que arquivos grandes não travam o terminal via timeout/maxBuffer/truncamento.
-- [ ] Fase D.5: adicionar detecção fina de binários antes de preview externo em arquivos não-textuais.
+- [x] Fase D.5: adicionar detecção fina de binários antes de preview externo em arquivos não-textuais.
 
 ### Faixa E: Markdown e documentação
 
-- [ ] Fase E.1: criar adapter `glow` para Markdown explícito.
-- [ ] Fase E.2: fallback JS com texto plano e seções compactas.
-- [ ] Fase E.3: plugar em docs/roadmaps/help apenas por comando opt-in.
+- [x] Fase E.1: criar adapter `glow` para Markdown explícito.
+- [x] Fase E.2: fallback JS com texto plano e seções compactas.
+- [x] Fase E.3: plugar em `/fs preview --markdown` como comando opt-in inicial.
+- [ ] Fase E.4: avaliar `/help full --glow` e docs/roadmaps com pager explícito.
 
 ### Faixa F: diff
 
-- [ ] Fase F.1: criar adapter `delta` para unified diff.
-- [ ] Fase F.2: fallback JS atual para diff bruto.
-- [ ] Fase F.3: aplicar em `/git diff` e `/gh pr diff` apenas por flag ou preferência.
+- [x] Fase F.1: criar adapter `delta` para unified diff.
+- [x] Fase F.2: fallback JS atual para diff bruto.
+- [x] Fase F.3: aplicar em `/git diff` e `/gh pr diff` apenas por flag ou preferência.
+- [x] Fase F.4: corrigir raiz Git para paths repo-relativos consistentes.
 
 ### Faixa G: pickers interativos
 
