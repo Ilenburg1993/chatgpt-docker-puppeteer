@@ -21,7 +21,8 @@ describe('terminal/commands/help', () => {
 
         expect(ctx.output()).toContain('Ajuda rápida');
         expect(ctx.output()).toContain('/help full');
-        expect(ctx.output()).toContain('Esperas humanas');
+        expect(ctx.output()).toContain('Esperas');
+        expect(ctx.output()).toContain('/sdk waits');
         expect(ctx.output()).not.toContain('╔');
         expect(ctx.output()).not.toContain('binding/frescor');
         expect(ctx.output()).not.toContain('CommandDefinition');
@@ -34,8 +35,11 @@ describe('terminal/commands/help', () => {
 
         cmdHelp(ctx, 'full');
 
-        expect(ctx.output()).toContain('Terminal LLM-B — Ajuda');
+        expect(ctx.output()).toContain('Terminal LLM-B - Ajuda completa');
         expect(ctx.output()).toContain('/session sdk commands');
         expect(ctx.output()).toContain('POST /inject');
+        expect(ctx.output()).toContain('Sessão e observação');
+        expect(ctx.output()).not.toContain('╚');
+        expect(ctx.output()).not.toContain('\x1b[33m/status');
     });
 });

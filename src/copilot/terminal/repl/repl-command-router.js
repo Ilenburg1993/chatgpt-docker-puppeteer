@@ -14,8 +14,8 @@ import { readCopilotBootConfig } from '#copilot/boot';
 import { getTerminalInterventionPolicy, LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
 import { EVENT_BUS, runShutdown, toError } from '#copilot/core';
 import { EMITTER_DIALOG_READY } from '#copilot/events';
-import { logSwallowed } from '../../core/error-handlers.js';
 import { container } from '../../core/di-container.js';
+import { logSwallowed } from '../../core/error-handlers.js';
 import {
     clearRuntimeInterventionMailbox,
     consumeRuntimeInterventionMailbox,
@@ -78,7 +78,6 @@ import {
     cmdWorkspace as _cmdWorkspace,
 } from '../commands/index.js';
 import { ensureDialogLoop, getTurnQueueDepth, println, printlnBlock, sendTurn } from '../dialog/index.js';
-import { terminalThemeRow } from '../state/repl/index.js';
 import {
     abortTerminalCurrentMessage,
     answerTerminalPendingQuestion,
@@ -93,6 +92,7 @@ import {
     stopTerminalDialogMode,
 } from '../frontend/gateways/index.js';
 import { clearRateLimiters } from '../state/repl-runtime/index.js';
+import { terminalThemeRow } from '../state/repl/index.js';
 import { deliverEntryAsTurnIfIdle } from '../wiring/mailbox/index.js';
 import { parseTerminalReplCommand, parseTerminalSubcommand } from './repl-command-parser.js';
 
@@ -116,7 +116,11 @@ const RESTART_WAIT_TIMEOUT_MS = resolveBoundedTimeoutMs(LLM_B_BOOT_TIMEOUT_MS, 6
 let _terminalInterventionQueue = Promise.resolve();
 
 /**
- * @typedef {{ hubSessionId: string | null; injectPort: number; eventBus: import('../../core/event-bus.js').EventBus | null }} CmdCtx
+ * @typedef {{
+ *     hubSessionId: string | null;
+ *     injectPort: number;
+ *     eventBus: import('../../core/event-bus.js').EventBus | null;
+ * }} CmdCtx
  */
 
 /**
@@ -261,10 +265,16 @@ async function _cmdSteer(message) {
     const interventionPolicy = getTerminalInterventionPolicy();
     if (interventionPolicy.enabled && !interventionPolicy.allowSteer) {
         if (tryApplyImmediateTerminalZeroPr(prompt)) {
-            println(terminalThemeRow('Intervenção', 'aplicada imediatamente na pergunta pendente', { role: 'success' }));
+            println(
+                terminalThemeRow('Intervenção', 'aplicada imediatamente na pergunta pendente', { role: 'success' }),
+            );
             return;
         }
-        println(terminalThemeRow('/steer', 'bloqueado por política zero-PR para evitar consumo implícito de PR', { role: 'warn' }));
+        println(
+            terminalThemeRow('/steer', 'bloqueado por política zero-PR para evitar consumo implícito de PR', {
+                role: 'warn',
+            }),
+        );
         const queued = enqueueRuntimeInterventionMailbox({
             runtimeId: null,
             source: 'terminal',
@@ -278,7 +288,12 @@ async function _cmdSteer(message) {
                 { role: 'success' },
             ),
         );
-        println(terminalThemeRow('Próximo', 'Use /abort para interromper sem PR, ou /turn <mensagem> para abrir novo turno explicitamente.'));
+        println(
+            terminalThemeRow(
+                'Próximo',
+                'Use /abort para interromper sem PR, ou /turn <mensagem> para abrir novo turno explicitamente.',
+            ),
+        );
         return;
     }
     try {
@@ -292,7 +307,11 @@ async function _cmdSteer(message) {
         );
         println(terminalThemeRow('Nota', '/steer pode consumir PR via SDK immediate.'));
     } catch (e) {
-        println(terminalThemeRow('/steer', `falha ao enviar intervenção imediata: ${toError(e).message}`, { role: 'error' }));
+        println(
+            terminalThemeRow('/steer', `falha ao enviar intervenção imediata: ${toError(e).message}`, {
+                role: 'error',
+            }),
+        );
     }
 }
 
@@ -312,12 +331,18 @@ async function _cmdInterrupt(message) {
         const interventionPolicy = getTerminalInterventionPolicy();
         if (interventionPolicy.enabled && !interventionPolicy.allowQueueFallback) {
             if (tryApplyImmediateTerminalZeroPr(prompt)) {
-                println(terminalThemeRow('Intervenção', 'aplicada imediatamente na pergunta pendente', { role: 'success' }));
+                println(
+                    terminalThemeRow('Intervenção', 'aplicada imediatamente na pergunta pendente', { role: 'success' }),
+                );
                 return;
             }
             const aborted = await _cmdAbortCurrentTurn();
             if (!aborted) {
-                println(terminalThemeRow('/interrupt', 'abort falhou; nenhuma substituição foi aplicada', { role: 'error' }));
+                println(
+                    terminalThemeRow('/interrupt', 'abort falhou; nenhuma substituição foi aplicada', {
+                        role: 'error',
+                    }),
+                );
                 return;
             }
             const queued = enqueueRuntimeInterventionMailbox({
@@ -326,7 +351,13 @@ async function _cmdInterrupt(message) {
                 modeHint: 'interrupt',
                 message: prompt,
             });
-            println(terminalThemeRow('/interrupt', 'política zero-PR ativa: substituição não foi enfileirada como turno para evitar consumo de PR', { role: 'warn' }));
+            println(
+                terminalThemeRow(
+                    '/interrupt',
+                    'política zero-PR ativa: substituição não foi enfileirada como turno para evitar consumo de PR',
+                    { role: 'warn' },
+                ),
+            );
             println(
                 terminalThemeRow(
                     'Mailbox',
@@ -339,7 +370,11 @@ async function _cmdInterrupt(message) {
         }
         const aborted = await _cmdAbortCurrentTurn();
         if (!aborted) {
-            println(terminalThemeRow('/interrupt', 'mensagem substituta não foi enviada porque o abort falhou', { role: 'error' }));
+            println(
+                terminalThemeRow('/interrupt', 'mensagem substituta não foi enviada porque o abort falhou', {
+                    role: 'error',
+                }),
+            );
             return;
         }
         const queuedBefore = getTurnQueueDepth();
@@ -352,7 +387,9 @@ async function _cmdInterrupt(message) {
             ),
         );
         void turn.catch((e) => {
-            println(terminalThemeRow('/interrupt', `turno substituto falhou: ${toError(e).message}`, { role: 'error' }));
+            println(
+                terminalThemeRow('/interrupt', `turno substituto falhou: ${toError(e).message}`, { role: 'error' }),
+            );
         });
     });
 }
@@ -390,7 +427,10 @@ function _cmdMailbox(arg) {
     const summary = readRuntimeInterventionMailboxSummary(null);
     const latest = summary.latest;
     println(
-        terminalThemeRow('Mailbox', `${summary.queueSize} na fila · ${summary.dropped} descartada(s) · runtime ${summary.runtimeId}`),
+        terminalThemeRow(
+            'Mailbox',
+            `${summary.queueSize} na fila · ${summary.dropped} descartada(s) · runtime ${summary.runtimeId}`,
+        ),
     );
     if (latest) {
         println(
@@ -433,7 +473,11 @@ async function _cmdTurn(message) {
     try {
         const reply = await sendTurn(prompt, 'user');
         if (reply === null) {
-            println(terminalThemeRow('/turn', 'turno explícito concluído sem resposta textual. Veja /errors ou /status.', { role: 'warn' }));
+            println(
+                terminalThemeRow('/turn', 'turno explícito concluído sem resposta textual. Veja /errors ou /status.', {
+                    role: 'warn',
+                }),
+            );
         }
     } catch (e) {
         println(terminalThemeRow('/turn', `falha no turno explícito: ${toError(e).message}`, { role: 'error' }));
@@ -453,7 +497,11 @@ function _cmdQueueMailbox(message) {
         return;
     }
     if (tryApplyImmediateTerminalZeroPr(prompt)) {
-        println(terminalThemeRow('Intervenção', 'aplicada imediatamente na pergunta pendente (zero-PR)', { role: 'success' }));
+        println(
+            terminalThemeRow('Intervenção', 'aplicada imediatamente na pergunta pendente (zero-PR)', {
+                role: 'success',
+            }),
+        );
         return;
     }
     const queued = enqueueRuntimeInterventionMailbox({
@@ -702,6 +750,8 @@ export async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
     if (handler) {
         await handler(ctx, arg, rest, rl, injectServer, cleanup);
     } else {
-        println(`\x1b[90m  Comando desconhecido: /${cmd}. Use /help para ver todos os comandos.\x1b[0m`);
+        println(
+            terminalThemeRow('Comando', `/${cmd} não existe. Use /help para ver todos os comandos.`, { role: 'warn' }),
+        );
     }
 }

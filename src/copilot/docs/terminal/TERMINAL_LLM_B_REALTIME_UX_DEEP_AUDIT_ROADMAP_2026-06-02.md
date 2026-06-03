@@ -2716,3 +2716,19 @@
   - `rg -n "\\x1b\\[|\\u001b\\[" src/copilot/terminal/commands/sdk.js`.
 - [ ] Próxima lacuna: executar validação visual live pós-migração de `/sdk` e `/workspace`, garantindo que `/sdk`, `/sdk capabilities`, `/sdk skills`, `/workspace list` e `/workspace sync` não recriem paredes de texto.
 - [ ] Próxima lacuna: auditar `/tools` e `/help`, pois são comandos de alta exposição e ainda podem ter densidade visual excessiva no primeiro viewport.
+
+### 11.39 `/help` e `/tools` como superfícies de orientação, não dumps
+
+- [x] Achado: `/help full` ainda era uma arte ANSI monolítica com borda, cores locais e dezenas de linhas duplicadas manualmente.
+- [x] Achado: `/tools` já usava parte do tema, mas as linhas principais ainda eram strings com `padEnd`, rodapés soltos e labels como `nome técnico:` no diagnóstico.
+- [x] Decisão: `/help` deve ser um catálogo estruturado por seções, com dados fáceis de manter; `/tools` deve preservar nomes técnicos apenas em `diag/raw`, mantendo o default humano.
+- [x] Implementação: `/help` curto passou a renderizar `Ajuda rápida - Terminal LLM-B` com `terminalThemeHeadline`, `terminalThemeDivider`, `terminalThemeRow` e grupos `Situação`, `Conversa`, `Ações`, `Arquivos`, `Modelo`, `Esperas`, `Diagnóstico`, `Completo` e `HTTP local`.
+- [x] Implementação: `/help full` foi reescrito como seções estruturadas (`Sessão e observação`, `Conversa e controle`, `Sessão SDK persistente`, `Modelo, BYOK e quota`, `Contexto, arquivos e índice`, `Interações humanas e SDK`, `Exibição e navegação`, `Memória, GitHub e Git`, `HTTP local`).
+- [x] Implementação: o fallback de comando desconhecido no roteador passou a usar `Comando` com `terminalThemeRow`, sem ANSI local.
+- [x] Implementação: `/tools` default e diag passaram a renderizar estatísticas, categorias, superfícies, contrato, issues e lifecycle com `terminalThemeRow`, sem alinhamento manual por `padEnd`.
+- [x] UX preservada: `report_intent_local` continua aparecendo como `Intenção capturada` no default e só revela o nome técnico em `/tools diag`.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_help.spec.js tests/unit/copilot/terminal/test_commands_tools.spec.js`.
+- [x] Varredura local confirmou ausência de ANSI literal em `/help`, `/tools` e fallback do roteador.
+- [ ] Próxima lacuna: rodar live PTY visual cobrindo `/help`, `/help full`, `/tools`, `/tools diag`, `/sdk` e `/workspace` para capturar screenshots/logs iguais ao operador.
+- [ ] Próxima lacuna: auditar `/events`, `/errors`, `/audit` e `/intent`, pois são superfícies diagnósticas onde nomes internos podem ser aceitáveis apenas em modo detail/raw.

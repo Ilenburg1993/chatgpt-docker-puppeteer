@@ -2,37 +2,39 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { readTerminalToolStatsProjection, readTerminalStatusProjection, readTerminalToolRegistrySnapshot } = vi.hoisted(() => ({
-    readTerminalToolStatsProjection: vi.fn(),
-    readTerminalStatusProjection: vi.fn(() => ({
-        runtimeId: 'default',
-        runtimeHealth: 'ok',
-        toolLoad: {
-            hasCanonicalLocalFsTools: true,
-            hasCanonicalLocalExecTools: true,
-            hasSdkWorkspaceTooling: false,
-            hasLegacySdkShellToolsLoaded: false,
-            disabled: [],
-            toolContract: {
-                ok: true,
-                errorCount: 0,
-                warningCount: 0,
-                metadataCoverage: {
-                    descriptionPct: 100,
-                    parametersPct: 100,
-                    categoryPct: 100,
-                    tagsPct: 100,
-                    instructionsPct: 100,
+const { readTerminalToolStatsProjection, readTerminalStatusProjection, readTerminalToolRegistrySnapshot } = vi.hoisted(
+    () => ({
+        readTerminalToolStatsProjection: vi.fn(),
+        readTerminalStatusProjection: vi.fn(() => ({
+            runtimeId: 'default',
+            runtimeHealth: 'ok',
+            toolLoad: {
+                hasCanonicalLocalFsTools: true,
+                hasCanonicalLocalExecTools: true,
+                hasSdkWorkspaceTooling: false,
+                hasLegacySdkShellToolsLoaded: false,
+                disabled: [],
+                toolContract: {
+                    ok: true,
+                    errorCount: 0,
+                    warningCount: 0,
+                    metadataCoverage: {
+                        descriptionPct: 100,
+                        parametersPct: 100,
+                        categoryPct: 100,
+                        tagsPct: 100,
+                        instructionsPct: 100,
+                    },
                 },
             },
-        },
-    })),
-    readTerminalToolRegistrySnapshot: vi.fn(() => ({
-        toolContract: {
-            issues: [],
-        },
-    })),
-}));
+        })),
+        readTerminalToolRegistrySnapshot: vi.fn(() => ({
+            toolContract: {
+                issues: [],
+            },
+        })),
+    }),
+);
 
 vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     readTerminalToolStatsProjection,
@@ -146,7 +148,8 @@ describe('commands/tools', () => {
         expect(defaultCtx.output()).toContain('Intenção capturada');
         expect(defaultCtx.output()).not.toContain('read_file_content');
         expect(defaultCtx.output()).not.toContain('report_intent_local');
-        expect(defaultCtx.output()).toContain('Detalhes técnicos: /tools diag');
+        expect(defaultCtx.output()).toContain('Detalhes');
+        expect(defaultCtx.output()).toContain('/tools diag');
 
         readTerminalToolStatsProjection.mockReturnValueOnce({
             stats: {
@@ -172,7 +175,8 @@ describe('commands/tools', () => {
         cmdTools({ println: diagCtx.println }, 'diag');
 
         expect(diagCtx.output()).toContain('Ler arquivo');
-        expect(diagCtx.output()).toContain('nome técnico: read_file_content');
+        expect(diagCtx.output()).toContain('Nome técnico');
+        expect(diagCtx.output()).toContain('read_file_content');
         expect(diagCtx.output()).not.toContain('tool técnico: read_file_content');
         expect(diagCtx.output()).toContain('tipo file');
         expect(diagCtx.output()).not.toContain('tipo: file');
@@ -205,7 +209,6 @@ describe('commands/tools', () => {
         expect(ctx.output()).toContain('Leitura local');
         expect(ctx.output()).not.toContain('io-engine.fs.readFile.text');
     });
-
 
     it('renderiza lifecycle compacto em modo diag', () => {
         readTerminalToolStatsProjection.mockReturnValueOnce({

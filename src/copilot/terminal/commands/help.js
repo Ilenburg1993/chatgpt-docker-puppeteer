@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { terminalThemeText } from '../state/ui/index.js';
+import { terminalThemeDivider, terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 
 /**
  * @typedef {object} SessionContext
@@ -25,6 +25,34 @@ function command(value) {
 }
 
 /**
+ * @typedef {{ command: string; description: string }} HelpCommand
+ */
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string} title
+ * @param {HelpCommand[]} rows
+ * @returns {void}
+ */
+function renderHelpSection(println, title, rows) {
+    println('');
+    println(terminalThemeHeadline('assistant', title, [`${rows.length} comando(s)`]));
+    for (const row of rows) {
+        println(
+            `  ${terminalThemeText('command', row.command.padEnd(48))} ${terminalThemeText('muted', row.description)}`,
+        );
+    }
+}
+
+/**
+ * @param {string[]} commands
+ * @returns {string}
+ */
+function commandChain(commands) {
+    return commands.map((item) => command(item)).join(terminalThemeText('muted', ' · '));
+}
+
+/**
  * Exibe ajuda curta dos comandos do terminal por padrão; `/help full` preserva o catálogo completo.
  *
  * @param {SessionContext} ctx
@@ -38,20 +66,42 @@ export function cmdHelp({ injectPort, println }, arg = '') {
         return;
     }
 
-    println(`
-  ${terminalThemeText('assistant', 'Ajuda rápida — Terminal LLM-B')}
-  ─────────────────────────────────────
-  Situação agora        ${command('/status')} · ${command('/now')} · ${command('/activity 10')}
-  Conversa              texto livre · ${command('/turn <msg>')} · ${command('/answer <texto>')}
-  Ações guiadas         ${command('/menu')} · ${command('/menu 1')} · ${command('/menu status')}
-  Arquivos              ${command('@caminho')} · ${command('/fs list')} · ${command('/fs read <path>')} · ${command('/search <termo>')}
-  Modelo e acesso       ${command('/byok status')} · ${command('/byok recommend')} · ${command('/sdk quota')}
-  Esperas humanas       ${command('/sdk waits')} · ${command('/elicitation show latest')} · ${command('/permission show latest')}
-  Diagnóstico           ${command('/health')} · ${command('/errors 20')} · ${command('/display preset focus')}
-  Catálogo completo     ${terminalThemeText('muted', '/help full')}
-  HTTP local            ${terminalThemeText('muted', `porta ${injectPort}: /inject · /events · /sessions`)}
-  ─────────────────────────────────────
-`);
+    println('');
+    println(terminalThemeHeadline('assistant', 'Ajuda rápida - Terminal LLM-B'));
+    println(terminalThemeDivider(58));
+    println(terminalThemeRow('Situação', commandChain(['/status', '/now', '/activity 10']), { role: 'muted' }));
+    println(
+        terminalThemeRow(
+            'Conversa',
+            `${terminalThemeText('muted', 'texto livre')} · ${commandChain(['/turn <msg>', '/answer <texto>'])}`,
+            { role: 'muted' },
+        ),
+    );
+    println(terminalThemeRow('Ações', commandChain(['/menu', '/menu 1', '/menu status']), { role: 'muted' }));
+    println(
+        terminalThemeRow('Arquivos', commandChain(['@caminho', '/fs list', '/fs read <path>', '/search <termo>']), {
+            role: 'muted',
+        }),
+    );
+    println(
+        terminalThemeRow('Modelo', commandChain(['/byok status', '/byok recommend', '/sdk quota']), { role: 'muted' }),
+    );
+    println(
+        terminalThemeRow(
+            'Esperas',
+            commandChain(['/sdk waits', '/elicitation show latest', '/permission show latest']),
+            { role: 'muted' },
+        ),
+    );
+    println(
+        terminalThemeRow('Diagnóstico', commandChain(['/health', '/errors 20', '/display preset focus']), {
+            role: 'muted',
+        }),
+    );
+    println(terminalThemeRow('Completo', command('/help full'), { role: 'muted' }));
+    println(terminalThemeRow('HTTP local', `porta ${injectPort}: /inject · /events · /sessions`));
+    println(terminalThemeDivider(58));
+    println('');
 }
 
 /**
@@ -59,124 +109,141 @@ export function cmdHelp({ injectPort, println }, arg = '') {
  * @returns {void}
  */
 function renderFullHelp({ injectPort, println }) {
-    println(`
-  \x1b[36m╔═══════════════════════ Terminal LLM-B — Ajuda ═══════════════════════╗\x1b[0m
-
-  \x1b[1mComandos de Sessão\x1b[0m
-  \x1b[33m/status\x1b[0m                              — status do agente + modelo + reasoning + binding/frescor do prompt
-  \x1b[33m/health\x1b[0m                              — diagnóstico/health completo do runtime, infra, IO e lifecycle
-  \x1b[33m/now\x1b[0m                                 — snapshot operacional curto (conversa/pergunta/modelo)
-  \x1b[33m/live [n]\x1b[0m                             — fluxo live: conversa, streaming, SSE, tools, arquivos e I/O real
-  \x1b[33m/activity [n]\x1b[0m                        — atividade atual da LLM-B + timeline recente
-  \x1b[33m/history [n]\x1b[0m                         — últimos N turnos em memória
-  \x1b[33m/db-history [n]\x1b[0m                      — últimos N turnos (SQLite)
-  \x1b[33m/db-sessions [n]\x1b[0m                     — últimas N sessões hub
-  \x1b[33m/who\x1b[0m                                 — atores e canais ativos
-  \x1b[33m/count\x1b[0m                               — estatísticas da sessão
-  \x1b[33m/clear\x1b[0m                               — limpa histórico em memória
-  \x1b[33m/clear-shadow\x1b[0m                        — limpa pergunta humana restaurada do disco
-  \x1b[33m/queue <msg>\x1b[0m                         — enfileira intervenção no mailbox zero-PR
-  \x1b[33m/turn <msg>\x1b[0m                          — abre novo turno explicitamente (pode consumir PR)
-  \x1b[33m/steer <msg>\x1b[0m                         — SDK immediate explícito (bloqueado por padrão para preservar zero-PR)
-  \x1b[33m/interrupt <msg>\x1b[0m                     — aborta turno ativo; por padrão guarda substituição no mailbox zero-PR
-  \x1b[33m/abort\x1b[0m                               — aborta apenas o turno SDK ativo
-  \x1b[33m/mailbox [status|consume|clear]\x1b[0m      — inspeciona/consome/limpa a fila mailbox zero-PR
-  \x1b[33m/session [sdk [n]]\x1b[0m                   — cockpit da sessão SDK persistente; snapshots ficam em save/list/restore
-  \x1b[33m/session sdk commands\x1b[0m                — comandos CommandDefinition[] registrados no SDK
-  \x1b[33m/session sdk events [n]\x1b[0m              — lifecycle/commands SDK resumidos a partir do archive SSE canônico
-  \x1b[33m/session sdk waits [n]\x1b[0m               — perguntas, formulários e permissões publicados pelo fanout canônico
-  \x1b[33m/session sdk next <new|resume <id|#n|current|last|foreground>|auto>\x1b[0m — agenda seleção de sessão SDK para o próximo boot
-  \x1b[33m/session sdk delete <id|#n>\x1b[0m        — apaga estado persistido SDK fora da sessão viva
-  \x1b[33m/restart\x1b[0m                             — reinicia a conversa
-  \x1b[33m/emergency-reset\x1b[0m (\x1b[33m/ereset\x1b[0m)            — limpa limitadores + reinicia a conversa
-  \x1b[33m/quit\x1b[0m / \x1b[33m/exit\x1b[0m                         — encerra terminal
-
-  \x1b[1mConfiguração do Modelo\x1b[0m
-  \x1b[33m/model\x1b[0m                               — exibe modelo ativo
-  \x1b[33m/model list\x1b[0m                          — lista modelos disponíveis (via SDK)
-  \x1b[33m/model <id>\x1b[0m                          — troca modelo (ex: /model auto)
-  \x1b[33m/byok [status|reload|providers|profiles|health|probe|models|recommend|env|use|model|provider|persist]\x1b[0m — BYOK universal via .env.local
-  \x1b[33m/reasoning\x1b[0m                           — exibe nível de raciocínio atual
-  \x1b[33m/reasoning low|medium|high|xhigh|off\x1b[0m — altera reasoning effort
-
-  \x1b[1mContexto e Arquivos\x1b[0m
-  \x1b[33m/attach\x1b[0m                              — lista fila de attachments agendados para embed
-  \x1b[33m/attach <caminho>\x1b[0m                    — adiciona arquivo à fila (embed no próximo turno)
-  \x1b[33m/attach blob <mime> <base64> [--name n]\x1b[0m — adiciona blob inline sem roundtrip por disco
-  \x1b[33m/attach clear\x1b[0m                        — limpa fila de attachments
-  \x1b[33m@<caminho>\x1b[0m (inline)                  — embed automático: @src/foo.js no texto da mensagem
-  \x1b[33m/context\x1b[0m                             — estima uso atual de tokens da sessão
-  \x1b[33m/compact\x1b[0m                             — compacta histórico em resumo técnico denso
-  \x1b[33m/plan [on|off|autopilot|read|clear]\x1b[0m — controla o mode/plan vanilla da sessão SDK
-  \x1b[33m/thinking [on|off]\x1b[0m                   — toggle da expansão ao vivo do thinking/reasoning
-  \x1b[33m/thinking list [n]\x1b[0m                  — lista thinkings capturados (colapsados)
-  \x1b[33m/thinking show <id>|latest\x1b[0m          — abre thinking completo capturado
-  \x1b[33m/intent [n|detail|clear]\x1b[0m             — consulta intenções explícitas capturadas da LLM-B
-  \x1b[33m/usage [on|off|now]\x1b[0m                  — telemetria de tokens/custo; PR só quando classificada
-  \x1b[33m/tools [diag|all|raw]\x1b[0m                — stats de tools (canônico, diagnóstico e raw)
-  \x1b[33m/sdk [status|models|tools|quota|prompt|capabilities|waits|compact]\x1b[0m — catálogo/quota/capabilities/ops SDK via Agent
-  \x1b[33m/workspace [list|read|write|sync|mirror|promote]\x1b[0m — workspace SDK + convergência SDK↔FS auditável
-  \x1b[33m/fs [list|read|search|create|write]\x1b[0m   — filesystem local canônico via file-tools
-  \x1b[33m/scope [list|declare|context|find|refresh|close]\x1b[0m — escopos inteligentes: cache, parse, índice e contexto
-  \x1b[33m/index [status|build|search|symbol|clear]\x1b[0m — índice L2 local: FTS, símbolos, imports e poda segura
-  \x1b[33m/elicitation [list|show|request]\x1b[0m      — formulários/URL estruturados do SDK
-  \x1b[33m/permission [list|all|show|clear|mode|respond]\x1b[0m — permissões SDK observadas + governança + resposta manual
-  \x1b[33m/errors [n]\x1b[0m                          — mostra últimos N erros rastreados (default: 10)
-  \x1b[33m/events [n|sources] [delta] [trace <id>] [tool <id>] [--json|--raw]\x1b[0m — archive SSE e mapa de fontes canônicas
-  \x1b[33m/audit [n]\x1b[0m                           — últimas N entradas do audit log (default: 10)
-  \x1b[33m/display [toggle] [on|off]\x1b[0m           — gerencia toggles de exibição (thinking, streaming, telemetria, tools, intent)
-  \x1b[33m/display preset <default|minimal|verbose|debug|focus>\x1b[0m — aplica presets de UX
-  \x1b[33m/display theme <elegant|vivid|mono>\x1b[0m — ajusta paleta visual (sóbria, contraste alto, sem cor)
-  \x1b[33m/display detail <compact|detailed>\x1b[0m — define densidade textual da UX live
-  \x1b[33m/menu [n|id|run n]\x1b[0m                  — command palette inteligente (pseudo-botões/dropdown no terminal)
-  \x1b[33m/metrics\x1b[0m                             — métricas consolidadas da sessão (turns, tokens, billing, inject/prompt)
-  \x1b[33m/export [path]\x1b[0m                       — exporta conversa como Markdown
-  \x1b[33m/resume\x1b[0m                              — lista sessões do hub disponíveis para injeção de histórico
-  \x1b[33m/resume <sessionId>\x1b[0m                  — injeta resumo do hub; não troca a sessão SDK persistente
-
-  \x1b[1mMemória Semântica\x1b[0m
-  \x1b[33m/remember [tag:] texto\x1b[0m               — persiste memória
-  \x1b[33m/recall [tag]\x1b[0m                        — recupera por tag
-  \x1b[33m/recall ?busca\x1b[0m                       — busca full-text
-  \x1b[33m/forget <id>\x1b[0m                         — remove memória por ID
-
-  \x1b[1mGitHub CLI (/gh)\x1b[0m
-  \x1b[33m/gh issue list [open|closed|all] [label]\x1b[0m  — lista issues
-  \x1b[33m/gh issue <n>\x1b[0m                             — detalhe de issue
-  \x1b[33m/gh issue create <título>\x1b[0m                 — criar issue
-  \x1b[33m/gh issue close <n>\x1b[0m                       — fechar issue
-  \x1b[33m/gh issue comment <n> <txt>\x1b[0m               — comentar issue
-  \x1b[33m/gh pr list [open|closed|merged]\x1b[0m          — lista PRs
-  \x1b[33m/gh pr <n>\x1b[0m                                — detalhe de PR
-  \x1b[33m/gh pr diff <n>\x1b[0m                           — diff de PR
-  \x1b[33m/gh run list [limit]\x1b[0m                      — lista CI runs
-  \x1b[33m/gh run <id>\x1b[0m                              — detalhe de run
-  \x1b[33m/gh release list\x1b[0m                          — lista releases
-  \x1b[33m/gh search <query>\x1b[0m                        — buscar issues/prs
-  \x1b[33m/gh status\x1b[0m                                — status da conta GitHub
-  \x1b[33m/gh api <endpoint>\x1b[0m                        — chamada raw à API
-
-  \x1b[1mGit CLI (/git)\x1b[0m
-  \x1b[33m/git status\x1b[0m                          — status working tree (alias: /st, /gst)
-  \x1b[33m/git log [n] [--oneline]\x1b[0m             — log de commits (alias: /log, /glog)
-  \x1b[33m/git diff [--staged] [file]\x1b[0m          — diff (alias: /diff)
-  \x1b[33m/git branch\x1b[0m                          — branches
-  \x1b[33m/git pull\x1b[0m                            — git pull
-  \x1b[33m/git stash [list|pop|drop]\x1b[0m           — stash
-
-  \x1b[1mAliases\x1b[0m
-  \x1b[33m/alias\x1b[0m / \x1b[33m/alias list\x1b[0m                — listar aliases
-  \x1b[33m/alias set <nome> <cmd>\x1b[0m              — criar alias
-  \x1b[33m/alias remove <nome>\x1b[0m                 — remover alias
-
-  \x1b[1mHTTP Endpoints\x1b[0m  \x1b[90m(porta ${injectPort})\x1b[0m
-  \x1b[33mPOST /inject\x1b[0m  \x1b[33mPOST /pipeline\x1b[0m  \x1b[33mGET /events\x1b[0m
-  \x1b[33mGET /sessions\x1b[0m  \x1b[33mPOST|GET|DELETE /memory\x1b[0m
-  \x1b[33mGET /gh/issues\x1b[0m  \x1b[33mGET /gh/prs\x1b[0m  \x1b[33mGET /gh/ci\x1b[0m
-  \x1b[33mGET /git/status\x1b[0m  \x1b[33mGET /git/log\x1b[0m
-
-  \x1b[90mTexto livre sem / entra no mailbox zero-PR por padrão e será aplicado na próxima pergunta humana.\x1b[0m
-  \x1b[90mUse /turn ou prefixo !!turn apenas quando quiser abrir novo turno que pode consumir PR.\x1b[0m
-  \x1b[36m╚═══════════════════════════════════════════════════════════════════════╝\x1b[0m
-`);
+    println('');
+    println(terminalThemeHeadline('assistant', 'Terminal LLM-B - Ajuda completa', [`HTTP local ${injectPort}`]));
+    println(terminalThemeDivider(76));
+    renderHelpSection(println, 'Sessão e observação', [
+        { command: '/status', description: 'status do agente, modelo, acesso, prompt e próximo passo' },
+        { command: '/health', description: 'diagnóstico completo do runtime, infra, I/O e lifecycle' },
+        { command: '/now', description: 'snapshot operacional curto da conversa' },
+        { command: '/live [n]', description: 'fluxo live com conversa, SSE, tools, arquivos e I/O real' },
+        { command: '/activity [n]', description: 'atividade atual da LLM-B e timeline recente' },
+        { command: '/history [n]', description: 'últimos turnos em memória' },
+        { command: '/db-history [n]', description: 'últimos turnos persistidos no SQLite' },
+        { command: '/db-sessions [n]', description: 'últimas sessões do hub' },
+        { command: '/who', description: 'atores e canais ativos' },
+        { command: '/count', description: 'estatísticas da sessão' },
+    ]);
+    renderHelpSection(println, 'Conversa e controle', [
+        { command: '/queue <msg>', description: 'enfileira intervenção no mailbox zero-PR' },
+        { command: '/turn <msg>', description: 'abre novo turno explicitamente, podendo consumir PR' },
+        { command: '/steer <msg>', description: 'envio SDK immediate explícito, bloqueado por padrão' },
+        { command: '/interrupt <msg>', description: 'aborta turno ativo e guarda substituição no mailbox' },
+        { command: '/answer <texto>', description: 'responde pergunta humana pendente' },
+        { command: '/abort', description: 'aborta apenas o turno SDK ativo' },
+        { command: '/mailbox [status|consume|clear]', description: 'inspeciona, consome ou limpa o mailbox zero-PR' },
+        { command: '/clear', description: 'limpa histórico em memória' },
+        { command: '/clear-shadow', description: 'limpa pergunta humana restaurada do disco' },
+        { command: '/restart', description: 'reinicia a conversa' },
+        { command: '/emergency-reset (/ereset)', description: 'limpa limitadores e reinicia a conversa' },
+        { command: '/quit ou /exit', description: 'encerra terminal' },
+    ]);
+    renderHelpSection(println, 'Sessão SDK persistente', [
+        { command: '/session [sdk [n]]', description: 'cockpit da sessão SDK persistente' },
+        { command: '/session sdk commands', description: 'CommandDefinition[] registrados no SDK' },
+        { command: '/session sdk events [n]', description: 'lifecycle e comandos SDK pelo archive SSE canônico' },
+        {
+            command: '/session sdk waits [n]',
+            description: 'perguntas, formulários e permissões publicados pelo fanout',
+        },
+        { command: '/session sdk next <new|resume|auto>', description: 'agenda seleção de sessão SDK no próximo boot' },
+        { command: '/session sdk delete <id|#n>', description: 'apaga estado persistido SDK fora da sessão viva' },
+    ]);
+    renderHelpSection(println, 'Modelo, BYOK e quota', [
+        { command: '/model', description: 'exibe modelo ativo' },
+        { command: '/model list', description: 'lista modelos disponíveis via SDK' },
+        { command: '/model <id>', description: 'troca modelo, como /model auto' },
+        { command: '/byok status|recommend|use|provider|model', description: 'BYOK universal via .env.local' },
+        { command: '/reasoning', description: 'exibe nível de raciocínio atual' },
+        { command: '/reasoning low|medium|high|xhigh|off', description: 'altera reasoning effort' },
+        { command: '/sdk quota', description: 'quota e usage RPC do SDK' },
+    ]);
+    renderHelpSection(println, 'Contexto, arquivos e índice', [
+        { command: '/attach [path|clear]', description: 'gerencia fila de anexos para o próximo turno' },
+        {
+            command: '/attach blob <mime> <base64> [--name n]',
+            description: 'adiciona blob inline sem roundtrip por disco',
+        },
+        { command: '@<caminho>', description: 'embed automático de arquivo no texto da mensagem' },
+        { command: '/context', description: 'estima uso atual de tokens da sessão' },
+        { command: '/compact', description: 'compacta histórico em resumo técnico denso' },
+        { command: '/fs [list|read|search|create|write]', description: 'filesystem local canônico via file-tools' },
+        {
+            command: '/workspace [list|read|write|sync|mirror|promote]',
+            description: 'workspace SDK e convergência SDK/FS',
+        },
+        {
+            command: '/scope [list|declare|context|find|refresh|close]',
+            description: 'escopos inteligentes de contexto',
+        },
+        {
+            command: '/index [status|build|search|symbol|clear]',
+            description: 'índice local FTS, símbolos, imports e poda',
+        },
+        { command: '/search <termo>', description: 'busca textual rápida no workspace' },
+    ]);
+    renderHelpSection(println, 'Interações humanas e SDK', [
+        {
+            command: '/sdk [status|models|tools|quota|prompt|capabilities|waits|compact]',
+            description: 'catálogo e operações SDK via Agent',
+        },
+        { command: '/sdk waits', description: 'esperas humanas unificadas' },
+        { command: '/elicitation [list|show|request|respond]', description: 'formulários e URL estruturados do SDK' },
+        { command: '/permission [list|show|mode|respond]', description: 'permissões SDK observadas e governança' },
+        { command: '/tools [diag|all|raw]', description: 'telemetria canônica de ferramentas' },
+        { command: '/events [n|sources|trace|tool]', description: 'archive SSE e mapa de fontes canônicas' },
+        { command: '/errors [n]', description: 'últimos erros rastreados' },
+        { command: '/audit [n]', description: 'últimas entradas do audit log' },
+    ]);
+    renderHelpSection(println, 'Exibição e navegação', [
+        { command: '/menu [n|id|run n]', description: 'command palette inteligente no terminal' },
+        {
+            command: '/display [toggle] [on|off]',
+            description: 'toggles de thinking, streaming, telemetria, tools e intenção',
+        },
+        { command: '/display preset <default|minimal|verbose|debug|focus>', description: 'aplica presets de UX' },
+        { command: '/display theme <elegant|vivid|mono>', description: 'ajusta paleta visual' },
+        { command: '/display detail <compact|detailed>', description: 'define densidade textual live' },
+        { command: '/thinking [on|off|list|show]', description: 'controla e consulta thinking/reasoning capturado' },
+        { command: '/intent [n|detail|clear]', description: 'intenções explícitas capturadas da LLM-B' },
+        { command: '/usage [on|off|now]', description: 'telemetria de tokens e custo' },
+        { command: '/metrics', description: 'métricas consolidadas da sessão' },
+        { command: '/export [path]', description: 'exporta conversa como Markdown' },
+        { command: '/resume [sessionId]', description: 'lista ou injeta resumo do hub' },
+    ]);
+    renderHelpSection(println, 'Memória, GitHub e Git', [
+        { command: '/remember [tag:] texto', description: 'persiste memória semântica' },
+        { command: '/recall [tag|?busca]', description: 'recupera memória por tag ou full-text' },
+        { command: '/forget <id>', description: 'remove memória por ID' },
+        { command: '/gh issue|pr|run|release|search|status|api', description: 'opera GitHub CLI pelo terminal' },
+        {
+            command: '/git status|log|diff|branch|pull|stash',
+            description: 'opera Git local e aliases /st, /gst, /diff',
+        },
+        { command: '/alias [list|set|remove]', description: 'gerencia aliases do terminal' },
+    ]);
+    renderHelpSection(println, 'HTTP local', [
+        { command: 'POST /inject', description: 'injeta mensagem no terminal' },
+        { command: 'POST /pipeline', description: 'envia pipeline local' },
+        { command: 'GET /events', description: 'stream/eventos do terminal' },
+        { command: 'GET /sessions', description: 'sessões do hub' },
+        { command: 'POST|GET|DELETE /memory', description: 'memória semântica via HTTP' },
+        { command: 'GET /gh/issues|/gh/prs|/gh/ci', description: 'projeções GitHub' },
+        { command: 'GET /git/status|/git/log', description: 'projeções Git' },
+    ]);
+    println('');
+    println(
+        terminalThemeRow(
+            'Texto livre',
+            'sem / entra no mailbox zero-PR por padrão e será aplicado na próxima pergunta humana',
+        ),
+    );
+    println(
+        terminalThemeRow(
+            'Novo turno',
+            'use /turn ou prefixo !!turn apenas quando quiser abrir novo turno que pode consumir PR',
+        ),
+    );
+    println(terminalThemeDivider(76));
+    println('');
 }
