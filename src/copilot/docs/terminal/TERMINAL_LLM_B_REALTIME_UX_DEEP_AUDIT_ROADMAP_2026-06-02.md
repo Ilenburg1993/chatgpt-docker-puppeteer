@@ -4292,7 +4292,24 @@
 - [x] Live PTY Faixa F passou:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-diff-preview-20260603-2030`.
 - [x] Resultado live: PASS em 26/26 critérios, incluindo `diagnostic-ux-git-diff-preview`.
-- [ ] Próxima implementação: adapter JSON/YAML explícito com `jq`/`yq`, mantendo JS como fonte canônica.
+- [x] Implementação: `terminal/capabilities/structured-preview.js` renderiza JSON/YAML com
+      `jq`/`yq` opcionais e fallback JS/`js-yaml`.
+- [x] Implementação: `/fs preview <path> --json|--yaml [--query filtro] [--plain]` ativa
+      preview estruturado explicitamente sem alterar `/fs read` default.
+- [x] Segurança: `jq`/`yq` rodam por stdin e array de args; `yq` desativa operações de arquivo/env.
+- [x] Testes/lint Faixa H passaram:
+      `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs && node --check src/copilot/terminal/capabilities/structured-preview.js && node --check src/copilot/terminal/commands/fs.js`.
+- [x] Lint escopado Faixa H passou:
+      `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs src/copilot/terminal/capabilities/structured-preview.js src/copilot/terminal/commands/fs.js tests/unit/copilot/terminal/test_structured_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
+- [x] Testes Faixa H passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_structured_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
+- [x] Resultado: 2 arquivos, 12 testes.
+- [x] Typecheck strict de `src/copilot` passou após Faixa H.
+- [x] Live PTY Faixa H passou:
+      `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=240000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-structured-preview-20260603-2040`.
+- [x] Resultado live: PASS em 28/28 critérios, incluindo `diagnostic-ux-fs-json-preview` e
+      `diagnostic-ux-fs-yaml-preview`.
+- [ ] Próxima implementação: picker explícito com `fzf`/`gum`, sem rodar em modo não interativo nem durante pergunta pendente.
   - Resultado: 6 arquivos, 65 testes.
 - [x] Live PTY estruturado passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=150000 --transport=pty --out-dir=artifacts/terminal-live/structured-question-card-20260603-1723`.

@@ -1,7 +1,7 @@
 // @ts-check
 
 import { mkdtempSync, rmSync } from 'node:fs';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -148,6 +148,38 @@ describe('terminal/commands/fs', () => {
         expect(preview.output()).toContain('Preview');
         expect(preview.output()).toContain('js · fallback: markdown externo desativado');
         expect(preview.output()).toContain('# Titulo');
+        expectNoAnsi(preview.output());
+    });
+
+    it('/fs preview --json usa preview estruturado explícito com fallback seguro', async () => {
+        expect(tmpDir).toBeTruthy();
+        expect(tmpRel).toBeTruthy();
+        const fileRel = `${tmpRel}/payload.json`;
+        await writeFile(join(/** @type {string} */ (tmpDir), 'payload.json'), '{"b":2,"a":{"c":3}}\n', 'utf8');
+
+        const preview = mockCtx();
+        await cmdFs(preview, `preview ${fileRel} --json --plain`);
+
+        expect(preview.output()).toContain('Preview');
+        expect(preview.output()).toContain('js · filtro . · fallback: renderer externo desativado');
+        expect(preview.output()).toContain('"b": 2');
+        expect(preview.output()).toContain('"a": {');
+        expectNoAnsi(preview.output());
+    });
+
+    it('/fs preview --yaml usa preview estruturado explícito com fallback seguro', async () => {
+        expect(tmpDir).toBeTruthy();
+        expect(tmpRel).toBeTruthy();
+        const fileRel = `${tmpRel}/payload.yaml`;
+        await writeFile(join(/** @type {string} */ (tmpDir), 'payload.yaml'), 'b: 2\na:\n  c: 3\n', 'utf8');
+
+        const preview = mockCtx();
+        await cmdFs(preview, `preview ${fileRel} --yaml --plain`);
+
+        expect(preview.output()).toContain('Preview');
+        expect(preview.output()).toContain('js · filtro . · fallback: renderer externo desativado');
+        expect(preview.output()).toContain('b: 2');
+        expect(preview.output()).toContain('a:');
         expectNoAnsi(preview.output());
     });
 

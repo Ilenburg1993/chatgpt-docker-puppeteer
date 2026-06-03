@@ -9,7 +9,11 @@
  */
 
 import { toError } from '../../core/error-handlers.js';
-import { renderTerminalFilePreview, renderTerminalMarkdownPreview } from '../capabilities/index.js';
+import {
+    renderTerminalFilePreview,
+    renderTerminalMarkdownPreview,
+    renderTerminalStructuredPreview,
+} from '../capabilities/index.js';
 import { readTerminalIoActivityProjection } from '../events/index.js';
 import { requireTerminalFileTool } from '../frontend/gateways/index.js';
 import { buildActivityAwareGuidance, buildFailureRecoveryLines } from '../frontend/operational-guidance/index.js';
@@ -144,12 +148,15 @@ function parseListFlags(parts) {
 /**
  * @param {string[]} parts
  * @param {boolean} [previewDefault=false]
- * @returns {{ preview: boolean; forceJs: boolean; markdown: boolean; lineLimit: number; rest: string[] }}
+ * @returns {{ preview: boolean; forceJs: boolean; markdown: boolean; structured: 'json' | 'yaml' | null; query: string; lineLimit: number; rest: string[] }}
  */
 function parseReadFlags(parts, previewDefault = false) {
     let preview = previewDefault;
     let forceJs = false;
     let markdown = false;
+    /** @type {'json' | 'yaml' | null} */
+    let structured = null;
+    let query = '.';
     let lineLimit = 220;
     /** @type {string[]} */
     const rest = [];
@@ -163,6 +170,18 @@ function parseReadFlags(parts, previewDefault = false) {
         } else if (part === '--markdown' || part === '--md') {
             markdown = true;
             preview = true;
+        } else if (part === '--json') {
+            structured = 'json';
+            preview = true;
+        } else if (part === '--yaml' || part === '--yml') {
+            structured = 'yaml';
+            preview = true;
+        } else if (part === '--query' || part === '--filter') {
+            const next = parts[i + 1];
+            if (next) {
+                query = next;
+                i += 1;
+            }
         } else if (part === '--lines') {
             const next = parts[i + 1];
             if (next && /^\d+$/u.test(next)) {
@@ -173,7 +192,8 @@ function parseReadFlags(parts, previewDefault = false) {
             rest.push(part);
         }
     }
-    return { preview, forceJs, markdown, lineLimit, rest };
+    if (structured) markdown = false;
+    return { preview, forceJs, markdown, structured, query, lineLimit, rest };
 }
 
 /**
@@ -220,7 +240,7 @@ async function runRead(ctx, parts, previewDefault = false) {
     const flags = parseReadFlags(parts, previewDefault);
     const path = flags.rest.join(' ').trim();
     if (!path) {
-        ctx.println(terminalThemeRow('Uso', '/fs read <path> [--preview] [--lines n]', { role: 'warn' }));
+        ctx.println(terminalThemeRow('Uso', '/fs read <path> [--preview] [--markdown|--json|--yaml] [--query filtro] [--lines n]', { role: 'warn' }));
         return;
     }
     const result = await invokeFileTool(readFileContentTool, { path, encoding: 'utf8', quietLog: true });
@@ -232,17 +252,31 @@ async function runRead(ctx, parts, previewDefault = false) {
     ctx.println('');
     ctx.println(terminalThemeRow('Arquivo', `${String(result['path'] ?? path)} · (FS local)`));
     if (flags.preview) {
-        const rendered = flags.markdown
-            ? renderTerminalMarkdownPreview(content, { forceJs: flags.forceJs, width: 100 })
-            : renderTerminalFilePreview(String(result['path'] ?? path), content, {
-                  lineLimit: flags.lineLimit,
+        const rendered = flags.structured
+            ? renderTerminalStructuredPreview(content, {
+                  format: flags.structured,
+                  query: flags.query,
                   forceJs: flags.forceJs,
-              });
+              })
+            : flags.markdown
+              ? renderTerminalMarkdownPreview(content, { forceJs: flags.forceJs, width: 100 })
+              : renderTerminalFilePreview(String(result['path'] ?? path), content, {
+                    lineLimit: flags.lineLimit,
+                    forceJs: flags.forceJs,
+                });
         ctx.println(
             terminalThemeRow(
                 'Preview',
-                `${rendered.renderer}${rendered.fallbackReason ? ` · fallback: ${rendered.fallbackReason}` : ''}${rendered.truncated ? ' · truncado' : ''}`,
-                { role: rendered.renderer === 'bat' || rendered.renderer === 'glow' ? 'success' : 'muted' },
+                `${rendered.renderer}${'queryApplied' in rendered && rendered.queryApplied ? ` · filtro ${flags.query}` : ''}${rendered.fallbackReason ? ` · fallback: ${rendered.fallbackReason}` : ''}${rendered.truncated ? ' · truncado' : ''}`,
+                {
+                    role:
+                        rendered.renderer === 'bat' ||
+                        rendered.renderer === 'glow' ||
+                        rendered.renderer === 'jq' ||
+                        rendered.renderer === 'yq'
+                            ? 'success'
+                            : 'muted',
+                },
             ),
         );
         ctx.println(rendered.output);
@@ -336,7 +370,7 @@ export async function cmdFs(ctx, arg = '') {
             ctx.println(
                 terminalThemeRow(
                     'Uso',
-                    '/fs list [path] [--recursive] [--hidden] | read <path> [--preview] [--markdown] | preview <path> | search <pattern> [path] | create <path> <content> | write <path> <content>',
+                    '/fs list [path] [--recursive] [--hidden] | read <path> [--preview] [--markdown|--json|--yaml] | preview <path> | search <pattern> [path] | create <path> <content> | write <path> <content>',
                     { role: 'warn' },
                 ),
             );

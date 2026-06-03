@@ -255,7 +255,7 @@ Decisão:
 - [ ] Criar adapter de picker interativo.
 - [x] Criar adapter de Markdown.
 - [x] Criar adapter de diff.
-- [ ] Criar adapter de JSON/YAML query/format.
+- [x] Criar adapter de JSON/YAML query/format.
 - [ ] Garantir fallback JS para cada adapter.
 
 ### 5.3 Integração UX
@@ -267,6 +267,7 @@ Decisão:
 - [ ] `/help full` e docs podem usar `glow` em modo explícito.
 - [ ] `/events`, `/activity`, `/byok`, `/status` podem oferecer filtros `--json` e documentação de
       pipe para `jq`, mantendo saída humana por padrão.
+- [x] `/fs preview` pode pretty-printar JSON/YAML explicitamente com `--json`/`--yaml`.
 
 ## 6. Riscos
 
@@ -384,6 +385,25 @@ Decisão:
 - [x] Live PTY Faixa F passou:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-diff-preview-20260603-2030`.
 - [x] Resultado live: PASS em 26/26 critérios, incluindo `diagnostic-ux-git-diff-preview`.
+- [x] Faixa H: `structured-preview.js` implementa preview explícito para JSON/YAML com `jq`/`yq`
+      opcionais e fallback JS/`js-yaml`.
+- [x] Segurança Faixa H: `jq`/`yq` rodam por stdin, sem shell; `yq` recebe
+      `--security-disable-env-ops` e `--security-disable-file-ops`.
+- [x] `/fs preview <path> --json|--yaml [--query filtro] [--plain]` ativa preview estruturado
+      explicitamente; `/fs read` default permanece texto canônico.
+- [x] Testes/lint Faixa H passaram:
+      `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs && node --check src/copilot/terminal/capabilities/structured-preview.js && node --check src/copilot/terminal/commands/fs.js`.
+- [x] Lint escopado Faixa H passou:
+      `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs src/copilot/terminal/capabilities/structured-preview.js src/copilot/terminal/commands/fs.js tests/unit/copilot/terminal/test_structured_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
+- [x] Testes Faixa H passaram:
+      `npx vitest run tests/unit/copilot/terminal/test_structured_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
+- [x] Resultado: 2 arquivos, 12 testes.
+- [x] Typecheck strict de `src/copilot` passou após Faixa H:
+      `npm run typecheck:strict:src.copilot`.
+- [x] Live PTY Faixa H passou:
+      `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=240000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-structured-preview-20260603-2040`.
+- [x] Resultado live: PASS em 28/28 critérios, incluindo `diagnostic-ux-fs-json-preview` e
+      `diagnostic-ux-fs-yaml-preview`.
 
 ### Faixa D: preview read-only
 
@@ -416,8 +436,11 @@ Decisão:
 
 ### Faixa H: contratos estruturados
 
-- [ ] Fase H.1: criar adapter opcional de pretty/query JSON com `jq`.
-- [ ] Fase H.2: criar adapter opcional de YAML/multiformato com `yq`.
+- [x] Fase H.1: criar adapter opcional de pretty/query JSON com `jq`.
+- [x] Fase H.2: criar adapter opcional de YAML/multiformato com `yq`.
+- [x] Fase H.3: fallback JS/`js-yaml` para JSON/YAML quando renderer externo estiver ausente.
+- [x] Fase H.4: plugar em `/fs preview --json|--yaml` como operação explícita.
+- [x] Fase H.5: validar em live PTY com critérios dedicados.
 - [ ] Fase H.3: manter parsers JS como fonte canônica.
 - [ ] Fase H.4: documentar pipe seguro para LLM e operador.
 

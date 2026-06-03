@@ -1741,7 +1741,9 @@ function diagnosticUxCycleCriteria(boot) {
     const fsReadStart = plain.indexOf('/fs read data/copilot-terminal/live-scratch/');
     const fsPreviewStart = plain.indexOf('/fs preview data/copilot-terminal/live-scratch/', Math.max(0, fsReadStart));
     const fsMarkdownStart = plain.indexOf('/fs preview data/copilot-terminal/live-scratch/', Math.max(0, fsPreviewStart + 1));
-    const fsSearchStart = plain.indexOf('/fs search TERMINAL_DIAGNOSTIC_UX_', Math.max(0, fsMarkdownStart));
+    const fsJsonStart = plain.indexOf('/fs preview data/copilot-terminal/live-scratch/', Math.max(0, fsMarkdownStart + 1));
+    const fsYamlStart = plain.indexOf('/fs preview data/copilot-terminal/live-scratch/', Math.max(0, fsJsonStart + 1));
+    const fsSearchStart = plain.indexOf('/fs search TERMINAL_DIAGNOSTIC_UX_', Math.max(0, fsYamlStart));
     const terminalLibsStart = plain.indexOf('/terminal libs', Math.max(0, fsSearchStart));
     const gitDiffStart = plain.indexOf('/git diff --plain src/copilot/terminal/README.md', Math.max(0, terminalLibsStart));
     const activityStart = plain.indexOf('/activity 8', Math.max(0, gitDiffStart));
@@ -1777,7 +1779,9 @@ function diagnosticUxCycleCriteria(boot) {
     };
     const fsReadSurface = surfaceBetween(fsReadStart, fsPreviewStart);
     const fsPreviewSurface = surfaceBetween(fsPreviewStart, fsMarkdownStart);
-    const fsMarkdownSurface = surfaceBetween(fsMarkdownStart, fsSearchStart);
+    const fsMarkdownSurface = surfaceBetween(fsMarkdownStart, fsJsonStart);
+    const fsJsonSurface = surfaceBetween(fsJsonStart, fsYamlStart);
+    const fsYamlSurface = surfaceBetween(fsYamlStart, fsSearchStart);
     const terminalLibsSurface = surfaceBetween(terminalLibsStart, gitDiffStart);
     const gitDiffSurface = surfaceBetween(gitDiffStart, activityStart);
     const activitySurface = surfaceBetween(activityStart, liveFullStart);
@@ -1833,6 +1837,24 @@ function diagnosticUxCycleCriteria(boot) {
                 /Terminal UX Markdown|Item de diagnóstico/iu.test(fsMarkdownSurface) &&
                 !/\[copilot\/read_file_content\]|chatcmpl-tool-|toolu_|\\x1b\[/iu.test(fsMarkdownSurface),
             detail: '/fs preview --markdown rendered explicit Markdown preview through glow/js without raw file-tool logs, tool ids or ANSI literals',
+        },
+        {
+            id: 'diagnostic-ux-fs-json-preview',
+            pass:
+                /Arquivo[\s\S]*TERMINAL_DIAGNOSTIC_UX_\d+\.json[\s\S]*\(FS local\)/iu.test(fsJsonSurface) &&
+                /Preview\s+js\s+·\s+filtro\s+\.\s+·\s+fallback:\s+renderer externo desativado/iu.test(fsJsonSurface) &&
+                /"marker":\s*"TERMINAL_DIAGNOSTIC_UX_/iu.test(fsJsonSurface) &&
+                !/\[copilot\/read_file_content\]|chatcmpl-tool-|toolu_|\\x1b\[/iu.test(fsJsonSurface),
+            detail: '/fs preview --json rendered explicit structured preview without raw file-tool logs, tool ids or ANSI literals',
+        },
+        {
+            id: 'diagnostic-ux-fs-yaml-preview',
+            pass:
+                /Arquivo[\s\S]*TERMINAL_DIAGNOSTIC_UX_\d+\.yaml[\s\S]*\(FS local\)/iu.test(fsYamlSurface) &&
+                /Preview\s+js\s+·\s+filtro\s+\.\s+·\s+fallback:\s+renderer externo desativado/iu.test(fsYamlSurface) &&
+                /marker:\s+TERMINAL_DIAGNOSTIC_UX_/iu.test(fsYamlSurface) &&
+                !/\[copilot\/read_file_content\]|chatcmpl-tool-|toolu_|\\x1b\[/iu.test(fsYamlSurface),
+            detail: '/fs preview --yaml rendered explicit structured preview without raw file-tool logs, tool ids or ANSI literals',
         },
         {
             id: 'diagnostic-ux-terminal-libs',
@@ -2060,6 +2082,8 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
     const marker = `TERMINAL_DIAGNOSTIC_UX_${Date.now()}`;
     const scratchPath = `data/copilot-terminal/live-scratch/${marker}.txt`;
     const markdownPath = `data/copilot-terminal/live-scratch/${marker}.md`;
+    const jsonPath = `data/copilot-terminal/live-scratch/${marker}.json`;
+    const yamlPath = `data/copilot-terminal/live-scratch/${marker}.yaml`;
     const gitDiffFixturePath = path.join(ROOT, 'src/copilot/terminal/README.md');
     const gitDiffFixtureOriginal = await readFile(gitDiffFixturePath, 'utf8').catch(() => null);
     if (gitDiffFixtureOriginal !== null) {
@@ -2077,9 +2101,13 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
             commands: [
                 { line: `/fs create ${scratchPath} ${marker}`, advanceAfterMs: 1_000 },
                 { line: `/fs create ${markdownPath} # Terminal UX Markdown - Item de diagnóstico`, advanceAfterMs: 1_000 },
+                { line: `/fs create ${jsonPath} {"marker":"${marker}","count":2}`, advanceAfterMs: 1_000 },
+                { line: `/fs create ${yamlPath} marker: ${marker}`, advanceAfterMs: 1_000 },
                 { line: `/fs read ${scratchPath}`, advanceAfterMs: 1_000 },
                 { line: `/fs preview ${scratchPath} --lines 20`, advanceAfterMs: 1_000 },
                 { line: `/fs preview ${markdownPath} --markdown`, advanceAfterMs: 1_000 },
+                { line: `/fs preview ${jsonPath} --json --plain`, advanceAfterMs: 1_000 },
+                { line: `/fs preview ${yamlPath} --yaml --plain`, advanceAfterMs: 1_000 },
                 { line: `/fs search ${marker} data/copilot-terminal/live-scratch`, advanceAfterMs: 1_000 },
                 { line: '/terminal libs', advanceAfterMs: 1_000 },
                 { line: '/git diff --plain src/copilot/terminal/README.md', advanceAfterMs: 1_000 },
