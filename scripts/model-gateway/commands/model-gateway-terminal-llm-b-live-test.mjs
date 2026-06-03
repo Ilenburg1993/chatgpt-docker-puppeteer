@@ -1875,10 +1875,10 @@ function diagnosticUxCycleCriteria(boot) {
                 /Eventos[\s\S]*(Ferramenta|Atividade|terminal|io)/iu.test(eventsSurface) &&
                 hasIsoSeconds(eventsSurface) &&
                 hasRelativeAge(eventsSurface) &&
-                !/chatcmpl-tool-[a-z0-9-]+|rastreamento implicit:|#\d+ ·|hub [a-z0-9-]+|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}/iu.test(
+                !/estado io op|io_op|chatcmpl-tool-[a-z0-9-]+|rastreamento implicit:|#\d+ ·|hub [a-z0-9-]+|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}/iu.test(
                     eventsSurface,
                 ),
-            detail: '/events default rendered diagnostics with ISO seconds plus relative time and without raw tool ids, trace ids, event ids, hub ids, or millisecond timestamps',
+            detail: '/events default rendered diagnostics with ISO seconds plus relative time and without raw tool ids, trace ids, event ids, raw io_op state, hub ids, or millisecond timestamps',
         },
         {
             id: 'diagnostic-ux-session-sdk-events-human',

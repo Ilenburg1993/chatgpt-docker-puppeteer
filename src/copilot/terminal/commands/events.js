@@ -262,6 +262,7 @@ function humanEventLabel(event) {
 function humanStatus(value) {
     const text = normalizeEventSummaryText(value).toLowerCase();
     if (!text) return '';
+    if (text === 'io' || text === 'io_op') return 'I/O local';
     if (text === 'success' || text === 'completed' || text === 'done') return 'concluído';
     if (text === 'failed' || text === 'failure' || text === 'error') return 'falhou';
     if (text === 'active' || text === 'running' || text === 'started') return 'em andamento';
@@ -283,6 +284,7 @@ function humanEventSource(source) {
     const text = normalizeEventSummaryText(source ?? '');
     const lower = text.toLowerCase();
     if (!text) return '-';
+    if (lower === 'io' || lower.startsWith('io/')) return 'I/O local';
     if (lower.startsWith('sdk/user_input')) return 'pergunta humana SDK';
     if (lower.startsWith('sdk/assistant')) return 'SDK assistant';
     if (lower.startsWith('agent/background')) return 'tarefa em segundo plano';
@@ -306,6 +308,19 @@ function normalizeEventSummaryText(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function humanPayloadKind(value) {
+    const text = normalizeEventSummaryText(value).toLowerCase();
+    if (!text) return '';
+    if (text === 'io' || text === 'io_op') return 'I/O local';
+    if (text === 'tool' || text === 'tool_lifecycle') return 'ferramenta';
+    if (text === 'background' || text === 'background_task') return 'tarefa em segundo plano';
+    return text.replace(/[_-]+/gu, ' ');
+}
+
+/**
  * @param {Record<string, unknown>} payload
  * @param {{ showIds?: boolean }} [opts]
  * @returns {string}
@@ -315,15 +330,21 @@ function summarizePayload(payload, opts = {}) {
     const toolCallId = payload['toolCallId'] ?? payload['callId'];
     const requestId = payload['requestId'] ?? payload['pendingRequestId'];
     const content = payload['content'] ?? payload['chunk'] ?? payload['question'] ?? payload['message'] ?? null;
-    const status = payload['status'] ?? payload['type'] ?? payload['classification'] ?? null;
+    const status = payload['status'] ?? null;
+    const type = payload['type'] ?? null;
+    const classification = payload['classification'] ?? null;
     const humanToolName = typeof toolName === 'string' ? getTerminalHumanToolName(toolName) : null;
     const showIds = Boolean(opts.showIds);
     const renderedStatus = humanStatus(status);
+    const renderedType = humanPayloadKind(type);
+    const renderedClassification = humanPayloadKind(classification);
     return [
         humanToolName ? `ferramenta ${compact(humanToolName, 48)}` : null,
         showIds && toolCallId ? `call ${compactTerminalDiagnosticId(String(toolCallId), 14)}` : null,
         showIds && requestId ? `req ${compactTerminalDiagnosticId(String(requestId), 14)}` : null,
         renderedStatus ? `estado ${compact(renderedStatus)}` : null,
+        renderedType ? `tipo ${compact(renderedType)}` : null,
+        renderedClassification ? `classe ${compact(renderedClassification)}` : null,
         content ? compact(content) : null,
     ]
         .filter(Boolean)

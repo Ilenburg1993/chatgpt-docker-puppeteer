@@ -304,6 +304,52 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).not.toContain('agente/background');
     });
 
+    it('humaniza eventos de I/O local sem tratar type como estado', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 1,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 12,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 31,
+                    event: 'tool.lifecycle',
+                    source: 'io',
+                    eventSource: 'io',
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: {
+                        type: 'io_op',
+                        toolName: 'io.search',
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '12');
+
+        expect(ctx.output()).toContain('I/O local');
+        expect(ctx.output()).toContain('ferramenta Busca local');
+        expect(ctx.output()).toContain('tipo I/O local');
+        expect(ctx.output()).not.toContain('estado io op');
+        expect(ctx.output()).not.toContain('io_op');
+    });
+
     it('consulta por tool call, request e hub session', async () => {
         readTerminalSseEventArchiveTail.mockResolvedValueOnce({
             state: {

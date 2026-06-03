@@ -4286,7 +4286,25 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/tools-diag-hierarchy-20260603-1751`.
   - Resultado: PASS; 22/22 critérios, incluindo `/tools` default humano, `/tools diag` hierárquico,
         `/health full` temático e ausência de labels antigos.
-- [ ] Lacuna remanescente: `/events` ainda mostra alguns estados compactos como `estado io op`;
-      isso é aceitável para a rodada atual, mas deve ser traduzido em uma próxima faixa de eventos.
+- [x] Lacuna resolvida: `/events` não deve mostrar estados compactos como `estado io op`; a
+      superfície default deve distinguir `estado`, `tipo` e `classe`.
 - [ ] Lacuna remanescente: o banner inicial e algumas sessões ainda repetem comandos longos em uma
       única linha; isso deve entrar na faixa de compactação de primeiro viewport.
+
+### 12.11 Evidência de eventos I/O humanos
+
+- [x] Implementação: `/events` deixou de tratar `payload.type` como `status`; agora `status`,
+      `type` e `classification` viram respectivamente `estado`, `tipo` e `classe`.
+- [x] Implementação: fontes `io` e `io/...` aparecem como `I/O local` no default.
+- [x] Implementação: `io_op` aparece como `tipo I/O local`, não como `estado io op`.
+- [x] Harness live: o critério `diagnostic-ux-events-human` passou a reprovar `estado io op` e
+      `io_op` no default.
+- [x] Teste escopado passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`.
+  - Resultado: 1 arquivo, 13 testes.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/events-io-human-20260603-1754`.
+  - Resultado: PASS; `/events` mostrou `I/O local · ferramenta ... · tipo I/O local` e manteve
+        ausência de IDs crus, `io_op`, timestamps com milissegundos e `chatcmpl-tool`.
+- [ ] Próxima lacuna: primeiro viewport ainda é verboso no banner e em linhas de ajuda, com comandos
+      longos demais para leitura rápida.
