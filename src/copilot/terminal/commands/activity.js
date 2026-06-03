@@ -2,7 +2,12 @@
 
 import { readTerminalIoActivityProjection } from '../events/index.js';
 import { readTerminalActivityProjection } from '../frontend/index.js';
-import { formatTerminalIsoTimestamp, terminalThemeText } from '../state/ui/index.js';
+import {
+    formatTerminalIsoTimestamp,
+    terminalThemeDivider,
+    terminalThemeHeadline,
+    terminalThemeRow,
+} from '../state/ui/index.js';
 import {
     buildTerminalToolActivityPresentation,
     compactTerminalDiagnosticId,
@@ -47,6 +52,17 @@ function renderStatusLabel(status) {
 }
 
 /**
+ * @param {string | null | undefined} status
+ * @returns {'success' | 'warn' | 'error' | 'muted'}
+ */
+function renderStatusRole(status) {
+    if (status === 'active' || status === 'running' || status === 'started') return 'warn';
+    if (status === 'completed' || status === 'done' || status === 'success') return 'success';
+    if (status === 'failed' || status === 'error') return 'error';
+    return 'muted';
+}
+
+/**
  * @param {string} phase
  * @returns {string}
  */
@@ -60,18 +76,28 @@ function renderActivityPhaseLabel(phase) {
 }
 
 /**
- * @param {string} source
+ * @param {string | null | undefined} severity
+ * @returns {'success' | 'warn' | 'error'}
+ */
+function renderActivitySeverityRole(severity) {
+    if (severity === 'error') return 'error';
+    if (severity === 'warn') return 'warn';
+    return 'success';
+}
+
+/**
+ * @param {unknown} source
  * @returns {string}
  */
 function renderSourceLabel(source) {
-    const normalized = source.trim().toLowerCase();
+    const normalized = typeof source === 'string' ? source.trim().toLowerCase() : '';
     if (!normalized) return 'terminal';
     if (normalized === 'sdk' || normalized.startsWith('sdk/')) return 'SDK';
     if (normalized === 'agent' || normalized.startsWith('agent/')) return 'agente';
     if (normalized === 'dialog' || normalized.startsWith('dialog')) return 'diálogo';
     if (normalized === 'io') return 'I/O';
     if (normalized.includes('terminal')) return 'terminal';
-    return source;
+    return compactHumanText(source);
 }
 
 /**
@@ -191,42 +217,47 @@ function renderToolSummary(tool, opts) {
  * @returns {void}
  */
 function printTurnTraceSummary(println, title, trace, opts) {
-    const stateColor = trace.status === 'active' ? '\x1b[33m' : trace.status === 'completed' ? '\x1b[32m' : '\x1b[31m';
-    println(`  \x1b[36m${title}\x1b[0m
-  ─────────────────────────────────────
-  estado          ${stateColor}${renderStatusLabel(trace.status)}\x1b[0m
-  ferramentas     \x1b[90m${trace.toolCount}\x1b[0m
-  arquivos        \x1b[90m${trace.fileCount}\x1b[0m
-  input humano    \x1b[90m${trace.userInputCount ?? trace.userInputs?.length ?? 0}\x1b[0m`);
+    println(terminalThemeHeadline('assistant', title));
+    println(terminalThemeDivider(37));
+    println(terminalThemeRow('Estado', renderStatusLabel(trace.status), { role: renderStatusRole(trace.status) }));
+    println(terminalThemeRow('Ferramentas', String(trace.toolCount)));
+    println(terminalThemeRow('Arquivos', String(trace.fileCount)));
+    println(terminalThemeRow('Input humano', String(trace.userInputCount ?? trace.userInputs?.length ?? 0)));
     if (opts.detail) {
-        println(`  trace           \x1b[90m${compactTerminalDiagnosticId(trace.traceId)}\x1b[0m`);
+        println(terminalThemeRow('Trace', compactTerminalDiagnosticId(trace.traceId) ?? String(trace.traceId ?? 'sem trace')));
     }
 
     if (trace.files.length > 0) {
-        println('  arquivos tocados');
+        println(terminalThemeHeadline('assistant', 'Arquivos tocados'));
         for (const file of trace.files.slice(0, 5)) {
             const source = opts.detail ? ` · ${renderSourceLabel(file.source)}` : '';
             println(
-                `    - ${renderOperationLabel(file.operation)} · ${compactHumanText(file.path)}${file.count > 1 ? ` ×${file.count}` : ''}${source}`,
+                terminalThemeRow(
+                    'Arquivo',
+                    `${renderOperationLabel(file.operation)} · ${compactHumanText(file.path)}${file.count > 1 ? ` ×${file.count}` : ''}${source}`,
+                ),
             );
         }
     }
 
     if (trace.tools.length > 0) {
-        println('  ferramentas');
+        println(terminalThemeHeadline('assistant', 'Ferramentas'));
         for (const tool of trace.tools.slice(0, 5)) {
             const rendered = renderToolSummary(tool, opts);
             const status = tool.status ? ` · ${renderStatusLabel(tool.status)}` : '';
             const source = opts.detail ? ` · ${renderSourceLabel(tool.source)}` : '';
             println(
-                `    - ${rendered.name} · ${renderOperationLabel(tool.operation)}${rendered.target ? ` · ${rendered.target}` : ''}${status}${source}`,
+                terminalThemeRow(
+                    'Ferramenta',
+                    `${rendered.name} · ${renderOperationLabel(tool.operation)}${rendered.target ? ` · ${rendered.target}` : ''}${status}${source}`,
+                ),
             );
         }
     }
 
     const userInputs = Array.isArray(trace.userInputs) ? trace.userInputs : [];
     if (userInputs.length > 0) {
-        println('  interações humanas');
+        println(terminalThemeHeadline('assistant', 'Interações humanas'));
         for (const userInput of userInputs.slice(0, 5)) {
             const choices =
                 Array.isArray(userInput.choices) && userInput.choices.length > 0
@@ -236,12 +267,15 @@ function printTurnTraceSummary(println, title, trace, opts) {
             const requestId = opts.detail && userInput.requestId ? ` · req=${compactTerminalDiagnosticId(userInput.requestId)}` : '';
             const source = opts.detail ? ` · ${renderSourceLabel(userInput.source ?? 'sdk')}` : '';
             println(
-                `    - pergunta · ${renderStatusLabel(userInput.status)}${requestId} · ${compactHumanText(userInput.question)}${choices}${answer}${source}`,
+                terminalThemeRow(
+                    'Pergunta',
+                    `${renderStatusLabel(userInput.status)}${requestId} · ${compactHumanText(userInput.question)}${choices}${answer}${source}`,
+                ),
             );
         }
     }
 
-    println('  ─────────────────────────────────────');
+    println(terminalThemeDivider(37));
 }
 
 /**
@@ -287,38 +321,57 @@ function printStreamDiagnostics(println, diagnostics) {
     const c = diagnostics.counters;
     const suppressedPct = (diagnostics.totals.suppressedRatio * 100).toFixed(0);
     const normalizedPct = (diagnostics.totals.normalizedRatio * 100).toFixed(0);
-    println('  \x1b[36mStreaming público\x1b[0m');
+    println(terminalThemeHeadline('assistant', 'Streaming público'));
     println(
-        `  deltas          aceitos=${c.deltaAccepted} · normalizados=${c.deltaNormalized} · suprimidos=${c.deltaSuppressed} \x1b[90m(sup=${suppressedPct}% · norm=${normalizedPct}%)\x1b[0m`,
+        terminalThemeRow(
+            'Deltas',
+            `aceitos=${c.deltaAccepted} · normalizados=${c.deltaNormalized} · suprimidos=${c.deltaSuppressed} (sup=${suppressedPct}% · norm=${normalizedPct}%)`,
+        ),
     );
     println(
-        `  causal          aceitos=${c.deltaCausalAccepted} · duplicados=${c.deltaCausalDuplicateSuppressed} · fallback temporal=${c.deltaTemporalFallbackSuppressed}`,
+        terminalThemeRow(
+            'Causal',
+            `aceitos=${c.deltaCausalAccepted} · duplicados=${c.deltaCausalDuplicateSuppressed} · fallback temporal=${c.deltaTemporalFallbackSuppressed}`,
+        ),
     );
     println(
-        `  cumulativo      normalizados=${c.deltaCumulativeNormalized} · suprimidos=${c.deltaCumulativeSuppressed} · overlap=${c.deltaOverlapNormalized} · sufixo dup=${c.deltaDuplicateSuppressed}`,
+        terminalThemeRow(
+            'Cumulativo',
+            `normalizados=${c.deltaCumulativeNormalized} · suprimidos=${c.deltaCumulativeSuppressed} · overlap=${c.deltaOverlapNormalized} · sufixo dup=${c.deltaDuplicateSuppressed}`,
+        ),
     );
     println(
-        `  final           ok=${c.finalAlreadyStreamed} · sufixo=${c.finalSuffix} · mismatch=${c.finalMismatch} · sem-delta=${c.finalNoVisibleStream} · vazio=${c.finalEmpty}`,
+        terminalThemeRow(
+            'Final',
+            `ok=${c.finalAlreadyStreamed} · sufixo=${c.finalSuffix} · mismatch=${c.finalMismatch} · sem-delta=${c.finalNoVisibleStream} · vazio=${c.finalEmpty}`,
+        ),
     );
     if (diagnostics.recent.length > 0) {
-        println('  decisões recentes');
+        println(terminalThemeHeadline('assistant', 'Decisões recentes'));
         for (const entry of diagnostics.recent.slice(0, 5)) {
             const ts = formatTerminalIsoTimestamp(entry.timestamp);
             if (entry.kind === 'delta') {
-                const color =
-                    entry.action === 'suppressed' ? '\x1b[33m' : entry.action === 'normalized' ? '\x1b[36m' : '\x1b[90m';
+                const role = entry.action === 'suppressed' ? 'warn' : entry.action === 'normalized' ? 'assistant' : 'muted';
                 println(
-                    `    ${color}[${ts}]\x1b[0m delta · ${entry.action}/${entry.reason} · ${entry.source} · raw=${entry.rawChars} norm=${entry.normalizedChars}`,
+                    terminalThemeRow(
+                        'Delta',
+                        `[${ts}] ${entry.action}/${entry.reason} · ${entry.source} · raw=${entry.rawChars} norm=${entry.normalizedChars}`,
+                        { role },
+                    ),
                 );
             } else {
-                const color = entry.severity === 'warn' ? '\x1b[33m' : entry.severity === 'error' ? '\x1b[31m' : '\x1b[90m';
+                const role = entry.severity === 'warn' ? 'warn' : entry.severity === 'error' ? 'error' : 'muted';
                 println(
-                    `    ${color}[${ts}]\x1b[0m final · ${entry.mode}/${entry.reason} · stream=${entry.streamingVisibleChars} final=${entry.finalChars}`,
+                    terminalThemeRow(
+                        'Final',
+                        `[${ts}] ${entry.mode}/${entry.reason} · stream=${entry.streamingVisibleChars} final=${entry.finalChars}`,
+                        { role },
+                    ),
                 );
             }
         }
     }
-    println('  ─────────────────────────────────────');
+    println(terminalThemeDivider(37));
 }
 
 /**
@@ -337,22 +390,24 @@ export function cmdActivity({ println }, arg) {
     const recentNonCurrent = projection.turnTrace.recent.filter((entry) => entry.traceId !== activeTurnTrace?.traceId);
     const latestCompletedTurnTrace = pickMostUsefulRecentTurnTrace(recentNonCurrent);
     const latestHumanTurnTrace = pickRecentHumanTurnTrace(recentNonCurrent);
-    const severityColor =
-        current.severity === 'error' ? '\x1b[31m' : current.severity === 'warn' ? '\x1b[33m' : '\x1b[32m';
     const progressLabel = typeof current.progress === 'number' ? ` · ${current.progress}%` : '';
-    println(`
-  ${terminalThemeText('assistant', 'Atividade Atual da LLM-B')}
-  ─────────────────────────────────────
-  estado          ${severityColor}${renderActivityPhaseLabel(current.phase)}\x1b[0m
-  evento          ${compactActivityLabel(current.label)}${progressLabel}
-  detalhe         ${current.detail ? compactOperatorDetail(current.detail) : '\x1b[90m(nenhum)\x1b[0m'}
-  idade           \x1b[90m${Math.round(current.ageMs / 1000)}s\x1b[0m
-  ─────────────────────────────────────`);
+    println('');
+    println(terminalThemeHeadline('assistant', 'Atividade Atual da LLM-B'));
+    println(terminalThemeDivider(37));
+    println(
+        terminalThemeRow('Estado', renderActivityPhaseLabel(current.phase), {
+            role: renderActivitySeverityRole(current.severity),
+        }),
+    );
+    println(terminalThemeRow('Evento', `${compactActivityLabel(current.label)}${progressLabel}`));
+    println(terminalThemeRow('Detalhe', current.detail ? compactOperatorDetail(current.detail) : '(nenhum)'));
+    println(terminalThemeRow('Idade', `${Math.round(current.ageMs / 1000)}s`));
+    println(terminalThemeDivider(37));
     if (detail) {
-        println(`  origem          \x1b[90m${current.source}\x1b[0m`);
+        println(terminalThemeRow('Origem', current.source));
     }
     if (!detail) {
-        println('  \x1b[90mDetalhes técnicos ficam em /activity detail.\x1b[0m');
+        println(terminalThemeRow('Detalhe', 'Detalhes técnicos ficam em /activity detail.', { role: 'command' }));
     }
 
     if (activeTurnTrace) {
@@ -372,10 +427,9 @@ export function cmdActivity({ println }, arg) {
     }
 
     if (recentIo.length > 0) {
-        println('  \x1b[36mI/O real recente\x1b[0m');
+        println(terminalThemeHeadline('assistant', 'I/O real recente'));
         for (const entry of recentIo.slice(0, 8)) {
             const ts = formatTerminalIsoTimestamp(entry.timestamp);
-            const sev = entry.success ? '\x1b[90m' : '\x1b[31m';
             const bytes =
                 typeof entry.bytesRead === 'number'
                     ? ` · ${renderBytes(entry.bytesRead)} lidos`
@@ -386,10 +440,14 @@ export function cmdActivity({ println }, arg) {
             const engine = entry.engine ? ` · ${entry.engine}` : '';
             const engineDetail = detail ? engine : '';
             println(
-                `  ${sev}[${ts}]\x1b[0m ${renderIoOperationLabel(entry.operation)} · ${compactHumanText(entry.target)}${bytes}${duration}${engineDetail}`,
+                terminalThemeRow(
+                    'Operação',
+                    `[${ts}] ${renderIoOperationLabel(entry.operation)} · ${compactHumanText(entry.target)}${bytes}${duration}${engineDetail}`,
+                    { role: entry.success ? 'muted' : 'error' },
+                ),
             );
         }
-        println('  ─────────────────────────────────────');
+        println(terminalThemeDivider(37));
     }
 
     if (detail) {
@@ -397,18 +455,22 @@ export function cmdActivity({ println }, arg) {
     }
 
     if (projection.history.length === 0) {
-        println('  \x1b[90mSem histórico de atividade ainda.\x1b[0m\n');
+        println(terminalThemeRow('Timeline', 'Sem histórico de atividade ainda.'));
+        println('');
         return;
     }
 
-    println(`  ${terminalThemeText('assistant', 'Timeline recente')}`);
+    println(terminalThemeHeadline('assistant', 'Timeline recente'));
     for (const entry of projection.history) {
         const ts = formatTerminalIsoTimestamp(entry.ts);
-        const sev = entry.severity === 'error' ? '\x1b[31m' : entry.severity === 'warn' ? '\x1b[33m' : '\x1b[90m';
         const extra = entry.detail ? ` — ${compactOperatorDetail(entry.detail)}` : '';
         const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';
         println(
-            `  ${sev}[${ts}]\x1b[0m ${renderActivityPhaseLabel(entry.phase)} · ${compactActivityLabel(entry.label)}${progress}${extra}`,
+            terminalThemeRow(
+                'Evento',
+                `[${ts}] ${renderActivityPhaseLabel(entry.phase)} · ${compactActivityLabel(entry.label)}${progress}${extra}`,
+                { role: renderActivitySeverityRole(entry.severity) },
+            ),
         );
     }
     println('');

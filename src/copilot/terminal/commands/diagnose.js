@@ -24,6 +24,7 @@ import {
     terminalPermissionModeSkipsSdkPrompts,
     terminalThemeDivider,
     terminalThemeHeadline,
+    terminalThemeRow,
     terminalThemeText,
 } from '../state/index.js';
 import {
@@ -142,10 +143,10 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         : `${C.grey}(sem detalhe)${C.reset}`;
     const actionLine = renderCompactActionLine(health?.['recommendedAction']);
     const askUserLine = health?.['pendingQuestion']
-        ? `${C.green}vivo${C.reset}${health?.['pendingQuestionKind'] ? ` [${health['pendingQuestionKind']}]` : ''}`
+        ? `vivo${health?.['pendingQuestionKind'] ? ` [${health['pendingQuestionKind']}]` : ''}`
         : health?.['pendingQuestionShadow']
-          ? `${health?.['pendingQuestionShadowExpired'] ? `${C.red}pergunta restaurada expirada${C.reset}` : health?.['pendingQuestionShadowState'] === 'expiring_soon' ? `${C.yellow}pergunta restaurada expirando${C.reset}` : health?.['pendingQuestionShadowState'] === 'fresh' ? `${C.cyan}pergunta recém-restaurada${C.reset}` : `${C.yellow}pergunta restaurada${C.reset}`}${health?.['pendingQuestionShadowKind'] ? ` [${health['pendingQuestionShadowKind']}]` : ''}`
-          : `${C.grey}nenhum${C.reset}`;
+          ? `${health?.['pendingQuestionShadowExpired'] ? 'pergunta restaurada expirada' : health?.['pendingQuestionShadowState'] === 'expiring_soon' ? 'pergunta restaurada expirando' : health?.['pendingQuestionShadowState'] === 'fresh' ? 'pergunta recém-restaurada' : 'pergunta restaurada'}${health?.['pendingQuestionShadowKind'] ? ` [${health['pendingQuestionShadowKind']}]` : ''}`
+          : 'nenhum';
     const askUserAgeLine =
         typeof health?.['pendingQuestionShadowAgeMs'] === 'number'
             ? `${Math.round(Number(health['pendingQuestionShadowAgeMs']) / 1000)}s`
@@ -231,24 +232,53 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     const hubSessionLabel = renderDiagnoseSessionId(hub.activeHubSessionId, detail, '(sem hub)');
 
     if (!wantsFull) {
-        println(`
-${terminalThemeHeadline('assistant', 'Saúde do Terminal LLM-B')}
-${terminalThemeDivider(36)}
-  Conversa     ${agentStatusColor}${renderHumanRuntimeStatus(String(snap['status'] ?? 'unknown'))}${C.reset} ${dialogLoopActive ? `${C.grey}· ativa${C.reset}` : `${C.yellow}· inativa${C.reset}`}
-  Modelo       ${C.magenta}${snap['model']}${C.reset} ${C.grey}· raciocínio ${configProjection.currentReasoningEffort}${C.reset}
-  Acesso       ${renderCompactByokLine(byok)}
-  Gateway      ${renderCompactGatewayLine(gatewayProjection, gatewayActive)}
-  Entrada      ${askUserLine}${typeof health?.['backgroundPendingCount'] === 'number' && health['backgroundPendingCount'] > 0 ? ` ${C.grey}· ${health['backgroundPendingCount']} tarefa(s) em segundo plano${C.reset}` : ''}
-  Ferramentas  ${renderCompactMcpLine(mcp, toolLoad)}
-  Atividade    ${activityColor}${activity.label}${C.reset}${typeof activity.progress === 'number' ? ` ${C.grey}(${activity.progress}%)${C.reset}` : ''} ${activity.detail ? `${C.grey}· ${activity.detail}${C.reset}` : ''}
-  Infra        ${renderHumanHealthStatus(String(health?.['status'] ?? 'unknown'))} ${C.grey}· memória ${memMB}MB · uptime ${Math.floor(uptimeSec / 60)}m${C.reset}
-  Próximo      ${renderCompactActionLine(health?.['recommendedAction'])}
-  Detalhe      ${renderCommandList(['/health full', '/diagnose', '/tools diag', '/activity detail'])}
-${terminalThemeDivider(36)}
-`);
+        const backgroundLine =
+            typeof health?.['backgroundPendingCount'] === 'number' && health['backgroundPendingCount'] > 0
+                ? ` · ${health['backgroundPendingCount']} tarefa(s) em segundo plano`
+                : '';
+        const activityProgress = typeof activity.progress === 'number' ? ` (${activity.progress}%)` : '';
+        const activityDetailLine = activity.detail ? ` · ${activity.detail}` : '';
+        println('');
+        println(terminalThemeHeadline('assistant', 'Saúde do Terminal LLM-B'));
+        println(terminalThemeDivider(36));
+        println(
+            terminalThemeRow(
+                'Conversa',
+                `${renderHumanRuntimeStatus(String(snap['status'] ?? 'unknown'))} · ${dialogLoopActive ? 'ativa' : 'inativa'}`,
+                { role: renderRuntimeStatusRole(String(snap['status'] ?? 'unknown'), dialogLoopActive) },
+            ),
+        );
+        println(
+            terminalThemeRow('Modelo', `${snap['model']} · raciocínio ${configProjection.currentReasoningEffort}`, {
+                role: 'assistant',
+            }),
+        );
+        println(terminalThemeRow('Acesso', renderCompactByokLine(byok), { role: byok.ready ? 'success' : 'warn' }));
+        println(terminalThemeRow('Gateway', renderCompactGatewayLine(gatewayProjection, gatewayActive)));
+        println(terminalThemeRow('Entrada', `${askUserLine}${backgroundLine}`, { role: askUserLine === 'nenhum' ? 'muted' : 'question' }));
+        println(terminalThemeRow('Ferramentas', renderCompactMcpLine(mcp, toolLoad), { role: renderCompactMcpRole(mcp, toolLoad) }));
+        println(
+            terminalThemeRow('Atividade', `${activity.label}${activityProgress}${activityDetailLine}`, {
+                role: renderActivityRole(activity.severity),
+            }),
+        );
+        println(
+            terminalThemeRow(
+                'Infra',
+                `${renderHumanHealthStatus(String(health?.['status'] ?? 'unknown'))} · memória ${memMB}MB · uptime ${Math.floor(uptimeSec / 60)}m`,
+                { role: renderHealthRole(String(health?.['status'] ?? 'unknown')) },
+            ),
+        );
+        println(terminalThemeRow('Próximo', renderCompactActionLine(health?.['recommendedAction']), { role: 'command' }));
+        println(terminalThemeRow('Detalhe', renderCommandList(['/health full', '/diagnose', '/tools diag', '/activity detail'])));
+        println(terminalThemeDivider(36));
         if (configProjection.runtimeFallbackWarning) {
             println(
-                `${C.yellow}  Nota: ${configProjection.runtimeFallbackWarning} Diagnóstico exibido para o runtime default (${configProjection.runtimeId}).${C.reset}`,
+                terminalThemeRow(
+                    'Nota',
+                    `${configProjection.runtimeFallbackWarning} Diagnóstico exibido para o runtime default (${configProjection.runtimeId}).`,
+                    { role: 'warn' },
+                ),
             );
         }
         return;
@@ -339,13 +369,47 @@ function renderHumanRuntimeStatus(value) {
 
 /**
  * @param {string} value
+ * @param {boolean} active
+ * @returns {'success' | 'warn' | 'error' | 'assistant'}
+ */
+function renderRuntimeStatusRole(value, active) {
+    if (!active) return 'warn';
+    if (value === 'waiting_for_input' || value === 'idle') return 'success';
+    if (value === 'processing' || value === 'starting') return 'assistant';
+    if (value === 'stopped') return 'warn';
+    return 'error';
+}
+
+/**
+ * @param {string} value
  * @returns {string}
  */
 function renderHumanHealthStatus(value) {
-    if (value === 'healthy') return `${C.green}ok${C.reset}`;
-    if (value === 'degraded') return `${C.yellow}atenção${C.reset}`;
-    if (value === 'unhealthy' || value === 'error') return `${C.red}problema${C.reset}`;
-    return `${C.grey}${value || 'desconhecida'}${C.reset}`;
+    if (value === 'healthy') return 'ok';
+    if (value === 'degraded') return 'atenção';
+    if (value === 'unhealthy' || value === 'error') return 'problema';
+    return value || 'desconhecida';
+}
+
+/**
+ * @param {string} value
+ * @returns {'success' | 'warn' | 'error' | 'muted'}
+ */
+function renderHealthRole(value) {
+    if (value === 'healthy') return 'success';
+    if (value === 'degraded') return 'warn';
+    if (value === 'unhealthy' || value === 'error') return 'error';
+    return 'muted';
+}
+
+/**
+ * @param {unknown} severity
+ * @returns {'success' | 'warn' | 'error'}
+ */
+function renderActivityRole(severity) {
+    if (severity === 'error') return 'error';
+    if (severity === 'warn') return 'warn';
+    return 'success';
 }
 
 /**
@@ -360,10 +424,9 @@ function renderHumanHealthStatus(value) {
  * @returns {string}
  */
 function renderCompactByokLine(byok) {
-    if (!byok.enabled) return `${C.grey}BYOK desligado${C.reset}`;
+    if (!byok.enabled) return 'BYOK desligado';
     const auth = renderCompactAuthLabel(byok.auth);
-    const color = byok.ready ? C.green : C.red;
-    return `${color}${byok.ready ? 'pronto' : 'incompleto'}${C.reset} ${C.grey}· ${byok.providerType ?? byok.preset ?? 'provedor'} · ${byok.model ?? 'modelo'} · ${auth}${C.reset}`;
+    return `${byok.ready ? 'pronto' : 'incompleto'} · ${byok.providerType ?? byok.preset ?? 'provedor'} · ${byok.model ?? 'modelo'} · ${auth}`;
 }
 
 /**
@@ -383,9 +446,9 @@ function renderCompactAuthLabel(auth) {
  * @returns {string}
  */
 function renderCompactGatewayLine(projection, active) {
-    if (projection.providerCount <= 0 && projection.modelCount <= 0) return `${C.grey}catálogo desligado${C.reset}`;
+    if (projection.providerCount <= 0 && projection.modelCount <= 0) return 'catálogo desligado';
     const activeLabel = renderGatewayActiveLabel(active);
-    return `${C.grey}${pluralPt(projection.providerCount, 'provedor', 'provedores')} · ${projection.enabledModelCount} de ${projection.modelCount} modelos habilitados · ${activeLabel}${C.reset}`;
+    return `${pluralPt(projection.providerCount, 'provedor', 'provedores')} · ${projection.enabledModelCount} de ${projection.modelCount} modelos habilitados · ${activeLabel}`;
 }
 
 /**
@@ -407,7 +470,7 @@ function renderGatewayActiveLabel(active) {
  */
 function renderCompactMcpLine(mcp, toolLoad) {
     if (mcp.available && !mcp.circuitOpen && mcp.toolCount > 0) {
-        return `${C.green}${mcp.toolCount} ferramenta(s) disponíveis${C.reset}${typeof mcp.latencyMs === 'number' ? ` ${C.grey}· ${mcp.latencyMs}ms${C.reset}` : ''}`;
+        return `${mcp.toolCount} ferramenta(s) disponíveis${typeof mcp.latencyMs === 'number' ? ` · ${mcp.latencyMs}ms` : ''}`;
     }
     const localReady = Boolean(
         toolLoad?.hasCanonicalLocalFsTools || toolLoad?.hasCanonicalLocalExecTools || toolLoad?.hasSdkWorkspaceTooling,
@@ -418,10 +481,23 @@ function renderCompactMcpLine(mcp, toolLoad) {
             toolLoad?.hasCanonicalLocalExecTools ? 'terminal' : null,
             toolLoad?.hasSdkWorkspaceTooling ? 'workspace SDK' : null,
         ].filter(Boolean);
-        return `${C.green}locais ativas${C.reset} ${C.grey}· ${signals.join(' · ') || 'registry local'} · MCP remoto ausente${C.reset}`;
+        return `locais ativas · ${signals.join(' · ') || 'registry local'} · MCP remoto ausente`;
     }
-    if (mcp.circuitOpen) return `${C.red}ponte MCP pausada${C.reset}`;
-    return `${C.yellow}ponte MCP indisponível${C.reset}`;
+    if (mcp.circuitOpen) return 'ponte MCP pausada';
+    return 'ponte MCP indisponível';
+}
+
+/**
+ * @param {{ available: boolean; circuitOpen: boolean; toolCount: number }} mcp
+ * @param {{ hasCanonicalLocalFsTools?: boolean; hasCanonicalLocalExecTools?: boolean; hasSdkWorkspaceTooling?: boolean } | null | undefined} toolLoad
+ * @returns {'success' | 'warn' | 'error'}
+ */
+function renderCompactMcpRole(mcp, toolLoad) {
+    if (mcp.available && !mcp.circuitOpen && mcp.toolCount > 0) return 'success';
+    if (toolLoad?.hasCanonicalLocalFsTools || toolLoad?.hasCanonicalLocalExecTools || toolLoad?.hasSdkWorkspaceTooling) {
+        return 'success';
+    }
+    return mcp.circuitOpen ? 'error' : 'warn';
 }
 
 /**
@@ -430,11 +506,11 @@ function renderCompactMcpLine(mcp, toolLoad) {
  */
 function renderCompactActionLine(action) {
     const value = typeof action === 'string' ? action.trim() : '';
-    if (!value || value === 'none') return `${C.grey}nenhuma ação imediata${C.reset}`;
-    if (value === 'inspect_boot_report') return `${C.yellow}verificar relatório de inicialização${C.reset}`;
-    if (value === 'try_model_alternative') return `${C.yellow}testar modelo alternativo${C.reset}`;
-    if (value === 'check_quota') return `${C.yellow}verificar quota/limites${C.reset}`;
-    return `${C.yellow}${value}${C.reset}`;
+    if (!value || value === 'none') return 'nenhuma ação imediata';
+    if (value === 'inspect_boot_report') return 'verificar relatório de inicialização';
+    if (value === 'try_model_alternative') return 'testar modelo alternativo';
+    if (value === 'check_quota') return 'verificar quota/limites';
+    return value.replace(/_/gu, ' ');
 }
 
 /**

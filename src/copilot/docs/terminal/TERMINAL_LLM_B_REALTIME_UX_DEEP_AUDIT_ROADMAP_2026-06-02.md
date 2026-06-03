@@ -2651,5 +2651,21 @@
 - [x] Implementação: `cmdNow` passou a renderizar `Agora` e `Agora - Detalhe` com linhas `Conversa`, `Entrada`, `Modelo`, `Catálogo`, `Atividade`, `Runtime`, `Timeline` e `SSE` via tema central.
 - [x] Implementação: `cmdLive` passou a renderizar `Fluxo da conversa` e `Fluxo detalhado da conversa` com helpers de papel visual por estado, sem cor ANSI local.
 - [x] Implementação: blocos internos de `/live full` foram humanizados para `Ferramenta`, `Arquivo`, `Operação` e `Evento`, evitando bullets desalinhados e listas que pareciam logs crus.
+- [x] `/activity` default, seus resumos de turno, I/O real e timeline recente passaram para `terminalThemeHeadline`, `terminalThemeDivider` e `terminalThemeRow`.
+- [x] `/activity detail` preserva origem, IDs e engine, mas também usa linhas temáticas para streaming público e decisões recentes.
+- [x] `/health` compacto deixou de usar template monolítico com `C.green/C.grey` e agora renderiza conversa, modelo, acesso, gateway, entrada, ferramentas, atividade, infra, próximo passo e detalhe por `terminalThemeRow`.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js`
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js`
 - [ ] Validar via PTY que `/status`, `/now`, `/live`, `/activity` e `/health` ainda cabem bem na largura visual do terminal do operador.
-- [ ] Próxima lacuna estética: consolidar `/activity` e `/health`, pois ainda aparecem no relatório de live como bons funcionalmente, mas com pequenas sobras de cor/estrutura herdada.
+- [ ] Próxima lacuna estética: auditar `/help`, `/tools` e `/byok` default, pois ainda ha blocos extensos com ANSI local e listas densas.
+
+### 11.37 `/activity` e `/health` sem gramática herdada
+
+- [x] Achado: `/activity` ainda tinha cabeçalho novo, mas miolo antigo com `estado`, `evento`, `idade`, bullets e I/O colorido manualmente.
+- [x] Achado: `/health` compacto tinha cabeçalho novo, mas linhas internas misturavam `C.green`, `C.grey`, `C.magenta` e texto em bloco, dificultando alinhamento e evolução estética.
+- [x] Decisão: as telas de observação cotidiana devem compartilhar a mesma malha visual; listas só ficam como linhas temáticas, e o modo detail/raw fica responsável por densidade técnica.
+- [x] Implementação: `cmdActivity` substituiu templates ANSI por painel temático completo, incluindo `Resumo do turno atual`, `Último turno concluído`, `Arquivos tocados`, `Ferramentas`, `Interações humanas`, `I/O real recente` e `Timeline recente`.
+- [x] Implementação: `cmdDiagnose` compacto substituiu o bloco único por linhas temáticas e helpers sem ANSI para BYOK, gateway, MCP, health, ação recomendada e status runtime.
+- [x] Resultado esperado: o operador passa a ver `/status`, `/now`, `/health`, `/live` e `/activity` como uma família visual única, não como cinco comandos de origens diferentes.
+- [ ] Próxima validação live: rodar ciclo PTY focado em largura e poluição visual, com inspeção dos logs plain/raw para regressões de `request_user_input`, `report_intent`, IDs crus e linhas desalinhadas.

@@ -164,16 +164,16 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('web_fetch');
         expect(ctx.output()).toContain('tela full');
         expect(ctx.output()).not.toContain('display=full');
-        expect(ctx.output()).toContain('estado');
-        expect(ctx.output()).toContain('evento');
-        expect(ctx.output()).toContain('ferramentas');
+        expect(ctx.output()).toContain('Estado');
+        expect(ctx.output()).toContain('Evento');
+        expect(ctx.output()).toContain('Ferramentas');
         expect(ctx.output()).toContain('Timeline recente');
         expect(ctx.output()).not.toContain('\x1b[36mTimeline recente');
         expect(ctx.output()).toContain('Resumo do turno atual');
         expect(ctx.output()).toContain('Último turno concluído');
-        expect(ctx.output()).toContain('arquivos tocados');
+        expect(ctx.output()).toContain('Arquivos tocados');
         expect(ctx.output()).toContain('workspace.read_file');
-        expect(ctx.output()).toContain('interações humanas');
+        expect(ctx.output()).toContain('Interações humanas');
         expect(ctx.output()).toContain('Qual ambiente devo usar?');
         expect(ctx.output()).toContain('resposta prod');
         expect(ctx.output()).not.toContain('resposta=');
@@ -196,7 +196,7 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('io-engine.fs.readFile.text');
         expect(ctx.output()).toContain('turn:turn-1');
         expect(ctx.output()).toContain('req=ui-1');
-        expect(ctx.output()).toContain('origem');
+        expect(ctx.output()).toContain('Origem');
         expect(ctx.output()).toContain(
             '/workspaces/chatgpt-docker-puppeteer/src/copilot/terminal/commands/activity.js',
         );
