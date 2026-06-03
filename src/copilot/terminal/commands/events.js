@@ -9,6 +9,7 @@ import { listTerminalPublicStreamSourcePolicies } from '../events/index.js';
 import { compactTerminalDiagnosticId, getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
 import {
     formatTerminalIsoTimestamp,
+    formatTerminalRelativeAge,
     readTerminalSseEventArchiveTail,
     terminalThemeHeadline,
     terminalThemeRow,
@@ -458,9 +459,12 @@ export async function cmdEvents({ println }, arg = '') {
     const showDiagnosticIds = Boolean(
         filters.traceId || filters.turnId || filters.toolCallId || filters.requestId || filters.hubSessionId,
     );
+    const now = Date.now();
 
     for (const entry of entries) {
-        const time = formatTerminalIsoTimestamp(entry.timestamp);
+        const time = showDiagnosticIds
+            ? formatTerminalIsoTimestamp(entry.timestamp)
+            : formatTerminalRelativeAge(entry.timestamp, now);
         const origin = compact(humanEventSource(entry.eventSource ?? entry.source ?? '-'), 52);
         const eventId = showDiagnosticIds && entry.eventId ? ` · #${entry.eventId}` : '';
         const trace =

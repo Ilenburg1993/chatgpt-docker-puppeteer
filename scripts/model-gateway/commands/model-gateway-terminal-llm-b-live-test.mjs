@@ -1729,14 +1729,21 @@ async function runMenuCycleLiveTest({ outDir, requestedTransport, timeoutMs, ter
 
 function diagnosticUxCycleCriteria(boot) {
     const plain = String(boot?.plain ?? '');
-    const fsReadStart = plain.indexOf('/fs read package.json');
-    const fsReadSurface = fsReadStart >= 0 ? plain.slice(fsReadStart) : plain;
+    const fsReadStart = plain.indexOf('/fs read data/copilot-terminal/live-scratch/');
+    const fsSearchStart = plain.indexOf('/fs search TERMINAL_DIAGNOSTIC_UX_');
     const activityStart = plain.indexOf('/activity 8');
-    const activitySurface = activityStart >= 0 ? plain.slice(activityStart) : plain;
     const toolsStart = plain.indexOf('/tools');
-    const toolsSurface = toolsStart >= 0 ? plain.slice(toolsStart) : plain;
     const eventsStart = plain.indexOf('/events 12');
-    const eventsSurface = eventsStart >= 0 ? plain.slice(eventsStart) : plain;
+    const quitStart = plain.indexOf('/quit');
+    const surfaceBetween = (start, end) => {
+        if (start < 0) return plain;
+        const safeEnd = end > start ? end : plain.length;
+        return plain.slice(start, safeEnd);
+    };
+    const fsReadSurface = surfaceBetween(fsReadStart, fsSearchStart);
+    const activitySurface = surfaceBetween(activityStart, toolsStart);
+    const toolsSurface = surfaceBetween(toolsStart, eventsStart);
+    const eventsSurface = surfaceBetween(eventsStart, quitStart);
     return [
         {
             id: 'diagnostic-ux-ready',
@@ -1758,23 +1765,32 @@ function diagnosticUxCycleCriteria(boot) {
         },
         {
             id: 'diagnostic-ux-activity-human',
-            pass: /Atividade Atual da LLM-B[\s\S]*(Arquivo|Ferramenta|Evento)/iu.test(activitySurface),
-            detail: '/activity after local FS operations remained human-readable',
+            pass:
+                /Atividade Atual da LLM-B[\s\S]*(Arquivo|Ferramenta|Evento)/iu.test(activitySurface) &&
+                /há \d+[smhda]/iu.test(activitySurface) &&
+                !/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}\]/u.test(activitySurface),
+            detail: '/activity after local FS operations used human relative time and hid ISO timestamps in default mode',
         },
         {
             id: 'diagnostic-ux-tools-human',
             pass:
                 (/Ferramentas observadas[\s\S]*uso[\s\S]*Detalhes\s+\/tools diag/iu.test(toolsSurface) ||
                     /Nenhuma ferramenta observada[\s\S]*Próximo/iu.test(toolsSurface)) &&
+                /Pasta local/iu.test(toolsSurface) &&
+                /Leitura local/iu.test(toolsSurface) &&
+                /Busca local/iu.test(toolsSurface) &&
                 !/calls=|errors=|avg=|tool=|chatcmpl-tool/iu.test(toolsSurface),
-            detail: '/tools default remained human-readable after diagnostic operations',
+            detail: '/tools default remained human-readable and used granular local I/O names after diagnostic operations',
         },
         {
             id: 'diagnostic-ux-events-human',
             pass:
                 /Eventos[\s\S]*(Ferramenta|Atividade|terminal|io)/iu.test(eventsSurface) &&
-                !/chatcmpl-tool-[a-z0-9-]+|rastreamento implicit:|#\d+ ·|hub [a-z0-9-]+/iu.test(eventsSurface),
-            detail: '/events default rendered diagnostics without raw tool ids, trace ids, event ids, or hub ids',
+                /há \d+[smhda]/iu.test(eventsSurface) &&
+                !/chatcmpl-tool-[a-z0-9-]+|rastreamento implicit:|#\d+ ·|hub [a-z0-9-]+|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}/iu.test(
+                    eventsSurface,
+                ),
+            detail: '/events default rendered diagnostics with relative time and without raw tool ids, trace ids, event ids, hub ids, or ISO timestamps',
         },
         {
             id: 'diagnostic-ux-clean-close',

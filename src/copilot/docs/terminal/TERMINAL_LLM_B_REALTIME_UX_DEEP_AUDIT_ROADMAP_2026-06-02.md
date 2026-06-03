@@ -3750,5 +3750,53 @@
         `rastreamento implicit`, `#id` e `hub`.
 - [x] Harness reforçado: `diagnostic-ux-events-human` agora falha se o default voltar a mostrar
       IDs de tool crus, `rastreamento implicit`, `#id` ou `hub`.
-- [ ] Próxima lacuna: revisar `/activity` default/detail para separar melhor timeline humana de
+- [x] Próxima lacuna: revisar `/activity` default/detail para separar melhor timeline humana de
       timeline técnica e reduzir truncamentos confusos em caminhos longos.
+
+### 11.48 `/activity` com tempo humano no default e ISO só no detail
+
+- [x] Achado: `/activity` default ainda imprimia timestamps ISO entre colchetes em I/O real e
+      timeline recente. Na prática, isso fazia a tela parecer dump de log, justamente a estética
+      ruim vista nas screenshots.
+- [x] Decisão: o caminho padrão deve responder "o que aconteceu e há quanto tempo"; o modo
+      `detail` responde "qual timestamp exato, engine e identificadores técnicos".
+- [x] Implementação: `activity.js` passou a renderizar I/O e timeline como `há 4s`, `há 2m`,
+      `há 3h`, `há 1d` no default.
+- [x] Implementação: `/activity detail` preserva os timestamps ISO completos, engines de I/O,
+      trace IDs e request IDs para auditoria profunda.
+- [x] Implementação: a idade da atividade atual passou a usar duração compacta (`10s`, `2m`,
+      `1h`) em vez de segundos crus potencialmente longos.
+- [x] Implementação estrutural: `time-format.js` agora expõe helpers canônicos
+      `formatTerminalRelativeAge` e `formatTerminalElapsedDuration`, evitando lógica local
+      duplicada em comandos.
+- [x] Implementação: `search` em I/O recente de `/activity` passou a aparecer como `busca`.
+- [x] Implementação: `/events` default passou a usar idade relativa e reservou ISO para filtros
+      técnicos/raw/json, alinhando o archive SSE com a mesma gramática visual de `/activity`.
+- [x] Teste reforçado: `tests/unit/copilot/terminal/test_commands_activity.spec.js` agora garante
+      que o default não contém timestamp ISO e que o modo `detail` continua contendo.
+- [x] Teste reforçado: `tests/unit/copilot/terminal/test_commands_events.spec.js` agora cobre
+      tempo relativo no resumo default sem remover timestamp técnico nos caminhos diagnósticos.
+- [x] Harness live reforçado: `--diagnostic-ux-cycle` agora separa as superfícies de `/activity`,
+      `/tools` e `/events`, e falha se `/activity` ou `/events` default voltarem a mostrar
+      timestamp ISO.
+- [x] Validação escopada passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-relative-time-events-20260603-1535`.
+  - Resultado: PASS em 7/7; `/activity` e `/events` default ficaram sem ISO, IDs densos e
+        badges técnicos.
+- [x] Próxima lacuna: revisar `/tools` porque operações distintas ainda podiam colapsar em nomes
+      repetidos como `Escrita local` para mkdir/write.
+- [x] Implementação: `tool-activity-presenter.js` agora distingue `Pasta local`, `Escrita local`,
+      `Leitura local`, `Busca local`, `Cópia local`, `Movimento local`, `Edição local` e
+      `Exclusão local` para ferramentas `io.*`.
+- [x] Testes reforçados:
+  - `tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js` cobre os nomes granulares.
+  - `tests/unit/copilot/terminal/test_commands_tools.spec.js` garante que `/tools` default não
+        vaze motores `io-engine.*`.
+- [x] Live PTY diagnóstico repetido:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-tools-granular-20260603-1537`.
+  - Resultado: PASS em 7/7; `/tools` mostrou `Pasta local`, `Leitura local`, `Busca local` e
+        `Escrita local`.
+- [ ] Próxima lacuna: revisar `/live` e `/session` porque ainda há trechos com `Origem`,
+      `phase/source`, timestamps ISO e detalhes técnicos em superfícies default.

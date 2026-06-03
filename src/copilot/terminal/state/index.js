@@ -83,7 +83,7 @@ export {
     readTerminalToolLifecycleProjection,
     recordTerminalToolLifecycleDiagnostic,
 } from './tool-lifecycle-state.js';
-export { formatTerminalIsoTimestamp } from './time-format.js';
+export { formatTerminalElapsedDuration, formatTerminalIsoTimestamp, formatTerminalRelativeAge } from './time-format.js';
 export { buildTerminalTaskThinkingId, formatTerminalThinkingRef } from './thinking-labels.js';
 export {
     beginTerminalTurnTrace,

@@ -273,10 +273,14 @@ function resolveHumanToolName(toolName, canonicalToolName) {
     if (canonical && HUMAN_TOOL_NAMES[canonical]) return HUMAN_TOOL_NAMES[canonical];
     const raw = toolName.trim();
     if (/^io\.read(?:\.|$)/iu.test(raw)) return 'Leitura local';
-    if (/^io\.(?:write|append|mkdir)(?:\.|$)/iu.test(raw)) return 'Escrita local';
-    if (/^io\.(?:move|copy|patch)(?:\.|$)/iu.test(raw)) return 'Alteração local';
+    if (/^io\.mkdir(?:\.|$)/iu.test(raw)) return 'Pasta local';
+    if (/^io\.(?:write|append)(?:\.|$)/iu.test(raw)) return 'Escrita local';
+    if (/^io\.copy(?:\.|$)/iu.test(raw)) return 'Cópia local';
+    if (/^io\.move(?:\.|$)/iu.test(raw)) return 'Movimento local';
+    if (/^io\.patch(?:\.|$)/iu.test(raw)) return 'Edição local';
     if (/^io\.(?:delete|remove)(?:\.|$)/iu.test(raw)) return 'Exclusão local';
-    if (/^io\.(?:scan|search|stat|fetch)(?:\.|$)/iu.test(raw)) return 'Inspeção local';
+    if (/^io\.search(?:\.|$)/iu.test(raw)) return 'Busca local';
+    if (/^io\.(?:scan|stat|fetch)(?:\.|$)/iu.test(raw)) return 'Inspeção local';
     return HUMAN_TOOL_NAMES[raw] ?? raw;
 }
 

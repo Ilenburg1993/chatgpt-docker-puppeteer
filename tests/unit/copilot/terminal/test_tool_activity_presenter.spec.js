@@ -13,6 +13,9 @@ describe('terminal/tool-activity-presenter', () => {
     it('expõe helpers canônicos para diagnósticos humanos sem duplicar glossário', () => {
         expect(getTerminalHumanToolName('read_file_content')).toBe('Ler arquivo');
         expect(getTerminalHumanToolName('report_intent_local')).toBe('Intenção capturada');
+        expect(getTerminalHumanToolName('io.mkdir.io-engine.ensure-dir')).toBe('Pasta local');
+        expect(getTerminalHumanToolName('io.write.io-engine.atomic-write')).toBe('Escrita local');
+        expect(getTerminalHumanToolName('io.search.io-engine.rg.search')).toBe('Busca local');
         expect(getTerminalHumanToolName('tool.fast')).toBe('tool.fast');
         expect(isTerminalInternalCallIdentifier('chatcmpl-tool-80d5a00b25801fef')).toBe(true);
         expect(compactTerminalDiagnosticId('chatcmpl-tool-80d5a00b25801fef')).toBe('chatcmpl-too…');

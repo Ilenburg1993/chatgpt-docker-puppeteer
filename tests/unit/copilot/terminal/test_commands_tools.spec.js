@@ -186,12 +186,18 @@ describe('commands/tools', () => {
         readTerminalToolStatsProjection.mockReturnValueOnce({
             stats: {
                 'io.read.io-engine.fs.readFile.text': { calls: 1, errors: 0, avgLatencyMs: 3 },
+                'io.mkdir.io-engine.ensure-dir': { calls: 1, errors: 0, avgLatencyMs: 2 },
+                'io.search.io-engine.rg.search': { calls: 1, errors: 0, avgLatencyMs: 21 },
             },
             canonicalEntries: /** @type {[string, Record<string, any>][]} */ ([
                 ['io.read.io-engine.fs.readFile.text', { calls: 1, errors: 0, avgLatencyMs: 3, kind: 'io' }],
+                ['io.mkdir.io-engine.ensure-dir', { calls: 1, errors: 0, avgLatencyMs: 2, kind: 'io' }],
+                ['io.search.io-engine.rg.search', { calls: 1, errors: 0, avgLatencyMs: 21, kind: 'io' }],
             ]),
             entries: /** @type {[string, Record<string, any>][]} */ ([
                 ['io.read.io-engine.fs.readFile.text', { calls: 1, errors: 0, avgLatencyMs: 3, kind: 'io' }],
+                ['io.mkdir.io-engine.ensure-dir', { calls: 1, errors: 0, avgLatencyMs: 2, kind: 'io' }],
+                ['io.search.io-engine.rg.search', { calls: 1, errors: 0, avgLatencyMs: 21, kind: 'io' }],
             ]),
             tools: [],
             byCategory: {},
@@ -207,7 +213,11 @@ describe('commands/tools', () => {
         cmdTools({ println: ctx.println });
 
         expect(ctx.output()).toContain('Leitura local');
+        expect(ctx.output()).toContain('Pasta local');
+        expect(ctx.output()).toContain('Busca local');
         expect(ctx.output()).not.toContain('io-engine.fs.readFile.text');
+        expect(ctx.output()).not.toContain('io-engine.ensure-dir');
+        expect(ctx.output()).not.toContain('io-engine.rg.search');
     });
 
     it('renderiza lifecycle compacto em modo diag', () => {

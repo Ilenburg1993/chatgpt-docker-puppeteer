@@ -3,7 +3,9 @@
 import { readTerminalIoActivityProjection } from '../events/index.js';
 import { readTerminalActivityProjection } from '../frontend/index.js';
 import {
+    formatTerminalElapsedDuration,
     formatTerminalIsoTimestamp,
+    formatTerminalRelativeAge,
     terminalThemeDivider,
     terminalThemeHeadline,
     terminalThemeRow,
@@ -110,6 +112,7 @@ function renderIoOperationLabel(operation) {
     if (operation === 'mkdir') return 'criação de pasta';
     if (operation === 'rename') return 'renomeação';
     if (operation === 'unlink') return 'exclusão';
+    if (operation === 'search') return 'busca';
     if (operation === 'stat') return 'inspeção';
     return renderOperationLabel(operation);
 }
@@ -122,6 +125,15 @@ function renderBytes(bytes) {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * @param {number} timestamp
+ * @param {{ detail: boolean; now: number }} opts
+ * @returns {string}
+ */
+function renderActivityTime(timestamp, opts) {
+    return opts.detail ? `[${formatTerminalIsoTimestamp(timestamp)}]` : formatTerminalRelativeAge(timestamp, opts.now);
 }
 
 /**
@@ -383,6 +395,7 @@ function printStreamDiagnostics(println, diagnostics) {
  */
 export function cmdActivity({ println }, arg) {
     const { limit, detail } = parseActivityArg(arg);
+    const now = Date.now();
     const projection = readTerminalActivityProjection(limit);
     const recentIo = readTerminalIoActivityProjection(limit);
     const current = projection.current;
@@ -401,7 +414,7 @@ export function cmdActivity({ println }, arg) {
     );
     println(terminalThemeRow('Evento', `${compactActivityLabel(current.label)}${progressLabel}`));
     println(terminalThemeRow('Detalhe', current.detail ? compactOperatorDetail(current.detail) : '(nenhum)'));
-    println(terminalThemeRow('Idade', `${Math.round(current.ageMs / 1000)}s`));
+    println(terminalThemeRow('Idade', formatTerminalElapsedDuration(current.ageMs)));
     println(terminalThemeDivider(37));
     if (detail) {
         println(terminalThemeRow('Origem', current.source));
@@ -429,7 +442,7 @@ export function cmdActivity({ println }, arg) {
     if (recentIo.length > 0) {
         println(terminalThemeHeadline('assistant', 'I/O real recente'));
         for (const entry of recentIo.slice(0, 8)) {
-            const ts = formatTerminalIsoTimestamp(entry.timestamp);
+            const ts = renderActivityTime(entry.timestamp, { detail, now });
             const bytes =
                 typeof entry.bytesRead === 'number'
                     ? ` · ${renderBytes(entry.bytesRead)} lidos`
@@ -442,7 +455,7 @@ export function cmdActivity({ println }, arg) {
             println(
                 terminalThemeRow(
                     'Operação',
-                    `[${ts}] ${renderIoOperationLabel(entry.operation)} · ${compactHumanText(entry.target)}${bytes}${duration}${engineDetail}`,
+                    `${ts} · ${renderIoOperationLabel(entry.operation)} · ${compactHumanText(entry.target)}${bytes}${duration}${engineDetail}`,
                     { role: entry.success ? 'muted' : 'error' },
                 ),
             );
@@ -462,13 +475,13 @@ export function cmdActivity({ println }, arg) {
 
     println(terminalThemeHeadline('assistant', 'Timeline recente'));
     for (const entry of projection.history) {
-        const ts = formatTerminalIsoTimestamp(entry.ts);
+        const ts = renderActivityTime(entry.ts, { detail, now });
         const extra = entry.detail ? ` — ${compactOperatorDetail(entry.detail)}` : '';
         const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';
         println(
             terminalThemeRow(
                 'Evento',
-                `[${ts}] ${renderActivityPhaseLabel(entry.phase)} · ${compactActivityLabel(entry.label)}${progress}${extra}`,
+                `${ts} · ${renderActivityPhaseLabel(entry.phase)} · ${compactActivityLabel(entry.label)}${progress}${extra}`,
                 { role: renderActivitySeverityRole(entry.severity) },
             ),
         );
