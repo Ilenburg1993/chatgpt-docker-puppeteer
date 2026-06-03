@@ -1740,7 +1740,10 @@ function diagnosticUxCycleCriteria(boot) {
     const historyStart = plain.indexOf('/history 6', Math.max(0, sdkWaitsStart));
     const dbHistoryStart = plain.indexOf('/db-history 6', Math.max(0, historyStart));
     const dbSessionsStart = plain.indexOf('/db-sessions 6', Math.max(0, dbHistoryStart));
-    const quitStart = plain.indexOf('/quit', Math.max(0, dbSessionsStart));
+    const whoStart = plain.indexOf('/who', Math.max(0, dbSessionsStart));
+    const countStart = plain.indexOf('/count', Math.max(0, whoStart));
+    const clearStart = plain.indexOf('/clear', Math.max(0, countStart));
+    const quitStart = plain.indexOf('/quit', Math.max(0, clearStart));
     const surfaceBetween = (start, end) => {
         if (start < 0) return plain;
         const safeEnd = end > start ? end : plain.length;
@@ -1755,7 +1758,10 @@ function diagnosticUxCycleCriteria(boot) {
     const sdkWaitsSurface = surfaceBetween(sdkWaitsStart, historyStart);
     const historySurface = surfaceBetween(historyStart, dbHistoryStart);
     const dbHistorySurface = surfaceBetween(dbHistoryStart, dbSessionsStart);
-    const dbSessionsSurface = surfaceBetween(dbSessionsStart, quitStart);
+    const dbSessionsSurface = surfaceBetween(dbSessionsStart, whoStart);
+    const whoSurface = surfaceBetween(whoStart, countStart);
+    const countSurface = surfaceBetween(countStart, clearStart);
+    const clearSurface = surfaceBetween(clearStart, quitStart);
     return [
         {
             id: 'diagnostic-ux-ready',
@@ -1855,6 +1861,17 @@ function diagnosticUxCycleCriteria(boot) {
             detail: '/db-sessions rendered persisted session list without ISO timestamps, English hub-sessions copy, or raw ids',
         },
         {
+            id: 'diagnostic-ux-small-commands-human',
+            pass:
+                /Atores ativos nesta sessão[\s\S]*digita diretamente no terminal/iu.test(whoSurface) &&
+                /Estatísticas da sessão|nenhuma sessão persistida ativa/iu.test(countSurface) &&
+                /Histórico[\s\S]*memória local limpa/iu.test(clearSurface) &&
+                !/AlwaysAliveAgent|POST http|GET http|Hub session|SDK session|\\x1b\[|id [0-9a-f]{8}/iu.test(
+                    `${whoSurface}\n${countSurface}\n${clearSurface}`,
+                ),
+            detail: '/who, /count and /clear rendered themed operator-facing copy without HTTP internals, ANSI, or ids',
+        },
+        {
             id: 'diagnostic-ux-clean-close',
             pass: boot.exitCode === 0 && /readline fechado/u.test(plain),
             detail: 'terminal closed cleanly after diagnostic UX cycle',
@@ -1882,6 +1899,9 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
             { line: '/history 6', advanceAfterMs: 1_000 },
             { line: '/db-history 6', advanceAfterMs: 1_000 },
             { line: '/db-sessions 6', advanceAfterMs: 1_000 },
+            { line: '/who', advanceAfterMs: 1_000 },
+            { line: '/count', advanceAfterMs: 1_000 },
+            { line: '/clear', advanceAfterMs: 1_000 },
             '/quit',
         ],
         terminalPort,

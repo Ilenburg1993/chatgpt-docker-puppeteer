@@ -631,6 +631,8 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('3009');
         expect(ctx.output()).toContain('LLM-A');
         expect(ctx.output()).toContain('gpt-5-mini');
+        expect(ctx.output()).not.toContain('AlwaysAliveAgent');
+        expect(ctx.output()).not.toContain('POST http');
     });
 
     it('cmdWho aceita runtimeId explícito e projeta o modelo alvo', () => {
@@ -644,6 +646,8 @@ describe('commands/session — sync commands', () => {
         cmdClear({ println: ctx.println });
         const { llmBridgeClient } = await import('#copilot/channel');
         expect(llmBridgeClient.clearHistory).toHaveBeenCalled();
+        expect(ctx.output()).toContain('memória local limpa');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('cmdAnswer envia resposta pendente', () => {
@@ -745,13 +749,17 @@ describe('commands/session — sync commands', () => {
     it('cmdCount sem hubSessionId avisa', () => {
         const ctx = mockCtx();
         cmdCount({ hubSessionId: null, println: ctx.println });
-        expect(ctx.output()).toContain('Nenhuma hub session');
+        expect(ctx.output()).toContain('nenhuma sessão persistida ativa');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('cmdCount com hubSessionId exibe estatísticas', () => {
         const ctx = mockCtx();
         cmdCount({ hubSessionId: 'hub-1', println: ctx.println });
-        expect(ctx.output()).toContain('Turnos');
+        expect(ctx.output()).toContain('Estatísticas da sessão');
+        expect(ctx.output()).toContain('hub ativa');
+        expect(ctx.output()).not.toContain('Hub session');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 });
 

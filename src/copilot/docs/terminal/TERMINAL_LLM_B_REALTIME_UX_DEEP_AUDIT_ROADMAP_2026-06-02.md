@@ -3881,5 +3881,38 @@
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-db-sessions-no-ids-20260603-1555`.
   - Resultado: PASS em 13/13 critérios.
-- [ ] Próxima lacuna: revisar `/count`, `/who`, `/clear` e comandos pequenos que ainda podem
+- [x] Próxima lacuna: revisar `/count`, `/who`, `/clear` e comandos pequenos que ainda podem
       usar ANSI literal ou IDs compactos desnecessários.
+
+### 11.52 Comandos pequenos sem vazamento técnico nem ANSI cru
+
+- [x] Achado: `/who` ainda misturava papel humano com detalhes de implementação (`stdin`,
+      `POST http://localhost`, `GET /events`, `AlwaysAliveAgent`), criando ruído visual e
+      reforçando a sensação de "dump de ferramenta" apontada nas screenshots.
+- [x] Achado: `/count` mostrava ANSI literal, IDs compactos de hub/session SDK e labels em
+      inglês (`Hub session`, `SDK session`), apesar de ser um comando de status rápido.
+- [x] Achado: `/clear` imprimia escape ANSI manual e frase menos consistente com a gramática
+      dos demais comandos de sessão.
+- [x] Decisão: comandos pequenos devem ser micro-painéis operacionais; endpoints, agentes
+      internos, IDs e códigos de cor só devem aparecer em diagnósticos explícitos.
+- [x] Implementação: `/who` passou a mostrar `Você`, `LLM-A`, `LLM-B` e `Eventos` com descrições
+      de função, usando porta como contexto humano em vez de URL HTTP crua.
+- [x] Implementação: `/count` passou a usar `terminalThemeHeadline`, `terminalThemeDivider` e
+      `terminalThemeRow`, com contagens por ator, memórias e presença de sessões como
+      `hub ativa · SDK ativa`, sem IDs.
+- [x] Implementação: `/count` sem sessão agora responde `nenhuma sessão persistida ativa` via
+      tema do terminal, sem ANSI literal.
+- [x] Implementação: `/clear` agora responde `Histórico  memória local limpa`, também via tema.
+- [x] Teste escopado reforçado:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
+  - Cobertura adicionada contra `AlwaysAliveAgent`, `POST http`, `Hub session` e `\x1b[` nos
+        comandos pequenos.
+- [x] Harness live ampliado: `--diagnostic-ux-cycle` agora executa `/who`, `/count` e `/clear`
+      após os painéis de histórico/DB.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-small-commands-20260603-1558`.
+  - Resultado: PASS; `/who` mostrou atores humanos, `/count` mostrou estatísticas sem IDs e
+        `/clear` confirmou memória local limpa sem ANSI cru.
+- [ ] Próxima lacuna: revisar `/session sdk` fora dos subcomandos `events/waits`, pois o
+      inventário de sessões e ações de resume/next ainda pode expor índices, estados e
+      metadados técnicos demais sem explicar o que o operador deve fazer.

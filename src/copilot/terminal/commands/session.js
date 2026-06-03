@@ -1436,10 +1436,10 @@ export function cmdWho({ injectPort, println }, arg = '') {
     const { currentModel, currentReasoningEffort } = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
     println('');
     println(terminalThemeHeadline('assistant', 'Atores ativos nesta sessão'));
-    println(terminalThemeRow('Você', 'stdin (digitar diretamente aqui)', { role: 'user' }));
-    println(terminalThemeRow('LLM-A', `POST http://localhost:${injectPort}/inject`, { role: 'system' }));
-    println(terminalThemeRow('LLM-B', `AlwaysAliveAgent (Copilot SDK · ${currentModel} · ${currentReasoningEffort})`, { role: 'assistant' }));
-    println(terminalThemeRow('SSE', `GET http://localhost:${injectPort}/events`));
+    println(terminalThemeRow('Você', 'digita diretamente no terminal', { role: 'user' }));
+    println(terminalThemeRow('LLM-A', `envia mensagens pela porta ${injectPort}`, { role: 'system' }));
+    println(terminalThemeRow('LLM-B', `conversa permanente · ${currentModel} · raciocínio ${currentReasoningEffort}`, { role: 'assistant' }));
+    println(terminalThemeRow('Eventos', `stream local na porta ${injectPort}`));
     println('');
 }
 
@@ -1452,19 +1452,24 @@ export function cmdWho({ injectPort, println }, arg = '') {
 export function cmdCount({ hubSessionId, println }) {
     const projection = readTerminalCountProjection({ hubSessionId: hubSessionId ?? null });
     if (!projection.available) {
-        println('\x1b[33m  Nenhuma hub session ativa.\x1b[0m');
+        println(terminalThemeRow('Sessão', 'nenhuma sessão persistida ativa', { role: 'warn' }));
         return;
     }
-    println(`
-  \x1b[36mEstatísticas da sessão\x1b[0m
-  ─────────────────────────────────────────────
-    Turnos (usuário):   ${String(projection.userTurns).padStart(4)}
-    Turnos (LLM-B):     ${String(projection.llmBTurns).padStart(4)}
-    Turnos (total):     ${String(projection.turns).padStart(4)}
-    Memórias salvas:    ${String(projection.memories).padStart(4)}
-    Hub session:        ${projection.hubSessionId?.slice(0, 8) ?? '—'}…
-    SDK session:        ${projection.sdkSessionId?.slice(0, 8) ?? '—'}…
-  ─────────────────────────────────────────────\n`);
+    println('');
+    println(terminalThemeHeadline('assistant', 'Estatísticas da sessão'));
+    println(terminalThemeDivider(37));
+    println(terminalThemeRow('Você', `${projection.userTurns} turno(s)`));
+    println(terminalThemeRow('LLM-B', `${projection.llmBTurns} turno(s)`));
+    println(terminalThemeRow('Total', `${projection.turns} turno(s)`));
+    println(terminalThemeRow('Memórias', `${projection.memories} salva(s)`));
+    println(
+        terminalThemeRow(
+            'Sessões',
+            `hub ${projection.hubSessionId ? 'ativa' : 'ausente'} · SDK ${projection.sdkSessionId ? 'ativa' : 'ausente'}`,
+        ),
+    );
+    println(terminalThemeDivider(37));
+    println('');
 }
 
 /**
@@ -1475,7 +1480,7 @@ export function cmdCount({ hubSessionId, println }) {
  */
 export function cmdClear({ println }) {
     clearTerminalHistory();
-    println('\x1b[90m  Histórico em memória limpo.\x1b[0m');
+    println(terminalThemeRow('Histórico', 'memória local limpa', { role: 'success' }));
 }
 
 /**
