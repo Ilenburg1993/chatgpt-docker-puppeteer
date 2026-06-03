@@ -268,7 +268,7 @@ describe('terminal/commands/sdk', () => {
         const ctx = mockCtx();
         await cmdSdk({ println: ctx.println }, 'capabilities');
         expect(runtimeMocks.getTerminalSdkSessionCapabilities).toHaveBeenCalled();
-        expect(ctx.output()).toContain('SDK Capabilities');
+        expect(ctx.output()).toContain('Capacidades SDK');
         expect(ctx.output()).toContain('formulários sim');
         expect(ctx.output()).toContain('workspace sim');
         expect(ctx.output()).not.toContain('elicitation=true');
@@ -422,13 +422,13 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('System Prompt SDK');
         expect(ctx.output()).toContain('sdk-transform');
         expect(ctx.output()).toContain('abcd1234efgh5678');
-        expect(ctx.output()).toContain('modo');
+        expect(ctx.output()).toContain('Modo');
         expect(ctx.output()).toContain('auto reload');
         expect(ctx.output()).toContain('sources RPC');
         expect(ctx.output()).toContain('seções');
-        expect(ctx.output()).toContain('fontes');
+        expect(ctx.output()).toContain('fontes disponíveis');
         expect(ctx.output()).toContain('defasado');
-        expect(ctx.output()).toContain('Instruction sources');
+        expect(ctx.output()).toContain('Fontes de instrução');
         expect(ctx.output()).not.toContain('live=');
         expect(ctx.output()).not.toContain('autoReload=');
         expect(ctx.output()).not.toContain('customize=');
@@ -456,14 +456,15 @@ describe('terminal/commands/sdk', () => {
             projectPaths: ['/repo'],
             skillDirectories: ['/extra-skills'],
         });
-        expect(ctx.output()).toContain('Skills SDK (1)');
+        expect(ctx.output()).toContain('Skills SDK');
+        expect(ctx.output()).toContain('1 skill(s)');
         expect(ctx.output()).toContain('ativas 1');
         expect(ctx.output()).toContain('fontes project=1');
         expect(ctx.output()).toContain('skill-pdf');
         expect(ctx.output()).toContain('slash');
-        expect(ctx.output()).toContain('filtros: projeto /repo');
+        expect(ctx.output()).toContain('projeto /repo');
         expect(ctx.output()).toContain('diretório /extra-skills');
-        expect(ctx.output()).toContain('custom agent = definicao declarativa');
+        expect(ctx.output()).toContain('custom agent = definição');
         expect(ctx.output()).not.toContain('enabled=1');
     });
 
@@ -472,7 +473,7 @@ describe('terminal/commands/sdk', () => {
         await cmdSdk({ println: ctx.println }, 'skills config');
 
         expect(runtimeMocks.readTerminalSdkSkillsGovernance).toHaveBeenCalled();
-        expect(ctx.output()).toContain('Skills SDK Config');
+        expect(ctx.output()).toContain('Configuração das Skills SDK');
         expect(ctx.output()).toContain('diretórios 1');
         expect(ctx.output()).toContain('security-scan');
         expect(ctx.output()).toContain('SessionConfig.customAgents');
@@ -484,11 +485,11 @@ describe('terminal/commands/sdk', () => {
         const ctx = mockCtx();
         await cmdSdk({ println: ctx.println }, 'skills agents');
 
-        expect(ctx.output()).toContain('Custom Agents x Skills');
+        expect(ctx.output()).toContain('Custom Agents e Skills');
         expect(ctx.output()).toContain('security-auditor');
-        expect(ctx.output()).toContain('preload security-scan, skill-pdf');
-        expect(ctx.output()).toContain('desativadas security-scan');
-        expect(ctx.output()).toContain('subagent.*');
+        expect(ctx.output()).toContain('security-scan, skill-pdf');
+        expect(ctx.output()).toContain('security-scan');
+        expect(ctx.output()).toContain('subagent = runtime');
         expect(ctx.output()).not.toContain('preload=');
     });
 
@@ -510,19 +511,19 @@ describe('terminal/commands/sdk', () => {
         await cmdSdk({ println: setCtx.println }, 'headers Authorization=Bearer-test X-Mode=byok');
 
         expect(getNextTurnRequestHeaders()).toEqual({ Authorization: 'Bearer-test', 'X-Mode': 'byok' });
-        expect(setCtx.output()).toContain('Headers one-shot configurados');
+        expect(setCtx.output()).toContain('one-shot configurados');
         expect(setCtx.output()).toContain('dispatch SDK direto');
 
         const showCtx = mockCtx();
         await cmdSdk({ println: showCtx.println }, 'headers');
-        expect(showCtx.output()).toContain('Request Headers do próximo turno');
+        expect(showCtx.output()).toContain('Headers do próximo turno');
         expect(showCtx.output()).toContain('Authorization');
         expect(showCtx.output()).toContain('X-Mode');
 
         const clearCtx = mockCtx();
         await cmdSdk({ println: clearCtx.println }, 'headers clear');
         expect(getNextTurnRequestHeaders()).toBeNull();
-        expect(clearCtx.output()).toContain('Headers one-shot limpos');
+        expect(clearCtx.output()).toContain('one-shot limpos');
     });
 
     it('/workspace lista, lê e escreve no workspace virtual SDK, deixando claro que não é FS local', async () => {
@@ -540,7 +541,7 @@ describe('terminal/commands/sdk', () => {
         const write = mockCtx();
         await cmdWorkspace({ println: write.println }, 'write notes.md oi');
         expect(runtimeMocks.createTerminalSdkWorkspaceFile).toHaveBeenCalledWith('notes.md', 'oi');
-        expect(write.output()).toContain('workspace SDK virtual');
+        expect(write.output()).toContain('SDK virtual');
         expect(write.output()).toContain('notes.md');
     });
 
@@ -560,7 +561,8 @@ describe('terminal/commands/sdk', () => {
             }),
         );
         expect(ctx.output()).toContain('SDK');
-        expect(ctx.output()).toContain('materializado');
+        expect(ctx.output()).toContain('Materialização');
+        expect(ctx.output()).toContain('concluída');
     });
 
     it('/workspace sync exibe guidance acionável quando conteúdo não é textual', async () => {
@@ -613,9 +615,10 @@ describe('terminal/commands/sdk', () => {
             'LOCAL:tmp/local.md',
         );
         expect(ctx.output()).toContain('FS');
-        expect(ctx.output()).toContain('promovido');
+        expect(ctx.output()).toContain('Promoção');
+        expect(ctx.output()).toContain('concluída');
         expect(ctx.output()).toContain('fail-if-exists');
-        expect(ctx.output()).toContain('traceId=');
+        expect(ctx.output()).toContain('traceId');
 
         runtimeMocks.readTerminalSdkWorkspaceFile.mockResolvedValueOnce({
             path: 'notes/from-local.md',

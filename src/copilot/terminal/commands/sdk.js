@@ -8,8 +8,8 @@
 import { randomUUID } from 'node:crypto';
 
 import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#copilot/core';
-import { summarizeModelGatewaySdkQuotaSnapshots } from '#copilot/model-gateway';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
+import { summarizeModelGatewaySdkQuotaSnapshots } from '#copilot/model-gateway';
 import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
 import {
     clearNextTurnRequestHeaders,
@@ -58,6 +58,7 @@ import {
     classifyTerminalSdkQuota,
     clearTerminalElicitation,
     clearTerminalPermission,
+    formatTerminalIsoTimestamp,
     getTerminalElicitation,
     getTerminalPermission,
     listTerminalElicitations,
@@ -69,7 +70,6 @@ import {
     recordTerminalPermissionCompleted,
     recordTerminalPermissionRequested,
     terminalPermissionModeSkipsSdkPrompts,
-    formatTerminalIsoTimestamp,
 } from '../state/sdk/index.js';
 import { terminalThemeDivider, terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
@@ -499,10 +499,10 @@ async function renderCommandFailureGuidance(println, runtimeId) {
             : null,
     });
     if (guidance.nextCommand) {
-        println(`  \x1b[33m? ${guidance.nextCommand}\x1b[0m`);
+        println(terminalThemeRow('Próximo', guidance.nextCommand, { role: 'command' }));
     }
     for (const line of buildFailureRecoveryLines(guidance)) {
-        println(`  \x1b[90m${line}\x1b[0m`);
+        println(terminalThemeRow('Recuperação', line));
     }
 }
 
@@ -780,39 +780,59 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
                   'Detalhe',
                   `formulários ${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permissões ${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · perguntas SDK ${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · perguntas estruturadas ${structuredInputPending}`,
               )
-            : terminalThemeRow('Resumo', renderHumanSdkWaitCounts({
-                  forms: pendingElicitations.pending,
-                  permissions: permissionSummary.pending,
-                  questions: userInputSummary.pending,
-                  inputs: structuredInputPending,
-              })),
+            : terminalThemeRow(
+                  'Resumo',
+                  renderHumanSdkWaitCounts({
+                      forms: pendingElicitations.pending,
+                      permissions: permissionSummary.pending,
+                      questions: userInputSummary.pending,
+                      inputs: structuredInputPending,
+                  }),
+              ),
     );
 
     if (pendingElicitations.pending > 0) {
-        println(terminalThemeRow('Ação', `${terminalThemeText('command', '/elicitation show latest')} ${terminalThemeText('muted', '·')} ${terminalThemeText('command', '/elicitation list')}`));
+        println(
+            terminalThemeRow(
+                'Ação',
+                `${terminalThemeText('command', '/elicitation show latest')} ${terminalThemeText('muted', '·')} ${terminalThemeText('command', '/elicitation list')}`,
+            ),
+        );
     }
     if (permissionSummary.pending > 0) {
-        println(terminalThemeRow('Ação', `${terminalThemeText('command', '/permission show latest')} ${terminalThemeText('muted', '·')} ${terminalThemeText('command', '/permission all')}`));
+        println(
+            terminalThemeRow(
+                'Ação',
+                `${terminalThemeText('command', '/permission show latest')} ${terminalThemeText('muted', '·')} ${terminalThemeText('command', '/permission all')}`,
+            ),
+        );
     }
     if (userInputSummary.pending > 0) {
-        println(terminalThemeRow('Ação', `${terminalThemeText('command', '/answer <texto>')} ${terminalThemeText('muted', 'ou responda na conversa ativa')}`));
+        println(
+            terminalThemeRow(
+                'Ação',
+                `${terminalThemeText('command', '/answer <texto>')} ${terminalThemeText('muted', 'ou responda na conversa ativa')}`,
+            ),
+        );
         const latest = userInputSummary.latest;
         if (latest) {
             const choices = latest.choices.length > 0 ? ` · opções ${latest.choices.join(' | ')}` : '';
             const freeform = latest.allowFreeform ? 'livre' : 'seleção obrigatória';
-            println(terminalThemeRow('Pergunta', `${formatAge(latest.createdAt)} · ${latest.kind} · ${freeform}${choices}`));
+            println(
+                terminalThemeRow('Pergunta', `${formatAge(latest.createdAt)} · ${latest.kind} · ${freeform}${choices}`),
+            );
             if (detail) println(terminalThemeRow('ID', latest.id));
             println(terminalThemeRow('Texto', compactText(latest.question, 220), { role: 'question' }));
         }
     }
     if (structuredInputPending > 0) {
-        println(terminalThemeRow('Ação', 'digite a resposta normalmente; o REPL destrava a pergunta estruturada pendente'));
+        println(
+            terminalThemeRow('Ação', 'digite a resposta normalmente; o REPL destrava a pergunta estruturada pendente'),
+        );
         for (const entry of structuredInputs.slice(0, 3)) {
             const choices = entry.choices.length > 0 ? ` · opções ${entry.choices.join(' | ')}` : '';
             const freeform = entry.allowFreeform ? 'livre' : 'seleção obrigatória';
-            println(
-                terminalThemeRow('Pergunta', `${formatAge(entry.createdAt)} · ${freeform}${choices}`),
-            );
+            println(terminalThemeRow('Pergunta', `${formatAge(entry.createdAt)} · ${freeform}${choices}`));
             if (detail) println(terminalThemeRow('ID', entry.requestId));
             println(terminalThemeRow('Texto', compactText(entry.question, 220), { role: 'question' }));
         }
@@ -887,9 +907,13 @@ function parseSdkSimulateRequestUserInputArgs(rest) {
 function renderSdkSimulate({ println }, rest) {
     const [kind = '', ...tail] = rest;
     if (kind !== 'request-user-input' && kind !== 'request_user_input') {
+        println('');
         println(
-            '\n  \x1b[33mUso: /sdk simulate request-user-input [--choices "sim|nao"] [--required] [pergunta]\x1b[0m\n',
+            terminalThemeRow('Uso', '/sdk simulate request-user-input [--choices "sim|nao"] [--required] [pergunta]', {
+                role: 'command',
+            }),
         );
+        println('');
         return;
     }
     const parsed = parseSdkSimulateRequestUserInputArgs(tail);
@@ -932,17 +956,29 @@ function renderSdkCapabilitiesSummary({ println }, runtimeId) {
     const tools = objectOrNull(caps['tools']) ?? {};
     const plan = objectOrNull(caps['plan']) ?? {};
 
-    println('\n  \x1b[36mSDK Capabilities\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('accent', 'Capacidades SDK', ['UI', 'tools', 'plano']));
+    println(terminalThemeDivider(58));
     println(
-        `  UI       \x1b[90mformulários ${availableLabel(ui['elicitation'])} · confirmações ${availableLabel(ui['confirm'])} · seleção ${availableLabel(ui['select'])} · texto livre ${availableLabel(ui['input'])}\x1b[0m`,
+        terminalThemeRow(
+            'UI',
+            `formulários ${availableLabel(ui['elicitation'])} · confirmações ${availableLabel(ui['confirm'])} · seleção ${availableLabel(ui['select'])} · texto livre ${availableLabel(ui['input'])}`,
+        ),
     );
     println(
-        `  tools    \x1b[90mworkspace ${availableLabel(tools['workspace'])} · lista ${availableLabel(tools['list'])} · quota ${availableLabel(tools['quota'])}\x1b[0m`,
+        terminalThemeRow(
+            'Tools',
+            `workspace ${availableLabel(tools['workspace'])} · lista ${availableLabel(tools['list'])} · quota ${availableLabel(tools['quota'])}`,
+        ),
     );
     println(
-        `  plano    \x1b[90mleitura ${availableLabel(plan['read'])} · escrita ${availableLabel(plan['write'])} · remoção ${availableLabel(plan['delete'])}\x1b[0m`,
+        terminalThemeRow(
+            'Plano',
+            `leitura ${availableLabel(plan['read'])} · escrita ${availableLabel(plan['write'])} · remoção ${availableLabel(plan['delete'])}`,
+        ),
     );
-    println(`  raw      \x1b[90m${pretty(capabilities, 1200)}\x1b[0m\n`);
+    println(terminalThemeRow('Retorno', pretty(capabilities, 1200)));
+    println('');
 }
 
 /**
@@ -1006,38 +1042,58 @@ export async function cmdSdk({ println }, arg = '') {
             renderSdkRequestHeadersSummary({ println }, rest);
         } else if (sub === 'waits') {
             renderSdkWaitsSummary({ println }, runtimeId, {
-                detail: rest.includes('detail') || rest.includes('--detail') || rest.includes('debug') || rest.includes('--debug'),
+                detail:
+                    rest.includes('detail') ||
+                    rest.includes('--detail') ||
+                    rest.includes('debug') ||
+                    rest.includes('--debug'),
             });
         } else if (sub === 'simulate') {
             renderSdkSimulate({ println }, rest);
         } else if (sub === 'compact') {
             const result = await callWithRuntimeTarget(compactTerminalSdkSession, runtimeId);
-            println(`\n  \x1b[32m[OK] SDK compaction solicitada.\x1b[0m\n  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
+            println('');
+            println(terminalThemeRow('SDK', 'compactação solicitada', { role: 'success' }));
+            println(terminalThemeRow('Retorno', pretty(result, 700)));
+            println('');
         } else {
             const state = readTerminalRuntimeState(runtimeId);
             const pendingElicitations = readTerminalElicitationSummary({ runtimeId: state.runtimeId });
             const permissionSummary = readTerminalPermissionSummary({ runtimeId: state.runtimeId });
             const userInputSummary = readTerminalUserInputSummary({ runtimeId: state.runtimeId });
             const structuredInputPending = getTerminalPendingStructuredUserInputCount();
-            println('\n  \x1b[36mSDK do Terminal\x1b[0m');
-            println(`  Runtime  \x1b[90m${state.runtimeId}\x1b[0m`);
-            println(`  Sessão   \x1b[90m${state.sessionId ?? 'sem sessão SDK'}\x1b[0m`);
-            println(`  Modelo   \x1b[33m${state.model}\x1b[0m  \x1b[90mraciocínio ${state.reasoningEffort}\x1b[0m`);
+            println('');
+            println(terminalThemeHeadline('accent', 'SDK do Terminal', [state.runtimeId]));
+            println(terminalThemeDivider(58));
+            println(terminalThemeRow('Sessão', state.sessionId ?? 'sem sessão SDK'));
             println(
-                `  Esperas  \x1b[90m${renderHumanSdkWaitCounts({
-                    forms: pendingElicitations.pending,
-                    permissions: permissionSummary.pending,
-                    questions: userInputSummary.pending,
-                    inputs: structuredInputPending,
-                })}\x1b[0m`,
+                terminalThemeRow('Modelo', `${state.model} · raciocínio ${state.reasoningEffort}`, { role: 'command' }),
+            );
+            println(
+                terminalThemeRow(
+                    'Esperas',
+                    renderHumanSdkWaitCounts({
+                        forms: pendingElicitations.pending,
+                        permissions: permissionSummary.pending,
+                        questions: userInputSummary.pending,
+                        inputs: structuredInputPending,
+                    }),
+                ),
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             println(
-                '  \x1b[90mUso: /sdk models | /sdk skills [--project <path>] [--dir <path>] | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk capabilities | /sdk headers [k=v ...|clear] | /sdk waits | /sdk simulate request-user-input | /sdk doctor | /sdk compact\x1b[0m\n',
+                terminalThemeRow(
+                    'Uso',
+                    '/sdk models | /sdk skills [--project <path>] [--dir <path>] | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk capabilities | /sdk headers [k=v ...|clear] | /sdk waits | /sdk simulate request-user-input | /sdk doctor | /sdk compact',
+                    { role: 'command' },
+                ),
             );
+            println('');
         }
     } catch (e) {
-        println(`\n  \x1b[31m[ERR] SDK: ${toError(e).message}\x1b[0m\n`);
+        println('');
+        println(terminalThemeRow('SDK', toError(e).message, { role: 'error' }));
+        println('');
     }
 }
 
@@ -1050,39 +1106,56 @@ function renderSdkRequestHeadersSummary({ println }, rest) {
     const [first = '', ...tail] = rest;
     if (!first) {
         const headers = getNextTurnRequestHeaders();
-        println('\n  \x1b[36mRequest Headers do próximo turno\x1b[0m');
+        println('');
+        println(terminalThemeHeadline('accent', 'Headers do próximo turno'));
         if (!headers) {
-            println('  \x1b[90mNenhum header one-shot configurado. Use /sdk headers chave=valor ...\x1b[0m');
+            println(terminalThemeRow('Status', 'nenhum header one-shot configurado'));
+            println(terminalThemeRow('Uso', '/sdk headers chave=valor ...', { role: 'command' }));
         } else {
             for (const [key, value] of Object.entries(headers)) {
-                println(`  \x1b[33m${key}\x1b[0m=\x1b[90m${value}\x1b[0m`);
+                println(terminalThemeRow(key, value, { role: 'command', width: 18 }));
             }
         }
         println(
-            '  \x1b[90mObservação: turnos com requestHeaders usam dispatch SDK direto e reanexam a conversa depois da resposta.\x1b[0m\n',
+            terminalThemeRow(
+                'Observação',
+                'turnos com requestHeaders usam dispatch SDK direto e reanexam a conversa depois da resposta',
+            ),
         );
+        println('');
         return;
     }
 
     if (first === 'clear') {
         clearNextTurnRequestHeaders();
-        println('\n  \x1b[90mHeaders one-shot limpos.\x1b[0m\n');
+        println('');
+        println(terminalThemeRow('Headers', 'one-shot limpos', { role: 'success' }));
+        println('');
         return;
     }
 
     const headers = parseSdkRequestHeaders([first, ...tail]);
     if (Object.keys(headers).length === 0) {
-        println('\n  \x1b[31m[ERR] Use /sdk headers chave=valor [outra=coisa] ou /sdk headers clear\x1b[0m\n');
+        println('');
+        println(terminalThemeRow('Headers', 'nenhum par chave=valor válido informado', { role: 'error' }));
+        println(
+            terminalThemeRow('Uso', '/sdk headers chave=valor [outra=coisa] ou /sdk headers clear', {
+                role: 'command',
+            }),
+        );
+        println('');
         return;
     }
     setNextTurnRequestHeaders(headers);
-    println('\n  \x1b[32m[OK] Headers one-shot configurados para o próximo turno do usuário.\x1b[0m');
+    println('');
+    println(terminalThemeRow('Headers', 'one-shot configurados para o próximo turno do usuário', { role: 'success' }));
     for (const [key, value] of Object.entries(headers)) {
-        println(`  \x1b[33m${key}\x1b[0m=\x1b[90m${value}\x1b[0m`);
+        println(terminalThemeRow(key, value, { role: 'command', width: 18 }));
     }
     println(
-        '  \x1b[90mEsse próximo turno usará dispatch SDK direto (consome PR) e depois reanexará a conversa.\x1b[0m\n',
+        terminalThemeRow('Fluxo', 'o próximo turno usa dispatch SDK direto, consome PR e depois reanexa a conversa'),
     );
+    println('');
 }
 
 /**
@@ -1093,14 +1166,15 @@ function renderSdkRequestHeadersSummary({ println }, rest) {
 async function renderSdkModels({ println }, runtimeId) {
     const result = await callWithRuntimeTarget(listTerminalSdkModels, runtimeId);
     const models = arrayFromSdkList(result);
-    println(`\n  \x1b[36mModelos SDK (${models.length})\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('accent', 'Modelos SDK', [`${models.length} modelo(s)`]));
     for (const model of models.slice(0, 30)) {
         const m = objectOrNull(model) ?? {};
         const id = String(m['id'] ?? m['name'] ?? model);
         const effort = Array.isArray(m['supportedReasoningEfforts']) ? m['supportedReasoningEfforts'].join(',') : '';
-        println(`  \x1b[33m${id}\x1b[0m${effort ? `  \x1b[90mreasoning: ${effort}\x1b[0m` : ''}`);
+        println(terminalThemeRow('Modelo', effort ? `${id} · reasoning ${effort}` : id, { role: 'command' }));
     }
-    if (models.length > 30) println(`  \x1b[90m... ${models.length - 30} modelos omitidos\x1b[0m`);
+    if (models.length > 30) println(terminalThemeRow('Omitidos', `${models.length - 30} modelo(s)`));
     println('');
 }
 
@@ -1114,11 +1188,17 @@ async function renderSdkSkills({ println }, rest, runtimeId) {
     const [action = '', ...tail] = rest;
     if (action === 'status') {
         const state = readTerminalRuntimeState(runtimeId);
-        println('\n  \x1b[36mSkills SDK Status\x1b[0m');
-        println(`  runtime  \x1b[90m${state.runtimeId}\x1b[0m`);
+        println('');
+        println(terminalThemeHeadline('accent', 'Status das Skills SDK'));
+        println(terminalThemeRow('Runtime', state.runtimeId));
         println(
-            '  \x1b[90mUse /sdk skills para discovery, /sdk skills config para governança e /sdk skills agents para projeção por custom agent.\x1b[0m\n',
+            terminalThemeRow(
+                'Uso',
+                '/sdk skills para discovery · /sdk skills config para governança · /sdk skills agents para custom agents',
+                { role: 'command' },
+            ),
         );
+        println('');
         return;
     }
     if (action === 'config') {
@@ -1154,9 +1234,13 @@ async function renderSdkSkills({ println }, rest, runtimeId) {
         .map(([source, count]) => `${source}=${count}`)
         .join(' · ');
 
-    println(`\n  \x1b[36mSkills SDK (${skills.length})\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('accent', 'Skills SDK', [`${skills.length} skill(s)`]));
     println(
-        `  \x1b[90mativas ${enabledCount} · desativadas ${skills.length - enabledCount} · invocáveis ${invocableCount}${sourceSummary ? ` · fontes ${sourceSummary}` : ''}\x1b[0m`,
+        terminalThemeRow(
+            'Resumo',
+            `ativas ${enabledCount} · desativadas ${skills.length - enabledCount} · invocáveis ${invocableCount}${sourceSummary ? ` · fontes ${sourceSummary}` : ''}`,
+        ),
     );
     if (options.projectPaths?.length || options.skillDirectories?.length) {
         const filters = [
@@ -1165,7 +1249,7 @@ async function renderSdkSkills({ println }, rest, runtimeId) {
         ]
             .filter(Boolean)
             .join(' · ');
-        println(`  \x1b[90mfiltros: ${filters}\x1b[0m`);
+        println(terminalThemeRow('Filtros', filters));
     }
     for (const skill of skills.slice(0, 40)) {
         const s = objectOrNull(skill) ?? {};
@@ -1182,14 +1266,19 @@ async function renderSdkSkills({ println }, rest, runtimeId) {
             .filter(Boolean)
             .join(' · ');
         println(
-            `  \x1b[33m${name}\x1b[0m${badges ? `  \x1b[90m[${badges}]\x1b[0m` : ''}${desc ? `  \x1b[90m${desc}\x1b[0m` : ''}`,
+            terminalThemeRow('Skill', `${name}${badges ? ` · ${badges}` : ''}${desc ? ` · ${desc}` : ''}`, {
+                role: enabled ? 'command' : 'muted',
+            }),
         );
-        if (projectPath) println(`    \x1b[90mprojeto ${projectPath}\x1b[0m`);
-        if (path && path !== projectPath) println(`    \x1b[90mcaminho ${path}\x1b[0m`);
+        if (projectPath) println(terminalThemeRow('Projeto', projectPath));
+        if (path && path !== projectPath) println(terminalThemeRow('Caminho', path));
     }
-    if (skills.length > 40) println(`  \x1b[90m... ${skills.length - 40} skills omitidas\x1b[0m`);
+    if (skills.length > 40) println(terminalThemeRow('Omitidas', `${skills.length - 40} skill(s)`));
     println(
-        '  \x1b[90mcustom agent = definicao declarativa em SessionConfig.customAgents; subagent = uso runtime desse custom agent via eventos subagent.*\x1b[0m',
+        terminalThemeRow(
+            'Vocabulário',
+            'custom agent = definição em SessionConfig.customAgents; subagent = uso runtime via eventos subagent.*',
+        ),
     );
     println('');
 }
@@ -1215,24 +1304,34 @@ async function renderSdkSkillsConfig({ println }, runtimeId) {
     const skillDirectories = Array.isArray(bootSkills['skillDirectories']) ? bootSkills['skillDirectories'] : [];
     const disabledSkills = Array.isArray(bootSkills['disabledSkills']) ? bootSkills['disabledSkills'] : [];
 
-    println('\n  \x1b[36mSkills SDK Config\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('accent', 'Configuração das Skills SDK'));
     println(
-        `  \x1b[90mdiretórios ${skillDirectories.length} | desativadas no boot ${disabledSkills.length} | desativadas runtime ${discoveredDisabled.length}\x1b[0m`,
+        terminalThemeRow(
+            'Resumo',
+            `diretórios ${skillDirectories.length} · desativadas no boot ${disabledSkills.length} · desativadas runtime ${discoveredDisabled.length}`,
+        ),
     );
-    println(`  session dirs      \x1b[90m${skillDirectories.length > 0 ? skillDirectories.join(', ') : '-'}\x1b[0m`);
-    println(`  boot disabled     \x1b[90m${disabledSkills.length > 0 ? disabledSkills.join(', ') : '-'}\x1b[0m`);
+    println(terminalThemeRow('Dirs sessão', skillDirectories.length > 0 ? skillDirectories.join(', ') : '-'));
+    println(terminalThemeRow('Boot off', disabledSkills.length > 0 ? disabledSkills.join(', ') : '-'));
+    println(terminalThemeRow('Runtime off', discoveredDisabled.length > 0 ? discoveredDisabled.join(', ') : '-'));
+    println(terminalThemeRow('Semântica', String(semantics['customAgentDefinition'] ?? '-')));
+    println(terminalThemeRow('Runtime', String(semantics['subagentRuntime'] ?? '-')));
+    println(terminalThemeRow('Mutação', String(semantics['disabledSkillsMutationScope'] ?? '-')));
     println(
-        `  runtime disabled  \x1b[90m${discoveredDisabled.length > 0 ? discoveredDisabled.join(', ') : '-'}\x1b[0m`,
-    );
-    println(`  semantic          \x1b[90m${String(semantics['customAgentDefinition'] ?? '-')}\x1b[0m`);
-    println(`  runtime           \x1b[90m${String(semantics['subagentRuntime'] ?? '-')}\x1b[0m`);
-    println(`  mutation          \x1b[90m${String(semantics['disabledSkillsMutationScope'] ?? '-')}\x1b[0m`);
-    println(
-        '  \x1b[90mObservação: disable/enable ajusta disabledSkills no runtime/CLI atual; persiste no escopo server, não reescreve automaticamente o env do processo.\x1b[0m',
+        terminalThemeRow(
+            'Observação',
+            'disable/enable ajusta disabledSkills no runtime/CLI atual; não reescreve automaticamente o env do processo',
+        ),
     );
     println(
-        '  \x1b[90mUso: /sdk skills agents | /sdk skills disable <skill...> | /sdk skills enable <skill...> | /sdk skills [--project <path>] [--dir <path>]\x1b[0m\n',
+        terminalThemeRow(
+            'Uso',
+            '/sdk skills agents | /sdk skills disable <skill...> | /sdk skills enable <skill...> | /sdk skills [--project <path>] [--dir <path>]',
+            { role: 'command' },
+        ),
     );
+    println('');
 }
 
 /**
@@ -1250,12 +1349,19 @@ async function renderSdkSkillsAgents({ println }, runtimeId) {
         return Array.isArray(entry?.['preloadSkills']) && entry['preloadSkills'].length > 0;
     });
 
-    println(`\n  \x1b[36mCustom Agents x Skills (${customAgents.length})\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('accent', 'Custom Agents e Skills', [`${customAgents.length} agent(s)`]));
     println(
-        `  \x1b[90magentes com preload ${agentsWithSkills.length} | inferíveis ${customAgents.filter((agent) => objectOrNull(agent)?.['infer'] !== false).length}\x1b[0m`,
+        terminalThemeRow(
+            'Resumo',
+            `agentes com preload ${agentsWithSkills.length} · inferíveis ${customAgents.filter((agent) => objectOrNull(agent)?.['infer'] !== false).length}`,
+        ),
     );
     println(
-        '  \x1b[90mcustom agent = definicao de sessao; subagent = quando o runtime seleciona/invoca esse custom agent e emite subagent.*\x1b[0m',
+        terminalThemeRow(
+            'Vocabulário',
+            'custom agent = definição de sessão; subagent = runtime selecionando/invocando esse custom agent',
+        ),
     );
 
     for (const agent of customAgents) {
@@ -1273,20 +1379,25 @@ async function renderSdkSkillsAgents({ println }, runtimeId) {
         const tools = Array.isArray(entry['tools']) ? entry['tools'].map(String) : null;
 
         println(
-            `  \x1b[33m${name}\x1b[0m  \x1b[90m(${displayName}) | inferir ${String(infer)} | tools ${tools ? tools.join(', ') || '[]' : 'all'}\x1b[0m`,
+            terminalThemeRow(
+                'Agent',
+                `${name} (${displayName}) · inferir ${String(infer)} · tools ${tools ? tools.join(', ') || '[]' : 'all'}`,
+                { role: 'command' },
+            ),
         );
         if (preloadSkills.length === 0) {
-            println('    \x1b[90mpreload skills: -\x1b[0m');
+            println(terminalThemeRow('Preload', '-'));
             continue;
         }
-        println(`    \x1b[90mpreload ${preloadSkills.join(', ')}\x1b[0m`);
-        if (preloadEnabledSkills.length > 0) println(`    \x1b[32mativas ${preloadEnabledSkills.join(', ')}\x1b[0m`);
+        println(terminalThemeRow('Preload', preloadSkills.join(', ')));
+        if (preloadEnabledSkills.length > 0)
+            println(terminalThemeRow('Ativas', preloadEnabledSkills.join(', '), { role: 'success' }));
         if (preloadDisabledSkills.length > 0)
-            println(`    \x1b[31mdesativadas ${preloadDisabledSkills.join(', ')}\x1b[0m`);
+            println(terminalThemeRow('Desativadas', preloadDisabledSkills.join(', '), { role: 'error' }));
     }
 
     if (customAgents.length === 0) {
-        println('  \x1b[90mNenhum custom agent configurado nesta sessao.\x1b[0m');
+        println(terminalThemeRow('Status', 'nenhum custom agent configurado nesta sessão'));
     }
     println('');
 }
@@ -1301,7 +1412,10 @@ async function renderSdkSkillsAgents({ println }, runtimeId) {
 async function updateSdkDisabledSkills({ println }, action, names, runtimeId) {
     const requested = normalizeSkillNames(names);
     if (requested.length === 0) {
-        println(`\n  \x1b[31m[ERR] Use /sdk skills ${action} <skill...>\x1b[0m\n`);
+        println('');
+        println(terminalThemeRow('Skills', 'nenhuma skill informada', { role: 'error' }));
+        println(terminalThemeRow('Uso', `/sdk skills ${action} <skill...>`, { role: 'command' }));
+        println('');
         return;
     }
 
@@ -1325,12 +1439,17 @@ async function updateSdkDisabledSkills({ println }, action, names, runtimeId) {
     const disabledSkills = [...currentDisabled].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     await callWithRuntimeTarget(setTerminalSdkDisabledSkills, runtimeId, disabledSkills);
 
-    println(`\n  \x1b[32m[OK] disabledSkills runtime atualizadas via SDK (${action}).\x1b[0m`);
-    println(`  \x1b[90msolicitadas ${requested.join(', ')}\x1b[0m`);
-    println(`  \x1b[90mdesativadas runtime ${disabledSkills.length > 0 ? disabledSkills.join(', ') : '-'}\x1b[0m`);
+    println('');
+    println(terminalThemeRow('Skills', `disabledSkills runtime atualizadas via SDK (${action})`, { role: 'success' }));
+    println(terminalThemeRow('Solicitadas', requested.join(', ')));
+    println(terminalThemeRow('Runtime off', disabledSkills.length > 0 ? disabledSkills.join(', ') : '-'));
     println(
-        '  \x1b[90mEscopo: altera o runtime/CLI atual via server RPC; n�o reescreve automaticamente COPILOT_DISABLED_SKILLS do processo.\x1b[0m\n',
+        terminalThemeRow(
+            'Escopo',
+            'altera o runtime/CLI atual via server RPC; não reescreve automaticamente COPILOT_DISABLED_SKILLS do processo',
+        ),
     );
+    println('');
 }
 
 /**
@@ -1345,7 +1464,12 @@ async function renderSdkTools({ println }, model, runtimeId) {
     const registrySnapshot = readTerminalToolRegistrySnapshot();
     const contract = registrySnapshot.toolContract;
     println('');
-    println(terminalThemeHeadline('tool', 'Ferramentas SDK', [model ? `modelo ${model}` : null, `${tools.length} tool(s) nativa(s)`]));
+    println(
+        terminalThemeHeadline('tool', 'Ferramentas SDK', [
+            model ? `modelo ${model}` : null,
+            `${tools.length} tool(s) nativa(s)`,
+        ]),
+    );
     for (const tool of tools.slice(0, 50)) {
         const t = objectOrNull(tool) ?? {};
         const rawName = String(t['name'] ?? tool);
@@ -1374,10 +1498,28 @@ async function renderSdkTools({ println }, model, runtimeId) {
     println('');
     println(terminalThemeHeadline('tool', 'Registry local canônico'));
     println(terminalThemeRow('Total', String(registrySnapshot.total), { role: 'info' }));
-    println(terminalThemeRow('Arquivos', activeLabel(registrySnapshot.hasCanonicalLocalFsTools), { role: registrySnapshot.hasCanonicalLocalFsTools ? 'success' : 'warn' }));
-    println(terminalThemeRow('Terminal', activeLabel(registrySnapshot.hasCanonicalLocalExecTools), { role: registrySnapshot.hasCanonicalLocalExecTools ? 'success' : 'warn' }));
-    println(terminalThemeRow('Shell legado', registrySnapshot.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado', { role: registrySnapshot.hasLegacySdkShellToolsLoaded ? 'warn' : 'muted' }));
-    println(terminalThemeRow('Desativadas', String(registrySnapshot.disabled.length), { role: registrySnapshot.disabled.length > 0 ? 'warn' : 'muted' }));
+    println(
+        terminalThemeRow('Arquivos', activeLabel(registrySnapshot.hasCanonicalLocalFsTools), {
+            role: registrySnapshot.hasCanonicalLocalFsTools ? 'success' : 'warn',
+        }),
+    );
+    println(
+        terminalThemeRow('Terminal', activeLabel(registrySnapshot.hasCanonicalLocalExecTools), {
+            role: registrySnapshot.hasCanonicalLocalExecTools ? 'success' : 'warn',
+        }),
+    );
+    println(
+        terminalThemeRow(
+            'Shell legado',
+            registrySnapshot.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado',
+            { role: registrySnapshot.hasLegacySdkShellToolsLoaded ? 'warn' : 'muted' },
+        ),
+    );
+    println(
+        terminalThemeRow('Desativadas', String(registrySnapshot.disabled.length), {
+            role: registrySnapshot.disabled.length > 0 ? 'warn' : 'muted',
+        }),
+    );
     if (registrySnapshot.disabled.length > 0) {
         println(terminalThemeRow('Lista', registrySnapshot.disabled.join(', '), { role: 'muted' }));
     }
@@ -1410,23 +1552,28 @@ async function renderSdkQuota({ println }, runtimeId, opts = {}) {
     const snapshots = objectOrNull(data['quotaSnapshots']) ?? {};
     const quotaSummary = summarizeModelGatewaySdkQuotaSnapshots(result);
     const state = classifyTerminalSdkQuota(result);
-    const color = state === 'bad' ? '\x1b[31m' : state === 'warn' ? '\x1b[33m' : '\x1b[32m';
-    if (!opts.compact) println('\n  \x1b[36mQuota SDK\x1b[0m');
+    const role = state === 'bad' ? 'error' : state === 'warn' ? 'warn' : 'success';
+    if (!opts.compact) {
+        println('');
+        println(terminalThemeHeadline('accent', 'Quota SDK'));
+    }
     for (const row of quotaSummary.rows) {
         const pct = row.remainingPercentage === null ? '?' : `${row.remainingPercentage.toFixed(1)}%`;
         println(
-            opts.compact
-                ? `  Quota    ${color}${row.quotaId}\x1b[0m  \x1b[33m${pct}\x1b[0m restante · reset \x1b[90m${row.resetAt ?? '-'}\x1b[0m · escopo \x1b[90m${row.scope}\x1b[0m`
-                : `  ${color}${row.quotaId}\x1b[0m  \x1b[33m${pct}\x1b[0m restante · reset \x1b[90m${row.resetAt ?? '-'}\x1b[0m · escopo \x1b[90m${row.scope}\x1b[0m`,
+            terminalThemeRow(
+                opts.compact ? 'Quota' : row.quotaId,
+                `${opts.compact ? `${row.quotaId} · ` : ''}${pct} restante · reset ${row.resetAt ?? '-'} · escopo ${row.scope}`,
+                { role },
+            ),
         );
     }
-    if (Object.keys(snapshots).length === 0) println('  \x1b[90mSem snapshots de quota no retorno SDK.\x1b[0m');
+    if (Object.keys(snapshots).length === 0) println(terminalThemeRow('Quota', 'sem snapshots no retorno SDK'));
     if (!opts.compact) {
         if (usageMetrics) {
             const summary = pretty(usageMetrics, 700).replace(/\n+/g, ' ');
-            println(`  usage rpc  \x1b[90m${summary}\x1b[0m`);
+            println(terminalThemeRow('Usage RPC', summary));
         } else if (usageMetricsError) {
-            println(`  usage rpc  \x1b[90mindisponível: ${usageMetricsError}\x1b[0m`);
+            println(terminalThemeRow('Usage RPC', `indisponível: ${usageMetricsError}`, { role: 'warn' }));
         }
     }
     if (!opts.compact) println('');
@@ -1458,41 +1605,62 @@ async function renderSdkSystemPrompt({ println }, runtimeId) {
         typeof session['available'] === 'boolean' ? session['available'] : Boolean(projection['sessionAvailable']);
     const yesNo = (/** @type {unknown} */ value) => (value ? 'sim' : 'não');
 
-    println('\n  \x1b[36mSystem Prompt SDK\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('accent', 'System Prompt SDK'));
     println(
-        `  modo     \x1b[33m${String(status['effectiveMode'] ?? '?')}\x1b[0m  live \x1b[33m${String(status['effectiveLiveMode'] ?? '?')}\x1b[0m  reload \x1b[33m${String(status['liveReloadMechanism'] ?? '?')}\x1b[0m`,
+        terminalThemeRow(
+            'Modo',
+            `${String(status['effectiveMode'] ?? '?')} · live ${String(status['effectiveLiveMode'] ?? '?')} · reload ${String(status['liveReloadMechanism'] ?? '?')}`,
+            { role: 'command' },
+        ),
     );
     println(
-        `  config   \x1b[90m${String(status['configPath'] ?? '-')}\x1b[0m  auto reload \x1b[33m${yesNo(Boolean(status['autoReload']))}\x1b[0m`,
+        terminalThemeRow(
+            'Config',
+            `${String(status['configPath'] ?? '-')} · auto reload ${yesNo(Boolean(status['autoReload']))}`,
+        ),
     );
     println(
-        `  sdk      \x1b[90mcustomize ${yesNo(Boolean(sdkCompatibility['supportsCustomizeMode']))} · sources RPC ${yesNo(Boolean(sdkCompatibility['supportsInstructionSourcesRpc']))}\x1b[0m`,
+        terminalThemeRow(
+            'SDK',
+            `customize ${yesNo(Boolean(sdkCompatibility['supportsCustomizeMode']))} · sources RPC ${yesNo(Boolean(sdkCompatibility['supportsInstructionSourcesRpc']))}`,
+        ),
     );
     println(
-        `  digest   \x1b[90m${String(revision['digest'] ?? '-')}\x1b[0m  seções \x1b[33m${sections.length}\x1b[0m  anexos \x1b[33m${appendFiles.length}\x1b[0m`,
+        terminalThemeRow(
+            'Digest',
+            `${String(revision['digest'] ?? '-')} · seções ${sections.length} · anexos ${appendFiles.length}`,
+        ),
     );
     println(
-        `  sessão   \x1b[90m${String(sessionId ?? '-')}\x1b[0m  fontes \x1b[33m${sessionAvailable ? 'disponíveis' : 'nenhuma'}\x1b[0m`,
+        terminalThemeRow(
+            'Sessão',
+            `${String(sessionId ?? '-')} · fontes ${sessionAvailable ? 'disponíveis' : 'nenhuma'}`,
+        ),
     );
     println(
-        `  binding  \x1b[90m${String(binding['digest'] ?? '-')}\x1b[0m  defasado \x1b[33m${yesNo(Boolean(freshness['isStale']))}\x1b[0m  ação \x1b[33m${renderSdkPromptActionLabel(freshness['recommendedAction'])}\x1b[0m`,
+        terminalThemeRow(
+            'Binding',
+            `${String(binding['digest'] ?? '-')} · defasado ${yesNo(Boolean(freshness['isStale']))} · ação ${renderSdkPromptActionLabel(freshness['recommendedAction'])}`,
+        ),
     );
 
     if (freshness['reason']) {
-        println(`  ${terminalThemeText('muted', String(freshness['reason']))}`);
+        println(terminalThemeRow('Motivo', String(freshness['reason'])));
     }
 
     if (limitations.length > 0) {
-        println('  \x1b[36mLimitações\x1b[0m');
+        println(terminalThemeHeadline('warn', 'Limitações'));
         for (const limitation of limitations.slice(0, 4)) {
-            println(`  \x1b[90m• ${String(limitation)}\x1b[0m`);
+            println(terminalThemeRow('Limite', String(limitation), { role: 'warn' }));
         }
     }
 
     if (instructionSources) {
-        println(`  \x1b[36mInstruction sources\x1b[0m\n  \x1b[90m${pretty(instructionSources, 1200)}\x1b[0m`);
+        println(terminalThemeHeadline('accent', 'Fontes de instrução'));
+        println(terminalThemeRow('Retorno', pretty(instructionSources, 1200)));
     } else if (instructionSourcesError) {
-        println(`  \x1b[33mInstruction sources indisponíveis:\x1b[0m ${String(instructionSourcesError)}`);
+        println(terminalThemeRow('Fontes', `indisponíveis: ${String(instructionSourcesError)}`, { role: 'warn' }));
     }
 
     println('');
@@ -1510,27 +1678,36 @@ export async function cmdWorkspace({ println }, arg = '') {
         if (sub === 'read') {
             const path = rest.join(' ').trim();
             if (!path) {
-                println('\x1b[33m  Uso: /workspace read <path>\x1b[0m');
+                println(terminalThemeRow('Uso', '/workspace read <path>', { role: 'command' }));
                 return;
             }
             const result = await callWithRuntimeTarget(readTerminalSdkWorkspaceFile, runtimeId, path);
-            println(
-                `\n  \x1b[36m${path}\x1b[0m  \x1b[90m(SDK virtual; não FS local)\x1b[0m\n${pretty(result, 4000)}\n`,
-            );
+            println('');
+            println(terminalThemeHeadline('fileRead', 'Workspace SDK virtual', [path]));
+            println(terminalThemeRow('Escopo', 'SDK virtual; não é FS local'));
+            println(terminalThemeRow('Retorno', pretty(result, 4000)));
+            println('');
         } else if (sub === 'write') {
             const path = rest.shift();
             const content = rest.join(' ');
             if (!path || !content) {
-                println('\x1b[33m  Uso: /workspace write <path> <content>\x1b[0m');
+                println(terminalThemeRow('Uso', '/workspace write <path> <content>', { role: 'command' }));
                 return;
             }
             const result = await callWithRuntimeTarget(createTerminalSdkWorkspaceFile, runtimeId, path, content);
-            println(`\n  \x1b[32m? Arquivo escrito no workspace SDK virtual:\x1b[0m \x1b[33m${path}\x1b[0m`);
-            println(`  \x1b[90m${pretty(result, 500)}\x1b[0m\n`);
+            println('');
+            println(terminalThemeRow('Workspace', 'arquivo escrito no SDK virtual', { role: 'success' }));
+            println(terminalThemeRow('Arquivo', path, { role: 'fileWrite' }));
+            println(terminalThemeRow('Retorno', pretty(result, 500)));
+            println('');
         } else if (sub === 'sync' || sub === 'materialize') {
             const sourcePath = rest[0] ?? '';
             if (!sourcePath.trim()) {
-                println('\x1b[33m  Uso: /workspace sync <sdkPath> [--to <localPath>] [--overwrite]\x1b[0m');
+                println(
+                    terminalThemeRow('Uso', '/workspace sync <sdkPath> [--to <localPath>] [--overwrite]', {
+                        role: 'command',
+                    }),
+                );
                 return;
             }
             const flags = parseWorkspaceMaterializeFlags(rest.slice(1));
@@ -1538,8 +1715,14 @@ export async function cmdWorkspace({ println }, arg = '') {
             const readResult = await callWithRuntimeTarget(readTerminalSdkWorkspaceFile, runtimeId, sourcePath);
             const content = workspaceReadContent(readResult);
             if (content === null) {
-                println('\n  \x1b[31m✗ Workspace SDK: conteúdo não textual/indisponível para materialização.\x1b[0m');
-                println(`  \x1b[90m${pretty(readResult, 900)}\x1b[0m\n`);
+                println('');
+                println(
+                    terminalThemeRow('Workspace', 'conteúdo não textual/indisponível para materialização', {
+                        role: 'error',
+                    }),
+                );
+                println(terminalThemeRow('Retorno', pretty(readResult, 900)));
+                println('');
                 await renderCommandFailureGuidance(println, runtimeId);
                 return;
             }
@@ -1553,30 +1736,44 @@ export async function cmdWorkspace({ println }, arg = '') {
                 },
             );
             if (writeResult['success'] !== true) {
+                println('');
                 println(
-                    `\n  \x1b[31m✗ Materialização SDK→FS falhou:\x1b[0m ${String(writeResult['error'] ?? 'erro desconhecido')}`,
+                    terminalThemeRow('Materialização', String(writeResult['error'] ?? 'erro desconhecido'), {
+                        role: 'error',
+                    }),
                 );
                 println(
-                    '  \x1b[90mUse --overwrite para substituir arquivo local já existente quando apropriado.\x1b[0m\n',
+                    terminalThemeRow(
+                        'Correção',
+                        'use --overwrite para substituir arquivo local já existente quando apropriado',
+                        { role: 'command' },
+                    ),
                 );
+                println('');
                 await renderCommandFailureGuidance(println, runtimeId);
                 return;
             }
 
-            println(
-                `\n  \x1b[32m✓ SDK→FS materializado:\x1b[0m \x1b[33m${sourcePath}\x1b[0m → \x1b[33m${destinationPath}\x1b[0m`,
-            );
+            println('');
+            println(terminalThemeRow('Materialização', 'SDK para FS concluída', { role: 'success' }));
+            println(terminalThemeRow('Origem', sourcePath, { role: 'fileRead' }));
+            println(terminalThemeRow('Destino', destinationPath, { role: 'fileWrite' }));
             const io = ioSummary(writeResult);
-            if (io) println(`  \x1b[90m${io}\x1b[0m`);
-            println(`  \x1b[90mbytes=${String(writeResult['bytesWritten'] ?? content.length)}\x1b[0m\n`);
+            if (io) println(terminalThemeRow('I/O', io));
+            println(terminalThemeRow('Bytes', String(writeResult['bytesWritten'] ?? content.length)));
+            println('');
         } else if (sub === 'mirror' || sub === 'sync-all') {
             const flags = parseWorkspaceMaterializeFlags(rest);
             const targetRoot = flags.to ?? '.copilot/sdk-workspace-mirror';
             const listResult = await callWithRuntimeTarget(listTerminalSdkWorkspaceFiles, runtimeId);
             const files = workspaceListPaths(listResult);
             if (files.length === 0) {
-                println('\n  \x1b[33mWorkspace SDK virtual vazio ou sem paths materializáveis.\x1b[0m');
-                println(`  \x1b[90m${pretty(listResult, 900)}\x1b[0m\n`);
+                println('');
+                println(
+                    terminalThemeRow('Workspace', 'SDK virtual vazio ou sem paths materializáveis', { role: 'warn' }),
+                );
+                println(terminalThemeRow('Retorno', pretty(listResult, 900)));
+                println('');
                 return;
             }
 
@@ -1587,7 +1784,7 @@ export async function cmdWorkspace({ println }, arg = '') {
                 const content = workspaceReadContent(readResult);
                 if (content === null) {
                     fail += 1;
-                    println(`  \x1b[31m✗ skip\x1b[0m ${sourcePath} (conteúdo não textual)`);
+                    println(terminalThemeRow('Ignorado', `${sourcePath} · conteúdo não textual`, { role: 'warn' }));
                     continue;
                 }
                 const destinationPath = `${targetRoot.replace(/\/$/u, '')}/${sourcePath}`;
@@ -1597,20 +1794,32 @@ export async function cmdWorkspace({ println }, arg = '') {
                 );
                 if (writeResult['success'] === true) {
                     ok += 1;
-                    println(`  \x1b[32m✓\x1b[0m ${sourcePath} → ${destinationPath}`);
+                    println(terminalThemeRow('Mirror', `${sourcePath} → ${destinationPath}`, { role: 'success' }));
                 } else {
                     fail += 1;
-                    println(`  \x1b[31m✗\x1b[0m ${sourcePath} (${String(writeResult['error'] ?? 'erro')})`);
+                    println(
+                        terminalThemeRow('Mirror', `${sourcePath} · ${String(writeResult['error'] ?? 'erro')}`, {
+                            role: 'error',
+                        }),
+                    );
                 }
             }
 
+            println('');
             println(
-                `\n  \x1b[36mMirror SDK→FS concluído\x1b[0m  \x1b[90mok=${ok} · fail=${fail} · root=${targetRoot}\x1b[0m\n`,
+                terminalThemeRow('Mirror SDK', `concluído · ok=${ok} · fail=${fail} · root=${targetRoot}`, {
+                    role: fail > 0 ? 'warn' : 'success',
+                }),
             );
+            println('');
         } else if (sub === 'promote' || sub === 'push' || sub === 'import') {
             const sourcePath = rest[0] ?? '';
             if (!sourcePath.trim()) {
-                println('\x1b[33m  Uso: /workspace promote <localPath> [--to <sdkPath>] [--overwrite]\x1b[0m');
+                println(
+                    terminalThemeRow('Uso', '/workspace promote <localPath> [--to <sdkPath>] [--overwrite]', {
+                        role: 'command',
+                    }),
+                );
                 return;
             }
             const flags = parseWorkspaceMaterializeFlags(rest.slice(1));
@@ -1625,47 +1834,79 @@ export async function cmdWorkspace({ println }, arg = '') {
                 },
             );
             if (!result.ok) {
-                println(`\n  \x1b[31m✗ Promoção FS→SDK falhou:\x1b[0m ${result.reason}`);
+                println('');
+                println(terminalThemeRow('Promoção', result.reason, { role: 'error' }));
                 if (result.conflict) {
                     println(
-                        '  \x1b[90mpolítica=fail-if-exists · ação=conflict · use --overwrite com intenção explícita\x1b[0m',
+                        terminalThemeRow(
+                            'Conflito',
+                            'política fail-if-exists · ação conflict · use --overwrite com intenção explícita',
+                            { role: 'warn' },
+                        ),
                     );
                 }
-                println(`  \x1b[90mtraceId=${result.traceId}\x1b[0m\n`);
+                println(terminalThemeRow('Trace', result.traceId));
+                println('');
                 await renderCommandFailureGuidance(println, runtimeId);
                 return;
             }
 
+            println('');
+            println(terminalThemeRow('Promoção', 'FS para SDK concluída', { role: 'success' }));
+            println(terminalThemeRow('Origem', sourcePath, { role: 'fileRead' }));
+            println(terminalThemeRow('Destino', destinationPath, { role: 'fileWrite' }));
             println(
-                `\n  \x1b[32m✓ FS→SDK promovido:\x1b[0m \x1b[33m${sourcePath}\x1b[0m → \x1b[33m${destinationPath}\x1b[0m`,
+                terminalThemeRow(
+                    'Política',
+                    `${flags.overwrite ? 'overwrite' : 'fail-if-exists'} · ação ${result.action} · bytes ${result.bytes} · traceId ${result.traceId}`,
+                ),
             );
-            println(
-                `  \x1b[90mpolítica=${flags.overwrite ? 'overwrite' : 'fail-if-exists'} · ação=${result.action} · bytes=${result.bytes} · traceId=${result.traceId}\x1b[0m\n`,
-            );
+            println('');
         } else {
             const result = await callWithRuntimeTarget(listTerminalSdkWorkspaceFiles, runtimeId);
             const files = arrayFromSdkList(result);
-            println(`\n  \x1b[36mWorkspace SDK virtual (${files.length || 'retorno bruto'})\x1b[0m`);
+            println('');
+            println(
+                terminalThemeHeadline('fileRead', 'Workspace SDK virtual', [
+                    files.length ? `${files.length} arquivo(s)` : 'retorno bruto',
+                ]),
+            );
             if (files.length > 0) {
                 for (const file of files.slice(0, 80)) {
                     const f = objectOrNull(file) ?? {};
-                    println(`  \x1b[33m${String(f['path'] ?? f['name'] ?? file)}\x1b[0m`);
+                    println(terminalThemeRow('Arquivo', String(f['path'] ?? f['name'] ?? file), { role: 'fileRead' }));
                 }
-                if (files.length > 80) println(`  \x1b[90m• ${files.length - 80} arquivos omitidos\x1b[0m`);
+                if (files.length > 80) println(terminalThemeRow('Omitidos', `${files.length - 80} arquivo(s)`));
             } else {
-                println(`  \x1b[90m${pretty(result, 1500)}\x1b[0m`);
+                println(terminalThemeRow('Retorno', pretty(result, 1500)));
             }
-            println('  \x1b[90mUso: /workspace list | read <path> | write <path> <content>\x1b[0m');
             println(
-                '  \x1b[90m     /workspace sync <sdkPath> [--to <localPath>] [--overwrite] · /workspace mirror [--to <localDir>] [--overwrite]\x1b[0m',
+                terminalThemeRow('Uso', '/workspace list | read <path> | write <path> <content>', { role: 'command' }),
             );
             println('  \x1b[90m     /workspace promote <localPath> [--to <sdkPath>] [--overwrite]\x1b[0m');
             println(
-                '  \x1b[90mObs: list/read/write operam no workspace SDK virtual; sync/mirror materializam no FS local canônico; promote faz FS→SDK com auditoria.\x1b[0m\n',
+                terminalThemeRow(
+                    'Uso',
+                    '/workspace sync <sdkPath> [--to <localPath>] [--overwrite] · /workspace mirror [--to <localDir>] [--overwrite]',
+                    { role: 'command' },
+                ),
             );
+            println(
+                terminalThemeRow('Uso', '/workspace promote <localPath> [--to <sdkPath>] [--overwrite]', {
+                    role: 'command',
+                }),
+            );
+            println(
+                terminalThemeRow(
+                    'Obs',
+                    'list/read/write operam no SDK virtual; sync/mirror materializam no FS local; promote faz FS para SDK com auditoria',
+                ),
+            );
+            println('');
         }
     } catch (e) {
-        println(`\n  \x1b[31m? Workspace SDK: ${toError(e).message}\x1b[0m`);
+        println('');
+        println(terminalThemeRow('Workspace', toError(e).message, { role: 'error' }));
         await renderCommandFailureGuidance(println, runtimeId);
         println('');
     }
@@ -1684,7 +1925,9 @@ export async function cmdElicitation({ println }, arg = '') {
             const message = rest.join(' ').trim() || 'Confirma?';
             const result = await callWithRuntimeTarget(confirmTerminalSdkSessionUi, runtimeId, message);
             println('');
-            println(terminalThemeRow('Confirm', `session.ui.confirm concluído · ${String(result)}`, { role: 'success' }));
+            println(
+                terminalThemeRow('Confirm', `session.ui.confirm concluído · ${String(result)}`, { role: 'success' }),
+            );
             println('');
         } else if (sub === 'select') {
             const { left, right } = splitAtDoubleDash(rest);
@@ -1695,7 +1938,11 @@ export async function cmdElicitation({ println }, arg = '') {
                 .map((item) => item.trim())
                 .filter(Boolean);
             if (options.length === 0) {
-                println(terminalThemeRow('/elicitation', 'Uso: /elicitation select <mensagem> -- opcao1|opcao2|opcao3', { role: 'command' }));
+                println(
+                    terminalThemeRow('/elicitation', 'Uso: /elicitation select <mensagem> -- opcao1|opcao2|opcao3', {
+                        role: 'command',
+                    }),
+                );
                 return;
             }
             const result = await callWithRuntimeTarget(selectTerminalSdkSessionUi, runtimeId, message, options);
@@ -1727,14 +1974,20 @@ export async function cmdElicitation({ println }, arg = '') {
             println('');
             println(terminalThemeHeadline('question', 'Session UI'));
             println(terminalThemeDivider(37));
-            println(terminalThemeRow('Elicitation', ok ? 'disponível' : 'indisponível', { role: ok ? 'success' : 'warn' }));
+            println(
+                terminalThemeRow('Elicitation', ok ? 'disponível' : 'indisponível', { role: ok ? 'success' : 'warn' }),
+            );
             println(terminalThemeDivider(37));
             println('');
         } else if (sub === 'show') {
             renderElicitationEntry({ println }, getTerminalElicitation(rest[0] || 'latest', { runtimeId }));
         } else if (sub === 'clear') {
             const ok = clearTerminalElicitation(rest[0] || 'latest');
-            println(terminalThemeRow('Formulário', ok ? 'removido da UX local' : 'não encontrado', { role: ok ? 'success' : 'warn' }));
+            println(
+                terminalThemeRow('Formulário', ok ? 'removido da UX local' : 'não encontrado', {
+                    role: ok ? 'success' : 'warn',
+                }),
+            );
         } else if (sub === 'respond') {
             const [id = 'latest', action, ...jsonRest] = rest;
             const entry = getTerminalElicitation(id, { runtimeId });
@@ -1781,7 +2034,11 @@ export async function cmdElicitation({ println }, arg = '') {
                 return;
             }
             if (!isRuntimeElicitationSchema(parsed.json)) {
-                println(terminalThemeRow('Schema', 'inválido: esperado { "type": "object", "properties": { ... } }.', { role: 'error' }));
+                println(
+                    terminalThemeRow('Schema', 'inválido: esperado { "type": "object", "properties": { ... } }.', {
+                        role: 'error',
+                    }),
+                );
                 return;
             }
             const result = await callWithRuntimeTarget(requestTerminalSdkElicitation, runtimeId, message, parsed.json);
@@ -1809,8 +2066,19 @@ export async function cmdElicitation({ println }, arg = '') {
                 }
                 println(terminalThemeDivider(37));
             }
-            println(terminalThemeRow('Uso', '/elicitation [list|all|capabilities|confirm|select|input|show|clear|request|request-json|respond]', { role: 'command' }));
-            println(terminalThemeRow('Nota', 'pergunta humana = conversa READY/REPLY; elicitation = formulário/URL estruturado do SDK.'));
+            println(
+                terminalThemeRow(
+                    'Uso',
+                    '/elicitation [list|all|capabilities|confirm|select|input|show|clear|request|request-json|respond]',
+                    { role: 'command' },
+                ),
+            );
+            println(
+                terminalThemeRow(
+                    'Nota',
+                    'pergunta humana = conversa READY/REPLY; elicitation = formulário/URL estruturado do SDK.',
+                ),
+            );
             println('');
         }
     } catch (e) {
@@ -1841,13 +2109,19 @@ export async function cmdPermission({ println }, arg = '') {
                     `${sdkPromptsSkipped ? 'ignorados' : 'seletivos'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme política'}`,
                 ),
             );
-            println(terminalThemeRow('Uso', '/permission mode <approve_all|audit_only|selective>', { role: 'command' }));
+            println(
+                terminalThemeRow('Uso', '/permission mode <approve_all|audit_only|selective>', { role: 'command' }),
+            );
             println(terminalThemeDivider(37));
             println('');
             return;
         }
         if (next !== 'approve_all' && next !== 'audit_only' && next !== 'selective') {
-            println(terminalThemeRow('/permission', 'Uso: /permission mode <approve_all|audit_only|selective>', { role: 'command' }));
+            println(
+                terminalThemeRow('/permission', 'Uso: /permission mode <approve_all|audit_only|selective>', {
+                    role: 'command',
+                }),
+            );
             return;
         }
         const updated = setTerminalRuntimePermissionMode(next, runtimeId);
@@ -1873,7 +2147,11 @@ export async function cmdPermission({ println }, arg = '') {
         const payloadArg = rest.slice(2).join(' ').trim();
         const entry = getTerminalPermission(idArg || 'latest', { runtimeId });
         if (!entry || !entry.requestId) {
-            println(terminalThemeRow('Permissão', 'não encontrada ou sem requestId canônico para responder', { role: 'warn' }));
+            println(
+                terminalThemeRow('Permissão', 'não encontrada ou sem requestId canônico para responder', {
+                    role: 'warn',
+                }),
+            );
             return;
         }
         const decision = parsePermissionDecision(actionArg);
@@ -1920,7 +2198,11 @@ export async function cmdPermission({ println }, arg = '') {
             ts: Date.now(),
         });
         println('');
-        println(terminalThemeRow('Permissão', `resposta enviada · ${entry.requestId} · ${decision.kind}`, { role: 'success' }));
+        println(
+            terminalThemeRow('Permissão', `resposta enviada · ${entry.requestId} · ${decision.kind}`, {
+                role: 'success',
+            }),
+        );
         println(terminalThemeRow('Resultado', pretty(result, 700)));
         println('');
         return;
@@ -1940,7 +2222,9 @@ export async function cmdPermission({ println }, arg = '') {
             println(terminalThemeDivider(37));
             println(terminalThemeRow('Fonte', String(remote.source ?? 'unknown')));
             if (requests.length === 0) {
-                println(terminalThemeRow('Permissões', 'nenhuma pendente reportada pela sessão SDK', { role: 'success' }));
+                println(
+                    terminalThemeRow('Permissões', 'nenhuma pendente reportada pela sessão SDK', { role: 'success' }),
+                );
                 println(terminalThemeDivider(37));
                 println('');
                 return;
@@ -1987,7 +2271,11 @@ export async function cmdPermission({ println }, arg = '') {
     }
     if (sub === 'clear') {
         const ok = clearTerminalPermission(rest[0] || 'latest');
-        println(terminalThemeRow('Permissão', ok ? 'removida da UX local' : 'não encontrada', { role: ok ? 'success' : 'warn' }));
+        println(
+            terminalThemeRow('Permissão', ok ? 'removida da UX local' : 'não encontrada', {
+                role: ok ? 'success' : 'warn',
+            }),
+        );
         return;
     }
 
@@ -2011,8 +2299,14 @@ export async function cmdPermission({ println }, arg = '') {
         }
         println(terminalThemeDivider(37));
     }
-    println(terminalThemeRow('Uso', '/permission [list|pending|reset-approvals|cockpit|all|show|clear|mode|respond]', { role: 'command' }));
-    println(terminalThemeRow('Nota', 'Permissões são decididas pelo SDK/hook; este comando é observabilidade operacional.'));
+    println(
+        terminalThemeRow('Uso', '/permission [list|pending|reset-approvals|cockpit|all|show|clear|mode|respond]', {
+            role: 'command',
+        }),
+    );
+    println(
+        terminalThemeRow('Nota', 'Permissões são decididas pelo SDK/hook; este comando é observabilidade operacional.'),
+    );
     println('');
 }
 
@@ -2042,7 +2336,11 @@ function renderElicitationEntry({ println }, entry) {
     if (entry.requestedSchema) println(`\n  schema:\n${pretty(entry.requestedSchema, 2500)}`);
     if (entry.actionable) {
         const shorthand = describeElicitationShorthand(entry.requestedSchema);
-        println(terminalThemeRow('Responder', '/elicitation respond <id> <accept|decline|cancel> [json]', { role: 'command' }));
+        println(
+            terminalThemeRow('Responder', '/elicitation respond <id> <accept|decline|cancel> [json]', {
+                role: 'command',
+            }),
+        );
         if (shorthand) println(terminalThemeRow('Atalho', shorthand, { role: 'command' }));
         println('');
     }
@@ -2064,7 +2362,8 @@ function renderPermissionEntry({ println }, entry) {
     println(terminalThemeRow('Estado', entry.status, { role: entry.status === 'pending' ? 'question' : 'muted' }));
     println(terminalThemeRow('Tipo', entry.permissionType, { role: 'warn' }));
     if (entry.requestId) println(terminalThemeRow('Requisição', entry.requestId));
-    if (entry.granted !== null) println(terminalThemeRow('Aprovação', String(entry.granted), { role: entry.granted ? 'success' : 'warn' }));
+    if (entry.granted !== null)
+        println(terminalThemeRow('Aprovação', String(entry.granted), { role: entry.granted ? 'success' : 'warn' }));
     if (entry.result) println(terminalThemeRow('Resultado', entry.result, { role: 'warn' }));
     println(terminalThemeRow('Criada', formatTerminalIsoTimestamp(entry.createdAt)));
     if (entry.completedAt) println(terminalThemeRow('Concluída', formatTerminalIsoTimestamp(entry.completedAt)));
@@ -2101,7 +2400,9 @@ function renderPermissionCockpit({ println }, runtimeId) {
     println('');
     println(terminalThemeHeadline('question', 'Permissões SDK'));
     println(terminalThemeDivider(37));
-    println(terminalThemeRow('Pendentes', String(pending.length), { role: pending.length > 0 ? 'question' : 'success' }));
+    println(
+        terminalThemeRow('Pendentes', String(pending.length), { role: pending.length > 0 ? 'question' : 'success' }),
+    );
     if (latest) {
         const request = latest.requestId ? ` · requisição ${latest.requestId}` : '';
         println(terminalThemeRow('Recente', `${latest.id} · ${latest.permissionType}${request}`));
@@ -2124,7 +2425,11 @@ function renderPermissionCockpit({ println }, runtimeId) {
         println(terminalThemeRow('Mudanças', '(sem mudanças recentes no runtime local)'));
     }
 
-    println(terminalThemeRow('Atalhos', '/permission pending · /permission show latest · /permission mode selective', { role: 'command' }));
+    println(
+        terminalThemeRow('Atalhos', '/permission pending · /permission show latest · /permission mode selective', {
+            role: 'command',
+        }),
+    );
     if (latest?.requestId && latest.status === 'pending') {
         println(terminalThemeRow('Atalho', `/permission respond ${latest.id} approve-once`, { role: 'command' }));
     }

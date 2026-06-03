@@ -2696,4 +2696,23 @@
 - [x] Correção `/permission`: mode, respond, pending, reset-approvals, clear, list, show e cockpit passaram a usar linhas temáticas, com `Permissão`, `Permissões`, `Modo`, `Prompts SDK`, `Pendentes`, `Atalhos` e `Ação`.
 - [x] Teste escopado passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
-- [ ] Próxima lacuna: revisar `/sdk capabilities`, `/sdk doctor`, `/sdk workspace` e demais painéis SDK que ainda têm blocos `\x1b[...]` locais fora de `/permission`/`/elicitation`.
+- [x] Próxima lacuna: revisar `/sdk capabilities`, `/sdk doctor`, `/sdk workspace` e demais painéis SDK que ainda têm blocos `\x1b[...]` locais fora de `/permission`/`/elicitation`.
+
+### 11.38 `/sdk` e `/workspace` sem ilhas de debug visual
+
+- [x] Achado: após `/permission` e `/elicitation`, o arquivo `commands/sdk.js` ainda tinha superfícies antigas em `/sdk capabilities`, `/sdk headers`, `/sdk models`, `/sdk skills`, `/sdk quota`, `/sdk prompt` e `/workspace`.
+- [x] Achado: o operador ainda podia ver `SDK Capabilities`, `Request Headers`, `[OK]`, `[ERR]`, linhas manuais coloridas e dumps sem rótulo, criando a sensação de outra ferramenta dentro da UX.
+- [x] Decisão: painéis cotidianos do SDK devem usar nomes humanos em português, linhas alinhadas e papéis visuais do tema central; termos crus ficam só em detalhes, retornos brutos ou diagnósticos explícitos.
+- [x] Implementação: `/sdk capabilities` virou `Capacidades SDK`, com linhas `UI`, `Tools`, `Plano` e `Retorno`.
+- [x] Implementação: `/sdk` default passou a renderizar `SDK do Terminal`, `Sessão`, `Modelo`, `Esperas`, `Quota` e `Uso` via tema central, sem `reasoning=`/`restante=` ou ANSI local.
+- [x] Implementação: `/sdk headers` passou a mostrar `Headers do próximo turno`, `Headers`, `Fluxo` e pares chave/valor alinhados.
+- [x] Implementação: `/sdk models`, `/sdk skills`, `/sdk skills config`, `/sdk skills agents` e mutações enable/disable passaram para linhas temáticas e vocabulário humano.
+- [x] Implementação: `/sdk quota` e `/sdk prompt` agora renderizam estado, quota, usage RPC, modo, binding e fontes de instrução sem cores hardcoded.
+- [x] Implementação: `/workspace read/write/sync/mirror/promote/list` passou para linhas `Workspace`, `Materialização`, `Mirror SDK`, `Promoção`, `Origem`, `Destino`, `Política`, `Trace`, `Retorno` e `Uso`.
+- [x] Implementação: guidance de falha transversal deixou de imprimir `? <comando>` e linhas mudas; agora usa `Próximo` e `Recuperação`.
+- [x] Teste escopado passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
+- [x] Varredura local confirmou ausência de ANSI literal em `src/copilot/terminal/commands/sdk.js`:
+  - `rg -n "\\x1b\\[|\\u001b\\[" src/copilot/terminal/commands/sdk.js`.
+- [ ] Próxima lacuna: executar validação visual live pós-migração de `/sdk` e `/workspace`, garantindo que `/sdk`, `/sdk capabilities`, `/sdk skills`, `/workspace list` e `/workspace sync` não recriem paredes de texto.
+- [ ] Próxima lacuna: auditar `/tools` e `/help`, pois são comandos de alta exposição e ainda podem ter densidade visual excessiva no primeiro viewport.
