@@ -4487,3 +4487,37 @@
   - Resultado: cockpit em linhas alinhadas, sem rodapé longo, com `Comandos` em múltiplas linhas.
 - [ ] Próxima lacuna: `/byok providers`, `/byok profiles`, `/byok models`, `/byok recommend` e
       `/byok probe` ainda têm muitos blocos ANSI manuais e merecem faixa BYOK própria por risco.
+
+### 12.16 BYOK configuração: env, persist, reload, providers e profiles
+
+- [x] Auditoria pós-push: `main` sincronizado e worktree limpo exceto `.codex/config.toml` local.
+- [x] Achado: `/byok env`, `/byok persist`, `/byok reload`, `/byok providers` e `/byok profiles`
+      ainda usavam blocos ANSI manuais e vocabulário herdado, apesar de serem telas de
+      configuração frequentes.
+- [x] Decisão UX: esses subcomandos são navegação operacional, não prova runtime. Devem ser
+      migrados antes de `models/recommend/probe`, que exigem uma faixa maior por risco e volume.
+- [x] Implementação: `/byok env` virou painel temático com arquivo, chaves, perfis e uso.
+- [x] Implementação: `/byok persist` e `/byok reload` passaram a renderizar sucesso/erro com
+      `terminalThemeRow`, sem ANSI manual.
+- [x] Implementação: `/byok providers` virou painel com resumo compacto, status por perfil,
+      configuração, health e comandos de ação em linhas temáticas.
+- [x] Implementação: `/byok profiles` virou painel com perfil ativo/disponível, configuração e uso
+      temático.
+- [x] Live PTY curto passou:
+  - Sequência: `/byok providers`, `/byok profiles`, `/byok env`, `/quit`.
+  - Achados do live: resumo de presets ainda longo, coluna curta para `cloudflare-workers-ai` e
+        custo `true` bruto em perfis.
+- [x] Correções pós-live:
+  - Resumo de presets agora mostra preview limitado e contagem omitida.
+  - Colunas de perfis/configuração/comandos foram alargadas.
+  - `custo perfil gratuito(true)` virou apenas `custo perfil gratuito`.
+- [x] Correção de health associada: idade passou de `atras` para `atrás` e `provider.timeout`
+      passou a `timeout do provedor` no texto humano.
+- [x] Testes escopados atualizados em `test_commands_byok.spec.js` para `profiles` e `providers`.
+- [x] Validação escopada final passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js --testNamePattern "mostra .env.local|lista perfis|lista providers|reload|persiste perfil|persiste volta"`.
+  - `npm run typecheck:strict:src.copilot`.
+- [x] Live PTY repetido de `/byok providers` e `/byok profiles` confirmou alinhamento melhorado
+      para `cloudflare-workers-ai`, resumo de presets compacto e custo booleano removido.
+- [ ] Próxima faixa BYOK: `models`, `recommend`, `probe` e `probe shortlist`, separando modo
+      humano default de detalhe/raw diagnóstico.

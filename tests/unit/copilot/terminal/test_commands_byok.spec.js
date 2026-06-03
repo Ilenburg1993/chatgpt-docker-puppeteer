@@ -2152,6 +2152,9 @@ describe('terminal /byok command', () => {
 
         expect(ctx.output()).toContain('kilo');
         expect(ctx.output()).toContain('metadados owner');
+        expect(ctx.output()).toContain('/byok use <perfil> prepara o seletor no processo atual');
+        expect(ctx.output()).not.toContain('\x1b[36mBYOK profiles');
+        expect(ctx.output()).not.toContain('← ativo');
         expect(ctx.output()).not.toContain('secret');
     });
 
@@ -2920,12 +2923,14 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('BYOK provedores');
         expect(ctx.output()).toContain('openrouter-free');
         expect(ctx.output()).toContain('groq-free');
-        expect(ctx.output()).toContain('← ativo');
+        expect(ctx.output()).toContain('ativo');
         expect(ctx.output()).toContain('/byok use groq-free');
         expect(ctx.output()).toContain('/byok models refresh provider:groq');
         expect(ctx.output()).toContain('metadados tier,owner');
         expect(ctx.output()).toContain('custo perfil gratuito');
         expect(ctx.output()).toContain('chat ok');
+        expect(ctx.output()).not.toContain('\x1b[36mBYOK provedores');
+        expect(ctx.output()).not.toContain('comandos: /byok use');
         expect(ctx.output()).not.toContain('ativo=');
         expect(ctx.output()).not.toContain('prontos=');
         expect(ctx.output()).not.toContain('presets=');

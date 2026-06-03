@@ -278,6 +278,7 @@ function renderByokTokenLabel(value) {
         quota: 'quota',
         credits: 'créditos',
         'rate-limit': 'limite de taxa',
+        'provider.timeout': 'timeout do provedor',
         ok: 'ok',
         failed: 'falhou',
         pass: 'ok',
@@ -756,7 +757,8 @@ function classifyByokModelCost(model) {
 function renderByokProfileCostTag(profileName) {
     const hint = readByokProfileCostHint(profileName);
     if (hint.profileFreeTier !== true) return '';
-    const detail = hint.profileCostDetail ? `(${String(hint.profileCostDetail).slice(0, 40)})` : '';
+    const rawDetail = hint.profileCostDetail ? String(hint.profileCostDetail).trim() : '';
+    const detail = rawDetail && rawDetail !== 'true' ? `(${rawDetail.slice(0, 40)})` : '';
     return ` · custo perfil gratuito${detail}`;
 }
 
@@ -1398,12 +1400,12 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
 function formatByokHealthAge(timestamp) {
     if (!timestamp) return 'sem data';
     const deltaSeconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
-    if (deltaSeconds < 60) return `${deltaSeconds}s atras`;
+    if (deltaSeconds < 60) return `${deltaSeconds}s atrás`;
     const deltaMinutes = Math.round(deltaSeconds / 60);
-    if (deltaMinutes < 60) return `${deltaMinutes}min atras`;
+    if (deltaMinutes < 60) return `${deltaMinutes}min atrás`;
     const deltaHours = Math.round(deltaMinutes / 60);
-    if (deltaHours < 48) return `${deltaHours}h atras`;
-    return `${Math.round(deltaHours / 24)}d atras`;
+    if (deltaHours < 48) return `${deltaHours}h atrás`;
+    return `${Math.round(deltaHours / 24)}d atrás`;
 }
 
 /**
@@ -1524,7 +1526,7 @@ function renderByokHealthTag(health) {
             : health.lastRetryAfterSeconds
               ? ` · retry ${health.lastRetryAfterSeconds}s`
               : '';
-        const failure = health.lastFailureKind ? `${health.lastFailureKind} · ` : '';
+        const failure = health.lastFailureKind ? `${renderByokTokenLabel(health.lastFailureKind)} · ` : '';
         return `chat falhou (${failure}${renderByokChatHealthEvidence(health.lastErrorContext)} · ${formatByokHealthAge(health.lastFailureAt)}${limit}${health.failureCount > 1 ? ` · x${health.failureCount}` : ''})`;
     }
     if (health.lastStatus !== 'ok') return 'chat sem registro';
@@ -5189,26 +5191,39 @@ export async function cmdByok({ println, eventBus = null }, arg) {
     const { envKeys, models, profiles, summary } = projection;
 
     if (sub === 'env') {
-        println('\n  \x1b[36mBYOK env canonico\x1b[0m');
-        println('  \x1b[90mArquivo unico para o operador: .env.local (gitignored). Coloque perfis, modelos, metadata e segredos apenas ali.\x1b[0m\n');
-        for (const key of envKeys) {
-            println(`    \x1b[33m${key}\x1b[0m`);
-        }
-        println('\n  \x1b[90mPerfis vivem em COPILOT_BYOK_PROFILES_JSON; o ativo em COPILOT_BYOK_PROFILE. Exemplos seguros ficam em .env.local.example.\x1b[0m');
-        println('  \x1b[90mUso: /byok | /byok providers | /byok profiles | /byok models | /byok env\x1b[0m\n');
+        println('');
+        println(terminalThemeHeadline('tool', 'BYOK env canônico'));
+        println(terminalThemeDivider(60));
+        println(
+            terminalThemeRow(
+                'Arquivo',
+                '.env.local · gitignored · perfis, modelos, metadados e segredos vivem somente ali',
+            ),
+        );
+        println(terminalThemeRows('Chaves', [...envKeys], { role: 'command', width: 12 }));
+        println(
+            terminalThemeRow(
+                'Perfis',
+                'COPILOT_BYOK_PROFILES_JSON define perfis; COPILOT_BYOK_PROFILE escolhe o ativo',
+            ),
+        );
+        println(terminalThemeRows('Uso', ['/byok', '/byok providers', '/byok profiles', '/byok models', '/byok env'], { role: 'command', width: 12 }));
+        println(terminalThemeDivider(60));
+        println('');
         return;
     }
 
     if (sub === 'persist') {
         try {
             const message = await persistByokSelection(rest, projection);
-            println(`  \x1b[32m${message}\x1b[0m`);
-            println('  \x1b[90mGravação feita em .env.local sem imprimir segredos.\x1b[0m');
+            println(terminalThemeRow('BYOK', message, { role: 'success' }));
+            println(terminalThemeRow('Arquivo', 'gravação feita em .env.local sem imprimir segredos'));
             printByokSdkSessionBoundaryHint(println, { persisted: true });
             println('');
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            println(`  \x1b[31mNão foi possível persistir BYOK: ${message}\x1b[0m\n`);
+            println(terminalThemeRow('BYOK', `não foi possível persistir: ${message}`, { role: 'error' }));
+            println('');
         }
         return;
     }
@@ -5603,12 +5618,14 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         clearRuntimeSelectors();
         const result = loadDotenv({ path: '.env.local', override: true, quiet: true });
         if (result.error) {
-            println(`  \x1b[31mNão foi possível recarregar .env.local: ${result.error.message}\x1b[0m\n`);
+            println(terminalThemeRow('BYOK', `não foi possível recarregar .env.local: ${result.error.message}`, { role: 'error' }));
+            println('');
             return;
         }
-        println('  \x1b[32m.env.local recarregado no processo atual. Segredos não foram exibidos.\x1b[0m');
+        println(terminalThemeRow('BYOK', '.env.local recarregado no processo atual · segredos não exibidos', { role: 'success' }));
         if (skipStatus) {
-            println('  \x1b[90mStatus omitido por solicitação; aplique a rota preparada e rode /byok para o cockpit final.\x1b[0m\n');
+            println(terminalThemeRow('Status', 'omitido por solicitação; rode /byok para o cockpit final'));
+            println('');
             return;
         }
         await renderStatus(readTerminalByokProjection(), println);
@@ -5629,55 +5646,93 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             const key = profile.preset ?? profile.providerType ?? 'custom';
             presetCounts.set(key, (presetCounts.get(key) ?? 0) + 1);
         }
-        const configuredPresets = [...presetCounts.entries()]
-            .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+        const configuredPresetEntries = [...presetCounts.entries()].sort((a, b) =>
+            String(a[0]).localeCompare(String(b[0])),
+        );
+        const configuredPresets = configuredPresetEntries
+            .slice(0, 6)
             .map(([preset, count]) => `${preset} ${count}`)
             .join(' · ');
-        println(`\n  \x1b[36mBYOK provedores\x1b[0m (${profiles.length} perfil(is))`);
-        println(`  \x1b[90mativo ${summary.profile ?? summary.preset ?? 'sdk'} · prontos ${profiles.length} · presets ${configuredPresets || '-'}\x1b[0m\n`);
+        const omittedPresetCount = Math.max(0, configuredPresetEntries.length - 6);
+        const presetSummary = configuredPresets
+            ? `${configuredPresetEntries.length} tipo(s) · ${configuredPresets}${omittedPresetCount > 0 ? ` · +${omittedPresetCount}` : ''}`
+            : '-';
+        println('');
+        println(terminalThemeHeadline('tool', 'BYOK provedores', [`${profiles.length} perfil(is)`]));
+        println(terminalThemeDivider(64));
+        println(
+            terminalThemeRow(
+                'Resumo',
+                `ativo ${summary.profile ?? summary.preset ?? 'sdk'} · prontos ${profiles.length} · presets ${presetSummary}`,
+            ),
+        );
         if (profiles.length === 0) {
-            println('    \x1b[33mNenhum provedor BYOK configurado. Adicione perfis em COPILOT_BYOK_PROFILES_JSON no .env.local.\x1b[0m\n');
+            println(terminalThemeRow('Provedores', 'nenhum configurado', { role: 'warn' }));
+            println(terminalThemeRow('Próximo', 'adicione perfis em COPILOT_BYOK_PROFILES_JSON no .env.local', { role: 'command' }));
+            println('');
             return;
         }
         for (const profile of profiles) {
-            const active = profile.name === summary.profile ? ' \x1b[32m← ativo\x1b[0m' : '';
+            const active = profile.name === summary.profile ? 'ativo' : 'disponível';
             const metadata = profile.metadataKeys.length ? ` · metadados ${profile.metadataKeys.join(',')}` : '';
             const cost = renderByokProfileCostTag(profile.name);
             const health = readHealthForByokProfile(profile);
             const healthLabel = ` · ${renderByokHealthTag(health)} · ${renderByokAgentProbeHealthTag(health)}`;
             const readiness =
                 profile.auth.bearerTokenConfigured || profile.auth.apiKeyConfigured || profile.auth.headersConfigured
-                    ? '\x1b[32mready\x1b[0m'
-                    : '\x1b[33msem credencial\x1b[0m';
-            println(`    \x1b[33m${profile.name}\x1b[0m${active} · ${readiness}`);
+                    ? 'pronto'
+                    : 'sem credencial';
+            println(terminalThemeRow(profile.name, `${active} · ${readiness}`, { role: readiness === 'pronto' ? 'success' : 'warn', width: 24 }));
             println(
-                `      \x1b[90mpreset ${profile.preset ?? '-'} · provedor ${profile.providerType ?? '-'} · modelo ${profile.model ?? '-'} · autenticação ${renderProfileAuth(profile)}${metadata}${cost}${healthLabel}\x1b[0m`,
+                terminalThemeRow(
+                    'Configuração',
+                    `preset ${profile.preset ?? '-'} · provedor ${profile.providerType ?? '-'} · modelo ${profile.model ?? '-'} · autenticação ${renderProfileAuth(profile)}${metadata}${cost}${healthLabel}`,
+                    { width: 24 },
+                ),
             );
             println(
-                `      \x1b[90mcomandos: /byok use ${profile.name} · /byok models refresh provider:${profile.preset ?? profile.providerType ?? profile.name} · /byok recommend provider:${profile.preset ?? profile.providerType ?? profile.name} free reasoning safe\x1b[0m`,
+                terminalThemeRows(
+                    'Comandos',
+                    [
+                        `/byok use ${profile.name}`,
+                        `/byok models refresh provider:${profile.preset ?? profile.providerType ?? profile.name}`,
+                        `/byok recommend provider:${profile.preset ?? profile.providerType ?? profile.name} free reasoning safe`,
+                    ],
+                    { role: 'command', width: 24 },
+                ),
             );
         }
-        println('\n  \x1b[90mUse /byok models all-providers free reasoning safe para comparar todos os perfis; use provider:<nome> para filtrar.\x1b[0m\n');
+        println(terminalThemeRow('Comparar', '/byok models all-providers free reasoning safe · filtro provider:<nome>', { role: 'command' }));
+        println(terminalThemeDivider(64));
+        println('');
         return;
     }
 
     if (sub === 'profiles') {
-        println(`\n  \x1b[36mBYOK profiles\x1b[0m (${profiles.length})\n`);
+        println('');
+        println(terminalThemeHeadline('tool', 'BYOK profiles', [`${profiles.length}`]));
+        println(terminalThemeDivider(60));
         if (profiles.length === 0) {
-            println('    \x1b[33mNenhum perfil configurado em COPILOT_BYOK_PROFILES_JSON no .env.local.\x1b[0m\n');
+            println(terminalThemeRow('Perfis', 'nenhum configurado em COPILOT_BYOK_PROFILES_JSON no .env.local', { role: 'warn' }));
+            println('');
             return;
         }
         for (const profile of profiles) {
-            const active = profile.name === summary.profile ? ' \x1b[32m← ativo\x1b[0m' : '';
+            const active = profile.name === summary.profile ? 'ativo' : 'disponível';
             const metadata = profile.metadataKeys.length ? ` · metadados ${profile.metadataKeys.join(',')}` : '';
             const cost = renderByokProfileCostTag(profile.name);
-            println(`    \x1b[33m${profile.name}\x1b[0m${active}`);
+            println(terminalThemeRow(profile.name, active, { role: active === 'ativo' ? 'success' : 'muted', width: 24 }));
             println(
-                `      \x1b[90mpreset ${profile.preset ?? '-'} · provedor ${profile.providerType ?? '-'} · modelo ${profile.model ?? '-'} · autenticação ${renderProfileAuth(profile)}${metadata}${cost}\x1b[0m`,
+                terminalThemeRow(
+                    'Configuração',
+                    `preset ${profile.preset ?? '-'} · provedor ${profile.providerType ?? '-'} · modelo ${profile.model ?? '-'} · autenticação ${renderProfileAuth(profile)}${metadata}${cost}`,
+                    { width: 24 },
+                ),
             );
         }
-        println('\n  \x1b[90mUso: /byok use <perfil> prepara o seletor no processo atual.\x1b[0m');
+        println(terminalThemeRow('Uso', '/byok use <perfil> prepara o seletor no processo atual', { role: 'command' }));
         printByokSdkSessionBoundaryHint(println);
+        println(terminalThemeDivider(60));
         println('');
         return;
     }
