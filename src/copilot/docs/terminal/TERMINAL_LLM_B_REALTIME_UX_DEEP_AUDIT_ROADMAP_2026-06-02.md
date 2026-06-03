@@ -4521,3 +4521,29 @@
       para `cloudflare-workers-ai`, resumo de presets compacto e custo booleano removido.
 - [ ] Próxima faixa BYOK: `models`, `recommend`, `probe` e `probe shortlist`, separando modo
       humano default de detalhe/raw diagnóstico.
+
+### 12.17 BYOK models/recommend/probe: envelope humano sem alterar execução
+
+- [x] Auditoria: `models`, `recommend`, `probe` e `probe shortlist` ainda misturavam cabeçalhos
+      ANSI, escopo longo, avisos soltos e rodapés explicativos crus com listas de modelos/probes.
+- [x] Decisão técnica: nesta faixa, migrar apenas o envelope humano seguro: cabeçalho, fonte,
+      filtros, contexto, avisos, vazio, guia e rodapé. As linhas de modelo/probe permanecem para
+      uma próxima faixa porque envolvem ranking, orçamento, health e resultado runtime.
+- [x] Implementação: `probe shortlist` passou a usar `BYOK shortlist agent probe`, `Escopo`,
+      `Aviso`, `Shortlist`, `Próximo` e `Sessão viva` em linhas temáticas.
+- [x] Implementação: `probe chat/agent/streaming/json/vision` passou a renderizar cabeçalho,
+      escopo e guia final com tema central.
+- [x] Implementação: `models` passou a renderizar cabeçalho, fonte, ordenação, avisos e estado
+      vazio com tema central.
+- [x] Implementação: `recommend` passou a renderizar cabeçalho, fonte, filtros, contexto, avisos,
+      estado vazio, guia de probe agent e troca viva com tema central.
+- [x] Validação escopada passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js --testNamePattern "models all-providers|BYOK models|recommend|probe shortlist|roda probe|streaming|json|vision|lista providers|lista perfis|mostra .env.local|usa metadados"`.
+  - `npm run typecheck:strict:src.copilot`.
+- [x] Live PTY sem runtime passou:
+  - Sequência: `/byok models 2`, `/byok recommend 2`, `/quit`.
+  - Resultado: envelopes `BYOK models` e `BYOK recommend` ficaram temáticos e legíveis.
+  - Achado remanescente: linhas individuais de modelos ainda imprimem ANSI manual, IDs/tags muito
+        densos e orçamento colorido diretamente.
+- [ ] Próxima etapa: migrar linhas de modelo/recomendação/probe individual, removendo ANSI manual
+      das linhas com `model.id`, tags, orçamento, cor de budget e resultado de probe.

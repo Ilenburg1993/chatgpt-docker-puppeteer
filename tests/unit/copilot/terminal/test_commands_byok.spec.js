@@ -1978,7 +1978,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'status');
 
-        expect(ctx.output()).toMatch(/visão.*nao.*contexto 256000/su);
+        expect(ctx.output()).toMatch(/visão.*não.*contexto 256000/su);
         expect(ctx.output()).toContain('origem cache do provedor · sobrescreve defaults do provedor');
         expect(ctx.output()).not.toContain('source=provider-cache:model');
     });
@@ -2708,7 +2708,7 @@ describe('terminal /byok command', () => {
             }),
         );
         expect(ctx.output()).toContain('BYOK streaming probe');
-        expect(ctx.output()).toContain('UX live ficaria cega');
+        expect(ctx.output()).toContain('UX live cega');
     });
 
     it('roda probe JSON como capacidade estruturada sem degradar chat health', async () => {
@@ -2760,7 +2760,7 @@ describe('terminal /byok command', () => {
             }),
         );
         expect(ctx.output()).toContain('BYOK json probe');
-        expect(ctx.output()).toContain('Sonda JSON confirma saída estruturada');
+        expect(ctx.output()).toContain('sonda JSON confirma saída estruturada');
     });
 
     it('roda probe vision com fixture de imagem sem degradar chat health', async () => {
@@ -2815,7 +2815,7 @@ describe('terminal /byok command', () => {
         );
         expect(ctx.output()).toContain('BYOK vision probe');
         expect(ctx.output()).toContain('fixture image/png/68 bytes');
-        expect(ctx.output()).toContain('Sonda de visão confirma');
+        expect(ctx.output()).toContain('sonda de visão confirmou');
     });
 
     it('explica probe vision sem prova como resultado multimodal não conclusivo', async () => {
@@ -2857,7 +2857,7 @@ describe('terminal /byok command', () => {
         );
         expect(ctx.output()).toContain('resultado:');
         expect(ctx.output()).toContain('empty');
-        expect(ctx.output()).toContain('resultado explícito sem prova visual positiva');
+        expect(ctx.output()).toContain('resultado sem prova visual positiva');
         expect(ctx.output()).not.toContain('Sonda de visão confirma que o provider aceitou');
     });
 

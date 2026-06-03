@@ -5536,12 +5536,16 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                 matchesRecommendFilters(model, filters, runtimeBudget),
             );
             const candidates = eligibleModels.slice(0, filters.limit);
-            println(`\n  \x1b[36mBYOK shortlist agent probe\x1b[0m (${candidates.length}/${modelList.length})`);
+            println('');
+            println(terminalThemeHeadline('tool', 'BYOK shortlist agent probe', [`${candidates.length}/${modelList.length}`]));
             println(
-                `  \x1b[90mEscopo: ${filters.allProviders ? 'todos os perfis selecionados' : 'provider/perfil ativo'} + ranking do catalogo + filtros ${renderByokFilterLabel(filters) || 'safe'}; cada candidato roda a mesma sessão SDK descartável de /byok probe agent, sem trocar a conversa viva.${timeoutMs ? ` timeout ${timeoutMs}ms` : ''}\x1b[0m\n`,
+                terminalThemeRow(
+                    'Escopo',
+                    `${filters.allProviders ? 'todos os perfis selecionados' : 'provider/perfil ativo'} + ranking do catálogo + filtros ${renderByokFilterLabel(filters) || 'safe'}; cada candidato roda sessão SDK descartável de /byok probe agent, sem trocar a conversa viva${timeoutMs ? ` · timeout ${timeoutMs}ms` : ''}`,
+                ),
             );
             for (const error of discovered.errors.slice(0, 6)) {
-                println(`  \x1b[33m  aviso: descoberta remota indisponível (${error}); usando catálogo disponível.\x1b[0m`);
+                println(terminalThemeRow('Aviso', `descoberta remota indisponível (${error}); usando catálogo disponível`, { role: 'warn' }));
             }
             renderByokCatalogWarnings(println, discovered.warnings);
             renderByokShortlistProfileCoverage(
@@ -5554,7 +5558,9 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                 runtimeBudget,
             );
             if (candidates.length === 0) {
-                println('    \x1b[33mNenhum candidato cabe na shortlist atual. Ajuste provider/filtros, remova safe para inspeção ou rode /byok models.\x1b[0m\n');
+                println(terminalThemeRow('Shortlist', 'nenhum candidato cabe nos filtros atuais', { role: 'warn' }));
+                println(terminalThemeRow('Próximo', 'ajuste provider/filtros, remova safe para inspeção ou rode /byok models', { role: 'command' }));
+                println('');
                 renderEmptyByokFilterDiagnostics(println, modelList, filters, runtimeBudget);
                 return;
             }
@@ -5573,8 +5579,13 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                 println('');
             }
             println(
-                `  \x1b[90mShortlist encerrada: aprovados ${passed}/${candidates.length} · providers tentados ${attempted}/${candidates.length}. A saúde persistida alimenta /byok recommend ... safe; a sessão viva só muda com /byok use e /byok model.\x1b[0m\n`,
+                terminalThemeRow(
+                    'Shortlist',
+                    `encerrada · aprovados ${passed}/${candidates.length} · providers tentados ${attempted}/${candidates.length} · saúde persistida alimenta /byok recommend ... safe`,
+                ),
             );
+            println(terminalThemeRow('Sessão viva', 'só muda com /byok use e /byok model', { role: 'command' }));
+            println('');
             return;
         }
         /** @type {ByokProbeMode} */
@@ -5591,25 +5602,30 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             rest[0] ?? '',
         );
         const selection = buildByokProbeSelection(explicitMode ? rest.slice(1) : rest);
-        println(`\n  \x1b[36mBYOK ${mode} probe\x1b[0m`);
+        println('');
+        println(terminalThemeHeadline('tool', `BYOK ${mode} probe`));
         println(
-            `  \x1b[90mEscopo: sessão SDK descartável; não troca a conversa viva nem grava transcript live.${mode === 'chat' ? ' Sonda de chat não usa ferramentas.' : mode === 'agent' ? ' Sonda agente exige ferramentas representativas do terminal + ask_user com resposta sintética.' : mode === 'streaming' ? ' Sonda de streaming exige delta real; não degrada saúde de chat.' : mode === 'json' ? ' Sonda JSON exige payload parseável; não degrada saúde de chat.' : ' Sonda de visão anexa fixture PNG hermética e exige identificação visual; não degrada saúde de chat.'}${selection.profile ? ` perfil ${selection.profile}` : ''}${selection.provider ? ` provedor ${selection.provider}` : ''}${selection.model ? ` modelo ${selection.model}` : ''}${selection.baseUrl ? ` base URL ${selection.baseUrl}` : ''}${selection.wireApi ? ` protocolo ${renderByokWireLabel(selection.wireApi)}` : ''}\x1b[0m`,
+            terminalThemeRow(
+                'Escopo',
+                `sessão SDK descartável; não troca a conversa viva nem grava transcript live.${mode === 'chat' ? ' Sonda de chat não usa ferramentas.' : mode === 'agent' ? ' Sonda agente exige ferramentas representativas do terminal + ask_user com resposta sintética.' : mode === 'streaming' ? ' Sonda de streaming exige delta real; não degrada saúde de chat.' : mode === 'json' ? ' Sonda JSON exige payload parseável; não degrada saúde de chat.' : ' Sonda de visão anexa fixture PNG hermética e exige identificação visual; não degrada saúde de chat.'}${selection.profile ? ` perfil ${selection.profile}` : ''}${selection.provider ? ` provedor ${selection.provider}` : ''}${selection.model ? ` modelo ${selection.model}` : ''}${selection.baseUrl ? ` base URL ${selection.baseUrl}` : ''}${selection.wireApi ? ` protocolo ${renderByokWireLabel(selection.wireApi)}` : ''}`,
+            ),
         );
         const { probe, providerAttempted } = await runByokProbe(mode, selection, eventBus);
         renderByokProbeResult(println, mode, probe, { providerAttempted });
-        println(
+        const probeGuidance =
             mode === 'agent'
-                ? '  \x1b[90mSonda agente confirma a fronteira exigida pelo terminal: streaming + ferramentas representativas + ask_user. Sonda de chat isolada continua disponível com /byok probe chat.\x1b[0m\n'
+                ? 'sonda agente confirma streaming + ferramentas representativas + ask_user; sonda de chat isolada segue disponível com /byok probe chat'
                 : mode === 'streaming'
-                  ? '  \x1b[90mSonda de streaming separa resposta final de delta incremental. Falha no delta não implica que o chat seja inutilizável, mas a UX live ficaria cega.\x1b[0m\n'
+                  ? 'sonda de streaming separa resposta final de delta incremental; falha no delta não torna chat inutilizável, mas deixa a UX live cega'
                   : mode === 'json'
-                    ? '  \x1b[90mSonda JSON confirma saída estruturada parseável. Use junto com sonda agente antes de promover modelo para fluxos automatizados.\x1b[0m\n'
+                    ? 'sonda JSON confirma saída estruturada parseável; use junto com sonda agente antes de promover modelo'
                     : mode === 'vision'
                       ? probe.ok
-                          ? '  \x1b[90mSonda de visão confirma que o provedor aceitou anexo de imagem e interpretou a fixture. Use junto com agente/JSON quando o fluxo precisar automação multimodal.\x1b[0m\n'
-                          : '  \x1b[90mSonda de visão registrou resultado explícito sem prova visual positiva; chat/agente não são degradados por essa capacidade multimodal.\x1b[0m\n'
-                    : '  \x1b[90mCatálogo mostra oferta; sonda de chat confirma conversa canária. Para validar execução agente, rode /byok probe agent antes do live.\x1b[0m\n',
-        );
+                          ? 'sonda de visão confirmou anexo de imagem e interpretação da fixture; combine com agente/JSON para automação multimodal'
+                          : 'sonda de visão registrou resultado sem prova visual positiva; chat/agente não são degradados por essa capacidade'
+                      : 'catálogo mostra oferta; sonda de chat confirma conversa canária; para validar execução agente, rode /byok probe agent';
+        println(terminalThemeRow('Guia', probeGuidance));
+        println('');
         return;
     }
 
@@ -5772,19 +5788,30 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             : modelList.map((model) => ({ model, variants: [] }));
         const visibleEntries = modelEntries.slice(0, limit);
         const filterLabel = renderByokFilterLabel(filters);
-        println(`\n  \x1b[36mBYOK models\x1b[0m (${filters.grouped ? `${modelEntries.length} grupos/${modelList.length}` : modelList.length})`);
+        println('');
         println(
-            `  \x1b[90mfonte ${discovered.sourceLabel}${discovered.profileCount > 1 ? ` · perfis ${discovered.profileCount}` : ''}${discovered.endpoint ? ` · endpoint ${discovered.endpoint}` : ''} · ordem free/capability/context · filtros ${filterLabel || '-'}\x1b[0m\n`,
+            terminalThemeHeadline('tool', 'BYOK models', [
+                filters.grouped ? `${modelEntries.length} grupos/${modelList.length}` : `${modelList.length}`,
+            ]),
         );
+        println(
+            terminalThemeRow(
+                'Fonte',
+                `${discovered.sourceLabel}${discovered.profileCount > 1 ? ` · perfis ${discovered.profileCount}` : ''}${discovered.endpoint ? ` · endpoint ${discovered.endpoint}` : ''}`,
+            ),
+        );
+        println(terminalThemeRow('Ordenação', `free/capability/context · filtros ${filterLabel || '-'}`));
         for (const error of discovered.errors.slice(0, 6)) {
-            println(`  \x1b[33m  aviso: descoberta remota indisponível (${error}); usando catálogo disponível.\x1b[0m`);
+            println(terminalThemeRow('Aviso', `descoberta remota indisponível (${error}); usando catálogo disponível`, { role: 'warn' }));
         }
         if (discovered.errors.length > 6) {
-            println(`  \x1b[33m  aviso: +${discovered.errors.length - 6} erro(s) de descoberta omitidos; use provider:<nome> para isolar.\x1b[0m`);
+            println(terminalThemeRow('Aviso', `+${discovered.errors.length - 6} erro(s) de descoberta omitidos; use provider:<nome> para isolar`, { role: 'warn' }));
         }
         renderByokCatalogWarnings(println, discovered.warnings);
         if (modelList.length === 0) {
-            println('    \x1b[33mNenhum modelo BYOK encontrado para os filtros atuais. Remova filtros, use provider:<nome> ou rode /byok models all-providers refresh.\x1b[0m\n');
+            println(terminalThemeRow('Modelos', 'nenhum encontrado para os filtros atuais', { role: 'warn' }));
+            println(terminalThemeRow('Próximo', 'remova filtros, use provider:<nome> ou rode /byok models all-providers refresh', { role: 'command' }));
+            println('');
             renderEmptyByokFilterDiagnostics(println, discovered.models.length > 0 ? discovered.models : models, filters, runtimeBudget);
             return;
         }
@@ -5817,28 +5844,42 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             : rankedRecommended.map((model) => ({ model, variants: [] }))
         ).slice(0, filters.limit);
         const filterLabel = renderByokFilterLabel(filters);
-        println(`\n  \x1b[36mBYOK recommend\x1b[0m (${recommendedEntries.length}/${modelList.length}${filters.grouped ? ' grupos' : ''})`);
+        println('');
         println(
-            `  \x1b[90mfonte ${discovered.sourceLabel}${discovered.profileCount > 1 ? ` · perfis ${discovered.profileCount}` : ''}${discovered.endpoint ? ` · endpoint ${discovered.endpoint}` : ''} · filtros ${filterLabel || '-'}\x1b[0m\n`,
+            terminalThemeHeadline('tool', 'BYOK recommend', [
+                `${recommendedEntries.length}/${modelList.length}${filters.grouped ? ' grupos' : ''}`,
+            ]),
         );
+        println(
+            terminalThemeRow(
+                'Fonte',
+                `${discovered.sourceLabel}${discovered.profileCount > 1 ? ` · perfis ${discovered.profileCount}` : ''}${discovered.endpoint ? ` · endpoint ${discovered.endpoint}` : ''}`,
+            ),
+        );
+        println(terminalThemeRow('Filtros', filterLabel || '-'));
         if (runtimeBudget !== null) {
             const contextLabel =
                 runtimeBudget.tokenLimit !== null
                     ? `${runtimeBudget.contextTokens}/${runtimeBudget.tokenLimit}`
                     : `${runtimeBudget.contextTokens}`;
             println(
-                `  \x1b[90mcontexto atual≈${contextLabel} tokens · estimativa pré-turno≈${runtimeBudget.estimatedRequestTokens} tokens\x1b[0m\n`,
+                terminalThemeRow(
+                    'Contexto',
+                    `atual ≈${contextLabel} tokens · estimativa pré-turno ≈${runtimeBudget.estimatedRequestTokens} tokens`,
+                ),
             );
         }
         for (const error of discovered.errors.slice(0, 6)) {
-            println(`  \x1b[33m  aviso: descoberta remota indisponível (${error}); usando catálogo disponível.\x1b[0m`);
+            println(terminalThemeRow('Aviso', `descoberta remota indisponível (${error}); usando catálogo disponível`, { role: 'warn' }));
         }
         if (discovered.errors.length > 6) {
-            println(`  \x1b[33m  aviso: +${discovered.errors.length - 6} erro(s) de descoberta omitidos; use provider:<nome> para isolar.\x1b[0m`);
+            println(terminalThemeRow('Aviso', `+${discovered.errors.length - 6} erro(s) de descoberta omitidos; use provider:<nome> para isolar`, { role: 'warn' }));
         }
         renderByokCatalogWarnings(println, discovered.warnings);
         if (recommendedEntries.length === 0) {
-            println('    \x1b[33mNenhum modelo atende aos filtros. Tente remover filtros ou rode /byok models refresh.\x1b[0m\n');
+            println(terminalThemeRow('Recomendação', 'nenhum modelo atende aos filtros', { role: 'warn' }));
+            println(terminalThemeRow('Próximo', 'remova filtros ou rode /byok models refresh', { role: 'command' }));
+            println('');
             renderEmptyByokFilterDiagnostics(println, modelList, filters, runtimeBudget);
             if (filters.avoidLowLimit) renderSafeRecommendationEvidenceDiagnostics(println, budgetSafeRecommendations);
             return;
@@ -5854,7 +5895,15 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             println(`       \x1b[90m${renderByokRecommendationActionHint(entry.model)}\x1b[0m`);
             index += 1;
         }
-        println('\n  \x1b[90mA probe agent é a live fake descartável do terminal: valida streaming/tool/ask_user antes de trocar a sessão viva. Use /byok use <perfil> para mudar provedor e /byok model <id> para mudar só o modelo ativo.\x1b[0m\n');
+        println('');
+        println(
+            terminalThemeRow(
+                'Probe agent',
+                'live descartável do terminal: valida streaming/tool/ask_user antes de trocar a sessão viva',
+            ),
+        );
+        println(terminalThemeRow('Troca viva', '/byok use <perfil> troca provedor; /byok model <id> troca só modelo ativo', { role: 'command' }));
+        println('');
         return;
     }
 
