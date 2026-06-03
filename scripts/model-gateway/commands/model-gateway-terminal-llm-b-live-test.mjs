@@ -1739,7 +1739,9 @@ function diagnosticUxCycleCriteria(boot) {
     const sdkWaitsStart = plain.indexOf('/session sdk waits 8', Math.max(0, sdkEventsStart));
     const sdkInventoryStart = plain.indexOf('/session sdk 6', Math.max(0, sdkWaitsStart));
     const sdkStatusStart = plain.indexOf('/sdk status', Math.max(0, sdkInventoryStart));
-    const historyStart = plain.indexOf('/history 6', Math.max(0, sdkStatusStart));
+    const permissionModeStart = plain.indexOf('/permission mode', Math.max(0, sdkStatusStart));
+    const permissionCockpitStart = plain.indexOf('/permission cockpit', Math.max(0, permissionModeStart));
+    const historyStart = plain.indexOf('/history 6', Math.max(0, permissionCockpitStart));
     const dbHistoryStart = plain.indexOf('/db-history 6', Math.max(0, historyStart));
     const dbSessionsStart = plain.indexOf('/db-sessions 6', Math.max(0, dbHistoryStart));
     const scopeDeclareStart = plain.indexOf('/scope declare terminal-ux-scope', Math.max(0, dbSessionsStart));
@@ -1763,7 +1765,9 @@ function diagnosticUxCycleCriteria(boot) {
     const sdkEventsSurface = surfaceBetween(sdkEventsStart, sdkWaitsStart);
     const sdkWaitsSurface = surfaceBetween(sdkWaitsStart, sdkInventoryStart);
     const sdkInventorySurface = surfaceBetween(sdkInventoryStart, sdkStatusStart);
-    const sdkStatusSurface = surfaceBetween(sdkStatusStart, historyStart);
+    const sdkStatusSurface = surfaceBetween(sdkStatusStart, permissionModeStart);
+    const permissionModeSurface = surfaceBetween(permissionModeStart, permissionCockpitStart);
+    const permissionCockpitSurface = surfaceBetween(permissionCockpitStart, historyStart);
     const historySurface = surfaceBetween(historyStart, dbHistoryStart);
     const dbHistorySurface = surfaceBetween(dbHistoryStart, dbSessionsStart);
     const dbSessionsSurface = surfaceBetween(dbSessionsStart, scopeDeclareStart);
@@ -1868,6 +1872,16 @@ function diagnosticUxCycleCriteria(boot) {
             detail: '/sdk status rendered session presence and quota/status without raw session ids or key=value diagnostics',
         },
         {
+            id: 'diagnostic-ux-permission-human',
+            pass:
+                /Modo de permissões[\s\S]*(automáticas|auditoria sem janelas|seletivas)/iu.test(permissionModeSurface) &&
+                /Permissões SDK[\s\S]*(Pendentes|Mudanças)/iu.test(permissionCockpitSurface) &&
+                !/approve_all|audit_only|selective|file_write|fs\.write|requestId|\\x1b\[|\d{4}-\d{2}-\d{2}T/iu.test(
+                    `${permissionModeSurface}\n${permissionCockpitSurface}`,
+                ),
+            detail: '/permission mode/cockpit rendered translated governance labels without raw mode constants, permission types, requestId labels, ANSI, or ISO timestamps',
+        },
+        {
             id: 'diagnostic-ux-history-human',
             pass:
                 /Histórico/iu.test(historySurface) &&
@@ -1935,6 +1949,8 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
             { line: '/session sdk waits 8', advanceAfterMs: 1_000 },
             { line: '/session sdk 6', advanceAfterMs: 1_000 },
             { line: '/sdk status', advanceAfterMs: 1_000 },
+            { line: '/permission mode', advanceAfterMs: 1_000 },
+            { line: '/permission cockpit', advanceAfterMs: 1_000 },
             { line: '/history 6', advanceAfterMs: 1_000 },
             { line: '/db-history 6', advanceAfterMs: 1_000 },
             { line: '/db-sessions 6', advanceAfterMs: 1_000 },

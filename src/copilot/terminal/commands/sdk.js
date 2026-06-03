@@ -58,7 +58,6 @@ import {
     classifyTerminalSdkQuota,
     clearTerminalElicitation,
     clearTerminalPermission,
-    formatTerminalIsoTimestamp,
     getTerminalElicitation,
     getTerminalPermission,
     listTerminalElicitations,
@@ -116,6 +115,60 @@ function activeLabel(value) {
  */
 function renderSdkSessionPresence(value) {
     return typeof value === 'string' && value.trim() ? 'sessão ativa' : 'sem sessão SDK';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderPermissionModeLabel(value) {
+    const mode = String(value ?? '').trim();
+    if (mode === 'approve_all') return 'automáticas';
+    if (mode === 'audit_only') return 'auditoria sem janelas';
+    if (mode === 'selective') return 'seletivas';
+    return mode.replace(/[._-]+/gu, ' ') || 'n/d';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {'approve_all' | 'audit_only' | 'selective' | null}
+ */
+function parsePermissionModeInput(value) {
+    const mode = String(value ?? '').trim().toLowerCase();
+    if (mode === 'approve_all' || mode === 'automatico' || mode === 'automático' || mode === 'auto' || mode === 'tudo') {
+        return 'approve_all';
+    }
+    if (mode === 'audit_only' || mode === 'auditoria' || mode === 'audit') return 'audit_only';
+    if (mode === 'selective' || mode === 'seletivo' || mode === 'seletiva') return 'selective';
+    return null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderPermissionTypeLabel(value) {
+    const type = String(value ?? '').trim();
+    if (type === 'file_write' || type === 'write' || type === 'fs.write') return 'escrita de arquivo';
+    if (type === 'file_read' || type === 'read' || type === 'fs.read') return 'leitura de arquivo';
+    if (type === 'file_delete' || type === 'delete' || type === 'fs.delete') return 'exclusão de arquivo';
+    if (type === 'file_move' || type === 'move' || type === 'fs.move') return 'movimento de arquivo';
+    if (type === 'shell' || type === 'terminal.exec') return 'execução no terminal';
+    return type.replace(/[._-]+/gu, ' ') || 'n/d';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderPermissionDecisionLabel(value) {
+    const decision = String(value ?? '').trim();
+    if (decision === 'approved' || decision === 'approve-once') return 'aprovada uma vez';
+    if (decision === 'approve-for-session') return 'aprovada para a sessão';
+    if (decision === 'approve-for-location') return 'aprovada para este local';
+    if (decision === 'reject' || decision === 'not-approved') return 'recusada';
+    if (decision === 'user-not-available') return 'operador indisponível';
+    return decision.replace(/[._-]+/gu, ' ') || '';
 }
 
 /**
@@ -805,7 +858,7 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
         detail
             ? terminalThemeRow(
                   'Detalhe',
-                  `formulários ${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permissões ${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · perguntas SDK ${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · perguntas estruturadas ${structuredInputPending}`,
+                  `formulários ${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permissões ${permissionSummary.pending}${permissionSummary.latest ? ` (${renderPermissionTypeLabel(permissionSummary.latest.permissionType)})` : ''} · perguntas SDK ${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · perguntas estruturadas ${structuredInputPending}`,
               )
             : terminalThemeRow(
                   'Resumo',
@@ -2128,7 +2181,7 @@ export async function cmdPermission({ println }, arg = '') {
             println('');
             println(terminalThemeHeadline('question', 'Modo de permissões'));
             println(terminalThemeDivider(37));
-            println(terminalThemeRow('Modo', current, { role: 'warn' }));
+            println(terminalThemeRow('Modo', renderPermissionModeLabel(current), { role: 'warn' }));
             println(
                 terminalThemeRow(
                     'Prompts SDK',
@@ -2136,24 +2189,25 @@ export async function cmdPermission({ println }, arg = '') {
                 ),
             );
             println(
-                terminalThemeRow('Uso', '/permission mode <approve_all|audit_only|selective>', { role: 'command' }),
+                terminalThemeRow('Uso', '/permission mode <automatico|auditoria|seletivo>', { role: 'command' }),
             );
             println(terminalThemeDivider(37));
             println('');
             return;
         }
-        if (next !== 'approve_all' && next !== 'audit_only' && next !== 'selective') {
+        const nextMode = parsePermissionModeInput(next);
+        if (!nextMode) {
             println(
-                terminalThemeRow('/permission', 'Uso: /permission mode <approve_all|audit_only|selective>', {
+                terminalThemeRow('/permission', 'Uso: /permission mode <automatico|auditoria|seletivo>', {
                     role: 'command',
                 }),
             );
             return;
         }
-        const updated = setTerminalRuntimePermissionMode(next, runtimeId);
+        const updated = setTerminalRuntimePermissionMode(nextMode, runtimeId);
         const sdkPromptsSkipped = terminalPermissionModeSkipsSdkPrompts(updated);
         println('');
-        println(terminalThemeRow('Modo', `permissões atualizadas: ${updated}`, { role: 'success' }));
+        println(terminalThemeRow('Modo', `permissões atualizadas: ${renderPermissionModeLabel(updated)}`, { role: 'success' }));
         println(
             terminalThemeRow(
                 'Prompts SDK',
@@ -2276,7 +2330,7 @@ export async function cmdPermission({ println }, arg = '') {
                     runtimeId: resolvedRuntimeId,
                     ts: Date.now(),
                 });
-                println(terminalThemeRow('Permissão', `${requestId} · ${permissionType}`, { role: 'question' }));
+                println(terminalThemeRow('Permissão', `alça ${requestId} · ${renderPermissionTypeLabel(permissionType)}`, { role: 'question' }));
             }
             println(terminalThemeDivider(37));
             println('');
@@ -2318,7 +2372,7 @@ export async function cmdPermission({ println }, arg = '') {
             println(
                 terminalThemeRow(
                     'Permissão',
-                    `${entry.id} · ${entry.permissionType} · ${entry.status}${result ? ` · ${result}` : ''}`,
+                    `${entry.id} · ${renderPermissionTypeLabel(entry.permissionType)} · ${entry.status}${result ? ` · ${renderPermissionDecisionLabel(result)}` : ''}`,
                     { role: entry.status === 'pending' ? 'question' : entry.granted === false ? 'warn' : 'muted' },
                 ),
             );
@@ -2386,13 +2440,13 @@ function renderPermissionEntry({ println }, entry) {
     println(terminalThemeHeadline('question', 'Permissão SDK', [entry.id]));
     println(terminalThemeDivider(37));
     println(terminalThemeRow('Estado', entry.status, { role: entry.status === 'pending' ? 'question' : 'muted' }));
-    println(terminalThemeRow('Tipo', entry.permissionType, { role: 'warn' }));
-    if (entry.requestId) println(terminalThemeRow('Requisição', entry.requestId));
+    println(terminalThemeRow('Tipo', renderPermissionTypeLabel(entry.permissionType), { role: 'warn' }));
+    if (entry.requestId) println(terminalThemeRow('Alça', entry.requestId));
     if (entry.granted !== null)
-        println(terminalThemeRow('Aprovação', String(entry.granted), { role: entry.granted ? 'success' : 'warn' }));
-    if (entry.result) println(terminalThemeRow('Resultado', entry.result, { role: 'warn' }));
-    println(terminalThemeRow('Criada', formatTerminalIsoTimestamp(entry.createdAt)));
-    if (entry.completedAt) println(terminalThemeRow('Concluída', formatTerminalIsoTimestamp(entry.completedAt)));
+        println(terminalThemeRow('Aprovação', entry.granted ? 'aprovada' : 'não aprovada', { role: entry.granted ? 'success' : 'warn' }));
+    if (entry.result) println(terminalThemeRow('Resultado', renderPermissionDecisionLabel(entry.result), { role: 'warn' }));
+    println(terminalThemeRow('Criada', formatTerminalRelativeAge(entry.createdAt)));
+    if (entry.completedAt) println(terminalThemeRow('Concluída', formatTerminalRelativeAge(entry.completedAt)));
     if (entry.status === 'pending' && entry.requestId) {
         println(
             terminalThemeRow(
@@ -2416,7 +2470,7 @@ function renderPermissionCockpit({ println }, runtimeId) {
     const pending = listTerminalPermissions({ runtimeId: scopedRuntimeId });
     const byType = new Map();
     for (const entry of pending) {
-        const key = entry.permissionType || 'unknown';
+        const key = renderPermissionTypeLabel(entry.permissionType || 'unknown');
         byType.set(key, (byType.get(key) ?? 0) + 1);
     }
     const typeRows = [...byType.entries()].sort((a, b) => b[1] - a[1]);
@@ -2430,8 +2484,8 @@ function renderPermissionCockpit({ println }, runtimeId) {
         terminalThemeRow('Pendentes', String(pending.length), { role: pending.length > 0 ? 'question' : 'success' }),
     );
     if (latest) {
-        const request = latest.requestId ? ` · requisição ${latest.requestId}` : '';
-        println(terminalThemeRow('Recente', `${latest.id} · ${latest.permissionType}${request}`));
+        const request = latest.requestId ? ` · alça ${latest.requestId}` : '';
+        println(terminalThemeRow('Recente', `${latest.id} · ${renderPermissionTypeLabel(latest.permissionType)}${request}`));
     } else {
         println(terminalThemeRow('Recente', '(nenhuma permissão observada)'));
     }
@@ -2445,14 +2499,14 @@ function renderPermissionCockpit({ println }, runtimeId) {
     if (modeChanges.length > 0) {
         println(terminalThemeHeadline('question', 'Mudanças de modo'));
         for (const item of modeChanges) {
-            println(terminalThemeRow('Mudança', `${formatTerminalIsoTimestamp(item.ts)} · ${item.mode}`));
+            println(terminalThemeRow('Mudança', `${formatTerminalRelativeAge(item.ts)} · ${renderPermissionModeLabel(item.mode)}`));
         }
     } else {
         println(terminalThemeRow('Mudanças', '(sem mudanças recentes no runtime local)'));
     }
 
     println(
-        terminalThemeRow('Atalhos', '/permission pending · /permission show latest · /permission mode selective', {
+        terminalThemeRow('Atalhos', '/permission pending · /permission show latest · /permission mode seletivo', {
             role: 'command',
         }),
     );

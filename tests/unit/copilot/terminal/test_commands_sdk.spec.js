@@ -866,13 +866,15 @@ describe('terminal/commands/sdk', () => {
         const list = mockCtx();
         await cmdPermission({ println: list.println }, 'all');
         expect(list.output()).toContain('perm-1');
-        expect(list.output()).toContain('file_write');
-        expect(list.output()).toContain('approved');
+        expect(list.output()).toContain('escrita de arquivo');
+        expect(list.output()).toContain('aprovada uma vez');
+        expect(list.output()).not.toContain('file_write');
+        expect(list.output()).not.toContain('approved');
 
         const show = mockCtx();
         await cmdPermission({ println: show.println }, 'show perm-1');
         expect(show.output()).toContain('perm-1');
-        expect(show.output()).toContain('file_write');
+        expect(show.output()).toContain('escrita de arquivo');
 
         const clear = mockCtx();
         await cmdPermission({ println: clear.println }, 'clear perm-1');
@@ -937,7 +939,8 @@ describe('terminal/commands/sdk', () => {
         const show = mockCtx();
         await cmdPermission({ println: show.println }, 'show perm-e2e-1');
         expect(show.output()).toContain('perm-e2e-1');
-        expect(show.output()).toContain('approve-once');
+        expect(show.output()).toContain('aprovada uma vez');
+        expect(show.output()).not.toContain('approve-once');
     });
 
     it('/permission respond valida decisões persistentes que exigem approval', async () => {
@@ -960,7 +963,8 @@ describe('terminal/commands/sdk', () => {
         expect(runtimeMocks.listTerminalSdkPendingPermissions).toHaveBeenCalledOnce();
         expect(ctx.output()).toContain('pendentes via RPC');
         expect(ctx.output()).toContain('perm-rpc-1');
-        expect(ctx.output()).toContain('file_write');
+        expect(ctx.output()).toContain('escrita de arquivo');
+        expect(ctx.output()).not.toContain('file_write');
     });
 
     it('/permission pending hidrata estado local para permitir respond por RPC-only request', async () => {
@@ -982,7 +986,8 @@ describe('terminal/commands/sdk', () => {
         const show = mockCtx();
         await cmdPermission({ println: show.println }, 'mode');
         expect(agentRuntimeMocks.readTerminalRuntimePermissionMode).toHaveBeenCalled();
-        expect(show.output()).toContain('approve_all');
+        expect(show.output()).toContain('automáticas');
+        expect(show.output()).not.toContain('approve_all');
         expect(show.output()).toContain('Modo de permissões');
         expect(show.output()).toContain('Prompts SDK');
         expect(show.output()).toContain('ignorados');
@@ -991,9 +996,10 @@ describe('terminal/commands/sdk', () => {
         expect(show.output()).not.toContain('sdk prompts=');
 
         const set = mockCtx();
-        await cmdPermission({ println: set.println }, 'mode audit_only');
+        await cmdPermission({ println: set.println }, 'mode auditoria');
         expect(agentRuntimeMocks.setTerminalRuntimePermissionMode).toHaveBeenCalledWith('audit_only', null);
         expect(set.output()).toContain('permissões atualizadas');
+        expect(set.output()).toContain('auditoria sem janelas');
         expect(set.output()).toContain('Prompts SDK');
         expect(set.output()).toContain('ignorados');
         expect(set.output()).not.toContain('prompts SDK skip');
@@ -1073,10 +1079,12 @@ describe('terminal/commands/sdk', () => {
 
         expect(ctx.output()).toContain('Permissões SDK');
         expect(ctx.output()).toContain('Pendentes');
-        expect(ctx.output()).toContain('file_write 2');
-        expect(ctx.output()).toContain('shell 1');
+        expect(ctx.output()).toContain('escrita de arquivo 2');
+        expect(ctx.output()).toContain('execução no terminal 1');
+        expect(ctx.output()).not.toContain('file_write 2');
+        expect(ctx.output()).not.toContain('shell 1');
         expect(ctx.output()).toContain('Mudanças de modo');
-        expect(ctx.output()).toContain('selective');
+        expect(ctx.output()).toContain('seletivas');
         expect(ctx.output()).toContain('/permission pending');
         expect(ctx.output()).not.toContain('requestId=');
     });

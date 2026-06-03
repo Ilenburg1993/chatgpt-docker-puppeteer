@@ -3984,6 +3984,39 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=150000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-sdk-quota-relative-20260603-1615`.
   - Resultado: PASS em 17/17 critérios; `/sdk status` ficou sem ID/ISO e `/scope` ficou sem ANSI
         literal ou labels `ready/warming`.
-- [ ] Próxima lacuna: revisar `/permission`, `/plan`, `/queue`, `/mailbox` e superfícies de
+- [x] Próxima lacuna: revisar `/permission`, `/plan`, `/queue`, `/mailbox` e superfícies de
       intervenção humana, porque ainda são as áreas mais propensas a repetir tool names,
       permissões cruas e prompts que parecem "outra tool qualquer".
+
+### 11.55 Permissões sem constantes cruas no painel operacional
+
+- [x] Achado: `/permission mode` ainda mostrava `approve_all`, `audit_only` e `selective`.
+- [x] Achado: `/permission list`, `/permission pending`, `/permission show` e `/permission cockpit`
+      ainda mostravam tipos como `file_write`, decisões como `approve-once`/`approved` e
+      timestamps ISO.
+- [x] Decisão: comandos de permissão devem deixar claro ao operador se o sistema está em
+      autorização automática, auditoria sem janelas ou modo seletivo; constantes do SDK ficam
+      restritas a comandos de ação quando inevitáveis.
+- [x] Implementação: normalizadores canônicos de modo, tipo e decisão de permissão foram
+      adicionados em `sdk.js`.
+- [x] Implementação: `/permission mode` passou a mostrar `automáticas`, `auditoria sem janelas`
+      e `seletivas`, aceitando aliases humanos como `automatico`, `auditoria` e `seletivo`.
+- [x] Implementação: `/permission list/show/pending/cockpit` passou a traduzir `file_write` para
+      `escrita de arquivo`, `shell` para `execução no terminal`, `approve-once` para
+      `aprovada uma vez` e equivalentes.
+- [x] Implementação: `Criada`, `Concluída` e mudanças de modo passaram a usar tempo relativo.
+- [x] Implementação: labels como `Requisição` passaram a `Alça`, reduzindo a aparência de dump de
+      request interno.
+- [x] Teste escopado passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
+  - Cobertura reforçada contra `approve_all`, `file_write`, `approved`, `approve-once` e ISO nos
+        painéis default relevantes.
+- [x] Harness live ampliado: `--diagnostic-ux-cycle` agora executa `/permission mode` e
+      `/permission cockpit`.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=160000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-permission-human-20260603-1620`.
+  - Resultado: PASS em 18/18 critérios; o painel mostrou `automáticas`, `sem janelas SDK por
+        padrão` e nenhum `approve_all`, `file_write`, `requestId` ou timestamp ISO.
+- [ ] Próxima lacuna: revisar os fluxos de `/queue`, `/mailbox`, `/interrupt` e aplicação
+      automática de intervenção humana, reduzindo termos `mailbox zero-PR`, IDs de entry e
+      repetição visual quando uma pergunta estruturada aguarda resposta.
