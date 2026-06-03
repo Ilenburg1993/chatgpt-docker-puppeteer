@@ -25,7 +25,6 @@ import {
     recordTerminalToolLifecycleDiagnostic,
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
-    terminalThemeBadge,
     terminalThemeRow,
     terminalThemeStatus,
     terminalThemeText,
@@ -158,11 +157,7 @@ function buildToolCompletionDurationLabel(entry, sdkDurationMs) {
 
     const ioDurationLabel = formatToolDurationMs(io.totalDurationMs);
     const bytesLabel = formatToolBytes(io.bytesRead + io.bytesWritten);
-    const ioParts = [
-        `io ${io.count} op${io.count === 1 ? '' : 's'}`,
-        ioDurationLabel,
-        bytesLabel,
-    ].filter(Boolean);
+    const ioParts = [`io ${io.count} op${io.count === 1 ? '' : 's'}`, ioDurationLabel, bytesLabel].filter(Boolean);
     return [sdkLabel ?? null, ioParts.join(' · ')].filter(Boolean).join(' · ') || 'n/d';
 }
 
@@ -341,7 +336,9 @@ function printToolStart(presentation) {
         const question = presentation.target ?? presentation.startLine.replace(/^aguardando decisão humana:\s*/iu, '');
         const questionText = compactDetail ? compactTerminalToolText(question, 96) : question;
         println(
-            `  ${terminalThemeBadge('question', 'PERGUNTA')} ${terminalThemeText('question', questionText || 'Aguardando resposta do operador')}`,
+            terminalThemeRow('Pergunta ao operador', questionText || 'Aguardando resposta do operador', {
+                role: 'question',
+            }),
         );
         if (!compactDetail) {
             println(
@@ -351,11 +348,18 @@ function printToolStart(presentation) {
         return;
     }
     const operationRole = mapTerminalToolOperationRole(presentation.operation);
-    const primaryBadge = terminalThemeBadge(operationRole, renderToolOperationBadgeLabel(presentation.operation));
     println(
         compactDetail
-            ? `  ${primaryBadge} ${terminalThemeText('tool', compactTerminalToolText(presentation.displayToolName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(presentation.startLine, 86))}`
-            : `  ${primaryBadge} ${terminalThemeText('tool', presentation.displayToolName)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.startLine)}`,
+            ? terminalThemeRow(
+                  'Ferramenta',
+                  `${terminalThemeText('tool', compactTerminalToolText(presentation.displayToolName, 28))} · ${terminalThemeText(operationRole, compactTerminalToolText(presentation.startLine, 86))}`,
+                  { role: operationRole },
+              )
+            : terminalThemeRow(
+                  'Ferramenta',
+                  `${terminalThemeText('tool', presentation.displayToolName)} · ${terminalThemeText(operationRole, presentation.startLine)}`,
+                  { role: operationRole },
+              ),
     );
 }
 
@@ -381,25 +385,6 @@ function shouldPersistToolProgressMilestone(entry, progress, progressMessage) {
     if (messageChanged && intervalElapsed) return true;
     if (progressJumpedEnough && intervalElapsed) return true;
     return false;
-}
-
-/**
- * @param {import('./tool-activity-presenter.js').TerminalToolOperation} operation
- * @returns {string}
- */
-function renderToolOperationBadgeLabel(operation) {
-    if (operation === 'read') return 'LER';
-    if (operation === 'write') return 'CRIAR';
-    if (operation === 'edit') return 'EDITAR';
-    if (operation === 'copy') return 'COPIAR';
-    if (operation === 'move') return 'MOVER';
-    if (operation === 'delete') return 'EXCLUIR';
-    if (operation === 'list') return 'LISTAR';
-    if (operation === 'run') return 'EXEC';
-    if (operation === 'inspect') return 'VER';
-    if (operation === 'ask') return 'PERGUNTA';
-    if (operation === 'intent') return 'INTENÇÃO';
-    return 'AÇÃO';
 }
 
 /**
@@ -433,7 +418,6 @@ function printToolProgress(presentation, progress, progressMessage, options = {}
 function printToolComplete(presentation, success, durationLabel, fallbackToolCallId = null) {
     if (!getShowToolActivity()) return;
     const compactDetail = getTerminalDetailLevel() === 'compact';
-    const statusBadge = success ? terminalThemeBadge('success', 'OK') : terminalThemeBadge('error', 'FALHA');
     const statusText = terminalThemeStatus(success);
     const operationRole = mapTerminalToolOperationRole(presentation.operation);
     if (compactDetail) clearInlineStatus();
@@ -450,16 +434,21 @@ function printToolComplete(presentation, success, durationLabel, fallbackToolCal
         presentation.searchTerms.length === 0 &&
         (hasOnlyCallIdTarget || !presentation.target);
     const lowFidelitySuffix =
-        lowFidelityGeneric && fallbackToolCallId ? ` · callId=${compactTerminalToolText(fallbackToolCallId, 28)}` : '';
+        lowFidelityGeneric && fallbackToolCallId ? ' · detalhes técnicos disponíveis em /tools diag' : '';
     const completionDetail = `${presentation.completeLine(success, durationLabel)}${lowFidelitySuffix}`;
-    const renderedName =
-        lowFidelityGeneric && fallbackToolCallId
-            ? `tool#${fallbackToolCallId.slice(-8)}`
-            : presentation.displayToolName;
+    const renderedName = lowFidelityGeneric && fallbackToolCallId ? 'Ferramenta interna' : presentation.displayToolName;
     println(
         compactDetail
-            ? `  ${statusBadge} ${statusText} ${terminalThemeText('tool', compactTerminalToolText(renderedName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(completionDetail, 88))}`
-            : `  ${statusBadge} ${statusText} ${terminalThemeText('tool', renderedName)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, completionDetail)}`,
+            ? terminalThemeRow(
+                  success ? 'Concluído' : 'Falhou',
+                  `${statusText} ${terminalThemeText('tool', compactTerminalToolText(renderedName, 28))} · ${terminalThemeText(operationRole, compactTerminalToolText(completionDetail, 88))}`,
+                  { role: success ? 'success' : 'error' },
+              )
+            : terminalThemeRow(
+                  success ? 'Concluído' : 'Falhou',
+                  `${statusText} ${terminalThemeText('tool', renderedName)} · ${terminalThemeText(operationRole, completionDetail)}`,
+                  { role: success ? 'success' : 'error' },
+              ),
     );
 }
 
@@ -470,11 +459,11 @@ function printToolComplete(presentation, success, durationLabel, fallbackToolCal
 function hasSemanticToolTarget(presentation) {
     return Boolean(
         presentation.path ||
-            presentation.lineRange ||
-            presentation.fileTargets.length > 0 ||
-            presentation.urlTargets.length > 0 ||
-            presentation.searchTerms.length > 0 ||
-            presentation.patchFiles.length > 0,
+        presentation.lineRange ||
+        presentation.fileTargets.length > 0 ||
+        presentation.urlTargets.length > 0 ||
+        presentation.searchTerms.length > 0 ||
+        presentation.patchFiles.length > 0,
     );
 }
 
@@ -755,7 +744,10 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
  * @returns {void}
  */
 export function handleTerminalToolUserRequested(evt) {
-    const presentation = buildTerminalToolActivityPresentation(evt, /** @type {string} */ (evt?.['toolName'] ?? 'tool'));
+    const presentation = buildTerminalToolActivityPresentation(
+        evt,
+        /** @type {string} */ (evt?.['toolName'] ?? 'tool'),
+    );
     const toolName = presentation.canonicalToolName ?? presentation.toolName;
     const requestId = typeof evt?.['requestId'] === 'string' ? evt['requestId'] : null;
     recordTerminalTurnToolActivity({
@@ -773,9 +765,13 @@ export function handleTerminalToolUserRequested(evt) {
     });
     println('');
     println(
-        terminalThemeRow('Tool', `${toolName} aguarda usuário${requestId ? ` · ${renderToolRequestLabel(requestId)}` : ''}`, {
-            role: 'question',
-        }),
+        terminalThemeRow(
+            'Tool',
+            `${toolName} aguarda usuário${requestId ? ` · ${renderToolRequestLabel(requestId)}` : ''}`,
+            {
+                role: 'question',
+            },
+        ),
     );
     broadcastToolLifecycle(buildToolLifecycleUserRequested({ toolName, requestId: requestId ?? null }));
 }
@@ -874,9 +870,8 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
     let resolvedToolCallId = evtToolCallId;
     const resolvedByRequest = registry.resolveByRequestId(requestId);
     const resolvedName = resolvedByRequest?.toolName ?? registry.resolveNameByRequestId(requestId);
-    const toolName = isGenericTerminalToolName(effectiveOriginalToolName) && resolvedName
-        ? resolvedName
-        : effectiveOriginalToolName;
+    const toolName =
+        isGenericTerminalToolName(effectiveOriginalToolName) && resolvedName ? resolvedName : effectiveOriginalToolName;
     const resolvedEntry = resolvedByRequest ?? registry.resolveByName(toolName);
     renderReportIntentToolPayload({
         toolName,
@@ -994,7 +989,11 @@ export function reconcileTerminalInFlightToolsAtTurnEnd({ registry, reason = 'as
         });
         if (getShowToolActivity()) {
             println(
-                `  ${terminalThemeBadge('warn', 'SYNC')} ${terminalThemeText('tool', canonicalName)} ${terminalThemeText('muted', '·')} ${terminalThemeText('warn', `completion inferida no turn_end · ${durationLabel}`)}`,
+                terminalThemeRow(
+                    'Sincronização',
+                    `${terminalThemeText('tool', canonicalName)} · ${terminalThemeText('warn', `conclusão inferida no fim do turno · ${durationLabel}`)}`,
+                    { role: 'warn' },
+                ),
             );
         }
         broadcastToolLifecycle(

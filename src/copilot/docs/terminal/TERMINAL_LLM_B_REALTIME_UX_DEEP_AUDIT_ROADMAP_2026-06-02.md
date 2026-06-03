@@ -3619,3 +3619,63 @@
   - `npx vitest run tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js`.
 - [ ] Próxima lacuna: executar live com cenário que gere pergunta/permissão/sampling/OAuth quando
       viável, para confirmar a estética de eventos SDK raros no terminal real.
+
+### 11.43 Runtime do agente e renderers sem tags técnicas
+
+- [x] Achado: `agent-runtime-events.js` ainda imprimia badges técnicos em eventos centrais:
+      `PERGUNTA`, `LLM-B`, `BYOK`, `ERROR`, `MODEL`, `COMPACTAR`, `OK`, `FALHA`,
+      `SUBAGENTE`, `PR`, `LLM`, `DIALOG`, `SESSION` e `COMMAND`.
+- [x] Achado: esses rótulos eram exatamente o tipo de ruído observado nas screenshots: linhas
+      parecidas com tool trace, desalinhadas semanticamente e misturando estado humano com
+      identificadores internos.
+- [x] Decisão: eventos operacionais do agente devem usar nomes humanos estáveis e curtos:
+      `Pergunta ao operador`, `Sessão`, `Erro BYOK`, `Modelo`, `Contexto`, `Compactação`,
+      `Subagente`, `Premium Request`, `Uso do modelo`, `Diálogo`, `Sessão SDK` e
+      `Comando SDK`.
+- [x] Implementação: `agent-runtime-events.js` passou a renderizar esses eventos com
+      `terminalThemeRow`, preservando `recordTerminalActivity`, SSE, traces e health BYOK.
+- [x] Implementação: erro recuperável de modelo deixa de imprimir `MODEL`; fallback passa a
+      aparecer como `Modelo  fallback aplicado: origem -> destino`.
+- [x] Implementação: boot recovery passa a aparecer como `Diálogo  boot recovery ...`, sem badge
+      técnico.
+- [x] Implementação: lifecycle SDK e comando SDK agora aparecem como `Sessão SDK` e
+      `Comando SDK`, sem prefixos `SESSION`/`COMMAND`.
+- [x] Achado: `intent-renderer.js` ainda imprimia `INTENÇÃO CAPTURADA`; o default agora mostra
+      `Intenção  risco ... · origem ...`.
+- [x] Achado: `io-activity-events.js` ainda imprimia `[ARQUIVO] [LER]`/`[MOVER]`; o default agora
+      mostra `Arquivo  leitura/movimento · caminho · ok/falhou`.
+- [x] Achado: `assistant-transcript-renderer.js` ainda imprimia badge `LLM-B`; o cabeçalho agora
+      usa `terminalThemeRow(title, source + detail)`.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_intent_renderer.spec.js tests/unit/copilot/terminal/test_io_activity_events.spec.js tests/unit/copilot/terminal/test_assistant_transcript_renderer.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js`.
+
+### 11.44 Tool lifecycle, menu e GitHub sem badges visíveis no default
+
+- [x] Achado: `tool-lifecycle-runtime.js` ainda mostrava `PERGUNTA`, badges de operação
+      (`LER`, `CRIAR`, `MOVER`), status `OK`/`FALHA` e `SYNC`.
+- [x] Achado: tools genéricas de baixa fidelidade podiam renderizar `callId=...` ou `tool#...`,
+      vazando ID interno na superfície padrão.
+- [x] Decisão: lifecycle de tool deve ser narrado como evento operacional, não como log de SDK:
+      `Pergunta ao operador`, `Ferramenta`, `Concluído`, `Falhou` e `Sincronização`.
+- [x] Implementação: início/progresso/fim de tool foram convertidos para `terminalThemeRow` onde
+      havia badge técnico; detalhes semânticos de tool continuam preservados.
+- [x] Implementação: quando a tool é genérica e só há ID técnico, o terminal mostra
+      `Ferramenta interna` e orienta que detalhes técnicos estão em `/tools diag`, sem expor o ID
+      no default.
+- [x] Implementação: reconciliação de tool no fim do turno agora mostra
+      `Sincronização  <tool> · conclusão inferida no fim do turno`.
+- [x] Achado: `/menu` usava badge `AGIR`; agora usa texto humano `Agora` com papel de aviso.
+- [x] Achado: `/gh` ainda tinha ANSI literal legado; um normalizador no dispatcher remove ANSI de
+      toda saída do comando e traduz `[DRAFT]` para `Rascunho`.
+- [x] Teste novo: `tests/unit/copilot/terminal/test_commands_gh.spec.js` cobre a normalização de
+      ANSI/draft.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_gh.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/terminal/test_io_activity_events.spec.js tests/unit/copilot/terminal/test_intent_renderer.spec.js`.
+- [x] Live PTY `--ux-cycle` executado após o lote:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/default-ux-cycle-terminal-ux-clean-20260603-1511`.
+  - Resultado: PASS em 16/16 critérios, incluindo `/help`, `/help full`, `/status`, `/now`,
+        `/health`, `/tools`, `/sdk`, `/sdk capabilities`, `/workspace list`, `/live`,
+        `/activity` e `/sdk waits`.
+  - Logs: `artifacts/terminal-live/default-ux-cycle-terminal-ux-clean-20260603-1511/summary.md`.
+- [ ] Próxima lacuna: adicionar um ciclo diagnóstico curto para eventos de pergunta, tool, I/O e
+      intenção, comparando a renderização real com as screenshots originais.

@@ -13,13 +13,13 @@ import {
     readTerminalRuntimeControlState,
     readTerminalRuntimeState,
 } from '../frontend/gateways/index.js';
+import { readTerminalIntentStats } from '../state/index.js';
 import {
     readTerminalElicitationSummary,
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
 } from '../state/sdk/index.js';
-import { readTerminalIntentStats } from '../state/index.js';
-import { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../state/ui/index.js';
+import { terminalActionChip, terminalThemeText } from '../state/ui/index.js';
 
 /**
  * @typedef {{
@@ -262,7 +262,7 @@ function renderTerminalSmartMenu(println, entries) {
     for (let i = 0; i < entries.length; i += 1) {
         const entry = /** @type {TerminalSmartMenuEntry} */ (entries[i]);
         const index = terminalThemeText('index', `[${String(i + 1).padStart(2, '0')}]`);
-        const hot = entry.hot ? `${terminalThemeBadge('hot', 'AGIR')} ` : '     ';
+        const hot = entry.hot ? `${terminalThemeText('warn', 'Agora')} ` : '      ';
         const label = padMenuCell(entry.label, 28);
         const command = padMenuCell(entry.commandLine, 24);
         const description = compactMenuCell(entry.description, 64);

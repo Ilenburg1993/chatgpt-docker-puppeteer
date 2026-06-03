@@ -20,9 +20,7 @@ const {
     readTerminalIntentHistory,
     readTerminalTranscriptTurns,
 } = await import('../../../../src/copilot/terminal/state/index.js');
-const { __test__, renderTerminalIntent } = await import(
-    '../../../../src/copilot/terminal/events/intent-renderer.js'
-);
+const { __test__, renderTerminalIntent } = await import('../../../../src/copilot/terminal/events/intent-renderer.js');
 
 describe('terminal/events/intent-renderer', () => {
     beforeEach(() => {
@@ -44,10 +42,11 @@ describe('terminal/events/intent-renderer', () => {
 
         expect(dialogMocks.printlnBlock).toHaveBeenCalledTimes(1);
         const output = dialogMocks.printlnBlock.mock.calls[0]?.[0]?.join('\n') ?? '';
-        expect(output).toContain('INTENÇÃO CAPTURADA');
+        expect(output).toContain('Intenção');
         expect(output).toContain('risco médio');
         expect(output).toContain('origem ferramenta de intenção');
         expect(output).toContain('Vou revisar a UX do terminal');
+        expect(output).not.toContain('INTENÇÃO CAPTURADA');
         expect(output).not.toContain('INTENT');
         expect(output).not.toContain('fonte=');
         expect(output).not.toContain('tool=report_intent_local');

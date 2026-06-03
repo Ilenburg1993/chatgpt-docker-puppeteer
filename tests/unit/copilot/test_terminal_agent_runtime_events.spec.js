@@ -323,7 +323,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 detail: expect.not.stringContaining('session='),
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('Comando SDK: terminal_session'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Comando SDK'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('terminal_session'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('SDK command:'));
         expect(broadcastSse).toHaveBeenCalledWith(
             'sdk.command.executed',
@@ -341,9 +342,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
     it('apresenta tools de arquivo com alvo e operação durante streaming', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
-        const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } = await import(
-            '../../../src/copilot/terminal/state/turn-materialization-state.js'
-        );
+        const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } =
+            await import('../../../src/copilot/terminal/state/turn-materialization-state.js');
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();
         const rl = {
@@ -658,7 +658,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             },
         });
 
-        expect(printlnBlock).toHaveBeenCalledWith(expect.arrayContaining([expect.stringContaining('INTENÇÃO')]));
+        expect(printlnBlock).toHaveBeenCalledWith(expect.arrayContaining([expect.stringContaining('Intenção')]));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Vou editar read-tools'));
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'turn',
@@ -685,9 +685,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
     it('deduplica visualmente intents equivalentes vindos de assistant.intent e report_intent_local', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
-        const { __test__: terminalIntentRendererTestHarness } = await import(
-            '../../../src/copilot/terminal/events/intent-renderer.js'
-        );
+        const { __test__: terminalIntentRendererTestHarness } =
+            await import('../../../src/copilot/terminal/events/intent-renderer.js');
         terminalIntentRendererTestHarness.clearRecentIntentHashes();
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();
@@ -894,7 +893,9 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(println).toHaveBeenCalledWith(
             expect.stringContaining('Tarefa em segundo plano concluída: investigar sessão SDK'),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('Shell concluído: npm run lint:copilot · saída 0'));
+        expect(println).toHaveBeenCalledWith(
+            expect.stringContaining('Shell concluído: npm run lint:copilot · saída 0'),
+        );
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('exit='));
         expect(broadcastSse).toHaveBeenCalledWith(
             'agent.background.completed',
@@ -970,9 +971,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
     it('promove pr.consumed para narrativa explícita de uso com SSE dedicada', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
-        const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } = await import(
-            '../../../src/copilot/terminal/state/turn-materialization-state.js'
-        );
+        const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } =
+            await import('../../../src/copilot/terminal/state/turn-materialization-state.js');
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();
         const agent = {
@@ -1005,7 +1005,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 recordHistory: true,
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('PR'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Premium Request'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('modelo cobrado gpt-5-mini'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('modeloCobrado='));
         expect(broadcastSse).toHaveBeenCalledWith(
@@ -1051,16 +1051,15 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             'Premium Request classificada com divergência de modelo',
             expect.any(Object),
         );
-        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('PR'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Premium Request'));
         expect(broadcastSse).toHaveBeenCalledWith('pr.consumed', expect.any(Object));
     });
 
     it('narra llm.usage sem Premium Request separadamente de pr.consumed', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
-        const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } = await import(
-            '../../../src/copilot/terminal/state/turn-materialization-state.js'
-        );
+        const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } =
+            await import('../../../src/copilot/terminal/state/turn-materialization-state.js');
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();
         const agent = {
@@ -1094,7 +1093,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 recordHistory: true,
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('LLM'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Uso do modelo'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('ask_user_continuation'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('classe='));
         expect(broadcastSse).toHaveBeenCalledWith(
@@ -1141,7 +1140,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 severity: 'warn',
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('Boot recovery sem fallback PR'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('boot recovery sem fallback PR'));
         expect(broadcastSse).toHaveBeenCalledWith(
             'dialog.boot_recovery',
             expect.objectContaining({ skippedPrFallback: true }),
@@ -1174,7 +1173,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 source: 'agent',
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('Fallback de modelo: gpt-5 → gpt-5-mini'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('fallback aplicado: gpt-5 → gpt-5-mini'));
         expect(broadcastSse).toHaveBeenCalledWith(
             'pr.fallback_model',
             expect.objectContaining({ from: 'gpt-5', to: 'gpt-5-mini' }),
@@ -1227,7 +1226,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 recordHistory: false,
             }),
         );
-        expect(println.mock.calls.filter(([line]) => String(line).includes('MODEL'))).toHaveLength(1);
+        expect(println.mock.calls.filter(([line]) => String(line).includes('Modelo'))).toHaveLength(1);
         expect(broadcastSse).toHaveBeenCalledWith(
             'agent.error',
             expect.objectContaining({
@@ -1248,9 +1247,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
     });
 
     it('explica erro recuperável de model_call BYOK sem sugerir fallback Copilot auto', async () => {
-        const { beginTerminalTurnMaterialization, readTerminalTurnMaterialization, clearTerminalTurnMaterialization } = await import(
-            '../../../src/copilot/terminal/state/turn-materialization-state.js'
-        );
+        const { beginTerminalTurnMaterialization, readTerminalTurnMaterialization, clearTerminalTurnMaterialization } =
+            await import('../../../src/copilot/terminal/state/turn-materialization-state.js');
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         /** @type {Map<string, Function[]>} */
@@ -1327,12 +1325,10 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
     });
 
     it('classifica session.error query em BYOK como falha de provider e revisa o turno tardio', async () => {
-        const { clearTerminalTurnMaterialization } = await import(
-            '../../../src/copilot/terminal/state/turn-materialization-state.js'
-        );
-        const { clearByokProviderModelHealth, readByokProviderModelHealth } = await import(
-            '../../../src/copilot/model-gateway/health/provider-health.js'
-        );
+        const { clearTerminalTurnMaterialization } =
+            await import('../../../src/copilot/terminal/state/turn-materialization-state.js');
+        const { clearByokProviderModelHealth, readByokProviderModelHealth } =
+            await import('../../../src/copilot/model-gateway/health/provider-health.js');
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         /** @type {Map<string, Function[]>} */

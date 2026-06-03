@@ -34,6 +34,27 @@ import {
  * @property {(text: string) => void} println
  */
 
+const ANSI_ESCAPE_PATTERN = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'gu');
+
+/**
+ * @param {string} text
+ * @returns {string}
+ */
+function normalizeGhTerminalOutput(text) {
+    return text
+        .replace(ANSI_ESCAPE_PATTERN, '')
+        .replace(/\[DRAFT\]/gu, 'Rascunho')
+        .replace(/[ \t]+\n/gu, '\n');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @returns {(text: string) => void}
+ */
+function createGhPrintln(println) {
+    return (text) => println(normalizeGhTerminalOutput(text));
+}
+
 // ─── Subcommand handlers ─────────────────────────────────────────────────────
 
 /**
@@ -188,7 +209,7 @@ async function handlePr(println, args) {
             println(`\x1b[31m  PR #${n} não encontrado.\x1b[0m`);
             return;
         }
-        const draftTag = pr.isDraft ? '\x1b[33m[DRAFT]\x1b[0m ' : '';
+        const draftTag = pr.isDraft ? 'Rascunho ' : '';
         println(`\n  \x1b[36m#${pr.number}\x1b[0m ${draftTag}\x1b[1m${pr.title}\x1b[0m  \x1b[90m[${pr.state}]\x1b[0m`);
         println(`  Branch: ${pr.headRefName}  ·  Autor: ${pr.author?.login}`);
         println(`  URL: \x1b[34m${pr.url}\x1b[0m`);
@@ -378,11 +399,16 @@ const SUBCOMMAND_HANDLERS = {
  * @returns {Promise<void>}
  */
 export async function cmdGh({ println }, args) {
+    const ghPrintln = createGhPrintln(println);
     const sub = args[0]?.toLowerCase() ?? '';
     const handler = SUBCOMMAND_HANDLERS[sub];
     if (handler) {
-        await handler(println, args);
+        await handler(ghPrintln, args);
         return;
     }
-    printHelp(println);
+    printHelp(ghPrintln);
 }
+
+export const __test__ = {
+    normalizeGhTerminalOutput,
+};

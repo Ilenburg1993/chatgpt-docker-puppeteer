@@ -11,7 +11,7 @@
 
 import { createHash } from 'node:crypto';
 import { SEPARATOR, printlnBlock } from '../dialog/index.js';
-import { appendTerminalTranscriptTurn, terminalThemeBadge, terminalThemeText } from '../state/events/index.js';
+import { appendTerminalTranscriptTurn, terminalThemeRow, terminalThemeText } from '../state/events/index.js';
 
 const RECENT_TRANSCRIPT_TTL_MS = 5 * 60_000;
 const RECENT_TRANSCRIPT_MAX = 128;
@@ -105,16 +105,15 @@ export function renderTerminalAssistantTranscript(input) {
     const badgeRole = status === 'error' ? 'error' : status === 'completed' ? 'success' : 'info';
     const detail = input.detail ? ` ${terminalThemeText('muted', `· ${input.detail}`)}` : '';
 
-    const lines = [
-        SEPARATOR,
-        `  ${terminalThemeBadge(badgeRole, 'LLM-B')} ${terminalThemeText('assistant', title)} ${terminalThemeText('muted', `· ${source}`)}${detail}`,
-        '',
-    ];
+    const lines = [SEPARATOR, terminalThemeRow(title, `${source}${detail}`, { role: badgeRole }), ''];
     for (const line of content.split('\n')) {
         lines.push(`  ${terminalThemeText('assistant', '│')}  ${line}`);
     }
     if (input.truncated) {
-        lines.push('', `  ${terminalThemeText('warn', '… conteúdo preservado parcialmente em memória; veja o archive do transcript')}`);
+        lines.push(
+            '',
+            `  ${terminalThemeText('warn', '… conteúdo preservado parcialmente em memória; veja o archive do transcript')}`,
+        );
     }
     lines.push('');
     printlnBlock(lines);

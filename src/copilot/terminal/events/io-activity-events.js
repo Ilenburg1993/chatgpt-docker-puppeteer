@@ -15,7 +15,7 @@ import { println } from '../dialog/index.js';
 import {
     recordTerminalActivity,
     recordTerminalTurnFileActivity,
-    terminalThemeBadge,
+    terminalThemeRow,
     terminalThemeText,
 } from '../state/events/index.js';
 import { handleTerminalIoToolLifecycle } from './tool-lifecycle-runtime.js';
@@ -146,35 +146,12 @@ const IO_OPERATION_LABELS = new Map([
     ['stat', 'inspeção'],
 ]);
 
-const IO_OPERATION_BADGES = new Map([
-    ['read', 'LER'],
-    ['fetch', 'BUSCAR'],
-    ['write', 'ESCREVER'],
-    ['append', 'ANEXAR'],
-    ['mkdir', 'PASTA'],
-    ['copy', 'COPIAR'],
-    ['patch', 'EDITAR'],
-    ['move', 'MOVER'],
-    ['delete', 'REMOVER'],
-    ['scan', 'LISTAR'],
-    ['search', 'BUSCAR'],
-    ['stat', 'INSPECIONAR'],
-]);
-
 /**
  * @param {string} operation
  * @returns {string}
  */
 function renderIoOperationLabel(operation) {
     return IO_OPERATION_LABELS.get(operation) ?? operation;
-}
-
-/**
- * @param {string} operation
- * @returns {string}
- */
-function renderIoOperationBadge(operation) {
-    return IO_OPERATION_BADGES.get(operation) ?? operation.toUpperCase();
 }
 
 /**
@@ -295,12 +272,13 @@ function handleIoOperation(message, registry = null) {
     });
 
     if (getShowToolActivity()) {
-        const badge = success
-            ? terminalThemeBadge(role, renderIoOperationBadge(io.operation))
-            : terminalThemeBadge('error', 'ARQUIVO');
         const status = success ? terminalThemeText('success', 'ok') : terminalThemeText('error', 'falhou');
         println(
-            `  ${terminalThemeBadge('tool', 'ARQUIVO')} ${badge} ${terminalThemeText(role, compactText(primaryTarget, 92))} ${terminalThemeText('muted', `· ${status}${humanExtra ? ` · ${humanExtra}` : ''}`)}`,
+            terminalThemeRow(
+                'Arquivo',
+                `${renderIoOperationLabel(io.operation)} · ${terminalThemeText(role, compactText(primaryTarget, 92))} · ${status}${humanExtra ? ` · ${humanExtra}` : ''}`,
+                { role },
+            ),
         );
     }
 
@@ -354,7 +332,6 @@ export const __test__ = {
     mapIoOperationToTurnOperation,
     handleIoOperation,
     isDuplicateIoOperation,
-    renderIoOperationBadge,
     renderIoOperationLabel,
     get ioDedupWindow() {
         return _ioDedupWindow;

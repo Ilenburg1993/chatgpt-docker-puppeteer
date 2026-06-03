@@ -80,8 +80,10 @@ describe('terminal/io-activity-events', () => {
                 progress: 100,
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('[ARQUIVO]'));
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('[LER]'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Arquivo'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('leitura'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('[ARQUIVO]'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('[LER]'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('[IO]'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('io-engine.fs.readFile.text'));
         expect(broadcastSse).toHaveBeenCalledWith(
@@ -166,7 +168,8 @@ describe('terminal/io-activity-events', () => {
                 timestamp: 321,
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('[MOVER]'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('movimento'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('[MOVER]'));
         expect(broadcastSse).toHaveBeenCalledWith(
             'tool.lifecycle',
             expect.objectContaining({

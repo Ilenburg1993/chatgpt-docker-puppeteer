@@ -10,6 +10,7 @@
  * @module copilot/terminal/agent-runtime-events
  */
 
+import { readConfiguredByokSummary } from '#copilot/config';
 import {
     cancelTimer,
     redactSecretRecord,
@@ -17,7 +18,6 @@ import {
     registerInterval,
     resolveModelSelectionMismatch,
 } from '#copilot/core';
-import { readConfiguredByokSummary } from '#copilot/config';
 import {
     EMITTER_AGENT_BACKGROUND_COMPLETED,
     EMITTER_AGENT_BACKGROUND_IDLE,
@@ -40,6 +40,11 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
+import {
+    classifyByokProviderFailure,
+    recordByokProviderModelCallFailure,
+    recordByokProviderModelCallSuccess,
+} from '#copilot/model-gateway';
 import { getShowSessionActivity, getShowToolActivity, getShowUsage } from '../../presentation/state/index.js';
 import {
     broadcastSse,
@@ -51,24 +56,19 @@ import {
 } from '../dialog/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
-    createTerminalPendingQuestionReplayState,
-    createToolCallRegistry,
     completeTerminalTurnMaterialization,
     completeTerminalTurnTrace,
+    createTerminalPendingQuestionReplayState,
+    createToolCallRegistry,
     getTerminalDetailLevel,
     recordTerminalActivity,
+    reviseRecentTerminalTurnTraceStatus,
     terminalActionChip,
-    terminalThemeBadge,
     terminalThemeRow,
     terminalThemeText,
     withTerminalTurnCorrelation,
-    reviseRecentTerminalTurnTraceStatus,
 } from '../state/events/index.js';
-import {
-    classifyByokProviderFailure,
-    recordByokProviderModelCallFailure,
-    recordByokProviderModelCallSuccess,
-} from '#copilot/model-gateway';
+import { formatTerminalIsoTimestamp } from '../state/ui/index.js';
 import { renderTerminalIntent } from './intent-renderer.js';
 import {
     compactTerminalDiagnosticId,
@@ -81,7 +81,6 @@ import {
     handleTerminalNativeToolProgress,
     handleTerminalNativeToolStart,
 } from './tool-lifecycle-runtime.js';
-import { formatTerminalIsoTimestamp } from '../state/ui/index.js';
 
 const AGENT_SHELL_COMPLETED_EVENT = 'agent.shell.completed';
 const AGENT_SHELL_DETACHED_COMPLETED_EVENT = 'agent.shell.detached_completed';
@@ -98,7 +97,10 @@ const INTERNAL_BACKGROUND_DESCRIPTION_PATTERNS = [
 ];
 
 const BACKGROUND_DESCRIPTION_LABELS = new Map([
-    ['Relay question.answered answers into hook tools resolver', 'Resposta humana entregue ao resolvedor da ferramenta'],
+    [
+        'Relay question.answered answers into hook tools resolver',
+        'Resposta humana entregue ao resolvedor da ferramenta',
+    ],
     ['Clear persisted pendingQuestion', 'Pergunta pendente persistida limpa'],
     ['Persist pendingQuestion + pendingQuestionMeta + lastAskUserAt', 'Pergunta pendente salva para retomada'],
     ['Read persisted state', 'Estado persistido lido'],
@@ -336,12 +338,22 @@ function sanitizeSdkLifecycleMetadata(metadata) {
 
 /**
  * @param {Record<string, unknown>} evt
- * @returns {{ type: string; sessionId: string | null; metadata: Record<string, unknown>; label: string; visible: boolean; detail: string }}
+ * @returns {{
+ *     type: string;
+ *     sessionId: string | null;
+ *     metadata: Record<string, unknown>;
+ *     label: string;
+ *     visible: boolean;
+ *     detail: string;
+ * }}
  */
 function normalizeSdkLifecycleEvent(evt) {
     const type = normalizeSdkLifecycleString(evt?.['type']) ?? 'session.unknown';
     const sessionId = normalizeSdkLifecycleString(evt?.['sessionId']);
-    const rawMetadata = evt?.['metadata'] && typeof evt['metadata'] === 'object' ? /** @type {Record<string, unknown>} */ (evt['metadata']) : {};
+    const rawMetadata =
+        evt?.['metadata'] && typeof evt['metadata'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (evt['metadata'])
+            : {};
     const metadata = sanitizeSdkLifecycleMetadata(rawMetadata);
     const label = SDK_LIFECYCLE_LABELS[type] ?? 'Lifecycle SDK';
     const summary = normalizeSdkLifecycleString(metadata['summary']);
@@ -367,7 +379,14 @@ function normalizeSdkLifecycleEvent(evt) {
 
 /**
  * @param {{ errorType: string; message: string }} input
- * @returns {{ enabled: boolean; profile: string | null; provider: string | null; model: string | null; operatorDetail: string | null; failure: import('../../model-gateway/health/provider-failure.js').ByokProviderFailure | null }}
+ * @returns {{
+ *     enabled: boolean;
+ *     profile: string | null;
+ *     provider: string | null;
+ *     model: string | null;
+ *     operatorDetail: string | null;
+ *     failure: import('../../model-gateway/health/provider-failure.js').ByokProviderFailure | null;
+ * }}
  */
 function resolveByokSessionErrorDescriptor({ errorType, message }) {
     let byok;
@@ -600,7 +619,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
 
         rl?.pause();
         println(
-            `\n  ${terminalThemeBadge('question', compactDetail ? 'PERGUNTA' : 'PERGUNTA AO OPERADOR')} ${terminalThemeText('question', 'decisão pendente')}`,
+            `\n${terminalThemeRow(compactDetail ? 'Pergunta' : 'Pergunta ao operador', 'decisão pendente', { role: 'question' })}`,
         );
         println(terminalThemeRow('Pergunta', questionText || 'Aguardando resposta do operador', { role: 'question' }));
         if (choices.length > 0) {
@@ -619,7 +638,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                           'Ação',
                           `${terminalActionChip('/answer')} ${terminalActionChip('/status')} ${terminalActionChip('/clear-shadow')}`,
                       )
-                    : terminalThemeRow('Ação', 'Responda digitando normalmente. Sua próxima mensagem será usada como resposta.'),
+                    : terminalThemeRow(
+                          'Ação',
+                          'Responda digitando normalmente. Sua próxima mensagem será usada como resposta.',
+                      ),
             );
             if (!compactDetail) {
                 println(
@@ -650,7 +672,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             severity: 'warn',
             source: 'agent',
         });
-        println(`${terminalThemeBadge('warn', 'LLM-B')} ${terminalThemeText('warn', 'Agente parado. Use /restart para reiniciar.')}`);
+        println(terminalThemeRow('Sessão', 'Agente parado. Use /restart para reiniciar.', { role: 'warn' }));
         if (rl) {
             scheduleTerminalPromptRedraw(rl, buildUserPrompt());
         }
@@ -721,9 +743,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             severity: 'error',
             source: 'agent',
         });
-        println(
-            `\n  ${terminalThemeBadge('error', byokError.enabled ? 'BYOK' : 'ERROR')} ${terminalThemeText('error', detail)}`,
-        );
+        println(`\n${terminalThemeRow(byokError.enabled ? 'Erro BYOK' : 'Erro de sessão', detail, { role: 'error' })}`);
         broadcastSse(
             'session.error',
             withAgentSseEnvelope(
@@ -804,7 +824,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         });
         if (shouldPrint && !isTerminalRenderLocked()) {
             println(
-                `\n  ${terminalThemeBadge(severity, isRecoverableModelCall ? 'MODEL' : 'ERROR')} ${terminalThemeText(severity, detail)}`,
+                `\n${terminalThemeRow(isRecoverableModelCall ? 'Modelo' : 'Erro do agente', detail, {
+                    role: severity,
+                })}`,
             );
         }
         broadcastSse(
@@ -816,8 +838,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                     recoverable,
                     message: msg,
                     byokEnabled: evt?.['byokEnabled'] === true,
-                    byokProviderType:
-                        typeof evt?.['byokProviderType'] === 'string' ? evt['byokProviderType'] : null,
+                    byokProviderType: typeof evt?.['byokProviderType'] === 'string' ? evt['byokProviderType'] : null,
                     byokProfile: typeof evt?.['byokProfile'] === 'string' ? evt['byokProfile'] : null,
                     byokModel: typeof evt?.['byokModel'] === 'string' ? evt['byokModel'] : null,
                     operatorMeaning: operatorDetail,
@@ -834,7 +855,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             detail: 'Reduzindo uso de contexto da sessão',
             source: 'agent',
         });
-        println(`  ${terminalThemeBadge('warn', 'COMPACTAR')} ${terminalThemeText('warn', 'Compactando contexto da sessão')}`);
+        println(terminalThemeRow('Contexto', 'Compactando contexto da sessão', { role: 'warn' }));
         broadcastSse('compaction.start', withAgentSseEnvelope({}, 'agent/compaction.start'));
     };
 
@@ -853,10 +874,14 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         if (success && pre !== undefined && post !== undefined) {
             const pct = ((1 - post / pre) * 100).toFixed(0);
             println(
-                `  ${terminalThemeBadge('success', 'OK')} ${terminalThemeText('success', `Compactação concluída: ${pre.toLocaleString('pt-BR')} -> ${post.toLocaleString('pt-BR')} tokens (-${pct}%)`)}`,
+                terminalThemeRow(
+                    'Compactação',
+                    `concluída: ${pre.toLocaleString('pt-BR')} -> ${post.toLocaleString('pt-BR')} tokens (-${pct}%)`,
+                    { role: 'success' },
+                ),
             );
         } else if (!success) {
-            println(`  ${terminalThemeBadge('error', 'FALHA')} ${terminalThemeText('error', 'Compactação falhou')}`);
+            println(terminalThemeRow('Compactação', 'falhou', { role: 'error' }));
         }
         broadcastSse('compaction.complete', withAgentSseEnvelope({ success, pre, post }, 'agent/compaction.complete'));
     };
@@ -879,7 +904,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             detail: name,
             source: 'agent',
         });
-        println(`  ${terminalThemeBadge('info', 'SUBAGENTE')} ${terminalThemeText('info', `iniciado: ${name}`)}`);
+        println(terminalThemeRow('Subagente', `iniciado: ${name}`, { role: 'info' }));
     };
 
     const onSubagentCompleted = (/** @type {Record<string, unknown>} */ evt) => {
@@ -888,7 +913,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             detail: name,
             source: 'agent',
         });
-        println(`  ${terminalThemeBadge('success', 'SUBAGENTE')} ${terminalThemeText('success', `concluído: ${name}`)}`);
+        println(terminalThemeRow('Subagente', `concluído: ${name}`, { role: 'success' }));
     };
 
     const onSubagentFailed = (/** @type {Record<string, unknown>} */ evt) => {
@@ -899,7 +924,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             severity: 'error',
             source: 'agent',
         });
-        printlnWhenRenderUnlocked(`  ${terminalThemeBadge('error', 'SUBAGENTE')} ${terminalThemeText('error', `falhou: ${name} — ${error}`)}`);
+        printlnWhenRenderUnlocked(terminalThemeRow('Subagente', `falhou: ${name} — ${error}`, { role: 'error' }));
     };
 
     const onBackgroundCompleted = (/** @type {Record<string, unknown>} */ evt) => {
@@ -1017,7 +1042,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         });
         if ((showUsage || billing.mismatch) && !isTerminalRenderLocked()) {
             println(
-                `  ${terminalThemeBadge(billing.mismatch ? 'warn' : 'info', 'PR')} ${terminalThemeText(billing.mismatch ? 'warn' : 'muted', detail)}`,
+                terminalThemeRow('Premium Request', detail, {
+                    role: billing.mismatch ? 'warn' : 'muted',
+                }),
             );
         }
         broadcastSse(AGENT_PR_CONSUMED_EVENT, withAgentSseEnvelope(evt, 'agent/pr.consumed'));
@@ -1064,7 +1091,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         });
         if ((showUsage || billing.mismatch) && !isTerminalRenderLocked()) {
             println(
-                `  ${terminalThemeBadge(billing.mismatch ? 'warn' : 'info', 'LLM')} ${terminalThemeText(billing.mismatch ? 'warn' : 'muted', billing.mismatch ? technicalDetail : operatorDetail)}`,
+                terminalThemeRow('Uso do modelo', billing.mismatch ? technicalDetail : operatorDetail, {
+                    role: billing.mismatch ? 'warn' : 'muted',
+                }),
             );
         }
     };
@@ -1078,9 +1107,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             source: 'agent',
             severity: 'warn',
         });
-        println(
-            `  ${terminalThemeBadge('warn', 'MODEL')} ${terminalThemeText('warn', `Fallback de modelo: ${detail}`)}`,
-        );
+        println(terminalThemeRow('Modelo', `fallback aplicado: ${detail}`, { role: 'warn' }));
         broadcastSse(AGENT_PR_FALLBACK_MODEL_EVENT, withAgentSseEnvelope(evt, 'agent/pr.fallback_model'));
     };
 
@@ -1092,19 +1119,33 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const error = typeof evt?.['error'] === 'string' ? evt['error'] : null;
         const detail = [
             reason,
-            zeroPR ? 'zero-PR' : prFallback ? 'fallback com PR' : skippedPrFallback ? 'fallback PR bloqueado' : 'sem PR',
+            zeroPR
+                ? 'zero-PR'
+                : prFallback
+                  ? 'fallback com PR'
+                  : skippedPrFallback
+                    ? 'fallback PR bloqueado'
+                    : 'sem PR',
             error,
         ]
             .filter(Boolean)
             .join(' · ');
-        recordTerminalActivity('system', skippedPrFallback ? 'Boot recovery preservou zero-PR' : 'Boot recovery da conversa', {
-            detail,
-            source: 'dialog',
-            severity: skippedPrFallback || prFallback ? 'warn' : 'info',
-        });
+        recordTerminalActivity(
+            'system',
+            skippedPrFallback ? 'Boot recovery preservou zero-PR' : 'Boot recovery da conversa',
+            {
+                detail,
+                source: 'dialog',
+                severity: skippedPrFallback || prFallback ? 'warn' : 'info',
+            },
+        );
         if ((skippedPrFallback || prFallback) && !isTerminalRenderLocked()) {
             println(
-                `  ${terminalThemeBadge('warn', 'DIALOG')} ${terminalThemeText('warn', skippedPrFallback ? `Boot recovery sem fallback PR: ${detail}` : `Boot recovery com PR: ${detail}`)}`,
+                terminalThemeRow(
+                    'Diálogo',
+                    skippedPrFallback ? `boot recovery sem fallback PR: ${detail}` : `boot recovery com PR: ${detail}`,
+                    { role: 'warn' },
+                ),
             );
         }
         broadcastSse(EMITTER_DIALOG_BOOT_RECOVERY, withAgentSseEnvelope(evt, 'agent/dialog.boot_recovery'));
@@ -1119,9 +1160,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             updateCurrent: normalized.visible,
         });
         if (normalized.visible && getShowSessionActivity() && !isTerminalRenderLocked()) {
-            println(
-                `  ${terminalThemeBadge('info', 'SESSION')} ${terminalThemeText('muted', `${normalized.label}: ${normalized.detail}`)}`,
-            );
+            println(terminalThemeRow('Sessão SDK', `${normalized.label}: ${normalized.detail}`, { role: 'muted' }));
         }
         broadcastSse(
             EMITTER_SDK_LIFECYCLE,
@@ -1159,9 +1198,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             updateCurrent: false,
         });
         if (getShowSessionActivity() && !isTerminalRenderLocked()) {
-            println(
-                `  ${terminalThemeBadge('info', 'COMMAND')} ${terminalThemeText('muted', `Comando SDK: ${detail}`)}`,
-            );
+            println(terminalThemeRow('Comando SDK', detail, { role: 'muted' }));
         }
         broadcastSse(
             EMITTER_SDK_COMMAND_EXECUTED,
