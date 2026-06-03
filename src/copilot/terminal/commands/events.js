@@ -9,7 +9,7 @@ import { listTerminalPublicStreamSourcePolicies } from '../events/index.js';
 import { compactTerminalDiagnosticId, getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
 import {
     formatTerminalIsoTimestamp,
-    formatTerminalRelativeAge,
+    formatTerminalTimeLabel,
     readTerminalSseEventArchiveTail,
     terminalThemeHeadline,
     terminalThemeRow,
@@ -267,7 +267,11 @@ function humanStatus(value) {
     if (text === 'active' || text === 'running' || text === 'started') return 'em andamento';
     if (text === 'requested' || text === 'pending') return 'pendente';
     if (text === 'ask_user_continuation') return 'continuação da pergunta humana';
+    if (text === 'session.created') return 'sessão criada';
+    if (text === 'session.deleted') return 'sessão removida';
     if (text === 'session.updated') return 'sessão atualizada';
+    if (text === 'session.foreground') return 'sessão em primeiro plano';
+    if (text === 'session.background') return 'sessão em segundo plano';
     return text.replace(/[_-]+/gu, ' ');
 }
 
@@ -463,8 +467,8 @@ export async function cmdEvents({ println }, arg = '') {
 
     for (const entry of entries) {
         const time = showDiagnosticIds
-            ? formatTerminalIsoTimestamp(entry.timestamp)
-            : formatTerminalRelativeAge(entry.timestamp, now);
+            ? formatTerminalIsoTimestamp(entry.timestamp, { precision: 'seconds' })
+            : formatTerminalTimeLabel(entry.timestamp, { now, mode: 'dual' });
         const origin = compact(humanEventSource(entry.eventSource ?? entry.source ?? '-'), 52);
         const eventId = showDiagnosticIds && entry.eventId ? ` · #${entry.eventId}` : '';
         const trace =

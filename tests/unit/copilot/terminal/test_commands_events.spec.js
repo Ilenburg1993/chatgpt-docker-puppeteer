@@ -41,9 +41,15 @@ const readTerminalSseEventArchiveTail = vi.fn(async () => ({
 }));
 
 vi.mock('../../../../src/copilot/terminal/state/index.js', () => ({
-    formatTerminalIsoTimestamp: vi.fn((/** @type {unknown} */ value) => new Date(Number(value)).toISOString()),
+    formatTerminalIsoTimestamp: vi.fn((/** @type {unknown} */ value) =>
+        new Date(Number(value)).toISOString().replace(/\.\d{3}Z$/u, '+00:00'),
+    ),
     formatTerminalRelativeAge: vi.fn(
         (/** @type {unknown} */ value) => `há ${Math.max(0, Math.floor((1710000005000 - Number(value)) / 1000))}s`,
+    ),
+    formatTerminalTimeLabel: vi.fn(
+        (/** @type {unknown} */ value) =>
+            `${new Date(Number(value)).toISOString().replace(/\.\d{3}Z$/u, '+00:00')} (há ${Math.max(0, Math.floor((1710000005000 - Number(value)) / 1000))}s)`,
     ),
     readTerminalSseEventArchiveTail,
     terminalThemeHeadline: vi.fn((/** @type {string} */ _role, /** @type {string} */ title) => `  ${title}`),
@@ -209,7 +215,8 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('Runtime pronto');
         expect(ctx.output()).toContain('Aviso de quota');
         expect(ctx.output()).toContain('Modelo alterado');
-        expect(ctx.output()).not.toContain('2024-03-09T');
+        expect(ctx.output()).toContain('2024-03-09T16:00:00+00:00 (há 5s)');
+        expect(ctx.output()).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}/u);
         expect(ctx.output()).not.toContain('dialog loop changed');
         expect(ctx.output()).not.toContain('terminal runtime wired');
         expect(ctx.output()).not.toContain('quota warning');

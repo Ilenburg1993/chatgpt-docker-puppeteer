@@ -36,4 +36,12 @@ export {
     terminalThemeStatus,
     terminalThemeText,
 } from '../ui-theme.js';
-export { formatTerminalElapsedDuration, formatTerminalIsoTimestamp, formatTerminalRelativeAge } from '../time-format.js';
+export {
+    TERMINAL_TIME_DISPLAY_MODES,
+    formatTerminalElapsedDuration,
+    formatTerminalIsoTimestamp,
+    formatTerminalIsoTimestampSeconds,
+    formatTerminalRelativeAge,
+    formatTerminalTimeLabel,
+    resolveTerminalTimeDisplayMode,
+} from '../time-format.js';

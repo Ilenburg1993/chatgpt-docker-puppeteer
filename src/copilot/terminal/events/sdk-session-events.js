@@ -119,6 +119,44 @@ import {
 } from './tool-lifecycle-runtime.js';
 
 /**
+ * @param {string | undefined | null} source
+ * @returns {string}
+ */
+function renderInterventionSourceLabel(source) {
+    switch (source) {
+        case 'terminal':
+            return 'terminal';
+        case 'http':
+            return 'HTTP local';
+        case 'sdk':
+            return 'SDK';
+        case 'watchdog':
+            return 'watchdog';
+        default:
+            return 'operador';
+    }
+}
+
+/**
+ * @param {string | undefined | null} mode
+ * @returns {string}
+ */
+function renderInterventionModeLabel(mode) {
+    switch (mode) {
+        case 'queue':
+            return 'fila';
+        case 'interrupt':
+            return 'substituição';
+        case 'steer':
+            return 'intervenção';
+        case 'turn':
+            return 'turno';
+        default:
+            return 'intervenção';
+    }
+}
+
+/**
  * @param {string} previousModel
  * @param {string} newModel
  * @param {string | null} reasoningEffort
@@ -538,7 +576,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
         renderTurnTraceSummary(trace);
         broadcastSse('assistant.turn_end', withSdkSessionSseEnvelope({ turnId }, 'sdk/assistant.turn_end'));
-        // Drenar entradas stranded do mailbox zero-PR: se o modelo completou sem chamar ask_user,
+        // Drenar entradas da fila de intervenção: se o modelo completou sem chamar ask_user,
         // as entradas não serão consumidas automaticamente. Usar setImmediate para aguardar
         // setBusy(false) do engine.js antes de verificar o estado de ociosidade.
         setImmediate(() => {
@@ -897,16 +935,19 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             const answered = answerTerminalPendingQuestion(mailboxEntry.message, runtimeId);
             if (answered) {
                 const mailboxSummary = readRuntimeInterventionMailboxSummary(runtimeId);
-                recordTerminalActivity('question', 'Mailbox zero-PR aplicado em ask_user', {
-                    detail: `origem ${mailboxEntry.source} · modo ${mailboxEntry.modeHint}${mailboxEntry.mergedCount > 0 ? ` · ${mailboxEntry.mergedCount} mescla(s)` : ''}`,
+                const sourceLabel = renderInterventionSourceLabel(mailboxEntry.source);
+                const modeLabel = renderInterventionModeLabel(mailboxEntry.modeHint);
+                const mergedLabel = mailboxEntry.mergedCount > 0 ? ` · ${mailboxEntry.mergedCount} mescla(s)` : '';
+                recordTerminalActivity('question', 'Fila de intervenção aplicada em pergunta humana', {
+                    detail: `origem ${sourceLabel} · ${modeLabel}${mergedLabel}`,
                     source: 'sdk',
                     severity: 'info',
                     recordHistory: false,
                 });
                 println(
                     terminalThemeRow(
-                        'Mailbox',
-                        `intervenção aplicada automaticamente · origem ${mailboxEntry.source} · modo ${mailboxEntry.modeHint} · ${mailboxSummary.queueSize} restante(s) na fila`,
+                        'Fila de intervenção',
+                        `aplicada automaticamente · origem ${sourceLabel} · ${modeLabel} · ${mailboxSummary.queueSize} restante(s) na fila`,
                         { role: 'info' },
                     ),
                 );
@@ -931,8 +972,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                     modeHint: mailboxEntry.modeHint,
                     message: mailboxEntry.message,
                 });
-                recordTerminalActivity('question', 'Mailbox zero-PR não aplicado (requeued)', {
-                    detail: `${mailboxEntry.id} · pending answer route unavailable`,
+                recordTerminalActivity('question', 'Fila de intervenção aguardando próxima oportunidade', {
+                    detail: 'pergunta humana ainda não aceita resposta; intervenção preservada',
                     source: 'sdk',
                     severity: 'warn',
                     recordHistory: false,

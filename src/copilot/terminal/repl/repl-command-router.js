@@ -257,7 +257,7 @@ async function runTerminalInterventionSequence(operation) {
 }
 
 /**
- * Tenta aplicar intervenção imediatamente em `ask_user` pendente (zero-PR).
+ * Tenta aplicar intervenção imediatamente em pergunta humana pendente, sem abrir novo turno.
  *
  * @param {string} message
  * @returns {boolean}
@@ -296,7 +296,7 @@ async function _cmdSteer(message) {
             return;
         }
         println(
-            terminalThemeRow('/steer', 'bloqueado por política zero-PR para evitar consumo implícito de PR', {
+            terminalThemeRow('/steer', 'bloqueado para evitar consumo implícito de PR', {
                 role: 'warn',
             }),
         );
@@ -420,7 +420,7 @@ async function _cmdInterrupt(message) {
 }
 
 /**
- * Operações do mailbox zero-PR de intervenção.
+ * Operações da fila de intervenção.
  *
  * @param {string} arg
  * @returns {void}
@@ -510,7 +510,7 @@ async function _cmdTurn(message) {
 }
 
 /**
- * Enfileira uma intervenção na mailbox zero-PR sem abrir novo turno SDK.
+ * Enfileira uma intervenção sem abrir novo turno SDK.
  *
  * @param {string} message
  * @returns {void}
@@ -523,7 +523,7 @@ function _cmdQueueMailbox(message) {
     }
     if (tryApplyImmediateTerminalZeroPr(prompt)) {
         println(
-            terminalThemeRow('Intervenção', 'aplicada imediatamente na pergunta pendente (zero-PR)', {
+            terminalThemeRow('Intervenção', 'aplicada imediatamente na pergunta pendente', {
                 role: 'success',
             }),
         );

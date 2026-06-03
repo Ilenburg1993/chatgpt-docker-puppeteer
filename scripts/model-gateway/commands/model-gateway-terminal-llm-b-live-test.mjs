@@ -1779,6 +1779,9 @@ function diagnosticUxCycleCriteria(boot) {
     const whoSurface = surfaceBetween(whoStart, countStart);
     const countSurface = surfaceBetween(countStart, clearStart);
     const clearSurface = surfaceBetween(clearStart, quitStart);
+    const hasIsoSeconds = (surface) => /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}/u.test(surface);
+    const hasRelativeAge = (surface) => /há \d+[smhda]/iu.test(surface);
+    const hasIsoMilliseconds = (surface) => /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}/u.test(surface);
     return [
         {
             id: 'diagnostic-ux-ready',
@@ -1799,23 +1802,30 @@ function diagnosticUxCycleCriteria(boot) {
             detail: 'diagnostic cycle did not expose old ANSI literals or uppercase FS/tool badges',
         },
         {
+            id: 'diagnostic-ux-no-old-intervention-jargon',
+            pass: !/mailbox zero-PR|texto livre → fila zero-PR|\[mailbox/iu.test(plain),
+            detail: 'terminal banner/help/intervention cycle did not expose old mailbox-zero-PR jargon',
+        },
+        {
             id: 'diagnostic-ux-activity-human',
             pass:
                 /Atividade Atual da LLM-B[\s\S]*(Arquivo|Ferramenta|Evento)/iu.test(activitySurface) &&
-                /há \d+[smhda]/iu.test(activitySurface) &&
-                !/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}\]/u.test(activitySurface),
-            detail: '/activity after local FS operations used human relative time and hid ISO timestamps in default mode',
+                hasIsoSeconds(activitySurface) &&
+                hasRelativeAge(activitySurface) &&
+                !hasIsoMilliseconds(activitySurface),
+            detail: '/activity after local FS operations used ISO seconds plus relative time without millisecond timestamp noise',
         },
         {
             id: 'diagnostic-ux-live-full-human',
             pass:
                 /Fluxo detalhado da conversa[\s\S]*I\/O real recente[\s\S]*Eventos recentes/iu.test(liveFullSurface) &&
-                /há \d+[smhda]/iu.test(liveFullSurface) &&
-                !/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}\]/u.test(liveFullSurface) &&
+                hasIsoSeconds(liveFullSurface) &&
+                hasRelativeAge(liveFullSurface) &&
+                !hasIsoMilliseconds(liveFullSurface) &&
                 !/\bsearch\b|phase:|approve_all|not_needed|\bempty\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
                     liveFullSurface,
                 ),
-            detail: '/live full rendered detailed flow with relative time and without ISO brackets, raw phase/search labels, permission constants, empty/not_needed states, or UUIDs',
+            detail: '/live full rendered detailed flow with ISO seconds plus relative time and without raw labels, permission constants, empty/not_needed states, or UUIDs',
         },
         {
             id: 'diagnostic-ux-tools-human',
@@ -1832,39 +1842,45 @@ function diagnosticUxCycleCriteria(boot) {
             id: 'diagnostic-ux-events-human',
             pass:
                 /Eventos[\s\S]*(Ferramenta|Atividade|terminal|io)/iu.test(eventsSurface) &&
-                /há \d+[smhda]/iu.test(eventsSurface) &&
+                hasIsoSeconds(eventsSurface) &&
+                hasRelativeAge(eventsSurface) &&
                 !/chatcmpl-tool-[a-z0-9-]+|rastreamento implicit:|#\d+ ·|hub [a-z0-9-]+|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}/iu.test(
                     eventsSurface,
                 ),
-            detail: '/events default rendered diagnostics with relative time and without raw tool ids, trace ids, event ids, hub ids, or ISO timestamps',
+            detail: '/events default rendered diagnostics with ISO seconds plus relative time and without raw tool ids, trace ids, event ids, hub ids, or millisecond timestamps',
         },
         {
             id: 'diagnostic-ux-session-sdk-events-human',
             pass:
                 /Eventos SDK da sessão[\s\S]*(Evento|Resultado)/iu.test(sdkEventsSurface) &&
-                !/#\d+|agent\/sdk|sdk\.lifecycle|\d{4}-\d{2}-\d{2}T|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
+                (/nenhum ciclo de vida SDK ou comando SDK arquivado ainda/iu.test(sdkEventsSurface) ||
+                    (hasIsoSeconds(sdkEventsSurface) && hasRelativeAge(sdkEventsSurface))) &&
+                !/#\d+|agent\/sdk|sdk\.lifecycle|session deleted|sessão sessão|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
                     sdkEventsSurface,
                 ),
-            detail: '/session sdk events rendered aggregate SDK history without event ids, raw sdk sources, ISO timestamps, or UUIDs',
+            detail: '/session sdk events rendered aggregate SDK history with translated lifecycle and ISO seconds plus relative time, without event ids, raw sdk sources, or UUIDs',
         },
         {
             id: 'diagnostic-ux-session-sdk-waits-human',
             pass:
                 /Esperas SDK da sessão/iu.test(sdkWaitsSurface) &&
-                !/#\d+|sdk\/user_input|request_user_input|chatcmpl-tool-|fs\.write|\d{4}-\d{2}-\d{2}T|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
+                (/nenhuma espera SDK arquivada ainda/iu.test(sdkWaitsSurface) ||
+                    (hasIsoSeconds(sdkWaitsSurface) && hasRelativeAge(sdkWaitsSurface))) &&
+                !/#\d+|sdk\/user_input|request_user_input|chatcmpl-tool-|fs\.write|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
                     sdkWaitsSurface,
                 ),
-            detail: '/session sdk waits rendered aggregate waits without event ids, raw SDK names, permission constants, ISO timestamps, or UUIDs',
+            detail: '/session sdk waits rendered aggregate waits without event ids, raw SDK names, permission constants, or UUIDs',
         },
         {
             id: 'diagnostic-ux-session-sdk-inventory-human',
             pass:
                 /Sessão SDK[\s\S]*(Sessões SDK listadas|nenhuma sessão SDK listada)/iu.test(sdkInventorySurface) &&
                 /Última usada|Primeiro plano/iu.test(sdkInventorySurface) &&
-                !/\d{4}-\d{2}-\d{2}T|Foreground|probe-residue|\blast\b|\bforeground\b|operator-next-boot|sdk-resume-fallback|provider-boundary|\bsdk-(?:current|old|probe|new|last|second)\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
+                (!/Tempo/iu.test(sdkInventorySurface) || (hasIsoSeconds(sdkInventorySurface) && hasRelativeAge(sdkInventorySurface))) &&
+                !/Foreground|probe-residue|\blast\b|\bforeground\b|operator-next-boot|sdk-resume-fallback|provider-boundary|\bsdk-(?:current|old|probe|new|last|second)\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
                     sdkInventorySurface,
                 ),
-            detail: '/session sdk default rendered inventory with relative time, translated labels, and without raw ids, ISO timestamps, or English flags',
+            detail: '/session sdk default rendered inventory with ISO seconds plus relative time, translated labels, and without raw ids or English flags',
         },
         {
             id: 'diagnostic-ux-sdk-status-human',
@@ -1880,10 +1896,10 @@ function diagnosticUxCycleCriteria(boot) {
             pass:
                 /Modo de permissões[\s\S]*(automáticas|auditoria sem janelas|seletivas)/iu.test(permissionModeSurface) &&
                 /Permissões SDK[\s\S]*(Pendentes|Mudanças)/iu.test(permissionCockpitSurface) &&
-                !/approve_all|audit_only|selective|file_write|fs\.write|requestId|\\x1b\[|\d{4}-\d{2}-\d{2}T/iu.test(
+                !/approve_all|audit_only|selective|file_write|fs\.write|requestId|\\x1b\[/iu.test(
                     `${permissionModeSurface}\n${permissionCockpitSurface}`,
                 ),
-            detail: '/permission mode/cockpit rendered translated governance labels without raw mode constants, permission types, requestId labels, ANSI, or ISO timestamps',
+            detail: '/permission mode/cockpit rendered translated governance labels without raw mode constants, permission types, requestId labels, or ANSI',
         },
         {
             id: 'diagnostic-ux-intervention-queue-human',
@@ -1899,22 +1915,24 @@ function diagnosticUxCycleCriteria(boot) {
             id: 'diagnostic-ux-history-human',
             pass:
                 /Histórico/iu.test(historySurface) &&
-                !/\[\d{4}-\d{2}-\d{2}T|reconciled|\bmixed\b|\[live\]/iu.test(historySurface),
-            detail: '/history rendered conversation turns without ISO timestamps, raw timeline labels, or [live] badges',
+                (!/(LLM-B|Você|Sistema)/iu.test(historySurface) || (hasIsoSeconds(historySurface) && hasRelativeAge(historySurface))) &&
+                !/reconciled|\bmixed\b|\[live\]/iu.test(historySurface),
+            detail: '/history rendered conversation turns with ISO seconds plus relative time and without raw timeline labels or [live] badges',
         },
         {
             id: 'diagnostic-ux-db-history-human',
             pass:
                 /(Últimos|Nenhum turno|não disponível)/iu.test(dbHistorySurface) &&
-                !/\[\d{4}-\d{2}-\d{2}T|\d{4}-\d{2}-\d{2}T/iu.test(dbHistorySurface),
-            detail: '/db-history rendered persisted turns or empty state without ISO timestamps',
+                (!/Últimos/iu.test(dbHistorySurface) || (hasIsoSeconds(dbHistorySurface) && hasRelativeAge(dbHistorySurface))),
+            detail: '/db-history rendered persisted turns or empty state with ISO seconds plus relative time when rows exist',
         },
         {
             id: 'diagnostic-ux-db-sessions-human',
             pass:
                 /(sessões persistidas|Nenhuma sessão persistida)/iu.test(dbSessionsSurface) &&
-                !/\d{4}-\d{2}-\d{2}T|hub sessions|id [0-9a-f]{8}/iu.test(dbSessionsSurface),
-            detail: '/db-sessions rendered persisted session list without ISO timestamps, English hub-sessions copy, or raw ids',
+                (!/sessões persistidas/iu.test(dbSessionsSurface) || (hasIsoSeconds(dbSessionsSurface) && hasRelativeAge(dbSessionsSurface))) &&
+                !/hub sessions|id [0-9a-f]{8}/iu.test(dbSessionsSurface),
+            detail: '/db-sessions rendered persisted session list with ISO seconds plus relative time and without English hub-sessions copy or raw ids',
         },
         {
             id: 'diagnostic-ux-scope-human',

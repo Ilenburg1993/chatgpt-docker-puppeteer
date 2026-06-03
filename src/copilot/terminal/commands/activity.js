@@ -4,8 +4,7 @@ import { readTerminalIoActivityProjection } from '../events/index.js';
 import { readTerminalActivityProjection } from '../frontend/index.js';
 import {
     formatTerminalElapsedDuration,
-    formatTerminalIsoTimestamp,
-    formatTerminalRelativeAge,
+    formatTerminalTimeLabel,
     terminalThemeDivider,
     terminalThemeHeadline,
     terminalThemeRow,
@@ -133,7 +132,9 @@ function renderBytes(bytes) {
  * @returns {string}
  */
 function renderActivityTime(timestamp, opts) {
-    return opts.detail ? `[${formatTerminalIsoTimestamp(timestamp)}]` : formatTerminalRelativeAge(timestamp, opts.now);
+    return opts.detail
+        ? `[${formatTerminalTimeLabel(timestamp, { now: opts.now, mode: 'dual' })}]`
+        : formatTerminalTimeLabel(timestamp, { now: opts.now, mode: 'dual' });
 }
 
 /**
@@ -361,7 +362,7 @@ function printStreamDiagnostics(println, diagnostics) {
     if (diagnostics.recent.length > 0) {
         println(terminalThemeHeadline('assistant', 'Decisões recentes'));
         for (const entry of diagnostics.recent.slice(0, 5)) {
-            const ts = formatTerminalIsoTimestamp(entry.timestamp);
+            const ts = formatTerminalTimeLabel(entry.timestamp, { mode: 'dual' });
             if (entry.kind === 'delta') {
                 const role = entry.action === 'suppressed' ? 'warn' : entry.action === 'normalized' ? 'assistant' : 'muted';
                 println(

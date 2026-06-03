@@ -1,10 +1,10 @@
 // @ts-check
 /**
  * @module copilot/terminal/wiring/mailbox-drain
- * @file Lógica centralizada de drenagem do mailbox zero-PR do Terminal LLM-B.
+ * @file Lógica centralizada de drenagem da fila de intervenção do Terminal LLM-B.
  *
- *   O sistema zero-PR usa um mailbox (`_runtimeInterventionMailbox`) para receber mensagens do operador enquanto o modelo
- *   está ocupado. O mailbox é drenado automaticamente em 3 triggers:
+ *   A fila de intervenção usa `_runtimeInterventionMailbox` internamente para receber mensagens do operador enquanto o
+ *   modelo está ocupado. Ela é drenada automaticamente em 3 gatilhos:
  *
  *   1. `onUserInputRequested` — quando `ask_user` dispara durante um turno ativo; a entrada é entregue diretamente à
  *        callback do SDK sem custar PR extra. → Tratado em `sdk-session-events.js` (fluxo distinto: entrega via SDK
@@ -40,16 +40,71 @@ import { terminalThemeRow } from '../state/repl/index.js';
 import { withTerminalTurnCorrelation } from '../state/events/index.js';
 
 /**
- * Resultado de uma operação de drenagem do mailbox.
+ * Resultado de uma operação de drenagem da fila de intervenção.
  *
  * @typedef {'sent' | 'requeued' | 'empty'} MailboxDrainResult
  */
 
 /**
- * Entrega uma entrada de mailbox já consumida como turno de usuário, se o modelo estiver ocioso.
+ * @param {string | undefined | null} source
+ * @returns {string}
+ */
+function renderInterventionSourceLabel(source) {
+    switch (source) {
+        case 'terminal':
+            return 'terminal';
+        case 'http':
+            return 'HTTP local';
+        case 'sdk':
+            return 'SDK';
+        case 'watchdog':
+            return 'watchdog';
+        default:
+            return 'operador';
+    }
+}
+
+/**
+ * @param {string | undefined | null} mode
+ * @returns {string}
+ */
+function renderInterventionModeLabel(mode) {
+    switch (mode) {
+        case 'queue':
+            return 'fila';
+        case 'interrupt':
+            return 'substituição';
+        case 'steer':
+            return 'intervenção';
+        case 'turn':
+            return 'turno';
+        default:
+            return 'intervenção';
+    }
+}
+
+/**
+ * @param {string} trigger
+ * @returns {string}
+ */
+function renderDrainTriggerLabel(trigger) {
+    switch (trigger) {
+        case 'turn_end':
+            return 'fim do turno';
+        case 'dialog_ready':
+            return 'conversa pronta';
+        case 'manual_consume':
+            return 'consumo manual';
+        default:
+            return String(trigger).replace(/[._-]+/gu, ' ');
+    }
+}
+
+/**
+ * Entrega uma entrada da fila de intervenção já consumida como turno de usuário, se o modelo estiver ocioso.
  *
- * Se o modelo ainda estiver ocupado (turno em andamento ou fila não-vazia), recoloca a entrada no mailbox para ser
- * drenada na próxima oportunidade.
+ * Se o modelo ainda estiver ocupado (turno em andamento ou fila não-vazia), recoloca a entrada na fila para ser drenada
+ * na próxima oportunidade.
  *
  * @param {import('../../presentation/state/index.js').RuntimeInterventionMailboxEntry} entry Entrada
  *   previamente consumida (via `consumeRuntimeInterventionMailbox`).
@@ -64,7 +119,7 @@ export function deliverEntryAsTurnIfIdle(entry, trigger) {
         println(
             terminalThemeRow(
                 'Fila de intervenção',
-                `aplicada como turno · gatilho ${String(trigger).replace(/[._-]+/gu, ' ')} · origem ${String(entry.source).replace(/[._-]+/gu, ' ')} · ${String(entry.modeHint).replace(/[._-]+/gu, ' ')}`,
+                `aplicada como novo turno · ${renderDrainTriggerLabel(trigger)} · origem ${renderInterventionSourceLabel(entry.source)} · ${renderInterventionModeLabel(entry.modeHint)}`,
             ),
         );
         broadcastSse(
@@ -84,7 +139,7 @@ export function deliverEntryAsTurnIfIdle(entry, trigger) {
         return 'sent';
     }
 
-    // Modelo ainda ocupado — recolocar no mailbox para próxima oportunidade.
+    // Modelo ainda ocupado — recolocar na fila para próxima oportunidade.
     enqueueRuntimeInterventionMailbox({
         runtimeId: entry.runtimeId,
         source: entry.source,
@@ -95,12 +150,12 @@ export function deliverEntryAsTurnIfIdle(entry, trigger) {
 }
 
 /**
- * Consome uma entrada do mailbox zero-PR e, se o modelo estiver ocioso, enfileira como turno.
+ * Consome uma entrada da fila de intervenção e, se o modelo estiver ocioso, enfileira como turno.
  *
- * Caso o modelo esteja ocupado, a entrada é recolocada no mailbox e será drenada no próximo trigger de drenagem
+ * Caso o modelo esteja ocupado, a entrada é recolocada na fila e será drenada no próximo gatilho de drenagem
  * (`turn_end` ou `dialog_ready`).
  *
- * Retorna `'empty'` se o mailbox não tiver entradas; caso contrário delega a `deliverEntryAsTurnIfIdle` e retorna seu
+ * Retorna `'empty'` se a fila não tiver entradas; caso contrário delega a `deliverEntryAsTurnIfIdle` e retorna seu
  * resultado.
  *
  * @param {string} trigger Identificador do contexto de drenagem (ex: `'turn_end'`, `'dialog_ready'`,

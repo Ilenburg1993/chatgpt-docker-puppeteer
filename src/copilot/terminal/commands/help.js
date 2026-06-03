@@ -125,13 +125,13 @@ function renderFullHelp({ injectPort, println }) {
         { command: '/count', description: 'estatísticas da sessão' },
     ]);
     renderHelpSection(println, 'Conversa e controle', [
-        { command: '/queue <msg>', description: 'enfileira intervenção no mailbox zero-PR' },
+        { command: '/queue <msg>', description: 'guarda intervenção para a próxima pergunta humana' },
         { command: '/turn <msg>', description: 'abre novo turno explicitamente, podendo consumir PR' },
         { command: '/steer <msg>', description: 'envio SDK immediate explícito, bloqueado por padrão' },
-        { command: '/interrupt <msg>', description: 'aborta turno ativo e guarda substituição no mailbox' },
+        { command: '/interrupt <msg>', description: 'aborta turno ativo e guarda substituição para a próxima pergunta' },
         { command: '/answer <texto>', description: 'responde pergunta humana pendente' },
         { command: '/abort', description: 'aborta apenas o turno SDK ativo' },
-        { command: '/mailbox [status|consume|clear]', description: 'inspeciona, consome ou limpa o mailbox zero-PR' },
+        { command: '/mailbox [status|consume|clear]', description: 'inspeciona, consome ou limpa a fila de intervenção' },
         { command: '/clear', description: 'limpa histórico em memória' },
         { command: '/clear-shadow', description: 'limpa pergunta humana restaurada do disco' },
         { command: '/restart', description: 'reinicia a conversa' },
@@ -235,7 +235,7 @@ function renderFullHelp({ injectPort, println }) {
     println(
         terminalThemeRow(
             'Texto livre',
-            'sem / entra no mailbox zero-PR por padrão e será aplicado na próxima pergunta humana',
+            'sem / entra na fila de intervenção por padrão e será aplicado na próxima pergunta humana',
         ),
     );
     println(

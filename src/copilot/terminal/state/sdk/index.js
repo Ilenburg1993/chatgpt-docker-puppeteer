@@ -31,4 +31,4 @@ export {
     readTerminalPromptHookSummary,
     recordTerminalPromptHookSubmitted,
 } from '../sdk-hook-events.js';
-export { formatTerminalIsoTimestamp } from '../time-format.js';
+export { formatTerminalIsoTimestamp, formatTerminalIsoTimestampSeconds, formatTerminalTimeLabel } from '../time-format.js';

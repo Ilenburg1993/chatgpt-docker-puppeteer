@@ -206,9 +206,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         const interventionPolicy = getTerminalInterventionPolicy();
         const isModelIdle = !getBusy() && getTurnQueueDepth() === 0;
         if (isModelIdle && interventionPolicy.allowQueueFallback) {
-            println(
-                terminalThemeText('muted', '  [intervene->turn] Modelo ocioso; mailbox não seria consumido. Encaminhando como turno.'),
-            );
+            println(terminalThemeRow('Intervenção', 'modelo ocioso; encaminhada como novo turno', { role: 'info' }));
             await queueUserTurn(finalMessage);
             return;
         }
@@ -232,13 +230,17 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             ),
         );
         println(
-            terminalThemeText('muted', '  Este caminho preserva zero-PR. Use /steer apenas quando quiser intervenção SDK immediate explícita.'),
+            terminalThemeRow(
+                'Próximo',
+                'a intervenção será aplicada na próxima pergunta humana; /turn abre novo turno explicitamente.',
+            ),
         );
         if (isModelIdle) {
             println(
-                terminalThemeText(
-                    'warn',
-                    '  Modelo ocioso e allowQueueFallback=false; entrada no mailbox pode não ser consumida até próximo turno ativo.',
+                terminalThemeRow(
+                    'Aviso',
+                    'modelo ocioso; a intervenção aguardará o próximo turno ativo para ser consumida.',
+                    { role: 'warn' },
                 ),
             );
         }

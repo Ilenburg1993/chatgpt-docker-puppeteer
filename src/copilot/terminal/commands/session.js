@@ -50,7 +50,7 @@ import {
 import {
     readTerminalSseEventArchiveTail,
     formatTerminalIsoTimestamp,
-    formatTerminalRelativeAge,
+    formatTerminalTimeLabel,
     terminalPermissionModeSkipsSdkPrompts,
     terminalThemeDivider,
     terminalThemeHeadline,
@@ -1246,7 +1246,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     if (projection.recentIo.length > 0) {
         println(terminalThemeHeadline('assistant', 'I/O real recente'));
         for (const entry of projection.recentIo.slice(0, 6)) {
-            const time = formatTerminalRelativeAge(entry.timestamp, now);
+            const time = formatTerminalTimeLabel(entry.timestamp, { now, mode: 'dual' });
             const statusLabel = entry.success ? 'concluída' : 'falhou';
             const bytes =
                 typeof entry.bytesRead === 'number'
@@ -1268,7 +1268,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     if (projection.activity.history.length > 0) {
         println(terminalThemeHeadline('assistant', 'Eventos recentes'));
         for (const entry of projection.activity.history.slice(0, 6)) {
-            const time = formatTerminalRelativeAge(entry.ts, now);
+            const time = formatTerminalTimeLabel(entry.ts, { now, mode: 'dual' });
             const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';
             println(
                 terminalThemeRow(
@@ -1310,7 +1310,7 @@ export function cmdHistory({ println }, n = 10) {
     println(terminalThemeDivider(64));
     const now = Date.now();
     for (const turn of hist) {
-        const time = formatTerminalRelativeAge(turn.timestamp, now);
+        const time = formatTerminalTimeLabel(turn.timestamp, { now, mode: 'dual' });
         const actor = renderTerminalActorLabel(turn.role, turn.rawRole);
         const sourceLabel = turn.persisted ? '' : ' · ao vivo';
         const preview = turn.content.slice(0, 160) + (turn.content.length > 160 ? '…' : '');
@@ -1364,7 +1364,7 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
         println(terminalThemeDivider(52));
         const now = Date.now();
         for (const t of turns) {
-            const time = formatTerminalRelativeAge(String(t['created_at'] ?? ''), now);
+            const time = formatTerminalTimeLabel(String(t['created_at'] ?? ''), { now, mode: 'dual' });
             const role = String(t['role'] ?? 'user');
             const content = String(t['content'] ?? '');
             const actor = renderTerminalActorLabel(role, role);
@@ -1403,7 +1403,7 @@ export function cmdDbSessions({ hubSessionId, println }, n = 10) {
         println(terminalThemeDivider(62));
         const now = Date.now();
         for (const s of sessions) {
-            const createdAt = formatTerminalRelativeAge(String(s['created_at'] ?? ''), now);
+            const createdAt = formatTerminalTimeLabel(String(s['created_at'] ?? ''), { now, mode: 'dual' });
             const sessionId = String(s['id'] ?? '');
             const sessionStatus = String(s['status'] ?? 'unknown');
             const title = String(s['title'] ?? '(sem título)');
@@ -1754,7 +1754,7 @@ function renderSdkSessionReasonLabel(value) {
  */
 function renderSdkSessionRelativeTime(value, now = Date.now()) {
     if (value == null || value === '') return 'sem horário';
-    const rendered = formatTerminalRelativeAge(/** @type {Date | number | string} */ (value), now);
+    const rendered = formatTerminalTimeLabel(/** @type {Date | number | string} */ (value), { now, mode: 'dual' });
     return rendered === 'agora' ? 'há 0s' : rendered;
 }
 
@@ -1866,7 +1866,12 @@ function readPayloadString(payload, keys) {
 function renderSdkArchiveTypeLabel(value) {
     const type = String(value ?? '').trim();
     if (!type) return 'registrado';
+    if (type === 'session.created') return 'sessão criada';
+    if (type === 'session.deleted') return 'sessão removida';
     if (type === 'session.updated') return 'sessão atualizada';
+    if (type === 'session.foreground') return 'sessão em primeiro plano';
+    if (type === 'session.background') return 'sessão em segundo plano';
+    if (type === 'session.shutdown') return 'sessão encerrada';
     if (type === 'completed') return 'concluído';
     if (type === 'requested') return 'solicitado';
     if (type === 'pending') return 'pendente';
@@ -1895,7 +1900,7 @@ function renderSdkPermissionTypeLabel(value) {
 function renderSdkSessionReference(value) {
     if (!value) return null;
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(value)) {
-        return 'sessão ativa';
+        return 'ativa';
     }
     return compactSdkSessionEventValue(value, 28);
 }
@@ -2051,7 +2056,7 @@ async function cmdSessionSdkEvents({ println }, tokens) {
     }
     const now = Date.now();
     for (const entry of collapsed) {
-        const time = entry.firstTimestamp ? formatTerminalRelativeAge(entry.firstTimestamp, now) : 'sem horário';
+        const time = entry.firstTimestamp ? formatTerminalTimeLabel(entry.firstTimestamp, { now, mode: 'dual' }) : 'sem horário';
         const repeats = entry.count > 1 ? ` ×${entry.count}` : '';
         println(terminalThemeRow('Evento', `${time} · ${entry.line}${repeats}`));
     }
@@ -2115,7 +2120,7 @@ async function cmdSessionSdkWaits({ println }, tokens) {
     }
     const now = Date.now();
     for (const entry of collapsed) {
-        const time = entry.firstTimestamp ? formatTerminalRelativeAge(entry.firstTimestamp, now) : 'sem horário';
+        const time = entry.firstTimestamp ? formatTerminalTimeLabel(entry.firstTimestamp, { now, mode: 'dual' }) : 'sem horário';
         const repeats = entry.count > 1 ? ` ×${entry.count}` : '';
         println(terminalThemeRow('Espera', `${time} · ${entry.line}${repeats}`));
     }

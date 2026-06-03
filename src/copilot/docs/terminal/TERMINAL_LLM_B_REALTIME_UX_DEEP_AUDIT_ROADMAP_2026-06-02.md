@@ -4045,5 +4045,134 @@
   - Resultado: PASS em 19/19 critérios; a superfície mostrou `Fila de intervenção`, `origem
         terminal`, `fila`, e não mostrou `mailbox zero-PR`, runtime ID, `modeHint`, `entryId` ou
         ANSI.
-- [ ] Próxima lacuna: revisar textos do banner/help/menu que ainda ensinam `mailbox zero-PR`,
+- [x] Próxima lacuna: revisar textos do banner/help/menu que ainda ensinam `mailbox zero-PR`,
       além de eventos de aplicação automática em `sdk-session-events.js` que ainda citam mailbox.
+
+### 11.57 Banner, help e aplicação automática alinhados à fila de intervenção
+
+- [x] Achado: o banner inicial ainda ensinava `texto livre → fila zero-PR`.
+- [x] Achado: `/help` ainda descrevia `/queue`, `/interrupt` e `/mailbox` como operações de
+      `mailbox zero-PR`.
+- [x] Achado: eventos de aplicação automática em `sdk-session-events.js` ainda registravam
+      `Mailbox zero-PR aplicado em ask_user`.
+- [x] Implementação: banner curto passou a `texto livre → fila de intervenção`.
+- [x] Implementação: `/help` passou a explicar `/queue` como intervenção guardada para a próxima
+      pergunta humana e `/mailbox` como fila de intervenção.
+- [x] Implementação: eventos de aplicação automática passaram a `Fila de intervenção aplicada em
+      pergunta humana`.
+- [x] Implementação: comentários e exemplos internos foram alinhados para evitar regressão de
+      nomenclatura.
+- [x] Harness live reforçado: `diagnostic-ux-no-old-intervention-jargon` falha se o terminal
+      voltar a mostrar `mailbox zero-PR`, `texto livre → fila zero-PR` ou `[mailbox`.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-intervention-jargon-20260603-1628`.
+  - Resultado: PASS em 20/20 critérios; banner, help e ciclo `/queue`/`/mailbox` não exibiram
+        `mailbox zero-PR`, `texto livre → fila zero-PR`, `[mailbox`, IDs de runtime ou ANSI.
+
+## 12. UX v2: terminal como produto operacional elegante
+
+### 12.1 Diagnóstico consolidado da virada UX
+
+- [x] Entrada nova do operador: a prioridade passa a ser uma revolução de UX do terminal, não apenas
+      remoção incremental de IDs.
+- [x] Requisito novo: superfícies operacionais devem mostrar tanto ISO 8601 completo até segundos
+      quanto tempo relativo, com configuração central para futura troca de direção.
+- [x] Requisito novo: a linha viva deve permanecer fora do input, sempre pronta, mostrando estados
+      nobres da LLM-B: pensando, usando tools, carregando contexto, aguardando operador, emitindo
+      deltas, finalizando resposta, trocando modelo e reconfigurando BYOK.
+- [x] Requisito novo: `request_user_input`/`ask_user` não são tools comuns na UX; devem aparecer
+      como pergunta humana/decisão do operador, com persistência clara e sem repetição.
+- [x] Requisito novo: `report_intent` não deve aparecer como nome visual primário; a superfície deve
+      falar em `Intenção da LLM-B` ou `Intenção capturada`, com risco e origem humana.
+- [x] Requisito novo: seleção/troca automática de modelo e vínculo BYOK devem virar eventos de
+      primeira classe no terminal, com explicação clara do configurado, efetivo, cobrado, fallback,
+      mismatch e handoff.
+
+### 12.2 Situação atual observada em código e live PTY
+
+- [x] Live PTY de 2026-06-03 mostrou melhora grande nas superfícies de `/fs`, `/activity`,
+      `/events`, `/session sdk`, `/permission`, `/scope`, `/queue` e `/mailbox`.
+- [x] Gap observado na live: `/session sdk events` ainda exibiu `session deleted · sessão sessão
+      ativa`, demonstrando que lifecycle SDK ainda precisava de tradução semântica.
+- [x] Gap observado em código: o boot prompt ainda ensinava `Mailbox zero-PR` para a LLM-B, criando
+      risco de a própria LLM repetir jargão antigo.
+- [x] Gap observado em código: `mailbox-drain`, `repl-lifecycle`, `terminal-agent-wiring` e
+      comandos de intervenção ainda continham mensagens ou comentários visíveis com `mailbox`/
+      `zero-PR` em caminhos de borda.
+- [x] Gap observado em arquitetura: a função de tempo existente separava `formatTerminalIsoTimestamp`
+      e `formatTerminalRelativeAge`, mas não havia contrato único para "ISO + relativo" configurável.
+- [x] Gap observado em testes live: critérios antigos reprovavam ISO no default; eles precisarão ser
+      revisados para exigir ISO até segundos + relativo e continuar proibindo IDs/tool names crus.
+
+### 12.3 Situação ideal UX v2
+
+- [ ] Tempo canônico: todos os eventos e timelines humanos devem usar uma API central como
+      `formatTerminalTimeLabel`, com `dual` como default operacional: `YYYY-MM-DDTHH:mm:ss-03:00
+      (há 4s)`.
+- [ ] Linha viva: deve usar duração compacta por ergonomia (`12s`, `2m03s`) e nunca roubar o input;
+      histórico e painéis persistentes devem usar ISO+relativo.
+- [ ] Tema: cada papel deve ter cor estável: operador, LLM-B, thinking, tool, pergunta, erro, aviso,
+      sucesso, arquivo leitura/escrita/edição/exclusão, modelo/BYOK.
+- [ ] Layout: comandos devem usar `terminalThemeHeadline`, `terminalThemeRow`,
+      `terminalThemeDivider` e blocos atômicos; ANSI manual só pode existir em adaptadores centrais.
+- [ ] Perguntas humanas: `ask_user` e `request_user_input` devem ter painel próprio, sem parecer
+      tool genérica, com resposta pendente única, escolhas claras e erro de timeout acionável.
+- [ ] Intenções: `report_intent`/`assistant.intent` devem renderizar uma única intenção deduplicada,
+      com nome humano, risco, origem e sem `toolCallId` no default.
+- [ ] Modelos/BYOK: seleção automática, handoff, mismatch, fallback, quota e provider efetivo devem
+      aparecer como narrativas breves e auditáveis no terminal.
+- [ ] Live tests: o harness PTY deve validar visualmente os contratos de tempo, nomes humanos,
+      ausência de IDs crus, ausência de spam e preservação do input.
+
+### 12.4 Roadmap operacional UX v2
+
+- [x] Fase 12.4.A: criar contrato central de tempo `formatTerminalTimeLabel`.
+- [x] Fase 12.4.A.1: suportar modos `dual`, `iso`, `relative` e `elapsed`.
+- [x] Fase 12.4.A.2: suportar ISO com precisão configurável, defaultando para segundos no modo
+      humano dual.
+- [x] Fase 12.4.A.3: exportar a API pelos barrels do terminal.
+- [x] Fase 12.4.B: migrar `/activity` para tempo dual nas timelines persistentes.
+- [x] Fase 12.4.C: migrar `/events` para tempo dual no default e ISO até segundos em filtro
+      diagnóstico.
+- [x] Fase 12.4.D: migrar `/live full`, `/history`, `/db-history`, `/db-sessions`,
+      `/session sdk events` e `/session sdk waits` para tempo dual.
+- [x] Fase 12.4.E: traduzir lifecycle SDK `session.created/deleted/foreground/background` no
+      agregador de eventos de sessão.
+- [x] Fase 12.4.F: remover `Mailbox zero-PR` do boot prompt e alinhar a linguagem interna à fila de
+      intervenção.
+- [ ] Fase 12.4.G: atualizar harness live para exigir tempo dual em superfícies default.
+- [x] Fase 12.4.G: atualizar harness live para exigir tempo dual em superfícies default.
+- [x] Fase 12.4.H: adicionar testes unitários para a API de tempo e comandos migrados.
+- [x] Fase 12.4.I: rodar live PTY focada em tempo dual, lifecycle SDK e intervenção.
+- [ ] Fase 12.4.J: auditar `/status`, `/now`, `/health`, `/diagnose`, `/byok`, `/model` e
+      `/reasoning` contra o novo contrato visual.
+- [ ] Fase 12.4.K: projetar painel próprio de pergunta humana para reduzir repetição e timeout sem
+      resposta.
+- [ ] Fase 12.4.L: projetar faixa de modelo/BYOK na linha viva e nos eventos persistentes.
+- [ ] Fase 12.4.M: depois da estabilização UX/terminal/BYOK, iniciar investigação formal de libs
+      externas (`gum`, `fzf`, `bat`, `glow`, `delta`, `atuin`, `zoxide`, `jq`, `yq`) em documento
+      separado antes de qualquer adoção.
+
+### 12.5 Evidência da primeira rodada UX v2
+
+- [x] Implementação: `time-format.js` passou a expor `formatTerminalTimeLabel`, com modos
+      `dual`, `iso`, `relative` e `elapsed`.
+- [x] Implementação: ISO humano dual usa precisão até segundos por padrão, evitando ruído de
+      milissegundos em telas persistentes.
+- [x] Implementação: parser de timestamp aceita `Date`, número, ISO string e string numérica,
+      corrigindo o bug `tempo inválido` observado em `/db-sessions`.
+- [x] Implementação: `/activity`, `/live full`, `/events`, `/history`, `/db-history`,
+      `/db-sessions`, `/session sdk events`, `/session sdk waits` e inventário SDK passaram a usar
+      ISO+relativo nas linhas de timeline.
+- [x] Implementação: lifecycle SDK `session.created/deleted/updated/foreground/background` passou
+      a ser traduzido em `/session sdk events` e `/events`.
+- [x] Implementação: boot prompt e superfícies de intervenção deixam de ensinar `Mailbox zero-PR`
+      como linguagem operacional.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_time_format.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js`.
+  - Resultado: 4 arquivos, 63 testes.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-time-dual-20260603-1717`.
+  - Resultado: PASS em 20/20 critérios, exigindo ISO até segundos + tempo relativo e bloqueando
+        regressões como `tempo inválido`, `session deleted`, `sessão sessão`, IDs crus e jargão
+        antigo de mailbox.

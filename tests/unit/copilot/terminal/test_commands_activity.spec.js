@@ -194,7 +194,8 @@ describe('terminal/commands/activity', () => {
 
         cmdActivity({ println: ctx.println }, '5 detail');
 
-        expect(ctx.output()).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}\]/u);
+        expect(ctx.output()).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2} \(há \d+[smhda]\)\]/u);
+        expect(ctx.output()).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}/u);
         expect(ctx.output()).toContain('io-engine.fs.readFile.text');
         expect(ctx.output()).toContain('turn:turn-1');
         expect(ctx.output()).toContain('req=ui-1');

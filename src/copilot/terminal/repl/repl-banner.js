@@ -45,7 +45,7 @@ ${terminalThemeDivider(62)}
 ${terminalThemeHeadline('assistant', 'Terminal LLM-B', ['sessão permanente'])}
 ${terminalThemeDivider(62)}
   ${commandList(['/status', '/now', '/menu', '/activity 10', '/help'])}
-  ${terminalThemeText('muted', 'texto livre → fila zero-PR · /turn <msg> abre turno · @arquivo anexa contexto')}
+  ${terminalThemeText('muted', 'texto livre → fila de intervenção · /turn <msg> abre turno · @arquivo anexa contexto')}
   ${terminalThemeText('muted', `HTTP :${injectPort} · /inject · /events · /sessions · diagnóstico: /health /tools`)}
 `;
 }

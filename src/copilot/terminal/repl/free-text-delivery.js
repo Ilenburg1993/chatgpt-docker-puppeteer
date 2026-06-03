@@ -6,7 +6,7 @@
  *   Determina se uma entrada de texto livre do operador deve ser entregue como:
  *
  *   - `'turn'` → novo turno canônico na fila do dialog loop (pode consumir PR)
- *   - `'intervene'`→ intervenção no mailbox zero-PR (sem consumo de PR, aplicada em ask_user)
+ *   - `'intervene'`→ intervenção na fila de intervenção (sem consumo de PR, aplicada em ask_user)
  *   - `'steer'` → intervenção SDK immediate no turno ativo (/steer)
  *
  *   A rota pode ser determinada por:
@@ -39,7 +39,7 @@ import { getTerminalInterventionPolicy } from '#copilot/config';
  *
  * @example
  *     resolveFreeTextDelivery('!!turn: oi'); // → { mode: 'turn', message: 'oi' }
- *     resolveFreeTextDelivery('[mailbox] responda'); // → { mode: 'intervene', message: 'responda' }
+ *     resolveFreeTextDelivery('[fila] responda'); // → { mode: 'intervene', message: 'responda' }
  *     resolveFreeTextDelivery('mensagem simples'); // → depende da política de intervenção
  *
  * @param {string} input - Entrada bruta do operador (pode conter diretivas de rota).

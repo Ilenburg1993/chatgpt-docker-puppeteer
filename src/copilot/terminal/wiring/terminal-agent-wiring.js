@@ -495,7 +495,7 @@ export function registerAgentEventListeners(printBanner) {
             'dialog.ready',
             withTerminalAgentSseEnvelope({ model, reasoningEffort }, 'terminal-agent-wiring/dialog.ready'),
         );
-        // Drain do mailbox zero-PR: cobre abort pelo watchdog (que não dispara TURN_END).
+        // Drenagem da fila de intervenção: cobre abort pelo watchdog (que não dispara TURN_END).
         drainMailboxToTurnIfIdle('dialog_ready');
     });
     agentEvents.on(EMITTER_ASSISTANT_STREAMING_DELTA, (/** @type {{ totalResponseSizeBytes?: number }} */ evt) => {
