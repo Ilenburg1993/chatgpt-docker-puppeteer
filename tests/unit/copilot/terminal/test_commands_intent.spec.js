@@ -74,7 +74,7 @@ describe('terminal/commands/intent', () => {
 
         cmdIntent(ctx, 'clear');
 
-        expect(ctx.output()).toContain('Histórico de intenções limpo');
+        expect(ctx.output()).toContain('histórico limpo');
         expect(readTerminalIntentStats().entries).toBe(0);
     });
 

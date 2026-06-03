@@ -11,12 +11,7 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit';
-import {
-    formatTerminalIsoTimestamp,
-    terminalThemeHeadline,
-    terminalThemeRow,
-    terminalThemeText,
-} from '../state/index.js';
+import { formatTerminalIsoTimestamp, terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
 
 /**
  * @typedef {object} AuditContext
@@ -37,7 +32,7 @@ export async function cmdAudit({ println }, arg) {
     const entries = await defaultAuditLog.getAuditSummary(null, limit);
 
     println('');
-    println(terminalThemeHeadline('command', 'Audit Log', [`últimas ${limit} entradas`]));
+    println(terminalThemeHeadline('command', 'Auditoria', [`últimas ${limit} entradas`]));
     println('');
 
     if (!entries || entries.length === 0) {
@@ -55,11 +50,11 @@ export async function cmdAudit({ println }, arg) {
         categories[type] = (categories[type] ?? 0) + 1;
         const ts = typeof e['ts'] === 'number' ? formatTerminalIsoTimestamp(e['ts']) : 'sem horário';
         const desc = typeof e['description'] === 'string' ? e['description'] : type;
-        println(`  ${terminalThemeText('muted', ts.padEnd(20))} ${terminalThemeText('command', type.padEnd(18))} ${desc}`);
+        println(terminalThemeRow(type, `${ts} · ${desc}`, { role: 'command', width: 18 }));
     }
 
     println('');
-    println(terminalThemeHeadline('command', 'Sumário por tipo'));
+    println(terminalThemeHeadline('command', 'Resumo por tipo'));
     for (const [cat, count] of Object.entries(categories)) {
         println(terminalThemeRow(cat, String(count), { role: 'info', width: 18 }));
     }

@@ -11,7 +11,7 @@
  */
 
 import { readTerminalErrorsProjection } from '../frontend/index.js';
-import { formatTerminalIsoTimestamp, terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/index.js';
+import { formatTerminalIsoTimestamp, terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
 
 /**
  * @typedef {object} ErrorsContext
@@ -33,7 +33,9 @@ export function cmdErrors({ println }, arg) {
     const { stats, recent } = readTerminalErrorsProjection(limit);
 
     println('');
-    println(terminalThemeHeadline('error', 'Erros rastreados', [`${stats.total} total`, `${stats.buffered} no buffer`]));
+    println(
+        terminalThemeHeadline('error', 'Erros rastreados', [`${stats.total} total`, `${stats.buffered} no buffer`]),
+    );
     println('');
 
     if (recent.length === 0) {
@@ -45,8 +47,8 @@ export function cmdErrors({ println }, arg) {
     for (const err of recent) {
         const ts = formatTerminalIsoTimestamp(err.timestamp);
         const type = err.errorType ?? 'Error';
-        const src = err.source ? `${terminalThemeText('muted', `[${err.source}]`)} ` : '';
-        println(`    ${terminalThemeText('error', type)}  ${terminalThemeText('muted', ts)}  ${src}${err.message}`);
+        const src = err.source ? ` · fonte ${err.source}` : '';
+        println(terminalThemeRow(type, `${ts}${src} · ${err.message}`, { role: 'error', width: 18 }));
     }
     println('');
 }

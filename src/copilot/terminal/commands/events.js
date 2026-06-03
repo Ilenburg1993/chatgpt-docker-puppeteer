@@ -6,6 +6,7 @@
  */
 
 import { listTerminalPublicStreamSourcePolicies } from '../events/index.js';
+import { compactTerminalDiagnosticId, getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
 import {
     formatTerminalIsoTimestamp,
     readTerminalSseEventArchiveTail,
@@ -13,7 +14,6 @@ import {
     terminalThemeRow,
     terminalThemeText,
 } from '../state/index.js';
-import { compactTerminalDiagnosticId, getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
 
 /**
  * @typedef {object} EventsContext
@@ -22,7 +22,19 @@ import { compactTerminalDiagnosticId, getTerminalHumanToolName } from '../events
 
 /**
  * @param {string} arg
- * @returns {{ query: { limit: number; event: string | null; traceId: string | null; turnId: string | null; source: string | null; toolCallId: string | null; requestId: string | null; hubSessionId: string | null }; format: 'text' | 'json' | 'raw' }}
+ * @returns {{
+ *     query: {
+ *         limit: number;
+ *         event: string | null;
+ *         traceId: string | null;
+ *         turnId: string | null;
+ *         source: string | null;
+ *         toolCallId: string | null;
+ *         requestId: string | null;
+ *         hubSessionId: string | null;
+ *     };
+ *     format: 'text' | 'json' | 'raw';
+ * }}
  */
 function parseEventsArg(arg) {
     const tokens = arg.trim().split(/\s+/u).filter(Boolean);
@@ -314,7 +326,13 @@ function summarizePayload(payload, opts = {}) {
 }
 
 /**
- * @param {{ event: string; source: string | null; eventSource: string | null; traceId: string | null; turnId: string | null }} entry
+ * @param {{
+ *     event: string;
+ *     source: string | null;
+ *     eventSource: string | null;
+ *     traceId: string | null;
+ *     turnId: string | null;
+ * }} entry
  * @returns {string | null}
  */
 function buildTranscriptExportHint(entry) {
@@ -447,7 +465,11 @@ export async function cmdEvents({ println }, arg = '') {
         const transcriptHint = buildTranscriptExportHint(entry);
         const detail = [summary, transcriptHint].filter(Boolean).join(' · ');
         println(
-            `  ${terminalThemeText('muted', time)}  #${entry.eventId} ${terminalThemeText('accent', humanEventLabel(entry.event))}  ${terminalThemeText('muted', `${origin}${trace}${turn}${hub}`)}${detail ? ` - ${detail}` : ''}`,
+            terminalThemeRow(
+                humanEventLabel(entry.event),
+                `${time} · #${entry.eventId} · ${origin}${trace}${turn}${hub}${detail ? ` · ${detail}` : ''}`,
+                { role: 'muted', width: 22 },
+            ),
         );
     }
     println('');

@@ -9,17 +9,18 @@
 
 import {
     clearTerminalIntentHistory,
+    formatTerminalIsoTimestamp,
     readTerminalIntentHistory,
     readTerminalIntentStats,
-    formatTerminalIsoTimestamp,
-    terminalThemeBadge,
-    terminalThemeText,
+    terminalThemeDivider,
+    terminalThemeHeadline,
+    terminalThemeRow,
 } from '../state/index.js';
 
 /**
  * @typedef {object} IntentCommandContext
  * @property {(text: string) => void} println
- * @property {((lines: string[]) => void)=} printlnBlock
+ * @property {(lines: string[]) => void} [printlnBlock]
  */
 
 /**
@@ -95,7 +96,9 @@ export function cmdIntent(ctx, arg) {
     const normalizedTokens = tokens.map((token) => token.toLowerCase());
     if (normalizedTokens.includes('clear')) {
         clearTerminalIntentHistory();
-        ctx.println(`\n  ${terminalThemeText('muted', 'Histórico de intenções limpo.')}\n`);
+        ctx.println('');
+        ctx.println(terminalThemeRow('Intenções', 'histórico limpo', { role: 'success' }));
+        ctx.println('');
         return;
     }
 
@@ -107,32 +110,48 @@ export function cmdIntent(ctx, arg) {
     const stats = readTerminalIntentStats();
 
     if (entries.length === 0) {
-        ctx.println(`\n  ${terminalThemeText('muted', 'Nenhuma intenção capturada ainda.')}\n`);
+        ctx.println('');
+        ctx.println(terminalThemeRow('Intenções', 'Nenhuma intenção capturada ainda', { role: 'muted' }));
+        ctx.println('');
         return;
     }
 
     /** @type {string[]} */
     const lines = [
         '',
-        `  ${terminalThemeBadge('info', 'INTENÇÃO CAPTURADA')} ${terminalThemeText('info', `Últimas ${entries.length} intenções`)} ${terminalThemeText('muted', `· total ${stats.entries} · ${stats.bytes} bytes${detail ? ' · detalhe técnico' : ''}`)}`,
-        '',
+        terminalThemeHeadline('info', 'Intenções capturadas', [
+            `últimas ${entries.length}`,
+            `total ${stats.entries}`,
+            `${stats.bytes} bytes`,
+            detail ? 'detalhe técnico' : null,
+        ]),
+        terminalThemeDivider(58),
     ];
     for (const entry of entries) {
         const theme = riskTheme(entry.risk);
         const source = humanIntentSource(entry.source);
+        lines.push(terminalThemeRow('Intenção', compact(entry.intent, 180), { role: theme }));
         lines.push(
-            `  ${terminalThemeText(theme, '•')} ${terminalThemeText('muted', `${formatTime(entry.timestamp)} · origem ${source} · risco ${humanRiskLabel(entry.risk)}`)}`,
+            terminalThemeRow(
+                'Contexto',
+                `${formatTime(entry.timestamp)} · origem ${source} · risco ${humanRiskLabel(entry.risk)}`,
+            ),
         );
         if (detail) {
             const tool = entry.tool ? ` · ferramenta ${entry.tool}` : '';
             const call = entry.toolCallId ? ` · chamada ${compact(entry.toolCallId, 18)}` : '';
-            lines.push(`    ${terminalThemeText('muted', `origem bruta ${entry.source}${tool}${call} · registro ${entry.id}`)}`);
+            lines.push(
+                terminalThemeRow('Técnico', `origem bruta ${entry.source}${tool}${call} · registro ${entry.id}`),
+            );
         }
-        lines.push(`    ${compact(entry.intent, 180)}`);
     }
     lines.push(
         '',
-        `  ${terminalThemeText('muted', 'Use /intent <n> para ampliar, /intent detail para envelope técnico ou /intent clear para limpar a janela em memória.')}`,
+        terminalThemeRow(
+            'Uso',
+            'Use /intent <n> para ampliar, /intent detail para envelope técnico ou /intent clear para limpar a janela em memória.',
+            { role: 'command' },
+        ),
         '',
     );
     printBlock(ctx, lines);
