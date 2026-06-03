@@ -2597,7 +2597,7 @@
 - [x] Teste de sessão foi atualizado para bloquear os rótulos técnicos antigos e aceitar os novos rótulos humanos capitalizados.
 - [x] Teste escopado passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
-- [ ] Próxima lacuna: revisar o `/status` compacto restante, que ainda tem ANSI local em algumas linhas, e decidir se vale migrar agora ou manter até a próxima rodada de compactação.
+- [x] Próxima lacuna: revisar o `/status` compacto restante, que ainda tem ANSI local em algumas linhas, e decidir se vale migrar agora ou manter até a próxima rodada de compactação.
 - [x] Próxima lacuna: revisar `/session sdk` inventário/controle, que ainda contém mensagens com ANSI local em ações de boot.
 
 ### 11.33 `/session sdk` com cockpit visual consistente
@@ -2616,7 +2616,7 @@
 - [x] IDs de sessão continuam copiáveis, mas aparecem dentro de linhas alinhadas e com rótulo humano.
 - [x] Teste escopado passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
-- [ ] Próxima lacuna: revisar se `/status` compacto deve migrar totalmente para tema, removendo os ANSI locais remanescentes sem perder contraste rápido.
+- [x] Próxima lacuna: revisar se `/status` compacto deve migrar totalmente para tema, removendo os ANSI locais remanescentes sem perder contraste rápido.
 
 ### 11.34 Barrel estreito de tema e polimento BYOK residual
 
@@ -2630,3 +2630,13 @@
   - Resultado: PASS.
 - [x] Achado da live: `/status`, `/now`, `/health`, `/live` e `/activity` compactos estão funcionais e humanos, mas ainda usam algumas cores locais herdadas; a estética já melhorou, porém a unificação total da paleta ainda cabe em rodada própria.
 - [ ] Próxima lacuna: migrar outros comandos que só precisam de tema para o barrel estreito, reduzindo acoplamento acidental em testes e cold start.
+
+### 11.35 `/status` compacto sem ANSI herdado
+
+- [x] Achado: a live ainda mostrava `/status` compacto com cores locais hardcoded, embora a informação já estivesse humana.
+- [x] Decisão: `/status` compacto deve usar a mesma gramática visual do `/status full`, porque é a primeira tela de decisão do operador.
+- [x] `cmdStatus` default trocou a string template por `terminalThemeHeadline`, `terminalThemeDivider` e `terminalThemeRow`.
+- [x] Acesso, saúde, entrada, modelo, catálogo, atividade, próximo passo e detalhes agora são linhas temáticas, sem `\x1b[...]` local no bloco.
+- [x] Teste escopado passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
+- [ ] Próxima lacuna: migrar `/now`, `/health`, `/live` e `/activity` compactos para o barrel estreito de tema e remover suas cores locais herdadas, em lotes pequenos.

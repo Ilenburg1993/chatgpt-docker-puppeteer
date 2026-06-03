@@ -443,29 +443,20 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     );
     const { snap, health } = projection;
     const active = projection.dialogLoopActive;
-    const statusColor =
-        snap['status'] === 'waiting_for_input' ? '\x1b[32m' : snap['status'] === 'idle' ? '\x1b[33m' : '\x1b[31m';
     if (!detailMode) {
-        const healthColor =
-            health?.['status'] === 'healthy' ? '\x1b[32m' : health?.['status'] === 'degraded' ? '\x1b[33m' : '\x1b[31m';
         const waitCount =
             projection.pendingElicitations +
             projection.pendingPermissions +
             projection.pendingUserInputs +
             projection.pendingStructuredUserInputs;
-        const waitLine =
-            waitCount > 0
-                ? `\x1b[33m${waitCount} pendência(s)\x1b[0m \x1b[90m/sdk waits\x1b[0m`
-                : '\x1b[32mnenhuma pendência\x1b[0m';
+        const waitLine = waitCount > 0 ? `${waitCount} pendência(s) · /sdk waits` : 'nenhuma pendência';
         const queue = Number(snap['queueSize'] ?? 0);
         const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
         const byokLabel = byok.enabled
-            ? `${byok.ready ? '\x1b[32mpronto\x1b[0m' : '\x1b[33mincompleto\x1b[0m'} \x1b[90m${byok.providerType ?? '-'} · ${byok.model ?? '-'}\x1b[0m`
-            : '\x1b[90mSDK Copilot\x1b[0m';
+            ? `${byok.ready ? 'pronto' : 'incompleto'} · ${byok.providerType ?? '-'} · ${byok.model ?? '-'}`
+            : 'SDK Copilot';
         const modelBilling = projection.modelBilling;
-        const modelLabel = modelBilling.mismatch
-            ? `${terminalThemeText('warn', modelBilling.displayModel)} ${terminalThemeText('muted', '(ver /status full)')}`
-            : terminalThemeText('assistant', modelBilling.displayModel);
+        const modelLabel = modelBilling.mismatch ? `${modelBilling.displayModel} · ver /status full` : modelBilling.displayModel;
         const gatewayProjection = configProjection.modelGatewayProjection ?? {
             providerCount: 0,
             modelCount: 0,
@@ -474,20 +465,31 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         const rawAction = projection.recommendedAction === 'none' ? null : projection.recommendedAction;
         const action = rawAction ?? (waitCount > 0 ? '/sdk waits' : '/menu');
 
-        println(`
-  ${terminalThemeText('assistant', 'Status do Terminal LLM-B')}
-  ─────────────────────────────────────
-  Conversa     ${statusColor}${renderHumanTerminalStatus(snap['status'])}\x1b[0m · ${active ? '\x1b[32mativa\x1b[0m' : '\x1b[31minativa\x1b[0m'} · fila ${queue}
-  Saúde        ${health ? `${healthColor}${renderHumanTerminalHealth(health['status'])}\x1b[0m` : '\x1b[90msem leitura\x1b[0m'}
-  Entrada      ${waitLine}
-  Modelo       ${modelLabel} \x1b[90m· raciocínio ${configProjection.currentReasoningEffort}\x1b[0m
-  Acesso       ${byokLabel}
-  Catálogo     \x1b[90m${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados\x1b[0m
-  Atividade    \x1b[90m${renderLiveActivitySummary(projection.activity)}\x1b[0m
-  Próximo      ${terminalThemeText('command', action)}
-  Detalhe      ${renderCommandList(['/status full', '/now', '/health', '/menu'])}
-  ─────────────────────────────────────
-`);
+        println('');
+        println(terminalThemeHeadline('assistant', 'Status do Terminal LLM-B'));
+        println(terminalThemeDivider(37));
+        println(
+            terminalThemeRow(
+                'Conversa',
+                `${renderHumanTerminalStatus(snap['status'])} · ${active ? 'ativa' : 'inativa'} · fila ${queue}`,
+                { role: active ? 'success' : 'warn' },
+            ),
+        );
+        println(terminalThemeRow('Saúde', health ? renderHumanTerminalHealth(health['status']) : 'sem leitura', { role: health?.['status'] === 'healthy' ? 'success' : 'warn' }));
+        println(terminalThemeRow('Entrada', waitLine, { role: waitCount > 0 ? 'warn' : 'success' }));
+        println(terminalThemeRow('Modelo', `${modelLabel} · raciocínio ${configProjection.currentReasoningEffort}`, { role: modelBilling.mismatch ? 'warn' : 'assistant' }));
+        println(terminalThemeRow('Acesso', byokLabel, { role: byok.enabled && !byok.ready ? 'warn' : 'success' }));
+        println(
+            terminalThemeRow(
+                'Catálogo',
+                `${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados`,
+            ),
+        );
+        println(terminalThemeRow('Atividade', renderLiveActivitySummary(projection.activity)));
+        println(terminalThemeRow('Próximo', action, { role: 'command' }));
+        println(terminalThemeRow('Detalhe', renderCommandList(['/status full', '/now', '/health', '/menu'])));
+        println(terminalThemeDivider(37));
+        println('');
         return;
     }
     const effort = configProjection.currentReasoningEffort;
