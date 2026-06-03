@@ -3593,3 +3593,24 @@
   - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`.
 - [ ] Próxima lacuna: adicionar `/events` ao ciclo live visual ou criar mini ciclo diagnóstico que
       cubra `/events`, `/errors`, `/audit`, `/intent` sem poluir o ciclo default cotidiano.
+
+### 11.42 Narrativa SDK sem badges técnicos
+
+- [x] Achado: `sdk-session-events.js` já traduzia muitos eventos vanilla, mas ainda imprimia badges
+      em colchetes como `TURNO`, `AÇÕES`, `ARQUIVOS`, `PERM`, `PERGUNTA`, `MAILBOX`, `MODELO`,
+      `HOOK`, `SAMPLE`, `CMDS`, `CAPS`, `AUTO` e `PLAN`.
+- [x] Achado: alguns caminhos ainda tinham ANSI literal em permissão, OAuth MCP, elicitation e
+      conclusão de OAuth.
+- [x] Decisão: eventos SDK importantes devem aparecer como linhas operacionais humanas (`Turno`,
+      `Ações`, `Arquivos`, `Permissão`, `Pergunta`, `Mailbox`, `Modelo`, `Hook`, `Sampling`,
+      `Comandos SDK`, `Capabilities`, `Auto mode`, `Plan mode`, `OAuth MCP`), não como tags
+      técnicas.
+- [x] Implementação: `session.info`, elicitation pending/completed, permission requested/completed,
+      permission mode, OAuth MCP required/login/completed, sampling, commands/capabilities, auto
+      mode, exit plan mode, hook failure e resumo de turno passaram a usar `terminalThemeRow`.
+- [x] Varredura local confirmou ausência de ANSI literal e `terminalThemeBadge` em
+      `src/copilot/terminal/events/sdk-session-events.js`.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js tests/unit/copilot/terminal/test_intent_renderer.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js`.
+- [ ] Próxima lacuna: executar live com cenário que gere pergunta/permissão/sampling/OAuth quando
+      viável, para confirmar a estética de eventos SDK raros no terminal real.

@@ -417,7 +417,9 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             'Workspace da sessão alterado',
             expect.objectContaining({ detail: 'update · files/plan.md' }),
         );
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('TURN'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Turno'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Ações'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Arquivos'));
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('workspace.read_file'));
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('files/plan.md'));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Workspace file update: files/plan.md'));
@@ -948,9 +950,9 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
                 actions: ['approve', 'edit', 'reject'],
             }),
         );
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('HOOK'));
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('SAMPLE'));
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('PLAN'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Hook'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Sampling'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Plan mode'));
         expect(refreshPromptIfIdle).toHaveBeenCalled();
     });
 
