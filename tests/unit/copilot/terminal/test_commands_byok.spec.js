@@ -1928,8 +1928,13 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('.env.local');
         expect(ctx.output()).toContain('Autenticação');
         expect(ctx.output()).toContain('token bearer');
+        expect(ctx.output()).toContain('Comandos');
+        expect(ctx.output()).toContain('/byok gateway catalog refresh|diff|integrity|sqlite|search <query>');
+        expect(ctx.output()).toContain('/byok auto [on|policy|doctor|standby|proof-plan|switch|history|off]');
         expect(ctx.output()).not.toContain('apiKey');
         expect(ctx.output()).not.toContain('bearer=');
+        expect(ctx.output()).not.toContain('\x1b[36mBYOK status');
+        expect(ctx.output()).not.toContain('Uso: /byok | /byok reload | /byok auto');
         expect(ctx.output()).toContain('Preparada');
         expect(ctx.output()).toContain('Sessão viva');
         expect(ctx.output()).toContain('/session sdk next new');

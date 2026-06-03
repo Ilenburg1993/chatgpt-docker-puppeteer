@@ -125,7 +125,7 @@ import {
     persistTerminalByokGatewayAutoEffectApplications,
     runTerminalByokGatewayPostTurnAutomation,
 } from '../byok/index.js';
-import { terminalThemeRow } from '../state/theme/index.js';
+import { terminalThemeDivider, terminalThemeHeadline, terminalThemeRow, terminalThemeRows } from '../state/theme/index.js';
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
 const DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT = 8;
@@ -170,7 +170,7 @@ const BYOK_RUNTIME_SELECTOR_ENV_KEYS = Object.freeze([
  * @returns {string}
  */
 function yesNo(value) {
-    return value ? '\x1b[32msim\x1b[0m' : '\x1b[90mnao\x1b[0m';
+    return value ? 'sim' : 'não';
 }
 
 /**
@@ -333,10 +333,17 @@ function printByokSdkSessionBoundaryHint(println, options = {}) {
         ? 'A seleção persistida será aplicada por uma nova sessão SDK.'
         : 'A seleção BYOK foi preparada no processo atual.';
     println(
-        `  \x1b[90m${prefix} Para entrar/sair de BYOK ou trocar provedor/perfil, agende /session sdk next new e reinicie a tarefa do terminal; /restart reinicia só a conversa.\x1b[0m`,
+        terminalThemeRow(
+            'Próximo',
+            `${prefix} Para entrar/sair de BYOK ou trocar provedor/perfil, agende /session sdk next new e reinicie a tarefa do terminal; /restart reinicia só a conversa.`,
+        ),
     );
     println(
-        '  \x1b[90m/byok model <id> tenta trocar o modelo na sessão viva apenas quando ela já nasceu com o mesmo provedor BYOK.\x1b[0m',
+        terminalThemeRow(
+            'Modelo vivo',
+            '/byok model <id> tenta trocar o modelo na sessão viva apenas quando ela já nasceu com o mesmo provedor BYOK.',
+            { role: 'command' },
+        ),
     );
 }
 
@@ -2030,20 +2037,40 @@ function resolveByokStatusCapabilities(projection) {
 async function renderStatus(projection, println) {
     const { summary } = projection;
     const statusCapabilities = resolveByokStatusCapabilities(projection);
-    println('\n  \x1b[36mBYOK status\x1b[0m');
-    println(`    Estado         ativo ${yesNo(summary.enabled)} · pronto ${yesNo(summary.ready)}`);
-    println(`    Perfil         \x1b[33m${valueOrDash(summary.profile)}\x1b[0m · preset ${valueOrDash(summary.preset)}`);
-    println(`    Provedor       \x1b[33m${valueOrDash(summary.providerType)}\x1b[0m · base ${valueOrDash(summary.baseUrl)}`);
-    println(`    Modelo         \x1b[33m${valueOrDash(summary.model)}\x1b[0m · protocolo ${renderByokWireLabel(summary.wireApi)} · Azure ${valueOrDash(summary.azureApiVersion)}`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK status'));
+    println(terminalThemeDivider(66));
     println(
-        `    Autenticação   chave API ${yesNo(summary.auth.apiKeyConfigured)} · token bearer ${yesNo(summary.auth.bearerTokenConfigured)} · headers ${yesNo(summary.auth.headersConfigured)}`,
+        terminalThemeRow('Estado', `ativo ${yesNo(summary.enabled)} · pronto ${yesNo(summary.ready)}`, {
+            role: summary.ready ? 'success' : summary.enabled ? 'warn' : 'muted',
+        }),
+    );
+    println(terminalThemeRow('Perfil', `${valueOrDash(summary.profile)} · preset ${valueOrDash(summary.preset)}`));
+    println(terminalThemeRow('Provedor', `${valueOrDash(summary.providerType)} · base ${valueOrDash(summary.baseUrl)}`));
+    println(
+        terminalThemeRow(
+            'Modelo',
+            `${valueOrDash(summary.model)} · protocolo ${renderByokWireLabel(summary.wireApi)} · Azure ${valueOrDash(summary.azureApiVersion)}`,
+        ),
     );
     println(
-        `    Capacidades    raciocínio ${yesNo(statusCapabilities.reasoningEffort)} · SDK ${yesNo(statusCapabilities.sdkReasoningEffort)} · visão ${yesNo(statusCapabilities.vision)} · contexto ${statusCapabilities.contextWindowTokens}`,
+        terminalThemeRow(
+            'Autenticação',
+            `chave API ${yesNo(summary.auth.apiKeyConfigured)} · token bearer ${yesNo(summary.auth.bearerTokenConfigured)} · headers ${yesNo(summary.auth.headersConfigured)}`,
+        ),
+    );
+    println(
+        terminalThemeRow(
+            'Capacidades',
+            `raciocínio ${yesNo(statusCapabilities.reasoningEffort)} · SDK ${yesNo(statusCapabilities.sdkReasoningEffort)} · visão ${yesNo(statusCapabilities.vision)} · contexto ${statusCapabilities.contextWindowTokens}`,
+        ),
     );
     if (statusCapabilities.modelId) {
         println(
-            `    Modelo fonte   \x1b[33m${statusCapabilities.modelId} · origem ${renderByokSourceLabel(statusCapabilities.source)}${statusCapabilities.differsFromProviderDefault ? ' · sobrescreve defaults do provedor' : ''}\x1b[0m`,
+            terminalThemeRow(
+                'Modelo fonte',
+                `${statusCapabilities.modelId} · origem ${renderByokSourceLabel(statusCapabilities.source)}${statusCapabilities.differsFromProviderDefault ? ' · sobrescreve defaults do provedor' : ''}`,
+            ),
         );
     }
     const limitParts = [
@@ -2053,7 +2080,7 @@ async function renderStatus(projection, println) {
         summary.limits?.dailyRequests ? `RPD ${summary.limits.dailyRequests}` : null,
     ].filter(Boolean);
     if (limitParts.length > 0) {
-        println(`    Limites        \x1b[33m${limitParts.join(' · ')}\x1b[0m`);
+        println(terminalThemeRow('Limites', limitParts.join(' · ')));
     }
     const activeHealth = readHealthForByokProfile({
         name: summary.profile ?? summary.preset ?? 'runtime',
@@ -2062,14 +2089,14 @@ async function renderStatus(projection, println) {
         model: summary.model,
     });
     if (activeHealth) {
-        println(`    Saúde chat     \x1b[33m${renderByokHealthTag(activeHealth)}\x1b[0m`);
-        println(`    Saúde agente   \x1b[33m${renderByokAgentProbeHealthTag(activeHealth)}\x1b[0m`);
+        println(terminalThemeRow('Saúde chat', renderByokHealthTag(activeHealth)));
+        println(terminalThemeRow('Saúde agente', renderByokAgentProbeHealthTag(activeHealth)));
     }
     const costTag = renderByokProfileCostTag(summary.profile);
     if (costTag) {
-        println(`    Custo          \x1b[33m${costTag.replace(/^ · /u, '')}\x1b[0m`);
+        println(terminalThemeRow('Custo', costTag.replace(/^ · /u, '')));
     }
-    println(`    Catálogo       ${summary.modelList.count} modelo(s)`);
+    println(terminalThemeRow('Catálogo', `${summary.modelList.count} modelo(s)`));
     const gateway =
         projection.modelGateway ?? {
             source: 'unavailable',
@@ -2081,11 +2108,14 @@ async function renderStatus(projection, println) {
             },
         };
     println(
-        `    Gateway        \x1b[33m${gateway.diagnostics.providerCount} provedores · ${gateway.diagnostics.modelCount} modelos · ${gateway.diagnostics.enabledModelCount} habilitados · origem ${renderByokSourceLabel(gateway.source)}\x1b[0m`,
+        terminalThemeRow(
+            'Gateway',
+            `${gateway.diagnostics.providerCount} provedores · ${gateway.diagnostics.modelCount} modelos · ${gateway.diagnostics.enabledModelCount} habilitados · origem ${renderByokSourceLabel(gateway.source)}`,
+        ),
     );
     const gatewayActive = /** @type {{ modelId?: string | null }} */ (gateway.active);
     if (gatewayActive.modelId) {
-        println(`    Modelo gateway \x1b[33m${gatewayActive.modelId}\x1b[0m`);
+        println(terminalThemeRow('Gateway ativo', gatewayActive.modelId));
     }
     try {
         const inventory = await listTerminalSdkSessionInventory();
@@ -2094,27 +2124,53 @@ async function renderStatus(projection, println) {
             inventory.persistedByokBinding,
             inventory.currentSessionId,
         );
-        println(`    Preparada      \x1b[33m${binding.preparedLabel}\x1b[0m`);
+        println(terminalThemeRow('Preparada', binding.preparedLabel));
         println(
-            `    Sessão viva    \x1b[33m${inventory.currentSessionId ?? '(sem sessão viva)'}\x1b[0m \x1b[90m· ${binding.liveLabel}\x1b[0m`,
+            terminalThemeRow('Sessão viva', `${inventory.currentSessionId ? 'ativa' : 'sem sessão viva'} · ${binding.liveLabel}`),
         );
-        const color = binding.state === 'next-boot-required' || binding.state === 'selection-incomplete' ? '\x1b[33m' : '\x1b[90m';
-        println(`    Fronteira      ${color}${binding.headline}\x1b[0m`);
-        if (binding.action) println(`      \x1b[90m${binding.action}\x1b[0m`);
+        println(
+            terminalThemeRow('Fronteira', binding.headline, {
+                role: binding.state === 'next-boot-required' || binding.state === 'selection-incomplete' ? 'warn' : 'muted',
+            }),
+        );
+        if (binding.action) println(terminalThemeRow('Ação', binding.action, { role: 'command' }));
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        println(`    Vínculo vivo   \x1b[33mindisponível\x1b[0m \x1b[90m(${message})\x1b[0m`);
+        println(terminalThemeRow('Vínculo vivo', `indisponível · ${message}`, { role: 'warn' }));
     }
     for (const warning of summary.warnings) {
-        println(`  \x1b[33m  aviso: ${warning}\x1b[0m`);
+        println(terminalThemeRow('Aviso', warning, { role: 'warn' }));
     }
     for (const error of summary.errors) {
-        println(`  \x1b[31m  erro: ${error}\x1b[0m`);
+        println(terminalThemeRow('Erro', error, { role: 'error' }));
     }
     renderActiveByokHealthGuidance(projection, activeHealth, println);
-    println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; a sessão SDK recebe a seleção no próximo boot.\x1b[0m');
+    println(
+        terminalThemeRow(
+            'Arquivo',
+            '.env.local · comandos preparam o processo; a sessão SDK recebe a seleção no próximo boot',
+        ),
+    );
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok auto [on|policy|doctor|explain|standby|standby persisted|proof-plan|switch|status|plan|record|history|handoffs|confirmations|apply|off] [profile:<id>] [preset:<operator_manual|llm_operator_guarded|auto_same_boundary|auto_prepare_new_session>] [allow-live-set-model] | /byok providers | /byok profiles | /byok gateway operator-ready [profile:<id>] | /byok gateway catalog <refresh [provider]|refresh-plan [provider]|refresh-log|diff|conflicts|integrity|sqlite|openai [sqlite]|explain <model>|search <query>|freshness [filtro]> | /byok gateway auto [profile:<id>|standby|proof-plan] | /byok gateway importers [provider] | /byok gateway provider <traits|explain> [provider] | /byok gateway local | /byok gateway env [provider] | /byok gateway probes matrix [provider] | /byok gateway selection audit [effective|runtime-proof|write-trace] [strict] [profile] | /byok gateway routes [filtro] [n] | /byok gateway overlays [filtro] [n] | /byok gateway accounts [filtro] [n] | /byok gateway limits [filtro] [n] | /byok gateway quota-matrix [filtro] [n] | /byok gateway health sqlite | /byok gateway eligibility [strict|runs|diff] [filtro] [n] | /byok health [provider:<id> model:<id> profile:<id>|clear provider:<id> model:<id> profile:<id>] | /byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [route <perfil> active --show-rejected provider:<provider>|catalog refresh [provider]|catalog diff|conflicts|all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] [wire:<completions|responses>] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println(
+        terminalThemeRows(
+            'Comandos',
+            [
+                '/byok reload · /byok providers · /byok profiles · /byok env',
+                '/byok gateway operator-ready [profile:<id>]',
+                '/byok gateway catalog refresh|diff|integrity|sqlite|search <query>',
+                '/byok gateway selection audit [effective|runtime-proof|write-trace]',
+                '/byok models [all-providers|grouped|refresh|free|reasoning|safe]',
+                '/byok recommend [all-providers] [grouped] [filtros] [n]',
+                '/byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>]',
+                '/byok use <perfil|sdk> · /byok model <id> · /byok provider <preset> [model]',
+                '/byok auto [on|policy|doctor|standby|proof-plan|switch|history|off]',
+            ],
+            { role: 'command', width: 12 },
+        ),
+    );
+    println(terminalThemeDivider(66));
+    println('');
 }
 
 /**

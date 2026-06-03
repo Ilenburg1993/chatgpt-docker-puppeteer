@@ -927,9 +927,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         });
         if (narration.print) {
             printlnWhenRenderUnlocked(
-                failed
-                    ? `  \x1b[31mTarefa em segundo plano falhou: ${operatorDescription}\x1b[0m`
-                    : `  \x1b[32mTarefa em segundo plano concluída: ${operatorDescription}\x1b[0m`,
+                terminalThemeRow('Tarefa', `${failed ? 'falhou' : 'concluída'} · ${operatorDescription}`, {
+                    role: failed ? 'error' : 'success',
+                }),
             );
         }
         broadcastSse(
@@ -958,7 +958,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         });
         const shouldPrint = getShowSessionActivity() && !isInternalBackgroundDescription(description);
         if (shouldPrint) {
-            printlnWhenRenderUnlocked(`  \x1b[90mTarefa em segundo plano ociosa: ${operatorDescription}\x1b[0m`);
+            printlnWhenRenderUnlocked(terminalThemeRow('Tarefa', `ociosa · ${operatorDescription}`));
         }
         broadcastSse(
             'agent.background.idle',

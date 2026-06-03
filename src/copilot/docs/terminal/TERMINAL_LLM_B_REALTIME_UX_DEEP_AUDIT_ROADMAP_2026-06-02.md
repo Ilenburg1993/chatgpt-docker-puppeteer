@@ -4425,3 +4425,65 @@
   - Sequência: `/remember ux: terminal bonito`, `/recall ux`, `/forget mem-12345678`, `/quit`.
   - Resultado: `/recall ux` listou memórias com ISO 8601 completo e não exibiu mais
         `Comando /recall não existe`.
+
+### 12.14 Próxima faixa: GitHub, fallback de sessão e eventos background sem superfície crua
+
+- [x] Auditoria inicial pós-commit:
+  - `git status` limpo exceto `.codex/config.toml` local do operador.
+  - Busca de vazamentos localizou `/gh`, fallback de `/session` no roteador e eventos
+        `agent.background.*` como próximos pontos de alto retorno.
+- [x] Achado `/gh`: o comando já remove ANSI herdado via `normalizeGhTerminalOutput`, mas isso
+      transforma mensagens próprias em texto plano solto (`Uso: ...`, `Buscando...`, títulos em
+      bloco), sem hierarquia visual nem roles estáveis.
+- [x] Achado `/session`: `_cmdSessionDispatch` ainda tem fallback com ANSI manual e uma linha de uso
+      longa demais, exatamente o tipo de ruído que piora a primeira leitura do operador.
+- [x] Achado eventos background: conclusão/falha/ocioso ainda imprimem ANSI literal direto em
+      `agent-runtime-events.js`, apesar de subagente, erro, uso e modelo já usarem `terminalThemeRow`.
+- [x] Decisão UX:
+  - Mensagens próprias do terminal devem usar tema central, headline/row/divider e vocabulário
+        humano.
+  - Saídas vindas de bridges GitHub podem continuar passando por normalização, mas o envelope do
+        comando deve ser temático.
+  - Eventos background devem ter labels curtos (`Tarefa`) e status humano (`concluída`, `falhou`,
+        `ociosa`) sem ANSI manual.
+- [x] Implementar helpers locais de `/gh` para `status`, `uso`, `seção`, `resultado vazio` e
+      `erro`, sem quebrar os formatadores externos.
+- [x] Migrar fallback de `/session` para `terminalThemeRows`.
+- [x] Migrar prints background para `terminalThemeRow`.
+- [x] Adicionar testes contra ANSI em `/gh`, fallback de `/session` e prints background quando
+      houver harness isolável.
+- [x] Validação escopada passou:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_gh.spec.js tests/unit/copilot/terminal/test_repl_command_router_session_dispatch.spec.js tests/unit/copilot/terminal/test_repl_command_router_routes.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js`.
+  - Resultado: 4 arquivos, 8 testes.
+- [x] Live PTY curta passou em `npm run terminal:llm-b`:
+  - Sequência: `/gh`, `/gh issue create`, `/session xpto`, `/quit`.
+  - Resultado: `/gh` exibiu painel compacto temático; `/gh issue create` exibiu uso sem `Uso:`;
+        `/session xpto` quebrou o uso em linhas alinhadas sem ANSI cru.
+- [ ] Próxima lacuna: auditar `/help`, `/tools` default e `/byok` default, porque são superfícies
+      de alta exposição e ainda podem carregar densidade técnica em excesso.
+
+### 12.15 Cockpit BYOK default sem rodapé monstruoso
+
+- [x] Auditoria: `/help` e `/tools` default já estavam alinhados ao tema central e preservavam
+      detalhe/raw em rotas explícitas; `/byok` default ainda era a maior superfície de alta
+      exposição com ANSI manual e linha única de uso excessivamente longa.
+- [x] Decisão UX: `/byok` sem argumentos é cockpit operacional, não manual completo. Deve mostrar
+      estado, perfil, provedor, modelo, autenticação, capacidades, gateway, vínculo vivo e próximos
+      comandos em blocos curtos.
+- [x] Implementação: `renderStatus` passou a usar `terminalThemeHeadline`, `terminalThemeDivider`,
+      `terminalThemeRow` e `terminalThemeRows`.
+- [x] Implementação: `yesNo` deixou de embutir ANSI e passou a retornar texto humano (`sim`/`não`);
+      cor fica sob responsabilidade do tema.
+- [x] Implementação: o hint de fronteira SDK/BYOK deixou ANSI manual e agora renderiza `Próximo` e
+      `Modelo vivo` em linhas temáticas.
+- [x] Implementação: rodapé único de centenas de caracteres foi substituído por grupos de comandos:
+      operação, gateway, catálogo, seleção, modelos, recomendação, probes, seleção viva e automação.
+- [x] Teste escopado reforçado em `test_commands_byok.spec.js`:
+  - Garante presença dos grupos de comandos compactos.
+  - Garante ausência do título ANSI legado `\x1b[36mBYOK status`.
+  - Garante ausência do antigo rodapé `Uso: /byok | /byok reload | /byok auto`.
+- [x] Live PTY curto passou em `npm run terminal:llm-b`:
+  - Sequência: `/byok`, `/quit`.
+  - Resultado: cockpit em linhas alinhadas, sem rodapé longo, com `Comandos` em múltiplas linhas.
+- [ ] Próxima lacuna: `/byok providers`, `/byok profiles`, `/byok models`, `/byok recommend` e
+      `/byok probe` ainda têm muitos blocos ANSI manuais e merecem faixa BYOK própria por risco.

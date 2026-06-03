@@ -70,6 +70,12 @@ describe('terminal/dialog/dialog-runtime', () => {
         expect(agentEvents).toContain("const SDK_LIFECYCLE_VISIBLE_TYPES = new Set(['session.created', 'session.foreground', 'session.background'])");
         expect(agentEvents).not.toContain("['session.created', 'session.deleted', 'session.foreground', 'session.background']");
         expect(agentEvents).not.toContain("'question.pending reconciliado pelo ask_user SDK'");
+        expect(agentEvents).not.toContain('Tarefa em segundo plano falhou:');
+        expect(agentEvents).not.toContain('Tarefa em segundo plano concluída:');
+        expect(agentEvents).not.toContain('Tarefa em segundo plano ociosa:');
+        expect(agentEvents).not.toContain('\\x1b[31mTarefa em segundo plano');
+        expect(agentEvents).not.toContain('\\x1b[32mTarefa em segundo plano');
+        expect(agentEvents).not.toContain('\\x1b[90mTarefa em segundo plano');
 
         expect(src).toContain('sem pergunta humana ou formulário pendente');
         expect(src).not.toContain('sem ask_user/elicitation pendente');

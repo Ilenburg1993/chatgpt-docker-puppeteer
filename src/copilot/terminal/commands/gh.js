@@ -28,6 +28,13 @@ import {
     viewPr,
     viewRun,
 } from '#copilot/bridges';
+import {
+    terminalThemeDivider,
+    terminalThemeHeadline,
+    terminalThemeRow,
+    terminalThemeRows,
+    terminalThemeText,
+} from '../state/index.js';
 
 /**
  * @typedef {object} SessionContext
@@ -49,10 +56,51 @@ function normalizeGhTerminalOutput(text) {
 
 /**
  * @param {(text: string) => void} println
- * @returns {(text: string) => void}
+ * @param {string} text
+ * @returns {void}
  */
-function createGhPrintln(println) {
-    return (text) => println(normalizeGhTerminalOutput(text));
+function printGhBridgeOutput(println, text) {
+    println(normalizeGhTerminalOutput(text));
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string} text
+ * @returns {void}
+ */
+function printGhStatus(println, text) {
+    println(terminalThemeRow('GitHub', text, { role: 'muted' }));
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string} usage
+ * @returns {void}
+ */
+function printGhUsage(println, usage) {
+    println(terminalThemeRow('Uso', usage, { role: 'command' }));
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string} title
+ * @param {Array<string | null | undefined | false>} [details=[]]
+ * @returns {void}
+ */
+function printGhSection(println, title, details = []) {
+    println('');
+    println(terminalThemeHeadline('tool', title, details));
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string} label
+ * @param {string} value
+ * @param {import('../state/ui-theme.js').TerminalThemeRole} [role='muted']
+ * @returns {void}
+ */
+function printGhRow(println, label, value, role = 'muted') {
+    println(terminalThemeRow(label, value, { role }));
 }
 
 // ─── Subcommand handlers ─────────────────────────────────────────────────────
@@ -68,7 +116,7 @@ async function handleIssue(println, args) {
     if (action === 'list' || action === 'ls') {
         const stateArg = args[2] ?? 'open';
         const label = args[3];
-        println('\x1b[90m  Buscando issues…\x1b[0m');
+        printGhStatus(println, 'buscando issues');
         const issueResult = await listIssues({
             state: /** @type {'open' | 'closed' | 'all'} */ (stateArg),
             label,
@@ -80,35 +128,35 @@ async function handleIssue(println, args) {
         }));
         const issues = issueResult.items;
         if (!issues.length) {
-            println('\x1b[90m  Nenhuma issue encontrada.\x1b[0m');
+            printGhRow(println, 'Issues', 'nenhuma encontrada');
             return;
         }
-        println(`\n  \x1b[36mIssues\x1b[0m \x1b[90m(${stateArg})\x1b[0m`);
-        println(formatIssueList(issues));
+        printGhSection(println, 'Issues', [stateArg]);
+        printGhBridgeOutput(println, formatIssueList(issues));
         return;
     }
 
     if (action === 'create') {
         const title = args.slice(2).join(' ');
         if (!title) {
-            println('\x1b[90m  Uso: /gh issue create <título>\x1b[0m');
+            printGhUsage(println, '/gh issue create <título>');
             return;
         }
-        println('\x1b[90m  Criando issue…\x1b[0m');
+        printGhStatus(println, 'criando issue');
         const result = await createIssue(title, '').catch(() => null);
-        if (result?.url) println(`\x1b[32m  ✓ Issue criada: ${result.url}\x1b[0m`);
-        else println('\x1b[31m  Falha ao criar issue.\x1b[0m');
+        if (result?.url) printGhRow(println, 'Issue', `criada · ${result.url}`, 'success');
+        else printGhRow(println, 'Issue', 'falha ao criar', 'error');
         return;
     }
 
     if (action === 'close') {
         const n = Number(args[2]);
         if (!n) {
-            println('\x1b[90m  Uso: /gh issue close <número>\x1b[0m');
+            printGhUsage(println, '/gh issue close <número>');
             return;
         }
         const ok = await closeIssue(n).catch(() => false);
-        println(ok ? `\x1b[32m  ✓ Issue #${n} fechada.\x1b[0m` : `\x1b[31m  Falha ao fechar #${n}.\x1b[0m`);
+        printGhRow(println, 'Issue', ok ? `#${n} fechada` : `falha ao fechar #${n}`, ok ? 'success' : 'error');
         return;
     }
 
@@ -116,37 +164,38 @@ async function handleIssue(println, args) {
         const n = Number(args[2]);
         const body = args.slice(3).join(' ');
         if (!n || !body) {
-            println('\x1b[90m  Uso: /gh issue comment <n> <texto>\x1b[0m');
+            printGhUsage(println, '/gh issue comment <n> <texto>');
             return;
         }
         const ok = await commentIssue(n, body).catch(() => false);
-        println(ok ? `\x1b[32m  ✓ Comentário adicionado em #${n}.\x1b[0m` : `\x1b[31m  Falha ao comentar.\x1b[0m`);
+        printGhRow(println, 'Comentário', ok ? `adicionado em #${n}` : 'falha ao comentar', ok ? 'success' : 'error');
         return;
     }
 
     // action = número → ver detalhes
     const n = Number(action);
     if (n) {
-        println('\x1b[90m  Buscando issue…\x1b[0m');
+        printGhStatus(println, 'buscando issue');
         const issue = await viewIssue(n).catch(() => null);
         if (!issue) {
-            println(`\x1b[31m  Issue #${n} não encontrada.\x1b[0m`);
+            printGhRow(println, 'Issue', `#${n} não encontrada`, 'error');
             return;
         }
-        println(`\n  \x1b[36m#${issue.number}\x1b[0m \x1b[1m${issue.title}\x1b[0m  \x1b[90m[${issue.state}]\x1b[0m`);
-        println(`  URL: \x1b[34m${issue.url}\x1b[0m`);
-        if (issue.labels?.length) println(`  Labels: ${issue.labels.map((l) => l.name).join(', ')}`);
-        println(`  Autor: ${issue.author?.login}  ·  Comentários: ${issue.comments}`);
+        printGhSection(println, `Issue #${issue.number}`, [issue.state]);
+        printGhRow(println, 'Título', issue.title, 'accent');
+        printGhRow(println, 'URL', issue.url, 'command');
+        if (issue.labels?.length) printGhRow(println, 'Labels', issue.labels.map((l) => l.name).join(', '));
+        printGhRow(println, 'Resumo', `autor ${issue.author?.login ?? '-'} · comentários ${issue.comments ?? 0}`);
         if (issue.body) {
-            println('  ─────────────────────────────────────────────');
+            println(terminalThemeDivider(45));
             for (const line of issue.body.slice(0, 800).split('\n')) println(`  ${line}`);
-            if (issue.body.length > 800) println('  \x1b[90m…(truncado)\x1b[0m');
+            if (issue.body.length > 800) printGhRow(println, 'Prévia', 'truncada em 800 caracteres');
         }
         println('');
         return;
     }
 
-    println('\x1b[90m  Uso: /gh issue [list|<n>|create|close|comment] [args…]\x1b[0m');
+    printGhUsage(println, '/gh issue [list|<n>|create|close|comment] [args…]');
 }
 
 /**
@@ -159,7 +208,7 @@ async function handlePr(println, args) {
 
     if (action === 'list' || action === 'ls') {
         const stateArg = args[2] ?? 'open';
-        println('\x1b[90m  Buscando PRs…\x1b[0m');
+        printGhStatus(println, 'buscando PRs');
         const prResult = await listPrs({ state: /** @type {'open' | 'closed' | 'merged' | 'all'} */ (stateArg) }).catch(
             () => ({
                 items: [],
@@ -170,58 +219,59 @@ async function handlePr(println, args) {
         );
         const prs = prResult.items;
         if (!prs.length) {
-            println('\x1b[90m  Nenhum PR encontrado.\x1b[0m');
+            printGhRow(println, 'PRs', 'nenhum encontrado');
             return;
         }
-        println(`\n  \x1b[36mPull Requests\x1b[0m \x1b[90m(${stateArg})\x1b[0m`);
-        println(formatPrList(prs));
+        printGhSection(println, 'Pull Requests', [stateArg]);
+        printGhBridgeOutput(println, formatPrList(prs));
         return;
     }
 
     if (action === 'diff') {
         const n = Number(args[2]);
         if (!n) {
-            println('\x1b[90m  Uso: /gh pr diff <número>\x1b[0m');
+            printGhUsage(println, '/gh pr diff <número>');
             return;
         }
-        println('\x1b[90m  Buscando diff…\x1b[0m');
+        printGhStatus(println, 'buscando diff');
         const diff = await diffPr(n).catch(() => '');
         if (!diff) {
-            println(`\x1b[90m  Sem diff para PR #${n}.\x1b[0m`);
+            printGhRow(println, 'Diff', `sem alterações para PR #${n}`);
             return;
         }
         const lines = diff.split('\n').slice(0, 120);
         for (const l of lines) {
-            if (l.startsWith('+')) println(`\x1b[32m  ${l}\x1b[0m`);
-            else if (l.startsWith('-')) println(`\x1b[31m  ${l}\x1b[0m`);
+            if (l.startsWith('+')) println(`  ${terminalThemeText('success', l)}`);
+            else if (l.startsWith('-')) println(`  ${terminalThemeText('error', l)}`);
             else println(`  ${l}`);
         }
-        if (diff.split('\n').length > 120) println('  \x1b[90m…(diff truncado a 120 linhas)\x1b[0m');
+        if (diff.split('\n').length > 120) printGhRow(println, 'Diff', 'truncado em 120 linhas');
         return;
     }
 
     // action = número
     const n = Number(action);
     if (n) {
-        println('\x1b[90m  Buscando PR…\x1b[0m');
+        printGhStatus(println, 'buscando PR');
         const pr = await viewPr(n).catch(() => null);
         if (!pr) {
-            println(`\x1b[31m  PR #${n} não encontrado.\x1b[0m`);
+            printGhRow(println, 'PR', `#${n} não encontrado`, 'error');
             return;
         }
         const draftTag = pr.isDraft ? 'Rascunho ' : '';
-        println(`\n  \x1b[36m#${pr.number}\x1b[0m ${draftTag}\x1b[1m${pr.title}\x1b[0m  \x1b[90m[${pr.state}]\x1b[0m`);
-        println(`  Branch: ${pr.headRefName}  ·  Autor: ${pr.author?.login}`);
-        println(`  URL: \x1b[34m${pr.url}\x1b[0m`);
+        printGhSection(println, `PR #${pr.number}`, [pr.state, pr.isDraft ? 'rascunho' : null]);
+        printGhRow(println, 'Título', `${draftTag}${pr.title}`, 'accent');
+        printGhRow(println, 'Branch', `${pr.headRefName} · autor ${pr.author?.login ?? '-'}`);
+        printGhRow(println, 'URL', pr.url, 'command');
         if (pr.body) {
-            println('  ─────────────────────────────────────────────');
+            println(terminalThemeDivider(45));
             for (const line of pr.body.slice(0, 600).split('\n')) println(`  ${line}`);
         }
         println('');
         return;
     }
 
-    println('\x1b[90m  Uso: /gh pr [list|<n>|diff <n>] [args…]\x1b[0m');
+    printGhUsage(println, '/gh pr [list|<n>|diff <n>] [args…]');
 }
 
 /**
@@ -234,7 +284,7 @@ async function handleRun(println, args) {
 
     if (action === 'list' || action === 'ls') {
         const limit = Number(args[2]) || 10;
-        println('\x1b[90m  Buscando CI runs…\x1b[0m');
+        printGhStatus(println, 'buscando execuções de CI');
         const runResult = await listRuns({ limit }).catch(() => ({
             items: [],
             hasMore: false,
@@ -243,31 +293,32 @@ async function handleRun(println, args) {
         }));
         const runs = runResult.items;
         if (!runs.length) {
-            println('\x1b[90m  Nenhum run encontrado.\x1b[0m');
+            printGhRow(println, 'CI', 'nenhuma execução encontrada');
             return;
         }
-        println('\n  \x1b[36mCI Runs\x1b[0m');
-        println(formatRunList(runs));
+        printGhSection(println, 'Execuções de CI');
+        printGhBridgeOutput(println, formatRunList(runs));
         return;
     }
 
     const runId = action;
     if (runId && runId !== 'list') {
-        println('\x1b[90m  Buscando run…\x1b[0m');
+        printGhStatus(println, 'buscando execução de CI');
         const run = /** @type {Record<string, unknown> | null} */ (await viewRun(runId).catch(() => null));
         if (!run) {
-            println(`\x1b[31m  Run "${runId}" não encontrado.\x1b[0m`);
+            printGhRow(println, 'CI', `execução ${runId} não encontrada`, 'error');
             return;
         }
-        println(`\n  \x1b[36mRun #${run['databaseId'] ?? runId}\x1b[0m  ${run['displayTitle'] ?? run['name']}`);
-        println(`  Status: ${run['status']}  ·  Conclusão: ${run['conclusion'] ?? '…'}`);
-        println(`  Branch: ${run['headBranch']}  ·  Workflow: ${run['workflowName']}`);
-        println(`  URL: \x1b[34m${run['url']}\x1b[0m`);
+        printGhSection(println, `CI #${run['databaseId'] ?? runId}`);
+        printGhRow(println, 'Título', String(run['displayTitle'] ?? run['name'] ?? '-'), 'accent');
+        printGhRow(println, 'Estado', `${run['status'] ?? '-'} · conclusão ${run['conclusion'] ?? 'pendente'}`);
+        printGhRow(println, 'Origem', `${run['headBranch'] ?? '-'} · workflow ${run['workflowName'] ?? '-'}`);
+        printGhRow(println, 'URL', String(run['url'] ?? '-'), 'command');
         println('');
         return;
     }
 
-    println('\x1b[90m  Uso: /gh run [list|<runId>]\x1b[0m');
+    printGhUsage(println, '/gh run [list|<runId>]');
 }
 
 /**
@@ -275,14 +326,14 @@ async function handleRun(println, args) {
  * @returns {Promise<void>}
  */
 async function handleRelease(println) {
-    println('\x1b[90m  Buscando releases…\x1b[0m');
+    printGhStatus(println, 'buscando releases');
     const releases = await listReleases().catch(() => []);
     if (!releases.length) {
-        println('\x1b[90m  Nenhuma release encontrada.\x1b[0m');
+        printGhRow(println, 'Releases', 'nenhuma encontrada');
         return;
     }
-    println('\n  \x1b[36mReleases\x1b[0m');
-    println(formatReleaseList(releases));
+    printGhSection(println, 'Releases');
+    printGhBridgeOutput(println, formatReleaseList(releases));
 }
 
 /**
@@ -293,19 +344,19 @@ async function handleRelease(println) {
 async function handleSearch(println, args) {
     const query = args.slice(1).join(' ');
     if (!query) {
-        println('\x1b[90m  Uso: /gh search <query>\x1b[0m');
+        printGhUsage(println, '/gh search <query>');
         return;
     }
-    println('\x1b[90m  Buscando…\x1b[0m');
+    printGhStatus(println, 'buscando');
     const results = await searchIssues(query, { limit: 10 }).catch(() => []);
     if (!results.length) {
-        println('\x1b[90m  Nenhum resultado.\x1b[0m');
+        printGhRow(println, 'Busca', 'nenhum resultado');
         return;
     }
-    println(`\n  \x1b[36mResultados para:\x1b[0m "${query}"`);
+    printGhSection(println, 'Resultados GitHub', [query]);
     for (const r of /** @type {Record<string, unknown>[]} */ (results)) {
-        const typeLabel = r['isPullRequest'] ? '\x1b[34mPR\x1b[0m' : '\x1b[36missue\x1b[0m';
-        println(`  ${typeLabel}  #${r['number']}  ${r['title']}  \x1b[90m[${r['state']}]\x1b[0m`);
+        const typeLabel = r['isPullRequest'] ? 'PR' : 'Issue';
+        printGhRow(println, typeLabel, `#${r['number']} · ${r['title']} · ${r['state']}`);
     }
     println('');
 }
@@ -315,13 +366,15 @@ async function handleSearch(println, args) {
  * @returns {Promise<void>}
  */
 async function handleStatus(println) {
-    println('\x1b[90m  Verificando status gh…\x1b[0m');
+    printGhStatus(println, 'verificando status');
     const status = await ghGetStatus().catch(() => null);
     if (!status) {
-        println('\x1b[90m  Status gh não disponível.\x1b[0m');
+        printGhRow(println, 'Status', 'não disponível');
         return;
     }
-    println(`\n  \x1b[36mGitHub Status\x1b[0m\n  ${status}\n`);
+    printGhSection(println, 'Status GitHub');
+    printGhBridgeOutput(println, String(status));
+    println('');
 }
 
 /**
@@ -332,41 +385,61 @@ async function handleStatus(println) {
 async function handleApi(println, args) {
     const endpoint = args[1];
     if (!endpoint) {
-        println('\x1b[90m  Uso: /gh api <endpoint>  ex: /gh api /user\x1b[0m');
+        printGhUsage(println, '/gh api <endpoint>  ex: /gh api /user');
         return;
     }
-    println('\x1b[90m  Chamando gh api…\x1b[0m');
+    printGhStatus(println, 'chamando gh api');
     const data = await ghRawApi(endpoint).catch(() => null);
     if (data === null) {
-        println('\x1b[31m  Falha na chamada a gh api.\x1b[0m');
+        printGhRow(println, 'GitHub API', 'falha na chamada', 'error');
         return;
     }
     const out = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
     for (const line of out.split('\n').slice(0, 80)) println(`  ${line}`);
-    if (out.split('\n').length > 80) println('  \x1b[90m…(truncado)\x1b[0m');
+    if (out.split('\n').length > 80) printGhRow(println, 'GitHub API', 'truncado em 80 linhas');
 }
 
 /** @param {(text: string) => void} println */
 function printHelp(println) {
-    println(`
-  \x1b[36m/gh — GitHub CLI\x1b[0m
-  ─────────────────────────────────────────────────────────────────
-  \x1b[33m/gh issue list [open|closed|all] [label]\x1b[0m  — lista issues
-  \x1b[33m/gh issue <n>\x1b[0m                             — detalhe de issue
-  \x1b[33m/gh issue create <título>\x1b[0m                 — cria issue
-  \x1b[33m/gh issue close <n>\x1b[0m                       — fecha issue
-  \x1b[33m/gh issue comment <n> <texto>\x1b[0m             — comenta issue
-  \x1b[33m/gh pr list [open|closed|merged]\x1b[0m          — lista PRs
-  \x1b[33m/gh pr <n>\x1b[0m                                — detalhe de PR
-  \x1b[33m/gh pr diff <n>\x1b[0m                           — diff de PR
-  \x1b[33m/gh run list [limit]\x1b[0m                      — lista CI runs
-  \x1b[33m/gh run <id>\x1b[0m                              — detalhe de run
-  \x1b[33m/gh release list\x1b[0m                          — lista releases
-  \x1b[33m/gh search <query>\x1b[0m                        — busca issues/prs
-  \x1b[33m/gh status\x1b[0m                                — status geral da conta
-  \x1b[33m/gh api <endpoint>\x1b[0m                        — chamada raw à API
-  ─────────────────────────────────────────────────────────────────
-`);
+    println('');
+    println(terminalThemeHeadline('tool', '/gh', ['GitHub operacional']));
+    println(terminalThemeDivider(64));
+    println(
+        terminalThemeRows(
+            'Issues',
+            [
+                '/gh issue list [open|closed|all] [label] · lista issues',
+                '/gh issue <n> · detalhe de issue',
+                '/gh issue create <título> · cria issue',
+                '/gh issue close <n> · fecha issue',
+                '/gh issue comment <n> <texto> · comenta issue',
+            ],
+            { role: 'command' },
+        ),
+    );
+    println(
+        terminalThemeRows(
+            'PRs',
+            ['/gh pr list [open|closed|merged] · lista PRs', '/gh pr <n> · detalhe', '/gh pr diff <n> · diff'],
+            { role: 'command' },
+        ),
+    );
+    println(
+        terminalThemeRows(
+            'CI/API',
+            [
+                '/gh run list [limit] · lista CI',
+                '/gh run <id> · detalhe de execução',
+                '/gh release list · lista releases',
+                '/gh search <query> · busca issues/PRs',
+                '/gh status · status da conta',
+                '/gh api <endpoint> · chamada raw',
+            ],
+            { role: 'command' },
+        ),
+    );
+    println(terminalThemeDivider(64));
+    println('');
 }
 
 // ─── Dispatch table ──────────────────────────────────────────────────────────
@@ -399,14 +472,13 @@ const SUBCOMMAND_HANDLERS = {
  * @returns {Promise<void>}
  */
 export async function cmdGh({ println }, args) {
-    const ghPrintln = createGhPrintln(println);
     const sub = args[0]?.toLowerCase() ?? '';
     const handler = SUBCOMMAND_HANDLERS[sub];
     if (handler) {
-        await handler(ghPrintln, args);
+        await handler(println, args);
         return;
     }
-    printHelp(ghPrintln);
+    printHelp(println);
 }
 
 export const __test__ = {

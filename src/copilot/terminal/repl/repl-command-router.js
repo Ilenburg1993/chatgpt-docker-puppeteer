@@ -93,7 +93,7 @@ import {
     stopTerminalDialogMode,
 } from '../frontend/gateways/index.js';
 import { clearRateLimiters } from '../state/repl-runtime/index.js';
-import { terminalThemeRow } from '../state/repl/index.js';
+import { terminalThemeRow, terminalThemeRows } from '../state/repl/index.js';
 import { deliverEntryAsTurnIfIdle } from '../wiring/mailbox/index.js';
 import { parseTerminalReplCommand, parseTerminalSubcommand } from './repl-command-parser.js';
 
@@ -618,7 +618,17 @@ async function _cmdSessionDispatch(subCmd, rest) {
         await _cmdSessionRestore({ println }, parsed.rest[0] || '');
     } else {
         println(
-            '\x1b[33m  Uso: /session [sdk [n]|sdk next <new|resume <id|#n|current|last|foreground>|auto>] | /session save [reason] | /session list | /session restore <id>\x1b[0m',
+            terminalThemeRows(
+                'Uso',
+                [
+                    '/session sdk [n]',
+                    '/session sdk next <new|resume <id|#n|current|last|foreground>|auto>',
+                    '/session save [reason]',
+                    '/session list',
+                    '/session restore <id>',
+                ],
+                { role: 'command' },
+            ),
         );
     }
 }
