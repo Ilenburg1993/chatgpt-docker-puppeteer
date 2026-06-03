@@ -96,7 +96,10 @@ describe('terminal/commands/events', () => {
     it('aceita filtros humanos sem sinal de igual', async () => {
         const ctx = mockCtx();
 
-        await cmdEvents({ println: ctx.println }, '12 source sdk tool call_123 request req-123 hub hub-1 trace turn:abc');
+        await cmdEvents(
+            { println: ctx.println },
+            '12 source sdk tool call_123 request req-123 hub hub-1 trace turn:abc',
+        );
 
         expect(readTerminalSseEventArchiveTail).toHaveBeenLastCalledWith(
             expect.objectContaining({
@@ -419,13 +422,11 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('Mensagem da LLM-B');
         expect(ctx.output()).toContain('Pergunta ao operador');
         expect(ctx.output()).toContain('Resposta do operador');
-        expect(ctx.output()).toContain('transcript LLM-B · export envelope SDK assistant · rastreamento turn:1 · turno 1');
-        expect(ctx.output()).toContain(
-            'transcript Sistema/pergunta humana · export envelope pergunta humana SDK · rastreamento turn:1 · turno 1',
-        );
-        expect(ctx.output()).toContain(
-            'transcript Operador/pergunta humana · export envelope pergunta humana SDK · rastreamento turn:1 · turno 1',
-        );
+        expect(ctx.output()).toContain('transcript LLM-B · export envelope SDK assistant');
+        expect(ctx.output()).toContain('transcript Sistema/pergunta humana · export envelope pergunta humana SDK');
+        expect(ctx.output()).toContain('transcript Operador/pergunta humana · export envelope pergunta humana SDK');
+        expect(ctx.output()).not.toContain('rastreamento turn:1');
+        expect(ctx.output()).not.toContain('turno 1');
         expect(ctx.output()).not.toContain('ask_user');
         expect(ctx.output()).not.toContain('trace=');
     });

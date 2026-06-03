@@ -333,9 +333,10 @@ function summarizePayload(payload, opts = {}) {
  *     traceId: string | null;
  *     turnId: string | null;
  * }} entry
+ * @param {{ showIds?: boolean }} [opts]
  * @returns {string | null}
  */
-function buildTranscriptExportHint(entry) {
+function buildTranscriptExportHint(entry, opts = {}) {
     /** @type {string | null} */
     let transcript = null;
     if (entry.event === 'assistant.message') transcript = 'LLM-B';
@@ -343,8 +344,9 @@ function buildTranscriptExportHint(entry) {
     if (entry.event === 'user_input.completed') transcript = 'Operador/pergunta humana';
     if (!transcript) return null;
     const source = entry.eventSource ?? entry.source ?? entry.event;
-    const trace = entry.traceId ? ` · rastreamento ${compactTerminalDiagnosticId(entry.traceId, 18)}` : '';
-    const turn = entry.turnId ? ` · turno ${compactTerminalDiagnosticId(entry.turnId, 18)}` : '';
+    const showIds = Boolean(opts.showIds);
+    const trace = showIds && entry.traceId ? ` · rastreamento ${compactTerminalDiagnosticId(entry.traceId, 18)}` : '';
+    const turn = showIds && entry.turnId ? ` · turno ${compactTerminalDiagnosticId(entry.turnId, 18)}` : '';
     return `transcript ${transcript} · export envelope ${humanEventSource(source)}${trace}${turn}`;
 }
 
@@ -453,21 +455,33 @@ export async function cmdEvents({ println }, arg = '') {
         return;
     }
 
+    const showDiagnosticIds = Boolean(
+        filters.traceId || filters.turnId || filters.toolCallId || filters.requestId || filters.hubSessionId,
+    );
+
     for (const entry of entries) {
         const time = formatTerminalIsoTimestamp(entry.timestamp);
         const origin = compact(humanEventSource(entry.eventSource ?? entry.source ?? '-'), 52);
-        const trace = entry.traceId ? ` · rastreamento ${compactTerminalDiagnosticId(entry.traceId, 18)}` : '';
-        const turn = entry.turnId ? ` · turno ${compactTerminalDiagnosticId(entry.turnId, 18)}` : '';
-        const hub = entry.hubSessionId ? ` · hub ${compactTerminalDiagnosticId(entry.hubSessionId, 14)}` : '';
+        const eventId = showDiagnosticIds && entry.eventId ? ` · #${entry.eventId}` : '';
+        const trace =
+            showDiagnosticIds && entry.traceId
+                ? ` · rastreamento ${compactTerminalDiagnosticId(entry.traceId, 18)}`
+                : '';
+        const turn =
+            showDiagnosticIds && entry.turnId ? ` · turno ${compactTerminalDiagnosticId(entry.turnId, 18)}` : '';
+        const hub =
+            showDiagnosticIds && entry.hubSessionId
+                ? ` · hub ${compactTerminalDiagnosticId(entry.hubSessionId, 14)}`
+                : '';
         const summary = summarizePayload(entry.payload ?? {}, {
-            showIds: Boolean(filters.toolCallId || filters.requestId || filters.hubSessionId),
+            showIds: showDiagnosticIds,
         });
-        const transcriptHint = buildTranscriptExportHint(entry);
+        const transcriptHint = buildTranscriptExportHint(entry, { showIds: showDiagnosticIds });
         const detail = [summary, transcriptHint].filter(Boolean).join(' · ');
         println(
             terminalThemeRow(
                 humanEventLabel(entry.event),
-                `${time} · #${entry.eventId} · ${origin}${trace}${turn}${hub}${detail ? ` · ${detail}` : ''}`,
+                `${time}${eventId} · ${origin}${trace}${turn}${hub}${detail ? ` · ${detail}` : ''}`,
                 { role: 'muted', width: 22 },
             ),
         );

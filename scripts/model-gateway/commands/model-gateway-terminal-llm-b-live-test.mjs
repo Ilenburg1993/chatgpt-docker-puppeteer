@@ -1735,6 +1735,8 @@ function diagnosticUxCycleCriteria(boot) {
     const activitySurface = activityStart >= 0 ? plain.slice(activityStart) : plain;
     const toolsStart = plain.indexOf('/tools');
     const toolsSurface = toolsStart >= 0 ? plain.slice(toolsStart) : plain;
+    const eventsStart = plain.indexOf('/events 12');
+    const eventsSurface = eventsStart >= 0 ? plain.slice(eventsStart) : plain;
     return [
         {
             id: 'diagnostic-ux-ready',
@@ -1769,8 +1771,10 @@ function diagnosticUxCycleCriteria(boot) {
         },
         {
             id: 'diagnostic-ux-events-human',
-            pass: /Eventos[\s\S]*(Arquivo|I\/O|Tool|terminal|copilot)/iu.test(plain) && !/chatcmpl-tool-[a-z0-9-]+/iu.test(plain),
-            detail: '/events rendered diagnostics without raw tool ids',
+            pass:
+                /Eventos[\s\S]*(Ferramenta|Atividade|terminal|io)/iu.test(eventsSurface) &&
+                !/chatcmpl-tool-[a-z0-9-]+|rastreamento implicit:|#\d+ ·|hub [a-z0-9-]+/iu.test(eventsSurface),
+            detail: '/events default rendered diagnostics without raw tool ids, trace ids, event ids, or hub ids',
         },
         {
             id: 'diagnostic-ux-clean-close',

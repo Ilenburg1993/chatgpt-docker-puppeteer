@@ -3725,6 +3725,30 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-fs-io-events-small-20260603-1525`.
   - Resultado: PASS em 7/7 critérios.
   - Logs: `artifacts/terminal-live/diagnostic-ux-fs-io-events-small-20260603-1525/summary.md`.
-- [ ] Próxima lacuna: revisar `/events` e `/activity detail` para reduzir densidade de
+- [x] Próxima lacuna: revisar `/events` e `/activity detail` para reduzir densidade de
       `rastreamento implicit`, `hub ...` e timestamps longos no default, mantendo tudo acessível
       em detail/raw.
+
+### 11.47 `/events` default sem IDs densos
+
+- [x] Achado live: `/events 12` default ainda mostrava `#eventId`, `rastreamento implicit:...`,
+      `hub ...` e `turno ...` em todas as linhas, mesmo sem filtro explícito.
+- [x] Decisão: `/events` é diagnóstico, mas o default deve ser escaneável; identificadores longos
+      entram quando o operador pede filtros técnicos (`trace`, `turn`, `tool`, `request`, `hub`)
+      ou raw/json.
+- [x] Implementação: `cmdEvents` agora calcula `showDiagnosticIds` a partir dos filtros técnicos.
+      Sem esses filtros, cada linha mostra tempo, origem humana e resumo do payload; com filtros,
+      preserva `#id`, rastreamento, turno, hub e IDs compactos.
+- [x] Implementação: hints de transcript também deixam de anexar rastreamento/turno no default,
+      mantendo `export envelope` humano.
+- [x] Teste atualizado:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`.
+- [x] Live diagnóstico repetido:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-events-id-guard-20260603-1528`.
+  - Resultado: PASS; `/events` default passou a mostrar linhas como
+        `Ferramenta  timestamp · io · ferramenta Leitura local · estado io op`, sem
+        `rastreamento implicit`, `#id` e `hub`.
+- [x] Harness reforçado: `diagnostic-ux-events-human` agora falha se o default voltar a mostrar
+      IDs de tool crus, `rastreamento implicit`, `#id` ou `hub`.
+- [ ] Próxima lacuna: revisar `/activity` default/detail para separar melhor timeline humana de
+      timeline técnica e reduzir truncamentos confusos em caminhos longos.
