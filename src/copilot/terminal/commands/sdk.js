@@ -71,7 +71,13 @@ import {
     recordTerminalPermissionRequested,
     terminalPermissionModeSkipsSdkPrompts,
 } from '../state/sdk/index.js';
-import { terminalThemeDivider, terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
+import {
+    formatTerminalRelativeAge,
+    terminalThemeDivider,
+    terminalThemeHeadline,
+    terminalThemeRow,
+    terminalThemeText,
+} from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -102,6 +108,27 @@ function pluralPt(value, singular, plural) {
  */
 function activeLabel(value) {
     return value === true ? 'ativo' : 'ausente';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderSdkSessionPresence(value) {
+    return typeof value === 'string' && value.trim() ? 'sessão ativa' : 'sem sessão SDK';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderSdkQuotaResetLabel(value) {
+    if (value == null || value === '') return '-';
+    const parsed = value instanceof Date ? value.getTime() : typeof value === 'number' ? value : Date.parse(String(value));
+    if (!Number.isFinite(parsed)) return String(value);
+    const now = Date.now();
+    const relative = formatTerminalRelativeAge(parsed, now);
+    return parsed >= now ? `em ${relative.replace(/^há\s+/u, '')}` : relative;
 }
 
 /**
@@ -1065,7 +1092,7 @@ export async function cmdSdk({ println }, arg = '') {
             println('');
             println(terminalThemeHeadline('accent', 'SDK do Terminal', [state.runtimeId]));
             println(terminalThemeDivider(58));
-            println(terminalThemeRow('Sessão', state.sessionId ?? 'sem sessão SDK'));
+            println(terminalThemeRow('Sessão', renderSdkSessionPresence(state.sessionId)));
             println(
                 terminalThemeRow('Modelo', `${state.model} · raciocínio ${state.reasoningEffort}`, { role: 'command' }),
             );
@@ -1562,7 +1589,7 @@ async function renderSdkQuota({ println }, runtimeId, opts = {}) {
         println(
             terminalThemeRow(
                 opts.compact ? 'Quota' : row.quotaId,
-                `${opts.compact ? `${row.quotaId} · ` : ''}${pct} restante · reset ${row.resetAt ?? '-'} · escopo ${row.scope}`,
+                `${opts.compact ? `${row.quotaId} · ` : ''}${pct} restante · reset ${renderSdkQuotaResetLabel(row.resetAt)} · escopo ${row.scope}`,
                 { role },
             ),
         );
@@ -1635,7 +1662,7 @@ async function renderSdkSystemPrompt({ println }, runtimeId) {
     println(
         terminalThemeRow(
             'Sessão',
-            `${String(sessionId ?? '-')} · fontes ${sessionAvailable ? 'disponíveis' : 'nenhuma'}`,
+            `${renderSdkSessionPresence(sessionId)} · fontes ${sessionAvailable ? 'disponíveis' : 'nenhuma'}`,
         ),
     );
     println(

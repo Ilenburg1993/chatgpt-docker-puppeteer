@@ -244,12 +244,14 @@ describe('terminal/commands/sdk', () => {
         const ctx = mockCtx();
         await cmdSdk({ println: ctx.println }, 'status');
         expect(ctx.output()).toContain('SDK do Terminal');
-        expect(ctx.output()).toContain('sdk-1');
+        expect(ctx.output()).toContain('sessão ativa');
+        expect(ctx.output()).not.toContain('sdk-1');
         expect(ctx.output()).toContain('chat');
         expect(ctx.output()).toContain('0 perguntas');
         expect(ctx.output()).not.toContain('pergunta=0');
         expect(ctx.output()).not.toContain('reasoning=');
         expect(ctx.output()).not.toContain('restante=');
+        expect(ctx.output()).not.toContain('2026-05-01');
     });
 
     it('/sdk quota usa frase humana no modo default', async () => {
@@ -262,6 +264,7 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).not.toContain('restante=');
         expect(ctx.output()).not.toContain('reset=');
         expect(ctx.output()).not.toContain('escopo=');
+        expect(ctx.output()).not.toContain('2026-05-01');
     });
 
     it('/sdk capabilities exibe capacidades consolidadas da sessão SDK', async () => {
@@ -426,7 +429,9 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('auto reload');
         expect(ctx.output()).toContain('sources RPC');
         expect(ctx.output()).toContain('seções');
+        expect(ctx.output()).toContain('sessão ativa');
         expect(ctx.output()).toContain('fontes disponíveis');
+        expect(ctx.output()).not.toContain('sdk-1');
         expect(ctx.output()).toContain('defasado');
         expect(ctx.output()).toContain('Fontes de instrução');
         expect(ctx.output()).not.toContain('live=');

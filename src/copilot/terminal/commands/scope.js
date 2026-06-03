@@ -20,6 +20,7 @@ import {
 import { stat } from 'node:fs/promises';
 import { relative } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
+import { terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
 
 /**
  * @typedef {{ println: (text: string) => void; hubSessionId?: string | null }} ScopeCommandContext
@@ -58,6 +59,29 @@ function compactPath(target) {
  */
 function numberLabel(value) {
     return typeof value === 'number' && Number.isFinite(value) ? String(value) : '-';
+}
+
+/**
+ * @param {boolean} value
+ * @returns {string}
+ */
+function yesNo(value) {
+    return value ? 'sim' : 'não';
+}
+
+/**
+ * @param {unknown} kind
+ * @returns {string}
+ */
+function renderScopeSymbolKind(kind) {
+    const value = String(kind ?? '').trim();
+    if (value === 'function') return 'função';
+    if (value === 'class') return 'classe';
+    if (value === 'method') return 'método';
+    if (value === 'const') return 'constante';
+    if (value === 'let') return 'variável';
+    if (value === 'export') return 'export';
+    return value.replace(/[._-]+/gu, ' ') || 'símbolo';
 }
 
 /**
@@ -217,12 +241,15 @@ async function resolveDeclareTarget(ctx, args) {
  */
 function printScopeStats(ctx, stats) {
     if (!stats) {
-        ctx.println('\x1b[33m  Escopo não encontrado.\x1b[0m');
+        ctx.println(terminalThemeRow('Escopo', 'não encontrado', { role: 'warn' }));
         return;
     }
-    const ready = stats.ready ? '\x1b[32mready\x1b[0m' : '\x1b[33mwarming\x1b[0m';
+    const ready = stats.ready ? 'pronto' : 'aquecendo';
     ctx.println(
-        `  \x1b[36m${stats.sessionId}\x1b[0m · ${ready} · arquivos ${stats.pathCount} · cache L1 ${stats.preloaded} · analisados ${stats.parsed} · invalidados ${stats.invalidated} · falhas ${stats.failed} · ${Math.round(stats.warmDurationMs)}ms`,
+        terminalThemeRow(
+            'Escopo',
+            `${stats.sessionId} · ${ready} · arquivos ${stats.pathCount} · cache L1 ${stats.preloaded} · analisados ${stats.parsed} · invalidados ${stats.invalidated} · falhas ${stats.failed} · ${Math.round(stats.warmDurationMs)}ms`,
+        ),
     );
 }
 
@@ -254,16 +281,22 @@ async function runDeclare(ctx, parts) {
         target.paths.length > 0
             ? `${target.paths.length} paths explícitos`
             : `diretório ${compactPath(String(target.directory ?? '.'))}`;
-    ctx.println(`\n  \x1b[36m/scope declare\x1b[0m ${handle.sessionId} · ${source}`);
+    ctx.println('');
+    ctx.println(terminalThemeHeadline('assistant', 'Escopo declarado'));
+    ctx.println(terminalThemeRow('Escopo', handle.sessionId));
+    ctx.println(terminalThemeRow('Fonte', source));
     ctx.println(
-        `  \x1b[90msímbolos ${args.parseSymbols ? 'sim' : 'não'} · recursivo ${args.recursive ? 'sim' : 'não'} · limite ${numberLabel(args.maxFiles)} informativo · concorrência ${numberLabel(args.concurrency)} informativo\x1b[0m`,
+        terminalThemeRow(
+            'Opções',
+            `símbolos ${yesNo(args.parseSymbols)} · recursivo ${yesNo(args.recursive)} · limite ${numberLabel(args.maxFiles)} informativo · concorrência ${numberLabel(args.concurrency)} informativo`,
+        ),
     );
 
     if (args.awaitReady) {
         const stats = await handle.awaitReady();
         printScopeStats(ctx, stats);
     } else {
-        ctx.println('  \x1b[90mwarm-up em background; use /scope context ou /scope list para acompanhar.\x1b[0m');
+        ctx.println(terminalThemeRow('Próximo', 'aquecimento em segundo plano; use /scope context ou /scope list para acompanhar'));
     }
     ctx.println('');
 }
@@ -274,10 +307,11 @@ async function runDeclare(ctx, parts) {
 function runList(ctx) {
     const ids = listScopes();
     if (ids.length === 0) {
-        ctx.println('\x1b[33m  Nenhum escopo ativo.\x1b[0m');
+        ctx.println(terminalThemeRow('Escopos', 'nenhum escopo ativo', { role: 'warn' }));
         return;
     }
-    ctx.println('\n  \x1b[36mEscopos ativos\x1b[0m');
+    ctx.println('');
+    ctx.println(terminalThemeHeadline('assistant', 'Escopos ativos'));
     for (const id of ids) printScopeStats(ctx, getScopeStats(id));
     ctx.println('');
 }
@@ -290,15 +324,17 @@ function runContext(ctx, parts) {
     const sessionId = parts[0] ?? ctx.hubSessionId ?? 'terminal-live';
     const scope = getScopeContext(sessionId);
     if (!scope) {
-        ctx.println(`\x1b[33m  Escopo não encontrado: ${sessionId}\x1b[0m`);
+        ctx.println(terminalThemeRow('Escopo', `não encontrado: ${sessionId}`, { role: 'warn' }));
         return;
     }
-    const ready = scope.ready ? '\x1b[32mready\x1b[0m' : '\x1b[33mwarming\x1b[0m';
-    ctx.println(`\n  \x1b[36mContexto de escopo\x1b[0m ${scope.sessionId} · ${ready}`);
-    ctx.println(`  arquivos ${scope.files} · símbolos ${scope.symbols} · exports ${scope.topExports.length}`);
-    for (const item of scope.topExports.slice(0, 30)) ctx.println(`  \x1b[90m- ${item}\x1b[0m`);
+    const ready = scope.ready ? 'pronto' : 'aquecendo';
+    ctx.println('');
+    ctx.println(terminalThemeHeadline('assistant', 'Contexto de escopo'));
+    ctx.println(terminalThemeRow('Escopo', `${scope.sessionId} · ${ready}`));
+    ctx.println(terminalThemeRow('Arquivos', `${scope.files} · símbolos ${scope.symbols} · exports ${scope.topExports.length}`));
+    for (const item of scope.topExports.slice(0, 30)) ctx.println(terminalThemeRow('Export', item));
     if (scope.topExports.length > 30)
-        ctx.println(`  \x1b[90m… ${scope.topExports.length - 30} exports adicionais\x1b[0m`);
+        ctx.println(terminalThemeRow('Mais', `${scope.topExports.length - 30} export(s) adicional(is)`));
     ctx.println('');
 }
 
@@ -311,17 +347,22 @@ function runFind(ctx, parts) {
     const sessionId = args.sessionId ?? args.rest.shift() ?? ctx.hubSessionId ?? 'terminal-live';
     const symbol = args.rest.join(' ').trim();
     if (!symbol) {
-        ctx.println('\x1b[33m  Uso: /scope find <sessionId> <symbol> [--exact]\x1b[0m');
+        ctx.println(terminalThemeRow('Uso', '/scope find <sessionId> <symbol> [--exact]', { role: 'warn' }));
         return;
     }
     const results = findSymbol(sessionId, symbol, { exactMatch: args.exactMatch });
-    ctx.println(`\n  \x1b[36mBusca de símbolo no escopo\x1b[0m ${sessionId} · "${symbol}" · resultados ${results.length}`);
+    ctx.println('');
+    ctx.println(terminalThemeHeadline('assistant', 'Busca de símbolo no escopo'));
+    ctx.println(terminalThemeRow('Consulta', `${sessionId} · "${symbol}" · resultados ${results.length}`));
     for (const result of results.slice(0, 80)) {
         ctx.println(
-            `  \x1b[33m${result.symbol.kind}\x1b[0m ${result.symbol.name} · ${compactPath(result.filePath)}:${result.symbol.line}`,
+            terminalThemeRow(
+                renderScopeSymbolKind(result.symbol.kind),
+                `${result.symbol.name} · ${compactPath(result.filePath)}:${result.symbol.line}`,
+            ),
         );
     }
-    if (results.length > 80) ctx.println(`  \x1b[90m… ${results.length - 80} resultados adicionais\x1b[0m`);
+    if (results.length > 80) ctx.println(terminalThemeRow('Mais', `${results.length - 80} resultado(s) adicional(is)`));
     ctx.println('');
 }
 
@@ -334,9 +375,9 @@ async function runRefresh(ctx, parts) {
     const sessionId = args.sessionId ?? args.rest.shift() ?? ctx.hubSessionId ?? 'terminal-live';
     const modifiedPaths = args.rest.length > 0 ? args.rest : undefined;
     const result = await refreshScope(sessionId, modifiedPaths);
-    ctx.println(
-        `\n  \x1b[36m/scope refresh\x1b[0m ${sessionId} · atualizados ${result.refreshed} · falhas ${result.failed}\n`,
-    );
+    ctx.println('');
+    ctx.println(terminalThemeRow('Escopo', `${sessionId} · atualizados ${result.refreshed} · falhas ${result.failed}`));
+    ctx.println('');
 }
 
 /**
@@ -347,10 +388,10 @@ function runClose(ctx, parts) {
     const sessionId = parts[0] ?? ctx.hubSessionId ?? 'terminal-live';
     const stats = closeScope(sessionId);
     if (!stats) {
-        ctx.println(`\x1b[33m  Escopo não encontrado: ${sessionId}\x1b[0m`);
+        ctx.println(terminalThemeRow('Escopo', `não encontrado: ${sessionId}`, { role: 'warn' }));
         return;
     }
-    ctx.println(`\x1b[32m  Escopo fechado:\x1b[0m ${sessionId} · arquivos ${stats.pathCount} · analisados ${stats.parsed}`);
+    ctx.println(terminalThemeRow('Escopo fechado', `${sessionId} · arquivos ${stats.pathCount} · analisados ${stats.parsed}`, { role: 'success' }));
 }
 
 /**
@@ -369,10 +410,16 @@ export async function cmdScope(ctx, arg = '') {
         else if (sub === 'close' || sub === 'end') runClose(ctx, parts);
         else {
             ctx.println(
-                '\x1b[33m  Uso: /scope list | declare [sessionId] [dir] [--await] [--include p] [--exclude p] [--ext js] [--max-files n] [--concurrency n] | context [sessionId] | find <sessionId> <symbol> [--exact] | refresh [sessionId] [paths...] | close [sessionId]\x1b[0m',
+                terminalThemeRow(
+                    'Uso',
+                    '/scope list | declare [sessionId] [dir] [--await] [--include p] [--exclude p] [--ext js] [--max-files n] [--concurrency n] | context [sessionId] | find <sessionId> <symbol> [--exact] | refresh [sessionId] [paths...] | close [sessionId]',
+                    { role: 'warn' },
+                ),
             );
         }
     } catch (e) {
-        ctx.println(`\n  \x1b[31m✗ Scope: ${toError(e).message}\x1b[0m\n`);
+        ctx.println('');
+        ctx.println(terminalThemeRow('Escopo', toError(e).message, { role: 'error' }));
+        ctx.println('');
     }
 }

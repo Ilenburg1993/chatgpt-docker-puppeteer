@@ -55,13 +55,13 @@ describe('terminal/commands/scope', () => {
             ctx,
             `declare scope-terminal-test ${tmpRel} --await --include *.js --max-files 1 --concurrency 2`,
         );
-        expect(ctx.output()).toContain('/scope declare');
+        expect(ctx.output()).toContain('Escopo declarado');
         expect(ctx.output()).toContain('scope-terminal-test');
         expect(ctx.output()).toContain('diretório');
         expect(ctx.output()).toContain('símbolos sim');
         expect(ctx.output()).toContain('recursivo sim');
         expect(ctx.output()).toContain('informativo');
-        expect(ctx.output()).toContain('ready');
+        expect(ctx.output()).toContain('pronto');
 
         await cmdScope(ctx, 'context scope-terminal-test');
         expect(ctx.output()).toContain('Contexto de escopo');
@@ -73,11 +73,12 @@ describe('terminal/commands/scope', () => {
         expect(ctx.output()).toContain('alphaHelper');
 
         await cmdScope(ctx, `refresh scope-terminal-test ${tmpRel}/alpha.js`);
-        expect(ctx.output()).toContain('/scope refresh');
+        expect(ctx.output()).toContain('Escopo');
         expect(ctx.output()).toContain('atualizados 1');
 
         await cmdScope(ctx, 'close scope-terminal-test');
         expect(ctx.output()).toContain('Escopo fechado');
+        expect(ctx.output()).not.toContain('\x1b[');
         expect(ctx.output()).not.toContain('files=');
         expect(ctx.output()).not.toContain('parsed=');
         expect(ctx.output()).not.toContain('dir=');
@@ -98,6 +99,7 @@ describe('terminal/commands/scope', () => {
         expect(ctx.output()).toContain('Escopos ativos');
         expect(ctx.output()).toContain('scope-terminal-filtered');
         expect(ctx.output()).toContain('arquivos 1');
+        expect(ctx.output()).not.toContain('\x1b[');
         expect(ctx.output()).not.toContain('files=');
     });
 });

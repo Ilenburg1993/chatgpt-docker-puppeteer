@@ -1738,10 +1738,15 @@ function diagnosticUxCycleCriteria(boot) {
     const sdkEventsStart = plain.indexOf('/session sdk events 8', Math.max(0, eventsStart));
     const sdkWaitsStart = plain.indexOf('/session sdk waits 8', Math.max(0, sdkEventsStart));
     const sdkInventoryStart = plain.indexOf('/session sdk 6', Math.max(0, sdkWaitsStart));
-    const historyStart = plain.indexOf('/history 6', Math.max(0, sdkInventoryStart));
+    const sdkStatusStart = plain.indexOf('/sdk status', Math.max(0, sdkInventoryStart));
+    const historyStart = plain.indexOf('/history 6', Math.max(0, sdkStatusStart));
     const dbHistoryStart = plain.indexOf('/db-history 6', Math.max(0, historyStart));
     const dbSessionsStart = plain.indexOf('/db-sessions 6', Math.max(0, dbHistoryStart));
-    const whoStart = plain.indexOf('/who', Math.max(0, dbSessionsStart));
+    const scopeDeclareStart = plain.indexOf('/scope declare terminal-ux-scope', Math.max(0, dbSessionsStart));
+    const scopeContextStart = plain.indexOf('/scope context terminal-ux-scope', Math.max(0, scopeDeclareStart));
+    const scopeFindStart = plain.indexOf('/scope find terminal-ux-scope cmdScope --exact', Math.max(0, scopeContextStart));
+    const scopeCloseStart = plain.indexOf('/scope close terminal-ux-scope', Math.max(0, scopeFindStart));
+    const whoStart = plain.indexOf('/who', Math.max(0, scopeCloseStart));
     const countStart = plain.indexOf('/count', Math.max(0, whoStart));
     const clearStart = plain.indexOf('/clear', Math.max(0, countStart));
     const quitStart = plain.indexOf('/quit', Math.max(0, clearStart));
@@ -1757,10 +1762,12 @@ function diagnosticUxCycleCriteria(boot) {
     const eventsSurface = surfaceBetween(eventsStart, sdkEventsStart);
     const sdkEventsSurface = surfaceBetween(sdkEventsStart, sdkWaitsStart);
     const sdkWaitsSurface = surfaceBetween(sdkWaitsStart, sdkInventoryStart);
-    const sdkInventorySurface = surfaceBetween(sdkInventoryStart, historyStart);
+    const sdkInventorySurface = surfaceBetween(sdkInventoryStart, sdkStatusStart);
+    const sdkStatusSurface = surfaceBetween(sdkStatusStart, historyStart);
     const historySurface = surfaceBetween(historyStart, dbHistoryStart);
     const dbHistorySurface = surfaceBetween(dbHistoryStart, dbSessionsStart);
-    const dbSessionsSurface = surfaceBetween(dbSessionsStart, whoStart);
+    const dbSessionsSurface = surfaceBetween(dbSessionsStart, scopeDeclareStart);
+    const scopeSurface = surfaceBetween(scopeDeclareStart, whoStart);
     const whoSurface = surfaceBetween(whoStart, countStart);
     const countSurface = surfaceBetween(countStart, clearStart);
     const clearSurface = surfaceBetween(clearStart, quitStart);
@@ -1852,6 +1859,15 @@ function diagnosticUxCycleCriteria(boot) {
             detail: '/session sdk default rendered inventory with relative time, translated labels, and without raw ids, ISO timestamps, or English flags',
         },
         {
+            id: 'diagnostic-ux-sdk-status-human',
+            pass:
+                /SDK do Terminal[\s\S]*Sessão\s+sessão ativa/iu.test(sdkStatusSurface) &&
+                !/\d{4}-\d{2}-\d{2}T|\bsdk-[a-z0-9_-]+\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|reasoning=|restante=/iu.test(
+                    sdkStatusSurface,
+                ),
+            detail: '/sdk status rendered session presence and quota/status without raw session ids or key=value diagnostics',
+        },
+        {
             id: 'diagnostic-ux-history-human',
             pass:
                 /Histórico/iu.test(historySurface) &&
@@ -1871,6 +1887,15 @@ function diagnosticUxCycleCriteria(boot) {
                 /(sessões persistidas|Nenhuma sessão persistida)/iu.test(dbSessionsSurface) &&
                 !/\d{4}-\d{2}-\d{2}T|hub sessions|id [0-9a-f]{8}/iu.test(dbSessionsSurface),
             detail: '/db-sessions rendered persisted session list without ISO timestamps, English hub-sessions copy, or raw ids',
+        },
+        {
+            id: 'diagnostic-ux-scope-human',
+            pass:
+                /Escopo declarado[\s\S]*Contexto de escopo[\s\S]*Busca de símbolo no escopo[\s\S]*Escopo fechado/iu.test(
+                    scopeSurface,
+                ) &&
+                !/\\x1b\[|\bready\b|\bwarming\b|files=|parsed=|parseSymbols=|recursive=/iu.test(scopeSurface),
+            detail: '/scope declare/context/find/close rendered themed scope output without ANSI literals or old diagnostic key=value labels',
         },
         {
             id: 'diagnostic-ux-small-commands-human',
@@ -1909,9 +1934,17 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
             { line: '/session sdk events 8', advanceAfterMs: 1_000 },
             { line: '/session sdk waits 8', advanceAfterMs: 1_000 },
             { line: '/session sdk 6', advanceAfterMs: 1_000 },
+            { line: '/sdk status', advanceAfterMs: 1_000 },
             { line: '/history 6', advanceAfterMs: 1_000 },
             { line: '/db-history 6', advanceAfterMs: 1_000 },
             { line: '/db-sessions 6', advanceAfterMs: 1_000 },
+            {
+                line: '/scope declare terminal-ux-scope src/copilot/terminal/commands --await --include scope.js --max-files 1',
+                advanceAfterMs: 1_000,
+            },
+            { line: '/scope context terminal-ux-scope', advanceAfterMs: 1_000 },
+            { line: '/scope find terminal-ux-scope cmdScope --exact', advanceAfterMs: 1_000 },
+            { line: '/scope close terminal-ux-scope', advanceAfterMs: 1_000 },
             { line: '/who', advanceAfterMs: 1_000 },
             { line: '/count', advanceAfterMs: 1_000 },
             { line: '/clear', advanceAfterMs: 1_000 },

@@ -3951,5 +3951,39 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-session-sdk-reasons-20260603-1608`.
   - Resultado: PASS em 15/15 critérios; `/session sdk` mostrou alças `#n`, tempo relativo,
         `Última usada`, `Primeiro plano`, motivo de boot traduzido e metadados sem códigos crus.
-- [ ] Próxima lacuna: auditar `/sdk` e `/scope`, pois buscas no código ainda indicam ANSI
+- [x] Próxima lacuna: auditar `/sdk` e `/scope`, pois buscas no código ainda indicam ANSI
       literal, IDs de sessão em linhas default e nomes técnicos que podem reaparecer na UX.
+
+### 11.54 `/scope` e `/sdk status` no mesmo idioma visual do terminal
+
+- [x] Achado: `/scope` ainda usava ANSI manual em todas as rotas principais (`declare`, `list`,
+      `context`, `find`, `refresh`, `close`, uso e erro).
+- [x] Achado: `/scope` imprimia `ready`, `warming`, bullets manuais e aparência de log, destoando
+      do restante da UX que já usa `terminalThemeRow`.
+- [x] Achado: `/sdk status` imprimia ID cru da sessão SDK e reset de quota em ISO no painel
+      principal.
+- [x] Decisão: `/scope` pode manter o nome do escopo quando ele é a alça operacional escolhida
+      pelo operador, mas deve abandonar ANSI cru, key=value legado e estados em inglês.
+- [x] Implementação: `/scope declare` passou a exibir `Escopo declarado`, `Escopo`, `Fonte`,
+      `Opções` e estatísticas via tema.
+- [x] Implementação: `/scope list`, `/scope context`, `/scope find`, `/scope refresh` e
+      `/scope close` passaram a usar `terminalThemeHeadline`/`terminalThemeRow`.
+- [x] Implementação: tipos de símbolo passaram a ser traduzidos (`função`, `classe`, `método`,
+      `constante`, `variável`).
+- [x] Implementação: estados `ready`/`warming` passaram a `pronto`/`aquecendo`.
+- [x] Implementação: `/sdk status` e `/sdk prompt` passaram a renderizar presença de sessão
+      (`sessão ativa`) em vez de ID cru.
+- [x] Implementação: resets de quota SDK passaram a usar tempo relativo (`há 3s`, `em 2m`) em
+      vez de timestamp ISO no status default.
+- [x] Testes escopados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_commands_scope.spec.js`.
+  - Cobertura reforçada contra ANSI, `sdk-1`, ISO de reset e key=value legado.
+- [x] Harness live ampliado: `--diagnostic-ux-cycle` agora executa `/sdk status` e o fluxo
+      `/scope declare/context/find/close`.
+- [x] Live PTY diagnóstico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=150000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-sdk-quota-relative-20260603-1615`.
+  - Resultado: PASS em 17/17 critérios; `/sdk status` ficou sem ID/ISO e `/scope` ficou sem ANSI
+        literal ou labels `ready/warming`.
+- [ ] Próxima lacuna: revisar `/permission`, `/plan`, `/queue`, `/mailbox` e superfícies de
+      intervenção humana, porque ainda são as áreas mais propensas a repetir tool names,
+      permissões cruas e prompts que parecem "outra tool qualquer".
