@@ -5620,9 +5620,30 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-events-human-source-contract-20260605-0035`.
 - [x] Resultado: `Status: PASS`; critério `sse-archive-human-source-labels` passou no summary,
       além de `sse-archive-query-visible`, `no-terminal-errors` e `clean-quit`.
-- [ ] Próxima auditoria UX: revisar labels remanescentes como `Sessão SDK` e
-      `Info SDK · cancellation` para decidir o que é técnico aceitável e o que deve ser
-      humanizado no modo padrão.
+- [x] Auditoria UX de lifecycle em `/events`: `Sessão SDK · agente · tipo sessão atualizada`
+      era uma linha redundante e centrada no backend; `Hook iniciado/concluído` também soava como
+      jargão técnico no modo padrão.
+- [x] Correção aplicada: `/events` padrão agora deriva `sdk.lifecycle` pelo `payload.type`
+      (`Sessão atualizada`, `Sessão criada`, `Sessão removida` etc.), mostra
+      `agent/sdk.lifecycle` como `controle da sessão`, troca hook por `Rotina iniciada/concluída`
+      e remove resumo redundante quando ele só repete o label.
+- [x] Contrato live ampliado: `sse-archive-human-source-labels` também exige
+      `Sessão atualizada`, `controle da sessão`, `Rotina iniciada` e `Rotina concluída`, e bloqueia
+      regressões para `Sessão SDK`, `Hook iniciado` e `Hook concluído` antes do `--raw`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/events.js`;
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx eslint src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`.
+- [x] Live de confirmação concluída:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-events-session-lifecycle-contract-20260605-0040`.
+- [x] Resultado: `Status: PASS`; `/events 60` exibiu `Sessão atualizada · controle da sessão`,
+      `Rotina iniciada` e `Rotina concluída`; o critério `sse-archive-human-source-labels`
+      passou no summary.
+- [x] Decisão de escopo: `Sessão SDK` permanece aceitável em `/events --raw` e em telas
+      explicitamente diagnósticas como `/health full` até nova auditoria dessas superfícies.
+- [ ] Próxima auditoria UX: revisar labels remanescentes como `Info SDK · cancellation` para
+      decidir o que é técnico aceitável e o que deve ser humanizado no modo padrão.
 - [x] Live pós-critério: repetir cenário canônico após `sse-archive-human-source-labels`
       confirmou o contrato no summary, não só na evidência visual.
 - [ ] Próxima live de falha controlada: reproduzir ou simular erro BYOK para confirmar que

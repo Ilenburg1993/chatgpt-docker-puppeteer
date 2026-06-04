@@ -400,8 +400,11 @@ describe('terminal/commands/events', () => {
 
         await cmdEvents({ println: ctx.println }, '20');
 
-        expect(ctx.output()).toContain('tipo sessão atualizada');
+        expect(ctx.output()).toContain('Sessão atualizada');
+        expect(ctx.output()).toContain('controle da sessão');
         expect(ctx.output()).toContain('tipo continuação da pergunta humana');
+        expect(ctx.output()).not.toContain('tipo sessão atualizada');
+        expect(ctx.output()).not.toContain('Sessão SDK');
         expect(ctx.output()).not.toContain('tipo session.updated');
         expect(ctx.output()).not.toContain('ask user continuation');
         expect(ctx.output()).not.toContain('ask_user_continuation');

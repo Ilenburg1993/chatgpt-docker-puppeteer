@@ -3977,9 +3977,15 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                 /pergunta ao operador/u.test(beforeRawDiagnosticsPlain) &&
                 /telemetria LLM/u.test(beforeRawDiagnosticsPlain) &&
                 /registro export/u.test(beforeRawDiagnosticsPlain) &&
-                !/SDK assistant|pergunta humana SDK|agente\/usage|export envelope/u.test(beforeRawDiagnosticsPlain),
+                /Sessão atualizada/u.test(beforeRawDiagnosticsPlain) &&
+                /controle da sessão/u.test(beforeRawDiagnosticsPlain) &&
+                /Rotina iniciada/u.test(beforeRawDiagnosticsPlain) &&
+                /Rotina concluída/u.test(beforeRawDiagnosticsPlain) &&
+                !/SDK assistant|pergunta humana SDK|agente\/usage|export envelope|Sessão SDK|Hook iniciado|Hook concluído/u.test(
+                    beforeRawDiagnosticsPlain,
+                ),
             detail:
-                '/events default rendered transcript/user/usage/export sources as operator-facing labels before raw diagnostics',
+                '/events default rendered transcript/user/usage/session/hook/export sources as operator-facing labels before raw diagnostics',
         },
         {
             id: 'sse-archive-raw-visible',

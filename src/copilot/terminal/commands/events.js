@@ -231,9 +231,10 @@ function compact(value, max = 100) {
 
 /**
  * @param {string} event
+ * @param {Record<string, unknown> | null} [payload]
  * @returns {string}
  */
-function humanEventLabel(event) {
+function humanEventLabel(event, payload = null) {
     if (event === 'assistant.message') return 'Mensagem da LLM-B';
     if (event === 'user_input.requested') return 'Pergunta ao operador';
     if (event === 'user_input.completed') return 'Resposta do operador';
@@ -263,9 +264,18 @@ function humanEventLabel(event) {
     if (event === 'assistant.reasoning_complete') return 'Raciocínio concluído';
     if (event === 'dialog.turn_start' || event === 'assistant.turn_start') return 'Turno iniciado';
     if (event === 'dialog.turn_end' || event === 'assistant.turn_end') return 'Turno concluído';
-    if (event === 'sdk.lifecycle') return 'Sessão SDK';
-    if (event === 'hook.start') return 'Hook iniciado';
-    if (event === 'hook.end') return 'Hook concluído';
+    if (event === 'sdk.lifecycle') {
+        const lifecycleType = typeof payload?.['type'] === 'string' ? humanPayloadKind(payload['type']) : '';
+        if (lifecycleType === 'sessão atualizada') return 'Sessão atualizada';
+        if (lifecycleType === 'sessão criada') return 'Sessão criada';
+        if (lifecycleType === 'sessão removida') return 'Sessão removida';
+        if (lifecycleType === 'sessão em primeiro plano') return 'Sessão em primeiro plano';
+        if (lifecycleType === 'sessão em segundo plano') return 'Sessão em segundo plano';
+        if (lifecycleType === 'sessão encerrada') return 'Sessão encerrada';
+        return 'Ciclo da sessão';
+    }
+    if (event === 'hook.start') return 'Rotina iniciada';
+    if (event === 'hook.end') return 'Rotina concluída';
     if (event === 'llm.usage' || event === 'session.usage') return 'Uso LLM';
     if (event === 'streaming.progress' || event === 'delta') return 'Streaming';
     if (event === 'busy') return 'Ocupado';
@@ -306,6 +316,7 @@ function humanEventSource(source) {
     if (lower.startsWith('sdk/assistant')) return 'LLM-B via SDK';
     if (lower.startsWith('agent/background')) return 'tarefa em segundo plano';
     if (lower.startsWith('agent/llm')) return 'telemetria LLM';
+    if (lower.startsWith('agent/sdk.lifecycle')) return 'controle da sessão';
     if (lower.startsWith('terminal-boot')) return 'terminal';
     if (lower.startsWith('terminal-dialog') || lower.startsWith('terminal-agent-wiring')) return 'diálogo';
     if (lower === 'sdk' || lower.startsWith('sdk/')) return 'SDK';
@@ -313,6 +324,22 @@ function humanEventSource(source) {
     if (lower === 'dialog' || lower.startsWith('dialog')) return 'diálogo';
     if (lower.includes('terminal')) return 'terminal';
     return text;
+}
+
+/**
+ * @param {string} label
+ * @param {string} summary
+ * @returns {boolean}
+ */
+function isRedundantEventSummary(label, summary) {
+    const normalizedLabel = normalizeEventSummaryText(label).toLowerCase();
+    const normalizedSummary = normalizeEventSummaryText(summary).toLowerCase();
+    if (!normalizedLabel || !normalizedSummary) return false;
+    return (
+        normalizedSummary === normalizedLabel ||
+        normalizedSummary === `tipo ${normalizedLabel}` ||
+        normalizedSummary === `estado ${normalizedLabel}`
+    );
 }
 
 /**
@@ -554,12 +581,13 @@ export async function cmdEvents({ println }, arg = '') {
             showDiagnosticIds && entry.hubSessionId
                 ? ` · hub ${compactTerminalDiagnosticId(entry.hubSessionId, 14)}`
                 : '';
-        const summary = summarizePayload(entry.payload ?? {}, {
+        const label = humanEventLabel(entry.event, entry.payload ?? {});
+        const rawSummary = summarizePayload(entry.payload ?? {}, {
             showIds: showDiagnosticIds,
         });
+        const summary = isRedundantEventSummary(label, rawSummary) ? '' : rawSummary;
         const transcriptHint = buildTranscriptExportHint(entry, { showIds: showDiagnosticIds });
         const detail = [summary, transcriptHint].filter(Boolean).join(' · ');
-        const label = humanEventLabel(entry.event);
         return {
             key: `${label}\u0000${origin}\u0000${summary}\u0000${transcriptHint ?? ''}`,
             label,
