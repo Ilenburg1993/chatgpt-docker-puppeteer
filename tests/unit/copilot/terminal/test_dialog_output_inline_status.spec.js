@@ -87,6 +87,7 @@ const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true
 const {
     beginTerminalRenderLock,
     clearInlineStatus,
+    deferTerminalIdlePromptRedraw,
     endTerminalRenderLock,
     parkTerminalPromptForContinuation,
     printlnBlock,
@@ -193,6 +194,60 @@ describe('terminal/dialog/output inline status', () => {
 
         expect(mocks.rl.setPrompt).toHaveBeenCalledTimes(1);
         expect(mocks.rl.prompt).toHaveBeenCalledTimes(1);
+    });
+
+    it('permite repaint forçado de prompt idêntico após comando explícito rápido', async () => {
+        const rl = {
+            closed: false,
+            line: '',
+            setPrompt: vi.fn(),
+            prompt: vi.fn(),
+        };
+
+        scheduleTerminalPromptRedraw(rl, 'você› ');
+        await new Promise((resolve) => setImmediate(resolve));
+
+        scheduleTerminalPromptRedraw(rl, 'você› ', { force: true });
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(rl.setPrompt).toHaveBeenCalledTimes(2);
+        expect(rl.prompt).toHaveBeenCalledTimes(2);
+    });
+
+    it('adia prompt idle pós-turno, mas não bloqueia repaint forçado de comando', async () => {
+        const rl = {
+            closed: false,
+            line: '',
+            setPrompt: vi.fn(),
+            prompt: vi.fn(),
+        };
+
+        deferTerminalIdlePromptRedraw(30);
+        scheduleTerminalPromptRedraw(rl, 'você› ');
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(rl.setPrompt).not.toHaveBeenCalled();
+
+        scheduleTerminalPromptRedraw(rl, 'você› ', { force: true });
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(rl.setPrompt).toHaveBeenCalledTimes(1);
+        expect(rl.prompt).toHaveBeenCalledTimes(1);
+    });
+
+    it('repaint forçado ignora linha stale de comando já aceito', async () => {
+        const rl = {
+            closed: false,
+            line: '/usage now',
+            setPrompt: vi.fn(),
+            prompt: vi.fn(),
+        };
+
+        scheduleTerminalPromptRedraw(rl, 'você› ', { force: true });
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(rl.setPrompt).toHaveBeenCalledWith('você› ');
+        expect(rl.prompt).toHaveBeenCalledTimes(1);
     });
 
     it('estaciona prompt normal durante continuação pós-resposta humana', () => {

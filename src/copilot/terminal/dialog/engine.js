@@ -82,6 +82,7 @@ import {
     buildUserPrompt,
     buildWaitingPrompt,
     clearInlineStatus,
+    deferTerminalIdlePromptRedraw,
     printExchange,
     println,
     scheduleTerminalPromptRedraw,
@@ -1352,6 +1353,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         }
         setBusy(false);
         if (readTerminalRuntimeControlState().dialogLoopActive) {
+            deferTerminalIdlePromptRedraw();
             markTerminalActivityIdle();
         }
         broadcastSse(

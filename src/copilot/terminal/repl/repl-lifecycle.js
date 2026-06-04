@@ -166,7 +166,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             })
             .finally(() => {
                 endTerminalRenderLock();
-                refreshPrompt();
+                scheduleTerminalPromptRedraw(rl, buildUserPrompt(), { force: true });
             });
     }
 
@@ -277,7 +277,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
                     await dispatchCmd(command.command, command.arg, command.rest, rl, injectServer, cleanup);
                 } finally {
                     endTerminalRenderLock();
-                    refreshPrompt();
+                    scheduleTerminalPromptRedraw(rl, buildUserPrompt(), { force: true });
                 }
                 return;
             }
@@ -317,7 +317,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             } finally {
                 endTerminalRenderLock();
                 if (isReadlineOpen(rl)) {
-                    scheduleTerminalPromptRedraw(rl, buildUserPrompt());
+                    scheduleTerminalPromptRedraw(rl, buildUserPrompt(), { force: true });
                 }
             }
             return;

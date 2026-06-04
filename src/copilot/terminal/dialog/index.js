@@ -13,6 +13,7 @@ export {
     buildUserPrompt,
     buildWaitingPrompt,
     clearInlineStatus,
+    deferTerminalIdlePromptRedraw,
     endTerminalRenderLock,
     isTerminalRenderLocked,
     parkTerminalPromptForContinuation,

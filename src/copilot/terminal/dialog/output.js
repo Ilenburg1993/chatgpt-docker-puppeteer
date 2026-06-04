@@ -40,6 +40,7 @@ export const PROMPT_WAITING = '     ';
 /** @type {number} */
 let _terminalRenderLockDepth = 0;
 /** @typedef {string | (() => string)} ScheduledPrompt */
+/** @typedef {{ force?: boolean }} TerminalPromptRedrawOptions */
 
 /**
  * @typedef {{
@@ -65,10 +66,16 @@ let _terminalRenderLockDepth = 0;
  * }} TerminalExclusiveTtyResult
  */
 
-/** @type {WeakMap<object, { prompt: ScheduledPrompt; immediate: NodeJS.Immediate }>} */
+/** @type {WeakMap<object, { prompt: ScheduledPrompt; force: boolean; immediate: NodeJS.Immediate }>} */
 const _scheduledPromptRedraws = new WeakMap();
 /** @type {WeakMap<object, { prompt: string; at: number }>} */
 const _lastPromptPaints = new WeakMap();
+/** @type {number} */
+let _terminalIdlePromptDeferredUntil = 0;
+/** @type {NodeJS.Timeout | null} */
+let _terminalIdlePromptDeferredTimer = null;
+/** @type {{ rl: { setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean }; prompt: ScheduledPrompt } | null} */
+let _terminalIdlePromptDeferredRequest = null;
 
 const ANSI_ESCAPE = String.fromCharCode(27);
 const ANSI_ESCAPE_PATTERN = new RegExp(`${ANSI_ESCAPE}\\[[0-?]*[ -/]*[@-~]`, 'g');
@@ -641,6 +648,17 @@ function resolvePromptForPaint(prompt) {
 }
 
 /**
+ * @returns {boolean}
+ */
+function hasActiveHumanInputPromptState() {
+    const runtime = readTerminalRuntimeState();
+    return Boolean(
+        runtime?.status === 'waiting_for_input' ||
+            (runtime?.pendingQuestion && runtime?.pendingQuestionKind && runtime.pendingQuestionKind !== 'ready'),
+    );
+}
+
+/**
  * @param {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean }} rl
  * @param {string} prompt
  * @param {{ force?: boolean }} [options]
@@ -685,6 +703,69 @@ function redrawPromptIfInteractive() {
 }
 
 /**
+ * @param {TerminalPromptRedrawOptions} options
+ * @returns {boolean}
+ */
+function shouldDeferTerminalIdlePromptRedraw(options = {}) {
+    if (options.force === true) return false;
+    if (_terminalIdlePromptDeferredUntil <= 0 || Date.now() >= _terminalIdlePromptDeferredUntil) return false;
+    if (getBusy() || hasActiveHumanInputPromptState()) return false;
+    return true;
+}
+
+/**
+ * @returns {void}
+ */
+function flushDeferredTerminalIdlePromptRedraw() {
+    const request = _terminalIdlePromptDeferredRequest;
+    _terminalIdlePromptDeferredRequest = null;
+    _terminalIdlePromptDeferredTimer = null;
+    _terminalIdlePromptDeferredUntil = 0;
+    if (!request || !isTerminalReadlineOpen(request.rl)) return;
+    if (getBusy() || hasActiveHumanInputPromptState()) return;
+    scheduleTerminalPromptRedraw(request.rl, request.prompt);
+}
+
+/**
+ * @param {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean }} rl
+ * @param {ScheduledPrompt} prompt
+ * @returns {void}
+ */
+function queueDeferredTerminalIdlePromptRedraw(rl, prompt) {
+    _terminalIdlePromptDeferredRequest = { rl, prompt };
+    const delayMs = Math.max(0, _terminalIdlePromptDeferredUntil - Date.now());
+    if (_terminalIdlePromptDeferredTimer) return;
+    _terminalIdlePromptDeferredTimer = setTimeout(flushDeferredTerminalIdlePromptRedraw, delayMs);
+    if (typeof _terminalIdlePromptDeferredTimer.unref === 'function') {
+        _terminalIdlePromptDeferredTimer.unref();
+    }
+}
+
+/**
+ * Adia brevemente o prompt idle depois de um turno materializado.
+ *
+ * O SDK pode entregar `assistant.message` e, poucos milissegundos depois, iniciar uma pergunta humana (`ask_user`).
+ * Sem esta janela, o terminal pinta `você›` e logo abaixo o card de pergunta, o que parece que a pergunta invadiu o
+ * prompt. Comandos explícitos usam `{ force: true }` e continuam repintando imediatamente.
+ *
+ * @param {number} [durationMs]
+ * @returns {void}
+ */
+export function deferTerminalIdlePromptRedraw(durationMs = 80) {
+    const until = Date.now() + Math.max(0, Number(durationMs) || 0);
+    if (until > _terminalIdlePromptDeferredUntil) {
+        _terminalIdlePromptDeferredUntil = until;
+    }
+    if (_terminalIdlePromptDeferredTimer) {
+        clearTimeout(_terminalIdlePromptDeferredTimer);
+        _terminalIdlePromptDeferredTimer = null;
+    }
+    if (_terminalIdlePromptDeferredRequest) {
+        queueDeferredTerminalIdlePromptRedraw(_terminalIdlePromptDeferredRequest.rl, _terminalIdlePromptDeferredRequest.prompt);
+    }
+}
+
+/**
  * Abre uma separação física entre o prompt vivo e um bloco durável.
  *
  * A limpeza ANSI deixa a tela real correta, mas logs plain e alguns terminais integrados ainda podem preservar a linha
@@ -706,13 +787,14 @@ function breakPromptLineBeforeDurableOutput() {
  *
  * @param {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean } | null | undefined} rl
  * @param {string} [prompt]
+ * @param {TerminalPromptRedrawOptions} [options]
  * @returns {void}
  */
-export function redrawTerminalPrompt(rl, prompt = buildUserPrompt()) {
+export function redrawTerminalPrompt(rl, prompt = buildUserPrompt(), options = {}) {
     if (!rl || !isTerminalReadlineOpen(rl)) return;
-    if (shouldSkipDuplicatePromptPaint(rl, prompt)) return;
+    if (options.force !== true && shouldSkipDuplicatePromptPaint(rl, prompt)) return;
     clearTerminalLine();
-    paintTerminalPrompt(rl, prompt);
+    paintTerminalPrompt(rl, prompt, { force: options.force === true });
 }
 
 /**
@@ -725,25 +807,32 @@ export function redrawTerminalPrompt(rl, prompt = buildUserPrompt()) {
  *
  * @param {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean } | null | undefined} rl
  * @param {ScheduledPrompt} [prompt]
+ * @param {TerminalPromptRedrawOptions} [options]
  * @returns {void}
  */
-export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt()) {
+export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt(), options = {}) {
     if (!isTerminalReadlineOpen(rl)) return;
+    if (shouldDeferTerminalIdlePromptRedraw(options)) {
+        queueDeferredTerminalIdlePromptRedraw(rl, prompt);
+        return;
+    }
     const key = /** @type {object} */ (rl);
     const current = _scheduledPromptRedraws.get(key);
     if (current) {
         current.prompt = prompt;
+        current.force = current.force || options.force === true;
         return;
     }
     const state = {
         prompt,
+        force: options.force === true,
         immediate: setImmediate(() => {
             _scheduledPromptRedraws.delete(key);
             if (_terminalRenderLockDepth > 0 || !isTerminalReadlineOpen(rl)) return;
             const inputLine = /** @type {{ line?: string }} */ (rl).line;
-            if (typeof inputLine === 'string' && inputLine.length > 0) return;
+            if (state.force !== true && typeof inputLine === 'string' && inputLine.length > 0) return;
             const nextPrompt = typeof state.prompt === 'function' ? state.prompt() : state.prompt;
-            redrawTerminalPrompt(rl, getBusy() ? buildWaitingPrompt() : nextPrompt);
+            redrawTerminalPrompt(rl, getBusy() ? buildWaitingPrompt() : nextPrompt, { force: state.force });
         }),
     };
     if (typeof state.immediate.unref === 'function') state.immediate.unref();
@@ -1055,6 +1144,12 @@ export function clearInlineStatus() {
 export function resetStatusRowState() {
     _statusRowsReserved = 0;
     _terminalPromptParkedUntil = 0;
+    _terminalIdlePromptDeferredUntil = 0;
+    _terminalIdlePromptDeferredRequest = null;
+    if (_terminalIdlePromptDeferredTimer) {
+        clearTimeout(_terminalIdlePromptDeferredTimer);
+        _terminalIdlePromptDeferredTimer = null;
+    }
 }
 
 /**

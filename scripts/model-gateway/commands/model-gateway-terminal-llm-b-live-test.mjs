@@ -4241,7 +4241,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'ux-no-durable-output-inside-default-prompt',
-            pass: !/voc[eê]\[[^\n\r]*\]›[^\n\r]*(?:Ferramenta|Arquivo|Conclu[ií]do|Falhou|Turno|Evento|Uso do modelo)\b/iu.test(
+            pass: !/voc[eê]\[[^\n\r]*\]›\s{2,}(?:Ferramenta|Arquivo|Conclu[ií]do|Falhou|Turno|Evento|Uso do modelo)\b/iu.test(
                 plain,
             ),
             detail: 'durable operational rows did not render inside the default idle prompt line',
@@ -5824,11 +5824,11 @@ async function main() {
                 });
                 return;
             }
-            write('/usage now');
-            write('/activity 12');
-            scenarioPlainOffset = stripAnsi(raw).length;
-            scenarioSent = true;
-            write(buildScenarioPrompt(liveScenario));
+            startPromptSynchronizedCommandSequence(['/usage now', '/activity 12'], () => {
+                scenarioPlainOffset = stripAnsi(raw).length;
+                scenarioSent = true;
+                write(buildScenarioPrompt(liveScenario));
+            });
         }
         if (
             !answerSent &&

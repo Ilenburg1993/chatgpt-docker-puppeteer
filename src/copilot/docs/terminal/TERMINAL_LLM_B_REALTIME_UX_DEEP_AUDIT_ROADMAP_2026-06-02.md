@@ -6217,3 +6217,64 @@
 - [ ] Próxima frente UX: auditar a sincronização entre comandos injetados pelo harness e prompt
       real, porque o log plain ainda mostra comandos como `/usage now` colados ao prompt em alguns
       trechos; confirmar se é artefato de `script`/ANSI ou desalinhamento visível no terminal humano.
+- [x] Auditoria inicial: o primeiro `/usage now` com prompt na mesma linha é esperado em TTY, pois
+      representa o comando digitado no prompt humano; porém `/activity 12` e o prompt do cenário
+      eram enviados imediatamente depois, antes de o REPL voltar ao prompt.
+- [x] Decisão: lives canônicas devem dirigir o terminal como operador humano, aguardando prompt entre
+      comandos de pré-diagnóstico. Rajadas rápidas continuam úteis em testes de stress, mas não no
+      baseline estético usado para comparar UX real.
+- [x] Correção aplicada: o caminho canônico do runner passou a usar
+      `startPromptSynchronizedCommandSequence(['/usage now', '/activity 12'], ...)` antes de enviar
+      o prompt do cenário, reaproveitando o mecanismo já usado por lives BYOK/no-PR.
+- [x] Achado crítico exposto pela live sincronizada: após `/usage now`, o REPL podia não repintar o
+      prompt quando o comando terminava dentro da janela curta de dedupe de prompt. O terminal seguia
+      aceitando input, mas a superfície humana parecia parada, sem linha pronta.
+- [x] Decisão UX: dedupe continua válido para eventos assíncronos, streaming, tools e pergunta
+      humana; conclusão de comando explícito (`/...`) é uma fronteira de interação humana e deve
+      forçar repaint do prompt mesmo que o texto seja idêntico ao anterior.
+- [x] Correção aplicada: `redrawTerminalPrompt()` e `scheduleTerminalPromptRedraw()` ganharam opção
+      `{ force: true }`; `repl-lifecycle.js` usa essa opção apenas após `dispatchCmd()` explícito e
+      no caminho de comando imediato/steer.
+- [x] Teste unitário: `test_dialog_output_inline_status.spec.js` cobre repaint forçado de prompt
+      idêntico após comando explícito rápido, preservando o dedupe default.
+- [x] Achado adicional da live sincronizada:
+      `artifacts/terminal-live/2026-06-04T06-13-16-980Z/summary.md` falhou apenas
+      `ux-no-durable-output-inside-default-prompt`. O log mostrou um prompt idle vazio
+      `você[kilo-auto…/high]›` imediatamente antes do card `Pergunta ao operador`, porque o fim do
+      turno materializado repintou prompt milissegundos antes do SDK iniciar `ask_user`.
+- [x] Decisão UX: após um turno materializado, prompt idle pode esperar uma janela curtíssima para
+      permitir chegada de `ask_user`/input estruturado; prompts de comando explícito continuam
+      imediatos via `{ force: true }`, e prompt de pergunta humana não deve ser adiado quando a
+      pergunta já estiver ativa.
+- [x] Correção aplicada: `deferTerminalIdlePromptRedraw()` foi adicionada ao renderer central,
+      exportada pelo barrel `dialog/index.js` e chamada no final de turno em `dialog/engine.js` antes
+      de `markTerminalActivityIdle()`. A função adia apenas prompt idle não-forçado e reaproveita a
+      mesma fila de redraw para não criar uma segunda superfície de prompt.
+- [x] Teste unitário: `test_dialog_output_inline_status.spec.js` cobre que prompt idle pós-turno é
+      adiado, enquanto repaint forçado de comando explícito segue imediato.
+- [x] Achado adicional: em comandos rápidos, `readline` pode manter `rl.line` preenchido por um tick
+      depois de emitir o evento `line`. O scheduler respeitava esse valor mesmo com `{ force: true }`,
+      então o prompt pós-comando podia sumir e o harness enviava o próximo comando sem superfície
+      visual pronta.
+- [x] Correção aplicada: repaint forçado ignora `rl.line` stale apenas dentro do redraw agendado com
+      `{ force: true }`. Redraw normal continua protegendo input humano parcial.
+- [x] Teste unitário: `test_dialog_output_inline_status.spec.js` cobre repaint forçado com
+      `rl.line='/usage now'`.
+- [x] Achado no contrato live: `ux-no-durable-output-inside-default-prompt` tinha falso positivo
+      quando o prompt do usuário continha texto longo com palavras como `ferramenta`; o critério foi
+      estreitado para labels operacionais alinhados (`›  Ferramenta`, `›  Uso do modelo` etc.).
+- [x] Live canônica pós-deferência de prompt:
+  - `artifacts/terminal-live/2026-06-04T06-21-55-432Z/summary.md`.
+  - Resultado: `Status: PASS`; passaram deltas, tools, pergunta humana, resposta, pós-ask,
+    export/SSE, `ux-no-durable-output-inside-default-prompt`, `no-prompt-double-render`,
+    `no-terminal-errors` e `clean-quit`.
+- [x] Achado visual remanescente: apesar do PASS, o prelude ainda mostrou `/activity 12` sem prompt
+      no plain log. O problema fica restrito ao harness/prelude e não quebrou o fluxo humano central
+      de deltas, tools e pergunta.
+- [x] Tentativa rejeitada: atrasar o repaint pós-comando para o próximo macrotask em
+      `repl-lifecycle.js` gerou regressão pior:
+      `artifacts/terminal-live/2026-06-04T06-24-16-588Z/summary.md` falhou
+      `no-prompt-double-render` com `você› você›` antes do export. A mudança foi revertida.
+- [ ] Próxima frente UX: tratar prelude/diagnósticos do harness como fila de comandos com critério
+      próprio, sem alterar novamente o repaint canônico do REPL até haver evidência mais clara do
+      comportamento humano real.
