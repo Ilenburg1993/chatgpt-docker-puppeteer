@@ -219,6 +219,14 @@ function compactSummaryText(value, max = 36) {
 
 /**
  * @param {string | null | undefined} value
+ * @returns {string}
+ */
+function compactOneLine(value) {
+    return String(value ?? '').replace(/\s+/gu, ' ').trim();
+}
+
+/**
+ * @param {string | null | undefined} value
  * @returns {boolean}
  */
 function isLikelyInternalId(value) {
@@ -388,6 +396,28 @@ function renderAssistantMessageProtocolKindLabel(kind) {
     if (normalized === 'delta') return 'Trecho de resposta';
     if (normalized === 'reasoning') return 'Raciocínio';
     return normalized.replace(/[._-]+/gu, ' ') || 'Mensagem';
+}
+
+/**
+ * @param {string} infoType
+ * @param {string} message
+ * @returns {{ label: string; detail: string }}
+ */
+function renderSdkSessionInfoForOperator(infoType, message) {
+    const type = String(infoType ?? 'info').trim() || 'info';
+    const text = compactOneLine(message);
+    if (type === 'configuration') {
+        const disabledTools = text.match(/Disabled tools:\s*(?<tools>.+)$/iu)?.groups?.['tools']?.trim();
+        if (disabledTools) {
+            return {
+                label: 'Config SDK',
+                detail: `tools nativas desativadas · ${compactSummaryText(disabledTools, 92)}`,
+            };
+        }
+        return { label: 'Config SDK', detail: compactSummaryText(text || 'configuração atualizada', 112) };
+    }
+    if (type === 'model') return { label: 'Modelo SDK', detail: compactSummaryText(text || 'modelo atualizado', 112) };
+    return { label: 'Info SDK', detail: `${type} · ${compactSummaryText(text || '(sem mensagem)', 104)}` };
 }
 
 /**
@@ -718,7 +748,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             },
         );
         if (shouldPrintSessionNarration('verbose')) {
-            println(terminalThemeRow('SDK info', `${infoType} · ${message}`));
+            const renderedInfo = renderSdkSessionInfoForOperator(infoType, message);
+            println(terminalThemeRow(renderedInfo.label, renderedInfo.detail));
             if (evt?.url) println(terminalThemeRow('URL', String(evt.url), { role: 'command' }));
         }
         broadcastSse(
@@ -1116,7 +1147,9 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        if (shouldPrintSessionNarration('verbose')) println(`  \x1b[90m🪪 Título da sessão: ${title}\x1b[0m`);
+        if (shouldPrintSessionNarration('verbose')) {
+            println(terminalThemeRow('Título', compactSummaryText(compactOneLine(title), 104), { role: 'muted' }));
+        }
         broadcastSse('session.title_changed', withSdkSessionSseEnvelope({ title }, 'sdk/session.title_changed'));
     };
 
@@ -1204,18 +1237,9 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             recordHistory: false,
         });
         if (shouldPrintSessionNarration('verbose')) {
-            const sdkLabel = sdkCount === null ? 'contagem SDK n/d' : `${sdkCount} SDK`;
-            const localLabel =
-                localCount > 0 ? `ferramentas locais ativas: ${localCount} (/tools)` : 'sem ferramentas locais ativas';
-            println(
-                terminalThemeRow(
-                    'Ferramentas SDK',
-                    `Ferramentas dinâmicas do SDK atualizadas: ${sdkLabel} · ${localLabel}`,
-                    {
-                        role: 'muted',
-                    },
-                ),
-            );
+            const sdkLabel = sdkCount === null ? 'SDK sem contagem' : `SDK dinâmicas ${sdkCount}`;
+            const localLabel = localCount > 0 ? `locais ${localCount} em /tools` : 'sem ferramentas locais';
+            println(terminalThemeRow('Ferramentas', `${sdkLabel} · ${localLabel}`, { role: 'muted' }));
         }
         broadcastSse(
             'session.tools_updated',
@@ -1240,7 +1264,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             recordHistory: false,
         });
         if (shouldPrintSessionNarration('verbose'))
-            println(terminalThemeRow('Skills SDK', `Skills SDK: ${enabled}/${count} habilitadas`, { role: 'muted' }));
+            println(terminalThemeRow('Skills', `${enabled}/${count} habilitadas`, { role: 'muted' }));
         broadcastSse(
             'session.skills_loaded',
             withSdkSessionSseEnvelope({ count, enabled }, 'sdk/session.skills_loaded'),

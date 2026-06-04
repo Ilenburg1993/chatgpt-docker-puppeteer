@@ -4972,3 +4972,36 @@
 - [ ] Próxima lacuna UX: quando uma tool fora de cenário é detectada em live/harness, a tela
       humana deveria explicar em português: `Cenário live interrompido: tool fora do contrato`,
       com lista curta de permitidas e comando de retentativa.
+
+### 12.25 Boot verbose compacto para configuração, skills, tools e título
+
+- [x] Auditoria live: o boot em `TERMINAL_DISPLAY_PRESET=full` ainda podia exibir linhas
+      visualmente ruidosas:
+  - `SDK info configuration · Disabled tools: ...`;
+  - `Skills SDK · Skills SDK: ...`;
+  - `Ferramentas SDK · Ferramentas dinâmicas do SDK atualizadas: ...`;
+  - `Título da sessão: <prompt completo enorme>`.
+- [x] Decisão UX: preset `full` pode mostrar eventos de sessão, mas não deve despejar strings
+      cruas do SDK na primeira tela. A cópia default deve ser compacta, alinhada e em português;
+      SSE/export/raw continuam sendo a trilha técnica completa.
+- [x] Implementação:
+  - `session.info configuration` agora imprime `Config SDK · tools nativas desativadas · ...`;
+  - título de sessão usa `terminalThemeRow('Título', ...)` e compactação de uma linha;
+  - skills imprimem `Skills · <enabled>/<count> habilitadas`;
+  - tools imprimem `Ferramentas · SDK dinâmicas <n> · locais <n> em /tools`.
+- [x] Testes unitários:
+  - `test_terminal_sdk_session_events.spec.js` cobre os novos textos de skills/tools;
+  - o teste `compacta config e título de sessão na narrativa verbose` bloqueia retorno de
+        `SDK info`, `Disabled tools:` e `Título da sessão:`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/events/sdk-session-events.js`.
+  - `npx eslint src/copilot/terminal/events/sdk-session-events.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js`.
+  - `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events.spec.js`.
+- [x] Live PTY diagnóstica passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-boot-compact-session-events-20260603-2253`.
+  - Resultado: PASS em 29/29 critérios.
+  - Busca no log plain confirmou ausência de `SDK info`, `Disabled tools:`, `Título da sessão:`,
+        `Skills SDK:` e `Ferramentas dinâmicas do SDK atualizadas`.
+- [ ] Próxima lacuna: `/events` default ainda mostra repetições de `Atividade`/`Ferramenta`
+      quando o ciclo tem muitos I/O locais próximos. Avaliar agregação por janela sem afetar
+      `/events --raw`.
