@@ -86,10 +86,10 @@ export function renderTerminalDiffPreview(diff, options = {}) {
     if (!delta?.command) return jsFallback('delta ausente');
 
     const colorMode = options.color ?? (process.stdout.isTTY ? 'always' : 'never');
+    if (colorMode === 'never') return jsFallback('diff externo desativado sem cor');
     const args = ['--paging=never', '--color-only'];
     if (colorMode !== 'always') args.push('--no-gitconfig');
-    if (colorMode === 'never') args.push('--color=never');
-    else args.push('--dark');
+    args.push('--dark');
 
     const result = spawnSync(delta.command, args, {
         encoding: 'utf8',

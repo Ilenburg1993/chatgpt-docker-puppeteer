@@ -206,6 +206,8 @@ function renderFullHelp({ injectPort, println }) {
         { command: '/gh pr diff <n> [--plain]', description: 'preview de patch de PR com o mesmo contrato de diff' },
         { command: '/menu picker', description: 'mostra plano seguro; não abre TUI sem ação explícita' },
         { command: '/menu picker --interactive', description: 'abre fzf/gum somente com TTY exclusivo e sem pergunta pendente' },
+        { command: 'npm run terminal:aux-libs:smoke', description: 'smoke read-only de renderers externos e fallbacks JS' },
+        { command: 'npm --silent run terminal:aux-libs:smoke -- --json', description: 'JSON pipeável do smoke sem banner do npm' },
         { command: 'atuin/zoxide', description: 'detectados apenas; adiados por histórico/cwd pessoal e estado fora do produto' },
     ]);
     renderHelpSection(println, 'Interações humanas e SDK', [

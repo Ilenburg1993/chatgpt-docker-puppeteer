@@ -117,6 +117,7 @@ function printTerminalLibsCompact(println, refresh) {
     }
     println('');
     println(terminalThemeRow('Detalhes', '/terminal libs detail · /terminal libs json · /terminal libs refresh'));
+    println(terminalThemeRow('Smoke', 'npm run terminal:aux-libs:smoke · npm --silent run terminal:aux-libs:smoke -- --json'));
     println('');
 }
 
@@ -164,6 +165,15 @@ function printTerminalLibsDetail(println, refresh) {
             );
         }
     }
+    println('');
+    printRows(
+        println,
+        [
+            ['Smoke', 'npm run terminal:aux-libs:smoke'],
+            ['JSON limpo', 'npm --silent run terminal:aux-libs:smoke -- --json'],
+        ],
+        { width: 12 },
+    );
     println('');
 }
 

@@ -36,4 +36,12 @@ describe('terminal/capabilities/diff-preview', () => {
         expect(rendered.output).toContain('linhas omitidas');
         expect(rendered.output).not.toContain('+line 19');
     });
+
+    it('mantém fallback JS quando saída sem cor é exigida', () => {
+        const rendered = renderTerminalDiffPreview(SAMPLE_DIFF, { color: 'never' });
+
+        expect(rendered.renderer).toBe('js');
+        expect(rendered.fallbackReason).toMatch(/delta ausente|sem cor/u);
+        expect(rendered.output).toContain('diff --git a/a.txt b/a.txt');
+    });
 });

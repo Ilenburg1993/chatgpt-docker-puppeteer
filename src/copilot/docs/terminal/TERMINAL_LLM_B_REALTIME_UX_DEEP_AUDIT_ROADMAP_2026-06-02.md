@@ -6951,4 +6951,26 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-help-detail-20260604 --timeout-ms 140000`;
   - artefato: `artifacts/terminal-live/2026-06-04T15-52-52-818Z/summary.md`;
   - resultado: PASS em 20/20 critérios, incluindo `ux-cycle-terminal-libs-detail`.
-- [ ] Próxima lacuna: avaliar docs de pipe seguro para `jq`/`yq` e smoke não interativo de previews com `PATH` vazio/real.
+- [x] Smoke não interativo de previews implementado:
+  - `scripts/model-gateway/commands/model-gateway-terminal-aux-libs-smoke.mjs`;
+  - `npm run terminal:aux-libs:smoke`;
+  - `npm --silent run terminal:aux-libs:smoke -- --json`;
+  - `make terminal-aux-libs-smoke`.
+- [x] Achado corrigido pelo smoke: `delta` recebia flag inválida quando o adapter era chamado com
+      `color=never`; agora `renderTerminalDiffPreview()` usa fallback JS nesses casos e reserva
+      `delta` para saída colorida explícita.
+- [x] Smoke executado:
+  - `npm run terminal:aux-libs:smoke`;
+  - `node scripts/model-gateway/commands/model-gateway-terminal-aux-libs-smoke.mjs --json | jq -r '.ok, (.checks[] | [.id,.status,.renderer,.expected] | @tsv)'`;
+  - `npm --silent run terminal:aux-libs:smoke -- --json | jq -r '.ok'`.
+- [x] Smoke exposto na UX:
+  - `/help full` mostra `npm run terminal:aux-libs:smoke` e o modo JSON pipeável com `npm --silent`;
+  - `/terminal libs` e `/terminal libs detail` mostram `Smoke` e `JSON limpo`.
+- [x] Make target validado:
+  - `make terminal-aux-libs-smoke`.
+- [x] Live UX repetida:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-smoke-command-20260604 --timeout-ms 140000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T16-00-21-072Z/summary.md`;
+  - resultado: PASS em 20/20 critérios.
+- [ ] Próxima lacuna: validar visualmente TUI completa `fzf`/`gum` quando for aceitável tomar o TTY
+      real, mantendo o fluxo filtrado como prova automatizada.

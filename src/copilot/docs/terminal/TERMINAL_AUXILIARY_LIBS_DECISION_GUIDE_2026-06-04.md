@@ -326,7 +326,7 @@ Decisão:
 - [x] Fase D.1: `bat`/`batcat` sem pager.
 - [x] Fase D.2: fallback JS.
 - [x] Fase D.3: detecção de binário/controle.
-- [ ] Fase D.4: comando de smoke local para provar fallback em `PATH` vazio e renderer real quando disponível.
+- [x] Fase D.4: comando de smoke local para provar fallback em `PATH` vazio e renderer real quando disponível.
 
 ### Faixa E: Markdown
 
@@ -340,7 +340,7 @@ Decisão:
 - [x] Fase F.1: `delta` por stdin.
 - [x] Fase F.2: fallback JS.
 - [x] Fase F.3: `/git diff` e `/gh pr diff`.
-- [ ] Fase F.4: documentar relação entre diff bruto canônico e apresentação colorida.
+- [x] Fase F.4: documentar relação entre diff bruto canônico e apresentação colorida.
 
 ### Faixa G: Structured preview
 
@@ -348,7 +348,7 @@ Decisão:
 - [x] Fase G.2: `yq` YAML.
 - [x] Fase G.3: flags de segurança em `yq`.
 - [x] Fase G.4: exemplos humanos de query em `/terminal libs detail`.
-- [ ] Fase G.5: docs de pipe seguro para operador e LLM.
+- [x] Fase G.5: docs de pipe seguro para operador e LLM.
 
 ### Faixa H: Picker e TTY
 
@@ -392,10 +392,27 @@ Decisão:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-help-detail-20260604 --timeout-ms 140000`;
   - artefato: `artifacts/terminal-live/2026-06-04T15-52-52-818Z/summary.md`;
   - resultado: PASS em 20/20 critérios, incluindo `ux-cycle-terminal-libs-detail`.
+- [x] Smoke read-only criado:
+  - `npm run terminal:aux-libs:smoke`;
+  - `npm --silent run terminal:aux-libs:smoke -- --json` para pipe JSON sem banner do npm;
+  - `make terminal-aux-libs-smoke`;
+  - o smoke prova fallbacks com `PATH` vazio e renderers reais com `PATH` do operador.
+- [x] Bug corrigido no adapter `delta`:
+  - quando a superfície exige `color=never`, o adapter não passa mais flag inválida ao `delta`;
+  - nesses casos, o fallback JS é usado de propósito para preservar saída sem ANSI;
+  - quando a intenção é exercitar `delta`, o smoke usa `color=always`.
+- [x] Validação final do smoke:
+  - `npm run terminal:aux-libs:smoke` passou;
+  - `npm --silent run terminal:aux-libs:smoke -- --json | jq -r '.ok'` retornou `true`;
+  - `make terminal-aux-libs-smoke` passou.
+- [x] Live PTY repetida após expor o smoke em `/help full` e `/terminal libs detail`:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-smoke-command-20260604 --timeout-ms 140000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T16-00-21-072Z/summary.md`;
+  - resultado: PASS em 20/20 critérios.
 
 ## 9. Próxima execução recomendada
 
 1. Planejar validação visual assistida de TUI completa (`fzf` e `gum` quando instalado).
-2. Avaliar docs de pipe seguro para `jq`/`yq` em `/terminal libs detail` e `/help full`.
+2. Refinar docs de pipe seguro para `jq`/`yq` em comandos específicos, se surgirem novas superfícies.
 3. Avaliar `/help full --glow` apenas como comando explícito, sem pager automático.
-4. Criar smoke não interativo de previews para `PATH` vazio e `PATH` real.
+4. Expandir smoke para cenários de erro/truncamento se a próxima rodada de UX pedir.

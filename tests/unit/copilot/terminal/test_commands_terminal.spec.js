@@ -91,6 +91,7 @@ describe('terminal/commands/terminal', () => {
         expect(ctx.output()).toContain('Gum');
         expect(ctx.output()).toContain('aceita com guardas');
         expect(ctx.output()).toContain('/terminal libs detail');
+        expect(ctx.output()).toContain('terminal:aux-libs:smoke');
     });
 
     it('mostra detail com path, docs, risco e fallback', () => {
@@ -108,6 +109,7 @@ describe('terminal/commands/terminal', () => {
         expect(ctx.output()).toContain('/menu picker --interactive');
         expect(ctx.output()).toContain('ConversationHub');
         expect(ctx.output()).toContain('adiado; não ler histórico externo');
+        expect(ctx.output()).toContain('JSON limpo');
     });
 
     it('emite JSON estruturado para LLMs e scripts', () => {
