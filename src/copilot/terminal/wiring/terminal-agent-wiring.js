@@ -27,9 +27,10 @@ import {
 import { log } from '#copilot/observability';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { getHubSessionId } from '../../presentation/state/index.js';
-import { broadcastSse, ensureDialogLoop, println } from '../dialog/index.js';
+import { broadcastSse, ensureDialogLoop, println, sendTurn } from '../dialog/index.js';
 import {
     buildEmptyAfterUserInputRecoveryRows,
+    EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE,
     createTerminalHandledAgentEventsSet,
     createTerminalPassthroughAgentEventsSet,
     isTerminalAssistantTranscriptCovered,
@@ -60,6 +61,7 @@ const AUTO_RESTART_DIALOG_STOP_REASONS = new Set(['watchdog_restart', 'model_sto
 const EMITTER_DIALOG_TURN_END = 'dialog.turn_end';
 const DIALOG_LOOP_CHANGED_DEDUP_WINDOW_MS = 250;
 const EMPTY_DIALOG_AFTER_USER_INPUT_WINDOW_MS = 30_000;
+const EMPTY_DIALOG_AFTER_USER_INPUT_AUTO_RECOVERY_MAX_KEYS = 64;
 
 /**
  * @template {Record<string, unknown>} T
@@ -146,6 +148,52 @@ export function shouldWarnEmptyDialogTurnAfterUserInput(input) {
             ? Math.max(0, input.windowMs)
             : EMPTY_DIALOG_AFTER_USER_INPUT_WINDOW_MS;
     return now >= lastUserInputCompletedAt && now - lastUserInputCompletedAt <= windowMs;
+}
+
+/**
+ * @param {{
+ *     requestId?: string | null;
+ *     turnId?: string | number | null;
+ *     answeredAt?: number | null;
+ * }} input
+ * @returns {string}
+ */
+export function createEmptyAfterUserInputAutoRecoveryKey(input) {
+    const requestId = typeof input.requestId === 'string' && input.requestId.trim().length > 0 ? input.requestId.trim() : null;
+    if (requestId) return `request:${requestId}`;
+    const turnId =
+        typeof input.turnId === 'string' || typeof input.turnId === 'number' ? String(input.turnId).trim() : '';
+    if (turnId) return `turn:${turnId}`;
+    const answeredAt = typeof input.answeredAt === 'number' && Number.isFinite(input.answeredAt) ? input.answeredAt : Date.now();
+    return `answer-window:${Math.floor(answeredAt / EMPTY_DIALOG_AFTER_USER_INPUT_WINDOW_MS)}`;
+}
+
+/**
+ * @param {{
+ *     reply?: string | null;
+ *     replyAlreadyMaterialized?: boolean;
+ *     lastUserInputCompletedAt?: number | null;
+ *     now?: number;
+ *     windowMs?: number;
+ *     requestId?: string | null;
+ *     turnId?: string | number | null;
+ *     attemptedKeys?: ReadonlySet<string>;
+ * }} input
+ * @returns {{ attempt: true; key: string } | { attempt: false; key: string | null; reason: string }}
+ */
+export function shouldAttemptEmptyAfterUserInputAutoRecovery(input) {
+    if (!shouldWarnEmptyDialogTurnAfterUserInput(input)) {
+        return { attempt: false, key: null, reason: 'not_empty_after_recent_user_input' };
+    }
+    const key = createEmptyAfterUserInputAutoRecoveryKey({
+        requestId: input.requestId ?? null,
+        turnId: input.turnId ?? null,
+        answeredAt: input.lastUserInputCompletedAt ?? null,
+    });
+    if (input.attemptedKeys?.has(key)) {
+        return { attempt: false, key, reason: 'already_attempted' };
+    }
+    return { attempt: true, key };
 }
 
 /**
@@ -436,6 +484,8 @@ export function registerAgentEventListeners(printBanner) {
     let lastDialogLoopChangedSse = null;
     /** @type {{ at: number; answerPreview: string | null; requestId: string | null } | null} */
     let lastUserInputCompleted = null;
+    /** @type {Set<string>} */
+    const emptyAfterUserInputAutoRecoveryKeys = new Set();
 
     agentEvents.on(
         EMITTER_USER_INPUT_COMPLETED,
@@ -482,6 +532,14 @@ export function registerAgentEventListeners(printBanner) {
             const { envelope, reply, turnId, replyAlreadyMaterialized } = createDialogTurnEndSseEnvelope(evt);
             broadcastSse('dialog.turn_end', envelope);
             if (!reply.trim()) {
+                const autoRecovery = shouldAttemptEmptyAfterUserInputAutoRecovery({
+                    reply,
+                    replyAlreadyMaterialized,
+                    lastUserInputCompletedAt: lastUserInputCompleted?.at ?? null,
+                    now: Date.now(),
+                    requestId: lastUserInputCompleted?.requestId ?? null,
+                    turnId,
+                });
                 if (
                     shouldWarnEmptyDialogTurnAfterUserInput({
                         reply,
@@ -497,6 +555,66 @@ export function registerAgentEventListeners(printBanner) {
                     ]
                         .filter(Boolean)
                         .join(' · ');
+                    if (autoRecovery.attempt) {
+                        emptyAfterUserInputAutoRecoveryKeys.add(autoRecovery.key);
+                        if (emptyAfterUserInputAutoRecoveryKeys.size > EMPTY_DIALOG_AFTER_USER_INPUT_AUTO_RECOVERY_MAX_KEYS) {
+                            const oldestKey = emptyAfterUserInputAutoRecoveryKeys.values().next().value;
+                            if (typeof oldestKey === 'string') emptyAfterUserInputAutoRecoveryKeys.delete(oldestKey);
+                        }
+                        println(
+                            [
+                                '',
+                                `  ${terminalThemeBadge('warn', 'RECUPERANDO')} ${terminalThemeText('warn', 'Continuação pós-pergunta vazia; tentando retomar automaticamente uma vez')}`,
+                                terminalThemeRow('Ação', 'continuação enfileirada sem repetir a pergunta humana', {
+                                    role: 'command',
+                                    width: 11,
+                                }),
+                            ].join('\n'),
+                        );
+                        recordTerminalActivity('turn', 'Recuperando continuação pós-pergunta vazia', {
+                            detail,
+                            severity: 'warn',
+                            source: 'dialog.turn_end',
+                            updateCurrent: false,
+                        });
+                        broadcastSse(
+                            'dialog.empty_after_user_input.auto_recovery',
+                            withTerminalAgentSseEnvelope(
+                                {
+                                    turnId,
+                                    detail,
+                                    requestId: lastUserInputCompleted?.requestId ?? null,
+                                    recoveryKey: autoRecovery.key,
+                                    resumeMessage: EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE,
+                                },
+                                'terminal-agent-wiring/dialog.empty_after_user_input.auto_recovery',
+                            ),
+                        );
+                        setImmediate(() => {
+                            void sendTurn(EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE, 'user').catch((error) => {
+                                const message = error instanceof Error ? error.message : String(error);
+                                recordTerminalActivity('error', 'Recuperação pós-pergunta falhou ao enfileirar', {
+                                    detail: message,
+                                    severity: 'error',
+                                    source: 'dialog.turn_end',
+                                    updateCurrent: false,
+                                });
+                                broadcastSse(
+                                    'dialog.empty_after_user_input.auto_recovery_failed',
+                                    withTerminalAgentSseEnvelope(
+                                        {
+                                            turnId,
+                                            requestId: lastUserInputCompleted?.requestId ?? null,
+                                            recoveryKey: autoRecovery.key,
+                                            message,
+                                        },
+                                        'terminal-agent-wiring/dialog.empty_after_user_input.auto_recovery_failed',
+                                    ),
+                                );
+                            });
+                        });
+                        return;
+                    }
                     const recoveryRows = buildEmptyAfterUserInputRecoveryRows({
                         detail,
                         turnId,

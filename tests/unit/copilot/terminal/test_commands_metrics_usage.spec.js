@@ -366,7 +366,8 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('Janela de contexto');
         expect(ctx.output()).not.toContain('Context window');
         expect(ctx.output()).toContain('Vínculo');
-        expect(ctx.output()).toContain('runtime, SDK e hub conectados');
+        expect(ctx.output()).toContain('ambiente, SDK e hub conectados');
+        expect(ctx.output()).not.toContain('runtime, SDK e hub conectados');
         expect(ctx.output()).not.toContain('runtime-456789…');
         expect(ctx.output()).not.toContain('runtime-4567890123456789012345');
         expect(ctx.output()).toContain('/usage now detail');
@@ -389,7 +390,8 @@ describe('commands/metrics + usage', () => {
         cmdUsage({ println: ctx.println }, 'now --runtime alt');
 
         expect(ctx.output()).toContain('Vínculo');
-        expect(ctx.output()).toContain('runtime, SDK e hub conectados');
+        expect(ctx.output()).toContain('ambiente, SDK e hub conectados');
+        expect(ctx.output()).not.toContain('runtime, SDK e hub conectados');
         expect(ctx.output()).toContain('SDK interativo');
         expect(ctx.output()).toContain('gpt-4.1-mini');
         expect(ctx.output()).not.toContain('interactive');

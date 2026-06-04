@@ -141,4 +141,66 @@ describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
             }),
         ).toBe(false);
     });
+
+    it('gera chave estavel para recuperação automática pós-pergunta vazia', async () => {
+        const mod = await import('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js');
+
+        expect(
+            mod.createEmptyAfterUserInputAutoRecoveryKey({
+                requestId: ' ask-request-123 ',
+                turnId: 'turn-ignored',
+                answeredAt: 60_000,
+            }),
+        ).toBe('request:ask-request-123');
+        expect(
+            mod.createEmptyAfterUserInputAutoRecoveryKey({
+                requestId: null,
+                turnId: 'turn-7',
+                answeredAt: 60_000,
+            }),
+        ).toBe('turn:turn-7');
+        expect(
+            mod.createEmptyAfterUserInputAutoRecoveryKey({
+                requestId: null,
+                turnId: null,
+                answeredAt: 60_000,
+            }),
+        ).toBe('answer-window:2');
+    });
+
+    it('tenta recuperação automática pós-pergunta uma única vez por chave', async () => {
+        const mod = await import('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js');
+        const attemptedKeys = new Set(['request:already-used']);
+
+        expect(
+            mod.shouldAttemptEmptyAfterUserInputAutoRecovery({
+                reply: '',
+                lastUserInputCompletedAt: 1_000,
+                now: 2_000,
+                windowMs: 5_000,
+                requestId: 'ask-request-123',
+                attemptedKeys,
+            }),
+        ).toEqual({ attempt: true, key: 'request:ask-request-123' });
+        expect(
+            mod.shouldAttemptEmptyAfterUserInputAutoRecovery({
+                reply: '',
+                lastUserInputCompletedAt: 1_000,
+                now: 2_000,
+                windowMs: 5_000,
+                requestId: 'already-used',
+                attemptedKeys,
+            }),
+        ).toEqual({ attempt: false, key: 'request:already-used', reason: 'already_attempted' });
+        expect(
+            mod.shouldAttemptEmptyAfterUserInputAutoRecovery({
+                reply: 'ok',
+                lastUserInputCompletedAt: 1_000,
+                now: 2_000,
+                windowMs: 5_000,
+                requestId: 'ask-request-123',
+                attemptedKeys,
+            }),
+        ).toEqual({ attempt: false, key: null, reason: 'not_empty_after_recent_user_input' });
+    });
 });

@@ -181,7 +181,7 @@ export function cmdUsage({ println }, arg) {
             const hubLabel = renderUsageBindingId(projection.binding.hubSessionId, detail);
             println(
                 detail
-                    ? terminalThemeRow('Vínculo', `runtime ${runtimeLabel} · SDK ${sdkLabel} · hub ${hubLabel}`)
+                    ? terminalThemeRow('Vínculo', `ambiente ${runtimeLabel} · SDK ${sdkLabel} · hub ${hubLabel}`)
                     : terminalThemeRow('Vínculo', `${renderUsageBindingSummary({
                           runtimeSessionId: projection.runtimeSessionId,
                           sdkSessionId: projection.binding.sdkSessionId,
@@ -250,11 +250,11 @@ function renderUsageBindingId(value, detail) {
  */
 function renderUsageBindingSummary(binding) {
     const present = [
-        binding.runtimeSessionId ? 'runtime' : null,
+        binding.runtimeSessionId ? 'ambiente' : null,
         binding.sdkSessionId ? 'SDK' : null,
         binding.hubSessionId ? 'hub' : null,
     ].filter(Boolean);
-    if (present.length === 3) return 'runtime, SDK e hub conectados';
+    if (present.length === 3) return 'ambiente, SDK e hub conectados';
     if (present.length > 0) return `vínculo parcial: ${present.join(', ')}`;
     return 'sem vínculo registrado';
 }

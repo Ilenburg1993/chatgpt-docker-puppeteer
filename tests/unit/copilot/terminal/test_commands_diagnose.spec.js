@@ -281,6 +281,8 @@ describe('commands/diagnose', () => {
             const lowerOutput = output.toLowerCase();
 
             expect(output).toContain('Diagnóstico do Terminal LLM-B');
+            expect(output).toContain('Agente  ·  ambiente · modelo · entrada');
+            expect(output).not.toContain('Agente  ·  runtime · modelo · entrada');
             expect(output).toContain('atenção');
             expect(lowerOutput).toContain('tarefas');
             expect(lowerOutput).toContain('pulso');
@@ -425,6 +427,7 @@ describe('commands/diagnose', () => {
 
         await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println }, '--runtime missing full');
 
-        expect(ctx.output()).toContain('runtime default (default)');
+        expect(ctx.output()).toContain('ambiente principal (default)');
+        expect(ctx.output()).not.toContain('runtime default (default)');
     });
 });

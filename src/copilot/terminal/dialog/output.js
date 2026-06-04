@@ -866,6 +866,24 @@ export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt(
 }
 
 /**
+ * Cancela uma pintura de prompt ainda não materializada para o readline informado.
+ *
+ * Quando o operador envia uma linha antes do `setImmediate` de redraw anterior rodar, aquele prompt ficou obsoleto. Se
+ * ele ainda pintar, a tela mostra `você›` vazio imediatamente antes do prompt de espera do novo turno.
+ *
+ * @param {{ setPrompt?: (prompt: string) => void; prompt?: () => void; closed?: boolean } | null | undefined} rl
+ * @returns {void}
+ */
+export function cancelScheduledTerminalPromptRedraw(rl) {
+    if (!rl || typeof rl !== 'object') return;
+    const key = /** @type {object} */ (rl);
+    const current = _scheduledPromptRedraws.get(key);
+    if (!current) return;
+    clearImmediate(current.immediate);
+    _scheduledPromptRedraws.delete(key);
+}
+
+/**
  * Ativa lock de renderização para impedir redraw de prompt enquanto há escrita contínua no terminal.
  *
  * @returns {void}

@@ -696,6 +696,24 @@ describe('terminal/commands/events', () => {
                     },
                 },
                 {
+                    timestamp: 1710000003500,
+                    eventId: 67,
+                    event: 'dialog.empty_after_user_input.auto_recovery',
+                    source: 'terminal-agent-wiring/dialog.empty_after_user_input.auto_recovery',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        turnId: 'turn:ask',
+                        detail: 'continuação pós-pergunta terminou sem texto público · resposta SIM',
+                        requestId: 'ask-request-1234567890',
+                        recoveryKey: 'request:ask-request-1234567890',
+                        resumeMessage:
+                            'Continue a partir da ultima resposta humana e entregue a resposta final em texto publico.',
+                    },
+                },
+                {
                     timestamp: 1710000004000,
                     eventId: 65,
                     event: 'llm.usage',
@@ -736,7 +754,11 @@ describe('terminal/commands/events', () => {
             'retomar /turn Continue a partir da ultima resposta humana e entregue a resposta final em texto publico.',
         );
         expect(ctx.output()).toContain('diagnóstico /activity 40 · /events 60 · /byok health');
+        expect(ctx.output()).toContain('Retomada automática');
+        expect(ctx.output()).toContain('retomada automática enfileirada uma vez');
+        expect(ctx.output()).toContain('sem repetir a pergunta humana');
         expect(ctx.output()).not.toContain('ask-request-1234567890');
+        expect(ctx.output()).not.toContain('request:ask-request');
         expect(ctx.output()).toContain('tipo iniciado pelo agente');
         expect(ctx.output()).not.toContain('agent error');
         expect(ctx.output()).not.toContain('Info da sessão');

@@ -8,8 +8,9 @@
  * @module copilot/terminal/events/dialog-recovery-presenter
  */
 
-export const EMPTY_AFTER_USER_INPUT_RESUME_COMMAND =
-    '/turn Continue a partir da ultima resposta humana e entregue a resposta final em texto publico.';
+export const EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE =
+    'Continue a partir da ultima resposta humana e entregue a resposta final em texto publico.';
+export const EMPTY_AFTER_USER_INPUT_RESUME_COMMAND = `/turn ${EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE}`;
 export const EMPTY_AFTER_USER_INPUT_DIAGNOSTIC_COMMANDS = '/activity 40 · /events 60 · /byok health';
 export const EMPTY_AFTER_USER_INPUT_MODEL_COMMAND = '/byok model';
 

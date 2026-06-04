@@ -93,11 +93,11 @@ export const TERMINAL_DISPLAY_PRESETS = Object.freeze({
     default: {
         name: 'default',
         label: 'Default',
-        description: 'Equilíbrio operacional: resposta incremental, telemetria LLM, tools e intent.',
+        description: 'Sessão diária limpa: resposta incremental, tools e intenção; telemetria fica sob comando.',
         state: Object.freeze({
             thinking: false,
             streaming: true,
-            usage: true,
+            usage: false,
             tools: true,
             intent: true,
             session: false,
@@ -279,7 +279,7 @@ export function applyTerminalDisplayPreset(presetName) {
 }
 
 /**
- * Resolve o preset visual inicial do terminal. Valor inválido cai para `full`, que é o padrão operacional da LLM-B.
+ * Resolve o preset visual inicial do terminal. Valor inválido cai para `default`, que é o caminho feliz do operador.
  *
  * @param {string | undefined} [value]
  * @returns {TerminalDisplayPresetName}
@@ -288,7 +288,7 @@ export function resolveTerminalBootDisplayPreset(value = TERMINAL_DISPLAY_PRESET
     const normalized = String(value || '')
         .trim()
         .toLowerCase();
-    return isTerminalDisplayPresetName(normalized) ? normalized : 'full';
+    return isTerminalDisplayPresetName(normalized) ? normalized : 'default';
 }
 
 /**

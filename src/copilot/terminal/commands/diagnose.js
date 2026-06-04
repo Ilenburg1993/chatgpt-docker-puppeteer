@@ -357,7 +357,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
             println(
                 terminalThemeRow(
                     'Nota',
-                    `${configProjection.runtimeFallbackWarning} Diagnóstico exibido para o runtime default (${configProjection.runtimeId}).`,
+                    `${configProjection.runtimeFallbackWarning} Diagnóstico exibido para o ambiente principal (${configProjection.runtimeId}).`,
                     { role: 'warn' },
                 ),
             );
@@ -369,7 +369,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     println(terminalThemeHeadline('assistant', 'Diagnóstico do Terminal LLM-B', ['full']));
     println(terminalThemeDivider(62));
 
-    println(terminalThemeHeadline('assistant', 'Agente', ['runtime', 'modelo', 'entrada']));
+    println(terminalThemeHeadline('assistant', 'Agente', ['ambiente', 'modelo', 'entrada']));
     println(terminalThemeRow('Status', renderDiagnoseAgentStatus(snap['status']), { role: renderRuntimeStatusRole(String(snap['status'] ?? 'unknown'), dialogLoopActive) }));
     println(terminalThemeRow('Saúde', health ? renderHumanHealthStatus(String(health['status'] ?? 'unknown')) : 'sem leitura', { role: renderHealthRole(String(health?.['status'] ?? 'unknown')) }));
     println(terminalThemeRow('Conversa', dialogLoopActive ? 'ativa' : 'inativa', { role: dialogLoopActive ? 'success' : 'warn' }));
@@ -447,7 +447,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         println(
             diagnoseText(
                 'warn',
-                `  Nota: ${configProjection.runtimeFallbackWarning} Diagnóstico exibido para o runtime default (${configProjection.runtimeId}).`,
+                `  Nota: ${configProjection.runtimeFallbackWarning} Diagnóstico exibido para o ambiente principal (${configProjection.runtimeId}).`,
             ),
         );
     }

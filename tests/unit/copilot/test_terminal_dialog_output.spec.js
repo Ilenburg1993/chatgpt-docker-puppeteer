@@ -109,6 +109,21 @@ describe('terminal/dialog/output.js — contrato', () => {
         expect(rl.prompt).toHaveBeenCalledTimes(1);
     });
 
+    it('cancela redraw pendente quando uma nova linha torna o prompt obsoleto', async () => {
+        const mod = await import('../../../src/copilot/terminal/dialog/output.js');
+        const rl = {
+            setPrompt: vi.fn(),
+            prompt: vi.fn(),
+        };
+
+        mod.scheduleTerminalPromptRedraw(rl, 'prompt velho');
+        mod.cancelScheduledTerminalPromptRedraw(rl);
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(rl.setPrompt).not.toHaveBeenCalled();
+        expect(rl.prompt).not.toHaveBeenCalled();
+    });
+
     it('ignora redraw agendado quando o readline fecha antes da pintura', async () => {
         const mod = await import('../../../src/copilot/terminal/dialog/output.js');
         const rl = {

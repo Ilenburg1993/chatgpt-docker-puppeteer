@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const stateStore = vi.hoisted(() => ({
     getShowThinking: vi.fn(() => false),
     getShowStreaming: vi.fn(() => true),
-    getShowUsage: vi.fn(() => true),
+    getShowUsage: vi.fn(() => false),
     getShowToolActivity: vi.fn(() => true),
     getShowIntentActivity: vi.fn(() => true),
     getShowSessionActivity: vi.fn(() => false),
@@ -80,6 +80,13 @@ describe('terminal/commands/display', () => {
             'full',
             'focus',
         ]);
+        expect(listTerminalDisplayPresets().find((preset) => preset.name === 'default')?.state).toMatchObject({
+            streaming: true,
+            usage: false,
+            tools: true,
+            intent: true,
+            session: false,
+        });
         expect(
             readTerminalPromptDisplayPolicy({
                 thinking: false,
@@ -121,16 +128,17 @@ describe('terminal/commands/display', () => {
         expect(stateStore.setShowSessionActivity).toHaveBeenCalledWith(true);
     });
 
-    it('aplica preset full como padrão de boot e valida fallback', () => {
-        expect(resolveTerminalBootDisplayPreset(undefined)).toBe('full');
-        expect(resolveTerminalBootDisplayPreset('xpto')).toBe('full');
+    it('aplica preset default como padrão de boot e valida fallback', () => {
+        expect(resolveTerminalBootDisplayPreset(undefined)).toBe('default');
+        expect(resolveTerminalBootDisplayPreset('xpto')).toBe('default');
         expect(resolveTerminalBootDisplayPreset('minimal')).toBe('minimal');
 
-        const preset = applyTerminalBootDisplayPreset('full');
-        expect(preset.name).toBe('full');
-        expect(stateStore.setShowThinking).toHaveBeenCalledWith(true);
+        const preset = applyTerminalBootDisplayPreset('default');
+        expect(preset.name).toBe('default');
+        expect(stateStore.setShowThinking).toHaveBeenCalledWith(false);
         expect(stateStore.setShowStreaming).toHaveBeenCalledWith(true);
-        expect(stateStore.setShowSessionActivity).toHaveBeenCalledWith(true);
+        expect(stateStore.setShowUsage).toHaveBeenCalledWith(false);
+        expect(stateStore.setShowSessionActivity).toHaveBeenCalledWith(false);
     });
 
     it('valida uso de preset inválido', () => {

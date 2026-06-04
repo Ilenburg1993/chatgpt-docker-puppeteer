@@ -8556,3 +8556,107 @@
   - testes negam retorno de `Runtime alvo`, `runtime solicitado`, `reservada` e `reserved` nas
     superfícies humanas;
   - critério live de `/health full` rejeita `Runtime alvo` e `Linha viva reserved/reservada`.
+
+### 12.84 Preset diário limpo e `full` como opt-in — 2026-06-04
+
+- [x] Auditoria:
+  - as screenshots mostravam o terminal iniciando em `TERMINAL_DISPLAY_PRESET=full`;
+  - `full` ligava `thinking`, `usage`, `session`, `tools`, `intent` e `streaming`, deixando o caminho feliz
+    parecido com diagnóstico permanente;
+  - o rodapé de usage pós-turno explicava modelo/custo/tokens, mas era ruído quando o operador só queria
+    uma conversa fluida;
+  - os comandos canônicos `terminal:llm-b`, `terminal:llm-b:dev`, `dev:terminal` e o runner live forçavam
+    `full`, então o default real não correspondia à UX ideal.
+- [x] Decisão UX:
+  - `default` é o modo diário elegante: streaming público, tools e intenção continuam visíveis;
+  - `usage`, `session` e `thinking` deixam de aparecer por padrão e ficam disponíveis em `/usage now`,
+    `/metrics`, `/status full`, `/display usage on`, `/display session on`, `/display thinking on`,
+    `/display preset full` e `/display preset debug`;
+  - `full` continua existindo como opt-in para auditoria e troubleshooting, sem ser o boot canônico.
+- [x] Implementação:
+  - `TERMINAL_DISPLAY_PRESET` agora cai para `default` quando não configurado;
+  - preset inválido também cai para `default`, em vez de `full`;
+  - script `terminal:llm-b`, `terminal:llm-b:dev` e `dev:terminal` iniciam em `default`;
+  - runner live usa `TERMINAL_DISPLAY_PRESET` do ambiente quando presente e `default` quando ausente;
+  - contrato unitário garante que `default` mantém `usage=false`, `session=false` e `thinking=false`.
+- [ ] Próxima validação live:
+  - rodar cenário canônico PTY com preset default e confirmar ausência de footer pós-turno verboso;
+  - rodar cenário diagnóstico com `TERMINAL_DISPLAY_PRESET=full` explicitamente para confirmar que
+    o modo rico continua acessível.
+
+### 12.85 Prompt obsoleto cancelado ao receber nova linha — 2026-06-04
+
+- [x] Evidência live:
+  - live PTY em `artifacts/terminal-live/default-ux-20260604-display-default/summary.md` confirmou
+    o preset `default` e ausência de footer de usage automático;
+  - a mesma live falhou em `no-prompt-double-render`;
+  - no `terminal.plain.log`, o prompt anterior aparecia vazio e, logo abaixo, outro prompt era pintado
+    junto da linha viva do turno.
+- [x] Diagnóstico:
+  - prompts são coalescidos via `setImmediate`;
+  - se uma linha nova chega antes desse `setImmediate`, o redraw agendado pertence ao estado anterior
+    e não deve mais materializar;
+  - o novo turno já vai assumir a tela com linha viva/prompt de espera, portanto manter o prompt antigo
+    cria duplicação visual.
+- [x] Correção:
+  - adicionada primitiva `cancelScheduledTerminalPromptRedraw(rl)` no renderer do diálogo;
+  - o lifecycle do REPL cancela redraw pendente no início de cada evento `line`;
+  - teste unitário cobre o cancelamento do redraw obsoleto antes do próximo tick.
+- [ ] Próxima validação live:
+  - repetir o cenário canônico PTY em preset `default` e exigir `no-prompt-double-render`.
+
+### 12.86 Recuperação automática pós-pergunta vazia — 2026-06-04
+
+- [x] Evidência live:
+  - live PTY em `artifacts/terminal-live/canonical-ux-20260604-display-default-prompt-fix/summary.md`
+    confirmou `no-prompt-double-render` e o preset `default`;
+  - o mesmo ciclo bloqueou porque, após o operador responder `SIM`, a LLM-B encerrou a continuação sem
+    mensagem pública;
+  - a UX atual mostrou uma placa `RECUPERAR` com `/turn Continue...`, ou seja, exigiu ação manual para
+    um caso em que o operador já tinha respondido corretamente.
+- [x] Decisão UX:
+  - resposta humana aceita é um contrato forte: o terminal deve tentar preservar o fluxo conversacional
+    sem pedir ao operador para repetir comandos;
+  - a recuperação automática só é segura como uma continuação textual única, depois da pergunta humana,
+    sem repetir o prompt original e sem reexecutar tools anteriores por conta própria;
+  - a tentativa deve ser rastreável em SSE/activity e ter chave idempotente por `requestId`/turno/janela,
+    para não criar loop infinito;
+  - se a tentativa automática também falhar, a placa manual continua existindo como fallback explícito.
+- [x] Implementação:
+  - separar mensagem de retomada humana (`Continue...`) do comando visual (`/turn Continue...`);
+  - adicionar política testável de tentativa única para `dialog.empty_after_user_input`;
+  - enfileirar a continuação via `sendTurn()` depois do turno atual, sem disputar o mutex de envio;
+  - emitir `dialog.empty_after_user_input.auto_recovery` antes da tentativa;
+  - atualizar `/events` e summary quando necessário para diferenciar `tentando recuperar` de
+    `recuperação manual necessária`.
+- [ ] Validação:
+  - [x] teste unitário da política de idempotência;
+  - [x] live PTY canônico com preset `default`, exigindo pergunta, resposta humana e ausência de
+    duplicação visual;
+  - [ ] live ou harness focado que force `dialog.empty_after_user_input` para exercitar a retomada
+    automática sem depender de não determinismo do modelo.
+- [x] Evidência:
+  - `artifacts/terminal-live/canonical-ux-20260604-auto-recovery-default-rerun/summary.md`
+    terminou PASS;
+  - critérios relevantes verdes: `no-prompt-double-render`, `ux-question-wait-surface-human`,
+    `ux-question-live-status-does-not-compete-with-input`, `post-ask-final-visible`,
+    `sse-canonical-transcript-events`, `export-post-ask-final` e `no-terminal-errors`;
+  - a recuperação automática não foi exercitada porque, nesta rodada, a LLM-B entregou o final
+    pós-pergunta corretamente via `assistant.message`.
+
+### 12.87 Vocabulário remanescente de runtime em comandos humanos — 2026-06-04
+
+- [x] Achado live:
+  - `/usage now` ainda renderizava `runtime, SDK e hub conectados`;
+  - `/health full` ainda tinha cabeçalho `Agente · runtime · modelo · entrada`;
+  - esses textos contradiziam a decisão já aplicada em `/status`, `/diagnose`, `/metrics` e linha viva:
+    `runtimeId` é contrato interno; superfície humana usa `ambiente`.
+- [x] Correção:
+  - `/usage now` passou a dizer `ambiente, SDK e hub conectados`;
+  - `/usage now detail` passou a dizer `ambiente <id> · SDK <id> · hub <id>`;
+  - `/health full`/diagnóstico passou a usar `Agente · ambiente · modelo · entrada`;
+  - notas de fallback passaram a falar em `ambiente principal`.
+- [x] Validação:
+  - testes focados de usage/diagnose passaram junto da bateria de wiring/eventos/display;
+  - lint escopado dos arquivos tocados passou sem erros;
+  - em próxima live, confirmar ausência de `runtime, SDK e hub conectados` e do cabeçalho antigo.

@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
     EMPTY_AFTER_USER_INPUT_DIAGNOSTIC_COMMANDS,
     EMPTY_AFTER_USER_INPUT_RESUME_COMMAND,
+    EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE,
     buildEmptyAfterUserInputRecoveryRows,
     summarizeEmptyAfterUserInputRecovery,
 } from '../../../../src/copilot/terminal/events/dialog-recovery-presenter.js';
@@ -22,6 +23,7 @@ describe('terminal/events/dialog-recovery-presenter', () => {
 
         expect(text).toContain('Estado: resposta humana registrada; a LLM-B encerrou sem texto publico');
         expect(text).toContain('Resposta: SIM');
+        expect(EMPTY_AFTER_USER_INPUT_RESUME_COMMAND).toBe(`/turn ${EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE}`);
         expect(text).toContain(`Retomar: ${EMPTY_AFTER_USER_INPUT_RESUME_COMMAND}`);
         expect(text).toContain(`Diagnóstico: ${EMPTY_AFTER_USER_INPUT_DIAGNOSTIC_COMMANDS}`);
         expect(text).toContain('Alternativa: /byok model para trocar modelo');
