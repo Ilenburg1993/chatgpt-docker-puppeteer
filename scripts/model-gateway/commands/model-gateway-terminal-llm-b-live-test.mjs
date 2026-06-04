@@ -1247,13 +1247,22 @@ function sendCommandSequence(write, commands, { delayMs = 250 } = {}) {
 }
 
 function normalizeLiveCommandEntry(entry) {
-    if (typeof entry === 'string') return { line: entry, waitBeforeMs: 0, advanceAfterMs: 0 };
-    if (!entry || typeof entry !== 'object') return { line: '', waitBeforeMs: 0, advanceAfterMs: 0 };
+    if (typeof entry === 'string') return { line: entry, waitBeforeMs: 0, advanceAfterMs: 0, waitFor: null };
+    if (!entry || typeof entry !== 'object') return { line: '', waitBeforeMs: 0, advanceAfterMs: 0, waitFor: null };
     return {
         line: typeof entry.line === 'string' ? entry.line : '',
         waitBeforeMs: Number.isFinite(entry.waitBeforeMs) ? Math.max(0, Number(entry.waitBeforeMs)) : 0,
         advanceAfterMs: Number.isFinite(entry.advanceAfterMs) ? Math.max(0, Number(entry.advanceAfterMs)) : 0,
+        waitFor: typeof entry.waitFor === 'string' || entry.waitFor instanceof RegExp ? entry.waitFor : null,
     };
+}
+
+function liveWaitForMatched(waitFor, text) {
+    if (!waitFor) return true;
+    const value = String(text ?? '');
+    if (typeof waitFor === 'string') return value.includes(waitFor);
+    waitFor.lastIndex = 0;
+    return waitFor.test(value);
 }
 
 function extractSdkSessionCockpitId(plain, label) {
@@ -1314,6 +1323,7 @@ async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, 
     let ready = false;
     let childClosed = false;
     let waitingForPrompt = false;
+    let activeWaitFor = null;
     let commandOutputOffset = 0;
     /** @type {NodeJS.Timeout | null} */
     let promptFallbackTimer = null;
@@ -1354,13 +1364,27 @@ async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, 
         if (!entry.line.trim()) return sendNextCommand();
         const send = () => {
             waitingForPrompt = entry.line.trim() !== '/quit';
+            activeWaitFor = entry.waitFor;
             commandOutputOffset = stripAnsi(raw).length;
             write(entry.line);
             if (waitingForPrompt && entry.advanceAfterMs > 0) {
                 promptFallbackTimer = setTimeout(() => {
                     promptFallbackTimer = null;
                     if (!waitingForPrompt || childClosed) return;
+                    const commandOutput = stripAnsi(raw).slice(commandOutputOffset);
+                    if (activeWaitFor && !liveWaitForMatched(activeWaitFor, commandOutput)) {
+                        promptFallbackTimer = setTimeout(() => {
+                            promptFallbackTimer = null;
+                            if (!waitingForPrompt || childClosed) return;
+                            waitingForPrompt = false;
+                            activeWaitFor = null;
+                            sendNextCommand();
+                        }, entry.advanceAfterMs);
+                        promptFallbackTimer.unref();
+                        return;
+                    }
                     waitingForPrompt = false;
+                    activeWaitFor = null;
                     sendNextCommand();
                 }, entry.advanceAfterMs);
                 promptFallbackTimer.unref();
@@ -1388,8 +1412,14 @@ async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, 
             sendNextCommand();
             return;
         }
-        if (waitingForPrompt && hasReturnedToReplPrompt(plain, commandOutputOffset)) {
+        const commandOutput = plain.slice(commandOutputOffset);
+        if (
+            waitingForPrompt &&
+            hasReturnedToReplPrompt(plain, commandOutputOffset) &&
+            liveWaitForMatched(activeWaitFor, commandOutput)
+        ) {
             waitingForPrompt = false;
+            activeWaitFor = null;
             if (promptFallbackTimer) {
                 clearTimeout(promptFallbackTimer);
                 promptFallbackTimer = null;
@@ -2418,6 +2448,7 @@ function defaultUxCycleCriteria(boot) {
     const workspaceStart = plain.indexOf('Workspace SDK virtual');
     const liveStart = plain.indexOf('Fluxo da conversa');
     const activityStart = plain.indexOf('Atividade Atual da LLM-B');
+    const eventsStart = plain.indexOf('Eventos SSE');
     const waitsStart = plain.lastIndexOf('Esperas humanas');
     const surfaceStarts = [
         helpStart,
@@ -2431,6 +2462,7 @@ function defaultUxCycleCriteria(boot) {
         workspaceStart,
         liveStart,
         activityStart,
+        eventsStart,
         waitsStart,
     ]
         .filter((index) => index >= 0)
@@ -2450,11 +2482,35 @@ function defaultUxCycleCriteria(boot) {
     const workspaceSurface = surfaceAt(workspaceStart);
     const liveSurface = surfaceAt(liveStart);
     const activitySurface = surfaceAt(activityStart);
+    const eventsSurface = surfaceAt(eventsStart);
+    const orderedSurfaceStarts = [
+        helpStart,
+        helpFullStart,
+        statusStart,
+        nowStart,
+        healthStart,
+        toolsStart,
+        sdkStart,
+        sdkCapabilitiesStart,
+        workspaceStart,
+        liveStart,
+        activityStart,
+        eventsStart,
+        waitsStart,
+    ];
+    const surfacesRenderedInOrder =
+        orderedSurfaceStarts.every((index) => index >= 0) &&
+        orderedSurfaceStarts.every((index, position, values) => position === 0 || values[position - 1] < index);
     return [
         {
             id: 'ux-cycle-ready',
             pass: /LLM-B pronta/u.test(plain),
             detail: 'terminal reached ready state before opening default UX surfaces',
+        },
+        {
+            id: 'ux-cycle-command-order',
+            pass: surfacesRenderedInOrder,
+            detail: 'default UX surfaces appeared in the same order as the operator commands',
         },
         {
             id: 'ux-cycle-help-compact',
@@ -2543,13 +2599,21 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-activity-human',
             pass:
-                /Atividade Atual da LLM-B[\s\S]*Estado[\s\S]*Evento[\s\S]*Detalhes técnicos ficam em \/activity detail/iu.test(
+                /Atividade Atual da LLM-B[\s\S]*Estado[\s\S]*Evento[\s\S]*Drill-down\s+\/activity detail mostra origem, trace, engine e streaming/iu.test(
                     activitySurface,
                 ) &&
-                !/\bsource\b|\btools\b|\btrace\b|Streaming público|\bdeltas\b|cumulativo|Sessão SDK removida|session\.deleted/iu.test(
+                !/\bsource\b|\btools\b|\btraceId\b|Streaming público|\bdeltas\b|cumulativo|Sessão SDK removida|session\.deleted/iu.test(
                     activitySurface,
                 ),
             detail: '/activity default rendered human labels and moved technical identifiers behind detail mode',
+        },
+        {
+            id: 'ux-cycle-events-complete-iso',
+            pass:
+                /Eventos SSE[\s\S]*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}/u.test(
+                    eventsSurface,
+                ) && !/\btraceId=|\bturnId=|\bhubSessionId=/u.test(eventsSurface),
+            detail: '/events default rendered complete ISO 8601 timestamps without raw diagnostic ids',
         },
         {
             id: 'ux-cycle-waits-human',
@@ -2578,19 +2642,20 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
         label: 'default human UX surfaces',
         outDir,
         commands: [
-            { line: '/help', advanceAfterMs: 1_000 },
-            { line: '/help full', advanceAfterMs: 1_000 },
-            { line: '/status', advanceAfterMs: 1_000 },
-            { line: '/now', advanceAfterMs: 1_000 },
-            { line: '/health', advanceAfterMs: 1_000 },
-            { line: '/tools', advanceAfterMs: 1_000 },
-            { line: '/tools diag', advanceAfterMs: 1_000 },
-            { line: '/sdk', advanceAfterMs: 1_000 },
-            { line: '/sdk capabilities', advanceAfterMs: 1_000 },
-            { line: '/workspace list', advanceAfterMs: 1_000 },
-            { line: '/live', advanceAfterMs: 1_000 },
-            { line: '/activity 5', advanceAfterMs: 1_000 },
-            { line: '/sdk waits', advanceAfterMs: 1_000 },
+            { line: '/help', waitFor: 'Ajuda rápida', advanceAfterMs: 1_500 },
+            { line: '/help full', waitFor: 'Terminal LLM-B - Ajuda completa', advanceAfterMs: 5_000 },
+            { line: '/status', waitFor: 'Status do Terminal LLM-B', advanceAfterMs: 1_500 },
+            { line: '/now', waitFor: '\n  Agora', advanceAfterMs: 1_500 },
+            { line: '/health', waitFor: 'Saúde do Terminal LLM-B', advanceAfterMs: 1_500 },
+            { line: '/tools', waitFor: /Ferramentas observadas|Nenhuma ferramenta observada/u, advanceAfterMs: 1_500 },
+            { line: '/tools diag', waitFor: /Ferramentas observadas|Nenhuma ferramenta observada/u, advanceAfterMs: 1_500 },
+            { line: '/sdk', waitFor: 'SDK do Terminal', advanceAfterMs: 1_500 },
+            { line: '/sdk capabilities', waitFor: 'Capacidades SDK', advanceAfterMs: 1_500 },
+            { line: '/workspace list', waitFor: 'Workspace SDK virtual', advanceAfterMs: 1_500 },
+            { line: '/live', waitFor: 'Fluxo da conversa', advanceAfterMs: 1_500 },
+            { line: '/activity 5', waitFor: 'Atividade Atual da LLM-B', advanceAfterMs: 1_500 },
+            { line: '/events 20', waitFor: 'Eventos SSE', advanceAfterMs: 1_500 },
+            { line: '/sdk waits', waitFor: 'Esperas humanas', advanceAfterMs: 1_500 },
             '/quit',
         ],
         terminalPort,

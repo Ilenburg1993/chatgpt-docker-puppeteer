@@ -6806,5 +6806,30 @@
   - `node --check src/copilot/terminal/state/time-format.js tests/unit/copilot/terminal/test_time_format.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
   - `npx vitest run tests/unit/copilot/terminal/test_time_format.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
   - `npx eslint src/copilot/terminal/state/time-format.js tests/unit/copilot/terminal/test_time_format.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
-- [ ] Próxima inspeção UX: executar um ciclo curto não-live ou live para confirmar visualmente que
-      os timestamps completos não estouram colunas em `/events` e `/activity` em PTY estreito.
+- [x] Live PTY executado para inspeção visual do contrato de timestamp completo:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-complete-iso-cycle-20260604 --timeout-ms 90000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T08-39-49-862Z/summary.md`.
+  - Resultado observado: `/activity` e `/events` exibiram `2026-06-04T05:39:56.404-03:00 (há 1s)`
+    e `2026-06-04T05:39:54.289-03:00 (há 3s)`, confirmando ISO 8601 completo local
+    com milissegundos e idade relativa nas linhas persistentes.
+- [x] Achado no harness: o critério `ux-cycle-activity-human` ainda procurava a cópia antiga
+      `Detalhes técnicos ficam em /activity detail` e bloqueava a palavra `trace` mesmo quando ela
+      aparecia somente na instrução humana `Drill-down /activity detail mostra origem, trace,
+      engine e streaming`.
+- [x] Correção aplicada no runner live:
+  - `ux-cycle-activity-human` agora exige o texto de drill-down vigente e continua bloqueando
+    identificadores crus como `traceId`, `source`, `tools`, `deltas` e eventos de limpeza SDK.
+  - O ciclo `--ux-cycle` agora aguarda marcadores de superfície por comando (`Ajuda rápida`,
+    `Terminal LLM-B - Ajuda completa`, `Status do Terminal LLM-B`, `Eventos SSE`, etc.),
+    reduzindo falsos positivos/falsos negativos por repaint de prompt ou telas longas.
+  - Novo critério `ux-cycle-command-order` falha se as superfícies default aparecerem fora da
+    ordem dos comandos do operador.
+- [x] Live PTY repetido após ajuste do harness:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-command-order-guard-20260604 --timeout-ms 120000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T08-44-53-143Z/summary.md`.
+  - Resultado: PASS em 18/18 critérios, incluindo `ux-cycle-command-order`,
+    `ux-cycle-activity-human` e `ux-cycle-events-complete-iso`.
+- [ ] Próxima lacuna UX/BYOK: a live mostrou `/status` exibindo `claude-haiku-4.5` como
+      modelo enquanto prompt, `/health` e `/now` continuam em `kilo-auto/free`; investigar a
+      origem de cada label e consolidar um contrato único de modelo solicitado, rota BYOK e
+      modelo efetivo do SDK.
