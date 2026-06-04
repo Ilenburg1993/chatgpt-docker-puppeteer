@@ -6515,3 +6515,55 @@
 - [ ] Próxima live obrigatória: repetir cenário canônico com PTY para confirmar que
       `ux-live-status-not-input-prompt`, `llm-usage-visible`, `no-prompt-double-render`,
       `ask-user-input-prompt-visible`, export/SSE e `clean-quit` passam juntos.
+
+### 12.50 Eventos runtime não podem escapar da camada humana
+
+- [x] Auditoria live: `artifacts/terminal-live/2026-06-04T07-16-42-720Z/summary.md` bloqueou por
+      `assistant-empty-turn`, mas revelou linhas humanas ainda com cheiro de adaptador cru:
+      `Provedor BYOK  Erro do SDK sem mensagem estruturada.`, `Evento cancellation · Operation
+      cancelled by user`, `Turno terminou sem saída pública...` com ANSI manual e símbolo de erro
+      fora do tema, além de `Fallback` com texto de contrato ainda longo.
+- [x] Decisão UX: `/events raw`, SSE e export técnico podem preservar payloads originais; a tela
+      padrão do operador não pode imprimir inglês de SDK, labels genéricos como `Evento`, nem ANSI
+      manual. Todo evento visível deve passar por label humano, detalhe compacto e `terminalThemeRow`.
+- [x] Correção: `dialog/engine.js` trocou a mensagem crua de turno vazio por rows temáticas
+      `Turno`/`Diagnóstico`, sem símbolo manual, mantendo SSE e `/activity` como drill-down.
+- [x] Correção: `sdk-session-events.js` renderiza `infoType=cancellation` como
+      `Cancelamento · operação cancelada pelo operador`, e avisos como `Aviso da sessão`, sem
+      `Warning SDK`.
+- [x] Correção: `agent-runtime-events.js` humaniza o bloco BYOK recuperável na origem:
+      label curto, `provedor` em português, ação clara, e fallback como consequência operacional,
+      sem repetir `Erro do SDK sem mensagem estruturada` como primeira coisa que o operador vê.
+- [x] Testes: casos unitários escopados cobrem cancelamento/session warning/BYOK
+      recuperável/turno vazio humano, bloqueando `Operation cancelled by user`, `Warning SDK`,
+      ANSI manual e `provider BYOK` no stdout humano.
+- [x] Validação escopada:
+  - `node --check src/copilot/terminal/dialog/engine.js src/copilot/terminal/events/sdk-session-events.js src/copilot/terminal/events/agent-runtime-events.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js`.
+  - `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js`.
+  - `npx eslint src/copilot/terminal/dialog/engine.js src/copilot/terminal/events/sdk-session-events.js src/copilot/terminal/events/agent-runtime-events.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js`.
+- [x] Live canônica pós-humanização de eventos runtime:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-terminal-ux-runtime-human-events-20260604 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T07-27-34-180Z/summary.md`.
+  - Resultado geral: `Status: PASS`. Passaram `ux-no-raw-sdk-info-labels`,
+    `ux-live-status-not-input-prompt`, `no-prompt-double-render`,
+    `ask-user-input-prompt-visible`, `llm-usage-visible`, export/SSE e `clean-quit`.
+  - Confirmação visual: `Configuração ferramentas nativas desativadas`, pergunta `[PERG]`,
+    `Uso BYOK sem pedido premium`, `/events` humano e `/errors` limpo apareceram corretamente.
+- [x] Achado visual extra da live: a linha viva de ferramenta ainda podia quebrar em várias linhas
+      físicas no PTY estreito porque o fallback genérico anexava detalhe, modelo, raciocínio e
+      estado da conversa: `LLM-B ferramenta · ... Ler` seguido por `arquivo ... modelo ...`.
+- [x] Correção aplicada: `live-status-line.js` ganhou caminho compacto específico para
+      `phase=tool`, renderizando apenas `LLM-B ferramenta · <nome humano> · <duração>`, com
+      detalhes completos preservados nas linhas duráveis e em `/activity`.
+- [x] Contrato live reforçado: o runner ganhou `ux-tool-live-status-stays-single-line`, bloqueando
+      quebra física da linha viva de ferramenta e caudas `modelo`/`raciocínio`/`conversa ativa`.
+- [x] Live canônica pós-compactação de ferramenta:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-terminal-ux-tool-status-single-line-20260604 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T07-31-04-217Z/summary.md`.
+  - Resultado geral: `Status: PASS`.
+  - Confirmação: `ux-tool-live-status-stays-single-line`, `ux-compact-tool-live-status`,
+    `ux-live-status-not-input-prompt`, `no-prompt-double-render`, `ask-user-input-prompt-visible`,
+    `llm-usage-visible`, export/SSE e `clean-quit` passaram.
+- [ ] Próxima frente UX: repetir `invalid-choice` e um cenário de falha BYOK/tool recuperável para
+      validar a mesma limpeza em caminhos não felizes, especialmente cancelamento, retry e falhas de
+      provider.

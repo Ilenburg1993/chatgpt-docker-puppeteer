@@ -339,6 +339,16 @@ export function formatTerminalLiveStatusLine(input = {}) {
         );
     }
     const target = renderLiveToolName(activity);
+    if (activity.phase === 'tool') {
+        const toolLabel = target || label || 'ferramenta';
+        return (
+            `  ${terminalThemeText('assistant', 'LLM-B')} ` +
+            `${terminalThemeText(severityRole, 'ferramenta')}` +
+            `${terminalThemeText('tool', ` · ${toolLabel}`)}` +
+            `${terminalThemeText('muted', `${progress} · ${formatLiveDuration(ageMs)}${queue}`)}` +
+            '\x1b[K'
+        );
+    }
     const targetText = target ? ` · ${target}` : '';
     const detailText = detail ? ` · ${detail}` : '';
     return (

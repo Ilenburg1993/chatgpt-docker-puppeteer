@@ -496,9 +496,15 @@ function recordTerminalExplicitEmptyOutput(input) {
         }),
     );
     println(
-        '\x1b[31m  ⛔ Turno terminou sem saída pública, sem delta materializado e sem pergunta humana ou formulário pendente.\x1b[0m',
+        terminalThemeRow('Turno', 'sem saída pública, sem delta e sem pergunta humana pendente', {
+            role: 'error',
+        }),
     );
-    println('\x1b[90m     Consulte /activity, /live e /byok health para separar provider, SDK e transcript.\x1b[0m');
+    println(
+        terminalThemeRow('Diagnóstico', 'use /activity, /live e /byok health para separar provedor, SDK e transcript', {
+            role: 'muted',
+        }),
+    );
 
     if (input.byok.enabled === true && input.byok.ready === true) {
         recordByokProviderModelCallFailure({

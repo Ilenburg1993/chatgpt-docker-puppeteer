@@ -144,6 +144,58 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(typeof mod.setupTerminalAgentRuntimeEventListeners).toBe('function');
     });
 
+    it('renderiza falha BYOK recuperável com vocabulário humano e sem mensagem crua do SDK', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('error')?.[0]?.({
+            hookType: 'errorOccurred',
+            errorContext: 'model_call',
+            recoverable: true,
+            errorMessage: 'Erro do SDK sem mensagem estruturada.',
+            byokEnabled: true,
+            byokProviderType: 'openai',
+            byokProfile: 'kilo',
+            byokModel: 'kilo-auto/free',
+        });
+
+        const rendered = println.mock.calls.map(([line]) => String(line)).join('\n');
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'error',
+            'Falha do provedor BYOK',
+            expect.objectContaining({
+                detail: expect.stringContaining('falha sem mensagem estruturada do SDK'),
+                severity: 'warn',
+            }),
+        );
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'error',
+            'Falha do provedor BYOK',
+            expect.objectContaining({
+                detail: expect.not.stringContaining('Erro do SDK sem mensagem estruturada'),
+            }),
+        );
+        expect(rendered).toContain('BYOK');
+        expect(rendered).toContain('falha do provedor');
+        expect(rendered).toContain('falha sem mensagem estruturada do SDK');
+        expect(rendered).toContain('Recuperação');
+        expect(rendered).not.toContain('Provedor BYOK');
+        expect(rendered).not.toContain('Fallback');
+        expect(rendered).not.toContain('Erro do SDK sem mensagem estruturada');
+        expect(rendered).not.toContain('Premium Request');
+    });
+
     it('materializa lifecycle SDK em activity e SSE sem imprimir quando atividade de sessao esta oculta', async () => {
         getShowSessionActivity.mockReturnValue(false);
         const { setupTerminalAgentRuntimeEventListeners } =
@@ -1002,7 +1054,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Premium Request classificada com divergência de modelo',
+            'Pedido premium classificado com divergência de modelo',
             expect.objectContaining({
                 detail: 'modelo configurado gpt-5 · modelo efetivo gpt-5-mini · modelo cobrado gpt-5-mini · custo 0.0123',
                 severity: 'warn',
@@ -1010,7 +1062,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 recordHistory: true,
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('Premium Request'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Pedido premium'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('modelo cobrado gpt-5-mini'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('modeloCobrado='));
         expect(broadcastSse).toHaveBeenCalledWith(
@@ -1053,14 +1105,14 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Premium Request classificada com divergência de modelo',
+            'Pedido premium classificado com divergência de modelo',
             expect.any(Object),
         );
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Premium Request'));
         expect(broadcastSse).toHaveBeenCalledWith('pr.consumed', expect.any(Object));
     });
 
-    it('narra llm.usage sem Premium Request separadamente de pr.consumed', async () => {
+    it('narra llm.usage sem pedido premium separadamente de pr.consumed', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } =
@@ -1091,7 +1143,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Uso BYOK sem Premium Request',
+            'Uso BYOK sem pedido premium',
             expect.objectContaining({
                 detail: 'modelo gpt-5.4 · tokens 10→4 · custo 0.0123',
                 source: 'agent',
@@ -1101,7 +1153,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Uso do modelo'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('tokens 10→4'));
         expect(println).not.toHaveBeenCalledWith(expect.stringMatching(/Uso do modelo[\s\S]*modelo gpt-5\.4/u));
-        expect(println).not.toHaveBeenCalledWith(expect.stringMatching(/Uso do modelo[\s\S]*sem Premium Request/u));
+        expect(println).not.toHaveBeenCalledWith(expect.stringMatching(/Uso do modelo[\s\S]*sem pedido premium/u));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('ask_user_continuation'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('classe='));
         expect(broadcastSse).toHaveBeenCalledWith(
@@ -1240,7 +1292,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             expect.objectContaining({
                 errorContext: 'model_call',
                 recoverable: true,
-                operatorMeaning: expect.stringContaining('sem Premium Request confirmada'),
+                operatorMeaning: expect.stringContaining('sem pedido premium confirmado'),
                 handledAs: 'recoverable_model_call',
             }),
         );
@@ -1286,7 +1338,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'error',
-            'Erro de provider BYOK',
+            'Falha do provedor BYOK',
             expect.objectContaining({
                 severity: 'warn',
                 detail: expect.stringContaining('fallback para Copilot auto bloqueado por contrato'),
@@ -1295,32 +1347,32 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'error',
-            'Erro de provider BYOK',
+            'Falha do provedor BYOK',
             expect.objectContaining({
                 detail: expect.not.stringContaining('auto é a única recuperação permitida'),
             }),
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'error',
-            'Erro de provider BYOK',
+            'Falha do provedor BYOK',
             expect.objectContaining({
-                detail: expect.stringContaining('provider gemini'),
+                detail: expect.stringContaining('provedor gemini'),
             }),
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'error',
-            'Erro de provider BYOK',
+            'Falha do provedor BYOK',
             expect.objectContaining({
                 detail: expect.not.stringContaining('provider='),
             }),
         );
         const rendered = println.mock.calls.map(([line]) => String(line)).join('\n');
-        expect(rendered).toContain('Provider BYOK');
+        expect(rendered).toContain('BYOK');
         expect(rendered).toContain('Ação');
         expect(rendered).toContain('/byok use');
         expect(rendered).toContain('/byok model');
-        expect(rendered).toContain('Fallback');
-        expect(rendered).toContain('provider gemini · perfil gemini-free · modelo gemini-2.5-flash');
+        expect(rendered).toContain('Recuperação');
+        expect(rendered).toContain('provedor gemini · perfil gemini-free · modelo gemini-2.5-flash');
         expect(rendered).not.toContain('Modelo       Provider returned 403 · erro de provider BYOK');
         expect(rendered).not.toContain('retry automático bloqueado para não prender o terminal; troque provider/modelo');
         expect(broadcastSse).toHaveBeenCalledWith(
@@ -1328,7 +1380,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             expect.objectContaining({
                 byokEnabled: true,
                 byokProviderType: 'gemini',
-                operatorMeaning: expect.stringContaining('sem Premium Request'),
+                operatorMeaning: expect.stringContaining('sem pedido premium'),
                 handledAs: 'recoverable_model_call',
             }),
         );
@@ -1383,7 +1435,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             'Erro de sessão BYOK',
             expect.objectContaining({
                 severity: 'error',
-                detail: expect.stringContaining('sem Premium Request'),
+                detail: expect.stringContaining('sem pedido premium'),
             }),
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
@@ -1622,6 +1674,6 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 }),
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('Provider BYOK'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('falha do provedor'));
     });
 });

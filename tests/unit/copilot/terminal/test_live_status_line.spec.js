@@ -103,22 +103,25 @@ describe('terminal/live-status-line', () => {
         vi.useRealTimers();
     });
 
-    it('formata a linha viva com fase, tool, detalhe, tempo e modelo efetivo', async () => {
+    it('mantém a linha viva de ferramenta curta e sem metadados redundantes', async () => {
         const { formatTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');
 
         const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:12.000-03:00') });
 
         expect(line).toContain('LLM-B');
-        expect(line).toContain('ferramenta · Executando ferramenta');
+        expect(line).toContain('ferramenta');
         expect(line).toContain('Ler arquivo');
         expect(line).not.toContain('Executando tool');
+        expect(line).not.toContain('Executando ferramenta');
         expect(line).not.toContain('tool/');
         expect(line).not.toContain('read_file_content');
-        expect(line).toContain('lendo arquivo');
+        expect(line).not.toContain('lendo arquivo');
         expect(line).toContain('12s');
-        expect(line).toContain('modelo claude-sonnet-4.6');
-        expect(line).toContain('raciocínio xhigh');
+        expect(line).not.toContain('modelo claude-sonnet-4.6');
+        expect(line).not.toContain('raciocínio xhigh');
+        expect(line).not.toContain('conversa ativa');
+        expect(line.length).toBeLessThan(48);
     });
 
     it('mantém request_user_input formatável, mas fora do pulso periódico para não disputar o input', async () => {

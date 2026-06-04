@@ -231,6 +231,25 @@ function compactOneLine(value) {
 }
 
 /**
+ * @param {string} value
+ * @returns {string}
+ */
+function renderSdkOperatorMessage(value) {
+    const text = compactOneLine(value);
+    if (/^Operation cancelled by user\.?$/iu.test(text)) return 'operação cancelada pelo operador';
+    if (/^Response was interrupted due to a server error\.?\s*Retrying\.{0,3}$/iu.test(text)) {
+        return 'resposta interrompida por erro do servidor; tentando novamente';
+    }
+    if (/^Request failed due to a transient API error\.?\s*Retrying\.{0,3}$/iu.test(text)) {
+        return 'falha temporária da API; tentando novamente';
+    }
+    return text
+        .replace(/\bPremium Request\b/giu, 'pedido premium')
+        .replace(/\bprovider\b/giu, 'provedor')
+        .replace(/\bDisabled tools:/giu, 'ferramentas desativadas:');
+}
+
+/**
  * @param {string | null | undefined} value
  * @returns {boolean}
  */
@@ -518,9 +537,9 @@ function renderAssistantMessageProtocolKindLabel(kind) {
  */
 function renderSdkSessionInfoForOperator(infoType, message) {
     const type = String(infoType ?? 'info').trim() || 'info';
-    const text = compactOneLine(message);
+    const text = renderSdkOperatorMessage(message);
     if (type === 'configuration') {
-        const disabledTools = text.match(/Disabled tools:\s*(?<tools>.+)$/iu)?.groups?.['tools']?.trim();
+        const disabledTools = text.match(/ferramentas desativadas:\s*(?<tools>.+)$/iu)?.groups?.['tools']?.trim();
         if (disabledTools) {
             return {
                 label: 'Configuração',
@@ -530,17 +549,17 @@ function renderSdkSessionInfoForOperator(infoType, message) {
         return { label: 'Configuração', detail: compactSummaryText(text || 'configuração atualizada', 112) };
     }
     if (type === 'model_retry') {
-        const interrupted = /Response was interrupted due to a server error\.?\s*Retrying\.?/iu.test(text);
         return {
             label: 'Retry modelo',
-            detail: interrupted
-                ? 'resposta interrompida por erro do servidor; tentando novamente'
-                : compactSummaryText(text || 'tentando novamente', 112),
+            detail: compactSummaryText(text || 'tentando novamente', 112),
         };
+    }
+    if (type === 'cancellation') {
+        return { label: 'Cancelamento', detail: compactSummaryText(text || 'operação cancelada', 112) };
     }
     if (type === 'model') return { label: 'Modelo', detail: compactSummaryText(text || 'modelo atualizado', 112) };
     return {
-        label: 'Evento',
+        label: 'Sessão',
         detail: `${type.replace(/[._-]+/gu, ' ')} · ${compactSummaryText(text || '(sem mensagem)', 104)}`,
     };
 }
@@ -1202,13 +1221,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const onSessionWarning = (/** @type {{ warningType?: string; message?: string; url?: string }} */ evt) => {
         const warningType = evt?.warningType ?? 'warning';
-        const message = evt?.message ?? '(sem mensagem)';
-        recordTerminalActivity('system', `Warning SDK · ${warningType}`, {
+        const message = renderSdkOperatorMessage(evt?.message ?? '(sem mensagem)');
+        const warningLabel = String(warningType).replace(/[._-]+/gu, ' ').trim() || 'aviso';
+        recordTerminalActivity('system', `Aviso da sessão · ${warningLabel}`, {
             detail: message,
             severity: 'warn',
             source: 'sdk',
         });
-        println(terminalThemeRow('Warning SDK', `[${warningType}] ${message}`, { role: 'warn' }));
+        println(terminalThemeRow('Aviso sessão', `${warningLabel} · ${message}`, { role: 'warn' }));
         if (evt?.url) println(terminalThemeText('muted', `  ${evt.url}`));
         broadcastSse(
             'session.warning',

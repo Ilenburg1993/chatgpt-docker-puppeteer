@@ -260,9 +260,25 @@ function renderRuntimeArgsLabel(args) {
 const TOOL_HEARTBEAT_INTERVAL_MS = 10_000;
 const RECOVERABLE_MODEL_ERROR_RENDER_THROTTLE_MS = 30_000;
 const RECOVERABLE_MODEL_CALL_OPERATOR_DETAIL =
-    'roteamento/retry delegado ao SDK; auto é a única recuperação permitida quando aplicável; sem pedido premium confirmado';
+    'roteamento e retry delegados ao SDK; auto é a única recuperação permitida quando aplicável; sem pedido premium confirmado';
 const RECOVERABLE_BYOK_MODEL_CALL_OPERATOR_DETAIL =
-    'erro de provedor BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque provedor/modelo via /byok use ou /byok model; sem pedido premium';
+    'falha de provedor BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque provedor/modelo via /byok use ou /byok model; sem pedido premium';
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function renderProviderFailureMessageForOperator(value) {
+    const text = String(value ?? '').replace(/\s+/gu, ' ').trim();
+    if (/^Erro do SDK sem mensagem estruturada\.?$/iu.test(text)) {
+        return 'falha sem mensagem estruturada do SDK';
+    }
+    return text
+        .replace(/\bprovider\b/giu, 'provedor')
+        .replace(/\bPremium Request\b/giu, 'pedido premium')
+        .replace(/\s+/gu, ' ')
+        .trim();
+}
 
 /**
  * @param {Record<string, unknown>} evt
@@ -270,6 +286,7 @@ const RECOVERABLE_BYOK_MODEL_CALL_OPERATOR_DETAIL =
  * @returns {string}
  */
 function renderRecoverableByokModelCallErrorForOperator(evt, message) {
+    const operatorMessage = renderProviderFailureMessageForOperator(message);
     const provider =
         typeof evt['byokProviderType'] === 'string'
             ? evt['byokProviderType']
@@ -280,10 +297,14 @@ function renderRecoverableByokModelCallErrorForOperator(evt, message) {
     const model = typeof evt['byokModel'] === 'string' ? evt['byokModel'] : '-';
     return [
         '',
-        terminalThemeRow('Provedor BYOK', message, { role: 'warn' }),
+        terminalThemeRow('BYOK', `falha do provedor · ${operatorMessage}`, { role: 'warn' }),
         terminalThemeRow('Ação', 'troque provedor/modelo com /byok use ou /byok model', { role: 'command' }),
-        terminalThemeRow('Fallback', 'Copilot auto bloqueado por contrato · sem pedido premium', { role: 'muted' }),
-        terminalThemeRow('Contexto', `provedor ${provider} · perfil ${profile} · modelo ${model}`, { role: 'muted' }),
+        terminalThemeRow('Recuperação', 'Copilot auto bloqueado por contrato · sem pedido premium', {
+            role: 'muted',
+        }),
+        terminalThemeRow('Contexto', `provedor ${provider} · perfil ${profile} · modelo ${model}`, {
+            role: 'muted',
+        }),
     ].join('\n');
 }
 
@@ -765,10 +786,11 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         }
 
         const errorTypeLabel = renderRuntimeErrorTypeLabel(errorType);
+        const operatorMessage = renderProviderFailureMessageForOperator(msg);
         const detail =
             byokError.enabled && byokError.operatorDetail
-                ? `Erro de ${errorTypeLabel}: ${msg} · ${byokError.operatorDetail}`
-                : `Erro de ${errorTypeLabel}: ${msg}`;
+                ? `Erro de ${errorTypeLabel}: ${operatorMessage} · ${byokError.operatorDetail}`
+                : `Erro de ${errorTypeLabel}: ${operatorMessage}`;
 
         recordTerminalActivity('error', byokError.enabled ? 'Erro de sessão BYOK' : 'Erro de sessão', {
             detail,
@@ -809,17 +831,18 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const hookType = typeof evt?.['hookType'] === 'string' ? evt['hookType'] : null;
         const errorContext = typeof evt?.['errorContext'] === 'string' ? evt['errorContext'] : 'unknown';
         const msg = typeof evt?.['errorMessage'] === 'string' ? evt['errorMessage'] : 'unknown error';
+        const operatorMessage = renderProviderFailureMessageForOperator(msg);
         const recoverable = evt?.['recoverable'] === true;
         const isRecoverableModelCall = hookType === 'errorOccurred' && errorContext === 'model_call' && recoverable;
         const isByokModelCall = isRecoverableModelCall && isByokRecoverableModelCall(evt);
         const operatorDetail = isRecoverableModelCall ? resolveRecoverableModelCallOperatorDetail(evt) : null;
         const label = isByokModelCall
-            ? 'Erro de provedor BYOK'
+            ? 'Falha do provedor BYOK'
             : isRecoverableModelCall
               ? 'Erro recuperável de modelo SDK'
               : 'Erro do agente';
         const severity = isRecoverableModelCall ? 'warn' : 'error';
-        const detail = isRecoverableModelCall ? `${msg} · ${operatorDetail}` : `[${errorContext}] ${msg}`;
+        const detail = isRecoverableModelCall ? `${operatorMessage} · ${operatorDetail}` : `[${errorContext}] ${operatorMessage}`;
         const renderKey = `${errorContext}|${msg}`;
         const now = Date.now();
         const lastRenderedAt = recoverableModelErrorPrintedAtByKey.get(renderKey) ?? 0;

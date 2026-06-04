@@ -175,6 +175,45 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(typeof mod.setupTerminalSdkSessionEventListeners).toBe('function');
     });
 
+    it('humaniza cancelamento e aviso da sessão antes de renderizar no terminal', async () => {
+        mocks.getShowSessionActivity.mockReturnValue(true);
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
+        agent.emit('session.info', { infoType: 'cancellation', message: 'Operation cancelled by user' });
+        agent.emit('session.warning', {
+            warningType: 'rate_limit',
+            message: 'Provider warning without Premium Request evidence',
+        });
+
+        const rendered = mocks.println.mock.calls.map(([line]) => String(line)).join('\n');
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Cancelamento',
+            expect.objectContaining({
+                detail: 'operação cancelada pelo operador',
+                source: 'sdk',
+            }),
+        );
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Aviso da sessão · rate limit',
+            expect.objectContaining({
+                detail: 'provedor warning without pedido premium evidence',
+                source: 'sdk',
+                severity: 'warn',
+            }),
+        );
+        expect(rendered).toContain('Cancelamento');
+        expect(rendered).toContain('operação cancelada pelo operador');
+        expect(rendered).toContain('Aviso sessão');
+        expect(rendered).not.toContain('Warning SDK');
+        expect(rendered).not.toContain('Operation cancelled by user');
+        expect(rendered).not.toContain('Premium Request');
+    });
+
     it('reflete session.mode_changed no estado e no SSE vanilla', async () => {
         const { setupTerminalSdkSessionEventListeners } =
             await import('../../../src/copilot/terminal/events/sdk-session-events.js');
@@ -421,7 +460,8 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Turno'));
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Ações'));
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Arquivos'));
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('workspace.read_file'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('LER Ler arquivo'));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('workspace.read_file'));
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('files/plan.md'));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining(process.cwd()));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Workspace file update: files/plan.md'));
@@ -769,7 +809,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             title: 'Faça um teste integrado canônico do terminal com prompt muito longo que não deve ocupar a tela inteira do operador humano',
         });
 
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringMatching(/Config SDK\s+tools nativas desativadas/u));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringMatching(/Configuração\s+ferramentas nativas desativadas/u));
         expect(mocks.println).toHaveBeenCalledWith(expect.stringMatching(/Título\s+Faça um teste integrado/u));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('SDK info'));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Disabled tools:'));
@@ -845,12 +885,13 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         });
 
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
-            'error',
-            'Retry de modelo em andamento',
+            'system',
+            'Retry modelo',
             expect.objectContaining({
                 severity: 'warn',
                 source: 'sdk',
                 recordHistory: true,
+                detail: 'falha temporária da API; tentando novamente',
             }),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(

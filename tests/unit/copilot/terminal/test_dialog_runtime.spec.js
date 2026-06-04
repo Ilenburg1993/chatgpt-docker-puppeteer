@@ -81,5 +81,10 @@ describe('terminal/dialog/dialog-runtime', () => {
 
         expect(src).toContain('sem pergunta humana ou formulário pendente');
         expect(src).not.toContain('sem ask_user/elicitation pendente');
+        expect(src).toContain("'Turno'");
+        expect(src).toContain("'Diagnóstico'");
+        expect(src).not.toContain('Turno terminou sem saída pública');
+        expect(src).not.toContain('⛔');
+        expect(src).not.toContain("println('\\x1b[31m");
     });
 });

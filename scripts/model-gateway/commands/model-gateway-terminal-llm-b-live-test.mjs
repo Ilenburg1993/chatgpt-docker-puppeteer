@@ -4218,6 +4218,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             detail: 'tool live status used human phase labels instead of raw phase/tool prefixes',
         },
         {
+            id: 'ux-tool-live-status-stays-single-line',
+            pass: !/LLM-B\s+ferramenta[^\n]*(?:[\r\n]\s*(?:arquivo|·)|modelo\s+|racioc[ií]nio|conversa ativa)/iu.test(
+                plain,
+            ),
+            detail: 'tool live status stayed one compact operator line without model/runtime tail',
+        },
+        {
             id: 'ux-no-technical-tool-name-in-live-status',
             pass: !/⟲ LLM-B[^\n\r]*(?:tool\/|ferramenta ·)[^\n\r]*\bexec_command\b/iu.test(plain),
             detail: 'live status did not expose exec_command in the default visual line',
