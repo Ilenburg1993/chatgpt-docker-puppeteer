@@ -73,4 +73,20 @@ describe('terminal/capabilities/picker-runner', () => {
         expect(result.status).toBe('failed');
         expect(result.reason).toBe('seleção não corresponde a item conhecido');
     });
+
+    it('passa escolhas do gum após separador de opções', () => {
+        const execute = vi.fn(() => ({ status: 0, stdout: '01 Status · visão operacional\n' }));
+
+        runTerminalExternalPicker(ITEMS, {
+            command: 'gum',
+            renderer: 'gum',
+            execute,
+        });
+
+        expect(execute).toHaveBeenCalledWith(
+            'gum',
+            expect.arrayContaining(['choose', '--header', 'menu>', '--', '01 Status · visão operacional']),
+            {},
+        );
+    });
 });

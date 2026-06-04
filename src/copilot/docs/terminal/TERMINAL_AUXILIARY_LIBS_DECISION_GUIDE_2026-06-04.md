@@ -519,6 +519,10 @@ Decisão:
     de controle;
   - nesses casos, o terminal volta ao parser JS canônico e informa que o filtro foi ignorado;
   - testes cobrem `--version` em JSON e caractere de controle em YAML.
+- [x] Guardrail de option-injection em escolhas do `gum`:
+  - `runTerminalExternalPicker()` já não usa shell livre;
+  - mesmo assim, escolhas posicionais do `gum choose` agora entram depois de `--`;
+  - teste unitário garante que escolhas como `01 Status ...` são passadas após o separador.
 - [x] Live PTY com contrato JSON de libs:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-json-contract-pass3-20260604 --timeout-ms 180000`;
   - artefato: `artifacts/terminal-live/2026-06-04T17-44-25-689Z/summary.md`;

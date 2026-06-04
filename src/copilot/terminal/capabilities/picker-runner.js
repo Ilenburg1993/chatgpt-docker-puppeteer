@@ -98,7 +98,7 @@ export function runTerminalExternalPicker(items, options) {
     const filter = String(process.env['COPILOT_TERMINAL_PICKER_FILTER'] ?? '').trim();
     const result =
         renderer === 'gum'
-            ? execute(command, ['choose', '--header', prompt.trim(), ...lines], {})
+            ? execute(command, ['choose', '--header', prompt.trim(), '--', ...lines], {})
             : execute(
                   command,
                   [

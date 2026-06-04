@@ -7579,6 +7579,10 @@
     controle antes de chamar renderer externo;
   - o fallback JS permanece canônico e declara `filtro ignorado`;
   - `test_structured_preview.spec.js` cobre JSON/YAML.
+- [x] Oitava correção derivada da reauditoria de libs auxiliares:
+  - `gum choose` recebe opções antes das escolhas;
+  - `picker-runner.js` agora passa `--` antes das escolhas;
+  - `test_picker_runner.spec.js` cobre o separador.
 - [ ] Próxima lacuna visual:
   - auditar `/help full`, `/byok gateway commands`, `/byok gateway operator-ready` e `/byok auto`
     para confirmar que o modo detalhado é rico sem parecer lixo técnico;
