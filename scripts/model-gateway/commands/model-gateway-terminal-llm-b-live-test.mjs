@@ -5468,6 +5468,9 @@ async function main() {
     const scheduleMissingRequiredAskDiagnostics = () => {
         if (postCommandsSent) return;
         postCommandsSent = true;
+        console.warn(
+            '[terminal-live] cenário canônico: deltas públicos concluídos, mas ask_user obrigatório não apareceu; coletando diagnósticos.',
+        );
         const diagnostics = ['/activity 40', '/events 100 --raw', '/errors 10', `/export ${exportArg}`];
         sendCommandSequence(write, diagnostics, { delayMs: 450 });
         setTimeout(

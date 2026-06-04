@@ -5216,12 +5216,15 @@
 - [x] Próxima lacuna do harness/live: quando o cenário canônico volta para `Pronto` após deltas
       sem `ask_user`, o runner deve classificar rapidamente como `missing-required-ask-user`
       ou `assistant-ended-before-ask`, em vez de aguardar timeout total.
-- [ ] Próxima lacuna UX: a tela humana deve receber uma linha curta de diagnóstico do cenário live
+- [x] Próxima lacuna UX: a tela humana deve receber uma linha curta de diagnóstico do cenário live
       após deltas sem pergunta, por exemplo `Cenário live aguardava ask_user, mas o turno terminou`.
 - [x] Continuação: o runner ganhou detector `assistant-ended-before-ask` para o padrão
       `DELTA-CANONICAL-8` materializado + pergunta ausente + retorno ao prompt.
 - [x] Continuação: durante a live, esse padrão agenda `/activity 40`, `/events 100 --raw`,
       `/errors 10`, `/export ...` e `/quit`, reduzindo espera inútil antes do summary.
+- [x] Continuação UX: o runner imprime uma linha curta
+      `[terminal-live] cenário canônico: deltas públicos concluídos, mas ask_user obrigatório não apareceu; coletando diagnósticos.`
+      antes de disparar os comandos diagnósticos.
 - [x] Validação local: o artefato bloqueado
       `live-canonical-dual-time-model-events-20260604-2244` seria classificado como
       `assistant-ended-before-ask`.
