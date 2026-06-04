@@ -2095,10 +2095,10 @@ function diagnosticUxCycleCriteria(boot) {
                 /Diagnóstico do Terminal LLM-B[\s\S]*Agente[\s\S]*Atividade[\s\S]*Infraestrutura[\s\S]*Ferramentas por latência/iu.test(
                     healthFullSurface,
                 ) &&
-                !/╔|╚|\bAGENTE\b|\bINFRAESTRUTURA\b|TOOL STATS|TODOs PENDENTES|Status\s+idle|Modo SDK\s+interactive|Permissões\s+approve_all/u.test(
+                !/╔|╚|\bAGENTE\b|\bINFRAESTRUTURA\b|TOOL STATS|TODOs PENDENTES|Status\s+idle|Modo SDK\s+interactive|Permissões\s+approve_all|[Ss]essão (?:runtime|SDK|hub)\s+(?:[a-z0-9_-]{8,}|.*…)|Hub storage\s+.*[Ss]essão\s+[a-z0-9_-]{8,}…|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/u.test(
                     healthFullSurface,
                 ),
-            detail: '/health full rendered themed sections with human status/mode labels instead of the old decorative ANSI box or raw constants',
+            detail: '/health full rendered themed sections with human status/mode labels instead of the old decorative ANSI box, raw constants, UUIDs or session ids',
         },
         {
             id: 'diagnostic-ux-tools-human',

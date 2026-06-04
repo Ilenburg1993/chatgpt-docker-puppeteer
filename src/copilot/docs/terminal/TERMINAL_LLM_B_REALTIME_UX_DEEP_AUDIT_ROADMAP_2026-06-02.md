@@ -4713,3 +4713,28 @@
   - Sequência: `/byok models 2`, `/byok recommend 2`, `/quit`.
   - Resultado: linhas individuais apareceram como `Modelo`, `Detalhes`, `Orçamento` e `Ação`,
         sem ANSI manual visível.
+
+### 12.18 `/health full` sem IDs de sessão em superfície humana
+
+- [x] Auditoria pós-live: `/health full` e `/diagnose full` ainda mostravam IDs compactos de
+      sessão runtime, sessão SDK, sessão hub e storage do hub, apesar de a tela ser operacional e
+      humana.
+- [x] Decisão UX: superfícies humanas (`/health`, `/health full`, `/diagnose full`, `/status`,
+      `/now`) devem comunicar presença, saúde e ação recomendada; identificadores completos ou
+      compactos ficam reservados para `detail`, `debug`, `raw` e comandos explicitamente técnicos.
+- [x] Implementação: `cmdDiagnose` passou a renderizar `Sessão runtime ativa`, `Sessão SDK ativa`
+      e `Sessão hub ativo` em modo `full`, preservando IDs completos apenas em `detail/debug`.
+- [x] Implementação: `Hub storage` passou a trocar `sessão <id>…` por `sessão ativa` em modo
+      humano, mantendo o resumo bruto no modo detalhado.
+- [x] Harness live reforçado: `diagnostic-ux-health-full-themed` agora reprova se `/health full`
+      voltar a exibir UUIDs, IDs compactos de sessão ou o storage do hub com identificador.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/diagnose.js`.
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx eslint src/copilot/terminal/commands/diagnose.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_diagnose.spec.js`.
+- [x] Live PTY diagnóstica passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-health-no-session-ids-20260603-2124`.
+  - Resultado: PASS em 29/29 critérios; `/health full` mostrou `sessão ativa` sem IDs de sessão.
+- [ ] Próxima lacuna: revisar `Timers`, `Mapa runtime`, `Runtime alvo` e `/session` para remover
+      os últimos resíduos técnicos das telas humanas sem perder diagnóstico nos modos detalhados.

@@ -28,7 +28,6 @@ import {
     terminalThemeText,
 } from '../state/index.js';
 import {
-    compactTerminalDiagnosticId,
     compactTerminalToolText,
     getTerminalHumanToolName,
 } from '../events/tool-activity-presenter.js';
@@ -158,14 +157,15 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
             : mcp.circuitOpen
               ? `${C.red}falha · circuito aberto${C.reset}`
               : `${C.yellow}aviso · indisponível${C.reset}`;
+    const hubSummary = renderDiagnoseHubStorageSummary(hub.summary, detail);
     const hubLine =
-        hub.summary === 'sem storage'
-            ? `${C.grey}${hub.summary}${C.reset}`
-            : hub.summary.includes('não inicializado')
-              ? `${C.yellow}aviso · ${hub.summary}${C.reset}`
-              : hub.summary.includes('erro')
-                ? `${C.red}falha · ${hub.summary}${C.reset}`
-                : `${C.green}ok · ${hub.summary}${C.reset}`;
+        hubSummary === 'sem storage'
+            ? `${C.grey}${hubSummary}${C.reset}`
+            : hubSummary.includes('não inicializado')
+              ? `${C.yellow}aviso · ${hubSummary}${C.reset}`
+              : hubSummary.includes('erro')
+                ? `${C.red}falha · ${hubSummary}${C.reset}`
+                : `${C.green}ok · ${hubSummary}${C.reset}`;
     const todoLines =
         todos.length === 0
             ? `${C.green}nenhum pendente${C.reset}`
@@ -263,9 +263,9 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         : keepaliveOk
           ? `${C.green}standby da conversa${C.reset}`
           : `${C.yellow}parado${C.reset}`;
-    const runtimeSessionLabel = renderDiagnoseSessionId(runtimeSessionId, detail, '(sem runtime)');
-    const sdkSessionLabel = renderDiagnoseSessionId(binding.sdkSessionId, detail, '(sem sdk)');
-    const hubSessionLabel = renderDiagnoseSessionId(hub.activeHubSessionId, detail, '(sem hub)');
+    const runtimeSessionLabel = renderDiagnoseSessionId(runtimeSessionId, detail, 'sem runtime', 'ativa');
+    const sdkSessionLabel = renderDiagnoseSessionId(binding.sdkSessionId, detail, 'sem SDK', 'ativa');
+    const hubSessionLabel = renderDiagnoseSessionId(hub.activeHubSessionId, detail, 'sem hub', 'ativo');
 
     if (!wantsFull) {
         const backgroundLine =
@@ -409,11 +409,24 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
  * @param {string | null | undefined} value
  * @param {boolean} detail
  * @param {string} emptyLabel
+ * @param {string} activeLabel
  * @returns {string}
  */
-function renderDiagnoseSessionId(value, detail, emptyLabel) {
+function renderDiagnoseSessionId(value, detail, emptyLabel, activeLabel) {
     if (!value) return emptyLabel;
-    return detail ? value : (compactTerminalDiagnosticId(value, 14) ?? value);
+    return detail ? value : activeLabel;
+}
+
+/**
+ * @param {string | null | undefined} summary
+ * @param {boolean} detail
+ * @returns {string}
+ */
+function renderDiagnoseHubStorageSummary(summary, detail) {
+    const value = String(summary ?? '').trim();
+    if (!value) return 'sem storage';
+    if (detail) return value;
+    return value.replace(/^sessão\s+[a-z0-9_-]+…?$/iu, 'sessão ativa');
 }
 
 /**

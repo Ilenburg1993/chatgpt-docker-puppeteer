@@ -310,8 +310,11 @@ describe('commands/diagnose', () => {
             expect(output).toContain('pergunta restaurada expirando');
             expect(output).toContain('Runtime alvo');
             expect(output).not.toContain('runtime id');
-            expect(output).toContain('sdk-diagnose-1…');
-            expect(output).toContain('hub-1');
+            expect(output).toContain('Sessão runtime ativa');
+            expect(output).toContain('Sessão SDK   ativa');
+            expect(output).toContain('Sessão hub   ativo');
+            expect(output).not.toContain('sdk-diagnose-1…');
+            expect(output).not.toContain('hub-1');
             expect(output).not.toContain('sdk-diagnose-123456789012345');
             expect(output).not.toContain('hub-diagnose-123456789012345');
             expect(output).toContain('*default:gpt-5/processing');
