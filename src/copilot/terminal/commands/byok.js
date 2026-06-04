@@ -301,6 +301,18 @@ function renderByokTokenLabel(value) {
         replan_after_turn_failure: 'replanejar pós-falha',
         wait_for_provider_reset: 'aguardar reset do provedor',
         policy_denied: 'política não autorizou',
+        policy_disabled: 'política desativada',
+        no_effect_policy_enabled: 'sem efeito terminal habilitado',
+        automation_decision_blocked: 'decisão automática bloqueada',
+        no_active_catalog_snapshot: 'snapshot ativo ausente',
+        model_unavailable: 'modelo indisponível',
+        route_blocked: 'rota bloqueada',
+        runtime_selector_route_missing: 'seletor não encontrou rota',
+        selected_route_missing: 'rota selecionada ausente',
+        rate_limit_resettable: 'limite de taxa com reset',
+        provider_health_cooldown: 'cooldown de saúde do provedor',
+        route_wait_for_reset: 'rota aguardando reset',
+        'blocked:provider_health_cooldown:rate-limit': 'bloqueada por cooldown de limite de taxa',
         keep_current: 'manter atual',
         wait_for_reset: 'aguardar reset',
     });
@@ -3789,12 +3801,12 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
     println(`    troca viva:    \x1b[33m${decision.canApplyLiveModel ? 'sim' : 'nao'}\x1b[0m`);
     println(`    nova sessao:   \x1b[33m${decision.requiresNewSession ? 'sim' : 'nao'}\x1b[0m`);
     if (decision.blockerClass && decision.blockerClass !== 'none') {
-        println(`    classe:        \x1b[33m${decision.blockerClass}\x1b[0m`);
+        println(`    classe:        \x1b[33m${renderByokTokenLabel(decision.blockerClass)}\x1b[0m`);
     }
-    if (decision.nonActionReason) println(`    sem ação:      \x1b[33m${decision.nonActionReason}\x1b[0m`);
+    if (decision.nonActionReason) println(`    sem ação:      \x1b[33m${renderByokTokenLabel(decision.nonActionReason)}\x1b[0m`);
     if (decision.cooldown?.active === true) {
         println(
-            `    cooldown:      \x1b[33m${decision.cooldown.reason ?? 'ativo'} · reset ${decision.cooldown.resetAt ?? '-'} · nova tentativa ${decision.cooldown.retryAfterSeconds ?? '-'}s\x1b[0m`,
+            `    cooldown:      \x1b[33m${renderByokTokenLabel(decision.cooldown.reason)} · reset ${decision.cooldown.resetAt ?? '-'} · nova tentativa ${decision.cooldown.retryAfterSeconds ?? '-'}s\x1b[0m`,
         );
     }
     if (alternativeSummary) {
@@ -3820,7 +3832,7 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
             println(`      \x1b[90mprovar: ${proof.command}\x1b[0m`);
         }
     }
-    if (decision.blockers.length > 0) println(`    bloqueios:     \x1b[33m${decision.blockers.join(', ')}\x1b[0m`);
+    if (decision.blockers.length > 0) println(`    bloqueios:     \x1b[33m${renderByokTokenList(decision.blockers)}\x1b[0m`);
     if (persistence) {
         println(`    persistência:  \x1b[32m${persistence.automationDecisions} decisão(ões) gravada(s)\x1b[0m`);
     }
@@ -3942,7 +3954,7 @@ async function renderByokGatewayAutoStandby(println, rest) {
         `  \x1b[90mperfil ${status.args.profileId} · seletor de execução ${status.runtimeSelectorPlan.ok ? 'ok' : 'bloqueado'} · rotas ${rows.length} · provas ${proofCount} · provedores ${providerCount} · sem chamada a provedor\x1b[0m`,
     );
     if (visibleRows.length === 0) {
-        println('  \x1b[90mNenhuma rota de prontidao foi derivada do selector atual.\x1b[0m\n');
+        println('  \x1b[90mNenhuma rota de prontidão foi derivada do seletor atual.\x1b[0m\n');
         return;
     }
     for (const [index, row] of visibleRows.entries()) {
@@ -4194,7 +4206,7 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
     const applied = result.application?.applied ?? [];
     const skipped = result.application?.skipped ?? [];
     println(
-        `    decisão:       \x1b[33mação ${result.status.decision.action} · rota ${result.status.decision.selectedRouteKey ?? '-'}\x1b[0m`,
+        `    decisão:       \x1b[33mação ${renderByokTokenLabel(result.status.decision.action)} · rota ${result.status.decision.selectedRouteKey ?? '-'}\x1b[0m`,
     );
     println(
         `    efeitos:       \x1b[33maplicados ${applied.length} · pulados ${skipped.length} · persistidos ${result.effectPersistence?.automationEffectApplications ?? 0}\x1b[0m`,
@@ -4205,7 +4217,7 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
     const health = result.healthPersistence;
     if (health) {
         println(
-            `    health:        \x1b[33mregistrado ${health.recorded ? 'sim' : 'nao'} · rota ${health.providerId ?? '-'}:${health.providerModel ?? '-'} · SQLite ${health.sqlite ? `${health.sqlite.healthObservations}/${health.sqlite.records}` : '-'}\x1b[0m`,
+            `    saúde:         \x1b[33mregistrada ${health.recorded ? 'sim' : 'nao'} · rota ${health.providerId ?? '-'}:${health.providerModel ?? '-'} · SQLite ${health.sqlite ? `${health.sqlite.healthObservations}/${health.sqlite.records}` : '-'}\x1b[0m`,
         );
     }
     const details = [...applied, ...skipped].map(describeTerminalByokGatewayAutoEffect).slice(0, 5);
@@ -4319,20 +4331,20 @@ async function renderByokGatewayAutoDoctor(println, rest) {
         `  \x1b[90mperfil ${status.args.profileId} · snapshot ativo ${activeSnapshot ? 'sim' : 'nao'} · comandos ${commandCount} · avisos ${warnings.length}\x1b[0m`,
     );
     println(
-        `    política:      \x1b[33mativa ${effectivePolicy.enabled ? 'sim' : 'nao'} · arquivo ${fileConfigured ? 'sim' : 'nao'} · set model vivo ${effectivePolicy.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${effectivePolicy.allowNewSession ? 'sim' : 'nao'}\x1b[0m`,
+        `    política:      \x1b[33mativa ${effectivePolicy.enabled ? 'sim' : 'nao'} · arquivo ${fileConfigured ? 'sim' : 'nao'} · modelo vivo ${effectivePolicy.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${effectivePolicy.allowNewSession ? 'sim' : 'nao'}\x1b[0m`,
     );
     println(
-        `    origem policy: \x1b[33mativa ${policySources['enabled']?.source ?? '-'} · perfis ${policySources['profiles']?.source ?? '-'} · set model vivo ${policySources['allowLiveSetModel']?.source ?? '-'} · nova sessão ${policySources['allowNewSession']?.source ?? '-'}\x1b[0m`,
+        `    origem policy: \x1b[33mativa ${policySources['enabled']?.source ?? '-'} · perfis ${policySources['profiles']?.source ?? '-'} · modelo vivo ${policySources['allowLiveSetModel']?.source ?? '-'} · nova sessão ${policySources['allowNewSession']?.source ?? '-'}\x1b[0m`,
     );
     println(
-        `    decisão:       \x1b[33mok ${decision.ok ? 'sim' : 'nao'} · ação ${decision.action} · rota ${decision.selectedRouteKey ?? '-'}\x1b[0m`,
+        `    decisão:       \x1b[33mok ${decision.ok ? 'sim' : 'nao'} · ação ${renderByokTokenLabel(decision.action)} · rota ${decision.selectedRouteKey ?? '-'}\x1b[0m`,
     );
     println(
-        `    target:        \x1b[33m${decision.targetBoundary.preset ?? '-'} · ${decision.targetBoundary.model ?? '-'}\x1b[0m`,
+        `    alvo:          \x1b[33m${decision.targetBoundary.preset ?? '-'} · ${decision.targetBoundary.model ?? '-'}\x1b[0m`,
     );
     if (decision.cooldown?.active === true) {
         println(
-            `    cooldown:      \x1b[33m${decision.cooldown.reason ?? 'ativo'} · reset ${decision.cooldown.resetAt ?? '-'} · nova tentativa ${decision.cooldown.retryAfterSeconds ?? '-'}s\x1b[0m`,
+            `    cooldown:      \x1b[33m${renderByokTokenLabel(decision.cooldown.reason)} · reset ${decision.cooldown.resetAt ?? '-'} · nova tentativa ${decision.cooldown.retryAfterSeconds ?? '-'}s\x1b[0m`,
         );
     }
     if (alternativeSummary) {
@@ -4340,7 +4352,7 @@ async function renderByokGatewayAutoDoctor(println, rest) {
         const topReasons = Object.entries(rejectionCounts)
             .sort((left, right) => Number(right[1] ?? 0) - Number(left[1] ?? 0))
             .slice(0, 4)
-            .map(([reason, count]) => `${reason} ${count}`)
+            .map(([reason, count]) => `${renderByokTokenLabel(reason)} ${count}`)
             .join(', ');
         println(
             `    alternativas:  \x1b[33musáveis ${alternativeSummary.usableCount}/${alternativeSummary.evaluatedCount} · provedores ${alternativeSummary.providerCount}${topReasons ? ` · ${topReasons}` : ''}\x1b[0m`,
@@ -4355,8 +4367,8 @@ async function renderByokGatewayAutoDoctor(println, rest) {
     println(
         `    sdk:           \x1b[33msessão ${status.inventory.currentSessionId ?? '-'} · sessão viva ${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}\x1b[0m`,
     );
-    if (decision.blockers.length > 0) println(`    bloqueios:     \x1b[33m${decision.blockers.join(', ')}\x1b[0m`);
-    if (warnings.length > 0) println(`    avisos:        \x1b[33m${warnings.join(', ')}\x1b[0m`);
+    if (decision.blockers.length > 0) println(`    bloqueios:     \x1b[33m${renderByokTokenList(decision.blockers)}\x1b[0m`);
+    if (warnings.length > 0) println(`    avisos:        \x1b[33m${renderByokTokenList(warnings)}\x1b[0m`);
     println(`    resumo:        \x1b[90m${decision.operatorSummary}\x1b[0m`);
     println(
         `    próximo:       \x1b[90m${warnings.includes('policy_disabled') ? '/byok auto on profile:' + status.args.profileId : decision.nextCommands.join(' && ')}\x1b[0m\n`,

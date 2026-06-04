@@ -134,7 +134,7 @@ export function describeTerminalByokGatewayAutoEffect(effect) {
     }
     if (effect['applied'] === true && kind === 'replan_after_turn_failure') {
         const scope = optionalScalarString(effect['recoveryScope']) === 'account' ? 'conta/key' : 'modelo/rota';
-        return `replanejamento pos-falha registrado (${optionalScalarString(effect['failureKind']) ?? 'unknown_failure'}, escopo ${scope})`;
+        return `replanejamento pós-falha registrado (${optionalScalarString(effect['failureKind']) ?? 'unknown_failure'}, escopo ${scope})`;
     }
     if (skippedReason === 'effect_not_authorized') {
         return `efeito ${kind} aguardando autorizacao da policy`;

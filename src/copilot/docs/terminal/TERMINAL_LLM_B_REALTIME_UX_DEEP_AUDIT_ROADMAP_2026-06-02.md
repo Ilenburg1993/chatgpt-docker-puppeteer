@@ -8433,6 +8433,19 @@
     `artifacts/terminal-live/byok-auto-probe-ux-20260604-wait-before/summary.md`;
   - status PASS;
   - o cockpit `operator-ready` deixou de colar no eco do catálogo canônico longo.
+- [x] Limpeza pós-PASS:
+  - recovery fixture deixou de expor `ação manual_intervention`;
+  - empty state de standby passou de `selector atual`/`prontidao` para `seletor atual`/`prontidão`;
+  - linha `health:` do fixture virou `saúde:`;
+  - detalhe de recovery passou a usar `pós-falha`.
+- [x] Limpeza dos painéis `auto status` e `auto doctor`:
+  - `model_unavailable`, `route_blocked`, `runtime_selector_route_missing`,
+    `selected_route_missing`, `policy_disabled`, `no_effect_policy_enabled` e
+    `automation_decision_blocked` passaram por tradução visual;
+  - `target:` virou `alvo:`;
+  - `set model vivo` virou `modelo vivo`;
+  - cooldowns, bloqueios, classes e motivos de não ação agora usam a mesma função de rótulo
+    humano dos ledgers.
 - [ ] Próxima auditoria:
   - segmentar critérios de auto-probe por superfície em vez de procurar alguns termos no log
     inteiro;

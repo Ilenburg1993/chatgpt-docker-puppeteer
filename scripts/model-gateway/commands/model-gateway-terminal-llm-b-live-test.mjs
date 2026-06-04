@@ -5346,7 +5346,7 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
                 /sem chamada (?:a )?provedor/.test(plain) &&
                 ((/(?:provar|prove):\s+\/byok probe/u.test(plain) &&
                     /novo boot:\s+\/session sdk next new/u.test(plain)) ||
-                    /Nenhuma rota de prontidao foi derivada do selector atual/u.test(plain)),
+                    /Nenhuma rota de prontid[aã]o foi derivada do seletor atual/u.test(plain)),
             detail: '/byok auto standby rendered ready replacement commands or an explicit empty state without provider calls',
         },
         {
