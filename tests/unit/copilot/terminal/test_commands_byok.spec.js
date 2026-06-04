@@ -4,7 +4,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeProofCommands, buildModelGatewayRuntimeStandbyPlan, buildModelGatewayRuntimeStandbyRoutes, buildModelGatewayRuntimeSelectorPlan, buildModelGatewayRuntimeAutomationDecision, buildModelGatewayRuntimeAutomationControllerStep, DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH, explainModelGatewayRuntimeAutomationPolicySources, listModelGatewayRuntimeAutomationPolicyPresets, resolveModelGatewayRuntimeAutomationPolicyPreset, validateModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationEffectivePolicy, readModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationPolicyFile, writeModelGatewayRuntimeAutomationPolicyFile, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayAccountLimitOverlays, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, explainModelGatewaySelectionComparison, flushAndMirrorByokProviderHealthToSqlite, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayProbeBackoff, planModelGatewayCatalogRefresh, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, scheduleTerminalSdkSessionBootSelection, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayEligibilityDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayProviderQuotaCapabilities, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
+const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeProofCommands, buildModelGatewayRuntimeStandbyPlan, buildModelGatewayRuntimeStandbyRoutes, buildModelGatewayRuntimeSelectorPlan, buildModelGatewayRuntimeAutomationDecision, buildModelGatewayRuntimeAutomationControllerStep, DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH, explainModelGatewayRuntimeAutomationPolicySources, listModelGatewayRuntimeAutomationPolicyPresets, resolveModelGatewayRuntimeAutomationPolicyPreset, validateModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationEffectivePolicy, readModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationPolicyFile, writeModelGatewayRuntimeAutomationPolicyFile, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayAccountLimitOverlays, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, explainModelGatewaySelectionComparison, flushAndMirrorByokProviderHealthToSqlite, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayProbeBackoff, planModelGatewayCatalogRefresh, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalConfigProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, scheduleTerminalSdkSessionBootSelection, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayEligibilityDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayProviderQuotaCapabilities, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -1286,6 +1286,7 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             modelGatewayProjection: { providers: [], models: [] },
         })),
         readTerminalByokProjection: vi.fn(),
+        readTerminalConfigProjection: vi.fn(() => ({ currentModel: 'kilo-auto/free' })),
         readTerminalRuntimeState: vi.fn(() => ({ contextWindow: null })),
         recordByokProviderModelCallFailure: vi.fn(),
         recordByokProviderModelCallSuccess: vi.fn(),
@@ -1382,6 +1383,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     listTerminalSdkSessionInventory,
     readTerminalByokGatewayProjectionFromEnv,
     readTerminalByokProjection,
+    readTerminalConfigProjection,
     readTerminalRuntimeState,
     scheduleTerminalSdkSessionBootSelection,
     setTerminalModelProjection,
@@ -1834,6 +1836,8 @@ describe('terminal /byok command', () => {
             modelGatewayProjection: { providers: [], models: [] },
         });
         readTerminalByokProjection.mockReset();
+        readTerminalConfigProjection.mockReset();
+        readTerminalConfigProjection.mockReturnValue({ currentModel: 'kilo-auto/free' });
         readTerminalRuntimeState.mockReset();
         readTerminalRuntimeState.mockReturnValue({ contextWindow: null });
         recordByokProviderModelCallFailure.mockReset();
@@ -2016,7 +2020,7 @@ describe('terminal /byok command', () => {
 
         expect(ctx.output()).toContain('BYOK · perfil ollama-cloud');
         expect(ctx.output()).toContain('BYOK · perfil kilo');
-        expect(ctx.output()).toContain('cruzam provider/perfil');
+        expect(ctx.output()).toContain('cruza provedor ou perfil da sessão atual');
         expect(ctx.output()).toContain('/session sdk next new');
     });
 
@@ -2362,9 +2366,12 @@ describe('terminal /byok command', () => {
                 errorContext: 'provider.credits',
             }),
         );
-        expect(ctx.output()).toContain('diagnóstico: provider BYOK recusou a chamada por credito');
-        expect(ctx.output()).toContain('ação: troque para modelo free');
-        expect(ctx.output()).toContain('erro: 402 402 status code (no body)');
+        expect(ctx.output()).toContain('Diagnóstico');
+        expect(ctx.output()).toContain('provider BYOK recusou a chamada por credito');
+        expect(ctx.output()).toContain('Ação');
+        expect(ctx.output()).toContain('troque para modelo free');
+        expect(ctx.output()).toContain('Erro');
+        expect(ctx.output()).toContain('402 402 status code (no body)');
     });
 
     it('sonda shortlist recomendada sem trocar a sessão viva e preserva profile/modelo de cada candidato', async () => {
@@ -2464,7 +2471,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('BYOK shortlist agent probe');
         expect(ctx.output()).toContain('kilo/model-a');
         expect(ctx.output()).toContain('openrouter/model-b');
-        expect(ctx.output()).toContain('Shortlist encerrada: aprovados 2/2');
+        expect(ctx.output()).toContain('Shortlist');
+        expect(ctx.output()).toContain('encerrada · aprovados 2/2');
         expect(ctx.output()).not.toContain('ok=2/2');
         expect(ctx.output()).not.toContain('providerTentado=');
         expect(ctx.output()).toContain('/byok recommend ... safe');
@@ -2534,7 +2542,8 @@ describe('terminal /byok command', () => {
                 providerModel: 'kilo-auto/free',
             }),
         );
-        expect(ctx.output()).toContain('Shortlist encerrada: aprovados 1/1');
+        expect(ctx.output()).toContain('Shortlist');
+        expect(ctx.output()).toContain('encerrada · aprovados 1/1');
         expect(ctx.output()).not.toContain('ok=1/1');
         expect(ctx.output()).not.toContain('providerTentado=');
         expect(ctx.output()).not.toContain("COPILOT_BYOK_PROFILE 'kilo-code'");
@@ -4431,8 +4440,8 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'model anthropic/claude-sonnet-4.5');
 
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
-        expect(ctx.output()).toContain('Sessão viva não usa o mesmo provedor BYOK');
-        expect(ctx.output()).toContain('sem troca cruzando provedor');
+        expect(ctx.output()).toContain('Sessão atual usa outro provedor/perfil');
+        expect(ctx.output()).toContain('sem troca cruzada na conversa viva');
         expect(ctx.output()).not.toContain('bound ao mesmo provider');
     });
 
@@ -4464,7 +4473,8 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'models');
 
-        expect(ctx.output()).toContain('fonte provider');
+        expect(ctx.output()).toContain('Fonte');
+        expect(ctx.output()).toContain('provider');
         expect(ctx.output()).toContain('remote-a');
         expect(ctx.output()).toContain('free');
         expect(ctx.output()).toContain('provedor fixture');
@@ -5034,7 +5044,8 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'models reasoning vision 5');
 
-        expect(ctx.output()).toContain('fonte model-gateway/static-fallback');
+        expect(ctx.output()).toContain('Fonte');
+        expect(ctx.output()).toContain('model-gateway/static-fallback');
         expect(ctx.output()).toContain('gateway-model');
         expect(ctx.output()).toContain('provedor openrouter');
         expect(ctx.output()).toContain('max req 64000');
@@ -5066,7 +5077,8 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'models');
 
         expect(ctx.output().indexOf('free-reasoning')).toBeLessThan(ctx.output().indexOf('paid-small'));
-        expect(ctx.output()).toContain('ordem free/capability/context');
+        expect(ctx.output()).toContain('Ordenação');
+        expect(ctx.output()).toContain('free/capability/context');
     });
 
     it('limita a página padrão de modelos BYOK e permite ampliar por número', async () => {
@@ -5092,14 +5104,16 @@ describe('terminal /byok command', () => {
 
         expect(defaultCtx.output()).toContain('remote-24');
         expect(defaultCtx.output()).not.toContain('remote-25');
-        expect(defaultCtx.output()).toContain('exibindo 24/30');
+        expect(defaultCtx.output()).toContain('Exibindo');
+        expect(defaultCtx.output()).toContain('24/30');
 
         const expandedCtx = mockCtx();
         await cmdByok({ println: expandedCtx.println }, 'models refresh 26');
 
         expect(expandedCtx.output()).toContain('remote-26');
         expect(expandedCtx.output()).not.toContain('remote-27');
-        expect(expandedCtx.output()).toContain('exibindo 26/30');
+        expect(expandedCtx.output()).toContain('Exibindo');
+        expect(expandedCtx.output()).toContain('26/30');
     });
 
     it('filtra catálogo BYOK por provider, gratuidade, capacidade e limite', async () => {
@@ -5274,7 +5288,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'models all-providers grouped free reasoning safe 10');
 
-        expect(ctx.output()).toContain('(1 grupos/2)');
+        expect(ctx.output()).toContain('1 grupos/2');
         expect(ctx.output()).toContain('shared/free-model');
         expect(ctx.output()).toContain('variantes openrouter-free/openrouter | groq-free/groq');
         expect(ctx.output()).not.toContain('variants=');
@@ -5325,7 +5339,8 @@ describe('terminal /byok command', () => {
             expect.objectContaining({ COPILOT_BYOK_PROFILE: 'groq-free' }),
             expect.any(Object),
         );
-        expect(ctx.output()).toContain('filtros todos os perfis,provedor:groq,gratuito,raciocínio,modo seguro');
+        expect(ctx.output()).toContain('Filtros');
+        expect(ctx.output()).toContain('todos os perfis,provedor:groq,gratuito,raciocínio,modo seguro');
         expect(ctx.output()).toContain('groq/free-reasoning');
         expect(ctx.output()).not.toContain('openrouter');
         expect(ctx.output()).toContain('/byok probe agent profile:groq-free model:groq/free-reasoning');
@@ -5464,7 +5479,8 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'models all-providers provider:groq free reasoning safe 5');
 
-        expect(ctx.output()).toContain('Nenhum modelo BYOK encontrado');
+        expect(ctx.output()).toContain('Modelos');
+        expect(ctx.output()).toContain('nenhum encontrado para os filtros atuais');
         expect(ctx.output()).toContain('O filtro safe removeu 1 candidato');
         expect(ctx.output()).toContain('qwen/qwen3-32b');
         expect(ctx.output()).toContain('baixo para turno real');
@@ -5540,7 +5556,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('paid-vision');
         expect(ctx.output()).toContain('ok para uso geral');
         expect(ctx.output()).toContain('/byok probe agent model:free-comfortable');
-        expect(ctx.output()).toContain('live fake descartável');
+        expect(ctx.output()).toContain('Probe agent');
+        expect(ctx.output()).toContain('live descartável do terminal');
     });
 
     it('na recomendacao safe exige probe agente positivo antes de promover modelo ao operador', async () => {
@@ -5813,7 +5830,8 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'recommend provider:openrouter metered reasoning 5');
 
-        expect(ctx.output()).toContain('filtros provedor:openrouter,pago/medido,raciocínio');
+        expect(ctx.output()).toContain('Filtros');
+        expect(ctx.output()).toContain('provedor:openrouter,pago/medido,raciocínio');
         expect(ctx.output()).toContain('openrouter/paid');
         expect(ctx.output()).not.toContain('openrouter/free');
         expect(ctx.output()).not.toContain('groq/paid');
@@ -5909,8 +5927,9 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'recommend free reasoning safe 5');
 
-        expect(ctx.output()).toContain('contexto atual≈63000/200000 tokens');
-        expect(ctx.output()).toContain('estimativa pré-turno≈64024 tokens');
+        expect(ctx.output()).toContain('Contexto');
+        expect(ctx.output()).toContain('atual ≈63000/200000 tokens');
+        expect(ctx.output()).toContain('estimativa pré-turno ≈64024 tokens');
         expect(ctx.output()).toContain('openrouter-roomy');
         expect(ctx.output()).not.toContain('openrouter/almost-enough');
         expect(ctx.output()).toContain('/byok probe agent model:openrouter-roomy');
@@ -5966,7 +5985,8 @@ describe('terminal /byok command', () => {
 
         expect(loadDotenv).toHaveBeenCalledWith({ path: '.env.local', override: true, quiet: true });
         expect(ctx.output()).toContain('.env.local recarregado');
-        expect(ctx.output()).toContain('Status omitido');
+        expect(ctx.output()).toContain('Status');
+        expect(ctx.output()).toContain('omitido por solicitação');
         expect(ctx.output()).not.toContain('BYOK status');
         expect(ctx.output()).not.toContain('secret');
     });

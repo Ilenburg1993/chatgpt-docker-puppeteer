@@ -2459,6 +2459,13 @@ function defaultUxCycleCriteria(boot) {
         .filter((index) => index >= 0)
         .sort((a, b) => a - b)[0] ?? -1;
     const healthStart = plain.indexOf('Saúde do Terminal LLM-B');
+    const waitsStart = plain.lastIndexOf('Esperas humanas');
+    const byokStatusStart = plain.indexOf('BYOK status', Math.max(0, waitsStart));
+    const byokModelCommandStart = plain.indexOf('/byok model terminal-ux-boundary-fixture', Math.max(0, byokStatusStart));
+    const byokAfterModelStart = byokModelCommandStart >= 0
+        ? plain.indexOf('BYOK status', byokModelCommandStart + 1)
+        : -1;
+    const sessionSdkAfterByokStart = plain.indexOf('Sessão SDK', Math.max(0, byokAfterModelStart));
     const toolsStart = (() => {
         const populated = plain.indexOf('Ferramentas observadas');
         return populated >= 0 ? populated : plain.indexOf('Nenhuma ferramenta observada');
@@ -2469,7 +2476,6 @@ function defaultUxCycleCriteria(boot) {
     const liveStart = plain.indexOf('Fluxo da conversa');
     const activityStart = plain.indexOf('Atividade Atual da LLM-B');
     const eventsStart = plain.indexOf('Eventos SSE');
-    const waitsStart = plain.lastIndexOf('Esperas humanas');
     const surfaceStarts = [
         helpStart,
         helpFullStart,
@@ -2486,6 +2492,10 @@ function defaultUxCycleCriteria(boot) {
         activityStart,
         eventsStart,
         waitsStart,
+        byokStatusStart,
+        byokModelCommandStart,
+        byokAfterModelStart,
+        sessionSdkAfterByokStart,
     ]
         .filter((index) => index >= 0)
         .sort((a, b) => a - b);
@@ -2500,6 +2510,11 @@ function defaultUxCycleCriteria(boot) {
     const terminalLibsDetailSurface = surfaceAt(terminalLibsDetailStart);
     const statusSurface = surfaceAt(statusStart);
     const usageSurface = surfaceAt(usageStart);
+    const byokStatusSurface = surfaceAt(byokStatusStart);
+    const byokModelCommandSurface = surfaceAt(byokModelCommandStart);
+    const byokAfterModelSurface = surfaceAt(byokAfterModelStart);
+    const byokModelOutcomeSurface = `${byokModelCommandSurface}\n${byokAfterModelSurface}`;
+    const sessionSdkAfterByokSurface = surfaceAt(sessionSdkAfterByokStart);
     const healthSurface = surfaceAt(healthStart);
     const toolsSurface = surfaceAt(toolsStart);
     const sdkSurface = surfaceAt(sdkStart);
@@ -2528,6 +2543,10 @@ function defaultUxCycleCriteria(boot) {
         activityStart,
         eventsStart,
         waitsStart,
+        byokStatusStart,
+        byokModelCommandStart,
+        byokAfterModelStart,
+        sessionSdkAfterByokStart,
     ];
     const surfacesRenderedInOrder =
         orderedSurfaceStarts.every((index) => index >= 0) &&
@@ -2626,6 +2645,32 @@ function defaultUxCycleCriteria(boot) {
                       )) &&
                 !/Quota Copilot|side-channel|não é cobrança BYOK/iu.test(usageSurface),
             detail: '/usage now rendered BYOK as current state and Copilot telemetry as historical side-channel',
+        },
+        {
+            id: 'ux-cycle-byok-boundary-human',
+            pass:
+                /BYOK status[\s\S]*Preparada[\s\S]*Sessão viva[\s\S]*Fronteira/iu.test(byokStatusSurface) &&
+                (/(?:Sessão atual usa outro provedor\/perfil[\s\S]*modelo preparado para o próximo boot[\s\S]*sem troca cruzada na conversa viva)|(?:Modelo BYOK solicitado na sessão viva[\s\S]*confirme o modelo efetivo)/iu.test(
+                    byokModelOutcomeSurface,
+                )) &&
+                /BYOK status[\s\S]*(seleção preparada cruza provedor ou perfil da sessão atual|seleção preparada e sessão BYOK atual estão alinhadas|modelo BYOK já confirmado na sessão atual|provedor BYOK da sessão atual coincide; o modelo preparado ainda precisa de confirmação|sem sessão SDK viva)/iu.test(
+                    byokAfterModelSurface,
+                ) &&
+                !/\bbinding\b|provider-boundary|provider BYOK vivo|binding de nascimento|binding da sessão viva|cruzam provider\/perfil/iu.test(
+                    `${byokStatusSurface}\n${byokModelOutcomeSurface}`,
+                ),
+            detail: '/byok and /byok model rendered prepared/live boundary with human next-boot language and no raw binding/provider-boundary terms',
+        },
+        {
+            id: 'ux-cycle-session-sdk-boundary-human',
+            pass:
+                /Sessão SDK[\s\S]*Vínculo SDK[\s\S]*BYOK pronto[\s\S]*Limite BYOK/iu.test(
+                    sessionSdkAfterByokSurface,
+                ) &&
+                !/\bbinding\b|provider-boundary|provider\/perfil|Foreground|operator-next-boot|sdk-resume-fallback/iu.test(
+                    sessionSdkAfterByokSurface,
+                ),
+            detail: '/session sdk rendered BYOK selection boundary without raw binding/provider-boundary vocabulary',
         },
         {
             id: 'ux-cycle-health-compact',
@@ -2749,6 +2794,14 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
             { line: '/activity 5', waitFor: 'Atividade Atual da LLM-B', advanceAfterMs: 1_500 },
             { line: '/events 20', waitFor: 'Eventos SSE', advanceAfterMs: 1_500 },
             { line: '/sdk waits', waitFor: 'Esperas humanas', advanceAfterMs: 1_500 },
+            { line: '/byok', waitFor: 'BYOK status', advanceAfterMs: 1_500 },
+            {
+                line: '/byok model terminal-ux-boundary-fixture',
+                waitFor: /modelo preparado para o próximo boot|Modelo BYOK solicitado na sessão viva/u,
+                advanceAfterMs: 1_500,
+            },
+            { line: '/byok', waitFor: 'BYOK status', advanceAfterMs: 1_500 },
+            { line: '/session sdk 6', waitFor: 'Sessão SDK', advanceAfterMs: 1_500 },
             '/quit',
         ],
         terminalPort,

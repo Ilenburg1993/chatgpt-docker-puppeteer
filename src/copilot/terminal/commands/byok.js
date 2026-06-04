@@ -109,6 +109,7 @@ import {
 } from '#copilot/config';
 import {
     listTerminalSdkSessionInventory,
+    readTerminalConfigProjection,
     readTerminalByokGatewayProjectionFromEnv,
     readTerminalByokProjection,
     readTerminalRuntimeState,
@@ -371,7 +372,7 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
     }
     if (!inventory.currentSessionId || !isSameTerminalByokProviderBoundary(summary, inventory.persistedByokBinding)) {
         println(
-            '  \x1b[33mSessão viva não usa o mesmo provedor BYOK; modelo preparado para o próximo boot, sem troca cruzando provedor.\x1b[0m',
+            '  \x1b[33mSessão atual usa outro provedor/perfil; modelo preparado para o próximo boot, sem troca cruzada na conversa viva.\x1b[0m',
         );
         return;
     }
@@ -2148,10 +2149,12 @@ async function renderStatus(projection, println) {
     }
     try {
         const inventory = await listTerminalSdkSessionInventory();
+        const runtimeConfig = readTerminalConfigProjection();
         const binding = classifyTerminalByokSdkBinding(
             summary,
             inventory.persistedByokBinding,
             inventory.currentSessionId,
+            runtimeConfig.currentModel,
         );
         println(terminalThemeRow('Preparada', binding.preparedLabel));
         println(

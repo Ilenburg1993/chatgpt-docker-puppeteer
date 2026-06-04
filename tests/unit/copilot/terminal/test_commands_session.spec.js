@@ -825,8 +825,8 @@ describe('commands/session — sync commands', () => {
         cmdDbSessions({ hubSessionId: 'abc-123', println: ctx.println });
         expect(ctx.output()).toContain('Test Session');
         expect(ctx.output()).toContain('sessões persistidas');
-        expect(ctx.output()).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2} \(há \d+[smhda]\)/u);
-        expect(ctx.output()).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}/u);
+        expect(ctx.output()).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2} \(há \d+[smhda]\)/u);
+        expect(ctx.output()).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/u);
     });
 
     it('cmdCount sem hubSessionId avisa', () => {

@@ -7182,5 +7182,42 @@
   - artefato: `artifacts/terminal-live/2026-06-04T17-10-45-648Z/summary.md`;
   - resultado: PASS em 22/22 criterios, com `Pedidos premium SDK` e sem linhas acima de 132
     colunas no plain log filtrado.
+- [x] Fronteira de modelo BYOK/SDK com vocabulario operacional:
+  - achado por auditoria: `session-binding.js` era a unidade certa para impedir trocas cruzando
+    provedor/perfil, mas suas frases default ainda vazavam termos internos como `provider BYOK vivo`,
+    `binding de nascimento` e `binding da sessao viva`;
+  - decisao UX: o operador deve ler quatro conceitos estaveis: `selecao preparada`, `sessao atual`,
+    `proximo boot` e `confirmacao`; `binding`, `provider-boundary` e equivalentes ficam somente no
+    codigo/diagnostico raw;
+  - correcao: `classifyTerminalByokSdkBinding()` agora descreve divergencia de modelo como
+    `provedor BYOK da sessao atual coincide; o modelo preparado ainda precisa de confirmacao`;
+  - correcao: troca cruzando provedor/perfil agora aparece como
+    `selecao preparada cruza provedor ou perfil da sessao atual`;
+  - correcao: `/byok model <id>` quando nao pode aplicar no runtime vivo diz
+    `Sessao atual usa outro provedor/perfil; modelo preparado para o proximo boot`, sem sugerir
+    que houve tentativa perigosa de troca cruzada;
+  - achado live adicional: quando `/byok model <id>` era aplicado na sessao viva e o SDK emitia
+    `session.model_changed`, `/byok` e `/session sdk` ainda comparavam apenas contra o modelo de
+    nascimento persistido da sessao e continuavam dizendo que o modelo preparado precisava de
+    confirmacao;
+  - correcao: `classifyTerminalByokSdkBinding()` agora recebe o modelo runtime atual; se ele ja
+    coincide com a selecao BYOK preparada, o estado vira `modelo BYOK ja confirmado na sessao atual`;
+  - correcao: `/byok` e `/session sdk` passam o modelo runtime atual pela projection canonica,
+    preservando o dado de nascimento em `Vinculo SDK`, mas nao confundindo isso com o modelo efetivo
+    confirmado;
+  - regressao coberta em `tests/unit/copilot/terminal/test_byok_session_binding.spec.js` e no
+    contrato existente de `/byok model`;
+  - harness live reforcado: `--ux-cycle` agora executa `/byok`, `/byok model
+    terminal-ux-boundary-fixture`, `/byok` e `/session sdk 6`, rejeitando `binding`,
+    `provider-boundary` e vocabulário antigo;
+  - validacao focada:
+    `npx vitest run tests/unit/copilot/terminal/test_byok_session_binding.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js --hookTimeout=30000`;
+  - validacao focada:
+    `npx eslint src/copilot/terminal/byok/session-binding.js src/copilot/terminal/commands/byok.js src/copilot/terminal/commands/session.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs tests/unit/copilot/terminal/test_byok_session_binding.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js`;
+  - live final:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-byok-boundary-confirmed-pass2-20260604 --timeout-ms 180000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T17-29-14-103Z/summary.md`;
+  - resultado: PASS em 24/24 criterios, incluindo `ux-cycle-byok-boundary-human` e
+    `ux-cycle-session-sdk-boundary-human`.
 - [ ] Próxima lacuna: validar visualmente TUI completa `fzf`/`gum` quando for aceitável tomar o TTY
       real, mantendo o fluxo filtrado como prova automatizada.

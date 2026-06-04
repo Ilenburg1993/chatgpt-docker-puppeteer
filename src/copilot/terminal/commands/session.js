@@ -2448,6 +2448,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
         readTerminalByokProjection().summary,
         inventory.persistedByokBinding,
         inventory.currentSessionId,
+        callWithRuntimeTarget(readTerminalConfigProjection, runtimeId).currentModel,
     );
     println(terminalThemeRow('Vínculo SDK', renderTerminalSdkProviderBinding(inventory.persistedByokBinding)));
     println(terminalThemeRow('BYOK pronto', byokBinding.preparedLabel));
