@@ -338,6 +338,15 @@ function humanPayloadKind(value) {
  * @returns {string}
  */
 function summarizePayload(payload, opts = {}) {
+    const previousModel = payload['previousModel'];
+    const newModel = payload['newModel'];
+    if (typeof newModel === 'string' && newModel.trim().length > 0) {
+        const previous = typeof previousModel === 'string' && previousModel.trim().length > 0 ? previousModel.trim() : 'modelo anterior n/d';
+        const effort = typeof payload['reasoningEffort'] === 'string' && payload['reasoningEffort'].trim().length > 0
+            ? ` · raciocínio ${payload['reasoningEffort'].trim()}`
+            : '';
+        return `modelo ${compact(previous, 42)} → ${compact(newModel.trim(), 42)}${effort}`;
+    }
     const toolName = payload['toolName'] ?? payload['tool'];
     const toolCallId = payload['toolCallId'] ?? payload['callId'];
     const requestId = payload['requestId'] ?? payload['pendingRequestId'];

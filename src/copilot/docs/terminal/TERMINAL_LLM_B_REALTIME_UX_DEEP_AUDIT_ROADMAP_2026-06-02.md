@@ -5187,6 +5187,8 @@
 - [x] Default humano confirmado como `dual`: ISO 8601 local até segundos + tempo relativo.
 - [x] Cabeçalhos de LLM-A/LLM-B, raciocínio, `printExchange`, runtime timestamps e comandos humanos
       selecionados migraram de ISO cru/milissegundos para helper dual.
+- [x] `/events` default agora resume `session.model_changed` com a troca real:
+      `modelo anterior → modelo novo · raciocínio ...`, sem exigir `--raw`.
 - [ ] Próxima lacuna: auditar comandos remanescentes que ainda mostram apenas ISO ou apenas relativo
       por decisão local (`/sdk`, `/workspace-index`, `/export`, `/byok`) e classificar se são
       humanos ou raw/export.

@@ -202,7 +202,7 @@ describe('terminal/commands/events', () => {
                     traceId: null,
                     turnId: null,
                     hubSessionId: null,
-                    payload: { previousModel: 'auto', newModel: 'gpt-4.1-mini' },
+                    payload: { previousModel: 'auto', newModel: 'gpt-4.1-mini', reasoningEffort: 'high' },
                 },
             ],
         });
@@ -215,6 +215,7 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('Runtime pronto');
         expect(ctx.output()).toContain('Aviso de quota');
         expect(ctx.output()).toContain('Modelo alterado');
+        expect(ctx.output()).toContain('modelo auto → gpt-4.1-mini · raciocínio high');
         expect(ctx.output()).toContain('2024-03-09T16:00:00+00:00 (há 5s)');
         expect(ctx.output()).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}/u);
         expect(ctx.output()).not.toContain('dialog loop changed');
