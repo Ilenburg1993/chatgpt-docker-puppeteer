@@ -139,9 +139,10 @@ describe('terminal/live-status-line', () => {
         const line = formatTerminalLiveStatusLine();
 
         expect(shouldRenderTerminalLiveStatusLine()).toBe(true);
-        expect(line).toContain('Pergunta');
-        expect(line).toContain('Escolha como continuar');
+        expect(line).toContain('aguardando operador');
+        expect(line).toContain('request_user_input pendente');
         expect(line).toContain('opções seguir|pausar');
+        expect(line).not.toContain('Escolha como continuar');
         expect(line).not.toContain('opções=');
         expect(line).not.toContain('noloop');
         expect(line).not.toContain('loop');
@@ -248,11 +249,11 @@ describe('terminal/live-status-line', () => {
 
         expect(line).toContain('pensando');
         expect(line).toContain('20s sem delta');
-        expect(line).toContain('modelo auto');
-        expect(line).toContain('raciocínio high');
+        expect(line).not.toContain('modelo auto');
+        expect(line).not.toContain('raciocínio high');
         expect(line).not.toContain('thinking');
         expect(line).not.toContain('LLM-B trabalhando');
-        expect(line.length).toBeLessThan(90);
+        expect(line.length).toBeLessThan(70);
     });
 
     it('traduz pending messages na linha viva de turno', async () => {
@@ -337,9 +338,10 @@ describe('terminal/live-status-line', () => {
 
         expect(shouldRenderTerminalLiveStatusLine()).toBe(true);
         const line = formatTerminalLiveStatusLine();
-        expect(line).toContain('Pergunta');
-        expect(line).toContain('Qual cor devo usar');
+        expect(line).toContain('aguardando operador');
+        expect(line).toContain('responda no prompt [PERG]');
         expect(line).toContain('opções azul|verde');
+        expect(line).not.toContain('Qual cor devo usar');
         expect(line).not.toContain('opções=');
         expect(line).not.toContain('modelo auto');
         expect(line).not.toContain('LLM-B trabalhando');

@@ -5113,3 +5113,55 @@
       com altura estável específica para pergunta humana.
 - [ ] Próxima lacuna: decidir se `/events --raw` deve permanecer despejo JSON bruto na tela ou se
       o raw interativo deve sugerir `/export`/arquivo por padrão, mantendo `--json` para pipe.
+
+### 12.30 Linha viva de pergunta pendente mais curta e menos invasiva
+
+- [x] Auditoria live: no rerun canônico, a pergunta em si já aparecia corretamente no card
+      `Pergunta ao operador`, mas a linha viva repetia a pergunta inteira (`LLM-B Pergunta ·
+      ASK-CANONICAL...`). Em PTY estreito isso podia quebrar em múltiplas linhas e parecer colado
+      ao prompt `[PERG]`.
+- [x] Decisão UX: durante `ask_user` vivo, o card persistente é a fonte do texto da pergunta. A
+      linha viva deve apenas comunicar estado operacional: `aguardando operador · responda no
+      prompt [PERG]`, com opções resumidas quando existirem.
+- [x] Implementação: `formatTerminalLiveStatusLine` deixou de repetir a pergunta completa para
+      `pendingQuestion` e `request_user_input` estruturado. O texto agora é curto, previsível e
+      menos propenso a disputar o input.
+- [x] Testes unitários:
+  - `test_live_status_line.spec.js` exige `aguardando operador`;
+  - bloqueia vazamento do texto longo da pergunta na linha viva;
+  - preserva opções compactas (`opções azul|verde`, `opções seguir|pausar`).
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/repl/live-status-line.js`;
+  - `npx eslint src/copilot/terminal/repl/live-status-line.js tests/unit/copilot/terminal/test_live_status_line.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js`.
+- [ ] Próxima validação live: repetir cenário canônico para confirmar que a linha viva de pergunta
+      não quebra em 2-3 linhas no PTY e que `ask_user` continua visível/único.
+
+### 12.31 Live bloqueado por ausência de `ask_user` e pulso sem-delta compacto
+
+- [x] Tentativa de validação PTY da linha viva curta:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=300000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-short-ask-live-status-20260603-222007`.
+- [x] Resultado: `Status: BLOCKED`; blocker `live-timeout`; a LLM-B executou as tools reais e
+      emitiu os 8 deltas, mas não chamou `ask_user` antes do timeout. O summary registrou
+      `ask=not-answered · postAsk=missing · diagnostics=not-started`.
+- [x] Diagnóstico: essa rodada não valida a linha viva de pergunta pendente, pois a pergunta não
+      ocorreu. Ela valida indiretamente que o harness separa bloqueio de cenário de regressão de
+      UX (`root-cause-not-ux-duplication`).
+- [x] Nova lacuna visual encontrada no mesmo PTY: o pulso `Aguardando resposta · 10s sem resposta
+      visível` ainda incluía modelo/esforço e quebrava em várias linhas. O prompt de espera já
+      mostra modelo e raciocínio, então a linha viva estava duplicando metadado.
+- [x] Implementação: o caminho `noDeltaStatus` de `formatTerminalLiveStatusLine` passou a mostrar
+      apenas `LLM-B pensando · <tempo> sem delta · conversa ativa`, sem `modelo ... · raciocínio
+      ...`.
+- [x] Testes unitários: `test_live_status_line.spec.js` exige ausência de `modelo auto` e
+      `raciocínio high` nesse pulso e limite de comprimento menor que 70 caracteres.
+- [x] Validação passou:
+  - `node --check src/copilot/terminal/repl/live-status-line.js`;
+  - `npx eslint src/copilot/terminal/repl/live-status-line.js tests/unit/copilot/terminal/test_live_status_line.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js`;
+  - `npm run typecheck:strict:src.copilot`.
+- [ ] Próxima validação live: repetir cenário canônico até uma execução com `ask_user` real para
+      confirmar a linha curta `aguardando operador`.
+- [ ] Próxima lacuna do harness: adicionar heartbeat/diagnóstico textual próprio quando o cenário
+      fica mais de 60s sem eventos relevantes após deltas, para não deixar o operador sem saber se
+      o modelo, o SDK ou o runner estão travados.

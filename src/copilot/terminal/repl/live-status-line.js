@@ -25,7 +25,6 @@ const MIN_LIVE_STATUS_HEARTBEAT_MS = 1_000;
 const DEFAULT_LIVE_STATUS_HEARTBEAT_MS = 5_000;
 const LIVE_LABEL_MAX_CHARS = 28;
 const LIVE_DETAIL_MAX_CHARS = 48;
-const LIVE_QUESTION_MAX_CHARS = 56;
 
 /**
  * @param {string} phase
@@ -171,34 +170,26 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const effort = stream?.reasoningEffort || runtime.reasoningEffort || '-';
     const modelEffort = renderLiveModelEffort(model, effort);
     if (hasHumanPendingQuestion(runtime)) {
-        const questionText = compactLiveStatusText(
-            runtime.pendingQuestion.question ?? 'pergunta pendente',
-            LIVE_QUESTION_MAX_CHARS,
-        );
         const choices = Array.isArray(runtime.pendingQuestion.choices) ? runtime.pendingQuestion.choices : [];
-        const choiceText = choices.length > 0 ? ` · opções ${choices.join('|')}` : '';
+        const choiceText = choices.length > 0 ? ` · opções ${compactLiveStatusText(choices.join('|'), 24)}` : '';
         const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila ${runtime.queueSize}` : '';
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
-            `${terminalThemeText('question', 'Pergunta')}` +
-            `${terminalThemeText('muted', ` · ${questionText}${choiceText} · ${runtime.dialogLoopActive ? 'conversa ativa' : 'standby'}${queue}`)}` +
+            `${terminalThemeText('question', 'aguardando operador')}` +
+            `${terminalThemeText('muted', ` · responda no prompt [PERG]${choiceText} · ${runtime.dialogLoopActive ? 'conversa ativa' : 'standby'}${queue}`)}` +
             '\x1b[K'
         );
     }
     const structuredInputs = listTerminalPendingStructuredUserInputs();
     const structuredInput = structuredInputs.at(0) ?? null;
     if (structuredInput) {
-        const questionText = compactLiveStatusText(
-            structuredInput.question ?? 'input humano pendente',
-            LIVE_QUESTION_MAX_CHARS,
-        );
         const choices = Array.isArray(structuredInput.choices) ? structuredInput.choices : [];
-        const choiceText = choices.length > 0 ? ` · opções ${choices.join('|')}` : '';
+        const choiceText = choices.length > 0 ? ` · opções ${compactLiveStatusText(choices.join('|'), 24)}` : '';
         const queue = structuredInputs.length > 1 ? ` · fila ${structuredInputs.length}` : '';
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
-            `${terminalThemeText('question', 'Pergunta')}` +
-            `${terminalThemeText('muted', ` · ${questionText}${choiceText}${queue}`)}` +
+            `${terminalThemeText('question', 'aguardando operador')}` +
+            `${terminalThemeText('muted', ` · request_user_input pendente${choiceText}${queue}`)}` +
             '\x1b[K'
         );
     }
@@ -218,7 +209,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText(severityRole, 'pensando')}` +
-            `${terminalThemeText('muted', ` · ${noDeltaStatus}${modelEffort ? ` · ${modelEffort}` : ''} · ${runtimeTail}${queue}`)}` +
+            `${terminalThemeText('muted', ` · ${noDeltaStatus} · ${runtimeTail}${queue}`)}` +
             '\x1b[K'
         );
     }
