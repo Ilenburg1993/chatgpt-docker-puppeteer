@@ -109,6 +109,8 @@ const ABSOLUTE_WINDOWS_PATH_PATTERN = /(^|[\s(["'`:=])([A-Za-z]:\\[^\s"'`)]+)/gu
  *     lineRange: { start: number | null; end: number | null } | null;
  *     commands: string[];
  *     filters: string[];
+ *     questionChoices: string[];
+ *     allowFreeformQuestion: boolean | null;
  *     resultCount: number | null;
  *     resultSummary: string | null;
  *     primaryTargetKind: 'file' | 'directory' | 'url' | 'search' | 'patch' | 'command' | 'filter' | null;
@@ -258,6 +260,32 @@ function inferQuestion(args) {
     const data = objectOrNull(args);
     if (!data) return null;
     return stringOrNull(data['question']) ?? stringOrNull(data['message']) ?? stringOrNull(data['prompt']);
+}
+
+/**
+ * @param {unknown} args
+ * @returns {string[]}
+ */
+function inferQuestionChoices(args) {
+    const data = objectOrNull(args);
+    if (!data) return [];
+    const value = data['choices'] ?? data['options'];
+    if (!Array.isArray(value)) return [];
+    return value.flatMap((choice) => {
+        const text = stringOrNull(choice);
+        return text ? [text] : [];
+    });
+}
+
+/**
+ * @param {unknown} args
+ * @returns {boolean | null}
+ */
+function inferQuestionAllowFreeform(args) {
+    const data = objectOrNull(args);
+    if (!data) return null;
+    const value = data['allowFreeform'] ?? data['allow_freeform'] ?? data['freeform'];
+    return typeof value === 'boolean' ? value : null;
 }
 
 /**
@@ -627,6 +655,8 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
     const isStructuredInputTool = (canonicalToolName ?? toolName) === 'request_user_input';
     const isIntentTool = (canonicalToolName ?? toolName) === 'report_intent_local' || toolName === 'report_intent';
     const questionPreview = isStructuredInputTool ? inferQuestion(toolArgs) : null;
+    const questionChoices = isStructuredInputTool ? inferQuestionChoices(toolArgs) : [];
+    const allowFreeformQuestion = isStructuredInputTool ? inferQuestionAllowFreeform(toolArgs) : null;
     const intentPreview = isIntentTool ? inferIntentText({ ...evt, args: toolArgs }) : null;
     const path = isStructuredInputTool ? null : (meta.fileTargets[0] ?? null);
     const { operation, label } = inferOperation(toolName, path, evt['operation']);
@@ -663,6 +693,8 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
         lineRange: meta.lineRange,
         commands: meta.commands,
         filters: meta.filters,
+        questionChoices,
+        allowFreeformQuestion,
         resultCount: meta.resultCount,
         resultSummary,
         primaryTargetKind: meta.primaryTargetKind,

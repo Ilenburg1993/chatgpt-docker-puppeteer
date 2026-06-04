@@ -8451,3 +8451,84 @@
     inteiro;
   - criar fixture controlado para provar também o caminho `set_live_model` aplicado por
     `/byok auto apply`, sem depender de seleção real do catálogo atual.
+
+### 12.82 Lifecycle conversacional: pergunta humana e intenção fora da estética de tool crua — 2026-06-04
+
+- [x] Auditoria do ponto de entrada:
+  - as screenshots ruins mostram `request_user_input ainda executando`, `report_intent`, `chatcmpl-tool-*`
+    e blocos `[TOOL]`/`[INTENT]` competindo com a narrativa principal;
+  - o código já possui `human-question-renderer`, `intent-renderer`, `tool-activity-presenter` e
+    `live-status-line`, mas alguns eventos laterais ainda chegam pelo lifecycle genérico;
+  - quando isso acontece, a superfície default pode chamar pergunta/intenção de “Tool” ou usar
+    `requestId`/`toolCallId` como alvo visual;
+  - raw/diag/export devem preservar envelope técnico, mas stdout padrão, `/activity`, `/live` e
+    `/tools diag` devem ser humanos.
+- [x] Decisão de UX:
+  - `ask_user` e `request_user_input` são “Pergunta ao operador”, nunca tool comum;
+  - `report_intent` e `report_intent_local` são “Intenção capturada”, nunca comando externo;
+  - IDs como `chatcmpl-tool-*`, `toolu_*`, `call_*` e UUIDs são rastreio técnico e só pertencem a
+    raw/all/export;
+  - lifecycle pode continuar emitindo `tool.lifecycle`, mas a narrativa local deve usar fase
+    `question` ou `turn` quando a semântica for pergunta/intenção;
+  - a linha viva deve permanecer livre para trabalho em andamento e nunca ocupar input quando uma
+    pergunta estruturada está pendente.
+- [x] Correção aplicada:
+  - introduzir helpers canônicos para detectar apresentação de pergunta/intenção no runtime de
+    lifecycle;
+  - ajustar `handleTerminalToolUserRequested()` para imprimir “Pergunta ao operador” quando a tool
+    pedir ação humana, sem `Tool ... aguarda usuário`;
+  - ajustar labels de start/progress/complete para `Pergunta concluída/falhou` e
+    `Intenção capturada`, evitando `Tool concluída` para eventos conversacionais;
+  - garantir que targets visuais default não caiam para `requestId` técnico;
+  - reforçar testes unitários para lifecycle e presenter;
+  - propagar `choices` e `allowFreeform` de `request_user_input` pelo `TerminalToolActivityPresentation`,
+    para o card humano não perder opções estruturadas.
+- [x] Validação focada:
+  - `node --check` em presenter, lifecycle e testes alterados;
+  - `npx vitest run tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js
+    tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js
+    tests/unit/copilot/terminal/test_human_question_renderer.spec.js
+    tests/unit/copilot/terminal/test_live_status_line.spec.js`;
+  - `npx eslint src/copilot/terminal/events/tool-activity-presenter.js
+    src/copilot/terminal/events/tool-lifecycle-runtime.js
+    tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js
+    tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js`;
+  - `git diff --check`.
+- [ ] Próxima etapa:
+  - atualizar critérios live para procurar resíduos por superfície e não apenas no log inteiro;
+  - testar cenário live com `request_user_input`/`ask_user` e confirmar que o operador vê card humano,
+    opções, timestamp e input livre sem heartbeat repetitivo.
+- [x] Harness live:
+  - `evaluateOutput()` ganhou `questionWaitSurface`, recortando a tela da pergunta até a resposta do
+    operador antes dos diagnósticos raw;
+  - novo critério `ux-question-wait-surface-human` valida card/prompt humano sem
+    `request_user_input ainda executando`, `ask_user SDK`, `chatcmpl-tool-*`, `toolu_*`,
+    `Tool solicitou`, `Tool concluída/falhou` ou `LLM-B ainda trabalhando` no trecho que o
+    operador usa para responder;
+  - isso reduz mistura entre superfície humana e `/events --raw`, mantendo raw/export intactos.
+- [x] Live estruturado:
+  - comando executado:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs
+    --structured-input-cycle --transport=pty --timeout-ms=180000
+    --out-dir=artifacts/terminal-live/structured-input-ux-20260604-lifecycle-question`;
+  - status PASS;
+  - evidência: card `Pergunta humana estruturada`, `Origem`, `Hora` ISO completo,
+    `[PERGUNTA]`, opções `[1] SIM [2] NAO`, prompt `[PERG]`, resposta roteada e `/sdk waits`
+    limpo após resposta;
+  - busca no log confirmou ausência de `chatcmpl-tool`, `Tool solicitou`, `LLM-B ainda trabalhando`
+    e `ask_user SDK` na superfície limpa.
+- [x] Live canônico com LLM-B real:
+  - comando executado:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs
+    --live-scenario=canonical --transport=pty --timeout-ms=240000
+    --out-dir=artifacts/terminal-live/canonical-ux-20260604-question-lifecycle`;
+  - status PASS;
+  - evidência visual:
+    `Intenção capturada`, `Ler arquivo`, bloco de deltas `DELTA-CANONICAL-*`, card
+    `Pergunta ao operador`, ISO completo, opção `[1] SIM`, prompt `[PERG]`, confirmação
+    `Resposta enviada para pergunta pendente` e resposta final pós-pergunta;
+  - critérios relevantes aprovados:
+    `ux-no-durable-waiting-spam`, `ux-question-live-status-does-not-compete-with-input`,
+    `ux-question-wait-surface-human`, `ux-no-durable-tool-output-inside-question-prompt`,
+    `ux-human-tool-names`, `ux-intent-command-default-human`, `ux-intent-command-detail-human-envelope`
+    e `no-terminal-errors`.

@@ -14,6 +14,7 @@ const recordTerminalActivity = vi.fn();
 const recordTerminalToolLifecycleDiagnostic = vi.fn();
 const recordTerminalTurnFileActivity = vi.fn();
 const recordTerminalTurnToolActivity = vi.fn();
+const printTerminalHumanQuestionCard = vi.fn();
 
 vi.mock('../../../../src/copilot/observability/index.js', () => ({
     recordToolCall,
@@ -35,7 +36,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/gateways/index.js', () => ({
 }));
 
 vi.mock('../../../../src/copilot/terminal/events/human-question-renderer.js', () => ({
-    printTerminalHumanQuestionCard: vi.fn(),
+    printTerminalHumanQuestionCard,
 }));
 
 vi.mock('../../../../src/copilot/terminal/events/intent-renderer.js', () => ({
@@ -99,8 +100,8 @@ describe('terminal/tool-lifecycle-runtime', () => {
         });
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
-            'tool',
-            'Tool falhou',
+            'question',
+            'Pergunta falhou',
             expect.objectContaining({
                 detail: expect.stringContaining('aguardando decisão humana falhou'),
                 severity: 'error',
@@ -113,6 +114,51 @@ describe('terminal/tool-lifecycle-runtime', () => {
             toolCallId: 'chatcmpl-tool-ask',
             success: false,
         });
+    });
+
+    it('renderiza tool.user_requested de request_user_input como pergunta humana sem linha Tool crua', async () => {
+        const { handleTerminalToolUserRequested } = await import(
+            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
+        );
+
+        handleTerminalToolUserRequested({
+            toolName: 'request_user_input',
+            requestId: 'chatcmpl-tool-80d5a00b25801fef',
+            args: {
+                question: 'Como você quer continuar?',
+                choices: ['seguir', 'pausar'],
+            },
+        });
+
+        expect(recordTerminalTurnToolActivity).toHaveBeenCalledWith(
+            expect.objectContaining({
+                toolName: 'request_user_input',
+                operation: 'ask',
+                target: 'Como você quer continuar?',
+                status: 'user_requested',
+            }),
+        );
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'question',
+            'Pergunta ao operador aguardando resposta',
+            expect.objectContaining({
+                detail: expect.stringContaining('Como você quer continuar?'),
+                toolName: 'request_user_input',
+                toolTarget: 'Como você quer continuar?',
+            }),
+        );
+        expect(printTerminalHumanQuestionCard).toHaveBeenCalledWith(
+            println,
+            expect.objectContaining({
+                question: 'Como você quer continuar?',
+                choices: ['seguir', 'pausar'],
+                allowFreeform: true,
+                source: 'tool',
+                state: 'aguardando resposta',
+            }),
+        );
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Tool'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('chatcmpl-tool'));
     });
 
     it('reconcilia postToolUse com exitCode não zero como falha visual da tool', async () => {

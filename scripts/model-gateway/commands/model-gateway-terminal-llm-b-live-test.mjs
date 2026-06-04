@@ -4227,6 +4227,20 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const preEventsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b/i)[0] ?? plain;
     const beforeRawDiagnosticsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b[^\n]*--raw/i)[0] ?? plain;
     const beforeReadyPlain = plain.split(/LLM-B pronta/iu)[0] ?? plain;
+    const answerText = scenario.answerSteps.at(-1)?.answer ?? '';
+    const questionIndex = scenario.askQuestion ? beforeRawDiagnosticsPlain.search(scenario.askQuestionRe) : -1;
+    const answerPromptIndex = answerText
+        ? beforeRawDiagnosticsPlain.search(
+              new RegExp(`\\[PERG(?:UNTA)?\\]›\\s*${escapeRegExp(answerText)}`, 'iu'),
+          )
+        : -1;
+    const questionWaitSurface =
+        questionIndex >= 0
+            ? beforeRawDiagnosticsPlain.slice(
+                  questionIndex,
+                  answerPromptIndex > questionIndex ? answerPromptIndex : beforeRawDiagnosticsPlain.length,
+              )
+            : '';
     const activity40Sections = beforeRawDiagnosticsPlain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/activity\s+40\b[^\n\r]*/iu).slice(1);
     const latestActivity40Section =
         activity40Sections
@@ -4865,6 +4879,19 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                 !/SIMSIM/u.test(plain) &&
                 !/voc[eê]\[[^\n\r]*\[PERG\][^\n\r]*›[^\n\r]*(?:LLM-B aguardando voc[eê]|SIMSIM)/iu.test(plain),
             detail: 'pending-question live status did not repaint inside the human input line',
+        },
+        {
+            id: 'ux-question-wait-surface-human',
+            pass:
+                questionWaitSurface.length === 0 ||
+                (/\[(?:PERGUNTA|PERG)\]|Pergunta ao operador/iu.test(questionWaitSurface) &&
+                    !/request_user_input ainda executando|ask_user SDK|chatcmpl-tool-[a-z0-9-]+|toolu_[a-z0-9_-]+|Tool\s+solicitou|Tool\s+(?:conclu[ií]da|falhou)|LLM-B ainda trabalhando/iu.test(
+                        questionWaitSurface,
+                    )),
+            detail:
+                questionWaitSurface.length === 0
+                    ? 'no dedicated question wait surface was captured for this scenario'
+                    : 'human-question wait surface stayed semantic without raw SDK/tool heartbeat noise',
         },
         {
             id: 'ux-no-durable-tool-output-inside-question-prompt',

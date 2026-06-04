@@ -90,7 +90,26 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.operation).toBe('ask');
         expect(presentation.detail).toContain('aguardando decisão humana');
         expect(presentation.startLine).toContain('Qual caminho seguir?');
+        expect(presentation.questionChoices).toEqual([]);
+        expect(presentation.allowFreeformQuestion).toBeNull();
         expect(presentation.completeLine(true, '1.0s')).toContain('aguardando decisão humana concluído');
+    });
+
+    it('carrega opções estruturadas de request_user_input para o card humano', () => {
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'request_user_input',
+            args: {
+                question: 'Como continuar?',
+                choices: ['seguir', 'pausar'],
+                allowFreeform: false,
+            },
+        });
+
+        expect(presentation.displayToolName).toBe('Pergunta ao operador');
+        expect(presentation.operation).toBe('ask');
+        expect(presentation.target).toBe('Como continuar?');
+        expect(presentation.questionChoices).toEqual(['seguir', 'pausar']);
+        expect(presentation.allowFreeformQuestion).toBe(false);
     });
 
     it('mostra ask_user como pergunta humana mesmo quando vem do hook SDK', () => {

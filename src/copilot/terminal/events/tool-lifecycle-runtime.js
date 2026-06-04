@@ -90,6 +90,66 @@ function renderOptionalToolRequestDetail(requestId) {
 }
 
 /**
+ * @param {import('./tool-activity-presenter.js').TerminalToolActivityPresentation} presentation
+ * @returns {boolean}
+ */
+function isHumanQuestionPresentation(presentation) {
+    return presentation.operation === 'ask';
+}
+
+/**
+ * @param {import('./tool-activity-presenter.js').TerminalToolActivityPresentation} presentation
+ * @returns {boolean}
+ */
+function isIntentPresentation(presentation) {
+    return (
+        presentation.operation === 'intent' ||
+        isReportIntentTool(presentation.canonicalToolName ?? presentation.toolName)
+    );
+}
+
+/**
+ * @param {import('./tool-activity-presenter.js').TerminalToolActivityPresentation} presentation
+ * @returns {import('../state/activity-state.js').TerminalActivityPhase}
+ */
+function terminalActivityPhaseForPresentation(presentation) {
+    if (isHumanQuestionPresentation(presentation)) return 'question';
+    if (isIntentPresentation(presentation)) return 'turn';
+    return 'tool';
+}
+
+/**
+ * @param {import('./tool-activity-presenter.js').TerminalToolActivityPresentation} presentation
+ * @param {'start' | 'progress' | 'partial' | 'complete' | 'user_requested'} stage
+ * @param {boolean | null} [success=null]
+ * @returns {string}
+ */
+function terminalActivityLabelForPresentation(presentation, stage, success = null) {
+    if (isHumanQuestionPresentation(presentation)) {
+        if (stage === 'complete') return success === false ? 'Pergunta falhou' : 'Pergunta respondida';
+        if (stage === 'user_requested') return 'Pergunta ao operador aguardando resposta';
+        return 'Pergunta ao operador';
+    }
+    if (isIntentPresentation(presentation)) {
+        if (stage === 'complete') return success === false ? 'Intenção falhou' : 'Intenção registrada';
+        return 'Intenção capturada';
+    }
+    if (stage === 'progress') return 'Progresso da ferramenta';
+    if (stage === 'partial') return 'Resultado parcial da ferramenta';
+    if (stage === 'complete') return success === false ? 'Ferramenta falhou' : 'Ferramenta concluída';
+    if (stage === 'user_requested') return 'Ferramenta aguarda operador';
+    return 'Ferramenta em uso';
+}
+
+/**
+ * @param {import('./tool-activity-presenter.js').TerminalToolActivityPresentation} presentation
+ * @returns {string}
+ */
+function terminalActivityToolNameForPresentation(presentation) {
+    return presentation.canonicalToolName ?? presentation.toolName;
+}
+
+/**
  * @param {string} toolName
  * @returns {boolean}
  */
@@ -421,7 +481,8 @@ function printToolStart(presentation) {
         const question = presentation.target ?? presentation.startLine.replace(/^aguardando decisão humana:\s*/iu, '');
         printTerminalHumanQuestionCard(println, {
             question,
-            choices: [],
+            choices: presentation.questionChoices,
+            allowFreeform: presentation.allowFreeformQuestion ?? true,
             source: 'tool',
             state: 'aguardando resposta',
             compact: compactDetail,
@@ -631,12 +692,16 @@ export function handleTerminalNativeToolStart({ registry, evt }) {
         });
     }
     recordToolTurnProjection(presentation, 'started', toolCallId, null);
-    recordTerminalActivity('tool', 'Ferramenta em uso', {
-        detail: presentation.detail,
-        toolName: canonicalName,
-        toolTarget: presentation.target,
-        source: 'sdk',
-    });
+    recordTerminalActivity(
+        terminalActivityPhaseForPresentation(presentation),
+        terminalActivityLabelForPresentation(presentation, 'start'),
+        {
+            detail: presentation.detail,
+            toolName: terminalActivityToolNameForPresentation(presentation),
+            toolTarget: presentation.target,
+            source: 'sdk',
+        },
+    );
     if (shouldPrintToolNarration(entry, toolCallId, registry)) printToolStart(presentation);
     broadcastToolLifecycle(
         buildToolLifecycleStart({
@@ -699,9 +764,12 @@ export function handleTerminalNativeToolProgress({ registry, evt }) {
     }
     const effectiveDetail =
         progressMessage ?? (progress !== null ? `${presentation.detail} · ${progress}%` : presentation.detail);
-    recordTerminalActivity('tool', persistMilestone ? 'Progresso da ferramenta' : 'Ferramenta em uso', {
+    const activityLabel = persistMilestone
+        ? terminalActivityLabelForPresentation(presentation, 'progress')
+        : terminalActivityLabelForPresentation(presentation, 'start');
+    recordTerminalActivity(terminalActivityPhaseForPresentation(presentation), activityLabel, {
         detail: effectiveDetail,
-        toolName: name,
+        toolName: terminalActivityToolNameForPresentation(presentation),
         toolTarget: presentation.target,
         progress,
         source: 'sdk',
@@ -753,13 +821,17 @@ export function handleTerminalNativeToolPartialResult({ registry, evt }) {
     if (toolCallId) {
         registry.touch(toolCallId, { presentation });
     }
-    recordTerminalActivity('tool', 'Resultado parcial de tool', {
-        detail: partialOutput,
-        toolName: name,
-        toolTarget: presentation.target,
-        source: 'sdk',
-        recordHistory: false,
-    });
+    recordTerminalActivity(
+        terminalActivityPhaseForPresentation(presentation),
+        terminalActivityLabelForPresentation(presentation, 'partial'),
+        {
+            detail: partialOutput,
+            toolName: terminalActivityToolNameForPresentation(presentation),
+            toolTarget: presentation.target,
+            source: 'sdk',
+            recordHistory: false,
+        },
+    );
     broadcastToolLifecycle(
         buildToolLifecyclePartialResult({
             toolCallId,
@@ -853,10 +925,10 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
     recordTerminalDiagnosticToolStats(canonicalName, durationMs, success);
     const durationLabel = buildToolCompletionDurationLabel(metricEntry, durationMs);
     if (effectiveToolCallId) completeTerminalTurnToolCall({ toolCallId: effectiveToolCallId, success });
-    const activityLabel = success ? 'Tool concluída' : 'Tool falhou';
-    recordTerminalActivity('tool', activityLabel, {
+    const activityLabel = terminalActivityLabelForPresentation(presentation, 'complete', success);
+    recordTerminalActivity(terminalActivityPhaseForPresentation(presentation), activityLabel, {
         detail: presentation.completeLine(success, durationLabel),
-        toolName: canonicalName,
+        toolName: terminalActivityToolNameForPresentation(presentation),
         toolTarget: presentation.target,
         progress: success ? 100 : null,
         severity: success ? 'info' : 'error',
@@ -903,27 +975,47 @@ export function handleTerminalToolUserRequested(evt) {
     const requestId = typeof evt?.['requestId'] === 'string' ? evt['requestId'] : null;
     recordTerminalTurnToolActivity({
         toolName,
-        operation: 'run',
-        target: renderToolRequestLabel(requestId),
+        operation: presentation.operation,
+        target: presentation.target,
         source: 'sdk',
         status: 'user_requested',
     });
-    recordTerminalActivity('tool', 'Tool solicitou ação do usuário', {
-        detail: `${toolName}${renderOptionalToolRequestDetail(requestId)}`,
-        toolName,
-        source: 'sdk',
-        severity: 'warn',
-    });
-    println('');
-    println(
-        terminalThemeRow(
-            'Tool',
-            `${toolName} aguarda usuário${requestId ? ` · ${renderToolRequestLabel(requestId)}` : ''}`,
-            {
-                role: 'question',
-            },
-        ),
+    recordTerminalActivity(
+        terminalActivityPhaseForPresentation(presentation),
+        terminalActivityLabelForPresentation(presentation, 'user_requested'),
+        {
+            detail: presentation.detail,
+            toolName: terminalActivityToolNameForPresentation(presentation),
+            toolTarget: presentation.target,
+            source: 'sdk',
+            severity: 'warn',
+        },
     );
+    println('');
+    if (isHumanQuestionPresentation(presentation)) {
+        printTerminalHumanQuestionCard(println, {
+            question: presentation.target ?? 'Aguardando resposta do operador',
+            choices: presentation.questionChoices,
+            allowFreeform: presentation.allowFreeformQuestion ?? true,
+            source: 'tool',
+            state: 'aguardando resposta',
+            compact: getTerminalDetailLevel() === 'compact',
+            includeDivider: false,
+            includeShortcuts: getTerminalDetailLevel() !== 'compact',
+        });
+    } else {
+        println(
+            terminalThemeRow(
+                isIntentPresentation(presentation) ? 'Intenção' : 'Ferramenta',
+                `${presentation.displayToolName} aguarda operador${
+                    presentation.target ? ` · ${presentation.target}` : renderOptionalToolRequestDetail(requestId)
+                }`,
+                {
+                    role: 'question',
+                },
+            ),
+        );
+    }
     broadcastToolLifecycle(buildToolLifecycleUserRequested({ toolName, requestId: requestId ?? null }));
 }
 
