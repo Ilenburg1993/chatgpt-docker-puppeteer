@@ -232,6 +232,15 @@ export function formatTerminalLiveStatusLine(input = {}) {
             '\x1b[K'
         );
     }
+    if (activity.phase === 'boot') {
+        const bootLabel = compactLiveStatusText(activity.label, 24);
+        return (
+            `  ${terminalThemeText('assistant', 'LLM-B')} ` +
+            `${terminalThemeText(severityRole, `iniciando · ${bootLabel}`)}` +
+            `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)} · ${runtimeTail}${queue}`)}` +
+            '\x1b[K'
+        );
+    }
     if (isModelRecoveryActivity(activity)) {
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +

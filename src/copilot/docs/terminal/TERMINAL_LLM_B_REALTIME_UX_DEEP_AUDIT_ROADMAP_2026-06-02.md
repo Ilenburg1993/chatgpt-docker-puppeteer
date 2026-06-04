@@ -5251,3 +5251,27 @@
       `server error`, `modelo kilo-auto/free` e `raciocínio high` na linha viva de retry.
 - [ ] Próxima live estética: repetir cenário canônico ou `model-switch` forçando um retry/troca para
       confirmar visual real em PTY, sem depender apenas do teste unitário.
+
+### 12.34 Prompt de espera como estado curto, não painel de telemetria
+
+- [x] Auditoria do live PASS mostrou que a tela ainda exibia `LLM-B pensando · modelo ... ·
+      raciocínio ...` no prompt temporário, competindo visualmente com a linha viva permanente.
+- [x] Decisão UX: o prompt normal pode mostrar `você[modelo/esforço]›` quando o terminal está
+      pronto; durante processamento, o prompt de espera deve ser curto e sem metadados duplicados.
+- [x] `buildWaitingPrompt()` agora renderiza apenas `LLM-B pensando`, tags essenciais
+      (`[PERGUNTA]`, fila, shadow) e, no modo detalhado, fase/label curtos. Modelo/esforço saem
+      dessa superfície.
+- [x] `formatTerminalLiveStatusLine()` agora compacta `boot` como
+      `LLM-B iniciando · <fase> · <idade> · <runtime>`, sem repetir modelo/esforço na linha viva de
+      inicialização.
+- [x] Testes unitários atualizados:
+  - `test_build_user_prompt.spec.js` exige ausência de `modelo gpt-5-mini`, `raciocínio high`,
+        `gpt-5-mini` e `high` no prompt de espera.
+  - `test_live_status_line.spec.js` exige boot curto sem modelo/esforço e com limite de comprimento.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/dialog/output.js`;
+  - `node --check src/copilot/terminal/repl/live-status-line.js`;
+  - `npx eslint src/copilot/terminal/dialog/output.js src/copilot/terminal/repl/live-status-line.js tests/unit/copilot/terminal/test_build_user_prompt.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_build_user_prompt.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js`.
+- [ ] Próxima live estética: confirmar em PTY que boot + turno inicial não quebram em múltiplas
+      linhas e que o input fica visualmente previsível enquanto a LLM-B trabalha.

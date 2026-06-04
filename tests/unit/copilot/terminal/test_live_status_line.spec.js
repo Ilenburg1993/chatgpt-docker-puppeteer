@@ -339,6 +339,9 @@ describe('terminal/live-status-line', () => {
         expect(line).toContain('iniciando');
         expect(line).not.toContain('starting:noloop');
         expect(line).not.toContain('stopped:noloop');
+        expect(line).not.toContain('modelo claude-sonnet-4.6');
+        expect(line).not.toContain('raciocínio xhigh');
+        expect(line.length).toBeLessThan(82);
     });
 
     it('compacta estado turn sem repetir detalhe longo', async () => {

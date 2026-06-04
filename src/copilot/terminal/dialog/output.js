@@ -525,7 +525,6 @@ function renderWaitingPromptPhaseLabel(phase) {
  * @returns {string}
  */
 export function buildWaitingPrompt() {
-    const { model, reasoningEffort } = readTerminalDialogStreamMeta();
     const promptPolicy = readTerminalPromptDisplayPolicy();
     const detailLevel = getTerminalDetailLevel();
     const activity = readTerminalActivitySnapshot();
@@ -547,14 +546,10 @@ export function buildWaitingPrompt() {
     }
     if (runtime.pendingQuestionShadowState === 'expired') tags.push('SHDW:EXP');
     const tagsStr = tags.length > 0 ? ` ${terminalThemeText('muted', `[${tags.join('|')}]`)}` : '';
-    const modelEffort = terminalThemeText(
-        'muted',
-        ` · modelo ${shortenPromptToken(model, 24)} · raciocínio ${shortenPromptToken(reasoningEffort, 12)}`,
-    );
     if (!promptPolicy.showWaitingActivity || compactDetail) {
-        return `${terminalThemeText('thinking', 'LLM-B pensando')}${tagsStr}${modelEffort} `;
+        return `${terminalThemeText('thinking', 'LLM-B pensando')}${tagsStr} `;
     }
-    return `${terminalThemeText(sevRole, `LLM-B pensando · ${phase} · ${label}`)}${tagsStr}${modelEffort} `;
+    return `${terminalThemeText(sevRole, `LLM-B pensando · ${phase} · ${label}`)}${tagsStr} `;
 }
 
 /** Separador visual entre turnos — 72 colunas. */
