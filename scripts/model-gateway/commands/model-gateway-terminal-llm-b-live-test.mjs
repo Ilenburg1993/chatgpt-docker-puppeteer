@@ -3990,6 +3990,17 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                 '/events default rendered transcript/user/usage/session/hook/export sources as operator-facing labels before raw diagnostics',
         },
         {
+            id: 'sse-archive-human-operational-events',
+            pass:
+                !/agent error|Info da sessão|terminal turn empty output|Operation cancelled by user|non[_ ]user[_ ]initiated|recoverable_model_call|model_call|errorOccurred/iu.test(
+                    beforeRawDiagnosticsPlain,
+                ) &&
+                (!/Erro do SDK sem mensagem estruturada|erro de provider BYOK/iu.test(beforeRawDiagnosticsPlain) ||
+                    /Erro BYOK|falha do provider BYOK/iu.test(beforeRawDiagnosticsPlain)),
+            detail:
+                '/events default rendered provider failures, cancellations, empty turns, and usage classifications as human operational events',
+        },
+        {
             id: 'sse-archive-raw-visible',
             pass: archiveRawEvents.length > 0,
             detail: `/events --raw exposed ${archiveRawEvents.length} archived event(s)`,
@@ -4056,6 +4067,22 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                 beforeRawDiagnosticsPlain,
             ),
             detail: 'BYOK provider errors stayed compact in the live status line; full action/context remains in durable diagnostics',
+        },
+        {
+            id: 'ux-activity-drilldown-label',
+            pass:
+                /Drill-down\s+\/activity detail mostra origem, trace, engine e streaming/iu.test(
+                    beforeRawDiagnosticsPlain,
+                ) && !/^\s*T[eé]cnico\s+Detalhes t[eé]cnicos ficam em \/activity detail/imu.test(beforeRawDiagnosticsPlain),
+            detail: '/activity default exposed a calm drill-down route instead of the old technical label',
+        },
+        {
+            id: 'ux-events-stable-long-label-column',
+            pass:
+                !/Tarefa em segundo plano conclu[ií]da\s{2,}\d{4}-\d{2}-\d{2}T/iu.test(beforeRawDiagnosticsPlain) &&
+                (/Tarefa em segundo pla…\s+\d{4}-\d{2}-\d{2}T/iu.test(beforeRawDiagnosticsPlain) ||
+                    !/Tarefa em segundo plano conclu[ií]da/iu.test(beforeRawDiagnosticsPlain)),
+            detail: '/events default kept long event labels from pushing the timestamp column',
         },
         {
             id: 'ux-single-live-status-source',

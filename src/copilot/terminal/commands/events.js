@@ -246,8 +246,20 @@ function humanEventLabel(event, payload = null) {
     if (event === 'quota.warning') return 'Aviso de quota';
     if (event === 'session.model_changed') return 'Modelo alterado';
     if (event === 'session.skills_loaded') return 'Skills carregadas';
-    if (event === 'session.info') return 'Info da sessão';
+    if (event === 'session.info') {
+        const infoType = typeof payload?.['infoType'] === 'string' ? payload['infoType'].trim().toLowerCase() : '';
+        if (infoType === 'cancellation') return 'Cancelamento';
+        if (infoType === 'configuration') return 'Configuração';
+        if (infoType === 'model_retry') return 'Retry modelo';
+        return 'Evento da sessão';
+    }
     if (event === 'session.error') return 'Erro da sessão';
+    if (event === 'agent.error') {
+        if (payload?.['byokEnabled'] === true || typeof payload?.['byokProviderType'] === 'string') return 'Erro BYOK';
+        return 'Erro do agente';
+    }
+    if (event === 'terminal.turn.empty_output') return 'Turno sem saída';
+    if (event === 'dialog.empty_after_user_input') return 'Continuação vazia';
     if (event === 'byok.provider.config') return 'Configuração BYOK';
     if (event === 'dialog.ready') return 'Conversa pronta';
     if (event === 'dialog.stopped') return 'Conversa parada';
@@ -295,6 +307,15 @@ function humanStatus(value) {
     if (text === 'active' || text === 'running' || text === 'started') return 'em andamento';
     if (text === 'requested' || text === 'pending') return 'pendente';
     if (text === 'ask_user_continuation') return 'continuação da pergunta humana';
+    if (text === 'non_user_initiated') return 'iniciado pelo agente';
+    if (text === 'byok_user_message') return 'mensagem BYOK do operador';
+    if (text === 'user_input_completed_continuation') return 'continuação após resposta humana';
+    if (text === 'model_call') return 'chamada do modelo';
+    if (text === 'recoverable_model_call') return 'erro recuperável do modelo';
+    if (text === 'erroroccurred' || text === 'error_occurred') return 'erro capturado';
+    if (text === 'cancellation') return 'cancelamento';
+    if (text === 'empty') return 'sem saída';
+    if (text === 'agent') return 'agente';
     if (text === 'session.created') return 'sessão criada';
     if (text === 'session.deleted') return 'sessão removida';
     if (text === 'session.updated') return 'sessão atualizada';
@@ -312,11 +333,13 @@ function humanEventSource(source) {
     const lower = text.toLowerCase();
     if (!text) return '-';
     if (lower === 'io' || lower.startsWith('io/')) return 'I/O local';
+    if (lower.startsWith('sdk/session.info')) return 'controle da sessão';
     if (lower.startsWith('sdk/user_input')) return 'pergunta ao operador';
     if (lower.startsWith('sdk/assistant')) return 'LLM-B via SDK';
     if (lower.startsWith('agent/background')) return 'tarefa em segundo plano';
     if (lower.startsWith('agent/llm')) return 'telemetria LLM';
     if (lower.startsWith('agent/sdk.lifecycle')) return 'controle da sessão';
+    if (lower.startsWith('agent/error')) return 'erro do agente';
     if (lower.startsWith('terminal-boot')) return 'terminal';
     if (lower.startsWith('terminal-dialog') || lower.startsWith('terminal-agent-wiring')) return 'diálogo';
     if (lower === 'sdk' || lower.startsWith('sdk/')) return 'SDK';
@@ -362,6 +385,9 @@ function humanPayloadKind(value) {
     if (text === 'tool' || text === 'tool_lifecycle') return 'ferramenta';
     if (text === 'background' || text === 'background_task') return 'tarefa em segundo plano';
     if (text === 'ask_user_continuation') return 'continuação da pergunta humana';
+    if (text === 'non_user_initiated') return 'iniciado pelo agente';
+    if (text === 'byok_user_message') return 'mensagem BYOK do operador';
+    if (text === 'user_input_completed_continuation') return 'continuação após resposta humana';
     if (text === 'session.created') return 'sessão criada';
     if (text === 'session.deleted') return 'sessão removida';
     if (text === 'session.updated') return 'sessão atualizada';
@@ -370,7 +396,74 @@ function humanPayloadKind(value) {
     if (text === 'session.shutdown') return 'sessão encerrada';
     if (text === 'model_retry') return 'retry do modelo';
     if (text === 'byok_provider_failure') return 'falha do provider BYOK';
+    if (text === 'model_call') return 'chamada do modelo';
+    if (text === 'recoverable_model_call') return 'erro recuperável do modelo';
+    if (text === 'erroroccurred' || text === 'error_occurred') return 'erro capturado';
+    if (text === 'cancellation') return 'cancelamento';
+    if (text === 'empty') return 'sem saída';
+    if (text === 'agent') return 'agente';
     return text.replace(/[_-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function humanEventMessage(value) {
+    const text = normalizeEventSummaryText(value);
+    if (!text) return '';
+    if (text === 'Operation cancelled by user') return 'operação cancelada pelo operador';
+    return text;
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @returns {string}
+ */
+function summarizeAgentErrorPayload(payload) {
+    const isByok = payload['byokEnabled'] === true || typeof payload['byokProviderType'] === 'string';
+    const provider = typeof payload['byokProviderType'] === 'string' ? `provider ${compact(payload['byokProviderType'], 28)}` : null;
+    const profile = typeof payload['byokProfile'] === 'string' ? `perfil ${compact(payload['byokProfile'], 28)}` : null;
+    const model = typeof payload['byokModel'] === 'string' ? `modelo ${compact(payload['byokModel'], 42)}` : null;
+    const recoverable = payload['recoverable'] === true ? 'recuperável' : null;
+    const handledAs = humanPayloadKind(payload['handledAs']);
+    const context = humanPayloadKind(payload['errorContext']);
+    const message = humanEventMessage(payload['operatorMeaning'] ?? payload['message']);
+    return [
+        isByok ? 'falha do provider BYOK' : null,
+        provider,
+        profile,
+        model,
+        recoverable,
+        handledAs ? `classe ${compact(handledAs, 52)}` : null,
+        context ? `contexto ${compact(context, 52)}` : null,
+        message ? compact(message, 120) : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @returns {string}
+ */
+function summarizeEmptyTurnPayload(payload) {
+    const actor = humanPayloadKind(payload['actor']);
+    const sourceDetail = humanPayloadKind(payload['sourceDetail']);
+    const assistantMessages = typeof payload['assistantMessageCount'] === 'number' ? payload['assistantMessageCount'] : null;
+    const deltaCount = typeof payload['deltaCount'] === 'number' ? payload['deltaCount'] : null;
+    const pendingQuestion = payload['pendingQuestionKind']
+        ? `pergunta pendente ${compact(humanPayloadKind(payload['pendingQuestionKind']), 40)}`
+        : 'sem pergunta humana pendente';
+    return [
+        actor ? `autor ${actor}` : null,
+        sourceDetail ? `origem ${sourceDetail}` : null,
+        assistantMessages != null ? `mensagens LLM-B ${assistantMessages}` : null,
+        deltaCount != null ? `deltas ${deltaCount}` : null,
+        pendingQuestion,
+    ]
+        .filter(Boolean)
+        .join(' · ');
 }
 
 /**
@@ -379,6 +472,18 @@ function humanPayloadKind(value) {
  * @returns {string}
  */
 function summarizePayload(payload, opts = {}) {
+    if (payload['byokEnabled'] === true || payload['handledAs'] || payload['errorContext']) {
+        const agentErrorSummary = summarizeAgentErrorPayload(payload);
+        if (agentErrorSummary) return agentErrorSummary;
+    }
+    if (
+        payload['sourceDetail'] ||
+        Object.prototype.hasOwnProperty.call(payload, 'assistantMessageCount') ||
+        Object.prototype.hasOwnProperty.call(payload, 'pendingQuestionKind')
+    ) {
+        const emptyTurnSummary = summarizeEmptyTurnPayload(payload);
+        if (emptyTurnSummary) return emptyTurnSummary;
+    }
     const previousModel = payload['previousModel'];
     const newModel = payload['newModel'];
     if (typeof newModel === 'string' && newModel.trim().length > 0) {
@@ -393,7 +498,7 @@ function summarizePayload(payload, opts = {}) {
     const requestId = payload['requestId'] ?? payload['pendingRequestId'];
     const content = payload['content'] ?? payload['chunk'] ?? payload['question'] ?? payload['message'] ?? null;
     const status = payload['status'] ?? null;
-    const type = payload['type'] ?? null;
+    const type = payload['type'] ?? payload['infoType'] ?? null;
     const classification = payload['classification'] ?? null;
     const humanToolName = typeof toolName === 'string' ? getTerminalHumanToolName(toolName) : null;
     const showIds = Boolean(opts.showIds);
@@ -408,7 +513,7 @@ function summarizePayload(payload, opts = {}) {
         renderedStatus ? `estado ${compact(renderedStatus)}` : null,
         renderedType ? `tipo ${compact(renderedType)}` : null,
         renderedClassification ? `${classificationLabel} ${compact(renderedClassification)}` : null,
-        content ? compact(content) : null,
+        content ? compact(humanEventMessage(content)) : null,
     ]
         .filter(Boolean)
         .join(' · ');
@@ -609,7 +714,7 @@ export async function cmdEvents({ println }, arg = '') {
             terminalThemeRow(
                 row.label,
                 `${row.time}${countLabel}${row.eventId} · ${row.origin}${row.trace}${row.turn}${row.hub}${row.detail ? ` · ${row.detail}` : ''}`,
-                { role: 'muted', width: 22 },
+                { role: 'muted', width: 22, truncateLabel: true },
             ),
         );
     }

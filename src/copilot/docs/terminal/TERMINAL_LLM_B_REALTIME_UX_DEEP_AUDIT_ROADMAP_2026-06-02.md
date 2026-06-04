@@ -5749,3 +5749,77 @@
 - [ ] Próxima live de falha controlada: reproduzir ou simular erro BYOK para confirmar que
       `/errors 10` mostra `terminal.byok_provider` com ação/contexto, sem duplicar eventos
       recuperáveis internos.
+- [x] Auditoria UX de `/events` pós-erro BYOK: a live bloqueada
+      `live-canonical-empty-turn-status-clear-contract-20260605-0105` mostrou que a superfície
+      default ainda vazava `agent error`, `Info da sessão`, `Operation cancelled by user`,
+      `terminal turn empty output`, `model_call`, `recoverable_model_call` e
+      `non_user_initiated`. O envelope raw estava correto, mas o modo humano ainda espelhava
+      nomes internos.
+- [x] Decisão UX: `/events` default é histórico operacional para operador humano; `--raw`/`--json`
+      continuam como auditoria técnica. Portanto, erro de provider, cancelamento, turno sem saída
+      e classificação de uso devem ter labels e detalhes humanos, com IDs/nomes internos apenas em
+      modos diagnósticos explícitos.
+- [x] Correção aplicada: `agent.error` vira `Erro BYOK` quando há contexto BYOK; `session.info`
+      com `infoType=cancellation` vira `Cancelamento` e traduz `Operation cancelled by user` para
+      `operação cancelada pelo operador`; `terminal.turn.empty_output` vira `Turno sem saída`;
+      `non_user_initiated`, `model_call`, `recoverable_model_call`, `errorOccurred` e `empty` são
+      normalizados antes de aparecerem no resumo.
+- [x] A origem `sdk/session.info` agora aparece como `controle da sessão`, evitando o rótulo solto
+      `SDK` para cancelamentos e eventos de controle.
+- [x] Contrato unitário adicionado em `test_commands_events.spec.js`: bloqueia os rótulos crus
+      acima e exige `Erro BYOK`, `falha do provider BYOK`, `Cancelamento`, `Turno sem saída` e
+      `tipo iniciado pelo agente`.
+- [x] Contrato live adicionado: `sse-archive-human-operational-events` bloqueia esses vazamentos
+      no trecho humano antes de `/events --raw` e exige label BYOK humano quando uma falha de
+      provider aparece.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/events.js`;
+  - `node --check tests/unit/copilot/terminal/test_commands_events.spec.js`;
+  - `npx eslint src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`.
+- [ ] Próxima live: repetir cenário canônico com o novo critério
+      `sse-archive-human-operational-events` e verificar se `/events 60` permanece legível em PTY
+      real.
+- [x] Live canônica executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-events-operational-human-contract-20260605-0120`.
+  - Resultado: `Status: PASS`; novo critério `sse-archive-human-operational-events` passou,
+        assim como `sse-archive-human-source-labels`, `ux-no-raw-sdk-info-labels`,
+        `ux-compact-byok-error-live-status`, `no-terminal-errors`, `clean-quit` e correlação
+        export/SSE.
+- [x] Achado visual da live: `/activity 40` ainda mostrava `Técnico  Detalhes técnicos ficam em
+      /activity detail` no modo padrão. A mensagem era funcional, mas colocava a superfície
+      operacional novamente em tom de backend.
+- [x] Correção aplicada: `/activity` padrão agora mostra `Drill-down  /activity detail mostra
+      origem, trace, engine e streaming`, mantendo a rota técnica clara sem chamar o painel
+      principal de técnico.
+- [x] Achado visual da live: labels longos em `/events 60`, como `Tarefa em segundo plano
+      concluída`, ultrapassavam a coluna fixa e empurravam timestamp/origem para a direita,
+      quebrando a grade visual.
+- [x] Correção aplicada: `terminalThemeRow()` ganhou `truncateLabel` opt-in; `/events` usa esse
+      modo para manter a coluna estável sem afetar outras superfícies que precisam preservar label
+      inteiro.
+- [x] Contratos adicionados:
+  - unitário de tema real em `test_ui_theme.spec.js` para truncamento opt-in e preservação default;
+  - harness live `ux-activity-drilldown-label`;
+  - harness live `ux-events-stable-long-label-column`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/state/ui-theme.js`;
+  - `node --check src/copilot/terminal/commands/activity.js`;
+  - `node --check src/copilot/terminal/commands/events.js`;
+  - `node --check tests/unit/copilot/terminal/test_commands_activity.spec.js`;
+  - `node --check tests/unit/copilot/terminal/test_commands_events.spec.js`;
+  - `node --check tests/unit/copilot/terminal/test_ui_theme.spec.js`;
+  - `npx eslint src/copilot/terminal/state/ui-theme.js src/copilot/terminal/commands/activity.js src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_ui_theme.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_ui_theme.spec.js`.
+- [ ] Próxima live: repetir cenário canônico após o patch de `Drill-down`/truncamento para
+      confirmar a grade visual em PTY real e fechar os novos critérios do harness.
+- [x] Live de confirmação executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-activity-events-grid-contract-20260605-0130`.
+  - Resultado: `Status: PASS`; critérios `ux-activity-drilldown-label` e
+        `ux-events-stable-long-label-column` passaram no summary.
+- [x] Evidência visual: `/activity 40` exibiu `Drill-down  /activity detail mostra origem, trace,
+      engine e streaming`; `/events 60` exibiu `Tarefa em segundo pla…` com timestamp alinhado,
+      sem empurrar a coluna.
+- [ ] Próxima frente UX: revisar `/activity` timeline para reduzir duplicação de eventos de tarefa
+      de segundo plano e tornar `Resposta do operador · agente` mais específica quando o evento
+      vem de delivery/ack interno, mantendo autoria humana clara no transcript/export.

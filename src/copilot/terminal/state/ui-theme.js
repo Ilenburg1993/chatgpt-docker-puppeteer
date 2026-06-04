@@ -227,13 +227,17 @@ export function terminalThemeHeadline(role, title, details = []) {
 /**
  * @param {string} label
  * @param {string} value
- * @param {{ width?: number; role?: TerminalThemeRole }} [options]
+ * @param {{ width?: number; role?: TerminalThemeRole; truncateLabel?: boolean }} [options]
  * @returns {string}
  */
 export function terminalThemeRow(label, value, options = {}) {
     const width = Math.max(4, Math.floor(options.width ?? 12));
     const role = options.role ?? 'muted';
-    return `  ${terminalThemeText('muted', label.padEnd(width))}  ${terminalThemeText(role, value)}`;
+    const renderedLabel =
+        options.truncateLabel && label.length > width
+            ? `${label.slice(0, Math.max(1, width - 1))}…`
+            : label.padEnd(width);
+    return `  ${terminalThemeText('muted', renderedLabel)}  ${terminalThemeText(role, value)}`;
 }
 
 /**

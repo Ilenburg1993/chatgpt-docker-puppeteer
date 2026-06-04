@@ -183,8 +183,10 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('há ');
         expect(ctx.output()).not.toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}\]/u);
         expect(ctx.output()).not.toMatch(/\[\d{2}:\d{2}:\d{2}\]/u);
-        expect(ctx.output()).toContain('Detalhes técnicos ficam em /activity detail');
-        expect(ctx.output()).toContain('Técnico');
+        expect(ctx.output()).toContain('/activity detail mostra origem, trace, engine e streaming');
+        expect(ctx.output()).toContain('Drill-down');
+        expect(ctx.output()).not.toContain('Detalhes técnicos ficam em /activity detail');
+        expect(ctx.output()).not.toContain('Técnico');
         expect(ctx.output()).not.toContain('Detalhe      Detalhes técnicos');
         expect(ctx.output()).not.toContain('source');
         expect(ctx.output()).not.toContain('Streaming público');
@@ -428,7 +430,7 @@ describe('terminal/commands/activity', () => {
 
         cmdActivity({ println: ctx.println }, '5');
 
-        expect(ctx.output()).toContain('Estado       sistema');
+        expect(ctx.output()).toMatch(/Estado\s+sistema/u);
         expect(ctx.output()).toContain('sistema · Uso BYOK sem Premium Request');
         expect(ctx.output()).toContain('tarefa · Tarefa em segundo plano concluída');
         expect(ctx.output()).toContain('inicialização · Inicializando terminal');

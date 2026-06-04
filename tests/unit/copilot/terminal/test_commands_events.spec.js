@@ -410,6 +410,115 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).not.toContain('ask_user_continuation');
     });
 
+    it('humaniza erros BYOK, cancelamentos e turnos vazios no resumo default', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 4,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 20,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 61,
+                    event: 'agent.error',
+                    source: 'agent/error',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        hookType: 'errorOccurred',
+                        errorContext: 'model_call',
+                        recoverable: true,
+                        message: 'Erro do SDK sem mensagem estruturada.',
+                        byokEnabled: true,
+                        byokProviderType: 'openai',
+                        byokProfile: 'kilo',
+                        byokModel: 'kilo-auto/free',
+                        operatorMeaning:
+                            'erro de provider BYOK; troque provider/modelo via /byok use ou /byok model',
+                        handledAs: 'recoverable_model_call',
+                    },
+                },
+                {
+                    timestamp: 1710000001000,
+                    eventId: 62,
+                    event: 'session.info',
+                    source: 'sdk/session.info',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: { infoType: 'cancellation', message: 'Operation cancelled by user' },
+                },
+                {
+                    timestamp: 1710000002000,
+                    eventId: 63,
+                    event: 'terminal.turn.empty_output',
+                    source: 'terminal-dialog/empty-output',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        actor: 'agent',
+                        sourceDetail: 'empty',
+                        assistantMessageCount: 0,
+                        pendingQuestionKind: null,
+                    },
+                },
+                {
+                    timestamp: 1710000003000,
+                    eventId: 64,
+                    event: 'llm.usage',
+                    source: 'agent/llm.usage',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: { classification: 'non_user_initiated' },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '20');
+
+        expect(ctx.output()).toContain('Erro BYOK');
+        expect(ctx.output()).toContain('erro do agente');
+        expect(ctx.output()).toContain('falha do provider BYOK');
+        expect(ctx.output()).toContain('provider openai');
+        expect(ctx.output()).toContain('contexto chamada do modelo');
+        expect(ctx.output()).toContain('Cancelamento');
+        expect(ctx.output()).toContain('controle da sessão');
+        expect(ctx.output()).toContain('operação cancelada pelo operador');
+        expect(ctx.output()).toContain('Turno sem saída');
+        expect(ctx.output()).toContain('autor agente');
+        expect(ctx.output()).toContain('origem sem saída');
+        expect(ctx.output()).toContain('tipo iniciado pelo agente');
+        expect(ctx.output()).not.toContain('agent error');
+        expect(ctx.output()).not.toContain('Info da sessão');
+        expect(ctx.output()).not.toContain('terminal turn empty output');
+        expect(ctx.output()).not.toContain('Operation cancelled by user');
+        expect(ctx.output()).not.toContain('non user initiated');
+        expect(ctx.output()).not.toContain('non_user_initiated');
+        expect(ctx.output()).not.toContain('model_call');
+        expect(ctx.output()).not.toContain('recoverable_model_call');
+        expect(ctx.output()).not.toContain('errorOccurred');
+    });
+
     it('agrega eventos default repetidos sem alterar consultas diagnosticas', async () => {
         const repeated = [0, 1, 2].map((offset) => ({
             timestamp: 1710000000000 + offset * 1000,
