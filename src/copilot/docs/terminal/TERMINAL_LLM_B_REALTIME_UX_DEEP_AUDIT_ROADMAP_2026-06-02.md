@@ -5005,3 +5005,26 @@
 - [ ] Próxima lacuna: `/events` default ainda mostra repetições de `Atividade`/`Ferramenta`
       quando o ciclo tem muitos I/O locais próximos. Avaliar agregação por janela sem afetar
       `/events --raw`.
+
+### 12.26 `/events` default com agregação visual leve
+
+- [x] Auditoria live: em ciclos de diagnóstico com muitos I/O locais, `/events 12` mostrava
+      várias linhas repetidas como `Ferramenta · I/O local · ferramenta Leitura local` e
+      `Atividade · I/O local · ferramenta Leitura local`, criando ruído sem agregar contexto.
+- [x] Decisão UX: `/events` default é uma superfície humana de triagem; pode agrupar eventos
+      idênticos por rótulo, origem e resumo. Já `/events --raw`, `/events --json` e consultas
+      com `trace`, `turn`, `tool`, `request` ou `hub` continuam linha a linha.
+- [x] Implementação: `cmdEvents` cria linhas renderizadas intermediárias e, quando não há filtro
+      diagnóstico, agrega linhas equivalentes exibindo `×N` no detalhe temporal.
+- [x] Implementação: a agregação usa chave de rótulo humano + origem humana + resumo + hint de
+      transcript/export, preservando eventos semanticamente distintos.
+- [x] Testes unitários:
+  - `agrega eventos default repetidos sem alterar consultas diagnosticas` cobre três eventos
+        iguais de I/O local renderizados como uma única linha `×3`.
+- [x] Validação passou:
+  - `node --check src/copilot/terminal/commands/events.js`.
+  - `npx eslint src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`.
+  - `npm run typecheck:strict:src.copilot`.
+- [ ] Próxima lacuna: avaliar se a agregação deve virar mais inteligente para pares
+      `tool.lifecycle` + `terminal.activity` correlacionados, evitando sumir com informação útil.

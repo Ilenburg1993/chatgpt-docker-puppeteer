@@ -350,6 +350,49 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).not.toContain('io_op');
     });
 
+    it('agrega eventos default repetidos sem alterar consultas diagnosticas', async () => {
+        const repeated = [0, 1, 2].map((offset) => ({
+            timestamp: 1710000000000 + offset * 1000,
+            eventId: 70 + offset,
+            event: 'tool.lifecycle',
+            source: 'io',
+            eventSource: 'io',
+            traceId: null,
+            turnId: null,
+            hubSessionId: null,
+            payload: {
+                type: 'io_op',
+                toolName: 'io.read',
+            },
+        }));
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: repeated.length,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 12,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: repeated,
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '12');
+
+        expect(ctx.output()).toContain('×3');
+        expect((ctx.output().match(/Ferramenta/g) ?? [])).toHaveLength(1);
+        expect(ctx.output()).toContain('ferramenta Leitura local');
+    });
+
     it('consulta por tool call, request e hub session', async () => {
         readTerminalSseEventArchiveTail.mockResolvedValueOnce({
             state: {

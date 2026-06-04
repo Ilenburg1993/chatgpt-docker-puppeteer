@@ -19,6 +19,18 @@ import {
 /**
  * @typedef {object} EventsContext
  * @property {(text: string) => void} println
+ *
+ * @typedef {object} RenderedEventRow
+ * @property {string} key
+ * @property {string} label
+ * @property {string} time
+ * @property {string} origin
+ * @property {string} eventId
+ * @property {string} trace
+ * @property {string} turn
+ * @property {string} hub
+ * @property {string} detail
+ * @property {number} count
  */
 
 /**
@@ -377,6 +389,22 @@ function buildTranscriptExportHint(entry, opts = {}) {
 }
 
 /**
+ * @param {Record<string, unknown>} filters
+ * @returns {boolean}
+ */
+function hasActiveEventFilters(filters) {
+    return Boolean(
+        filters['event'] ||
+            filters['traceId'] ||
+            filters['turnId'] ||
+            filters['source'] ||
+            filters['toolCallId'] ||
+            filters['requestId'] ||
+            filters['hubSessionId'],
+    );
+}
+
+/**
  * @param {EventsContext} ctx
  * @param {string} [arg]
  * @returns {Promise<void>}
@@ -485,8 +513,8 @@ export async function cmdEvents({ println }, arg = '') {
         filters.traceId || filters.turnId || filters.toolCallId || filters.requestId || filters.hubSessionId,
     );
     const now = Date.now();
-
-    for (const entry of entries) {
+    const shouldAggregateDefaultEvents = !showDiagnosticIds && !hasActiveEventFilters(/** @type {Record<string, unknown>} */ (filters));
+    const eventRows = entries.map((entry) => {
         const time = showDiagnosticIds
             ? formatTerminalIsoTimestamp(entry.timestamp, { precision: 'seconds' })
             : formatTerminalTimeLabel(entry.timestamp, { now, mode: 'dual' });
@@ -507,13 +535,50 @@ export async function cmdEvents({ println }, arg = '') {
         });
         const transcriptHint = buildTranscriptExportHint(entry, { showIds: showDiagnosticIds });
         const detail = [summary, transcriptHint].filter(Boolean).join(' · ');
+        const label = humanEventLabel(entry.event);
+        return {
+            key: `${label}\u0000${origin}\u0000${summary}\u0000${transcriptHint ?? ''}`,
+            label,
+            time,
+            origin,
+            eventId,
+            trace,
+            turn,
+            hub,
+            detail,
+            count: 1,
+        };
+    });
+    const rows = shouldAggregateDefaultEvents ? aggregateEventRows(eventRows) : eventRows;
+
+    for (const row of rows) {
+        const countLabel = row.count > 1 ? ` · ×${row.count}` : '';
         println(
             terminalThemeRow(
-                humanEventLabel(entry.event),
-                `${time}${eventId} · ${origin}${trace}${turn}${hub}${detail ? ` · ${detail}` : ''}`,
+                row.label,
+                `${row.time}${countLabel}${row.eventId} · ${row.origin}${row.trace}${row.turn}${row.hub}${row.detail ? ` · ${row.detail}` : ''}`,
                 { role: 'muted', width: 22 },
             ),
         );
     }
     println('');
+}
+
+/**
+ * @param {RenderedEventRow[]} rows
+ * @returns {RenderedEventRow[]}
+ */
+function aggregateEventRows(rows) {
+    /** @type {Map<string, RenderedEventRow>} */
+    const groups = new Map();
+    for (const row of rows) {
+        const existing = groups.get(row.key);
+        if (!existing) {
+            groups.set(row.key, { ...row });
+            continue;
+        }
+        existing.count += 1;
+        existing.time = row.time;
+    }
+    return [...groups.values()];
 }
