@@ -85,6 +85,7 @@ const INLINE_STATUS_MODE_OFF = 'off';
 const INLINE_STATUS_MODE_OVERLAY = 'overlay';
 const INLINE_STATUS_MODE_RESERVED = 'reserved';
 const PROMPT_REDRAW_DEDUPE_MS = 250;
+const PROMPT_PARK_DEFAULT_MS = 8_000;
 
 /**
  * Quantidade de linhas reservadas para status acima do prompt (layout: [status...][prompt]).
@@ -96,6 +97,7 @@ const PROMPT_REDRAW_DEDUPE_MS = 250;
  * @type {number}
  */
 let _statusRowsReserved = 0;
+let _terminalPromptParkedUntil = 0;
 
 /**
  * @param {string} value
@@ -602,6 +604,43 @@ function hasTerminalReadlineBufferedInput(rl) {
 }
 
 /**
+ * Evita que transições curtas pós-resposta humana repintem um prompt normal antes da continuação da LLM-B começar.
+ *
+ * @param {number} [durationMs]
+ * @returns {void}
+ */
+export function parkTerminalPromptForContinuation(durationMs = PROMPT_PARK_DEFAULT_MS) {
+    _terminalPromptParkedUntil = Math.max(_terminalPromptParkedUntil, Date.now() + Math.max(0, durationMs));
+}
+
+/**
+ * @returns {boolean}
+ */
+function shouldUseParkedTerminalPrompt() {
+    if (_terminalPromptParkedUntil <= 0) return false;
+    if (Date.now() > _terminalPromptParkedUntil) {
+        _terminalPromptParkedUntil = 0;
+        return false;
+    }
+    const runtime = readTerminalRuntimeState();
+    if (runtime.pendingQuestion && runtime.pendingQuestionKind && runtime.pendingQuestionKind !== 'ready') return false;
+    const activity = readTerminalActivitySnapshot();
+    if (activity.phase === 'idle') {
+        _terminalPromptParkedUntil = 0;
+        return false;
+    }
+    return true;
+}
+
+/**
+ * @param {string} prompt
+ * @returns {string}
+ */
+function resolvePromptForPaint(prompt) {
+    return shouldUseParkedTerminalPrompt() ? buildWaitingPrompt() : prompt;
+}
+
+/**
  * @param {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean }} rl
  * @param {string} prompt
  * @param {{ force?: boolean }} [options]
@@ -609,10 +648,11 @@ function hasTerminalReadlineBufferedInput(rl) {
  */
 function paintTerminalPrompt(rl, prompt, options = {}) {
     if (!isTerminalReadlineOpen(rl)) return;
+    const resolvedPrompt = resolvePromptForPaint(prompt);
     if (options.force !== true) {
-        _lastPromptPaints.set(/** @type {object} */ (rl), { prompt, at: Date.now() });
+        _lastPromptPaints.set(/** @type {object} */ (rl), { prompt: resolvedPrompt, at: Date.now() });
     }
-    rl.setPrompt(prompt);
+    rl.setPrompt(resolvedPrompt);
     if (!isTerminalReadlineOpen(rl)) return;
     rl.prompt();
 }
@@ -628,7 +668,10 @@ function shouldSkipDuplicatePromptPaint(rl, prompt, now = Date.now()) {
     const inputLine = /** @type {{ line?: string }} */ (rl).line;
     if (typeof inputLine === 'string' && inputLine.length > 0) return false;
     const last = _lastPromptPaints.get(rl);
-    return Boolean(last && last.prompt === prompt && now - last.at >= 0 && now - last.at < PROMPT_REDRAW_DEDUPE_MS);
+    const resolvedPrompt = resolvePromptForPaint(prompt);
+    return Boolean(
+        last && last.prompt === resolvedPrompt && now - last.at >= 0 && now - last.at < PROMPT_REDRAW_DEDUPE_MS,
+    );
 }
 
 /**
@@ -1011,6 +1054,7 @@ export function clearInlineStatus() {
  */
 export function resetStatusRowState() {
     _statusRowsReserved = 0;
+    _terminalPromptParkedUntil = 0;
 }
 
 /**

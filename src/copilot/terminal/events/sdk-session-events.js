@@ -1198,7 +1198,6 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             envelope: completedEnvelope,
         });
         broadcastSse('user_input.completed', completedEnvelope);
-        refreshPromptIfIdle();
     };
 
     const onSessionWarning = (/** @type {{ warningType?: string; message?: string; url?: string }} */ evt) => {

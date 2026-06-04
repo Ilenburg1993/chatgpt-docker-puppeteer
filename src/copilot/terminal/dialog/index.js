@@ -15,6 +15,7 @@ export {
     clearInlineStatus,
     endTerminalRenderLock,
     isTerminalRenderLocked,
+    parkTerminalPromptForContinuation,
     printExchange,
     println,
     printlnBlock,

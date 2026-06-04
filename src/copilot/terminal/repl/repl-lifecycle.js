@@ -29,6 +29,7 @@ import {
     buildWaitingPrompt,
     endTerminalRenderLock,
     getTurnQueueDepth,
+    parkTerminalPromptForContinuation,
     println,
     resetStatusRowState,
     scheduleTerminalPromptRedraw,
@@ -145,6 +146,11 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
                 ? `\n${terminalThemeRow('Resposta', `enviada para pergunta pendente${runtimeSuffix}.`, { role: 'success' })}`
                 : `\n${terminalThemeRow('Resposta', `falhou ao responder pergunta pendente${runtimeSuffix}.`, { role: 'error' })}`,
         );
+    }
+
+    function parkPromptForPendingAnswerContinuation() {
+        if (!isReadlineOpen(rl)) return;
+        rl.setPrompt(buildWaitingPrompt());
     }
 
     /**
@@ -319,8 +325,10 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
 
         const pendingAnswer = tryAnswerTerminalPendingQuestionInput(trimmed);
         if (shouldConsumeTerminalPendingAnswerInput(pendingAnswer)) {
+            if (pendingAnswer.ok) parkTerminalPromptForContinuation();
             printPendingAnswerResult(pendingAnswer);
-            refreshPrompt();
+            if (pendingAnswer.ok) parkPromptForPendingAnswerContinuation();
+            else refreshPrompt();
             return;
         }
 
@@ -361,13 +369,15 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             ? null
             : tryAnswerTerminalPendingQuestionInput(trimmedForEscape);
         if (immediatePendingAnswer && shouldConsumeTerminalPendingAnswerInput(immediatePendingAnswer)) {
+            if (immediatePendingAnswer.ok) parkTerminalPromptForContinuation();
             beginTerminalRenderLock();
             try {
                 printPendingAnswerResult(immediatePendingAnswer);
             } finally {
                 endTerminalRenderLock();
             }
-            refreshPrompt();
+            if (immediatePendingAnswer.ok) parkPromptForPendingAnswerContinuation();
+            else refreshPrompt();
             return;
         }
         lineQueue = lineQueue

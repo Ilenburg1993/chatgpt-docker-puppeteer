@@ -19,6 +19,11 @@ const mocks = vi.hoisted(() => ({
         rl.prompt();
     }),
     readTerminalAgentRuntimeEventHost: vi.fn(() => ({ on: vi.fn(), off: vi.fn() })),
+    readTerminalRuntimeState: vi.fn(() => ({
+        status: 'idle',
+        pendingQuestion: null,
+        pendingQuestionKind: null,
+    })),
 }));
 
 vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
@@ -40,11 +45,18 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
 
 vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
     readTerminalAgentRuntimeEventHost: mocks.readTerminalAgentRuntimeEventHost,
+    readTerminalRuntimeState: mocks.readTerminalRuntimeState,
 }));
 
 describe('terminal/event-adapters.js — contrato', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mocks.getBusy.mockReturnValue(false);
+        mocks.readTerminalRuntimeState.mockReturnValue({
+            status: 'idle',
+            pendingQuestion: null,
+            pendingQuestionKind: null,
+        });
     });
 
     it('registra adapters runtime + SDK por uma suite única em modo interativo', async () => {
@@ -81,5 +93,26 @@ describe('terminal/event-adapters.js — contrato', () => {
             expect.objectContaining({ rl: null }),
         );
         expect(mocks.buildUserPrompt).not.toHaveBeenCalled();
+    });
+
+    it('redesenha prompt de pergunta humana mesmo com turno busy', async () => {
+        mocks.getBusy.mockReturnValue(true);
+        mocks.readTerminalRuntimeState.mockReturnValue({
+            status: 'waiting_for_input',
+            pendingQuestion: { question: 'ASK-CANONICAL' },
+            pendingQuestionKind: 'question',
+        });
+        const { setupTerminalInteractiveEventAdapters } =
+            await import('../../../src/copilot/terminal/events/event-adapters.js');
+        const rl = { setPrompt: vi.fn(), prompt: vi.fn() };
+
+        setupTerminalInteractiveEventAdapters(/** @type {any} */ (rl));
+        const sdkArgs = /** @type {{ refreshPromptIfIdle: () => void }} */ (
+            mocks.setupTerminalSdkSessionEventListeners.mock.calls.at(-1)?.[0]
+        );
+        sdkArgs.refreshPromptIfIdle();
+
+        expect(rl.setPrompt).toHaveBeenCalledWith('prompt> ');
+        expect(rl.prompt).toHaveBeenCalled();
     });
 });

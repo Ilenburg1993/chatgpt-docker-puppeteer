@@ -88,9 +88,11 @@ const {
     beginTerminalRenderLock,
     clearInlineStatus,
     endTerminalRenderLock,
+    parkTerminalPromptForContinuation,
     printlnBlock,
     readTerminalExclusiveTtyReadiness,
     redrawTerminalPrompt,
+    resetStatusRowState,
     scheduleTerminalPromptRedraw,
     withTerminalExclusiveTty,
     writeInlineStatus,
@@ -136,6 +138,7 @@ describe('terminal/dialog/output inline status', () => {
 
     afterEach(() => {
         clearInlineStatus();
+        resetStatusRowState();
         if (originalIsTTY) Object.defineProperty(process.stdout, 'isTTY', originalIsTTY);
         if (originalStdinIsTTY) Object.defineProperty(process.stdin, 'isTTY', originalStdinIsTTY);
         if (originalColumns) Object.defineProperty(process.stdout, 'columns', originalColumns);
@@ -190,6 +193,15 @@ describe('terminal/dialog/output inline status', () => {
 
         expect(mocks.rl.setPrompt).toHaveBeenCalledTimes(1);
         expect(mocks.rl.prompt).toHaveBeenCalledTimes(1);
+    });
+
+    it('estaciona prompt normal durante continuação pós-resposta humana', () => {
+        parkTerminalPromptForContinuation(1_000);
+
+        writeInlineStatus('LLM-B finalizando · 1s');
+
+        expect(mocks.rl.setPrompt).toHaveBeenCalledWith(expect.stringContaining('LLM-B pensando'));
+        expect(mocks.rl.setPrompt).not.toHaveBeenCalledWith('você› ');
     });
 
     it('não repinta prompt em printlnBlock enquanto render lock está ativo', () => {

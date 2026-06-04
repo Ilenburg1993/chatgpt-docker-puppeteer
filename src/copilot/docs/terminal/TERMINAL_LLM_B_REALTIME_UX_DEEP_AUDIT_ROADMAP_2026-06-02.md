@@ -6144,6 +6144,68 @@
     `ask_user`; porém `ux-no-boot-prompt-double-paint`,
     `ux-no-durable-output-inside-default-prompt`, `ux-no-generic-tool-failure-copy`,
     `ux-activity-no-redundant-timeline-labels` e `no-terminal-errors` passaram.
-- [ ] Próxima frente UX: investigar por que respostas automáticas muito rápidas podem aparecer como
-      `SIM` sem o prefixo visual `você...[PERG]›` no plain/live, mesmo quando o evento
-      `user_input.requested` existe e o card da pergunta foi renderizado.
+- [x] Achado UX: respostas automáticas muito rápidas podiam ser enviadas antes de o prompt dedicado
+      `[PERG]›` aparecer no TTY, fazendo o plain/live registrar `SIM` como linha solta, apesar de
+      `user_input.requested` e do card persistente existirem.
+- [x] Decisão UX: `ask_user` é exceção ao guard de `busy`; enquanto o runtime está aguardando input
+      humano, o prompt deve redesenhar mesmo durante um turno busy, porque a pergunta é parte da
+      superfície interativa ativa, não uma nova pergunta concorrente.
+- [x] Correção aplicada: `event-adapters.js` lê `readTerminalRuntimeState()` e permite
+      `scheduleTerminalPromptRedraw()` durante `waiting_for_input` ou `pendingQuestion` real; o
+      runner live só envia a resposta automatizada quando card e prompt `[PERG]›` já estão
+      materializados.
+- [x] Teste unitário: `test_terminal_event_adapters.spec.js` cobre que o adapter redesenha prompt de
+      pergunta humana mesmo com `getBusy() === true`.
+- [x] Contrato live reforçado: o runner ganhou `ask-user-input-prompt-visible`, reprovando cenário
+      em que a pergunta existe, mas o prompt humano dedicado não aparece antes da resposta.
+- [x] Live de confirmação parcial:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-canonical-question-prompt-redraw-20260605-0243 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T05-42-49-136Z/summary.md`.
+  - Resultado geral: `Status: BLOCKED` por `assistant-empty-turn` na continuação pós-pergunta, mas
+    o `terminal.plain.log` mostrou `você[kilo-auto…/high][PERG]› SIM`, confirmando a correção do
+    prompt humano.
+- [x] Achado no harness: quando o bloqueio ocorre depois de deltas/tools/pergunta já materializados,
+      o resumo antigo trocava a suíte completa por `root-cause-not-ux-duplication`, apagando sinais
+      úteis do terminal.
+- [x] Correção aplicada: o runner diferencia `assistant-empty-after-user-input`,
+      `assistant-empty-after-ask` e `assistant-empty-turn`; bloqueios tardios agora preservam
+      `evaluateOutput()` e adicionam o critério `blocked-by-*` em vez de ocultar critérios já
+      observáveis.
+- [x] Live canônica saudável:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-canonical-late-blocker-classification-20260605-0257 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T05-47-40-339Z/summary.md`.
+  - Resultado: `Status: PASS`; deltas, tool, `ask_user`, prompt `[PERG]›`, resposta `SIM`, final
+    pós-pergunta, export e SSE passaram.
+- [x] Achado visual pós-PASS: a inspeção humana do plain log mostrou prompts normais consecutivos
+      depois de `Resposta enviada para pergunta pendente`, mas o critério antigo só detectava
+      `você› você›` na mesma linha.
+- [x] Contrato live reforçado: `no-prompt-double-render` agora também reprova prompts normais em
+      linhas consecutivas, como `você[...]›` seguido de outro `você[...]›` antes da linha viva.
+- [x] Correção aplicada: o REPL não força `refreshPrompt()` após resposta humana aceita; respostas
+      inválidas ainda redesenham o prompt para permitir correção imediata.
+- [x] Correção aplicada: `sdk-session-events.js` deixou de chamar `refreshPromptIfIdle()` em
+      `user_input.completed`; a conclusão da pergunta agora registra transcript/SSE/activity sem
+      disputar repaint com a continuação do modelo.
+- [x] Correção estrutural: `dialog/output.js` ganhou
+      `parkTerminalPromptForContinuation()`, uma primitiva transitória de TTY para estacionar o
+      prompt normal durante a continuação pós-resposta humana. Enquanto o estacionamento está ativo,
+      pinturas de prompt usam `buildWaitingPrompt()`; quando a atividade volta a `idle` ou o prazo
+      expira, o prompt normal volta automaticamente.
+- [x] Barrel preservado: `dialog/index.js` exporta `parkTerminalPromptForContinuation()` e
+      `repl-lifecycle.js` consome a função pelo barrel público.
+- [x] Teste unitário: `test_dialog_output_inline_status.spec.js` cobre que, com prompt estacionado,
+      `writeInlineStatus()` pinta prompt de espera (`LLM-B pensando`) e não repinta `você›`.
+- [x] Validação focada:
+  - `node --check src/copilot/terminal/dialog/output.js src/copilot/terminal/dialog/index.js src/copilot/terminal/repl/repl-lifecycle.js src/copilot/terminal/events/sdk-session-events.js tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js tests/unit/copilot/test_terminal_event_adapters.spec.js`.
+  - `npx eslint src/copilot/terminal/dialog/output.js src/copilot/terminal/dialog/index.js src/copilot/terminal/repl/repl-lifecycle.js src/copilot/terminal/events/sdk-session-events.js src/copilot/terminal/events/event-adapters.js tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js tests/unit/copilot/test_terminal_event_adapters.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Lives de regressão do critério:
+  - `artifacts/terminal-live/2026-06-04T05-51-12-545Z/summary.md` e
+    `artifacts/terminal-live/2026-06-04T05-52-52-830Z/summary.md` reprovaram
+    `no-prompt-double-render`, confirmando que a régua passou a detectar o problema visual real.
+  - `artifacts/terminal-live/2026-06-04T05-58-09-623Z/summary.md` bloqueou por
+    `assistant-ended-before-ask`; o modelo materializou deltas e encerrou antes de chamar
+    `ask_user`, então não exercitou a correção pós-`SIM`.
+- [ ] Próxima frente UX: obter uma live canônica não-flaky após `parkTerminalPromptForContinuation()`
+      em que o modelo materialize `ask_user` e validar que `no-prompt-double-render` passa no trecho
+      pós-resposta humana.

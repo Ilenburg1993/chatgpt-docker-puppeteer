@@ -148,6 +148,10 @@ function buildAskRenderedRegex(question) {
     return new RegExp(`\\[(?:PERGUNTA|ASK)\\]\\s+${escapeRegExp(question)}`, 'u');
 }
 
+function hasHumanQuestionInputPrompt(plain) {
+    return /voc[eê]\[[^\]\n]+(?:\/[^\]\n]+)?\]\[PERG(?:UNTA)?\]›/iu.test(String(plain ?? ''));
+}
+
 function buildQuestionPendingRegex(question) {
     return new RegExp(`\\[(?:QUESTION|ASK:[^\\]]+)\\]\\s+LLM-B perguntou:\\s*"${escapeRegExp(question)}"`, 'u');
 }
@@ -3035,12 +3039,25 @@ function detectLiveBlocker(plain, runtime = {}) {
             detail: `BYOK provider turn failed and was contained without Copilot fallback${modelMatch?.[1] ? ` · model=${modelMatch[1]}` : ''}`,
         };
     }
+    const scenario = runtime.liveScenario ?? LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID];
     const emptyOutput = findTerminalEmptyOutputEvent(runtime.sseEvents) ?? findEmptyDialogTurnEnd(runtime.sseEvents);
     if (/Turno terminou sem saída pública/i.test(plain) || emptyOutput) {
+        const asked = Boolean(findUserInputRequestedEvent(runtime.sseEvents)) || scenario.askRenderedRe.test(plain);
+        const answered =
+            Boolean(findUserInputCompletedEvent(runtime.sseEvents)) ||
+            new RegExp(`\\[PERG(?:UNTA)?\\]›\\s*${escapeRegExp(scenario.answerSteps.at(-1)?.answer ?? '')}`, 'iu').test(
+                plain,
+            );
+        const id = answered ? 'assistant-empty-after-user-input' : asked ? 'assistant-empty-after-ask' : 'assistant-empty-turn';
+        const phaseDetail = answered
+            ? 'after the operator answered the required ask_user prompt'
+            : asked
+              ? 'after the required ask_user prompt was rendered'
+              : 'before the required canonical ask/final was fully materialized';
         return {
-            id: 'assistant-empty-turn',
+            id,
             detail:
-                'terminal reached an explicit turn with empty public output before the canonical ask/final' +
+                `terminal reached an explicit turn with empty public output ${phaseDetail}` +
                 `${emptyOutput?.traceId ? ` · trace=${emptyOutput.traceId}` : ''}` +
                 `${emptyOutput?.turnId ? ` · turn=${emptyOutput.turnId}` : ''}` +
                 `${Number.isFinite(emptyOutput?.eventId) ? ` · sse=#${emptyOutput.eventId}` : ''}`,
@@ -3173,6 +3190,31 @@ function findTerminalEmptyOutputEvent(events) {
         };
     }
     return null;
+}
+
+function findUserInputRequestedEvent(events) {
+    if (!Array.isArray(events)) return null;
+    return (
+        events.find((evt) => evt?.event === 'user_input.requested' || evt?.event === 'elicitation.pending') ?? null
+    );
+}
+
+function findUserInputCompletedEvent(events) {
+    if (!Array.isArray(events)) return null;
+    return (
+        events.find(
+            (evt) =>
+                evt?.event === 'user_input.completed' ||
+                evt?.event === 'question.answered' ||
+                evt?.event === 'elicitation.completed',
+        ) ?? null
+    );
+}
+
+function shouldEvaluateScenarioDespiteBlocker(blocker) {
+    return ['assistant-empty-after-user-input', 'assistant-empty-after-ask', 'assistant-ended-before-ask'].includes(
+        blocker?.id,
+    );
 }
 
 function summarizeSseEvents(events) {
@@ -3777,7 +3819,9 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const taskDeltaActivityDuringDialog =
         /task\s+·\s+Executando tarefa interna\s+—\s+delta/.test(preEventsPlain) ||
         /"label":"Executando tarefa interna","detail":"delta/.test(preEventsPlain);
-    const promptDoubleRender = /voc[eê]\[[^\r\n]*?›[ \t]+voc[eê]\[[^\r\n]*?›/iu.test(plain);
+    const promptDoubleRender =
+        /voc[eê]\[[^\r\n]*?›[ \t]+voc[eê]\[[^\r\n]*?›/iu.test(plain) ||
+        /(?:^|\n)voc[eê]\[[^\r\n]*?›[^\S\r\n]*(?:\r?\n)+voc[eê]\[[^\r\n]*?›/iu.test(plain);
     const inlineStatusRendered = /(?:⟲|⏳|⌛)\s+(?:LLM-B|aguardando)\b|LLM-B\s+(?:turno|pensando|iniciando)\s+·/iu.test(plain);
     const duplicatePathologies = [/__anonymous__/, /hook:error_occurred/];
     const beforeRawWithoutExpectedScenarioMarkers = scenario.expectedOutputMarkers.reduce(
@@ -3884,6 +3928,11 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'ask-user-visible',
             pass: scenario.askRenderedRe.test(plain),
             detail: `ask_user prompt rendered persistently for scenario=${scenario.id}`,
+        },
+        {
+            id: 'ask-user-input-prompt-visible',
+            pass: hasHumanQuestionInputPrompt(plain),
+            detail: 'ask_user rendered a dedicated [PERG] input prompt before the answer',
         },
         {
             id: 'ask-user-single-source',
@@ -5781,7 +5830,12 @@ async function main() {
             scenarioSent = true;
             write(buildScenarioPrompt(liveScenario));
         }
-        if (!answerSent && answerStepIndex === 0 && liveScenario.askRenderedRe.test(plain)) {
+        if (
+            !answerSent &&
+            answerStepIndex === 0 &&
+            liveScenario.askRenderedRe.test(plain) &&
+            hasHumanQuestionInputPrompt(plain)
+        ) {
             if (missingRequiredAskDiagnosticTimer) {
                 clearTimeout(missingRequiredAskDiagnosticTimer);
                 missingRequiredAskDiagnosticTimer = null;
@@ -5923,12 +5977,22 @@ async function main() {
                   sseEvents: sseSummary.events,
                   liveScenario,
               });
+    const evaluateScenarioWithBlocker = shouldEvaluateScenarioDespiteBlocker(blocker);
     const exportSummary =
-        noPr || byokControlProbe || autoControlProbe || modelControlProbe || blocker
+        noPr || byokControlProbe || autoControlProbe || modelControlProbe || (blocker && !evaluateScenarioWithBlocker)
             ? null
             : await inspectExportedMarkdown(exportPath, liveScenario);
     const baseCriteria = blocker
-        ? evaluateBlockedOutput(plain, sseSummary, blocker)
+        ? evaluateScenarioWithBlocker
+            ? [
+                  ...evaluateOutput(plain, sseSummary, exportSummary, liveScenario),
+                  {
+                      id: `blocked-by-${blocker.id}`,
+                      pass: false,
+                      detail: blocker.detail,
+                  },
+              ]
+            : evaluateBlockedOutput(plain, sseSummary, blocker)
         : autoControlProbe
           ? evaluateAutoProbeOutput(plain, sseSummary, { profile: autoProbeProfile })
           : modelControlProbe
