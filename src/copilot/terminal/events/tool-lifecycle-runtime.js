@@ -18,6 +18,7 @@
 import { recordToolCall } from '#copilot/observability';
 import { getShowToolActivity } from '../../presentation/state/index.js';
 import { broadcastSse, clearInlineStatus, println, writeInlineStatus } from '../dialog/index.js';
+import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     completeTerminalTurnToolCall,
     getTerminalDetailLevel,
@@ -468,6 +469,28 @@ function hasSemanticToolTarget(presentation) {
 }
 
 /**
+ * @returns {boolean}
+ */
+function isTerminalWaitingForHumanQuestion() {
+    const runtime = readTerminalRuntimeState();
+    return runtime.status === 'waiting_for_input' && runtime.pendingQuestionKind === 'question';
+}
+
+/**
+ * @param {import('../state/tool-call-registry.js').ToolCallEntry | null | undefined} entry
+ * @param {string | null | undefined} toolCallId
+ * @param {ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>} registry
+ * @returns {boolean}
+ */
+function shouldPrintToolNarration(entry, toolCallId, registry) {
+    if (!getShowToolActivity()) return false;
+    if (entry?.suppressLiveNarration === true) return false;
+    if (toolCallId && registry.shouldSuppressLiveNarration(toolCallId)) return false;
+    if (isTerminalWaitingForHumanQuestion()) return false;
+    return true;
+}
+
+/**
  * @param {{
  *     registry: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>;
  *     evt: Record<string, unknown>;
@@ -492,6 +515,8 @@ export function handleTerminalNativeToolStart({ registry, evt }) {
         registry.touch(toolCallId, { rawArgs, presentation });
         return;
     }
+    /** @type {import('../state/tool-call-registry.js').ToolCallEntry | null} */
+    let entry = null;
     if (registry.isNameInFlight(name)) {
         if (toolCallId) {
             registry.register(toolCallId, name, 'native', {
@@ -503,7 +528,7 @@ export function handleTerminalNativeToolStart({ registry, evt }) {
         return;
     }
     if (toolCallId) {
-        registry.register(toolCallId, name, 'native', {
+        entry = registry.register(toolCallId, name, 'native', {
             canonicalName,
             rawArgs,
             presentation,
@@ -515,7 +540,7 @@ export function handleTerminalNativeToolStart({ registry, evt }) {
         toolName: canonicalName,
         source: 'sdk',
     });
-    printToolStart(presentation);
+    if (shouldPrintToolNarration(entry, toolCallId, registry)) printToolStart(presentation);
     broadcastToolLifecycle(
         buildToolLifecycleStart({
             toolCallId,
@@ -550,7 +575,7 @@ export function handleTerminalNativeToolProgress({ registry, evt }) {
     const progress = typeof evt?.['progress'] === 'number' ? Number(evt['progress']) : null;
     const progressMessage = typeof evt?.['progressMessage'] === 'string' ? evt['progressMessage'] : null;
     const shouldPrint =
-        getShowToolActivity() &&
+        shouldPrintToolNarration(entry, toolCallId, registry) &&
         ((progress !== null &&
             (entry?.lastProgress == null || Math.abs(progress - entry.lastProgress) >= 5 || progress === 100)) ||
             (progressMessage !== null && progressMessage !== entry?.lastProgressMessage));
@@ -719,7 +744,9 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
         severity: success ? 'info' : 'error',
         source: 'sdk',
     });
-    printToolComplete(presentation, success, durationLabel, effectiveToolCallId || null);
+    if (shouldPrintToolNarration(metricEntry, effectiveToolCallId || toolCallId, registry)) {
+        printToolComplete(presentation, success, durationLabel, effectiveToolCallId || null);
+    }
     broadcastToolLifecycle(
         buildToolLifecycleComplete({
             toolCallId: effectiveToolCallId || toolCallId,
@@ -816,9 +843,14 @@ export function handleTerminalExternalToolRequested({ registry, evt, verboseNarr
         toolName: displayToolName,
         source: 'sdk',
     });
-    if (getShowToolActivity()) {
+    const canPrintExternalStart = shouldPrintToolNarration(null, toolCallId, registry);
+    if (canPrintExternalStart) {
         printToolStart({ ...presentation, displayToolName, startLine: presentation.startLine });
-    } else if (verboseNarration) {
+    } else if (
+        verboseNarration &&
+        !registry.shouldSuppressLiveNarration(toolCallId) &&
+        !isTerminalWaitingForHumanQuestion()
+    ) {
         const targetLabel = presentation.target || presentation.path || renderToolRequestLabel(requestId) || '';
         println(
             terminalThemeRow('Integração', `${displayToolName}${targetLabel ? ` · ${targetLabel}` : ''}`, {
@@ -903,9 +935,14 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
         source: 'sdk',
         severity: success ? 'info' : 'error',
     });
-    if (getShowToolActivity()) {
+    const canPrintExternalComplete = shouldPrintToolNarration(completedEntry ?? resolvedEntry, resolvedToolCallId, registry);
+    if (canPrintExternalComplete) {
         printToolComplete(presentation, success, durationLabel, resolvedToolCallId);
-    } else if (verboseNarration) {
+    } else if (
+        verboseNarration &&
+        !registry.shouldSuppressLiveNarration(resolvedToolCallId) &&
+        !isTerminalWaitingForHumanQuestion()
+    ) {
         println(
             terminalThemeRow(
                 'Integração',
@@ -936,15 +973,16 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
  * @param {{
  *     registry: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry> | null;
  *     entry: import('./io-activity-events.js').TerminalIoActivityEntry;
+ *     correlated?: import('../state/tool-call-registry.js').ToolCallEntry | null;
  * }} input
  * @returns {void}
  */
-export function handleTerminalIoToolLifecycle({ registry, entry }) {
-    const correlated = registry ? registry.attachIoActivity(entry) : null;
+export function handleTerminalIoToolLifecycle({ registry, entry, correlated = null }) {
+    const effectiveCorrelated = correlated ?? (registry ? registry.attachIoActivity(entry) : null);
     broadcastToolLifecycle(
         buildToolLifecycleIoOp(entry, {
-            correlatedToolCallId: correlated?.toolCallId ?? null,
-            correlatedToolName: correlated?.toolName ?? null,
+            correlatedToolCallId: effectiveCorrelated?.toolCallId ?? null,
+            correlatedToolName: effectiveCorrelated?.toolName ?? null,
         }),
     );
 }

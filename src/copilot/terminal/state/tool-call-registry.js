@@ -56,6 +56,7 @@ const RECENTLY_COMPLETED_TTL_MS = 2 * 60_000;
  *     lastDurableProgressMessage: string | null;
  *     rawArgs: Record<string, unknown>;
  *     presentation: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation | null;
+ *     suppressLiveNarration: boolean;
  *     io: ToolCallIoSummary;
  *     completedAt: number | null;
  *     success: boolean | null;
@@ -75,6 +76,7 @@ const RECENTLY_COMPLETED_TTL_MS = 2 * 60_000;
  *             canonicalName?: string | null;
  *             rawArgs?: Record<string, unknown>;
  *             presentation?: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation | null;
+ *             suppressLiveNarration?: boolean;
  *         },
  *     ) => ToolCallEntry;
  *     getEntry: (toolCallId: string) => ToolCallEntry | null;
@@ -89,8 +91,11 @@ const RECENTLY_COMPLETED_TTL_MS = 2 * 60_000;
  *             lastDurableProgressMessage?: string | null;
  *             lastHeartbeatAt?: number;
  *             lastSignalAt?: number;
+ *             suppressLiveNarration?: boolean;
  *         },
  *     ) => ToolCallEntry | null;
+ *     suppressLiveNarration: (toolCallId: string) => ToolCallEntry | null;
+ *     shouldSuppressLiveNarration: (toolCallId: string | null | undefined) => boolean;
  *     updatePresentation: (
  *         toolCallId: string,
  *         presentation: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation,
@@ -121,6 +126,9 @@ export function createToolCallRegistry() {
     /** @type {Map<string, ToolCallEntry>} recently-completed by toolCallId */
     const _recentlyCompleted = new Map();
 
+    /** @type {Map<string, number>} toolCallIds cuja narração viva deve ficar silenciosa no transcript operacional. */
+    const _liveNarrationSuppressedIds = new Map();
+
     /** @type {Map<string, number>} aliases de completion recente: name:, id:, name-id: */
     const _recentCompletionKeys = new Map();
 
@@ -148,6 +156,11 @@ export function createToolCallRegistry() {
         for (const [key, ts] of _recentCompletionKeys.entries()) {
             if (now - ts > RECENTLY_COMPLETED_TTL_MS) {
                 _recentCompletionKeys.delete(key);
+            }
+        }
+        for (const [id, ts] of _liveNarrationSuppressedIds.entries()) {
+            if (now - ts > IN_FLIGHT_TTL_MS) {
+                _liveNarrationSuppressedIds.delete(id);
             }
         }
     }
@@ -276,6 +289,7 @@ export function createToolCallRegistry() {
             lastDurableProgressMessage: null,
             rawArgs: opts.rawArgs ?? {},
             presentation: opts.presentation ?? null,
+            suppressLiveNarration: opts.suppressLiveNarration === true || _liveNarrationSuppressedIds.has(toolCallId),
             io: createIoSummary(),
             completedAt: null,
             success: null,
@@ -326,9 +340,39 @@ export function createToolCallRegistry() {
         if ('lastHeartbeatAt' in patch && typeof patch.lastHeartbeatAt === 'number') {
             entry.lastHeartbeatAt = patch.lastHeartbeatAt;
         }
+        if ('suppressLiveNarration' in patch) {
+            entry.suppressLiveNarration = patch.suppressLiveNarration === true;
+            if (entry.suppressLiveNarration) _liveNarrationSuppressedIds.set(toolCallId, Date.now());
+        }
         entry.lastSignalAt =
             'lastSignalAt' in patch && typeof patch.lastSignalAt === 'number' ? patch.lastSignalAt : Date.now();
         return entry;
+    }
+
+    /**
+     * @param {string} toolCallId
+     * @returns {ToolCallEntry | null}
+     */
+    function suppressLiveNarration(toolCallId) {
+        pruneStale();
+        if (!toolCallId || typeof toolCallId !== 'string') return null;
+        _liveNarrationSuppressedIds.set(toolCallId, Date.now());
+        const entry = _active.get(toolCallId);
+        if (!entry) return null;
+        entry.suppressLiveNarration = true;
+        entry.lastSignalAt = Date.now();
+        return entry;
+    }
+
+    /**
+     * @param {string | null | undefined} toolCallId
+     * @returns {boolean}
+     */
+    function shouldSuppressLiveNarration(toolCallId) {
+        pruneStale();
+        if (!toolCallId) return false;
+        const entry = _active.get(toolCallId) ?? _recentlyCompleted.get(toolCallId);
+        return entry?.suppressLiveNarration === true || _liveNarrationSuppressedIds.has(toolCallId);
     }
 
     /**
@@ -558,6 +602,7 @@ export function createToolCallRegistry() {
         _active.clear();
         _recentlyCompleted.clear();
         _recentCompletionKeys.clear();
+        _liveNarrationSuppressedIds.clear();
         _requestIdToName.clear();
         _requestIdToEntry.clear();
     }
@@ -566,6 +611,8 @@ export function createToolCallRegistry() {
         register,
         getEntry,
         touch,
+        suppressLiveNarration,
+        shouldSuppressLiveNarration,
         updatePresentation,
         updateProgress,
         complete,

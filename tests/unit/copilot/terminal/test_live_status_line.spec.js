@@ -486,7 +486,7 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(55);
     });
 
-    it('compacta estado de resposta humana recebida enquanto aguarda continuação da LLM-B', async () => {
+    it('compacta estado pós-resposta humana sem quebrar a linha viva', async () => {
         const { formatTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');
         mocks.activity = {
@@ -500,12 +500,14 @@ describe('terminal/live-status-line', () => {
 
         const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:12.000-03:00') });
 
-        expect(line).toContain('resposta recebida');
-        expect(line).toContain('aguardando LLM-B');
+        expect(line).toContain('continuando');
+        expect(line).toContain('12s');
+        expect(line).not.toContain('resposta recebida');
+        expect(line).not.toContain('aguardando LLM-B');
         expect(line).not.toContain('Resposta do operador');
         expect(line).not.toContain('escolha estruturada');
         expect(line).not.toContain('modelo auto');
         expect(line).not.toContain('conversa ativa');
-        expect(line.length).toBeLessThan(60);
+        expect(line.length).toBeLessThan(32);
     });
 });

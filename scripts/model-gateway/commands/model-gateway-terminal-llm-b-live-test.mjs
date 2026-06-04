@@ -3692,6 +3692,11 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const markerCount = countCanonicalDeltaMarkers(plain);
     const preEventsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b/i)[0] ?? plain;
     const beforeRawDiagnosticsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b[^\n]*--raw/i)[0] ?? plain;
+    const activity40Sections = beforeRawDiagnosticsPlain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/activity\s+40\b[^\n\r]*/iu).slice(1);
+    const latestActivity40Section =
+        activity40Sections
+            .at(-1)
+            ?.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/(?:tools|events|usage|errors|health|export|quit)\b/iu)[0] ?? '';
     const archiveRawEvents = extractArchiveRawEvents(plain);
     const canonicalEvents = [...sseSummary.events, ...archiveRawEvents];
     const canonicalToolLifecycle = summarizeCanonicalToolLifecycle(canonicalEvents);
@@ -4083,6 +4088,17 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             detail: '/activity default exposed a calm drill-down route instead of the old technical label',
         },
         {
+            id: 'ux-activity-post-turn-timeline-operational',
+            pass:
+                latestActivity40Section.length === 0 ||
+                (/Timeline operacional/iu.test(latestActivity40Section) &&
+                    !/inicializa[cç][aã]o\s+·|turno\s+·\s+Processando mensagem/iu.test(latestActivity40Section)),
+            detail:
+                latestActivity40Section.length === 0
+                    ? '/activity 40 post-turn section was not present in this scenario'
+                    : '/activity 40 post-turn default timeline hid boot and routine message-processing rows',
+        },
+        {
             id: 'ux-events-stable-long-label-column',
             pass:
                 !/Tarefa em segundo plano conclu[ií]da\s{2,}\d{4}-\d{2}-\d{2}T/iu.test(beforeRawDiagnosticsPlain) &&
@@ -4141,6 +4157,18 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                 !/SIMSIM/u.test(plain) &&
                 !/voc[eê]\[[^\n\r]*\[PERG\][^\n\r]*›[^\n\r]*(?:LLM-B aguardando voc[eê]|SIMSIM)/iu.test(plain),
             detail: 'pending-question live status did not repaint inside the human input line',
+        },
+        {
+            id: 'ux-no-durable-tool-output-inside-question-prompt',
+            pass: !/voc[eê]\[[^\n\r]*\[PERG\][^\n\r]*›[^\n\r]*(?:Ferramenta|Arquivo|Conclu[ií]do|Falhou|Turno)\b/iu.test(
+                plain,
+            ),
+            detail: 'durable tool/file/turn rows did not render inside the pending human-question prompt line',
+        },
+        {
+            id: 'ux-answer-live-status-stays-single-line',
+            pass: !/LLM-B resposta recebida\s+·\s+aguardando LLM-B/iu.test(plain),
+            detail: 'post-answer live status stayed compact enough for narrow PTY',
         },
         {
             id: 'ux-turn-file-summary-deduped',

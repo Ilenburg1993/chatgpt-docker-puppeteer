@@ -309,8 +309,8 @@ export function formatTerminalLiveStatusLine(input = {}) {
         const answered = `${activity.label ?? ''} ${activity.detail ?? ''}`.toLowerCase().includes('resposta');
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
-            `${terminalThemeText(severityRole, answered ? 'resposta recebida' : 'pergunta')}` +
-            `${terminalThemeText('muted', ` · aguardando LLM-B · ${formatLiveDuration(ageMs)}${queue}`)}` +
+            `${terminalThemeText(severityRole, answered ? 'continuando' : 'pergunta')}` +
+            `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)}${queue}`)}` +
             '\x1b[K'
         );
     }

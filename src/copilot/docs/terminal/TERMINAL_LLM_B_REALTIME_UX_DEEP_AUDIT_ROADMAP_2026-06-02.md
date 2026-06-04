@@ -5997,7 +5997,72 @@
 - [x] Evidência visual: o bloco durável do turno mostrou `Turno 2 ações · 1 arquivo` e
       `Arquivos LER package.json`, sem repetição; o prompt de pergunta mostrou `SIM` isolado, sem
       `SIMSIM` e sem `LLM-B aguardando você` colado ao input.
-- [ ] Próxima frente UX: revisar a timeline operacional de `/activity`, porque ela ainda inclui
+- [x] Próxima frente UX: revisar a timeline operacional de `/activity`, porque ela ainda inclui
       `Processando mensagem` e eventos de inicialização quando há eventos operacionais suficientes;
       avaliar se boot/processamento devem ficar em `/activity detail` por default após a primeira
       resposta.
+- [x] Decisão UX: a timeline default deve preferir eventos com valor operacional imediato
+      (ferramentas, pergunta humana, conclusão, erro/aviso). Boot e `Processando mensagem` só
+      aparecem no default quando ainda não há evento operacional melhor; caso contrário ficam em
+      `/activity detail`.
+- [x] Correção aplicada: `isRoutineDefaultTimelineEntry()` passou a classificar `boot` e
+      `turn/Processando mensagem` como rotina ocultável, com fallback automático para boot quando o
+      histórico inteiro é rotina inicial.
+- [x] Testes unitários: `test_commands_activity.spec.js` cobre que boot/processamento somem quando
+      há `Tarefa em segundo plano concluída`, mas boot continua visível durante inicialização pura.
+- [x] Achado adicional: `/activity` podia dizer `Arquivos 2` e, logo abaixo, mostrar apenas
+      `Arquivo leitura · package.json ×2`, criando aparente contradição entre contador e lista.
+- [x] Correção aplicada: `printTurnTraceSummary()` agora calcula arquivos únicos agregados para o
+      default; em `detail`, quando há diferença, mostra `1 arquivo único · 2 registros`, preservando
+      a informação bruta sem poluir o resumo humano.
+- [x] Contrato live reforçado: o runner ganhou
+      `ux-activity-post-turn-timeline-operational`, validando a última seção `/activity 40` e
+      reprovando `inicialização`/`Processando mensagem` no default pós-turno.
+- [x] Live executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-activity-timeline-operational-20260605-0425`.
+  - Resultado: `Status: PASS`; `ux-activity-post-turn-timeline-operational` passou; `/activity 40`
+    pós-turno mostrou timeline com pergunta, conclusão e ferramentas, sem boot/processamento; o
+    resumo mostrou `Arquivos 1` e `Arquivo leitura · package.json ×2`.
+- [x] Achado visual remanescente: em PTY estreito, a linha viva pós-`SIM` ainda quebrou em duas
+      linhas como `LLM-B resposta recebida · aguardando LLM-B ·` / `0s`, apesar de não competir
+      mais com o input.
+- [x] Decisão UX: após a resposta humana, o histórico/card já explica a autoria; a linha viva deve
+      ser apenas o pulso de continuação. Texto canônico: `LLM-B continuando · Ns`.
+- [x] Correção aplicada: `live-status-line.js` encurtou `phase=question` pós-resposta para
+      `continuando · Ns`, e o runner ganhou `ux-answer-live-status-stays-single-line`.
+- [x] Validação focada:
+  - `node --check src/copilot/terminal/events/tool-lifecycle-runtime.js src/copilot/terminal/events/io-activity-events.js src/copilot/terminal/events/sdk-session-events.js src/copilot/terminal/state/tool-call-registry.js tests/unit/copilot/terminal/test_io_activity_events.spec.js`.
+  - `npx eslint src/copilot/terminal/state/tool-call-registry.js src/copilot/terminal/events/tool-lifecycle-runtime.js src/copilot/terminal/events/io-activity-events.js src/copilot/terminal/events/sdk-session-events.js src/copilot/terminal/events/agent-runtime-events.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs tests/unit/copilot/terminal/test_io_activity_events.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js`.
+  - `npx vitest run tests/unit/copilot/terminal/test_io_activity_events.spec.js`.
+  - `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js`.
+- [x] Live executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-canonical-question-output-guard-20260605-0516 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T05-16-03-451Z/summary.md`.
+  - Resultado: `Status: PASS`; `ux-answer-live-status-stays-single-line`,
+    `ux-activity-post-turn-timeline-operational` e `ux-no-durable-tool-output-inside-question-prompt`
+    passaram.
+- [x] Evidência visual: `terminal.plain.log` mostrou uma única linha
+      `você[kilo-auto…/high][PERG]› SIM`; grep confirmou ausência de `Ferramenta`, `Arquivo`,
+      `Concluído`, `Falhou` ou `Turno` na linha do prompt `[PERG]`.
+- [x] Achado crítico corrigido: live anterior mostrou que o SDK pode emitir `ask_user` e outra tool
+      no mesmo lote `preToolUse`; nessa corrida, `Arquivo leitura` e `Concluído Ler arquivo` podiam
+      ser impressos enquanto a pergunta humana estava ativa, poluindo o input.
+- [x] Decisão UX: enquanto o terminal aguarda pergunta humana, o card/prompt `[PERG]` é superfície
+      exclusiva. Tools e I/O podem continuar no ledger canônico (`/activity`, `/events`, SSE,
+      turn trace), mas não devem disputar stdout durável com o input humano.
+- [x] Correção estrutural: `ToolCallRegistry` ganhou `suppressLiveNarration()` e
+      `shouldSuppressLiveNarration()`, preservando a decisão mesmo quando `hook.start` chega antes
+      ou depois de `tool.execution_start`.
+- [x] Correção de fluxo SDK: `sdk-session-events.js` detecta `preToolUse` com `ask_user` +
+      ferramentas irmãs e marca essas ferramentas como silenciosas no transcript vivo.
+- [x] Correção de saída: `tool-lifecycle-runtime.js`, `io-activity-events.js` e o heartbeat de
+      `agent-runtime-events.js` respeitam a barreira de pergunta humana; dados continuam sendo
+      gravados em activity, lifecycle SSE e turn trace.
+- [x] Teste unitário: `test_io_activity_events.spec.js` cobre I/O correlacionado a tool silenciosa e
+      I/O emitido durante `waiting_for_input/question`, ambos sem `println` e com SSE preservado.
+- [x] Contrato live reforçado: o runner ganhou
+      `ux-no-durable-tool-output-inside-question-prompt`, bloqueando tool/file/turn na linha
+      `[PERG]›`.
+- [ ] Próxima frente UX: auditar se a linha durável inicial de uma tool pode aparecer colada ao
+      prompt normal `você›` antes de uma pergunta futura; decidir se `printlnBlock`/reserva de
+      prompt deve ser unificada para todo stdout durável, não apenas para pergunta ativa.

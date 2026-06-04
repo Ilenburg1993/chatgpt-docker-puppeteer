@@ -12,6 +12,7 @@ import { channel } from 'node:diagnostics_channel';
 import { relative } from 'node:path';
 import { getShowToolActivity } from '../../presentation/state/index.js';
 import { println } from '../dialog/index.js';
+import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     recordTerminalActivity,
     recordTerminalTurnFileActivity,
@@ -176,6 +177,14 @@ function compactText(text, max = 120) {
 }
 
 /**
+ * @returns {boolean}
+ */
+function isTerminalWaitingForHumanQuestion() {
+    const runtime = readTerminalRuntimeState();
+    return runtime.status === 'waiting_for_input' && runtime.pendingQuestionKind === 'question';
+}
+
+/**
  * @param {number | undefined} bytes
  * @returns {string | null}
  */
@@ -271,7 +280,10 @@ function handleIoOperation(message, registry = null) {
         progress: success ? 100 : null,
     });
 
-    if (getShowToolActivity()) {
+    const correlated = registry ? registry.attachIoActivity(entry) : null;
+    const suppressLiveNarration = correlated?.suppressLiveNarration === true || isTerminalWaitingForHumanQuestion();
+
+    if (getShowToolActivity() && !suppressLiveNarration) {
         const status = success ? terminalThemeText('success', 'ok') : terminalThemeText('error', 'falhou');
         println(
             terminalThemeRow(
@@ -282,7 +294,7 @@ function handleIoOperation(message, registry = null) {
         );
     }
 
-    handleTerminalIoToolLifecycle({ registry, entry });
+    handleTerminalIoToolLifecycle({ registry: null, entry, correlated });
 }
 
 /**

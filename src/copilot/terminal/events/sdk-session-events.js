@@ -234,6 +234,40 @@ function compactOneLine(value) {
  * @param {string | null | undefined} value
  * @returns {boolean}
  */
+function isHumanInputToolName(value) {
+    const normalized = String(value ?? '').trim().toLowerCase();
+    return normalized === 'ask_user' || normalized === 'request_user_input' || normalized.endsWith('.ask_user');
+}
+
+/**
+ * @param {Record<string, unknown>} input
+ * @returns {{ id: string | null; name: string }[]}
+ */
+function extractHookToolCalls(input) {
+    const toolCalls = Array.isArray(input['toolCalls']) ? input['toolCalls'] : [];
+    return toolCalls.flatMap((toolCall) => {
+        if (!toolCall || typeof toolCall !== 'object') return [];
+        const record = /** @type {Record<string, unknown>} */ (toolCall);
+        const id =
+            typeof record['id'] === 'string' && record['id'].trim()
+                ? record['id'].trim()
+                : typeof record['toolCallId'] === 'string' && record['toolCallId'].trim()
+                  ? record['toolCallId'].trim()
+                  : null;
+        const name =
+            typeof record['name'] === 'string' && record['name'].trim()
+                ? record['name'].trim()
+                : typeof record['toolName'] === 'string' && record['toolName'].trim()
+                  ? record['toolName'].trim()
+                  : '';
+        return name ? [{ id, name }] : [];
+    });
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {boolean}
+ */
 function isLikelyInternalId(value) {
     if (!value) return false;
     const text = value.trim();
@@ -1643,6 +1677,25 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     ) => {
         const hookType = evt?.hookType ?? 'unknown';
         const hookInvocationId = evt?.hookInvocationId ?? null;
+        if (hookType === 'preToolUse' && evt?.input && typeof evt.input === 'object') {
+            const calls = extractHookToolCalls(evt.input);
+            const hasHumanInputTool = calls.some((call) => isHumanInputToolName(call.name));
+            const suppressed = hasHumanInputTool
+                ? calls.filter((call) => call.id && !isHumanInputToolName(call.name))
+                : [];
+            for (const call of suppressed) {
+                if (call.id) _reg.suppressLiveNarration(call.id);
+            }
+            if (suppressed.length > 0) {
+                const names = [...new Set(suppressed.map((call) => call.name))].slice(0, 3).join(', ');
+                recordTerminalActivity('question', 'Tools secundárias silenciosas durante pergunta', {
+                    detail: `${suppressed.length} tool(s) preservada(s) em /activity e /events${names ? ` · ${names}` : ''}`,
+                    source: 'sdk',
+                    recordHistory: false,
+                    updateCurrent: false,
+                });
+            }
+        }
         recordTerminalActivity('system', 'Hook SDK iniciado', {
             detail: `${hookType}${hookInvocationId ? ` · ${hookInvocationId}` : ''}`,
             source: 'sdk',

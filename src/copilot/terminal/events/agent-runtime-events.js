@@ -600,6 +600,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             for (const entry of inFlight) {
                 const toolCallId = entry.toolCallId;
                 if (
+                    entry.suppressLiveNarration === true ||
                     entry.toolName === 'ask_user' ||
                     entry.toolName === 'request_user_input' ||
                     entry.canonicalName === 'request_user_input' ||

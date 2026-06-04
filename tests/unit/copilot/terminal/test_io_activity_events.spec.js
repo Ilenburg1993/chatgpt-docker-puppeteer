@@ -10,6 +10,7 @@ const readTerminalTurnTraceProjection = vi.fn(() => ({ current: null, recent: []
 const broadcastSse = vi.fn();
 const println = vi.fn();
 const getShowToolActivity = vi.fn(() => true);
+const readTerminalRuntimeState = vi.fn(() => ({ status: 'idle', pendingQuestionKind: null }));
 
 vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
     recordTerminalActivity,
@@ -29,10 +30,15 @@ vi.mock('../../../../src/copilot/presentation/state/index.js', () => ({
     getShowToolActivity,
 }));
 
+vi.mock('../../../../src/copilot/terminal/frontend/gateways/index.js', () => ({
+    readTerminalRuntimeState,
+}));
+
 describe('terminal/io-activity-events', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getShowToolActivity.mockReturnValue(true);
+        readTerminalRuntimeState.mockReturnValue({ status: 'idle', pendingQuestionKind: null });
         readTerminalTurnTraceProjection.mockReturnValue({ current: null, recent: [] });
     });
 
@@ -176,6 +182,118 @@ describe('terminal/io-activity-events', () => {
                 type: 'io_op',
                 operation: 'move',
                 target: 'data/copilot-terminal/live-scratch/source.txt',
+            }),
+        );
+    });
+
+    it('não imprime I/O vivo quando a tool correlacionada ficou silenciosa por pergunta humana', async () => {
+        const { createToolCallRegistry } = await import(
+            '../../../../src/copilot/terminal/state/tool-call-registry.js'
+        );
+        const { clearTerminalIoActivityProjection, setupTerminalIoActivityEvents } =
+            await import('../../../../src/copilot/terminal/events/io-activity-events.js');
+        const registry = createToolCallRegistry();
+        registry.register('call-question-sibling', 'read_file_content', 'native', {
+            canonicalName: 'read_file_content',
+            presentation: {
+                toolName: 'read_file_content',
+                canonicalToolName: 'read_file_content',
+                displayToolName: 'Ler arquivo',
+                operation: 'read',
+                detail: 'lendo arquivo · package.json',
+                startLine: 'lendo arquivo · package.json',
+                progressLinePrefix: 'lendo arquivo',
+                path: 'package.json',
+                target: 'package.json',
+                fileTargets: ['package.json'],
+                urlTargets: [],
+                searchTerms: [],
+                patchFiles: [],
+                lineRange: null,
+                completeLine: () => 'lendo arquivo concluído · package.json',
+            },
+        });
+        registry.suppressLiveNarration('call-question-sibling');
+        clearTerminalIoActivityProjection();
+        const cleanup = setupTerminalIoActivityEvents({ registry });
+
+        try {
+            channel('copilot.io.operation').publish({
+                ts: 456,
+                success: true,
+                io: {
+                    operation: 'read',
+                    target: join(process.cwd(), 'package.json'),
+                    targetKind: 'file',
+                    bytesRead: 85226,
+                    durationMs: 1,
+                    engine: 'io-engine.fs.readFile.text',
+                    riskClass: 'low',
+                    traceId: 'trace-question-sibling-io',
+                },
+            });
+        } finally {
+            cleanup();
+        }
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'tool',
+            'Arquivo: leitura concluída',
+            expect.objectContaining({
+                detail: expect.stringContaining('leitura · package.json'),
+                toolName: 'io.read',
+            }),
+        );
+        expect(println).not.toHaveBeenCalled();
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'tool.lifecycle',
+            expect.objectContaining({
+                type: 'io_op',
+                correlatedToolCallId: 'call-question-sibling',
+                correlatedToolName: 'read_file_content',
+            }),
+        );
+    });
+
+    it('não imprime I/O vivo enquanto o runtime aguarda resposta humana', async () => {
+        const { clearTerminalIoActivityProjection, setupTerminalIoActivityEvents } =
+            await import('../../../../src/copilot/terminal/events/io-activity-events.js');
+        readTerminalRuntimeState.mockReturnValue({ status: 'waiting_for_input', pendingQuestionKind: 'question' });
+        clearTerminalIoActivityProjection();
+        const cleanup = setupTerminalIoActivityEvents();
+
+        try {
+            channel('copilot.io.operation').publish({
+                ts: 457,
+                success: true,
+                io: {
+                    operation: 'read',
+                    target: join(process.cwd(), 'README.md'),
+                    targetKind: 'file',
+                    bytesRead: 20,
+                    durationMs: 1,
+                    engine: 'io-engine.fs.readFile.text',
+                    riskClass: 'low',
+                    traceId: 'trace-question-waiting-io',
+                },
+            });
+        } finally {
+            cleanup();
+        }
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'tool',
+            'Arquivo: leitura concluída',
+            expect.objectContaining({
+                detail: expect.stringContaining('leitura · README.md'),
+            }),
+        );
+        expect(println).not.toHaveBeenCalled();
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'tool.lifecycle',
+            expect.objectContaining({
+                type: 'io_op',
+                target: 'README.md',
             }),
         );
     });

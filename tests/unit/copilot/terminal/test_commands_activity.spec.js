@@ -180,6 +180,7 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Resumo do turno atual');
         expect(ctx.output()).toContain('Último turno concluído');
         expect(ctx.output()).toContain('Arquivos tocados');
+        expect(ctx.output()).toMatch(/Arquivos\s+1/u);
         expect((ctx.output().match(/Arquivo\s+leitura · src\/copilot\/terminal\/repl\/repl\.js ×2/gu) ?? [])).toHaveLength(1);
         expect(ctx.output()).toContain('Ler arquivo');
         expect(ctx.output()).not.toContain('workspace.read_file');
@@ -209,6 +210,7 @@ describe('terminal/commands/activity', () => {
         cmdActivity({ println: ctx.println }, '5 detail');
 
         expect(ctx.output()).toContain('Timeline completa');
+        expect(ctx.output()).toContain('1 arquivo único · 2 registros');
         expect(ctx.output()).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2} \(há \d+[smhda]\)\]/u);
         expect(ctx.output()).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}/u);
         expect(ctx.output()).toContain('io-engine.fs.readFile.text');
@@ -417,6 +419,19 @@ describe('terminal/commands/activity', () => {
                     ts: 2,
                 },
                 {
+                    phase: 'turn',
+                    label: 'Processando mensagem',
+                    detail: 'Faça um teste integrado canônico do terminal',
+                    source: 'dialog',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 0,
+                    ts: 2,
+                },
+                {
                     phase: 'boot',
                     label: 'Inicializando terminal',
                     detail: 'Preparando aliases',
@@ -444,9 +459,52 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('/activity detail mostra timeline completa');
         expect(ctx.output()).not.toContain('sistema · Uso BYOK sem Premium Request');
         expect(ctx.output()).toContain('tarefa · Tarefa em segundo plano concluída');
-        expect(ctx.output()).toContain('inicialização · Inicializando terminal');
+        expect(ctx.output()).not.toContain('turno · Processando mensagem');
+        expect(ctx.output()).not.toContain('inicialização · Inicializando terminal');
         expect(ctx.output()).not.toContain('system · Uso BYOK');
         expect(ctx.output()).not.toContain('task · Tarefa');
         expect(ctx.output()).not.toContain('boot · Inicializando');
+    });
+
+    it('mantém eventos de boot no default quando ainda não existe evento operacional melhor', () => {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+            current: {
+                phase: 'boot',
+                label: 'Inicializando terminal',
+                detail: 'Preparando aliases',
+                source: 'terminal',
+                severity: 'info',
+                progress: null,
+                toolName: null,
+                startedAt: 1,
+                updatedAt: 2,
+                ageMs: 0,
+            },
+            history: [
+                {
+                    phase: 'boot',
+                    label: 'Inicializando terminal',
+                    detail: 'Preparando aliases',
+                    source: 'terminal',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 0,
+                    ts: 2,
+                },
+            ],
+            turnTrace: {
+                current: null,
+                recent: [],
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdActivity({ println: ctx.println }, '5');
+
+        expect(ctx.output()).toContain('Timeline operacional');
+        expect(ctx.output()).toContain('inicialização · Inicializando terminal');
     });
 });

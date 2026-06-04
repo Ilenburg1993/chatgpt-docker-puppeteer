@@ -135,6 +135,16 @@ function renderBytes(bytes) {
 }
 
 /**
+ * @param {number} value
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function pluralPt(value, singular, plural) {
+    return `${value} ${value === 1 ? singular : plural}`;
+}
+
+/**
  * @param {number} timestamp
  * @param {{ detail: boolean; now: number }} opts
  * @returns {string}
@@ -262,9 +272,11 @@ function aggregateTurnTraceFiles(files) {
 function isRoutineDefaultTimelineEntry(entry) {
     const label = compactHumanText(entry.label ?? '').toLowerCase();
     if (entry.severity === 'error' || entry.severity === 'warn') return false;
+    if (entry.phase === 'boot') return true;
     if (entry.phase === 'idle') return true;
     if (entry.phase === 'streaming') return true;
     if (entry.phase === 'system' && label.includes('uso byok sem premium request')) return true;
+    if (entry.phase === 'turn' && label.includes('processando mensagem')) return true;
     return false;
 }
 
@@ -287,19 +299,26 @@ function selectDefaultTimelineEntries(history, limit) {
  * @returns {void}
  */
 function printTurnTraceSummary(println, title, trace, opts) {
+    const aggregatedFiles = aggregateTurnTraceFiles(Array.isArray(trace.files) ? trace.files : []);
+    const rawFileCount = Math.max(Number(trace.fileCount ?? 0), Array.isArray(trace.files) ? trace.files.length : 0);
+    const uniqueFileCount = aggregatedFiles.length;
+    const fileCountLabel =
+        opts.detail && rawFileCount > uniqueFileCount
+            ? `${pluralPt(uniqueFileCount, 'arquivo único', 'arquivos únicos')} · ${pluralPt(rawFileCount, 'registro', 'registros')}`
+            : String(uniqueFileCount || rawFileCount);
     println(terminalThemeHeadline('assistant', title));
     println(terminalThemeDivider(37));
     println(terminalThemeRow('Estado', renderStatusLabel(trace.status), { role: renderStatusRole(trace.status) }));
     println(terminalThemeRow('Ferramentas', String(trace.toolCount)));
-    println(terminalThemeRow('Arquivos', String(trace.fileCount)));
+    println(terminalThemeRow('Arquivos', fileCountLabel));
     println(terminalThemeRow('Operador', String(trace.userInputCount ?? trace.userInputs?.length ?? 0)));
     if (opts.detail) {
         println(terminalThemeRow('Trace', compactTerminalDiagnosticId(trace.traceId) ?? String(trace.traceId ?? 'sem trace')));
     }
 
-    if (trace.files.length > 0) {
+    if (aggregatedFiles.length > 0) {
         println(terminalThemeHeadline('assistant', 'Arquivos tocados'));
-        for (const file of aggregateTurnTraceFiles(trace.files).slice(0, 5)) {
+        for (const file of aggregatedFiles.slice(0, 5)) {
             const source = opts.detail ? ` · ${renderSourceLabel(file.source)}` : '';
             println(
                 terminalThemeRow(
